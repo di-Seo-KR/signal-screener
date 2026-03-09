@@ -202,6 +202,20 @@ function fmtPrice(p, market) {
   return `$${p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+// ── Default indicator settings ──
+const DEFAULT_SETTINGS = {
+  maList: [
+    { enabled: false, period: 5,   color: "#facc15", width: 1.5 },
+    { enabled: true,  period: 20,  color: "#38bdf8", width: 2 },
+    { enabled: true,  period: 60,  color: "#f97316", width: 2 },
+    { enabled: true,  period: 200, color: "#a855f7", width: 2.5 },
+  ],
+  bb: { enabled: true, period: 20, mult: 2 },
+  rsi: { enabled: true, period: 14 },
+  macd: { enabled: true },
+  vol: { enabled: true },
+};
+
 // ── Full-page chart component ────────────────────────────────────
 export default function ChartModal({ asset, onClose, krwRate }) {
   const containerRef = useRef(null);
@@ -211,17 +225,27 @@ export default function ChartModal({ asset, onClose, krwRate }) {
   const chartObjs = useRef({});
 
   const [timeframe, setTimeframe] = useState("1d");
-  const [indicators, setIndicators] = useState({
-    ma5: false, ma20: true, ma60: true, ma200: true, bb: true, vol: true, rsi: true, macd: true,
-  });
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
   const [ohlcInfo, setOhlcInfo] = useState(null);
   const [showKRW, setShowKRW] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
+  // ── Customizable indicator settings ──
+  const [settings, setSettings] = useState(() => {
+    try { const s = localStorage.getItem("chart-settings"); return s ? JSON.parse(s) : DEFAULT_SETTINGS; }
+    catch { return DEFAULT_SETTINGS; }
+  });
+
+  // Persist settings
+  const updateSettings = (newSettings) => {
+    setSettings(newSettings);
+    try { localStorage.setItem("chart-settings", JSON.stringify(newSettings)); } catch {}
+  };
 
   const isCrypto = asset?.market === "crypto";
   const isUS = asset?.market === "us";
-  const toggleIndicator = (key) => setIndicators(prev => ({ ...prev, [key]: !prev[key] }));
+  const canShowKRW = (isUS || isCrypto) && krwRate;
 
   const fetchData = useCallback(async (tf) => {
     setLoading(true);
@@ -254,6 +278,18 @@ export default function ChartModal({ asset, onClose, krwRate }) {
 
       candles = deduplicateCandles(candles, tf);
       if (!candles.length) throw new Error("데이터 없음");
+
+      // KRW conversion for US & crypto assets
+      if (showKRW && canShowKRW && krwRate) {
+        candles = candles.map(c => ({
+          ...c,
+          open: c.open * krwRate,
+          high: c.high * krwRate,
+          low: c.low * krwRate,
+          close: c.close * krwRate,
+        }));
+      }
+
       return candles;
     } catch (e) {
       setError(e.message);
@@ -261,7 +297,7 @@ export default function ChartModal({ asset, onClose, krwRate }) {
     } finally {
       setLoading(false);
     }
-  }, [asset, isCrypto]);
+  }, [asset, isCrypto, showKRW, canShowKRW, krwRate]);
 
   const buildCharts = useCallback(async (tf) => {
     const candles = await fetchData(tf);
@@ -277,8 +313,9 @@ export default function ChartModal({ asset, onClose, krwRate }) {
     const times   = candles.map(c => c.time);
     const volumes = candles.map(c => c.volume ?? 0);
 
-    const showRSI  = indicators.rsi;
-    const showMACD = indicators.macd;
+    const showRSI  = settings.rsi?.enabled;
+    const showMACD = settings.macd?.enabled;
+    const showVol  = settings.vol?.enabled;
     const mainH  = showRSI || showMACD ? 360 : 520;
     const subH   = 130;
 
@@ -296,7 +333,7 @@ export default function ChartModal({ asset, onClose, krwRate }) {
     candleSeries.setData(candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
 
     // Volume histogram
-    if (indicators.vol) {
+    if (showVol) {
       const volSeries = mainChart.addHistogramSeries({
         color: "#1f6feb44",
         priceFormat: { type: "volume" },
@@ -309,15 +346,9 @@ export default function ChartModal({ asset, onClose, krwRate }) {
       })));
     }
 
-    // MA lines — lastValueVisible: false to prevent label overlap!
-    const maConfig = [
-      { key: "ma5",  period: 5,   color: "#facc15", width: 1.5 },
-      { key: "ma20", period: 20,  color: "#38bdf8", width: 2 },
-      { key: "ma60", period: 60,  color: "#f97316", width: 2 },
-      { key: "ma200",period: 200, color: "#a855f7", width: 2.5 },
-    ];
-    maConfig.forEach(({ key, period, color, width }) => {
-      if (!indicators[key]) return;
+    // MA lines from settings — lastValueVisible: false
+    (settings.maList || []).forEach(({ enabled, period, color, width }) => {
+      if (!enabled) return;
       const sma = calcSMA(closes, period);
       const maSeries = mainChart.addLineSeries({
         color, lineWidth: width,
@@ -327,9 +358,11 @@ export default function ChartModal({ asset, onClose, krwRate }) {
       maSeries.setData(sma.map((v, i) => v != null ? { time: times[i], value: v } : null).filter(Boolean));
     });
 
-    // Bollinger Bands — lastValueVisible: false
-    if (indicators.bb) {
-      const bbs = calcBB(closes);
+    // Bollinger Bands from settings
+    if (settings.bb?.enabled) {
+      const bbPeriod = settings.bb.period || 20;
+      const bbMult = settings.bb.mult || 2;
+      const bbs = calcBB(closes, bbPeriod, bbMult);
       const bbUpper = mainChart.addLineSeries({ color: "#60a5fa88", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, lineStyle: LineStyle.Dashed });
       const bbMid   = mainChart.addLineSeries({ color: "#60a5facc", lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
       const bbLower = mainChart.addLineSeries({ color: "#60a5fa88", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, lineStyle: LineStyle.Dashed });
@@ -356,9 +389,10 @@ export default function ChartModal({ asset, onClose, krwRate }) {
 
     // ── RSI chart ───
     if (showRSI && rsiRef.current) {
+      const rsiPeriod = settings.rsi?.period || 14;
       const rsiChart = createChart(rsiRef.current, makeChartOptions(subH, containerW, tf));
       chartObjs.current.rsi = rsiChart;
-      const rsi = calcRSI(closes);
+      const rsi = calcRSI(closes, rsiPeriod);
       const rsiSeries = rsiChart.addLineSeries({ color: "#f472b6", lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
       rsiSeries.setData(rsi.map((v, i) => v != null ? { time: times[i], value: v } : null).filter(Boolean));
       [70, 30].forEach(lvl => {
@@ -410,7 +444,7 @@ export default function ChartModal({ asset, onClose, krwRate }) {
         });
       }
     });
-  }, [fetchData, indicators]);
+  }, [fetchData, settings]);
 
   useEffect(() => {
     if (!asset) return;
@@ -419,7 +453,7 @@ export default function ChartModal({ asset, onClose, krwRate }) {
       clearTimeout(timer);
       Object.values(chartObjs.current).forEach(c => { try { c.remove(); } catch {} });
     };
-  }, [asset, timeframe, indicators]);
+  }, [asset, timeframe, settings, showKRW]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -491,14 +525,14 @@ export default function ChartModal({ asset, onClose, krwRate }) {
                 {asset.weekChange >= 0 ? "\u25B2" : "\u25BC"} {Math.abs(asset.weekChange)}%
               </span>
             )}
-            {isUS && krwRate && (
+            {canShowKRW && (
               <button onClick={() => setShowKRW(!showKRW)} style={{
                 fontSize: "10px", padding: "3px 8px", borderRadius: "6px", cursor: "pointer",
                 background: showKRW ? CC.blue + "33" : "transparent",
                 color: showKRW ? CC.blue : CC.text3,
                 border: `1px solid ${showKRW ? CC.blue : CC.border}`,
               }}>
-                {showKRW ? "KRW" : "USD"}
+                {showKRW ? "\u20A9 KRW" : "$ USD"}
               </button>
             )}
           </div>
@@ -545,29 +579,144 @@ export default function ChartModal({ asset, onClose, krwRate }) {
           })}
         </div>
 
-        {/* Indicator toggles */}
-        <div style={{ display: "flex", gap: "5px", marginBottom: "12px", flexWrap: "wrap" }}>
-          {[
-            { key: "ma5",  label: "MA5",   color: "#facc15" },
-            { key: "ma20", label: "MA20",  color: "#38bdf8" },
-            { key: "ma60", label: "MA60",  color: "#f97316" },
-            { key: "ma200",label: "MA200", color: "#a855f7" },
-            { key: "bb",   label: "BB",    color: "#60a5fa" },
-            { key: "vol",  label: "\uAC70\uB798\uB7C9", color: "#1f6feb" },
-            { key: "rsi",  label: "RSI",   color: "#f472b6" },
-            { key: "macd", label: "MACD",  color: "#34d399" },
-          ].map(({ key, label, color }) => (
-            <button key={key} onClick={() => toggleIndicator(key)} style={{
+        {/* Indicator quick toggles + settings gear */}
+        <div style={{ display: "flex", gap: "5px", marginBottom: showSettings ? "0px" : "12px", flexWrap: "wrap", alignItems: "center" }}>
+          {(settings.maList || []).map((ma, idx) => (
+            <button key={`ma-${idx}`} onClick={() => {
+              const newList = [...settings.maList];
+              newList[idx] = { ...newList[idx], enabled: !newList[idx].enabled };
+              updateSettings({ ...settings, maList: newList });
+            }} style={{
               padding: "4px 9px", borderRadius: "8px", fontSize: "11px", cursor: "pointer", fontWeight: 600,
-              background: indicators[key] ? `${color}22` : "transparent",
-              color: indicators[key] ? color : CC.text3,
-              border: `1px solid ${indicators[key] ? `${color}88` : CC.border}`,
+              background: ma.enabled ? `${ma.color}22` : "transparent",
+              color: ma.enabled ? ma.color : CC.text3,
+              border: `1px solid ${ma.enabled ? `${ma.color}88` : CC.border}`,
             }}>
-              <span style={{ display: "inline-block", width: "7px", height: "7px", borderRadius: "50%", background: indicators[key] ? color : CC.text3, marginRight: "4px", verticalAlign: "middle" }} />
+              <span style={{ display: "inline-block", width: "7px", height: "7px", borderRadius: "50%", background: ma.enabled ? ma.color : CC.text3, marginRight: "4px", verticalAlign: "middle" }} />
+              MA{ma.period}
+            </button>
+          ))}
+          {[
+            { key: "bb", label: "BB", color: "#60a5fa" },
+            { key: "vol", label: "\uAC70\uB798\uB7C9", color: "#1f6feb" },
+            { key: "rsi", label: "RSI", color: "#f472b6" },
+            { key: "macd", label: "MACD", color: "#34d399" },
+          ].map(({ key, label, color }) => (
+            <button key={key} onClick={() => {
+              updateSettings({ ...settings, [key]: { ...settings[key], enabled: !settings[key]?.enabled } });
+            }} style={{
+              padding: "4px 9px", borderRadius: "8px", fontSize: "11px", cursor: "pointer", fontWeight: 600,
+              background: settings[key]?.enabled ? `${color}22` : "transparent",
+              color: settings[key]?.enabled ? color : CC.text3,
+              border: `1px solid ${settings[key]?.enabled ? `${color}88` : CC.border}`,
+            }}>
+              <span style={{ display: "inline-block", width: "7px", height: "7px", borderRadius: "50%", background: settings[key]?.enabled ? color : CC.text3, marginRight: "4px", verticalAlign: "middle" }} />
               {label}
             </button>
           ))}
+          {/* Settings gear button */}
+          <button onClick={() => setShowSettings(!showSettings)} style={{
+            padding: "4px 9px", borderRadius: "8px", fontSize: "14px", cursor: "pointer",
+            background: showSettings ? CC.card2 : "transparent",
+            color: showSettings ? CC.blue : CC.text3,
+            border: `1px solid ${showSettings ? CC.blue : CC.border}`,
+            marginLeft: "auto",
+          }} title="보조지표 설정">{"\u2699\uFE0F"}</button>
         </div>
+
+        {/* Settings panel (collapsible) */}
+        {showSettings && (
+          <div style={{
+            background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "12px",
+            padding: "14px", marginBottom: "12px",
+          }}>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: CC.text1, marginBottom: "12px" }}>
+              {"\u2699\uFE0F"} 보조지표 설정
+            </div>
+
+            {/* MA settings */}
+            <div style={{ marginBottom: "12px" }}>
+              <div style={{ fontSize: "11px", color: CC.text3, marginBottom: "6px", fontWeight: 600 }}>이동평균선 (MA)</div>
+              {(settings.maList || []).map((ma, idx) => (
+                <div key={idx} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                  <input type="checkbox" checked={ma.enabled} onChange={() => {
+                    const newList = [...settings.maList];
+                    newList[idx] = { ...newList[idx], enabled: !newList[idx].enabled };
+                    updateSettings({ ...settings, maList: newList });
+                  }} style={{ accentColor: ma.color }} />
+                  <span style={{ fontSize: "11px", color: CC.text2, width: "28px" }}>MA</span>
+                  <input type="number" value={ma.period} min={1} max={500} onChange={e => {
+                    const newList = [...settings.maList];
+                    newList[idx] = { ...newList[idx], period: parseInt(e.target.value) || 5 };
+                    updateSettings({ ...settings, maList: newList });
+                  }} style={{
+                    width: "60px", padding: "4px 6px", borderRadius: "6px", fontSize: "12px",
+                    background: CC.card2, color: CC.text1, border: `1px solid ${CC.border2}`, outline: "none",
+                  }} />
+                  <input type="color" value={ma.color} onChange={e => {
+                    const newList = [...settings.maList];
+                    newList[idx] = { ...newList[idx], color: e.target.value };
+                    updateSettings({ ...settings, maList: newList });
+                  }} style={{ width: "28px", height: "24px", border: "none", cursor: "pointer", background: "transparent" }} />
+                  <button onClick={() => {
+                    const newList = settings.maList.filter((_, i) => i !== idx);
+                    updateSettings({ ...settings, maList: newList });
+                  }} style={{
+                    background: "transparent", border: "none", color: CC.red, cursor: "pointer", fontSize: "14px", padding: "2px",
+                  }}>{"\u2715"}</button>
+                </div>
+              ))}
+              <button onClick={() => {
+                const colors = ["#facc15","#38bdf8","#f97316","#a855f7","#34d399","#f472b6","#fb923c","#60a5fa"];
+                const c = colors[(settings.maList || []).length % colors.length];
+                updateSettings({ ...settings, maList: [...(settings.maList || []), { enabled: true, period: 10, color: c, width: 2 }] });
+              }} style={{
+                fontSize: "11px", padding: "4px 10px", borderRadius: "6px", cursor: "pointer",
+                background: CC.card2, color: CC.blue, border: `1px solid ${CC.border2}`, fontWeight: 600,
+              }}>+ MA 추가</button>
+            </div>
+
+            {/* BB settings */}
+            <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "10px", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "11px", color: CC.text2, fontWeight: 600 }}>BB</span>
+              <label style={{ fontSize: "11px", color: CC.text3 }}>기간
+                <input type="number" value={settings.bb?.period || 20} min={5} max={100} onChange={e => {
+                  updateSettings({ ...settings, bb: { ...settings.bb, period: parseInt(e.target.value) || 20 } });
+                }} style={{
+                  width: "50px", padding: "3px 5px", borderRadius: "5px", fontSize: "11px", marginLeft: "4px",
+                  background: CC.card2, color: CC.text1, border: `1px solid ${CC.border2}`, outline: "none",
+                }} />
+              </label>
+              <label style={{ fontSize: "11px", color: CC.text3 }}>배수
+                <input type="number" value={settings.bb?.mult || 2} min={0.5} max={5} step={0.5} onChange={e => {
+                  updateSettings({ ...settings, bb: { ...settings.bb, mult: parseFloat(e.target.value) || 2 } });
+                }} style={{
+                  width: "50px", padding: "3px 5px", borderRadius: "5px", fontSize: "11px", marginLeft: "4px",
+                  background: CC.card2, color: CC.text1, border: `1px solid ${CC.border2}`, outline: "none",
+                }} />
+              </label>
+            </div>
+
+            {/* RSI settings */}
+            <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "10px" }}>
+              <span style={{ fontSize: "11px", color: CC.text2, fontWeight: 600 }}>RSI</span>
+              <label style={{ fontSize: "11px", color: CC.text3 }}>기간
+                <input type="number" value={settings.rsi?.period || 14} min={2} max={50} onChange={e => {
+                  updateSettings({ ...settings, rsi: { ...settings.rsi, period: parseInt(e.target.value) || 14 } });
+                }} style={{
+                  width: "50px", padding: "3px 5px", borderRadius: "5px", fontSize: "11px", marginLeft: "4px",
+                  background: CC.card2, color: CC.text1, border: `1px solid ${CC.border2}`, outline: "none",
+                }} />
+              </label>
+            </div>
+
+            {/* Reset button */}
+            <button onClick={() => updateSettings(DEFAULT_SETTINGS)} style={{
+              fontSize: "11px", padding: "5px 12px", borderRadius: "6px", cursor: "pointer",
+              background: "transparent", color: CC.text3, border: `1px solid ${CC.border2}`,
+            }}>기본값으로 초기화</button>
+          </div>
+        )}
 
         {/* Chart area */}
         {loading && (
@@ -588,19 +737,19 @@ export default function ChartModal({ asset, onClose, krwRate }) {
         )}
         <div style={{ display: loading ? "none" : "block" }}>
           <div ref={mainRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden" }} />
-          {indicators.rsi && (
+          {settings.rsi?.enabled && (
             <>
               <div style={{
                 color: "#f472b6", fontSize: "11px", fontWeight: 600, padding: "8px 0 4px 4px",
                 display: "flex", alignItems: "center", gap: "6px",
               }}>
                 <span style={{ width: "10px", height: "3px", background: "#f472b6", borderRadius: "2px", display: "inline-block" }} />
-                RSI(14)
+                RSI({settings.rsi?.period || 14})
               </div>
               <div ref={rsiRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden" }} />
             </>
           )}
-          {indicators.macd && (
+          {settings.macd?.enabled && (
             <>
               <div style={{
                 fontSize: "11px", fontWeight: 600, padding: "8px 0 4px 4px",
@@ -627,20 +776,17 @@ export default function ChartModal({ asset, onClose, krwRate }) {
           display: "flex", gap: "12px", flexWrap: "wrap", fontSize: "11px",
         }}>
           {[
-            { color: "#facc15", label: "MA5", active: indicators.ma5 },
-            { color: "#38bdf8", label: "MA20", active: indicators.ma20 },
-            { color: "#f97316", label: "MA60", active: indicators.ma60 },
-            { color: "#a855f7", label: "MA200", active: indicators.ma200 },
-            { color: "#60a5fa", label: "\uBCFC\uB9B0\uC800\uBC34\uB4DC", active: indicators.bb },
-            { color: "#f472b6", label: "RSI(14)", active: indicators.rsi },
-            { color: "#38bdf8", label: "MACD", active: indicators.macd },
-            { color: "#fb923c", label: "Signal", active: indicators.macd },
-          ].filter(l => l.active).map(({ color, label }) => (
+            ...(settings.maList || []).filter(m => m.enabled).map(m => ({ color: m.color, label: `MA${m.period}` })),
+            ...(settings.bb?.enabled ? [{ color: "#60a5fa", label: `BB(${settings.bb?.period || 20},${settings.bb?.mult || 2})` }] : []),
+            ...(settings.rsi?.enabled ? [{ color: "#f472b6", label: `RSI(${settings.rsi?.period || 14})` }] : []),
+            ...(settings.macd?.enabled ? [{ color: "#38bdf8", label: "MACD" }, { color: "#fb923c", label: "Signal" }] : []),
+          ].map(({ color, label }) => (
             <span key={label} style={{ display: "flex", alignItems: "center", gap: "5px", color: CC.text3 }}>
               <span style={{ width: "16px", height: "3px", background: color, display: "inline-block", borderRadius: "2px" }} />
               {label}
             </span>
           ))}
+          {showKRW && canShowKRW && <span style={{ color: CC.blue, fontWeight: 600, marginLeft: "auto" }}>KRW 환산</span>}
         </div>
 
         <div style={{ height: "20px" }} />

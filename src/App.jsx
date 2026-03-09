@@ -99,27 +99,103 @@ const US_ASSETS = [
   { symbol: "BABA", name: "Alibaba" }, { symbol: "JD", name: "JD.com" },
   { symbol: "PDD", name: "PDD (Temu)" }, { symbol: "BIDU", name: "Baidu" },
   { symbol: "NTES", name: "NetEase" }, { symbol: "TME", name: "Tencent Music" },
-  // ── ETFs ──
+  // ── ETFs — 주요 인덱스 ──
   { symbol: "SPY", name: "S&P 500 ETF" }, { symbol: "QQQ", name: "나스닥 100 ETF" },
   { symbol: "DIA", name: "다우 ETF" }, { symbol: "IWM", name: "Russell 2000" },
+  { symbol: "VOO", name: "Vanguard S&P500" }, { symbol: "VTI", name: "US Total Market" },
+  { symbol: "VT", name: "World Total" }, { symbol: "VEA", name: "선진국 ETF" },
+  { symbol: "VWO", name: "이머징 Vanguard" }, { symbol: "EFA", name: "EAFE ETF" },
+  // ── 레버리지/인버스 ──
+  { symbol: "TQQQ", name: "나스닥 3x" }, { symbol: "SQQQ", name: "나스닥 -3x" },
+  { symbol: "UPRO", name: "S&P 3x" }, { symbol: "SPXS", name: "S&P -3x" },
+  { symbol: "SOXL", name: "반도체 3x" }, { symbol: "SOXS", name: "반도체 -3x" },
+  { symbol: "TECL", name: "테크 3x" }, { symbol: "TECS", name: "테크 -3x" },
+  { symbol: "FAS", name: "금융 3x" }, { symbol: "FAZ", name: "금융 -3x" },
+  { symbol: "LABU", name: "바이오 3x" }, { symbol: "LABD", name: "바이오 -3x" },
+  { symbol: "TNA", name: "Russell 3x" }, { symbol: "TZA", name: "Russell -3x" },
+  { symbol: "SPXU", name: "S&P -3x Ultra" }, { symbol: "UDOW", name: "다우 3x" },
+  { symbol: "SDOW", name: "다우 -3x" }, { symbol: "WEBL", name: "인터넷 3x" },
+  { symbol: "WEBS", name: "인터넷 -3x" }, { symbol: "FNGU", name: "FANG+ 3x" },
+  { symbol: "FNGD", name: "FANG+ -3x" }, { symbol: "NAIL", name: "주택건설 3x" },
+  { symbol: "TMF", name: "장기채 3x" }, { symbol: "TMV", name: "장기채 -3x" },
+  { symbol: "NUGT", name: "금광 2x" }, { symbol: "DUST", name: "금광 -2x" },
+  { symbol: "JNUG", name: "주니어금광 2x" }, { symbol: "JDST", name: "주니어금광 -2x" },
+  { symbol: "BOIL", name: "천연가스 2x" }, { symbol: "KOLD", name: "천연가스 -2x" },
+  { symbol: "UCO", name: "원유 2x" }, { symbol: "SCO", name: "원유 -2x" },
+  // ── 크립토 ETF ──
+  { symbol: "BITX", name: "BTC 2x 레버리지" }, { symbol: "BITO", name: "ProShares BTC" },
+  { symbol: "BITI", name: "ProShares Short BTC" }, { symbol: "IBIT", name: "iShares BTC Trust" },
+  { symbol: "FBTC", name: "Fidelity BTC" }, { symbol: "GBTC", name: "Grayscale BTC" },
+  { symbol: "ARKB", name: "ARK 21Shares BTC" }, { symbol: "BITB", name: "Bitwise BTC" },
+  { symbol: "HODL", name: "VanEck BTC" }, { symbol: "BRRR", name: "Valkyrie BTC" },
+  { symbol: "ETHE", name: "Grayscale ETH" }, { symbol: "ETHA", name: "iShares ETH" },
+  { symbol: "FETH", name: "Fidelity ETH" }, { symbol: "ETHV", name: "VanEck ETH" },
+  { symbol: "BTCW", name: "WisdomTree BTC" }, { symbol: "EZBC", name: "Franklin BTC" },
+  { symbol: "SBIT", name: "ProShares Short BTC 2x" },
+  // ── ARK 혁신 ETF ──
   { symbol: "ARKK", name: "ARK Innovation" }, { symbol: "ARKW", name: "ARK Next Gen" },
-  { symbol: "SOXL", name: "반도체 3x" }, { symbol: "TQQQ", name: "나스닥 3x" },
-  { symbol: "SQQQ", name: "나스닥 -3x" }, { symbol: "UPRO", name: "S&P 3x" },
-  { symbol: "SPXS", name: "S&P -3x" },
-  { symbol: "BITO", name: "ProShares BTC" }, { symbol: "BITI", name: "ProShares Short BTC" },
+  { symbol: "ARKG", name: "ARK Genomic" }, { symbol: "ARKF", name: "ARK Fintech" },
+  { symbol: "ARKQ", name: "ARK Autonomous" }, { symbol: "ARKX", name: "ARK Space" },
+  // ── 원자재/금속 ──
   { symbol: "GLD", name: "Gold ETF" }, { symbol: "SLV", name: "Silver ETF" },
+  { symbol: "IAU", name: "iShares Gold" }, { symbol: "SGOL", name: "Aberdeen Gold" },
+  { symbol: "PPLT", name: "Platinum ETF" }, { symbol: "PALL", name: "Palladium ETF" },
+  { symbol: "DBA", name: "농산물 ETF" }, { symbol: "WEAT", name: "밀 ETF" },
+  { symbol: "CORN", name: "옥수수 ETF" }, { symbol: "CPER", name: "구리 ETF(US)" },
+  { symbol: "UNG", name: "Natural Gas" }, { symbol: "USO", name: "원유 ETF" },
+  { symbol: "COPX", name: "구리광산 ETF" }, { symbol: "LIT", name: "리튬&배터리" },
+  { symbol: "URA", name: "우라늄 ETF" }, { symbol: "REMX", name: "희토류 ETF" },
+  // ── 채권 ──
   { symbol: "TLT", name: "미국 장기채" }, { symbol: "SHY", name: "미국 단기채" },
+  { symbol: "IEF", name: "미국 중기채" }, { symbol: "BND", name: "Total Bond" },
+  { symbol: "AGG", name: "US Agg Bond" }, { symbol: "HYG", name: "High Yield Bond" },
+  { symbol: "LQD", name: "Investment Grade" }, { symbol: "TIP", name: "물가연동채" },
+  { symbol: "EMB", name: "이머징 채권" }, { symbol: "JNK", name: "정크 본드" },
+  // ── 배당 ──
   { symbol: "SCHD", name: "배당 ETF" }, { symbol: "JEPI", name: "JP모건 인컴" },
-  { symbol: "VIG", name: "배당 성장 ETF" }, { symbol: "NOBL", name: "배당 귀족 ETF" },
+  { symbol: "JEPQ", name: "JP모건 나스닥인컴" }, { symbol: "VIG", name: "배당 성장 ETF" },
+  { symbol: "NOBL", name: "배당 귀족 ETF" }, { symbol: "DVY", name: "Select Dividend" },
+  { symbol: "HDV", name: "iShares 고배당" }, { symbol: "DIVO", name: "Amplify 배당인컴" },
+  { symbol: "QYLD", name: "나스닥 커버드콜" }, { symbol: "XYLD", name: "S&P 커버드콜" },
+  { symbol: "RYLD", name: "Russell 커버드콜" }, { symbol: "NUSI", name: "나스닥 헤지인컴" },
+  // ── 섹터 Select ──
   { symbol: "XLF", name: "금융 Select" }, { symbol: "XLE", name: "에너지 Select" },
   { symbol: "XLK", name: "테크 Select" }, { symbol: "XLV", name: "헬스케어 Select" },
   { symbol: "XLI", name: "산업재 Select" }, { symbol: "XLC", name: "커뮤니케이션 Select" },
   { symbol: "XLRE", name: "부동산 Select" }, { symbol: "XLU", name: "유틸리티 Select" },
+  { symbol: "XLP", name: "필수소비재 Select" }, { symbol: "XLY", name: "임의소비재 Select" },
+  { symbol: "XLB", name: "소재 Select" },
+  // ── 테마 ETF ──
   { symbol: "KWEB", name: "China Internet" }, { symbol: "EEM", name: "Emerging Markets" },
-  { symbol: "VNQ", name: "Real Estate" }, { symbol: "HYG", name: "High Yield Bond" },
-  { symbol: "LQD", name: "Investment Grade" }, { symbol: "UNG", name: "Natural Gas" },
-  { symbol: "USO", name: "원유 ETF" }, { symbol: "COPX", name: "구리 ETF" },
-  { symbol: "VIX", name: "VIX 변동성" }, { symbol: "UVXY", name: "VIX 1.5x" },
+  { symbol: "VNQ", name: "Real Estate" }, { symbol: "SOXX", name: "반도체 iShares" },
+  { symbol: "SMH", name: "반도체 VanEck" }, { symbol: "IGV", name: "소프트웨어 ETF" },
+  { symbol: "HACK", name: "사이버보안 ETF" }, { symbol: "BOTZ", name: "로봇&AI ETF" },
+  { symbol: "ROBO", name: "로보틱스 ETF" }, { symbol: "AIQ", name: "AI ETF" },
+  { symbol: "IRBO", name: "iShares 로보틱스" }, { symbol: "DRIV", name: "자율주행 ETF" },
+  { symbol: "CLOU", name: "클라우드 ETF" }, { symbol: "SKYY", name: "클라우드 First Trust" },
+  { symbol: "WCLD", name: "클라우드 SaaS" }, { symbol: "CIBR", name: "사이버보안 First Trust" },
+  { symbol: "TAN", name: "태양광 ETF" }, { symbol: "ICLN", name: "클린에너지" },
+  { symbol: "QCLN", name: "클린에너지 First Trust" }, { symbol: "PBW", name: "클린에너지 WilderHill" },
+  { symbol: "FAN", name: "풍력 ETF" }, { symbol: "ERTH", name: "기후 ETF" },
+  { symbol: "ESGU", name: "ESG ETF" }, { symbol: "KRMA", name: "ESG 글로벌" },
+  { symbol: "IBB", name: "바이오 iShares" }, { symbol: "XBI", name: "바이오 SPDR" },
+  { symbol: "ARKG", name: "ARK Genomic" }, { symbol: "GNOM", name: "게노믹스 ETF" },
+  { symbol: "ITA", name: "방산 ETF" }, { symbol: "PPA", name: "항공방산 ETF" },
+  { symbol: "JETS", name: "항공사 ETF" }, { symbol: "AWAY", name: "여행 ETF" },
+  { symbol: "BETZ", name: "스포츠베팅 ETF" }, { symbol: "HERO", name: "게임 ETF" },
+  { symbol: "SOCL", name: "소셜미디어 ETF" }, { symbol: "MSOS", name: "대마 ETF" },
+  // ── 변동성 ──
+  { symbol: "UVXY", name: "VIX 1.5x" }, { symbol: "SVXY", name: "VIX Short" },
+  { symbol: "VXX", name: "VIX 단기선물" }, { symbol: "VIXY", name: "VIX Short-Term" },
+  // ── 국가/지역 ──
+  { symbol: "FXI", name: "China Large Cap" }, { symbol: "MCHI", name: "China MSCI" },
+  { symbol: "EWJ", name: "Japan ETF" }, { symbol: "EWY", name: "Korea ETF" },
+  { symbol: "EWZ", name: "Brazil ETF" }, { symbol: "INDA", name: "India ETF" },
+  { symbol: "EWT", name: "Taiwan ETF" }, { symbol: "EWG", name: "Germany ETF" },
+  { symbol: "EWU", name: "UK ETF" }, { symbol: "EWA", name: "Australia ETF" },
+  { symbol: "EWC", name: "Canada ETF" }, { symbol: "ERUS", name: "Russia ETF" },
+  { symbol: "TUR", name: "Turkey ETF" }, { symbol: "RSX", name: "Russia VanEck" },
+  { symbol: "GXC", name: "China SPDR" }, { symbol: "ASHR", name: "China A-Shares" },
 ];
 
 const KR_ASSETS = [
@@ -947,6 +1023,7 @@ export default function App() {
   const [marketIndices, setMarketIndices] = useState([]);
   const [marketLoading, setMarketLoading] = useState(false);
   const [hotAssets, setHotAssets] = useState([]);
+  const [fearGreed, setFearGreed] = useState({ stock: null, crypto: null });
 
   // ── 스크리너 상태 ─────────────────────────────────────────────
   const [results, setResults]         = useState([]);
@@ -1063,6 +1140,31 @@ export default function App() {
       } catch {}
     }
     setHotAssets(hotResults);
+
+    // ── 공포/탐욕 지수 ──
+    const fgData = { stock: null, crypto: null };
+    // CNN Fear & Greed (via proxy API)
+    try {
+      const fgRes = await fetch("/api/fear-greed?_t=" + Date.now());
+      if (fgRes.ok) {
+        const fgJson = await fgRes.json();
+        if (fgJson.stock) fgData.stock = fgJson.stock;
+        if (fgJson.crypto) fgData.crypto = fgJson.crypto;
+      }
+    } catch {}
+    // Fallback: Alternative.me Crypto Fear & Greed
+    if (!fgData.crypto) {
+      try {
+        const altRes = await fetch("https://api.alternative.me/fng/?limit=1");
+        if (altRes.ok) {
+          const altJson = await altRes.json();
+          const d = altJson?.data?.[0];
+          if (d) fgData.crypto = { value: parseInt(d.value), label: d.value_classification, ts: d.timestamp };
+        }
+      } catch {}
+    }
+    setFearGreed(fgData);
+
     setMarketLoading(false);
   }, [marketLoading]);
 
@@ -1399,6 +1501,48 @@ export default function App() {
                 </div>
               )}
             </div>
+
+            {/* 공포/탐욕 지수 */}
+            {(fearGreed.stock || fearGreed.crypto) && (
+              <div style={{ display: "grid", gridTemplateColumns: fearGreed.stock && fearGreed.crypto ? "1fr 1fr" : "1fr", gap: "10px", marginBottom: "16px" }}>
+                {[
+                  fearGreed.stock && { type: "stock", icon: "📈", label: "주식 공포/탐욕", data: fearGreed.stock },
+                  fearGreed.crypto && { type: "crypto", icon: "₿", label: "크립토 공포/탐욕", data: fearGreed.crypto },
+                ].filter(Boolean).map(({ type, icon, label, data }) => {
+                  const val = data.value;
+                  const fgColor = val <= 25 ? "#F04452" : val <= 40 ? "#FF8C42" : val <= 60 ? "#FFB400" : val <= 75 ? "#7ED957" : "#05C072";
+                  const fgLabel = val <= 25 ? "극도의 공포" : val <= 40 ? "공포" : val <= 60 ? "중립" : val <= 75 ? "탐욕" : "극도의 탐욕";
+                  const bgGrad = val <= 25 ? "linear-gradient(135deg, #2A1520, #1E0D14)"
+                    : val <= 40 ? "linear-gradient(135deg, #2A1E15, #1E150D)"
+                    : val <= 60 ? "linear-gradient(135deg, #2A2615, #1E1A0D)"
+                    : val <= 75 ? "linear-gradient(135deg, #1A2A1A, #0D1E0D)"
+                    : "linear-gradient(135deg, #0A2A1A, #061E10)";
+                  return (
+                    <div key={type} style={{
+                      background: bgGrad, border: `1px solid ${fgColor}33`,
+                      borderRadius: "16px", padding: "18px", textAlign: "center",
+                    }}>
+                      <div style={{ fontSize: "12px", color: C.text3, marginBottom: "8px" }}>{icon} {label}</div>
+                      <div style={{ position: "relative", width: "100px", height: "100px", margin: "0 auto 10px" }}>
+                        <svg viewBox="0 0 120 120" style={{ width: "100%", height: "100%" }}>
+                          <circle cx="60" cy="60" r="52" fill="none" stroke={C.border} strokeWidth="8" />
+                          <circle cx="60" cy="60" r="52" fill="none" stroke={fgColor} strokeWidth="8"
+                            strokeDasharray={`${val * 3.267} ${326.7 - val * 3.267}`}
+                            strokeDashoffset="81.675" strokeLinecap="round"
+                            style={{ transition: "stroke-dasharray 1s ease" }} />
+                          <text x="60" y="55" textAnchor="middle" fill={fgColor} fontSize="28" fontWeight="800">{val}</text>
+                          <text x="60" y="75" textAnchor="middle" fill={C.text3} fontSize="10">/100</text>
+                        </svg>
+                      </div>
+                      <div style={{ fontSize: "14px", fontWeight: 700, color: fgColor }}>{fgLabel}</div>
+                      {data.label && data.label !== fgLabel && (
+                        <div style={{ fontSize: "11px", color: C.text3, marginTop: "2px" }}>{data.label}</div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* 인기 종목 */}
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px", marginBottom: "16px" }}>

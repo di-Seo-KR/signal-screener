@@ -153,10 +153,28 @@ const BT_SYMBOLS = [
   "RIVN","LCID","LI","NIO","XPEV","ENPH","FSLR","PLUG",
   // China ADR
   "BABA","JD","PDD","BIDU","NTES","TME",
-  // ETFs
-  "SPY","QQQ","DIA","IWM","ARKK","ARKW","SOXL","TQQQ","SQQQ","UPRO","SPXS",
-  "BITO","BITI","GLD","SLV","TLT","SHY","SCHD","JEPI","VIG","NOBL",
-  "XLF","XLE","XLK","XLV","XLI","XLC","XLRE","XLU","KWEB","EEM","VNQ","HYG","LQD","UNG","USO","COPX",
+  // ETFs — Index & Leveraged
+  "SPY","QQQ","DIA","IWM","VOO","VTI","VT",
+  "TQQQ","SQQQ","UPRO","SPXS","SOXL","SOXS","TECL","TECS","FAS","FAZ","LABU","LABD",
+  "TNA","TZA","UDOW","SDOW","FNGU","FNGD","TMF","TMV","NUGT","DUST","BOIL","KOLD",
+  // Crypto ETFs
+  "BITX","BITO","BITI","IBIT","FBTC","GBTC","ARKB","BITB","HODL","ETHE","ETHA","FETH","SBIT",
+  // ARK
+  "ARKK","ARKW","ARKG","ARKF","ARKQ","ARKX",
+  // Commodities
+  "GLD","SLV","IAU","PPLT","UNG","USO","COPX","LIT","URA","REMX","DBA","WEAT","CORN",
+  // Bonds
+  "TLT","SHY","IEF","BND","AGG","HYG","LQD","TIP","EMB","JNK",
+  // Dividends
+  "SCHD","JEPI","JEPQ","VIG","NOBL","DVY","HDV","QYLD","XYLD",
+  // Sectors
+  "XLF","XLE","XLK","XLV","XLI","XLC","XLRE","XLU","XLP","XLY","XLB",
+  // Thematic
+  "KWEB","EEM","VNQ","SOXX","SMH","IGV","HACK","BOTZ","AIQ","TAN","ICLN","IBB","XBI","ITA","JETS","MSOS",
+  // Volatility
+  "UVXY","SVXY","VXX",
+  // Country
+  "FXI","EWJ","EWY","EWZ","INDA","EWT","EWG",
   // KR
   "005930.KS","000660.KS","373220.KS","207940.KS","005380.KS","000270.KS","068270.KS","035420.KS","035720.KS","051910.KS","006400.KS",
   "066570.KS","009150.KS","000990.KS","042700.KS","058470.KS",
