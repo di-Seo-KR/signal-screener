@@ -1,7 +1,9 @@
-// Signal Screener v3.1 — 토스증권 스타일 UI
-// Features: 실시간 스크리닝, 캔들차트, 11개 전문가 조건, 포트폴리오, 뉴스, 텔레그램 알림
+// DI금융 v4.0 — 투자 스크리너 + 퀀트 엔진 + 백테스트
+// Features: 스크리닝, 캔들차트, 12개 전략, 백테스트, 포트폴리오, 뉴스, 텔레그램 알림
 import { useState, useEffect, useCallback } from "react";
 import ChartModal from "./ChartModal.jsx";
+import StrategyPanel from "./StrategyPanel.jsx";
+import BacktestPanel from "./BacktestPanel.jsx";
 
 // ════════════════════════════════════════════════════════════════════
 // 데이터 정의
@@ -20,6 +22,13 @@ const US_ASSETS = [
   { symbol: "JPM", name: "JPMorgan" }, { symbol: "GS", name: "Goldman Sachs" },
   { symbol: "CRM", name: "Salesforce" }, { symbol: "ORCL", name: "Oracle" },
   { symbol: "ADBE", name: "Adobe" }, { symbol: "QCOM", name: "Qualcomm" },
+  // ETF
+  { symbol: "SPY", name: "S&P 500 ETF" }, { symbol: "QQQ", name: "나스닥 100 ETF" },
+  { symbol: "ARKK", name: "ARK Innovation" }, { symbol: "SOXL", name: "반도체 3x" },
+  { symbol: "TQQQ", name: "나스닥 3x" }, { symbol: "BITI", name: "ProShares Short BTC" },
+  { symbol: "BITO", name: "ProShares BTC Strategy" }, { symbol: "GLD", name: "Gold ETF" },
+  { symbol: "TLT", name: "미국 장기채 ETF" }, { symbol: "VIX", name: "VIX 변동성" },
+  { symbol: "SCHD", name: "배당 ETF" }, { symbol: "JEPI", name: "JP모건 인컴 ETF" },
 ];
 
 const KR_ASSETS = [
@@ -392,11 +401,23 @@ export default function App() {
   const [settings, setSettings] = useState(() => ({ botToken: "", chatId: "", autoSend: false, ...loadSettings() }));
   const [tgStatus, setTgStatus] = useState("");
 
+  // ── 백테스트/전략 상태 ─────────────────────────────────────────
+  const [btStrategy, setBtStrategy] = useState(null);
+  const [btSymbol, setBtSymbol] = useState(null);
+
+  // ── 통화 (KRW/USD) ──────────────────────────────────────────
+  const [currency, setCurrency] = useState("USD");
+  const [krwRate, setKrwRate] = useState(1350); // 기본 환율
+
+  // ── 동기화 PIN ───────────────────────────────────────────────
+  const [syncPin, setSyncPin] = useState(() => loadSettings().syncPin || "");
+  const [syncStatus, setSyncStatus] = useState("");
+
   // ── 뉴스 상태 ─────────────────────────────────────────────────
   const [newsItems, setNewsItems] = useState([]);
   const [newsLoading, setNewsLoading] = useState(false);
 
-  useEffect(() => { saveSettings({ botToken: settings.botToken, chatId: settings.chatId, autoSend: settings.autoSend }); }, [settings]);
+  useEffect(() => { saveSettings({ botToken: settings.botToken, chatId: settings.chatId, autoSend: settings.autoSend, syncPin }); }, [settings, syncPin]);
   useEffect(() => { savePortfolio(portfolio); }, [portfolio]);
 
   // ── 스크리너 실행 ─────────────────────────────────────────────
@@ -513,6 +534,62 @@ export default function App() {
 
   useEffect(() => { if (tab === "news") fetchNews(); }, [tab]);
 
+  // ── 환율 가져오기 ──────────────────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch("/api/yahoo-ohlc?symbol=USDKRW=X&interval=1d&range=5d&_t=" + Date.now());
+        if (r.ok) {
+          const j = await r.json();
+          const candles = j.candles || [];
+          if (candles.length) setKrwRate(candles[candles.length - 1].close);
+        }
+      } catch {}
+    })();
+  }, []);
+
+  // ── 포트폴리오 동기화 ─────────────────────────────────────────
+  const syncUpload = useCallback(async () => {
+    if (!syncPin || syncPin.length < 4) { setSyncStatus("❌ PIN 4자리 이상 필요"); return; }
+    setSyncStatus("⏳ 업로드 중...");
+    try {
+      const r = await fetch(`/api/sync?pin=${encodeURIComponent(syncPin)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ portfolio, settings: { ...settings, syncPin } }),
+      });
+      if (r.ok) setSyncStatus("✅ 동기화 완료");
+      else setSyncStatus("❌ 업로드 실패");
+    } catch (e) { setSyncStatus(`❌ ${e.message}`); }
+  }, [syncPin, portfolio, settings]);
+
+  const syncDownload = useCallback(async () => {
+    if (!syncPin || syncPin.length < 4) { setSyncStatus("❌ PIN 4자리 이상 필요"); return; }
+    setSyncStatus("⏳ 다운로드 중...");
+    try {
+      const r = await fetch(`/api/sync?pin=${encodeURIComponent(syncPin)}`);
+      if (r.ok) {
+        const data = await r.json();
+        if (data.portfolio?.length) { setPortfolio(data.portfolio); savePortfolio(data.portfolio); }
+        if (data.settings) { setSettings(p => ({ ...p, ...data.settings })); saveSettings({ ...settings, ...data.settings }); }
+        setSyncStatus(`✅ 동기화 완료 (${data.updatedAt ? new Date(data.updatedAt).toLocaleString("ko-KR") : ""})`);
+      } else setSyncStatus("❌ 데이터 없음");
+    } catch (e) { setSyncStatus(`❌ ${e.message}`); }
+  }, [syncPin, settings]);
+
+  // ── 통화 변환 헬퍼 ──────────────────────────────────────────────
+  const toDisplay = (val, market) => {
+    if (val == null) return "—";
+    if (currency === "KRW") {
+      const krw = market === "kr" ? val : val * krwRate;
+      return `₩${Math.round(krw).toLocaleString()}`;
+    }
+    if (market === "kr") return `₩${Math.round(val).toLocaleString()}`;
+    if (val < 0.01) return `$${val.toFixed(6)}`;
+    if (val < 1) return `$${val.toFixed(4)}`;
+    return `$${val.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  };
+
   const filtered = results.filter(a => filterMarket === "all" || a.market === filterMarket);
 
   const pStats = portfolio.reduce((acc, item) => {
@@ -551,14 +628,14 @@ export default function App() {
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <span style={{ fontSize: "20px" }}>📡</span>
             <span style={{ fontWeight: 800, fontSize: "17px" }}>DI금융</span>
-            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v3</span>
+            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v4</span>
           </div>
           <nav style={{ display: "flex", gap: "2px" }}>
-            {[{ id: "screener", label: "스크리너", icon: "🔍" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
+            {[{ id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "backtest", label: "백테스트", icon: "📊" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} style={{
-                padding: "7px 14px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                padding: "6px 8px", borderRadius: "8px", fontSize: "11px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
-                color: tab === t.id ? C.blue : C.text3, border: "none",
+                color: tab === t.id ? C.blue : C.text3, border: "none", whiteSpace: "nowrap",
               }}>{t.icon} {t.label}</button>
             ))}
           </nav>
@@ -714,7 +791,11 @@ export default function App() {
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: portfolio.length ? "16px" : "0" }}>
                 <div style={{ fontWeight: 700, fontSize: "16px" }}>💼 내 포트폴리오</div>
-                <div style={{ display: "flex", gap: "8px" }}>
+                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                  <button onClick={() => setCurrency(c => c === "USD" ? "KRW" : "USD")} style={{
+                    padding: "6px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: 700,
+                    background: C.card2, color: C.yellow, border: `1px solid ${C.yellow}44`,
+                  }}>{currency === "USD" ? "🇺🇸 USD" : "🇰🇷 KRW"}</button>
                   <button onClick={fetchPortfolioPrices} style={{
                     padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
                     background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}44`,
@@ -728,9 +809,9 @@ export default function App() {
               {portfolio.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
                   {[
-                    { label: "총 투자금액", value: `$${pStats.invested.toLocaleString(undefined, { maximumFractionDigits: 0 })}` },
-                    { label: "현재 평가금액", value: pStats.hasPrices ? `$${pStats.current.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—" },
-                    { label: "총 손익", value: pStats.hasPrices ? `${pStats.pnl >= 0 ? "+" : ""}$${pStats.pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "—", color: pStats.pnl >= 0 ? C.green : C.red },
+                    { label: "총 투자금액", value: currency === "KRW" ? `₩${Math.round(pStats.invested * krwRate).toLocaleString()}` : `$${pStats.invested.toLocaleString(undefined, { maximumFractionDigits: 0 })}` },
+                    { label: "현재 평가금액", value: pStats.hasPrices ? (currency === "KRW" ? `₩${Math.round(pStats.current * krwRate).toLocaleString()}` : `$${pStats.current.toLocaleString(undefined, { maximumFractionDigits: 0 })}`) : "—" },
+                    { label: "총 손익", value: pStats.hasPrices ? `${pStats.pnl >= 0 ? "+" : ""}${currency === "KRW" ? `₩${Math.round(Math.abs(pStats.pnl) * krwRate).toLocaleString()}` : `$${pStats.pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}` : "—", color: pStats.pnl >= 0 ? C.green : C.red },
                   ].map(({ label, value, color }) => (
                     <div key={label} style={{ background: C.bg, borderRadius: "12px", padding: "14px" }}>
                       <div style={{ fontSize: "11px", color: C.text3, marginBottom: "4px" }}>{label}</div>
@@ -833,7 +914,7 @@ export default function App() {
                       </div>
                       <div style={{ textAlign: "right" }}>
                         <div style={{ fontWeight: 700, fontSize: "16px" }}>
-                          {cur ? fmtPrice(cur, item.market) : <span style={{ color: C.text3 }}>—</span>}
+                          {cur ? toDisplay(cur, item.market) : <span style={{ color: C.text3 }}>—</span>}
                         </div>
                         {pnlPct != null && (
                           <div style={{ fontSize: "13px", color: isUp ? C.green : C.red, fontWeight: 600 }}>
@@ -844,10 +925,10 @@ export default function App() {
                     </div>
                     <div style={{ display: "flex", gap: "16px", marginTop: "12px", paddingTop: "12px", borderTop: `1px solid ${C.border}`, flexWrap: "wrap" }}>
                       {[
-                        { label: "평균 매입가",   value: fmtPrice(item.avgPrice, item.market) },
-                        { label: "총 투자금액",   value: item.market === "kr" ? `₩${Math.round(invested).toLocaleString()}` : `$${invested.toLocaleString(undefined, { maximumFractionDigits: 2 })}` },
-                        { label: "현재 평가금액", value: current != null ? (item.market === "kr" ? `₩${Math.round(current).toLocaleString()}` : `$${current.toLocaleString(undefined, { maximumFractionDigits: 2 })}`) : "—" },
-                        { label: "손익",          value: pnl != null ? `${isUp ? "+" : ""}${item.market === "kr" ? `₩${Math.round(pnl).toLocaleString()}` : `$${pnl.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}` : "—", color: pnl != null ? (isUp ? C.green : C.red) : C.text2 },
+                        { label: "평균 매입가",   value: toDisplay(item.avgPrice, item.market) },
+                        { label: "총 투자금액",   value: toDisplay(invested, item.market) },
+                        { label: "현재 평가금액", value: current != null ? toDisplay(current, item.market) : "—" },
+                        { label: "손익",          value: pnl != null ? `${isUp ? "+" : ""}${toDisplay(Math.abs(pnl), item.market)}` : "—", color: pnl != null ? (isUp ? C.green : C.red) : C.text2 },
                       ].map(({ label, value, color }) => (
                         <div key={label}>
                           <div style={{ fontSize: "10px", color: C.text3, marginBottom: "2px" }}>{label}</div>
@@ -863,7 +944,54 @@ export default function App() {
                 );
               })}
             </div>
+
+            {/* 기기간 동기화 */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginTop: "16px" }}>
+              <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "12px" }}>🔄 기기간 동기화</div>
+              <div style={{ fontSize: "12px", color: C.text3, marginBottom: "12px", lineHeight: 1.6 }}>
+                PIN을 설정하면 PC/모바일 간 포트폴리오와 설정을 동기화할 수 있어요.<br />
+                같은 PIN을 입력하면 어느 기기에서든 같은 데이터를 불러올 수 있어요.
+              </div>
+              <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                <input value={syncPin} onChange={e => { setSyncPin(e.target.value); setSettings(p => ({ ...p, syncPin: e.target.value })); }}
+                  placeholder="동기화 PIN (4자리 이상)" style={{
+                    padding: "9px 14px", borderRadius: "10px", fontSize: "13px", width: "180px",
+                    background: C.bg, border: `1px solid ${C.border2}`, color: C.text1, outline: "none",
+                  }} />
+                <button onClick={syncUpload} style={{
+                  padding: "9px 14px", borderRadius: "10px", fontSize: "12px", fontWeight: 700,
+                  background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}44`, cursor: "pointer",
+                }}>⬆️ 업로드</button>
+                <button onClick={syncDownload} style={{
+                  padding: "9px 14px", borderRadius: "10px", fontSize: "12px", fontWeight: 700,
+                  background: C.greenBg, color: C.green, border: `1px solid ${C.green}44`, cursor: "pointer",
+                }}>⬇️ 다운로드</button>
+              </div>
+              {syncStatus && (
+                <div style={{ marginTop: "8px", fontSize: "12px", color: syncStatus.startsWith("✅") ? C.green : syncStatus.startsWith("❌") ? C.red : C.blue }}>
+                  {syncStatus}
+                </div>
+              )}
+            </div>
           </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 전략
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "strategy" && (
+          <StrategyPanel onRunBacktest={(strategy, symbol) => {
+            setBtStrategy(strategy);
+            setBtSymbol(symbol);
+            setTab("backtest");
+          }} />
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 백테스트
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "backtest" && (
+          <BacktestPanel initialStrategy={btStrategy} initialSymbol={btSymbol} />
         )}
 
         {/* ═══════════════════════════════════════════════════════════

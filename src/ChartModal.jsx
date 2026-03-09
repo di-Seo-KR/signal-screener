@@ -141,7 +141,8 @@ export default function ChartModal({ asset, onClose }) {
       let candles;
       if (isCrypto) {
         const { days } = CRYPTO_TF[tf] || CRYPTO_TF["1d"];
-        const r = await fetch(`/api/coingecko-ohlc?id=${encodeURIComponent(asset.cryptoId)}&days=${days}`);
+        const coinId = asset.cryptoId || asset.symbolRaw || asset.id || asset.symbol.toLowerCase();
+        const r = await fetch(`/api/coingecko-ohlc?id=${encodeURIComponent(coinId)}&days=${days}`);
         if (!r.ok) throw new Error(`CoinGecko ${r.status}`);
         const j = await r.json();
         candles = j.candles || [];
