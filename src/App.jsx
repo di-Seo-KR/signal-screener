@@ -1080,22 +1080,23 @@ export default function App() {
       { symbol: "^KQ11", name: "코스닥", flag: "🇰🇷" },
       { symbol: "USDKRW=X", name: "원/달러 환율", flag: "💱" },
     ];
-    const results = [];
-    for (const idx of indices) {
-      try {
-        const r = await fetch(`/api/yahoo?symbol=${encodeURIComponent(idx.symbol)}&interval=1d&range=5d&_t=${Date.now()}`);
-        if (r.ok) {
-          const j = await r.json();
-          const closes = j.closes || [];
-          if (closes.length >= 2) {
-            const cur = closes[closes.length - 1];
-            const prev = closes[closes.length - 2];
-            const change = ((cur - prev) / prev) * 100;
-            results.push({ ...idx, price: cur, change: +change.toFixed(2) });
+    // 지수 병렬 fetch
+    const idxSyms = indices.map(i => i.symbol).join(",");
+    let results = [];
+    try {
+      const r = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(idxSyms)}&interval=1d&range=5d`);
+      if (r.ok) {
+        const batch = (await r.json()).results || {};
+        for (const idx of indices) {
+          const d = batch[idx.symbol];
+          if (d && d.closes?.length >= 2) {
+            const cur = d.closes[d.closes.length - 1];
+            const prev = d.closes[d.closes.length - 2];
+            results.push({ ...idx, price: cur, change: +( ((cur - prev) / prev) * 100 ).toFixed(2) });
           }
         }
-      } catch {}
-    }
+      }
+    } catch {}
     setMarketIndices(results);
     // Hot assets — 주요 종목 가격
     const hots = [
@@ -1106,39 +1107,42 @@ export default function App() {
       { symbol: "005930.KS", name: "삼성전자", market: "kr" },
       { symbol: "000660.KS", name: "SK하이닉스", market: "kr" },
     ];
+    // Hot assets 병렬 fetch
+    const hotSyms = hots.map(h => h.symbol).join(",");
     const hotResults = [];
-    for (const h of hots) {
-      try {
-        const r = await fetch(`/api/yahoo?symbol=${encodeURIComponent(h.symbol)}&interval=1d&range=5d&_t=${Date.now()}`);
-        if (r.ok) {
-          const j = await r.json();
-          const closes = j.closes || [];
-          if (closes.length >= 2) {
-            const cur = closes[closes.length - 1];
-            const prev = closes[closes.length - 2];
+    try {
+      const hr = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(hotSyms)}&interval=1d&range=5d`);
+      if (hr.ok) {
+        const hBatch = (await hr.json()).results || {};
+        for (const h of hots) {
+          const d = hBatch[h.symbol];
+          if (d && d.closes?.length >= 2) {
+            const cur = d.closes[d.closes.length - 1];
+            const prev = d.closes[d.closes.length - 2];
             hotResults.push({ ...h, price: cur, change: +( ((cur - prev) / prev) * 100 ).toFixed(2), symbolRaw: h.symbol });
           }
         }
-      } catch {}
-    }
-    // Crypto hots
-    for (const cId of ["bitcoin", "ethereum", "solana"]) {
-      try {
-        const r = await fetch(`/api/coingecko?id=${cId}&days=2&_t=${Date.now()}`);
-        if (r.ok) {
-          const j = await r.json();
-          const dp = (j.prices || []).map(p => p[1]);
-          if (dp.length >= 2) {
-            const cur = dp[dp.length - 1];
-            const prev = dp[0];
-            const name = cId === "bitcoin" ? "Bitcoin" : cId === "ethereum" ? "Ethereum" : "Solana";
-            const sym = cId === "bitcoin" ? "BTC" : cId === "ethereum" ? "ETH" : "SOL";
-            hotResults.push({ symbol: sym, name, market: "crypto", price: cur, change: +( ((cur - prev) / prev) * 100 ).toFixed(2), symbolRaw: cId });
-          }
+      }
+    } catch {}
+    // Crypto hots — 병렬
+    const cryptoHots = [
+      { id: "bitcoin", sym: "BTC", name: "Bitcoin" },
+      { id: "ethereum", sym: "ETH", name: "Ethereum" },
+      { id: "solana", sym: "SOL", name: "Solana" },
+    ];
+    const cryptoResults = await Promise.allSettled(
+      cryptoHots.map(c => fetch(`/api/coingecko?id=${c.id}&days=2`).then(r => r.ok ? r.json() : null))
+    );
+    cryptoHots.forEach((c, i) => {
+      const r = cryptoResults[i];
+      if (r.status === "fulfilled" && r.value) {
+        const dp = (r.value.prices || []).map(p => p[1]);
+        if (dp.length >= 2) {
+          const cur = dp[dp.length - 1], prev = dp[0];
+          hotResults.push({ symbol: c.sym, name: c.name, market: "crypto", price: cur, change: +( ((cur - prev) / prev) * 100 ).toFixed(2), symbolRaw: c.id });
         }
-        await new Promise(r => setTimeout(r, 1200));
-      } catch {}
-    }
+      }
+    });
     setHotAssets(hotResults);
 
     // ── 공포/탐욕 지수 ──
@@ -1170,62 +1174,97 @@ export default function App() {
 
   useEffect(() => { if (tab === "home" && marketIndices.length === 0) fetchMarketOverview(); }, [tab]);
 
-  // ── 스크리너 실행 ─────────────────────────────────────────────
+  // ── 스크리너 실행 (병렬 배치 최적화) ──────────────────────────
   const runScan = useCallback(async () => {
     if (scanning) return;
     setScanning(true); setScanErrors([]);
-    const all = [
+    const yahooAssets = [
       ...US_ASSETS.map(a => ({ ...a, market: "us", symbolRaw: a.symbol })),
       ...KR_ASSETS.map(a => ({ ...a, market: "kr", symbolRaw: a.symbol, symbol: a.symbol.replace(".KS", "") })),
-      ...CRYPTO_ASSETS.map(a => ({ ...a, market: "crypto", symbol: a.symbol, symbolRaw: a.id })),
     ];
-    setScanProgress({ done: 0, total: all.length });
+    const cryptoAssets = CRYPTO_ASSETS.map(a => ({ ...a, market: "crypto", symbol: a.symbol, symbolRaw: a.id }));
+    const totalCount = yahooAssets.length + cryptoAssets.length;
+    setScanProgress({ done: 0, total: totalCount });
     const found = [], errors = [];
+    let doneCount = 0;
 
-    for (let i = 0; i < all.length; i++) {
-      const asset = all[i];
+    // ── Yahoo 배치 병렬 처리 (10개씩 배치 → batch API) ──
+    const YAHOO_BATCH = 10;
+    for (let b = 0; b < yahooAssets.length; b += YAHOO_BATCH) {
+      const batch = yahooAssets.slice(b, b + YAHOO_BATCH);
+      const syms = batch.map(a => a.symbolRaw);
       try {
-        let wCloses, wVolumes, wHighs, wLows, dCloses;
-        if (asset.market === "crypto") {
-          const r = await fetch(`/api/coingecko?id=${encodeURIComponent(asset.symbolRaw)}&days=365&_t=${Date.now()}`);
-          if (!r.ok) throw new Error(`CoinGecko ${r.status}`);
-          const j = await r.json();
-          const dp = (j.prices || []).map(p => p[1]);
-          const dv = (j.total_volumes || []).map(v => v[1]);
-          wCloses = []; wVolumes = []; wHighs = []; wLows = [];
-          for (let k = 6; k < dp.length; k += 7) {
-            const sl = dp.slice(Math.max(0, k - 6), k + 1);
-            wCloses.push(dp[k]);
-            wVolumes.push(dv.slice(Math.max(0, k - 6), k + 1).reduce((a, b) => a + b, 0));
-            wHighs.push(Math.max(...sl));
-            wLows.push(Math.min(...sl));
-          }
-          dCloses = dp;
-          await new Promise(r => setTimeout(r, 1200)); // CoinGecko 무료 API 레이트리밋 방지
-        } else {
-          // 주간 + 일간 데이터만 가져옴 (yahoo.js가 highs/lows 포함)
-          const [wkR, dyR] = await Promise.all([
-            fetch(`/api/yahoo?symbol=${encodeURIComponent(asset.symbolRaw)}&interval=1wk&range=2y&_t=${Date.now()}`),
-            fetch(`/api/yahoo?symbol=${encodeURIComponent(asset.symbolRaw)}&interval=1d&range=1y&_t=${Date.now()}`),
-          ]);
-          if (!wkR.ok) throw new Error(`Yahoo ${wkR.status}`);
-          if (!dyR.ok) throw new Error(`Yahoo daily ${dyR.status}`);
-          const wk = await wkR.json();
-          const dy = await dyR.json();
-          wCloses  = wk.closes  || [];
-          wVolumes = wk.volumes || [];
-          wHighs   = wk.highs   || wCloses;
-          wLows    = wk.lows    || wCloses;
-          dCloses  = dy.closes  || [];
-          // Yahoo 레이트 리밋 방지 딜레이
-          await new Promise(r => setTimeout(r, 200));
+        // 주간 + 일간 배치를 동시 요청
+        const [wkRes, dyRes] = await Promise.all([
+          fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(syms.join(","))}&interval=1wk&range=2y`),
+          fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(syms.join(","))}&interval=1d&range=1y`),
+        ]);
+        const wkData = wkRes.ok ? (await wkRes.json()).results || {} : {};
+        const dyData = dyRes.ok ? (await dyRes.json()).results || {} : {};
+
+        for (const asset of batch) {
+          try {
+            const wk = wkData[asset.symbolRaw];
+            const dy = dyData[asset.symbolRaw];
+            if (!wk || wk.error || !wk.closes?.length) throw new Error("데이터 없음");
+            const wCloses = wk.closes || [];
+            const wVolumes = wk.volumes || [];
+            const wHighs = wk.highs || wCloses;
+            const wLows = wk.lows || wCloses;
+            const dCloses = dy?.closes || [];
+            const result = analyzeAsset(wCloses, dCloses, wVolumes, wHighs, wLows, conditions);
+            const match = mode === "or" ? result.triggers.length > 0 : conditions.every(c => result.triggers.includes(c));
+            if (match) found.push({ ...asset, ...result });
+          } catch (e) { errors.push(`${asset.market.toUpperCase()}:${asset.symbol} — ${e.message}`); }
+          doneCount++;
         }
-        if (!wCloses.length) throw new Error("데이터 없음");
-        const result = analyzeAsset(wCloses, dCloses, wVolumes, wHighs, wLows, conditions);
-        const match = mode === "or" ? result.triggers.length > 0 : conditions.every(c => result.triggers.includes(c));
-        if (match) found.push({ ...asset, ...result });
-      } catch (e) { errors.push(`${asset.market.toUpperCase()}:${asset.symbol} — ${e.message}`); }
-      setScanProgress({ done: i + 1, total: all.length });
+      } catch (e) {
+        // 배치 전체 실패 시 개별 에러 기록
+        batch.forEach(a => { errors.push(`${a.market.toUpperCase()}:${a.symbol} — batch ${e.message}`); doneCount++; });
+      }
+      setScanProgress({ done: doneCount, total: totalCount });
+    }
+
+    // ── 크립토 병렬 처리 (3개 동시) ──
+    const CRYPTO_CONCURRENT = 3;
+    for (let b = 0; b < cryptoAssets.length; b += CRYPTO_CONCURRENT) {
+      const batch = cryptoAssets.slice(b, b + CRYPTO_CONCURRENT);
+      const results = await Promise.allSettled(batch.map(async (asset) => {
+        const r = await fetch(`/api/coingecko?id=${encodeURIComponent(asset.symbolRaw)}&days=365`);
+        if (!r.ok) throw new Error(`CoinGecko ${r.status}`);
+        const j = await r.json();
+        const dp = (j.prices || []).map(p => p[1]);
+        const dv = (j.total_volumes || []).map(v => v[1]);
+        const wCloses = [], wVolumes = [], wHighs = [], wLows = [];
+        for (let k = 6; k < dp.length; k += 7) {
+          const sl = dp.slice(Math.max(0, k - 6), k + 1);
+          wCloses.push(dp[k]);
+          wVolumes.push(dv.slice(Math.max(0, k - 6), k + 1).reduce((a, c) => a + c, 0));
+          wHighs.push(Math.max(...sl));
+          wLows.push(Math.min(...sl));
+        }
+        return { asset, wCloses, wVolumes, wHighs, wLows, dCloses: dp };
+      }));
+
+      for (let i = 0; i < results.length; i++) {
+        const r = results[i];
+        const asset = batch[i];
+        if (r.status === "fulfilled") {
+          try {
+            const { wCloses, wVolumes, wHighs, wLows, dCloses } = r.value;
+            if (!wCloses.length) throw new Error("데이터 없음");
+            const result = analyzeAsset(wCloses, dCloses, wVolumes, wHighs, wLows, conditions);
+            const match = mode === "or" ? result.triggers.length > 0 : conditions.every(c => result.triggers.includes(c));
+            if (match) found.push({ ...asset, ...result });
+          } catch (e) { errors.push(`CRYPTO:${asset.symbol} — ${e.message}`); }
+        } else {
+          errors.push(`CRYPTO:${asset.symbol} — ${r.reason?.message || "fetch 실패"}`);
+        }
+        doneCount++;
+      }
+      setScanProgress({ done: doneCount, total: totalCount });
+      // CoinGecko 레이트 리밋: 배치 간 800ms
+      if (b + CRYPTO_CONCURRENT < cryptoAssets.length) await new Promise(r => setTimeout(r, 800));
     }
 
     const sorted = found.sort((a, b) => {
