@@ -377,6 +377,7 @@ function AssetCard({ asset, onChart }) {
 // ════════════════════════════════════════════════════════════════════
 export default function App() {
   const [tab, setTab] = useState("screener");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // ── 스크리너 상태 ─────────────────────────────────────────────
   const [results, setResults]         = useState([]);
@@ -451,24 +452,24 @@ export default function App() {
             wLows.push(Math.min(...sl));
           }
           dCloses = dp;
-          await new Promise(r => setTimeout(r, 700));
+          await new Promise(r => setTimeout(r, 1200)); // CoinGecko 무료 API 레이트리밋 방지
         } else {
-          const [wkR, dyR, ohlcR] = await Promise.all([
+          // 주간 + 일간 데이터만 가져옴 (yahoo.js가 highs/lows 포함)
+          const [wkR, dyR] = await Promise.all([
             fetch(`/api/yahoo?symbol=${encodeURIComponent(asset.symbolRaw)}&interval=1wk&range=2y&_t=${Date.now()}`),
             fetch(`/api/yahoo?symbol=${encodeURIComponent(asset.symbolRaw)}&interval=1d&range=1y&_t=${Date.now()}`),
-            fetch(`/api/yahoo-ohlc?symbol=${encodeURIComponent(asset.symbolRaw)}&interval=1wk&range=2y&_t=${Date.now()}`),
           ]);
+          if (!wkR.ok) throw new Error(`Yahoo ${wkR.status}`);
+          if (!dyR.ok) throw new Error(`Yahoo daily ${dyR.status}`);
           const wk = await wkR.json();
           const dy = await dyR.json();
           wCloses  = wk.closes  || [];
           wVolumes = wk.volumes || [];
+          wHighs   = wk.highs   || wCloses;
+          wLows    = wk.lows    || wCloses;
           dCloses  = dy.closes  || [];
-          try {
-            const ohlcJ = await ohlcR.json();
-            wHighs = (ohlcJ.candles || []).map(c => c.high);
-            wLows  = (ohlcJ.candles || []).map(c => c.low);
-          } catch { wHighs = wCloses; wLows = wCloses; }
-          await new Promise(r => setTimeout(r, 80));
+          // Yahoo 레이트 리밋 방지 딜레이
+          await new Promise(r => setTimeout(r, 200));
         }
         if (!wCloses.length) throw new Error("데이터 없음");
         const result = analyzeAsset(wCloses, dCloses, wVolumes, wHighs, wLows, conditions);
@@ -616,6 +617,13 @@ export default function App() {
         button, a { cursor: pointer; font-family: inherit; }
         input { font-family: inherit; }
         input:focus { border-color: ${C.blue} !important; }
+        @media (max-width: 640px) {
+          .desktop-nav { display: none !important; }
+          .mobile-menu-btn { display: block !important; }
+        }
+        @media (min-width: 641px) {
+          .mobile-dropdown { display: none !important; }
+        }
       `}</style>
 
       {/* ── 헤더 ──────────────────────────────────────────────────── */}
@@ -630,16 +638,40 @@ export default function App() {
             <span style={{ fontWeight: 800, fontSize: "17px" }}>DI금융</span>
             <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v4</span>
           </div>
-          <nav style={{ display: "flex", gap: "2px" }}>
+          {/* 데스크톱 네비게이션 */}
+          <nav className="desktop-nav" style={{ display: "flex", gap: "2px" }}>
             {[{ id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "backtest", label: "백테스트", icon: "📊" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} style={{
-                padding: "6px 8px", borderRadius: "8px", fontSize: "11px", fontWeight: 600,
+                padding: "6px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
                 color: tab === t.id ? C.blue : C.text3, border: "none", whiteSpace: "nowrap",
               }}>{t.icon} {t.label}</button>
             ))}
           </nav>
+          {/* 모바일 햄버거 */}
+          <button className="mobile-menu-btn" onClick={() => setMenuOpen(!menuOpen)} style={{
+            display: "none", background: "none", border: "none", color: C.text2,
+            fontSize: "22px", padding: "4px 8px", cursor: "pointer",
+          }}>
+            {menuOpen ? "✕" : "☰"}
+          </button>
         </div>
+        {/* 모바일 드롭다운 메뉴 */}
+        {menuOpen && (
+          <div className="mobile-dropdown" style={{
+            background: C.card, borderTop: `1px solid ${C.border}`,
+            padding: "8px 16px 12px", display: "flex", flexDirection: "column", gap: "2px",
+          }}>
+            {[{ id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "backtest", label: "백테스트", icon: "📊" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
+              <button key={t.id} onClick={() => { setTab(t.id); setMenuOpen(false); }} style={{
+                padding: "10px 14px", borderRadius: "10px", fontSize: "14px", fontWeight: 600,
+                background: tab === t.id ? C.blueBg : "transparent",
+                color: tab === t.id ? C.blue : C.text2, border: "none",
+                textAlign: "left", cursor: "pointer",
+              }}>{t.icon} {t.label}</button>
+            ))}
+          </div>
+        )}
       </header>
 
       <main style={{ maxWidth: "900px", margin: "0 auto", padding: "20px" }}>
@@ -1034,12 +1066,18 @@ export default function App() {
                           {item.desc}
                         </div>
                       )}
-                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                      <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
                         <span style={{
                           padding: "2px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 700,
                           background: item.source?.includes("CoinGecko") ? `${C.purple}22` : `${C.blue}22`,
                           color: item.source?.includes("CoinGecko") ? C.purple : C.blue,
                         }}>{item.source}</span>
+                        {(item.tags || []).map((tag, ti) => (
+                          <span key={ti} style={{
+                            padding: "1px 6px", borderRadius: "4px", fontSize: "9px", fontWeight: 600,
+                            background: `${C.yellow}15`, color: C.yellow,
+                          }}>{tag}</span>
+                        ))}
                         {item.date && (
                           <span style={{ fontSize: "11px", color: C.text3 }}>
                             {(() => {
