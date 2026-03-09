@@ -106,25 +106,25 @@ const TF_CONFIG = {
   "5m":  { label: "5분",   interval: "5m",  range: "5d" },
   "10m": { label: "10분",  interval: "5m",  range: "5d" },  // Yahoo doesn't support 10m, use 5m
   "30m": { label: "30분",  interval: "30m", range: "1mo" },
-  "1h":  { label: "1시간", interval: "1h",  range: "1mo" },
-  "2h":  { label: "2시간", interval: "1h",  range: "1mo" },  // Aggregate from 1h
-  "4h":  { label: "4시간", interval: "1h",  range: "3mo" },  // Aggregate from 1h
-  "1d":  { label: "날봉",  interval: "1d",  range: "6mo" },
-  "1wk": { label: "주봉",  interval: "1wk", range: "2y" },
-  "1mo": { label: "월봉",  interval: "1mo", range: "10y" },
+  "1h":  { label: "1시간", interval: "1h",  range: "6mo" },
+  "2h":  { label: "2시간", interval: "1h",  range: "6mo" },  // Aggregate from 1h
+  "4h":  { label: "4시간", interval: "1h",  range: "1y" },   // Aggregate from 1h
+  "1d":  { label: "날봉",  interval: "1d",  range: "max" },  // 상장일부터 전체
+  "1wk": { label: "주봉",  interval: "1wk", range: "max" },  // 상장일부터 전체
+  "1mo": { label: "월봉",  interval: "1mo", range: "max" },  // 상장일부터 전체
 };
 
 const CRYPTO_TF = {
   "1m":  { label: "1분",   days: "1" },
   "5m":  { label: "5분",   days: "1" },
   "10m": { label: "10분",  days: "1" },
-  "30m": { label: "30분",  days: "7" },
-  "1h":  { label: "1시간", days: "7" },
-  "2h":  { label: "2시간", days: "14" },
-  "4h":  { label: "4시간", days: "30" },
-  "1d":  { label: "날봉",  days: "90" },
-  "1wk": { label: "주봉",  days: "365" },
-  "1mo": { label: "월봉",  days: "max" },
+  "30m": { label: "30분",  days: "14" },
+  "1h":  { label: "1시간", days: "30" },
+  "2h":  { label: "2시간", days: "90" },
+  "4h":  { label: "4시간", days: "180" },
+  "1d":  { label: "날봉",  days: "max" },   // 상장일부터 전체
+  "1wk": { label: "주봉",  days: "max" },   // 상장일부터 전체
+  "1mo": { label: "월봉",  days: "max" },   // 상장일부터 전체
 };
 
 // ── Aggregate candles for 10m/2h/4h (from smaller intervals) ──
