@@ -232,6 +232,9 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
   const rsiRef    = useRef(null);
   const macdRef   = useRef(null);
   const chartObjs = useRef({});
+  const candleSeriesRef = useRef(null);  // for real-time update
+  const lastCandleRef = useRef(null);    // last candle data
+  const liveIntervalRef = useRef(null);  // polling interval
 
   const [timeframe, setTimeframe] = useState("1d");
   const [loading, setLoading] = useState(false);
@@ -239,6 +242,9 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
   const [ohlcInfo, setOhlcInfo] = useState(null);
   const [showKRW, setShowKRW] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [livePrice, setLivePrice] = useState(null);
+  const [liveChange, setLiveChange] = useState(null);
+  const [liveConnected, setLiveConnected] = useState(false);
 
   // ── Customizable indicator settings ──
   const [settings, setSettings] = useState(() => {
@@ -340,6 +346,17 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       wickUpColor: "#26a64b", wickDownColor: "#ef4444",
     });
     candleSeries.setData(candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
+    candleSeriesRef.current = candleSeries;
+    lastCandleRef.current = candles.length ? { ...candles[candles.length - 1] } : null;
+    // Set initial live price from last candle
+    if (candles.length) {
+      const last = candles[candles.length - 1];
+      setLivePrice(last.close);
+      if (candles.length >= 2) {
+        const prev = candles[candles.length - 2].close;
+        setLiveChange(prev ? ((last.close - prev) / prev) * 100 : null);
+      }
+    }
 
     // Volume histogram
     if (showVol) {
@@ -476,9 +493,87 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
     return () => ro.disconnect();
   }, []);
 
-  // Prevent body scrolling when chart page is open
+  // ── Real-time price polling (3s interval) ──
+  useEffect(() => {
+    if (!asset) return;
+    let active = true;
+
+    const fetchLive = async () => {
+      try {
+        let price = null;
+        if (isCrypto) {
+          const coinId = asset.cryptoId || asset.symbolRaw || asset.id || asset.symbol.toLowerCase();
+          const r = await fetch(`/api/coingecko?id=${encodeURIComponent(coinId)}&days=1`);
+          if (r.ok) {
+            const j = await r.json();
+            const prices = j.prices || [];
+            if (prices.length) price = prices[prices.length - 1][1];
+          }
+        } else {
+          const sym = asset.symbolRaw || asset.symbol;
+          const r = await fetch(`/api/yahoo?symbol=${encodeURIComponent(sym)}&interval=1m&range=1d`);
+          if (r.ok) {
+            const j = await r.json();
+            if (j.closes?.length) price = j.closes[j.closes.length - 1];
+          }
+        }
+        if (!active || price == null) return;
+
+        // Apply KRW conversion if active
+        const displayPrice = (showKRW && canShowKRW && krwRate) ? price * krwRate : price;
+        setLivePrice(displayPrice);
+        setLiveConnected(true);
+
+        // Update last candle on chart
+        const lastCandle = lastCandleRef.current;
+        const series = candleSeriesRef.current;
+        if (lastCandle && series) {
+          const updatedCandle = {
+            time: lastCandle.time,
+            open: lastCandle.open,
+            high: Math.max(lastCandle.high, displayPrice),
+            low: Math.min(lastCandle.low, displayPrice),
+            close: displayPrice,
+          };
+          try { series.update(updatedCandle); } catch {}
+          lastCandleRef.current = updatedCandle;
+        }
+
+        // Calculate change from previous candle close (stored in asset or derived)
+        if (lastCandle) {
+          const prevClose = lastCandle.open; // open of current candle as reference
+          if (prevClose) setLiveChange(((displayPrice - prevClose) / prevClose) * 100);
+        }
+      } catch {
+        if (active) setLiveConnected(false);
+      }
+    };
+
+    // Initial fetch after short delay to let chart build
+    const initTimer = setTimeout(fetchLive, 1500);
+
+    // Poll interval: crypto 5s (rate limit), stocks 3s
+    const interval = isCrypto ? 5000 : 3000;
+    liveIntervalRef.current = setInterval(fetchLive, interval);
+
+    return () => {
+      active = false;
+      clearTimeout(initTimer);
+      if (liveIntervalRef.current) clearInterval(liveIntervalRef.current);
+      setLiveConnected(false);
+    };
+  }, [asset, isCrypto, showKRW, canShowKRW, krwRate, timeframe]);
+
+  // Prevent body scrolling + inject live pulse animation
   useEffect(() => {
     document.body.style.overflow = "hidden";
+    const styleId = "live-pulse-style";
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement("style");
+      style.id = styleId;
+      style.textContent = `@keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`;
+      document.head.appendChild(style);
+    }
     return () => { document.body.style.overflow = ""; };
   }, []);
 
@@ -527,13 +622,36 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ color: CC.text1, fontWeight: 700, fontSize: "18px" }}>{formatPriceWithKRW(asset.price)}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "flex-end" }}>
+            {liveConnected && (
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: "4px",
+                fontSize: "9px", fontWeight: 700, color: CC.green,
+                background: CC.greenBg, padding: "2px 6px", borderRadius: "4px",
+                animation: "livePulse 1.5s ease-in-out infinite",
+              }}>
+                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: CC.green, display: "inline-block" }} />
+                LIVE
+              </span>
+            )}
+            <span style={{ color: CC.text1, fontWeight: 700, fontSize: "18px" }}>
+              {livePrice != null
+                ? (showKRW && canShowKRW
+                    ? `₩${Math.round(livePrice).toLocaleString("ko-KR")}`
+                    : fmtPrice(livePrice, asset.market))
+                : formatPriceWithKRW(asset.price)}
+            </span>
+          </div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "flex-end" }}>
-            {asset.weekChange != null && (
+            {liveChange != null ? (
+              <span style={{ fontSize: "13px", fontWeight: 600, color: liveChange >= 0 ? CC.green : CC.red }}>
+                {liveChange >= 0 ? "\u25B2" : "\u25BC"} {Math.abs(liveChange).toFixed(2)}%
+              </span>
+            ) : asset.weekChange != null ? (
               <span style={{ fontSize: "13px", fontWeight: 600, color: asset.weekChange >= 0 ? CC.green : CC.red }}>
                 {asset.weekChange >= 0 ? "\u25B2" : "\u25BC"} {Math.abs(asset.weekChange)}%
               </span>
-            )}
+            ) : null}
             {canShowKRW && (
               <button onClick={() => setShowKRW(!showKRW)} style={{
                 fontSize: "10px", padding: "3px 8px", borderRadius: "6px", cursor: "pointer",

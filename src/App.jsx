@@ -1198,7 +1198,13 @@ export default function App() {
     setMarketLoading(false);
   }, [marketLoading]);
 
-  useEffect(() => { if (tab === "home" && marketIndices.length === 0) fetchMarketOverview(); }, [tab]);
+  // 홈 탭 진입 시 즉시 로드 + 30초 간격 자동 갱신
+  useEffect(() => {
+    if (tab !== "home") return;
+    if (marketIndices.length === 0) fetchMarketOverview();
+    const iv = setInterval(() => { fetchMarketOverview(); }, 30000);
+    return () => clearInterval(iv);
+  }, [tab]);
 
   // ── 스크리너 실행 (병렬 배치 최적화) ──────────────────────────
   const runScan = useCallback(async () => {
@@ -1444,6 +1450,7 @@ export default function App() {
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+        @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.4} }
         * { box-sizing: border-box; margin: 0; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
         html { font-size: 16px; line-height: 1.5; }
         body { letter-spacing: -0.01em; }
@@ -1544,7 +1551,19 @@ export default function App() {
             {/* 시장 지수 요약 */}
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px", marginBottom: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                <div style={{ fontWeight: 700, fontSize: "16px" }}>📊 시장 현황</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontWeight: 700, fontSize: "16px" }}>📊 시장 현황</span>
+                  {marketIndices.length > 0 && (
+                    <span style={{
+                      display: "inline-flex", alignItems: "center", gap: "4px",
+                      fontSize: "9px", fontWeight: 700, color: C.green,
+                      background: C.greenBg, padding: "2px 6px", borderRadius: "4px",
+                    }}>
+                      <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: C.green, display: "inline-block", animation: "livePulse 1.5s ease-in-out infinite" }} />
+                      30초 자동갱신
+                    </span>
+                  )}
+                </div>
                 <button onClick={fetchMarketOverview} disabled={marketLoading} style={{
                   padding: "5px 12px", borderRadius: "8px", fontSize: "11px", fontWeight: 600,
                   background: C.card2, color: C.text3, border: `1px solid ${C.border2}`, cursor: "pointer",
