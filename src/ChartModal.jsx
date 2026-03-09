@@ -196,8 +196,9 @@ function makeChartOptions(height, width, tf, cc) {
     },
     height,
     width: width || 300,
-    handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
-    handleScale: { mouseWheel: true, pinch: true },
+    handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false, touch: true },
+    handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true, axisDoubleClickReset: true },
+    kineticScroll: { mouse: true, touch: true },
   };
 }
 
@@ -224,6 +225,142 @@ const DEFAULT_SETTINGS = {
   vol: { enabled: true },
 };
 
+// ── 투자진단 분석 엔진 ──────────────────────────────────────────
+function runDiagnosis(candles) {
+  if (!candles || candles.length < 20) return null;
+  const closes = candles.map(c => c.close);
+  const highs = candles.map(c => c.high);
+  const lows = candles.map(c => c.low);
+  const volumes = candles.map(c => c.volume || 0);
+  const n = closes.length;
+  const last = closes[n - 1];
+  const prev = closes[n - 2];
+
+  // ── 지표 계산 ──
+  const rsiArr = calcRSI(closes, 14);
+  const rsi = rsiArr[n - 1];
+  const sma20 = closes.slice(-20).reduce((a, b) => a + b, 0) / 20;
+  const sma50 = n >= 50 ? closes.slice(-50).reduce((a, b) => a + b, 0) / 50 : null;
+  const sma200 = n >= 200 ? closes.slice(-200).reduce((a, b) => a + b, 0) / 200 : null;
+  const bbArr = calcBB(closes, 20, 2);
+  const bb = bbArr[n - 1];
+  const { macdLine, signalLine, histogram } = calcMACD(closes);
+  const macdVal = macdLine[n - 1];
+  const sigVal = signalLine[n - 1];
+  const histVal = histogram[n - 1];
+  const prevHist = histogram[n - 2];
+
+  const avgVol = volumes.slice(-20).reduce((a, b) => a + b, 0) / Math.min(volumes.length, 20);
+  const curVol = volumes[n - 1];
+  const volRatio = avgVol > 0 ? curVol / avgVol : 1;
+
+  const high52 = n >= 52 ? Math.max(...highs.slice(-260)) : Math.max(...highs);
+  const low52 = n >= 52 ? Math.min(...lows.slice(-260)) : Math.min(...lows);
+  const fromHigh = high52 > 0 ? ((last - high52) / high52) * 100 : 0;
+  const fromLow = low52 > 0 ? ((last - low52) / low52) * 100 : 0;
+
+  // 최근 5일 변화율
+  const change5 = n >= 5 ? ((last - closes[n - 5]) / closes[n - 5]) * 100 : 0;
+  // 최근 20일 변화율
+  const change20 = n >= 20 ? ((last - closes[n - 20]) / closes[n - 20]) * 100 : 0;
+
+  // ── 카테고리별 점수 ──
+  const signals = [];
+
+  // 1. 추세 점수 (0-100)
+  let trendScore = 50;
+  if (sma20 && last > sma20) trendScore += 10;
+  if (sma20 && last < sma20) trendScore -= 10;
+  if (sma50 && last > sma50) trendScore += 10;
+  if (sma50 && last < sma50) trendScore -= 10;
+  if (sma200 && last > sma200) trendScore += 10;
+  if (sma200 && last < sma200) trendScore -= 10;
+  if (sma50 && sma200 && sma50 > sma200) { trendScore += 10; signals.push({ type: "bullish", name: "골든크로스 구간", detail: "50일선이 200일선 위 — 장기 상승 추세" }); }
+  if (sma50 && sma200 && sma50 < sma200) { trendScore -= 5; signals.push({ type: "bearish", name: "데스크로스 구간", detail: "50일선이 200일선 아래 — 장기 하락 추세" }); }
+  if (change5 > 3) trendScore += 5;
+  if (change5 < -3) trendScore -= 5;
+  trendScore = Math.max(0, Math.min(100, trendScore));
+  const trendDetail = last > (sma20 || last)
+    ? `단기 상승세 (MA20 위 ${((last / sma20 - 1) * 100).toFixed(1)}%)`
+    : `단기 하락세 (MA20 아래 ${((1 - last / (sma20 || last)) * 100).toFixed(1)}%)`;
+
+  // 2. 모멘텀 점수
+  let momScore = 50;
+  if (rsi != null) {
+    if (rsi >= 70) { momScore -= 15; signals.push({ type: "bearish", name: "RSI 과매수", detail: `RSI ${rsi.toFixed(1)} — 과열 구간, 단기 조정 가능` }); }
+    else if (rsi <= 30) { momScore += 15; signals.push({ type: "bullish", name: "RSI 과매도", detail: `RSI ${rsi.toFixed(1)} — 반등 가능 구간` }); }
+    else if (rsi > 50) momScore += 8;
+    else momScore -= 5;
+  }
+  if (macdVal != null && sigVal != null) {
+    if (macdVal > sigVal && prevHist != null && histVal > prevHist) { momScore += 12; signals.push({ type: "bullish", name: "MACD 상승 가속", detail: "MACD 히스토그램 확대 중 — 매수 모멘텀 증가" }); }
+    if (macdVal < sigVal && prevHist != null && histVal < prevHist) { momScore -= 10; signals.push({ type: "bearish", name: "MACD 하락 가속", detail: "MACD 히스토그램 축소 중 — 매도 압력 증가" }); }
+    if (macdVal > 0 && sigVal > 0) momScore += 5;
+  }
+  momScore = Math.max(0, Math.min(100, momScore));
+
+  // 3. 변동성 점수
+  let volScore = 60;
+  if (bb) {
+    const bw = bb.upper - bb.lower;
+    const bbPercent = bb.middle > 0 ? (bw / bb.middle) * 100 : 0;
+    if (bbPercent < 5) { volScore += 10; signals.push({ type: "neutral", name: "볼린저 스퀴즈", detail: `밴드폭 ${bbPercent.toFixed(1)}% — 큰 변동 임박 가능` }); }
+    if (last >= bb.upper) { volScore -= 10; signals.push({ type: "bearish", name: "볼린저 상단 터치", detail: "상단 밴드 근접 — 단기 과열" }); }
+    if (last <= bb.lower) { volScore += 10; signals.push({ type: "bullish", name: "볼린저 하단 터치", detail: "하단 밴드 근접 — 반등 가능" }); }
+  }
+  volScore = Math.max(0, Math.min(100, volScore));
+  const volDetail = bb ? `BB 위치: ${((last - bb.lower) / (bb.upper - bb.lower) * 100).toFixed(0)}%` : "데이터 부족";
+
+  // 4. 수급 점수
+  let supScore = 50;
+  if (volRatio >= 2) { supScore += 20; signals.push({ type: "bullish", name: "거래량 급증", detail: `평균 대비 ${volRatio.toFixed(1)}배 — 강한 수급 유입` }); }
+  else if (volRatio >= 1.5) supScore += 10;
+  else if (volRatio <= 0.3) { supScore -= 10; signals.push({ type: "neutral", name: "거래량 고갈", detail: `평균 대비 ${(volRatio * 100).toFixed(0)}% — 관심 저하` }); }
+  // 가격 상승 + 거래량 증가 = 건전한 상승
+  if (change5 > 0 && volRatio > 1.2) supScore += 10;
+  if (change5 < 0 && volRatio > 1.5) supScore -= 10; // 하락 + 거래량 급증 = 투매
+  supScore = Math.max(0, Math.min(100, supScore));
+  const supDetail = `거래량 비율 ${volRatio.toFixed(1)}x (20일 평균 대비)`;
+
+  // 5. 위치 점수 (52주 내 위치)
+  let posScore = 50;
+  const range52 = high52 - low52;
+  const pos52 = range52 > 0 ? ((last - low52) / range52) * 100 : 50;
+  if (pos52 <= 15) { posScore += 15; signals.push({ type: "bullish", name: "52주 저점 근접", detail: `52주 범위 하위 ${pos52.toFixed(0)}% — 저가 매수 기회` }); }
+  if (pos52 >= 90) { posScore -= 5; signals.push({ type: "neutral", name: "52주 고점 근접", detail: `52주 범위 상위 ${pos52.toFixed(0)}% — 신중 접근` }); }
+  if (fromHigh < -30) { posScore += 10; signals.push({ type: "bullish", name: "고점 대비 급락", detail: `고점 대비 ${fromHigh.toFixed(1)}% — 반등 여력 존재` }); }
+  posScore = Math.max(0, Math.min(100, posScore));
+  const posDetail = `52주 고점 대비 ${fromHigh.toFixed(1)}%`;
+
+  // 종합 점수 (가중 평균)
+  const totalScore = Math.round(
+    trendScore * 0.30 + momScore * 0.25 + volScore * 0.15 + supScore * 0.15 + posScore * 0.15
+  );
+
+  let verdict, summary;
+  if (totalScore >= 75) { verdict = "적극 매수"; summary = "다수의 기술적 지표가 강한 매수 신호를 보이고 있습니다. 추세, 모멘텀, 수급이 모두 긍정적입니다."; }
+  else if (totalScore >= 60) { verdict = "매수 우위"; summary = "전반적으로 긍정적 신호가 우세합니다. 기술적 분석상 매수 관점이 유리합니다."; }
+  else if (totalScore >= 45) { verdict = "중립 (관망)"; summary = "매수와 매도 신호가 혼재합니다. 추가 확인 후 진입을 권장합니다."; }
+  else if (totalScore >= 30) { verdict = "매도 우위"; summary = "하락 신호가 다수 감지됩니다. 포지션 축소 또는 손절을 고려하세요."; }
+  else { verdict = "적극 매도"; summary = "강한 하락 신호가 감지됩니다. 빠른 대응이 필요할 수 있습니다."; }
+
+  return {
+    score: totalScore,
+    verdict,
+    summary,
+    categories: [
+      { name: "추세", icon: "\uD83D\uDCC8", score: trendScore, detail: trendDetail },
+      { name: "모멘텀", icon: "\u26A1", score: momScore, detail: `RSI ${rsi != null ? rsi.toFixed(1) : "N/A"}` },
+      { name: "변동성", icon: "\uD83C\uDF0A", score: volScore, detail: volDetail },
+      { name: "수급", icon: "\uD83D\uDCCA", score: supScore, detail: supDetail },
+      { name: "가격위치", icon: "\uD83C\uDFAF", score: posScore, detail: posDetail },
+      { name: "단기추세", icon: "\uD83D\uDD25", score: Math.max(0, Math.min(100, 50 + change5 * 5)), detail: `5일 변화 ${change5.toFixed(2)}%` },
+    ],
+    signals,
+    rsi, macdVal, volRatio, pos52, fromHigh, change5, change20,
+  };
+}
+
 // ── Full-page chart component ────────────────────────────────────
 export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) {
   const CC = theme === "dark" ? CC_DARK : CC_LIGHT;
@@ -245,6 +382,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
   const [livePrice, setLivePrice] = useState(null);
   const [liveChange, setLiveChange] = useState(null);
   const [liveConnected, setLiveConnected] = useState(false);
+  const [diagData, setDiagData] = useState(null);
 
   // ── Customizable indicator settings ──
   const [settings, setSettings] = useState(() => {
@@ -356,6 +494,12 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         const prev = candles[candles.length - 2].close;
         setLiveChange(prev ? ((last.close - prev) / prev) * 100 : null);
       }
+    }
+    // 투자진단 실행 (날봉 이상일 때만 의미있음)
+    if (!isIntraday(tf) && candles.length >= 20) {
+      try { setDiagData(runDiagnosis(candles)); } catch { setDiagData(null); }
+    } else {
+      setDiagData(null);
     }
 
     // Volume histogram
@@ -863,7 +1007,10 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
           </div>
         )}
         <div style={{ display: loading ? "none" : "block" }}>
-          <div ref={mainRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden" }} />
+          <div ref={mainRef} style={{
+            width: "100%", borderRadius: "10px", overflow: "hidden",
+            touchAction: "none", WebkitOverflowScrolling: "auto",
+          }} />
           {settings.rsi?.enabled && (
             <>
               <div style={{
@@ -873,7 +1020,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                 <span style={{ width: "10px", height: "3px", background: "#f472b6", borderRadius: "2px", display: "inline-block" }} />
                 RSI({settings.rsi?.period || 14})
               </div>
-              <div ref={rsiRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden" }} />
+              <div ref={rsiRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden", touchAction: "none" }} />
             </>
           )}
           {settings.macd?.enabled && (
@@ -891,7 +1038,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                   <span style={{ color: "#fb923c" }}>Signal</span>
                 </span>
               </div>
-              <div ref={macdRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden" }} />
+              <div ref={macdRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden", touchAction: "none" }} />
             </>
           )}
         </div>
@@ -916,10 +1063,107 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
           {showKRW && canShowKRW && <span style={{ color: CC.blue, fontWeight: 600, marginLeft: "auto" }}>KRW 환산</span>}
         </div>
 
-        <div style={{ height: "20px" }} />
+        {/* ── 투자진단 패널 ─────────────────────────────────────── */}
+        {!loading && !error && diagData && (
+          <div style={{ marginTop: "16px" }}>
+            {/* 종합 점수 */}
+            <div style={{
+              background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "14px",
+              padding: "18px", marginBottom: "12px",
+            }}>
+              <div style={{ fontSize: "14px", fontWeight: 700, marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{ fontSize: "18px" }}>{"\uD83E\uDE7A"}</span> 투자진단
+              </div>
+              {/* Score gauge */}
+              <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "16px" }}>
+                <div style={{ position: "relative", width: "80px", height: "80px", flexShrink: 0 }}>
+                  <svg viewBox="0 0 80 80" width="80" height="80">
+                    <circle cx="40" cy="40" r="34" fill="none" stroke={CC.border} strokeWidth="7" />
+                    <circle cx="40" cy="40" r="34" fill="none"
+                      stroke={diagData.score >= 70 ? CC.green : diagData.score >= 40 ? CC.yellow : CC.red}
+                      strokeWidth="7" strokeLinecap="round"
+                      strokeDasharray={`${(diagData.score / 100) * 213.6} 213.6`}
+                      transform="rotate(-90 40 40)"
+                      style={{ transition: "stroke-dasharray 0.8s ease" }}
+                    />
+                    <text x="40" y="37" textAnchor="middle" fill={CC.text1} fontSize="18" fontWeight="800">{diagData.score}</text>
+                    <text x="40" y="50" textAnchor="middle" fill={CC.text3} fontSize="9">/100</text>
+                  </svg>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontSize: "16px", fontWeight: 800, marginBottom: "4px",
+                    color: diagData.score >= 70 ? CC.green : diagData.score >= 40 ? CC.yellow : CC.red,
+                  }}>{diagData.verdict}</div>
+                  <div style={{ fontSize: "12px", color: CC.text2, lineHeight: "1.5" }}>{diagData.summary}</div>
+                </div>
+              </div>
+
+              {/* Category scores */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                {diagData.categories.map(cat => (
+                  <div key={cat.name} style={{
+                    background: CC.bg, borderRadius: "10px", padding: "10px 12px",
+                    border: `1px solid ${CC.border}`,
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                      <span style={{ fontSize: "11px", color: CC.text3, fontWeight: 600 }}>{cat.icon} {cat.name}</span>
+                      <span style={{
+                        fontSize: "13px", fontWeight: 700,
+                        color: cat.score >= 70 ? CC.green : cat.score >= 40 ? CC.yellow : CC.red,
+                      }}>{cat.score}</span>
+                    </div>
+                    <div style={{
+                      height: "4px", background: CC.border, borderRadius: "2px", overflow: "hidden",
+                    }}>
+                      <div style={{
+                        height: "100%", borderRadius: "2px", transition: "width 0.6s ease",
+                        width: `${cat.score}%`,
+                        background: cat.score >= 70 ? CC.green : cat.score >= 40 ? CC.yellow : CC.red,
+                      }} />
+                    </div>
+                    <div style={{ fontSize: "10px", color: CC.text3, marginTop: "4px" }}>{cat.detail}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 상세 시그널 목록 */}
+            {diagData.signals.length > 0 && (
+              <div style={{
+                background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "14px",
+                padding: "16px", marginBottom: "12px",
+              }}>
+                <div style={{ fontSize: "13px", fontWeight: 700, marginBottom: "10px" }}>{"\uD83D\uDCCB"} 감지된 시그널</div>
+                {diagData.signals.map((sig, i) => (
+                  <div key={i} style={{
+                    display: "flex", alignItems: "flex-start", gap: "10px",
+                    padding: "8px 0", borderBottom: i < diagData.signals.length - 1 ? `1px solid ${CC.border}` : "none",
+                  }}>
+                    <span style={{
+                      fontSize: "9px", fontWeight: 700, padding: "3px 7px", borderRadius: "5px",
+                      flexShrink: 0, marginTop: "2px",
+                      background: sig.type === "bullish" ? CC.greenBg : sig.type === "bearish" ? CC.redBg : CC.yellowBg,
+                      color: sig.type === "bullish" ? CC.green : sig.type === "bearish" ? CC.red : CC.yellow,
+                    }}>{sig.type === "bullish" ? "매수" : sig.type === "bearish" ? "매도" : "중립"}</span>
+                    <div>
+                      <div style={{ fontSize: "12px", fontWeight: 600, color: CC.text1 }}>{sig.name}</div>
+                      <div style={{ fontSize: "11px", color: CC.text3, marginTop: "2px" }}>{sig.detail}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div style={{ height: "30px" }} />
       </div>
 
-      <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }`}</style>
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+        @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+      `}</style>
     </div>
   );
 }

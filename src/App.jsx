@@ -1451,15 +1451,23 @@ export default function App() {
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
         @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+        @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
         * { box-sizing: border-box; margin: 0; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-        html { font-size: 16px; line-height: 1.5; }
-        body { letter-spacing: -0.01em; }
+        html { font-size: 16px; line-height: 1.5; scroll-behavior: smooth; }
+        body { letter-spacing: -0.01em; transition: background 0.3s ease, color 0.3s ease; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: ${C.border2}; border-radius: 3px; }
-        button, a { cursor: pointer; font-family: inherit; }
-        input, select { font-family: inherit; font-size: 14px; }
-        input:focus { border-color: ${C.blue} !important; box-shadow: 0 0 0 3px ${C.blue}18; }
+        button, a { cursor: pointer; font-family: inherit; transition: all 0.15s ease; }
+        button:active { transform: scale(0.97); }
+        input, select { font-family: inherit; font-size: 14px; transition: border-color 0.2s ease; }
+        input:focus { border-color: ${C.blue} !important; box-shadow: 0 0 0 3px ${C.blue}18; outline: none; }
+        .skeleton { background: linear-gradient(90deg, ${C.card2} 25%, ${C.border} 50%, ${C.card2} 75%);
+          background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
+        .tab-content { animation: fadeIn 0.3s ease; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 4px 12px ${C.bg}88; }
         @media (max-width: 640px) {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: block !important; }
@@ -1540,7 +1548,7 @@ export default function App() {
             TAB: 홈 (토스 스타일 대시보드)
         ═══════════════════════════════════════════════════════════ */}
         {tab === "home" && (
-          <div>
+          <div className="tab-content">
             {/* 검색바 */}
             <div style={{ marginBottom: "20px" }}>
               <SearchBar onSelect={(asset) => {
@@ -1570,15 +1578,23 @@ export default function App() {
                 }}>{marketLoading ? "⏳" : "🔄"}</button>
               </div>
               {marketIndices.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "20px", color: C.text3, fontSize: "13px" }}>
-                  {marketLoading ? "시장 데이터 로딩 중..." : "데이터를 불러오려면 새로고침을 누르세요"}
-                </div>
+                marketLoading ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "8px" }}>
+                    {[1,2,3,4,5,6].map(i => (
+                      <div key={i} className="skeleton" style={{ height: "72px", borderRadius: "12px" }} />
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: "center", padding: "20px", color: C.text3, fontSize: "13px" }}>
+                    데이터를 불러오려면 새로고침을 누르세요
+                  </div>
+                )
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "8px" }}>
                   {marketIndices.map(idx => (
-                    <div key={idx.symbol} style={{
+                    <div key={idx.symbol} className="card-hover" style={{
                       background: C.bg, borderRadius: "12px", padding: "12px", textAlign: "center",
-                      border: `1px solid ${C.border}`,
+                      border: `1px solid ${C.border}`, transition: "all 0.2s ease", cursor: "default",
                     }}>
                       <div style={{ fontSize: "11px", color: C.text3, marginBottom: "4px" }}>{idx.flag} {idx.name}</div>
                       <div style={{ fontWeight: 700, fontSize: "15px", color: C.text1, marginBottom: "2px" }}>
@@ -1777,7 +1793,7 @@ export default function App() {
             TAB: 스크리너
         ═══════════════════════════════════════════════════════════ */}
         {tab === "screener" && (
-          <div>
+          <div className="tab-content">
             {/* 조건 선택 패널 */}
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
@@ -1861,17 +1877,26 @@ export default function App() {
                 })}
               </div>
 
+              {conditions.length === 0 && !scanning && !results.length && (
+                <div style={{
+                  textAlign: "center", padding: "14px", borderRadius: "10px", marginBottom: "10px",
+                  background: C.blueBg, border: `1px solid ${C.blue}33`, fontSize: "13px", color: C.blue,
+                }}>
+                  💡 위에서 스크리닝 조건을 1개 이상 선택한 후 스캔을 시작하세요
+                </div>
+              )}
               <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
                 <button onClick={runScan} disabled={scanning || conditions.length === 0} style={{
                   padding: "11px 24px", borderRadius: "12px", fontSize: "14px", fontWeight: 700,
-                  background: scanning ? C.card2 : C.blue, color: scanning ? C.text3 : "#fff", border: "none",
-                  minWidth: "120px",
+                  background: scanning ? C.card2 : conditions.length === 0 ? C.card2 : C.blue,
+                  color: scanning || conditions.length === 0 ? C.text3 : "#fff", border: "none",
+                  minWidth: "120px", opacity: conditions.length === 0 ? 0.6 : 1,
                 }}>
                   {scanning
                     ? <span style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }}>
                         <span style={{ animation: "pulse 1s infinite" }}>⏳</span> {scanProgress.done}/{scanProgress.total}
                       </span>
-                    : "🔍 스캔 시작"}
+                    : `🔍 스캔 시작 ${conditions.length > 0 ? `(${conditions.length}개 조건)` : ""}`}
                 </button>
                 {scanning && (
                   <div style={{ flex: 1, minWidth: "120px" }}>
@@ -1950,7 +1975,7 @@ export default function App() {
             TAB: 포트폴리오
         ═══════════════════════════════════════════════════════════ */}
         {tab === "portfolio" && (
-          <div>
+          <div className="tab-content">
             {/* 요약 헤더 */}
             <div style={{
               background: `linear-gradient(135deg, ${C.card}, #0d1f35)`,
@@ -2199,7 +2224,7 @@ export default function App() {
             TAB: 뉴스
         ═══════════════════════════════════════════════════════════ */}
         {tab === "news" && (
-          <div>
+          <div className="tab-content">
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "16px", marginBottom: "12px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -2280,7 +2305,7 @@ export default function App() {
             TAB: 알림
         ═══════════════════════════════════════════════════════════ */}
         {tab === "alerts" && (
-          <div>
+          <div className="tab-content">
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px" }}>
               <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "16px" }}>🔔 텔레그램 알림</div>
 
