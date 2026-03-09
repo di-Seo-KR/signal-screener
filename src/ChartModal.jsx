@@ -354,7 +354,7 @@ function runDiagnosis(candles) {
       { name: "변동성", icon: "\uD83C\uDF0A", score: volScore, detail: volDetail },
       { name: "수급", icon: "\uD83D\uDCCA", score: supScore, detail: supDetail },
       { name: "가격위치", icon: "\uD83C\uDFAF", score: posScore, detail: posDetail },
-      { name: "단기추세", icon: "\uD83D\uDD25", score: Math.max(0, Math.min(100, 50 + change5 * 5)), detail: `5일 변화 ${change5.toFixed(2)}%` },
+      { name: "단기추세", icon: "\uD83D\uDD25", score: Math.round(Math.max(0, Math.min(100, 50 + change5 * 5))), detail: `5일 변화 ${change5.toFixed(2)}%` },
     ],
     signals,
     rsi, macdVal, volRatio, pos52, fromHigh, change5, change20,
