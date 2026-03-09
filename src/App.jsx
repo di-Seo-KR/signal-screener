@@ -1,4 +1,4 @@
-// DI금융 v4.0 — 투자 스크리너 + 퀀트 엔진 + 백테스트
+// DI금융 v5.0 — 투자 스크리너 + 퀀트 엔진 + 백테스트
 // Features: 스크리닝, 캔들차트, 12개 전략, 백테스트, 포트폴리오, 뉴스, 텔레그램 알림
 import { useState, useEffect, useCallback } from "react";
 import ChartModal from "./ChartModal.jsx";
@@ -22,13 +22,39 @@ const US_ASSETS = [
   { symbol: "JPM", name: "JPMorgan" }, { symbol: "GS", name: "Goldman Sachs" },
   { symbol: "CRM", name: "Salesforce" }, { symbol: "ORCL", name: "Oracle" },
   { symbol: "ADBE", name: "Adobe" }, { symbol: "QCOM", name: "Qualcomm" },
-  // ETF
+  // Tech expansion
+  { symbol: "AVGO", name: "Broadcom" }, { symbol: "MU", name: "Micron" },
+  { symbol: "MRVL", name: "Marvell" }, { symbol: "SMCI", name: "Super Micro" },
+  { symbol: "ARM", name: "ARM Holdings" }, { symbol: "PANW", name: "Palo Alto" },
+  { symbol: "CRWD", name: "CrowdStrike" }, { symbol: "NOW", name: "ServiceNow" },
+  { symbol: "SHOP", name: "Shopify" }, { symbol: "SNOW", name: "Snowflake" },
+  { symbol: "DDOG", name: "Datadog" },
+  // Finance expansion
+  { symbol: "BAC", name: "BofA" }, { symbol: "WFC", name: "Wells Fargo" },
+  { symbol: "MS", name: "Morgan Stanley" }, { symbol: "C", name: "Citigroup" },
+  { symbol: "BLK", name: "BlackRock" },
+  // Healthcare expansion
+  { symbol: "UNH", name: "UnitedHealth" }, { symbol: "JNJ", name: "J&J" },
+  { symbol: "LLY", name: "Eli Lilly" }, { symbol: "NVO", name: "Novo Nordisk" },
+  { symbol: "ABBV", name: "AbbVie" },
+  // Energy/Materials expansion
+  { symbol: "XOM", name: "Exxon" }, { symbol: "CVX", name: "Chevron" },
+  { symbol: "LNG", name: "Cheniere" },
+  // Consumer expansion
+  { symbol: "WMT", name: "Walmart" }, { symbol: "COST", name: "Costco" },
+  { symbol: "HD", name: "Home Depot" }, { symbol: "MCD", name: "McDonalds" },
+  // ETF expansion
   { symbol: "SPY", name: "S&P 500 ETF" }, { symbol: "QQQ", name: "나스닥 100 ETF" },
   { symbol: "ARKK", name: "ARK Innovation" }, { symbol: "SOXL", name: "반도체 3x" },
   { symbol: "TQQQ", name: "나스닥 3x" }, { symbol: "BITI", name: "ProShares Short BTC" },
   { symbol: "BITO", name: "ProShares BTC Strategy" }, { symbol: "GLD", name: "Gold ETF" },
   { symbol: "TLT", name: "미국 장기채 ETF" }, { symbol: "VIX", name: "VIX 변동성" },
   { symbol: "SCHD", name: "배당 ETF" }, { symbol: "JEPI", name: "JP모건 인컴 ETF" },
+  { symbol: "IWM", name: "Russell 2000" }, { symbol: "XLF", name: "Financial Select" },
+  { symbol: "XLE", name: "Energy Select" }, { symbol: "XLK", name: "Tech Select" },
+  { symbol: "KWEB", name: "China Internet" }, { symbol: "EEM", name: "Emerging Markets" },
+  { symbol: "VNQ", name: "Real Estate" }, { symbol: "HYG", name: "High Yield Bond" },
+  { symbol: "LQD", name: "Investment Grade Bond" }, { symbol: "UNG", name: "Natural Gas" },
 ];
 
 const KR_ASSETS = [
@@ -40,6 +66,16 @@ const KR_ASSETS = [
   { symbol: "207940.KS", name: "삼성바이오로직스" }, { symbol: "066570.KS", name: "LG전자" },
   { symbol: "005380.KS", name: "현대차" },   { symbol: "000270.KS", name: "기아" },
   { symbol: "086790.KS", name: "하나금융지주" },
+  // Energy & Materials expansion
+  { symbol: "373220.KS", name: "LG에너지솔루션" }, { symbol: "247540.KS", name: "에코프로비엠" },
+  { symbol: "028260.KS", name: "삼성물산" }, { symbol: "012330.KS", name: "현대모비스" },
+  { symbol: "096770.KS", name: "SK이노베이션" }, { symbol: "034730.KS", name: "SK" },
+  { symbol: "017670.KS", name: "SK텔레콤" },
+  // Games & Entertainment expansion
+  { symbol: "259960.KS", name: "크래프톤" }, { symbol: "263750.KS", name: "펄어비스" },
+  { symbol: "036570.KS", name: "엔씨소프트" },
+  // Insurance expansion
+  { symbol: "000810.KS", name: "삼성화재" }, { symbol: "032830.KS", name: "삼성생명" },
 ];
 
 const CRYPTO_ASSETS = [
@@ -53,6 +89,14 @@ const CRYPTO_ASSETS = [
   { id: "chainlink", symbol: "LINK", name: "Chainlink" },
   { id: "dogecoin", symbol: "DOGE", name: "Dogecoin" },
   { id: "uniswap", symbol: "UNI", name: "Uniswap" },
+  { id: "binancecoin", symbol: "BNB", name: "BNB" },
+  { id: "tron", symbol: "TRX", name: "TRON" },
+  { id: "near", symbol: "NEAR", name: "NEAR Protocol" },
+  { id: "sui", symbol: "SUI", name: "Sui" },
+  { id: "pepe", symbol: "PEPE", name: "Pepe" },
+  { id: "render-token", symbol: "RNDR", name: "Render" },
+  { id: "injective-protocol", symbol: "INJ", name: "Injective" },
+  { id: "fetch-ai", symbol: "FET", name: "Fetch.ai" },
 ];
 
 // ════════════════════════════════════════════════════════════════════
@@ -128,15 +172,60 @@ function calcWilliamsR(highs, lows, closes, period = 14) {
   return ((hh - closes[closes.length - 1]) / (hh - ll)) * -100;
 }
 
+function calcATR(highs, lows, closes, period = 14) {
+  if (closes.length < period + 1) return null;
+  const trs = [];
+  for (let i = 1; i < closes.length; i++) {
+    const tr = Math.max(
+      highs[i] - lows[i],
+      Math.abs(highs[i] - closes[i-1]),
+      Math.abs(lows[i] - closes[i-1])
+    );
+    trs.push(tr);
+  }
+  if (trs.length < period) return null;
+  let atr = trs.slice(0, period).reduce((a,b) => a+b, 0) / period;
+  for (let i = period; i < trs.length; i++) {
+    atr = (atr * (period - 1) + trs[i]) / period;
+  }
+  return atr;
+}
+
+function calcSimpleADX(highs, lows, closes, period = 14) {
+  if (closes.length < period + 2) return null;
+  let plusDM = 0, minusDM = 0, tr = 0;
+  for (let i = 1; i <= period; i++) {
+    const upMove = highs[i] - highs[i-1];
+    const downMove = lows[i-1] - lows[i];
+    plusDM += (upMove > downMove && upMove > 0) ? upMove : 0;
+    minusDM += (downMove > upMove && downMove > 0) ? downMove : 0;
+    tr += Math.max(highs[i]-lows[i], Math.abs(highs[i]-closes[i-1]), Math.abs(lows[i]-closes[i-1]));
+  }
+  for (let i = period + 1; i < closes.length; i++) {
+    const upMove = highs[i] - highs[i-1];
+    const downMove = lows[i-1] - lows[i];
+    plusDM = plusDM - plusDM/period + ((upMove > downMove && upMove > 0) ? upMove : 0);
+    minusDM = minusDM - minusDM/period + ((downMove > upMove && downMove > 0) ? downMove : 0);
+    tr = tr - tr/period + Math.max(highs[i]-lows[i], Math.abs(highs[i]-closes[i-1]), Math.abs(lows[i]-closes[i-1]));
+  }
+  const plusDI = tr > 0 ? (plusDM / tr) * 100 : 0;
+  const minusDI = tr > 0 ? (minusDM / tr) * 100 : 0;
+  const dx = (plusDI + minusDI) > 0 ? Math.abs(plusDI - minusDI) / (plusDI + minusDI) * 100 : 0;
+  return { adx: dx, plusDI, minusDI };
+}
+
 function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, weeklyLows, conditions) {
   const price = weeklyCloses[weeklyCloses.length - 1];
   const rsi = calcRSI(weeklyCloses, 14);
+  const ma20daily = calcSMA(dailyCloses, 20);
   const ma50daily  = calcSMA(dailyCloses, 50);
   const ma200daily = calcSMA(dailyCloses, 200);
   const bb   = calcBB(weeklyCloses);
   const macd = calcMACD(weeklyCloses);
   const stoch = calcStochastic(weeklyHighs, weeklyLows, weeklyCloses);
   const wr    = calcWilliamsR(weeklyHighs, weeklyLows, weeklyCloses);
+  const atr   = calcATR(weeklyHighs, weeklyLows, weeklyCloses);
+  const adxResult = calcSimpleADX(weeklyHighs, weeklyLows, weeklyCloses);
 
   const avgVol  = weeklyVolumes.slice(-20).reduce((a, b) => a + b, 0) / Math.min(weeklyVolumes.length, 20);
   const curVol  = weeklyVolumes[weeklyVolumes.length - 1] || 0;
@@ -161,30 +250,99 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
     bbSqueeze = bwArr.length >= 4 && curBW <= minBW * 1.05;
   }
 
-  // 3주 연속 하락
-  const threeWeekDown = weeklyCloses.length >= 4 &&
-    weeklyCloses[weeklyCloses.length - 1] < weeklyCloses[weeklyCloses.length - 2] &&
-    weeklyCloses[weeklyCloses.length - 2] < weeklyCloses[weeklyCloses.length - 3] &&
-    weeklyCloses[weeklyCloses.length - 3] < weeklyCloses[weeklyCloses.length - 4];
-
-  // 52주 신저가 근접
+  // 52주 신고/저가
+  const high52w = weeklyCloses.length >= 52
+    ? Math.max(...weeklyCloses.slice(-52))
+    : Math.max(...weeklyCloses);
   const low52w = weeklyCloses.length >= 52
     ? Math.min(...weeklyCloses.slice(-52))
     : Math.min(...weeklyCloses);
   const near52wLow = price <= low52w * 1.05;
+  const near52wHigh = price >= high52w * 0.98;
+
+  // OBV (On-Balance Volume) - 간단한 구현
+  let obv = 0;
+  const obvArr = [];
+  for (let i = 0; i < weeklyCloses.length; i++) {
+    if (i === 0) obv = weeklyVolumes[i];
+    else {
+      if (weeklyCloses[i] > weeklyCloses[i-1]) obv += weeklyVolumes[i];
+      else if (weeklyCloses[i] < weeklyCloses[i-1]) obv -= weeklyVolumes[i];
+    }
+    obvArr.push(obv);
+  }
+
+  // 최근 주간 변동폭 (ATR의 2배 이상인지 확인)
+  const recentRange = weeklyHighs[weeklyHighs.length - 1] - weeklyLows[weeklyLows.length - 1];
+  const atrBreakout = atr && recentRange > atr * 2;
+
+  // 가격 채널 (52주 고/저 근처)
+  const priceChannel = near52wHigh || near52wLow;
+
+  // 갭 신호 (주간 변화 ±3% 이상)
+  const gapSignal = Math.abs(weekChange) >= 3;
+
+  // 거래량 극증
+  const volumeClimax = volRatio >= 3;
+
+  // 거래량 고갈
+  const volumeDry = volRatio <= 0.3;
+
+  // OBV 다이버전스 - 최근 4주 가격 추세 vs OBV 추세
+  let obvDivergence = false;
+  if (obvArr.length >= 4) {
+    const priceTrend = weeklyCloses[weeklyCloses.length - 1] > weeklyCloses[weeklyCloses.length - 4] ? 1 : -1;
+    const obvTrend = obvArr[obvArr.length - 1] > obvArr[obvArr.length - 4] ? 1 : -1;
+    obvDivergence = priceTrend !== obvTrend;
+  }
+
+  // 평균회귀 (200일선 대비 ±15% 이상)
+  const meanReversion = ma200Dist && Math.abs(ma200Dist) >= 15;
+
+  // MACD 다이버전스 - 간단한 구현: 지난 2주 가격 방향 vs MACD 방향
+  let macdDivergence = false;
+  if (weeklyCloses.length >= 2) {
+    const priceTrend = weeklyCloses[weeklyCloses.length - 1] > weeklyCloses[weeklyCloses.length - 2] ? 1 : -1;
+    const macdVal = macd.macdLine || 0;
+    const prevMacdVal = macd.signalLine || 0;
+    const macdTrend = macdVal > prevMacdVal ? 1 : -1;
+    macdDivergence = priceTrend !== macdTrend;
+  }
+
+  // MA 리본 (정배열/역배열)
+  let maRibbon = false;
+  if (ma20daily && ma50daily && ma200daily) {
+    const bullish = ma20daily > ma50daily && ma50daily > ma200daily;
+    const bearish = ma20daily < ma50daily && ma50daily < ma200daily;
+    maRibbon = bullish || bearish;
+  }
+
+  // ADX 강한 추세
+  const adxTrend = adxResult && adxResult.adx >= 25;
+
+  // 골든크로스
+  const goldenCross = ma50daily && ma200daily && ma50daily > ma200daily;
+
+  // 데스크로스
+  const deathCross = ma50daily && ma200daily && ma50daily < ma200daily;
 
   const triggers = [];
-  if (conditions.includes("rsi30")           && rsi != null && rsi <= 30)                          triggers.push("rsi30");
-  if (conditions.includes("ma200")           && ma200Dist != null && Math.abs(ma200Dist) <= 2)     triggers.push("ma200");
-  if (conditions.includes("bb_lower")        && bb && price <= bb.lower * 1.01)                   triggers.push("bb_lower");
-  if (conditions.includes("macd_golden")     && macd.goldenCross)                                  triggers.push("macd_golden");
-  if (conditions.includes("volume_spike")    && volRatio >= 2)                                     triggers.push("volume_spike");
-  if (conditions.includes("stoch_oversold")  && stoch && stoch.k < 20 && stoch.d < 20)            triggers.push("stoch_oversold");
-  if (conditions.includes("bb_squeeze")      && bbSqueeze)                                         triggers.push("bb_squeeze");
-  if (conditions.includes("ma_golden")       && ma50daily && ma200daily && ma50daily > ma200daily) triggers.push("ma_golden");
-  if (conditions.includes("three_week_down") && threeWeekDown)                                     triggers.push("three_week_down");
-  if (conditions.includes("extreme_oversold")&& ma200Dist != null && ma200Dist <= -20)             triggers.push("extreme_oversold");
-  if (conditions.includes("near_52w_low")    && near52wLow)                                        triggers.push("near_52w_low");
+  if (conditions.includes("rsi_extreme")     && rsi != null && (rsi <= 25 || rsi >= 75))           triggers.push("rsi_extreme");
+  if (conditions.includes("macd_divergence")  && macdDivergence)                                   triggers.push("macd_divergence");
+  if (conditions.includes("ma_ribbon")        && maRibbon)                                         triggers.push("ma_ribbon");
+  if (conditions.includes("adx_trend")        && adxTrend)                                         triggers.push("adx_trend");
+  if (conditions.includes("bb_squeeze")       && bbSqueeze)                                        triggers.push("bb_squeeze");
+  if (conditions.includes("atr_breakout")     && atrBreakout)                                      triggers.push("atr_breakout");
+  if (conditions.includes("price_channel")    && priceChannel)                                     triggers.push("price_channel");
+  if (conditions.includes("gap_signal")       && gapSignal)                                        triggers.push("gap_signal");
+  if (conditions.includes("volume_climax")    && volumeClimax)                                     triggers.push("volume_climax");
+  if (conditions.includes("obv_divergence")   && obvDivergence)                                    triggers.push("obv_divergence");
+  if (conditions.includes("volume_dry")       && volumeDry)                                        triggers.push("volume_dry");
+  if (conditions.includes("near_52w_low")     && near52wLow)                                       triggers.push("near_52w_low");
+  if (conditions.includes("near_52w_high")    && near52wHigh)                                      triggers.push("near_52w_high");
+  if (conditions.includes("death_cross")      && deathCross)                                       triggers.push("death_cross");
+  if (conditions.includes("golden_cross")     && goldenCross)                                      triggers.push("golden_cross");
+  if (conditions.includes("mean_reversion")   && meanReversion)                                    triggers.push("mean_reversion");
 
   return {
     triggers, price: +price.toFixed(6),
@@ -194,7 +352,7 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
     volRatio: +volRatio.toFixed(1),
     ma50: ma50daily, ma200: ma200daily,
     stoch, wr: wr != null ? +wr.toFixed(1) : null,
-    low52w,
+    low52w, high52w,
   };
 }
 
@@ -202,18 +360,41 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
 // 조건 메타데이터
 // ════════════════════════════════════════════════════════════════════
 const CONDITION_META = {
-  rsi30:           { label: "RSI ≤ 30",           icon: "📉", desc: "주봉 RSI가 30 이하 — 극단적 과매도 구간",  category: "기본" },
-  ma200:           { label: "200일선 터치",         icon: "📊", desc: "현재가와 200일선 오차 ±2% 이내",         category: "기본" },
-  bb_lower:        { label: "BB 하단 터치",         icon: "🎯", desc: "볼린저밴드 하단 이하 — 통계적 과매도",    category: "기본" },
-  macd_golden:     { label: "MACD 골든크로스",      icon: "✨", desc: "MACD 라인이 시그널 위로 상향 돌파",       category: "기본" },
-  volume_spike:    { label: "거래량 급증",           icon: "🔥", desc: "최근 거래량이 20주 평균의 2배 이상",      category: "기본" },
-  stoch_oversold:  { label: "스토캐스틱 과매도",    icon: "🌊", desc: "Stochastic %K & %D 모두 20 이하",        category: "전문가" },
-  bb_squeeze:      { label: "BB 스퀴즈",            icon: "⚡", desc: "밴드폭이 52주 최저 — 대폭발 전조",        category: "전문가" },
-  ma_golden:       { label: "MA 골든크로스 50/200", icon: "🏆", desc: "50일선이 200일선 위 — 장기 상승전환",      category: "전문가" },
-  three_week_down: { label: "3주 연속 하락",         icon: "📛", desc: "3주 연속 하락 — 단기 저점 탐색 구간",    category: "전문가" },
-  extreme_oversold:{ label: "극단 과매도",           icon: "💥", desc: "200일선 대비 -20% — 역사적 저점권",       category: "전문가" },
-  near_52w_low:    { label: "52주 신저가 근접",      icon: "🔔", desc: "52주 최저가 대비 5% 이내 — 매집 관심",   category: "전문가" },
+  // 모멘텀 & 추세
+  rsi_extreme:     { label: "RSI 극단값",        icon: "⚡", desc: "RSI ≤ 25 또는 ≥ 75 — 극단적 과매수/과매도" },
+  macd_divergence: { label: "MACD 다이버전스",    icon: "🔀", desc: "가격과 MACD 방향 불일치 — 추세 반전 선행지표" },
+  ma_ribbon:       { label: "이평선 정배열/역배열", icon: "📐", desc: "MA20>MA50>MA200 정배열 또는 역배열 — 추세 강도 확인" },
+  adx_trend:       { label: "ADX 강한 추세",      icon: "💪", desc: "ADX ≥ 25 + DI 방향 — 추세 존재 및 방향 확인" },
+  // 변동성 & 가격 구조
+  bb_squeeze:      { label: "볼린저 스퀴즈",      icon: "🔥", desc: "밴드폭 52주 최저 — 대규모 변동 임박 신호" },
+  atr_breakout:    { label: "ATR 돌파",           icon: "🚀", desc: "당일 변동폭이 ATR(14) 2배 초과 — 폭발적 움직임" },
+  price_channel:   { label: "채널 돌파",          icon: "📊", desc: "52주 고가/저가 채널 돌파 — 신고가 또는 지지선 이탈" },
+  gap_signal:      { label: "갭 시그널",          icon: "⬆️", desc: "전주 대비 ±3% 이상 갭 — 수급 불균형" },
+  // 수급 & 거래량
+  volume_climax:   { label: "거래량 클라이맥스",   icon: "🌊", desc: "거래량 20주 평균 3배 이상 — 세력 매집/투매 신호" },
+  obv_divergence:  { label: "OBV 다이버전스",     icon: "📈", desc: "OBV와 가격 방향 불일치 — 스마트머니 움직임 포착" },
+  volume_dry:      { label: "거래량 고갈",         icon: "🏜️", desc: "거래량 20주 평균 30% 이하 — 바닥 형성 가능" },
+  // 밸류에이션 & 상대강도
+  near_52w_low:    { label: "52주 신저가 근접",    icon: "🔔", desc: "52주 최저가 대비 5% 이내" },
+  near_52w_high:   { label: "52주 신고가 근접",    icon: "🏆", desc: "52주 최고가 대비 2% 이내 — 모멘텀 브레이크아웃" },
+  death_cross:     { label: "데스크로스",          icon: "💀", desc: "50일선이 200일선 하향돌파 — 장기 하락전환 경고" },
+  golden_cross:    { label: "골든크로스",          icon: "✨", desc: "50일선이 200일선 상향돌파 — 장기 상승전환" },
+  mean_reversion:  { label: "평균회귀 신호",       icon: "🎯", desc: "200일선 대비 ±15% 이상 이탈 — 평균회귀 구간" },
 };
+
+// ════════════════════════════════════════════════════════════════════
+// 감정 분석 헬퍼
+// ════════════════════════════════════════════════════════════════════
+function analyzeSentiment(title) {
+  const pos = ["surge","rally","rise","gain","jump","soar","record","bull","up","growth","profit","beat","strong","high","buy","upgrade","긍정","상승","급등","호재","성장","흑자","매수","상향","신고가","최고","강세","돌파"];
+  const neg = ["crash","fall","drop","plunge","decline","loss","bear","down","sell","cut","miss","weak","low","risk","concern","recession","부정","하락","급락","악재","적자","매도","하향","신저가","최저","약세","폭락","위기","불안"];
+  const titleLower = title.toLowerCase();
+  const posCount = pos.filter(w => titleLower.includes(w)).length;
+  const negCount = neg.filter(w => titleLower.includes(w)).length;
+  if (posCount > negCount) return "positive";
+  if (negCount > posCount) return "negative";
+  return "neutral";
+}
 
 // ════════════════════════════════════════════════════════════════════
 // 텔레그램
@@ -282,9 +463,11 @@ const C = {
 // 서브 컴포넌트: Tag
 // ════════════════════════════════════════════════════════════════════
 const TAG_COLORS = {
-  rsi30: C.purple, ma200: C.blue, bb_lower: C.yellow, macd_golden: C.green,
-  volume_spike: C.red, stoch_oversold: C.purple, bb_squeeze: C.yellow,
-  ma_golden: C.green, three_week_down: C.red, extreme_oversold: C.red, near_52w_low: C.yellow,
+  rsi_extreme: C.purple, macd_divergence: C.yellow, ma_ribbon: C.blue, adx_trend: C.green,
+  bb_squeeze: C.red, atr_breakout: C.red, price_channel: C.blue, gap_signal: C.yellow,
+  volume_climax: C.red, obv_divergence: C.purple, volume_dry: C.yellow,
+  near_52w_low: C.green, near_52w_high: C.blue, death_cross: C.red, golden_cross: C.green,
+  mean_reversion: C.purple,
 };
 
 function SignalTag({ triggerKey }) {
@@ -383,7 +566,7 @@ export default function App() {
   const [results, setResults]         = useState([]);
   const [scanning, setScanning]       = useState(false);
   const [scanProgress, setScanProgress] = useState({ done: 0, total: 0 });
-  const [conditions, setConditions]   = useState(["rsi30","ma200","bb_lower","macd_golden","volume_spike"]);
+  const [conditions, setConditions]   = useState(["rsi_extreme","bb_squeeze","volume_climax","golden_cross","mean_reversion"]);
   const [mode, setMode]               = useState("or");
   const [filterMarket, setFilterMarket] = useState("all");
   const [sortBy, setSortBy]           = useState("rsi");
@@ -417,6 +600,7 @@ export default function App() {
   // ── 뉴스 상태 ─────────────────────────────────────────────────
   const [newsItems, setNewsItems] = useState([]);
   const [newsLoading, setNewsLoading] = useState(false);
+  const [newsSort, setNewsSort] = useState("time"); // time, positive, negative
 
   useEffect(() => { saveSettings({ botToken: settings.botToken, chatId: settings.chatId, autoSend: settings.autoSend, syncPin }); }, [settings, syncPin]);
   useEffect(() => { savePortfolio(portfolio); }, [portfolio]);
@@ -604,6 +788,26 @@ export default function App() {
     };
   }, { invested: 0, current: 0, pnl: 0, hasPrices: false });
 
+  // 뉴스 정렬
+  const sortedNews = [...newsItems].sort((a, b) => {
+    if (newsSort === "time") {
+      return new Date(b.date || b.publishedAt || b.pubDate || 0) - new Date(a.date || a.publishedAt || a.pubDate || 0);
+    } else if (newsSort === "positive") {
+      const sentA = analyzeSentiment(a.title);
+      const sentB = analyzeSentiment(b.title);
+      const scoreA = sentA === "positive" ? 3 : sentA === "neutral" ? 2 : 1;
+      const scoreB = sentB === "positive" ? 3 : sentB === "neutral" ? 2 : 1;
+      return scoreB - scoreA;
+    } else if (newsSort === "negative") {
+      const sentA = analyzeSentiment(a.title);
+      const sentB = analyzeSentiment(b.title);
+      const scoreA = sentA === "negative" ? 3 : sentA === "neutral" ? 2 : 1;
+      const scoreB = sentB === "negative" ? 3 : sentB === "neutral" ? 2 : 1;
+      return scoreB - scoreA;
+    }
+    return 0;
+  });
+
   // ────────────────────────────────────────────────────────────────
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text1, fontFamily: "'Pretendard', 'Apple SD Gothic Neo', system-ui, sans-serif" }}>
@@ -633,10 +837,11 @@ export default function App() {
         borderBottom: `1px solid ${C.border}`,
       }}>
         <div style={{ maxWidth: "900px", margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "56px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <div onClick={() => { setTab("screener"); setMenuOpen(false); }} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}
+            title="홈으로 이동">
             <span style={{ fontSize: "20px" }}>📡</span>
             <span style={{ fontWeight: 800, fontSize: "17px" }}>DI금융</span>
-            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v4</span>
+            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v5</span>
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "2px" }}>
@@ -648,6 +853,14 @@ export default function App() {
               }}>{t.icon} {t.label}</button>
             ))}
           </nav>
+          {/* 새로고침 버튼 */}
+          <button onClick={() => window.location.reload()} title="새로고침" style={{
+            background: "none", border: "none", color: C.text3, fontSize: "18px",
+            padding: "4px 8px", cursor: "pointer", marginLeft: "4px",
+            transition: "color .2s",
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = C.blue}
+          onMouseLeave={e => e.currentTarget.style.color = C.text3}>🔄</button>
           {/* 모바일 햄버거 */}
           <button className="mobile-menu-btn" onClick={() => setMenuOpen(!menuOpen)} style={{
             display: "none", background: "none", border: "none", color: C.text2,
@@ -684,7 +897,7 @@ export default function App() {
             {/* 조건 선택 패널 */}
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                <div style={{ fontWeight: 700, fontSize: "15px" }}>⚙️ 스크리닝 조건</div>
+                <div style={{ fontWeight: 700, fontSize: "15px" }}>⚙️ 스크리닝 옵션</div>
                 <div style={{ display: "flex", gap: "6px" }}>
                   {["or", "and"].map(m => (
                     <button key={m} onClick={() => setMode(m)} style={{
@@ -696,32 +909,70 @@ export default function App() {
                 </div>
               </div>
 
-              <div style={{ fontSize: "11px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px" }}>기본 조건</div>
+              {/* 모멘텀 & 추세 */}
+              <div style={{ fontSize: "10px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>모멘텀 & 추세</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", marginBottom: "14px" }}>
-                {Object.entries(CONDITION_META).filter(([, v]) => v.category === "기본").map(([key, meta]) => {
+                {["rsi_extreme","macd_divergence","ma_ribbon","adx_trend"].map(key => {
+                  const meta = CONDITION_META[key];
                   const on = conditions.includes(key);
                   return (
                     <button key={key} onClick={() => setConditions(p => on ? p.filter(c => c !== key) : [...p, key])}
-                      title={meta.desc} style={{
+                      title={meta?.desc} style={{
                         padding: "6px 12px", borderRadius: "10px", fontSize: "12px", fontWeight: 600,
                         background: on ? `${C.blue}22` : C.card2, color: on ? C.blue : C.text3,
                         border: `1px solid ${on ? C.blue : C.border2}`,
-                      }}>{meta.icon} {meta.label}</button>
+                      }}>{meta?.icon} {meta?.label}</button>
                   );
                 })}
               </div>
 
-              <div style={{ fontSize: "11px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px" }}>전문가 조건</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", marginBottom: "18px" }}>
-                {Object.entries(CONDITION_META).filter(([, v]) => v.category === "전문가").map(([key, meta]) => {
+              {/* 변동성 & 가격 구조 */}
+              <div style={{ fontSize: "10px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>변동성 & 가격 구조</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", marginBottom: "14px" }}>
+                {["bb_squeeze","atr_breakout","price_channel","gap_signal"].map(key => {
+                  const meta = CONDITION_META[key];
                   const on = conditions.includes(key);
                   return (
                     <button key={key} onClick={() => setConditions(p => on ? p.filter(c => c !== key) : [...p, key])}
-                      title={meta.desc} style={{
+                      title={meta?.desc} style={{
                         padding: "6px 12px", borderRadius: "10px", fontSize: "12px", fontWeight: 600,
-                        background: on ? `${C.purple}22` : C.card2, color: on ? C.purple : C.text3,
-                        border: `1px solid ${on ? C.purple : C.border2}`,
-                      }}>{meta.icon} {meta.label}</button>
+                        background: on ? `${C.red}22` : C.card2, color: on ? C.red : C.text3,
+                        border: `1px solid ${on ? C.red : C.border2}`,
+                      }}>{meta?.icon} {meta?.label}</button>
+                  );
+                })}
+              </div>
+
+              {/* 수급 & 거래량 */}
+              <div style={{ fontSize: "10px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>수급 & 거래량</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", marginBottom: "14px" }}>
+                {["volume_climax","obv_divergence","volume_dry"].map(key => {
+                  const meta = CONDITION_META[key];
+                  const on = conditions.includes(key);
+                  return (
+                    <button key={key} onClick={() => setConditions(p => on ? p.filter(c => c !== key) : [...p, key])}
+                      title={meta?.desc} style={{
+                        padding: "6px 12px", borderRadius: "10px", fontSize: "12px", fontWeight: 600,
+                        background: on ? `${C.yellow}22` : C.card2, color: on ? C.yellow : C.text3,
+                        border: `1px solid ${on ? C.yellow : C.border2}`,
+                      }}>{meta?.icon} {meta?.label}</button>
+                  );
+                })}
+              </div>
+
+              {/* 구조적 시그널 */}
+              <div style={{ fontSize: "10px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>구조적 시그널</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", marginBottom: "18px" }}>
+                {["near_52w_low","near_52w_high","death_cross","golden_cross","mean_reversion"].map(key => {
+                  const meta = CONDITION_META[key];
+                  const on = conditions.includes(key);
+                  return (
+                    <button key={key} onClick={() => setConditions(p => on ? p.filter(c => c !== key) : [...p, key])}
+                      title={meta?.desc} style={{
+                        padding: "6px 12px", borderRadius: "10px", fontSize: "12px", fontWeight: 600,
+                        background: on ? `${C.green}22` : C.card2, color: on ? C.green : C.text3,
+                        border: `1px solid ${on ? C.green : C.border2}`,
+                      }}>{meta?.icon} {meta?.label}</button>
                   );
                 })}
               </div>
@@ -900,107 +1151,238 @@ export default function App() {
                     }]);
                     setNewAsset({ symbol: "", name: "", market: "us", qty: "", avgPrice: "" });
                     setShowAddAsset(false);
-                  }} style={{ padding: "9px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700, background: C.blue, color: "#fff", border: "none" }}>추가하기</button>
-                  <button onClick={() => setShowAddAsset(false)} style={{ padding: "9px 16px", borderRadius: "10px", fontSize: "13px", background: C.card2, color: C.text3, border: `1px solid ${C.border2}` }}>취소</button>
+                  }} style={{
+                    padding: "9px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
+                    background: C.blue, color: "#fff", border: "none", flex: 1,
+                  }}>추가</button>
+                  <button onClick={() => setShowAddAsset(false)} style={{
+                    padding: "9px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                    background: C.card2, color: C.text3, border: `1px solid ${C.border2}`, flex: 1,
+                  }}>취소</button>
                 </div>
-              </div>
-            )}
-
-            {/* 포트폴리오 빈 상태 */}
-            {portfolio.length === 0 && !showAddAsset && (
-              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "48px 24px", textAlign: "center" }}>
-                <div style={{ fontSize: "40px", marginBottom: "16px" }}>💼</div>
-                <div style={{ fontWeight: 700, fontSize: "17px", marginBottom: "8px" }}>포트폴리오가 비어 있어요</div>
-                <div style={{ color: C.text3, fontSize: "13px", marginBottom: "20px", lineHeight: 1.7 }}>
-                  토스증권에서 보유 중인 자산을 추가하면<br />수익률을 실시간으로 추적할 수 있어요
-                </div>
-                <button onClick={() => setShowAddAsset(true)} style={{
-                  padding: "11px 24px", borderRadius: "12px", fontSize: "14px", fontWeight: 700,
-                  background: C.blue, color: "#fff", border: "none",
-                }}>+ 첫 자산 추가하기</button>
               </div>
             )}
 
             {/* 포트폴리오 아이템 */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {portfolio.map((item, idx) => {
-                const cur = portfolioPrices[item.symbol];
-                const invested = item.qty * item.avgPrice;
-                const current  = cur ? item.qty * cur : null;
-                const pnl      = current != null ? current - invested : null;
-                const pnlPct   = pnl != null && invested > 0 ? (pnl / invested) * 100 : null;
-                const isUp = pnl != null && pnl >= 0;
-                const mcBg = item.market === "us" ? "#1A2C4F" : item.market === "kr" ? "#1A2A1E" : "#1E1A2A";
-                const mcC  = item.market === "us" ? C.blue : item.market === "kr" ? C.green : C.purple;
-                return (
-                  <div key={idx} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "16px 20px" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <div style={{ width: "42px", height: "42px", borderRadius: "12px", background: mcBg, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "10px", color: mcC }}>
-                          {item.symbol.slice(0, 4)}
-                        </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: "15px" }}>{item.name || item.symbol}</div>
-                          <div style={{ fontSize: "12px", color: C.text3 }}>{item.symbol} · {item.qty.toLocaleString()} 주</div>
-                        </div>
+            {portfolio.length === 0 ? (
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "48px 24px", textAlign: "center" }}>
+                <div style={{ fontSize: "44px", marginBottom: "16px" }}>💼</div>
+                <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "8px" }}>포트폴리오 비어있음</div>
+                <div style={{ color: C.text3, fontSize: "14px" }}>자산을 추가하여 시작하세요</div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {portfolio.map((item, idx) => {
+                  const cur = portfolioPrices[item.symbol];
+                  const gain = cur ? ((cur - item.avgPrice) / item.avgPrice) * 100 : 0;
+                  const gainVal = cur ? item.qty * (cur - item.avgPrice) : 0;
+                  const isPos = gainVal >= 0;
+                  return (
+                    <div key={idx} style={{
+                      background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "14px",
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                    }}>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: "14px", marginBottom: "2px" }}>{item.name}</div>
+                        <div style={{ fontSize: "12px", color: C.text3 }}>{item.symbol} · {item.qty.toLocaleString()}개</div>
                       </div>
                       <div style={{ textAlign: "right" }}>
-                        <div style={{ fontWeight: 700, fontSize: "16px" }}>
-                          {cur ? toDisplay(cur, item.market) : <span style={{ color: C.text3 }}>—</span>}
+                        <div style={{ fontSize: "13px", color: C.text2 }}>{toDisplay(cur, item.market)}</div>
+                        <div style={{ fontSize: "12px", fontWeight: 600, color: isPos ? C.green : C.red }}>
+                          {isPos ? "+" : ""}{gain.toFixed(2)}% {toDisplay(gainVal, item.market)}
                         </div>
-                        {pnlPct != null && (
-                          <div style={{ fontSize: "13px", color: isUp ? C.green : C.red, fontWeight: 600 }}>
-                            {isUp ? "▲" : "▼"} {Math.abs(pnlPct).toFixed(2)}%
-                          </div>
-                        )}
                       </div>
-                    </div>
-                    <div style={{ display: "flex", gap: "16px", marginTop: "12px", paddingTop: "12px", borderTop: `1px solid ${C.border}`, flexWrap: "wrap" }}>
-                      {[
-                        { label: "평균 매입가",   value: toDisplay(item.avgPrice, item.market) },
-                        { label: "총 투자금액",   value: toDisplay(invested, item.market) },
-                        { label: "현재 평가금액", value: current != null ? toDisplay(current, item.market) : "—" },
-                        { label: "손익",          value: pnl != null ? `${isUp ? "+" : ""}${toDisplay(Math.abs(pnl), item.market)}` : "—", color: pnl != null ? (isUp ? C.green : C.red) : C.text2 },
-                      ].map(({ label, value, color }) => (
-                        <div key={label}>
-                          <div style={{ fontSize: "10px", color: C.text3, marginBottom: "2px" }}>{label}</div>
-                          <div style={{ fontSize: "13px", fontWeight: 600, color: color || C.text2 }}>{value}</div>
-                        </div>
-                      ))}
                       <button onClick={() => setPortfolio(p => p.filter((_, i) => i !== idx))} style={{
-                        marginLeft: "auto", alignSelf: "flex-end", padding: "4px 10px", borderRadius: "7px",
-                        fontSize: "11px", background: "transparent", color: C.text3, border: `1px solid ${C.border2}`,
+                        padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: 600,
+                        background: C.redBg, color: C.red, border: `1px solid ${C.red}44`, marginLeft: "12px",
                       }}>삭제</button>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 전략
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "strategy" && <StrategyPanel onRunBacktest={(strategy, symbol) => {
+          setBtStrategy(strategy); setBtSymbol(symbol); setTab("backtest");
+        }} />}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 백테스트
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "backtest" && <BacktestPanel initialStrategy={btStrategy} initialSymbol={btSymbol} />}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 뉴스
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "news" && (
+          <div>
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "16px", marginBottom: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontWeight: 700 }}>📰 투자 뉴스</span>
+                  <button onClick={fetchNews} disabled={newsLoading} style={{
+                    padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 600,
+                    background: C.card2, color: C.text3, border: `1px solid ${C.border2}`, cursor: "pointer",
+                  }}>{newsLoading ? "⏳" : "🔄 새로고침"}</button>
+                </div>
+                <div style={{ display: "flex", gap: "4px" }}>
+                  {[
+                    ["time", "시간순"],
+                    ["positive", "긍정순"],
+                    ["negative", "부정순"],
+                  ].map(([v, l]) => (
+                    <button key={v} onClick={() => setNewsSort(v)} style={{
+                      padding: "4px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: 600,
+                      background: newsSort === v ? C.blueBg : "transparent",
+                      color: newsSort === v ? C.blue : C.text3,
+                      border: `1px solid ${newsSort === v ? C.blue : C.border2}`,
+                    }}>{l}</button>
+                  ))}
+                </div>
+              </div>
             </div>
 
-            {/* 기기간 동기화 */}
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginTop: "16px" }}>
-              <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "12px" }}>🔄 기기간 동기화</div>
-              <div style={{ fontSize: "12px", color: C.text3, marginBottom: "12px", lineHeight: 1.6 }}>
-                PIN을 설정하면 PC/모바일 간 포트폴리오와 설정을 동기화할 수 있어요.<br />
-                같은 PIN을 입력하면 어느 기기에서든 같은 데이터를 불러올 수 있어요.
+            {newsLoading ? (
+              <div style={{ textAlign: "center", padding: "32px", color: C.text3 }}>뉴스 로딩 중...</div>
+            ) : sortedNews.length === 0 ? (
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "48px 24px", textAlign: "center" }}>
+                <div style={{ fontSize: "44px", marginBottom: "16px" }}>📰</div>
+                <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "8px" }}>뉴스 없음</div>
+                <div style={{ color: C.text3, fontSize: "14px" }}>최신 뉴스가 없습니다</div>
               </div>
-              <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-                <input value={syncPin} onChange={e => { setSyncPin(e.target.value); setSettings(p => ({ ...p, syncPin: e.target.value })); }}
-                  placeholder="동기화 PIN (4자리 이상)" style={{
-                    padding: "9px 14px", borderRadius: "10px", fontSize: "13px", width: "180px",
-                    background: C.bg, border: `1px solid ${C.border2}`, color: C.text1, outline: "none",
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {sortedNews.map((news, i) => {
+                  const sentiment = analyzeSentiment(news.title);
+                  const sentimentBadge = sentiment === "positive" ? "🟢 긍정" : sentiment === "negative" ? "🔴 부정" : "⚪ 중립";
+                  const pubDate = new Date(news.date || news.publishedAt || news.pubDate || Date.now());
+                  return (
+                    <a key={i} href={news.url || news.link || "#"} target="_blank" rel="noopener" style={{
+                      background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "14px",
+                      textDecoration: "none", color: "inherit", display: "block", transition: "all .2s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.borderColor = C.blue}
+                    onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
+                      <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "6px", color: C.text1, lineHeight: 1.4 }}>{news.title}</div>
+                          <div style={{ fontSize: "12px", color: C.text3, marginBottom: "8px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                            <span>{news.source || "Unknown"}</span>
+                            <span>·</span>
+                            <span>{pubDate.toLocaleString("ko-KR")}</span>
+                          </div>
+                          {(news.desc || news.description) && (
+                            <div style={{ fontSize: "12px", color: C.text2, lineHeight: 1.5 }}>{(news.desc || news.description).slice(0, 120)}</div>
+                          )}
+                          {news.tags?.length > 0 && (
+                            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "6px" }}>
+                              {news.tags.map((tag, ti) => (
+                                <span key={ti} style={{ padding: "2px 6px", borderRadius: "4px", fontSize: "10px", background: C.card2, color: C.text3 }}>{tag}</span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ fontSize: "11px", whiteSpace: "nowrap", color: C.text2, padding: "4px 8px", background: C.card2, borderRadius: "6px" }}>{sentimentBadge}</div>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 알림
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "alerts" && (
+          <div>
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px" }}>
+              <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "16px" }}>🔔 텔레그램 알림</div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+                <div>
+                  <div style={{ fontSize: "11px", color: C.text3, marginBottom: "6px", fontWeight: 600 }}>봇 토큰</div>
+                  <input value={settings.botToken} onChange={e => setSettings(p => ({ ...p, botToken: e.target.value }))}
+                    placeholder="123456789:ABCdefGHIjklMNOpqrSTUvwxyz" type="password" style={{
+                      width: "100%", padding: "10px 12px", borderRadius: "10px", fontSize: "12px",
+                      background: C.bg, border: `1px solid ${C.border2}`, color: C.text1, outline: "none",
+                    }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: "11px", color: C.text3, marginBottom: "6px", fontWeight: 600 }}>채팅 ID</div>
+                  <input value={settings.chatId} onChange={e => setSettings(p => ({ ...p, chatId: e.target.value }))}
+                    placeholder="1234567890" type="password" style={{
+                      width: "100%", padding: "10px 12px", borderRadius: "10px", fontSize: "12px",
+                      background: C.bg, border: `1px solid ${C.border2}`, color: C.text1, outline: "none",
+                    }} />
+                </div>
+              </div>
+
+              <div style={{ marginBottom: "12px" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px" }}>
+                  <input type="checkbox" checked={settings.autoSend} onChange={e => setSettings(p => ({ ...p, autoSend: e.target.checked }))}
+                    style={{ cursor: "pointer" }} />
+                  <span>스캔 완료 시 자동 알림</span>
+                </label>
+              </div>
+
+              <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+                <button onClick={() => {
+                  if (!settings.botToken || !settings.chatId) return;
+                  (async () => {
+                    setTgStatus("⏳ 전송 중...");
+                    try {
+                      const r = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendMessage`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ chat_id: settings.chatId, text: "🚨 *DI금융 테스트*\n\n테스트 알림입니다.", parse_mode: "Markdown" }),
+                      });
+                      if (r.ok) setTgStatus("✅ 테스트 완료");
+                      else setTgStatus("❌ 전송 실패");
+                    } catch (e) { setTgStatus(`❌ ${e.message}`); }
+                  })();
+                }} style={{
+                  padding: "9px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
+                  background: C.blue, color: "#fff", border: "none",
+                }}>📤 테스트</button>
+              </div>
+
+              {tgStatus && (
+                <div style={{ fontSize: "12px", color: tgStatus.includes("✅") ? C.green : C.red, fontWeight: 600 }}>
+                  {tgStatus}
+                </div>
+              )}
+            </div>
+
+            {/* 동기화 */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px" }}>
+              <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "16px" }}>🔄 데이터 동기화</div>
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ fontSize: "11px", color: C.text3, marginBottom: "6px", fontWeight: 600 }}>동기화 PIN (4자리 이상)</div>
+                <input value={syncPin} onChange={e => setSyncPin(e.target.value)} type="password" placeholder="1234"
+                  style={{
+                    width: "100%", padding: "10px 12px", borderRadius: "10px", fontSize: "13px",
+                    background: C.bg, border: `1px solid ${C.border2}`, color: C.text1, outline: "none", marginBottom: "12px",
                   }} />
+              </div>
+              <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
                 <button onClick={syncUpload} style={{
-                  padding: "9px 14px", borderRadius: "10px", fontSize: "12px", fontWeight: 700,
-                  background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}44`, cursor: "pointer",
-                }}>⬆️ 업로드</button>
+                  padding: "9px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
+                  background: C.blue, color: "#fff", border: "none", flex: 1,
+                }}>📤 업로드</button>
                 <button onClick={syncDownload} style={{
-                  padding: "9px 14px", borderRadius: "10px", fontSize: "12px", fontWeight: 700,
-                  background: C.greenBg, color: C.green, border: `1px solid ${C.green}44`, cursor: "pointer",
-                }}>⬇️ 다운로드</button>
+                  padding: "9px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
+                  background: C.green, color: "#fff", border: "none", flex: 1,
+                }}>📥 다운로드</button>
               </div>
               {syncStatus && (
-                <div style={{ marginTop: "8px", fontSize: "12px", color: syncStatus.startsWith("✅") ? C.green : syncStatus.startsWith("❌") ? C.red : C.blue }}>
+                <div style={{ fontSize: "12px", color: syncStatus.includes("✅") ? C.green : C.red, fontWeight: 600 }}>
                   {syncStatus}
                 </div>
               )}
@@ -1008,212 +1390,9 @@ export default function App() {
           </div>
         )}
 
-        {/* ═══════════════════════════════════════════════════════════
-            TAB: 전략
-        ═══════════════════════════════════════════════════════════ */}
-        {tab === "strategy" && (
-          <StrategyPanel onRunBacktest={(strategy, symbol) => {
-            setBtStrategy(strategy);
-            setBtSymbol(symbol);
-            setTab("backtest");
-          }} />
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════
-            TAB: 백테스트
-        ═══════════════════════════════════════════════════════════ */}
-        {tab === "backtest" && (
-          <BacktestPanel initialStrategy={btStrategy} initialSymbol={btSymbol} />
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════
-            TAB: 뉴스
-        ═══════════════════════════════════════════════════════════ */}
-        {tab === "news" && (
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <div style={{ fontWeight: 700, fontSize: "16px" }}>📰 금융 뉴스 & 트렌딩</div>
-              <button onClick={fetchNews} style={{
-                padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
-                background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}44`,
-              }}>{newsLoading ? "⏳ 로딩 중" : "🔄 새로고침"}</button>
-            </div>
-
-            {newsLoading && newsItems.length === 0 && (
-              <div style={{ textAlign: "center", padding: "40px", color: C.text3 }}>
-                <div style={{ fontSize: "24px", marginBottom: "8px" }}>📡</div>
-                뉴스를 불러오는 중...
-              </div>
-            )}
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {newsItems.map((item, i) => (
-                <a key={i} href={item.url} target="_blank" rel="noopener noreferrer"
-                  style={{
-                    background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px",
-                    padding: "16px 20px", textDecoration: "none", color: "inherit",
-                    display: "block", transition: "border-color .15s",
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = C.border2}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: "14px", color: C.text1, marginBottom: "6px", lineHeight: 1.5 }}>
-                        {item.title}
-                      </div>
-                      {item.desc && (
-                        <div style={{ fontSize: "12px", color: C.text3, lineHeight: 1.5, marginBottom: "6px" }}>
-                          {item.desc}
-                        </div>
-                      )}
-                      <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-                        <span style={{
-                          padding: "2px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 700,
-                          background: item.source?.includes("CoinGecko") ? `${C.purple}22` : `${C.blue}22`,
-                          color: item.source?.includes("CoinGecko") ? C.purple : C.blue,
-                        }}>{item.source}</span>
-                        {(item.tags || []).map((tag, ti) => (
-                          <span key={ti} style={{
-                            padding: "1px 6px", borderRadius: "4px", fontSize: "9px", fontWeight: 600,
-                            background: `${C.yellow}15`, color: C.yellow,
-                          }}>{tag}</span>
-                        ))}
-                        {item.date && (
-                          <span style={{ fontSize: "11px", color: C.text3 }}>
-                            {(() => {
-                              try {
-                                const d = new Date(item.date);
-                                const diff = Math.floor((Date.now() - d.getTime()) / 60000);
-                                if (diff < 60) return `${diff}분 전`;
-                                if (diff < 1440) return `${Math.floor(diff / 60)}시간 전`;
-                                return d.toLocaleDateString("ko-KR");
-                              } catch { return ""; }
-                            })()}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <span style={{ color: C.text3, fontSize: "16px", flexShrink: 0, marginTop: "2px" }}>→</span>
-                  </div>
-                </a>
-              ))}
-            </div>
-
-            {!newsLoading && newsItems.length === 0 && (
-              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "48px 24px", textAlign: "center" }}>
-                <div style={{ fontSize: "40px", marginBottom: "16px" }}>📰</div>
-                <div style={{ fontWeight: 700, fontSize: "17px", marginBottom: "8px" }}>뉴스를 불러올 수 없어요</div>
-                <div style={{ color: C.text3, fontSize: "13px" }}>새로고침을 눌러 다시 시도해 주세요</div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════
-            TAB: 알림 설정
-        ═══════════════════════════════════════════════════════════ */}
-        {tab === "alerts" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px" }}>
-              <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "16px" }}>🔔 텔레그램 알림 설정</div>
-
-              <div style={{ background: C.blueBg, borderRadius: "12px", padding: "14px", marginBottom: "18px", fontSize: "13px", color: C.text2, lineHeight: 1.8 }}>
-                <strong style={{ color: C.blue }}>설정 방법</strong><br />
-                1️⃣ 텔레그램 → <strong>@BotFather</strong> → /newbot → 봇 생성<br />
-                2️⃣ 발급받은 <strong>Bot Token</strong> 입력<br />
-                3️⃣ 생성한 봇에게 메시지 전송 후 아래 링크에서 Chat ID 확인<br />
-                <a href={`https://api.telegram.org/bot${settings.botToken}/getUpdates`}
-                  target="_blank" rel="noopener" style={{ color: C.blueL, wordBreak: "break-all" }}>
-                  https://api.telegram.org/bot{"<TOKEN>"}/getUpdates
-                </a>
-              </div>
-
-              {[{ k: "botToken", label: "Bot Token", ph: "8749984490:AAH..." }, { k: "chatId", label: "Chat ID", ph: "5202880452" }].map(({ k, label, ph }) => (
-                <div key={k} style={{ marginBottom: "14px" }}>
-                  <div style={{ fontSize: "12px", color: C.text3, marginBottom: "5px", fontWeight: 600 }}>{label}</div>
-                  <input value={settings[k]} onChange={e => setSettings(p => ({ ...p, [k]: e.target.value }))}
-                    placeholder={ph} style={{
-                      width: "100%", padding: "10px 14px", borderRadius: "10px", fontSize: "13px",
-                      background: C.bg, border: `1px solid ${C.border2}`, color: C.text1, outline: "none",
-                    }} />
-                </div>
-              ))}
-
-              <div style={{ padding: "8px 14px", background: `${C.green}15`, borderRadius: "8px", marginBottom: "14px", fontSize: "12px", color: C.green, display: "flex", alignItems: "center", gap: "6px" }}>
-                <span>💾</span> 설정은 자동 저장됩니다 — 새로고침해도 유지돼요
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", background: C.bg, borderRadius: "12px", marginBottom: "16px" }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "2px" }}>스캔 완료 시 자동 전송</div>
-                  <div style={{ fontSize: "12px", color: C.text3 }}>시그널 감지 시 자동으로 알림 전송</div>
-                </div>
-                <div onClick={() => setSettings(p => ({ ...p, autoSend: !p.autoSend }))} style={{
-                  width: "44px", height: "24px", borderRadius: "12px", cursor: "pointer",
-                  background: settings.autoSend ? C.blue : C.border2, position: "relative", transition: "background .2s",
-                }}>
-                  <div style={{
-                    position: "absolute", top: "2px", width: "20px", height: "20px", borderRadius: "10px",
-                    background: "#fff", transition: "left .2s", left: settings.autoSend ? "22px" : "2px",
-                  }} />
-                </div>
-              </div>
-
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                <button onClick={async () => {
-                  if (!settings.botToken || !settings.chatId) { setTgStatus("❌ 토큰과 Chat ID를 입력하세요"); return; }
-                  setTgStatus("📡 전송 중...");
-                  try {
-                    const r = await sendTelegramAlert(settings.botToken, settings.chatId,
-                      [{ name: "DI금융", symbol: "TEST", market: "us", price: 100, weekChange: 0.5, rsi: 28.5, triggers: ["rsi30"] }], ["rsi30"]);
-                    setTgStatus(r.ok ? "✅ 테스트 메시지 전송 완료!" : `❌ ${r.description}`);
-                  } catch (e) { setTgStatus(`❌ ${e.message}`); }
-                }} style={{
-                  padding: "10px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
-                  background: C.blue, color: "#fff", border: "none",
-                }}>📤 테스트 전송</button>
-
-                {results.length > 0 && (
-                  <button onClick={async () => {
-                    if (!settings.botToken || !settings.chatId) { setTgStatus("❌ 설정 필요"); return; }
-                    setTgStatus("📡 전송 중...");
-                    try {
-                      const r = await sendTelegramAlert(settings.botToken, settings.chatId, results, conditions);
-                      setTgStatus(r.ok ? `✅ ${results.length}개 전송 완료!` : `❌ ${r.description}`);
-                    } catch (e) { setTgStatus(`❌ ${e.message}`); }
-                  }} style={{
-                    padding: "10px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
-                    background: C.greenBg, color: C.green, border: `1px solid ${C.green}44`,
-                  }}>📊 스캔 결과 전송 ({results.length}개)</button>
-                )}
-              </div>
-
-              {tgStatus && (
-                <div style={{
-                  marginTop: "12px", padding: "10px 14px", borderRadius: "10px", fontSize: "13px",
-                  background: tgStatus.startsWith("✅") ? C.greenBg : tgStatus.startsWith("❌") ? C.redBg : C.blueBg,
-                  color: tgStatus.startsWith("✅") ? C.green : tgStatus.startsWith("❌") ? C.red : C.blue,
-                  border: `1px solid ${tgStatus.startsWith("✅") ? C.green : tgStatus.startsWith("❌") ? C.red : C.blue}44`,
-                }}>{tgStatus}</div>
-              )}
-            </div>
-
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px" }}>
-              <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "12px" }}>⏰ 자동 스캔 (Vercel Cron)</div>
-              <div style={{ fontSize: "13px", color: C.text2, lineHeight: 1.9 }}>
-                현재 <strong style={{ color: C.green }}>평일 오전 9시</strong> 자동 스캔 예약됨<br />
-                스케줄 변경: <code style={{ background: C.bg, padding: "1px 6px", borderRadius: "4px", fontSize: "12px" }}>vercel.json</code> → cron 표현식 수정 후 재배포<br />
-                환경변수: Vercel Dashboard → Settings → Environment Variables<br />
-                <code style={{ background: C.bg, padding: "1px 6px", borderRadius: "4px", fontSize: "12px" }}>TELEGRAM_BOT_TOKEN</code> ·{" "}
-                <code style={{ background: C.bg, padding: "1px 6px", borderRadius: "4px", fontSize: "12px" }}>TELEGRAM_CHAT_ID</code>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* 차트 모달 */}
+        {chartAsset && <ChartModal asset={chartAsset} onClose={() => setChartAsset(null)} />}
       </main>
-
-      {/* 캔들 차트 모달 */}
-      {chartAsset && <ChartModal asset={chartAsset} onClose={() => setChartAsset(null)} />}
     </div>
   );
 }

@@ -216,7 +216,7 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
           <div>
             <label style={{ fontSize: "11px", color: C.text3, display: "block", marginBottom: "4px" }}>기간</label>
             <div style={{ display: "flex", gap: "4px" }}>
-              {[{ v: "6mo", l: "6개월" }, { v: "1y", l: "1년" }, { v: "2y", l: "2년" }].map(r => (
+              {[{ v: "6mo", l: "6개월" }, { v: "1y", l: "1년" }, { v: "2y", l: "2년" }, { v: "5y", l: "5년" }].map(r => (
                 <button key={r.v} onClick={() => setRange(r.v)} style={{
                   flex: 1, padding: "8px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
                   background: range === r.v ? C.blueBg : C.card2, color: range === r.v ? C.blue : C.text3,

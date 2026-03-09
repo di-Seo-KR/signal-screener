@@ -508,6 +508,204 @@ export const strategyTripleMA = {
   },
 };
 
+// ━━━ 전략 13: VWAP 반전 ━━━
+// 거래량 가중 평균가 기반 — 기관투자자의 기준선
+export const strategyVWAP = {
+  id: "vwap_reversion",
+  name: "VWAP 반전",
+  desc: "가격이 VWAP(20봉 근사) 아래로 -2% 이상 이탈 후 복귀 시 매수. 기관 매집 가능성 포착.",
+  category: "평균회귀",
+  risk: "중",
+  icon: "🏦",
+  params: { period: 20, threshold: 0.02 },
+  generate(candles, params = {}) {
+    const { period = 20, threshold = 0.02 } = { ...this.params, ...params };
+    const signals = [];
+    for (let i = period; i < candles.length; i++) {
+      // VWAP 근사: 기간 내 (TP*Vol)/Vol 합
+      let tpvSum = 0, volSum = 0;
+      for (let j = i - period + 1; j <= i; j++) {
+        const tp = (candles[j].high + candles[j].low + candles[j].close) / 3;
+        tpvSum += tp * (candles[j].volume || 1);
+        volSum += (candles[j].volume || 1);
+      }
+      const vwap = volSum > 0 ? tpvSum / volSum : candles[i].close;
+      const deviation = (candles[i].close - vwap) / vwap;
+      const prevDeviation = i > period ? (() => {
+        let pTpv = 0, pVol = 0;
+        for (let j = i - period; j < i; j++) {
+          const tp = (candles[j].high + candles[j].low + candles[j].close) / 3;
+          pTpv += tp * (candles[j].volume || 1);
+          pVol += (candles[j].volume || 1);
+        }
+        return pVol > 0 ? (candles[i - 1].close - pTpv / pVol) / (pTpv / pVol) : 0;
+      })() : 0;
+      if (deviation > -threshold && prevDeviation <= -threshold)
+        signals.push({ index: i, type: "BUY", price: candles[i].close, reason: `VWAP 복귀 (${(deviation * 100).toFixed(1)}%)` });
+      else if (deviation > threshold && prevDeviation <= threshold)
+        signals.push({ index: i, type: "SELL", price: candles[i].close, reason: `VWAP 상단 이탈 (${(deviation * 100).toFixed(1)}%)` });
+    }
+    return signals;
+  },
+};
+
+// ━━━ 전략 14: 피보나치 되돌림 ━━━
+// 38.2% / 61.8% 되돌림 구간에서 반등 매수
+export const strategyFibonacci = {
+  id: "fibonacci_retracement",
+  name: "피보나치 되돌림",
+  desc: "52봉 고점-저점 기준 38.2~61.8% 되돌림 구간 진입 시 매수. 고전적 지지/저항 전략.",
+  category: "평균회귀",
+  risk: "중",
+  icon: "🌀",
+  params: { lookback: 52, fib382: 0.382, fib618: 0.618 },
+  generate(candles, params = {}) {
+    const { lookback = 52, fib382 = 0.382, fib618 = 0.618 } = { ...this.params, ...params };
+    const signals = [];
+    for (let i = lookback; i < candles.length; i++) {
+      const slice = candles.slice(i - lookback, i);
+      const high = Math.max(...slice.map(c => c.high));
+      const low = Math.min(...slice.map(c => c.low));
+      const range = high - low;
+      if (range <= 0) continue;
+      const fib382Level = high - range * fib382;
+      const fib618Level = high - range * fib618;
+      const price = candles[i].close;
+      const prevPrice = candles[i - 1].close;
+      // 가격이 피보나치 구간에 진입하고 반등 시작
+      if (price >= fib618Level && price <= fib382Level && prevPrice < fib618Level)
+        signals.push({ index: i, type: "BUY", price, reason: `피보나치 61.8% 반등 (${fib618Level.toFixed(2)})` });
+      else if (price > high * 0.98 && prevPrice < high * 0.98)
+        signals.push({ index: i, type: "SELL", price, reason: `고점 근접 (${high.toFixed(2)})` });
+    }
+    return signals;
+  },
+};
+
+// ━━━ 전략 15: 허쉬만 채널 모멘텀 ━━━
+// 가격이 중앙선 위에서 모멘텀 강화 시 포지션 확대
+export const strategyMomentumChannel = {
+  id: "momentum_channel",
+  name: "모멘텀 채널",
+  desc: "BB 중앙선 위 + RSI > 50 + 거래량 증가 동시 충족 시 매수. 다중 필터 모멘텀 포착.",
+  category: "모멘텀",
+  risk: "중",
+  icon: "⚡",
+  params: { bbPeriod: 20, rsiPeriod: 14, volMult: 1.5 },
+  generate(candles, params = {}) {
+    const { bbPeriod = 20, rsiPeriod = 14, volMult = 1.5 } = { ...this.params, ...params };
+    const closes = candles.map(c => c.close);
+    const bb = calcBB(closes, bbPeriod);
+    const rsi = calcRSI(closes, rsiPeriod);
+    const signals = [];
+    for (let i = Math.max(bbPeriod, rsiPeriod, 20); i < candles.length; i++) {
+      if (!bb[i] || rsi[i] == null) continue;
+      const avgVol = candles.slice(i - 20, i).reduce((a, c) => a + (c.volume || 0), 0) / 20;
+      const curVol = candles[i].volume || 0;
+      const volUp = avgVol > 0 && curVol >= avgVol * volMult;
+      const aboveMiddle = closes[i] > bb[i].middle;
+      const rsiStrong = rsi[i] > 50;
+      const prevAbove = bb[i - 1] ? closes[i - 1] > bb[i - 1].middle : false;
+      if (aboveMiddle && !prevAbove && rsiStrong && volUp)
+        signals.push({ index: i, type: "BUY", price: closes[i], reason: `모멘텀 채널 진입 (RSI ${rsi[i].toFixed(0)}, Vol ${(curVol / avgVol).toFixed(1)}x)` });
+      else if (!aboveMiddle && prevAbove)
+        signals.push({ index: i, type: "SELL", price: closes[i], reason: `중앙선 이탈` });
+    }
+    return signals;
+  },
+};
+
+// ━━━ 전략 16: 갭 앤 고 (Gap & Go) ━━━
+// 갭 상승 후 첫 되돌림에서 매수
+export const strategyGapAndGo = {
+  id: "gap_and_go",
+  name: "갭 앤 고",
+  desc: "전일 대비 2% 이상 갭 상승 후 3봉 이내 매수 → 5봉 보유 후 매도. 단기 모멘텀 전략.",
+  category: "모멘텀",
+  risk: "높음",
+  icon: "🎯",
+  params: { gapPct: 2, holdBars: 5 },
+  generate(candles, params = {}) {
+    const { gapPct = 2, holdBars = 5 } = { ...this.params, ...params };
+    const signals = [];
+    for (let i = 1; i < candles.length; i++) {
+      const gap = ((candles[i].open - candles[i - 1].close) / candles[i - 1].close) * 100;
+      if (gap >= gapPct && candles[i].close > candles[i].open) {
+        signals.push({ index: i, type: "BUY", price: candles[i].close, reason: `갭 +${gap.toFixed(1)}% 돌파` });
+        const sellIdx = Math.min(i + holdBars, candles.length - 1);
+        signals.push({ index: sellIdx, type: "SELL", price: candles[sellIdx].close, reason: `${holdBars}봉 보유 후 매도` });
+      }
+    }
+    return signals;
+  },
+};
+
+// ━━━ 전략 17: 스윙 구간 트레이딩 ━━━
+// ATR 기반 동적 매수/매도 구간 설정
+export const strategySwingATR = {
+  id: "swing_atr",
+  name: "ATR 스윙",
+  desc: "가격이 20EMA - 1.5×ATR 아래에서 반등 시 매수, 20EMA + 1.5×ATR 위에서 매도. 스윙 트레이딩 전략.",
+  category: "변동성",
+  risk: "중",
+  icon: "🎢",
+  params: { emaPeriod: 20, atrPeriod: 14, atrMult: 1.5 },
+  generate(candles, params = {}) {
+    const { emaPeriod = 20, atrPeriod = 14, atrMult = 1.5 } = { ...this.params, ...params };
+    const closes = candles.map(c => c.close);
+    const highs = candles.map(c => c.high);
+    const lows = candles.map(c => c.low);
+    const ema = calcEMA(closes, emaPeriod);
+    const atr = calcATR(highs, lows, closes, atrPeriod);
+    const signals = [];
+    for (let i = Math.max(emaPeriod, atrPeriod) + 1; i < candles.length; i++) {
+      if (atr[i] == null) continue;
+      const lowerBand = ema[i] - atrMult * atr[i];
+      const upperBand = ema[i] + atrMult * atr[i];
+      if (closes[i] > lowerBand && closes[i - 1] <= (ema[i - 1] - atrMult * (atr[i - 1] || atr[i])))
+        signals.push({ index: i, type: "BUY", price: closes[i], reason: `ATR 하단 반등 (${lowerBand.toFixed(2)})` });
+      else if (closes[i] >= upperBand)
+        signals.push({ index: i, type: "SELL", price: closes[i], reason: `ATR 상단 도달 (${upperBand.toFixed(2)})` });
+    }
+    return signals;
+  },
+};
+
+// ━━━ 전략 18: OBV 트렌드 추종 ━━━
+// On-Balance Volume 이동평균 돌파 — 스마트머니 추적
+export const strategyOBV = {
+  id: "obv_trend",
+  name: "OBV 추세 추종",
+  desc: "OBV가 20일 이동평균을 상향돌파하면 매수. 거래량 기반 스마트머니 움직임 추적.",
+  category: "추세추종",
+  risk: "낮음",
+  icon: "📈",
+  params: { obvMAPeriod: 20 },
+  generate(candles, params = {}) {
+    const { obvMAPeriod = 20 } = { ...this.params, ...params };
+    const closes = candles.map(c => c.close);
+    const obvArr = [0];
+    for (let i = 1; i < closes.length; i++) {
+      if (closes[i] > closes[i - 1]) obvArr.push(obvArr[i - 1] + (candles[i].volume || 0));
+      else if (closes[i] < closes[i - 1]) obvArr.push(obvArr[i - 1] - (candles[i].volume || 0));
+      else obvArr.push(obvArr[i - 1]);
+    }
+    const obvSMA = obvArr.map((_, i) => {
+      if (i < obvMAPeriod - 1) return null;
+      return obvArr.slice(i - obvMAPeriod + 1, i + 1).reduce((a, b) => a + b, 0) / obvMAPeriod;
+    });
+    const signals = [];
+    for (let i = obvMAPeriod + 1; i < candles.length; i++) {
+      if (obvSMA[i] == null || obvSMA[i - 1] == null) continue;
+      if (obvArr[i] > obvSMA[i] && obvArr[i - 1] <= obvSMA[i - 1])
+        signals.push({ index: i, type: "BUY", price: closes[i], reason: `OBV > OBV-MA${obvMAPeriod} 골든크로스` });
+      else if (obvArr[i] < obvSMA[i] && obvArr[i - 1] >= obvSMA[i - 1])
+        signals.push({ index: i, type: "SELL", price: closes[i], reason: `OBV < OBV-MA${obvMAPeriod} 데드크로스` });
+    }
+    return signals;
+  },
+};
+
 // ── 전략 목록 ────────────────────────────────────────────────────
 export const ALL_STRATEGIES = [
   strategyRSI,
@@ -522,6 +720,12 @@ export const ALL_STRATEGIES = [
   strategyWilliamsADX,
   strategyBBSqueeze,
   strategyTripleMA,
+  strategyVWAP,
+  strategyFibonacci,
+  strategyMomentumChannel,
+  strategyGapAndGo,
+  strategySwingATR,
+  strategyOBV,
 ];
 
 // ════════════════════════════════════════════════════════════════════
@@ -740,14 +944,19 @@ export function recommendStrategies(marketDiagnosis) {
     recs.push({ strategy: strategyTripleMA, score: 8, reason: "삼중 이평선 정배열로 추세 라이딩" });
     recs.push({ strategy: strategyDualMomentum, score: 7, reason: "듀얼 모멘텀으로 절대/상대 강세 확인" });
     recs.push({ strategy: strategyVolume, score: 7, reason: "거래량 돌파로 강한 모멘텀 포착" });
+    recs.push({ strategy: strategyOBV, score: 7, reason: "OBV 상향돌파 — 스마트머니 추적" });
+    recs.push({ strategy: strategyMomentumChannel, score: 6, reason: "다중 필터 모멘텀으로 추세 확인" });
   }
 
   if (regime === "저변동 횡보" || trend === "횡보") {
     recs.push({ strategy: strategyBB, score: 9, reason: "횡보장에서 볼린저밴드 바운스가 최적" });
     recs.push({ strategy: strategyKeltner, score: 8, reason: "켈트너 채널 회귀도 횡보장에 효과적" });
     recs.push({ strategy: strategyRSI, score: 8, reason: "RSI 반전이 레인지바운드에서 효과적" });
+    recs.push({ strategy: strategyVWAP, score: 8, reason: "VWAP 반전 — 기관 매집 가능성 포착" });
+    recs.push({ strategy: strategyFibonacci, score: 7, reason: "피보나치 되돌림 구간에서 지지 확인" });
     recs.push({ strategy: strategyCombo, score: 7, reason: "이중 필터로 가짜 신호 제거" });
     recs.push({ strategy: strategyBBSqueeze, score: 6, reason: "스퀴즈 후 돌파 가능성 대비" });
+    recs.push({ strategy: strategySwingATR, score: 6, reason: "ATR 기반 스윙 구간 트레이딩" });
   }
 
   if (momentum === "과매도" || regime === "급락") {
@@ -755,18 +964,23 @@ export function recommendStrategies(marketDiagnosis) {
     recs.push({ strategy: strategyCombo, score: 9, reason: "RSI+스토캐스틱 이중 확인 바닥 매수" });
     recs.push({ strategy: strategyWilliamsADX, score: 8, reason: "Williams %R + ADX로 추세 내 저점" });
     recs.push({ strategy: strategyBB, score: 7, reason: "BB 하단 터치 반등 가능성" });
+    recs.push({ strategy: strategyFibonacci, score: 7, reason: "피보나치 61.8% 되돌림 지지 확인" });
+    recs.push({ strategy: strategyVWAP, score: 6, reason: "VWAP 하단 이탈 후 복귀 매수" });
   }
 
   if (volatility === "높음") {
     recs.push({ strategy: strategyVolume, score: 8, reason: "높은 변동성에서 거래량 돌파가 강한 시그널" });
     recs.push({ strategy: strategyBBSqueeze, score: 7, reason: "변동성 압축 후 폭발 포착" });
     recs.push({ strategy: strategyTurtle, score: 7, reason: "터틀 트레이딩 — 변동성 돌파" });
+    recs.push({ strategy: strategySwingATR, score: 7, reason: "ATR 스윙 — 변동성 구간 트레이딩" });
+    recs.push({ strategy: strategyGapAndGo, score: 6, reason: "갭 앤 고 — 단기 모멘텀 포착" });
   }
 
   if (trend === "하락" && volatility !== "높음") {
     recs.push({ strategy: strategyMACD, score: 7, reason: "하락 추세 전환 포착에 MACD 유용" });
     recs.push({ strategy: strategyRSI, score: 6, reason: "과매도 반등 가능성 모니터링" });
     recs.push({ strategy: strategyKeltner, score: 6, reason: "켈트너 채널 하단 바운스" });
+    recs.push({ strategy: strategyOBV, score: 6, reason: "OBV 반전 — 바닥 형성 확인" });
   }
 
   // 중복 제거 + 점수 순 정렬

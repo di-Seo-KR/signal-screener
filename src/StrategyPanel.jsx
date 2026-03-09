@@ -41,10 +41,15 @@ export default function StrategyPanel({ onRunBacktest }) {
     { label: "S&P 500", value: "SPY" },
     { label: "나스닥 100", value: "QQQ" },
     { label: "삼성전자", value: "005930.KS" },
+    { label: "SK하이닉스", value: "000660.KS" },
     { label: "Bitcoin", value: "BTC-USD" },
     { label: "Apple", value: "AAPL" },
     { label: "NVIDIA", value: "NVDA" },
     { label: "Tesla", value: "TSLA" },
+    { label: "AMD", value: "AMD" },
+    { label: "Goldman Sachs", value: "GS" },
+    { label: "Broadcom", value: "AVGO" },
+    { label: "Russell 2000", value: "IWM" },
   ];
 
   const runDiagnosis = useCallback(async () => {

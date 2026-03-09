@@ -66,56 +66,82 @@ function calcMACD(closes) {
   return { macdLine, signalLine, histogram };
 }
 
+// ── Unix timestamp → { year, month, day } 변환 ─────────────────
+// lightweight-charts는 business day format이 더 안정적
+function tsToDay(ts) {
+  const d = new Date(ts * 1000);
+  return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
+}
+
+// ── 중복 시간 제거 (같은 날짜 데이터가 있으면 마지막 것만 유지) ──
+function deduplicateCandles(candles) {
+  const map = new Map();
+  for (const c of candles) {
+    const key = `${c.time.year}-${c.time.month}-${c.time.day}`;
+    map.set(key, c);
+  }
+  return Array.from(map.values()).sort((a, b) => {
+    if (a.time.year !== b.time.year) return a.time.year - b.time.year;
+    if (a.time.month !== b.time.month) return a.time.month - b.time.month;
+    return a.time.day - b.time.day;
+  });
+}
+
 // ── 타임프레임 설정 ──────────────────────────────────────────────
 const TF_CONFIG = {
-  "5m":  { label: "5분",  interval: "5m",   range: "5d",   isCrypto: false },
-  "1h":  { label: "1시간", interval: "1h",  range: "1mo",  isCrypto: false },
-  "1d":  { label: "일봉",  interval: "1d",   range: "6mo",  isCrypto: false },
-  "1wk": { label: "주봉",  interval: "1wk",  range: "2y",   isCrypto: false },
-  "1mo": { label: "월봉",  interval: "1mo",  range: "5y",   isCrypto: false },
+  "5m":  { label: "5분",  interval: "5m",   range: "5d" },
+  "1h":  { label: "1시간", interval: "1h",  range: "1mo" },
+  "1d":  { label: "일봉",  interval: "1d",   range: "6mo" },
+  "1wk": { label: "주봉",  interval: "1wk",  range: "2y" },
+  "1mo": { label: "월봉",  interval: "1mo",  range: "10y" },
 };
 
 const CRYPTO_TF = {
   "5m":  { label: "5분",  days: "1"   },
   "1h":  { label: "1시간", days: "7"  },
   "1d":  { label: "일봉",  days: "90" },
-  "1wk": { label: "주봉",  days: "365"},
-  "1mo": { label: "월봉",  days: "max"},
+  "1wk": { label: "주봉",  days: "365" },
+  "1mo": { label: "월봉",  days: "max" },
 };
 
 // ── Chart Theme ───────────────────────────────────────────────────
-const chartOptions = (height) => ({
-  layout: {
-    background: { color: "#0d1117" },
-    textColor: "#8b949e",
-    fontFamily: "'Pretendard', 'Apple SD Gothic Neo', system-ui, sans-serif",
-  },
-  grid: {
-    vertLines: { color: "#1c2128" },
-    horzLines: { color: "#1c2128" },
-  },
-  crosshair: {
-    mode: CrosshairMode.Normal,
-    vertLine: { color: "#3d4f63", labelBackgroundColor: "#1f6feb" },
-    horzLine: { color: "#3d4f63", labelBackgroundColor: "#1f6feb" },
-  },
-  rightPriceScale: {
-    borderColor: "#1c2128",
-    scaleMargins: { top: 0.1, bottom: 0.05 },
-  },
-  timeScale: {
-    borderColor: "#1c2128",
-    timeVisible: true,
-    secondsVisible: false,
-  },
-  height,
-  width: undefined,
-  handleScroll: true,
-  handleScale: true,
-});
+function makeChartOptions(height, width) {
+  return {
+    layout: {
+      background: { color: "#0d1117" },
+      textColor: "#8b949e",
+      fontFamily: "'Pretendard', 'Apple SD Gothic Neo', system-ui, sans-serif",
+    },
+    grid: {
+      vertLines: { color: "#1c2128" },
+      horzLines: { color: "#1c2128" },
+    },
+    crosshair: {
+      mode: CrosshairMode.Normal,
+      vertLine: { color: "#3d4f63", labelBackgroundColor: "#1f6feb" },
+      horzLine: { color: "#3d4f63", labelBackgroundColor: "#1f6feb" },
+    },
+    rightPriceScale: {
+      borderColor: "#1c2128",
+      scaleMargins: { top: 0.1, bottom: 0.05 },
+    },
+    timeScale: {
+      borderColor: "#1c2128",
+      timeVisible: true,
+      secondsVisible: false,
+      fixLeftEdge: true,
+      fixRightEdge: true,
+    },
+    height,
+    width: width || 300,
+    handleScroll: true,
+    handleScale: true,
+  };
+}
 
 // ── Main Component ───────────────────────────────────────────────
 export default function ChartModal({ asset, onClose }) {
+  const containerRef = useRef(null);
   const mainRef   = useRef(null);
   const rsiRef    = useRef(null);
   const macdRef   = useRef(null);
@@ -127,7 +153,7 @@ export default function ChartModal({ asset, onClose }) {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
-  const [ohlcInfo, setOhlcInfo] = useState(null); // crosshair price info
+  const [ohlcInfo, setOhlcInfo] = useState(null);
 
   const isCrypto = asset?.market === "crypto";
 
@@ -145,14 +171,21 @@ export default function ChartModal({ asset, onClose }) {
         const r = await fetch(`/api/coingecko-ohlc?id=${encodeURIComponent(coinId)}&days=${days}`);
         if (!r.ok) throw new Error(`CoinGecko ${r.status}`);
         const j = await r.json();
-        candles = j.candles || [];
+        candles = (j.candles || []).map(c => ({
+          ...c, time: tsToDay(c.time),
+        }));
       } else {
         const { interval, range } = TF_CONFIG[tf] || TF_CONFIG["1d"];
-        const r = await fetch(`/api/yahoo-ohlc?symbol=${encodeURIComponent(asset.symbolRaw || asset.symbol)}&interval=${interval}&range=${range}&_t=${Date.now()}`);
+        const sym = asset.symbolRaw || asset.symbol;
+        const r = await fetch(`/api/yahoo-ohlc?symbol=${encodeURIComponent(sym)}&interval=${interval}&range=${range}&_t=${Date.now()}`);
         if (!r.ok) throw new Error(`Yahoo ${r.status}`);
         const j = await r.json();
-        candles = j.candles || [];
+        candles = (j.candles || []).map(c => ({
+          ...c, time: tsToDay(c.time),
+        }));
       }
+      // 중복 제거 및 정렬
+      candles = deduplicateCandles(candles);
       if (!candles.length) throw new Error("데이터 없음");
       return candles;
     } catch (e) {
@@ -172,6 +205,11 @@ export default function ChartModal({ asset, onClose }) {
     Object.values(chartObjs.current).forEach(c => { try { c.remove(); } catch {} });
     chartObjs.current = {};
 
+    // Clear container content
+    if (mainRef.current) mainRef.current.innerHTML = "";
+    if (rsiRef.current) rsiRef.current.innerHTML = "";
+    if (macdRef.current) macdRef.current.innerHTML = "";
+
     const closes  = candles.map(c => c.close);
     const times   = candles.map(c => c.time);
     const volumes = candles.map(c => c.volume ?? 0);
@@ -181,8 +219,11 @@ export default function ChartModal({ asset, onClose }) {
     const mainH  = showRSI || showMACD ? 340 : 500;
     const subH   = 120;
 
+    // Get container width
+    const containerW = containerRef.current?.clientWidth || mainRef.current?.clientWidth || 600;
+
     // ── Main chart (candles) ───
-    const mainChart = createChart(mainRef.current, { ...chartOptions(mainH) });
+    const mainChart = createChart(mainRef.current, makeChartOptions(mainH, containerW));
     chartObjs.current.main = mainChart;
 
     const candleSeries = mainChart.addCandlestickSeries({
@@ -232,14 +273,16 @@ export default function ChartModal({ asset, onClose }) {
     // Crosshair info
     mainChart.subscribeCrosshairMove(p => {
       if (p.time) {
-        const bar = candles.find(c => c.time === p.time);
+        const bar = candles.find(c =>
+          c.time.year === p.time.year && c.time.month === p.time.month && c.time.day === p.time.day
+        );
         if (bar) setOhlcInfo(bar);
       }
     });
 
     // ── RSI chart ───
-    if (showRSI) {
-      const rsiChart = createChart(rsiRef.current, { ...chartOptions(subH) });
+    if (showRSI && rsiRef.current) {
+      const rsiChart = createChart(rsiRef.current, makeChartOptions(subH, containerW));
       chartObjs.current.rsi = rsiChart;
       const rsi = calcRSI(closes);
       const rsiSeries = rsiChart.addLineSeries({ color: "#f472b6", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: true });
@@ -252,17 +295,20 @@ export default function ChartModal({ asset, onClose }) {
       });
 
       // Sync scrolling
+      let syncing = false;
       mainChart.timeScale().subscribeVisibleLogicalRangeChange(r => {
-        if (r) rsiChart.timeScale().setVisibleLogicalRange(r);
+        if (r && !syncing) { syncing = true; rsiChart.timeScale().setVisibleLogicalRange(r); syncing = false; }
       });
       rsiChart.timeScale().subscribeVisibleLogicalRangeChange(r => {
-        if (r) mainChart.timeScale().setVisibleLogicalRange(r);
+        if (r && !syncing) { syncing = true; mainChart.timeScale().setVisibleLogicalRange(r); syncing = false; }
       });
+
+      rsiChart.timeScale().fitContent();
     }
 
     // ── MACD chart ───
-    if (showMACD) {
-      const macdChart = createChart(macdRef.current, { ...chartOptions(subH) });
+    if (showMACD && macdRef.current) {
+      const macdChart = createChart(macdRef.current, makeChartOptions(subH, containerW));
       chartObjs.current.macd = macdChart;
       const { macdLine, signalLine, histogram } = calcMACD(closes);
 
@@ -276,40 +322,64 @@ export default function ChartModal({ asset, onClose }) {
       sigSeries.setData(signalLine.map((v, i) => v != null ? { time: times[i], value: v } : null).filter(Boolean));
 
       // Sync
+      let syncing2 = false;
       mainChart.timeScale().subscribeVisibleLogicalRangeChange(r => {
-        if (r) macdChart.timeScale().setVisibleLogicalRange(r);
+        if (r && !syncing2) { syncing2 = true; macdChart.timeScale().setVisibleLogicalRange(r); syncing2 = false; }
       });
       macdChart.timeScale().subscribeVisibleLogicalRangeChange(r => {
-        if (r) mainChart.timeScale().setVisibleLogicalRange(r);
+        if (r && !syncing2) { syncing2 = true; mainChart.timeScale().setVisibleLogicalRange(r); syncing2 = false; }
       });
+
+      macdChart.timeScale().fitContent();
     }
 
+    // Fit content on main chart AFTER all sub charts are built
     mainChart.timeScale().fitContent();
+
+    // Force resize after a tick to ensure proper rendering
+    requestAnimationFrame(() => {
+      const w = containerRef.current?.clientWidth || mainRef.current?.clientWidth;
+      if (w) {
+        Object.values(chartObjs.current).forEach(c => {
+          try {
+            c.applyOptions({ width: w });
+            c.timeScale().fitContent();
+          } catch {}
+        });
+      }
+    });
   }, [fetchData, indicators]);
 
   useEffect(() => {
     if (!asset) return;
-    buildCharts(timeframe);
+    // Small delay to ensure modal DOM is rendered and has width
+    const timer = setTimeout(() => buildCharts(timeframe), 50);
     return () => {
+      clearTimeout(timer);
       Object.values(chartObjs.current).forEach(c => { try { c.remove(); } catch {} });
     };
-  }, [asset, timeframe, indicators]); // rebuild when tf or indicators change
+  }, [asset, timeframe, indicators]);
 
-  // Resize observer
+  // Resize observer — use ResizeObserver for better reliability
   useEffect(() => {
-    const resizeAll = () => {
-      const w = mainRef.current?.clientWidth;
+    const el = containerRef.current;
+    if (!el) return;
+
+    const ro = new ResizeObserver(() => {
+      const w = el.clientWidth;
       if (!w) return;
-      Object.values(chartObjs.current).forEach(c => c.applyOptions({ width: w }));
-    };
-    window.addEventListener("resize", resizeAll);
-    return () => window.removeEventListener("resize", resizeAll);
+      Object.values(chartObjs.current).forEach(c => {
+        try { c.applyOptions({ width: w }); } catch {}
+      });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   if (!asset) return null;
 
   const formatPrice = (p) => {
-    if (!p) return "—";
+    if (!p && p !== 0) return "—";
     if (asset.market === "kr") return `₩${Math.round(p).toLocaleString()}`;
     if (p < 1) return `$${p.toFixed(6)}`;
     return `$${p.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
@@ -321,7 +391,7 @@ export default function ChartModal({ asset, onClose }) {
       background: "rgba(0,0,0,0.85)", display: "flex", alignItems: "center", justifyContent: "center",
       padding: "12px",
     }} onClick={onClose}>
-      <div style={{
+      <div ref={containerRef} style={{
         background: "#0d1117", border: "1px solid #1c2128", borderRadius: "16px",
         width: "min(900px, 100%)", maxHeight: "92vh", overflow: "auto",
         padding: "20px",
@@ -330,7 +400,7 @@ export default function ChartModal({ asset, onClose }) {
 
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             <span style={{ fontSize: "20px" }}>
               {asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿"}
             </span>
@@ -342,9 +412,11 @@ export default function ChartModal({ asset, onClose }) {
               <div style={{ color: "#f0f6fc", fontWeight: 700, fontSize: "22px" }}>
                 {formatPrice(asset.price)}
               </div>
-              <div style={{ fontSize: "13px", color: asset.weekChange >= 0 ? "#26a64b" : "#ef4444" }}>
-                {asset.weekChange >= 0 ? "▲" : "▼"} {Math.abs(asset.weekChange)}%
-              </div>
+              {asset.weekChange != null && (
+                <div style={{ fontSize: "13px", color: asset.weekChange >= 0 ? "#26a64b" : "#ef4444" }}>
+                  {asset.weekChange >= 0 ? "▲" : "▼"} {Math.abs(asset.weekChange)}%
+                </div>
+              )}
             </div>
           </div>
           <button onClick={onClose} style={{
@@ -362,10 +434,16 @@ export default function ChartModal({ asset, onClose }) {
           }}>
             {[["O", ohlcInfo.open], ["H", ohlcInfo.high], ["L", ohlcInfo.low], ["C", ohlcInfo.close]].map(([label, val]) => (
               <span key={label} style={{ color: "#8b949e" }}>
-                <span style={{ color: "#8b949e", marginRight: "4px" }}>{label}</span>
+                <span style={{ marginRight: "4px" }}>{label}</span>
                 <span style={{ color: "#f0f6fc", fontWeight: 600 }}>{formatPrice(val)}</span>
               </span>
             ))}
+            {ohlcInfo.volume != null && ohlcInfo.volume > 0 && (
+              <span style={{ color: "#8b949e" }}>
+                <span style={{ marginRight: "4px" }}>V</span>
+                <span style={{ color: "#f0f6fc", fontWeight: 600 }}>{(ohlcInfo.volume / 1e6).toFixed(1)}M</span>
+              </span>
+            )}
           </div>
         )}
 
@@ -415,6 +493,10 @@ export default function ChartModal({ asset, onClose }) {
           <div style={{ textAlign: "center", padding: "40px", color: "#ef4444" }}>
             <div style={{ fontSize: "20px", marginBottom: "8px" }}>⚠️</div>
             <div>{error}</div>
+            <button onClick={() => buildCharts(timeframe)} style={{
+              marginTop: "12px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px",
+              background: "#1f6feb", color: "#fff", border: "none", cursor: "pointer",
+            }}>다시 시도</button>
           </div>
         )}
         <div style={{ display: loading ? "none" : "block" }}>
