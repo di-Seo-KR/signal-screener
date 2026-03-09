@@ -705,9 +705,10 @@ function fmtPrice(price, market) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 색상 팔레트 (토스증권 스타일 다크 테마) — 가독성 개선
+// 색상 팔레트 — 다크 / 라이트 테마
 // ════════════════════════════════════════════════════════════════════
-const C = {
+const THEME_KEY = "ss_theme";
+const DARK = {
   bg: "#0A0E17", card: "#111927", card2: "#1A2332",
   border: "#1E2D3D", border2: "#283B50",
   blue: "#3182F6", blueL: "#5AA3FF", blueBg: "#1A2C4F",
@@ -716,7 +717,22 @@ const C = {
   yellow: "#FFB400", yellowBg: "#2A2000",
   purple: "#8B5CF6", purpleBg: "#1E1535",
   text1: "#F7F8FA", text2: "#B0BEC5", text3: "#6B7D8E",
+  isDark: true,
 };
+const LIGHT = {
+  bg: "#F5F6F8", card: "#FFFFFF", card2: "#F0F2F5",
+  border: "#E0E3E8", border2: "#D0D4DB",
+  blue: "#2563EB", blueL: "#3B82F6", blueBg: "#DBEAFE",
+  red: "#DC2626", redBg: "#FEE2E2",
+  green: "#16A34A", greenBg: "#DCFCE7",
+  yellow: "#D97706", yellowBg: "#FEF3C7",
+  purple: "#7C3AED", purpleBg: "#EDE9FE",
+  text1: "#111827", text2: "#4B5563", text3: "#9CA3AF",
+  isDark: false,
+};
+function loadTheme() { try { return localStorage.getItem(THEME_KEY) || "dark"; } catch { return "dark"; } }
+// C will be set dynamically in App component and passed through context
+let C = DARK;
 
 // ════════════════════════════════════════════════════════════════════
 // 서브 컴포넌트: PullToRefresh (모바일 아래로 당겨서 새로고침)
@@ -1016,6 +1032,16 @@ function AssetCard({ asset, onChart }) {
 // 메인 앱
 // ════════════════════════════════════════════════════════════════════
 export default function App() {
+  const [themeMode, setThemeMode] = useState(loadTheme);
+  C = themeMode === "dark" ? DARK : LIGHT;
+  const toggleTheme = useCallback(() => {
+    setThemeMode(prev => {
+      const next = prev === "dark" ? "light" : "dark";
+      try { localStorage.setItem(THEME_KEY, next); } catch {}
+      return next;
+    });
+  }, []);
+
   const [tab, setTab] = useState("home");
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -1459,13 +1485,23 @@ export default function App() {
               }}>{t.icon} {t.label}</button>
             ))}
           </nav>
-          {/* 모바일 햄버거 */}
-          <button className="mobile-menu-btn" onClick={() => setMenuOpen(!menuOpen)} style={{
-            display: "none", background: "none", border: "none", color: C.text2,
-            fontSize: "22px", padding: "4px 8px", cursor: "pointer",
-          }}>
-            {menuOpen ? "✕" : "☰"}
-          </button>
+          {/* 테마 토글 */}
+          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            <button onClick={toggleTheme} title={themeMode === "dark" ? "라이트 모드" : "다크 모드"} style={{
+              background: C.card2, border: `1px solid ${C.border}`, borderRadius: "10px",
+              width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "16px", cursor: "pointer", color: C.text1, transition: "all 0.2s",
+            }}>
+              {themeMode === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"}
+            </button>
+            {/* 모바일 햄버거 */}
+            <button className="mobile-menu-btn" onClick={() => setMenuOpen(!menuOpen)} style={{
+              display: "none", background: "none", border: "none", color: C.text2,
+              fontSize: "22px", padding: "4px 8px", cursor: "pointer",
+            }}>
+              {menuOpen ? "\u2715" : "\u2630"}
+            </button>
+          </div>
         </div>
         {/* 모바일 드롭다운 메뉴 */}
         {menuOpen && (
@@ -2315,7 +2351,7 @@ export default function App() {
         )}
 
         {/* 차트 모달 */}
-        {chartAsset && <ChartModal asset={chartAsset} onClose={() => setChartAsset(null)} krwRate={krwRate} />}
+        {chartAsset && <ChartModal asset={chartAsset} onClose={() => setChartAsset(null)} krwRate={krwRate} theme={themeMode} />}
       </main>
       </PullToRefresh>
     </div>

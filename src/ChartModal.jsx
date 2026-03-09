@@ -146,32 +146,48 @@ function aggregateCandles(candles, factor) {
   return result;
 }
 
-// Chart options
-function makeChartOptions(height, width, tf) {
+// ── colors — dark / light
+const CC_DARK = {
+  bg: "#0A0E17", card: "#111927", card2: "#1A2332",
+  border: "#1E2D3D", border2: "#283B50",
+  blue: "#3182F6", green: "#05C072", red: "#F04452", yellow: "#FFB400",
+  text1: "#F7F8FA", text2: "#B0BEC5", text3: "#6B7D8E",
+  gridColor: "#1c2128", crossColor: "#3d4f63", labelBg: "#1f6feb", chartText: "#8b949e",
+};
+const CC_LIGHT = {
+  bg: "#F5F6F8", card: "#FFFFFF", card2: "#F0F2F5",
+  border: "#E0E3E8", border2: "#D0D4DB",
+  blue: "#2563EB", green: "#16A34A", red: "#DC2626", yellow: "#D97706",
+  text1: "#111827", text2: "#4B5563", text3: "#9CA3AF",
+  gridColor: "#E5E7EB", crossColor: "#9CA3AF", labelBg: "#2563EB", chartText: "#6B7280",
+};
+
+// Chart options (theme-aware)
+function makeChartOptions(height, width, tf, cc) {
   const intra = isIntraday(tf);
   return {
     layout: {
-      background: { color: "#0A0E17" },
-      textColor: "#8b949e",
+      background: { color: cc.bg },
+      textColor: cc.chartText,
       fontFamily: "'Pretendard', 'Apple SD Gothic Neo', system-ui, sans-serif",
     },
     grid: {
-      vertLines: { color: "#1c2128" },
-      horzLines: { color: "#1c2128" },
+      vertLines: { color: cc.gridColor },
+      horzLines: { color: cc.gridColor },
     },
     crosshair: {
       mode: CrosshairMode.Normal,
-      vertLine: { color: "#3d4f63", labelBackgroundColor: "#1f6feb" },
-      horzLine: { color: "#3d4f63", labelBackgroundColor: "#1f6feb" },
+      vertLine: { color: cc.crossColor, labelBackgroundColor: cc.labelBg },
+      horzLine: { color: cc.crossColor, labelBackgroundColor: cc.labelBg },
     },
     rightPriceScale: {
-      borderColor: "#1c2128",
+      borderColor: cc.gridColor,
       scaleMargins: { top: 0.08, bottom: 0.05 },
       minimumWidth: 100,
       entireTextOnly: true,
     },
     timeScale: {
-      borderColor: "#1c2128",
+      borderColor: cc.gridColor,
       timeVisible: intra,
       secondsVisible: false,
       fixLeftEdge: true,
@@ -184,14 +200,6 @@ function makeChartOptions(height, width, tf) {
     handleScale: { mouseWheel: true, pinch: true },
   };
 }
-
-// ── colors (matching App.jsx palette)
-const CC = {
-  bg: "#0A0E17", card: "#111927", card2: "#1A2332",
-  border: "#1E2D3D", border2: "#283B50",
-  blue: "#3182F6", green: "#05C072", red: "#F04452", yellow: "#FFB400",
-  text1: "#F7F8FA", text2: "#B0BEC5", text3: "#6B7D8E",
-};
 
 // ── Price formatting with commas ──
 function fmtPrice(p, market) {
@@ -217,7 +225,8 @@ const DEFAULT_SETTINGS = {
 };
 
 // ── Full-page chart component ────────────────────────────────────
-export default function ChartModal({ asset, onClose, krwRate }) {
+export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) {
+  const CC = theme === "dark" ? CC_DARK : CC_LIGHT;
   const containerRef = useRef(null);
   const mainRef   = useRef(null);
   const rsiRef    = useRef(null);
@@ -322,7 +331,7 @@ export default function ChartModal({ asset, onClose, krwRate }) {
     const containerW = containerRef.current?.clientWidth || 600;
 
     // ── Main chart ───
-    const mainChart = createChart(mainRef.current, makeChartOptions(mainH, containerW, tf));
+    const mainChart = createChart(mainRef.current, makeChartOptions(mainH, containerW, tf, CC));
     chartObjs.current.main = mainChart;
 
     const candleSeries = mainChart.addCandlestickSeries({
@@ -390,7 +399,7 @@ export default function ChartModal({ asset, onClose, krwRate }) {
     // ── RSI chart ───
     if (showRSI && rsiRef.current) {
       const rsiPeriod = settings.rsi?.period || 14;
-      const rsiChart = createChart(rsiRef.current, makeChartOptions(subH, containerW, tf));
+      const rsiChart = createChart(rsiRef.current, makeChartOptions(subH, containerW, tf, CC));
       chartObjs.current.rsi = rsiChart;
       const rsi = calcRSI(closes, rsiPeriod);
       const rsiSeries = rsiChart.addLineSeries({ color: "#f472b6", lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
@@ -411,7 +420,7 @@ export default function ChartModal({ asset, onClose, krwRate }) {
 
     // ── MACD chart ───
     if (showMACD && macdRef.current) {
-      const macdChart = createChart(macdRef.current, makeChartOptions(subH, containerW, tf));
+      const macdChart = createChart(macdRef.current, makeChartOptions(subH, containerW, tf, CC));
       chartObjs.current.macd = macdChart;
       const { macdLine, signalLine, histogram } = calcMACD(closes);
 
@@ -453,7 +462,7 @@ export default function ChartModal({ asset, onClose, krwRate }) {
       clearTimeout(timer);
       Object.values(chartObjs.current).forEach(c => { try { c.remove(); } catch {} });
     };
-  }, [asset, timeframe, settings, showKRW]);
+  }, [asset, timeframe, settings, showKRW, theme]);
 
   useEffect(() => {
     const el = containerRef.current;
