@@ -1,5 +1,5 @@
-// Signal Screener v3.0 — 토스증권 스타일 UI
-// Features: 실시간 스크리닝, 캔들차트, 11개 전문가 조건, 포트폴리오 대시보드, 텔레그램 알림
+// Signal Screener v3.1 — 토스증권 스타일 UI
+// Features: 실시간 스크리닝, 캔들차트, 11개 전문가 조건, 포트폴리오, 뉴스, 텔레그램 알림
 import { useState, useEffect, useCallback } from "react";
 import ChartModal from "./ChartModal.jsx";
 
@@ -211,7 +211,7 @@ const CONDITION_META = {
 // ════════════════════════════════════════════════════════════════════
 async function sendTelegramAlert(botToken, chatId, assets, conditions) {
   const labels = Object.fromEntries(Object.entries(CONDITION_META).map(([k, v]) => [k, `${v.icon} ${v.label}`]));
-  let msg = `🚨 *Signal Screener 알림*\n\n`;
+  let msg = `🚨 *DI금융 알림*\n\n`;
   msg += `📅 ${new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}\n`;
   msg += `📊 시그널 감지: *${assets.length}개* 자산\n\n`;
   assets.slice(0, 15).forEach(a => {
@@ -392,6 +392,10 @@ export default function App() {
   const [settings, setSettings] = useState(() => ({ botToken: "", chatId: "", autoSend: false, ...loadSettings() }));
   const [tgStatus, setTgStatus] = useState("");
 
+  // ── 뉴스 상태 ─────────────────────────────────────────────────
+  const [newsItems, setNewsItems] = useState([]);
+  const [newsLoading, setNewsLoading] = useState(false);
+
   useEffect(() => { saveSettings({ botToken: settings.botToken, chatId: settings.chatId, autoSend: settings.autoSend }); }, [settings]);
   useEffect(() => { savePortfolio(portfolio); }, [portfolio]);
 
@@ -494,6 +498,21 @@ export default function App() {
 
   useEffect(() => { if (tab === "portfolio") fetchPortfolioPrices(); }, [tab, portfolio.length]);
 
+  // ── 뉴스 fetch ────────────────────────────────────────────────
+  const fetchNews = useCallback(async () => {
+    setNewsLoading(true);
+    try {
+      const r = await fetch(`/api/news?lang=ko&_t=${Date.now()}`);
+      if (r.ok) {
+        const j = await r.json();
+        setNewsItems(j.news || []);
+      }
+    } catch {}
+    setNewsLoading(false);
+  }, []);
+
+  useEffect(() => { if (tab === "news") fetchNews(); }, [tab]);
+
   const filtered = results.filter(a => filterMarket === "all" || a.market === filterMarket);
 
   const pStats = portfolio.reduce((acc, item) => {
@@ -531,11 +550,11 @@ export default function App() {
         <div style={{ maxWidth: "900px", margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "56px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <span style={{ fontSize: "20px" }}>📡</span>
-            <span style={{ fontWeight: 800, fontSize: "17px" }}>Signal Screener</span>
+            <span style={{ fontWeight: 800, fontSize: "17px" }}>DI금융</span>
             <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v3</span>
           </div>
           <nav style={{ display: "flex", gap: "2px" }}>
-            {[{ id: "screener", label: "스크리너", icon: "🔍" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
+            {[{ id: "screener", label: "스크리너", icon: "🔍" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} style={{
                 padding: "7px 14px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
@@ -848,6 +867,83 @@ export default function App() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════
+            TAB: 뉴스
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "news" && (
+          <div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div style={{ fontWeight: 700, fontSize: "16px" }}>📰 금융 뉴스 & 트렌딩</div>
+              <button onClick={fetchNews} style={{
+                padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+                background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}44`,
+              }}>{newsLoading ? "⏳ 로딩 중" : "🔄 새로고침"}</button>
+            </div>
+
+            {newsLoading && newsItems.length === 0 && (
+              <div style={{ textAlign: "center", padding: "40px", color: C.text3 }}>
+                <div style={{ fontSize: "24px", marginBottom: "8px" }}>📡</div>
+                뉴스를 불러오는 중...
+              </div>
+            )}
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {newsItems.map((item, i) => (
+                <a key={i} href={item.url} target="_blank" rel="noopener noreferrer"
+                  style={{
+                    background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px",
+                    padding: "16px 20px", textDecoration: "none", color: "inherit",
+                    display: "block", transition: "border-color .15s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = C.border2}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, fontSize: "14px", color: C.text1, marginBottom: "6px", lineHeight: 1.5 }}>
+                        {item.title}
+                      </div>
+                      {item.desc && (
+                        <div style={{ fontSize: "12px", color: C.text3, lineHeight: 1.5, marginBottom: "6px" }}>
+                          {item.desc}
+                        </div>
+                      )}
+                      <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <span style={{
+                          padding: "2px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 700,
+                          background: item.source?.includes("CoinGecko") ? `${C.purple}22` : `${C.blue}22`,
+                          color: item.source?.includes("CoinGecko") ? C.purple : C.blue,
+                        }}>{item.source}</span>
+                        {item.date && (
+                          <span style={{ fontSize: "11px", color: C.text3 }}>
+                            {(() => {
+                              try {
+                                const d = new Date(item.date);
+                                const diff = Math.floor((Date.now() - d.getTime()) / 60000);
+                                if (diff < 60) return `${diff}분 전`;
+                                if (diff < 1440) return `${Math.floor(diff / 60)}시간 전`;
+                                return d.toLocaleDateString("ko-KR");
+                              } catch { return ""; }
+                            })()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span style={{ color: C.text3, fontSize: "16px", flexShrink: 0, marginTop: "2px" }}>→</span>
+                  </div>
+                </a>
+              ))}
+            </div>
+
+            {!newsLoading && newsItems.length === 0 && (
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "48px 24px", textAlign: "center" }}>
+                <div style={{ fontSize: "40px", marginBottom: "16px" }}>📰</div>
+                <div style={{ fontWeight: 700, fontSize: "17px", marginBottom: "8px" }}>뉴스를 불러올 수 없어요</div>
+                <div style={{ color: C.text3, fontSize: "13px" }}>새로고침을 눌러 다시 시도해 주세요</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
             TAB: 알림 설정
         ═══════════════════════════════════════════════════════════ */}
         {tab === "alerts" && (
@@ -877,6 +973,10 @@ export default function App() {
                 </div>
               ))}
 
+              <div style={{ padding: "8px 14px", background: `${C.green}15`, borderRadius: "8px", marginBottom: "14px", fontSize: "12px", color: C.green, display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>💾</span> 설정은 자동 저장됩니다 — 새로고침해도 유지돼요
+              </div>
+
               <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "12px 14px", background: C.bg, borderRadius: "12px", marginBottom: "16px" }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: "13px", marginBottom: "2px" }}>스캔 완료 시 자동 전송</div>
@@ -899,7 +999,7 @@ export default function App() {
                   setTgStatus("📡 전송 중...");
                   try {
                     const r = await sendTelegramAlert(settings.botToken, settings.chatId,
-                      [{ name: "Signal Screener", symbol: "TEST", market: "us", price: 100, weekChange: 0.5, rsi: 28.5, triggers: ["rsi30"] }], ["rsi30"]);
+                      [{ name: "DI금융", symbol: "TEST", market: "us", price: 100, weekChange: 0.5, rsi: 28.5, triggers: ["rsi30"] }], ["rsi30"]);
                     setTgStatus(r.ok ? "✅ 테스트 메시지 전송 완료!" : `❌ ${r.description}`);
                   } catch (e) { setTgStatus(`❌ ${e.message}`); }
                 }} style={{

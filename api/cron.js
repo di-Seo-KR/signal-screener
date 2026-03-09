@@ -116,16 +116,46 @@ function analyzeSignals(weeklyCloses, dailyCloses, volumes, conditions) {
   };
 }
 
-// ─── 데이터 수집 함수 ───
-async function fetchYahoo(symbol, interval, range) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}`;
-  const res = await fetch(url, {
+// ─── Yahoo Finance cookie/crumb 인증 ───
+let _cookie = null;
+let _crumb = null;
+let _expires = 0;
+
+async function getYahooAuth() {
+  const now = Date.now();
+  if (_cookie && _crumb && now < _expires) return { cookie: _cookie, crumb: _crumb };
+  const initRes = await fetch("https://fc.yahoo.com", {
+    redirect: "follow",
+    headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36" },
+  });
+  const cookies = initRes.headers.get("set-cookie") || "";
+  const crumbRes = await fetch("https://query2.finance.yahoo.com/v1/test/getcrumb", {
     headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; SignalScreener/2.0)",
-      "Accept": "application/json",
-      "Referer": "https://finance.yahoo.com",
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Cookie": cookies,
     },
   });
+  if (!crumbRes.ok) throw new Error(`Crumb failed: ${crumbRes.status}`);
+  const crumb = await crumbRes.text();
+  _cookie = cookies; _crumb = crumb; _expires = now + 10 * 60 * 1000;
+  return { cookie: _cookie, crumb: _crumb };
+}
+
+// ─── 데이터 수집 함수 ───
+async function fetchYahoo(symbol, interval, range) {
+  const { cookie, crumb } = await getYahooAuth();
+  const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}&crumb=${encodeURIComponent(crumb)}`;
+  const res = await fetch(url, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      "Accept": "application/json",
+      "Cookie": cookie,
+    },
+  });
+  if (res.status === 401 || res.status === 403) {
+    _cookie = null; _crumb = null; _expires = 0;
+    return fetchYahoo(symbol, interval, range); // 재시도
+  }
   if (!res.ok) throw new Error(`Yahoo ${res.status}`);
   const json = await res.json();
   const result = json?.chart?.result?.[0];
@@ -154,7 +184,7 @@ async function sendTelegram(botToken, chatId, assets, conditions) {
     volume_spike: "🔥 거래량 급증",
   };
 
-  let msg = `🚨 *Signal Screener 자동 알림*\n\n`;
+  let msg = `🚨 *DI금융 자동 알림*\n\n`;
   msg += `📅 ${new Date().toLocaleDateString("ko-KR", {timeZone:"Asia/Seoul"})} `;
   msg += `${new Date().toLocaleTimeString("ko-KR", {timeZone:"Asia/Seoul"})}\n`;
   msg += `📊 시그널 감지: *${assets.length}개* 자산\n`;
