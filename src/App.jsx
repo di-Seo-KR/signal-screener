@@ -1978,9 +1978,11 @@ export default function App() {
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 {portfolio.map((item, idx) => {
                   const cur = portfolioPrices[item.symbol];
-                  const gain = cur ? ((cur - item.avgPrice) / item.avgPrice) * 100 : 0;
-                  const gainVal = cur ? item.qty * (cur - item.avgPrice) : 0;
-                  const isPos = gainVal >= 0;
+                  const gain = cur ? ((cur - item.avgPrice) / item.avgPrice) * 100 : null;
+                  const gainVal = cur ? item.qty * (cur - item.avgPrice) : null;
+                  const invested = item.qty * item.avgPrice;
+                  const evalVal = cur ? item.qty * cur : null;
+                  const isPos = gainVal != null ? gainVal >= 0 : true;
                   const mcColor = item.market === "us" ? C.blue : item.market === "kr" ? C.green : C.purple;
                   const mcBg = item.market === "us" ? "#1A2C4F" : item.market === "kr" ? "#1A2A1E" : "#1E1A2A";
                   const flag = item.market === "us" ? "🇺🇸" : item.market === "kr" ? "🇰🇷" : "₿";
@@ -2012,11 +2014,41 @@ export default function App() {
                           <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "2px" }}>
                             {toDisplay(cur, item.market)}
                           </div>
-                          <div style={{ fontSize: "13px", fontWeight: 700, color: isPos ? C.green : C.red }}>
-                            {isPos ? "+" : ""}{gain.toFixed(2)}%
-                          </div>
+                          {gain != null && (
+                            <div style={{ fontSize: "13px", fontWeight: 700, color: isPos ? C.green : C.red }}>
+                              {isPos ? "+" : ""}{gain.toFixed(2)}%
+                            </div>
+                          )}
                         </div>
                       </div>
+
+                      {/* 손익 상세 정보 */}
+                      {cur != null && (
+                        <div style={{
+                          display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px",
+                          padding: "0 18px 12px", fontSize: "11px",
+                        }}>
+                          <div style={{ background: C.bg, borderRadius: "8px", padding: "8px 10px" }}>
+                            <div style={{ color: C.text3, marginBottom: "2px" }}>투자금</div>
+                            <div style={{ color: C.text1, fontWeight: 700, fontSize: "13px" }}>
+                              {toDisplay(invested, item.market)}
+                            </div>
+                          </div>
+                          <div style={{ background: C.bg, borderRadius: "8px", padding: "8px 10px" }}>
+                            <div style={{ color: C.text3, marginBottom: "2px" }}>평가금</div>
+                            <div style={{ color: C.text1, fontWeight: 700, fontSize: "13px" }}>
+                              {toDisplay(evalVal, item.market)}
+                            </div>
+                          </div>
+                          <div style={{ background: isPos ? C.greenBg : C.redBg, borderRadius: "8px", padding: "8px 10px" }}>
+                            <div style={{ color: C.text3, marginBottom: "2px" }}>손익</div>
+                            <div style={{ color: isPos ? C.green : C.red, fontWeight: 700, fontSize: "13px" }}>
+                              {isPos ? "+" : ""}{toDisplay(Math.abs(gainVal), item.market)}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* 하단 액션 바 */}
                       <div style={{
                         display: "flex", gap: "8px", padding: "0 18px 14px",
