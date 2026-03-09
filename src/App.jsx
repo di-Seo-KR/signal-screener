@@ -9,94 +9,236 @@ import BacktestPanel from "./BacktestPanel.jsx";
 // 데이터 정의
 // ════════════════════════════════════════════════════════════════════
 const US_ASSETS = [
+  // ── Mega Cap Tech ──
   { symbol: "AAPL", name: "Apple" }, { symbol: "MSFT", name: "Microsoft" },
   { symbol: "GOOGL", name: "Alphabet" }, { symbol: "AMZN", name: "Amazon" },
   { symbol: "NVDA", name: "NVIDIA" }, { symbol: "META", name: "Meta" },
-  { symbol: "TSLA", name: "Tesla" }, { symbol: "AMD", name: "AMD" },
-  { symbol: "NFLX", name: "Netflix" }, { symbol: "INTC", name: "Intel" },
-  { symbol: "BA", name: "Boeing" }, { symbol: "DIS", name: "Disney" },
-  { symbol: "PYPL", name: "PayPal" }, { symbol: "SNAP", name: "Snap" },
-  { symbol: "UBER", name: "Uber" }, { symbol: "COIN", name: "Coinbase" },
-  { symbol: "SQ", name: "Block" }, { symbol: "PLTR", name: "Palantir" },
+  { symbol: "TSLA", name: "Tesla" }, { symbol: "NFLX", name: "Netflix" },
+  // ── Semiconductors ──
+  { symbol: "AMD", name: "AMD" }, { symbol: "INTC", name: "Intel" },
+  { symbol: "AVGO", name: "Broadcom" }, { symbol: "QCOM", name: "Qualcomm" },
+  { symbol: "MU", name: "Micron" }, { symbol: "MRVL", name: "Marvell" },
+  { symbol: "SMCI", name: "Super Micro" }, { symbol: "ARM", name: "ARM Holdings" },
+  { symbol: "ASML", name: "ASML" }, { symbol: "TSM", name: "TSMC" },
+  { symbol: "LRCX", name: "Lam Research" }, { symbol: "KLAC", name: "KLA" },
+  { symbol: "AMAT", name: "Applied Materials" }, { symbol: "ON", name: "ON Semi" },
+  { symbol: "TXN", name: "Texas Instruments" }, { symbol: "ADI", name: "Analog Devices" },
+  // ── Software & Cloud ──
+  { symbol: "CRM", name: "Salesforce" }, { symbol: "ORCL", name: "Oracle" },
+  { symbol: "ADBE", name: "Adobe" }, { symbol: "NOW", name: "ServiceNow" },
+  { symbol: "SHOP", name: "Shopify" }, { symbol: "SNOW", name: "Snowflake" },
+  { symbol: "DDOG", name: "Datadog" }, { symbol: "NET", name: "Cloudflare" },
+  { symbol: "ZS", name: "Zscaler" }, { symbol: "PANW", name: "Palo Alto" },
+  { symbol: "CRWD", name: "CrowdStrike" }, { symbol: "FTNT", name: "Fortinet" },
+  { symbol: "WDAY", name: "Workday" }, { symbol: "HUBS", name: "HubSpot" },
+  { symbol: "TEAM", name: "Atlassian" }, { symbol: "MDB", name: "MongoDB" },
+  { symbol: "PLTR", name: "Palantir" }, { symbol: "AI", name: "C3.ai" },
+  { symbol: "PATH", name: "UiPath" }, { symbol: "DOCN", name: "DigitalOcean" },
+  // ── Internet & Social ──
+  { symbol: "SNAP", name: "Snap" }, { symbol: "PINS", name: "Pinterest" },
+  { symbol: "UBER", name: "Uber" }, { symbol: "LYFT", name: "Lyft" },
+  { symbol: "ABNB", name: "Airbnb" }, { symbol: "BKNG", name: "Booking" },
+  { symbol: "DASH", name: "DoorDash" }, { symbol: "RBLX", name: "Roblox" },
+  { symbol: "U", name: "Unity" }, { symbol: "TTWO", name: "Take-Two" },
+  { symbol: "EA", name: "EA Games" }, { symbol: "ROKU", name: "Roku" },
+  { symbol: "SPOT", name: "Spotify" },
+  // ── Fintech & Crypto ──
+  { symbol: "COIN", name: "Coinbase" }, { symbol: "SQ", name: "Block" },
+  { symbol: "PYPL", name: "PayPal" }, { symbol: "AFRM", name: "Affirm" },
+  { symbol: "SOFI", name: "SoFi" }, { symbol: "HOOD", name: "Robinhood" },
+  { symbol: "MSTR", name: "MicroStrategy" },
+  // ── Finance (Banks & Asset Mgmt) ──
   { symbol: "V", name: "Visa" }, { symbol: "MA", name: "Mastercard" },
   { symbol: "JPM", name: "JPMorgan" }, { symbol: "GS", name: "Goldman Sachs" },
-  { symbol: "CRM", name: "Salesforce" }, { symbol: "ORCL", name: "Oracle" },
-  { symbol: "ADBE", name: "Adobe" }, { symbol: "QCOM", name: "Qualcomm" },
-  // Tech expansion
-  { symbol: "AVGO", name: "Broadcom" }, { symbol: "MU", name: "Micron" },
-  { symbol: "MRVL", name: "Marvell" }, { symbol: "SMCI", name: "Super Micro" },
-  { symbol: "ARM", name: "ARM Holdings" }, { symbol: "PANW", name: "Palo Alto" },
-  { symbol: "CRWD", name: "CrowdStrike" }, { symbol: "NOW", name: "ServiceNow" },
-  { symbol: "SHOP", name: "Shopify" }, { symbol: "SNOW", name: "Snowflake" },
-  { symbol: "DDOG", name: "Datadog" },
-  // Finance expansion
   { symbol: "BAC", name: "BofA" }, { symbol: "WFC", name: "Wells Fargo" },
   { symbol: "MS", name: "Morgan Stanley" }, { symbol: "C", name: "Citigroup" },
-  { symbol: "BLK", name: "BlackRock" },
-  // Healthcare expansion
+  { symbol: "BLK", name: "BlackRock" }, { symbol: "SCHW", name: "Schwab" },
+  { symbol: "AXP", name: "Amex" }, { symbol: "BX", name: "Blackstone" },
+  { symbol: "KKR", name: "KKR" }, { symbol: "APO", name: "Apollo" },
+  // ── Healthcare & Pharma ──
   { symbol: "UNH", name: "UnitedHealth" }, { symbol: "JNJ", name: "J&J" },
   { symbol: "LLY", name: "Eli Lilly" }, { symbol: "NVO", name: "Novo Nordisk" },
-  { symbol: "ABBV", name: "AbbVie" },
-  // Energy/Materials expansion
+  { symbol: "ABBV", name: "AbbVie" }, { symbol: "PFE", name: "Pfizer" },
+  { symbol: "MRK", name: "Merck" }, { symbol: "TMO", name: "Thermo Fisher" },
+  { symbol: "ABT", name: "Abbott" }, { symbol: "BMY", name: "Bristol-Myers" },
+  { symbol: "AMGN", name: "Amgen" }, { symbol: "GILD", name: "Gilead" },
+  { symbol: "ISRG", name: "Intuitive Surgical" }, { symbol: "VRTX", name: "Vertex" },
+  { symbol: "REGN", name: "Regeneron" }, { symbol: "MRNA", name: "Moderna" },
+  // ── Industrials & Defense ──
+  { symbol: "BA", name: "Boeing" }, { symbol: "CAT", name: "Caterpillar" },
+  { symbol: "DE", name: "Deere" }, { symbol: "HON", name: "Honeywell" },
+  { symbol: "RTX", name: "RTX (Raytheon)" }, { symbol: "LMT", name: "Lockheed Martin" },
+  { symbol: "GE", name: "GE Aerospace" }, { symbol: "UPS", name: "UPS" },
+  { symbol: "FDX", name: "FedEx" },
+  // ── Energy ──
   { symbol: "XOM", name: "Exxon" }, { symbol: "CVX", name: "Chevron" },
-  { symbol: "LNG", name: "Cheniere" },
-  // Consumer expansion
+  { symbol: "LNG", name: "Cheniere" }, { symbol: "COP", name: "ConocoPhillips" },
+  { symbol: "SLB", name: "Schlumberger" }, { symbol: "OXY", name: "Occidental" },
+  { symbol: "EOG", name: "EOG Resources" },
+  // ── Consumer ──
   { symbol: "WMT", name: "Walmart" }, { symbol: "COST", name: "Costco" },
   { symbol: "HD", name: "Home Depot" }, { symbol: "MCD", name: "McDonalds" },
-  // ETF expansion
+  { symbol: "DIS", name: "Disney" }, { symbol: "SBUX", name: "Starbucks" },
+  { symbol: "NKE", name: "Nike" }, { symbol: "TGT", name: "Target" },
+  { symbol: "LOW", name: "Lowe's" }, { symbol: "KO", name: "Coca-Cola" },
+  { symbol: "PEP", name: "Pepsi" }, { symbol: "PG", name: "P&G" },
+  { symbol: "PM", name: "Philip Morris" }, { symbol: "CL", name: "Colgate" },
+  // ── Telecom & Media ──
+  { symbol: "T", name: "AT&T" }, { symbol: "VZ", name: "Verizon" },
+  { symbol: "TMUS", name: "T-Mobile" }, { symbol: "CMCSA", name: "Comcast" },
+  { symbol: "WBD", name: "Warner Bros" }, { symbol: "PARA", name: "Paramount" },
+  // ── Real Estate ──
+  { symbol: "AMT", name: "American Tower" }, { symbol: "PLD", name: "Prologis" },
+  { symbol: "O", name: "Realty Income" }, { symbol: "EQIX", name: "Equinix" },
+  // ── EV & Clean Energy ──
+  { symbol: "RIVN", name: "Rivian" }, { symbol: "LCID", name: "Lucid" },
+  { symbol: "LI", name: "Li Auto" }, { symbol: "NIO", name: "NIO" },
+  { symbol: "XPEV", name: "XPeng" }, { symbol: "ENPH", name: "Enphase" },
+  { symbol: "FSLR", name: "First Solar" }, { symbol: "PLUG", name: "Plug Power" },
+  // ── China ADRs ──
+  { symbol: "BABA", name: "Alibaba" }, { symbol: "JD", name: "JD.com" },
+  { symbol: "PDD", name: "PDD (Temu)" }, { symbol: "BIDU", name: "Baidu" },
+  { symbol: "NTES", name: "NetEase" }, { symbol: "TME", name: "Tencent Music" },
+  // ── ETFs ──
   { symbol: "SPY", name: "S&P 500 ETF" }, { symbol: "QQQ", name: "나스닥 100 ETF" },
-  { symbol: "ARKK", name: "ARK Innovation" }, { symbol: "SOXL", name: "반도체 3x" },
-  { symbol: "TQQQ", name: "나스닥 3x" }, { symbol: "BITI", name: "ProShares Short BTC" },
-  { symbol: "BITO", name: "ProShares BTC Strategy" }, { symbol: "GLD", name: "Gold ETF" },
-  { symbol: "TLT", name: "미국 장기채 ETF" }, { symbol: "VIX", name: "VIX 변동성" },
-  { symbol: "SCHD", name: "배당 ETF" }, { symbol: "JEPI", name: "JP모건 인컴 ETF" },
-  { symbol: "IWM", name: "Russell 2000" }, { symbol: "XLF", name: "Financial Select" },
-  { symbol: "XLE", name: "Energy Select" }, { symbol: "XLK", name: "Tech Select" },
+  { symbol: "DIA", name: "다우 ETF" }, { symbol: "IWM", name: "Russell 2000" },
+  { symbol: "ARKK", name: "ARK Innovation" }, { symbol: "ARKW", name: "ARK Next Gen" },
+  { symbol: "SOXL", name: "반도체 3x" }, { symbol: "TQQQ", name: "나스닥 3x" },
+  { symbol: "SQQQ", name: "나스닥 -3x" }, { symbol: "UPRO", name: "S&P 3x" },
+  { symbol: "SPXS", name: "S&P -3x" },
+  { symbol: "BITO", name: "ProShares BTC" }, { symbol: "BITI", name: "ProShares Short BTC" },
+  { symbol: "GLD", name: "Gold ETF" }, { symbol: "SLV", name: "Silver ETF" },
+  { symbol: "TLT", name: "미국 장기채" }, { symbol: "SHY", name: "미국 단기채" },
+  { symbol: "SCHD", name: "배당 ETF" }, { symbol: "JEPI", name: "JP모건 인컴" },
+  { symbol: "VIG", name: "배당 성장 ETF" }, { symbol: "NOBL", name: "배당 귀족 ETF" },
+  { symbol: "XLF", name: "금융 Select" }, { symbol: "XLE", name: "에너지 Select" },
+  { symbol: "XLK", name: "테크 Select" }, { symbol: "XLV", name: "헬스케어 Select" },
+  { symbol: "XLI", name: "산업재 Select" }, { symbol: "XLC", name: "커뮤니케이션 Select" },
+  { symbol: "XLRE", name: "부동산 Select" }, { symbol: "XLU", name: "유틸리티 Select" },
   { symbol: "KWEB", name: "China Internet" }, { symbol: "EEM", name: "Emerging Markets" },
   { symbol: "VNQ", name: "Real Estate" }, { symbol: "HYG", name: "High Yield Bond" },
-  { symbol: "LQD", name: "Investment Grade Bond" }, { symbol: "UNG", name: "Natural Gas" },
+  { symbol: "LQD", name: "Investment Grade" }, { symbol: "UNG", name: "Natural Gas" },
+  { symbol: "USO", name: "원유 ETF" }, { symbol: "COPX", name: "구리 ETF" },
+  { symbol: "VIX", name: "VIX 변동성" }, { symbol: "UVXY", name: "VIX 1.5x" },
 ];
 
 const KR_ASSETS = [
+  // ── 시가총액 Top ──
   { symbol: "005930.KS", name: "삼성전자" }, { symbol: "000660.KS", name: "SK하이닉스" },
-  { symbol: "035420.KS", name: "NAVER" },    { symbol: "035720.KS", name: "카카오" },
-  { symbol: "051910.KS", name: "LG화학" },   { symbol: "006400.KS", name: "삼성SDI" },
-  { symbol: "003670.KS", name: "포스코퓨처엠" }, { symbol: "105560.KS", name: "KB금융" },
-  { symbol: "055550.KS", name: "신한지주" }, { symbol: "068270.KS", name: "셀트리온" },
-  { symbol: "207940.KS", name: "삼성바이오로직스" }, { symbol: "066570.KS", name: "LG전자" },
-  { symbol: "005380.KS", name: "현대차" },   { symbol: "000270.KS", name: "기아" },
-  { symbol: "086790.KS", name: "하나금융지주" },
-  // Energy & Materials expansion
-  { symbol: "373220.KS", name: "LG에너지솔루션" }, { symbol: "247540.KS", name: "에코프로비엠" },
-  { symbol: "028260.KS", name: "삼성물산" }, { symbol: "012330.KS", name: "현대모비스" },
-  { symbol: "096770.KS", name: "SK이노베이션" }, { symbol: "034730.KS", name: "SK" },
-  { symbol: "017670.KS", name: "SK텔레콤" },
-  // Games & Entertainment expansion
-  { symbol: "259960.KS", name: "크래프톤" }, { symbol: "263750.KS", name: "펄어비스" },
-  { symbol: "036570.KS", name: "엔씨소프트" },
-  // Insurance expansion
+  { symbol: "373220.KS", name: "LG에너지솔루션" }, { symbol: "207940.KS", name: "삼성바이오로직스" },
+  { symbol: "005380.KS", name: "현대차" }, { symbol: "000270.KS", name: "기아" },
+  { symbol: "068270.KS", name: "셀트리온" }, { symbol: "035420.KS", name: "NAVER" },
+  { symbol: "035720.KS", name: "카카오" }, { symbol: "051910.KS", name: "LG화학" },
+  { symbol: "006400.KS", name: "삼성SDI" },
+  // ── 반도체/전자 ──
+  { symbol: "066570.KS", name: "LG전자" }, { symbol: "009150.KS", name: "삼성전기" },
+  { symbol: "000990.KS", name: "DB하이텍" }, { symbol: "042700.KS", name: "한미반도체" },
+  { symbol: "058470.KS", name: "리노공업" },
+  // ── 2차전지/소재 ──
+  { symbol: "003670.KS", name: "포스코퓨처엠" }, { symbol: "247540.KS", name: "에코프로비엠" },
+  { symbol: "006260.KS", name: "LS" }, { symbol: "011170.KS", name: "롯데케미칼" },
+  { symbol: "010130.KS", name: "고려아연" },
+  // ── 금융 ──
+  { symbol: "105560.KS", name: "KB금융" }, { symbol: "055550.KS", name: "신한지주" },
+  { symbol: "086790.KS", name: "하나금융지주" }, { symbol: "316140.KS", name: "우리금융지주" },
   { symbol: "000810.KS", name: "삼성화재" }, { symbol: "032830.KS", name: "삼성생명" },
+  { symbol: "024110.KS", name: "기업은행" }, { symbol: "138930.KS", name: "BNK금융지주" },
+  // ── 자동차/모빌리티 ──
+  { symbol: "012330.KS", name: "현대모비스" }, { symbol: "018880.KS", name: "한온시스템" },
+  { symbol: "161390.KS", name: "한국타이어" },
+  // ── 에너지/정유/화학 ──
+  { symbol: "096770.KS", name: "SK이노베이션" }, { symbol: "034730.KS", name: "SK" },
+  { symbol: "010950.KS", name: "S-Oil" }, { symbol: "078930.KS", name: "GS" },
+  { symbol: "036460.KS", name: "한국가스공사" },
+  // ── 통신 ──
+  { symbol: "017670.KS", name: "SK텔레콤" }, { symbol: "030200.KS", name: "KT" },
+  { symbol: "032640.KS", name: "LG유플러스" },
+  // ── 건설/중공업 ──
+  { symbol: "028260.KS", name: "삼성물산" }, { symbol: "000720.KS", name: "현대건설" },
+  { symbol: "009540.KS", name: "HD한국조선해양" }, { symbol: "329180.KS", name: "HD현대중공업" },
+  { symbol: "010620.KS", name: "HD현대미포" },
+  // ── 게임/엔터 ──
+  { symbol: "259960.KS", name: "크래프톤" }, { symbol: "263750.KS", name: "펄어비스" },
+  { symbol: "036570.KS", name: "엔씨소프트" }, { symbol: "251270.KS", name: "넷마블" },
+  { symbol: "041510.KS", name: "에스엠" }, { symbol: "352820.KS", name: "하이브" },
+  { symbol: "122870.KS", name: "와이지엔터" }, { symbol: "035900.KS", name: "JYP Ent." },
+  // ── 유통/소비재 ──
+  { symbol: "004170.KS", name: "신세계" }, { symbol: "023530.KS", name: "롯데쇼핑" },
+  { symbol: "069960.KS", name: "현대백화점" }, { symbol: "097950.KS", name: "CJ제일제당" },
+  { symbol: "003230.KS", name: "삼양식품" }, { symbol: "271560.KS", name: "오리온" },
+  // ── 바이오/헬스케어 ──
+  { symbol: "128940.KS", name: "한미약품" }, { symbol: "326030.KS", name: "SK바이오팜" },
+  { symbol: "302440.KS", name: "SK바이오사이언스" }, { symbol: "145020.KS", name: "휴젤" },
+  { symbol: "091990.KS", name: "셀트리온헬스케어" },
+  // ── IT서비스 ──
+  { symbol: "018260.KS", name: "삼성SDS" }, { symbol: "034220.KS", name: "LG디스플레이" },
+  { symbol: "377300.KS", name: "카카오페이" }, { symbol: "323410.KS", name: "카카오뱅크" },
 ];
 
 const CRYPTO_ASSETS = [
+  // ── Top 10 ──
   { id: "bitcoin", symbol: "BTC", name: "Bitcoin" },
   { id: "ethereum", symbol: "ETH", name: "Ethereum" },
+  { id: "binancecoin", symbol: "BNB", name: "BNB" },
   { id: "solana", symbol: "SOL", name: "Solana" },
   { id: "ripple", symbol: "XRP", name: "XRP" },
   { id: "cardano", symbol: "ADA", name: "Cardano" },
+  { id: "dogecoin", symbol: "DOGE", name: "Dogecoin" },
+  { id: "tron", symbol: "TRX", name: "TRON" },
   { id: "avalanche-2", symbol: "AVAX", name: "Avalanche" },
   { id: "polkadot", symbol: "DOT", name: "Polkadot" },
+  // ── DeFi ──
   { id: "chainlink", symbol: "LINK", name: "Chainlink" },
-  { id: "dogecoin", symbol: "DOGE", name: "Dogecoin" },
   { id: "uniswap", symbol: "UNI", name: "Uniswap" },
-  { id: "binancecoin", symbol: "BNB", name: "BNB" },
-  { id: "tron", symbol: "TRX", name: "TRON" },
-  { id: "near", symbol: "NEAR", name: "NEAR Protocol" },
+  { id: "aave", symbol: "AAVE", name: "Aave" },
+  { id: "maker", symbol: "MKR", name: "Maker" },
+  { id: "lido-dao", symbol: "LDO", name: "Lido" },
+  { id: "the-graph", symbol: "GRT", name: "The Graph" },
+  { id: "compound-governance-token", symbol: "COMP", name: "Compound" },
+  { id: "1inch", symbol: "1INCH", name: "1inch" },
+  { id: "curve-dao-token", symbol: "CRV", name: "Curve" },
+  { id: "pendle", symbol: "PENDLE", name: "Pendle" },
+  { id: "jupiter-exchange-solana", symbol: "JUP", name: "Jupiter" },
+  // ── L1/L2 ──
+  { id: "near", symbol: "NEAR", name: "NEAR" },
   { id: "sui", symbol: "SUI", name: "Sui" },
-  { id: "pepe", symbol: "PEPE", name: "Pepe" },
+  { id: "aptos", symbol: "APT", name: "Aptos" },
+  { id: "cosmos", symbol: "ATOM", name: "Cosmos" },
+  { id: "internet-computer", symbol: "ICP", name: "Internet Computer" },
+  { id: "filecoin", symbol: "FIL", name: "Filecoin" },
+  { id: "arbitrum", symbol: "ARB", name: "Arbitrum" },
+  { id: "optimism", symbol: "OP", name: "Optimism" },
+  { id: "polygon-ecosystem-token", symbol: "POL", name: "Polygon" },
+  { id: "starknet", symbol: "STRK", name: "Starknet" },
+  { id: "mantle", symbol: "MNT", name: "Mantle" },
+  { id: "sei-network", symbol: "SEI", name: "Sei" },
+  { id: "celestia", symbol: "TIA", name: "Celestia" },
+  // ── AI & Data ──
   { id: "render-token", symbol: "RNDR", name: "Render" },
-  { id: "injective-protocol", symbol: "INJ", name: "Injective" },
   { id: "fetch-ai", symbol: "FET", name: "Fetch.ai" },
+  { id: "injective-protocol", symbol: "INJ", name: "Injective" },
+  { id: "akash-network", symbol: "AKT", name: "Akash" },
+  { id: "artificial-superintelligence-alliance", symbol: "ASI", name: "ASI Alliance" },
+  { id: "bittensor", symbol: "TAO", name: "Bittensor" },
+  // ── Meme ──
+  { id: "pepe", symbol: "PEPE", name: "Pepe" },
+  { id: "shiba-inu", symbol: "SHIB", name: "Shiba Inu" },
+  { id: "floki", symbol: "FLOKI", name: "Floki" },
+  { id: "bonk", symbol: "BONK", name: "Bonk" },
+  { id: "dogwifcoin", symbol: "WIF", name: "dogwifhat" },
+  // ── Stablecoins & Misc ──
+  { id: "wrapped-bitcoin", symbol: "WBTC", name: "Wrapped BTC" },
+  { id: "litecoin", symbol: "LTC", name: "Litecoin" },
+  { id: "bitcoin-cash", symbol: "BCH", name: "Bitcoin Cash" },
+  { id: "stellar", symbol: "XLM", name: "Stellar" },
+  { id: "hedera-hashgraph", symbol: "HBAR", name: "Hedera" },
+  { id: "algorand", symbol: "ALGO", name: "Algorand" },
+  { id: "eos", symbol: "EOS", name: "EOS" },
+  { id: "the-sandbox", symbol: "SAND", name: "The Sandbox" },
+  { id: "decentraland", symbol: "MANA", name: "Decentraland" },
+  { id: "axie-infinity", symbol: "AXS", name: "Axie Infinity" },
+  { id: "gala", symbol: "GALA", name: "Gala" },
+  { id: "ondo-finance", symbol: "ONDO", name: "Ondo Finance" },
 ];
 
 // 전체 자산 통합 (검색용)
@@ -393,13 +535,47 @@ const CONDITION_META = {
 // 감정 분석 헬퍼
 // ════════════════════════════════════════════════════════════════════
 function analyzeSentiment(title) {
-  const pos = ["surge","rally","rise","gain","jump","soar","record","bull","up","growth","profit","beat","strong","high","buy","upgrade","긍정","상승","급등","호재","성장","흑자","매수","상향","신고가","최고","강세","돌파"];
-  const neg = ["crash","fall","drop","plunge","decline","loss","bear","down","sell","cut","miss","weak","low","risk","concern","recession","부정","하락","급락","악재","적자","매도","하향","신저가","최저","약세","폭락","위기","불안"];
-  const titleLower = title.toLowerCase();
-  const posCount = pos.filter(w => titleLower.includes(w)).length;
-  const negCount = neg.filter(w => titleLower.includes(w)).length;
-  if (posCount > negCount) return "positive";
-  if (negCount > posCount) return "negative";
+  if (!title) return "neutral";
+  const t = ` ${title.toLowerCase()} `;
+
+  // ── 강한 긍정 (가중치 2) ──
+  const strongPos = ["surge","soar","record high","all-time high","skyrocket","boom","breakout",
+    "급등","폭등","신고가","사상최고","돌파","대박","호실적","깜짝실적","어닝서프라이즈"];
+  // ── 긍정 (가중치 1) ──
+  const pos = ["rally","gain","jump","rise","bull","growth","profit","beat","outperform",
+    "upgrade","buy","strong","positive","recover","rebound","advance","climb","up ",
+    "상승","호재","성장","흑자","매수","상향","강세","반등","회복","호조","개선",
+    "수혜","낙관","기대","확대","증가","호황","상승세","매출증가","이익증가"];
+  // ── 강한 부정 (가중치 2) ──
+  const strongNeg = ["crash","plunge","collapse","bankruptcy","default","crisis",
+    "폭락","급락","파산","디폴트","위기","붕괴","대폭락","폭발적하락","서킷브레이커"];
+  // ── 부정 (가중치 1) ──
+  const neg = ["fall","drop","decline","loss","bear","sell","cut","miss","weak","concern",
+    "recession","downgrade","warning","fear","risk","slump","slide","tumble","layoff",
+    "하락","악재","적자","매도","하향","약세","침체","불안","우려","감소","축소",
+    "둔화","손실","경고","감원","정리해고","하락세","부진","역풍"];
+  // ── 부정어 앞 긍정을 뒤집는 문맥 (반전어) ──
+  const negators = ["not ","no ","n't ","despite ","unlikely ","fails ","failed ",
+    "않","못","없","아닌","불구","실패"];
+
+  let score = 0;
+  strongPos.forEach(w => { if (t.includes(w)) score += 2; });
+  pos.forEach(w => { if (t.includes(w)) score += 1; });
+  strongNeg.forEach(w => { if (t.includes(w)) score -= 2; });
+  neg.forEach(w => { if (t.includes(w)) score -= 1; });
+
+  // 반전어 감지: "not rise", "상승 않" 등
+  const hasNegator = negators.some(n => t.includes(n));
+  if (hasNegator && score !== 0) score = -score * 0.5;
+
+  // "low risk" → 중립 보정, "high risk" → 부정 보정
+  if (t.includes("low risk")) score += 1;
+  if (t.includes("high risk")) score -= 1;
+  // "cut rates" (금리인하) → 긍정 보정
+  if (t.includes("cut rate") || t.includes("rate cut") || t.includes("금리인하") || t.includes("금리 인하")) score += 1;
+
+  if (score >= 1) return "positive";
+  if (score <= -1) return "negative";
   return "neutral";
 }
 
@@ -453,18 +629,81 @@ function fmtPrice(price, market) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 색상 팔레트 (토스증권 스타일 다크 테마)
+// 색상 팔레트 (토스증권 스타일 다크 테마) — 가독성 개선
 // ════════════════════════════════════════════════════════════════════
 const C = {
-  bg: "#070C14", card: "#0F1825", card2: "#141E2E",
-  border: "#1A2535", border2: "#243044",
+  bg: "#0A0E17", card: "#111927", card2: "#1A2332",
+  border: "#1E2D3D", border2: "#283B50",
   blue: "#3182F6", blueL: "#5AA3FF", blueBg: "#1A2C4F",
   red: "#F04452", redBg: "#2A1520",
   green: "#05C072", greenBg: "#0A2A1A",
   yellow: "#FFB400", yellowBg: "#2A2000",
   purple: "#8B5CF6", purpleBg: "#1E1535",
-  text1: "#F2F4F7", text2: "#A0AEBF", text3: "#5A6880",
+  text1: "#F7F8FA", text2: "#B0BEC5", text3: "#6B7D8E",
 };
+
+// ════════════════════════════════════════════════════════════════════
+// 서브 컴포넌트: PullToRefresh (모바일 아래로 당겨서 새로고침)
+// ════════════════════════════════════════════════════════════════════
+function PullToRefresh({ onRefresh, children }) {
+  const containerRef = useRef(null);
+  const [pulling, setPulling] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const startY = useRef(0);
+  const THRESHOLD = 80;
+
+  const handleTouchStart = useCallback((e) => {
+    if (window.scrollY === 0) {
+      startY.current = e.touches[0].clientY;
+      setPulling(true);
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e) => {
+    if (!pulling) return;
+    const diff = e.touches[0].clientY - startY.current;
+    if (diff > 0 && window.scrollY === 0) {
+      setPullDistance(Math.min(diff * 0.5, 120));
+    }
+  }, [pulling]);
+
+  const handleTouchEnd = useCallback(async () => {
+    if (pullDistance >= THRESHOLD && !refreshing) {
+      setRefreshing(true);
+      setPullDistance(50);
+      try { await onRefresh(); } catch {}
+      setRefreshing(false);
+    }
+    setPulling(false);
+    setPullDistance(0);
+  }, [pullDistance, refreshing, onRefresh]);
+
+  return (
+    <div ref={containerRef} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+      {pullDistance > 0 && (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          height: `${pullDistance}px`, overflow: "hidden",
+          transition: pulling ? "none" : "height .3s ease",
+        }}>
+          <div style={{
+            fontSize: "20px",
+            transform: `rotate(${Math.min(pullDistance / THRESHOLD, 1) * 360}deg)`,
+            transition: pulling ? "none" : "transform .3s ease",
+            opacity: Math.min(pullDistance / THRESHOLD, 1),
+          }}>
+            {refreshing ? "⏳" : pullDistance >= THRESHOLD ? "↻" : "↓"}
+          </div>
+          <span style={{ marginLeft: "8px", fontSize: "13px", color: C.text3, fontWeight: 600 }}>
+            {refreshing ? "새로고침 중..." : pullDistance >= THRESHOLD ? "놓으면 새로고침" : "아래로 당기기"}
+          </span>
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
 
 // ════════════════════════════════════════════════════════════════════
 // 서브 컴포넌트: Tag
@@ -1038,13 +1277,15 @@ export default function App() {
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-        * { box-sizing: border-box; margin: 0; }
-        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        * { box-sizing: border-box; margin: 0; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+        html { font-size: 16px; line-height: 1.5; }
+        body { letter-spacing: -0.01em; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: ${C.border2}; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb { background: ${C.border2}; border-radius: 3px; }
         button, a { cursor: pointer; font-family: inherit; }
-        input { font-family: inherit; }
-        input:focus { border-color: ${C.blue} !important; }
+        input, select { font-family: inherit; font-size: 14px; }
+        input:focus { border-color: ${C.blue} !important; box-shadow: 0 0 0 3px ${C.blue}18; }
         @media (max-width: 640px) {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: block !important; }
@@ -1077,14 +1318,6 @@ export default function App() {
               }}>{t.icon} {t.label}</button>
             ))}
           </nav>
-          {/* 새로고침 버튼 */}
-          <button onClick={() => window.location.reload()} title="새로고침" style={{
-            background: "none", border: "none", color: C.text3, fontSize: "18px",
-            padding: "4px 8px", cursor: "pointer", marginLeft: "4px",
-            transition: "color .2s",
-          }}
-          onMouseEnter={e => e.currentTarget.style.color = C.blue}
-          onMouseLeave={e => e.currentTarget.style.color = C.text3}>🔄</button>
           {/* 모바일 햄버거 */}
           <button className="mobile-menu-btn" onClick={() => setMenuOpen(!menuOpen)} style={{
             display: "none", background: "none", border: "none", color: C.text2,
@@ -1111,6 +1344,12 @@ export default function App() {
         )}
       </header>
 
+      <PullToRefresh onRefresh={async () => {
+        if (tab === "home") await fetchMarketOverview();
+        else if (tab === "portfolio") await fetchPortfolioPrices();
+        else if (tab === "news") await fetchNews();
+        else window.location.reload();
+      }}>
       <main style={{ maxWidth: "900px", margin: "0 auto", padding: "20px" }}>
 
         {/* ═══════════════════════════════════════════════════════════
@@ -1592,31 +1831,80 @@ export default function App() {
                 <div style={{ color: C.text3, fontSize: "14px" }}>자산을 추가하여 시작하세요</div>
               </div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                 {portfolio.map((item, idx) => {
                   const cur = portfolioPrices[item.symbol];
                   const gain = cur ? ((cur - item.avgPrice) / item.avgPrice) * 100 : 0;
                   const gainVal = cur ? item.qty * (cur - item.avgPrice) : 0;
                   const isPos = gainVal >= 0;
+                  const mcColor = item.market === "us" ? C.blue : item.market === "kr" ? C.green : C.purple;
+                  const mcBg = item.market === "us" ? "#1A2C4F" : item.market === "kr" ? "#1A2A1E" : "#1E1A2A";
+                  const flag = item.market === "us" ? "🇺🇸" : item.market === "kr" ? "🇰🇷" : "₿";
                   return (
                     <div key={idx} style={{
-                      background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "14px",
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden",
                     }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: "14px", marginBottom: "2px" }}>{item.name}</div>
-                        <div style={{ fontSize: "12px", color: C.text3 }}>{item.symbol} · {item.qty.toLocaleString()}개</div>
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: "13px", color: C.text2 }}>{toDisplay(cur, item.market)}</div>
-                        <div style={{ fontSize: "12px", fontWeight: 600, color: isPos ? C.green : C.red }}>
-                          {isPos ? "+" : ""}{gain.toFixed(2)}% {toDisplay(gainVal, item.market)}
+                      <div style={{ display: "flex", alignItems: "center", padding: "16px 18px", gap: "14px" }}>
+                        {/* 심볼 아이콘 */}
+                        <div style={{
+                          width: "44px", height: "44px", borderRadius: "12px", background: mcBg, flexShrink: 0,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontWeight: 800, fontSize: "10px", color: mcColor,
+                        }}>
+                          {item.symbol.replace(".KS","").slice(0,4)}
+                        </div>
+                        {/* 종목 정보 */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "3px" }}>
+                            <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>{item.name || item.symbol}</span>
+                            <span style={{ fontSize: "12px", color: C.text3 }}>{flag} {item.symbol}</span>
+                          </div>
+                          <div style={{ fontSize: "13px", color: C.text3 }}>
+                            {item.qty.toLocaleString()}주 · 평균 {toDisplay(item.avgPrice, item.market)}
+                          </div>
+                        </div>
+                        {/* 현재가 & 수익률 */}
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "2px" }}>
+                            {toDisplay(cur, item.market)}
+                          </div>
+                          <div style={{ fontSize: "13px", fontWeight: 700, color: isPos ? C.green : C.red }}>
+                            {isPos ? "+" : ""}{gain.toFixed(2)}%
+                          </div>
                         </div>
                       </div>
-                      <button onClick={() => setPortfolio(p => p.filter((_, i) => i !== idx))} style={{
-                        padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: 600,
-                        background: C.redBg, color: C.red, border: `1px solid ${C.red}44`, marginLeft: "12px",
-                      }}>삭제</button>
+                      {/* 하단 액션 바 */}
+                      <div style={{
+                        display: "flex", gap: "8px", padding: "0 18px 14px",
+                        borderTop: "none",
+                      }}>
+                        <button onClick={() => {
+                          const cryptoA = CRYPTO_ASSETS.find(c => c.symbol === item.symbol);
+                          setChartAsset({
+                            symbol: item.symbol, name: item.name || item.symbol,
+                            market: item.market, symbolRaw: item.symbolRaw || item.symbol,
+                            ...(cryptoA ? { id: cryptoA.id } : {}),
+                          });
+                        }} style={{
+                          flex: 1, padding: "9px 0", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                          background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}33`,
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+                        }}>📈 차트</button>
+                        <button onClick={() => {
+                          const sym = item.market === "crypto"
+                            ? `https://www.coingecko.com/en/coins/${item.cryptoId || item.symbol.toLowerCase()}`
+                            : `https://finance.yahoo.com/quote/${item.symbolRaw || item.symbol}`;
+                          window.open(sym, "_blank");
+                        }} style={{
+                          flex: 1, padding: "9px 0", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                          background: C.card2, color: C.text2, border: `1px solid ${C.border2}`,
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+                        }}>🔗 상세</button>
+                        <button onClick={() => setPortfolio(p => p.filter((_, i) => i !== idx))} style={{
+                          padding: "9px 14px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                          background: C.redBg, color: C.red, border: `1px solid ${C.red}33`,
+                        }}>삭제</button>
+                      </div>
                     </div>
                   );
                 })}
@@ -1812,8 +2100,9 @@ export default function App() {
         )}
 
         {/* 차트 모달 */}
-        {chartAsset && <ChartModal asset={chartAsset} onClose={() => setChartAsset(null)} />}
+        {chartAsset && <ChartModal asset={chartAsset} onClose={() => setChartAsset(null)} krwRate={krwRate} />}
       </main>
+      </PullToRefresh>
     </div>
   );
 }

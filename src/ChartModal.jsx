@@ -66,45 +66,92 @@ function calcMACD(closes) {
   return { macdLine, signalLine, histogram };
 }
 
-function tsToDay(ts) {
+// ── 시간 변환: 인트라데이는 Unix timestamp, 일봉 이상은 business day ──
+function isIntraday(tf) {
+  return ["1m", "5m", "10m", "30m", "1h", "2h", "4h"].includes(tf);
+}
+
+function tsToTime(ts, tf) {
+  if (isIntraday(tf)) {
+    // Unix timestamp (seconds) for intraday
+    return ts;
+  }
+  // Business day format for daily+
   const d = new Date(ts * 1000);
   return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
 }
 
-function deduplicateCandles(candles) {
+function deduplicateCandles(candles, tf) {
   const map = new Map();
   for (const c of candles) {
-    const key = `${c.time.year}-${c.time.month}-${c.time.day}`;
+    let key;
+    if (isIntraday(tf)) {
+      key = c.time; // Unix timestamp
+    } else {
+      key = `${c.time.year}-${c.time.month}-${c.time.day}`;
+    }
     map.set(key, c);
   }
   return Array.from(map.values()).sort((a, b) => {
+    if (isIntraday(tf)) return a.time - b.time;
     if (a.time.year !== b.time.year) return a.time.year - b.time.year;
     if (a.time.month !== b.time.month) return a.time.month - b.time.month;
     return a.time.day - b.time.day;
   });
 }
 
+// ── 타임프레임 설정 (10개 세분화) ──
 const TF_CONFIG = {
-  "5m":  { label: "5분",  interval: "5m",   range: "5d" },
+  "1m":  { label: "1분",   interval: "1m",  range: "1d" },
+  "5m":  { label: "5분",   interval: "5m",  range: "5d" },
+  "10m": { label: "10분",  interval: "5m",  range: "5d" },  // Yahoo doesn't support 10m, use 5m
+  "30m": { label: "30분",  interval: "30m", range: "1mo" },
   "1h":  { label: "1시간", interval: "1h",  range: "1mo" },
-  "1d":  { label: "일봉",  interval: "1d",   range: "6mo" },
-  "1wk": { label: "주봉",  interval: "1wk",  range: "2y" },
-  "1mo": { label: "월봉",  interval: "1mo",  range: "10y" },
+  "2h":  { label: "2시간", interval: "1h",  range: "1mo" },  // Aggregate from 1h
+  "4h":  { label: "4시간", interval: "1h",  range: "3mo" },  // Aggregate from 1h
+  "1d":  { label: "날봉",  interval: "1d",  range: "6mo" },
+  "1wk": { label: "주봉",  interval: "1wk", range: "2y" },
+  "1mo": { label: "월봉",  interval: "1mo", range: "10y" },
 };
 
 const CRYPTO_TF = {
-  "5m":  { label: "5분",  days: "1"   },
-  "1h":  { label: "1시간", days: "7"  },
-  "1d":  { label: "일봉",  days: "90" },
+  "1m":  { label: "1분",   days: "1" },
+  "5m":  { label: "5분",   days: "1" },
+  "10m": { label: "10분",  days: "1" },
+  "30m": { label: "30분",  days: "7" },
+  "1h":  { label: "1시간", days: "7" },
+  "2h":  { label: "2시간", days: "14" },
+  "4h":  { label: "4시간", days: "30" },
+  "1d":  { label: "날봉",  days: "90" },
   "1wk": { label: "주봉",  days: "365" },
   "1mo": { label: "월봉",  days: "max" },
 };
 
-// Chart options — wider right price scale margin to prevent cutoff
-function makeChartOptions(height, width) {
+// ── Aggregate candles for 10m/2h/4h (from smaller intervals) ──
+function aggregateCandles(candles, factor) {
+  if (factor <= 1) return candles;
+  const result = [];
+  for (let i = 0; i < candles.length; i += factor) {
+    const chunk = candles.slice(i, i + factor);
+    if (!chunk.length) break;
+    result.push({
+      time: chunk[0].time,
+      open: chunk[0].open,
+      high: Math.max(...chunk.map(c => c.high)),
+      low: Math.min(...chunk.map(c => c.low)),
+      close: chunk[chunk.length - 1].close,
+      volume: chunk.reduce((s, c) => s + (c.volume || 0), 0),
+    });
+  }
+  return result;
+}
+
+// Chart options
+function makeChartOptions(height, width, tf) {
+  const intra = isIntraday(tf);
   return {
     layout: {
-      background: { color: "#0d1117" },
+      background: { color: "#0A0E17" },
       textColor: "#8b949e",
       fontFamily: "'Pretendard', 'Apple SD Gothic Neo', system-ui, sans-serif",
     },
@@ -120,14 +167,16 @@ function makeChartOptions(height, width) {
     rightPriceScale: {
       borderColor: "#1c2128",
       scaleMargins: { top: 0.08, bottom: 0.05 },
-      minimumWidth: 80,
+      minimumWidth: 100,
+      entireTextOnly: true,
     },
     timeScale: {
       borderColor: "#1c2128",
-      timeVisible: true,
+      timeVisible: intra,
       secondsVisible: false,
       fixLeftEdge: true,
       fixRightEdge: true,
+      rightOffset: 5,
     },
     height,
     width: width || 300,
@@ -136,16 +185,25 @@ function makeChartOptions(height, width) {
   };
 }
 
-// ── colors
+// ── colors (matching App.jsx palette)
 const CC = {
-  bg: "#070C14", card: "#0F1825", card2: "#141E2E",
-  border: "#1A2535", border2: "#243044",
+  bg: "#0A0E17", card: "#111927", card2: "#1A2332",
+  border: "#1E2D3D", border2: "#283B50",
   blue: "#3182F6", green: "#05C072", red: "#F04452", yellow: "#FFB400",
-  text1: "#F2F4F7", text2: "#A0AEBF", text3: "#5A6880",
+  text1: "#F7F8FA", text2: "#B0BEC5", text3: "#6B7D8E",
 };
 
-// ── Full-page chart component (NOT a modal popup) ────────────────
-export default function ChartModal({ asset, onClose }) {
+// ── Price formatting with commas ──
+function fmtPrice(p, market) {
+  if (!p && p !== 0) return "—";
+  if (market === "kr") return `₩${Math.round(p).toLocaleString("ko-KR")}`;
+  if (p < 0.01) return `$${p.toFixed(6)}`;
+  if (p < 1) return `$${p.toFixed(4)}`;
+  return `$${p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// ── Full-page chart component ────────────────────────────────────
+export default function ChartModal({ asset, onClose, krwRate }) {
   const containerRef = useRef(null);
   const mainRef   = useRef(null);
   const rsiRef    = useRef(null);
@@ -159,8 +217,10 @@ export default function ChartModal({ asset, onClose }) {
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState(null);
   const [ohlcInfo, setOhlcInfo] = useState(null);
+  const [showKRW, setShowKRW] = useState(false);
 
   const isCrypto = asset?.market === "crypto";
+  const isUS = asset?.market === "us";
   const toggleIndicator = (key) => setIndicators(prev => ({ ...prev, [key]: !prev[key] }));
 
   const fetchData = useCallback(async (tf) => {
@@ -168,22 +228,31 @@ export default function ChartModal({ asset, onClose }) {
     setError(null);
     try {
       let candles;
+      // Aggregation factor for 10m (from 5m x2), 2h (from 1h x2), 4h (from 1h x4)
+      const aggFactor = tf === "10m" ? 2 : tf === "2h" ? 2 : tf === "4h" ? 4 : 1;
+
       if (isCrypto) {
         const { days } = CRYPTO_TF[tf] || CRYPTO_TF["1d"];
         const coinId = asset.cryptoId || asset.symbolRaw || asset.id || asset.symbol.toLowerCase();
         const r = await fetch(`/api/coingecko-ohlc?id=${encodeURIComponent(coinId)}&days=${days}`);
         if (!r.ok) throw new Error(`CoinGecko ${r.status}`);
         const j = await r.json();
-        candles = (j.candles || []).map(c => ({ ...c, time: tsToDay(c.time) }));
+        candles = (j.candles || []).map(c => ({ ...c, time: tsToTime(c.time, tf) }));
       } else {
-        const { interval, range } = TF_CONFIG[tf] || TF_CONFIG["1d"];
+        const cfg = TF_CONFIG[tf] || TF_CONFIG["1d"];
         const sym = asset.symbolRaw || asset.symbol;
-        const r = await fetch(`/api/yahoo-ohlc?symbol=${encodeURIComponent(sym)}&interval=${interval}&range=${range}&_t=${Date.now()}`);
+        const r = await fetch(`/api/yahoo-ohlc?symbol=${encodeURIComponent(sym)}&interval=${cfg.interval}&range=${cfg.range}&_t=${Date.now()}`);
         if (!r.ok) throw new Error(`Yahoo ${r.status}`);
         const j = await r.json();
-        candles = (j.candles || []).map(c => ({ ...c, time: tsToDay(c.time) }));
+        candles = (j.candles || []).map(c => ({ ...c, time: tsToTime(c.time, tf) }));
       }
-      candles = deduplicateCandles(candles);
+
+      // Aggregate if needed (10m, 2h, 4h)
+      if (aggFactor > 1) {
+        candles = aggregateCandles(candles, aggFactor);
+      }
+
+      candles = deduplicateCandles(candles, tf);
       if (!candles.length) throw new Error("데이터 없음");
       return candles;
     } catch (e) {
@@ -216,7 +285,7 @@ export default function ChartModal({ asset, onClose }) {
     const containerW = containerRef.current?.clientWidth || 600;
 
     // ── Main chart ───
-    const mainChart = createChart(mainRef.current, makeChartOptions(mainH, containerW));
+    const mainChart = createChart(mainRef.current, makeChartOptions(mainH, containerW, tf));
     chartObjs.current.main = mainChart;
 
     const candleSeries = mainChart.addCandlestickSeries({
@@ -240,7 +309,7 @@ export default function ChartModal({ asset, onClose }) {
       })));
     }
 
-    // MA lines — distinct colors + thicker
+    // MA lines — lastValueVisible: false to prevent label overlap!
     const maConfig = [
       { key: "ma5",  period: 5,   color: "#facc15", width: 1.5 },
       { key: "ma20", period: 20,  color: "#38bdf8", width: 2 },
@@ -253,18 +322,17 @@ export default function ChartModal({ asset, onClose }) {
       const maSeries = mainChart.addLineSeries({
         color, lineWidth: width,
         priceLineVisible: false,
-        lastValueVisible: true,
-        title: `MA${period}`,
+        lastValueVisible: false,
       });
       maSeries.setData(sma.map((v, i) => v != null ? { time: times[i], value: v } : null).filter(Boolean));
     });
 
-    // Bollinger Bands — more visible
+    // Bollinger Bands — lastValueVisible: false
     if (indicators.bb) {
       const bbs = calcBB(closes);
-      const bbUpper = mainChart.addLineSeries({ color: "#60a5fa88", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, lineStyle: LineStyle.Dashed, title: "BB+" });
-      const bbMid   = mainChart.addLineSeries({ color: "#60a5facc", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, title: "BB" });
-      const bbLower = mainChart.addLineSeries({ color: "#60a5fa88", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, lineStyle: LineStyle.Dashed, title: "BB-" });
+      const bbUpper = mainChart.addLineSeries({ color: "#60a5fa88", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, lineStyle: LineStyle.Dashed });
+      const bbMid   = mainChart.addLineSeries({ color: "#60a5facc", lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
+      const bbLower = mainChart.addLineSeries({ color: "#60a5fa88", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, lineStyle: LineStyle.Dashed });
       const toSeries = (fn) => bbs.map((b, i) => b ? { time: times[i], value: fn(b) } : null).filter(Boolean);
       bbUpper.setData(toSeries(b => b.upper));
       bbMid.setData(toSeries(b => b.middle));
@@ -274,19 +342,24 @@ export default function ChartModal({ asset, onClose }) {
     // Crosshair info
     mainChart.subscribeCrosshairMove(p => {
       if (p.time) {
-        const bar = candles.find(c =>
-          c.time.year === p.time.year && c.time.month === p.time.month && c.time.day === p.time.day
-        );
+        let bar;
+        if (isIntraday(tf)) {
+          bar = candles.find(c => c.time === p.time);
+        } else {
+          bar = candles.find(c =>
+            c.time.year === p.time.year && c.time.month === p.time.month && c.time.day === p.time.day
+          );
+        }
         if (bar) setOhlcInfo(bar);
       }
     });
 
     // ── RSI chart ───
     if (showRSI && rsiRef.current) {
-      const rsiChart = createChart(rsiRef.current, makeChartOptions(subH, containerW));
+      const rsiChart = createChart(rsiRef.current, makeChartOptions(subH, containerW, tf));
       chartObjs.current.rsi = rsiChart;
       const rsi = calcRSI(closes);
-      const rsiSeries = rsiChart.addLineSeries({ color: "#f472b6", lineWidth: 2, priceLineVisible: false, lastValueVisible: true, title: "RSI" });
+      const rsiSeries = rsiChart.addLineSeries({ color: "#f472b6", lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
       rsiSeries.setData(rsi.map((v, i) => v != null ? { time: times[i], value: v } : null).filter(Boolean));
       [70, 30].forEach(lvl => {
         const line = rsiChart.addLineSeries({ color: lvl === 70 ? "#f4723055" : "#34d39955", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, lineStyle: LineStyle.Dotted });
@@ -304,17 +377,17 @@ export default function ChartModal({ asset, onClose }) {
 
     // ── MACD chart ───
     if (showMACD && macdRef.current) {
-      const macdChart = createChart(macdRef.current, makeChartOptions(subH, containerW));
+      const macdChart = createChart(macdRef.current, makeChartOptions(subH, containerW, tf));
       chartObjs.current.macd = macdChart;
       const { macdLine, signalLine, histogram } = calcMACD(closes);
 
       const histSeries = macdChart.addHistogramSeries({ priceLineVisible: false, lastValueVisible: false });
       histSeries.setData(histogram.map((v, i) => v != null ? { time: times[i], value: v, color: v >= 0 ? "#26a64b99" : "#ef444499" } : null).filter(Boolean));
 
-      const macdSeries = macdChart.addLineSeries({ color: "#38bdf8", lineWidth: 2, priceLineVisible: false, lastValueVisible: true, title: "MACD" });
+      const macdSeries = macdChart.addLineSeries({ color: "#38bdf8", lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
       macdSeries.setData(macdLine.map((v, i) => v != null ? { time: times[i], value: v } : null).filter(Boolean));
 
-      const sigSeries = macdChart.addLineSeries({ color: "#fb923c", lineWidth: 2, priceLineVisible: false, lastValueVisible: true, title: "Signal" });
+      const sigSeries = macdChart.addLineSeries({ color: "#fb923c", lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
       sigSeries.setData(signalLine.map((v, i) => v != null ? { time: times[i], value: v } : null).filter(Boolean));
 
       let syncing2 = false;
@@ -368,14 +441,22 @@ export default function ChartModal({ asset, onClose }) {
 
   if (!asset) return null;
 
-  const formatPrice = (p) => {
-    if (!p && p !== 0) return "—";
-    if (asset.market === "kr") return `₩${Math.round(p).toLocaleString()}`;
-    if (p < 1) return `$${p.toFixed(6)}`;
-    return `$${p.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+  const formatPrice = (p) => fmtPrice(p, asset.market);
+
+  const formatPriceWithKRW = (p) => {
+    const usd = fmtPrice(p, asset.market);
+    if (showKRW && isUS && krwRate && p) {
+      const krw = Math.round(p * krwRate).toLocaleString("ko-KR");
+      return `${usd} (₩${krw})`;
+    }
+    return usd;
   };
 
-  // ── Full-page layout (NOT a popup/modal) ───────────────────────
+  // Timeframe button order
+  const tfOrder = ["1m", "5m", "10m", "30m", "1h", "2h", "4h", "1d", "1wk", "1mo"];
+  const tfLabels = isCrypto ? CRYPTO_TF : TF_CONFIG;
+
+  // ── Full-page layout ───────────────────────────────────────────
   return (
     <div style={{
       position: "fixed", inset: 0, zIndex: 1000,
@@ -385,88 +466,104 @@ export default function ChartModal({ asset, onClose }) {
       {/* Top bar */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "12px 20px", borderBottom: `1px solid ${CC.border}`,
+        padding: "12px 16px", borderBottom: `1px solid ${CC.border}`,
         background: `${CC.bg}f5`, backdropFilter: "blur(8px)", flexShrink: 0,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <button onClick={onClose} style={{
             background: CC.card, border: `1px solid ${CC.border}`, color: CC.text2, cursor: "pointer",
             fontSize: "14px", padding: "8px 14px", borderRadius: "10px", fontWeight: 600,
             display: "flex", alignItems: "center", gap: "6px",
           }}>← 뒤로</button>
           <span style={{ fontSize: "18px" }}>
-            {asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿"}
+            {asset.market === "us" ? "\uD83C\uDDFA\uD83C\uDDF8" : asset.market === "kr" ? "\uD83C\uDDF0\uD83C\uDDF7" : "\u20BF"}
           </span>
           <div>
-            <div style={{ color: CC.text1, fontWeight: 700, fontSize: "17px" }}>{asset.name}</div>
-            <div style={{ color: CC.text3, fontSize: "12px" }}>{asset.symbol}</div>
+            <div style={{ color: CC.text1, fontWeight: 700, fontSize: "16px" }}>{asset.name}</div>
+            <div style={{ color: CC.text3, fontSize: "11px" }}>{asset.symbol}</div>
           </div>
         </div>
         <div style={{ textAlign: "right" }}>
-          <div style={{ color: CC.text1, fontWeight: 700, fontSize: "20px" }}>{formatPrice(asset.price)}</div>
-          {asset.weekChange != null && (
-            <div style={{ fontSize: "13px", fontWeight: 600, color: asset.weekChange >= 0 ? CC.green : CC.red }}>
-              {asset.weekChange >= 0 ? "▲" : "▼"} {Math.abs(asset.weekChange)}%
-            </div>
-          )}
+          <div style={{ color: CC.text1, fontWeight: 700, fontSize: "18px" }}>{formatPriceWithKRW(asset.price)}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "flex-end" }}>
+            {asset.weekChange != null && (
+              <span style={{ fontSize: "13px", fontWeight: 600, color: asset.weekChange >= 0 ? CC.green : CC.red }}>
+                {asset.weekChange >= 0 ? "\u25B2" : "\u25BC"} {Math.abs(asset.weekChange)}%
+              </span>
+            )}
+            {isUS && krwRate && (
+              <button onClick={() => setShowKRW(!showKRW)} style={{
+                fontSize: "10px", padding: "3px 8px", borderRadius: "6px", cursor: "pointer",
+                background: showKRW ? CC.blue + "33" : "transparent",
+                color: showKRW ? CC.blue : CC.text3,
+                border: `1px solid ${showKRW ? CC.blue : CC.border}`,
+              }}>
+                {showKRW ? "KRW" : "USD"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Scrollable body */}
-      <div ref={containerRef} style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "16px 20px" }}>
+      <div ref={containerRef} style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "12px 16px" }}>
 
         {/* OHLC crosshair info */}
         {ohlcInfo && (
           <div style={{
-            display: "flex", gap: "14px", marginBottom: "10px",
-            background: CC.card, borderRadius: "10px", padding: "8px 14px",
+            display: "flex", gap: "12px", marginBottom: "8px",
+            background: CC.card, borderRadius: "10px", padding: "8px 12px",
             fontSize: "12px", flexWrap: "wrap", border: `1px solid ${CC.border}`,
           }}>
             {[["O", ohlcInfo.open], ["H", ohlcInfo.high], ["L", ohlcInfo.low], ["C", ohlcInfo.close]].map(([label, val]) => (
               <span key={label} style={{ color: CC.text3 }}>
                 <span style={{ marginRight: "4px" }}>{label}</span>
-                <span style={{ color: CC.text1, fontWeight: 600 }}>{formatPrice(val)}</span>
+                <span style={{ color: CC.text1, fontWeight: 600 }}>{formatPriceWithKRW(val)}</span>
               </span>
             ))}
             {ohlcInfo.volume != null && ohlcInfo.volume > 0 && (
               <span style={{ color: CC.text3 }}>
-                V <span style={{ color: CC.text1, fontWeight: 600 }}>{(ohlcInfo.volume / 1e6).toFixed(1)}M</span>
+                V <span style={{ color: CC.text1, fontWeight: 600 }}>{ohlcInfo.volume >= 1e9 ? `${(ohlcInfo.volume / 1e9).toFixed(1)}B` : ohlcInfo.volume >= 1e6 ? `${(ohlcInfo.volume / 1e6).toFixed(1)}M` : ohlcInfo.volume.toLocaleString()}</span>
               </span>
             )}
           </div>
         )}
 
-        {/* Timeframe buttons */}
-        <div style={{ display: "flex", gap: "6px", marginBottom: "10px", flexWrap: "wrap" }}>
-          {Object.entries(TF_CONFIG).map(([key, { label }]) => (
-            <button key={key} onClick={() => setTimeframe(key)} style={{
-              padding: "6px 14px", borderRadius: "8px", fontSize: "13px", cursor: "pointer", fontWeight: 600,
-              background: timeframe === key ? CC.blue : CC.card,
-              color: timeframe === key ? "#fff" : CC.text3,
-              border: `1px solid ${timeframe === key ? CC.blue : CC.border}`,
-            }}>{label}</button>
-          ))}
+        {/* Timeframe buttons — 10 granularities */}
+        <div style={{ display: "flex", gap: "4px", marginBottom: "8px", flexWrap: "wrap" }}>
+          {tfOrder.map(key => {
+            const cfg = tfLabels[key];
+            if (!cfg) return null;
+            return (
+              <button key={key} onClick={() => setTimeframe(key)} style={{
+                padding: "5px 10px", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontWeight: 600,
+                background: timeframe === key ? CC.blue : CC.card,
+                color: timeframe === key ? "#fff" : CC.text3,
+                border: `1px solid ${timeframe === key ? CC.blue : CC.border}`,
+              }}>{cfg.label}</button>
+            );
+          })}
         </div>
 
         {/* Indicator toggles */}
-        <div style={{ display: "flex", gap: "6px", marginBottom: "14px", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "5px", marginBottom: "12px", flexWrap: "wrap" }}>
           {[
             { key: "ma5",  label: "MA5",   color: "#facc15" },
             { key: "ma20", label: "MA20",  color: "#38bdf8" },
             { key: "ma60", label: "MA60",  color: "#f97316" },
             { key: "ma200",label: "MA200", color: "#a855f7" },
             { key: "bb",   label: "BB",    color: "#60a5fa" },
-            { key: "vol",  label: "거래량", color: "#1f6feb" },
+            { key: "vol",  label: "\uAC70\uB798\uB7C9", color: "#1f6feb" },
             { key: "rsi",  label: "RSI",   color: "#f472b6" },
             { key: "macd", label: "MACD",  color: "#34d399" },
           ].map(({ key, label, color }) => (
             <button key={key} onClick={() => toggleIndicator(key)} style={{
-              padding: "5px 10px", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontWeight: 600,
+              padding: "4px 9px", borderRadius: "8px", fontSize: "11px", cursor: "pointer", fontWeight: 600,
               background: indicators[key] ? `${color}22` : "transparent",
               color: indicators[key] ? color : CC.text3,
               border: `1px solid ${indicators[key] ? `${color}88` : CC.border}`,
             }}>
-              <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: indicators[key] ? color : CC.text3, marginRight: "5px", verticalAlign: "middle" }} />
+              <span style={{ display: "inline-block", width: "7px", height: "7px", borderRadius: "50%", background: indicators[key] ? color : CC.text3, marginRight: "4px", verticalAlign: "middle" }} />
               {label}
             </button>
           ))}
@@ -475,18 +572,18 @@ export default function ChartModal({ asset, onClose }) {
         {/* Chart area */}
         {loading && (
           <div style={{ textAlign: "center", padding: "80px", color: CC.text3 }}>
-            <div style={{ fontSize: "28px", marginBottom: "8px", animation: "pulse 1s infinite" }}>📡</div>
-            <div>차트 데이터 로딩 중...</div>
+            <div style={{ fontSize: "28px", marginBottom: "8px", animation: "pulse 1s infinite" }}>\uD83D\uDCE1</div>
+            <div>\uCC28\uD2B8 \uB370\uC774\uD130 \uB85C\uB529 \uC911...</div>
           </div>
         )}
         {error && !loading && (
           <div style={{ textAlign: "center", padding: "60px", color: CC.red }}>
-            <div style={{ fontSize: "24px", marginBottom: "8px" }}>⚠️</div>
+            <div style={{ fontSize: "24px", marginBottom: "8px" }}>\u26A0\uFE0F</div>
             <div style={{ marginBottom: "12px" }}>{error}</div>
             <button onClick={() => buildCharts(timeframe)} style={{
               padding: "9px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
               background: CC.blue, color: "#fff", border: "none", cursor: "pointer",
-            }}>다시 시도</button>
+            }}>\uB2E4\uC2DC \uC2DC\uB3C4</button>
           </div>
         )}
         <div style={{ display: loading ? "none" : "block" }}>
@@ -525,16 +622,16 @@ export default function ChartModal({ asset, onClose }) {
 
         {/* Legend */}
         <div style={{
-          marginTop: "14px", padding: "12px 14px",
+          marginTop: "12px", padding: "10px 12px",
           background: CC.card, borderRadius: "10px", border: `1px solid ${CC.border}`,
-          display: "flex", gap: "14px", flexWrap: "wrap", fontSize: "11px",
+          display: "flex", gap: "12px", flexWrap: "wrap", fontSize: "11px",
         }}>
           {[
             { color: "#facc15", label: "MA5", active: indicators.ma5 },
             { color: "#38bdf8", label: "MA20", active: indicators.ma20 },
             { color: "#f97316", label: "MA60", active: indicators.ma60 },
             { color: "#a855f7", label: "MA200", active: indicators.ma200 },
-            { color: "#60a5fa", label: "볼린저밴드", active: indicators.bb },
+            { color: "#60a5fa", label: "\uBCFC\uB9B0\uC800\uBC34\uB4DC", active: indicators.bb },
             { color: "#f472b6", label: "RSI(14)", active: indicators.rsi },
             { color: "#38bdf8", label: "MACD", active: indicators.macd },
             { color: "#fb923c", label: "Signal", active: indicators.macd },
@@ -546,7 +643,6 @@ export default function ChartModal({ asset, onClose }) {
           ))}
         </div>
 
-        {/* Spacer for scroll comfort */}
         <div style={{ height: "20px" }} />
       </div>
 

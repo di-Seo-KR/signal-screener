@@ -104,7 +104,46 @@ export default async function handler(req, res) {
       }
     } catch {}
 
-    // Source 3: CoinGecko trending top 3만
+    // Source 3: X(Twitter) / Nitter RSS — 주요 금융 인플루언서
+    try {
+      const xAccounts = [
+        { handle: "zaborowski", name: "X Finance" },
+        { handle: "DeItaone", name: "Walter Bloomberg" },
+        { handle: "unusual_whales", name: "Unusual Whales" },
+      ];
+      // Use multiple Nitter instances for resilience
+      const nitterHosts = ["nitter.privacydev.net", "nitter.poast.org", "nitter.cz"];
+      for (const { handle, name } of xAccounts) {
+        let fetched = false;
+        for (const host of nitterHosts) {
+          if (fetched) break;
+          try {
+            const xUrl = `https://${host}/${handle}/rss`;
+            const xRes = await fetch(xUrl, {
+              headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+              signal: AbortSignal.timeout(5000),
+            });
+            if (xRes.ok) {
+              const xml = await xRes.text();
+              const items = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
+              items.slice(0, 5).forEach(item => {
+                const title = (item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || item.match(/<title>(.*?)<\/title>/) || [])[1];
+                const link = (item.match(/<link>(.*?)<\/link>/) || [])[1];
+                const pubDate = (item.match(/<pubDate>(.*?)<\/pubDate>/) || item.match(/<dc:date>(.*?)<\/dc:date>/) || [])[1];
+                if (title && isRelevant(title, "", lang === "ko" ? "en" : lang)) {
+                  const tags = ["X", ...extractKeywords(title, "en")];
+                  const cleanTitle = title.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").slice(0, 200);
+                  news.push({ title: cleanTitle, url: (link || `https://x.com/${handle}`).replace(host, "x.com"), date: pubDate || new Date().toISOString(), desc: "", source: `X @${handle}`, tags });
+                }
+              });
+              fetched = true;
+            }
+          } catch {}
+        }
+      }
+    } catch {}
+
+    // Source 4: CoinGecko trending top 3만
     try {
       const cgRes = await fetch("https://api.coingecko.com/api/v3/search/trending", {
         headers: { "User-Agent": "SignalScreener/4.0" },

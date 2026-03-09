@@ -123,6 +123,56 @@ function EquityChart({ equity, buyHoldReturn, initialCapital }) {
   );
 }
 
+// Full asset list for backtest symbol datalist
+const BT_SYMBOLS = [
+  // US Mega Cap
+  "AAPL","MSFT","GOOGL","AMZN","NVDA","META","TSLA","NFLX",
+  // Semis
+  "AMD","INTC","AVGO","QCOM","MU","MRVL","SMCI","ARM","ASML","TSM","LRCX","KLAC","AMAT","ON","TXN","ADI",
+  // Software/Cloud
+  "CRM","ORCL","ADBE","NOW","SHOP","SNOW","DDOG","NET","ZS","PANW","CRWD","FTNT","WDAY","HUBS","TEAM","MDB","PLTR","AI","PATH",
+  // Internet
+  "SNAP","PINS","UBER","LYFT","ABNB","BKNG","DASH","RBLX","U","TTWO","EA","ROKU","SPOT",
+  // Fintech
+  "COIN","SQ","PYPL","AFRM","SOFI","HOOD","MSTR",
+  // Finance
+  "V","MA","JPM","GS","BAC","WFC","MS","C","BLK","SCHW","AXP","BX","KKR","APO",
+  // Healthcare
+  "UNH","JNJ","LLY","NVO","ABBV","PFE","MRK","TMO","ABT","BMY","AMGN","GILD","ISRG","VRTX","REGN","MRNA",
+  // Industrial/Defense
+  "BA","CAT","DE","HON","RTX","LMT","GE","UPS","FDX",
+  // Energy
+  "XOM","CVX","LNG","COP","SLB","OXY","EOG",
+  // Consumer
+  "WMT","COST","HD","MCD","DIS","SBUX","NKE","TGT","LOW","KO","PEP","PG","PM","CL",
+  // Telecom
+  "T","VZ","TMUS","CMCSA","WBD","PARA",
+  // Real Estate
+  "AMT","PLD","O","EQIX",
+  // EV
+  "RIVN","LCID","LI","NIO","XPEV","ENPH","FSLR","PLUG",
+  // China ADR
+  "BABA","JD","PDD","BIDU","NTES","TME",
+  // ETFs
+  "SPY","QQQ","DIA","IWM","ARKK","ARKW","SOXL","TQQQ","SQQQ","UPRO","SPXS",
+  "BITO","BITI","GLD","SLV","TLT","SHY","SCHD","JEPI","VIG","NOBL",
+  "XLF","XLE","XLK","XLV","XLI","XLC","XLRE","XLU","KWEB","EEM","VNQ","HYG","LQD","UNG","USO","COPX",
+  // KR
+  "005930.KS","000660.KS","373220.KS","207940.KS","005380.KS","000270.KS","068270.KS","035420.KS","035720.KS","051910.KS","006400.KS",
+  "066570.KS","009150.KS","000990.KS","042700.KS","058470.KS",
+  "003670.KS","247540.KS","006260.KS","010130.KS",
+  "105560.KS","055550.KS","086790.KS","316140.KS","000810.KS","032830.KS","024110.KS",
+  "012330.KS","096770.KS","034730.KS","010950.KS","017670.KS","030200.KS","032640.KS",
+  "028260.KS","000720.KS","009540.KS","329180.KS","010620.KS",
+  "259960.KS","263750.KS","036570.KS","251270.KS","041510.KS","352820.KS","122870.KS","035900.KS",
+  "004170.KS","023530.KS","097950.KS","003230.KS","271560.KS",
+  "128940.KS","326030.KS","145020.KS","018260.KS","377300.KS","323410.KS",
+  // Crypto (Yahoo format)
+  "BTC-USD","ETH-USD","BNB-USD","SOL-USD","XRP-USD","ADA-USD","DOGE-USD","AVAX-USD","DOT-USD",
+  "LINK-USD","UNI-USD","AAVE-USD","NEAR-USD","SUI-USD","APT-USD","ARB-USD","OP-USD",
+  "RNDR-USD","FET-USD","INJ-USD","PEPE-USD","SHIB-USD","BONK-USD","LTC-USD","BCH-USD","XLM-USD","HBAR-USD","ALGO-USD",
+];
+
 export default function BacktestPanel({ initialStrategy, initialSymbol }) {
   const [strategyId, setStrategyId] = useState(initialStrategy?.id || ALL_STRATEGIES[0].id);
   const [symbol, setSymbol] = useState(initialSymbol || "SPY");
@@ -202,18 +252,7 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
               }}
             />
             <datalist id="bt-symbol-list">
-              {[
-                "SPY","QQQ","AAPL","MSFT","GOOGL","AMZN","NVDA","META","TSLA","AMD",
-                "NFLX","BA","DIS","PYPL","UBER","COIN","PLTR","JPM","GS","V",
-                "AVGO","MU","ARM","PANW","CRWD","NOW","SHOP","SNOW",
-                "BAC","WFC","MS","BLK","UNH","JNJ","LLY","NVO",
-                "XOM","CVX","WMT","COST","HD","MCD",
-                "ARKK","SOXL","TQQQ","BITO","BITI","GLD","TLT","SCHD","JEPI","IWM",
-                "XLF","XLE","XLK","VNQ","HYG","EEM","KWEB",
-                "005930.KS","000660.KS","035420.KS","035720.KS","051910.KS",
-                "373220.KS","005380.KS","000270.KS","068270.KS",
-                "BTC-USD","ETH-USD","SOL-USD","XRP-USD","ADA-USD","AVAX-USD","DOGE-USD","LINK-USD",
-              ].map(s => <option key={s} value={s} />)}
+              {BT_SYMBOLS.map(s => <option key={s} value={s} />)}
             </datalist>
           </div>
           <div>
