@@ -36,8 +36,8 @@ export default async function handler(req, res) {
 
     const data = await response.json();
 
-    // 캐시 설정 (10분)
-    res.setHeader("Cache-Control", "s-maxage=600, stale-while-revalidate=1200");
+    // 항상 최신 데이터 — 캐시 비활성화
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
     return res.status(200).json(data);
   } catch (error) {
     console.error(`CoinGecko fetch error for ${id}:`, error);
