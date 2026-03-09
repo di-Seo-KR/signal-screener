@@ -1055,7 +1055,7 @@ export default function App() {
   const [results, setResults]         = useState([]);
   const [scanning, setScanning]       = useState(false);
   const [scanProgress, setScanProgress] = useState({ done: 0, total: 0 });
-  const [conditions, setConditions]   = useState(["rsi_extreme","bb_squeeze","volume_climax","golden_cross","mean_reversion"]);
+  const [conditions, setConditions]   = useState([]);
   const [mode, setMode]               = useState("or");
   const [filterMarket, setFilterMarket] = useState("all");
   const [sortBy, setSortBy]           = useState("rsi");
