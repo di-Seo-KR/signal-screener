@@ -194,12 +194,27 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
           <div>
             <label style={{ fontSize: "11px", color: C.text3, display: "block", marginBottom: "4px" }}>종목 심볼</label>
             <input value={symbol} onChange={e => setSymbol(e.target.value.toUpperCase())} placeholder="SPY, AAPL, 005930.KS..."
+              list="bt-symbol-list"
               style={{
                 width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "13px",
                 background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none",
                 boxSizing: "border-box",
               }}
             />
+            <datalist id="bt-symbol-list">
+              {[
+                "SPY","QQQ","AAPL","MSFT","GOOGL","AMZN","NVDA","META","TSLA","AMD",
+                "NFLX","BA","DIS","PYPL","UBER","COIN","PLTR","JPM","GS","V",
+                "AVGO","MU","ARM","PANW","CRWD","NOW","SHOP","SNOW",
+                "BAC","WFC","MS","BLK","UNH","JNJ","LLY","NVO",
+                "XOM","CVX","WMT","COST","HD","MCD",
+                "ARKK","SOXL","TQQQ","BITO","BITI","GLD","TLT","SCHD","JEPI","IWM",
+                "XLF","XLE","XLK","VNQ","HYG","EEM","KWEB",
+                "005930.KS","000660.KS","035420.KS","035720.KS","051910.KS",
+                "373220.KS","005380.KS","000270.KS","068270.KS",
+                "BTC-USD","ETH-USD","SOL-USD","XRP-USD","ADA-USD","AVAX-USD","DOGE-USD","LINK-USD",
+              ].map(s => <option key={s} value={s} />)}
+            </datalist>
           </div>
           <div>
             <label style={{ fontSize: "11px", color: C.text3, display: "block", marginBottom: "4px" }}>타임프레임</label>

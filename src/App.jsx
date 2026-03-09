@@ -1,6 +1,6 @@
-// DI금융 v5.0 — 투자 스크리너 + 퀀트 엔진 + 백테스트
-// Features: 스크리닝, 캔들차트, 12개 전략, 백테스트, 포트폴리오, 뉴스, 텔레그램 알림
-import { useState, useEffect, useCallback } from "react";
+// DI금융 v5.1 — 투자 스크리너 + 퀀트 엔진 + 백테스트
+// Features: 스크리닝, 캔들차트, 24개 전략, 백테스트, 포트폴리오, 뉴스, 텔레그램 알림
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import ChartModal from "./ChartModal.jsx";
 import StrategyPanel from "./StrategyPanel.jsx";
 import BacktestPanel from "./BacktestPanel.jsx";
@@ -97,6 +97,13 @@ const CRYPTO_ASSETS = [
   { id: "render-token", symbol: "RNDR", name: "Render" },
   { id: "injective-protocol", symbol: "INJ", name: "Injective" },
   { id: "fetch-ai", symbol: "FET", name: "Fetch.ai" },
+];
+
+// 전체 자산 통합 (검색용)
+const ALL_ASSETS = [
+  ...US_ASSETS.map(a => ({ ...a, market: "us", symbolRaw: a.symbol, searchKey: `${a.symbol} ${a.name}`.toLowerCase() })),
+  ...KR_ASSETS.map(a => ({ ...a, market: "kr", symbolRaw: a.symbol, symbol: a.symbol.replace(".KS", ""), searchKey: `${a.symbol.replace(".KS","")} ${a.name}`.toLowerCase() })),
+  ...CRYPTO_ASSETS.map(a => ({ ...a, market: "crypto", symbolRaw: a.id, searchKey: `${a.symbol} ${a.name} ${a.id}`.toLowerCase() })),
 ];
 
 // ════════════════════════════════════════════════════════════════════
@@ -483,6 +490,141 @@ function SignalTag({ triggerKey }) {
 }
 
 // ════════════════════════════════════════════════════════════════════
+// 서브 컴포넌트: SearchBar (글로벌 종목 검색 + 자동완성)
+// ════════════════════════════════════════════════════════════════════
+function SearchBar({ onSelect, placeholder = "종목 검색 (예: AAPL, 삼성전자, BTC...)" }) {
+  const [query, setQuery] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [selectedIdx, setSelectedIdx] = useState(-1);
+  const inputRef = useRef(null);
+  const dropRef = useRef(null);
+
+  const suggestions = useMemo(() => {
+    if (!query || query.length < 1) return [];
+    const q = query.toLowerCase().trim();
+    const matched = ALL_ASSETS.filter(a => a.searchKey.includes(q));
+    // 정렬: 심볼 정확 매치 > 심볼 시작 매치 > 이름 매치
+    matched.sort((a, b) => {
+      const aSymExact = a.symbol.toLowerCase() === q ? 0 : 1;
+      const bSymExact = b.symbol.toLowerCase() === q ? 0 : 1;
+      if (aSymExact !== bSymExact) return aSymExact - bSymExact;
+      const aSymStart = a.symbol.toLowerCase().startsWith(q) ? 0 : 1;
+      const bSymStart = b.symbol.toLowerCase().startsWith(q) ? 0 : 1;
+      if (aSymStart !== bSymStart) return aSymStart - bSymStart;
+      return a.symbol.localeCompare(b.symbol);
+    });
+    return matched.slice(0, 12);
+  }, [query]);
+
+  const handleKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSelectedIdx(i => Math.min(i + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSelectedIdx(i => Math.max(i - 1, -1));
+    } else if (e.key === "Enter" && selectedIdx >= 0 && suggestions[selectedIdx]) {
+      e.preventDefault();
+      onSelect(suggestions[selectedIdx]);
+      setQuery(""); setFocused(false); setSelectedIdx(-1);
+      inputRef.current?.blur();
+    } else if (e.key === "Escape") {
+      setFocused(false); setSelectedIdx(-1);
+      inputRef.current?.blur();
+    }
+  };
+
+  // 클릭 밖 감지
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropRef.current && !dropRef.current.contains(e.target) && inputRef.current && !inputRef.current.contains(e.target)) {
+        setFocused(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => { setSelectedIdx(-1); }, [query]);
+
+  const showDrop = focused && suggestions.length > 0;
+
+  return (
+    <div style={{ position: "relative", width: "100%" }}>
+      <div style={{ position: "relative" }}>
+        <span style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", fontSize: "16px", color: C.text3, pointerEvents: "none" }}>🔍</span>
+        <input
+          ref={inputRef}
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          style={{
+            width: "100%", padding: "13px 16px 13px 42px", borderRadius: "14px", fontSize: "14px",
+            background: C.card, border: `1px solid ${focused ? C.blue : C.border}`, color: C.text1,
+            outline: "none", transition: "border-color .2s, box-shadow .2s",
+            boxShadow: focused ? `0 0 0 3px ${C.blue}22` : "none",
+            boxSizing: "border-box",
+          }}
+        />
+        {query && (
+          <button onClick={() => { setQuery(""); inputRef.current?.focus(); }} style={{
+            position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)",
+            background: "none", border: "none", color: C.text3, fontSize: "16px", cursor: "pointer", padding: "4px",
+          }}>✕</button>
+        )}
+      </div>
+      {showDrop && (
+        <div ref={dropRef} style={{
+          position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 200,
+          background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px",
+          boxShadow: "0 8px 32px rgba(0,0,0,.5)", overflow: "hidden", maxHeight: "380px", overflowY: "auto",
+        }}>
+          {suggestions.map((asset, i) => {
+            const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
+            const isActive = i === selectedIdx;
+            return (
+              <div key={`${asset.symbol}-${asset.market}-${i}`}
+                onClick={() => { onSelect(asset); setQuery(""); setFocused(false); setSelectedIdx(-1); }}
+                onMouseEnter={() => setSelectedIdx(i)}
+                style={{
+                  display: "flex", alignItems: "center", gap: "12px",
+                  padding: "12px 16px", cursor: "pointer",
+                  background: isActive ? C.blueBg : "transparent",
+                  borderBottom: i < suggestions.length - 1 ? `1px solid ${C.border}` : "none",
+                  transition: "background .15s",
+                }}>
+                <div style={{
+                  width: "36px", height: "36px", borderRadius: "10px", flexShrink: 0,
+                  background: asset.market === "us" ? "#1A2C4F" : asset.market === "kr" ? "#1A2A1E" : "#1E1A2A",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontWeight: 800, fontSize: "9px",
+                  color: asset.market === "us" ? C.blue : asset.market === "kr" ? C.green : C.purple,
+                }}>
+                  {asset.symbol.length <= 5 ? asset.symbol : asset.symbol.slice(0, 5)}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: "14px", color: C.text1 }}>{asset.name}</div>
+                  <div style={{ fontSize: "12px", color: C.text3 }}>{flag} {asset.symbol}{asset.market === "kr" ? ".KS" : ""}</div>
+                </div>
+                <div style={{
+                  padding: "3px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 600,
+                  background: asset.market === "us" ? `${C.blue}18` : asset.market === "kr" ? `${C.green}18` : `${C.purple}18`,
+                  color: asset.market === "us" ? C.blue : asset.market === "kr" ? C.green : C.purple,
+                }}>
+                  {asset.market === "us" ? "US" : asset.market === "kr" ? "KR" : "Crypto"}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
 // 서브 컴포넌트: AssetCard
 // ════════════════════════════════════════════════════════════════════
 function AssetCard({ asset, onChart }) {
@@ -559,8 +701,13 @@ function AssetCard({ asset, onChart }) {
 // 메인 앱
 // ════════════════════════════════════════════════════════════════════
 export default function App() {
-  const [tab, setTab] = useState("screener");
+  const [tab, setTab] = useState("home");
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // ── 홈 대시보드 상태 ───────────────────────────────────────────
+  const [marketIndices, setMarketIndices] = useState([]);
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [hotAssets, setHotAssets] = useState([]);
 
   // ── 스크리너 상태 ─────────────────────────────────────────────
   const [results, setResults]         = useState([]);
@@ -604,6 +751,83 @@ export default function App() {
 
   useEffect(() => { saveSettings({ botToken: settings.botToken, chatId: settings.chatId, autoSend: settings.autoSend, syncPin }); }, [settings, syncPin]);
   useEffect(() => { savePortfolio(portfolio); }, [portfolio]);
+
+  // ── 홈 대시보드 데이터 ─────────────────────────────────────────
+  const fetchMarketOverview = useCallback(async () => {
+    if (marketLoading) return;
+    setMarketLoading(true);
+    const indices = [
+      { symbol: "^GSPC", name: "S&P 500", flag: "🇺🇸" },
+      { symbol: "^IXIC", name: "NASDAQ", flag: "🇺🇸" },
+      { symbol: "^DJI", name: "다우존스", flag: "🇺🇸" },
+      { symbol: "^KS11", name: "코스피", flag: "🇰🇷" },
+      { symbol: "^KQ11", name: "코스닥", flag: "🇰🇷" },
+      { symbol: "USDKRW=X", name: "원/달러 환율", flag: "💱" },
+    ];
+    const results = [];
+    for (const idx of indices) {
+      try {
+        const r = await fetch(`/api/yahoo?symbol=${encodeURIComponent(idx.symbol)}&interval=1d&range=5d&_t=${Date.now()}`);
+        if (r.ok) {
+          const j = await r.json();
+          const closes = j.closes || [];
+          if (closes.length >= 2) {
+            const cur = closes[closes.length - 1];
+            const prev = closes[closes.length - 2];
+            const change = ((cur - prev) / prev) * 100;
+            results.push({ ...idx, price: cur, change: +change.toFixed(2) });
+          }
+        }
+      } catch {}
+    }
+    setMarketIndices(results);
+    // Hot assets — 주요 종목 가격
+    const hots = [
+      { symbol: "NVDA", name: "NVIDIA", market: "us" },
+      { symbol: "AAPL", name: "Apple", market: "us" },
+      { symbol: "TSLA", name: "Tesla", market: "us" },
+      { symbol: "MSFT", name: "Microsoft", market: "us" },
+      { symbol: "005930.KS", name: "삼성전자", market: "kr" },
+      { symbol: "000660.KS", name: "SK하이닉스", market: "kr" },
+    ];
+    const hotResults = [];
+    for (const h of hots) {
+      try {
+        const r = await fetch(`/api/yahoo?symbol=${encodeURIComponent(h.symbol)}&interval=1d&range=5d&_t=${Date.now()}`);
+        if (r.ok) {
+          const j = await r.json();
+          const closes = j.closes || [];
+          if (closes.length >= 2) {
+            const cur = closes[closes.length - 1];
+            const prev = closes[closes.length - 2];
+            hotResults.push({ ...h, price: cur, change: +( ((cur - prev) / prev) * 100 ).toFixed(2), symbolRaw: h.symbol });
+          }
+        }
+      } catch {}
+    }
+    // Crypto hots
+    for (const cId of ["bitcoin", "ethereum", "solana"]) {
+      try {
+        const r = await fetch(`/api/coingecko?id=${cId}&days=2&_t=${Date.now()}`);
+        if (r.ok) {
+          const j = await r.json();
+          const dp = (j.prices || []).map(p => p[1]);
+          if (dp.length >= 2) {
+            const cur = dp[dp.length - 1];
+            const prev = dp[0];
+            const name = cId === "bitcoin" ? "Bitcoin" : cId === "ethereum" ? "Ethereum" : "Solana";
+            const sym = cId === "bitcoin" ? "BTC" : cId === "ethereum" ? "ETH" : "SOL";
+            hotResults.push({ symbol: sym, name, market: "crypto", price: cur, change: +( ((cur - prev) / prev) * 100 ).toFixed(2), symbolRaw: cId });
+          }
+        }
+        await new Promise(r => setTimeout(r, 1200));
+      } catch {}
+    }
+    setHotAssets(hotResults);
+    setMarketLoading(false);
+  }, [marketLoading]);
+
+  useEffect(() => { if (tab === "home" && marketIndices.length === 0) fetchMarketOverview(); }, [tab]);
 
   // ── 스크리너 실행 ─────────────────────────────────────────────
   const runScan = useCallback(async () => {
@@ -837,7 +1061,7 @@ export default function App() {
         borderBottom: `1px solid ${C.border}`,
       }}>
         <div style={{ maxWidth: "900px", margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "56px" }}>
-          <div onClick={() => { setTab("screener"); setMenuOpen(false); }} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}
+          <div onClick={() => { setTab("home"); setMenuOpen(false); }} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}
             title="홈으로 이동">
             <span style={{ fontSize: "20px" }}>📡</span>
             <span style={{ fontWeight: 800, fontSize: "17px" }}>DI금융</span>
@@ -845,7 +1069,7 @@ export default function App() {
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "2px" }}>
-            {[{ id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "backtest", label: "백테스트", icon: "📊" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
+            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "backtest", label: "백테스트", icon: "📊" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} style={{
                 padding: "6px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
@@ -875,7 +1099,7 @@ export default function App() {
             background: C.card, borderTop: `1px solid ${C.border}`,
             padding: "8px 16px 12px", display: "flex", flexDirection: "column", gap: "2px",
           }}>
-            {[{ id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "backtest", label: "백테스트", icon: "📊" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
+            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "backtest", label: "백테스트", icon: "📊" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); setMenuOpen(false); }} style={{
                 padding: "10px 14px", borderRadius: "10px", fontSize: "14px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
@@ -888,6 +1112,189 @@ export default function App() {
       </header>
 
       <main style={{ maxWidth: "900px", margin: "0 auto", padding: "20px" }}>
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 홈 (토스 스타일 대시보드)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "home" && (
+          <div>
+            {/* 검색바 */}
+            <div style={{ marginBottom: "20px" }}>
+              <SearchBar onSelect={(asset) => {
+                setChartAsset(asset);
+              }} />
+            </div>
+
+            {/* 시장 지수 요약 */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px", marginBottom: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+                <div style={{ fontWeight: 700, fontSize: "16px" }}>📊 시장 현황</div>
+                <button onClick={fetchMarketOverview} disabled={marketLoading} style={{
+                  padding: "5px 12px", borderRadius: "8px", fontSize: "11px", fontWeight: 600,
+                  background: C.card2, color: C.text3, border: `1px solid ${C.border2}`, cursor: "pointer",
+                }}>{marketLoading ? "⏳" : "🔄"}</button>
+              </div>
+              {marketIndices.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "20px", color: C.text3, fontSize: "13px" }}>
+                  {marketLoading ? "시장 데이터 로딩 중..." : "데이터를 불러오려면 새로고침을 누르세요"}
+                </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "8px" }}>
+                  {marketIndices.map(idx => (
+                    <div key={idx.symbol} style={{
+                      background: C.bg, borderRadius: "12px", padding: "12px", textAlign: "center",
+                      border: `1px solid ${C.border}`,
+                    }}>
+                      <div style={{ fontSize: "11px", color: C.text3, marginBottom: "4px" }}>{idx.flag} {idx.name}</div>
+                      <div style={{ fontWeight: 700, fontSize: "15px", color: C.text1, marginBottom: "2px" }}>
+                        {idx.name.includes("환율") ? `₩${Math.round(idx.price).toLocaleString()}` : idx.price.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </div>
+                      <div style={{
+                        fontSize: "12px", fontWeight: 600,
+                        color: idx.change >= 0 ? C.green : C.red,
+                      }}>
+                        {idx.change >= 0 ? "▲" : "▼"} {Math.abs(idx.change)}%
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 인기 종목 */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px", marginBottom: "16px" }}>
+              <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "14px" }}>🔥 주요 종목</div>
+              {hotAssets.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "16px", color: C.text3, fontSize: "13px" }}>
+                  {marketLoading ? "로딩 중..." : "시장 현황 로드 시 함께 표시됩니다"}
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  {hotAssets.map(asset => {
+                    const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
+                    const isPos = asset.change >= 0;
+                    return (
+                      <div key={asset.symbol} onClick={() => setChartAsset(asset)}
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "12px 14px", borderRadius: "12px", cursor: "pointer",
+                          background: "transparent", transition: "background .15s",
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = C.card2}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                          <div style={{
+                            width: "38px", height: "38px", borderRadius: "10px", flexShrink: 0,
+                            background: asset.market === "us" ? "#1A2C4F" : asset.market === "kr" ? "#1A2A1E" : "#1E1A2A",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontWeight: 800, fontSize: "10px",
+                            color: asset.market === "us" ? C.blue : asset.market === "kr" ? C.green : C.purple,
+                          }}>{asset.symbol.replace(".KS","").slice(0,4)}</div>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: "14px", color: C.text1 }}>{asset.name}</div>
+                            <div style={{ fontSize: "12px", color: C.text3 }}>{flag} {asset.symbol.replace(".KS","")}</div>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>
+                            {fmtPrice(asset.price, asset.market)}
+                          </div>
+                          <div style={{ fontSize: "12px", fontWeight: 600, color: isPos ? C.green : C.red }}>
+                            {isPos ? "▲" : "▼"} {Math.abs(asset.change)}%
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 포트폴리오 미니 요약 */}
+            {portfolio.length > 0 && (
+              <div style={{ background: `linear-gradient(135deg, ${C.card}, #0d1f35)`, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px", marginBottom: "16px", cursor: "pointer" }}
+                onClick={() => setTab("portfolio")}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "16px" }}>💼 내 포트폴리오</div>
+                  <span style={{ fontSize: "12px", color: C.text3 }}>{portfolio.length}개 종목 →</span>
+                </div>
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  {portfolio.slice(0, 5).map((item, i) => (
+                    <div key={i} style={{
+                      padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+                      background: C.bg, color: C.text2, border: `1px solid ${C.border}`,
+                    }}>
+                      {item.name || item.symbol}
+                    </div>
+                  ))}
+                  {portfolio.length > 5 && (
+                    <div style={{ padding: "6px 12px", borderRadius: "8px", fontSize: "12px", color: C.text3 }}>+{portfolio.length - 5}개</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 빠른 액세스 */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "10px", marginBottom: "16px" }}>
+              {[
+                { icon: "🔍", label: "스크리너", desc: "조건 검색", tab: "screener" },
+                { icon: "🎯", label: "전략", desc: "24개 전략", tab: "strategy" },
+                { icon: "📊", label: "백테스트", desc: "성과 시뮬레이션", tab: "backtest" },
+                { icon: "📰", label: "뉴스", desc: "투자 뉴스", tab: "news" },
+              ].map(item => (
+                <div key={item.tab} onClick={() => setTab(item.tab)}
+                  style={{
+                    background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px",
+                    padding: "18px 14px", cursor: "pointer", textAlign: "center",
+                    transition: "all .2s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.blue; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = "translateY(0)"; }}>
+                  <div style={{ fontSize: "28px", marginBottom: "8px" }}>{item.icon}</div>
+                  <div style={{ fontWeight: 700, fontSize: "14px", marginBottom: "4px", color: C.text1 }}>{item.label}</div>
+                  <div style={{ fontSize: "11px", color: C.text3 }}>{item.desc}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* 전체 종목 리스트 */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px" }}>
+              <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "14px" }}>
+                📋 전체 종목 ({ALL_ASSETS.length}개)
+              </div>
+              <div style={{ display: "flex", gap: "6px", marginBottom: "12px", flexWrap: "wrap" }}>
+                {[["all","전체"], ["us","🇺🇸 미국"], ["kr","🇰🇷 한국"], ["crypto","₿ 크립토"]].map(([v, l]) => (
+                  <button key={v} onClick={() => setFilterMarket(v)} style={{
+                    padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+                    background: filterMarket === v ? C.blueBg : "transparent",
+                    color: filterMarket === v ? C.blue : C.text3, border: `1px solid ${filterMarket === v ? C.blue : C.border2}`,
+                  }}>{l}</button>
+                ))}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "6px", maxHeight: "320px", overflow: "auto" }}>
+                {ALL_ASSETS.filter(a => filterMarket === "all" || a.market === filterMarket).map((asset, i) => {
+                  const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
+                  return (
+                    <div key={`${asset.symbol}-${i}`} onClick={() => setChartAsset(asset)}
+                      style={{
+                        padding: "10px 12px", borderRadius: "10px", cursor: "pointer",
+                        background: C.card2, border: `1px solid ${C.border}`, transition: "border-color .15s",
+                        display: "flex", alignItems: "center", gap: "8px",
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.borderColor = C.blue}
+                      onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
+                      <span style={{ fontSize: "12px" }}>{flag}</span>
+                      <div style={{ minWidth: 0, overflow: "hidden" }}>
+                        <div style={{ fontWeight: 600, fontSize: "12px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{asset.name}</div>
+                        <div style={{ fontSize: "10px", color: C.text3 }}>{asset.symbol}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 스크리너
@@ -1109,10 +1516,23 @@ export default function App() {
             {showAddAsset && (
               <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px" }}>
                 <div style={{ fontWeight: 700, marginBottom: "14px" }}>📌 자산 추가</div>
+                {/* 종목 검색으로 자동 입력 */}
+                <div style={{ marginBottom: "12px" }}>
+                  <div style={{ fontSize: "11px", color: C.text3, marginBottom: "6px" }}>종목 검색 (심볼 또는 이름 입력)</div>
+                  <SearchBar placeholder="종목 검색 (예: AAPL, 삼성, BTC...)" onSelect={(asset) => {
+                    const sym = asset.symbol.toUpperCase();
+                    setNewAsset(p => ({
+                      ...p,
+                      symbol: sym,
+                      name: asset.name,
+                      market: asset.market,
+                    }));
+                  }} />
+                </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "12px" }}>
                   {[
-                    { k: "symbol",   label: "심볼 (예: AAPL, 005930)", ph: "심볼 입력" },
-                    { k: "name",     label: "이름 (예: Apple, 삼성전자)", ph: "자산명" },
+                    { k: "symbol",   label: "심볼", ph: "AAPL, 005930..." },
+                    { k: "name",     label: "자산명", ph: "Apple, 삼성전자..." },
                     { k: "qty",      label: "보유 수량", ph: "0.00" },
                     { k: "avgPrice", label: "평균 매입가", ph: "0.00" },
                   ].map(({ k, label, ph }) => (
@@ -1122,6 +1542,7 @@ export default function App() {
                         placeholder={ph} style={{
                           width: "100%", padding: "9px 12px", borderRadius: "10px", fontSize: "13px",
                           background: C.bg, border: `1px solid ${C.border2}`, color: C.text1, outline: "none",
+                          boxSizing: "border-box",
                         }} />
                     </div>
                   ))}
