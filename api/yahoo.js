@@ -54,12 +54,13 @@ async function getAuth() {
   return { cookie: _cookie, crumb: _crumb };
 }
 
-async function fetchYahoo(symbol, interval, range) {
+async function fetchYahoo(symbol, interval, range, includePrePost = false) {
   const { cookie, crumb } = await getAuth();
+  const prePost = includePrePost ? "true" : "false";
 
   // Try query2 first, then query1 as fallback
   for (const host of ["query2.finance.yahoo.com", "query1.finance.yahoo.com"]) {
-    const url = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}&crumb=${encodeURIComponent(crumb)}&includePrePost=false`;
+    const url = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}&crumb=${encodeURIComponent(crumb)}&includePrePost=${prePost}`;
     try {
       let r = await fetch(url, {
         headers: { "User-Agent": UA, "Accept": "application/json", "Cookie": cookie },
@@ -69,7 +70,7 @@ async function fetchYahoo(symbol, interval, range) {
         // Invalidate and retry auth
         _cookie = null; _crumb = null; _expires = 0;
         const auth2 = await getAuth();
-        const url2 = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}&crumb=${encodeURIComponent(auth2.crumb)}&includePrePost=false`;
+        const url2 = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}&crumb=${encodeURIComponent(auth2.crumb)}&includePrePost=${prePost}`;
         r = await fetch(url2, {
           headers: { "User-Agent": UA, "Accept": "application/json", "Cookie": auth2.cookie },
         });
@@ -108,11 +109,14 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  const { symbol, interval = "1wk", range = "2y" } = req.query;
+  const { symbol, interval = "1wk", range = "2y", prepost } = req.query;
   if (!symbol) return res.status(400).json({ error: "symbol required" });
 
+  // 인트라데이(1m, 5m, 15m, 30m, 1h)에서 prepost=true면 정규장 외 데이터 포함
+  const includePrePost = prepost === "true" || prepost === "1";
+
   try {
-    const json = await fetchYahoo(symbol, interval, range);
+    const json = await fetchYahoo(symbol, interval, range, includePrePost);
     const parsed = parseYahooResult(json);
     if (!parsed || !parsed.closes.length) {
       return res.status(404).json({ error: "No data", closes: [], volumes: [], highs: [], lows: [] });

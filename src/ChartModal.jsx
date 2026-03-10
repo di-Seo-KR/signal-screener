@@ -451,7 +451,8 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       } else {
         const cfg = TF_CONFIG[tf] || TF_CONFIG["1d"];
         const sym = asset.symbolRaw || asset.symbol;
-        const r = await fetch(`/api/yahoo-ohlc?symbol=${encodeURIComponent(sym)}&interval=${cfg.interval}&range=${cfg.range}&_t=${Date.now()}`);
+        const isIntra = ["1m","5m","10m","30m","1h","2h","4h"].includes(tf);
+        const r = await fetch(`/api/yahoo-ohlc?symbol=${encodeURIComponent(sym)}&interval=${cfg.interval}&range=${cfg.range}${isIntra ? "&prepost=true" : ""}&_t=${Date.now()}`);
         if (!r.ok) throw new Error(`Yahoo ${r.status}`);
         const j = await r.json();
         candles = (j.candles || []).map(c => ({ ...c, time: tsToTime(c.time, tf) }));

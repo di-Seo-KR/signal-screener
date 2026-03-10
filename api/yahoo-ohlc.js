@@ -45,11 +45,12 @@ async function getAuth() {
   throw new Error("Yahoo auth failed");
 }
 
-async function fetchWithAuth(symbol, interval, range) {
+async function fetchWithAuth(symbol, interval, range, includePrePost = false) {
   const { cookie, crumb } = await getAuth();
+  const prePost = includePrePost ? "true" : "false";
 
   for (const host of ["query2.finance.yahoo.com", "query1.finance.yahoo.com"]) {
-    const url = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}&crumb=${encodeURIComponent(crumb)}&includePrePost=false`;
+    const url = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}&crumb=${encodeURIComponent(crumb)}&includePrePost=${prePost}`;
     try {
       let r = await fetch(url, {
         headers: { "User-Agent": UA, "Accept": "application/json", "Cookie": cookie },
@@ -58,7 +59,7 @@ async function fetchWithAuth(symbol, interval, range) {
       if (r.status === 401 || r.status === 403) {
         _cookie = null; _crumb = null; _expires = 0;
         const auth2 = await getAuth();
-        const url2 = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}&crumb=${encodeURIComponent(auth2.crumb)}&includePrePost=false`;
+        const url2 = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}&crumb=${encodeURIComponent(auth2.crumb)}&includePrePost=${prePost}`;
         r = await fetch(url2, {
           headers: { "User-Agent": UA, "Accept": "application/json", "Cookie": auth2.cookie },
         });
@@ -75,11 +76,12 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  const { symbol, interval = "1d", range = "6mo" } = req.query;
+  const { symbol, interval = "1d", range = "6mo", prepost } = req.query;
   if (!symbol) return res.status(400).json({ error: "symbol required" });
+  const includePrePost = prepost === "true" || prepost === "1";
 
   try {
-    const json = await fetchWithAuth(symbol, interval, range);
+    const json = await fetchWithAuth(symbol, interval, range, includePrePost);
     const result = json?.chart?.result?.[0];
     if (!result) return res.status(404).json({ error: "No data", candles: [] });
 
