@@ -2488,29 +2488,28 @@ function AppInner() {
           background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
         .tab-content { animation: slideUp 0.25s ease; }
         .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+        /* ── 기본 홈 그리드 (모바일 1컬럼) ── */
+        .home-grid { display: flex; flex-direction: column; gap: 12px; }
+        .home-left, .home-right { display: flex; flex-direction: column; gap: 12px; }
+        .home-full { display: flex; flex-direction: column; gap: 12px; }
         /* ── 모바일 (≤640px) ── */
         @media (max-width: 640px) {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: block !important; }
           .mobile-bottom-tab { display: flex !important; }
           main { padding-bottom: 80px !important; padding-left: 16px !important; padding-right: 16px !important; }
-          .home-grid { display: flex !important; flex-direction: column !important; gap: 12px !important; }
-          .home-grid > * { width: 100% !important; }
-          .home-left, .home-right { width: 100% !important; }
-          .signal-grid-2x2 { grid-template-columns: 1fr 1fr !important; }
-          .mover-grid { grid-template-columns: 1fr 1fr !important; }
         }
         /* ── 태블릿 (641~899px) ── */
         @media (min-width: 641px) and (max-width: 899px) {
           .mobile-dropdown { display: none !important; }
-          .home-grid { display: flex !important; flex-direction: column !important; gap: 14px !important; }
         }
         /* ── 데스크톱 (≥900px) ── */
         @media (min-width: 900px) {
           .mobile-dropdown { display: none !important; }
-          .home-grid { display: grid !important; grid-template-columns: 1fr 340px !important; gap: 16px !important; align-items: start !important; }
-          .home-left { display: flex; flex-direction: column; gap: 12px; }
-          .home-right { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 72px; }
+          .home-grid { display: grid !important; grid-template-columns: 1fr 360px !important; gap: 16px !important; align-items: start !important; }
+          .home-right { position: sticky; top: 72px; max-height: calc(100vh - 88px); overflow-y: auto; overflow-x: hidden;
+            scrollbar-width: none; -ms-overflow-style: none; }
+          .home-right::-webkit-scrollbar { display: none; }
         }
       `}</style>
 
@@ -3048,8 +3047,8 @@ function AppInner() {
 
                   {/* 테이블 헤더 */}
                   <div style={{
-                    display: "grid", gridTemplateColumns: "90px 1fr 60px 60px 60px",
-                    gap: "6px", padding: "6px 8px", marginBottom: "2px",
+                    display: "grid", gridTemplateColumns: "78px 1fr 48px 48px 48px",
+                    gap: "4px", padding: "6px 6px", marginBottom: "2px",
                     fontSize: "10px", fontWeight: 700, color: C.text3, letterSpacing: "0.02em",
                     borderBottom: `1px solid ${C.border}20`,
                   }}>
@@ -3079,7 +3078,7 @@ function AppInner() {
 
                         return (
                           <div key={`${evt.event}-${y}${m}${d}-${i}`} style={{
-                            display: "grid", gridTemplateColumns: "90px 1fr 60px 60px 60px",
+                            display: "grid", gridTemplateColumns: "78px 1fr 48px 48px 48px",
                             gap: "6px", alignItems: "center",
                             padding: "9px 8px",
                             opacity: isPast ? 0.65 : 1,
@@ -3175,6 +3174,11 @@ function AppInner() {
               );
             })()}
 
+            </div>{/* end home-right */}
+            </div>{/* end home-grid */}
+
+            {/* ═══ 하단 전체너비 섹션 (그리드 밖) ═══ */}
+
             {/* ── 섹터 히트맵 (접기/펼치기) ─── */}
             {sectorPerf.length > 0 && (
               <div style={{ background: C.card, borderRadius: "16px", padding: "16px" }}>
@@ -3255,9 +3259,6 @@ function AppInner() {
                 </>
               )}
             </div>
-
-            </div>{/* end home-right */}
-            </div>{/* end home-grid */}
           </div>
         )}
 
