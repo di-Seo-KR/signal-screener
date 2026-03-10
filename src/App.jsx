@@ -1858,6 +1858,7 @@ function AppInner() {
   }, []);
 
   const [tab, setTab] = useState("home");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // ── 모바일 감지 (폰트 크기 보정용) ──
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
@@ -2562,7 +2563,7 @@ function AppInner() {
         /* ── 모바일 (≤640px) — 폰트/간격 확대 ── */
         @media (max-width: 640px) {
           .desktop-nav { display: none !important; }
-          .mobile-top-nav { display: flex !important; }
+          .mobile-menu-btn { display: flex !important; }
           main { padding-left: 14px !important; padding-right: 14px !important;
             font-size: 15px !important; }
           .tab-content { font-size: 15px; }
@@ -2572,7 +2573,6 @@ function AppInner() {
         }
         /* ── 데스크톱 (≥900px) ── */
         @media (min-width: 900px) {
-          .mobile-top-nav { display: none !important; }
           .home-grid { display: grid !important; grid-template-columns: 1fr 360px !important; gap: 16px !important; align-items: start !important; }
           .home-right { position: sticky; top: 72px; max-height: calc(100vh - 88px); overflow-y: auto; overflow-x: hidden;
             scrollbar-width: none; -ms-overflow-style: none; }
@@ -2604,32 +2604,40 @@ function AppInner() {
               }}>{t.icon} {t.label}</button>
             ))}
           </nav>
-          {/* 테마 토글 */}
-          <button onClick={toggleTheme} title={themeMode === "dark" ? "라이트 모드" : "다크 모드"} style={{
-            background: C.card2, border: `1px solid ${C.border}`, borderRadius: "10px",
-            width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: "16px", cursor: "pointer", color: C.text1, transition: "all 0.2s",
+          {/* 테마 토글 + 햄버거 */}
+          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            <button onClick={toggleTheme} title={themeMode === "dark" ? "라이트 모드" : "다크 모드"} style={{
+              background: C.card2, border: `1px solid ${C.border}`, borderRadius: "10px",
+              width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "16px", cursor: "pointer", color: C.text1, transition: "all 0.2s",
+            }}>
+              {themeMode === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"}
+            </button>
+            <button className="mobile-menu-btn" onClick={() => setMenuOpen(!menuOpen)} style={{
+              display: "none", alignItems: "center", justifyContent: "center",
+              background: "none", border: "none", color: C.text2,
+              fontSize: "22px", width: "36px", height: "36px", cursor: "pointer",
+            }}>
+              {menuOpen ? "\u2715" : "\u2630"}
+            </button>
+          </div>
+        </div>
+        {/* 모바일 햄버거 드롭다운 */}
+        {menuOpen && (
+          <div style={{
+            background: C.card, borderTop: `1px solid ${C.border}`,
+            padding: "8px 16px 12px", display: "flex", flexDirection: "column", gap: "2px",
           }}>
-            {themeMode === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"}
-          </button>
-        </div>
-        {/* 모바일 가로 스크롤 탭 */}
-        <div className="mobile-top-nav" style={{
-          display: "none", gap: "2px", padding: "0 14px 8px",
-          overflowX: "auto", WebkitOverflowScrolling: "touch",
-          scrollbarWidth: "none", msOverflowStyle: "none",
-        }}>
-          <style>{`.mobile-top-nav::-webkit-scrollbar { display: none; }`}</style>
-          {[{ id: "home", label: "홈" }, { id: "screener", label: "스크리너" }, { id: "strategy", label: "전략" }, { id: "backtest", label: "백테스트" }, { id: "portfolio", label: "포트폴리오" }, { id: "news", label: "뉴스" }, { id: "alerts", label: "알림" }].map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
-              padding: "5px 12px", borderRadius: "16px", fontSize: "12px", fontWeight: 600,
-              background: tab === t.id ? C.blue : "transparent",
-              color: tab === t.id ? "#fff" : C.text3,
-              border: tab === t.id ? "none" : `1px solid ${C.border}`,
-              whiteSpace: "nowrap", flexShrink: 0, cursor: "pointer",
-            }}>{t.label}</button>
-          ))}
-        </div>
+            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "backtest", label: "백테스트", icon: "📊" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
+              <button key={t.id} onClick={() => { setTab(t.id); setMenuOpen(false); }} style={{
+                padding: "10px 14px", borderRadius: "10px", fontSize: "14px", fontWeight: 600,
+                background: tab === t.id ? C.blueBg : "transparent",
+                color: tab === t.id ? C.blue : C.text2, border: "none",
+                textAlign: "left", cursor: "pointer",
+              }}>{t.icon} {t.label}</button>
+            ))}
+          </div>
+        )}
       </header>
 
       <PullToRefresh onRefresh={async () => {
