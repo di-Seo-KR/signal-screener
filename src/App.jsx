@@ -2648,7 +2648,7 @@ function AppInner() {
         position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100,
         background: `${C.bg}f5`, backdropFilter: "blur(12px)",
         borderTop: `1px solid ${C.border}`,
-        display: "none", padding: "6px 0 env(safe-area-inset-bottom, 8px)",
+        display: "none", padding: "4px 0 calc(env(safe-area-inset-bottom, 0px) + 2px)",
       }} className="mobile-bottom-tab">
         {[
           { id: "home", icon: "🏠", label: "홈" },
