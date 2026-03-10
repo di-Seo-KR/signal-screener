@@ -1199,87 +1199,153 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
   const isPos = (change ?? 0) >= 0;
   const ext = extendedHours[asset.symbol];
 
-  // 팝업 열릴 때 기술적 데이터 fetch
+  // 팝업 열릴 때 기술적 데이터 + 애널리스트 데이터 병렬 fetch
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
         const sym = asset.symbolRaw || asset.symbol;
+        // 캔들 데이터 + 애널리스트 데이터 병렬 요청
+        const isCrypto = asset.market === "crypto";
+        const candlePromise = isCrypto
+          ? fetch(`/api/coingecko?id=${asset.id || asset.symbolRaw || asset.symbol.toLowerCase()}&days=365`).then(r => r.ok ? r.json() : null)
+          : fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(sym)}&interval=1d&range=1y`).then(r => r.ok ? r.json() : null);
+        const analystPromise = !isCrypto
+          ? fetch(`/api/yahoo-quote?symbols=${encodeURIComponent(sym)}`).then(r => r.ok ? r.json() : null).catch(() => null)
+          : Promise.resolve(null);
+        const [candleData, analystData] = await Promise.all([candlePromise, analystPromise]);
+
         let closes = [], volumes = [], highs = [], lows = [];
-        if (asset.market === "crypto") {
-          const cid = asset.id || asset.symbolRaw || asset.symbol.toLowerCase();
-          const r = await fetch(`/api/coingecko?id=${cid}&days=365`);
-          if (r.ok) {
-            const d = await r.json();
-            closes = (d.prices || []).map(p => p[1]);
-            volumes = (d.total_volumes || []).map(v => v[1]);
-            highs = closes; lows = closes;
-          }
-        } else {
-          const r = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(sym)}&interval=1d&range=1y`);
-          if (r.ok) {
-            const batch = (await r.json()).results || {};
-            const d = batch[sym];
-            if (d) { closes = d.closes || []; volumes = d.volumes || []; highs = d.highs || closes; lows = d.lows || closes; }
-          }
+        if (isCrypto && candleData) {
+          closes = (candleData.prices || []).map(p => p[1]);
+          volumes = (candleData.total_volumes || []).map(v => v[1]);
+          highs = closes; lows = closes;
+        } else if (candleData) {
+          const batch = candleData.results || {};
+          const d = batch[sym];
+          if (d) { closes = d.closes || []; volumes = d.volumes || []; highs = d.highs || closes; lows = d.lows || closes; }
         }
         if (cancelled || closes.length < 14) { if (!cancelled) setLoading(false); return; }
 
         const n = closes.length;
         const last = closes[n - 1];
-        // RSI(14)
-        let gains = 0, losses = 0;
-        for (let i = n - 14; i < n; i++) {
-          const diff = closes[i] - closes[i - 1];
-          if (diff > 0) gains += diff; else losses -= diff;
-        }
-        const avgGain = gains / 14, avgLoss = losses / 14;
-        const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
-        const rsi = +(100 - 100 / (1 + rs)).toFixed(1);
-
-        // MA50, MA200
         const sma = (arr, p) => arr.length >= p ? arr.slice(-p).reduce((a, b) => a + b, 0) / p : null;
-        const ma50 = sma(closes, 50);
-        const ma200 = sma(closes, 200);
-        const ma200Dist = ma200 ? +((last - ma200) / ma200 * 100).toFixed(1) : null;
 
-        // Volume ratio
+        // ── 기술적 지표 계산 ──
+        let gains = 0, losses = 0;
+        for (let i = n - 14; i < n; i++) { const d = closes[i] - closes[i - 1]; if (d > 0) gains += d; else losses -= d; }
+        const rs = losses === 0 ? 100 : (gains / 14) / (losses / 14);
+        const rsi = +(100 - 100 / (1 + rs)).toFixed(1);
+        const ma20 = sma(closes, 20), ma50 = sma(closes, 50), ma200 = sma(closes, 200);
+        const ma200Dist = ma200 ? +((last - ma200) / ma200 * 100).toFixed(1) : null;
         const recentVol = volumes.length >= 5 ? volumes.slice(-5).reduce((a, b) => a + b, 0) / 5 : 0;
         const avgVol = volumes.length >= 20 ? volumes.slice(-20).reduce((a, b) => a + b, 0) / 20 : recentVol;
         const volRatio = avgVol > 0 ? +(recentVol / avgVol).toFixed(2) : 1;
-
-        // Stochastic %K (14,3)
-        const h14 = Math.max(...highs.slice(-14));
-        const l14 = Math.min(...lows.slice(-14));
+        const h14 = Math.max(...highs.slice(-14)), l14 = Math.min(...lows.slice(-14));
         const stochK = h14 !== l14 ? +((last - l14) / (h14 - l14) * 100).toFixed(1) : 50;
-
-        // Williams %R (14)
         const wr = h14 !== l14 ? +(((h14 - last) / (h14 - l14)) * -100).toFixed(1) : -50;
-
-        // 52주 고저
-        const high52w = Math.max(...highs);
-        const low52w = Math.min(...lows);
-
-        // 적정주가 (Fair Value) — SMA200 + SMA50 + BB중심 가중평균
-        const bb20 = sma(closes, 20);
-        let fairValue = null;
-        if (ma200 && ma50) {
-          fairValue = ma200 * 0.4 + ma50 * 0.35 + (bb20 || ma50) * 0.25;
-        } else if (ma50) {
-          fairValue = ma50;
-        }
-        const fairPremium = fairValue ? +((last - fairValue) / fairValue * 100).toFixed(1) : null;
-
-        // weekChange
+        const high52w = Math.max(...highs), low52w = Math.min(...lows);
         const wkAgo = n >= 5 ? closes[n - 5] : closes[0];
         const weekChange = +((last - wkAgo) / wkAgo * 100).toFixed(2);
+
+        // ── 다중 모델 적정주가 (Multi-Model Fair Value Engine) ──
+        const analystQ = analystData?.quotes?.[sym] || {};
+        const models = [];
+
+        // 모델 1: 기술적 평균회귀 (SMA 컨버전스)
+        if (ma200 && ma50 && ma20) {
+          // 볼린저밴드 중심 + MA 가중평균 + 평균회귀
+          const bb20Std = closes.length >= 20
+            ? Math.sqrt(closes.slice(-20).reduce((a, v) => a + (v - ma20) ** 2, 0) / 20)
+            : 0;
+          const techFV = ma200 * 0.35 + ma50 * 0.30 + ma20 * 0.20 + (ma20 + bb20Std * 0.5) * 0.075 + (ma20 - bb20Std * 0.5) * 0.075;
+          models.push({ name: "기술적 평균회귀", value: techFV, weight: 0.20, icon: "📐" });
+        }
+
+        // 모델 2: 통계적 적정가 (Z-Score 기반 평균회귀)
+        if (closes.length >= 60) {
+          const mean60 = sma(closes, 60);
+          const std60 = Math.sqrt(closes.slice(-60).reduce((a, v) => a + (v - mean60) ** 2, 0) / 60);
+          const zScore = std60 > 0 ? (last - mean60) / std60 : 0;
+          // 평균회귀 목표: z-score를 0으로 되돌림
+          const statFV = mean60 + std60 * Math.max(-1, Math.min(1, zScore * 0.3));
+          models.push({ name: "통계적 평균회귀", value: statFV, weight: 0.15, icon: "📊" });
+        }
+
+        // 모델 3: 애널리스트 컨센서스 (Yahoo Finance)
+        if (analystQ.targetMean && analystQ.analystCount >= 3) {
+          models.push({ name: `애널리스트 컨센서스 (${analystQ.analystCount}명)`, value: analystQ.targetMean, weight: 0.30, icon: "🏦" });
+        } else if (analystQ.targetMedian && analystQ.analystCount >= 1) {
+          models.push({ name: `애널리스트 목표가 (${analystQ.analystCount}명)`, value: analystQ.targetMedian, weight: 0.20, icon: "🏦" });
+        }
+
+        // 모델 4: PER 기반 적정가 (Forward EPS × 섹터 평균 PER)
+        if (analystQ.forwardEps && analystQ.forwardEps > 0) {
+          // 섹터 평균 PER 근사치: S&P500 평균 ~20, 성장주 ~25-30, 가치주 ~15
+          const currentPE = analystQ.forwardPE || (last / analystQ.forwardEps);
+          const targetPE = currentPE > 35 ? currentPE * 0.85 : currentPE < 10 ? currentPE * 1.15 : currentPE;
+          const perFV = analystQ.forwardEps * Math.min(35, Math.max(12, targetPE));
+          if (perFV > 0 && isFinite(perFV)) {
+            models.push({ name: "Forward PER 밸류에이션", value: perFV, weight: 0.20, icon: "💹" });
+          }
+        } else if (analystQ.trailingEps && analystQ.trailingEps > 0 && analystQ.trailingPE) {
+          // Trailing EPS fallback
+          const historicalPE = analystQ.trailingPE;
+          const adjPE = historicalPE > 40 ? historicalPE * 0.8 : historicalPE < 8 ? historicalPE * 1.2 : historicalPE;
+          const perFV = analystQ.trailingEps * adjPE;
+          if (perFV > 0 && isFinite(perFV)) {
+            models.push({ name: "Trailing PER 밸류에이션", value: perFV, weight: 0.15, icon: "💹" });
+          }
+        }
+
+        // 모델 5: PBR 기반 적정가 (장부가치 × 적정 PBR)
+        if (analystQ.bookValue && analystQ.bookValue > 0 && analystQ.priceToBook) {
+          const currentPBR = analystQ.priceToBook;
+          const targetPBR = currentPBR > 10 ? currentPBR * 0.85 : currentPBR < 1 ? Math.max(1, currentPBR * 1.2) : currentPBR;
+          const pbrFV = analystQ.bookValue * targetPBR;
+          if (pbrFV > 0 && isFinite(pbrFV)) {
+            models.push({ name: "PBR 밸류에이션", value: pbrFV, weight: 0.10, icon: "📘" });
+          }
+        }
+
+        // 모델 6: 52주 레인지 중심값 (피보나치 기반)
+        if (high52w && low52w && high52w > low52w) {
+          const range52 = high52w - low52w;
+          // 피보나치 50% + 61.8% 가중평균
+          const fib50 = low52w + range52 * 0.5;
+          const fib618 = low52w + range52 * 0.618;
+          const rangeFV = fib50 * 0.6 + fib618 * 0.4;
+          models.push({ name: "52주 피보나치 중심", value: rangeFV, weight: 0.10, icon: "🎯" });
+        }
+
+        // ── 가중평균 종합 적정주가 계산 ──
+        let fairValue = null, fairPremium = null;
+        const analystTarget = analystQ.targetMean || analystQ.targetMedian || null;
+        const analystHigh = analystQ.targetHigh || null;
+        const analystLow = analystQ.targetLow || null;
+        if (models.length > 0) {
+          const totalWeight = models.reduce((s, m) => s + m.weight, 0);
+          fairValue = models.reduce((s, m) => s + m.value * (m.weight / totalWeight), 0);
+          fairPremium = +((last - fairValue) / fairValue * 100).toFixed(1);
+        }
 
         if (!cancelled) {
           setTechData({
             price: last, rsi, ma50, ma200, ma200Dist, volRatio,
-            stoch: { k: stochK }, wr, high52w, low52w,
-            fairValue, fairPremium, weekChange,
+            stoch: { k: stochK }, wr, high52w, low52w, weekChange,
+            // 고도화된 적정주가 데이터
+            fairValue, fairPremium, models,
+            analystTarget, analystHigh, analystLow,
+            analystCount: analystQ.analystCount || 0,
+            recommendation: analystQ.recommendation,
+            recommendationScore: analystQ.recommendationScore,
+            // 밸류에이션 지표
+            trailingPE: analystQ.trailingPE, forwardPE: analystQ.forwardPE,
+            priceToBook: analystQ.priceToBook, forwardEps: analystQ.forwardEps,
+            trailingEps: analystQ.trailingEps, bookValue: analystQ.bookValue,
+            marketCap: analystQ.marketCap, dividendYield: analystQ.dividendYield,
+            beta: analystQ.beta, earningsDate: analystQ.earningsDate,
           });
           setLoading(false);
         }
@@ -1432,36 +1498,142 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           )}
         </div>
 
-        {/* 적정주가 */}
+        {/* ═══ 적정주가 (Multi-Model Fair Value) ═══ */}
         {techData?.fairValue != null && (
           <div style={{ padding: "0 20px 12px" }}>
-            <div style={{
-              background: C.bg, borderRadius: "12px", padding: "14px",
-              border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between",
-            }}>
-              <div>
-                <div style={{ fontSize: "10px", color: C.text3, marginBottom: "4px" }}>📊 적정주가 추정</div>
-                <div style={{ fontSize: "18px", fontWeight: 800, color: C.text1 }}>
-                  {asset.market === "kr" ? `₩${Math.round(techData.fairValue).toLocaleString()}` : `$${techData.fairValue.toFixed(2)}`}
+            <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
+              {/* 종합 적정주가 헤더 */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                <div>
+                  <div style={{ fontSize: "10px", color: C.text3, marginBottom: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
+                    📊 종합 적정주가 <span style={{ fontSize: "8px", padding: "1px 5px", borderRadius: "3px", background: C.card2 }}>{techData.models?.length || 0}개 모델</span>
+                  </div>
+                  <div style={{ fontSize: "22px", fontWeight: 800, color: C.text1 }}>
+                    {asset.market === "kr" ? `₩${Math.round(techData.fairValue).toLocaleString()}` : `$${techData.fairValue.toFixed(2)}`}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{
+                    fontSize: "18px", fontWeight: 800,
+                    color: techData.fairPremium > 5 ? C.red : techData.fairPremium < -5 ? C.green : C.yellow,
+                  }}>
+                    {techData.fairPremium > 0 ? "+" : ""}{techData.fairPremium}%
+                  </div>
+                  <div style={{
+                    fontSize: "11px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px", display: "inline-block",
+                    background: techData.fairPremium > 10 ? C.redBg : techData.fairPremium > 5 ? `${C.red}12` : techData.fairPremium < -10 ? C.greenBg : techData.fairPremium < -5 ? `${C.green}12` : C.yellowBg,
+                    color: techData.fairPremium > 5 ? C.red : techData.fairPremium < -5 ? C.green : C.yellow,
+                  }}>
+                    {techData.fairPremium > 15 ? "매우 고평가" : techData.fairPremium > 10 ? "고평가" : techData.fairPremium > 5 ? "약간 고평가" : techData.fairPremium < -15 ? "매우 저평가" : techData.fairPremium < -10 ? "저평가" : techData.fairPremium < -5 ? "약간 저평가" : "적정 범위"}
+                  </div>
                 </div>
               </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "10px", color: C.text3, marginBottom: "4px" }}>현재 vs 적정</div>
+
+              {/* 적정주가 바 시각화 (현재가 위치) */}
+              {techData.analystLow && techData.analystHigh && (
+                <div style={{ marginBottom: "12px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px", color: C.text3, marginBottom: "4px" }}>
+                    <span>저점 {asset.market === "kr" ? `₩${Math.round(techData.analystLow).toLocaleString()}` : `$${techData.analystLow.toFixed(0)}`}</span>
+                    <span>고점 {asset.market === "kr" ? `₩${Math.round(techData.analystHigh).toLocaleString()}` : `$${techData.analystHigh.toFixed(0)}`}</span>
+                  </div>
+                  <div style={{ position: "relative", height: "8px", background: C.border, borderRadius: "4px", overflow: "visible" }}>
+                    {/* 적정주가 범위 */}
+                    <div style={{
+                      position: "absolute", left: "20%", right: "20%", top: 0, bottom: 0,
+                      background: `${C.blue}30`, borderRadius: "4px",
+                    }} />
+                    {/* 현재가 마커 */}
+                    {(() => {
+                      const pos = Math.max(0, Math.min(100, ((techData.price - techData.analystLow) / (techData.analystHigh - techData.analystLow)) * 100));
+                      return (
+                        <div style={{
+                          position: "absolute", left: `${pos}%`, top: "-3px",
+                          width: "14px", height: "14px", borderRadius: "50%",
+                          background: C.blue, border: `2px solid ${C.card}`,
+                          transform: "translateX(-7px)", boxShadow: `0 0 6px ${C.blue}66`,
+                        }} />
+                      );
+                    })()}
+                    {/* 적정주가 마커 */}
+                    {(() => {
+                      const fvPos = Math.max(0, Math.min(100, ((techData.fairValue - techData.analystLow) / (techData.analystHigh - techData.analystLow)) * 100));
+                      return (
+                        <div style={{
+                          position: "absolute", left: `${fvPos}%`, top: "-2px",
+                          width: "12px", height: "12px", borderRadius: "2px", transform: "translateX(-6px) rotate(45deg)",
+                          background: C.yellow, border: `2px solid ${C.card}`,
+                        }} />
+                      );
+                    })()}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "center", gap: "12px", marginTop: "6px", fontSize: "9px", color: C.text3 }}>
+                    <span><span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: C.blue, marginRight: "3px", verticalAlign: "middle" }}/>현재가</span>
+                    <span><span style={{ display: "inline-block", width: "7px", height: "7px", borderRadius: "1px", background: C.yellow, marginRight: "3px", verticalAlign: "middle", transform: "rotate(45deg)" }}/>적정가</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 개별 모델 브레이크다운 */}
+              {techData.models?.length > 0 && (
+                <div style={{ marginBottom: "10px" }}>
+                  <div style={{ fontSize: "10px", color: C.text3, fontWeight: 600, marginBottom: "6px" }}>모델별 산출가</div>
+                  {techData.models.map((m, i) => {
+                    const prem = +((techData.price - m.value) / m.value * 100).toFixed(1);
+                    return (
+                      <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "5px 0", borderBottom: i < techData.models.length - 1 ? `1px solid ${C.border}` : "none" }}>
+                        <span style={{ fontSize: "13px", width: "20px", textAlign: "center" }}>{m.icon}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "11px", color: C.text2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</div>
+                        </div>
+                        <div style={{ fontSize: "12px", fontWeight: 700, color: C.text1, whiteSpace: "nowrap" }}>
+                          {asset.market === "kr" ? `₩${Math.round(m.value).toLocaleString()}` : `$${m.value.toFixed(2)}`}
+                        </div>
+                        <div style={{
+                          fontSize: "10px", fontWeight: 600, width: "48px", textAlign: "right",
+                          color: prem > 5 ? C.red : prem < -5 ? C.green : C.text3,
+                        }}>
+                          {prem > 0 ? "+" : ""}{prem}%
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* 애널리스트 컨센서스 요약 */}
+              {techData.analystCount > 0 && (
                 <div style={{
-                  fontSize: "15px", fontWeight: 700,
-                  color: techData.fairPremium > 5 ? C.red : techData.fairPremium < -5 ? C.green : C.yellow,
+                  background: C.card, borderRadius: "10px", padding: "10px 12px",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  border: `1px solid ${C.border}`,
                 }}>
-                  {techData.fairPremium > 0 ? "+" : ""}{techData.fairPremium}%
-                  <span style={{ fontSize: "10px", fontWeight: 600, marginLeft: "4px" }}>
-                    {techData.fairPremium > 10 ? "고평가" : techData.fairPremium > 5 ? "약간 고평가" : techData.fairPremium < -10 ? "저평가" : techData.fairPremium < -5 ? "약간 저평가" : "적정"}
-                  </span>
+                  <div>
+                    <div style={{ fontSize: "9px", color: C.text3, marginBottom: "2px" }}>🏦 애널리스트 ({techData.analystCount}명)</div>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>
+                      {asset.market === "kr" ? `₩${Math.round(techData.analystTarget).toLocaleString()}` : `$${techData.analystTarget?.toFixed(2) || "—"}`}
+                    </div>
+                  </div>
+                  {techData.recommendation && (
+                    <div style={{
+                      padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
+                      background: techData.recommendation === "buy" || techData.recommendation === "strong_buy" ? C.greenBg : techData.recommendation === "sell" || techData.recommendation === "strong_sell" ? C.redBg : C.yellowBg,
+                      color: techData.recommendation === "buy" || techData.recommendation === "strong_buy" ? C.green : techData.recommendation === "sell" || techData.recommendation === "strong_sell" ? C.red : C.yellow,
+                    }}>
+                      {techData.recommendation === "strong_buy" ? "적극 매수" : techData.recommendation === "buy" ? "매수" : techData.recommendation === "hold" ? "보유" : techData.recommendation === "sell" ? "매도" : techData.recommendation === "strong_sell" ? "적극 매도" : techData.recommendation}
+                    </div>
+                  )}
+                  {techData.analystLow && techData.analystHigh && (
+                    <div style={{ textAlign: "right", fontSize: "10px", color: C.text3, lineHeight: 1.5 }}>
+                      <div>{asset.market === "kr" ? `₩${Math.round(techData.analystLow).toLocaleString()}` : `$${techData.analystLow.toFixed(0)}`} ~ {asset.market === "kr" ? `₩${Math.round(techData.analystHigh).toLocaleString()}` : `$${techData.analystHigh.toFixed(0)}`}</div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* 기술적 지표 */}
+        {/* ═══ 밸류에이션 + 기술적 지표 ═══ */}
         {techData && (
           <div style={{ padding: "0 20px 16px" }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
@@ -1469,11 +1641,9 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 { label: "RSI(14)", value: techData.rsi, color: techData.rsi <= 30 ? C.purple : techData.rsi >= 70 ? C.red : C.text2 },
                 { label: "200일선", value: techData.ma200Dist != null ? `${techData.ma200Dist > 0 ? "+" : ""}${techData.ma200Dist}%` : "—" },
                 { label: "거래량", value: `${techData.volRatio}x`, color: techData.volRatio >= 2 ? C.red : C.text2 },
-                { label: "스토캐스틱", value: `${techData.stoch.k}`, color: techData.stoch.k < 20 ? C.purple : techData.stoch.k > 80 ? C.red : C.text2 },
-                { label: "W%R", value: `${techData.wr}`, color: techData.wr < -80 ? C.purple : techData.wr > -20 ? C.red : C.text2 },
-                { label: "52주 위치", value: techData.high52w && techData.low52w
-                  ? `${((techData.price - techData.low52w) / (techData.high52w - techData.low52w) * 100).toFixed(0)}%`
-                  : "—" },
+                techData.forwardPE ? { label: "Forward PE", value: techData.forwardPE.toFixed(1), color: techData.forwardPE > 30 ? C.red : techData.forwardPE < 15 ? C.green : C.text2 } : { label: "스토캐스틱", value: `${techData.stoch.k}`, color: techData.stoch.k < 20 ? C.purple : techData.stoch.k > 80 ? C.red : C.text2 },
+                techData.priceToBook ? { label: "PBR", value: techData.priceToBook.toFixed(2), color: techData.priceToBook > 5 ? C.red : techData.priceToBook < 1.5 ? C.green : C.text2 } : { label: "W%R", value: `${techData.wr}`, color: techData.wr < -80 ? C.purple : techData.wr > -20 ? C.red : C.text2 },
+                techData.beta ? { label: "베타", value: techData.beta.toFixed(2), color: techData.beta > 1.5 ? C.red : techData.beta < 0.8 ? C.green : C.text2 } : { label: "52주 위치", value: techData.high52w && techData.low52w ? `${((techData.price - techData.low52w) / (techData.high52w - techData.low52w) * 100).toFixed(0)}%` : "—" },
               ].map(({ label, value, color }) => (
                 <div key={label} style={{ background: C.bg, borderRadius: "10px", padding: "8px 10px", textAlign: "center" }}>
                   <div style={{ fontSize: "9px", color: C.text3, marginBottom: "3px" }}>{label}</div>
@@ -1481,6 +1651,26 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 </div>
               ))}
             </div>
+            {/* 시가총액 + 배당 + 실적 */}
+            {(techData.marketCap || techData.dividendYield || techData.earningsDate) && (
+              <div style={{ display: "flex", gap: "6px", marginTop: "6px", flexWrap: "wrap" }}>
+                {techData.marketCap && (
+                  <span style={{ fontSize: "10px", padding: "3px 8px", borderRadius: "6px", background: C.card2, color: C.text3 }}>
+                    시총 {techData.marketCap >= 1e12 ? `$${(techData.marketCap / 1e12).toFixed(1)}T` : techData.marketCap >= 1e9 ? `$${(techData.marketCap / 1e9).toFixed(1)}B` : `$${(techData.marketCap / 1e6).toFixed(0)}M`}
+                  </span>
+                )}
+                {techData.dividendYield && techData.dividendYield > 0 && (
+                  <span style={{ fontSize: "10px", padding: "3px 8px", borderRadius: "6px", background: `${C.green}12`, color: C.green }}>
+                    배당 {(techData.dividendYield * 100).toFixed(2)}%
+                  </span>
+                )}
+                {techData.earningsDate && (
+                  <span style={{ fontSize: "10px", padding: "3px 8px", borderRadius: "6px", background: C.card2, color: C.text3 }}>
+                    실적 {new Date(techData.earningsDate * 1000).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         )}
 

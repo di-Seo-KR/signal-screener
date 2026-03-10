@@ -59,7 +59,7 @@ export default async function handler(req, res) {
     let quotes = {};
     for (const host of ["query2.finance.yahoo.com", "query1.finance.yahoo.com"]) {
       try {
-        const url = `https://${host}/v7/finance/quote?symbols=${encodeURIComponent(symStr)}&crumb=${encodeURIComponent(auth.crumb)}&fields=regularMarketPrice,regularMarketChange,regularMarketChangePercent,preMarketPrice,preMarketChange,preMarketChangePercent,postMarketPrice,postMarketChange,postMarketChangePercent,marketState`;
+        const url = `https://${host}/v7/finance/quote?symbols=${encodeURIComponent(symStr)}&crumb=${encodeURIComponent(auth.crumb)}&fields=regularMarketPrice,regularMarketChange,regularMarketChangePercent,preMarketPrice,preMarketChange,preMarketChangePercent,postMarketPrice,postMarketChange,postMarketChangePercent,marketState,targetMeanPrice,targetHighPrice,targetLowPrice,targetMedianPrice,numberOfAnalystOpinions,recommendationKey,recommendationMean,trailingPE,forwardPE,priceToBook,trailingEps,forwardEps,bookValue,fiftyDayAverage,twoHundredDayAverage,fiftyTwoWeekHigh,fiftyTwoWeekLow,marketCap,dividendYield,beta,earningsTimestamp,earningsTimestampStart,earningsTimestampEnd`;
         const r = await fetch(url, {
           headers: { "User-Agent": UA, "Accept": "application/json", "Cookie": auth.cookie },
           signal: AbortSignal.timeout(8000),
@@ -79,6 +79,30 @@ export default async function handler(req, res) {
               postMarketPrice: q.postMarketPrice || null,
               postMarketChange: q.postMarketChange || null,
               postMarketChangePct: q.postMarketChangePercent || null,
+              // 애널리스트 목표가
+              targetMean: q.targetMeanPrice || null,
+              targetHigh: q.targetHighPrice || null,
+              targetLow: q.targetLowPrice || null,
+              targetMedian: q.targetMedianPrice || null,
+              analystCount: q.numberOfAnalystOpinions || 0,
+              recommendation: q.recommendationKey || null, // buy, hold, sell, etc.
+              recommendationScore: q.recommendationMean || null, // 1=strongBuy ~ 5=strongSell
+              // 밸류에이션
+              trailingPE: q.trailingPE || null,
+              forwardPE: q.forwardPE || null,
+              priceToBook: q.priceToBook || null,
+              trailingEps: q.trailingEps || null,
+              forwardEps: q.forwardEps || null,
+              bookValue: q.bookValue || null,
+              // 기타
+              fiftyDayAvg: q.fiftyDayAverage || null,
+              twoHundredDayAvg: q.twoHundredDayAverage || null,
+              fiftyTwoWeekHigh: q.fiftyTwoWeekHigh || null,
+              fiftyTwoWeekLow: q.fiftyTwoWeekLow || null,
+              marketCap: q.marketCap || null,
+              dividendYield: q.dividendYield || null,
+              beta: q.beta || null,
+              earningsDate: q.earningsTimestamp || q.earningsTimestampStart || null,
             };
           }
           break;
