@@ -1913,6 +1913,14 @@ function AppInner() {
   const [lastScan, setLastScan]       = useState(null);
   const [chartAsset, setChartAsset]   = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null); // 종목 상세 팝업
+
+  // ── 저평가 종목 스캔 ──
+  const [valueResults, setValueResults] = useState([]);
+  const [valueScanning, setValueScanning] = useState(false);
+  const [valueScanProgress, setValueScanProgress] = useState({ done: 0, total: 0 });
+  const [valueFilter, setValueFilter] = useState("all"); // all, us, kr
+  const [valueSortBy, setValueSortBy] = useState("score"); // score, per, pbr, div, upside
+  const [valueLastScan, setValueLastScan] = useState(null);
   const [watchlist, setWatchlist] = useState(() => { try { return JSON.parse(localStorage.getItem("di_watchlist") || "[]"); } catch { return []; } });
 
   // ── 포트폴리오 상태 ───────────────────────────────────────────
@@ -2399,6 +2407,169 @@ function AppInner() {
       } catch { setTgStatus("❌ 텔레그램 전송 실패"); }
     }
   }, [scanning, conditions, mode, sortBy, settings]);
+
+  // ── 저평가 종목 통합 스캔 ─────────────────────────────────────
+  const runValueScan = useCallback(async () => {
+    if (valueScanning) return;
+    setValueScanning(true);
+    setValueResults([]);
+
+    // ETF/레버리지/인버스/크립토 제외 — 개별 주식만
+    const etfKeywords = ["ETF","3x","-3x","2x","-2x","Select","커버드콜","인컴","레버리지","인버스",
+      "VIX","Bond","채권","배당","물가연동","정크","클린에너지","태양광","풍력","ESG","게노믹스",
+      "사이버보안","클라우드","로봇","AI ETF","방산 ETF","항공사","여행","게임 ETF","소셜미디어","대마",
+      "Gold","Silver","Platinum","Palladium","농산물","밀 ETF","옥수수","구리","Natural Gas","원유",
+      "우라늄","희토류","리튬","S&P 500 ETF","나스닥 100","다우 ETF","Russell","Vanguard","Total Market",
+      "World Total","선진국","이머징","EAFE","China","Japan ETF","Korea ETF","Brazil","India ETF",
+      "Taiwan ETF","Germany ETF","UK ETF","Australia ETF","Canada ETF","Russia","Turkey","A-Shares",
+      "Real Estate","반도체 iShares","반도체 VanEck","소프트웨어 ETF","BTC","ETH","ProShares","iShares",
+      "Fidelity","Grayscale","ARK 21","Bitwise","VanEck","Valkyrie","WisdomTree","Franklin",
+      "Short BTC","ARK Innovation","ARK Next","ARK Genomic","ARK Fintech","ARK Autonomous","ARK Space"];
+    const isETF = (name) => etfKeywords.some(k => name.includes(k));
+
+    const stocks = [
+      ...US_ASSETS.filter(a => !isETF(a.name)).map(a => ({ ...a, market: "us" })),
+      ...KR_ASSETS.map(a => ({ ...a, market: "kr" })),
+    ];
+    setValueScanProgress({ done: 0, total: stocks.length });
+
+    const allResults = [];
+    const BATCH = 20; // yahoo-quote는 최대 50개, 20씩 안전하게
+    let done = 0;
+
+    for (let b = 0; b < stocks.length; b += BATCH) {
+      const batch = stocks.slice(b, b + BATCH);
+      const symbols = batch.map(a => a.symbol).join(",");
+      try {
+        const r = await fetch(`/api/yahoo-quote?symbols=${encodeURIComponent(symbols)}&_t=${Date.now()}`);
+        if (r.ok) {
+          const { quotes } = await r.json();
+          for (const asset of batch) {
+            const q = quotes[asset.symbol];
+            if (!q || !q.price) { done++; continue; }
+
+            // ── 밸류에이션 스코어 계산 ──
+            let score = 50; // 기본 중립
+            let reasons = [];
+
+            // 1) PER (Trailing)
+            const per = q.trailingPE;
+            if (per != null && per > 0) {
+              if (per < 8)       { score += 18; reasons.push(`PER ${per.toFixed(1)} 초저평가`); }
+              else if (per < 12) { score += 14; reasons.push(`PER ${per.toFixed(1)} 저평가`); }
+              else if (per < 16) { score += 8;  reasons.push(`PER ${per.toFixed(1)} 양호`); }
+              else if (per < 22) { score += 2; }
+              else if (per < 35) { score -= 5; }
+              else               { score -= 12; reasons.push(`PER ${per.toFixed(1)} 고평가`); }
+            }
+
+            // 2) Forward PER (성장 할인)
+            const fpe = q.forwardPE;
+            if (fpe != null && per != null && fpe > 0 && per > 0) {
+              const pegLike = fpe / per; // <1 = 이익 성장 예상
+              if (pegLike < 0.7)      { score += 10; reasons.push("Forward PE 대폭 할인"); }
+              else if (pegLike < 0.9)  { score += 5;  reasons.push("Forward PE 할인"); }
+              else if (pegLike > 1.2)  { score -= 5; }
+            }
+
+            // 3) PBR
+            const pbr = q.priceToBook;
+            if (pbr != null && pbr > 0) {
+              if (pbr < 0.7)      { score += 15; reasons.push(`PBR ${pbr.toFixed(2)} 초저평가`); }
+              else if (pbr < 1.0) { score += 12; reasons.push(`PBR ${pbr.toFixed(2)} 순자산 이하`); }
+              else if (pbr < 1.5) { score += 6;  reasons.push(`PBR ${pbr.toFixed(2)} 양호`); }
+              else if (pbr < 3.0) { score += 0; }
+              else                { score -= 8; }
+            }
+
+            // 4) 배당수익률
+            const dy = q.dividendYield ? q.dividendYield * 100 : 0;
+            if (dy > 5)       { score += 12; reasons.push(`배당 ${dy.toFixed(1)}% 고배당`); }
+            else if (dy > 3)  { score += 8;  reasons.push(`배당 ${dy.toFixed(1)}%`); }
+            else if (dy > 2)  { score += 4; }
+            else if (dy > 1)  { score += 1; }
+
+            // 5) 애널리스트 목표가 대비 업사이드
+            const upside = q.targetMean && q.price ? ((q.targetMean - q.price) / q.price * 100) : null;
+            if (upside != null) {
+              if (upside > 40)       { score += 14; reasons.push(`목표가 +${upside.toFixed(0)}% 대폭 상향`); }
+              else if (upside > 25)  { score += 10; reasons.push(`목표가 +${upside.toFixed(0)}%`); }
+              else if (upside > 15)  { score += 6; }
+              else if (upside > 5)   { score += 2; }
+              else if (upside < -10) { score -= 8; reasons.push(`목표가 ${upside.toFixed(0)}% 하향`); }
+            }
+
+            // 6) 52주 저점 대비 위치
+            const low52 = q.fiftyTwoWeekLow;
+            const high52 = q.fiftyTwoWeekHigh;
+            if (low52 && high52 && high52 > low52) {
+              const pos = (q.price - low52) / (high52 - low52); // 0=저점, 1=고점
+              if (pos < 0.15)      { score += 12; reasons.push("52주 최저점 근접"); }
+              else if (pos < 0.30) { score += 8;  reasons.push("52주 하단권"); }
+              else if (pos < 0.50) { score += 3; }
+              else if (pos > 0.90) { score -= 8; }
+            }
+
+            // 7) 200일 이동평균 대비
+            if (q.twoHundredDayAvg && q.price) {
+              const vs200 = (q.price - q.twoHundredDayAvg) / q.twoHundredDayAvg * 100;
+              if (vs200 < -30)      { score += 10; reasons.push(`200일선 -${Math.abs(vs200).toFixed(0)}% 괴리`); }
+              else if (vs200 < -15) { score += 6; }
+              else if (vs200 < -5)  { score += 2; }
+            }
+
+            score = Math.max(0, Math.min(100, score));
+
+            allResults.push({
+              symbol: asset.symbol,
+              name: asset.name,
+              market: asset.market,
+              price: q.price,
+              change: q.changePct,
+              score,
+              per: per || null,
+              fpe: fpe || null,
+              pbr: pbr || null,
+              divYield: dy || 0,
+              upside: upside || null,
+              targetMean: q.targetMean || null,
+              analystCount: q.analystCount || 0,
+              marketCap: q.marketCap || null,
+              low52: low52 || null,
+              high52: high52 || null,
+              reasons,
+            });
+            done++;
+          }
+        } else {
+          done += batch.length;
+        }
+      } catch {
+        done += batch.length;
+      }
+      setValueScanProgress({ done, total: stocks.length });
+    }
+
+    // 점수순 정렬, 상위만
+    allResults.sort((a, b) => b.score - a.score);
+    setValueResults(allResults);
+    setValueLastScan(new Date());
+    setValueScanning(false);
+  }, [valueScanning]);
+
+  const filteredValue = valueResults.filter(a => {
+    if (valueFilter === "all") return a.score >= 60;
+    if (valueFilter === "us") return a.market === "us" && a.score >= 55;
+    if (valueFilter === "kr") return a.market === "kr" && a.score >= 55;
+    return true;
+  }).sort((a, b) => {
+    if (valueSortBy === "score") return b.score - a.score;
+    if (valueSortBy === "per") return (a.per || 999) - (b.per || 999);
+    if (valueSortBy === "pbr") return (a.pbr || 999) - (b.pbr || 999);
+    if (valueSortBy === "div") return (b.divYield || 0) - (a.divYield || 0);
+    if (valueSortBy === "upside") return (b.upside || -999) - (a.upside || -999);
+    return b.score - a.score;
+  });
 
   // ── 포트폴리오 가격 갱신 ──────────────────────────────────────
   const fetchPortfolioPrices = useCallback(async () => {
@@ -3499,6 +3670,160 @@ function AppInner() {
                 <div style={{ fontSize: "12px", color: C.text3 }}>다른 시장 필터를 선택해보세요 (전체 {results.length}건 발견)</div>
               </div>
             )}
+
+            {/* ═══════════════════════════════════════════════════════
+                저평가 종목 통합 조회
+            ═══════════════════════════════════════════════════════ */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginTop: "20px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px", flexWrap: "wrap", gap: "8px" }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "2px" }}>💎 저평가 종목 통합 조회</div>
+                  <div style={{ fontSize: "11px", color: C.text3 }}>PER · PBR · 배당률 · 애널리스트 목표가 · 52주 위치 종합 분석</div>
+                </div>
+                <button onClick={runValueScan} disabled={valueScanning} style={{
+                  padding: "10px 20px", borderRadius: "12px", fontSize: "13px", fontWeight: 700,
+                  background: valueScanning ? C.card2 : C.green, color: valueScanning ? C.text3 : "#fff",
+                  border: "none", whiteSpace: "nowrap",
+                }}>
+                  {valueScanning
+                    ? <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ animation: "pulse 1s infinite" }}>⏳</span> {valueScanProgress.done}/{valueScanProgress.total}
+                      </span>
+                    : "💎 저평가 스캔"}
+                </button>
+              </div>
+
+              {valueScanning && (
+                <div style={{ height: "4px", background: C.border2, borderRadius: "2px", overflow: "hidden", marginBottom: "12px" }}>
+                  <div style={{
+                    height: "100%", background: C.green, borderRadius: "2px",
+                    width: `${valueScanProgress.total ? (valueScanProgress.done / valueScanProgress.total) * 100 : 0}%`,
+                    transition: "width .3s",
+                  }} />
+                </div>
+              )}
+
+              {valueLastScan && !valueScanning && (
+                <div style={{ fontSize: "11px", color: C.text3, marginBottom: "10px" }}>
+                  마지막 스캔: {valueLastScan.toLocaleTimeString("ko-KR")} · 전체 {valueResults.length}개 분석 · 저평가 {filteredValue.length}개 발견
+                </div>
+              )}
+
+              {/* 필터 + 정렬 */}
+              {valueResults.length > 0 && (
+                <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "12px", flexWrap: "wrap" }}>
+                  {[["all","전체"], ["us","🇺🇸 미국"], ["kr","🇰🇷 한국"]].map(([v, l]) => (
+                    <button key={v} onClick={() => setValueFilter(v)} style={{
+                      padding: "4px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+                      background: valueFilter === v ? C.greenBg : "transparent",
+                      color: valueFilter === v ? C.green : C.text3, border: `1px solid ${valueFilter === v ? C.green : C.border2}`,
+                    }}>{l}</button>
+                  ))}
+                  <div style={{ marginLeft: "auto", display: "flex", gap: "4px", alignItems: "center" }}>
+                    <span style={{ fontSize: "11px", color: C.text3 }}>정렬</span>
+                    {[["score","종합"], ["per","PER↑"], ["pbr","PBR↑"], ["div","배당↓"], ["upside","목표가↓"]].map(([v, l]) => (
+                      <button key={v} onClick={() => setValueSortBy(v)} style={{
+                        padding: "3px 7px", borderRadius: "6px", fontSize: "10px", fontWeight: 600,
+                        background: valueSortBy === v ? C.greenBg : "transparent", color: valueSortBy === v ? C.green : C.text3,
+                        border: `1px solid ${valueSortBy === v ? C.green : C.border2}`,
+                      }}>{l}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 결과 리스트 */}
+              {filteredValue.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {filteredValue.slice(0, 50).map((s, i) => {
+                    const scoreColor = s.score >= 80 ? C.green : s.score >= 65 ? C.blue : C.yellow;
+                    const scoreLabel = s.score >= 80 ? "강력 저평가" : s.score >= 70 ? "저평가" : s.score >= 60 ? "저평가 가능성" : "주의 관찰";
+                    return (
+                      <div key={s.symbol} onClick={() => setSelectedAsset({ symbol: s.symbol, name: s.name })} style={{
+                        background: C.card2, borderRadius: "12px", padding: "12px 14px",
+                        border: `1px solid ${C.border}`, cursor: "pointer", transition: "all .15s",
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontSize: "12px", fontWeight: 700, color: C.text3, minWidth: "20px" }}>{i + 1}</span>
+                            <span style={{ fontSize: "11px" }}>{s.market === "us" ? "🇺🇸" : "🇰🇷"}</span>
+                            <span style={{ fontWeight: 700, fontSize: "13px", color: C.text1 }}>{s.name}</span>
+                            <span style={{ fontSize: "11px", color: C.text3 }}>{s.symbol.replace(".KS","").replace(".KQ","")}</span>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>
+                              {s.market === "kr" ? `₩${Math.round(s.price).toLocaleString()}` : `$${s.price?.toFixed(2)}`}
+                            </span>
+                            <span style={{
+                              padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
+                              background: `${scoreColor}22`, color: scoreColor,
+                            }}>{s.score}점</span>
+                          </div>
+                        </div>
+                        {/* 지표 행 */}
+                        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "4px" }}>
+                          {s.per != null && (
+                            <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: s.per < 12 ? `${C.green}18` : s.per < 20 ? `${C.blue}18` : `${C.text3}18`, color: s.per < 12 ? C.green : s.per < 20 ? C.blue : C.text3 }}>
+                              PER {s.per.toFixed(1)}
+                            </span>
+                          )}
+                          {s.pbr != null && (
+                            <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: s.pbr < 1 ? `${C.green}18` : s.pbr < 2 ? `${C.blue}18` : `${C.text3}18`, color: s.pbr < 1 ? C.green : s.pbr < 2 ? C.blue : C.text3 }}>
+                              PBR {s.pbr.toFixed(2)}
+                            </span>
+                          )}
+                          {s.divYield > 0 && (
+                            <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: s.divYield > 3 ? `${C.yellow}18` : `${C.text3}18`, color: s.divYield > 3 ? C.yellow : C.text3 }}>
+                              배당 {s.divYield.toFixed(1)}%
+                            </span>
+                          )}
+                          {s.upside != null && (
+                            <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: s.upside > 15 ? `${C.green}18` : s.upside > 0 ? `${C.blue}18` : `${C.red}18`, color: s.upside > 15 ? C.green : s.upside > 0 ? C.blue : C.red }}>
+                              목표 {s.upside > 0 ? "+" : ""}{s.upside.toFixed(0)}%
+                            </span>
+                          )}
+                          {s.fpe != null && s.per != null && s.fpe < s.per * 0.85 && (
+                            <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: `${C.green}18`, color: C.green }}>
+                              F-PER {s.fpe.toFixed(1)}
+                            </span>
+                          )}
+                        </div>
+                        {/* 이유 */}
+                        {s.reasons.length > 0 && (
+                          <div style={{ fontSize: "10px", color: C.text3, lineHeight: 1.6 }}>
+                            {s.reasons.slice(0, 3).join(" · ")}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {filteredValue.length > 50 && (
+                    <div style={{ textAlign: "center", fontSize: "12px", color: C.text3, padding: "8px" }}>
+                      상위 50개만 표시 (전체 {filteredValue.length}개)
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {!valueScanning && valueResults.length === 0 && (
+                <div style={{ textAlign: "center", padding: "24px", color: C.text3 }}>
+                  <div style={{ fontSize: "36px", marginBottom: "10px" }}>💎</div>
+                  <div style={{ fontSize: "13px", lineHeight: 1.7 }}>
+                    <strong style={{ color: C.green }}>저평가 스캔</strong>을 눌러 미국·한국 주식의<br />
+                    밸류에이션을 종합 분석합니다
+                  </div>
+                  <div style={{ fontSize: "11px", marginTop: "8px", color: C.text3 }}>
+                    PER · PBR · 배당수익률 · Forward PE · 애널리스트 목표가 · 52주 위치 · 200일선 괴리 기반
+                  </div>
+                </div>
+              )}
+
+              {!valueScanning && valueResults.length > 0 && filteredValue.length === 0 && (
+                <div style={{ textAlign: "center", padding: "20px", color: C.text3, fontSize: "13px" }}>
+                  선택한 시장에 저평가 기준 충족 종목 없음 — 필터를 변경해보세요
+                </div>
+              )}
+            </div>
           </div>
         )}
 
