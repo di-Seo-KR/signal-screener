@@ -109,8 +109,8 @@ const TF_CONFIG = {
   "1h":  { label: "1시간", interval: "1h",  range: "6mo" },
   "2h":  { label: "2시간", interval: "1h",  range: "6mo" },  // Aggregate from 1h
   "4h":  { label: "4시간", interval: "1h",  range: "1y" },   // Aggregate from 1h
-  "1d":  { label: "날봉",  interval: "1d",  range: "max" },  // 상장일부터 전체
-  "1wk": { label: "주봉",  interval: "1wk", range: "max" },  // 상장일부터 전체
+  "1d":  { label: "날봉",  interval: "1d",  range: "1y" },   // 최근 1년 (더 세밀한 캔들)
+  "1wk": { label: "주봉",  interval: "1wk", range: "5y" },   // 최근 5년
   "1mo": { label: "월봉",  interval: "1mo", range: "max" },  // 상장일부터 전체
 };
 
@@ -730,7 +730,27 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         const r = await fetch(`/api/yahoo-ohlc?symbol=${encodeURIComponent(sym)}&interval=${cfg.interval}&range=${cfg.range}&prepost=true&_t=${Date.now()}`);
         if (!r.ok) throw new Error(`Yahoo ${r.status}`);
         const j = await r.json();
-        candles = (j.candles || []).map(c => ({ ...c, time: tsToTime(c.time, tf) }));
+        let raw = j.candles || [];
+
+        // 인트라데이: 프리/포스트마켓 이상 꼬리 클리핑
+        // Yahoo includePrePost에서 정규장 시가/종가 근처에 극단 고가/저가가 포함되는 문제 보정
+        if (isIntra && raw.length > 0) {
+          raw = raw.filter(c => c.volume > 0 || Math.abs(c.close - c.open) > 0); // volume=0 & flat 제거
+          raw = raw.map(c => {
+            const body = Math.abs(c.close - c.open);
+            const midPrice = (c.open + c.close) / 2;
+            const maxWick = Math.max(body * 5, midPrice * 0.005); // body의 5배 또는 0.5% 중 큰 값
+            const topBody = Math.max(c.open, c.close);
+            const botBody = Math.min(c.open, c.close);
+            return {
+              ...c,
+              high: Math.min(c.high, topBody + maxWick),
+              low: Math.max(c.low, botBody - maxWick),
+            };
+          });
+        }
+
+        candles = raw.map(c => ({ ...c, time: tsToTime(c.time, tf) }));
       }
 
       // Aggregate if needed (10m, 2h, 4h)
