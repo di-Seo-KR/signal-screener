@@ -1790,6 +1790,8 @@ export default function App() {
   const [sectorPerf, setSectorPerf] = useState([]);
   const [econEvents, setEconEvents] = useState([]);
   const [econExpanded, setEconExpanded] = useState(false);
+  const [econSort, setEconSort] = useState("date-asc"); // date-asc, date-desc, type
+  const [econFilter, setEconFilter] = useState("all"); // all, upcoming, past, FOMC, CPI, NFP, GDP, PCE
   const [homeSection, setHomeSection] = useState({
     market: true, watchlist: true, calendar: false, fearGreed: false,
     sector: false, signal: false, hotAssets: true, allAssets: false,
@@ -2707,77 +2709,192 @@ export default function App() {
               </div>
             )}
 
-            {/* ── 경제 캘린더 (확장 가능, 실제/예상 수치) ─── */}
+            {/* ── 경제 캘린더 (정렬/필터/년월일 표시) ─── */}
             {econEvents.length > 0 && (() => {
-              const now = new Date();
-              const todayStr = now.toISOString().slice(0, 10);
-              const upcomingEvts = econEvents.filter(e => e.daysUntil >= -1);
-              const pastEvts = econEvents.filter(e => e.daysUntil < -1).reverse();
-              const showEvents = econExpanded ? [...upcomingEvts.slice(0, 12), ...pastEvts.slice(0, 15)] : upcomingEvts.slice(0, 5);
+              // 필터 적용
+              let filtered = econEvents;
+              if (econFilter === "upcoming") filtered = econEvents.filter(e => e.daysUntil >= 0);
+              else if (econFilter === "past") filtered = econEvents.filter(e => e.daysUntil < 0);
+              else if (econFilter !== "all") filtered = econEvents.filter(e => e.type === econFilter);
+
+              // 정렬 적용
+              const sorted = [...filtered].sort((a, b) => {
+                if (econSort === "date-desc") return b.date - a.date;
+                if (econSort === "type") return a.type.localeCompare(b.type) || a.date - b.date;
+                return a.date - b.date; // date-asc default
+              });
+
+              const showEvents = econExpanded ? sorted : sorted.slice(0, 6);
+              const filterTabs = [
+                { key: "all", label: "전체" },
+                { key: "upcoming", label: "예정" },
+                { key: "past", label: "지난" },
+                { key: "FOMC", label: "FOMC" },
+                { key: "CPI", label: "CPI" },
+                { key: "NFP", label: "고용" },
+                { key: "GDP", label: "GDP" },
+                { key: "PCE", label: "PCE" },
+              ];
+
               return (
                 <div style={{ background: C.card, borderRadius: "16px", padding: "16px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                  {/* 헤더 */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
                     <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>경제 캘린더</span>
-                    <button onClick={() => setEconExpanded(p => !p)} style={{
-                      background: "none", border: "none", fontSize: "12px", color: C.blue, cursor: "pointer", padding: "4px 8px", fontWeight: 600,
-                    }}>{econExpanded ? "접기" : `전체 보기 (${econEvents.length})`}</button>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      {/* 정렬 토글 */}
+                      <button onClick={() => setEconSort(p => p === "date-asc" ? "date-desc" : p === "date-desc" ? "type" : "date-asc")}
+                        style={{
+                          background: C.card2, border: "none", borderRadius: "6px", padding: "4px 8px",
+                          fontSize: "10px", fontWeight: 600, color: C.text3, cursor: "pointer",
+                        }}
+                        title="정렬 변경">
+                        {econSort === "date-asc" ? "날짜순 ↑" : econSort === "date-desc" ? "날짜순 ↓" : "유형별"}
+                      </button>
+                      <button onClick={() => setEconExpanded(p => !p)} style={{
+                        background: "none", border: "none", fontSize: "11px", color: C.blue, cursor: "pointer", padding: "4px 6px", fontWeight: 600,
+                      }}>{econExpanded ? "접기" : `더보기 (${filtered.length})`}</button>
+                    </div>
                   </div>
-                  {econExpanded && pastEvts.length > 0 && (
-                    <div style={{ fontSize: "11px", color: C.text3, fontWeight: 600, marginBottom: "6px", padding: "4px 0", borderBottom: `1px solid ${C.border}15` }}>
-                      지난 이벤트 ({pastEvts.length}개)
+
+                  {/* 필터 탭 */}
+                  <div style={{ display: "flex", gap: "4px", marginBottom: "10px", overflow: "auto", paddingBottom: "2px" }}>
+                    {filterTabs.map(ft => (
+                      <button key={ft.key} onClick={() => setEconFilter(ft.key)} style={{
+                        padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 600, flexShrink: 0,
+                        background: econFilter === ft.key ? C.blueBg : "transparent",
+                        color: econFilter === ft.key ? C.blue : C.text3,
+                        border: `1px solid ${econFilter === ft.key ? `${C.blue}44` : "transparent"}`,
+                        cursor: "pointer",
+                      }}>{ft.label}</button>
+                    ))}
+                  </div>
+
+                  {/* 테이블 헤더 */}
+                  <div style={{
+                    display: "grid", gridTemplateColumns: "90px 1fr 60px 60px 60px",
+                    gap: "6px", padding: "6px 8px", marginBottom: "2px",
+                    fontSize: "10px", fontWeight: 700, color: C.text3, letterSpacing: "0.02em",
+                    borderBottom: `1px solid ${C.border}20`,
+                  }}>
+                    <span>날짜</span>
+                    <span>이벤트</span>
+                    <span style={{ textAlign: "right" }}>실제</span>
+                    <span style={{ textAlign: "right" }}>예상</span>
+                    <span style={{ textAlign: "right" }}>이전</span>
+                  </div>
+
+                  {/* 이벤트 리스트 */}
+                  {showEvents.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "20px", color: C.text3, fontSize: "12px" }}>
+                      해당 필터에 맞는 이벤트가 없습니다
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column" }}>
+                      {showEvents.map((evt, i) => {
+                        const statusColor = evt.status === "오늘" ? C.red : evt.status === "임박" ? C.yellow : evt.status === "완료" || evt.status === "어제" ? C.text3 : C.text2;
+                        const beat = evt.actual != null && evt.estimate != null ? evt.actual > evt.estimate : null;
+                        const miss = evt.actual != null && evt.estimate != null ? evt.actual < evt.estimate : null;
+                        const isPast = evt.daysUntil < 0;
+                        const y = evt.date.getFullYear();
+                        const m = String(evt.date.getMonth() + 1).padStart(2, "0");
+                        const d = String(evt.date.getDate()).padStart(2, "0");
+                        const dayName = ["일","월","화","수","목","금","토"][evt.date.getDay()];
+
+                        return (
+                          <div key={`${evt.event}-${y}${m}${d}-${i}`} style={{
+                            display: "grid", gridTemplateColumns: "90px 1fr 60px 60px 60px",
+                            gap: "6px", alignItems: "center",
+                            padding: "9px 8px",
+                            opacity: isPast ? 0.65 : 1,
+                            borderBottom: i < showEvents.length - 1 ? `1px solid ${C.border}10` : "none",
+                            background: evt.status === "오늘" ? `${C.red}08` : "transparent",
+                            borderRadius: evt.status === "오늘" ? "8px" : "0",
+                            transition: "background .15s",
+                          }}
+                          onMouseEnter={e => { if (evt.status !== "오늘") e.currentTarget.style.background = `${C.card2}80`; }}
+                          onMouseLeave={e => { if (evt.status !== "오늘") e.currentTarget.style.background = "transparent"; }}>
+                            {/* 날짜: YYYY.MM.DD (요일) */}
+                            <div style={{ flexShrink: 0 }}>
+                              <div style={{ fontSize: "12px", fontWeight: 700, color: C.text1, fontVariantNumeric: "tabular-nums" }}>
+                                {y}.{m}.{d}
+                              </div>
+                              <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "1px" }}>
+                                <span style={{ fontSize: "10px", color: C.text3 }}>{dayName}요일</span>
+                                <span style={{
+                                  fontSize: "8px", fontWeight: 700, padding: "1px 4px", borderRadius: "3px",
+                                  background: evt.status === "오늘" ? C.redBg : evt.status === "임박" ? C.yellowBg : evt.status === "예정" ? C.blueBg : C.card2,
+                                  color: evt.status === "오늘" ? C.red : evt.status === "임박" ? C.yellow : evt.status === "예정" ? C.blue : C.text3,
+                                }}>{evt.status}</span>
+                              </div>
+                            </div>
+
+                            {/* 이벤트명 + 아이콘 */}
+                            <div style={{ minWidth: 0, overflow: "hidden" }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                                <span style={{ fontSize: "13px", flexShrink: 0 }}>{evt.icon}</span>
+                                <span style={{
+                                  fontWeight: 600, fontSize: "12px", color: C.text1,
+                                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                                }}>{evt.name}</span>
+                              </div>
+                              {evt.daysUntil > 0 && (
+                                <div style={{ fontSize: "10px", color: C.text3, marginTop: "1px" }}>{evt.daysUntil}일 후</div>
+                              )}
+                            </div>
+
+                            {/* 실제 */}
+                            <div style={{ textAlign: "right" }}>
+                              {evt.actual != null ? (
+                                <div style={{
+                                  fontSize: "12px", fontWeight: 700, fontVariantNumeric: "tabular-nums",
+                                  color: beat ? C.green : miss ? C.red : C.text1,
+                                }}>
+                                  {evt.actual}{evt.unit}
+                                  {beat && <span style={{ fontSize: "9px", marginLeft: "1px" }}>▲</span>}
+                                  {miss && <span style={{ fontSize: "9px", marginLeft: "1px" }}>▼</span>}
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: "11px", color: C.text3 }}>—</span>
+                              )}
+                            </div>
+
+                            {/* 예상 */}
+                            <div style={{ textAlign: "right" }}>
+                              {evt.estimate != null ? (
+                                <span style={{ fontSize: "12px", color: C.text2, fontVariantNumeric: "tabular-nums" }}>
+                                  {evt.estimate}{evt.unit}
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: "11px", color: C.text3 }}>—</span>
+                              )}
+                            </div>
+
+                            {/* 이전 */}
+                            <div style={{ textAlign: "right" }}>
+                              {evt.previous != null ? (
+                                <span style={{ fontSize: "12px", color: C.text3, fontVariantNumeric: "tabular-nums" }}>
+                                  {evt.previous}{evt.unit}
+                                </span>
+                              ) : (
+                                <span style={{ fontSize: "11px", color: C.text3 }}>—</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    {showEvents.map((evt, i) => {
-                      const statusColor = evt.status === "오늘" ? C.red : evt.status === "임박" ? C.yellow : evt.status === "완료" || evt.status === "어제" ? C.text3 : C.text2;
-                      const isFuture = evt.daysUntil >= 0;
-                      const beat = evt.actual != null && evt.estimate != null ? evt.actual > evt.estimate : null;
-                      const miss = evt.actual != null && evt.estimate != null ? evt.actual < evt.estimate : null;
-                      return (
-                        <div key={`${evt.event}-${evt.date}-${i}`} style={{
-                          display: "flex", alignItems: "flex-start", gap: "10px",
-                          padding: "9px 4px",
-                          opacity: evt.daysUntil < -1 ? 0.7 : 1,
-                          borderBottom: i < showEvents.length - 1 ? `1px solid ${C.border}08` : "none",
-                          background: evt.status === "오늘" ? `${C.red}06` : "transparent",
-                          borderRadius: evt.status === "오늘" ? "8px" : "0",
-                        }}>
-                          <div style={{ width: "36px", textAlign: "center", flexShrink: 0, paddingTop: "2px" }}>
-                            <div style={{ fontSize: "16px", fontWeight: 800, color: C.text1, lineHeight: 1 }}>{evt.date.getDate()}</div>
-                            <div style={{ fontSize: "9px", color: C.text3 }}>{["일","월","화","수","목","금","토"][evt.date.getDay()]}</div>
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: "5px", flexWrap: "wrap" }}>
-                              <span style={{ fontSize: "13px" }}>{evt.icon}</span>
-                              <span style={{ fontWeight: 600, fontSize: "13px", color: C.text1 }}>{evt.name}</span>
-                              <span style={{
-                                fontSize: "9px", fontWeight: 700, padding: "1px 5px", borderRadius: "3px",
-                                background: evt.status === "오늘" ? C.redBg : evt.status === "임박" ? C.yellowBg : C.card2,
-                                color: statusColor,
-                              }}>{evt.status}</span>
-                            </div>
-                            {/* 실제/예상/이전 수치 */}
-                            <div style={{ display: "flex", gap: "10px", marginTop: "4px", fontSize: "11px", flexWrap: "wrap" }}>
-                              {evt.actual != null && (
-                                <span style={{ color: beat ? C.green : miss ? C.red : C.text1, fontWeight: 700 }}>
-                                  실제 {evt.actual}{evt.unit} {beat ? "▲" : miss ? "▼" : ""}
-                                </span>
-                              )}
-                              {evt.estimate != null && (
-                                <span style={{ color: C.text3 }}>예상 {evt.estimate}{evt.unit}</span>
-                              )}
-                              {evt.previous != null && (
-                                <span style={{ color: C.text3 }}>이전 {evt.previous}{evt.unit}</span>
-                              )}
-                              {evt.actual == null && evt.estimate == null && isFuture && (
-                                <span style={{ color: C.text3 }}>{evt.daysUntil === 0 ? "오늘 발표" : `${evt.daysUntil}일 후`}</span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+
+                  {/* 요약 바 */}
+                  {filtered.length > 6 && !econExpanded && (
+                    <div style={{ textAlign: "center", paddingTop: "8px" }}>
+                      <button onClick={() => setEconExpanded(true)} style={{
+                        background: C.card2, border: "none", borderRadius: "8px", padding: "6px 16px",
+                        fontSize: "11px", fontWeight: 600, color: C.text2, cursor: "pointer",
+                      }}>+ {filtered.length - 6}개 더 보기</button>
+                    </div>
+                  )}
                 </div>
               );
             })()}
