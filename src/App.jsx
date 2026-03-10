@@ -2588,6 +2588,7 @@ function AppInner() {
         position: "sticky", top: 0, zIndex: 100,
         background: `${C.bg}f0`, backdropFilter: "blur(12px)",
         borderBottom: `1px solid ${C.border}`,
+        paddingTop: "env(safe-area-inset-top, 0px)",
       }}>
         <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "56px" }}>
           <div onClick={() => { setTab("home"); setMenuOpen(false); }} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}
