@@ -1537,6 +1537,7 @@ export default function App() {
   const [fearGreed, setFearGreed] = useState({ stock: null, crypto: null });
   const [extendedHours, setExtendedHours] = useState({});
   const [sectorPerf, setSectorPerf] = useState([]);
+  const [econEvents, setEconEvents] = useState([]);
 
   // ── 스크리너 상태 ─────────────────────────────────────────────
   const [results, setResults]         = useState([]);
@@ -1791,10 +1792,58 @@ export default function App() {
     setMarketLoading(false);
   }, [marketLoading]);
 
+  // ── 경제 캘린더 (주요 이벤트) ──
+  const fetchEconCalendar = useCallback(async () => {
+    // 정적 주요 이벤트 + API 연동
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth(); // 0-indexed
+    // FOMC, CPI, GDP 등 주요 일정 (2026년 기준, 일반적 패턴)
+    const majorEvents = [
+      // FOMC meetings (typically every 6 weeks)
+      { type: "FOMC", name: "FOMC 금리결정", icon: "🏛️", importance: "high",
+        dates: [[0,28],[2,18],[4,6],[5,17],[7,29],[8,17],[10,4],[11,16]] },
+      // CPI (typically 2nd week of month)
+      { type: "CPI", name: "CPI 소비자물가", icon: "📊", importance: "high",
+        dates: [[0,14],[1,12],[2,12],[3,10],[4,13],[5,11],[6,15],[7,12],[8,10],[9,14],[10,12],[11,10]] },
+      // 고용지표 (1st Friday of month)
+      { type: "NFP", name: "비농업 고용지표", icon: "👷", importance: "high",
+        dates: [[0,2],[1,6],[2,6],[3,3],[4,1],[5,5],[6,3],[7,7],[8,4],[9,2],[10,6],[11,4]] },
+      // GDP
+      { type: "GDP", name: "GDP 성장률", icon: "📈", importance: "medium",
+        dates: [[0,29],[3,29],[6,30],[9,29]] },
+      // PCE (Fed's preferred inflation measure)
+      { type: "PCE", name: "PCE 물가지수", icon: "💰", importance: "high",
+        dates: [[0,31],[1,28],[2,28],[3,30],[4,30],[5,27],[6,31],[7,29],[8,26],[9,31],[10,26],[11,23]] },
+      // 소매판매
+      { type: "RETAIL", name: "소매판매", icon: "🛍️", importance: "medium",
+        dates: [[0,16],[1,14],[2,17],[3,16],[4,15],[5,17],[6,16],[7,15],[8,16],[9,16],[10,14],[11,16]] },
+    ];
+
+    const upcoming = [];
+    for (const evt of majorEvents) {
+      for (const [m, d] of evt.dates) {
+        if (m < month - 1 || (m === month - 1 && d < now.getDate())) continue; // skip past
+        const eventDate = new Date(year, m, d);
+        const diff = Math.floor((eventDate - now) / (1000 * 60 * 60 * 24));
+        if (diff >= -1 && diff <= 30) {
+          upcoming.push({
+            ...evt, date: eventDate, daysUntil: diff,
+            dateStr: `${m + 1}/${d}`,
+            status: diff < 0 ? "완료" : diff === 0 ? "오늘" : diff <= 3 ? "임박" : "예정",
+          });
+        }
+      }
+    }
+    upcoming.sort((a, b) => a.date - b.date);
+    setEconEvents(upcoming.slice(0, 8));
+  }, []);
+
   // 홈 탭 진입 시 즉시 로드 + 30초 간격 자동 갱신
   useEffect(() => {
     if (tab !== "home") return;
     if (marketIndices.length === 0) fetchMarketOverview();
+    fetchEconCalendar();
     const iv = setInterval(() => { fetchMarketOverview(); }, 30000);
     return () => clearInterval(iv);
   }, [tab]);
@@ -2240,12 +2289,24 @@ export default function App() {
             </div>
 
             {/* 관심종목 */}
-            {watchlist.length > 0 && (
+            {(
               <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px", marginBottom: "16px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
                   <div style={{ fontWeight: 700, fontSize: "16px" }}>⭐ 관심종목</div>
                   <span style={{ fontSize: "11px", color: C.text3 }}>{watchlist.length}개</span>
                 </div>
+                <div style={{ marginBottom: "10px" }}>
+                  <SearchBar placeholder="종목 검색하여 관심종목 추가..." onSelect={(asset) => {
+                    if (!watchlist.some(w => w.symbol === asset.symbol)) {
+                      setWatchlist(prev => [...prev, { symbol: asset.symbol, name: asset.name, market: asset.market, symbolRaw: asset.symbolRaw || asset.symbol, id: asset.id }]);
+                    }
+                  }} />
+                </div>
+                {watchlist.length === 0 && (
+                  <div style={{ textAlign: "center", padding: "14px", color: C.text3, fontSize: "12px" }}>
+                    위 검색창에서 종목을 검색하여 관심종목을 추가하세요
+                  </div>
+                )}
                 <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                   {watchlist.map(w => {
                     const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
@@ -2259,21 +2320,84 @@ export default function App() {
                         }}
                         onMouseEnter={e => e.currentTarget.style.background = C.card2}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
                           <span style={{ fontSize: "12px" }}>{flag}</span>
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: "13px", color: C.text1 }}>{w.name || w.symbol}</div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: "13px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.name || w.symbol}</div>
                             <div style={{ fontSize: "10px", color: C.text3 }}>{w.symbol.replace(".KS","")}</div>
                           </div>
                         </div>
-                        {hot && (
-                          <div style={{ textAlign: "right" }}>
-                            <div style={{ fontWeight: 600, fontSize: "13px", color: C.text1 }}>{fmtPrice(hot.price, w.market)}</div>
-                            <div style={{ fontSize: "11px", fontWeight: 600, color: hot.change >= 0 ? C.green : C.red }}>
-                              {hot.change >= 0 ? "▲" : "▼"} {Math.abs(hot.change)}%
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          {hot && (
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontWeight: 600, fontSize: "13px", color: C.text1 }}>{fmtPrice(hot.price, w.market)}</div>
+                              <div style={{ fontSize: "11px", fontWeight: 600, color: hot.change >= 0 ? C.green : C.red }}>
+                                {hot.change >= 0 ? "▲" : "▼"} {Math.abs(hot.change)}%
+                              </div>
                             </div>
+                          )}
+                          <button onClick={(e) => { e.stopPropagation(); setWatchlist(prev => prev.filter(x => x.symbol !== w.symbol)); }}
+                            style={{
+                              width: "24px", height: "24px", borderRadius: "6px", border: "none",
+                              background: C.card2, color: C.text3, fontSize: "11px", cursor: "pointer",
+                              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                            }}>✕</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 경제 캘린더 */}
+            {econEvents.length > 0 && (
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px", marginBottom: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "16px" }}>📅 경제 캘린더</div>
+                  <span style={{ fontSize: "10px", color: C.text3, background: C.card2, padding: "3px 8px", borderRadius: "6px" }}>주요 이벤트</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {econEvents.map((evt, i) => {
+                    const statusColor = evt.status === "오늘" ? C.red : evt.status === "임박" ? C.yellow : evt.status === "완료" ? C.text3 : C.text2;
+                    const statusBg = evt.status === "오늘" ? C.redBg : evt.status === "임박" ? C.yellowBg : C.card2;
+                    const importanceColor = evt.importance === "high" ? C.red : C.yellow;
+                    return (
+                      <div key={`${evt.type}-${i}`} style={{
+                        display: "flex", alignItems: "center", gap: "12px",
+                        padding: "10px 14px", borderRadius: "10px",
+                        background: evt.status === "오늘" ? `${C.red}08` : "transparent",
+                        border: evt.status === "오늘" ? `1px solid ${C.red}22` : "1px solid transparent",
+                      }}>
+                        <div style={{
+                          width: "40px", textAlign: "center", flexShrink: 0,
+                        }}>
+                          <div style={{ fontSize: "10px", color: C.text3, fontWeight: 600 }}>{evt.date.toLocaleDateString("ko-KR", { month: "short" })}</div>
+                          <div style={{ fontSize: "18px", fontWeight: 800, color: C.text1 }}>{evt.date.getDate()}</div>
+                          <div style={{ fontSize: "9px", color: C.text3 }}>{["일","월","화","수","목","금","토"][evt.date.getDay()]}</div>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
+                            <span style={{ fontSize: "14px" }}>{evt.icon}</span>
+                            <span style={{ fontWeight: 600, fontSize: "13px", color: C.text1 }}>{evt.name}</span>
+                            {evt.importance === "high" && (
+                              <span style={{ fontSize: "8px", fontWeight: 700, padding: "1px 5px", borderRadius: "3px", background: `${importanceColor}18`, color: importanceColor }}>중요</span>
+                            )}
                           </div>
-                        )}
+                          <div style={{ fontSize: "11px", color: C.text3 }}>
+                            {evt.daysUntil === 0 ? "오늘 발표" : evt.daysUntil < 0 ? "발표 완료" : `${evt.daysUntil}일 후`}
+                            {evt.type === "FOMC" && " · 금리 방향 결정"}
+                            {evt.type === "CPI" && " · 인플레이션 지표"}
+                            {evt.type === "NFP" && " · 고용시장 건강도"}
+                            {evt.type === "GDP" && " · 경제성장 속도"}
+                            {evt.type === "PCE" && " · 연준 선호 물가지표"}
+                            {evt.type === "RETAIL" && " · 소비지출 동향"}
+                          </div>
+                        </div>
+                        <span style={{
+                          fontSize: "10px", fontWeight: 700, padding: "3px 8px", borderRadius: "6px",
+                          background: statusBg, color: statusColor, whiteSpace: "nowrap", flexShrink: 0,
+                        }}>{evt.status}</span>
                       </div>
                     );
                   })}
