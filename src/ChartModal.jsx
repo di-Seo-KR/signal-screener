@@ -344,6 +344,33 @@ function runDiagnosis(candles) {
   else if (totalScore >= 30) { verdict = "매도 우위"; summary = "하락 신호가 다수 감지됩니다. 포지션 축소 또는 손절을 고려하세요."; }
   else { verdict = "적극 매도"; summary = "강한 하락 신호가 감지됩니다. 빠른 대응이 필요할 수 있습니다."; }
 
+  // ── 적정가치 추정 (기술적 분석 기반) ──
+  let fairValue = null;
+  let fairValueMethod = "";
+  if (n >= 50) {
+    // Method: Weighted average of key support/resistance levels
+    const sma50Val = sma50 || sma20;
+    const sma200Val = sma200 || sma50Val;
+    const bbMid = bb ? bb.middle : sma20;
+
+    // Fair value = weighted blend of MA levels & BB midline
+    fairValue = (sma20 * 0.25 + sma50Val * 0.30 + sma200Val * 0.25 + bbMid * 0.20);
+    fairValueMethod = "이동평균 & 볼린저밴드 기반";
+
+    // Adjust: if strong trend, weight recent price more
+    if (trendScore >= 70) {
+      fairValue = fairValue * 0.7 + last * 0.3;
+      fairValueMethod += " (상승 추세 반영)";
+    } else if (trendScore <= 30) {
+      fairValue = fairValue * 0.7 + last * 0.3;
+      fairValueMethod += " (하락 추세 반영)";
+    }
+
+    const premium = ((last - fairValue) / fairValue) * 100;
+    if (premium > 15) signals.push({ type: "bearish", name: "적정가치 대비 고평가", detail: `현재가가 적정가치 대비 ${premium.toFixed(1)}% 높음` });
+    else if (premium < -15) signals.push({ type: "bullish", name: "적정가치 대비 저평가", detail: `현재가가 적정가치 대비 ${Math.abs(premium).toFixed(1)}% 낮음` });
+  }
+
   return {
     score: totalScore,
     verdict,
@@ -357,6 +384,9 @@ function runDiagnosis(candles) {
       { name: "단기추세", icon: "\uD83D\uDD25", score: Math.round(Math.max(0, Math.min(100, 50 + change5 * 5))), detail: `5일 변화 ${change5.toFixed(2)}%` },
     ],
     signals,
+    fairValue,
+    fairValueMethod,
+    currentPrice: last,
     rsi, macdVal, volRatio, pos52, fromHigh, change5, change20,
   };
 }
@@ -383,6 +413,9 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
   const [liveChange, setLiveChange] = useState(null);
   const [liveConnected, setLiveConnected] = useState(false);
   const [diagData, setDiagData] = useState(null);
+  const [logScale, setLogScale] = useState(false);
+  const [currentRSI, setCurrentRSI] = useState(null);
+  const [showDiagnosis, setShowDiagnosis] = useState(false);
 
   // ── Customizable indicator settings ──
   const [settings, setSettings] = useState(() => {
@@ -478,6 +511,11 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
     const mainChart = createChart(mainRef.current, makeChartOptions(mainH, containerW, tf, CC));
     chartObjs.current.main = mainChart;
 
+    // Apply log scale if enabled
+    if (logScale) {
+      mainChart.priceScale('right').applyOptions({ mode: 1 }); // Logarithmic
+    }
+
     const candleSeries = mainChart.addCandlestickSeries({
       upColor: "#26a64b", downColor: "#ef4444",
       borderUpColor: "#26a64b", borderDownColor: "#ef4444",
@@ -563,6 +601,9 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       const rsiChart = createChart(rsiRef.current, makeChartOptions(subH, containerW, tf, CC));
       chartObjs.current.rsi = rsiChart;
       const rsi = calcRSI(closes, rsiPeriod);
+      // Store the current RSI value
+      const lastRSI = rsi.filter(v => v != null).pop();
+      setCurrentRSI(lastRSI);
       const rsiSeries = rsiChart.addLineSeries({ color: "#f472b6", lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
       rsiSeries.setData(rsi.map((v, i) => v != null ? { time: times[i], value: v } : null).filter(Boolean));
       [70, 30].forEach(lvl => {
@@ -614,7 +655,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         });
       }
     });
-  }, [fetchData, settings]);
+  }, [fetchData, settings, logScale]);
 
   useEffect(() => {
     if (!asset) return;
@@ -623,7 +664,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       clearTimeout(timer);
       Object.values(chartObjs.current).forEach(c => { try { c.remove(); } catch {} });
     };
-  }, [asset, timeframe, settings, showKRW, theme]);
+  }, [asset, timeframe, settings, showKRW, theme, logScale]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -850,6 +891,17 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
           })}
         </div>
 
+        {/* Log scale toggle button */}
+        <div style={{ display: "flex", gap: "4px", marginBottom: "8px", flexWrap: "wrap" }}>
+          <button onClick={() => setLogScale(p => !p)} style={{
+            padding: "5px 10px", borderRadius: "8px", fontSize: "12px", cursor: "pointer", fontWeight: 600,
+            background: logScale ? `${CC.yellow}22` : CC.card,
+            color: logScale ? CC.yellow : CC.text3,
+            border: `1px solid ${logScale ? CC.yellow : CC.border}`,
+            marginLeft: "4px",
+          }}>📐 로그</button>
+        </div>
+
         {/* Indicator quick toggles + settings gear */}
         <div style={{ display: "flex", gap: "5px", marginBottom: showSettings ? "0px" : "12px", flexWrap: "wrap", alignItems: "center" }}>
           {(settings.maList || []).map((ma, idx) => (
@@ -1015,10 +1067,19 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
             <>
               <div style={{
                 color: "#f472b6", fontSize: "11px", fontWeight: 600, padding: "8px 0 4px 4px",
-                display: "flex", alignItems: "center", gap: "6px",
+                display: "flex", alignItems: "center", gap: "6px", justifyContent: "space-between",
               }}>
-                <span style={{ width: "10px", height: "3px", background: "#f472b6", borderRadius: "2px", display: "inline-block" }} />
-                RSI({settings.rsi?.period || 14})
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ width: "10px", height: "3px", background: "#f472b6", borderRadius: "2px", display: "inline-block" }} />
+                  RSI({settings.rsi?.period || 14})
+                </div>
+                {currentRSI != null && (
+                  <span style={{
+                    fontSize: "13px", fontWeight: 700, padding: "2px 8px", borderRadius: "6px",
+                    background: currentRSI >= 70 ? `${CC.red}22` : currentRSI <= 30 ? `${CC.green}22` : `${CC.text3}22`,
+                    color: currentRSI >= 70 ? CC.red : currentRSI <= 30 ? CC.green : CC.text2,
+                  }}>{currentRSI.toFixed(1)}</span>
+                )}
               </div>
               <div ref={rsiRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden", touchAction: "none" }} />
             </>
@@ -1066,93 +1127,158 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         {/* ── 투자진단 패널 ─────────────────────────────────────── */}
         {!loading && !error && diagData && (
           <div style={{ marginTop: "16px" }}>
-            {/* 종합 점수 */}
-            <div style={{
+            {/* Dropdown toggle */}
+            <button onClick={() => setShowDiagnosis(p => !p)} style={{
+              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
               background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "14px",
-              padding: "18px", marginBottom: "12px",
+              padding: "14px 18px", cursor: "pointer", marginBottom: showDiagnosis ? "12px" : "0",
+              transition: "all 0.2s",
             }}>
-              <div style={{ fontSize: "14px", fontWeight: 700, marginBottom: "14px", display: "flex", alignItems: "center", gap: "8px" }}>
-                <span style={{ fontSize: "18px" }}>{"\uD83E\uDE7A"}</span> 투자진단
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{ fontSize: "18px" }}>🩺</span>
+                <span style={{ fontSize: "14px", fontWeight: 700, color: CC.text1 }}>투자진단</span>
+                <span style={{
+                  fontSize: "12px", fontWeight: 700, padding: "3px 8px", borderRadius: "6px",
+                  background: diagData.score >= 70 ? CC.greenBg : diagData.score >= 40 ? CC.yellowBg : CC.redBg,
+                  color: diagData.score >= 70 ? CC.green : diagData.score >= 40 ? CC.yellow : CC.red,
+                }}>{diagData.score}점 · {diagData.verdict}</span>
               </div>
-              {/* Score gauge */}
-              <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "16px" }}>
-                <div style={{ position: "relative", width: "80px", height: "80px", flexShrink: 0 }}>
-                  <svg viewBox="0 0 80 80" width="80" height="80">
-                    <circle cx="40" cy="40" r="34" fill="none" stroke={CC.border} strokeWidth="7" />
-                    <circle cx="40" cy="40" r="34" fill="none"
-                      stroke={diagData.score >= 70 ? CC.green : diagData.score >= 40 ? CC.yellow : CC.red}
-                      strokeWidth="7" strokeLinecap="round"
-                      strokeDasharray={`${(diagData.score / 100) * 213.6} 213.6`}
-                      transform="rotate(-90 40 40)"
-                      style={{ transition: "stroke-dasharray 0.8s ease" }}
-                    />
-                    <text x="40" y="37" textAnchor="middle" fill={CC.text1} fontSize="18" fontWeight="800">{diagData.score}</text>
-                    <text x="40" y="50" textAnchor="middle" fill={CC.text3} fontSize="9">/100</text>
-                  </svg>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{
-                    fontSize: "16px", fontWeight: 800, marginBottom: "4px",
-                    color: diagData.score >= 70 ? CC.green : diagData.score >= 40 ? CC.yellow : CC.red,
-                  }}>{diagData.verdict}</div>
-                  <div style={{ fontSize: "12px", color: CC.text2, lineHeight: "1.5" }}>{diagData.summary}</div>
-                </div>
-              </div>
+              <span style={{
+                fontSize: "14px", color: CC.text3,
+                transform: showDiagnosis ? "rotate(180deg)" : "rotate(0deg)",
+                transition: "transform 0.2s",
+              }}>▼</span>
+            </button>
 
-              {/* Category scores */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                {diagData.categories.map(cat => (
-                  <div key={cat.name} style={{
-                    background: CC.bg, borderRadius: "10px", padding: "10px 12px",
-                    border: `1px solid ${CC.border}`,
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                      <span style={{ fontSize: "11px", color: CC.text3, fontWeight: 600 }}>{cat.icon} {cat.name}</span>
-                      <span style={{
-                        fontSize: "13px", fontWeight: 700,
-                        color: cat.score >= 70 ? CC.green : cat.score >= 40 ? CC.yellow : CC.red,
-                      }}>{cat.score}</span>
+            {showDiagnosis && (
+              <>
+                {/* 종합 점수 */}
+                <div style={{
+                  background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "14px",
+                  padding: "18px", marginBottom: "12px",
+                  borderTop: "none", borderTopLeftRadius: "0", borderTopRightRadius: "0",
+                }}>
+                  {/* Score gauge */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "16px" }}>
+                    <div style={{ position: "relative", width: "80px", height: "80px", flexShrink: 0 }}>
+                      <svg viewBox="0 0 80 80" width="80" height="80">
+                        <circle cx="40" cy="40" r="34" fill="none" stroke={CC.border} strokeWidth="7" />
+                        <circle cx="40" cy="40" r="34" fill="none"
+                          stroke={diagData.score >= 70 ? CC.green : diagData.score >= 40 ? CC.yellow : CC.red}
+                          strokeWidth="7" strokeLinecap="round"
+                          strokeDasharray={`${(diagData.score / 100) * 213.6} 213.6`}
+                          transform="rotate(-90 40 40)"
+                          style={{ transition: "stroke-dasharray 0.8s ease" }}
+                        />
+                        <text x="40" y="37" textAnchor="middle" fill={CC.text1} fontSize="18" fontWeight="800">{diagData.score}</text>
+                        <text x="40" y="50" textAnchor="middle" fill={CC.text3} fontSize="9">/100</text>
+                      </svg>
                     </div>
-                    <div style={{
-                      height: "4px", background: CC.border, borderRadius: "2px", overflow: "hidden",
-                    }}>
+                    <div style={{ flex: 1 }}>
                       <div style={{
-                        height: "100%", borderRadius: "2px", transition: "width 0.6s ease",
-                        width: `${cat.score}%`,
-                        background: cat.score >= 70 ? CC.green : cat.score >= 40 ? CC.yellow : CC.red,
-                      }} />
+                        fontSize: "16px", fontWeight: 800, marginBottom: "4px",
+                        color: diagData.score >= 70 ? CC.green : diagData.score >= 40 ? CC.yellow : CC.red,
+                      }}>{diagData.verdict}</div>
+                      <div style={{ fontSize: "12px", color: CC.text2, lineHeight: "1.5" }}>{diagData.summary}</div>
                     </div>
-                    <div style={{ fontSize: "10px", color: CC.text3, marginTop: "4px" }}>{cat.detail}</div>
                   </div>
-                ))}
-              </div>
-            </div>
 
-            {/* 상세 시그널 목록 */}
-            {diagData.signals.length > 0 && (
-              <div style={{
-                background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "14px",
-                padding: "16px", marginBottom: "12px",
-              }}>
-                <div style={{ fontSize: "13px", fontWeight: 700, marginBottom: "10px" }}>{"\uD83D\uDCCB"} 감지된 시그널</div>
-                {diagData.signals.map((sig, i) => (
-                  <div key={i} style={{
-                    display: "flex", alignItems: "flex-start", gap: "10px",
-                    padding: "8px 0", borderBottom: i < diagData.signals.length - 1 ? `1px solid ${CC.border}` : "none",
-                  }}>
-                    <span style={{
-                      fontSize: "9px", fontWeight: 700, padding: "3px 7px", borderRadius: "5px",
-                      flexShrink: 0, marginTop: "2px",
-                      background: sig.type === "bullish" ? CC.greenBg : sig.type === "bearish" ? CC.redBg : CC.yellowBg,
-                      color: sig.type === "bullish" ? CC.green : sig.type === "bearish" ? CC.red : CC.yellow,
-                    }}>{sig.type === "bullish" ? "매수" : sig.type === "bearish" ? "매도" : "중립"}</span>
-                    <div>
-                      <div style={{ fontSize: "12px", fontWeight: 600, color: CC.text1 }}>{sig.name}</div>
-                      <div style={{ fontSize: "11px", color: CC.text3, marginTop: "2px" }}>{sig.detail}</div>
+                  {/* Fair value section */}
+                  {diagData.fairValue != null && (
+                    <div style={{
+                      background: CC.bg, borderRadius: "10px", padding: "12px", marginBottom: "12px",
+                      border: `1px solid ${CC.border}`,
+                    }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                        <span style={{ fontSize: "12px", color: CC.text3, fontWeight: 600 }}>💰 적정가치 추정</span>
+                        <span style={{ fontSize: "9px", color: CC.text3, background: CC.card2, padding: "2px 6px", borderRadius: "4px" }}>{diagData.fairValueMethod}</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                        <div>
+                          <div style={{ fontSize: "11px", color: CC.text3 }}>적정가치</div>
+                          <div style={{ fontSize: "18px", fontWeight: 700, color: CC.text1 }}>{formatPrice(diagData.fairValue)}</div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: "11px", color: CC.text3 }}>현재가 vs 적정가</div>
+                          {(() => {
+                            const premium = diagData.currentPrice && diagData.fairValue
+                              ? ((diagData.currentPrice - diagData.fairValue) / diagData.fairValue) * 100
+                              : 0;
+                            const isOver = premium > 0;
+                            return (
+                              <div style={{
+                                fontSize: "16px", fontWeight: 700,
+                                color: Math.abs(premium) < 5 ? CC.yellow : isOver ? CC.red : CC.green,
+                              }}>
+                                {isOver ? "+" : ""}{premium.toFixed(1)}%
+                                <span style={{ fontSize: "11px", marginLeft: "4px", fontWeight: 500 }}>
+                                  {Math.abs(premium) < 5 ? "적정" : isOver ? "고평가" : "저평가"}
+                                </span>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
                     </div>
+                  )}
+
+                  {/* Category scores */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                    {diagData.categories.map(cat => (
+                      <div key={cat.name} style={{
+                        background: CC.bg, borderRadius: "10px", padding: "10px 12px",
+                        border: `1px solid ${CC.border}`,
+                      }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                          <span style={{ fontSize: "11px", color: CC.text3, fontWeight: 600 }}>{cat.icon} {cat.name}</span>
+                          <span style={{
+                            fontSize: "13px", fontWeight: 700,
+                            color: cat.score >= 70 ? CC.green : cat.score >= 40 ? CC.yellow : CC.red,
+                          }}>{cat.score}</span>
+                        </div>
+                        <div style={{
+                          height: "4px", background: CC.border, borderRadius: "2px", overflow: "hidden",
+                        }}>
+                          <div style={{
+                            height: "100%", borderRadius: "2px", transition: "width 0.6s ease",
+                            width: `${cat.score}%`,
+                            background: cat.score >= 70 ? CC.green : cat.score >= 40 ? CC.yellow : CC.red,
+                          }} />
+                        </div>
+                        <div style={{ fontSize: "10px", color: CC.text3, marginTop: "4px" }}>{cat.detail}</div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </div>
+
+                {/* 상세 시그널 목록 */}
+                {diagData.signals.length > 0 && (
+                  <div style={{
+                    background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "14px",
+                    padding: "16px", marginBottom: "12px",
+                    borderTop: "none", borderTopLeftRadius: "0", borderTopRightRadius: "0",
+                  }}>
+                    <div style={{ fontSize: "13px", fontWeight: 700, marginBottom: "10px" }}>{"\uD83D\uDCCB"} 감지된 시그널</div>
+                    {diagData.signals.map((sig, i) => (
+                      <div key={i} style={{
+                        display: "flex", alignItems: "flex-start", gap: "10px",
+                        padding: "8px 0", borderBottom: i < diagData.signals.length - 1 ? `1px solid ${CC.border}` : "none",
+                      }}>
+                        <span style={{
+                          fontSize: "9px", fontWeight: 700, padding: "3px 7px", borderRadius: "5px",
+                          flexShrink: 0, marginTop: "2px",
+                          background: sig.type === "bullish" ? CC.greenBg : sig.type === "bearish" ? CC.redBg : CC.yellowBg,
+                          color: sig.type === "bullish" ? CC.green : sig.type === "bearish" ? CC.red : CC.yellow,
+                        }}>{sig.type === "bullish" ? "매수" : sig.type === "bearish" ? "매도" : "중립"}</span>
+                        <div>
+                          <div style={{ fontSize: "12px", fontWeight: 600, color: CC.text1 }}>{sig.name}</div>
+                          <div style={{ fontSize: "11px", color: CC.text3, marginTop: "2px" }}>{sig.detail}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

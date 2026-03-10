@@ -1,5 +1,5 @@
-// DI금융 v5.1 — 투자 스크리너 + 퀀트 엔진 + 백테스트
-// Features: 스크리닝, 캔들차트, 24개 전략, 백테스트, 포트폴리오, 뉴스, 텔레그램 알림
+// DI금융 v6.1 — 투자 스크리너 + 퀀트 엔진 + 백테스트
+// Features: 스크리닝, 캔들차트, 28개 전략, 백테스트, 포트폴리오, 뉴스, 텔레그램 알림
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import ChartModal from "./ChartModal.jsx";
 import StrategyPanel from "./StrategyPanel.jsx";
@@ -249,6 +249,23 @@ const KR_ASSETS = [
   // ── IT서비스 ──
   { symbol: "018260.KS", name: "삼성SDS" }, { symbol: "034220.KS", name: "LG디스플레이" },
   { symbol: "377300.KS", name: "카카오페이" }, { symbol: "323410.KS", name: "카카오뱅크" },
+  // ── 코스닥 주요 ──
+  { symbol: "086520.KQ", name: "에코프로" }, { symbol: "403870.KQ", name: "HPSP" },
+  { symbol: "240810.KQ", name: "원익IPS" }, { symbol: "357780.KQ", name: "솔브레인" },
+  { symbol: "196170.KQ", name: "알테오젠" }, { symbol: "140860.KQ", name: "파크시스템스" },
+  { symbol: "298380.KQ", name: "에이비엘바이오" }, { symbol: "039030.KQ", name: "이오테크닉스" },
+  { symbol: "067160.KQ", name: "아프리카TV" }, { symbol: "005290.KQ", name: "동진쎄미켐" },
+  // ── 추가 코스피 대형주 ──
+  { symbol: "003550.KS", name: "LG" }, { symbol: "033780.KS", name: "KT&G" },
+  { symbol: "015760.KS", name: "한국전력" }, { symbol: "034020.KS", name: "두산에너빌리티" },
+  { symbol: "011200.KS", name: "HMM" }, { symbol: "003490.KS", name: "대한항공" },
+  { symbol: "180640.KS", name: "한진칼" }, { symbol: "090430.KS", name: "아모레퍼시픽" },
+  { symbol: "021240.KS", name: "코웨이" }, { symbol: "016360.KS", name: "삼성증권" },
+  { symbol: "006800.KS", name: "미래에셋증권" }, { symbol: "030000.KS", name: "제일기획" },
+  { symbol: "047050.KS", name: "포스코인터내셔널" }, { symbol: "000100.KS", name: "유한양행" },
+  { symbol: "009830.KS", name: "한화솔루션" }, { symbol: "267250.KS", name: "HD현대" },
+  { symbol: "042660.KS", name: "한화오션" }, { symbol: "000880.KS", name: "한화" },
+  { symbol: "010140.KS", name: "삼성중공업" }, { symbol: "011790.KS", name: "SKC" },
 ];
 
 const CRYPTO_ASSETS = [
@@ -1049,7 +1066,9 @@ export default function App() {
   const [marketIndices, setMarketIndices] = useState([]);
   const [marketLoading, setMarketLoading] = useState(false);
   const [hotAssets, setHotAssets] = useState([]);
+  const [dailyPicks, setDailyPicks] = useState([]);
   const [fearGreed, setFearGreed] = useState({ stock: null, crypto: null });
+  const [extendedHours, setExtendedHours] = useState({});
 
   // ── 스크리너 상태 ─────────────────────────────────────────────
   const [results, setResults]         = useState([]);
@@ -1194,6 +1213,76 @@ export default function App() {
       } catch {}
     }
     setFearGreed(fgData);
+
+    // ── 장외(프리/포스트마켓) 가격 ──
+    const extSyms = ["NVDA","AAPL","TSLA","MSFT","GOOGL","AMZN"].join(",");
+    const extResults = {};
+    try {
+      const er = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(extSyms)}&interval=1m&range=1d`);
+      if (er.ok) {
+        const eBatch = (await er.json()).results || {};
+        for (const [sym, data] of Object.entries(eBatch)) {
+          if (data?.closes?.length) {
+            const lastPrice = data.closes[data.closes.length - 1];
+            // Check if market is closed (timestamps analysis)
+            const lastTs = data.timestamps?.[data.timestamps.length - 1];
+            if (lastTs) {
+              const lastDate = new Date(lastTs * 1000);
+              const hour = lastDate.getUTCHours() - 5; // EST
+              const isExtended = hour < 9.5 || hour >= 16;
+              if (isExtended) {
+                extResults[sym] = { price: lastPrice, isPreMarket: hour < 9.5, isPostMarket: hour >= 16 };
+              }
+            }
+          }
+        }
+      }
+    } catch {}
+    setExtendedHours(extResults);
+
+    // ── 오늘의 종목 추천 ──
+    const pickSymbols = [
+      "NVDA","AAPL","TSLA","MSFT","GOOGL","AMZN","META","AMD","AVGO","COIN",
+      "005930.KS","000660.KS","035420.KS","068270.KS",
+    ].join(",");
+    const picks = [];
+    try {
+      const pr = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(pickSymbols)}&interval=1d&range=1mo`);
+      if (pr.ok) {
+        const pBatch = (await pr.json()).results || {};
+        for (const [sym, data] of Object.entries(pBatch)) {
+          if (!data?.closes?.length || data.closes.length < 10) continue;
+          const closes = data.closes;
+          const n = closes.length;
+          const last = closes[n - 1];
+          const prev = closes[n - 2];
+          const change1d = ((last - prev) / prev) * 100;
+          // Simple scoring: RSI-like + trend
+          const change5d = n >= 5 ? ((last - closes[n - 5]) / closes[n - 5]) * 100 : 0;
+          const sma10 = closes.slice(-10).reduce((a, b) => a + b, 0) / 10;
+          const sma20 = closes.slice(-20).reduce((a, b) => a + b, 0) / Math.min(20, n);
+          let score = 0;
+          if (last > sma10) score += 2;
+          if (last > sma20) score += 2;
+          if (change5d > 0 && change5d < 8) score += 3; // healthy uptrend
+          if (change1d > -2 && change1d < 5) score += 1; // not too volatile today
+          if (sma10 > sma20) score += 2; // short-term trend up
+          const isKR = sym.includes(".KS");
+          const assetInfo = [...US_ASSETS, ...KR_ASSETS].find(a => a.symbol === sym);
+          if (!assetInfo) continue;
+          picks.push({
+            symbol: sym, name: assetInfo.name,
+            market: isKR ? "kr" : "us",
+            symbolRaw: sym,
+            price: last, change: +change1d.toFixed(2),
+            score, change5d: +change5d.toFixed(2),
+            reason: score >= 7 ? "강한 상승 추세" : score >= 5 ? "긍정적 모멘텀" : score >= 3 ? "관심 구간" : "모니터링",
+          });
+        }
+      }
+    } catch {}
+    picks.sort((a, b) => b.score - a.score);
+    setDailyPicks(picks.slice(0, 6));
 
     setMarketLoading(false);
   }, [marketLoading]);
@@ -1654,6 +1743,58 @@ export default function App() {
               </div>
             )}
 
+            {/* 오늘의 추천 종목 */}
+            {dailyPicks.length > 0 && (
+              <div style={{ background: `linear-gradient(135deg, ${C.card}, ${C.isDark ? "#0d1f35" : "#e8f0fe"})`, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px", marginBottom: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "16px" }}>⭐ 오늘의 추천</div>
+                  <span style={{ fontSize: "10px", color: C.text3, background: C.card2, padding: "3px 8px", borderRadius: "6px" }}>기술적 분석 기반</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                  {dailyPicks.map((pick, i) => {
+                    const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
+                    const isPos = pick.change >= 0;
+                    return (
+                      <div key={pick.symbol} onClick={() => setChartAsset(pick)}
+                        style={{
+                          background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px",
+                          padding: "12px", cursor: "pointer", transition: "all .15s",
+                          position: "relative", overflow: "hidden",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = C.blue; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = "translateY(0)"; }}>
+                        {i < 3 && (
+                          <div style={{
+                            position: "absolute", top: "0", right: "0",
+                            background: i === 0 ? C.yellow : i === 1 ? C.text3 : "#CD7F32",
+                            color: "#fff", fontSize: "9px", fontWeight: 700, padding: "2px 6px",
+                            borderRadius: "0 12px 0 8px",
+                          }}>{i + 1}위</div>
+                        )}
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                          <span style={{ fontSize: "12px" }}>{flag}</span>
+                          <div style={{ minWidth: 0, flex: 1, overflow: "hidden" }}>
+                            <div style={{ fontWeight: 600, fontSize: "13px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{pick.name}</div>
+                            <div style={{ fontSize: "10px", color: C.text3 }}>{pick.symbol.replace(".KS","")}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                          <div style={{ fontSize: "12px", fontWeight: 600, color: isPos ? C.green : C.red }}>
+                            {isPos ? "▲" : "▼"}{Math.abs(pick.change)}%
+                          </div>
+                          <span style={{
+                            fontSize: "9px", padding: "2px 6px", borderRadius: "4px", fontWeight: 600,
+                            background: pick.score >= 7 ? C.greenBg : pick.score >= 5 ? C.blueBg : C.yellowBg,
+                            color: pick.score >= 7 ? C.green : pick.score >= 5 ? C.blue : C.yellow,
+                          }}>{pick.reason}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* 인기 종목 */}
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px", marginBottom: "16px" }}>
               <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "14px" }}>🔥 주요 종목</div>
@@ -1695,6 +1836,11 @@ export default function App() {
                           <div style={{ fontSize: "12px", fontWeight: 600, color: isPos ? C.green : C.red }}>
                             {isPos ? "▲" : "▼"} {Math.abs(asset.change)}%
                           </div>
+                          {extendedHours[asset.symbolRaw || asset.symbol] && (
+                            <div style={{ fontSize: "9px", color: C.purple, fontWeight: 600 }}>
+                              {extendedHours[asset.symbolRaw || asset.symbol].isPreMarket ? "🌅 프리" : "🌙 애프터"}
+                            </div>
+                          )}
                         </div>
                       </div>
                     );
@@ -1731,7 +1877,7 @@ export default function App() {
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "10px", marginBottom: "16px" }}>
               {[
                 { icon: "🔍", label: "스크리너", desc: "조건 검색", tab: "screener" },
-                { icon: "🎯", label: "전략", desc: "24개 전략", tab: "strategy" },
+                { icon: "🎯", label: "전략", desc: "28개 전략", tab: "strategy" },
                 { icon: "📊", label: "백테스트", desc: "성과 시뮬레이션", tab: "backtest" },
                 { icon: "📰", label: "뉴스", desc: "투자 뉴스", tab: "news" },
               ].map(item => (
