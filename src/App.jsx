@@ -1186,7 +1186,8 @@ function AssetCard({ asset, onChart }) {
 // 서브 컴포넌트: AssetDetailPopup (종목 상세 팝업 + 투자진단)
 // ════════════════════════════════════════════════════════════════════
 function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHours = {} }) {
-  const diag = useMemo(() => quickDiagnosis(asset), [asset]);
+  const [techData, setTechData] = useState(null);
+  const [loading, setLoading] = useState(true);
   const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
   const mcBg = asset.market === "us" ? "#1A2C4F" : asset.market === "kr" ? "#1A2A1E" : "#1E1A2A";
   const mcColor = asset.market === "us" ? C.blue : asset.market === "kr" ? C.green : C.purple;
@@ -1196,9 +1197,100 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
   const price = asset.price || hot?.price;
   const change = asset.change ?? hot?.change;
   const isPos = (change ?? 0) >= 0;
-
-  // 프리/포스트 마켓
   const ext = extendedHours[asset.symbol];
+
+  // 팝업 열릴 때 기술적 데이터 fetch
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const sym = asset.symbolRaw || asset.symbol;
+        let closes = [], volumes = [], highs = [], lows = [];
+        if (asset.market === "crypto") {
+          const cid = asset.id || asset.symbolRaw || asset.symbol.toLowerCase();
+          const r = await fetch(`/api/coingecko?id=${cid}&days=365`);
+          if (r.ok) {
+            const d = await r.json();
+            closes = (d.prices || []).map(p => p[1]);
+            volumes = (d.total_volumes || []).map(v => v[1]);
+            highs = closes; lows = closes;
+          }
+        } else {
+          const r = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(sym)}&interval=1d&range=1y`);
+          if (r.ok) {
+            const batch = (await r.json()).results || {};
+            const d = batch[sym];
+            if (d) { closes = d.closes || []; volumes = d.volumes || []; highs = d.highs || closes; lows = d.lows || closes; }
+          }
+        }
+        if (cancelled || closes.length < 14) { if (!cancelled) setLoading(false); return; }
+
+        const n = closes.length;
+        const last = closes[n - 1];
+        // RSI(14)
+        let gains = 0, losses = 0;
+        for (let i = n - 14; i < n; i++) {
+          const diff = closes[i] - closes[i - 1];
+          if (diff > 0) gains += diff; else losses -= diff;
+        }
+        const avgGain = gains / 14, avgLoss = losses / 14;
+        const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+        const rsi = +(100 - 100 / (1 + rs)).toFixed(1);
+
+        // MA50, MA200
+        const sma = (arr, p) => arr.length >= p ? arr.slice(-p).reduce((a, b) => a + b, 0) / p : null;
+        const ma50 = sma(closes, 50);
+        const ma200 = sma(closes, 200);
+        const ma200Dist = ma200 ? +((last - ma200) / ma200 * 100).toFixed(1) : null;
+
+        // Volume ratio
+        const recentVol = volumes.length >= 5 ? volumes.slice(-5).reduce((a, b) => a + b, 0) / 5 : 0;
+        const avgVol = volumes.length >= 20 ? volumes.slice(-20).reduce((a, b) => a + b, 0) / 20 : recentVol;
+        const volRatio = avgVol > 0 ? +(recentVol / avgVol).toFixed(2) : 1;
+
+        // Stochastic %K (14,3)
+        const h14 = Math.max(...highs.slice(-14));
+        const l14 = Math.min(...lows.slice(-14));
+        const stochK = h14 !== l14 ? +((last - l14) / (h14 - l14) * 100).toFixed(1) : 50;
+
+        // Williams %R (14)
+        const wr = h14 !== l14 ? +(((h14 - last) / (h14 - l14)) * -100).toFixed(1) : -50;
+
+        // 52주 고저
+        const high52w = Math.max(...highs);
+        const low52w = Math.min(...lows);
+
+        // 적정주가 (Fair Value) — SMA200 + SMA50 + BB중심 가중평균
+        const bb20 = sma(closes, 20);
+        let fairValue = null;
+        if (ma200 && ma50) {
+          fairValue = ma200 * 0.4 + ma50 * 0.35 + (bb20 || ma50) * 0.25;
+        } else if (ma50) {
+          fairValue = ma50;
+        }
+        const fairPremium = fairValue ? +((last - fairValue) / fairValue * 100).toFixed(1) : null;
+
+        // weekChange
+        const wkAgo = n >= 5 ? closes[n - 5] : closes[0];
+        const weekChange = +((last - wkAgo) / wkAgo * 100).toFixed(2);
+
+        if (!cancelled) {
+          setTechData({
+            price: last, rsi, ma50, ma200, ma200Dist, volRatio,
+            stoch: { k: stochK }, wr, high52w, low52w,
+            fairValue, fairPremium, weekChange,
+          });
+          setLoading(false);
+        }
+      } catch { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [asset.symbol]);
+
+  // 진단: techData가 있으면 enriched, 없으면 기본 asset
+  const enriched = techData ? { ...asset, ...techData } : asset;
+  const diag = useMemo(() => quickDiagnosis(enriched), [enriched]);
 
   return (
     <div onClick={onClose} style={{
@@ -1241,41 +1333,29 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
         </div>
 
         {/* 가격 */}
-        {price != null && (
+        {(price != null || techData?.price != null) && (
           <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.border}` }}>
             <div style={{ fontSize: "24px", fontWeight: 800, color: C.text1, marginBottom: "4px" }}>
-              {asset.market === "kr" ? `₩${Number(price).toLocaleString()}` : asset.market === "crypto" ? `$${Number(price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}` : `$${Number(price).toFixed(2)}`}
+              {(() => { const p = techData?.price || price; return asset.market === "kr" ? `₩${Number(p).toLocaleString()}` : asset.market === "crypto" ? `$${Number(p).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}` : `$${Number(p).toFixed(2)}`; })()}
             </div>
-            {change != null && (
+            {(change != null || techData?.weekChange != null) && (
               <span style={{
                 fontSize: "13px", fontWeight: 600,
-                color: isPos ? C.green : C.red,
+                color: (techData?.weekChange ?? change ?? 0) >= 0 ? C.green : C.red,
               }}>
-                {isPos ? "▲" : "▼"} {typeof asset.changePct === "number" ? `${Math.abs(asset.changePct).toFixed(2)}%` : typeof asset.weekChange === "number" ? `${Math.abs(asset.weekChange).toFixed(2)}%` : `${Math.abs(change).toFixed(2)}`}
+                {(techData?.weekChange ?? change ?? 0) >= 0 ? "▲" : "▼"} {Math.abs(techData?.weekChange ?? change ?? 0).toFixed(2)}%
               </span>
             )}
-            {ext && (ext.preMarketPrice || ext.postMarketPrice) && (
+            {ext && (ext.price) && (
               <div style={{ marginTop: "6px", fontSize: "11px", color: C.text3, display: "flex", alignItems: "center", gap: "6px" }}>
-                {ext.preMarketPrice && (
-                  <span style={{ background: C.card2, padding: "2px 6px", borderRadius: "4px" }}>
-                    프리 ${Number(ext.preMarketPrice).toFixed(2)}
-                    {ext.preMarketChangePct != null && (
-                      <span style={{ color: ext.preMarketChangePct >= 0 ? C.green : C.red, marginLeft: "4px" }}>
-                        {ext.preMarketChangePct >= 0 ? "+" : ""}{ext.preMarketChangePct.toFixed(2)}%
-                      </span>
-                    )}
-                  </span>
-                )}
-                {ext.postMarketPrice && (
-                  <span style={{ background: C.card2, padding: "2px 6px", borderRadius: "4px" }}>
-                    애프터 ${Number(ext.postMarketPrice).toFixed(2)}
-                    {ext.postMarketChangePct != null && (
-                      <span style={{ color: ext.postMarketChangePct >= 0 ? C.green : C.red, marginLeft: "4px" }}>
-                        {ext.postMarketChangePct >= 0 ? "+" : ""}{ext.postMarketChangePct.toFixed(2)}%
-                      </span>
-                    )}
-                  </span>
-                )}
+                <span style={{ background: C.card2, padding: "2px 6px", borderRadius: "4px" }}>
+                  {ext.isPreMarket ? "프리" : "애프터"} ${Number(ext.price).toFixed(2)}
+                  {ext.change != null && (
+                    <span style={{ color: ext.change >= 0 ? C.green : C.red, marginLeft: "4px" }}>
+                      {ext.change >= 0 ? "+" : ""}{ext.change.toFixed(2)}%
+                    </span>
+                  )}
+                </span>
               </div>
             )}
           </div>
@@ -1283,74 +1363,118 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
 
         {/* 투자진단 */}
         <div style={{ padding: "16px 20px" }}>
-          <div style={{
-            background: C.bg, borderRadius: "14px", padding: "16px",
-            border: `1px solid ${C.border}`,
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "14px" }}>
-              <div style={{ position: "relative", width: "64px", height: "64px", flexShrink: 0 }}>
-                <svg viewBox="0 0 64 64" width="64" height="64">
-                  <circle cx="32" cy="32" r="26" fill="none" stroke={C.border} strokeWidth="5" />
-                  <circle cx="32" cy="32" r="26" fill="none"
-                    stroke={diag.score >= 70 ? C.green : diag.score >= 40 ? C.yellow : C.red}
-                    strokeWidth="5" strokeLinecap="round"
-                    strokeDasharray={`${(diag.score / 100) * 163.4} 163.4`}
-                    transform="rotate(-90 32 32)"
-                    style={{ transition: "stroke-dasharray 0.6s ease" }}
-                  />
-                  <text x="32" y="30" textAnchor="middle" fill={C.text1} fontSize="16" fontWeight="800">{diag.score}</text>
-                  <text x="32" y="41" textAnchor="middle" fill={C.text3} fontSize="8">/100</text>
-                </svg>
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                  <span style={{ fontSize: "13px", fontWeight: 700, color: C.text3 }}>🩺 투자진단</span>
-                  <span style={{
-                    fontSize: "14px", fontWeight: 800,
-                    color: diag.score >= 70 ? C.green : diag.score >= 40 ? C.yellow : C.red,
-                  }}>{diag.verdict}</span>
+          {loading ? (
+            <div style={{
+              background: C.bg, borderRadius: "14px", padding: "24px", textAlign: "center",
+              border: `1px solid ${C.border}`,
+            }}>
+              <div style={{ fontSize: "20px", marginBottom: "8px", animation: "spin 1s linear infinite" }}>⏳</div>
+              <div style={{ fontSize: "12px", color: C.text3 }}>기술적 지표 분석 중...</div>
+            </div>
+          ) : (
+            <div style={{
+              background: C.bg, borderRadius: "14px", padding: "16px",
+              border: `1px solid ${C.border}`,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "14px" }}>
+                <div style={{ position: "relative", width: "64px", height: "64px", flexShrink: 0 }}>
+                  <svg viewBox="0 0 64 64" width="64" height="64">
+                    <circle cx="32" cy="32" r="26" fill="none" stroke={C.border} strokeWidth="5" />
+                    <circle cx="32" cy="32" r="26" fill="none"
+                      stroke={diag.score >= 70 ? C.green : diag.score >= 40 ? C.yellow : C.red}
+                      strokeWidth="5" strokeLinecap="round"
+                      strokeDasharray={`${(diag.score / 100) * 163.4} 163.4`}
+                      transform="rotate(-90 32 32)"
+                      style={{ transition: "stroke-dasharray 0.6s ease" }}
+                    />
+                    <text x="32" y="30" textAnchor="middle" fill={C.text1} fontSize="16" fontWeight="800">{diag.score}</text>
+                    <text x="32" y="41" textAnchor="middle" fill={C.text3} fontSize="8">/100</text>
+                  </svg>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5px" }}>
-                  {diag.categories.map(cat => (
-                    <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <span style={{ fontSize: "10px", color: C.text3, width: "30px" }}>{cat.name}</span>
-                      <div style={{ flex: 1, height: "5px", background: C.border, borderRadius: "3px", overflow: "hidden" }}>
-                        <div style={{
-                          height: "100%", borderRadius: "3px",
-                          width: `${cat.score}%`,
-                          background: cat.score >= 70 ? C.green : cat.score >= 40 ? C.yellow : C.red,
-                          transition: "width 0.4s ease",
-                        }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 700, color: C.text3 }}>🩺 투자진단</span>
+                    <span style={{
+                      fontSize: "14px", fontWeight: 800,
+                      color: diag.score >= 70 ? C.green : diag.score >= 40 ? C.yellow : C.red,
+                    }}>{diag.verdict}</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5px" }}>
+                    {diag.categories.map(cat => (
+                      <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ fontSize: "10px", color: C.text3, width: "30px" }}>{cat.name}</span>
+                        <div style={{ flex: 1, height: "5px", background: C.border, borderRadius: "3px", overflow: "hidden" }}>
+                          <div style={{
+                            height: "100%", borderRadius: "3px",
+                            width: `${cat.score}%`,
+                            background: cat.score >= 70 ? C.green : cat.score >= 40 ? C.yellow : C.red,
+                            transition: "width 0.4s ease",
+                          }} />
+                        </div>
+                        <span style={{ fontSize: "10px", fontWeight: 700, color: C.text3, width: "20px", textAlign: "right" }}>{cat.score}</span>
                       </div>
-                      <span style={{ fontSize: "10px", fontWeight: 700, color: C.text3, width: "20px", textAlign: "right" }}>{cat.score}</span>
-                    </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {diag.signals.length > 0 && (
+                <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+                  {diag.signals.map((sig, i) => (
+                    <span key={i} style={{
+                      fontSize: "10px", fontWeight: 600, padding: "4px 8px", borderRadius: "6px",
+                      background: sig.type === "bullish" ? `${C.green}18` : sig.type === "bearish" ? `${C.red}18` : `${C.yellow}18`,
+                      color: sig.type === "bullish" ? C.green : sig.type === "bearish" ? C.red : C.yellow,
+                    }}>{sig.type === "bullish" ? "▲" : sig.type === "bearish" ? "▼" : "●"} {sig.name}</span>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 적정주가 */}
+        {techData?.fairValue != null && (
+          <div style={{ padding: "0 20px 12px" }}>
+            <div style={{
+              background: C.bg, borderRadius: "12px", padding: "14px",
+              border: `1px solid ${C.border}`, display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <div>
+                <div style={{ fontSize: "10px", color: C.text3, marginBottom: "4px" }}>📊 적정주가 추정</div>
+                <div style={{ fontSize: "18px", fontWeight: 800, color: C.text1 }}>
+                  {asset.market === "kr" ? `₩${Math.round(techData.fairValue).toLocaleString()}` : `$${techData.fairValue.toFixed(2)}`}
+                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "10px", color: C.text3, marginBottom: "4px" }}>현재 vs 적정</div>
+                <div style={{
+                  fontSize: "15px", fontWeight: 700,
+                  color: techData.fairPremium > 5 ? C.red : techData.fairPremium < -5 ? C.green : C.yellow,
+                }}>
+                  {techData.fairPremium > 0 ? "+" : ""}{techData.fairPremium}%
+                  <span style={{ fontSize: "10px", fontWeight: 600, marginLeft: "4px" }}>
+                    {techData.fairPremium > 10 ? "고평가" : techData.fairPremium > 5 ? "약간 고평가" : techData.fairPremium < -10 ? "저평가" : techData.fairPremium < -5 ? "약간 저평가" : "적정"}
+                  </span>
                 </div>
               </div>
             </div>
-            {diag.signals.length > 0 && (
-              <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
-                {diag.signals.map((sig, i) => (
-                  <span key={i} style={{
-                    fontSize: "10px", fontWeight: 600, padding: "4px 8px", borderRadius: "6px",
-                    background: sig.type === "bullish" ? `${C.green}18` : sig.type === "bearish" ? `${C.red}18` : `${C.yellow}18`,
-                    color: sig.type === "bullish" ? C.green : sig.type === "bearish" ? C.red : C.yellow,
-                  }}>{sig.type === "bullish" ? "▲" : sig.type === "bearish" ? "▼" : "●"} {sig.name}</span>
-                ))}
-              </div>
-            )}
           </div>
-        </div>
+        )}
 
-        {/* 지표 (있는 경우) */}
-        {(asset.rsi != null || asset.ma200Dist != null || asset.volRatio != null) && (
+        {/* 기술적 지표 */}
+        {techData && (
           <div style={{ padding: "0 20px 16px" }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
               {[
-                asset.rsi != null && { label: "RSI(14)", value: asset.rsi, color: asset.rsi <= 30 ? C.purple : C.text2 },
-                asset.ma200Dist != null && { label: "200일선", value: `${asset.ma200Dist > 0 ? "+" : ""}${asset.ma200Dist}%` },
-                asset.volRatio != null && { label: "거래량", value: `${asset.volRatio}x`, color: asset.volRatio >= 2 ? C.red : C.text2 },
-              ].filter(Boolean).map(({ label, value, color }) => (
+                { label: "RSI(14)", value: techData.rsi, color: techData.rsi <= 30 ? C.purple : techData.rsi >= 70 ? C.red : C.text2 },
+                { label: "200일선", value: techData.ma200Dist != null ? `${techData.ma200Dist > 0 ? "+" : ""}${techData.ma200Dist}%` : "—" },
+                { label: "거래량", value: `${techData.volRatio}x`, color: techData.volRatio >= 2 ? C.red : C.text2 },
+                { label: "스토캐스틱", value: `${techData.stoch.k}`, color: techData.stoch.k < 20 ? C.purple : techData.stoch.k > 80 ? C.red : C.text2 },
+                { label: "W%R", value: `${techData.wr}`, color: techData.wr < -80 ? C.purple : techData.wr > -20 ? C.red : C.text2 },
+                { label: "52주 위치", value: techData.high52w && techData.low52w
+                  ? `${((techData.price - techData.low52w) / (techData.high52w - techData.low52w) * 100).toFixed(0)}%`
+                  : "—" },
+              ].map(({ label, value, color }) => (
                 <div key={label} style={{ background: C.bg, borderRadius: "10px", padding: "8px 10px", textAlign: "center" }}>
                   <div style={{ fontSize: "9px", color: C.text3, marginBottom: "3px" }}>{label}</div>
                   <div style={{ fontWeight: 700, fontSize: "13px", color: color || C.text1 }}>{value}</div>
