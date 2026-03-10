@@ -1185,7 +1185,7 @@ function AssetCard({ asset, onChart }) {
 // ════════════════════════════════════════════════════════════════════
 // 서브 컴포넌트: AssetDetailPopup (종목 상세 팝업 + 투자진단)
 // ════════════════════════════════════════════════════════════════════
-function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHours = {} }) {
+function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHours = {}, isWatched = false, onToggleWatch = () => {} }) {
   const [techData, setTechData] = useState(null);
   const [loading, setLoading] = useState(true);
   const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
@@ -1486,6 +1486,11 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
 
         {/* 액션 버튼 */}
         <div style={{ padding: "0 20px 20px", display: "flex", gap: "8px" }}>
+          <button onClick={() => onToggleWatch(asset.symbol)} style={{
+            width: "44px", height: "44px", borderRadius: "12px", fontSize: "18px",
+            background: isWatched ? `${C.yellow}22` : C.card2, border: `1px solid ${isWatched ? C.yellow : C.border2}`,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>{isWatched ? "⭐" : "☆"}</button>
           <button onClick={() => { onChart(); onClose(); }} style={{
             flex: 1, padding: "12px 0", borderRadius: "12px", fontSize: "14px", fontWeight: 700,
             background: C.blue, color: "#fff", border: "none", cursor: "pointer",
@@ -1544,6 +1549,7 @@ export default function App() {
   const [lastScan, setLastScan]       = useState(null);
   const [chartAsset, setChartAsset]   = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null); // 종목 상세 팝업
+  const [watchlist, setWatchlist] = useState(() => { try { return JSON.parse(localStorage.getItem("di_watchlist") || "[]"); } catch { return []; } });
 
   // ── 포트폴리오 상태 ───────────────────────────────────────────
   const [portfolio, setPortfolio]         = useState(loadPortfolio);
@@ -1575,6 +1581,9 @@ export default function App() {
 
   useEffect(() => { saveSettings({ botToken: settings.botToken, chatId: settings.chatId, autoSend: settings.autoSend, syncPin }); }, [settings, syncPin]);
   useEffect(() => { savePortfolio(portfolio); }, [portfolio]);
+
+  // 관심종목 저장
+  useEffect(() => { try { localStorage.setItem("di_watchlist", JSON.stringify(watchlist)); } catch {} }, [watchlist]);
 
   // ── 홈 대시보드 데이터 ─────────────────────────────────────────
   const fetchMarketOverview = useCallback(async () => {
@@ -2011,11 +2020,13 @@ export default function App() {
         input:focus { border-color: ${C.blue} !important; box-shadow: 0 0 0 3px ${C.blue}18; outline: none; }
         .skeleton { background: linear-gradient(90deg, ${C.card2} 25%, ${C.border} 50%, ${C.card2} 75%);
           background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
-        .tab-content { animation: fadeIn 0.3s ease; }
-        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 4px 12px ${C.bg}88; }
+        .tab-content { animation: slideUp 0.25s ease; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
         @media (max-width: 640px) {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: block !important; }
+          .mobile-bottom-tab { display: flex !important; }
+          main { padding-bottom: 80px !important; }
         }
         @media (min-width: 641px) {
           .mobile-dropdown { display: none !important; }
@@ -2032,8 +2043,8 @@ export default function App() {
           <div onClick={() => { setTab("home"); setMenuOpen(false); }} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}
             title="홈으로 이동">
             <span style={{ fontSize: "20px" }}>📡</span>
-            <span style={{ fontWeight: 800, fontSize: "17px" }}>DI금융</span>
-            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v5</span>
+            <span style={{ fontWeight: 800, fontSize: "17px", letterSpacing: "-0.5px" }}>DI금융</span>
+            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v6.2</span>
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "2px" }}>
@@ -2081,13 +2092,39 @@ export default function App() {
         )}
       </header>
 
+      {/* 모바일 하단 탭바 */}
+      <nav style={{
+        position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100,
+        background: `${C.bg}f5`, backdropFilter: "blur(12px)",
+        borderTop: `1px solid ${C.border}`,
+        display: "none", padding: "6px 0 env(safe-area-inset-bottom, 8px)",
+      }} className="mobile-bottom-tab">
+        {[
+          { id: "home", icon: "🏠", label: "홈" },
+          { id: "screener", icon: "🔍", label: "스크리너" },
+          { id: "strategy", icon: "🎯", label: "전략" },
+          { id: "portfolio", icon: "💼", label: "포트" },
+          { id: "news", icon: "📰", label: "뉴스" },
+        ].map(t => (
+          <button key={t.id} onClick={() => { setTab(t.id); setMenuOpen(false); }} style={{
+            flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "2px",
+            background: "none", border: "none", padding: "4px 0",
+            color: tab === t.id ? C.blue : C.text3, cursor: "pointer",
+            transition: "color .15s",
+          }}>
+            <span style={{ fontSize: "18px", lineHeight: 1 }}>{t.icon}</span>
+            <span style={{ fontSize: "9px", fontWeight: tab === t.id ? 700 : 500 }}>{t.label}</span>
+          </button>
+        ))}
+      </nav>
+
       <PullToRefresh onRefresh={async () => {
         if (tab === "home") await fetchMarketOverview();
         else if (tab === "portfolio") await fetchPortfolioPrices();
         else if (tab === "news") await fetchNews();
         else window.location.reload();
       }}>
-      <main style={{ maxWidth: "900px", margin: "0 auto", padding: "20px" }}>
+      <main style={{ maxWidth: "900px", margin: "0 auto", padding: "16px 20px 24px" }}>
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 홈 (토스 스타일 대시보드)
@@ -2156,6 +2193,48 @@ export default function App() {
                 </div>
               )}
             </div>
+
+            {/* 관심종목 */}
+            {watchlist.length > 0 && (
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px", marginBottom: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "16px" }}>⭐ 관심종목</div>
+                  <span style={{ fontSize: "11px", color: C.text3 }}>{watchlist.length}개</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  {watchlist.map(w => {
+                    const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
+                    const flag = w.market === "us" ? "🇺🇸" : w.market === "kr" ? "🇰🇷" : "₿";
+                    return (
+                      <div key={w.symbol} onClick={() => setSelectedAsset(w)}
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "10px 12px", borderRadius: "10px", cursor: "pointer",
+                          background: "transparent", transition: "background .15s",
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = C.card2}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <span style={{ fontSize: "12px" }}>{flag}</span>
+                          <div>
+                            <div style={{ fontWeight: 600, fontSize: "13px", color: C.text1 }}>{w.name || w.symbol}</div>
+                            <div style={{ fontSize: "10px", color: C.text3 }}>{w.symbol.replace(".KS","")}</div>
+                          </div>
+                        </div>
+                        {hot && (
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontWeight: 600, fontSize: "13px", color: C.text1 }}>{fmtPrice(hot.price, w.market)}</div>
+                            <div style={{ fontSize: "11px", fontWeight: 600, color: hot.change >= 0 ? C.green : C.red }}>
+                              {hot.change >= 0 ? "▲" : "▼"} {Math.abs(hot.change)}%
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* 공포/탐욕 지수 */}
             {(fearGreed.stock || fearGreed.crypto) && (
@@ -2791,7 +2870,7 @@ export default function App() {
                       }}>
                         <button onClick={() => {
                           const cryptoA = CRYPTO_ASSETS.find(c => c.symbol === item.symbol);
-                          setChartAsset({
+                          setSelectedAsset({
                             symbol: item.symbol, name: item.name || item.symbol,
                             market: item.market, symbolRaw: item.symbolRaw || item.symbol,
                             ...(cryptoA ? { id: cryptoA.id } : {}),
@@ -2800,7 +2879,7 @@ export default function App() {
                           flex: 1, padding: "9px 0", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
                           background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}33`,
                           display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
-                        }}>📈 차트</button>
+                        }}>🩺 진단</button>
                         <button onClick={() => {
                           const sym = item.market === "crypto"
                             ? `https://www.coingecko.com/en/coins/${item.cryptoId || item.symbol.toLowerCase()}`
@@ -3018,6 +3097,8 @@ export default function App() {
             onChart={() => setChartAsset(selectedAsset)}
             hotAssets={hotAssets}
             extendedHours={extendedHours}
+            isWatched={watchlist.some(w => w.symbol === selectedAsset.symbol)}
+            onToggleWatch={(sym) => setWatchlist(prev => prev.some(w => w.symbol === sym) ? prev.filter(w => w.symbol !== sym) : [...prev, { symbol: selectedAsset.symbol, name: selectedAsset.name, market: selectedAsset.market, symbolRaw: selectedAsset.symbolRaw || selectedAsset.symbol, id: selectedAsset.id }])}
           />
         )}
 
