@@ -1,4 +1,4 @@
-// DI금융 v6.1 — 투자 스크리너 + 퀀트 엔진 + 백테스트
+// DI금융 v6.2 — 투자 스크리너 + 퀀트 엔진 + 백테스트
 // Features: 스크리닝, 캔들차트, 28개 전략, 백테스트, 포트폴리오, 뉴스, 텔레그램 알림
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import ChartModal from "./ChartModal.jsx";
@@ -1183,6 +1183,207 @@ function AssetCard({ asset, onChart }) {
 }
 
 // ════════════════════════════════════════════════════════════════════
+// 서브 컴포넌트: AssetDetailPopup (종목 상세 팝업 + 투자진단)
+// ════════════════════════════════════════════════════════════════════
+function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHours = {} }) {
+  const diag = useMemo(() => quickDiagnosis(asset), [asset]);
+  const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
+  const mcBg = asset.market === "us" ? "#1A2C4F" : asset.market === "kr" ? "#1A2A1E" : "#1E1A2A";
+  const mcColor = asset.market === "us" ? C.blue : asset.market === "kr" ? C.green : C.purple;
+
+  // 가격 정보 (hotAssets에서 찾기)
+  const hot = hotAssets.find(h => h.symbol === asset.symbol);
+  const price = asset.price || hot?.price;
+  const change = asset.change ?? hot?.change;
+  const isPos = (change ?? 0) >= 0;
+
+  // 프리/포스트 마켓
+  const ext = extendedHours[asset.symbol];
+
+  return (
+    <div onClick={onClose} style={{
+      position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+      background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: 9998, padding: "20px",
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: C.card, borderRadius: "20px", width: "100%", maxWidth: "420px",
+        maxHeight: "80vh", overflow: "auto", border: `1px solid ${C.border}`,
+        boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+      }}>
+        {/* 헤더 */}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "18px 20px 14px", borderBottom: `1px solid ${C.border}`,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{
+              width: "44px", height: "44px", borderRadius: "12px", background: mcBg,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontWeight: 800, fontSize: "11px", color: mcColor, flexShrink: 0,
+            }}>
+              {asset.symbol.replace(".KS","").slice(0, 4)}
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <span style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>{asset.name}</span>
+                <span style={{ fontSize: "11px" }}>{flag}</span>
+              </div>
+              <div style={{ fontSize: "12px", color: C.text3 }}>{asset.symbol.replace(".KS","")}</div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            width: "32px", height: "32px", borderRadius: "50%", border: "none",
+            background: C.card2, color: C.text3, fontSize: "16px", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>✕</button>
+        </div>
+
+        {/* 가격 */}
+        {price != null && (
+          <div style={{ padding: "14px 20px", borderBottom: `1px solid ${C.border}` }}>
+            <div style={{ fontSize: "24px", fontWeight: 800, color: C.text1, marginBottom: "4px" }}>
+              {asset.market === "kr" ? `₩${Number(price).toLocaleString()}` : asset.market === "crypto" ? `$${Number(price).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}` : `$${Number(price).toFixed(2)}`}
+            </div>
+            {change != null && (
+              <span style={{
+                fontSize: "13px", fontWeight: 600,
+                color: isPos ? C.green : C.red,
+              }}>
+                {isPos ? "▲" : "▼"} {typeof asset.changePct === "number" ? `${Math.abs(asset.changePct).toFixed(2)}%` : typeof asset.weekChange === "number" ? `${Math.abs(asset.weekChange).toFixed(2)}%` : `${Math.abs(change).toFixed(2)}`}
+              </span>
+            )}
+            {ext && (ext.preMarketPrice || ext.postMarketPrice) && (
+              <div style={{ marginTop: "6px", fontSize: "11px", color: C.text3, display: "flex", alignItems: "center", gap: "6px" }}>
+                {ext.preMarketPrice && (
+                  <span style={{ background: C.card2, padding: "2px 6px", borderRadius: "4px" }}>
+                    프리 ${Number(ext.preMarketPrice).toFixed(2)}
+                    {ext.preMarketChangePct != null && (
+                      <span style={{ color: ext.preMarketChangePct >= 0 ? C.green : C.red, marginLeft: "4px" }}>
+                        {ext.preMarketChangePct >= 0 ? "+" : ""}{ext.preMarketChangePct.toFixed(2)}%
+                      </span>
+                    )}
+                  </span>
+                )}
+                {ext.postMarketPrice && (
+                  <span style={{ background: C.card2, padding: "2px 6px", borderRadius: "4px" }}>
+                    애프터 ${Number(ext.postMarketPrice).toFixed(2)}
+                    {ext.postMarketChangePct != null && (
+                      <span style={{ color: ext.postMarketChangePct >= 0 ? C.green : C.red, marginLeft: "4px" }}>
+                        {ext.postMarketChangePct >= 0 ? "+" : ""}{ext.postMarketChangePct.toFixed(2)}%
+                      </span>
+                    )}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 투자진단 */}
+        <div style={{ padding: "16px 20px" }}>
+          <div style={{
+            background: C.bg, borderRadius: "14px", padding: "16px",
+            border: `1px solid ${C.border}`,
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "14px" }}>
+              <div style={{ position: "relative", width: "64px", height: "64px", flexShrink: 0 }}>
+                <svg viewBox="0 0 64 64" width="64" height="64">
+                  <circle cx="32" cy="32" r="26" fill="none" stroke={C.border} strokeWidth="5" />
+                  <circle cx="32" cy="32" r="26" fill="none"
+                    stroke={diag.score >= 70 ? C.green : diag.score >= 40 ? C.yellow : C.red}
+                    strokeWidth="5" strokeLinecap="round"
+                    strokeDasharray={`${(diag.score / 100) * 163.4} 163.4`}
+                    transform="rotate(-90 32 32)"
+                    style={{ transition: "stroke-dasharray 0.6s ease" }}
+                  />
+                  <text x="32" y="30" textAnchor="middle" fill={C.text1} fontSize="16" fontWeight="800">{diag.score}</text>
+                  <text x="32" y="41" textAnchor="middle" fill={C.text3} fontSize="8">/100</text>
+                </svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                  <span style={{ fontSize: "13px", fontWeight: 700, color: C.text3 }}>🩺 투자진단</span>
+                  <span style={{
+                    fontSize: "14px", fontWeight: 800,
+                    color: diag.score >= 70 ? C.green : diag.score >= 40 ? C.yellow : C.red,
+                  }}>{diag.verdict}</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5px" }}>
+                  {diag.categories.map(cat => (
+                    <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span style={{ fontSize: "10px", color: C.text3, width: "30px" }}>{cat.name}</span>
+                      <div style={{ flex: 1, height: "5px", background: C.border, borderRadius: "3px", overflow: "hidden" }}>
+                        <div style={{
+                          height: "100%", borderRadius: "3px",
+                          width: `${cat.score}%`,
+                          background: cat.score >= 70 ? C.green : cat.score >= 40 ? C.yellow : C.red,
+                          transition: "width 0.4s ease",
+                        }} />
+                      </div>
+                      <span style={{ fontSize: "10px", fontWeight: 700, color: C.text3, width: "20px", textAlign: "right" }}>{cat.score}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            {diag.signals.length > 0 && (
+              <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+                {diag.signals.map((sig, i) => (
+                  <span key={i} style={{
+                    fontSize: "10px", fontWeight: 600, padding: "4px 8px", borderRadius: "6px",
+                    background: sig.type === "bullish" ? `${C.green}18` : sig.type === "bearish" ? `${C.red}18` : `${C.yellow}18`,
+                    color: sig.type === "bullish" ? C.green : sig.type === "bearish" ? C.red : C.yellow,
+                  }}>{sig.type === "bullish" ? "▲" : sig.type === "bearish" ? "▼" : "●"} {sig.name}</span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 지표 (있는 경우) */}
+        {(asset.rsi != null || asset.ma200Dist != null || asset.volRatio != null) && (
+          <div style={{ padding: "0 20px 16px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
+              {[
+                asset.rsi != null && { label: "RSI(14)", value: asset.rsi, color: asset.rsi <= 30 ? C.purple : C.text2 },
+                asset.ma200Dist != null && { label: "200일선", value: `${asset.ma200Dist > 0 ? "+" : ""}${asset.ma200Dist}%` },
+                asset.volRatio != null && { label: "거래량", value: `${asset.volRatio}x`, color: asset.volRatio >= 2 ? C.red : C.text2 },
+              ].filter(Boolean).map(({ label, value, color }) => (
+                <div key={label} style={{ background: C.bg, borderRadius: "10px", padding: "8px 10px", textAlign: "center" }}>
+                  <div style={{ fontSize: "9px", color: C.text3, marginBottom: "3px" }}>{label}</div>
+                  <div style={{ fontWeight: 700, fontSize: "13px", color: color || C.text1 }}>{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 액션 버튼 */}
+        <div style={{ padding: "0 20px 20px", display: "flex", gap: "8px" }}>
+          <button onClick={() => { onChart(); onClose(); }} style={{
+            flex: 1, padding: "12px 0", borderRadius: "12px", fontSize: "14px", fontWeight: 700,
+            background: C.blue, color: "#fff", border: "none", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+          }}>📈 차트 보기</button>
+          <a href={asset.market === "crypto"
+              ? `https://www.coingecko.com/en/coins/${asset.id || asset.symbolRaw || asset.symbol.toLowerCase()}`
+              : `https://finance.yahoo.com/quote/${asset.symbolRaw || asset.symbol}`}
+            target="_blank" rel="noopener"
+            style={{
+              flex: 1, padding: "12px 0", borderRadius: "12px", fontSize: "14px", fontWeight: 700,
+              background: C.card2, color: C.text2, border: `1px solid ${C.border2}`,
+              textDecoration: "none", textAlign: "center",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+            }}>🔗 상세 정보</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
 // 메인 앱
 // ════════════════════════════════════════════════════════════════════
 export default function App() {
@@ -1218,6 +1419,7 @@ export default function App() {
   const [scanErrors, setScanErrors]   = useState([]);
   const [lastScan, setLastScan]       = useState(null);
   const [chartAsset, setChartAsset]   = useState(null);
+  const [selectedAsset, setSelectedAsset] = useState(null); // 종목 상세 팝업
 
   // ── 포트폴리오 상태 ───────────────────────────────────────────
   const [portfolio, setPortfolio]         = useState(loadPortfolio);
@@ -1351,26 +1553,19 @@ export default function App() {
     }
     setFearGreed(fgData);
 
-    // ── 장외(프리/포스트마켓) 가격 ──
+    // ── 장외(프리/포스트마켓) 가격 — yahoo-quote API ──
     const extSyms = ["NVDA","AAPL","TSLA","MSFT","GOOGL","AMZN"].join(",");
     const extResults = {};
     try {
-      const er = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(extSyms)}&interval=1m&range=1d`);
+      const er = await fetch(`/api/yahoo-quote?symbols=${encodeURIComponent(extSyms)}`);
       if (er.ok) {
-        const eBatch = (await er.json()).results || {};
-        for (const [sym, data] of Object.entries(eBatch)) {
-          if (data?.closes?.length) {
-            const lastPrice = data.closes[data.closes.length - 1];
-            // Check if market is closed (timestamps analysis)
-            const lastTs = data.timestamps?.[data.timestamps.length - 1];
-            if (lastTs) {
-              const lastDate = new Date(lastTs * 1000);
-              const hour = lastDate.getUTCHours() - 5; // EST
-              const isExtended = hour < 9.5 || hour >= 16;
-              if (isExtended) {
-                extResults[sym] = { price: lastPrice, isPreMarket: hour < 9.5, isPostMarket: hour >= 16 };
-              }
-            }
+        const { quotes = {} } = await er.json();
+        for (const [sym, q] of Object.entries(quotes)) {
+          // PRE, POST, CLOSED 상태일 때 장외 가격 표시
+          if (q.marketState === "PRE" && q.preMarketPrice) {
+            extResults[sym] = { price: q.preMarketPrice, change: q.preMarketChangePct, isPreMarket: true, isPostMarket: false };
+          } else if ((q.marketState === "POST" || q.marketState === "POSTPOST" || q.marketState === "CLOSED") && q.postMarketPrice) {
+            extResults[sym] = { price: q.postMarketPrice, change: q.postMarketChangePct, isPreMarket: false, isPostMarket: true };
           }
         }
       }
@@ -1778,7 +1973,7 @@ export default function App() {
             {/* 검색바 */}
             <div style={{ marginBottom: "20px" }}>
               <SearchBar onSelect={(asset) => {
-                setChartAsset(asset);
+                setSelectedAsset(asset);
               }} />
             </div>
 
@@ -1892,7 +2087,7 @@ export default function App() {
                     const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
                     const isPos = pick.change >= 0;
                     return (
-                      <div key={pick.symbol} onClick={() => setChartAsset(pick)}
+                      <div key={pick.symbol} onClick={() => setSelectedAsset(pick)}
                         style={{
                           background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px",
                           padding: "12px", cursor: "pointer", transition: "all .15s",
@@ -1945,7 +2140,7 @@ export default function App() {
                     const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
                     const isPos = asset.change >= 0;
                     return (
-                      <div key={asset.symbol} onClick={() => setChartAsset(asset)}
+                      <div key={asset.symbol} onClick={() => setSelectedAsset(asset)}
                         style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between",
                           padding: "12px 14px", borderRadius: "12px", cursor: "pointer",
@@ -1973,11 +2168,25 @@ export default function App() {
                           <div style={{ fontSize: "12px", fontWeight: 600, color: isPos ? C.green : C.red }}>
                             {isPos ? "▲" : "▼"} {Math.abs(asset.change)}%
                           </div>
-                          {extendedHours[asset.symbolRaw || asset.symbol] && (
-                            <div style={{ fontSize: "9px", color: C.purple, fontWeight: 600 }}>
-                              {extendedHours[asset.symbolRaw || asset.symbol].isPreMarket ? "🌅 프리" : "🌙 애프터"}
-                            </div>
-                          )}
+                          {(() => {
+                            const ext = extendedHours[asset.symbolRaw || asset.symbol];
+                            if (!ext) return null;
+                            const extPos = ext.change != null ? ext.change >= 0 : null;
+                            return (
+                              <div style={{ fontSize: "10px", fontWeight: 600, marginTop: "2px", display: "flex", alignItems: "center", gap: "4px", justifyContent: "flex-end" }}>
+                                <span style={{
+                                  padding: "1px 4px", borderRadius: "3px", fontSize: "8px", fontWeight: 700,
+                                  background: C.purpleBg, color: C.purple,
+                                }}>{ext.isPreMarket ? "프리" : "애프터"}</span>
+                                <span style={{ color: C.text2 }}>{fmtPrice(ext.price, "us")}</span>
+                                {ext.change != null && (
+                                  <span style={{ color: extPos ? C.green : C.red }}>
+                                    {extPos ? "+" : ""}{ext.change.toFixed(2)}%
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     );
@@ -2051,7 +2260,7 @@ export default function App() {
                 {ALL_ASSETS.filter(a => filterMarket === "all" || a.market === filterMarket).map((asset, i) => {
                   const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
                   return (
-                    <div key={`${asset.symbol}-${i}`} onClick={() => setChartAsset(asset)}
+                    <div key={`${asset.symbol}-${i}`} onClick={() => setSelectedAsset(asset)}
                       style={{
                         padding: "10px 12px", borderRadius: "10px", cursor: "pointer",
                         background: C.card2, border: `1px solid ${C.border}`, transition: "border-color .15s",
@@ -2675,6 +2884,17 @@ export default function App() {
               )}
             </div>
           </div>
+        )}
+
+        {/* 종목 상세 팝업 */}
+        {selectedAsset && (
+          <AssetDetailPopup
+            asset={selectedAsset}
+            onClose={() => setSelectedAsset(null)}
+            onChart={() => setChartAsset(selectedAsset)}
+            hotAssets={hotAssets}
+            extendedHours={extendedHours}
+          />
         )}
 
         {/* 차트 모달 */}

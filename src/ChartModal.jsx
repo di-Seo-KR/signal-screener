@@ -196,9 +196,9 @@ function makeChartOptions(height, width, tf, cc) {
     },
     height,
     width: width || 300,
-    handleScroll: { mouseWheel: true, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false, touch: true },
-    handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true, axisDoubleClickReset: true },
-    kineticScroll: { mouse: true, touch: true },
+    handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false, touch: true },
+    handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: true, axisDoubleClickReset: true },
+    kineticScroll: { mouse: false, touch: true },
   };
 }
 
@@ -678,6 +678,30 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
     return () => ro.disconnect();
   }, []);
 
+  // ── Ctrl+Wheel 줌 (일반 스크롤은 페이지 스크롤) ──
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handleWheel = (e) => {
+      // Ctrl or Meta 키를 누른 상태에서만 차트 줌
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const mainChart = chartObjs.current.main;
+        if (!mainChart) return;
+        const ts = mainChart.timeScale();
+        const range = ts.getVisibleLogicalRange();
+        if (!range) return;
+        const zoomFactor = e.deltaY > 0 ? 1.15 : 0.87;
+        const center = (range.from + range.to) / 2;
+        const halfSpan = ((range.to - range.from) / 2) * zoomFactor;
+        ts.setVisibleLogicalRange({ from: center - halfSpan, to: center + halfSpan });
+      }
+      // Ctrl 없으면 → 기본 스크롤 동작 (페이지 스크롤)
+    };
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, []);
+
   // ── Real-time price polling (3s interval) ──
   useEffect(() => {
     if (!asset) return;
@@ -1061,7 +1085,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         <div style={{ display: loading ? "none" : "block" }}>
           <div ref={mainRef} style={{
             width: "100%", borderRadius: "10px", overflow: "hidden",
-            touchAction: "none", WebkitOverflowScrolling: "auto",
+            touchAction: "pan-y", WebkitOverflowScrolling: "auto",
           }} />
           {settings.rsi?.enabled && (
             <>
@@ -1081,7 +1105,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                   }}>{currentRSI.toFixed(1)}</span>
                 )}
               </div>
-              <div ref={rsiRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden", touchAction: "none" }} />
+              <div ref={rsiRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden", touchAction: "pan-y" }} />
             </>
           )}
           {settings.macd?.enabled && (
@@ -1099,7 +1123,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                   <span style={{ color: "#fb923c" }}>Signal</span>
                 </span>
               </div>
-              <div ref={macdRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden", touchAction: "none" }} />
+              <div ref={macdRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden", touchAction: "pan-y" }} />
             </>
           )}
         </div>
