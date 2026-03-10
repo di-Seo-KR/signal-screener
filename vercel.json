@@ -9,5 +9,11 @@
         { "key": "Access-Control-Allow-Origin", "value": "*" }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron",
+      "schedule": "30 1 * * 1-5"
+    }
   ]
 }

@@ -233,8 +233,8 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "Unauthorized" });
   }
 
-  const BOT_TOKEN  = process.env.TELEGRAM_BOT_TOKEN;
-  const CHAT_ID    = process.env.TELEGRAM_CHAT_ID;
+  const BOT_TOKEN  = process.env.TELEGRAM_BOT_TOKEN || "8749984490:AAHcYiqyxDQMZyAzhQTA21SzZP0j85I8h90";
+  const CHAT_ID    = process.env.TELEGRAM_CHAT_ID || "5202880452";
   const CONDITIONS = (process.env.ALERT_CONDITIONS || "rsi30,ma200,bb_lower,macd_golden,volume_spike").split(",");
   const MODE       = process.env.ALERT_MODE || "or";
 
@@ -301,13 +301,29 @@ export default async function handler(req, res) {
 
   console.log(`[Cron] 스캔 완료 — 시그널 ${signaled.length}개 / 오류 ${errors.length}개`);
 
-  // 시그널 있을 때만 텔레그램 전송
+  // 텔레그램 전송 (시그널 유무 관계없이 매일 발송)
   if (signaled.length > 0) {
     const tgResult = await sendTelegram(BOT_TOKEN, CHAT_ID, signaled, CONDITIONS);
     console.log("[Cron] 텔레그램 전송:", tgResult.ok ? "성공" : tgResult.description);
     return res.status(200).json({ ok: true, signaled: signaled.length, errors, telegram: tgResult.ok });
   } else {
-    console.log("[Cron] 시그널 없음 — 텔레그램 전송 생략");
-    return res.status(200).json({ ok: true, signaled: 0, message: "시그널 없음", errors });
+    // 시그널 없어도 일일 리포트 전송
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
+    const timeStr = now.toLocaleTimeString("ko-KR", { timeZone: "Asia/Seoul" });
+    const noSignalMsg = `📡 *DI금융 일일 리포트*\n\n📅 ${dateStr} ${timeStr}\n\n✅ 스캔 완료 — 현재 시그널 조건에 해당하는 종목이 없습니다.\n\n🔍 감시 조건: ${CONDITIONS.join(", ")}\n📊 스캔 대상: 미국 ${US_SYMBOLS.length}개 / 한국 ${KR_SYMBOLS.length}개 / 크립토 ${CRYPTO_IDS.length}개\n${errors.length > 0 ? `⚠️ 오류: ${errors.length}건\n` : ""}`;
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: CHAT_ID, text: noSignalMsg, parse_mode: "Markdown" }),
+      });
+      const tgResult = await r.json();
+      console.log("[Cron] 일일 리포트 전송:", tgResult.ok ? "성공" : tgResult.description);
+      return res.status(200).json({ ok: true, signaled: 0, message: "시그널 없음 — 일일 리포트 발송", errors, telegram: tgResult.ok });
+    } catch (e) {
+      console.error("[Cron] 텔레그램 전송 실패:", e.message);
+      return res.status(200).json({ ok: true, signaled: 0, message: "시그널 없음", errors, telegramError: e.message });
+    }
   }
 }
