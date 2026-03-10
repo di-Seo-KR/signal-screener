@@ -810,49 +810,53 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       position: "fixed", inset: 0, zIndex: 1000,
       background: CC.bg, display: "flex", flexDirection: "column",
       overflow: "hidden",
+      /* iOS 세이프 에어리어 (노치/다이나믹 아일랜드) 대응 */
+      paddingTop: "env(safe-area-inset-top, 0px)",
+      paddingBottom: "env(safe-area-inset-bottom, 0px)",
     }}>
-      {/* Top bar */}
+      {/* Top bar — 모바일 잘림 방지: 2줄 레이아웃, 최소 높이 보장 */}
       <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "12px 16px", borderBottom: `1px solid ${CC.border}`,
+        display: "flex", flexDirection: "column", gap: "6px",
+        padding: "10px 12px 8px", borderBottom: `1px solid ${CC.border}`,
         background: `${CC.bg}f5`, backdropFilter: "blur(8px)", flexShrink: 0,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <button onClick={onClose} style={{
-            background: CC.card, border: `1px solid ${CC.border}`, color: CC.text2, cursor: "pointer",
-            fontSize: "14px", padding: "8px 14px", borderRadius: "10px", fontWeight: 600,
-            display: "flex", alignItems: "center", gap: "6px",
-          }}>← 뒤로</button>
-          <span style={{ fontSize: "18px" }}>
-            {asset.market === "us" ? "\uD83C\uDDFA\uD83C\uDDF8" : asset.market === "kr" ? "\uD83C\uDDF0\uD83C\uDDF7" : "\u20BF"}
-          </span>
-          <div>
-            <div style={{ color: CC.text1, fontWeight: 700, fontSize: "16px" }}>{asset.name}</div>
-            <div style={{ color: CC.text3, fontSize: "11px" }}>{asset.symbol}</div>
-          </div>
-        </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "flex-end" }}>
-            {liveConnected && (
-              <span style={{
-                display: "inline-flex", alignItems: "center", gap: "4px",
-                fontSize: "9px", fontWeight: 700, color: CC.green,
-                background: CC.greenBg, padding: "2px 6px", borderRadius: "4px",
-                animation: "livePulse 1.5s ease-in-out infinite",
-              }}>
-                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: CC.green, display: "inline-block" }} />
-                LIVE
-              </span>
-            )}
-            <span style={{ color: CC.text1, fontWeight: 700, fontSize: "18px" }}>
-              {livePrice != null
-                ? (showKRW && canShowKRW
-                    ? `₩${Math.round(livePrice).toLocaleString("ko-KR")}`
-                    : fmtPrice(livePrice, asset.market))
-                : formatPriceWithKRW(asset.price)}
+        {/* 1행: 뒤로 + 종목명 + LIVE 배지 */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: 1 }}>
+            <button onClick={onClose} style={{
+              background: CC.card, border: `1px solid ${CC.border}`, color: CC.text2, cursor: "pointer",
+              fontSize: "13px", padding: "6px 10px", borderRadius: "8px", fontWeight: 600, flexShrink: 0,
+            }}>←</button>
+            <span style={{ fontSize: "16px", flexShrink: 0 }}>
+              {asset.market === "us" ? "\uD83C\uDDFA\uD83C\uDDF8" : asset.market === "kr" ? "\uD83C\uDDF0\uD83C\uDDF7" : "\u20BF"}
             </span>
+            <div style={{ minWidth: 0, overflow: "hidden" }}>
+              <div style={{ color: CC.text1, fontWeight: 700, fontSize: "15px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{asset.name}</div>
+              <div style={{ color: CC.text3, fontSize: "10px" }}>{asset.symbol}</div>
+            </div>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "flex-end" }}>
+          {liveConnected && (
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: "3px", flexShrink: 0,
+              fontSize: "9px", fontWeight: 700, color: CC.green,
+              background: CC.greenBg, padding: "2px 6px", borderRadius: "4px",
+              animation: "livePulse 1.5s ease-in-out infinite",
+            }}>
+              <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: CC.green, display: "inline-block" }} />
+              LIVE
+            </span>
+          )}
+        </div>
+        {/* 2행: 가격 + 등락률 + KRW 토글 */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ color: CC.text1, fontWeight: 700, fontSize: "18px" }}>
+            {livePrice != null
+              ? (showKRW && canShowKRW
+                  ? `₩${Math.round(livePrice).toLocaleString("ko-KR")}`
+                  : fmtPrice(livePrice, asset.market))
+              : formatPriceWithKRW(asset.price)}
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             {liveChange != null ? (
               <span style={{ fontSize: "13px", fontWeight: 600, color: liveChange >= 0 ? CC.green : CC.red }}>
                 {liveChange >= 0 ? "\u25B2" : "\u25BC"} {Math.abs(liveChange).toFixed(2)}%
@@ -864,7 +868,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
             ) : null}
             {canShowKRW && (
               <button onClick={() => setShowKRW(!showKRW)} style={{
-                fontSize: "10px", padding: "3px 8px", borderRadius: "6px", cursor: "pointer",
+                fontSize: "10px", padding: "3px 7px", borderRadius: "6px", cursor: "pointer",
                 background: showKRW ? CC.blue + "33" : "transparent",
                 color: showKRW ? CC.blue : CC.text3,
                 border: `1px solid ${showKRW ? CC.blue : CC.border}`,
@@ -877,7 +881,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       </div>
 
       {/* Scrollable body */}
-      <div ref={containerRef} style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "12px 16px" }}>
+      <div ref={containerRef} style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "10px 12px", WebkitOverflowScrolling: "touch" }}>
 
         {/* OHLC crosshair info */}
         {ohlcInfo && (
