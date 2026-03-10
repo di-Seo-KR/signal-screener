@@ -2213,6 +2213,7 @@ function AppInner() {
     if (tab !== "home") return;
     if (marketIndices.length === 0) fetchMarketOverview();
     fetchEconCalendar();
+    if (portfolio.length > 0) fetchPortfolioPrices();
     const iv = setInterval(() => { fetchMarketOverview(); }, 30000);
     return () => {
       clearInterval(iv);
@@ -2487,14 +2488,29 @@ function AppInner() {
           background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
         .tab-content { animation: slideUp 0.25s ease; }
         .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+        /* ── 모바일 (≤640px) ── */
         @media (max-width: 640px) {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: block !important; }
           .mobile-bottom-tab { display: flex !important; }
-          main { padding-bottom: 80px !important; }
+          main { padding-bottom: 80px !important; padding-left: 16px !important; padding-right: 16px !important; }
+          .home-grid { display: flex !important; flex-direction: column !important; gap: 12px !important; }
+          .home-grid > * { width: 100% !important; }
+          .home-left, .home-right { width: 100% !important; }
+          .signal-grid-2x2 { grid-template-columns: 1fr 1fr !important; }
+          .mover-grid { grid-template-columns: 1fr 1fr !important; }
         }
-        @media (min-width: 641px) {
+        /* ── 태블릿 (641~899px) ── */
+        @media (min-width: 641px) and (max-width: 899px) {
           .mobile-dropdown { display: none !important; }
+          .home-grid { display: flex !important; flex-direction: column !important; gap: 14px !important; }
+        }
+        /* ── 데스크톱 (≥900px) ── */
+        @media (min-width: 900px) {
+          .mobile-dropdown { display: none !important; }
+          .home-grid { display: grid !important; grid-template-columns: 1fr 340px !important; gap: 16px !important; align-items: start !important; }
+          .home-left { display: flex; flex-direction: column; gap: 12px; }
+          .home-right { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 72px; }
         }
       `}</style>
 
@@ -2504,7 +2520,7 @@ function AppInner() {
         background: `${C.bg}f0`, backdropFilter: "blur(12px)",
         borderBottom: `1px solid ${C.border}`,
       }}>
-        <div style={{ maxWidth: "900px", margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "56px" }}>
+        <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "56px" }}>
           <div onClick={() => { setTab("home"); setMenuOpen(false); }} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}
             title="홈으로 이동">
             <span style={{ fontSize: "20px" }}>📡</span>
@@ -2589,7 +2605,7 @@ function AppInner() {
         else if (tab === "news") await fetchNews();
         else window.location.reload();
       }}>
-      <main style={{ maxWidth: "900px", margin: "0 auto", padding: "16px 20px 24px" }}>
+      <main style={{ maxWidth: "1080px", margin: "0 auto", padding: "16px 20px 24px" }}>
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 홈 (토스 스타일 — 깔끔하고 정보 밀도 최적화)
@@ -2599,7 +2615,51 @@ function AppInner() {
             {/* 검색바 */}
             <SearchBar onSelect={(asset) => setSelectedAsset(asset)} />
 
-            {/* ── 시장 요약 (컴팩트 가로 스크롤) ─── */}
+            {/* 2컬럼 그리드 (데스크톱) / 1컬럼 (모바일) */}
+            <div className="home-grid">
+            <div className="home-left" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+
+            {/* ── 마켓 서머리 배너 (토스 스타일 한줄 요약) ─── */}
+            {marketIndices.length > 0 && (() => {
+              const sp = marketIndices.find(i => i.symbol === "^GSPC");
+              const nq = marketIndices.find(i => i.symbol === "^IXIC");
+              const ks = marketIndices.find(i => i.symbol === "^KS11");
+              const main = sp || nq;
+              const mainName = sp ? "S&P 500" : "나스닥";
+              const trend = main?.change > 1 ? "급등" : main?.change > 0.3 ? "상승" : main?.change > -0.3 ? "보합" : main?.change > -1 ? "하락" : "급락";
+              const trendColor = main?.change > 0.3 ? C.green : main?.change > -0.3 ? C.text2 : C.red;
+              const hour = new Date().getHours();
+              const greeting = hour < 12 ? "오전" : hour < 18 ? "오후" : "저녁";
+              const upCount = hotAssets.filter(h => h.change > 0).length;
+              const dnCount = hotAssets.filter(h => h.change < 0).length;
+              return (
+                <div style={{
+                  background: `linear-gradient(135deg, ${C.card} 0%, ${main?.change >= 0 ? C.greenBg : C.redBg} 100%)`,
+                  borderRadius: "16px", padding: "18px 20px",
+                }}>
+                  <div style={{ fontSize: "13px", color: C.text3, marginBottom: "6px" }}>
+                    {greeting} 마켓 브리핑
+                  </div>
+                  <div style={{ fontSize: "16px", fontWeight: 700, color: C.text1, lineHeight: 1.5, marginBottom: "8px" }}>
+                    {mainName} <span style={{ color: trendColor }}>{main?.change >= 0 ? "+" : ""}{main?.change}% {trend}</span>
+                    {ks && <span style={{ color: C.text3, fontSize: "13px" }}> · 코스피 {ks.change >= 0 ? "+" : ""}{ks.change}%</span>}
+                  </div>
+                  {/* 등락 비율 바 */}
+                  {hotAssets.length > 0 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "11px", color: C.green, fontWeight: 600 }}>{upCount}↑</span>
+                      <div style={{ flex: 1, height: "4px", borderRadius: "2px", background: C.card2, overflow: "hidden", display: "flex" }}>
+                        <div style={{ width: `${(upCount / Math.max(upCount + dnCount, 1)) * 100}%`, background: C.green, borderRadius: "2px 0 0 2px", transition: "width .5s ease" }} />
+                        <div style={{ flex: 1, background: hotAssets.length > 0 ? C.red : C.card2, borderRadius: "0 2px 2px 0" }} />
+                      </div>
+                      <span style={{ fontSize: "11px", color: C.red, fontWeight: 600 }}>{dnCount}↓</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* ── 시장 현황 (컴팩트 가로 스크롤) ─── */}
             <div style={{ borderRadius: "16px", overflow: "hidden" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -2688,60 +2748,6 @@ function AppInner() {
                 </div>
               );
             })()}
-
-            {/* ── 관심종목 ─── */}
-            <div style={{ background: C.card, borderRadius: "16px", padding: "16px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: watchlist.length > 0 ? "10px" : "0" }}>
-                <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>관심종목</span>
-                <SearchBar compact placeholder="+ 종목 추가" onSelect={(asset) => {
-                  if (!watchlist.some(w => w.symbol === asset.symbol)) {
-                    setWatchlist(prev => [...prev, { symbol: asset.symbol, name: asset.name, market: asset.market, symbolRaw: asset.symbolRaw || asset.symbol, id: asset.id }]);
-                  }
-                }} />
-              </div>
-              {watchlist.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "16px 0 8px", color: C.text3, fontSize: "13px" }}>
-                  오른쪽 검색으로 관심종목을 추가해보세요
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  {watchlist.map(w => {
-                    const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
-                    const flag = w.market === "us" ? "🇺🇸" : w.market === "kr" ? "🇰🇷" : "₿";
-                    return (
-                      <div key={w.symbol} onClick={() => setSelectedAsset(w)}
-                        style={{
-                          display: "flex", alignItems: "center", justifyContent: "space-between",
-                          padding: "10px 4px", cursor: "pointer",
-                          borderBottom: `1px solid ${C.border}08`,
-                        }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
-                          <span style={{ fontSize: "11px" }}>{flag}</span>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, fontSize: "13px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.name || w.symbol}</div>
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          {hot && (
-                            <div style={{ textAlign: "right" }}>
-                              <span style={{ fontWeight: 600, fontSize: "13px", color: C.text1 }}>{fmtPrice(hot.price, w.market)}</span>
-                              <span style={{ fontSize: "11px", fontWeight: 600, color: hot.change >= 0 ? C.green : C.red, marginLeft: "6px" }}>
-                                {hot.change >= 0 ? "+" : ""}{hot.change}%
-                              </span>
-                            </div>
-                          )}
-                          <button onClick={(e) => { e.stopPropagation(); setWatchlist(prev => prev.filter(x => x.symbol !== w.symbol)); }}
-                            style={{ width: "20px", height: "20px", borderRadius: "50%", border: "none",
-                              background: "transparent", color: C.text3, fontSize: "10px", cursor: "pointer",
-                              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: 0.5,
-                            }}>✕</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
 
             {/* ── 오늘의 추천 (상위 3개만, 컴팩트) ─── */}
             {dailyPicks.length > 0 && (
@@ -2837,6 +2843,160 @@ function AppInner() {
                 </div>
               </div>
             )}
+
+            {/* ── 급등/급락 TOP (토스 스타일) ─── */}
+            {hotAssets.length >= 4 && (() => {
+              const sorted = [...hotAssets].sort((a, b) => b.change - a.change);
+              const topGainers = sorted.slice(0, 3);
+              const topLosers = sorted.slice(-3).reverse();
+              return (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                  {/* 급등 */}
+                  <div style={{ background: C.card, borderRadius: "16px", padding: "14px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "10px" }}>
+                      <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.green }} />
+                      <span style={{ fontWeight: 700, fontSize: "13px", color: C.text1 }}>급등</span>
+                    </div>
+                    {topGainers.map((a, i) => (
+                      <div key={a.symbol} onClick={() => setSelectedAsset(a)} style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "6px 0", cursor: "pointer",
+                        borderBottom: i < 2 ? `1px solid ${C.border}10` : "none",
+                      }}>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: C.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "70px" }}>{a.name}</span>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: C.green }}>+{a.change}%</span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* 급락 */}
+                  <div style={{ background: C.card, borderRadius: "16px", padding: "14px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "10px" }}>
+                      <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.red }} />
+                      <span style={{ fontWeight: 700, fontSize: "13px", color: C.text1 }}>급락</span>
+                    </div>
+                    {topLosers.map((a, i) => (
+                      <div key={a.symbol} onClick={() => setSelectedAsset(a)} style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "6px 0", cursor: "pointer",
+                        borderBottom: i < 2 ? `1px solid ${C.border}10` : "none",
+                      }}>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: C.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "70px" }}>{a.name}</span>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: C.red }}>{a.change}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
+            </div>{/* end home-left */}
+            <div className="home-right" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+
+            {/* ── 관심종목 ─── */}
+            <div style={{ background: C.card, borderRadius: "16px", padding: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: watchlist.length > 0 ? "10px" : "0" }}>
+                <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>관심종목</span>
+                <SearchBar compact placeholder="+ 종목 추가" onSelect={(asset) => {
+                  if (!watchlist.some(w => w.symbol === asset.symbol)) {
+                    setWatchlist(prev => [...prev, { symbol: asset.symbol, name: asset.name, market: asset.market, symbolRaw: asset.symbolRaw || asset.symbol, id: asset.id }]);
+                  }
+                }} />
+              </div>
+              {watchlist.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "16px 0 8px", color: C.text3, fontSize: "13px" }}>
+                  검색으로 관심종목을 추가해보세요
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column" }}>
+                  {watchlist.map(w => {
+                    const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
+                    const ext = extendedHours[w.symbolRaw || w.symbol];
+                    const flag = w.market === "us" ? "🇺🇸" : w.market === "kr" ? "🇰🇷" : "₿";
+                    return (
+                      <div key={w.symbol} onClick={() => setSelectedAsset(w)}
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "10px 4px", cursor: "pointer",
+                          borderBottom: `1px solid ${C.border}08`,
+                        }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
+                          <span style={{ fontSize: "11px" }}>{flag}</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: "13px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.name || w.symbol}</div>
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          {hot && (
+                            <div style={{ textAlign: "right" }}>
+                              <div style={{ fontWeight: 600, fontSize: "13px", color: C.text1 }}>{fmtPrice(hot.price, w.market)}</div>
+                              <div style={{ display: "flex", alignItems: "center", gap: "3px", justifyContent: "flex-end" }}>
+                                <span style={{ fontSize: "11px", fontWeight: 600, color: hot.change >= 0 ? C.green : C.red }}>
+                                  {hot.change >= 0 ? "+" : ""}{hot.change}%
+                                </span>
+                                {ext && (
+                                  <span style={{ fontSize: "9px", color: C.purple, fontWeight: 600 }}>
+                                    {ext.isPreMarket ? "PRE" : "AH"} {ext.change != null ? `${ext.change >= 0 ? "+" : ""}${ext.change.toFixed(1)}%` : ""}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          <button onClick={(e) => { e.stopPropagation(); setWatchlist(prev => prev.filter(x => x.symbol !== w.symbol)); }}
+                            style={{ width: "20px", height: "20px", borderRadius: "50%", border: "none",
+                              background: "transparent", color: C.text3, fontSize: "10px", cursor: "pointer",
+                              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: 0.5,
+                            }}>✕</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ── 포트폴리오 미니 (토스 자산 카드 스타일) ─── */}
+            {portfolio.length > 0 && (() => {
+              let totalValue = 0, totalCost = 0;
+              for (const item of portfolio) {
+                const curPrice = portfolioPrices[item.symbol] || 0;
+                const qty = parseFloat(item.qty) || 0;
+                const avg = parseFloat(item.avgPrice) || 0;
+                totalValue += curPrice * qty;
+                totalCost += avg * qty;
+              }
+              const pnl = totalCost > 0 ? ((totalValue - totalCost) / totalCost * 100) : 0;
+              const pnlAmt = totalValue - totalCost;
+              return (
+                <div onClick={() => setTab("portfolio")} style={{
+                  background: C.card, borderRadius: "16px", padding: "18px 20px", cursor: "pointer",
+                  transition: "transform .15s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+                onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                    <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>내 포트폴리오</span>
+                    <span style={{ fontSize: "12px", color: C.text3 }}>{portfolio.length}개 →</span>
+                  </div>
+                  {totalValue > 0 ? (
+                    <div style={{ display: "flex", alignItems: "baseline", gap: "10px", flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: 800, fontSize: "22px", color: C.text1, letterSpacing: "-0.5px" }}>
+                        ${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                        <span style={{ fontSize: "13px", fontWeight: 700, color: pnl >= 0 ? C.green : C.red }}>
+                          {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}%
+                        </span>
+                        <span style={{ fontSize: "11px", color: C.text3 }}>
+                          ({pnlAmt >= 0 ? "+" : ""}${Math.abs(pnlAmt).toLocaleString(undefined, { maximumFractionDigits: 0 })})
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: "13px", color: C.text3 }}>가격 로딩 중...</div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* ── 경제 캘린더 (정렬/필터/년월일 표시) ─── */}
             {econEvents.length > 0 && (() => {
@@ -3056,41 +3216,6 @@ function AppInner() {
               </div>
             )}
 
-            {/* ── 포트폴리오 미니 ─── */}
-            {portfolio.length > 0 && (
-              <div onClick={() => setTab("portfolio")} style={{
-                background: C.card, borderRadius: "16px", padding: "16px", cursor: "pointer",
-              }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>내 포트폴리오</span>
-                  <span style={{ fontSize: "12px", color: C.text3 }}>{portfolio.length}개 →</span>
-                </div>
-              </div>
-            )}
-
-            {/* ── 빠른 액세스 (가로 스크롤, 작게) ─── */}
-            <div style={{ display: "flex", gap: "8px", overflow: "auto", paddingBottom: "2px" }}>
-              {[
-                { icon: "🔍", label: "스크리너", tab: "screener" },
-                { icon: "🎯", label: "전략", tab: "strategy" },
-                { icon: "📊", label: "백테스트", tab: "backtest" },
-                { icon: "📰", label: "뉴스", tab: "news" },
-                { icon: "🔔", label: "알림", tab: "alerts" },
-              ].map(item => (
-                <div key={item.tab} onClick={() => setTab(item.tab)}
-                  style={{
-                    background: C.card, borderRadius: "12px", flexShrink: 0,
-                    padding: "12px 18px", cursor: "pointer", textAlign: "center", minWidth: "72px",
-                    transition: "transform .15s",
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.transform = "scale(1.04)"}
-                  onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
-                  <div style={{ fontSize: "20px", marginBottom: "4px" }}>{item.icon}</div>
-                  <div style={{ fontWeight: 600, fontSize: "11px", color: C.text2 }}>{item.label}</div>
-                </div>
-              ))}
-            </div>
-
             {/* ── 전체 종목 (접기/펼치기) ─── */}
             <div style={{ background: C.card, borderRadius: "16px", padding: "16px" }}>
               <div onClick={() => toggleSection("allAssets")} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
@@ -3130,6 +3255,9 @@ function AppInner() {
                 </>
               )}
             </div>
+
+            </div>{/* end home-right */}
+            </div>{/* end home-grid */}
           </div>
         )}
 
