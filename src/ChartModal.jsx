@@ -71,12 +71,17 @@ function isIntraday(tf) {
   return ["1m", "5m", "10m", "30m", "1h", "2h", "4h"].includes(tf);
 }
 
+// lightweight-charts는 UTC 기준으로 시간을 렌더링하므로,
+// 사용자 로컬 타임존 오프셋을 보정하여 로컬 시간이 표시되게 함
+const LOCAL_TZ_OFFSET = new Date().getTimezoneOffset() * 60; // 초 단위 (KST = -32400)
+
 function tsToTime(ts, tf) {
   if (isIntraday(tf)) {
-    // Unix timestamp (seconds) for intraday
-    return ts;
+    // Unix timestamp (초) + 로컬 타임존 보정
+    // 예: KST(+9) → UTC timestamp에 +9시간을 더해 차트에서 로컬 시간 표시
+    return ts - LOCAL_TZ_OFFSET;
   }
-  // Business day format for daily+
+  // Business day format for daily+ (Date 생성자가 로컬 타임존 자동 적용)
   const d = new Date(ts * 1000);
   return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
 }
