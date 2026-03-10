@@ -1536,6 +1536,7 @@ export default function App() {
   const [dailyPicks, setDailyPicks] = useState([]);
   const [fearGreed, setFearGreed] = useState({ stock: null, crypto: null });
   const [extendedHours, setExtendedHours] = useState({});
+  const [sectorPerf, setSectorPerf] = useState([]);
 
   // ── 스크리너 상태 ─────────────────────────────────────────────
   const [results, setResults]         = useState([]);
@@ -1704,6 +1705,44 @@ export default function App() {
       }
     } catch {}
     setExtendedHours(extResults);
+
+    // ── 섹터/테마 ETF 성과 ──
+    const sectorETFs = [
+      { symbol: "XLK", name: "기술", icon: "💻" },
+      { symbol: "XLF", name: "금융", icon: "🏦" },
+      { symbol: "XLV", name: "헬스케어", icon: "🏥" },
+      { symbol: "XLE", name: "에너지", icon: "⛽" },
+      { symbol: "XLI", name: "산업재", icon: "🏭" },
+      { symbol: "XLY", name: "경기소비", icon: "🛒" },
+      { symbol: "XLP", name: "필수소비", icon: "🧴" },
+      { symbol: "XLU", name: "유틸리티", icon: "💡" },
+      { symbol: "XLRE", name: "부동산", icon: "🏠" },
+      { symbol: "XLC", name: "커뮤니케이션", icon: "📱" },
+      { symbol: "XLB", name: "소재", icon: "🪨" },
+    ];
+    const sectorResults = [];
+    try {
+      const sSyms = sectorETFs.map(s => s.symbol).join(",");
+      const sr = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(sSyms)}&interval=1d&range=5d`);
+      if (sr.ok) {
+        const sBatch = (await sr.json()).results || {};
+        for (const etf of sectorETFs) {
+          const d = sBatch[etf.symbol];
+          if (d && d.closes?.length >= 2) {
+            const cur = d.closes[d.closes.length - 1];
+            const prev = d.closes[d.closes.length - 2];
+            const wkAgo = d.closes[0];
+            sectorResults.push({
+              ...etf, price: cur,
+              change1d: +((cur - prev) / prev * 100).toFixed(2),
+              changeWk: +((cur - wkAgo) / wkAgo * 100).toFixed(2),
+            });
+          }
+        }
+      }
+    } catch {}
+    sectorResults.sort((a, b) => b.change1d - a.change1d);
+    setSectorPerf(sectorResults);
 
     // ── 오늘의 종목 추천 ──
     const pickSymbols = [
@@ -2174,9 +2213,12 @@ export default function App() {
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "8px" }}>
                   {marketIndices.map(idx => (
-                    <div key={idx.symbol} className="card-hover" style={{
+                    <div key={idx.symbol} className="card-hover" onClick={() => {
+                      if (!idx.symbol.includes("=X")) setChartAsset({ symbol: idx.symbol, name: idx.name, market: "us", symbolRaw: idx.symbol });
+                    }} style={{
                       background: C.bg, borderRadius: "12px", padding: "12px", textAlign: "center",
-                      border: `1px solid ${C.border}`, transition: "all 0.2s ease", cursor: "default",
+                      border: `1px solid ${C.border}`, transition: "all 0.2s ease",
+                      cursor: idx.symbol.includes("=X") ? "default" : "pointer",
                     }}>
                       <div style={{ fontSize: "11px", color: C.text3, marginBottom: "4px" }}>{idx.flag} {idx.name}</div>
                       <div style={{ fontWeight: 700, fontSize: "15px", color: C.text1, marginBottom: "2px" }}>
@@ -2188,6 +2230,9 @@ export default function App() {
                       }}>
                         {idx.change >= 0 ? "▲" : "▼"} {Math.abs(idx.change)}%
                       </div>
+                      {!idx.symbol.includes("=X") && (
+                        <div style={{ fontSize: "9px", color: C.text3, marginTop: "4px", opacity: 0.7 }}>탭하여 차트 보기</div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -2278,6 +2323,45 @@ export default function App() {
               </div>
             )}
 
+            {/* 섹터 성과 히트맵 */}
+            {sectorPerf.length > 0 && (
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px", marginBottom: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "16px" }}>🏗️ 섹터 성과</div>
+                  <span style={{ fontSize: "10px", color: C.text3, background: C.card2, padding: "3px 8px", borderRadius: "6px" }}>S&P 500 섹터 ETF</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(85px, 1fr))", gap: "6px" }}>
+                  {sectorPerf.map(sec => {
+                    const intensity = Math.min(Math.abs(sec.change1d) / 3, 1);
+                    const bg = sec.change1d >= 0
+                      ? `rgba(5, 192, 114, ${0.08 + intensity * 0.25})`
+                      : `rgba(240, 68, 82, ${0.08 + intensity * 0.25})`;
+                    return (
+                      <div key={sec.symbol} onClick={() => setChartAsset({ symbol: sec.symbol, name: `${sec.name} ETF`, market: "us", symbolRaw: sec.symbol })}
+                        style={{
+                          background: bg, borderRadius: "10px", padding: "10px 8px", textAlign: "center",
+                          cursor: "pointer", transition: "all .15s", border: `1px solid transparent`,
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = C.blue; e.currentTarget.style.transform = "scale(1.03)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = "transparent"; e.currentTarget.style.transform = "scale(1)"; }}>
+                        <div style={{ fontSize: "16px", marginBottom: "2px" }}>{sec.icon}</div>
+                        <div style={{ fontSize: "10px", fontWeight: 600, color: C.text2, marginBottom: "3px" }}>{sec.name}</div>
+                        <div style={{
+                          fontSize: "13px", fontWeight: 800,
+                          color: sec.change1d >= 0 ? C.green : C.red,
+                        }}>
+                          {sec.change1d >= 0 ? "+" : ""}{sec.change1d}%
+                        </div>
+                        <div style={{ fontSize: "9px", color: C.text3, marginTop: "2px" }}>
+                          주간 {sec.changeWk >= 0 ? "+" : ""}{sec.changeWk}%
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* 오늘의 추천 종목 */}
             {dailyPicks.length > 0 && (
               <div style={{ background: `linear-gradient(135deg, ${C.card}, ${C.isDark ? "#0d1f35" : "#e8f0fe"})`, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px", marginBottom: "16px" }}>
@@ -2326,6 +2410,78 @@ export default function App() {
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            )}
+
+            {/* 투자 시그널 요약 — 의사결정 지원 */}
+            {(marketIndices.length > 0 || sectorPerf.length > 0 || fearGreed.stock) && (
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px", marginBottom: "16px" }}>
+                <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "14px" }}>🧭 투자 시그널</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                  {/* 시장 방향성 */}
+                  {(() => {
+                    const sp = marketIndices.find(i => i.symbol === "^GSPC");
+                    const nq = marketIndices.find(i => i.symbol === "^IXIC");
+                    const avgChange = sp && nq ? (sp.change + nq.change) / 2 : sp?.change ?? nq?.change ?? 0;
+                    const direction = avgChange > 1 ? "강세" : avgChange > 0.2 ? "약세 상승" : avgChange > -0.2 ? "보합" : avgChange > -1 ? "약세 하락" : "급락";
+                    const dirColor = avgChange > 0.5 ? C.green : avgChange > -0.5 ? C.yellow : C.red;
+                    return (
+                      <div style={{ background: C.bg, borderRadius: "12px", padding: "14px" }}>
+                        <div style={{ fontSize: "10px", color: C.text3, marginBottom: "6px" }}>📈 시장 방향</div>
+                        <div style={{ fontSize: "16px", fontWeight: 800, color: dirColor }}>{direction}</div>
+                        <div style={{ fontSize: "11px", color: C.text3, marginTop: "2px" }}>
+                          S&P {sp ? `${sp.change >= 0 ? "+" : ""}${sp.change}%` : "—"} / NQ {nq ? `${nq.change >= 0 ? "+" : ""}${nq.change}%` : "—"}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {/* 섹터 로테이션 */}
+                  {sectorPerf.length > 0 && (() => {
+                    const top = sectorPerf[0];
+                    const bottom = sectorPerf[sectorPerf.length - 1];
+                    const upCount = sectorPerf.filter(s => s.change1d > 0).length;
+                    return (
+                      <div style={{ background: C.bg, borderRadius: "12px", padding: "14px" }}>
+                        <div style={{ fontSize: "10px", color: C.text3, marginBottom: "6px" }}>🔄 섹터 로테이션</div>
+                        <div style={{ fontSize: "12px", fontWeight: 700, color: C.text1 }}>
+                          <span style={{ color: C.green }}>{top.icon} {top.name}</span>
+                          <span style={{ color: C.text3, fontWeight: 400 }}> 강세</span>
+                        </div>
+                        <div style={{ fontSize: "11px", color: C.text3, marginTop: "2px" }}>
+                          {upCount}/{sectorPerf.length} 섹터 상승 · 약세: {bottom.name}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  {/* 공포/탐욕 요약 */}
+                  {fearGreed.stock && (
+                    <div style={{ background: C.bg, borderRadius: "12px", padding: "14px" }}>
+                      <div style={{ fontSize: "10px", color: C.text3, marginBottom: "6px" }}>😱 심리 지표</div>
+                      <div style={{
+                        fontSize: "16px", fontWeight: 800,
+                        color: fearGreed.stock.value <= 25 ? C.red : fearGreed.stock.value <= 40 ? "#FF8C42" : fearGreed.stock.value <= 60 ? C.yellow : C.green,
+                      }}>
+                        {fearGreed.stock.value <= 25 ? "극도의 공포" : fearGreed.stock.value <= 40 ? "공포" : fearGreed.stock.value <= 60 ? "중립" : fearGreed.stock.value <= 75 ? "탐욕" : "극도의 탐욕"}
+                      </div>
+                      <div style={{ fontSize: "11px", color: C.text3, marginTop: "2px" }}>
+                        {fearGreed.stock.value <= 30 ? "역발상 매수 구간 검토" : fearGreed.stock.value >= 75 ? "차익실현 검토" : "정상 범위"}
+                      </div>
+                    </div>
+                  )}
+                  {/* 환율 변동 */}
+                  {(() => {
+                    const fx = marketIndices.find(i => i.symbol === "USDKRW=X");
+                    if (!fx) return null;
+                    const fxImpact = fx.change > 0.5 ? "원화 약세 → 수출주 유리" : fx.change < -0.5 ? "원화 강세 → 내수주 유리" : "안정적";
+                    return (
+                      <div style={{ background: C.bg, borderRadius: "12px", padding: "14px" }}>
+                        <div style={{ fontSize: "10px", color: C.text3, marginBottom: "6px" }}>💱 환율 영향</div>
+                        <div style={{ fontSize: "14px", fontWeight: 700, color: C.text1 }}>₩{Math.round(fx.price).toLocaleString()}</div>
+                        <div style={{ fontSize: "11px", color: C.text3, marginTop: "2px" }}>{fxImpact}</div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             )}
