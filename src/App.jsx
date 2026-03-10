@@ -1,6 +1,42 @@
-// DI금융 v6.3 — 투자 스크리너 + 퀀트 엔진 + 백테스트
+// DI금융 v6.4 — 투자 스크리너 + 퀀트 엔진 + 백테스트
 // Features: 스크리닝, 캔들차트, 28개 전략, 백테스트, 포트폴리오, 뉴스, 텔레그램 알림
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
+
+// ════════════════════════════════════════════════════════════════════
+// ErrorBoundary — 런타임 에러 시 앱 전체 크래시 방지
+// ════════════════════════════════════════════════════════════════════
+class ErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  componentDidCatch(error, info) { console.error("[DI금융 ErrorBoundary]", error, info.componentStack); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{
+          minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center",
+          justifyContent: "center", background: "#0A0E17", color: "#F7F8FA", padding: "24px", textAlign: "center",
+        }}>
+          <div style={{ fontSize: "48px", marginBottom: "16px" }}>⚠️</div>
+          <h2 style={{ fontWeight: 800, fontSize: "20px", marginBottom: "8px" }}>앱 오류가 발생했습니다</h2>
+          <p style={{ color: "#6B7D8E", fontSize: "14px", marginBottom: "20px", maxWidth: "360px" }}>
+            일시적인 오류입니다. 새로고침하면 정상 작동합니다.
+          </p>
+          <button onClick={() => window.location.reload()} style={{
+            padding: "12px 28px", borderRadius: "12px", fontSize: "14px", fontWeight: 700,
+            background: "#3182F6", color: "#fff", border: "none", cursor: "pointer",
+          }}>새로고침</button>
+          <details style={{ marginTop: "16px", fontSize: "11px", color: "#6B7D8E", maxWidth: "360px" }}>
+            <summary style={{ cursor: "pointer" }}>오류 상세</summary>
+            <pre style={{ textAlign: "left", fontSize: "10px", whiteSpace: "pre-wrap", wordBreak: "break-all", marginTop: "8px" }}>
+              {this.state.error?.message}
+            </pre>
+          </details>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import ChartModal from "./ChartModal.jsx";
 import StrategyPanel from "./StrategyPanel.jsx";
 import BacktestPanel from "./BacktestPanel.jsx";
@@ -1766,7 +1802,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
 // ════════════════════════════════════════════════════════════════════
 // 메인 앱
 // ════════════════════════════════════════════════════════════════════
-export default function App() {
+function AppInner() {
   const [themeMode, setThemeMode] = useState(loadTheme);
   C = themeMode === "dark" ? DARK : LIGHT;
   const toggleTheme = useCallback(() => {
@@ -1779,6 +1815,10 @@ export default function App() {
 
   const [tab, setTab] = useState("home");
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // ── AbortController & 요청 중복 방지 refs ──
+  const abortRef = useRef(null);
+  const fetchingRef = useRef(false);
 
   // ── 홈 대시보드 상태 ───────────────────────────────────────────
   const [marketIndices, setMarketIndices] = useState([]);
@@ -1846,9 +1886,39 @@ export default function App() {
   // 관심종목 저장
   useEffect(() => { try { localStorage.setItem("di_watchlist", JSON.stringify(watchlist)); } catch {} }, [watchlist]);
 
+  // ── useMemo: 경제 캘린더 필터/정렬 결과 ──
+  const filteredEconEvents = useMemo(() => {
+    let filtered = econEvents;
+    if (econFilter === "upcoming") filtered = econEvents.filter(e => e.daysUntil >= 0);
+    else if (econFilter === "past") filtered = econEvents.filter(e => e.daysUntil < 0);
+    else if (econFilter !== "all") filtered = econEvents.filter(e => e.type === econFilter);
+    const sorted = [...filtered].sort((a, b) => {
+      if (econSort === "date-desc") return b.date - a.date;
+      if (econSort === "type") return a.type.localeCompare(b.type) || a.date - b.date;
+      return a.date - b.date;
+    });
+    return sorted;
+  }, [econEvents, econFilter, econSort]);
+
+  // ── useMemo: 스크리너 결과 정렬 ──
+  const sortedResults = useMemo(() => {
+    return [...results].sort((a, b) => {
+      if (sortBy === "rsi")     return (a.rsi ?? 999) - (b.rsi ?? 999);
+      if (sortBy === "change")  return a.weekChange - b.weekChange;
+      if (sortBy === "vol")     return b.volRatio - a.volRatio;
+      return b.triggers.length - a.triggers.length;
+    });
+  }, [results, sortBy]);
+
   // ── 홈 대시보드 데이터 ─────────────────────────────────────────
   const fetchMarketOverview = useCallback(async () => {
-    if (marketLoading) return;
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+    // 이전 요청 취소
+    if (abortRef.current) abortRef.current.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const signal = controller.signal;
     setMarketLoading(true);
     const indices = [
       { symbol: "^GSPC", name: "S&P 500", flag: "🇺🇸" },
@@ -1862,7 +1932,7 @@ export default function App() {
     const idxSyms = indices.map(i => i.symbol).join(",");
     let results = [];
     try {
-      const r = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(idxSyms)}&interval=1d&range=5d`);
+      const r = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(idxSyms)}&interval=1d&range=5d`, { signal });
       if (r.ok) {
         const batch = (await r.json()).results || {};
         for (const idx of indices) {
@@ -1875,6 +1945,7 @@ export default function App() {
         }
       }
     } catch {}
+    if (signal.aborted) { fetchingRef.current = false; return; }
     setMarketIndices(results);
     // Hot assets — 주요 종목 가격
     const hots = [
@@ -1882,6 +1953,10 @@ export default function App() {
       { symbol: "AAPL", name: "Apple", market: "us" },
       { symbol: "TSLA", name: "Tesla", market: "us" },
       { symbol: "MSFT", name: "Microsoft", market: "us" },
+      { symbol: "GOOGL", name: "Alphabet", market: "us" },
+      { symbol: "AMZN", name: "Amazon", market: "us" },
+      { symbol: "META", name: "Meta", market: "us" },
+      { symbol: "AMD", name: "AMD", market: "us" },
       { symbol: "005930.KS", name: "삼성전자", market: "kr" },
       { symbol: "000660.KS", name: "SK하이닉스", market: "kr" },
     ];
@@ -1889,7 +1964,7 @@ export default function App() {
     const hotSyms = hots.map(h => h.symbol).join(",");
     const hotResults = [];
     try {
-      const hr = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(hotSyms)}&interval=1d&range=5d`);
+      const hr = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(hotSyms)}&interval=1d&range=5d`, { signal });
       if (hr.ok) {
         const hBatch = (await hr.json()).results || {};
         for (const h of hots) {
@@ -2069,7 +2144,8 @@ export default function App() {
     setDailyPicks(picks.slice(0, 6));
 
     setMarketLoading(false);
-  }, [marketLoading]);
+    fetchingRef.current = false;
+  }, []);
 
   // ── 경제 캘린더 (API 기반 + 실제/예상 수치) ──
   const fetchEconCalendar = useCallback(async () => {
@@ -2138,7 +2214,12 @@ export default function App() {
     if (marketIndices.length === 0) fetchMarketOverview();
     fetchEconCalendar();
     const iv = setInterval(() => { fetchMarketOverview(); }, 30000);
-    return () => clearInterval(iv);
+    return () => {
+      clearInterval(iv);
+      // 탭 떠날 때 진행 중인 요청 취소
+      if (abortRef.current) abortRef.current.abort();
+      fetchingRef.current = false;
+    };
   }, [tab]);
 
   // ── 스크리너 실행 (병렬 배치 최적화) ──────────────────────────
@@ -2428,7 +2509,7 @@ export default function App() {
             title="홈으로 이동">
             <span style={{ fontSize: "20px" }}>📡</span>
             <span style={{ fontWeight: 800, fontSize: "17px", letterSpacing: "-0.5px" }}>DI금융</span>
-            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v6.3</span>
+            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v6.4</span>
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "2px" }}>
@@ -2759,20 +2840,7 @@ export default function App() {
 
             {/* ── 경제 캘린더 (정렬/필터/년월일 표시) ─── */}
             {econEvents.length > 0 && (() => {
-              // 필터 적용
-              let filtered = econEvents;
-              if (econFilter === "upcoming") filtered = econEvents.filter(e => e.daysUntil >= 0);
-              else if (econFilter === "past") filtered = econEvents.filter(e => e.daysUntil < 0);
-              else if (econFilter !== "all") filtered = econEvents.filter(e => e.type === econFilter);
-
-              // 정렬 적용
-              const sorted = [...filtered].sort((a, b) => {
-                if (econSort === "date-desc") return b.date - a.date;
-                if (econSort === "type") return a.type.localeCompare(b.type) || a.date - b.date;
-                return a.date - b.date; // date-asc default
-              });
-
-              const showEvents = econExpanded ? sorted : sorted.slice(0, 6);
+              const showEvents = econExpanded ? filteredEconEvents : filteredEconEvents.slice(0, 6);
               const filterTabs = [
                 { key: "all", label: "전체" },
                 { key: "upcoming", label: "예정" },
@@ -2801,7 +2869,7 @@ export default function App() {
                       </button>
                       <button onClick={() => setEconExpanded(p => !p)} style={{
                         background: "none", border: "none", fontSize: "11px", color: C.blue, cursor: "pointer", padding: "4px 6px", fontWeight: 600,
-                      }}>{econExpanded ? "접기" : `더보기 (${filtered.length})`}</button>
+                      }}>{econExpanded ? "접기" : `더보기 (${filteredEconEvents.length})`}</button>
                     </div>
                   </div>
 
@@ -2935,12 +3003,12 @@ export default function App() {
                   )}
 
                   {/* 요약 바 */}
-                  {filtered.length > 6 && !econExpanded && (
+                  {filteredEconEvents.length > 6 && !econExpanded && (
                     <div style={{ textAlign: "center", paddingTop: "8px" }}>
                       <button onClick={() => setEconExpanded(true)} style={{
                         background: C.card2, border: "none", borderRadius: "8px", padding: "6px 16px",
                         fontSize: "11px", fontWeight: 600, color: C.text2, cursor: "pointer",
-                      }}>+ {filtered.length - 6}개 더 보기</button>
+                      }}>+ {filteredEconEvents.length - 6}개 더 보기</button>
                     </div>
                   )}
                 </div>
@@ -3226,12 +3294,24 @@ export default function App() {
             {/* 대기 상태 */}
             {!scanning && results.length === 0 && (
               <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "48px 24px", textAlign: "center" }}>
-                <div style={{ fontSize: "44px", marginBottom: "16px" }}>📡</div>
-                <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "8px" }}>스캔 대기 중</div>
-                <div style={{ color: C.text3, fontSize: "14px", lineHeight: 1.7 }}>
-                  조건 선택 후 <strong style={{ color: C.blue }}>스캔 시작</strong>을 눌러주세요<br />
-                  미국 · 한국 주식 + 크립토 {US_ASSETS.length + KR_ASSETS.length + CRYPTO_ASSETS.length}개 자산 분석
+                <div style={{ fontSize: "44px", marginBottom: "16px" }}>{lastScan ? "🔍" : "📡"}</div>
+                <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "8px" }}>
+                  {lastScan ? "시그널 없음" : "스캔 대기 중"}
                 </div>
+                <div style={{ color: C.text3, fontSize: "14px", lineHeight: 1.7 }}>
+                  {lastScan ? (
+                    <>선택한 조건에 해당하는 종목이 없습니다<br />조건을 변경하거나 OR 모드를 사용해보세요</>
+                  ) : (
+                    <>조건 선택 후 <strong style={{ color: C.blue }}>스캔 시작</strong>을 눌러주세요<br />
+                    미국 · 한국 주식 + 크립토 {US_ASSETS.length + KR_ASSETS.length + CRYPTO_ASSETS.length}개 자산 분석</>
+                  )}
+                </div>
+                {lastScan && (
+                  <div style={{ fontSize: "11px", color: C.text3, marginTop: "12px" }}>
+                    마지막 스캔: {lastScan.toLocaleTimeString("ko-KR")}
+                    {scanErrors.length > 0 && <span style={{ color: C.yellow, marginLeft: "8px" }}>⚠️ {scanErrors.length}건 오류</span>}
+                  </div>
+                )}
               </div>
             )}
 
@@ -3242,7 +3322,11 @@ export default function App() {
             </div>
 
             {!scanning && results.length > 0 && filtered.length === 0 && (
-              <div style={{ textAlign: "center", padding: "32px", color: C.text3 }}>선택한 시장에 시그널 없음</div>
+              <div style={{ background: C.card, borderRadius: "16px", padding: "32px", textAlign: "center" }}>
+                <div style={{ fontSize: "32px", marginBottom: "8px" }}>🏷️</div>
+                <div style={{ fontWeight: 600, fontSize: "14px", color: C.text2, marginBottom: "4px" }}>선택한 시장에 시그널 없음</div>
+                <div style={{ fontSize: "12px", color: C.text3 }}>다른 시장 필터를 선택해보세요 (전체 {results.length}건 발견)</div>
+              </div>
             )}
           </div>
         )}
@@ -3688,5 +3772,16 @@ export default function App() {
       </main>
       </PullToRefresh>
     </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 앱 진입점 — ErrorBoundary 래핑
+// ════════════════════════════════════════════════════════════════════
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <AppInner />
+    </ErrorBoundary>
   );
 }
