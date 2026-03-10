@@ -1285,6 +1285,13 @@ function AssetCard({ asset, onChart }) {
 function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHours = {}, isWatched = false, onToggleWatch = () => {} }) {
   const [techData, setTechData] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // 팝업 열릴 때 배경 스크롤 차단
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
   const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
   const mcBg = asset.market === "us" ? "#1A2C4F" : asset.market === "kr" ? "#1A2A1E" : "#1E1A2A";
   const mcColor = asset.market === "us" ? C.blue : asset.market === "kr" ? C.green : C.purple;
@@ -1456,16 +1463,17 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
   const diag = useMemo(() => quickDiagnosis(enriched), [enriched]);
 
   return (
-    <div onClick={onClose} style={{
+    <div onClick={onClose} onTouchMove={e => e.stopPropagation()} style={{
       position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
       background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
       display: "flex", alignItems: "center", justifyContent: "center",
-      zIndex: 9998, padding: "20px",
+      zIndex: 9998, padding: "20px", overscrollBehavior: "contain",
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         background: C.card, borderRadius: "20px", width: "100%", maxWidth: "420px",
         maxHeight: "80vh", overflow: "auto", border: `1px solid ${C.border}`,
         boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+        overscrollBehavior: "contain", WebkitOverflowScrolling: "touch",
       }}>
         {/* 헤더 */}
         <div style={{
@@ -2492,12 +2500,16 @@ function AppInner() {
         .home-grid { display: flex; flex-direction: column; gap: 12px; }
         .home-left, .home-right { display: flex; flex-direction: column; gap: 12px; }
         .home-full { display: flex; flex-direction: column; gap: 12px; }
-        /* ── 모바일 (≤640px) ── */
+        /* ── 모바일 (≤640px) — 폰트/간격 확대 ── */
         @media (max-width: 640px) {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: block !important; }
           .mobile-bottom-tab { display: flex !important; }
-          main { padding-bottom: 80px !important; padding-left: 16px !important; padding-right: 16px !important; }
+          main { padding-bottom: 80px !important; padding-left: 14px !important; padding-right: 14px !important;
+            font-size: 14px !important; }
+          /* 모바일 전역 폰트 크기 하한 보정 — 9px/10px → 11px, 11px → 12px */
+          main * { min-height: 0; }
+          .tab-content { font-size: 14px; }
         }
         /* ── 태블릿 (641~899px) ── */
         @media (min-width: 641px) and (max-width: 899px) {
