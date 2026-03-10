@@ -1,4 +1,4 @@
-// DI금융 v6.2 — 투자 스크리너 + 퀀트 엔진 + 백테스트
+// DI금융 v6.3 — 투자 스크리너 + 퀀트 엔진 + 백테스트
 // Features: 스크리닝, 캔들차트, 28개 전략, 백테스트, 포트폴리오, 뉴스, 텔레그램 알림
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import ChartModal from "./ChartModal.jsx";
@@ -1947,23 +1947,43 @@ export default function App() {
     }
     setFearGreed(fgData);
 
-    // ── 장외(프리/포스트마켓) 가격 — yahoo-quote API ──
-    const extSyms = ["NVDA","AAPL","TSLA","MSFT","GOOGL","AMZN"].join(",");
-    const extResults = {};
+    // ── 장외(프리/포스트마켓) 가격 — hotAssets 전체 + 관심종목 ──
+    // hotAssets에 있는 US 종목 + watchlist의 US 종목 전체에서 프리/포스트마켓 가격 가져오기
+    const extSymSet = new Set();
+    // 기본 주요 종목
+    ["NVDA","AAPL","TSLA","MSFT","GOOGL","AMZN","META","AMD","AVGO","COIN","MSTR"].forEach(s => extSymSet.add(s));
+    // hotAssets에서 US 종목 추가
+    for (const h of (hotAssets || [])) {
+      if (h.market === "us" && h.symbolRaw && !h.symbolRaw.includes(".KS")) extSymSet.add(h.symbolRaw);
+    }
+    // watchlist에서 US 종목 추가
     try {
-      const er = await fetch(`/api/yahoo-quote?symbols=${encodeURIComponent(extSyms)}`);
-      if (er.ok) {
-        const { quotes = {} } = await er.json();
-        for (const [sym, q] of Object.entries(quotes)) {
-          // PRE, POST, CLOSED 상태일 때 장외 가격 표시
-          if (q.marketState === "PRE" && q.preMarketPrice) {
-            extResults[sym] = { price: q.preMarketPrice, change: q.preMarketChangePct, isPreMarket: true, isPostMarket: false };
-          } else if ((q.marketState === "POST" || q.marketState === "POSTPOST" || q.marketState === "CLOSED") && q.postMarketPrice) {
-            extResults[sym] = { price: q.postMarketPrice, change: q.postMarketChangePct, isPreMarket: false, isPostMarket: true };
-          }
-        }
+      const wl = JSON.parse(localStorage.getItem("di-watchlist") || "[]");
+      for (const w of wl) {
+        if (w.market === "us" && w.symbolRaw && !w.symbolRaw.includes(".KS")) extSymSet.add(w.symbolRaw);
+        else if (w.market === "us" && w.symbol && !w.symbol.includes(".KS")) extSymSet.add(w.symbol);
       }
     } catch {}
+    const extResults = {};
+    // yahoo-quote API는 한번에 최대 50개 정도 처리 가능, 필요시 분할
+    const extSymArr = [...extSymSet];
+    const chunkSize = 40;
+    for (let ci = 0; ci < extSymArr.length; ci += chunkSize) {
+      const chunk = extSymArr.slice(ci, ci + chunkSize).join(",");
+      try {
+        const er = await fetch(`/api/yahoo-quote?symbols=${encodeURIComponent(chunk)}`);
+        if (er.ok) {
+          const { quotes = {} } = await er.json();
+          for (const [sym, q] of Object.entries(quotes)) {
+            if (q.marketState === "PRE" && q.preMarketPrice) {
+              extResults[sym] = { price: q.preMarketPrice, change: q.preMarketChangePct, isPreMarket: true, isPostMarket: false };
+            } else if ((q.marketState === "POST" || q.marketState === "POSTPOST" || q.marketState === "CLOSED") && q.postMarketPrice) {
+              extResults[sym] = { price: q.postMarketPrice, change: q.postMarketChangePct, isPreMarket: false, isPostMarket: true };
+            }
+          }
+        }
+      } catch {}
+    }
     setExtendedHours(extResults);
 
     // ── 섹터/테마 ETF 성과 ──
@@ -2085,6 +2105,31 @@ export default function App() {
     } catch {
       setEconEvents([]);
     }
+  }, []);
+
+  // ── 모바일 핀치 줌 / 더블탭 줌 차단 (앱처럼 동작) ──
+  useEffect(() => {
+    // iOS Safari에서 gesturestart (핀치) 차단
+    const preventGesture = (e) => e.preventDefault();
+    document.addEventListener("gesturestart", preventGesture, { passive: false });
+    document.addEventListener("gesturechange", preventGesture, { passive: false });
+    // 2+ 손가락 터치 줌 차단
+    const preventMultiTouch = (e) => { if (e.touches.length > 1) e.preventDefault(); };
+    document.addEventListener("touchstart", preventMultiTouch, { passive: false });
+    // 더블탭 줌 차단 (300ms 이내 연속 터치)
+    let lastTouchEnd = 0;
+    const preventDoubleTap = (e) => {
+      const now = Date.now();
+      if (now - lastTouchEnd <= 300) e.preventDefault();
+      lastTouchEnd = now;
+    };
+    document.addEventListener("touchend", preventDoubleTap, { passive: false });
+    return () => {
+      document.removeEventListener("gesturestart", preventGesture);
+      document.removeEventListener("gesturechange", preventGesture);
+      document.removeEventListener("touchstart", preventMultiTouch);
+      document.removeEventListener("touchend", preventDoubleTap);
+    };
   }, []);
 
   // 홈 탭 진입 시 즉시 로드 + 30초 간격 자동 갱신
@@ -2343,6 +2388,9 @@ export default function App() {
         @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.4} }
         @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+        /* 모바일 앱처럼 전체 화면 확대/축소 방지 */
+        html, body { touch-action: manipulation; -ms-touch-action: manipulation; }
+        * { -webkit-touch-callout: none; }
         @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
         * { box-sizing: border-box; margin: 0; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
         html { font-size: 16px; line-height: 1.5; scroll-behavior: smooth; }
@@ -2380,7 +2428,7 @@ export default function App() {
             title="홈으로 이동">
             <span style={{ fontSize: "20px" }}>📡</span>
             <span style={{ fontWeight: 800, fontSize: "17px", letterSpacing: "-0.5px" }}>DI금융</span>
-            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v6.2</span>
+            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v6.3</span>
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "2px" }}>
