@@ -2648,8 +2648,9 @@ function AppInner() {
         position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100,
         background: `${C.bg}f5`, backdropFilter: "blur(12px)",
         borderTop: `1px solid ${C.border}`,
-        display: "none", padding: "4px 0 calc(env(safe-area-inset-bottom, 0px) + 2px)",
+        display: "none", paddingBottom: "env(safe-area-inset-bottom, 0px)",
       }} className="mobile-bottom-tab">
+        <div style={{ display: "flex", padding: "6px 0 2px" }}>
         {[
           { id: "home", icon: "🏠", label: "홈" },
           { id: "screener", icon: "🔍", label: "스크리너" },
@@ -2667,6 +2668,7 @@ function AppInner() {
             <span style={{ fontSize: mf(9), fontWeight: tab === t.id ? 700 : 500 }}>{t.label}</span>
           </button>
         ))}
+        </div>
       </nav>
 
       <PullToRefresh onRefresh={async () => {
