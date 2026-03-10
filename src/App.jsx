@@ -2030,23 +2030,28 @@ function AppInner() {
     }
     setFearGreed(fgData);
 
-    // ── 장외(프리/포스트마켓) 가격 — hotAssets 전체 + 관심종목 ──
-    // hotAssets에 있는 US 종목 + watchlist의 US 종목 전체에서 프리/포스트마켓 가격 가져오기
+    // ── 장외(프리/포스트마켓) 가격 — 전체 US 종목 + 관심종목 ──
     const extSymSet = new Set();
-    // 기본 주요 종목
-    ["NVDA","AAPL","TSLA","MSFT","GOOGL","AMZN","META","AMD","AVGO","COIN","MSTR"].forEach(s => extSymSet.add(s));
-    // hotAssets에서 US 종목 추가
-    for (const h of (hotAssets || [])) {
+    // 기본 주요 종목 + hotAssets에서 가져온 종목 (hotResults 참조 — 최신 데이터)
+    ["NVDA","AAPL","TSLA","MSFT","GOOGL","AMZN","META","AMD","AVGO","COIN","MSTR",
+     "BITX","TQQQ","SOXL","IBIT","BITO","MARA","RIOT","SOFI","HOOD","PLTR",
+     "SQQQ","SOXS","UVXY","FNGU","LABU","TMF"].forEach(s => extSymSet.add(s));
+    // hotResults (방금 fetch한 최신 데이터)에서 US 종목 추가
+    for (const h of hotResults) {
       if (h.market === "us" && h.symbolRaw && !h.symbolRaw.includes(".KS")) extSymSet.add(h.symbolRaw);
     }
-    // watchlist에서 US 종목 추가
+    // watchlist에서 US 종목 추가 (올바른 키: di_watchlist)
     try {
-      const wl = JSON.parse(localStorage.getItem("di-watchlist") || "[]");
+      const wl = JSON.parse(localStorage.getItem("di_watchlist") || "[]");
       for (const w of wl) {
         if (w.market === "us" && w.symbolRaw && !w.symbolRaw.includes(".KS")) extSymSet.add(w.symbolRaw);
         else if (w.market === "us" && w.symbol && !w.symbol.includes(".KS")) extSymSet.add(w.symbol);
       }
     } catch {}
+    // US_ASSETS 전체에서도 추가 (레버리지/크립토 ETF 포함)
+    for (const a of US_ASSETS) {
+      if (!a.symbol.includes(".KS")) extSymSet.add(a.symbol);
+    }
     const extResults = {};
     // yahoo-quote API는 한번에 최대 50개 정도 처리 가능, 필요시 분할
     const extSymArr = [...extSymSet];
