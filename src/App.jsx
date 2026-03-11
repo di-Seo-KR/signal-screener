@@ -2588,8 +2588,9 @@ function AppInner() {
     } catch {}
     if (signal.aborted) { fetchingRef.current = false; return; }
     setMarketIndices(results);
-    // Hot assets — 주요 종목 가격
+    // Hot assets — 핵심 종목 (US 30 + KR 15 = 45)
     const hots = [
+      // US Mega Cap + 반도체 + 인기주
       { symbol: "NVDA", name: "NVIDIA", market: "us" },
       { symbol: "AAPL", name: "Apple", market: "us" },
       { symbol: "TSLA", name: "Tesla", market: "us" },
@@ -2598,26 +2599,66 @@ function AppInner() {
       { symbol: "AMZN", name: "Amazon", market: "us" },
       { symbol: "META", name: "Meta", market: "us" },
       { symbol: "AMD", name: "AMD", market: "us" },
+      { symbol: "AVGO", name: "Broadcom", market: "us" },
+      { symbol: "NFLX", name: "Netflix", market: "us" },
+      { symbol: "CRM", name: "Salesforce", market: "us" },
+      { symbol: "PLTR", name: "Palantir", market: "us" },
+      { symbol: "COIN", name: "Coinbase", market: "us" },
+      { symbol: "MSTR", name: "MicroStrategy", market: "us" },
+      { symbol: "SOFI", name: "SoFi", market: "us" },
+      { symbol: "HOOD", name: "Robinhood", market: "us" },
+      { symbol: "JPM", name: "JPMorgan", market: "us" },
+      { symbol: "V", name: "Visa", market: "us" },
+      { symbol: "LLY", name: "Eli Lilly", market: "us" },
+      { symbol: "UNH", name: "UnitedHealth", market: "us" },
+      { symbol: "BA", name: "Boeing", market: "us" },
+      { symbol: "DIS", name: "Disney", market: "us" },
+      { symbol: "BABA", name: "Alibaba", market: "us" },
+      { symbol: "TSM", name: "TSMC", market: "us" },
+      { symbol: "APP", name: "AppLovin", market: "us" },
+      { symbol: "RDDT", name: "Reddit", market: "us" },
+      { symbol: "CPNG", name: "Coupang", market: "us" },
+      { symbol: "ARM", name: "ARM Holdings", market: "us" },
+      { symbol: "IONQ", name: "IonQ", market: "us" },
+      { symbol: "SMCI", name: "Super Micro", market: "us" },
+      // KR Top 15
       { symbol: "005930.KS", name: "삼성전자", market: "kr" },
       { symbol: "000660.KS", name: "SK하이닉스", market: "kr" },
+      { symbol: "373220.KS", name: "LG에너지솔루션", market: "kr" },
+      { symbol: "207940.KS", name: "삼성바이오로직스", market: "kr" },
+      { symbol: "005380.KS", name: "현대차", market: "kr" },
+      { symbol: "000270.KS", name: "기아", market: "kr" },
+      { symbol: "068270.KS", name: "셀트리온", market: "kr" },
+      { symbol: "035420.KS", name: "NAVER", market: "kr" },
+      { symbol: "035720.KS", name: "카카오", market: "kr" },
+      { symbol: "051910.KS", name: "LG화학", market: "kr" },
+      { symbol: "006400.KS", name: "삼성SDI", market: "kr" },
+      { symbol: "105560.KS", name: "KB금융", market: "kr" },
+      { symbol: "055550.KS", name: "신한지주", market: "kr" },
+      { symbol: "259960.KS", name: "크래프톤", market: "kr" },
+      { symbol: "352820.KS", name: "하이브", market: "kr" },
     ];
-    // Hot assets 병렬 fetch
-    const hotSyms = hots.map(h => h.symbol).join(",");
+    // Hot assets 병렬 fetch (배치 분할)
     const hotResults = [];
-    try {
-      const hr = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(hotSyms)}&interval=1d&range=5d`, { signal });
-      if (hr.ok) {
-        const hBatch = (await hr.json()).results || {};
-        for (const h of hots) {
-          const d = hBatch[h.symbol];
-          if (d && d.closes?.length >= 2) {
-            const cur = d.closes[d.closes.length - 1];
-            const prev = d.closes[d.closes.length - 2];
-            hotResults.push({ ...h, price: cur, change: +( ((cur - prev) / prev) * 100 ).toFixed(2), symbolRaw: h.symbol });
+    const hotChunkSize = 30;
+    for (let ci = 0; ci < hots.length; ci += hotChunkSize) {
+      const hotChunk = hots.slice(ci, ci + hotChunkSize);
+      const hotSyms = hotChunk.map(h => h.symbol).join(",");
+      try {
+        const hr = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(hotSyms)}&interval=1d&range=5d`, { signal });
+        if (hr.ok) {
+          const hBatch = (await hr.json()).results || {};
+          for (const h of hotChunk) {
+            const d = hBatch[h.symbol];
+            if (d && d.closes?.length >= 2) {
+              const cur = d.closes[d.closes.length - 1];
+              const prev = d.closes[d.closes.length - 2];
+              hotResults.push({ ...h, price: cur, change: +( ((cur - prev) / prev) * 100 ).toFixed(2), symbolRaw: h.symbol });
+            }
           }
         }
-      }
-    } catch {}
+      } catch {}
+    }
     // Crypto hots — 병렬
     const cryptoHots = [
       { id: "bitcoin", sym: "BTC", name: "Bitcoin" },
@@ -2745,49 +2786,63 @@ function AppInner() {
     sectorResults.sort((a, b) => b.change1d - a.change1d);
     setSectorPerf(sectorResults);
 
-    // ── 오늘의 종목 추천 ──
-    const pickSymbols = [
+    // ── 오늘의 종목 추천 (핵심 50종목 스캔) ──
+    const pickList = [
       "NVDA","AAPL","TSLA","MSFT","GOOGL","AMZN","META","AMD","AVGO","COIN",
-      "005930.KS","000660.KS","035420.KS","068270.KS",
-    ].join(",");
+      "NFLX","CRM","PLTR","MSTR","SOFI","HOOD","ARM","SMCI","TSM","APP",
+      "RDDT","BABA","JPM","LLY","BA","DIS","IONQ","CPNG","SHOP","CRWD",
+      "005930.KS","000660.KS","035420.KS","068270.KS","373220.KS","005380.KS",
+      "000270.KS","035720.KS","051910.KS","006400.KS","207940.KS","259960.KS",
+      "352820.KS","105560.KS","055550.KS","042660.KS","329180.KS","009540.KS",
+      "196170.KQ","042700.KS",
+    ];
     const picks = [];
-    try {
-      const pr = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(pickSymbols)}&interval=1d&range=1mo`);
-      if (pr.ok) {
-        const pBatch = (await pr.json()).results || {};
-        for (const [sym, data] of Object.entries(pBatch)) {
-          if (!data?.closes?.length || data.closes.length < 10) continue;
-          const closes = data.closes;
-          const n = closes.length;
-          const last = closes[n - 1];
-          const prev = closes[n - 2];
-          const change1d = ((last - prev) / prev) * 100;
-          // Simple scoring: RSI-like + trend
-          const change5d = n >= 5 ? ((last - closes[n - 5]) / closes[n - 5]) * 100 : 0;
-          const sma10 = closes.slice(-10).reduce((a, b) => a + b, 0) / 10;
-          const sma20 = closes.slice(-20).reduce((a, b) => a + b, 0) / Math.min(20, n);
-          let score = 0;
-          if (last > sma10) score += 2;
-          if (last > sma20) score += 2;
-          if (change5d > 0 && change5d < 8) score += 3; // healthy uptrend
-          if (change1d > -2 && change1d < 5) score += 1; // not too volatile today
-          if (sma10 > sma20) score += 2; // short-term trend up
-          const isKR = sym.includes(".KS");
-          const assetInfo = [...US_ASSETS, ...KR_ASSETS].find(a => a.symbol === sym);
-          if (!assetInfo) continue;
-          picks.push({
-            symbol: sym, name: assetInfo.name,
-            market: isKR ? "kr" : "us",
-            symbolRaw: sym,
-            price: last, change: +change1d.toFixed(2),
-            score, change5d: +change5d.toFixed(2),
-            reason: score >= 7 ? "강한 상승 추세" : score >= 5 ? "긍정적 모멘텀" : score >= 3 ? "관심 구간" : "모니터링",
-          });
+    const pickChunkSize = 25;
+    for (let ci = 0; ci < pickList.length; ci += pickChunkSize) {
+      const pickChunk = pickList.slice(ci, ci + pickChunkSize).join(",");
+      try {
+        const pr = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(pickChunk)}&interval=1d&range=1mo`);
+        if (pr.ok) {
+          const pBatch = (await pr.json()).results || {};
+          for (const [sym, data] of Object.entries(pBatch)) {
+            if (!data?.closes?.length || data.closes.length < 10) continue;
+            const closes = data.closes;
+            const n = closes.length;
+            const last = closes[n - 1];
+            const prev = closes[n - 2];
+            const change1d = ((last - prev) / prev) * 100;
+            const change5d = n >= 5 ? ((last - closes[n - 5]) / closes[n - 5]) * 100 : 0;
+            const sma10 = closes.slice(-10).reduce((a, b) => a + b, 0) / 10;
+            const sma20 = closes.slice(-20).reduce((a, b) => a + b, 0) / Math.min(20, n);
+            // 14일 RSI 간이 계산
+            let ag = 0, al = 0;
+            for (let ri = n - 14; ri < n; ri++) { const d = closes[ri] - closes[ri - 1]; if (d > 0) ag += d; else al -= d; }
+            const rsiV = al === 0 ? 100 : 100 - 100 / (1 + (ag / 14) / (al / 14));
+            let score = 0;
+            if (last > sma10) score += 2;
+            if (last > sma20) score += 2;
+            if (change5d > 0 && change5d < 10) score += 3;
+            if (change1d > -2 && change1d < 5) score += 1;
+            if (sma10 > sma20) score += 2;
+            if (rsiV >= 30 && rsiV <= 65) score += 1; // 과매수 아닌 건강 구간
+            if (rsiV < 30) score += 2; // 과매도 반등 기회
+            const isKR = sym.includes(".KS") || sym.includes(".KQ");
+            const assetInfo = [...US_ASSETS, ...KR_ASSETS].find(a => a.symbol === sym);
+            if (!assetInfo) continue;
+            picks.push({
+              symbol: sym, name: assetInfo.name,
+              market: isKR ? "kr" : "us",
+              symbolRaw: sym,
+              price: last, change: +change1d.toFixed(2),
+              score, change5d: +change5d.toFixed(2),
+              reason: score >= 8 ? "강한 상승 추세" : score >= 6 ? "긍정적 모멘텀" : score >= 4 ? "관심 구간" : "모니터링",
+            });
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
     picks.sort((a, b) => b.score - a.score);
-    setDailyPicks(picks.slice(0, 6));
+    setDailyPicks(picks);
 
     setMarketLoading(false);
     fetchingRef.current = false;
@@ -5037,6 +5092,62 @@ function AppInner() {
                           <div style={{ fontSize: "11px", fontWeight: 600, color: pick.change >= 0 ? C.green : C.red, marginTop: "4px" }}>
                             {pick.change >= 0 ? "+" : ""}{pick.change}%
                           </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* 종목별 퀀트 전략 Top 5 — 클릭하면 상세 팝업에서 백테스트 확인 */}
+              {topPicks.length > 0 && (
+                <div style={{ background: C.card, borderRadius: "16px", padding: "16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                    <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>종목별 퀀트 전략</span>
+                    <span style={{ fontSize: "10px", color: C.text3 }}>클릭 → 백테스트 상세</span>
+                  </div>
+                  <div style={{ fontSize: "11px", color: C.text3, marginBottom: "10px", lineHeight: 1.5 }}>
+                    각 종목을 클릭하면 10개 퀀트 전략 백테스트 결과(1년), 고급 지지/저항/목표/손절가, 리스크:리워드 분석을 확인할 수 있습니다.
+                  </div>
+                  {topPicks.map((pick, i) => {
+                    const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
+                    const hot = hotAssets.find(h => h.symbol === pick.symbol);
+                    const d = hot ? quickDiagnosis(hot) : null;
+                    return (
+                      <div key={pick.symbol} onClick={() => setSelectedAsset(pick)} style={{
+                        display: "flex", alignItems: "center", gap: "10px",
+                        padding: "12px 8px", cursor: "pointer",
+                        borderBottom: i < topPicks.length - 1 ? `1px solid ${C.border}08` : "none",
+                        borderRadius: "8px",
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = `${C.blue}06`}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        <div style={{
+                          width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0,
+                          background: `${C.blue}15`, display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: "14px", fontWeight: 800, color: C.blue,
+                        }}>{i + 1}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "3px" }}>
+                            <span style={{ fontWeight: 700, fontSize: "13px", color: C.text1 }}>{flag} {pick.name}</span>
+                            {d && (
+                              <span style={{
+                                fontSize: "10px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px",
+                                background: d.opinionColor === "green" ? `${C.green}18` : d.opinionColor === "red" ? `${C.red}18` : `${C.yellow}18`,
+                                color: d.opinionColor === "green" ? C.green : d.opinionColor === "red" ? C.red : C.yellow,
+                              }}>{d.opinion}</span>
+                            )}
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ fontSize: "10px", color: C.text3 }}>{pick.reason}</span>
+                            {d && <span style={{ fontSize: "10px", color: C.text3 }}>진단 {d.score}점</span>}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ fontSize: "13px", fontWeight: 700, color: pick.change >= 0 ? C.green : C.red }}>
+                            {pick.change >= 0 ? "+" : ""}{pick.change}%
+                          </div>
+                          <div style={{ fontSize: "10px", color: C.blue, fontWeight: 600 }}>전략 보기 →</div>
                         </div>
                       </div>
                     );
