@@ -1167,7 +1167,31 @@ function quickDiagnosis(asset) {
   else if (totalScore >= 20) verdict = "매도";
   else verdict = "적극 매도";
 
-  return { score: totalScore, verdict, signals, categories: [
+  // ── 매수/매도/중립 투자 의견 ──
+  let opinion, opinionColor, rationale;
+  if (totalScore >= 68) {
+    opinion = "매수";
+    opinionColor = "green";
+    rationale = signals.filter(s => s.type === "bullish").slice(0, 2).map(s => s.name).join(", ") || "기술적 상승 신호 우세";
+  } else if (totalScore >= 58) {
+    opinion = "매수 관망";
+    opinionColor = "green";
+    rationale = "상승 신호 있으나 확인 필요";
+  } else if (totalScore >= 42) {
+    opinion = "중립";
+    opinionColor = "yellow";
+    rationale = "방향성 불분명 — 추가 데이터 대기";
+  } else if (totalScore >= 32) {
+    opinion = "매도 관망";
+    opinionColor = "red";
+    rationale = "하락 신호 있으나 확인 필요";
+  } else {
+    opinion = "매도";
+    opinionColor = "red";
+    rationale = signals.filter(s => s.type === "bearish").slice(0, 2).map(s => s.name).join(", ") || "기술적 하락 신호 우세";
+  }
+
+  return { score: totalScore, verdict, opinion, opinionColor, rationale, signals, categories: [
     { name: "추세", score: trendScore },
     { name: "모멘텀", score: momScore },
     { name: "수급", score: supScore },
@@ -1245,6 +1269,11 @@ function AssetCard({ asset, onChart }) {
                       fontSize: "12px", fontWeight: 700,
                       color: diag.score >= 70 ? C.green : diag.score >= 40 ? C.yellow : C.red,
                     }}>{diag.verdict}</span>
+                    <span style={{
+                      fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px",
+                      background: diag.opinionColor === "green" ? `${C.green}18` : diag.opinionColor === "red" ? `${C.red}18` : `${C.yellow}18`,
+                      color: diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow,
+                    }}>{diag.opinion}</span>
                   </div>
                   {/* 카테고리 미니 바 */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px" }}>
@@ -1606,6 +1635,20 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                       color: diag.score >= 70 ? C.green : diag.score >= 40 ? C.yellow : C.red,
                     }}>{diag.verdict}</span>
                   </div>
+                  {/* 매수/매도/중립 의견 */}
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px",
+                    padding: "6px 10px", borderRadius: "8px",
+                    background: diag.opinionColor === "green" ? `${C.green}12` : diag.opinionColor === "red" ? `${C.red}12` : `${C.yellow}12`,
+                  }}>
+                    <span style={{
+                      fontSize: "13px", fontWeight: 800,
+                      color: diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow,
+                    }}>
+                      {diag.opinion === "매수" ? "🟢" : diag.opinion === "매도" ? "🔴" : diag.opinion === "중립" ? "🟡" : diag.opinionColor === "green" ? "🟢" : "🔴"} {diag.opinion}
+                    </span>
+                    <span style={{ fontSize: "10px", color: C.text3 }}>{diag.rationale}</span>
+                  </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5px" }}>
                     {diag.categories.map(cat => (
                       <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -1797,7 +1840,9 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               <div style={{ display: "flex", gap: "6px", marginTop: "6px", flexWrap: "wrap" }}>
                 {techData.marketCap && (
                   <span style={{ fontSize: "10px", padding: "3px 8px", borderRadius: "6px", background: C.card2, color: C.text3 }}>
-                    시총 {techData.marketCap >= 1e12 ? `$${(techData.marketCap / 1e12).toFixed(1)}T` : techData.marketCap >= 1e9 ? `$${(techData.marketCap / 1e9).toFixed(1)}B` : `$${(techData.marketCap / 1e6).toFixed(0)}M`}
+                    시총 {asset.market === "kr"
+                      ? (techData.marketCap >= 1e12 ? `₩${(techData.marketCap / 1e12).toFixed(1)}조` : techData.marketCap >= 1e8 ? `₩${(techData.marketCap / 1e8).toFixed(0)}억` : `₩${Math.round(techData.marketCap).toLocaleString()}`)
+                      : (techData.marketCap >= 1e12 ? `$${(techData.marketCap / 1e12).toFixed(1)}T` : techData.marketCap >= 1e9 ? `$${(techData.marketCap / 1e9).toFixed(1)}B` : `$${(techData.marketCap / 1e6).toFixed(0)}M`)}
                   </span>
                 )}
                 {techData.dividendYield && techData.dividendYield > 0 && (
@@ -1893,6 +1938,8 @@ function AppInner() {
   const [sectorPerf, setSectorPerf] = useState([]);
   const [econEvents, setEconEvents] = useState([]);
   const [econExpanded, setEconExpanded] = useState(false);
+  const [hotExpanded, setHotExpanded] = useState(false);
+  const [picksExpanded, setPicksExpanded] = useState(false);
   const [econSort, setEconSort] = useState("date-asc"); // date-asc, date-desc, type
   const [econFilter, setEconFilter] = useState("all"); // all, upcoming, past, FOMC, CPI, NFP, GDP, PCE
   const [homeSection, setHomeSection] = useState({
@@ -2966,10 +3013,12 @@ function AppInner() {
               <div style={{ background: C.card, borderRadius: "16px", padding: "16px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
                   <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>오늘의 추천</span>
-                  <span style={{ fontSize: mf(11), color: C.text3 }}>기술적 분석 기반</span>
+                  <button onClick={() => setPicksExpanded(!picksExpanded)} style={{
+                    fontSize: mf(11), color: C.blue, background: "none", border: "none", cursor: "pointer", fontWeight: 600,
+                  }}>{picksExpanded ? "접기" : `더보기 (${dailyPicks.length})`}</button>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  {dailyPicks.slice(0, 4).map((pick, i) => {
+                  {dailyPicks.slice(0, picksExpanded ? 20 : 4).map((pick, i) => {
                     const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
                     const isPos = pick.change >= 0;
                     return (
@@ -2977,7 +3026,7 @@ function AppInner() {
                         style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between",
                           padding: "10px 4px", cursor: "pointer",
-                          borderBottom: i < Math.min(dailyPicks.length, 4) - 1 ? `1px solid ${C.border}08` : "none",
+                          borderBottom: i < Math.min(dailyPicks.length, picksExpanded ? 20 : 4) - 1 ? `1px solid ${C.border}08` : "none",
                         }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
                           <div style={{
@@ -3010,9 +3059,14 @@ function AppInner() {
             {/* ── 주요 종목 (토스 스타일 리스트) ─── */}
             {hotAssets.length > 0 && (
               <div style={{ background: C.card, borderRadius: "16px", padding: "16px" }}>
-                <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1, display: "block", marginBottom: "6px" }}>주요 종목</span>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                  <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>주요 종목</span>
+                  <button onClick={() => setHotExpanded(!hotExpanded)} style={{
+                    fontSize: mf(11), color: C.blue, background: "none", border: "none", cursor: "pointer", fontWeight: 600,
+                  }}>{hotExpanded ? "접기" : `더보기 (${hotAssets.length})`}</button>
+                </div>
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  {hotAssets.slice(0, 8).map((asset, i) => {
+                  {hotAssets.slice(0, hotExpanded ? 30 : 8).map((asset, i) => {
                     const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
                     const isPos = asset.change >= 0;
                     const ext = extendedHours[asset.symbolRaw || asset.symbol];
@@ -3021,7 +3075,7 @@ function AppInner() {
                         style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between",
                           padding: "11px 4px", cursor: "pointer",
-                          borderBottom: i < 7 ? `1px solid ${C.border}08` : "none",
+                          borderBottom: i < (hotExpanded ? 29 : 7) ? `1px solid ${C.border}08` : "none",
                         }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
                           <div style={{
@@ -3166,6 +3220,88 @@ function AppInner() {
               )}
             </div>
 
+            {/* ── 관심종목 투자 전략 (quickDiagnosis 기반) ─── */}
+            {watchlist.length > 0 && hotAssets.length > 0 && (() => {
+              const watchDiags = watchlist.map(w => {
+                const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
+                if (!hot) return null;
+                const d = quickDiagnosis(hot);
+                return { ...w, ...hot, diag: d };
+              }).filter(Boolean).sort((a, b) => b.diag.score - a.diag.score);
+              if (!watchDiags.length) return null;
+              return (
+                <div style={{ background: C.card, borderRadius: "16px", padding: "16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                    <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>관심종목 투자 전략</span>
+                    <span style={{ fontSize: mf(10), color: C.text3 }}>자동 분석</span>
+                  </div>
+                  {watchDiags.map((w, i) => {
+                    const d = w.diag;
+                    const opColor = d.opinionColor === "green" ? C.green : d.opinionColor === "red" ? C.red : C.yellow;
+                    return (
+                      <div key={w.symbol} onClick={() => setSelectedAsset(w)} style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "10px 4px", cursor: "pointer",
+                        borderBottom: i < watchDiags.length - 1 ? `1px solid ${C.border}08` : "none",
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            width: "28px", height: "28px", borderRadius: "50%", flexShrink: 0,
+                            background: `${opColor}18`, display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: "12px", fontWeight: 800, color: opColor,
+                          }}>{d.score}</div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: "13px", color: C.text1 }}>{w.name}</div>
+                            <div style={{ fontSize: mf(10), color: C.text3 }}>{d.rationale}</div>
+                          </div>
+                        </div>
+                        <span style={{
+                          fontSize: "11px", fontWeight: 700, padding: "3px 10px", borderRadius: "6px",
+                          background: `${opColor}18`, color: opColor, whiteSpace: "nowrap",
+                        }}>{d.opinion}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* ── 퀀트 리포트 미니 ─── */}
+            {hotAssets.length > 0 && (() => {
+              const bullish = hotAssets.filter(a => { try { return quickDiagnosis(a).score >= 65; } catch { return false; } }).length;
+              const bearish = hotAssets.filter(a => { try { return quickDiagnosis(a).score <= 35; } catch { return false; } }).length;
+              const neutral = hotAssets.length - bullish - bearish;
+              const sentimentScore = hotAssets.length > 0 ? Math.round((bullish / hotAssets.length) * 100) : 50;
+              const now = new Date();
+              const reportTime = now.toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+              return (
+                <div style={{ background: `linear-gradient(135deg, ${C.card}, ${sentimentScore > 55 ? "#0d2818" : sentimentScore < 45 ? "#28100d" : "#1a1a0d"})`, borderRadius: "16px", padding: "16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                    <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>퀀트 리포트</span>
+                    <span style={{ fontSize: mf(10), color: C.text3 }}>{reportTime} 기준</span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "10px" }}>
+                    <div style={{ textAlign: "center", padding: "10px", borderRadius: "10px", background: `${C.green}12` }}>
+                      <div style={{ fontSize: "18px", fontWeight: 800, color: C.green }}>{bullish}</div>
+                      <div style={{ fontSize: mf(10), color: C.text3 }}>매수 신호</div>
+                    </div>
+                    <div style={{ textAlign: "center", padding: "10px", borderRadius: "10px", background: `${C.yellow}12` }}>
+                      <div style={{ fontSize: "18px", fontWeight: 800, color: C.yellow }}>{neutral}</div>
+                      <div style={{ fontSize: mf(10), color: C.text3 }}>중립</div>
+                    </div>
+                    <div style={{ textAlign: "center", padding: "10px", borderRadius: "10px", background: `${C.red}12` }}>
+                      <div style={{ fontSize: "18px", fontWeight: 800, color: C.red }}>{bearish}</div>
+                      <div style={{ fontSize: mf(10), color: C.text3 }}>매도 신호</div>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: "12px", color: C.text3, lineHeight: 1.6 }}>
+                    시장 센티먼트 <strong style={{ color: sentimentScore > 55 ? C.green : sentimentScore < 45 ? C.red : C.yellow }}>{sentimentScore}%</strong> 긍정
+                    {sentimentScore > 60 ? " — 매수 우위 장세" : sentimentScore > 50 ? " — 약 강세" : sentimentScore > 40 ? " — 혼조세" : " — 약세 우위"}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* ── 포트폴리오 미니 (토스 자산 카드 스타일) ─── */}
             {portfolio.length > 0 && (() => {
               let totalValue = 0, totalCost = 0;
@@ -3192,14 +3328,14 @@ function AppInner() {
                   {totalValue > 0 ? (
                     <div style={{ display: "flex", alignItems: "baseline", gap: "10px", flexWrap: "wrap" }}>
                       <span style={{ fontWeight: 800, fontSize: "22px", color: C.text1, letterSpacing: "-0.5px" }}>
-                        ${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        {currency === "KRW" ? `₩${Math.round(totalValue * krwRate).toLocaleString()}` : `$${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
                       </span>
                       <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                         <span style={{ fontSize: "13px", fontWeight: 700, color: pnl >= 0 ? C.green : C.red }}>
                           {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}%
                         </span>
                         <span style={{ fontSize: "11px", color: C.text3 }}>
-                          ({pnlAmt >= 0 ? "+" : ""}${Math.abs(pnlAmt).toLocaleString(undefined, { maximumFractionDigits: 0 })})
+                          ({pnlAmt >= 0 ? "+" : ""}{currency === "KRW" ? `₩${Math.round(Math.abs(pnlAmt) * krwRate).toLocaleString()}` : `$${Math.abs(pnlAmt).toLocaleString(undefined, { maximumFractionDigits: 0 })}`})
                         </span>
                       </div>
                     </div>
