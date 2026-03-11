@@ -40,6 +40,7 @@ export default function StrategyPanel({ onRunBacktest }) {
   const symbols = [
     { label: "S&P 500", value: "SPY" },
     { label: "나스닥 100", value: "QQQ" },
+    { label: "BITX (BTC 2x)", value: "BITX" },
     { label: "삼성전자", value: "005930.KS" },
     { label: "SK하이닉스", value: "000660.KS" },
     { label: "Bitcoin", value: "BTC-USD" },
@@ -47,8 +48,10 @@ export default function StrategyPanel({ onRunBacktest }) {
     { label: "NVIDIA", value: "NVDA" },
     { label: "Tesla", value: "TSLA" },
     { label: "AMD", value: "AMD" },
-    { label: "Goldman Sachs", value: "GS" },
+    { label: "Meta", value: "META" },
     { label: "Broadcom", value: "AVGO" },
+    { label: "Palantir", value: "PLTR" },
+    { label: "Coinbase", value: "COIN" },
     { label: "Russell 2000", value: "IWM" },
   ];
 
@@ -158,14 +161,19 @@ export default function StrategyPanel({ onRunBacktest }) {
                   {expandedStrategy === s.id && (
                     <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${C.border}` }}>
                       <div style={{ fontSize: "12px", color: C.text2, marginBottom: "8px", lineHeight: 1.6 }}>{s.desc}</div>
-                      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
                         <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "10px", background: C.card, color: C.text3, border: `1px solid ${C.border}` }}>
                           위험도: {s.risk}
                         </span>
+                        <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "10px", background: `${CAT_COLORS[s.category] || C.blue}15`, color: CAT_COLORS[s.category] || C.blue, fontWeight: 600 }}>
+                          {s.category}
+                        </span>
                         {onRunBacktest && (
                           <button onClick={(e) => { e.stopPropagation(); onRunBacktest(s, selectedSymbol); }} style={{
-                            padding: "3px 10px", borderRadius: "6px", fontSize: "10px", fontWeight: 700,
-                            background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}44`, cursor: "pointer",
+                            padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700,
+                            background: `linear-gradient(135deg, ${C.blue}, ${C.blueL})`, color: "#fff",
+                            border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px",
+                            boxShadow: `0 2px 8px ${C.blue}40`,
                           }}>📊 백테스트 실행</button>
                         )}
                       </div>
@@ -204,9 +212,11 @@ export default function StrategyPanel({ onRunBacktest }) {
                   }}>위험도: {s.risk}</span>
                   {onRunBacktest && (
                     <button onClick={() => onRunBacktest(s, selectedSymbol)} style={{
-                      padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
-                      background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}33`, cursor: "pointer",
-                    }}>백테스트</button>
+                      padding: "4px 10px", borderRadius: "6px", fontSize: "10px", fontWeight: 700,
+                      background: `linear-gradient(135deg, ${C.blue}, ${C.blueL})`, color: "#fff",
+                      border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "3px",
+                      boxShadow: `0 1px 4px ${C.blue}30`,
+                    }}>📊 백테스트</button>
                   )}
                 </div>
               </div>

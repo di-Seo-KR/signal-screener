@@ -1200,7 +1200,7 @@ function quickDiagnosis(asset) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 퀀트 전략 백테스팅 엔진 (10개 전략 → 종목별 상위 5개 추천)
+// 퀀트 전략 백테스팅 엔진 (10개 전략 → 종목별 상위 10개 추천)
 // ════════════════════════════════════════════════════════════════════
 function runBacktest(closes, highs, lows, volumes) {
   const n = closes.length;
@@ -1376,7 +1376,7 @@ function runBacktest(closes, highs, lows, volumes) {
     }, "RSI+MACD 복합", "RSI 저역에서 MACD 매수신호 시 진입, RSI 고역에서 매도신호 시 청산"),
   ];
 
-  // Sharpe 기준 정렬 후 상위 5개
+  // Sharpe 기준 정렬 후 상위 10개
   return strategies
     .filter(s => s.trades >= 2 && s.sharpe > -0.5 && s.totalReturn > -30 && s.maxDD < 50)
     .sort((a, b) => {
@@ -1385,7 +1385,7 @@ function runBacktest(closes, highs, lows, volumes) {
       const scoreB = b.sharpe * 0.4 + (b.totalReturn / 50) * 0.3 + (b.winRate / 100) * 0.2 + ((50 - b.maxDD) / 50) * 0.1;
       return scoreB - scoreA;
     })
-    .slice(0, 5);
+    .slice(0, 10);
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -1850,7 +1850,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
         }
 
         if (!cancelled) {
-          // 퀀트 백테스팅 (10개 전략 → 상위 5개)
+          // 퀀트 백테스팅 (10개 전략 → 상위 10개)
           const btResults = runBacktest(closes, highs, lows, volumes);
           // 고급 지지/저항/목표가/손절가
           const enrichedForLevels = { weekChange, ma200Dist };
@@ -2621,6 +2621,7 @@ function AppInner() {
       { symbol: "ARM", name: "ARM Holdings", market: "us" },
       { symbol: "IONQ", name: "IonQ", market: "us" },
       { symbol: "SMCI", name: "Super Micro", market: "us" },
+      { symbol: "BITX", name: "BTC 2x 레버리지", market: "us" },
       // KR Top 15
       { symbol: "005930.KS", name: "삼성전자", market: "kr" },
       { symbol: "000660.KS", name: "SK하이닉스", market: "kr" },
@@ -2790,7 +2791,7 @@ function AppInner() {
     const pickList = [
       "NVDA","AAPL","TSLA","MSFT","GOOGL","AMZN","META","AMD","AVGO","COIN",
       "NFLX","CRM","PLTR","MSTR","SOFI","HOOD","ARM","SMCI","TSM","APP",
-      "RDDT","BABA","JPM","LLY","BA","DIS","IONQ","CPNG","SHOP","CRWD",
+      "RDDT","BABA","JPM","LLY","BA","DIS","IONQ","CPNG","SHOP","CRWD","BITX",
       "005930.KS","000660.KS","035420.KS","068270.KS","373220.KS","005380.KS",
       "000270.KS","035720.KS","051910.KS","006400.KS","207940.KS","259960.KS",
       "352820.KS","105560.KS","055550.KS","042660.KS","329180.KS","009540.KS",
@@ -5099,12 +5100,12 @@ function AppInner() {
                 </div>
               )}
 
-              {/* 종목별 퀀트 전략 Top 5 — 클릭하면 상세 팝업에서 백테스트 확인 */}
+              {/* 종목별 퀀트 전략 Top 10 — 클릭하면 상세 팝업에서 백테스트 확인 */}
               {topPicks.length > 0 && (
                 <div style={{ background: C.card, borderRadius: "16px", padding: "16px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                     <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>종목별 퀀트 전략</span>
-                    <span style={{ fontSize: "10px", color: C.text3 }}>클릭 → 백테스트 상세</span>
+                    <span style={{ fontSize: "10px", padding: "3px 8px", borderRadius: "6px", background: `${C.blue}15`, color: C.blue, fontWeight: 600 }}>백테스트 상세 →</span>
                   </div>
                   <div style={{ fontSize: "11px", color: C.text3, marginBottom: "10px", lineHeight: 1.5 }}>
                     각 종목을 클릭하면 10개 퀀트 전략 백테스트 결과(1년), 고급 지지/저항/목표/손절가, 리스크:리워드 분석을 확인할 수 있습니다.
@@ -5147,7 +5148,7 @@ function AppInner() {
                           <div style={{ fontSize: "13px", fontWeight: 700, color: pick.change >= 0 ? C.green : C.red }}>
                             {pick.change >= 0 ? "+" : ""}{pick.change}%
                           </div>
-                          <div style={{ fontSize: "10px", color: C.blue, fontWeight: 600 }}>전략 보기 →</div>
+                          <button style={{ fontSize: "10px", color: C.blue, fontWeight: 700, background: `${C.blue}12`, border: `1px solid ${C.blue}30`, borderRadius: "6px", padding: "3px 10px", cursor: "pointer" }}>📊 백테스트</button>
                         </div>
                       </div>
                     );
