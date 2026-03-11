@@ -2856,10 +2856,25 @@ function AppInner() {
       const data = await resp.json();
       const now = new Date();
       const events = (data.events || []).map(e => {
-        // 미국 동부시간 기준 발표 → 한국 시간(KST, UTC+9)으로 변환
-        // 대부분 경제지표는 8:30 AM ET 발표 → KST 22:30 (전날 or 당일)
-        const usET = new Date(e.date + "T08:30:00-05:00"); // US Eastern
-        const d = new Date(usET.getTime()); // KST로 자동 변환 (브라우저 시간대)
+        // 미국 동부시간(ET) 기준 발표 → 한국시간(KST) 변환
+        // Intl로 US Eastern 시간대 자동 처리 (EST/EDT 서머타임 자동 반영)
+        // 대부분 경제지표는 8:30 AM ET 발표 → KST 21:30(EDT) or 22:30(EST)
+        // FOMC는 2:00 PM ET 발표
+        const isForFed = /FOMC|Fed.*Rate|Interest Rate/i.test(e.event);
+        const etHour = isForFed ? 14 : 8;
+        const etMin = isForFed ? 0 : 30;
+        // US Eastern 시간을 UTC로 정확히 변환 (서머타임 자동 반영)
+        const etDateStr = `${e.date}T${String(etHour).padStart(2,"0")}:${String(etMin).padStart(2,"0")}:00`;
+        // Intl.DateTimeFormat으로 ET→UTC 오프셋 계산
+        const tempDate = new Date(e.date + "T12:00:00Z");
+        const etOffset = (() => {
+          const etStr = tempDate.toLocaleString("en-US", { timeZone: "America/New_York", hour: "numeric", hour12: false, minute: "numeric" });
+          const utcStr = tempDate.toLocaleString("en-US", { timeZone: "UTC", hour: "numeric", hour12: false, minute: "numeric" });
+          const [etH] = etStr.split(":").map(Number);
+          const [utcH] = utcStr.split(":").map(Number);
+          return utcH - etH; // EDT=4, EST=5
+        })();
+        const d = new Date(e.date + `T${String(etHour + etOffset).padStart(2,"0")}:${String(etMin).padStart(2,"0")}:00Z`);
         // 한국 시간 기준 날짜 차이 계산
         const koNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
         const koEvt = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
