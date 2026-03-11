@@ -4074,8 +4074,12 @@ function AppInner() {
                     <div style={{ display: "flex", flexDirection: "column" }}>
                       {showEvents.map((evt, i) => {
                         const statusColor = evt.status === "오늘" ? C.red : evt.status === "임박" ? C.yellow : evt.status === "완료" || evt.status === "어제" ? C.text3 : C.text2;
-                        const beat = evt.actual != null && evt.estimate != null ? evt.actual > evt.estimate : null;
-                        const miss = evt.actual != null && evt.estimate != null ? evt.actual < evt.estimate : null;
+                        // CPI, PCE, PPI, 실업률 → 낮을수록 호재(역방향)
+                        const invertedIndicator = /CPI|PCE|PPI|Unemployment/i.test(evt.event);
+                        const hasActual = evt.actual != null && evt.estimate != null;
+                        const beat = hasActual ? (invertedIndicator ? evt.actual < evt.estimate : evt.actual > evt.estimate) : null;
+                        const miss = hasActual ? (invertedIndicator ? evt.actual > evt.estimate : evt.actual < evt.estimate) : null;
+                        const surprise = hasActual ? Math.abs(evt.actual - evt.estimate).toFixed(1) : null;
                         const isPast = evt.daysUntil < 0;
                         // 한국 시간 기준 날짜 표시
                         const kstStr = evt.date.toLocaleString("en-US", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false });
@@ -4132,15 +4136,23 @@ function AppInner() {
                             {/* 실제 */}
                             <div style={{ textAlign: "right" }}>
                               {evt.actual != null ? (
-                                <div style={{
-                                  fontSize: "12px", fontWeight: 700, fontVariantNumeric: "tabular-nums",
-                                  color: beat ? C.green : miss ? C.red : C.text1,
-                                }}>
-                                  {evt.actual}{evt.unit}
-                                  {beat && <span style={{ fontSize: mf(9), marginLeft: "1px" }}>▲</span>}
-                                  {miss && <span style={{ fontSize: mf(9), marginLeft: "1px" }}>▼</span>}
+                                <div>
+                                  <div style={{
+                                    fontSize: "12px", fontWeight: 700, fontVariantNumeric: "tabular-nums",
+                                    color: beat ? C.green : miss ? C.red : C.text1,
+                                  }}>
+                                    {evt.actual}{evt.unit}
+                                    {beat && <span style={{ fontSize: mf(9), marginLeft: "1px" }}>▲</span>}
+                                    {miss && <span style={{ fontSize: mf(9), marginLeft: "1px" }}>▼</span>}
+                                  </div>
+                                  {surprise && surprise !== "0.0" && (
+                                    <div style={{ fontSize: "8px", fontWeight: 600, color: beat ? C.green : C.red, opacity: 0.8 }}>
+                                      {beat ? "호재" : "악재"} {surprise}p
+                                    </div>
+                                  )}
                                 </div>
                               ) : (
+                                isPast ? <span style={{ fontSize: mf(10), color: C.yellow }}>발표 대기</span> :
                                 <span style={{ fontSize: mf(11), color: C.text3 }}>—</span>
                               )}
                             </div>
