@@ -1,4 +1,4 @@
-// DI금융 v6.5 — 투자 스크리너 + 퀀트 엔진 + 백테스트
+// DI금융 v6.6 — 투자 스크리너 + 퀀트 엔진 + 백테스트
 // Features: 스크리닝, 캔들차트, 28개 전략, 백테스트, 포트폴리오, 뉴스, 텔레그램 알림
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 
@@ -2810,7 +2810,7 @@ function AppInner() {
             title="홈으로 이동">
             <span style={{ fontSize: "20px" }}>📡</span>
             <span style={{ fontWeight: 800, fontSize: "17px", letterSpacing: "-0.5px" }}>DI금융</span>
-            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: mf(10), fontWeight: 700, background: C.blueBg, color: C.blue }}>v6.5</span>
+            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: mf(10), fontWeight: 700, background: C.blueBg, color: C.blue }}>v6.6</span>
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "2px" }}>
