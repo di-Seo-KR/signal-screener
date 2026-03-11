@@ -1200,6 +1200,356 @@ function quickDiagnosis(asset) {
 }
 
 // ════════════════════════════════════════════════════════════════════
+// 퀀트 전략 백테스팅 엔진 (10개 전략 → 종목별 상위 5개 추천)
+// ════════════════════════════════════════════════════════════════════
+function runBacktest(closes, highs, lows, volumes) {
+  const n = closes.length;
+  if (n < 60) return [];
+
+  // ── 공통 지표 사전 계산 ──
+  const sma = (arr, p, idx) => { if (idx < p - 1) return null; let s = 0; for (let i = idx - p + 1; i <= idx; i++) s += arr[i]; return s / p; };
+  const ema = (arr, p) => { const k = 2 / (p + 1); const out = [arr[0]]; for (let i = 1; i < arr.length; i++) out.push(arr[i] * k + out[i - 1] * (1 - k)); return out; };
+  const rsiArr = (arr, p = 14) => {
+    const out = new Array(arr.length).fill(50);
+    if (arr.length < p + 1) return out;
+    let ag = 0, al = 0;
+    for (let i = 1; i <= p; i++) { const d = arr[i] - arr[i - 1]; if (d > 0) ag += d; else al -= d; }
+    ag /= p; al /= p;
+    out[p] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+    for (let i = p + 1; i < arr.length; i++) {
+      const d = arr[i] - arr[i - 1];
+      ag = (ag * (p - 1) + (d > 0 ? d : 0)) / p;
+      al = (al * (p - 1) + (d < 0 ? -d : 0)) / p;
+      out[i] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+    }
+    return out;
+  };
+  const atrArr = (cls, hi, lo, p = 14) => {
+    const tr = [hi[0] - lo[0]];
+    for (let i = 1; i < cls.length; i++) tr.push(Math.max(hi[i] - lo[i], Math.abs(hi[i] - cls[i - 1]), Math.abs(lo[i] - cls[i - 1])));
+    const out = [tr[0]];
+    for (let i = 1; i < tr.length; i++) out.push(i < p ? tr.slice(0, i + 1).reduce((a, b) => a + b) / (i + 1) : (out[i - 1] * (p - 1) + tr[i]) / p);
+    return out;
+  };
+  const bbArr = (arr, p = 20, k = 2) => {
+    const mid = [], upper = [], lower = [];
+    for (let i = 0; i < arr.length; i++) {
+      if (i < p - 1) { mid.push(null); upper.push(null); lower.push(null); continue; }
+      const sl = arr.slice(i - p + 1, i + 1);
+      const m = sl.reduce((a, b) => a + b) / p;
+      const std = Math.sqrt(sl.reduce((a, v) => a + (v - m) ** 2, 0) / p);
+      mid.push(m); upper.push(m + k * std); lower.push(m - k * std);
+    }
+    return { mid, upper, lower };
+  };
+
+  const ema12 = ema(closes, 12), ema26 = ema(closes, 26);
+  const macd = ema12.map((v, i) => v - ema26[i]);
+  const macdSignal = ema(macd, 9);
+  const rsi = rsiArr(closes, 14);
+  const atr = atrArr(closes, highs, lows, 14);
+  const bb = bbArr(closes, 20, 2);
+  const sma20cache = closes.map((_, i) => sma(closes, 20, i));
+  const sma50cache = closes.map((_, i) => sma(closes, 50, i));
+  const sma200cache = closes.map((_, i) => sma(closes, 200, i));
+
+  // ── 전략 백테스트 러너 ──
+  function simulate(signalFn, name, desc) {
+    let cash = 10000, shares = 0, trades = 0, wins = 0, maxVal = 10000, maxDD = 0;
+    const equity = [];
+    let entryPrice = 0;
+    const startIdx = 60; // 워밍업
+
+    for (let i = startIdx; i < n; i++) {
+      const sig = signalFn(i);
+      const price = closes[i];
+      if (sig === 1 && cash > 0) { // 매수
+        shares = cash / price; cash = 0; entryPrice = price; trades++;
+      } else if (sig === -1 && shares > 0) { // 매도
+        cash = shares * price; if (price > entryPrice) wins++; shares = 0;
+      }
+      const val = cash + shares * price;
+      equity.push(val);
+      if (val > maxVal) maxVal = val;
+      const dd = (maxVal - val) / maxVal;
+      if (dd > maxDD) maxDD = dd;
+    }
+    // 미결 포지션 청산
+    if (shares > 0) { cash = shares * closes[n - 1]; if (closes[n - 1] > entryPrice) wins++; shares = 0; }
+    const finalVal = cash;
+    const totalReturn = ((finalVal - 10000) / 10000) * 100;
+    const daysHeld = n - startIdx;
+    const annReturn = daysHeld > 0 ? (Math.pow(finalVal / 10000, 252 / daysHeld) - 1) * 100 : 0;
+    // 일간 수익률 → Sharpe
+    const dailyRet = [];
+    for (let i = 1; i < equity.length; i++) dailyRet.push((equity[i] - equity[i - 1]) / equity[i - 1]);
+    const avgRet = dailyRet.length > 0 ? dailyRet.reduce((a, b) => a + b, 0) / dailyRet.length : 0;
+    const stdRet = dailyRet.length > 1 ? Math.sqrt(dailyRet.reduce((a, v) => a + (v - avgRet) ** 2, 0) / (dailyRet.length - 1)) : 1;
+    const sharpe = stdRet > 0 ? (avgRet / stdRet) * Math.sqrt(252) : 0;
+    const winRate = trades > 0 ? (wins / trades) * 100 : 0;
+
+    return { name, desc, totalReturn: +totalReturn.toFixed(1), annReturn: +annReturn.toFixed(1), sharpe: +sharpe.toFixed(2), maxDD: +(maxDD * 100).toFixed(1), winRate: +winRate.toFixed(0), trades };
+  }
+
+  const strategies = [
+    // 1) 골든/데드 크로스 (SMA 50/200)
+    simulate(i => {
+      if (!sma50cache[i] || !sma50cache[i - 1] || !sma200cache[i]) return 0;
+      if (sma50cache[i] > sma200cache[i] && sma50cache[i - 1] <= sma200cache[i - 1]) return 1;
+      if (sma50cache[i] < sma200cache[i] && sma50cache[i - 1] >= sma200cache[i - 1]) return -1;
+      return 0;
+    }, "골든/데드크로스", "SMA 50이 SMA 200 상향돌파 시 매수, 하향돌파 시 매도"),
+
+    // 2) RSI 역추세
+    simulate(i => {
+      if (rsi[i] < 30 && rsi[i - 1] >= 30) return 1; // 과매도 진입
+      if (rsi[i] > 70 && rsi[i - 1] <= 70) return -1; // 과매수 청산
+      return 0;
+    }, "RSI 역추세", "RSI 30 하향돌파 시 매수, 70 상향돌파 시 매도"),
+
+    // 3) MACD 크로스오버
+    simulate(i => {
+      if (macd[i] > macdSignal[i] && macd[i - 1] <= macdSignal[i - 1]) return 1;
+      if (macd[i] < macdSignal[i] && macd[i - 1] >= macdSignal[i - 1]) return -1;
+      return 0;
+    }, "MACD 크로스", "MACD가 시그널선 상향돌파 시 매수, 하향돌파 시 매도"),
+
+    // 4) 볼린저밴드 반전
+    simulate(i => {
+      if (!bb.lower[i]) return 0;
+      if (closes[i] < bb.lower[i] && closes[i - 1] >= bb.lower[i - 1]) return 1;
+      if (closes[i] > bb.upper[i] && closes[i - 1] <= bb.upper[i - 1]) return -1;
+      return 0;
+    }, "볼린저밴드 반전", "가격이 하한선 이탈 시 매수, 상한선 돌파 시 매도"),
+
+    // 5) 이동평균 3중 필터 (EMA 12/26 + SMA 200)
+    simulate(i => {
+      if (!sma200cache[i]) return 0;
+      if (closes[i] > sma200cache[i] && ema12[i] > ema26[i] && ema12[i - 1] <= ema26[i - 1]) return 1;
+      if (ema12[i] < ema26[i] && ema12[i - 1] >= ema26[i - 1]) return -1;
+      return 0;
+    }, "3중 이평선 필터", "SMA200 위에서 EMA12>EMA26 돌파 시 매수"),
+
+    // 6) ATR 돌파 (변동성 돌파)
+    simulate(i => {
+      if (i < 2) return 0;
+      const range = atr[i - 1] * 1.5;
+      if (closes[i] > closes[i - 1] + range) return 1;
+      if (closes[i] < closes[i - 1] - range) return -1;
+      return 0;
+    }, "ATR 변동성 돌파", "전일 종가 대비 1.5×ATR 돌파 시 매수/매도"),
+
+    // 7) 거래량 돌파 + 추세확인
+    simulate(i => {
+      if (i < 21) return 0;
+      const avgVol = volumes.slice(i - 20, i).reduce((a, b) => a + b, 0) / 20;
+      const volSpike = volumes[i] > avgVol * 2;
+      if (volSpike && closes[i] > closes[i - 1] && sma20cache[i] && closes[i] > sma20cache[i]) return 1;
+      if (volSpike && closes[i] < closes[i - 1] && sma20cache[i] && closes[i] < sma20cache[i]) return -1;
+      return 0;
+    }, "거래량 돌파", "2배 이상 거래량 급증 + 추세방향 확인 시 진입"),
+
+    // 8) 평균 회귀 (SMA20 기준)
+    simulate(i => {
+      if (!sma20cache[i]) return 0;
+      const dist = (closes[i] - sma20cache[i]) / sma20cache[i] * 100;
+      if (dist < -5 && (closes[i] - closes[i - 1]) > 0) return 1; // 과이탈 후 반등
+      if (dist > 5 && (closes[i] - closes[i - 1]) < 0) return -1; // 과이탈 후 하락
+      return 0;
+    }, "평균회귀 (SMA20)", "SMA20 대비 5%+ 이탈 후 반전 캔들 시 진입"),
+
+    // 9) 듀얼 모멘텀 (절대+상대)
+    simulate(i => {
+      if (i < 63) return 0;
+      const mom1m = (closes[i] - closes[i - 21]) / closes[i - 21];
+      const mom3m = (closes[i] - closes[i - 63]) / closes[i - 63];
+      if (mom1m > 0 && mom3m > 0.05) return 1;
+      if (mom1m < -0.03 || mom3m < -0.05) return -1;
+      return 0;
+    }, "듀얼 모멘텀", "1개월+3개월 수익률 모두 양수일 때 매수"),
+
+    // 10) RSI + MACD 복합
+    simulate(i => {
+      if (rsi[i] < 40 && macd[i] > macdSignal[i] && macd[i - 1] <= macdSignal[i - 1]) return 1;
+      if (rsi[i] > 60 && macd[i] < macdSignal[i] && macd[i - 1] >= macdSignal[i - 1]) return -1;
+      return 0;
+    }, "RSI+MACD 복합", "RSI 저역에서 MACD 매수신호 시 진입, RSI 고역에서 매도신호 시 청산"),
+  ];
+
+  // Sharpe 기준 정렬 후 상위 5개
+  return strategies
+    .filter(s => s.trades >= 2 && s.sharpe > -0.5 && s.totalReturn > -30 && s.maxDD < 50)
+    .sort((a, b) => {
+      // 복합 스코어: Sharpe 40% + 수익률 30% + 승률 20% + MDD(역) 10%
+      const scoreA = a.sharpe * 0.4 + (a.totalReturn / 50) * 0.3 + (a.winRate / 100) * 0.2 + ((50 - a.maxDD) / 50) * 0.1;
+      const scoreB = b.sharpe * 0.4 + (b.totalReturn / 50) * 0.3 + (b.winRate / 100) * 0.2 + ((50 - b.maxDD) / 50) * 0.1;
+      return scoreB - scoreA;
+    })
+    .slice(0, 5);
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 고급 지지/저항/목표가/손절가 엔진 (Multi-Model)
+// ════════════════════════════════════════════════════════════════════
+function calcAdvancedLevels(closes, highs, lows, volumes, techData, fairValue, analystTarget, analystHigh, analystLow) {
+  const n = closes.length;
+  const last = closes[n - 1];
+  if (n < 30) return null;
+
+  // ── ATR 계산 ──
+  const tr = [highs[0] - lows[0]];
+  for (let i = 1; i < n; i++) tr.push(Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1])));
+  const atr14 = tr.slice(-14).reduce((a, b) => a + b, 0) / 14;
+
+  // ── 피벗포인트 (Traditional + Fibonacci) ──
+  const pH = highs[n - 1], pL = lows[n - 1], pC = closes[n - 1];
+  const pivot = (pH + pL + pC) / 3;
+  const pivotR1 = 2 * pivot - pL;
+  const pivotS1 = 2 * pivot - pH;
+  const pivotR2 = pivot + (pH - pL);
+  const pivotS2 = pivot - (pH - pL);
+  // 피보나치 피벗
+  const fibR1 = pivot + 0.382 * (pH - pL);
+  const fibR2 = pivot + 0.618 * (pH - pL);
+  const fibS1 = pivot - 0.382 * (pH - pL);
+  const fibS2 = pivot - 0.618 * (pH - pL);
+
+  // ── 볼린저밴드 ──
+  const sma20 = closes.slice(-20).reduce((a, b) => a + b, 0) / 20;
+  const std20 = Math.sqrt(closes.slice(-20).reduce((a, v) => a + (v - sma20) ** 2, 0) / 20);
+  const bbUpper = sma20 + 2 * std20;
+  const bbLower = sma20 - 2 * std20;
+
+  // ── 52주 피보나치 리트레이스먼트 ──
+  const high52w = Math.max(...highs);
+  const low52w = Math.min(...lows);
+  const range52 = high52w - low52w;
+  const fib236 = high52w - range52 * 0.236;
+  const fib382 = high52w - range52 * 0.382;
+  const fib500 = high52w - range52 * 0.500;
+  const fib618 = high52w - range52 * 0.618;
+
+  // ── 볼륨프로파일 (간이: 가격대별 거래량 집중구간) ──
+  const priceStep = range52 / 20;
+  const volProfile = new Array(20).fill(0);
+  for (let i = Math.max(0, n - 60); i < n; i++) {
+    const bin = Math.min(19, Math.floor((closes[i] - low52w) / priceStep));
+    if (bin >= 0) volProfile[bin] += volumes[i] || 0;
+  }
+  // POC (Point of Control) = 최대 거래량 가격대
+  const pocBin = volProfile.indexOf(Math.max(...volProfile));
+  const poc = low52w + (pocBin + 0.5) * priceStep;
+  // VAH/VAL (70% 거래량 범위)
+  const totalVol = volProfile.reduce((a, b) => a + b, 0);
+  let cumVol = 0, vahBin = pocBin, valBin = pocBin;
+  const sortedBins = volProfile.map((v, i) => ({ v, i })).sort((a, b) => b.v - a.v);
+  for (const b of sortedBins) { cumVol += b.v; if (b.i > vahBin) vahBin = b.i; if (b.i < valBin) valBin = b.i; if (cumVol >= totalVol * 0.7) break; }
+  const vah = low52w + (vahBin + 1) * priceStep;
+  const val_ = low52w + valBin * priceStep;
+
+  // ── SMA 지지/저항 ──
+  const sma50 = n >= 50 ? closes.slice(-50).reduce((a, b) => a + b, 0) / 50 : null;
+  const sma200 = n >= 200 ? closes.slice(-200).reduce((a, b) => a + b, 0) / 200 : null;
+
+  // ── 지지선 후보 수집 + 가중 점수 ──
+  const supports = [];
+  const addSup = (price, weight, source) => { if (price && price < last * 0.999 && price > last * 0.5) supports.push({ price, weight, source }); };
+  addSup(pivotS1, 3, "피벗 S1");
+  addSup(pivotS2, 2, "피벗 S2");
+  addSup(fibS1, 2.5, "피보나치 피벗 S1");
+  addSup(fibS2, 1.5, "피보나치 피벗 S2");
+  addSup(bbLower, 2.5, "볼린저 하한");
+  addSup(fib382, 3, "52주 Fib 38.2%");
+  addSup(fib500, 2.5, "52주 Fib 50%");
+  addSup(fib618, 3, "52주 Fib 61.8%");
+  addSup(poc < last ? poc : null, 3.5, "볼륨 POC");
+  addSup(val_, 2, "볼륨 VAL");
+  addSup(sma50 && sma50 < last ? sma50 : null, 2.5, "SMA 50");
+  addSup(sma200 && sma200 < last ? sma200 : null, 3, "SMA 200");
+  addSup(last - atr14 * 2, 2, "ATR 2배");
+  // 클러스터링: 가격이 비슷한 것 묶기 (2% 이내)
+  supports.sort((a, b) => a.price - b.price);
+  const supClusters = [];
+  for (const s of supports) {
+    const existing = supClusters.find(c => Math.abs(c.price - s.price) / s.price < 0.02);
+    if (existing) { existing.weight += s.weight; existing.sources.push(s.source); existing.price = (existing.price * (existing.sources.length - 1) + s.price) / existing.sources.length; }
+    else supClusters.push({ price: s.price, weight: s.weight, sources: [s.source] });
+  }
+  supClusters.sort((a, b) => b.weight - a.weight);
+
+  // ── 저항선 후보 수집 + 가중 점수 ──
+  const resists = [];
+  const addRes = (price, weight, source) => { if (price && price > last * 1.001 && price < last * 2) resists.push({ price, weight, source }); };
+  addRes(pivotR1, 3, "피벗 R1");
+  addRes(pivotR2, 2, "피벗 R2");
+  addRes(fibR1, 2.5, "피보나치 피벗 R1");
+  addRes(fibR2, 1.5, "피보나치 피벗 R2");
+  addRes(bbUpper, 2.5, "볼린저 상한");
+  addRes(fib236, 3, "52주 Fib 23.6%");
+  addRes(fib382 > last ? fib382 : null, 2.5, "52주 Fib 38.2%");
+  addRes(poc > last ? poc : null, 3.5, "볼륨 POC");
+  addRes(vah > last ? vah : null, 2, "볼륨 VAH");
+  addRes(high52w, 2, "52주 고점");
+  addRes(sma50 && sma50 > last ? sma50 : null, 2.5, "SMA 50");
+  addRes(sma200 && sma200 > last ? sma200 : null, 3, "SMA 200");
+  addRes(last + atr14 * 2, 1.5, "ATR 2배");
+  resists.sort((a, b) => a.price - b.price);
+  const resClusters = [];
+  for (const r of resists) {
+    const existing = resClusters.find(c => Math.abs(c.price - r.price) / r.price < 0.02);
+    if (existing) { existing.weight += r.weight; existing.sources.push(r.source); existing.price = (existing.price * (existing.sources.length - 1) + r.price) / existing.sources.length; }
+    else resClusters.push({ price: r.price, weight: r.weight, sources: [r.source] });
+  }
+  resClusters.sort((a, b) => b.weight - a.weight);
+
+  // ── 목표가 (Multi-Model 가중평균) ──
+  const targets = [];
+  if (fairValue && fairValue > last) targets.push({ price: fairValue, weight: 4, source: "적정주가 모델" });
+  if (analystTarget && analystTarget > last) targets.push({ price: analystTarget, weight: 5, source: "애널리스트" });
+  if (analystHigh && analystHigh > last) targets.push({ price: analystHigh, weight: 2, source: "애널리스트 최고" });
+  if (resClusters[0]) targets.push({ price: resClusters[0].price, weight: 3, source: resClusters[0].sources[0] });
+  if (resClusters[1]) targets.push({ price: resClusters[1].price, weight: 1.5, source: resClusters[1].sources[0] });
+  // ATR 기반 목표가 (추세 지속 시)
+  if (techData?.weekChange > 0) targets.push({ price: last + atr14 * 3, weight: 2, source: "ATR 3배 목표" });
+  let targetPrice = null, targetSources = [];
+  if (targets.length > 0) {
+    const tw = targets.reduce((s, t) => s + t.weight, 0);
+    targetPrice = targets.reduce((s, t) => s + t.price * (t.weight / tw), 0);
+    targetSources = targets.map(t => t.source);
+  }
+
+  // ── 손절가 (ATR + 지지선 하단) ──
+  const stopCandidates = [];
+  stopCandidates.push({ price: last - atr14 * 2, weight: 4, source: "ATR 2배" });
+  if (supClusters[0]) stopCandidates.push({ price: supClusters[0].price * 0.98, weight: 3, source: `${supClusters[0].sources[0]} 하단` });
+  if (supClusters[1]) stopCandidates.push({ price: supClusters[1].price * 0.98, weight: 2, source: `${supClusters[1].sources[0]} 하단` });
+  if (analystLow) stopCandidates.push({ price: analystLow, weight: 2.5, source: "애널리스트 저점" });
+  stopCandidates.push({ price: last * 0.92, weight: 1, source: "고정 -8%" });
+  const sw = stopCandidates.reduce((s, c) => s + c.weight, 0);
+  const stopLoss = stopCandidates.reduce((s, c) => s + c.price * (c.weight / sw), 0);
+  const stopSources = stopCandidates.map(c => c.source);
+
+  const support1 = supClusters[0] || null;
+  const support2 = supClusters[1] || null;
+  const resist1 = resClusters[0] || null;
+  const resist2 = resClusters[1] || null;
+
+  const upside = targetPrice ? +((targetPrice - last) / last * 100).toFixed(1) : null;
+  const downside = +((last - stopLoss) / last * 100).toFixed(1);
+  const riskReward = upside && downside > 0 ? +(upside / downside).toFixed(1) : null;
+
+  return {
+    targetPrice, targetSources,
+    stopLoss, stopSources,
+    support1, support2,
+    resist1, resist2,
+    upside, downside, riskReward,
+    atr14, pivot, poc, bbUpper, bbLower,
+    vah, val: val_,
+  };
+}
+
+// ════════════════════════════════════════════════════════════════════
 // 서브 컴포넌트: AssetCard
 // ════════════════════════════════════════════════════════════════════
 function AssetCard({ asset, onChart }) {
@@ -1500,6 +1850,12 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
         }
 
         if (!cancelled) {
+          // 퀀트 백테스팅 (10개 전략 → 상위 5개)
+          const btResults = runBacktest(closes, highs, lows, volumes);
+          // 고급 지지/저항/목표가/손절가
+          const enrichedForLevels = { weekChange, ma200Dist };
+          const advLevels = calcAdvancedLevels(closes, highs, lows, volumes, enrichedForLevels, fairValue, analystTarget, analystHigh, analystLow);
+
           setTechData({
             price: last, rsi, ma50, ma200, ma200Dist, volRatio,
             stoch: { k: stochK }, wr, high52w, low52w, weekChange,
@@ -1515,6 +1871,10 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             trailingEps: analystQ.trailingEps, bookValue: analystQ.bookValue,
             marketCap: analystQ.marketCap, dividendYield: analystQ.dividendYield,
             beta: analystQ.beta, earningsDate: analystQ.earningsDate,
+            // 퀀트 백테스팅 + 고급 레벨
+            backtestStrategies: btResults,
+            advancedLevels: advLevels,
+            dataTimestamp: Date.now(),
           });
           setLoading(false);
         }
@@ -1682,105 +2042,168 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           )}
         </div>
 
-        {/* ═══ 투자 전략 (Investment Strategy) ═══ */}
-        {techData && !loading && (
-          <div style={{ padding: "0 20px 12px" }}>
-            <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
-              <div style={{ fontSize: "11px", fontWeight: 700, color: C.text3, marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
-                🎯 투자 전략
-                <span style={{
-                  fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px",
-                  background: diag.opinionColor === "green" ? `${C.green}18` : diag.opinionColor === "red" ? `${C.red}18` : `${C.yellow}18`,
-                  color: diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow,
-                }}>{diag.opinion}</span>
+        {/* ═══ 투자 전략 (Advanced Investment Strategy) ═══ */}
+        {techData && !loading && (() => {
+          const lv = techData.advancedLevels;
+          const bt = techData.backtestStrategies || [];
+          const p = techData.price;
+          const isBullish = diag.score >= 55;
+          const isBearish = diag.score < 40;
+          const fmtP = (v) => !v ? "—" : asset.market === "kr" ? `₩${Math.round(v).toLocaleString()}` : `$${v.toFixed(2)}`;
+          const targetPrice = lv?.targetPrice;
+          const stopLoss = lv?.stopLoss || p * 0.92;
+          const upside = lv?.upside;
+          const downside = lv?.downside || 8;
+          const riskReward = lv?.riskReward;
+          const sup1 = lv?.support1;
+          const sup2 = lv?.support2;
+          const res1 = lv?.resist1;
+          const res2 = lv?.resist2;
+          const freshMin = techData.dataTimestamp ? Math.round((Date.now() - techData.dataTimestamp) / 60000) : null;
+
+          return (
+            <>
+            {/* 전략 + 핵심 레벨 */}
+            <div style={{ padding: "0 20px 12px" }}>
+              <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: C.text3 }}>🎯 퀀트 전략</span>
+                    <span style={{
+                      fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px",
+                      background: diag.opinionColor === "green" ? `${C.green}18` : diag.opinionColor === "red" ? `${C.red}18` : `${C.yellow}18`,
+                      color: diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow,
+                    }}>{diag.opinion}</span>
+                  </div>
+                  {freshMin != null && <span style={{ fontSize: "9px", color: C.text3 }}>{freshMin < 1 ? "방금" : `${freshMin}분 전`} 분석</span>}
+                </div>
+
+                {/* 전략 요약 */}
+                <div style={{
+                  fontSize: "12px", color: C.text2, lineHeight: 1.7, marginBottom: "14px",
+                  padding: "10px 12px", borderRadius: "10px", background: C.card,
+                  borderLeft: `3px solid ${diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow}`,
+                }}>
+                  {isBullish && targetPrice
+                    ? `기술적 상승 신호 우세. 목표가 ${fmtP(targetPrice)}(+${upside}%)까지 상승 여력, 손절 ${fmtP(stopLoss)} 이탈 시 청산 권장.${riskReward ? ` R:R 1:${riskReward}.` : ""}`
+                    : isBullish
+                    ? `상승 추세 감지. 분할 매수 접근 유효. ${fmtP(stopLoss)} 하회 시 리스크 관리 필요.`
+                    : isBearish
+                    ? `하락 신호 우세. 관망 또는 ${fmtP(sup1?.price || stopLoss)} 지지 확인 후 진입 권장.`
+                    : `혼조 구간. 지지 ${fmtP(sup1?.price || stopLoss)}·저항 ${fmtP(res1?.price)} 돌파 확인 후 대응.`}
+                </div>
+
+                {/* 목표가 + 손절가 (근거 표시) */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "8px" }}>
+                  <div style={{ background: C.card, borderRadius: "8px", padding: "10px" }}>
+                    <div style={{ fontSize: "9px", color: C.text3, marginBottom: "3px" }}>목표가</div>
+                    <div style={{ fontSize: "15px", fontWeight: 800, color: C.green }}>{fmtP(targetPrice || techData.analystTarget)}</div>
+                    {upside && <div style={{ fontSize: "10px", color: C.green, marginTop: "2px" }}>+{upside}%</div>}
+                    {lv?.targetSources && <div style={{ fontSize: "8px", color: C.text3, marginTop: "4px", lineHeight: 1.4 }}>{lv.targetSources.slice(0, 3).join(" · ")}</div>}
+                  </div>
+                  <div style={{ background: C.card, borderRadius: "8px", padding: "10px" }}>
+                    <div style={{ fontSize: "9px", color: C.text3, marginBottom: "3px" }}>손절가</div>
+                    <div style={{ fontSize: "15px", fontWeight: 800, color: C.red }}>{fmtP(stopLoss)}</div>
+                    {downside > 0 && <div style={{ fontSize: "10px", color: C.red, marginTop: "2px" }}>-{downside}%</div>}
+                    {lv?.stopSources && <div style={{ fontSize: "8px", color: C.text3, marginTop: "4px", lineHeight: 1.4 }}>{lv.stopSources.slice(0, 3).join(" · ")}</div>}
+                  </div>
+                </div>
+
+                {/* 지지선 + 저항선 (다중 레벨, 근거 표시) */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "10px" }}>
+                  <div style={{ background: C.card, borderRadius: "8px", padding: "10px" }}>
+                    <div style={{ fontSize: "9px", color: C.text3, marginBottom: "5px" }}>지지선</div>
+                    {sup1 ? (
+                      <>
+                        <div style={{ fontSize: "13px", fontWeight: 700, color: C.blue }}>{fmtP(sup1.price)}</div>
+                        <div style={{ fontSize: "8px", color: C.text3, marginTop: "2px" }}>{sup1.sources.slice(0, 2).join(" · ")} <span style={{ color: C.blue }}>×{sup1.weight.toFixed(0)}</span></div>
+                        {sup2 && <div style={{ fontSize: "10px", color: C.text3, marginTop: "4px" }}>2차: {fmtP(sup2.price)} <span style={{ fontSize: "8px" }}>({sup2.sources[0]})</span></div>}
+                      </>
+                    ) : <div style={{ fontSize: "12px", color: C.text3 }}>—</div>}
+                  </div>
+                  <div style={{ background: C.card, borderRadius: "8px", padding: "10px" }}>
+                    <div style={{ fontSize: "9px", color: C.text3, marginBottom: "5px" }}>저항선</div>
+                    {res1 ? (
+                      <>
+                        <div style={{ fontSize: "13px", fontWeight: 700, color: C.purple }}>{fmtP(res1.price)}</div>
+                        <div style={{ fontSize: "8px", color: C.text3, marginTop: "2px" }}>{res1.sources.slice(0, 2).join(" · ")} <span style={{ color: C.purple }}>×{res1.weight.toFixed(0)}</span></div>
+                        {res2 && <div style={{ fontSize: "10px", color: C.text3, marginTop: "4px" }}>2차: {fmtP(res2.price)} <span style={{ fontSize: "8px" }}>({res2.sources[0]})</span></div>}
+                      </>
+                    ) : <div style={{ fontSize: "12px", color: C.text3 }}>—</div>}
+                  </div>
+                </div>
+
+                {/* 리스크:리워드 + 진입 + 포지션 */}
+                <div style={{ display: "flex", gap: "6px" }}>
+                  {riskReward && (
+                    <div style={{ flex: 1, padding: "8px 10px", borderRadius: "8px", background: riskReward >= 2 ? `${C.green}12` : riskReward >= 1 ? `${C.yellow}12` : `${C.red}12`, textAlign: "center" }}>
+                      <div style={{ fontSize: "9px", color: C.text3 }}>R:R</div>
+                      <div style={{ fontSize: "14px", fontWeight: 800, color: riskReward >= 2 ? C.green : riskReward >= 1 ? C.yellow : C.red }}>1:{riskReward}</div>
+                    </div>
+                  )}
+                  <div style={{ flex: 1, padding: "8px 10px", borderRadius: "8px", background: C.card, textAlign: "center" }}>
+                    <div style={{ fontSize: "9px", color: C.text3 }}>진입</div>
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: C.text1, marginTop: "2px" }}>{isBullish ? "분할매수" : isBearish ? "관망" : "확인 후"}</div>
+                  </div>
+                  <div style={{ flex: 1, padding: "8px 10px", borderRadius: "8px", background: C.card, textAlign: "center" }}>
+                    <div style={{ fontSize: "9px", color: C.text3 }}>포지션</div>
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: C.text1, marginTop: "2px" }}>{diag.score >= 70 ? "비중확대" : diag.score >= 55 ? "소량매수" : diag.score >= 40 ? "비중유지" : "비중축소"}</div>
+                  </div>
+                </div>
               </div>
-              {/* 매수 전략 */}
-              {(() => {
-                const p = techData.price;
-                const fv = techData.fairValue;
-                const low52 = techData.low52w;
-                const high52 = techData.high52w;
-                const ma200v = techData.ma200Dist != null ? p / (1 + techData.ma200Dist / 100) : null;
-                const support1 = ma200v ? Math.min(p, ma200v) : low52 ? low52 + (p - low52) * 0.382 : null;
-                const support2 = low52 ? low52 + (high52 - low52) * 0.236 : null;
-                const resist1 = high52 ? low52 + (high52 - low52) * 0.618 : null;
-                const resist2 = high52 || null;
-                const targetPrice = fv ? (fv > p ? fv : null) : (techData.analystTarget && techData.analystTarget > p ? techData.analystTarget : null);
-                const stopLoss = support2 || (low52 ? low52 * 1.02 : p * 0.92);
-                const upside = targetPrice ? +((targetPrice - p) / p * 100).toFixed(1) : null;
-                const downside = stopLoss ? +((p - stopLoss) / p * 100).toFixed(1) : 8;
-                const riskReward = upside && downside > 0 ? (upside / downside).toFixed(1) : null;
-                const isBullish = diag.score >= 55;
-                const isBearish = diag.score < 40;
-                const fmtP = (v) => !v ? "—" : asset.market === "kr" ? `₩${Math.round(v).toLocaleString()}` : `$${v.toFixed(2)}`;
-                return (
-                  <>
-                    {/* 전략 요약 문장 */}
-                    <div style={{
-                      fontSize: "12px", color: C.text2, lineHeight: 1.7, marginBottom: "14px",
-                      padding: "10px 12px", borderRadius: "10px", background: C.card,
-                      borderLeft: `3px solid ${diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow}`,
-                    }}>
-                      {isBullish && targetPrice
-                        ? `기술적 상승 신호가 우세합니다. 목표가 ${fmtP(targetPrice)}(+${upside}%) 부근까지 상승 여력이 있으며, ${fmtP(stopLoss)} 이탈 시 손절을 권장합니다.`
-                        : isBullish
-                        ? `상승 추세 신호가 감지됩니다. 현재가 부근에서 분할 매수 접근이 유효하며, ${fmtP(stopLoss)} 하회 시 리스크 관리가 필요합니다.`
-                        : isBearish
-                        ? `하락 신호가 우세합니다. 신규 매수보다는 관망 또는 ${fmtP(support1 || stopLoss)} 지지선 확인 후 진입을 권장합니다.`
-                        : `방향성이 불분명한 구간입니다. 핵심 지지선 ${fmtP(support1 || stopLoss)}과 저항선 ${fmtP(resist1)} 돌파 여부를 확인 후 대응하세요.`}
-                    </div>
-                    {/* 핵심 가격 레벨 */}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "10px" }}>
-                      {[
-                        { label: "목표가", value: fmtP(targetPrice || (techData.analystTarget || null)), color: C.green, sub: upside ? `+${upside}%` : null },
-                        { label: "손절가", value: fmtP(stopLoss), color: C.red, sub: downside ? `-${downside}%` : null },
-                        { label: "지지선", value: fmtP(support1), color: C.blue, sub: null },
-                        { label: "저항선", value: fmtP(resist1), color: C.purple, sub: null },
-                      ].map(lv => (
-                        <div key={lv.label} style={{ background: C.card, borderRadius: "8px", padding: "8px 10px" }}>
-                          <div style={{ fontSize: "9px", color: C.text3, marginBottom: "3px" }}>{lv.label}</div>
-                          <div style={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
-                            <span style={{ fontSize: "13px", fontWeight: 700, color: lv.color || C.text1 }}>{lv.value}</span>
-                            {lv.sub && <span style={{ fontSize: "10px", color: lv.color }}>{lv.sub}</span>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    {/* 리스크/리워드 + 포지션 가이드 */}
-                    <div style={{ display: "flex", gap: "6px" }}>
-                      {riskReward && (
-                        <div style={{
-                          flex: 1, padding: "8px 10px", borderRadius: "8px",
-                          background: riskReward >= 2 ? `${C.green}12` : riskReward >= 1 ? `${C.yellow}12` : `${C.red}12`,
-                          textAlign: "center",
-                        }}>
-                          <div style={{ fontSize: "9px", color: C.text3 }}>리스크:리워드</div>
-                          <div style={{ fontSize: "14px", fontWeight: 800, color: riskReward >= 2 ? C.green : riskReward >= 1 ? C.yellow : C.red }}>1:{riskReward}</div>
-                        </div>
-                      )}
-                      <div style={{
-                        flex: 1, padding: "8px 10px", borderRadius: "8px", background: C.card, textAlign: "center",
-                      }}>
-                        <div style={{ fontSize: "9px", color: C.text3 }}>진입 전략</div>
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: C.text1, marginTop: "2px" }}>
-                          {isBullish ? "분할 매수" : isBearish ? "관망" : "지지선 확인 후"}
-                        </div>
-                      </div>
-                      <div style={{
-                        flex: 1, padding: "8px 10px", borderRadius: "8px", background: C.card, textAlign: "center",
-                      }}>
-                        <div style={{ fontSize: "9px", color: C.text3 }}>포지션</div>
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: C.text1, marginTop: "2px" }}>
-                          {diag.score >= 70 ? "비중 확대" : diag.score >= 55 ? "소량 매수" : diag.score >= 40 ? "비중 유지" : "비중 축소"}
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                );
-              })()}
             </div>
-          </div>
-        )}
+
+            {/* ═══ 퀀트 전략 백테스트 결과 (상위 5개) ═══ */}
+            {bt.length > 0 && (
+              <div style={{ padding: "0 20px 12px" }}>
+                <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: C.text3 }}>📊 퀀트 전략 백테스트 (1년)</span>
+                    <span style={{ fontSize: "9px", color: C.text3 }}>상위 {bt.length}개</span>
+                  </div>
+                  {bt.map((s, i) => {
+                    const isTop = i === 0;
+                    const retColor = s.totalReturn >= 0 ? C.green : C.red;
+                    return (
+                      <div key={s.name} style={{
+                        padding: "10px 12px", borderRadius: "10px", marginBottom: i < bt.length - 1 ? "6px" : 0,
+                        background: isTop ? `${C.blue}08` : C.card,
+                        border: isTop ? `1px solid ${C.blue}30` : `1px solid ${C.border}`,
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ fontSize: "12px", fontWeight: 700, color: isTop ? C.blue : C.text1 }}>
+                              {isTop ? "🏆" : `${i + 1}.`} {s.name}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: "14px", fontWeight: 800, color: retColor }}>
+                            {s.totalReturn >= 0 ? "+" : ""}{s.totalReturn}%
+                          </span>
+                        </div>
+                        <div style={{ fontSize: "10px", color: C.text3, marginBottom: "6px" }}>{s.desc}</div>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
+                            샤프 <span style={{ fontWeight: 700, color: s.sharpe >= 1 ? C.green : s.sharpe >= 0 ? C.yellow : C.red }}>{s.sharpe}</span>
+                          </span>
+                          <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
+                            승률 <span style={{ fontWeight: 700, color: s.winRate >= 60 ? C.green : s.winRate >= 40 ? C.yellow : C.red }}>{s.winRate}%</span>
+                          </span>
+                          <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
+                            MDD <span style={{ fontWeight: 700, color: s.maxDD <= 10 ? C.green : s.maxDD <= 20 ? C.yellow : C.red }}>-{s.maxDD}%</span>
+                          </span>
+                          <span style={{ fontSize: "10px", padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
+                            {s.trades}회
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            </>
+          );
+        })()}
 
         {/* ═══ 적정주가 (Multi-Model Fair Value) ═══ */}
         {techData?.fairValue != null && (
@@ -2914,7 +3337,7 @@ function AppInner() {
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "2px" }}>
-            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "backtest", label: "백테스트", icon: "📊" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
+            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "backtest", label: "백테스트", icon: "📊" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} style={{
                 padding: "6px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
@@ -2946,7 +3369,7 @@ function AppInner() {
             background: C.card, borderTop: `1px solid ${C.border}`,
             padding: "8px 16px 12px", display: "flex", flexDirection: "column", gap: "2px",
           }}>
-            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "backtest", label: "백테스트", icon: "📊" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
+            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "backtest", label: "백테스트", icon: "📊" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); setMenuOpen(false); }} style={{
                 padding: "10px 14px", borderRadius: "10px", fontSize: "14px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
@@ -3108,7 +3531,7 @@ function AppInner() {
               );
             })()}
 
-            {/* ── 오늘의 추천 (상위 3개만, 컴팩트) ─── */}
+            {/* ── 오늘의 추천 ─── */}
             {dailyPicks.length > 0 && (
               <div style={{ background: C.card, borderRadius: "16px", padding: "16px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
@@ -3118,7 +3541,7 @@ function AppInner() {
                   }}>{picksExpanded ? "접기" : `더보기 (${dailyPicks.length})`}</button>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  {dailyPicks.slice(0, picksExpanded ? 40 : 20).map((pick, i) => {
+                  {dailyPicks.slice(0, picksExpanded ? 40 : 8).map((pick, i) => {
                     const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
                     const isPos = pick.change >= 0;
                     return (
@@ -3126,24 +3549,25 @@ function AppInner() {
                         style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between",
                           padding: "10px 4px", cursor: "pointer",
-                          borderBottom: i < Math.min(dailyPicks.length, picksExpanded ? 40 : 20) - 1 ? `1px solid ${C.border}08` : "none",
+                          borderBottom: i < Math.min(dailyPicks.length, picksExpanded ? 40 : 8) - 1 ? `1px solid ${C.border}08` : "none",
                         }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
                           <div style={{
                             width: "24px", height: "24px", borderRadius: "8px", flexShrink: 0,
-                            background: i === 0 ? `${C.blue}18` : C.card2,
+                            background: i < 3 ? `${C.blue}18` : C.card2,
                             display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: mf(11), fontWeight: 800, color: i === 0 ? C.blue : C.text3,
+                            fontSize: mf(11), fontWeight: 800, color: i < 3 ? C.blue : C.text3,
                           }}>{i + 1}</div>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, fontSize: "13px", color: C.text1 }}>{flag} {pick.name}</div>
+                            <div style={{ fontWeight: 600, fontSize: "13px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{flag} {pick.name}</div>
                           </div>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
                           <span style={{
                             fontSize: mf(9), padding: "2px 6px", borderRadius: "4px", fontWeight: 600,
                             background: pick.score >= 7 ? C.greenBg : pick.score >= 5 ? C.blueBg : C.yellowBg,
                             color: pick.score >= 7 ? C.green : pick.score >= 5 ? C.blue : C.yellow,
+                            whiteSpace: "nowrap", maxWidth: "90px", overflow: "hidden", textOverflow: "ellipsis",
                           }}>{pick.reason}</span>
                           <span style={{ fontSize: "12px", fontWeight: 600, color: isPos ? C.green : C.red, minWidth: "50px", textAlign: "right" }}>
                             {isPos ? "+" : ""}{pick.change}%
@@ -3166,7 +3590,7 @@ function AppInner() {
                   }}>{hotExpanded ? "접기" : `더보기 (${hotAssets.length})`}</button>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  {hotAssets.slice(0, hotExpanded ? 50 : 20).map((asset, i) => {
+                  {hotAssets.slice(0, hotExpanded ? 50 : 10).map((asset, i) => {
                     const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
                     const isPos = asset.change >= 0;
                     const ext = extendedHours[asset.symbolRaw || asset.symbol];
@@ -3175,7 +3599,7 @@ function AppInner() {
                         style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between",
                           padding: "11px 4px", cursor: "pointer",
-                          borderBottom: i < (hotExpanded ? 49 : 19) ? `1px solid ${C.border}08` : "none",
+                          borderBottom: i < (hotExpanded ? 49 : 9) ? `1px solid ${C.border}08` : "none",
                         }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
                           <div style={{
@@ -3320,7 +3744,7 @@ function AppInner() {
               )}
             </div>
 
-            {/* ── 관심종목 투자 전략 (quickDiagnosis 기반) ─── */}
+            {/* ── 관심종목 퀀트 전략 (quickDiagnosis 기반) ─── */}
             {watchlist.length > 0 && hotAssets.length > 0 && (() => {
               const watchDiags = watchlist.map(w => {
                 const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
@@ -3332,7 +3756,7 @@ function AppInner() {
               return (
                 <div style={{ background: C.card, borderRadius: "16px", padding: "16px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                    <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>관심종목 투자 전략</span>
+                    <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>관심종목 퀀트 전략</span>
                     <span style={{ fontSize: mf(10), color: C.text3 }}>자동 분석</span>
                   </div>
                   {watchDiags.map((w, i) => {
