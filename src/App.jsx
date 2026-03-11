@@ -5095,10 +5095,14 @@ function AppInner() {
                   {topPicks.map((pick, i) => {
                     const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
                     return (
-                      <div key={pick.symbol} onClick={() => setSelectedAsset(pick)} style={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "10px 4px", cursor: "pointer",
-                        borderBottom: i < topPicks.length - 1 ? `1px solid ${C.border}08` : "none",
+                      <div key={pick.symbol} role="button" tabIndex={0}
+                        onClick={() => setSelectedAsset(pick)}
+                        onTouchEnd={(e) => { e.preventDefault(); setSelectedAsset(pick); }}
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "10px 4px", cursor: "pointer",
+                          borderBottom: i < topPicks.length - 1 ? `1px solid ${C.border}08` : "none",
+                          WebkitTapHighlightColor: "transparent",
                       }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
                           <div style={{
@@ -5141,14 +5145,15 @@ function AppInner() {
                     const hot = hotAssets.find(h => h.symbol === pick.symbol);
                     const d = hot ? quickDiagnosis(hot) : null;
                     return (
-                      <div key={pick.symbol} onClick={() => setSelectedAsset(pick)} style={{
-                        display: "flex", alignItems: "center", gap: "10px",
-                        padding: "12px 8px", cursor: "pointer",
-                        borderBottom: i < topPicks.length - 1 ? `1px solid ${C.border}08` : "none",
-                        borderRadius: "8px",
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = `${C.blue}06`}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      <div key={pick.symbol} role="button" tabIndex={0}
+                        onClick={() => setSelectedAsset(pick)}
+                        onTouchEnd={(e) => { e.preventDefault(); setSelectedAsset(pick); }}
+                        style={{
+                          display: "flex", alignItems: "center", gap: "10px",
+                          padding: "12px 8px", cursor: "pointer",
+                          borderBottom: i < topPicks.length - 1 ? `1px solid ${C.border}08` : "none",
+                          borderRadius: "8px", WebkitTapHighlightColor: "transparent",
+                      }}>
                         <div style={{
                           width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0,
                           background: `${C.blue}15`, display: "flex", alignItems: "center", justifyContent: "center",
@@ -5174,7 +5179,7 @@ function AppInner() {
                           <div style={{ fontSize: "13px", fontWeight: 700, color: pick.change >= 0 ? C.green : C.red }}>
                             {pick.change >= 0 ? "+" : ""}{pick.change}%
                           </div>
-                          <button style={{ fontSize: "10px", color: C.blue, fontWeight: 700, background: `${C.blue}12`, border: `1px solid ${C.blue}30`, borderRadius: "6px", padding: "3px 10px", cursor: "pointer" }}>📊 백테스트</button>
+                          <div style={{ fontSize: "10px", color: C.blue, fontWeight: 700, background: `${C.blue}12`, border: `1px solid ${C.blue}30`, borderRadius: "6px", padding: "3px 10px", textAlign: "center", marginTop: "4px" }}>📊 백테스트</div>
                         </div>
                       </div>
                     );
