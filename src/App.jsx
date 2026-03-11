@@ -5135,10 +5135,7 @@ function AppInner() {
                 <div style={{ background: C.card, borderRadius: "16px", padding: "16px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                     <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>종목별 퀀트 전략</span>
-                    <span style={{ fontSize: "10px", padding: "3px 8px", borderRadius: "6px", background: `${C.blue}15`, color: C.blue, fontWeight: 600 }}>백테스트 상세 →</span>
-                  </div>
-                  <div style={{ fontSize: "11px", color: C.text3, marginBottom: "10px", lineHeight: 1.5 }}>
-                    각 종목을 클릭하면 10개 퀀트 전략 백테스트 결과(1년), 고급 지지/저항/목표/손절가, 리스크:리워드 분석을 확인할 수 있습니다.
+                    <span style={{ fontSize: "10px", color: C.text3 }}>종목 터치 → 백테스트 상세</span>
                   </div>
                   {topPicks.map((pick, i) => {
                     const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
