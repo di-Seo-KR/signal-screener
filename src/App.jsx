@@ -1682,6 +1682,106 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           )}
         </div>
 
+        {/* ═══ 투자 전략 (Investment Strategy) ═══ */}
+        {techData && !loading && (
+          <div style={{ padding: "0 20px 12px" }}>
+            <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: C.text3, marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                🎯 투자 전략
+                <span style={{
+                  fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px",
+                  background: diag.opinionColor === "green" ? `${C.green}18` : diag.opinionColor === "red" ? `${C.red}18` : `${C.yellow}18`,
+                  color: diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow,
+                }}>{diag.opinion}</span>
+              </div>
+              {/* 매수 전략 */}
+              {(() => {
+                const p = techData.price;
+                const fv = techData.fairValue;
+                const low52 = techData.low52w;
+                const high52 = techData.high52w;
+                const ma200v = techData.ma200Dist != null ? p / (1 + techData.ma200Dist / 100) : null;
+                const support1 = ma200v ? Math.min(p, ma200v) : low52 ? low52 + (p - low52) * 0.382 : null;
+                const support2 = low52 ? low52 + (high52 - low52) * 0.236 : null;
+                const resist1 = high52 ? low52 + (high52 - low52) * 0.618 : null;
+                const resist2 = high52 || null;
+                const targetPrice = fv ? (fv > p ? fv : null) : (techData.analystTarget && techData.analystTarget > p ? techData.analystTarget : null);
+                const stopLoss = support2 || (low52 ? low52 * 1.02 : p * 0.92);
+                const upside = targetPrice ? +((targetPrice - p) / p * 100).toFixed(1) : null;
+                const downside = stopLoss ? +((p - stopLoss) / p * 100).toFixed(1) : 8;
+                const riskReward = upside && downside > 0 ? (upside / downside).toFixed(1) : null;
+                const isBullish = diag.score >= 55;
+                const isBearish = diag.score < 40;
+                const fmtP = (v) => !v ? "—" : asset.market === "kr" ? `₩${Math.round(v).toLocaleString()}` : `$${v.toFixed(2)}`;
+                return (
+                  <>
+                    {/* 전략 요약 문장 */}
+                    <div style={{
+                      fontSize: "12px", color: C.text2, lineHeight: 1.7, marginBottom: "14px",
+                      padding: "10px 12px", borderRadius: "10px", background: C.card,
+                      borderLeft: `3px solid ${diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow}`,
+                    }}>
+                      {isBullish && targetPrice
+                        ? `기술적 상승 신호가 우세합니다. 목표가 ${fmtP(targetPrice)}(+${upside}%) 부근까지 상승 여력이 있으며, ${fmtP(stopLoss)} 이탈 시 손절을 권장합니다.`
+                        : isBullish
+                        ? `상승 추세 신호가 감지됩니다. 현재가 부근에서 분할 매수 접근이 유효하며, ${fmtP(stopLoss)} 하회 시 리스크 관리가 필요합니다.`
+                        : isBearish
+                        ? `하락 신호가 우세합니다. 신규 매수보다는 관망 또는 ${fmtP(support1 || stopLoss)} 지지선 확인 후 진입을 권장합니다.`
+                        : `방향성이 불분명한 구간입니다. 핵심 지지선 ${fmtP(support1 || stopLoss)}과 저항선 ${fmtP(resist1)} 돌파 여부를 확인 후 대응하세요.`}
+                    </div>
+                    {/* 핵심 가격 레벨 */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "10px" }}>
+                      {[
+                        { label: "목표가", value: fmtP(targetPrice || (techData.analystTarget || null)), color: C.green, sub: upside ? `+${upside}%` : null },
+                        { label: "손절가", value: fmtP(stopLoss), color: C.red, sub: downside ? `-${downside}%` : null },
+                        { label: "지지선", value: fmtP(support1), color: C.blue, sub: null },
+                        { label: "저항선", value: fmtP(resist1), color: C.purple, sub: null },
+                      ].map(lv => (
+                        <div key={lv.label} style={{ background: C.card, borderRadius: "8px", padding: "8px 10px" }}>
+                          <div style={{ fontSize: "9px", color: C.text3, marginBottom: "3px" }}>{lv.label}</div>
+                          <div style={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
+                            <span style={{ fontSize: "13px", fontWeight: 700, color: lv.color || C.text1 }}>{lv.value}</span>
+                            {lv.sub && <span style={{ fontSize: "10px", color: lv.color }}>{lv.sub}</span>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {/* 리스크/리워드 + 포지션 가이드 */}
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      {riskReward && (
+                        <div style={{
+                          flex: 1, padding: "8px 10px", borderRadius: "8px",
+                          background: riskReward >= 2 ? `${C.green}12` : riskReward >= 1 ? `${C.yellow}12` : `${C.red}12`,
+                          textAlign: "center",
+                        }}>
+                          <div style={{ fontSize: "9px", color: C.text3 }}>리스크:리워드</div>
+                          <div style={{ fontSize: "14px", fontWeight: 800, color: riskReward >= 2 ? C.green : riskReward >= 1 ? C.yellow : C.red }}>1:{riskReward}</div>
+                        </div>
+                      )}
+                      <div style={{
+                        flex: 1, padding: "8px 10px", borderRadius: "8px", background: C.card, textAlign: "center",
+                      }}>
+                        <div style={{ fontSize: "9px", color: C.text3 }}>진입 전략</div>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: C.text1, marginTop: "2px" }}>
+                          {isBullish ? "분할 매수" : isBearish ? "관망" : "지지선 확인 후"}
+                        </div>
+                      </div>
+                      <div style={{
+                        flex: 1, padding: "8px 10px", borderRadius: "8px", background: C.card, textAlign: "center",
+                      }}>
+                        <div style={{ fontSize: "9px", color: C.text3 }}>포지션</div>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: C.text1, marginTop: "2px" }}>
+                          {diag.score >= 70 ? "비중 확대" : diag.score >= 55 ? "소량 매수" : diag.score >= 40 ? "비중 유지" : "비중 축소"}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+        )}
+
         {/* ═══ 적정주가 (Multi-Model Fair Value) ═══ */}
         {techData?.fairValue != null && (
           <div style={{ padding: "0 20px 12px" }}>
@@ -3018,7 +3118,7 @@ function AppInner() {
                   }}>{picksExpanded ? "접기" : `더보기 (${dailyPicks.length})`}</button>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  {dailyPicks.slice(0, picksExpanded ? 20 : 4).map((pick, i) => {
+                  {dailyPicks.slice(0, picksExpanded ? 40 : 20).map((pick, i) => {
                     const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
                     const isPos = pick.change >= 0;
                     return (
@@ -3026,7 +3126,7 @@ function AppInner() {
                         style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between",
                           padding: "10px 4px", cursor: "pointer",
-                          borderBottom: i < Math.min(dailyPicks.length, picksExpanded ? 20 : 4) - 1 ? `1px solid ${C.border}08` : "none",
+                          borderBottom: i < Math.min(dailyPicks.length, picksExpanded ? 40 : 20) - 1 ? `1px solid ${C.border}08` : "none",
                         }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
                           <div style={{
@@ -3066,7 +3166,7 @@ function AppInner() {
                   }}>{hotExpanded ? "접기" : `더보기 (${hotAssets.length})`}</button>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column" }}>
-                  {hotAssets.slice(0, hotExpanded ? 30 : 8).map((asset, i) => {
+                  {hotAssets.slice(0, hotExpanded ? 50 : 20).map((asset, i) => {
                     const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
                     const isPos = asset.change >= 0;
                     const ext = extendedHours[asset.symbolRaw || asset.symbol];
@@ -3075,7 +3175,7 @@ function AppInner() {
                         style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between",
                           padding: "11px 4px", cursor: "pointer",
-                          borderBottom: i < (hotExpanded ? 29 : 7) ? `1px solid ${C.border}08` : "none",
+                          borderBottom: i < (hotExpanded ? 49 : 19) ? `1px solid ${C.border}08` : "none",
                         }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
                           <div style={{
@@ -3266,37 +3366,93 @@ function AppInner() {
               );
             })()}
 
-            {/* ── 퀀트 리포트 미니 ─── */}
-            {hotAssets.length > 0 && (() => {
-              const bullish = hotAssets.filter(a => { try { return quickDiagnosis(a).score >= 65; } catch { return false; } }).length;
-              const bearish = hotAssets.filter(a => { try { return quickDiagnosis(a).score <= 35; } catch { return false; } }).length;
-              const neutral = hotAssets.length - bullish - bearish;
-              const sentimentScore = hotAssets.length > 0 ? Math.round((bullish / hotAssets.length) * 100) : 50;
+            {/* ── 퀀트 리포트 ─── */}
+            {marketIndices.length > 0 && (() => {
+              const sp = marketIndices.find(i => i.symbol === "^GSPC");
+              const nq = marketIndices.find(i => i.symbol === "^IXIC");
+              const ks = marketIndices.find(i => i.symbol === "^KS11");
+              const kq = marketIndices.find(i => i.symbol === "^KQ11");
+              const fg = fearGreed.stock?.value;
+
+              // 종목별 상승/하락 카운트
+              const upCount = hotAssets.filter(a => a.change > 0).length;
+              const dnCount = hotAssets.filter(a => a.change < 0).length;
+              const flatCount = hotAssets.length - upCount - dnCount;
+              const advDecl = hotAssets.length > 0 ? (upCount / hotAssets.length * 100) : 50;
+
+              // 추천종목 기반 매수/매도 신호
+              const buyPicks = dailyPicks.filter(p => p.score >= 6).length;
+              const sellPicks = dailyPicks.filter(p => p.score <= 3).length;
+
+              // 종합 시장 점수 (0~100)
+              let mktScore = 50;
+              if (sp) mktScore += sp.change > 1 ? 10 : sp.change > 0.3 ? 5 : sp.change > -0.3 ? 0 : sp.change > -1 ? -5 : -10;
+              if (fg) mktScore += fg > 70 ? 8 : fg > 55 ? 4 : fg > 40 ? 0 : fg > 25 ? -4 : -8;
+              mktScore += advDecl > 60 ? 8 : advDecl > 50 ? 3 : advDecl > 40 ? -3 : -8;
+              if (buyPicks > 5) mktScore += 6; else if (buyPicks > 2) mktScore += 3;
+              if (sellPicks > 5) mktScore -= 6; else if (sellPicks > 2) mktScore -= 3;
+              mktScore = Math.max(0, Math.min(100, mktScore));
+
+              const mktVerdict = mktScore >= 70 ? "강세" : mktScore >= 55 ? "약 강세" : mktScore >= 45 ? "혼조" : mktScore >= 30 ? "약세" : "강한 약세";
+              const mktColor = mktScore >= 60 ? C.green : mktScore >= 45 ? C.yellow : C.red;
               const now = new Date();
               const reportTime = now.toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+
               return (
-                <div style={{ background: `linear-gradient(135deg, ${C.card}, ${sentimentScore > 55 ? "#0d2818" : sentimentScore < 45 ? "#28100d" : "#1a1a0d"})`, borderRadius: "16px", padding: "16px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                <div style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? "#0d2818" : mktScore < 45 ? "#28100d" : "#1a1a0d"})`, borderRadius: "16px", padding: "16px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                     <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>퀀트 리포트</span>
                     <span style={{ fontSize: mf(10), color: C.text3 }}>{reportTime} 기준</span>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "10px" }}>
-                    <div style={{ textAlign: "center", padding: "10px", borderRadius: "10px", background: `${C.green}12` }}>
-                      <div style={{ fontSize: "18px", fontWeight: 800, color: C.green }}>{bullish}</div>
-                      <div style={{ fontSize: mf(10), color: C.text3 }}>매수 신호</div>
+
+                  {/* 시장 점수 게이지 */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "14px" }}>
+                    <div style={{ position: "relative", width: "56px", height: "56px", flexShrink: 0 }}>
+                      <svg viewBox="0 0 56 56" width="56" height="56">
+                        <circle cx="28" cy="28" r="23" fill="none" stroke={C.border} strokeWidth="4" />
+                        <circle cx="28" cy="28" r="23" fill="none" stroke={mktColor} strokeWidth="4" strokeLinecap="round"
+                          strokeDasharray={`${(mktScore / 100) * 144.5} 144.5`} transform="rotate(-90 28 28)" />
+                        <text x="28" y="26" textAnchor="middle" fill={C.text1} fontSize="14" fontWeight="800">{mktScore}</text>
+                        <text x="28" y="36" textAnchor="middle" fill={C.text3} fontSize="7">/100</text>
+                      </svg>
                     </div>
-                    <div style={{ textAlign: "center", padding: "10px", borderRadius: "10px", background: `${C.yellow}12` }}>
-                      <div style={{ fontSize: "18px", fontWeight: 800, color: C.yellow }}>{neutral}</div>
-                      <div style={{ fontSize: mf(10), color: C.text3 }}>중립</div>
-                    </div>
-                    <div style={{ textAlign: "center", padding: "10px", borderRadius: "10px", background: `${C.red}12` }}>
-                      <div style={{ fontSize: "18px", fontWeight: 800, color: C.red }}>{bearish}</div>
-                      <div style={{ fontSize: mf(10), color: C.text3 }}>매도 신호</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: "16px", fontWeight: 800, color: mktColor, marginBottom: "4px" }}>{mktVerdict}</div>
+                      <div style={{ fontSize: "11px", color: C.text3, lineHeight: 1.5 }}>
+                        {sp ? `S&P ${sp.change >= 0 ? "+" : ""}${sp.change}%` : ""}{nq ? ` · 나스닥 ${nq.change >= 0 ? "+" : ""}${nq.change}%` : ""}
+                        {ks ? ` · 코스피 ${ks.change >= 0 ? "+" : ""}${ks.change}%` : ""}
+                      </div>
                     </div>
                   </div>
-                  <div style={{ fontSize: "12px", color: C.text3, lineHeight: 1.6 }}>
-                    시장 센티먼트 <strong style={{ color: sentimentScore > 55 ? C.green : sentimentScore < 45 ? C.red : C.yellow }}>{sentimentScore}%</strong> 긍정
-                    {sentimentScore > 60 ? " — 매수 우위 장세" : sentimentScore > 50 ? " — 약 강세" : sentimentScore > 40 ? " — 혼조세" : " — 약세 우위"}
+
+                  {/* 지표 그리드 */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "10px" }}>
+                    <div style={{ padding: "8px 10px", borderRadius: "8px", background: `${C.green}10` }}>
+                      <div style={{ fontSize: mf(10), color: C.text3, marginBottom: "2px" }}>상승 종목</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700, color: C.green }}>{upCount}개 <span style={{ fontSize: "10px", color: C.text3 }}>/ {hotAssets.length}</span></div>
+                    </div>
+                    <div style={{ padding: "8px 10px", borderRadius: "8px", background: `${C.red}10` }}>
+                      <div style={{ fontSize: mf(10), color: C.text3, marginBottom: "2px" }}>하락 종목</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700, color: C.red }}>{dnCount}개 <span style={{ fontSize: "10px", color: C.text3 }}>/ {hotAssets.length}</span></div>
+                    </div>
+                    <div style={{ padding: "8px 10px", borderRadius: "8px", background: `${C.yellow}10` }}>
+                      <div style={{ fontSize: mf(10), color: C.text3, marginBottom: "2px" }}>공포탐욕</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700, color: fg ? (fg > 60 ? C.green : fg > 40 ? C.yellow : C.red) : C.text3 }}>{fg || "—"} <span style={{ fontSize: "10px", color: C.text3 }}>{fg ? (fg <= 25 ? "극도의 공포" : fg <= 40 ? "공포" : fg <= 60 ? "중립" : fg <= 75 ? "탐욕" : "극도의 탐욕") : ""}</span></div>
+                    </div>
+                    <div style={{ padding: "8px 10px", borderRadius: "8px", background: `${C.blue}10` }}>
+                      <div style={{ fontSize: mf(10), color: C.text3, marginBottom: "2px" }}>추천 매수</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700, color: C.blue }}>{buyPicks}개 <span style={{ fontSize: "10px", color: C.text3 }}>/ {dailyPicks.length} 분석</span></div>
+                    </div>
+                  </div>
+
+                  {/* 요약 */}
+                  <div style={{ fontSize: "11px", color: C.text3, lineHeight: 1.6, padding: "8px 0 0", borderTop: `1px solid ${C.border}` }}>
+                    {mktScore >= 60
+                      ? `매수 우위 장세 — 상승 종목 ${upCount}개, 추천 ${buyPicks}개 감지`
+                      : mktScore >= 45
+                      ? `혼조 장세 — 방향성 확인 후 진입 권장`
+                      : `약세 장세 — 리스크 관리 필수, 하락 종목 ${dnCount}개`
+                    }
                   </div>
                 </div>
               );
