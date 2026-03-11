@@ -615,8 +615,10 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
   // 가격 채널 (52주 고/저 근처)
   const priceChannel = near52wHigh || near52wLow;
 
-  // 갭 신호 (주간 변화 ±3% 이상)
-  const gapSignal = Math.abs(weekChange) >= 3;
+  // 갭 신호 — 마켓별 동적 임계값 (P2 수정: crypto 8%, kr 4%, us 3%)
+  const marketType = conditions._marketType || "us"; // 호출 시 전달
+  const gapThreshold = marketType === "crypto" ? 8 : marketType === "kr" ? 4 : 3;
+  const gapSignal = Math.abs(weekChange) >= gapThreshold;
 
   // 거래량 극증
   const volumeClimax = volRatio >= 3;
@@ -624,25 +626,101 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
   // 거래량 고갈
   const volumeDry = volRatio <= 0.3;
 
-  // OBV 다이버전스 - 최근 4주 가격 추세 vs OBV 추세
+  // OBV 다이버전스 — 룩백 8주 + 선형회귀 기울기 비교 (P2 수정)
   let obvDivergence = false;
-  if (obvArr.length >= 4) {
-    const priceTrend = weeklyCloses[weeklyCloses.length - 1] > weeklyCloses[weeklyCloses.length - 4] ? 1 : -1;
-    const obvTrend = obvArr[obvArr.length - 1] > obvArr[obvArr.length - 4] ? 1 : -1;
-    obvDivergence = priceTrend !== obvTrend;
+  const obvLookback = Math.min(obvArr.length, 8);
+  if (obvArr.length >= obvLookback && obvLookback >= 4) {
+    const priceSlice8 = weeklyCloses.slice(-obvLookback);
+    const obvSlice8 = obvArr.slice(-obvLookback);
+    // 선형회귀 기울기
+    const linSlope = (arr) => {
+      const n = arr.length;
+      let sx = 0, sy = 0, sxy = 0, sx2 = 0;
+      for (let i = 0; i < n; i++) { sx += i; sy += arr[i]; sxy += i * arr[i]; sx2 += i * i; }
+      return (n * sxy - sx * sy) / (n * sx2 - sx * sx || 1);
+    };
+    const priceSlope = linSlope(priceSlice8);
+    const obvSlope = linSlope(obvSlice8);
+    obvDivergence = (priceSlope > 0 && obvSlope < 0) || (priceSlope < 0 && obvSlope > 0);
   }
+
+  // ── 신규 지표: CMF (Chaikin Money Flow) ──
+  let cmf = null;
+  const cmfPeriod = Math.min(20, weeklyCloses.length);
+  if (cmfPeriod >= 10) {
+    let mfvSum = 0, volSum = 0;
+    for (let i = weeklyCloses.length - cmfPeriod; i < weeklyCloses.length; i++) {
+      const h = weeklyHighs[i], l = weeklyLows[i], c = weeklyCloses[i], v = weeklyVolumes[i];
+      const clv = h === l ? 0 : ((c - l) - (h - c)) / (h - l);
+      mfvSum += clv * v;
+      volSum += v;
+    }
+    cmf = volSum > 0 ? mfvSum / volSum : 0;
+  }
+
+  // ── 신규 지표: MFI (Money Flow Index) ──
+  let mfi = null;
+  const mfiPeriod = 14;
+  if (weeklyCloses.length >= mfiPeriod + 1) {
+    let posFlow = 0, negFlow = 0;
+    for (let i = weeklyCloses.length - mfiPeriod; i < weeklyCloses.length; i++) {
+      const tp = (weeklyHighs[i] + weeklyLows[i] + weeklyCloses[i]) / 3;
+      const prevTp = (weeklyHighs[i-1] + weeklyLows[i-1] + weeklyCloses[i-1]) / 3;
+      const rawFlow = tp * weeklyVolumes[i];
+      if (tp > prevTp) posFlow += rawFlow;
+      else negFlow += rawFlow;
+    }
+    mfi = negFlow === 0 ? 100 : 100 - 100 / (1 + posFlow / negFlow);
+  }
+
+  // CMF 기반 스크리닝 조건
+  const cmfStrong = cmf != null && cmf > 0.1;     // 강한 매집
+  const cmfWeak = cmf != null && cmf < -0.1;      // 강한 분산
+  // MFI 기반 스크리닝 조건
+  const mfiOversold = mfi != null && mfi < 20;     // 거래량 동반 과매도
+  const mfiOverbought = mfi != null && mfi > 80;   // 거래량 동반 과매수
 
   // 평균회귀 (200일선 대비 ±15% 이상)
   const meanReversion = ma200Dist && Math.abs(ma200Dist) >= 15;
 
-  // MACD 다이버전스 - 간단한 구현: 지난 2주 가격 방향 vs MACD 방향
+  // MACD 다이버전스 — peak/trough 비교 방식 (P1 수정)
   let macdDivergence = false;
-  if (weeklyCloses.length >= 2) {
-    const priceTrend = weeklyCloses[weeklyCloses.length - 1] > weeklyCloses[weeklyCloses.length - 2] ? 1 : -1;
-    const macdVal = macd.macdLine || 0;
-    const prevMacdVal = macd.signalLine || 0;
-    const macdTrend = macdVal > prevMacdVal ? 1 : -1;
-    macdDivergence = priceTrend !== macdTrend;
+  let macdDivType = null; // "bullish" | "bearish"
+  if (weeklyCloses.length >= 12) {
+    // MACD 히스토그램 계산 (최근 12주)
+    const lookback = Math.min(weeklyCloses.length, 24);
+    const macdHist = [];
+    for (let i = weeklyCloses.length - lookback; i < weeklyCloses.length; i++) {
+      const sl = weeklyCloses.slice(0, i + 1);
+      const m = calcMACD(sl);
+      macdHist.push((m.macdLine || 0) - (m.signalLine || 0));
+    }
+    // swing high/low 찾기 (최소 2개 피크/트러프 필요)
+    const findSwings = (arr, type) => {
+      const swings = [];
+      for (let i = 1; i < arr.length - 1; i++) {
+        if (type === "high" && arr[i] > arr[i-1] && arr[i] >= arr[i+1]) swings.push({ idx: i, val: arr[i] });
+        if (type === "low" && arr[i] < arr[i-1] && arr[i] <= arr[i+1]) swings.push({ idx: i, val: arr[i] });
+      }
+      return swings.slice(-3); // 최근 3개
+    };
+    const priceSlice = weeklyCloses.slice(-lookback);
+    const priceHighs = findSwings(priceSlice, "high");
+    const priceLows = findSwings(priceSlice, "low");
+    const macdHighs = findSwings(macdHist, "high");
+    const macdLows = findSwings(macdHist, "low");
+    // Bearish: 가격 higher-high + MACD lower-high
+    if (priceHighs.length >= 2 && macdHighs.length >= 2) {
+      const [ph1, ph2] = priceHighs.slice(-2);
+      const [mh1, mh2] = macdHighs.slice(-2);
+      if (ph2.val > ph1.val && mh2.val < mh1.val) { macdDivergence = true; macdDivType = "bearish"; }
+    }
+    // Bullish: 가격 lower-low + MACD higher-low
+    if (!macdDivergence && priceLows.length >= 2 && macdLows.length >= 2) {
+      const [pl1, pl2] = priceLows.slice(-2);
+      const [ml1, ml2] = macdLows.slice(-2);
+      if (pl2.val < pl1.val && ml2.val > ml1.val) { macdDivergence = true; macdDivType = "bullish"; }
+    }
   }
 
   // MA 리본 (정배열/역배열)
@@ -653,14 +731,35 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
     maRibbon = bullish || bearish;
   }
 
-  // ADX 강한 추세
+  // ADX 강한 추세 + 방향성 (P2 수정: +DI/-DI 활용)
   const adxTrend = adxResult && adxResult.adx >= 25;
+  const adxBullish = adxTrend && adxResult.plusDI > adxResult.minusDI;
+  const adxBearish = adxTrend && adxResult.plusDI < adxResult.minusDI;
 
-  // 골든크로스
-  const goldenCross = ma50daily && ma200daily && ma50daily > ma200daily;
-
-  // 데스크로스
-  const deathCross = ma50daily && ma200daily && ma50daily < ma200daily;
+  // Golden/Death Cross — "이벤트" 감지로 전환 (P1 수정)
+  // 이전 주와 현재 주의 MA50-MA200 관계 변화를 추적
+  let goldenCross = false, deathCross = false;
+  if (dailyCloses.length >= 205) {
+    const prevMA50 = calcSMA(dailyCloses.slice(0, -5), 50);
+    const prevMA200 = calcSMA(dailyCloses.slice(0, -5), 200);
+    if (prevMA50 && prevMA200 && ma50daily && ma200daily) {
+      goldenCross = prevMA50 <= prevMA200 && ma50daily > ma200daily; // 실제 크로스 이벤트
+      deathCross = prevMA50 >= prevMA200 && ma50daily < ma200daily;
+    }
+    // 또는 최근 4주 이내에 크로스 발생 시에도 인정
+    if (!goldenCross && !deathCross && dailyCloses.length >= 220) {
+      for (let w = 1; w <= 4 && !goldenCross && !deathCross; w++) {
+        const pM50 = calcSMA(dailyCloses.slice(0, -(w*5)), 50);
+        const pM200 = calcSMA(dailyCloses.slice(0, -(w*5)), 200);
+        const cM50 = calcSMA(dailyCloses.slice(0, -(w*5 - 5) || undefined), 50);
+        const cM200 = calcSMA(dailyCloses.slice(0, -(w*5 - 5) || undefined), 200);
+        if (pM50 && pM200 && cM50 && cM200) {
+          if (pM50 <= pM200 && cM50 > cM200) goldenCross = true;
+          if (pM50 >= pM200 && cM50 < cM200) deathCross = true;
+        }
+      }
+    }
+  }
 
   const triggers = [];
   if (conditions.includes("rsi_extreme")     && rsi != null && (rsi <= 25 || rsi >= 75))           triggers.push("rsi_extreme");
@@ -679,6 +778,12 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
   if (conditions.includes("death_cross")      && deathCross)                                       triggers.push("death_cross");
   if (conditions.includes("golden_cross")     && goldenCross)                                      triggers.push("golden_cross");
   if (conditions.includes("mean_reversion")   && meanReversion)                                    triggers.push("mean_reversion");
+  if (conditions.includes("cmf_accumulation") && cmfStrong)                                        triggers.push("cmf_accumulation");
+  if (conditions.includes("cmf_distribution") && cmfWeak)                                          triggers.push("cmf_distribution");
+  if (conditions.includes("mfi_oversold")     && mfiOversold)                                      triggers.push("mfi_oversold");
+  if (conditions.includes("mfi_overbought")   && mfiOverbought)                                    triggers.push("mfi_overbought");
+  if (conditions.includes("adx_bullish")      && adxBullish)                                       triggers.push("adx_bullish");
+  if (conditions.includes("adx_bearish")      && adxBearish)                                       triggers.push("adx_bearish");
 
   return {
     triggers, price: +price.toFixed(6),
@@ -689,6 +794,10 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
     ma50: ma50daily, ma200: ma200daily,
     stoch, wr: wr != null ? +wr.toFixed(1) : null,
     low52w, high52w,
+    cmf: cmf != null ? +cmf.toFixed(3) : null,
+    mfi: mfi != null ? +mfi.toFixed(1) : null,
+    adxBullish, adxBearish,
+    macdDivType,
   };
 }
 
@@ -716,6 +825,13 @@ const CONDITION_META = {
   death_cross:     { label: "데스크로스",          icon: "💀", desc: "50일선이 200일선 하향돌파 — 장기 하락전환 경고" },
   golden_cross:    { label: "골든크로스",          icon: "✨", desc: "50일선이 200일선 상향돌파 — 장기 상승전환" },
   mean_reversion:  { label: "평균회귀 신호",       icon: "🎯", desc: "200일선 대비 ±15% 이상 이탈 — 평균회귀 구간" },
+  // 신규 조건 (v6.7)
+  cmf_accumulation:{ label: "CMF 매집 감지",       icon: "💰", desc: "Chaikin Money Flow > 0.1 — 스마트머니 매집 구간" },
+  cmf_distribution:{ label: "CMF 분산 감지",       icon: "💸", desc: "Chaikin Money Flow < -0.1 — 세력 매도 분산 구간" },
+  mfi_oversold:    { label: "MFI 과매도",          icon: "🔋", desc: "거래량 가중 RSI(MFI) < 20 — 볼륨 동반 극단 과매도" },
+  mfi_overbought:  { label: "MFI 과매수",          icon: "⚡", desc: "거래량 가중 RSI(MFI) > 80 — 볼륨 동반 극단 과매수" },
+  adx_bullish:     { label: "ADX 강세 추세",       icon: "🐂", desc: "ADX≥25 + 매수 방향(+DI > -DI) — 강한 상승 추세 확인" },
+  adx_bearish:     { label: "ADX 약세 추세",       icon: "🐻", desc: "ADX≥25 + 매도 방향(-DI > +DI) — 강한 하락 추세 확인" },
 };
 
 // ════════════════════════════════════════════════════════════════════
@@ -1103,15 +1219,23 @@ function quickDiagnosis(asset) {
   else if (asset.weekChange < -3) trendScore -= 3;
   trendScore = Math.max(0, Math.min(100, trendScore));
 
-  // ── 모멘텀: RSI 세분화 + 스토캐스틱 + W%R ──
+  // ── 모멘텀: RSI 연속 그라데이션 (P2 수정) + 스토캐스틱 + W%R ──
   if (asset.rsi != null) {
     if (asset.rsi >= 80) { momScore -= 18; signals.push({ type: "bearish", name: `RSI 극단 과매수 (${asset.rsi})` }); }
     else if (asset.rsi >= 70) { momScore -= 10; signals.push({ type: "bearish", name: `RSI 과매수 (${asset.rsi})` }); }
     else if (asset.rsi >= 55) momScore += 6;
     else if (asset.rsi >= 45) momScore += 0;
-    else if (asset.rsi >= 30) momScore -= 4;
-    else if (asset.rsi >= 20) { momScore += 12; signals.push({ type: "bullish", name: `RSI 과매도 (${asset.rsi})` }); }
-    else { momScore += 16; signals.push({ type: "bullish", name: `RSI 극단 과매도 (${asset.rsi})` }); }
+    else if (asset.rsi >= 40) momScore -= 1;       // 약간 약세 (기존: 30~45 모두 -4)
+    else if (asset.rsi >= 35) momScore += 2;        // 반등 기대 시작
+    else if (asset.rsi >= 30) momScore += 5;        // 과매도 진입
+    else if (asset.rsi >= 25) { momScore += 10; signals.push({ type: "bullish", name: `RSI 과매도 (${asset.rsi})` }); }
+    else if (asset.rsi >= 20) { momScore += 14; signals.push({ type: "bullish", name: `RSI 강한 과매도 (${asset.rsi})` }); }
+    else { momScore += 18; signals.push({ type: "bullish", name: `RSI 극단 과매도 (${asset.rsi})` }); }
+  }
+  // MFI (거래량 가중 RSI) 추가 반영
+  if (asset.mfi != null) {
+    if (asset.mfi < 20) { momScore += 6; signals.push({ type: "bullish", name: `MFI 과매도 (${asset.mfi})` }); }
+    else if (asset.mfi > 80) { momScore -= 6; signals.push({ type: "bearish", name: `MFI 과매수 (${asset.mfi})` }); }
   }
   if (asset.stoch?.k != null) {
     const sk = asset.stoch.k, sd = asset.stoch.d;
@@ -1137,6 +1261,16 @@ function quickDiagnosis(asset) {
   if (asset.weekChange > 0 && asset.volRatio > 1.3) { supScore += 8; signals.push({ type: "bullish", name: "가격↑ + 거래량↑" }); }
   if (asset.weekChange < 0 && asset.volRatio > 1.5) { supScore -= 10; signals.push({ type: "bearish", name: "가격↓ + 거래량↑ (투매)" }); }
   if (asset.weekChange > 0 && asset.volRatio < 0.7) supScore -= 4; // 미확인 상승
+  // CMF (Chaikin Money Flow) 추가 반영
+  if (asset.cmf != null) {
+    if (asset.cmf > 0.15) { supScore += 10; signals.push({ type: "bullish", name: `CMF 강한 매집 (${asset.cmf.toFixed(2)})` }); }
+    else if (asset.cmf > 0.05) supScore += 5;
+    else if (asset.cmf < -0.15) { supScore -= 10; signals.push({ type: "bearish", name: `CMF 강한 분산 (${asset.cmf.toFixed(2)})` }); }
+    else if (asset.cmf < -0.05) supScore -= 5;
+  }
+  // ADX 방향성 추가 반영 (추세 점수에도)
+  if (asset.adxBullish) { trendScore = Math.min(100, trendScore + 5); supScore += 3; }
+  if (asset.adxBearish) { trendScore = Math.max(0, trendScore - 5); supScore -= 3; }
   supScore = Math.max(0, Math.min(100, supScore));
 
   // ── 가격위치: 52주 세분화 ──
@@ -1156,8 +1290,12 @@ function quickDiagnosis(asset) {
   }
   posScore = Math.max(0, Math.min(100, posScore));
 
-  // ── 종합 점수 (가중 평균) ──
-  const totalScore = Math.round(trendScore * 0.30 + momScore * 0.30 + supScore * 0.20 + posScore * 0.20);
+  // ── 종합 점수 (시장유형별 적응 가중치) ──
+  const mkt = asset.market || "us";
+  const w = mkt === "crypto" ? { t: 0.25, m: 0.30, s: 0.30, p: 0.15 }
+          : mkt === "kr"     ? { t: 0.30, m: 0.25, s: 0.30, p: 0.15 }
+          :                    { t: 0.35, m: 0.25, s: 0.20, p: 0.20 };
+  const totalScore = Math.round(trendScore * w.t + momScore * w.m + supScore * w.s + posScore * w.p);
   let verdict;
   if (totalScore >= 80) verdict = "적극 매수";
   else if (totalScore >= 68) verdict = "매수";
@@ -2984,7 +3122,9 @@ function AppInner() {
             const wHighs = wk.highs || wCloses;
             const wLows = wk.lows || wCloses;
             const dCloses = dy?.closes || [];
-            const result = analyzeAsset(wCloses, dCloses, wVolumes, wHighs, wLows, conditions);
+            const conditionsWithMkt = [...conditions]; conditionsWithMkt._marketType = asset.market;
+            const result = analyzeAsset(wCloses, dCloses, wVolumes, wHighs, wLows, conditionsWithMkt);
+            result.market = asset.market;
             const match = mode === "or" ? result.triggers.length > 0 : conditions.every(c => result.triggers.includes(c));
             if (match) found.push({ ...asset, ...result });
           } catch (e) { errors.push(`${asset.market.toUpperCase()}:${asset.symbol} — ${e.message}`); }
@@ -3025,7 +3165,9 @@ function AppInner() {
           try {
             const { wCloses, wVolumes, wHighs, wLows, dCloses } = r.value;
             if (!wCloses.length) throw new Error("데이터 없음");
-            const result = analyzeAsset(wCloses, dCloses, wVolumes, wHighs, wLows, conditions);
+            const conditionsWithMkt = [...conditions]; conditionsWithMkt._marketType = "crypto";
+            const result = analyzeAsset(wCloses, dCloses, wVolumes, wHighs, wLows, conditionsWithMkt);
+            result.market = "crypto";
             const match = mode === "or" ? result.triggers.length > 0 : conditions.every(c => result.triggers.includes(c));
             if (match) found.push({ ...asset, ...result });
           } catch (e) { errors.push(`CRYPTO:${asset.symbol} — ${e.message}`); }
