@@ -98,8 +98,8 @@ function getCuratedEvents2026() {
     // March 2026
     { date: "2026-03-06", event: "Nonfarm Payrolls", actual: 151, estimate: 160, previous: 143, impact: "High", unit: "K" },
     { date: "2026-03-06", event: "Unemployment Rate", actual: 4.1, estimate: 4.0, previous: 4.0, impact: "High", unit: "%" },
-    { date: "2026-03-12", event: "CPI (YoY)", actual: null, estimate: 2.9, previous: 3.0, impact: "High", unit: "%" },
-    { date: "2026-03-12", event: "Core CPI (YoY)", actual: null, estimate: 3.2, previous: 3.3, impact: "High", unit: "%" },
+    { date: "2026-03-11", event: "CPI (YoY)", actual: null, estimate: 2.9, previous: 3.0, impact: "High", unit: "%" },
+    { date: "2026-03-11", event: "Core CPI (YoY)", actual: null, estimate: 3.2, previous: 3.3, impact: "High", unit: "%" },
     { date: "2026-03-17", event: "Retail Sales (MoM)", actual: null, estimate: 0.6, previous: -0.9, impact: "High", unit: "%" },
     { date: "2026-03-18", event: "FOMC Rate Decision", actual: null, estimate: 4.50, previous: 4.50, impact: "High", unit: "%" },
     { date: "2026-03-27", event: "GDP Growth Rate (Q4, Final)", actual: null, estimate: 2.3, previous: 2.3, impact: "High", unit: "%" },
