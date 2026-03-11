@@ -2856,8 +2856,14 @@ function AppInner() {
       const data = await resp.json();
       const now = new Date();
       const events = (data.events || []).map(e => {
-        const d = new Date(e.date + "T09:30:00");
-        const diff = Math.floor((d - now) / 86400000);
+        // 미국 동부시간 기준 발표 → 한국 시간(KST, UTC+9)으로 변환
+        // 대부분 경제지표는 8:30 AM ET 발표 → KST 22:30 (전날 or 당일)
+        const usET = new Date(e.date + "T08:30:00-05:00"); // US Eastern
+        const d = new Date(usET.getTime()); // KST로 자동 변환 (브라우저 시간대)
+        // 한국 시간 기준 날짜 차이 계산
+        const koNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+        const koEvt = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+        const diff = Math.floor((new Date(koEvt.getFullYear(), koEvt.getMonth(), koEvt.getDate()) - new Date(koNow.getFullYear(), koNow.getMonth(), koNow.getDate())) / 86400000);
         const evtName = e.event.replace(/\(.*?\)\s*/g, "").trim();
         let icon = "📊";
         let type = "OTHER";
@@ -4000,7 +4006,7 @@ function AppInner() {
                 <div style={{ background: C.card, borderRadius: "16px", padding: "16px" }}>
                   {/* 헤더 */}
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                    <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>경제 캘린더</span>
+                    <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>경제 캘린더 <span style={{ fontSize: "10px", fontWeight: 500, color: C.text3 }}>(KST)</span></span>
                     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
                       {/* 정렬 토글 */}
                       <button onClick={() => setEconSort(p => p === "date-asc" ? "date-desc" : p === "date-desc" ? "type" : "date-asc")}
@@ -4032,7 +4038,7 @@ function AppInner() {
 
                   {/* 테이블 헤더 */}
                   <div style={{
-                    display: "grid", gridTemplateColumns: "78px 1fr 48px 48px 48px",
+                    display: "grid", gridTemplateColumns: "90px 1fr 48px 48px 48px",
                     gap: "4px", padding: "6px 6px", marginBottom: "2px",
                     fontSize: mf(10), fontWeight: 700, color: C.text3, letterSpacing: "0.02em",
                     borderBottom: `1px solid ${C.border}20`,
@@ -4056,14 +4062,19 @@ function AppInner() {
                         const beat = evt.actual != null && evt.estimate != null ? evt.actual > evt.estimate : null;
                         const miss = evt.actual != null && evt.estimate != null ? evt.actual < evt.estimate : null;
                         const isPast = evt.daysUntil < 0;
-                        const y = evt.date.getFullYear();
-                        const m = String(evt.date.getMonth() + 1).padStart(2, "0");
-                        const d = String(evt.date.getDate()).padStart(2, "0");
-                        const dayName = ["일","월","화","수","목","금","토"][evt.date.getDay()];
+                        // 한국 시간 기준 날짜 표시
+                        const kstStr = evt.date.toLocaleString("en-US", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false });
+                        const kstDate = new Date(evt.date.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+                        const y = kstDate.getFullYear();
+                        const m = String(kstDate.getMonth() + 1).padStart(2, "0");
+                        const d = String(kstDate.getDate()).padStart(2, "0");
+                        const dayName = ["일","월","화","수","목","금","토"][kstDate.getDay()];
+                        const kstHour = String(kstDate.getHours()).padStart(2, "0");
+                        const kstMin = String(kstDate.getMinutes()).padStart(2, "0");
 
                         return (
                           <div key={`${evt.event}-${y}${m}${d}-${i}`} style={{
-                            display: "grid", gridTemplateColumns: "78px 1fr 48px 48px 48px",
+                            display: "grid", gridTemplateColumns: "90px 1fr 48px 48px 48px",
                             gap: "6px", alignItems: "center",
                             padding: "9px 8px",
                             opacity: isPast ? 0.65 : 1,
@@ -4080,7 +4091,7 @@ function AppInner() {
                                 {y}.{m}.{d}
                               </div>
                               <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "1px" }}>
-                                <span style={{ fontSize: mf(10), color: C.text3 }}>{dayName}요일</span>
+                                <span style={{ fontSize: mf(10), color: C.text3 }}>{dayName} {kstHour}:{kstMin}</span>
                                 <span style={{
                                   fontSize: "8px", fontWeight: 700, padding: "1px 4px", borderRadius: "3px",
                                   background: evt.status === "오늘" ? C.redBg : evt.status === "임박" ? C.yellowBg : evt.status === "예정" ? C.blueBg : C.card2,
