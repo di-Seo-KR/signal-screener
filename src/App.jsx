@@ -455,6 +455,41 @@ function calcRSI(closes, period = 14) {
   return al === 0 ? 100 : 100 - 100 / (1 + ag / al);
 }
 
+// RSI 전체 시계열 배열 반환 (다이버전스 분석용)
+function calcRSIArray(closes, period = 14) {
+  if (closes.length < period + 1) return [];
+  let ag = 0, al = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = closes[i] - closes[i - 1];
+    if (d >= 0) ag += d; else al -= d;
+  }
+  ag /= period; al /= period;
+  const rsiArr = [al === 0 ? 100 : 100 - 100 / (1 + ag / al)];
+  for (let i = period + 1; i < closes.length; i++) {
+    const d = closes[i] - closes[i - 1];
+    ag = (ag * (period - 1) + Math.max(d, 0)) / period;
+    al = (al * (period - 1) + Math.max(-d, 0)) / period;
+    rsiArr.push(al === 0 ? 100 : 100 - 100 / (1 + ag / al));
+  }
+  return rsiArr;
+}
+
+// 볼륨 프로파일 — POC(Point of Control) 산출
+function calcVolumeProfile(closes, volumes, bins = 20) {
+  if (closes.length < 10 || volumes.length < 10) return null;
+  const min = Math.min(...closes), max = Math.max(...closes);
+  if (max === min) return null;
+  const step = (max - min) / bins;
+  const profile = new Array(bins).fill(0);
+  closes.forEach((c, i) => {
+    const bin = Math.min(Math.floor((c - min) / step), bins - 1);
+    profile[bin] += volumes[i] || 0;
+  });
+  const pocBin = profile.indexOf(Math.max(...profile));
+  const poc = min + (pocBin + 0.5) * step;
+  return { poc, profile, min, max, step };
+}
+
 function calcSMA(data, period) {
   if (data.length < period) return null;
   return data.slice(-period).reduce((a, b) => a + b, 0) / period;
@@ -768,6 +803,52 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
     }
   }
 
+  // RSI 다이버전스 — MACD와 동일한 peak/trough 비교 방식
+  let rsiDivergence = false;
+  let rsiDivType = null; // "bullish" | "bearish"
+  if (weeklyCloses.length >= 16) {
+    const rsiLookback = Math.min(weeklyCloses.length, 24);
+    const rsiArr = calcRSIArray(weeklyCloses);
+    const rsiSlice = rsiArr.length >= rsiLookback ? rsiArr.slice(-rsiLookback) : rsiArr;
+    const priceSliceRsi = weeklyCloses.slice(-rsiSlice.length);
+    if (rsiSlice.length >= 6) {
+      const findSwingsRsi = (arr, type) => {
+        const swings = [];
+        for (let i = 1; i < arr.length - 1; i++) {
+          if (type === "high" && arr[i] > arr[i-1] && arr[i] >= arr[i+1]) swings.push({ idx: i, val: arr[i] });
+          if (type === "low" && arr[i] < arr[i-1] && arr[i] <= arr[i+1]) swings.push({ idx: i, val: arr[i] });
+        }
+        return swings.slice(-3);
+      };
+      const pHighs = findSwingsRsi(priceSliceRsi, "high");
+      const pLows = findSwingsRsi(priceSliceRsi, "low");
+      const rHighs = findSwingsRsi(rsiSlice, "high");
+      const rLows = findSwingsRsi(rsiSlice, "low");
+      // Bearish RSI Divergence: 가격 higher-high + RSI lower-high
+      if (pHighs.length >= 2 && rHighs.length >= 2) {
+        const [ph1, ph2] = pHighs.slice(-2);
+        const [rh1, rh2] = rHighs.slice(-2);
+        if (ph2.val > ph1.val && rh2.val < rh1.val) { rsiDivergence = true; rsiDivType = "bearish"; }
+      }
+      // Bullish RSI Divergence: 가격 lower-low + RSI higher-low
+      if (!rsiDivergence && pLows.length >= 2 && rLows.length >= 2) {
+        const [pl1, pl2] = pLows.slice(-2);
+        const [rl1, rl2] = rLows.slice(-2);
+        if (pl2.val < pl1.val && rl2.val > rl1.val) { rsiDivergence = true; rsiDivType = "bullish"; }
+      }
+    }
+  }
+
+  // 볼륨 프로파일 — POC 근접 여부 (지지/저항 근접 감지)
+  let nearPOC = false;
+  let pocPrice = null;
+  const vpResult = calcVolumeProfile(weeklyCloses, weeklyVolumes);
+  if (vpResult) {
+    pocPrice = vpResult.poc;
+    const pocDist = Math.abs(price - pocPrice) / pocPrice * 100;
+    nearPOC = pocDist <= 2; // POC ±2% 이내
+  }
+
   // MA 리본 (정배열/역배열)
   let maRibbon = false;
   if (ma20daily && ma50daily && ma200daily) {
@@ -829,6 +910,8 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
   if (conditions.includes("mfi_overbought")   && mfiOverbought)                                    triggers.push("mfi_overbought");
   if (conditions.includes("adx_bullish")      && adxBullish)                                       triggers.push("adx_bullish");
   if (conditions.includes("adx_bearish")      && adxBearish)                                       triggers.push("adx_bearish");
+  if (conditions.includes("rsi_divergence")   && rsiDivergence)                                    triggers.push("rsi_divergence");
+  if (conditions.includes("near_poc")         && nearPOC)                                          triggers.push("near_poc");
 
   return {
     triggers, price: +price.toFixed(6),
@@ -842,7 +925,9 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
     cmf: cmf != null ? +cmf.toFixed(3) : null,
     mfi: mfi != null ? +mfi.toFixed(1) : null,
     adxBullish, adxBearish,
-    macdDivType,
+    macdDivType, rsiDivType,
+    pocPrice: pocPrice != null ? +pocPrice.toFixed(2) : null,
+    nearPOC,
   };
 }
 
@@ -877,6 +962,9 @@ const CONDITION_META = {
   mfi_overbought:  { label: "MFI 과매수",          icon: "⚡", desc: "거래량 가중 RSI(MFI) > 80 — 볼륨 동반 극단 과매수" },
   adx_bullish:     { label: "ADX 강세 추세",       icon: "🐂", desc: "ADX≥25 + 매수 방향(+DI > -DI) — 강한 상승 추세 확인" },
   adx_bearish:     { label: "ADX 약세 추세",       icon: "🐻", desc: "ADX≥25 + 매도 방향(-DI > +DI) — 강한 하락 추세 확인" },
+  // 신규 조건 (v6.8)
+  rsi_divergence:  { label: "RSI 다이버전스",       icon: "🔄", desc: "가격과 RSI 방향 불일치 — MACD보다 빈번한 단기 반전 신호" },
+  near_poc:        { label: "볼륨 POC 근접",        icon: "🎯", desc: "볼륨 프로파일 POC(고거래량 가격대) ±2% — 강한 지지/저항 구간" },
 };
 
 // ════════════════════════════════════════════════════════════════════
@@ -1301,6 +1389,9 @@ function quickDiagnosis(asset) {
     if (asset.wr < -80) momScore += 4;
     if (asset.wr > -20) momScore -= 4;
   }
+  // RSI 다이버전스 반영 — 반전 시그널이므로 모멘텀 점수에 영향
+  if (asset.rsiDivType === "bullish") { momScore += 8; signals.push({ type: "bullish", name: "RSI 강세 다이버전스" }); }
+  else if (asset.rsiDivType === "bearish") { momScore -= 8; signals.push({ type: "bearish", name: "RSI 약세 다이버전스" }); }
   momScore = Math.max(0, Math.min(100, momScore));
 
   // ── 수급: 거래량 + 가격-거래량 상관 ──
@@ -1345,6 +1436,12 @@ function quickDiagnosis(asset) {
     else if (fromHigh < -25) posScore += 6;
     // 신고가
     if (pos52 >= 98 && asset.weekChange > 0) { posScore += 8; signals.push({ type: "bullish", name: "52주 신고가 돌파" }); }
+  }
+  // 볼륨 프로파일 POC 근접 — 지지/저항 구간 강조
+  if (asset.nearPOC && asset.pocPrice) {
+    if (asset.weekChange > 0) { posScore += 6; signals.push({ type: "bullish", name: `VOL POC 지지 ($${asset.pocPrice})` }); }
+    else if (asset.weekChange < 0) { posScore -= 4; signals.push({ type: "bearish", name: `VOL POC 저항 ($${asset.pocPrice})` }); }
+    else { signals.push({ type: "neutral", name: `VOL POC 근접 ($${asset.pocPrice})` }); }
   }
   posScore = Math.max(0, Math.min(100, posScore));
 
