@@ -1,5 +1,6 @@
-// DI금융 v6.6 — 투자 스크리너 + 퀀트 엔진 + 백테스트
-// Features: 스크리닝, 캔들차트, 28개 전략, 백테스트, 포트폴리오, 뉴스, 텔레그램 알림
+// DI금융 v6.7 — 투자 스크리너 + 퀀트 엔진 + 백테스트
+// Features: 스크리닝, 캔들차트, 32개 전략, 백테스트, 포트폴리오, 뉴스, 텔레그램 알림
+// v6.7: CMF/MFI UI 표시, MACD 다이버전스 방향, BB 스퀴즈 Keltner 고도화, 스크리닝 조건 확장
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 
 // ════════════════════════════════════════════════════════════════════
@@ -486,6 +487,27 @@ function calcMACD(closes) {
   return { goldenCross: prev <= prevSig && cur > sig, macdLine: cur, signalLine: sig };
 }
 
+// MACD 히스토그램 전체 배열 반환 (다이버전스 분석용, 1회 계산으로 최적화)
+function calcMACDHistogram(closes) {
+  if (closes.length < 35) return [];
+  const k12 = 2 / 13, k26 = 2 / 27, k9 = 2 / 10;
+  let e12 = closes.slice(0, 12).reduce((a, b) => a + b, 0) / 12;
+  let e26 = closes.slice(0, 26).reduce((a, b) => a + b, 0) / 26;
+  const macdArr = [];
+  for (let i = 0; i < closes.length; i++) {
+    if (i >= 12) e12 = closes[i] * k12 + e12 * (1 - k12);
+    if (i >= 26) { e26 = closes[i] * k26 + e26 * (1 - k26); macdArr.push(e12 - e26); }
+  }
+  if (macdArr.length < 9) return [];
+  let sig = macdArr.slice(0, 9).reduce((a, b) => a + b, 0) / 9;
+  const histogram = new Array(9).fill(0); // 처음 9개는 시그널 수렴 전이므로 0
+  for (let i = 9; i < macdArr.length; i++) {
+    sig = macdArr[i] * k9 + sig * (1 - k9);
+    histogram.push(macdArr[i] - sig);
+  }
+  return histogram;
+}
+
 function calcStochastic(highs, lows, closes, kPeriod = 14, dPeriod = 3) {
   if (closes.length < kPeriod) return null;
   const kArr = [];
@@ -571,19 +593,46 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
   const prev = weeklyCloses.length >= 2 ? weeklyCloses[weeklyCloses.length - 2] : price;
   const weekChange = ((price - prev) / prev) * 100;
 
-  // BB 스퀴즈
+  // BB 스퀴즈 (Keltner Channel 기반 고도화)
+  // BB가 Keltner Channel 안에 들어오면 진정한 스퀴즈
   let bbSqueeze = false;
-  if (weeklyCloses.length >= 20) {
-    const bwArr = [];
-    for (let i = 19; i < weeklyCloses.length; i++) {
-      const sl = weeklyCloses.slice(i - 19, i + 1);
-      const m  = sl.reduce((a, b) => a + b, 0) / 20;
-      const sd = Math.sqrt(sl.reduce((a, b) => a + (b - m) ** 2, 0) / 20);
-      bwArr.push(m > 0 ? (sd * 4) / m : 0);
+  if (weeklyCloses.length >= 20 && weeklyHighs.length >= 20) {
+    const n = weeklyCloses.length;
+    const bbPeriod = 20, bbMult = 2, kcEmaPeriod = 20, kcAtrPeriod = 10, kcAtrMult = 1.5;
+    // BB 계산
+    const bbSlice = weeklyCloses.slice(n - bbPeriod);
+    const bbMean = bbSlice.reduce((a, b) => a + b, 0) / bbPeriod;
+    const bbStd = Math.sqrt(bbSlice.reduce((a, b) => a + (b - bbMean) ** 2, 0) / bbPeriod);
+    const bbUpper = bbMean + bbMult * bbStd;
+    const bbLower = bbMean - bbMult * bbStd;
+    // Keltner EMA
+    const kcK = 2 / (kcEmaPeriod + 1);
+    let kcEma = weeklyCloses[0];
+    for (let i = 1; i < n; i++) kcEma = weeklyCloses[i] * kcK + kcEma * (1 - kcK);
+    // Keltner ATR
+    const atrN = Math.min(kcAtrPeriod, n - 1);
+    let atrSum = 0;
+    for (let i = n - atrN; i < n; i++) {
+      atrSum += Math.max(weeklyHighs[i] - weeklyLows[i], Math.abs(weeklyHighs[i] - weeklyCloses[i - 1]), Math.abs(weeklyLows[i] - weeklyCloses[i - 1]));
     }
-    const curBW = bwArr[bwArr.length - 1];
-    const minBW = Math.min(...bwArr.slice(-52));
-    bbSqueeze = bwArr.length >= 4 && curBW <= minBW * 1.05;
+    const kcAtr = atrSum / atrN;
+    const kcUpper = kcEma + kcAtrMult * kcAtr;
+    const kcLower = kcEma - kcAtrMult * kcAtr;
+    // 스퀴즈: BB가 KC 안에 있으면 true
+    bbSqueeze = bbLower > kcLower && bbUpper < kcUpper;
+    // 폴백: 기존 밴드폭 기준도 병합
+    if (!bbSqueeze) {
+      const bwArr = [];
+      for (let i = 19; i < n; i++) {
+        const sl = weeklyCloses.slice(i - 19, i + 1);
+        const m = sl.reduce((a, b) => a + b, 0) / 20;
+        const sd = Math.sqrt(sl.reduce((a, b) => a + (b - m) ** 2, 0) / 20);
+        bwArr.push(m > 0 ? (sd * 4) / m : 0);
+      }
+      const curBW = bwArr[bwArr.length - 1];
+      const minBW = Math.min(...bwArr.slice(-52));
+      bbSqueeze = bwArr.length >= 4 && curBW <= minBW * 1.05;
+    }
   }
 
   // 52주 신고/저가
@@ -683,18 +732,14 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
   // 평균회귀 (200일선 대비 ±15% 이상)
   const meanReversion = ma200Dist && Math.abs(ma200Dist) >= 15;
 
-  // MACD 다이버전스 — peak/trough 비교 방식 (P1 수정)
+  // MACD 다이버전스 — peak/trough 비교 방식 (P1 수정 + 성능 최적화)
   let macdDivergence = false;
   let macdDivType = null; // "bullish" | "bearish"
   if (weeklyCloses.length >= 12) {
-    // MACD 히스토그램 계산 (최근 12주)
+    // MACD 히스토그램 1회 계산 후 슬라이스 (기존 24회 반복 호출 제거)
     const lookback = Math.min(weeklyCloses.length, 24);
-    const macdHist = [];
-    for (let i = weeklyCloses.length - lookback; i < weeklyCloses.length; i++) {
-      const sl = weeklyCloses.slice(0, i + 1);
-      const m = calcMACD(sl);
-      macdHist.push((m.macdLine || 0) - (m.signalLine || 0));
-    }
+    const fullHist = calcMACDHistogram(weeklyCloses);
+    const macdHist = fullHist.length >= lookback ? fullHist.slice(-lookback) : fullHist;
     // swing high/low 찾기 (최소 2개 피크/트러프 필요)
     const findSwings = (arr, type) => {
       const swings = [];
@@ -811,7 +856,7 @@ const CONDITION_META = {
   ma_ribbon:       { label: "이평선 정배열/역배열", icon: "📐", desc: "MA20>MA50>MA200 정배열 또는 역배열 — 추세 강도 확인" },
   adx_trend:       { label: "ADX 강한 추세",      icon: "💪", desc: "ADX ≥ 25 + DI 방향 — 추세 존재 및 방향 확인" },
   // 변동성 & 가격 구조
-  bb_squeeze:      { label: "볼린저 스퀴즈",      icon: "🔥", desc: "밴드폭 52주 최저 — 대규모 변동 임박 신호" },
+  bb_squeeze:      { label: "볼린저 스퀴즈",      icon: "🔥", desc: "BB가 Keltner Channel 내부 수축 — 대규모 변동 임박 신호" },
   atr_breakout:    { label: "ATR 돌파",           icon: "🚀", desc: "당일 변동폭이 ATR(14) 2배 초과 — 폭발적 움직임" },
   price_channel:   { label: "채널 돌파",          icon: "📊", desc: "52주 고가/저가 채널 돌파 — 신고가 또는 지지선 이탈" },
   gap_signal:      { label: "갭 시그널",          icon: "⬆️", desc: "전주 대비 ±3% 이상 갭 — 수급 불균형" },
@@ -1033,17 +1078,25 @@ const TAG_COLORS = {
   volume_climax: C.red, obv_divergence: C.purple, volume_dry: C.yellow,
   near_52w_low: C.green, near_52w_high: C.blue, death_cross: C.red, golden_cross: C.green,
   mean_reversion: C.purple,
+  cmf_accumulation: C.green, cmf_distribution: C.red,
+  mfi_oversold: C.purple, mfi_overbought: C.red,
+  adx_bullish: C.green, adx_bearish: C.red,
 };
 
-function SignalTag({ triggerKey }) {
+function SignalTag({ triggerKey, asset }) {
   const meta = CONDITION_META[triggerKey];
   const color = TAG_COLORS[triggerKey] || C.blue;
   if (!meta) return null;
+  // MACD 다이버전스에 bullish/bearish 타입 표시
+  let label = meta.label;
+  if (triggerKey === "macd_divergence" && asset?.macdDivType) {
+    label = asset.macdDivType === "bullish" ? "MACD 상승 다이버전스" : "MACD 하락 다이버전스";
+  }
   return (
     <span style={{
       padding: "2px 7px", borderRadius: "6px", fontSize: "10px", fontWeight: 700,
       background: `${color}22`, color, border: `1px solid ${color}44`, whiteSpace: "nowrap",
-    }}>{meta.icon} {meta.label}</span>
+    }}>{meta.icon} {label}</span>
   );
 }
 
@@ -1251,8 +1304,13 @@ function quickDiagnosis(asset) {
   momScore = Math.max(0, Math.min(100, momScore));
 
   // ── 수급: 거래량 + 가격-거래량 상관 ──
-  if (asset.volRatio >= 3) { supScore += 18; signals.push({ type: "bullish", name: `거래량 폭증 (${asset.volRatio.toFixed(1)}x)` }); }
-  else if (asset.volRatio >= 2) { supScore += 14; signals.push({ type: "bullish", name: `거래량 급증 (${asset.volRatio.toFixed(1)}x)` }); }
+  // 거래량 클라이맥스 — 방향 구분 (매집 vs 투매)
+  if (asset.volRatio >= 3 && asset.weekChange > 0) { supScore += 18; signals.push({ type: "bullish", name: `거래량 폭증 매집 (${asset.volRatio.toFixed(1)}x)` }); }
+  else if (asset.volRatio >= 3 && asset.weekChange < 0) { supScore -= 15; signals.push({ type: "bearish", name: `거래량 폭증 투매 (${asset.volRatio.toFixed(1)}x)` }); }
+  else if (asset.volRatio >= 3) { supScore += 5; signals.push({ type: "neutral", name: `거래량 폭증 (${asset.volRatio.toFixed(1)}x)` }); }
+  else if (asset.volRatio >= 2 && asset.weekChange > 0) { supScore += 14; signals.push({ type: "bullish", name: `거래량 급증 (${asset.volRatio.toFixed(1)}x)` }); }
+  else if (asset.volRatio >= 2 && asset.weekChange < 0) { supScore -= 10; signals.push({ type: "bearish", name: `거래량 급증 하락 (${asset.volRatio.toFixed(1)}x)` }); }
+  else if (asset.volRatio >= 2) supScore += 4;
   else if (asset.volRatio >= 1.5) supScore += 8;
   else if (asset.volRatio >= 1.0) supScore += 2;
   else if (asset.volRatio <= 0.3) { supScore -= 12; signals.push({ type: "neutral", name: "거래량 극감" }); }
@@ -1280,7 +1338,7 @@ function quickDiagnosis(asset) {
     if (pos52 <= 10) { posScore += 18; signals.push({ type: "bullish", name: `52주 최저점 (${pos52.toFixed(0)}%)` }); }
     else if (pos52 <= 20) { posScore += 12; signals.push({ type: "bullish", name: `52주 저점대 (${pos52.toFixed(0)}%)` }); }
     else if (pos52 <= 40) posScore += 5;
-    else if (pos52 >= 95) { posScore -= 5; signals.push({ type: "neutral", name: `52주 최고점 (${pos52.toFixed(0)}%)` }); }
+    else if (pos52 >= 95 && !(pos52 >= 98 && asset.weekChange > 0)) { posScore -= 5; signals.push({ type: "neutral", name: `52주 최고점 (${pos52.toFixed(0)}%)` }); }
     else if (pos52 >= 85) posScore -= 2;
     const fromHigh = ((asset.price - asset.high52w) / asset.high52w) * 100;
     if (fromHigh < -40) { posScore += 12; signals.push({ type: "bullish", name: `고점 대비 ${fromHigh.toFixed(0)}%` }); }
@@ -1716,7 +1774,7 @@ function AssetCard({ asset, onChart }) {
             <span style={{ fontSize: "12px", color: C.text3 }}>{asset.symbol}</span>
           </div>
           <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-            {asset.triggers.map(t => <SignalTag key={t} triggerKey={t} />)}
+            {asset.triggers.map(t => <SignalTag key={t} triggerKey={t} asset={asset} />)}
           </div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -1805,6 +1863,8 @@ function AssetCard({ asset, onChart }) {
               { label: "스토캐스틱%K", value: asset.stoch ? `${asset.stoch.k.toFixed(1)}` : "—", color: asset.stoch?.k < 20 ? C.purple : C.text2 },
               { label: "Williams %R", value: asset.wr != null ? `${asset.wr}` : "—", color: asset.wr != null && asset.wr < -80 ? C.purple : C.text2 },
               { label: "52주 저가 대비", value: asset.low52w ? `+${(((asset.price - asset.low52w) / asset.low52w) * 100).toFixed(1)}%` : "—" },
+              { label: "CMF", value: asset.cmf != null ? `${asset.cmf > 0 ? "+" : ""}${asset.cmf.toFixed(3)}` : "—", color: asset.cmf != null ? (asset.cmf > 0.1 ? C.green : asset.cmf < -0.1 ? C.red : C.text2) : C.text2 },
+              { label: "MFI(14)", value: asset.mfi != null ? `${asset.mfi}` : "—", color: asset.mfi != null ? (asset.mfi < 20 ? C.purple : asset.mfi > 80 ? C.red : C.text2) : C.text2 },
             ].map(({ label, value, color }) => (
               <div key={label} style={{ background: C.bg, borderRadius: "10px", padding: "10px 12px" }}>
                 <div style={{ fontSize: "10px", color: C.text3, marginBottom: "4px" }}>{label}</div>
@@ -3520,13 +3580,16 @@ function AppInner() {
         .home-grid { display: flex; flex-direction: column; gap: 12px; }
         .home-left, .home-right { display: flex; flex-direction: column; gap: 12px; }
         .home-full { display: flex; flex-direction: column; gap: 12px; }
-        /* ── 모바일 (≤640px) — 폰트/간격 확대 ── */
+        /* ── 모바일 (≤640px) — 폰트/간격 확대 + 터치 최적화 ── */
         @media (max-width: 640px) {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
-          main { padding-left: 14px !important; padding-right: 14px !important;
+          main { padding-left: 12px !important; padding-right: 12px !important;
             font-size: 15px !important; }
           .tab-content { font-size: 15px; }
+          button { min-height: 40px; }
+          select { min-height: 40px; }
+          .screener-cond-btn { padding: 8px 14px !important; font-size: 13px !important; }
         }
         /* ── 태블릿 (641~899px) ── */
         @media (min-width: 641px) and (max-width: 899px) {
@@ -3552,7 +3615,7 @@ function AppInner() {
             title="홈으로 이동">
             <span style={{ fontSize: "20px" }}>📡</span>
             <span style={{ fontWeight: 800, fontSize: "17px", letterSpacing: "-0.5px" }}>DI금융</span>
-            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: mf(10), fontWeight: 700, background: C.blueBg, color: C.blue }}>v6.6</span>
+            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: mf(10), fontWeight: 700, background: C.blueBg, color: C.blue }}>v6.7</span>
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "2px" }}>
@@ -4450,7 +4513,7 @@ function AppInner() {
               {/* 모멘텀 & 추세 */}
               <div style={{ fontSize: "10px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>모멘텀 & 추세</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", marginBottom: "14px" }}>
-                {["rsi_extreme","macd_divergence","ma_ribbon","adx_trend"].map(key => {
+                {["rsi_extreme","macd_divergence","ma_ribbon","adx_trend","adx_bullish","adx_bearish"].map(key => {
                   const meta = CONDITION_META[key];
                   const on = conditions.includes(key);
                   return (
@@ -4484,7 +4547,7 @@ function AppInner() {
               {/* 수급 & 거래량 */}
               <div style={{ fontSize: "10px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>수급 & 거래량</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", marginBottom: "14px" }}>
-                {["volume_climax","obv_divergence","volume_dry"].map(key => {
+                {["volume_climax","obv_divergence","volume_dry","cmf_accumulation","cmf_distribution","mfi_oversold","mfi_overbought"].map(key => {
                   const meta = CONDITION_META[key];
                   const on = conditions.includes(key);
                   return (
