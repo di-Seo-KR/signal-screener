@@ -408,9 +408,8 @@ function SetupPanel({ config, setConfig, onConnect }) {
   const [showSecret, setShowSecret] = useState(false);
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState("");
-  const [qrScanning, setQrScanning] = useState(false);
-  const setupVideoRef = useRef(null);
-  const setupStreamRef = useRef(null);
+  const [qrStatus, setQrStatus] = useState(""); // "" | "loading" | "decoding" | "error"
+  const fileInputRef = useRef(null);
 
   const handleConnect = async () => {
     if (!key.trim() || !secret.trim()) { setError("API Key와 Secret을 모두 입력해주세요"); return; }
@@ -497,108 +496,80 @@ function SetupPanel({ config, setConfig, onConnect }) {
           <div style={{flex:1,height:"1px",background:C.border2}} />
         </div>
 
-        {/* QR 스캔으로 불러오기 */}
-        {!qrScanning ? (
-          <button onClick={async ()=>{
-            try {
-              await loadJsQR();
-              setQrScanning(true);
-              setTimeout(async () => {
-                try {
-                  const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } }
-                  });
-                  setupStreamRef.current = stream;
-                  if (setupVideoRef.current) {
-                    setupVideoRef.current.srcObject = stream;
-                    setupVideoRef.current.play();
-                    const canvas = document.createElement("canvas");
-                    const ctx = canvas.getContext("2d");
-                    const scanLoop = () => {
-                      if (!setupStreamRef.current) return;
-                      const v = setupVideoRef.current;
-                      if (!v || v.readyState < 2) { requestAnimationFrame(scanLoop); return; }
-                      canvas.width = v.videoWidth;
-                      canvas.height = v.videoHeight;
-                      ctx.drawImage(v, 0, 0);
-                      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                      const code = window.jsQR(imgData.data, canvas.width, canvas.height, { inversionAttempts: "dontInvert" });
-                      if (code?.data) {
-                        try {
-                          let syncData = code.data;
-                          if (syncData.startsWith("http")) {
-                            const url = new URL(syncData);
-                            syncData = url.searchParams.get("sync");
-                          }
-                          if (!syncData) throw new Error("no sync");
-                          const payload = JSON.parse(decodeURIComponent(escape(atob(syncData))));
-                          if (!payload.v || !payload.c?.k) throw new Error("invalid");
-                          // 성공! 스트림 정리
-                          setupStreamRef.current?.getTracks().forEach(t => t.stop());
-                          setupStreamRef.current = null;
-                          setQrScanning(false);
-                          // config 적용 + 연결
-                          const newConfig = { apiKey: payload.c.k, apiSecret: payload.c.s, isPaper: payload.c.p !== false, connected: true };
-                          setConfig(newConfig);
-                          save(KEYS.config, newConfig);
-                          // tradeSettings 등도 저장
-                          if (payload.t) save(KEYS.settings, payload.t);
-                          if (typeof payload.ae === "boolean") save(KEYS.autoTrade, payload.ae);
-                          if (typeof payload.as === "boolean") save("di_auto_scan", payload.as);
-                          if (typeof payload.th === "boolean") save("di_trading_halted", payload.th);
-                          // 계좌 확인
-                          alpacaAPI("account", newConfig).then(acc => {
-                            if (acc.id) onConnect(acc);
-                          }).catch(() => {});
-                          return;
-                        } catch {
-                          requestAnimationFrame(scanLoop);
-                          return;
-                        }
-                      }
-                      requestAnimationFrame(scanLoop);
-                    };
-                    requestAnimationFrame(scanLoop);
-                  }
-                } catch (e) {
-                  alert("카메라 접근 실패: " + e.message);
-                  setQrScanning(false);
+        {/* QR 스캔으로 불러오기 — 네이티브 카메라 촬영 방식 */}
+        <input ref={fileInputRef} type="file" accept="image/*" capture="environment"
+          style={{display:"none"}} onChange={async (e)=>{
+          const file = e.target.files?.[0];
+          if (!file) return;
+          setQrStatus("decoding");
+          try {
+            await loadJsQR();
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            img.onload = () => {
+              const canvas = document.createElement("canvas");
+              canvas.width = img.width;
+              canvas.height = img.height;
+              const ctx = canvas.getContext("2d");
+              ctx.drawImage(img, 0, 0);
+              URL.revokeObjectURL(url);
+              const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const code = window.jsQR(imgData.data, canvas.width, canvas.height, { inversionAttempts: "dontInvert" });
+              if (!code?.data) {
+                setQrStatus("error");
+                setError("QR 코드를 인식하지 못했습니다. 다시 촬영해주세요.");
+                return;
+              }
+              try {
+                let syncData = code.data;
+                if (syncData.startsWith("http")) {
+                  const u = new URL(syncData);
+                  syncData = u.searchParams.get("sync");
                 }
-              }, 200);
-            } catch (e) {
-              alert("QR 스캐너 로드 실패: " + e.message);
-            }
-          }} style={{
-            width:"100%",padding:"14px",borderRadius:"12px",fontSize:"15px",fontWeight:700,
-            background:C.card2,color:C.green,border:`1px solid ${C.green}44`,cursor:"pointer",
-            display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",
-          }}>
-            <span style={{fontSize:"20px"}}>📷</span> QR로 불러오기
-          </button>
-        ) : (
-          <div>
-            <div style={{borderRadius:"12px",overflow:"hidden",background:"#000",position:"relative",marginBottom:"8px"}}>
-              <video ref={setupVideoRef} style={{width:"100%",height:"auto",display:"block"}} playsInline muted />
-              <div style={{
-                position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",
-                width:"180px",height:"180px",border:"3px solid "+C.green,borderRadius:"16px",
-                boxShadow:"0 0 0 2000px rgba(0,0,0,0.5)"
-              }} />
-              <div style={{
-                position:"absolute",bottom:"12px",left:"50%",transform:"translateX(-50%)",
-                fontSize:"12px",color:"#fff",background:"rgba(0,0,0,0.7)",padding:"4px 12px",borderRadius:"20px",
-              }}>PC에 표시된 QR 코드를 비추세요</div>
-            </div>
-            <button onClick={()=>{
-              setupStreamRef.current?.getTracks().forEach(t => t.stop());
-              setupStreamRef.current = null;
-              setQrScanning(false);
-            }} style={{
-              width:"100%",padding:"10px",borderRadius:"10px",fontSize:"13px",fontWeight:600,
-              background:C.card2,color:C.text3,border:`1px solid ${C.border2}`,cursor:"pointer",
-            }}>취소</button>
-          </div>
-        )}
+                if (!syncData) throw new Error("no sync");
+                const payload = JSON.parse(decodeURIComponent(escape(atob(syncData))));
+                if (!payload.v || !payload.c?.k) throw new Error("invalid");
+                // config 적용 + 연결
+                const newConfig = { apiKey: payload.c.k, apiSecret: payload.c.s, isPaper: payload.c.p !== false, connected: true };
+                setConfig(newConfig);
+                save(KEYS.config, newConfig);
+                if (payload.t) save(KEYS.settings, payload.t);
+                if (typeof payload.ae === "boolean") save(KEYS.autoTrade, payload.ae);
+                if (typeof payload.as === "boolean") save("di_auto_scan", payload.as);
+                if (typeof payload.th === "boolean") save("di_trading_halted", payload.th);
+                setQrStatus("");
+                alpacaAPI("account", newConfig).then(acc => {
+                  if (acc.id) onConnect(acc);
+                }).catch(() => {});
+              } catch {
+                setQrStatus("error");
+                setError("유효하지 않은 QR 코드입니다. PC에서 생성한 QR을 촬영하세요.");
+              }
+            };
+            img.onerror = () => { setQrStatus("error"); setError("이미지 로드 실패"); };
+            img.src = url;
+          } catch {
+            setQrStatus("error");
+            setError("QR 스캐너 로드 실패");
+          }
+          // input 초기화 (같은 파일 재선택 가능)
+          e.target.value = "";
+        }} />
+        <button onClick={()=>{
+          setError("");
+          setQrStatus("loading");
+          fileInputRef.current?.click();
+          // 파일 선택 안 하고 취소한 경우 복구
+          setTimeout(() => { if (qrStatus === "loading") setQrStatus(""); }, 10000);
+        }} disabled={qrStatus==="decoding"} style={{
+          width:"100%",padding:"14px",borderRadius:"12px",fontSize:"15px",fontWeight:700,
+          background:C.card2,color:qrStatus==="decoding"?C.text3:C.green,
+          border:`1px solid ${C.green}44`,cursor:qrStatus==="decoding"?"default":"pointer",
+          display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",
+        }}>
+          <span style={{fontSize:"20px"}}>📷</span>
+          {qrStatus==="decoding"?"QR 인식 중...":"QR로 불러오기"}
+        </button>
         <div style={{fontSize:"10px",color:C.text3,marginTop:"8px",textAlign:"center"}}>
           PC 자동매매 설정에서 QR 생성 → 여기서 스캔
         </div>
