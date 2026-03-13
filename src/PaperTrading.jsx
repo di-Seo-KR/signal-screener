@@ -648,10 +648,34 @@ function applySyncPayload(payload, setConfig, setTradeSettings, setAutoTradeEnab
 }
 
 // ══════════════════════════════════════════════════════════════
+// URL ?sync= 파라미터 선파싱 (컴포넌트 마운트 전 1회)
+// ══════════════════════════════════════════════════════════════
+function parseSyncFromURL() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const syncCode = params.get("sync");
+    if (!syncCode) return null;
+    const payload = JSON.parse(decodeURIComponent(escape(atob(syncCode))));
+    if (!payload.v) return null;
+    return payload;
+  } catch { return null; }
+}
+
+// ══════════════════════════════════════════════════════════════
 // 메인 컴포넌트
 // ══════════════════════════════════════════════════════════════
 export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
-  const [config, setConfig] = useState(() => load(KEYS.config, {}));
+  // sync URL이 있으면 즉시 config에 반영 (시작하기 화면 우회)
+  const [config, setConfig] = useState(() => {
+    const saved = load(KEYS.config, {});
+    const sync = parseSyncFromURL();
+    if (sync?.c?.k) {
+      const merged = { ...saved, apiKey: sync.c.k, apiSecret: sync.c.s, isPaper: sync.c.p !== false, connected: true };
+      save(KEYS.config, merged);
+      return merged;
+    }
+    return saved;
+  });
   const [account, setAccount] = useState(null);
   const [positions, setPositions] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -660,7 +684,12 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
   const [activeTab, setActiveTab] = useState(() => load("di_pt_tab", "dashboard"));
   const [orderModal, setOrderModal] = useState(null);
 
-  const [autoTradeEnabled, setAutoTradeEnabled] = useState(() => load(KEYS.autoTrade, false));
+  const _sync = useMemo(() => parseSyncFromURL(), []);
+
+  const [autoTradeEnabled, setAutoTradeEnabled] = useState(() => {
+    if (_sync && typeof _sync.ae === "boolean") { save(KEYS.autoTrade, _sync.ae); return _sync.ae; }
+    return load(KEYS.autoTrade, false);
+  });
   const [tradeLog, setTradeLog] = useState(() => load(KEYS.tradeLog, []));
   const [executedSignals, setExecutedSignals] = useState(() => load(KEYS.executed, {}));
 
@@ -674,27 +703,36 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
   const [qrSvg, setQrSvg] = useState("");
   const videoRef = useRef(null);
   const qrStreamRef = useRef(null);
-  const [autoScanEnabled, setAutoScanEnabled] = useState(() => load("di_auto_scan", false));
+  const [autoScanEnabled, setAutoScanEnabled] = useState(() => {
+    if (_sync && typeof _sync.as === "boolean") { save("di_auto_scan", _sync.as); return _sync.as; }
+    return load("di_auto_scan", false);
+  });
 
   // 리스크 알림 상태
   const [riskAlerts, setRiskAlerts] = useState([]);
-  const [tradingHalted, setTradingHalted] = useState(() => load("di_trading_halted", false));
+  const [tradingHalted, setTradingHalted] = useState(() => {
+    if (_sync && typeof _sync.th === "boolean") { save("di_trading_halted", _sync.th); return _sync.th; }
+    return load("di_trading_halted", false);
+  });
 
-  const [tradeSettings, setTradeSettings] = useState(() => load(KEYS.settings, {
-    orderType: "market",
-    allocationPct: 2,
-    maxPositions: 20,
-    maxDrawdownPct: 10,
-    maxDailyLossPct: 3,
-    maxSectorPct: 35,
-    maxSinglePct: 5,
-    stopLossATR: 2,
-    takeProfitATR: 3,
-    useBracketOrders: true,
-    minConfidence: 0.5,
-    cooldownHours: 24,
-    strategies: Object.keys(STRATEGY_PORTFOLIOS),
-  }));
+  const [tradeSettings, setTradeSettings] = useState(() => {
+    if (_sync?.t) { save(KEYS.settings, _sync.t); return _sync.t; }
+    return load(KEYS.settings, {
+      orderType: "market",
+      allocationPct: 2,
+      maxPositions: 20,
+      maxDrawdownPct: 10,
+      maxDailyLossPct: 3,
+      maxSectorPct: 35,
+      maxSinglePct: 5,
+      stopLossATR: 2,
+      takeProfitATR: 3,
+      useBracketOrders: true,
+      minConfidence: 0.5,
+      cooldownHours: 24,
+      strategies: Object.keys(STRATEGY_PORTFOLIOS),
+    });
+  });
 
   const refreshTimer = useRef(null);
   const scanTimer = useRef(null);
@@ -714,33 +752,20 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
   useEffect(() => { save("di_trading_halted", tradingHalted); }, [tradingHalted]);
   useEffect(() => { save("di_pt_tab", activeTab); }, [activeTab]);
 
-  // ── URL 파라미터로 설정 가져오기 (공유 링크) ──
+  // ── URL sync 파라미터 정리 + 동기화 완료 알림 ──
   useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const syncCode = params.get("sync");
-      if (!syncCode) return;
-      const payload = JSON.parse(decodeURIComponent(escape(atob(syncCode))));
-      if (!payload.v || !payload.tradeSettings) return;
-      const t = new Date(payload.ts).toLocaleString("ko-KR");
-      if (window.confirm(`다른 기기의 설정을 가져올까요?\n\n내보낸 시각: ${t}`)) {
-        if (payload.config?.apiKey) {
-          const merged = { ...config, ...payload.config, connected: config.connected };
-          setConfig(merged);
-          save(KEYS.config, merged);
-        }
-        setTradeSettings(payload.tradeSettings);
-        if (typeof payload.autoTradeEnabled === "boolean") setAutoTradeEnabled(payload.autoTradeEnabled);
-        if (typeof payload.autoScanEnabled === "boolean") setAutoScanEnabled(payload.autoScanEnabled);
-        if (typeof payload.tradingHalted === "boolean") setTradingHalted(payload.tradingHalted);
-        alert("설정을 성공적으로 가져왔습니다!");
-      }
-      // URL에서 sync 파라미터 제거
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("sync")) {
+      // URL에서 sync 파라미터 제거 (이미 useState 초기화에서 적용됨)
       const url = new URL(window.location);
       url.searchParams.delete("sync");
-      window.history.replaceState({}, "", url.pathname + url.search);
-    } catch {}
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      window.history.replaceState({}, "", url.pathname + (url.search || ""));
+      if (_sync) {
+        const t = new Date(_sync.ts).toLocaleString("ko-KR");
+        setTimeout(() => alert(`QR 설정 동기화 완료!\n\n내보낸 시각: ${t}`), 500);
+      }
+    }
+  }, [_sync]);
 
   // ── 계좌 데이터 ──
   const refreshData = useCallback(async () => {
