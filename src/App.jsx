@@ -2888,7 +2888,7 @@ function AppInner() {
   const [newAsset, setNewAsset]           = useState({ symbol: "", name: "", market: "us", qty: "", avgPrice: "" });
 
   // ── 알림 설정 ─────────────────────────────────────────────────
-  const [settings, setSettings] = useState(() => ({ botToken: "", chatId: "", autoSend: false, strategyAlerts: true, ...loadSettings() }));
+  const [settings, setSettings] = useState(() => ({ botToken: "", chatId: "", autoSend: false, strategyAlerts: true, autoScanEnabled: false, autoScanInterval: 30, ...loadSettings() }));
   const [tgStatus, setTgStatus] = useState("");
 
   // ── 전략 매매 알림 (실시간 푸시) ──────────────────────────────
@@ -2922,7 +2922,7 @@ function AppInner() {
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsSort, setNewsSort] = useState("time"); // time, positive, negative
 
-  useEffect(() => { saveSettings({ botToken: settings.botToken, chatId: settings.chatId, autoSend: settings.autoSend, strategyAlerts: settings.strategyAlerts, syncPin }); }, [settings, syncPin]);
+  useEffect(() => { saveSettings({ botToken: settings.botToken, chatId: settings.chatId, autoSend: settings.autoSend, strategyAlerts: settings.strategyAlerts, autoScanEnabled: settings.autoScanEnabled, autoScanInterval: settings.autoScanInterval, syncPin }); }, [settings, syncPin]);
   useEffect(() => { savePortfolio(portfolio); }, [portfolio]);
   // 전략 알림 저장 (최대 100개 유지)
   useEffect(() => { try { localStorage.setItem("di_trade_alerts", JSON.stringify(tradeAlerts.slice(0, 100))); } catch {} }, [tradeAlerts]);
@@ -3680,6 +3680,36 @@ function AppInner() {
       } catch { setTgStatus("❌ 텔레그램 전송 실패"); }
     }
   }, [scanning, conditions, mode, sortBy, settings]);
+
+  // ── 자동 스캔 타이머 (30분 간격 등) ──────────────────────────
+  const autoScanTimerRef = useRef(null);
+  const [nextAutoScan, setNextAutoScan] = useState(null);
+
+  useEffect(() => {
+    // 기존 타이머 정리
+    if (autoScanTimerRef.current) {
+      clearInterval(autoScanTimerRef.current);
+      autoScanTimerRef.current = null;
+    }
+    if (!settings.autoScanEnabled || !settings.autoScanInterval) {
+      setNextAutoScan(null);
+      return;
+    }
+
+    const intervalMs = (settings.autoScanInterval || 30) * 60 * 1000;
+    const updateNext = () => setNextAutoScan(new Date(Date.now() + intervalMs));
+    updateNext();
+
+    autoScanTimerRef.current = setInterval(() => {
+      console.log("[DI금융] 자동 스캔 실행 —", new Date().toLocaleTimeString("ko-KR"));
+      runScan();
+      updateNext();
+    }, intervalMs);
+
+    return () => {
+      if (autoScanTimerRef.current) clearInterval(autoScanTimerRef.current);
+    };
+  }, [settings.autoScanEnabled, settings.autoScanInterval, runScan]);
 
   // ── 저평가 종목 통합 스캔 ─────────────────────────────────────
   const runValueScan = useCallback(async () => {
@@ -6021,7 +6051,7 @@ function AppInner() {
               </div>
 
               {/* 알림 설정 토글 */}
-              <div style={{ display: "flex", gap: "12px", marginBottom: "16px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "12px", marginBottom: "12px", flexWrap: "wrap" }}>
                 <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "12px", color: C.text2 }}>
                   <input type="checkbox" checked={settings.strategyAlerts !== false}
                     onChange={e => setSettings(p => ({ ...p, strategyAlerts: e.target.checked }))}
@@ -6034,6 +6064,54 @@ function AppInner() {
                     style={{ cursor: "pointer" }} />
                   <span>텔레그램 동시 발송</span>
                 </label>
+              </div>
+
+              {/* ── 자동 스캔 설정 ── */}
+              <div style={{
+                background: C.card2, borderRadius: "12px", padding: "14px", marginBottom: "16px",
+                border: `1px solid ${settings.autoScanEnabled ? C.blue + "40" : C.border2}`,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: settings.autoScanEnabled ? "12px" : "0" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "16px" }}>{settings.autoScanEnabled ? "🔄" : "⏸️"}</span>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: "13px" }}>자동 스캔</div>
+                      <div style={{ fontSize: "11px", color: C.text3 }}>
+                        {settings.autoScanEnabled
+                          ? `${settings.autoScanInterval || 30}분 간격으로 자동 실행`
+                          : "비활성화됨"}
+                      </div>
+                    </div>
+                  </div>
+                  <button onClick={() => setSettings(p => ({ ...p, autoScanEnabled: !p.autoScanEnabled }))} style={{
+                    padding: "6px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer",
+                    background: settings.autoScanEnabled ? C.blue : C.card, border: `1px solid ${settings.autoScanEnabled ? C.blue : C.border2}`,
+                    color: settings.autoScanEnabled ? "#fff" : C.text2,
+                  }}>{settings.autoScanEnabled ? "ON" : "OFF"}</button>
+                </div>
+                {settings.autoScanEnabled && (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                      <span style={{ fontSize: "12px", color: C.text2, minWidth: "50px" }}>간격</span>
+                      <div style={{ display: "flex", gap: "6px", flex: 1 }}>
+                        {[15, 30, 60, 120].map(m => (
+                          <button key={m} onClick={() => setSettings(p => ({ ...p, autoScanInterval: m }))} style={{
+                            flex: 1, padding: "6px 0", borderRadius: "8px", fontSize: "12px", fontWeight: 600, cursor: "pointer",
+                            background: (settings.autoScanInterval || 30) === m ? C.blueBg : "transparent",
+                            color: (settings.autoScanInterval || 30) === m ? C.blue : C.text3,
+                            border: `1px solid ${(settings.autoScanInterval || 30) === m ? C.blue + "40" : C.border2}`,
+                          }}>{m < 60 ? `${m}분` : `${m / 60}시간`}</button>
+                        ))}
+                      </div>
+                    </div>
+                    {nextAutoScan && (
+                      <div style={{ fontSize: "11px", color: C.text3, display: "flex", alignItems: "center", gap: "4px" }}>
+                        <span>⏰</span> 다음 스캔: {nextAutoScan.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                        {scanning && <span style={{ color: C.blue, fontWeight: 600 }}> — 스캔 중...</span>}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
               {/* 알림 피드 */}
