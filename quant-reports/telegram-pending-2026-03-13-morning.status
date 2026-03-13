@@ -1,0 +1,6 @@
+status: PENDING
+created: 2026-03-13T09:00:00+09:00
+attempts: 1
+last_attempt: 2026-03-13T09:00:00+09:00
+error: Chrome browser unresponsive (timeout) + WebFetch egress blocked
+next_retry: next scheduled run

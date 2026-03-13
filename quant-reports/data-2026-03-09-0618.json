@@ -1,0 +1,86 @@
+{
+  "timestamp": "2026-03-09T21:18:50.316Z",
+  "reportId": "2026-03-09-0618",
+  "testCount": 0,
+  "validAssets": 0,
+  "skippedAssets": [
+    {
+      "symbol": "AAPL",
+      "error": "fetch failed"
+    },
+    {
+      "symbol": "NVDA",
+      "error": "fetch failed"
+    },
+    {
+      "symbol": "TSLA",
+      "error": "fetch failed"
+    },
+    {
+      "symbol": "MSFT",
+      "error": "fetch failed"
+    },
+    {
+      "symbol": "AMZN",
+      "error": "fetch failed"
+    },
+    {
+      "symbol": "GOOGL",
+      "error": "fetch failed"
+    },
+    {
+      "symbol": "META",
+      "error": "fetch failed"
+    },
+    {
+      "symbol": "AMD",
+      "error": "fetch failed"
+    },
+    {
+      "symbol": "AVGO",
+      "error": "fetch failed"
+    },
+    {
+      "symbol": "JPM",
+      "error": "fetch failed"
+    },
+    {
+      "symbol": "005930.KS",
+      "error": "fetch failed"
+    },
+    {
+      "symbol": "000660.KS",
+      "error": "fetch failed"
+    },
+    {
+      "symbol": "035420.KS",
+      "error": "fetch failed"
+    },
+    {
+      "symbol": "bitcoin",
+      "error": "fetch failed"
+    },
+    {
+      "symbol": "ethereum",
+      "error": "fetch failed"
+    },
+    {
+      "symbol": "solana",
+      "error": "fetch failed"
+    }
+  ],
+  "marketDiagnoses": {},
+  "results": [],
+  "rankings": {
+    "topSharpe": [],
+    "topReturn": [],
+    "avgWinRates": [],
+    "bestRiskAdj": [],
+    "categoryRanking": []
+  },
+  "recommendationAccuracy": {
+    "hits": 0,
+    "total": 0,
+    "accuracy": "N/A"
+  }
+}

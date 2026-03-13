@@ -1,0 +1,25 @@
+{
+  "timestamp": "2026-03-09T18:42:39.936Z",
+  "config": {
+    "strategies": 24,
+    "assets": 0,
+    "initialCapital": 10000,
+    "commission": 0.001,
+    "slippage": 0.0005
+  },
+  "regimes": {},
+  "results": [],
+  "analysis": {
+    "topSharpe": [],
+    "topReturn": [],
+    "consistency": [],
+    "riskAdj": [],
+    "catSummary": [],
+    "recAccuracy": {}
+  },
+  "insights": {
+    "beatBuyHold": 0,
+    "highSharpe": 0,
+    "bigReturn": 0
+  }
+}

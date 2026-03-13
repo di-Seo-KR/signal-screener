@@ -1,0 +1,6 @@
+status: pending
+created: 2026-03-13T10:03:00+09:00
+send_attempts: 2
+last_error: Chrome MCP still completely unresponsive at 12:03 KST — tabs_context_mcp works but javascript_tool/navigate timeout (60s) on tabs 1685900612, 1685900613. 6th consecutive Chrome failure (04:03, 06:08, 08:00, 10:03, 12:03). All Chrome tools except tabs_context timing out.
+note: VIX correction alert — 06:08 alert had VIX 24.23 (3/11 close), actual 3/12 close was 27.29 (+12.63%). Also Brent $100 close and 10Y yield 4.26%. Alert ready for sending when Chrome becomes available.
+previous_unsent: telegram-pending-2026-03-13-alert-0608.txt, telegram-pending-2026-03-13-alert-0403.txt

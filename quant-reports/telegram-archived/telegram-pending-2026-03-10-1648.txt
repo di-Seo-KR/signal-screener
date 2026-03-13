@@ -1,0 +1,9 @@
+🔬 DI퀀트랩 리포트
+📅 2026-03-10
+🏆 Top Sharpe: 삼중 이평선 + ATR 정지 on AVGO → 41.15% (Sharpe 6057.92)
+💰 Top Return: BB 스퀴즈 돌파 on SOL → 299.23%
+📊 384개 테스트 완료 (187건 주목)
+
+Status: PENDING - API timeout, manual send required
+Bot Token: 8749984490:AAHcYiqyxDQMZyAzhQTA21SzZP0j85I8h90
+Chat ID: 5202880452

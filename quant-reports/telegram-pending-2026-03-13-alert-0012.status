@@ -1,0 +1,5 @@
+status: pending
+created: 2026-03-13T00:12:00+09:00
+send_attempts: 2
+last_error: Chrome MCP tools timed out - browser inactive/sleeping (02:03 KST retry also failed)
+note: Alert file created successfully. Telegram send pending - Chrome browser unresponsive during both 00:12 and 02:03 scheduled task executions.

@@ -1,0 +1,20 @@
+📊 DI금융 스크리닝 고도화 보고 (3/13 금 20:00)
+
+✅ 전일 항목 8/8 구현 완료
+• MACD div + 성능 최적화 정상 작동 확인
+• RSI div + 볼륨 POC 신규 추가 완료
+• 거래량 방향 구분, 52주 점수 충돌 해소
+
+⚠️ 전일 보고서 오탐 정정
+• P2-3/4/5 (Stoch·WR 타입, GoldenCross 배열) → App.jsx 로컬 함수가 스칼라 반환하므로 버그 아님
+
+🟡 P2 신규 발견 2건
+1. MACD div가 quickDiagnosis 점수에 미반영 (momScore ±10 추가 권장)
+2. Golden/Death Cross 이벤트 보너스 미반영 (trendScore ±12 추가 권장)
+
+💡 신규 제안
+• 복합 다이버전스(RSI+MACD 동시) 스크리닝
+• Supertrend·CCI 스크리닝 조건 추가
+• 백테스트 성과 기반 동적 가중치
+
+📄 상세: screening-refine-2026-03-13.md

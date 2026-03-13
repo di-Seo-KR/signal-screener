@@ -1,0 +1,6 @@
+status: pending
+created: 2026-03-13T06:08:00+09:00
+send_attempts: 2
+last_error: Chrome MCP still completely unresponsive at 08:03 KST — navigate, javascript_tool, computer screenshot all timed out (60s) across all tabs. 4th consecutive Chrome failure (04:03, 06:08, 08:00).
+note: New alert with 5 key signals based on 3/12 US market close data. Major developments: S&P 500 at 2026 closing low (6,672), WTI +9.72% to $95.73, Iran new Supreme Leader Hormuz closure threat, Dow below 47K first time in 2026. 08:00 check confirmed no new signals (US overnight session). Alert still valid and ready for sending when browser becomes active.
+previous_unsent: telegram-pending-2026-03-13-alert-0403.txt

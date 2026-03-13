@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-03-09T22:12:21.078Z",
+  "testCount": 0,
+  "validCount": 0,
+  "assets": 0,
+  "strategies": 24,
+  "regimes": {},
+  "topBySharpe": [],
+  "topByReturn": [],
+  "consistentStrategies": [],
+  "riskAdjusted": [],
+  "categoryRanking": [],
+  "recAccuracy": [],
+  "overallAccuracy": 0,
+  "notableFindings": [],
+  "allResults": []
+}

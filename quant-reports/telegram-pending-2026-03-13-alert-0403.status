@@ -1,0 +1,5 @@
+status: pending
+created: 2026-03-13T04:03:00+09:00
+send_attempts: 3
+last_error: All methods failed - Chrome MCP timed out (navigate, javascript_tool, new tab all unresponsive), curl exit 56 (network blocked), Python urllib 403 Forbidden tunnel
+note: Updated alert combining 00:12 + 02:00 + 04:03 market data with 5 key signals. Chrome browser appears to be sleeping — this is the 3rd consecutive scheduled task execution (00:12, 02:03, 04:03) where Chrome was unresponsive. Alert file saved and ready for next execution when browser is active.

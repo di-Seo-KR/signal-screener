@@ -1,0 +1,27 @@
+📊 DI금융 스크리닝 고도화 보고 (3/12 목)
+
+✅ 전일 개선 6/8 구현 완료
+• MACD 다이버전스 peak/trough
+• GC/DC 이벤트 감지
+• OBV 8주+선형회귀, Gap 마켓별 임계
+• RSI 연속 그라데이션, ADX 방향성
+• CMF/MFI 신규 지표 추가
+
+🔴 P1 긴급 — MACD 다이버전스 결함 발견
+• calcMACD가 signal 반환하는데 코드에서 signalLine으로 접근 → undefined
+• macdLine이 배열인데 스칼라처럼 사용 → NaN
+• 결과: MACD 다이버전스 기능 완전 미작동 상태
+• 수정: m.signal[lastIdx] 사용 + 전체 MACD 1회 계산으로 최적화
+
+🟡 P2 — 타입 오류 3건
+• Stochastic: 배열을 숫자로 비교 → quickDiag ±8점 미반영
+• Williams %R: 배열.toFixed() TypeError 가능성
+• GC/DC 4주 룩백: calcSMA 배열 간 비교 → 크로스 미감지
+
+🟢 P3 — 점수 정확도
+• volRatio≥3 무조건 bullish → 음봉 투매에도 +18 적용
+• 52주 신고가 돌파 시 -5+8=+3으로 보수적
+
+💡 신규 제안: RSI 다이버전스, 볼륨프로파일 지지저항
+
+📝 상세: quant-reports/screening-refine-2026-03-12.md

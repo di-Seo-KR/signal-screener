@@ -1,0 +1,12 @@
+🔬 DI퀀트랩 리포트
+📅 2026-03-10 14:14 KST
+🏆 Top: BB 스퀴즈 돌파 on Solana → 299.23% (Sharpe 0)
+💰 Top Sharpe: 삼중 이평선+ATR on Broadcom → 41.15% (Sharpe 6057.92)
+📊 384개 테스트 완료
+🔥 50%+ 수익 조합: 29건
+⚡ Sharpe>2.0: 161건
+📈 Best Category: 변동성 (avg 24.68%)
+🎯 추천 정확도: 81.3%
+
+---
+Status: PENDING (VM proxy blocked Telegram API)

@@ -1,0 +1,9 @@
+{
+  "status": "pending",
+  "created": "2026-03-12T22:13:00+09:00",
+  "sendAttempts": 1,
+  "lastAttempt": "2026-03-12T22:13:00+09:00",
+  "lastError": "Chrome MCP 전체 타임아웃 - 브라우저 연결 불가. curl도 프록시 차단(403).",
+  "signalCount": 4,
+  "signals": ["VIX 25.65 급등", "크립토 F&G 18 극단공포", "유가 $100+ 공급충격", "기술주 디커플링"]
+}
