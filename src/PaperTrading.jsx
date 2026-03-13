@@ -662,7 +662,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
   const [orders, setOrders] = useState([]);
   const [clock, setClock] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState(() => load("di_pt_tab", "dashboard"));
   const [orderModal, setOrderModal] = useState(null);
 
   const [autoTradeEnabled, setAutoTradeEnabled] = useState(() => load(KEYS.autoTrade, false));
@@ -673,11 +673,11 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
   const [scanProgress, setScanProgress] = useState(0);
   const [detectedSignals, setDetectedSignals] = useState([]);
   const [lastScanTime, setLastScanTime] = useState(null);
-  const [autoScanEnabled, setAutoScanEnabled] = useState(false);
+  const [autoScanEnabled, setAutoScanEnabled] = useState(() => load("di_auto_scan", false));
 
   // 리스크 알림 상태
   const [riskAlerts, setRiskAlerts] = useState([]);
-  const [tradingHalted, setTradingHalted] = useState(false);
+  const [tradingHalted, setTradingHalted] = useState(() => load("di_trading_halted", false));
 
   const [tradeSettings, setTradeSettings] = useState(() => load(KEYS.settings, {
     orderType: "market",
@@ -709,6 +709,9 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
   }, [executedSignals]);
   useEffect(() => { save(KEYS.autoTrade, autoTradeEnabled); }, [autoTradeEnabled]);
   useEffect(() => { save(KEYS.settings, tradeSettings); }, [tradeSettings]);
+  useEffect(() => { save("di_auto_scan", autoScanEnabled); }, [autoScanEnabled]);
+  useEffect(() => { save("di_trading_halted", tradingHalted); }, [tradingHalted]);
+  useEffect(() => { save("di_pt_tab", activeTab); }, [activeTab]);
 
   // ── 계좌 데이터 ──
   const refreshData = useCallback(async () => {
