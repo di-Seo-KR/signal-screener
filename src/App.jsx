@@ -1,6 +1,6 @@
-// DI금융 v6.7 — 투자 스크리너 + 퀀트 엔진 + 백테스트
-// Features: 스크리닝, 캔들차트, 32개 전략, 백테스트, 포트폴리오, 뉴스, 텔레그램 알림
-// v6.7: CMF/MFI UI 표시, MACD 다이버전스 방향, BB 스퀴즈 Keltner 고도화, 스크리닝 조건 확장
+// DI금융 v7.0 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리
+// Features: 스크리닝, 캔들차트, 32개 전략, 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 텔레그램 알림
+// v7.0: 전략별 포트폴리오 운용 시스템, 8-Point 리스크 히트맵, RSI 다이버전스, 볼륨 프로파일 POC
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 
 // ════════════════════════════════════════════════════════════════════
@@ -41,6 +41,8 @@ class ErrorBoundary extends Component {
 import ChartModal from "./ChartModal.jsx";
 import StrategyPanel from "./StrategyPanel.jsx";
 import BacktestPanel from "./BacktestPanel.jsx";
+import QuantPortfolio from "./QuantPortfolio.jsx";
+import RiskHeatmap from "./RiskHeatmap.jsx";
 
 // ════════════════════════════════════════════════════════════════════
 // 데이터 정의
@@ -3712,11 +3714,11 @@ function AppInner() {
             title="홈으로 이동">
             <span style={{ fontSize: "20px" }}>📡</span>
             <span style={{ fontWeight: 800, fontSize: "17px", letterSpacing: "-0.5px" }}>DI금융</span>
-            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: mf(10), fontWeight: 700, background: C.blueBg, color: C.blue }}>v6.7</span>
+            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: mf(10), fontWeight: 700, background: C.blueBg, color: C.blue }}>v7.0</span>
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "2px" }}>
-            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-report", label: "퀀트 리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📊" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
+            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-port", label: "전략 운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
               <button key={t.id} onClick={() => setTab(t.id)} style={{
                 padding: "6px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
@@ -3748,7 +3750,7 @@ function AppInner() {
             background: C.card, borderTop: `1px solid ${C.border}`,
             padding: "8px 16px 12px", display: "flex", flexDirection: "column", gap: "2px",
           }}>
-            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-report", label: "퀀트 리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📊" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
+            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-port", label: "전략 운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); setMenuOpen(false); }} style={{
                 padding: "10px 14px", borderRadius: "10px", fontSize: "14px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
@@ -5182,6 +5184,16 @@ function AppInner() {
         {tab === "strategy" && <StrategyPanel onRunBacktest={(strategy, symbol) => {
           setBtStrategy(strategy); setBtSymbol(symbol); setTab("backtest");
         }} />}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 전략 운용 (퀀트 포트폴리오)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "quant-port" && <QuantPortfolio theme={themeMode} />}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 리스크 히트맵
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "risk-map" && <RiskHeatmap marketIndices={marketIndices} fearGreed={fearGreed} />}
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 퀀트 리포트
