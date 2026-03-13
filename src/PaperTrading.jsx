@@ -183,27 +183,24 @@ async function fetchCandleData(symbols, onProgress) {
       const url = `/api/yahoo-batch?symbols=${batch.join(",")}&range=6mo&interval=1d`;
       const res = await fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(tmr));
       if (res.ok) {
-        const data = await res.json();
+        const json = await res.json();
+        const data = json.results || json; // yahoo-batch는 { results: { SYM: {...} } }
         for (const sym of batch) {
-          if (data[sym]?.chart?.result?.[0]) {
-            const r = data[sym].chart.result[0];
-            const ts = r.timestamp || [];
-            const q = r.indicators?.quote?.[0] || {};
-            const candles = [];
-            for (let j = 0; j < ts.length; j++) {
-              if (q.close?.[j] != null) {
-                candles.push({
-                  time: ts[j] * 1000,
-                  open: q.open?.[j] || q.close[j],
-                  high: q.high?.[j] || q.close[j],
-                  low: q.low?.[j] || q.close[j],
-                  close: q.close[j],
-                  volume: q.volume?.[j] || 0,
-                });
-              }
-            }
-            if (candles.length > 30) results[sym] = candles;
+          const d = data[sym];
+          if (!d?.closes?.length) continue;
+          const candles = [];
+          for (let j = 0; j < d.closes.length; j++) {
+            if (d.closes[j] == null) continue;
+            candles.push({
+              time: (d.timestamps?.[j] || 0) * 1000,
+              open: d.opens?.[j] || d.closes[j],
+              high: d.highs?.[j] || d.closes[j],
+              low: d.lows?.[j] || d.closes[j],
+              close: d.closes[j],
+              volume: d.volumes?.[j] || 0,
+            });
           }
+          if (candles.length > 30) results[sym] = candles;
         }
       }
     } catch {}
@@ -513,11 +510,24 @@ function SetupPanel({ config, setConfig, onConnect }) {
               const ctx = canvas.getContext("2d");
               ctx.drawImage(img, 0, 0);
               URL.revokeObjectURL(url);
+              // 이미지가 너무 크면 리사이즈 (인식 속도+정확도)
+              const MAX_DIM = 1024;
+              if (canvas.width > MAX_DIM || canvas.height > MAX_DIM) {
+                const scale = MAX_DIM / Math.max(canvas.width, canvas.height);
+                const sw = Math.round(canvas.width * scale);
+                const sh = Math.round(canvas.height * scale);
+                const small = document.createElement("canvas");
+                small.width = sw; small.height = sh;
+                small.getContext("2d").drawImage(canvas, 0, 0, sw, sh);
+                canvas.width = sw; canvas.height = sh;
+                ctx.drawImage(small, 0, 0);
+              }
               const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-              const code = window.jsQR(imgData.data, canvas.width, canvas.height, { inversionAttempts: "dontInvert" });
+              // attemptBoth: 흰배경+검은QR / 검은배경+흰QR 둘 다 시도
+              const code = window.jsQR(imgData.data, canvas.width, canvas.height, { inversionAttempts: "attemptBoth" });
               if (!code?.data) {
                 setQrStatus("error");
-                setError("QR 코드를 인식하지 못했습니다. 다시 촬영해주세요.");
+                setError("QR 코드를 인식하지 못했습니다. QR이 화면에 크게 나오도록 다시 촬영해주세요.");
                 return;
               }
               try {
@@ -1367,9 +1377,49 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
             </div>
           </div>
 
-          {/* 매매 설정 */}
+          {/* 투자 성향 프리셋 */}
           <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
-            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"16px"}}>포지션 사이징</div>
+            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"4px"}}>투자 성향</div>
+            <div style={{fontSize:"11px",color:C.text3,marginBottom:"14px"}}>성향을 선택하면 모든 설정이 자동으로 최적화됩니다</div>
+            <div style={{display:"flex",gap:"8px"}}>
+              {[
+                { id:"conservative", label:"안정형", icon:"🛡️", color:C.blue, bg:C.blueBg,
+                  desc:"소액·저위험·높은 신뢰도만",
+                  s:{allocationPct:1,maxPositions:10,maxDrawdownPct:5,maxDailyLossPct:2,maxSectorPct:25,maxSinglePct:3,
+                    stopLossATR:1.5,takeProfitATR:2.5,useBracketOrders:true,minConfidence:0.7,cooldownHours:48,orderType:"market",
+                    strategies:Object.keys(STRATEGY_PORTFOLIOS).filter(n=>(STRATEGY_CONFIDENCE[n]||0)>=0.7)}},
+                { id:"balanced", label:"균형형", icon:"⚖️", color:C.green, bg:C.greenBg,
+                  desc:"적정 리스크·다양한 전략",
+                  s:{allocationPct:2,maxPositions:20,maxDrawdownPct:10,maxDailyLossPct:3,maxSectorPct:35,maxSinglePct:5,
+                    stopLossATR:2,takeProfitATR:3,useBracketOrders:true,minConfidence:0.5,cooldownHours:24,orderType:"market",
+                    strategies:Object.keys(STRATEGY_PORTFOLIOS)}},
+                { id:"aggressive", label:"공격형", icon:"🔥", color:C.orange, bg:C.orangeBg,
+                  desc:"고비중·전략 전체·빠른 회전",
+                  s:{allocationPct:4,maxPositions:30,maxDrawdownPct:15,maxDailyLossPct:5,maxSectorPct:45,maxSinglePct:8,
+                    stopLossATR:2.5,takeProfitATR:4,useBracketOrders:true,minConfidence:0.4,cooldownHours:12,orderType:"market",
+                    strategies:Object.keys(STRATEGY_PORTFOLIOS)}},
+              ].map(p=>{
+                // 현재 설정이 이 프리셋과 일치하는지 체크
+                const match = tradeSettings.allocationPct===p.s.allocationPct
+                  && tradeSettings.minConfidence===p.s.minConfidence
+                  && tradeSettings.maxDrawdownPct===p.s.maxDrawdownPct;
+                return (
+                  <button key={p.id} onClick={()=>setTradeSettings(prev=>({...prev,...p.s}))} style={{
+                    flex:1,padding:"14px 8px",borderRadius:"12px",border:`2px solid ${match?p.color:C.border2}`,
+                    background:match?p.bg:"transparent",cursor:"pointer",textAlign:"center",transition:"all 0.2s",
+                  }}>
+                    <div style={{fontSize:"24px",marginBottom:"4px"}}>{p.icon}</div>
+                    <div style={{fontWeight:700,fontSize:"13px",color:match?p.color:C.text1}}>{p.label}</div>
+                    <div style={{fontSize:"10px",color:C.text3,marginTop:"2px"}}>{p.desc}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 매매 설정 (상세) */}
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
+            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"16px"}}>포지션 사이징 (상세)</div>
             <div style={{display:"flex",flexDirection:"column",gap:"14px"}}>
 
               <div>
@@ -1516,8 +1566,8 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
                       text: encoded,
                       width: 260,
                       height: 260,
-                      colorDark: "#ffffff",
-                      colorLight: "#0F1825",
+                      colorDark: "#000000",
+                      colorLight: "#ffffff",
                       correctLevel: window.QRCode.CorrectLevel.M,
                     });
                   }, 100);
@@ -1717,8 +1767,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
                   모바일에서 카메라로 스캔하세요
                 </div>
                 <div id="di-qr-container" style={{
-                  display:"inline-block",padding:"16px",background:"#0F1825",borderRadius:"16px",
-                  border:`1px solid ${C.border}`
+                  display:"inline-block",padding:"16px",background:"#ffffff",borderRadius:"16px",
                 }} />
                 <div style={{fontSize:"10px",color:C.text3,marginTop:"16px"}}>
                   API 키 포함 — 주변에 다른 사람이 없을 때 사용
