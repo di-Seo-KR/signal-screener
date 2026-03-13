@@ -182,7 +182,8 @@ function SetupPanel({ config, setConfig, onConnect }) {
 // ══════════════════════════════════════════════════════════════
 // 주문 실행 모달
 // ══════════════════════════════════════════════════════════════
-function OrderModal({ symbol, side, reason, config, onClose, onOrderPlaced }) {
+function OrderModal({ symbol: initSymbol, side, reason, config, onClose, onOrderPlaced }) {
+  const [symbol, setSymbol] = useState(initSymbol || "");
   const [qty, setQty] = useState("");
   const [notional, setNotional] = useState("");
   const [orderType, setOrderType] = useState("market");
@@ -231,11 +232,22 @@ function OrderModal({ symbol, side, reason, config, onClose, onOrderPlaced }) {
         </div>
 
         {/* 종목 */}
-        <div style={{ background: C.card2, borderRadius: "10px", padding: "12px", marginBottom: "12px",
-          borderLeft: `3px solid ${side === "buy" ? C.red : C.blue}` }}>
-          <div style={{ fontWeight: 700, fontSize: "15px" }}>{symbol}</div>
-          {reason && <div style={{ fontSize: "11px", color: C.text3, marginTop: "2px" }}>{reason}</div>}
-        </div>
+        {initSymbol ? (
+          <div style={{ background: C.card2, borderRadius: "10px", padding: "12px", marginBottom: "12px",
+            borderLeft: `3px solid ${side === "buy" ? C.red : C.blue}` }}>
+            <div style={{ fontWeight: 700, fontSize: "15px" }}>{symbol}</div>
+            {reason && <div style={{ fontSize: "11px", color: C.text3, marginTop: "2px" }}>{reason}</div>}
+          </div>
+        ) : (
+          <div style={{ marginBottom: "12px" }}>
+            <label style={{ fontSize: "12px", color: C.text3, fontWeight: 600, display: "block", marginBottom: "4px" }}>종목 심볼 (US 주식)</label>
+            <input value={symbol} onChange={e => setSymbol(e.target.value.toUpperCase())}
+              placeholder="AAPL, NVDA, TSLA..." style={{
+              width: "100%", padding: "10px 14px", borderRadius: "10px", fontSize: "16px", fontWeight: 700,
+              background: C.card2, border: `1px solid ${C.border2}`, color: C.text1, outline: "none",
+            }} />
+          </div>
+        )}
 
         {!result ? (
           <>

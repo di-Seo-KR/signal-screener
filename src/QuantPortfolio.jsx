@@ -421,7 +421,9 @@ async function fetchAllSymbolData(onProgress) {
     await Promise.allSettled(chunk.map(async (batch) => {
       try {
         const url = `/api/yahoo-batch?symbols=${batch.join(",")}&interval=1d&range=6mo`;
-        const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+        const ctrl = new AbortController();
+        const tmr = setTimeout(() => ctrl.abort(), 15000);
+        const res = await fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(tmr));
         if (res.ok) {
           const json = await res.json();
           if (json.results) {
