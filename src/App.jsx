@@ -1,6 +1,6 @@
-// DI금융 v7.0 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리
-// Features: 스크리닝, 캔들차트, 32개 전략, 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 텔레그램 알림
-// v7.0: 전략별 포트폴리오 운용 시스템, 8-Point 리스크 히트맵, RSI 다이버전스, 볼륨 프로파일 POC
+// DI금융 v7.2 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
+// Features: 스크리닝, 캔들차트, 32개 전략, 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
+// v7.2: 실제 전략 generate() 기반 매매 시그널, 터치 감도 최적화, 풀-투-리프레시 개선
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 
 // ════════════════════════════════════════════════════════════════════
@@ -43,6 +43,7 @@ import StrategyPanel from "./StrategyPanel.jsx";
 import BacktestPanel from "./BacktestPanel.jsx";
 import QuantPortfolio from "./QuantPortfolio.jsx";
 import RiskHeatmap from "./RiskHeatmap.jsx";
+import { ALL_STRATEGIES } from "./strategies.js";
 
 // ════════════════════════════════════════════════════════════════════
 // 데이터 정의
@@ -1145,6 +1146,24 @@ function loadTheme() { try { return localStorage.getItem(THEME_KEY) || "dark"; }
 let C = DARK;
 
 // ════════════════════════════════════════════════════════════════════
+// 터치 가드: 스크롤 중 카드 오클릭 방지
+// 터치 시작→이동(>8px)→끝 → 클릭 무시
+// ════════════════════════════════════════════════════════════════════
+const _touchState = { startX: 0, startY: 0, moved: false };
+function onTouchCardStart(e) {
+  const t = e.touches[0];
+  _touchState.startX = t.clientX; _touchState.startY = t.clientY; _touchState.moved = false;
+}
+function onTouchCardMove(e) {
+  if (_touchState.moved) return;
+  const t = e.touches[0];
+  const dx = Math.abs(t.clientX - _touchState.startX);
+  const dy = Math.abs(t.clientY - _touchState.startY);
+  if (dx > 8 || dy > 8) _touchState.moved = true;
+}
+function isTouchTap() { return !_touchState.moved; }
+
+// ════════════════════════════════════════════════════════════════════
 // 서브 컴포넌트: PullToRefresh (모바일 아래로 당겨서 새로고침)
 // ════════════════════════════════════════════════════════════════════
 function PullToRefresh({ onRefresh, children }) {
@@ -1153,20 +1172,33 @@ function PullToRefresh({ onRefresh, children }) {
   const [pullDistance, setPullDistance] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const startY = useRef(0);
-  const THRESHOLD = 80;
+  const startX = useRef(0);
+  const isVertical = useRef(null); // null=미확정, true=수직, false=수평
+  const THRESHOLD = 120; // 임계값 증가 (80→120) — 스크롤 중 오발동 방지
 
   const handleTouchStart = useCallback((e) => {
-    if (window.scrollY === 0) {
+    if (window.scrollY <= 2) { // 2px 이내일 때만 (정확히 0이 아닌 경우 대비)
       startY.current = e.touches[0].clientY;
+      startX.current = e.touches[0].clientX;
+      isVertical.current = null;
       setPulling(true);
+    } else {
+      setPulling(false);
     }
   }, []);
 
   const handleTouchMove = useCallback((e) => {
     if (!pulling) return;
-    const diff = e.touches[0].clientY - startY.current;
-    if (diff > 0 && window.scrollY === 0) {
-      setPullDistance(Math.min(diff * 0.5, 120));
+    const diffY = e.touches[0].clientY - startY.current;
+    const diffX = e.touches[0].clientX - startX.current;
+
+    // 방향 판단: 처음 10px 이동에서 수직/수평 결정
+    if (isVertical.current === null && (Math.abs(diffY) > 10 || Math.abs(diffX) > 10)) {
+      isVertical.current = Math.abs(diffY) > Math.abs(diffX) * 1.5; // 수직 이동이 수평의 1.5배 이상일 때만
+    }
+    // 수직 아래 방향 + 스크롤 최상단일 때만 pull-to-refresh 활성화
+    if (isVertical.current && diffY > 15 && window.scrollY <= 2) {
+      setPullDistance(Math.min((diffY - 15) * 0.35, 120)); // 감쇠 강화 (0.5→0.35) + 15px 데드존
     }
   }, [pulling]);
 
@@ -2856,8 +2888,22 @@ function AppInner() {
   const [newAsset, setNewAsset]           = useState({ symbol: "", name: "", market: "us", qty: "", avgPrice: "" });
 
   // ── 알림 설정 ─────────────────────────────────────────────────
-  const [settings, setSettings] = useState(() => ({ botToken: "", chatId: "", autoSend: false, ...loadSettings() }));
+  const [settings, setSettings] = useState(() => ({ botToken: "", chatId: "", autoSend: false, strategyAlerts: true, ...loadSettings() }));
   const [tgStatus, setTgStatus] = useState("");
+
+  // ── 전략 매매 알림 (실시간 푸시) ──────────────────────────────
+  const [tradeAlerts, setTradeAlerts] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("di_trade_alerts") || "[]"); } catch { return []; }
+  });
+  const [alertBadge, setAlertBadge] = useState(0); // 읽지 않은 알림 수
+  const scanCandleCache = useRef({}); // 스캔 중 수집된 캔들 데이터 캐시 {symbol: {closes, highs, lows, volumes}}
+
+  // 전략 이름 → 전략 객체 매핑 (generate() 호출용)
+  const STRATEGY_NAME_MAP = useMemo(() => {
+    const m = {};
+    for (const s of ALL_STRATEGIES) m[s.name] = s;
+    return m;
+  }, []);
 
   // ── 백테스트/전략 상태 ─────────────────────────────────────────
   const [btStrategy, setBtStrategy] = useState(null);
@@ -2876,8 +2922,10 @@ function AppInner() {
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsSort, setNewsSort] = useState("time"); // time, positive, negative
 
-  useEffect(() => { saveSettings({ botToken: settings.botToken, chatId: settings.chatId, autoSend: settings.autoSend, syncPin }); }, [settings, syncPin]);
+  useEffect(() => { saveSettings({ botToken: settings.botToken, chatId: settings.chatId, autoSend: settings.autoSend, strategyAlerts: settings.strategyAlerts, syncPin }); }, [settings, syncPin]);
   useEffect(() => { savePortfolio(portfolio); }, [portfolio]);
+  // 전략 알림 저장 (최대 100개 유지)
+  useEffect(() => { try { localStorage.setItem("di_trade_alerts", JSON.stringify(tradeAlerts.slice(0, 100))); } catch {} }, [tradeAlerts]);
 
   // 관심종목 저장
   useEffect(() => { try { localStorage.setItem("di_watchlist", JSON.stringify(watchlist)); } catch {} }, [watchlist]);
@@ -3301,6 +3349,205 @@ function AppInner() {
     };
   }, [tab]);
 
+  // ── 전략 매매 알림 생성 함수 ──────────────────────────────────
+  // 스크리닝 결과에서 전략 포트폴리오 종목의 시그널을 찾아 알림 생성
+  const STRATEGY_PORTFOLIO_SYMBOLS = useMemo(() => {
+    // 전략별 포트폴리오 종목 매핑 (QuantPortfolio.jsx의 포트폴리오에서 추출)
+    const map = {};
+    const portfolios = {
+      "RSI 반전 전략": ["GOOGL","AMD","TSLA","AAPL","DIS","PYPL","INTC","005930.KS","035720.KS","ETH-USD","SOL-USD"],
+      "볼린저밴드 바운스": ["AAPL","MSFT","JPM","JNJ","PG","V","KO","PEP","MRK","COST","105560.KS","055550.KS"],
+      "MACD 크로스오버": ["SPY","QQQ","NVDA","AVGO","MSFT","META","LLY","COST","005930.KS","035420.KS","BTC-USD"],
+      "이평선 크로스 (20/60)": ["SPY","QQQ","DIA","AAPL","MSFT","AMZN","JNJ","BTC-USD","GLD","005930.KS"],
+      "거래량 돌파 전략": ["NVDA","AMD","TSLA","AVGO","BTC-USD","SOL-USD","ETH-USD","005930.KS","042700.KS"],
+      "터틀 트레이딩": ["BTC-USD","ETH-USD","SOL-USD","GLD","XOM","CVX","SPY","CAT","005380.KS","009540.KS"],
+      "듀얼 모멘텀": ["SPY","QQQ","IWM","BTC-USD","GLD","NVDA","AAPL","005930.KS","TLT"],
+      "슈퍼트렌드": ["BTC-USD","SOL-USD","NVDA","TSLA","AMD","COIN","META","005930.KS","042700.KS"],
+      "일목균형표": ["005930.KS","000660.KS","035420.KS","005380.KS","068270.KS","SPY","BTC-USD","NVDA"],
+      "BB 스퀴즈 돌파": ["NVDA","TSLA","AMD","AVGO","BTC-USD","SOL-USD","META","005930.KS","000660.KS"],
+      "ATR 스윙": ["TSLA","NVDA","BTC-USD","SOL-USD","GLD","TLT","XOM","SPY","005930.KS"],
+      "스토캐스틱+RSI 콤보": ["AMZN","META","NFLX","CRM","068270.KS","BTC-USD","MA"],
+      "VWAP 반전": ["NVDA","AMD","MRVL","MU","QCOM","SOXX","000660.KS","042700.KS","AVGO"],
+      "피보나치 되돌림": ["SPY","QQQ","AAPL","MSFT","BTC-USD","GLD","005930.KS","000660.KS"],
+      "MACD 다이버전스": ["TSLA","AMD","GOOGL","BTC-USD","ETH-USD","SOL-USD","005930.KS","035720.KS"],
+      "레짐 전환 적응형": ["SPY","TLT","GLD","IWM","QQQ","BTC-USD","005930.KS","AAPL"],
+      "헤이킨 아시 추세": ["NVDA","META","AVGO","LLY","BTC-USD","SOL-USD","005930.KS","NFLX"],
+      "파라볼릭 SAR": ["SPY","QQQ","NVDA","AAPL","BTC-USD","GLD","005930.KS","XOM"],
+      "캔들 패턴 (엔궐핑)": ["TSLA","NVDA","AMD","SOL-USD","BTC-USD","005380.KS","000270.KS","BA"],
+      "채널 돌파 모멘텀": ["BTC-USD","SOL-USD","NVDA","TSLA","AMD","005930.KS","042700.KS","COIN"],
+      "모멘텀·거래량 가중": ["NVDA","AVGO","META","LLY","BTC-USD","005930.KS","SPY"],
+      "CCI 오실레이터": ["AMZN","GOOG","AAPL","NFLX","BTC-USD","005930.KS","035420.KS","JPM"],
+    };
+    for (const [strategy, syms] of Object.entries(portfolios)) {
+      for (const sym of syms) {
+        const cleanSym = sym.replace(".KS", "").replace("-USD", "");
+        if (!map[cleanSym]) map[cleanSym] = [];
+        map[cleanSym].push(strategy);
+      }
+    }
+    return map;
+  }, []);
+
+  const US_KO = useMemo(() => US_KO_NAMES, []);
+
+  // ═══════════════════════════════════════════════════════════════
+  // 진짜 퀀트 전략 기반 매매 알림 생성
+  // 각 전략의 generate(candles) 함수를 실제 호출하여 BUY/SELL 시그널 감지
+  // ═══════════════════════════════════════════════════════════════
+  const generateStrategyAlerts = useCallback((candleMap) => {
+    const newAlerts = [];
+    const now = new Date();
+    const RECENT_WINDOW = 5; // 최근 5봉 이내 시그널만 알림 대상
+
+    // 포트폴리오별 전략 실행
+    const portfolios = {
+      "RSI 반전 전략": ["GOOGL","AMD","TSLA","AAPL","DIS","PYPL","INTC","005930","035720","ETH","SOL"],
+      "볼린저밴드 바운스": ["AAPL","MSFT","JPM","JNJ","PG","V","KO","PEP","MRK","COST","105560","055550"],
+      "MACD 크로스오버": ["SPY","QQQ","NVDA","AVGO","MSFT","META","LLY","COST","005930","035420","BTC"],
+      "이평선 크로스 (20/60)": ["SPY","QQQ","DIA","AAPL","MSFT","AMZN","JNJ","BTC","GLD","005930"],
+      "거래량 돌파 전략": ["NVDA","AMD","TSLA","AVGO","BTC","SOL","ETH","005930","042700"],
+      "터틀 트레이딩": ["BTC","ETH","SOL","GLD","XOM","CVX","SPY","CAT","005380","009540"],
+      "듀얼 모멘텀": ["SPY","QQQ","IWM","BTC","GLD","NVDA","AAPL","005930","TLT"],
+      "슈퍼트렌드": ["BTC","SOL","NVDA","TSLA","AMD","COIN","META","005930","042700"],
+      "일목균형표": ["005930","000660","035420","005380","068270","SPY","BTC","NVDA"],
+      "BB 스퀴즈 돌파": ["NVDA","TSLA","AMD","AVGO","BTC","SOL","META","005930","000660"],
+      "ATR 스윙": ["TSLA","NVDA","BTC","SOL","GLD","TLT","XOM","SPY","005930"],
+      "스토캐스틱+RSI 콤보": ["AMZN","META","NFLX","CRM","068270","BTC","MA"],
+      "VWAP 반전": ["NVDA","AMD","MRVL","MU","QCOM","SOXX","000660","042700","AVGO"],
+      "피보나치 되돌림": ["SPY","QQQ","AAPL","MSFT","BTC","GLD","005930","000660"],
+      "MACD 다이버전스": ["TSLA","AMD","GOOGL","BTC","ETH","SOL","005930","035720"],
+      "레짐 전환 적응형": ["SPY","TLT","GLD","IWM","QQQ","BTC","005930","AAPL"],
+      "헤이킨 아시 추세": ["NVDA","META","AVGO","LLY","BTC","SOL","005930","NFLX"],
+      "파라볼릭 SAR": ["SPY","QQQ","NVDA","AAPL","BTC","GLD","005930","XOM"],
+      "캔들 패턴 (엔궐핑)": ["TSLA","NVDA","AMD","SOL","BTC","005380","000270","BA"],
+      "채널 돌파 모멘텀": ["BTC","SOL","NVDA","TSLA","AMD","005930","042700","COIN"],
+      "모멘텀·거래량 가중": ["NVDA","AVGO","META","LLY","BTC","005930","SPY"],
+      "CCI 오실레이터": ["AMZN","GOOG","AAPL","NFLX","BTC","005930","035420","JPM"],
+    };
+
+    for (const [stratName, symbols] of Object.entries(portfolios)) {
+      const stratObj = STRATEGY_NAME_MAP[stratName];
+      if (!stratObj || typeof stratObj.generate !== "function") continue;
+
+      for (const sym of symbols) {
+        const data = candleMap[sym];
+        if (!data || !data.closes || data.closes.length < 30) continue;
+
+        try {
+          // 일간 데이터를 candle 객체 배열로 변환
+          const candles = data.closes.map((c, i) => ({
+            close: c,
+            high: data.highs?.[i] ?? c,
+            low: data.lows?.[i] ?? c,
+            open: i > 0 ? data.closes[i - 1] : c,
+            volume: data.volumes?.[i] ?? 0,
+          }));
+
+          // 전략 generate() 실제 호출
+          const signals = stratObj.generate(candles);
+          if (!signals || signals.length === 0) continue;
+
+          // 최근 RECENT_WINDOW 봉 이내 시그널만 필터
+          const totalLen = candles.length;
+          const recentSignals = signals.filter(s => s.index >= totalLen - RECENT_WINDOW);
+          if (recentSignals.length === 0) continue;
+
+          // 가장 최근 시그널 사용
+          const lastSignal = recentSignals[recentSignals.length - 1];
+          const action = lastSignal.type === "BUY" ? "매수" : "매도";
+          const lastPrice = candles[candles.length - 1]?.close;
+          const prevPrice = candles.length > 5 ? candles[candles.length - 6]?.close : lastPrice;
+          const change = prevPrice ? ((lastPrice - prevPrice) / prevPrice * 100) : 0;
+
+          const assetName = data.name || US_KO_NAMES[sym] || sym;
+          const isKr = data.market === "kr";
+          const isCrypto = data.market === "crypto";
+          const flag = isKr ? "🇰🇷" : isCrypto ? "₿" : "🇺🇸";
+
+          newAlerts.push({
+            id: `${now.getTime()}-${sym}-${stratName}`,
+            timestamp: now.toISOString(),
+            strategy: stratName,
+            strategyIcon: stratObj.icon || "📊",
+            symbol: sym,
+            symbolRaw: data.symbolRaw || sym,
+            name: assetName,
+            market: data.market || "us",
+            flag,
+            action,
+            signalType: lastSignal.type,
+            price: lastPrice,
+            signalPrice: lastSignal.price,
+            change: change.toFixed(2),
+            reason: lastSignal.reason || `${stratName} ${action} 시그널`,
+            signalIndex: lastSignal.index,
+            totalCandles: totalLen,
+            recentSignalCount: recentSignals.length,
+            allRecentSignals: recentSignals.slice(-3).map(s => ({
+              type: s.type, reason: s.reason, index: s.index,
+            })),
+            read: false,
+          });
+        } catch (err) {
+          // 전략 실행 오류 (무시 — 일부 전략은 특정 데이터에서 에러 가능)
+          console.warn(`[전략알림] ${stratName}/${sym} 오류:`, err.message);
+        }
+      }
+    }
+
+    if (newAlerts.length > 0) {
+      // 중요도 정렬: 시그널이 더 최근일수록, 복수 시그널이 있을수록 상위
+      newAlerts.sort((a, b) => {
+        const recencyA = a.totalCandles - a.signalIndex;
+        const recencyB = b.totalCandles - b.signalIndex;
+        if (recencyA !== recencyB) return recencyA - recencyB;
+        return b.recentSignalCount - a.recentSignalCount;
+      });
+
+      setTradeAlerts(prev => [...newAlerts, ...prev].slice(0, 200));
+      setAlertBadge(prev => prev + newAlerts.length);
+
+      // 텔레그램 동시 발송 (전략 매매 알림)
+      if (settings.botToken && settings.chatId && settings.strategyAlerts) {
+        const tgMsg = formatStrategyAlertTelegram(newAlerts.slice(0, 15));
+        fetch(`/api/telegram-send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ botToken: settings.botToken, chatId: settings.chatId, text: tgMsg, parseMode: "Markdown" }),
+        }).catch(() => {});
+      }
+    }
+  }, [STRATEGY_NAME_MAP, settings]);
+
+  // 전략 매매 알림 텔레그램 포맷 (실제 전략 시그널 기반)
+  function formatStrategyAlertTelegram(alerts) {
+    let msg = `🚨 *DI금융 퀀트 전략 매매 시그널*\n`;
+    msg += `📅 ${new Date().toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}\n`;
+    msg += `⚙️ _실제 전략 generate() 시그널 기반_\n\n`;
+    const grouped = {};
+    for (const a of alerts) {
+      if (!grouped[a.strategy]) grouped[a.strategy] = [];
+      grouped[a.strategy].push(a);
+    }
+    for (const [strategy, items] of Object.entries(grouped)) {
+      const icon = items[0]?.strategyIcon || "📊";
+      msg += `*${icon} ${strategy}*\n`;
+      for (const a of items.slice(0, 4)) {
+        const emoji = a.action === "매수" ? "🟢" : "🔴";
+        const priceStr = a.market === "kr" ? `₩${Math.round(a.price || 0).toLocaleString()}` : `$${(a.price || 0).toLocaleString(undefined, {maximumFractionDigits: 2})}`;
+        msg += `  ${emoji} ${a.flag} *${a.name}* (\`${a.symbol}\`) — *${a.action}*\n`;
+        msg += `     ${priceStr} (${Number(a.change) >= 0 ? "+" : ""}${a.change}%)\n`;
+        msg += `     📌 ${a.reason}\n`;
+      }
+      if (items.length > 4) msg += `  ⋯ +${items.length - 4}건\n`;
+      msg += `\n`;
+    }
+    const buys = alerts.filter(a => a.action === "매수").length;
+    const sells = alerts.filter(a => a.action === "매도").length;
+    msg += `📊 총 ${alerts.length}건 시그널 (🟢매수 ${buys} / 🔴매도 ${sells})`;
+    return msg;
+  }
+
   // ── 스크리너 실행 (병렬 배치 최적화) ──────────────────────────
   const runScan = useCallback(async () => {
     if (scanning) return;
@@ -3313,6 +3560,7 @@ function AppInner() {
     const totalCount = yahooAssets.length + cryptoAssets.length;
     setScanProgress({ done: 0, total: totalCount });
     const found = [], errors = [];
+    const candleMap = {}; // 전략 알림용 캔들 데이터 수집
     let doneCount = 0;
 
     // ── Yahoo 배치 병렬 처리 (10개씩 배치 → batch API) ──
@@ -3344,6 +3592,14 @@ function AppInner() {
             result.market = asset.market;
             const match = mode === "or" ? result.triggers.length > 0 : conditions.every(c => result.triggers.includes(c));
             if (match) found.push({ ...asset, ...result });
+            // 전략 알림용 캔들 캐시 (일간 데이터 기반)
+            const cleanSym = asset.symbol.replace(".KS", "").replace(".KQ", "");
+            if (dy && dy.closes?.length > 20) {
+              candleMap[cleanSym] = {
+                closes: dy.closes, highs: dy.highs || dy.closes, lows: dy.lows || dy.closes,
+                volumes: dy.volumes || [], market: asset.market, name: asset.name, symbolRaw: asset.symbolRaw,
+              };
+            }
           } catch (e) { errors.push(`${asset.market.toUpperCase()}:${asset.symbol} — ${e.message}`); }
           doneCount++;
         }
@@ -3387,6 +3643,11 @@ function AppInner() {
             result.market = "crypto";
             const match = mode === "or" ? result.triggers.length > 0 : conditions.every(c => result.triggers.includes(c));
             if (match) found.push({ ...asset, ...result });
+            // 크립토 캔들 캐시
+            if (dCloses.length > 20) {
+              const sym = asset.symbol.replace("-USD", "");
+              candleMap[sym] = { closes: dCloses, highs: dCloses, lows: dCloses, volumes: dv || [], market: "crypto", name: asset.name, symbolRaw: asset.symbolRaw };
+            }
           } catch (e) { errors.push(`CRYPTO:${asset.symbol} — ${e.message}`); }
         } else {
           errors.push(`CRYPTO:${asset.symbol} — ${r.reason?.message || "fetch 실패"}`);
@@ -3405,6 +3666,12 @@ function AppInner() {
       return b.triggers.length - a.triggers.length;
     });
     setResults(sorted); setScanErrors(errors); setLastScan(new Date()); setScanning(false);
+
+    // ── 전략 매매 알림 생성 (실제 전략 시그널 기반) ──
+    scanCandleCache.current = candleMap;
+    if (settings.strategyAlerts !== false) {
+      generateStrategyAlerts(candleMap);
+    }
 
     if (settings.autoSend && settings.botToken && settings.chatId && sorted.length > 0) {
       try {
@@ -3773,16 +4040,24 @@ function AppInner() {
             title="홈으로 이동">
             <span style={{ fontSize: "20px" }}>📡</span>
             <span style={{ fontWeight: 800, fontSize: "17px", letterSpacing: "-0.5px" }}>DI금융</span>
-            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: mf(10), fontWeight: 700, background: C.blueBg, color: C.blue }}>v7.1</span>
+            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: mf(10), fontWeight: 700, background: C.blueBg, color: C.blue }}>v7.2</span>
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "2px" }}>
             {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-port", label: "전략 운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
-              <button key={t.id} onClick={() => setTab(t.id)} style={{
+              <button key={t.id} onClick={() => { setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }} style={{
                 padding: "6px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
                 color: tab === t.id ? C.blue : C.text3, border: "none", whiteSpace: "nowrap",
-              }}>{t.icon} {t.label}</button>
+                position: "relative",
+              }}>
+                {t.icon} {t.label}
+                {t.id === "alerts" && alertBadge > 0 && (
+                  <span style={{ position: "absolute", top: "-2px", right: "-2px", background: C.red, color: "#fff",
+                    fontSize: "9px", fontWeight: 800, borderRadius: "50%", width: "16px", height: "16px",
+                    display: "flex", alignItems: "center", justifyContent: "center" }}>{alertBadge > 9 ? "9+" : alertBadge}</span>
+                )}
+              </button>
             ))}
           </nav>
           {/* 테마 토글 + 햄버거 */}
@@ -4655,7 +4930,9 @@ function AppInner() {
                     {ALL_ASSETS.filter(a => filterMarket === "all" || a.market === filterMarket).map((asset, i) => {
                       const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
                       return (
-                        <div key={`${asset.symbol}-${i}`} onClick={() => setSelectedAsset(asset)}
+                        <div key={`${asset.symbol}-${i}`}
+                          onTouchStart={onTouchCardStart} onTouchMove={onTouchCardMove}
+                          onClick={() => { if (isTouchTap()) setSelectedAsset(asset); }}
                           style={{
                             padding: "8px 10px", borderRadius: "8px", cursor: "pointer",
                             display: "flex", alignItems: "center", gap: "6px", transition: "background .15s",
@@ -5467,7 +5744,8 @@ function AppInner() {
                     <span style={{ fontWeight: 700, fontSize: "14px", color: C.text1 }}>급등 TOP 5</span>
                   </div>
                   {topGainers.map((a, i) => (
-                    <div key={a.symbol} onClick={() => setSelectedAsset(a)} style={{
+                    <div key={a.symbol} onTouchStart={onTouchCardStart} onTouchMove={onTouchCardMove}
+                      onClick={() => { if (isTouchTap()) setSelectedAsset(a); }} style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between",
                       padding: "8px 0", cursor: "pointer",
                       borderBottom: i < 4 ? `1px solid ${C.border}08` : "none",
@@ -5486,7 +5764,8 @@ function AppInner() {
                     <span style={{ fontWeight: 700, fontSize: "14px", color: C.text1 }}>급락 TOP 5</span>
                   </div>
                   {topLosers.map((a, i) => (
-                    <div key={a.symbol} onClick={() => setSelectedAsset(a)} style={{
+                    <div key={a.symbol} onTouchStart={onTouchCardStart} onTouchMove={onTouchCardMove}
+                      onClick={() => { if (isTouchTap()) setSelectedAsset(a); }} style={{
                       display: "flex", alignItems: "center", justifyContent: "space-between",
                       padding: "8px 0", cursor: "pointer",
                       borderBottom: i < 4 ? `1px solid ${C.border}08` : "none",
@@ -5724,9 +6003,118 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "alerts" && (
           <div className="tab-content">
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px" }}>
-              <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "16px" }}>🔔 텔레그램 알림</div>
+            {/* ── 전략 매매 알림 피드 ── */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: "18px" }}>🚨 전략 매매 알림</div>
+                  <div style={{ fontSize: "12px", color: C.text3, marginTop: "2px" }}>
+                    32개 퀀트 전략의 generate() 함수로 실제 매매 시그널을 감지합니다
+                  </div>
+                </div>
+                {tradeAlerts.length > 0 && (
+                  <button onClick={() => { setTradeAlerts([]); setAlertBadge(0); }} style={{
+                    padding: "6px 12px", borderRadius: "8px", fontSize: "11px", fontWeight: 600,
+                    background: C.card2, color: C.text3, border: `1px solid ${C.border2}`, cursor: "pointer",
+                  }}>전체 삭제</button>
+                )}
+              </div>
 
+              {/* 알림 설정 토글 */}
+              <div style={{ display: "flex", gap: "12px", marginBottom: "16px", flexWrap: "wrap" }}>
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "12px", color: C.text2 }}>
+                  <input type="checkbox" checked={settings.strategyAlerts !== false}
+                    onChange={e => setSettings(p => ({ ...p, strategyAlerts: e.target.checked }))}
+                    style={{ cursor: "pointer" }} />
+                  <span>전략 매매 알림 활성화</span>
+                </label>
+                <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "12px", color: C.text2 }}>
+                  <input type="checkbox" checked={settings.autoSend}
+                    onChange={e => setSettings(p => ({ ...p, autoSend: e.target.checked }))}
+                    style={{ cursor: "pointer" }} />
+                  <span>텔레그램 동시 발송</span>
+                </label>
+              </div>
+
+              {/* 알림 피드 */}
+              {tradeAlerts.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px 0", color: C.text3 }}>
+                  <div style={{ fontSize: "40px", marginBottom: "12px" }}>🔕</div>
+                  <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "4px" }}>아직 전략 매매 알림이 없습니다</div>
+                  <div style={{ fontSize: "12px" }}>스크리너를 실행하면 32개 퀀트 전략이 실제 generate() 시그널을 감지합니다</div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "520px", overflow: "auto" }}>
+                  {tradeAlerts.slice(0, 50).map((alert, i) => {
+                    const isBuy = alert.action === "매수";
+                    const time = new Date(alert.timestamp);
+                    const timeStr = time.toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+                    return (
+                      <div key={alert.id || i}
+                        onTouchStart={onTouchCardStart} onTouchMove={onTouchCardMove}
+                        onClick={() => {
+                        if (!isTouchTap()) return;
+                        // 클릭 시 해당 종목 상세로 이동
+                        const asset = ALL_ASSETS.find(a => a.symbol === alert.symbol || a.symbolRaw === alert.symbolRaw);
+                        if (asset) { setSelectedAsset(asset); setTab("screener"); }
+                      }} style={{
+                        background: C.card2, borderRadius: "12px", padding: "14px",
+                        borderLeft: `3px solid ${isBuy ? C.green : C.red}`,
+                        cursor: "pointer", transition: "all .15s",
+                        opacity: alert.read ? 0.7 : 1,
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = C.border}
+                      onMouseLeave={e => e.currentTarget.style.background = C.card2}>
+                        {/* 상단: 전략명 + 시간 */}
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{
+                              padding: "2px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: 700,
+                              background: isBuy ? C.greenBg : C.redBg,
+                              color: isBuy ? C.green : C.red,
+                            }}>{isBuy ? "📈 매수" : "📉 매도"}</span>
+                            <span style={{ fontSize: "12px", fontWeight: 700, color: C.blue }}>{alert.strategy}</span>
+                          </div>
+                          <span style={{ fontSize: "10px", color: C.text3 }}>{timeStr}</span>
+                        </div>
+                        {/* 중단: 종목 정보 */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                          <div style={{
+                            width: "32px", height: "32px", borderRadius: "8px", flexShrink: 0,
+                            background: isBuy ? C.greenBg : C.redBg,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontWeight: 800, fontSize: "11px", color: isBuy ? C.green : C.red,
+                          }}>{alert.strategyIcon || alert.symbol.slice(0, 2)}</div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: "14px" }}>
+                              {alert.flag} {alert.name}
+                            </div>
+                            <div style={{ fontSize: "11px", color: C.text3 }}>
+                              {alert.symbol} · {alert.market === "kr" ? `₩${Math.round(alert.price || 0).toLocaleString()}` : `$${(alert.price || 0).toLocaleString(undefined, {maximumFractionDigits: 2})}`}
+                              {alert.change ? ` · ${Number(alert.change) >= 0 ? "+" : ""}${alert.change}%` : ""}
+                            </div>
+                          </div>
+                        </div>
+                        {/* 하단: 전략 시그널 사유 (실제 generate() 결과) */}
+                        <div style={{ fontSize: "11px", color: C.text2, display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
+                          <span style={{ color: C.yellow }}>📌</span>
+                          <span style={{ fontWeight: 600 }}>{alert.reason}</span>
+                          {alert.recentSignalCount > 1 && (
+                            <span style={{ padding: "1px 5px", borderRadius: "4px", fontSize: "9px", fontWeight: 700, background: isBuy ? C.greenBg : C.redBg, color: isBuy ? C.green : C.red }}>
+                              최근 {alert.recentSignalCount}건 시그널
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* ── 텔레그램 설정 ── */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "12px" }}>
+              <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "16px" }}>📱 텔레그램 연동</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
                 <div>
                   <div style={{ fontSize: "11px", color: C.text3, marginBottom: "6px", fontWeight: 600 }}>봇 토큰</div>
@@ -5746,15 +6134,7 @@ function AppInner() {
                 </div>
               </div>
 
-              <div style={{ marginBottom: "12px" }}>
-                <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "13px" }}>
-                  <input type="checkbox" checked={settings.autoSend} onChange={e => setSettings(p => ({ ...p, autoSend: e.target.checked }))}
-                    style={{ cursor: "pointer" }} />
-                  <span>스캔 완료 시 자동 알림</span>
-                </label>
-              </div>
-
-              <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+              <div style={{ display: "flex", gap: "8px" }}>
                 <button onClick={() => {
                   if (!settings.botToken || !settings.chatId) return;
                   (async () => {
@@ -5763,26 +6143,26 @@ function AppInner() {
                       const r = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendMessage`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ chat_id: settings.chatId, text: "🚨 *DI금융 테스트*\n\n테스트 알림입니다.", parse_mode: "Markdown" }),
+                        body: JSON.stringify({ chat_id: settings.chatId, text: "🚨 *DI금융 테스트*\n\n텔레그램 연결 테스트 성공!", parse_mode: "Markdown" }),
                       });
-                      if (r.ok) setTgStatus("✅ 테스트 완료");
+                      if (r.ok) setTgStatus("✅ 텔레그램 연결 완료");
                       else setTgStatus("❌ 전송 실패");
                     } catch (e) { setTgStatus(`❌ ${e.message}`); }
                   })();
                 }} style={{
                   padding: "9px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
                   background: C.blue, color: "#fff", border: "none",
-                }}>📤 테스트</button>
+                }}>📤 연결 테스트</button>
               </div>
 
               {tgStatus && (
-                <div style={{ fontSize: "12px", color: tgStatus.includes("✅") ? C.green : C.red, fontWeight: 600 }}>
+                <div style={{ fontSize: "12px", color: tgStatus.includes("✅") ? C.green : C.red, fontWeight: 600, marginTop: "8px" }}>
                   {tgStatus}
                 </div>
               )}
             </div>
 
-            {/* 동기화 */}
+            {/* ── 동기화 ── */}
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px" }}>
               <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "16px" }}>🔄 데이터 동기화</div>
               <div style={{ marginBottom: "12px" }}>
