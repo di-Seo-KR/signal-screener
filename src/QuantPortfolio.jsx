@@ -67,7 +67,7 @@ const getName = (sym) => SYM_NAMES[sym] || sym.replace(".KS", "").replace("-USD"
 // ══════════════════════════════════════════════════════════════
 // 전략별 포트폴리오 (32개 전략 × 다양한 종목 구성)
 // ══════════════════════════════════════════════════════════════
-const STRATEGY_PORTFOLIOS = {
+export const STRATEGY_PORTFOLIOS = {
   "RSI 반전 전략": [
     { sym: "GOOGL", w: 0.10 }, { sym: "AMD", w: 0.08 }, { sym: "TSLA", w: 0.08 },
     { sym: "AAPL", w: 0.08 }, { sym: "DIS", w: 0.06 }, { sym: "PYPL", w: 0.06 },

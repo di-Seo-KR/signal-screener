@@ -3,6 +3,7 @@
 // Alpaca Trading API 연동 (Paper / Live)
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ALL_STRATEGIES } from "./strategies.js";
+import { STRATEGY_PORTFOLIOS as RAW_PORTFOLIOS } from "./QuantPortfolio.jsx";
 
 const C = {
   bg: "#070C14", card: "#0F1825", card2: "#141E2E",
@@ -51,106 +52,49 @@ const STRATEGY_CONFIDENCE = {
   "이평선 크로스 (20/60)": 0.5,
   "거래량 돌파 전략": 0.6,
   "스토캐스틱+RSI 콤보": 0.7,
+  "켈트너 채널 회귀": 0.5,
+  "VWAP 반전": 0.5,
   "터틀 트레이딩": 0.7,
   "듀얼 모멘텀": 0.7,
   "슈퍼트렌드": 0.6,
   "파라볼릭 SAR": 0.5,
   "ATR 스윙": 0.6,
   "피보나치 되돌림": 0.5,
+  "통계적 차익 (Z-Score)": 0.6,
+  "래리 코너스 RSI(2)": 0.4,
+  "MFI 자금유입": 0.6,
+  "캔들 패턴 (엔궐핑)": 0.5,
+  "Williams %R + ADX": 0.6,
+  "삼중 이평선 + ATR 정지": 0.7,
+  "일목균형표": 0.6,
+  "OBV 추세 추종": 0.6,
+  "레짐 전환 적응형": 0.8,
+  "헤이킨 아시 추세": 0.6,
+  "듀얼 타임프레임 모멘텀": 0.7,
+  "엘더 삼중 필터": 0.8,
+  "MACD 다이버전스": 0.6,
+  "갭 앤 고": 0.5,
+  "모멘텀·거래량 가중": 0.6,
+  "CCI 오실레이터": 0.5,
+  "채널 돌파 모멘텀": 0.7,
+  "BB 스퀴즈 돌파": 0.6,
 };
 
 // ══════════════════════════════════════════════════════════════
-// 퀀트 전략 포트폴리오 (US 종목만)
+// QuantPortfolio 원본 32개 전략에서 US 종목만 자동 추출 + 비중 정규화
+// .KS(한국) / -USD(크립토) 제외 → Alpaca 거래 가능 종목만
 // ══════════════════════════════════════════════════════════════
-const STRATEGY_PORTFOLIOS = {
-  "RSI 반전 전략": [
-    { sym: "GOOGL", w: 0.12 }, { sym: "AMD", w: 0.10 }, { sym: "TSLA", w: 0.10 },
-    { sym: "AAPL", w: 0.10 }, { sym: "DIS", w: 0.08 }, { sym: "PYPL", w: 0.08 },
-    { sym: "INTC", w: 0.08 }, { sym: "NKE", w: 0.08 }, { sym: "BA", w: 0.08 },
-    { sym: "COIN", w: 0.06 }, { sym: "DASH", w: 0.06 }, { sym: "ABNB", w: 0.06 },
-  ],
-  "볼린저밴드 바운스": [
-    { sym: "AAPL", w: 0.10 }, { sym: "MSFT", w: 0.08 }, { sym: "JPM", w: 0.08 },
-    { sym: "JNJ", w: 0.07 }, { sym: "PG", w: 0.07 }, { sym: "V", w: 0.07 },
-    { sym: "KO", w: 0.06 }, { sym: "PEP", w: 0.06 }, { sym: "MRK", w: 0.06 },
-    { sym: "COST", w: 0.06 }, { sym: "HD", w: 0.06 }, { sym: "UNH", w: 0.07 },
-    { sym: "WMT", w: 0.05 }, { sym: "ABBV", w: 0.06 }, { sym: "TMO", w: 0.05 },
-  ],
-  "MACD 크로스오버": [
-    { sym: "NVDA", w: 0.10 }, { sym: "META", w: 0.08 }, { sym: "AMZN", w: 0.08 },
-    { sym: "MSFT", w: 0.07 }, { sym: "AVGO", w: 0.07 }, { sym: "ORCL", w: 0.06 },
-    { sym: "CRM", w: 0.06 }, { sym: "NOW", w: 0.06 }, { sym: "PANW", w: 0.06 },
-    { sym: "CRWD", w: 0.06 }, { sym: "DDOG", w: 0.05 }, { sym: "NET", w: 0.05 },
-    { sym: "SPY", w: 0.06 }, { sym: "QQQ", w: 0.07 }, { sym: "SOXX", w: 0.07 },
-  ],
-  "이평선 크로스 (20/60)": [
-    { sym: "SPY", w: 0.10 }, { sym: "QQQ", w: 0.08 }, { sym: "AAPL", w: 0.07 },
-    { sym: "MSFT", w: 0.07 }, { sym: "NVDA", w: 0.07 }, { sym: "AMZN", w: 0.06 },
-    { sym: "GOOG", w: 0.06 }, { sym: "META", w: 0.06 }, { sym: "AVGO", w: 0.06 },
-    { sym: "JPM", w: 0.06 }, { sym: "LLY", w: 0.06 }, { sym: "GLD", w: 0.05 },
-    { sym: "TLT", w: 0.05 }, { sym: "COST", w: 0.05 }, { sym: "XLE", w: 0.05 },
-    { sym: "DIA", w: 0.05 },
-  ],
-  "거래량 돌파 전략": [
-    { sym: "NVDA", w: 0.10 }, { sym: "AMD", w: 0.08 }, { sym: "TSLA", w: 0.08 },
-    { sym: "AVGO", w: 0.07 }, { sym: "MRVL", w: 0.06 }, { sym: "COIN", w: 0.06 },
-    { sym: "META", w: 0.07 }, { sym: "NFLX", w: 0.06 }, { sym: "SHOP", w: 0.06 },
-    { sym: "CRWD", w: 0.06 }, { sym: "SNOW", w: 0.05 }, { sym: "NET", w: 0.05 },
-    { sym: "DDOG", w: 0.05 }, { sym: "ARKK", w: 0.05 }, { sym: "SOXX", w: 0.05 },
-    { sym: "SMH", w: 0.05 },
-  ],
-  "스토캐스틱+RSI 콤보": [
-    { sym: "AMZN", w: 0.09 }, { sym: "META", w: 0.09 }, { sym: "NFLX", w: 0.08 },
-    { sym: "CRM", w: 0.07 }, { sym: "ORCL", w: 0.07 }, { sym: "SBUX", w: 0.06 },
-    { sym: "MCD", w: 0.06 }, { sym: "MA", w: 0.07 }, { sym: "DHR", w: 0.06 },
-    { sym: "ABNB", w: 0.06 }, { sym: "UBER", w: 0.06 }, { sym: "LLY", w: 0.06 },
-    { sym: "NOW", w: 0.06 }, { sym: "V", w: 0.06 }, { sym: "UNH", w: 0.05 },
-  ],
-  "터틀 트레이딩": [
-    { sym: "SPY", w: 0.08 }, { sym: "QQQ", w: 0.07 }, { sym: "GLD", w: 0.08 },
-    { sym: "TLT", w: 0.07 }, { sym: "XLE", w: 0.06 }, { sym: "XLF", w: 0.06 },
-    { sym: "XOM", w: 0.06 }, { sym: "CVX", w: 0.05 }, { sym: "COP", w: 0.05 },
-    { sym: "BA", w: 0.06 }, { sym: "CAT", w: 0.06 }, { sym: "GE", w: 0.06 },
-    { sym: "RTX", w: 0.05 }, { sym: "LMT", w: 0.05 }, { sym: "IWM", w: 0.05 },
-    { sym: "DIA", w: 0.05 }, { sym: "VNQ", w: 0.04 },
-  ],
-  "듀얼 모멘텀": [
-    { sym: "SPY", w: 0.12 }, { sym: "QQQ", w: 0.10 }, { sym: "IWM", w: 0.06 },
-    { sym: "GLD", w: 0.10 }, { sym: "NVDA", w: 0.08 }, { sym: "AAPL", w: 0.06 },
-    { sym: "MSFT", w: 0.06 }, { sym: "TLT", w: 0.08 }, { sym: "XLE", w: 0.06 },
-    { sym: "XLF", w: 0.05 }, { sym: "SOXX", w: 0.06 }, { sym: "AVGO", w: 0.05 },
-    { sym: "META", w: 0.05 }, { sym: "XLV", w: 0.04 }, { sym: "VNQ", w: 0.03 },
-  ],
-  "슈퍼트렌드": [
-    { sym: "NVDA", w: 0.10 }, { sym: "TSLA", w: 0.08 }, { sym: "AMD", w: 0.07 },
-    { sym: "AVGO", w: 0.07 }, { sym: "META", w: 0.07 }, { sym: "AMZN", w: 0.06 },
-    { sym: "COIN", w: 0.06 }, { sym: "MSTR", w: 0.05 }, { sym: "SHOP", w: 0.06 },
-    { sym: "SQ", w: 0.05 }, { sym: "CRWD", w: 0.06 }, { sym: "ARKK", w: 0.06 },
-    { sym: "SMH", w: 0.07 }, { sym: "SOXX", w: 0.07 }, { sym: "SPY", w: 0.07 },
-  ],
-  "파라볼릭 SAR": [
-    { sym: "AAPL", w: 0.08 }, { sym: "MSFT", w: 0.08 }, { sym: "GOOG", w: 0.07 },
-    { sym: "AMZN", w: 0.07 }, { sym: "JPM", w: 0.07 }, { sym: "V", w: 0.06 },
-    { sym: "MA", w: 0.06 }, { sym: "UNH", w: 0.06 }, { sym: "LLY", w: 0.06 },
-    { sym: "PG", w: 0.06 }, { sym: "JNJ", w: 0.05 }, { sym: "HD", w: 0.06 },
-    { sym: "COST", w: 0.06 }, { sym: "GS", w: 0.05 }, { sym: "MS", w: 0.05 },
-    { sym: "BLK", w: 0.06 },
-  ],
-  "ATR 스윙": [
-    { sym: "TSLA", w: 0.09 }, { sym: "NVDA", w: 0.08 }, { sym: "AMD", w: 0.07 },
-    { sym: "GLD", w: 0.10 }, { sym: "TLT", w: 0.08 }, { sym: "XOM", w: 0.06 },
-    { sym: "CVX", w: 0.06 }, { sym: "JPM", w: 0.06 }, { sym: "SPY", w: 0.07 },
-    { sym: "IWM", w: 0.05 }, { sym: "BA", w: 0.06 }, { sym: "CAT", w: 0.06 },
-    { sym: "RTX", w: 0.05 }, { sym: "LMT", w: 0.05 }, { sym: "GE", w: 0.06 },
-  ],
-  "피보나치 되돌림": [
-    { sym: "SPY", w: 0.12 }, { sym: "QQQ", w: 0.10 }, { sym: "AAPL", w: 0.08 },
-    { sym: "MSFT", w: 0.08 }, { sym: "AMZN", w: 0.07 }, { sym: "GOOG", w: 0.07 },
-    { sym: "GLD", w: 0.08 }, { sym: "TLT", w: 0.07 }, { sym: "XLE", w: 0.06 },
-    { sym: "DIA", w: 0.06 }, { sym: "COST", w: 0.06 }, { sym: "LLY", w: 0.06 },
-    { sym: "ABBV", w: 0.05 }, { sym: "AVGO", w: 0.04 },
-  ],
-};
+const STRATEGY_PORTFOLIOS = (() => {
+  const result = {};
+  for (const [name, holdings] of Object.entries(RAW_PORTFOLIOS)) {
+    const usOnly = holdings.filter(h => !h.sym.includes(".KS") && !h.sym.includes("-USD"));
+    if (usOnly.length === 0) continue;
+    // 비중 정규화 (US 종목만 남기면 합이 1이 안 되므로)
+    const totalW = usOnly.reduce((s, h) => s + h.w, 0);
+    result[name] = usOnly.map(h => ({ sym: h.sym, w: h.w / totalW }));
+  }
+  return result;
+})();
 
 const STRATEGY_MAP = {};
 ALL_STRATEGIES.forEach(s => { STRATEGY_MAP[s.name] = s; });
