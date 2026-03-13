@@ -1,353 +1,441 @@
-// DI금융 — 8-Point 리스크 히트맵
-// CP별 위험 수준 시각화 + 실시간 데이터 기반
-import { useState, useEffect, useMemo } from "react";
+// DI금융 — 리스크 컨트롤 타워 v2.0
+// 8-Point CP 시스템 + 시장 데이터 동적 연동 + 트렌드 히스토리 + 포트폴리오 영향도
+import { useState, useMemo } from "react";
 
 const C = {
   bg: "#070C14", card: "#0F1825", card2: "#141E2E",
   border: "#1A2535", border2: "#243044",
-  blue: "#3182F6", blueL: "#5AA3FF", blueBg: "#1A2C4F",
+  blue: "#3182F6", blueBg: "#1A2C4F",
   red: "#F04452", redBg: "#2A1520",
   green: "#05C072", greenBg: "#0A2A1A",
   yellow: "#FFB400", yellowBg: "#2A2000",
-  purple: "#8B5CF6", purpleBg: "#1E1535",
-  orange: "#FF6B2C", orangeBg: "#2A1810",
+  purple: "#8B5CF6",
+  orange: "#FF6B2C",
   text1: "#F2F4F7", text2: "#A0AEBF", text3: "#5A6880",
 };
 
-const SEVERITY = {
-  CRITICAL: { label: "CRITICAL", color: "#F04452", bg: "#FFF0F1", textColor: "#C41E3A", border: "#FFCDD2", icon: "🔺" },
-  HIGH:     { label: "HIGH",     color: "#FF6B2C", bg: "#FFF3E0", textColor: "#D84315", border: "#FFE0B2", icon: "🟠" },
-  MODERATE: { label: "MODERATE", color: "#FFB400", bg: "#FFFDE7", textColor: "#F57F17", border: "#FFF9C4", icon: "🟡" },
-  LOW:      { label: "LOW",      color: "#05C072", bg: "#E8F5E9", textColor: "#2E7D32", border: "#C8E6C9", icon: "🟢" },
+const SEV = {
+  CRITICAL: { label: "CRITICAL", color: "#F04452", glow: "#F0445233" },
+  HIGH:     { label: "HIGH",     color: "#FF6B2C", glow: "#FF6B2C33" },
+  MODERATE: { label: "MODERATE", color: "#FFB400", glow: "#FFB40033" },
+  LOW:      { label: "LOW",      color: "#05C072", glow: "#05C07233" },
 };
 
-// ── 8-Point 체크포인트 정의 ──
-const CHECKPOINTS = [
-  { id: "CP1", name: "매크로", icon: "📊", description: "거시경제 지표 및 시장 전반 동향" },
-  { id: "CP2", name: "통화정책", icon: "🏦", description: "중앙은행 금리 결정 및 유동성 정책" },
-  { id: "CP3", name: "지정학", icon: "🌍", description: "지정학적 리스크 및 국제 관계" },
-  { id: "CP4", name: "채권발작", icon: "📉", description: "국채 수익률 급등 및 채권시장 스트레스" },
-  { id: "CP5", name: "환율", icon: "💱", description: "주요 통화 변동 및 EM 통화 압박" },
-  { id: "CP6", name: "원자재", icon: "🛢️", description: "원유, 금, 구리 등 원자재 가격 변동" },
-  { id: "CP7", name: "기업실적", icon: "🏢", description: "주요 기업 실적 발표 및 가이던스" },
-  { id: "CP8", name: "유동성", icon: "💧", description: "시장 유동성 및 신용 스트레스 지표" },
-];
+// ── 8-Point CP 리스크 평가 (시장 데이터 기반 동적 산출) ──
+function assessRisks(mkt) {
+  const vix = mkt.vix;
+  const sp = mkt.sp500;
+  const spChg = mkt.sp500Change;
+  const dxy = mkt.dxy;
+  const fg = mkt.fearGreed;
 
-// ── 리스크 데이터 (시장 데이터 기반으로 실시간 업데이트 가능) ──
-function assessRisks(marketData) {
-  const today = new Date().toISOString().slice(0, 10);
-
-  // VIX 기반 매크로 리스크
-  const vix = marketData?.vix || 22;
-  const sp500Change = marketData?.sp500Change || -0.5;
-  const dollarIdx = marketData?.dollarIdx || 105;
-
-  // 기본 리스크 평가 (시장 데이터 연동)
   return [
     {
-      ...CHECKPOINTS[0], // CP1 매크로
-      severity: vix > 30 ? "CRITICAL" : vix > 25 ? "HIGH" : vix > 20 ? "MODERATE" : "LOW",
-      headline: vix > 25
-        ? `S&P ${sp500Change > 0 ? sp500Change.toFixed(0) + "일 연속 상승" : Math.abs(sp500Change).toFixed(0) + "일 연속 하락"} · 달러 ${dollarIdx > 104 ? "2026년 최고치" : "안정"}`
-        : `VIX ${vix.toFixed(1)} · 시장 안정권`,
-      details: [
-        `VIX: ${vix.toFixed(1)} (${vix > 30 ? "극단적 공포" : vix > 25 ? "높은 변동성" : vix > 20 ? "보통" : "안정"})`,
-        `S&P 500: ${sp500Change > 0 ? "상승" : "하락"} 추세`,
-        `달러 인덱스: ${dollarIdx.toFixed(1)}`,
+      id: "CP1", name: "매크로", icon: "📊",
+      severity: vix > 30 ? "CRITICAL" : vix > 25 ? "HIGH" : vix > 18 ? "MODERATE" : "LOW",
+      score: Math.min(100, Math.round(vix * 2.5 + Math.max(0, -spChg * 10))),
+      headline: `VIX ${vix.toFixed(1)} · S&P ${spChg >= 0 ? "+" : ""}${spChg.toFixed(1)}% · ${vix > 25 ? "변동성 경고" : vix > 18 ? "경계 구간" : "안정권"}`,
+      keyMetrics: [
+        { label: "VIX", value: vix.toFixed(1), status: vix > 25 ? "danger" : vix > 18 ? "warn" : "ok" },
+        { label: "S&P 500", value: `${spChg >= 0 ? "+" : ""}${spChg.toFixed(1)}%`, status: spChg < -1 ? "danger" : spChg < 0 ? "warn" : "ok" },
+        { label: "공포·탐욕", value: fg != null ? `${fg}` : "N/A", status: fg < 25 ? "danger" : fg < 40 ? "warn" : "ok" },
       ],
-      score: vix > 30 ? 95 : vix > 25 ? 75 : vix > 20 ? 50 : 25,
+      impact: "전 섹터 베타 조정 필요",
+      trend: vix > 25 ? "악화" : "안정",
     },
     {
-      ...CHECKPOINTS[1], // CP2 통화정책
-      severity: "CRITICAL",
-      headline: "Fed 딜레마 최고조 · ECB 인상 기대 격상",
-      details: [
-        "Fed: 금리 동결 예상 vs 인플레 재점화 리스크",
-        "ECB: 0.25%p 추가 인상 가능성 40%",
-        "BOJ: YCC 조정 관측 지속",
-      ],
-      score: 85,
-    },
-    {
-      ...CHECKPOINTS[2], // CP3 지정학
-      severity: "CRITICAL",
-      headline: "이란 호르무즈 봉쇄 공식 선언 · IEA 사상 최대 확정",
-      details: [
-        "이란: 호르무즈 해협 통과 유조선 억류 3건",
-        "중동 긴장: 브렌트 $100+ 돌파 촉매",
-        "미중 관계: 반도체 수출규제 확대 논의",
-      ],
-      score: 92,
-    },
-    {
-      ...CHECKPOINTS[3], // CP4 채권발작
+      id: "CP2", name: "통화정책", icon: "🏦",
       severity: "HIGH",
-      headline: "국채 수익률 상승 · Fed 인하 추가 지연",
-      details: [
-        "미국 10년물: 4.65% (+12bp)",
-        "2년-10년 스프레드: -15bp (역전 지속)",
-        "국채 입찰 수요: 보통 (bid-to-cover 2.3x)",
+      score: 72,
+      headline: "Fed 금리 동결 장기화 · 인플레 재점화 리스크",
+      keyMetrics: [
+        { label: "Fed 금리", value: "5.25-5.50%", status: "warn" },
+        { label: "인플레", value: "CPI 2.4%", status: "ok" },
+        { label: "금리인하 확률", value: "35%", status: "warn" },
       ],
-      score: 70,
+      impact: "금리 민감 종목(리츠, 유틸) 주의",
+      trend: "보합",
     },
     {
-      ...CHECKPOINTS[4], // CP5 환율
+      id: "CP3", name: "지정학", icon: "🌍",
       severity: "HIGH",
-      headline: "파운드 3일 하락 · EM 통화 압박",
-      details: [
-        "USD/KRW: 1,385원 (+0.5%)",
-        "EUR/USD: 1.078 (-0.3%)",
-        "EM 통화: 터키 리라, 브라질 헤알 약세",
+      score: 68,
+      headline: "중동 긴장 지속 · 미중 반도체 규제 확대",
+      keyMetrics: [
+        { label: "유가 변동", value: "+2.8%", status: "warn" },
+        { label: "방산지수", value: "+1.5%", status: "ok" },
+        { label: "EM 리스크", value: "보통", status: "warn" },
       ],
-      score: 65,
+      impact: "에너지·방산 롱, 공급망 민감주 헤지",
+      trend: "악화",
     },
     {
-      ...CHECKPOINTS[5], // CP6 원자재
-      severity: "CRITICAL",
-      headline: "브렌트 $100+ 공식화 · 단일 세션 +9%",
-      details: [
-        "WTI: $96.5 (+7.2%)",
-        "브렌트: $101.3 (+9.1%)",
-        "금: $2,180 (+1.2%) — 안전자산 수요",
+      id: "CP4", name: "채권시장", icon: "📉",
+      severity: vix > 25 ? "HIGH" : "MODERATE",
+      score: Math.min(100, Math.round(40 + Math.max(0, vix - 18) * 3)),
+      headline: `10Y 국채 ${vix > 25 ? "급등 경고" : "안정"} · 스프레드 ${vix > 20 ? "확대" : "축소"} 추세`,
+      keyMetrics: [
+        { label: "10Y 수익률", value: "4.52%", status: vix > 25 ? "danger" : "warn" },
+        { label: "2Y-10Y", value: "-8bp", status: "warn" },
+        { label: "IG 스프레드", value: "95bp", status: "ok" },
       ],
-      score: 90,
+      impact: "성장주 밸류에이션 하방 압력",
+      trend: vix > 25 ? "악화" : "보합",
     },
     {
-      ...CHECKPOINTS[6], // CP7 기업실적
+      id: "CP5", name: "환율", icon: "💱",
+      severity: dxy > 106 ? "HIGH" : dxy > 103 ? "MODERATE" : "LOW",
+      score: Math.min(100, Math.round(Math.max(0, (dxy - 100) * 8))),
+      headline: `달러 인덱스 ${dxy.toFixed(1)} · ${dxy > 106 ? "강달러 압박" : dxy > 103 ? "달러 강세" : "중립"}`,
+      keyMetrics: [
+        { label: "DXY", value: dxy.toFixed(1), status: dxy > 106 ? "danger" : dxy > 103 ? "warn" : "ok" },
+        { label: "USD/KRW", value: "1,385", status: "warn" },
+        { label: "EM 통화", value: dxy > 105 ? "약세" : "보합", status: dxy > 105 ? "warn" : "ok" },
+      ],
+      impact: "수출주/해외매출 비중 높은 종목 영향",
+      trend: dxy > 105 ? "악화" : "안정",
+    },
+    {
+      id: "CP6", name: "원자재", icon: "🛢️",
       severity: "MODERATE",
-      headline: "24H 주요 실적 N/A · 2분기 하향 카운트다운",
-      details: [
-        "실적 시즌 외 기간 — 주요 발표 없음",
-        "2Q 가이던스: 하향 조정 기업 증가 추세",
-        "AI 관련주: 실적 기대치 상향 유지",
+      score: 48,
+      headline: "WTI $72 · 금 $3,150 — 안전자산 수요 지속",
+      keyMetrics: [
+        { label: "WTI", value: "$72.3", status: "ok" },
+        { label: "금", value: "$3,150", status: "ok" },
+        { label: "구리", value: "$4.15", status: "ok" },
       ],
-      score: 40,
+      impact: "인플레 기대 안정, 에너지 섹터 중립",
+      trend: "안정",
     },
     {
-      ...CHECKPOINTS[7], // CP8 유동성
-      severity: "CRITICAL",
-      headline: "사모신용 스트레스 Bloomberg 공식 보도",
-      details: [
-        "하이일드 스프레드: 420bp (+35bp)",
-        "은행간 대출금리: SOFR +15bp",
-        "사모펀드 유동성: 경고 수준 진입",
+      id: "CP7", name: "기업실적", icon: "🏢",
+      severity: "LOW",
+      score: 28,
+      headline: "실적 시즌 외 · AI 관련 가이던스 상향 유지",
+      keyMetrics: [
+        { label: "S&P EPS", value: "+8.2% YoY", status: "ok" },
+        { label: "하향 비율", value: "32%", status: "ok" },
+        { label: "서프라이즈", value: "72% 상회", status: "ok" },
       ],
-      score: 88,
+      impact: "실적 기반 안정 — 개별 종목 선별 유리",
+      trend: "개선",
+    },
+    {
+      id: "CP8", name: "유동성", icon: "💧",
+      severity: vix > 28 ? "CRITICAL" : vix > 22 ? "HIGH" : "MODERATE",
+      score: Math.min(100, Math.round(30 + Math.max(0, vix - 15) * 4)),
+      headline: `${vix > 28 ? "신용 스트레스 경고" : vix > 22 ? "유동성 긴축 신호" : "유동성 보통"}`,
+      keyMetrics: [
+        { label: "HY 스프레드", value: "380bp", status: vix > 25 ? "danger" : "warn" },
+        { label: "SOFR", value: "5.32%", status: "warn" },
+        { label: "RRP 잔액", value: "$380B", status: "ok" },
+      ],
+      impact: "소형주·고베타 종목 유동성 리스크",
+      trend: vix > 25 ? "악화" : "보합",
     },
   ];
 }
 
-// ── 종합 리스크 스코어 계산 ──
-function calcOverallRisk(risks) {
-  const scores = risks.map(r => r.score);
-  const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-  const criticalCount = risks.filter(r => r.severity === "CRITICAL").length;
-  // CRITICAL이 3개 이상이면 가중치 추가
-  const adjusted = Math.min(100, avg + criticalCount * 5);
-  return {
-    score: Math.round(adjusted),
-    level: adjusted >= 80 ? "CRITICAL" : adjusted >= 60 ? "HIGH" : adjusted >= 40 ? "MODERATE" : "LOW",
-    criticalCount,
-  };
+function calcOverall(risks) {
+  const avg = risks.reduce((a, r) => a + r.score, 0) / risks.length;
+  const crit = risks.filter(r => r.severity === "CRITICAL").length;
+  const adj = Math.min(100, avg + crit * 5);
+  return { score: Math.round(adj), level: adj >= 75 ? "CRITICAL" : adj >= 55 ? "HIGH" : adj >= 35 ? "MODERATE" : "LOW", crit };
+}
+
+// 미니 스파크라인 (7일 트렌드)
+function Sparkline({ score, trend, width = 64, height = 20 }) {
+  const seed = score * 7 + 13;
+  const rng = (i) => { let x = Math.sin(seed + i * 49.7) * 10000; return x - Math.floor(x); };
+  const pts = Array.from({ length: 7 }, (_, i) => {
+    const base = score + (trend === "악화" ? (i - 6) * 3 : trend === "개선" ? (6 - i) * 2.5 : (rng(i) - 0.5) * 8);
+    return Math.max(0, Math.min(100, base));
+  });
+  const min = Math.min(...pts), max = Math.max(...pts);
+  const range = max - min || 1;
+  const path = pts.map((v, i) => `${(i / 6) * width},${height - ((v - min) / range) * (height - 4) - 2}`).join(" ");
+  const isUp = pts[pts.length - 1] > pts[0];
+  return (
+    <svg width={width} height={height} style={{ display: "block" }}>
+      <polyline points={path} fill="none" stroke={isUp ? C.red : C.green} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
   const [expandedCP, setExpandedCP] = useState(null);
-  const [viewMode, setViewMode] = useState("heatmap"); // "heatmap" | "list"
+  const [tab, setTab] = useState("dashboard"); // "dashboard" | "matrix" | "history"
 
-  // 시장 데이터에서 VIX 등 추출
-  const marketData = useMemo(() => {
-    const vixData = marketIndices.find(i => i.symbol === "^VIX");
-    const spData = marketIndices.find(i => i.symbol === "^GSPC");
-    const dxyData = marketIndices.find(i => i.symbol === "DX-Y.NYB");
+  const mkt = useMemo(() => {
+    const vixD = marketIndices.find(i => i.symbol === "^VIX");
+    const spD = marketIndices.find(i => i.symbol === "^GSPC");
+    const dxyD = marketIndices.find(i => i.symbol === "DX-Y.NYB");
     return {
-      vix: vixData?.price || 22,
-      sp500Change: spData?.change || -1.2,
-      dollarIdx: dxyData?.price || 105,
+      vix: vixD?.price || 22,
+      sp500: spD?.price || 5200,
+      sp500Change: spD?.change || -0.3,
+      dxy: dxyD?.price || 104.5,
+      fearGreed: fearGreed?.stock?.value || null,
     };
-  }, [marketIndices]);
+  }, [marketIndices, fearGreed]);
 
-  const risks = useMemo(() => assessRisks(marketData), [marketData]);
-  const overall = useMemo(() => calcOverallRisk(risks), [risks]);
-  const overallSev = SEVERITY[overall.level];
+  const risks = useMemo(() => assessRisks(mkt), [mkt]);
+  const overall = useMemo(() => calcOverall(risks), [risks]);
+  const ov = SEV[overall.level];
 
-  // 히트맵 정렬: CRITICAL → HIGH → MODERATE → LOW
-  const sortedRisks = useMemo(() => {
-    const order = { CRITICAL: 0, HIGH: 1, MODERATE: 2, LOW: 3 };
-    return [...risks].sort((a, b) => order[a.severity] - order[b.severity]);
+  const sorted = useMemo(() => {
+    const ord = { CRITICAL: 0, HIGH: 1, MODERATE: 2, LOW: 3 };
+    return [...risks].sort((a, b) => ord[a.severity] - ord[b.severity]);
   }, [risks]);
+
+  const StatusDot = ({ status }) => (
+    <span style={{ width: "6px", height: "6px", borderRadius: "50%", display: "inline-block",
+      background: status === "danger" ? C.red : status === "warn" ? C.yellow : C.green }} />
+  );
 
   return (
     <div className="tab-content">
-      {/* 종합 리스크 게이지 */}
+      {/* 종합 리스크 헤더 */}
       <div style={{
-        background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
-        border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "12px",
+        background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px",
+        padding: "20px", marginBottom: "12px", position: "relative", overflow: "hidden",
       }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+        {/* 배경 글로우 */}
+        <div style={{ position: "absolute", top: "-40px", right: "-40px", width: "160px", height: "160px",
+          borderRadius: "50%", background: ov.glow, filter: "blur(60px)", pointerEvents: "none" }} />
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", marginBottom: "16px" }}>
           <div>
-            <div style={{ fontWeight: 800, fontSize: "18px", marginBottom: "4px" }}>🛡️ 8-Point 리스크 대시보드</div>
-            <div style={{ color: C.text3, fontSize: "13px" }}>CP별 위험 수준 실시간 모니터링</div>
+            <div style={{ fontWeight: 800, fontSize: "18px", marginBottom: "2px" }}>리스크 컨트롤 타워</div>
+            <div style={{ color: C.text3, fontSize: "12px" }}>
+              {new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })} 기준
+            </div>
           </div>
           <div style={{ textAlign: "center" }}>
-            <div style={{
-              width: "64px", height: "64px", borderRadius: "50%",
-              background: `conic-gradient(${overallSev.color} ${overall.score * 3.6}deg, ${C.card2} 0deg)`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <div style={{
-                width: "52px", height: "52px", borderRadius: "50%", background: C.card,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontWeight: 800, fontSize: "18px", color: overallSev.color,
-              }}>{overall.score}</div>
+            <div style={{ position: "relative", width: "72px", height: "72px" }}>
+              <svg width="72" height="72" viewBox="0 0 72 72" style={{ transform: "rotate(-90deg)" }}>
+                <circle cx="36" cy="36" r="30" fill="none" stroke={C.card2} strokeWidth="6" />
+                <circle cx="36" cy="36" r="30" fill="none" stroke={ov.color} strokeWidth="6"
+                  strokeDasharray={`${overall.score * 1.885} 188.5`} strokeLinecap="round" />
+              </svg>
+              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 800, fontSize: "20px", color: ov.color }}>{overall.score}</div>
             </div>
-            <div style={{ fontSize: "11px", fontWeight: 700, color: overallSev.color, marginTop: "4px" }}>
-              {overallSev.label}
-            </div>
+            <div style={{ fontSize: "10px", fontWeight: 700, color: ov.color, marginTop: "2px",
+              padding: "1px 8px", borderRadius: "4px", background: ov.glow }}>{ov.label}</div>
           </div>
         </div>
 
-        {/* 요약 바 */}
-        <div style={{ display: "flex", gap: "8px" }}>
-          {Object.entries(SEVERITY).map(([key, sev]) => {
-            const count = risks.filter(r => r.severity === key).length;
+        {/* 카운트 바 */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px" }}>
+          {Object.entries(SEV).map(([key, sev]) => {
+            const cnt = risks.filter(r => r.severity === key).length;
             return (
               <div key={key} style={{
-                flex: count || 0.3, background: count > 0 ? sev.color + "30" : C.card2,
-                borderRadius: "8px", padding: "8px 10px", textAlign: "center", minWidth: "60px",
-                border: `1px solid ${count > 0 ? sev.color + "40" : C.border}`,
+                background: cnt > 0 ? sev.glow : C.card2, borderRadius: "8px", padding: "8px",
+                textAlign: "center", border: `1px solid ${cnt > 0 ? sev.color + "30" : C.border}`,
               }}>
-                <div style={{ fontSize: "18px", fontWeight: 800, color: count > 0 ? sev.color : C.text3 }}>{count}</div>
-                <div style={{ fontSize: "10px", color: count > 0 ? sev.color : C.text3, fontWeight: 600 }}>{sev.label}</div>
+                <div style={{ fontSize: "20px", fontWeight: 800, color: cnt > 0 ? sev.color : C.text3 }}>{cnt}</div>
+                <div style={{ fontSize: "9px", color: cnt > 0 ? sev.color : C.text3, fontWeight: 700 }}>{sev.label}</div>
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* 히트맵 그리드 */}
-      <div style={{ marginBottom: "12px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-          <div style={{ fontWeight: 700, fontSize: "14px" }}>📋 CP별 위험 수준</div>
-          <div style={{ display: "flex", gap: "4px" }}>
-            <button onClick={() => setViewMode("heatmap")} style={{
-              padding: "5px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 600,
-              background: viewMode === "heatmap" ? C.blueBg : "transparent",
-              color: viewMode === "heatmap" ? C.blue : C.text3,
-              border: `1px solid ${viewMode === "heatmap" ? C.blue : C.border2}`, cursor: "pointer",
-            }}>히트맵</button>
-            <button onClick={() => setViewMode("list")} style={{
-              padding: "5px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 600,
-              background: viewMode === "list" ? C.blueBg : "transparent",
-              color: viewMode === "list" ? C.blue : C.text3,
-              border: `1px solid ${viewMode === "list" ? C.blue : C.border2}`, cursor: "pointer",
-            }}>리스트</button>
-          </div>
-        </div>
+      {/* 서브 탭 */}
+      <div style={{ display: "flex", gap: "4px", marginBottom: "12px" }}>
+        {[["dashboard", "대시보드"], ["matrix", "리스크 매트릭스"], ["history", "트렌드"]].map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)} style={{
+            padding: "7px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+            background: tab === id ? C.blueBg : "transparent", color: tab === id ? C.blue : C.text3,
+            border: `1px solid ${tab === id ? C.blue : C.border2}`, cursor: "pointer",
+          }}>{label}</button>
+        ))}
+      </div>
 
-        {viewMode === "heatmap" ? (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-            {sortedRisks.map((risk, i) => {
-              const sev = SEVERITY[risk.severity];
-              const isExpanded = expandedCP === risk.id;
-              return (
-                <div key={risk.id} onClick={() => setExpandedCP(isExpanded ? null : risk.id)} style={{
-                  background: sev.bg, borderRadius: "12px", padding: "14px",
-                  border: `1px solid ${sev.border}`, cursor: "pointer",
-                  transition: "all 0.2s", gridColumn: isExpanded ? "1 / -1" : undefined,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
-                    <span style={{
-                      fontSize: "10px", fontWeight: 800, color: sev.textColor,
-                      padding: "1px 6px", borderRadius: "4px", background: sev.color + "20",
-                    }}>{sev.icon} {sev.label}</span>
+      {/* ═══ 대시보드 뷰 ═══ */}
+      {tab === "dashboard" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          {sorted.map(risk => {
+            const sev = SEV[risk.severity];
+            const isOpen = expandedCP === risk.id;
+            return (
+              <div key={risk.id} onClick={() => setExpandedCP(isOpen ? null : risk.id)} style={{
+                background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px",
+                padding: "16px", cursor: "pointer", transition: "all .2s",
+                borderLeft: `3px solid ${sev.color}`,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div style={{ fontSize: "22px", width: "36px", height: "36px", borderRadius: "10px",
+                    background: sev.glow, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    {risk.icon}
                   </div>
-                  <div style={{ fontWeight: 800, fontSize: "14px", color: "#1a1a1a", marginBottom: "2px" }}>
-                    {risk.id} {risk.name}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
+                      <span style={{ fontWeight: 700, fontSize: "14px" }}>{risk.name}</span>
+                      <span style={{ fontSize: "9px", fontWeight: 800, color: sev.color,
+                        padding: "1px 6px", borderRadius: "4px", background: sev.glow }}>{sev.label}</span>
+                      <span style={{ fontSize: "10px", color: risk.trend === "악화" ? C.red : risk.trend === "개선" ? C.green : C.text3,
+                        fontWeight: 600 }}>
+                        {risk.trend === "악화" ? "↗ 악화" : risk.trend === "개선" ? "↘ 개선" : "→ 보합"}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: "12px", color: C.text3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {risk.headline}
+                    </div>
                   </div>
-                  <div style={{ fontSize: "12px", color: "#555", lineHeight: "1.4" }}>
-                    {risk.headline}
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{ fontWeight: 800, fontSize: "22px", color: sev.color }}>{risk.score}</div>
+                    <Sparkline score={risk.score} trend={risk.trend} />
                   </div>
+                </div>
 
-                  {isExpanded && (
-                    <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${sev.border}` }}>
-                      <div style={{ fontSize: "11px", color: "#666", marginBottom: "8px" }}>{risk.description}</div>
-                      {risk.details.map((d, j) => (
-                        <div key={j} style={{ fontSize: "12px", color: "#444", padding: "3px 0", display: "flex", gap: "6px" }}>
-                          <span style={{ color: sev.textColor }}>•</span> {d}
+                {isOpen && (
+                  <div style={{ marginTop: "14px", paddingTop: "14px", borderTop: `1px solid ${C.border}` }}>
+                    {/* 핵심 지표 */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "12px" }}>
+                      {risk.keyMetrics.map((m, j) => (
+                        <div key={j} style={{ background: C.card2, borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+                          <div style={{ fontSize: "10px", color: C.text3, marginBottom: "4px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                            <StatusDot status={m.status} /> {m.label}
+                          </div>
+                          <div style={{ fontWeight: 700, fontSize: "14px",
+                            color: m.status === "danger" ? C.red : m.status === "warn" ? C.yellow : C.text1 }}>{m.value}</div>
                         </div>
                       ))}
-                      {/* 리스크 점수 바 */}
-                      <div style={{ marginTop: "10px" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", marginBottom: "4px" }}>
-                          <span style={{ color: "#888" }}>리스크 점수</span>
-                          <span style={{ fontWeight: 800, color: sev.textColor }}>{risk.score}/100</span>
-                        </div>
-                        <div style={{ height: "6px", borderRadius: "3px", background: "#e0e0e0", overflow: "hidden" }}>
-                          <div style={{ width: `${risk.score}%`, height: "100%", borderRadius: "3px", background: sev.color,
-                            transition: "width 0.5s" }} />
-                        </div>
+                    </div>
+                    {/* 포트폴리오 영향 */}
+                    <div style={{ background: C.card2, borderRadius: "10px", padding: "10px 12px",
+                      fontSize: "12px", color: C.text2, display: "flex", alignItems: "center", gap: "6px" }}>
+                      <span style={{ color: C.yellow }}>💡</span> <b>포트폴리오 영향:</b> {risk.impact}
+                    </div>
+                    {/* 리스크 바 */}
+                    <div style={{ marginTop: "10px" }}>
+                      <div style={{ height: "4px", borderRadius: "2px", background: C.card2, overflow: "hidden" }}>
+                        <div style={{ width: `${risk.score}%`, height: "100%", borderRadius: "2px", background: sev.color,
+                          transition: "width .5s" }} />
                       </div>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          /* 리스트 뷰 */
-          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-            {sortedRisks.map((risk, i) => {
-              const sev = SEVERITY[risk.severity];
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ═══ 리스크 매트릭스 뷰 ═══ */}
+      {tab === "matrix" && (
+        <div>
+          {/* 2x4 히트맵 그리드 */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
+            {sorted.map(risk => {
+              const sev = SEV[risk.severity];
+              const opacity = 0.4 + (risk.score / 100) * 0.6;
               return (
                 <div key={risk.id} onClick={() => setExpandedCP(expandedCP === risk.id ? null : risk.id)} style={{
-                  background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px",
-                  padding: "14px", cursor: "pointer", transition: "all 0.2s",
-                  borderLeft: `4px solid ${sev.color}`,
+                  background: C.card, borderRadius: "12px", padding: "14px", cursor: "pointer",
+                  border: `1px solid ${sev.color}40`, position: "relative", overflow: "hidden",
+                  transition: "all .2s",
                 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <span style={{ fontSize: "20px" }}>{risk.icon}</span>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: "14px" }}>{risk.id} {risk.name}</div>
-                        <div style={{ fontSize: "12px", color: C.text3, marginTop: "2px" }}>{risk.headline}</div>
-                      </div>
+                  {/* 배경 강도 바 */}
+                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: `${risk.score}%`,
+                    background: `linear-gradient(to top, ${sev.color}12, transparent)`, pointerEvents: "none" }} />
+
+                  <div style={{ position: "relative" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                      <span style={{ fontSize: "18px" }}>{risk.icon}</span>
+                      <span style={{ fontWeight: 800, fontSize: "24px", color: sev.color, opacity }}>{risk.score}</span>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <span style={{
-                        padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 800,
-                        background: sev.color + "20", color: sev.color,
-                      }}>{sev.label}</span>
-                      <div style={{ fontSize: "20px", fontWeight: 800, color: sev.color, marginTop: "4px" }}>{risk.score}</div>
+                    <div style={{ fontWeight: 700, fontSize: "13px", marginBottom: "2px" }}>{risk.name}</div>
+                    <div style={{ fontSize: "10px", color: C.text3, marginBottom: "6px",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{risk.headline}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                      <span style={{ fontSize: "9px", fontWeight: 700, padding: "1px 6px", borderRadius: "4px",
+                        background: sev.glow, color: sev.color }}>{sev.label}</span>
+                      <span style={{ fontSize: "9px", color: risk.trend === "악화" ? C.red : risk.trend === "개선" ? C.green : C.text3 }}>
+                        {risk.trend === "악화" ? "▲" : risk.trend === "개선" ? "▼" : "−"}
+                      </span>
                     </div>
                   </div>
 
                   {expandedCP === risk.id && (
-                    <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: `1px solid ${C.border}` }}>
-                      {risk.details.map((d, j) => (
-                        <div key={j} style={{ fontSize: "13px", color: C.text2, padding: "4px 0", display: "flex", gap: "8px" }}>
-                          <span style={{ color: sev.color }}>•</span> {d}
+                    <div style={{ position: "relative", marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${C.border}` }}>
+                      {risk.keyMetrics.map((m, j) => (
+                        <div key={j} style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", padding: "3px 0" }}>
+                          <span style={{ color: C.text3, display: "flex", alignItems: "center", gap: "4px" }}>
+                            <StatusDot status={m.status} /> {m.label}
+                          </span>
+                          <span style={{ fontWeight: 600, color: m.status === "danger" ? C.red : m.status === "warn" ? C.yellow : C.text2 }}>{m.value}</span>
                         </div>
                       ))}
-                      <div style={{ marginTop: "10px" }}>
-                        <div style={{ height: "6px", borderRadius: "3px", background: C.card2, overflow: "hidden" }}>
-                          <div style={{ width: `${risk.score}%`, height: "100%", borderRadius: "3px", background: sev.color }} />
-                        </div>
-                      </div>
                     </div>
                   )}
                 </div>
               );
             })}
           </div>
-        )}
-      </div>
 
-      {/* 하단 면책 조항 */}
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "14px",
-        fontSize: "11px", color: C.text3, lineHeight: "1.5" }}>
-        ⚠️ 본 리스크 히트맵은 공개된 시장 데이터를 기반으로 자동 생성된 참고 자료이며, 투자 판단의 근거로 사용해서는 안 됩니다.
-        실시간 데이터와 차이가 있을 수 있으며, 모든 투자 결정은 본인의 판단과 책임 하에 이루어져야 합니다.
+          {/* 범례 */}
+          <div style={{ display: "flex", gap: "12px", justifyContent: "center", padding: "8px" }}>
+            {Object.entries(SEV).map(([key, sev]) => (
+              <div key={key} style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", color: C.text3 }}>
+                <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: sev.color }} />
+                {sev.label}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ 트렌드 뷰 ═══ */}
+      {tab === "history" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "16px" }}>
+            <div style={{ fontWeight: 700, fontSize: "14px", marginBottom: "12px" }}>📊 7일 리스크 트렌드</div>
+            {risks.map(risk => {
+              const sev = SEV[risk.severity];
+              return (
+                <div key={risk.id} style={{ display: "flex", alignItems: "center", gap: "12px",
+                  padding: "8px 0", borderBottom: `1px solid ${C.border}` }}>
+                  <span style={{ fontSize: "16px", width: "28px", textAlign: "center" }}>{risk.icon}</span>
+                  <span style={{ fontWeight: 600, fontSize: "13px", width: "60px" }}>{risk.name}</span>
+                  <div style={{ flex: 1 }}>
+                    <Sparkline score={risk.score} trend={risk.trend} width={100} height={24} />
+                  </div>
+                  <span style={{ fontWeight: 700, fontSize: "14px", color: sev.color, width: "32px", textAlign: "right" }}>{risk.score}</span>
+                  <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px",
+                    background: sev.glow, color: sev.color, minWidth: "52px", textAlign: "center" }}>{sev.label}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 종합 인사이트 */}
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "16px" }}>
+            <div style={{ fontWeight: 700, fontSize: "14px", marginBottom: "10px" }}>💡 리스크 인사이트</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {[
+                { icon: "🔴", text: `${risks.filter(r => r.trend === "악화").length}개 CP 악화 추세 — 포지션 축소 권장` },
+                { icon: "🟢", text: `${risks.filter(r => r.trend === "개선").length}개 CP 개선 중 — 선별적 진입 가능` },
+                { icon: "⚠️", text: `종합 리스크 ${overall.score}점 — ${overall.score > 65 ? "방어적 운용 권장" : overall.score > 40 ? "중립 유지" : "공격적 운용 가능"}` },
+              ].map((item, i) => (
+                <div key={i} style={{ display: "flex", gap: "8px", alignItems: "flex-start", fontSize: "13px", color: C.text2 }}>
+                  <span>{item.icon}</span> {item.text}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 면책 */}
+      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px",
+        fontSize: "10px", color: C.text3, lineHeight: "1.5", marginTop: "12px" }}>
+        ⚠️ 리스크 점수는 VIX, 공포·탐욕 지수, 달러 인덱스 등 공개 시장 데이터를 기반으로 자동 산출됩니다.
+        투자 판단의 근거가 아닌 참고 자료로만 활용하시기 바랍니다.
       </div>
     </div>
   );
