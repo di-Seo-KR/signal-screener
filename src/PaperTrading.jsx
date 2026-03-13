@@ -597,6 +597,57 @@ function OrderModal({ symbol: initSymbol, side, reason, config, onClose, onOrder
 }
 
 // ══════════════════════════════════════════════════════════════
+// QR 코드 생성 (동적 CDN 로드) + 스캔 (jsQR)
+// ══════════════════════════════════════════════════════════════
+let _qrLib = null;
+async function loadQRGenerator() {
+  if (_qrLib) return _qrLib;
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+    s.onload = () => { _qrLib = window.QRCode; resolve(_qrLib); };
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+let _jsQR = null;
+async function loadJsQR() {
+  if (_jsQR) return _jsQR;
+  return new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js";
+    s.onload = () => { _jsQR = window.jsQR; resolve(_jsQR); };
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
+
+function buildSyncPayload(config, tradeSettings, autoTradeEnabled, autoScanEnabled, tradingHalted) {
+  return {
+    c: config.apiKey ? { k: config.apiKey, s: config.apiSecret, p: config.isPaper } : null,
+    t: tradeSettings,
+    ae: autoTradeEnabled,
+    as: autoScanEnabled,
+    th: tradingHalted,
+    v: 1,
+    ts: Date.now(),
+  };
+}
+
+function applySyncPayload(payload, setConfig, setTradeSettings, setAutoTradeEnabled, setAutoScanEnabled, setTradingHalted, config, save, KEYS) {
+  if (payload.c?.k) {
+    const merged = { ...config, apiKey: payload.c.k, apiSecret: payload.c.s, isPaper: payload.c.p, connected: true };
+    setConfig(merged);
+    save(KEYS.config, merged);
+  }
+  if (payload.t) setTradeSettings(payload.t);
+  if (typeof payload.ae === "boolean") setAutoTradeEnabled(payload.ae);
+  if (typeof payload.as === "boolean") setAutoScanEnabled(payload.as);
+  if (typeof payload.th === "boolean") setTradingHalted(payload.th);
+}
+
+// ══════════════════════════════════════════════════════════════
 // 메인 컴포넌트
 // ══════════════════════════════════════════════════════════════
 export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
@@ -617,6 +668,12 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
   const [scanProgress, setScanProgress] = useState(0);
   const [detectedSignals, setDetectedSignals] = useState([]);
   const [lastScanTime, setLastScanTime] = useState(null);
+
+  // QR 동기화 모달
+  const [qrModal, setQrModal] = useState(null); // null | "generate" | "scan"
+  const [qrSvg, setQrSvg] = useState("");
+  const videoRef = useRef(null);
+  const qrStreamRef = useRef(null);
   const [autoScanEnabled, setAutoScanEnabled] = useState(() => load("di_auto_scan", false));
 
   // 리스크 알림 상태
@@ -1029,7 +1086,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
       <div style={{ display: "flex", gap: "4px", marginBottom: "12px", overflowX: "auto" }}>
         {[
           ["dashboard","포지션",positions.length],
-          ["orders","주문",orders.length],
+          ["orders","주문",orders.filter(o=>["new","partially_filled","accepted","pending_new"].includes(o.status)).length],
           ["signals","시그널",detectedSignals.length],
           ["auto","자동매매",null],
           ["risk","리스크",riskAlerts.length],
@@ -1414,83 +1471,116 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
             </div>
           </div>
 
-          {/* 설정 동기화 (PC ↔ 모바일) */}
+          {/* 설정 동기화 — QR 코드 (PC ↔ 모바일) */}
           <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
-            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"4px"}}>기기 간 설정 동기화</div>
+            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"4px"}}>QR 설정 동기화</div>
             <div style={{fontSize:"11px",color:C.text3,marginBottom:"16px"}}>
-              PC에서 내보내기 → 모바일에서 가져오기 (또는 반대)
+              PC → QR 생성 → 모바일 카메라로 스캔 (API 키 포함)
             </div>
             <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
-              <button onClick={()=>{
-                const payload = {
-                  config: { ...config, connected: undefined },
-                  tradeSettings,
-                  autoTradeEnabled,
-                  autoScanEnabled,
-                  tradingHalted,
-                  v: 1,
-                  ts: Date.now(),
-                };
-                const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-                navigator.clipboard.writeText(encoded).then(()=>{
-                  alert("설정 코드가 클립보드에 복사되었습니다!\n\n다른 기기에서 '가져오기'를 눌러 붙여넣으세요.");
-                }).catch(()=>{
-                  prompt("아래 코드를 복사하세요:", encoded);
-                });
-              }} style={{
-                flex:1,minWidth:"120px",padding:"12px",borderRadius:"10px",fontWeight:700,fontSize:"13px",
-                background:C.blueBg,color:C.blue,border:`1px solid ${C.blue}55`,cursor:"pointer"}}>
-                📤 설정 내보내기
-              </button>
-              <button onClick={()=>{
-                const code = prompt("다른 기기에서 복사한 설정 코드를 붙여넣으세요:");
-                if (!code) return;
+              <button onClick={async ()=>{
                 try {
-                  const payload = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
-                  if (!payload.v || !payload.tradeSettings) throw new Error("invalid");
-                  if (payload.config?.apiKey) {
-                    setConfig(prev => ({ ...prev, ...payload.config, connected: prev.connected }));
-                    save(KEYS.config, { ...config, ...payload.config, connected: config.connected });
-                  }
-                  setTradeSettings(payload.tradeSettings);
-                  if (typeof payload.autoTradeEnabled === "boolean") setAutoTradeEnabled(payload.autoTradeEnabled);
-                  if (typeof payload.autoScanEnabled === "boolean") setAutoScanEnabled(payload.autoScanEnabled);
-                  if (typeof payload.tradingHalted === "boolean") setTradingHalted(payload.tradingHalted);
-                  const t = new Date(payload.ts).toLocaleString("ko-KR");
-                  alert(`설정을 성공적으로 가져왔습니다!\n\n내보낸 시각: ${t}`);
-                } catch {
-                  alert("잘못된 설정 코드입니다. 다시 확인해주세요.");
+                  const payload = buildSyncPayload(config, tradeSettings, autoTradeEnabled, autoScanEnabled, tradingHalted);
+                  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+                  // QR에 담을 URL (모바일에서 URL 열면 자동 import)
+                  const syncUrl = `${window.location.origin}${window.location.pathname}?tab=paper-trading&sync=${encoded}`;
+                  await loadQRGenerator();
+                  setQrSvg("");
+                  setQrModal("generate");
+                  // QRCode 라이브러리가 DOM 엘리먼트에 렌더하므로 약간의 딜레이 필요
+                  setTimeout(() => {
+                    const container = document.getElementById("di-qr-container");
+                    if (!container) return;
+                    container.innerHTML = "";
+                    new window.QRCode(container, {
+                      text: syncUrl,
+                      width: 260,
+                      height: 260,
+                      colorDark: "#ffffff",
+                      colorLight: "#0F1825",
+                      correctLevel: window.QRCode.CorrectLevel.L,
+                    });
+                  }, 100);
+                } catch (e) {
+                  alert("QR 코드 생성 실패: " + e.message);
                 }
               }} style={{
-                flex:1,minWidth:"120px",padding:"12px",borderRadius:"10px",fontWeight:700,fontSize:"13px",
+                flex:1,minWidth:"120px",padding:"14px",borderRadius:"10px",fontWeight:700,fontSize:"13px",
+                background:C.blueBg,color:C.blue,border:`1px solid ${C.blue}55`,cursor:"pointer"}}>
+                📱 QR 생성 (PC→모바일)
+              </button>
+              <button onClick={async ()=>{
+                try {
+                  await loadJsQR();
+                  setQrModal("scan");
+                  setTimeout(async () => {
+                    try {
+                      const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } }
+                      });
+                      qrStreamRef.current = stream;
+                      if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                        videoRef.current.play();
+                        // 프레임 스캔 루프
+                        const canvas = document.createElement("canvas");
+                        const ctx = canvas.getContext("2d");
+                        const scanLoop = () => {
+                          if (!qrStreamRef.current) return;
+                          const v = videoRef.current;
+                          if (!v || v.readyState < 2) { requestAnimationFrame(scanLoop); return; }
+                          canvas.width = v.videoWidth;
+                          canvas.height = v.videoHeight;
+                          ctx.drawImage(v, 0, 0);
+                          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                          const code = window.jsQR(imgData.data, canvas.width, canvas.height, { inversionAttempts: "dontInvert" });
+                          if (code?.data) {
+                            // QR 데이터 파싱
+                            try {
+                              let syncData = code.data;
+                              // URL인 경우 sync 파라미터 추출
+                              if (syncData.startsWith("http")) {
+                                const url = new URL(syncData);
+                                syncData = url.searchParams.get("sync");
+                              }
+                              if (!syncData) throw new Error("no sync data");
+                              const payload = JSON.parse(decodeURIComponent(escape(atob(syncData))));
+                              if (!payload.v) throw new Error("invalid");
+                              // 스트림 정리
+                              qrStreamRef.current?.getTracks().forEach(t => t.stop());
+                              qrStreamRef.current = null;
+                              setQrModal(null);
+                              // 설정 적용
+                              applySyncPayload(payload, setConfig, setTradeSettings, setAutoTradeEnabled, setAutoScanEnabled, setTradingHalted, config, save, KEYS);
+                              const t = new Date(payload.ts).toLocaleString("ko-KR");
+                              alert(`설정 동기화 완료!\n\n내보낸 시각: ${t}`);
+                            } catch {
+                              // 유효하지 않은 QR → 계속 스캔
+                              requestAnimationFrame(scanLoop);
+                              return;
+                            }
+                            return;
+                          }
+                          requestAnimationFrame(scanLoop);
+                        };
+                        requestAnimationFrame(scanLoop);
+                      }
+                    } catch (e) {
+                      alert("카메라 접근 실패: " + e.message);
+                      setQrModal(null);
+                    }
+                  }, 200);
+                } catch (e) {
+                  alert("QR 스캐너 로드 실패: " + e.message);
+                }
+              }} style={{
+                flex:1,minWidth:"120px",padding:"14px",borderRadius:"10px",fontWeight:700,fontSize:"13px",
                 background:C.greenBg,color:C.green,border:`1px solid ${C.green}55`,cursor:"pointer"}}>
-                📥 설정 가져오기
+                📷 QR 스캔 (모바일→PC)
               </button>
             </div>
-            <button onClick={()=>{
-                const payload = {
-                  config: { ...config, connected: undefined },
-                  tradeSettings,
-                  autoTradeEnabled,
-                  autoScanEnabled,
-                  tradingHalted,
-                  v: 1,
-                  ts: Date.now(),
-                };
-                const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
-                const url = `${window.location.origin}${window.location.pathname}?tab=paper-trading&sync=${encoded}`;
-                navigator.clipboard.writeText(url).then(()=>{
-                  alert("공유 링크가 복사되었습니다!\n\n모바일 브라우저에서 이 링크를 열면 설정이 자동 적용됩니다.");
-                }).catch(()=>{
-                  prompt("아래 링크를 복사하세요:", url);
-                });
-              }} style={{
-                width:"100%",marginTop:"8px",padding:"10px",borderRadius:"10px",fontWeight:600,fontSize:"12px",
-                background:"transparent",color:C.text2,border:`1px solid ${C.border2}`,cursor:"pointer"}}>
-                🔗 공유 링크 생성 (모바일에서 열기만 하면 자동 적용)
-              </button>
             <div style={{fontSize:"10px",color:C.text3,marginTop:"8px"}}>
-              API 키 포함 · 거래 로그 및 실행 기록은 제외
+              API 키·시크릿 포함 · 주변에 다른 사람이 없을 때 사용하세요
             </div>
           </div>
         </div>
@@ -1654,6 +1744,68 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── QR 모달 (생성 / 스캔) ── */}
+      {qrModal && (
+        <div style={{
+          position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:9999,
+          background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"
+        }} onClick={(e)=>{
+          if (e.target === e.currentTarget) {
+            qrStreamRef.current?.getTracks().forEach(t => t.stop());
+            qrStreamRef.current = null;
+            setQrModal(null);
+          }
+        }}>
+          <div style={{
+            background:C.card,border:`1px solid ${C.border}`,borderRadius:"20px",padding:"28px",
+            maxWidth:"360px",width:"100%",textAlign:"center"
+          }}>
+            {qrModal === "generate" && (
+              <>
+                <div style={{fontWeight:800,fontSize:"18px",marginBottom:"6px"}}>📱 QR 코드</div>
+                <div style={{fontSize:"12px",color:C.text3,marginBottom:"20px"}}>
+                  모바일에서 카메라로 스캔하세요
+                </div>
+                <div id="di-qr-container" style={{
+                  display:"inline-block",padding:"16px",background:"#0F1825",borderRadius:"16px",
+                  border:`1px solid ${C.border}`
+                }} />
+                <div style={{fontSize:"10px",color:C.text3,marginTop:"16px"}}>
+                  API 키 포함 — 주변에 다른 사람이 없을 때 사용
+                </div>
+              </>
+            )}
+            {qrModal === "scan" && (
+              <>
+                <div style={{fontWeight:800,fontSize:"18px",marginBottom:"6px"}}>📷 QR 스캔</div>
+                <div style={{fontSize:"12px",color:C.text3,marginBottom:"16px"}}>
+                  다른 기기에 표시된 QR 코드를 비추세요
+                </div>
+                <div style={{borderRadius:"12px",overflow:"hidden",background:"#000",position:"relative"}}>
+                  <video ref={videoRef} style={{width:"100%",height:"auto",display:"block"}} playsInline muted />
+                  <div style={{
+                    position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",
+                    width:"180px",height:"180px",border:"3px solid "+C.blue,borderRadius:"16px",
+                    boxShadow:`0 0 0 2000px rgba(0,0,0,0.4)`
+                  }} />
+                </div>
+                <div style={{fontSize:"11px",color:C.blue,marginTop:"12px",animation:"pulse 1.5s ease-in-out infinite"}}>
+                  스캔 대기 중...
+                </div>
+              </>
+            )}
+            <button onClick={()=>{
+              qrStreamRef.current?.getTracks().forEach(t => t.stop());
+              qrStreamRef.current = null;
+              setQrModal(null);
+            }} style={{
+              marginTop:"20px",padding:"12px 32px",borderRadius:"10px",fontWeight:700,fontSize:"13px",
+              background:C.card2,color:C.text2,border:`1px solid ${C.border2}`,cursor:"pointer",width:"100%"
+            }}>닫기</button>
+          </div>
         </div>
       )}
     </div>
