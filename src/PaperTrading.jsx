@@ -1507,7 +1507,6 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
                   const mini = JSON.stringify({k:config.apiKey,s:config.apiSecret,p:config.isPaper!==false?1:0,v:1});
                   const encoded = btoa(mini);
                   await loadQRGenerator();
-                  setQrSvg("");
                   setQrModal("generate");
                   setTimeout(() => {
                     const container = document.getElementById("di-qr-container");

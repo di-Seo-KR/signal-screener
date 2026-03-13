@@ -814,6 +814,14 @@ export default function QuantPortfolio({ theme = "dark" }) {
       fetchedRef.current = true;
       loadData();
     }
+    // 장중 5분마다 자동 갱신
+    const timer = setInterval(() => {
+      const now = new Date();
+      const h = now.getUTCHours();
+      // 미국 장중 (13:30~20:00 UTC = 9:30~16:00 ET) + 여유
+      if (h >= 13 && h <= 20) loadData();
+    }, 5 * 60 * 1000);
+    return () => clearInterval(timer);
   }, [loadData]);
 
   // 전략 데이터 계산 (실제 데이터 기반)
