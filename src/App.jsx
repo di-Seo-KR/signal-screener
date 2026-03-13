@@ -4352,7 +4352,7 @@ function AppInner() {
             { id: "portfolio", label: "내 포트폴리오", icon: "💼" },
             { id: "news", label: "마켓 뉴스", icon: "📰" },
             { id: "alerts", label: "매매 알림", icon: "🔔", badge: alertBadge },
-            { id: "paper-trading", label: "페이퍼 트레이딩", icon: "🏦" },
+            { id: "paper-trading", label: "퀀트 자동매매", icon: "🤖" },
           ].map(t => (
             <button key={t.id} className={`sb-item${tab === t.id ? " active" : ""}`}
               onClick={() => { setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }}
@@ -4397,7 +4397,7 @@ function AppInner() {
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "2px" }}>
-            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-port", label: "전략 운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "트레이딩", icon: "🏦" }].map(t => (
+            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-port", label: "전략 운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "자동매매", icon: "🤖" }].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }} style={{
                 padding: "6px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
@@ -4437,7 +4437,7 @@ function AppInner() {
             background: C.card, borderTop: `1px solid ${C.border}`,
             padding: "8px 16px 12px", display: "flex", flexDirection: "column", gap: "2px",
           }}>
-            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-port", label: "전략 운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }].map(t => (
+            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-port", label: "전략 운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "퀀트 자동매매", icon: "🤖" }].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); setMenuOpen(false); }} style={{
                 padding: "10px 14px", borderRadius: "10px", fontSize: "14px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
