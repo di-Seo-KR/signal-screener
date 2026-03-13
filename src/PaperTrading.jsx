@@ -1,7 +1,7 @@
 // DI금융 — 퀀트 전략 기반 자동매매 시스템 v3.0 (Production-Grade)
 // 리스크 관리 · 브래킷 주문 · 드로다운 보호 · 시그널 신뢰도 · 변동성 사이징
 // Alpaca Trading API 연동 (Paper / Live)
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { ALL_STRATEGIES } from "./strategies.js";
 import { STRATEGY_PORTFOLIOS as RAW_PORTFOLIOS } from "./QuantPortfolio.jsx";
 
@@ -408,6 +408,9 @@ function SetupPanel({ config, setConfig, onConnect }) {
   const [showSecret, setShowSecret] = useState(false);
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState("");
+  const [qrScanning, setQrScanning] = useState(false);
+  const setupVideoRef = useRef(null);
+  const setupStreamRef = useRef(null);
 
   const handleConnect = async () => {
     if (!key.trim() || !secret.trim()) { setError("API Key와 Secret을 모두 입력해주세요"); return; }
@@ -486,6 +489,120 @@ function SetupPanel({ config, setConfig, onConnect }) {
           background: testing ? C.card2 : `linear-gradient(135deg, ${C.blue}, #2563EB)`,
           color: "#fff", border: "none", cursor: testing ? "default" : "pointer",
         }}>{testing ? "연결 중..." : "트레이딩 연결"}</button>
+
+        {/* 구분선 */}
+        <div style={{display:"flex",alignItems:"center",gap:"12px",margin:"20px 0 16px"}}>
+          <div style={{flex:1,height:"1px",background:C.border2}} />
+          <span style={{fontSize:"11px",color:C.text3,fontWeight:600}}>또는</span>
+          <div style={{flex:1,height:"1px",background:C.border2}} />
+        </div>
+
+        {/* QR 스캔으로 불러오기 */}
+        {!qrScanning ? (
+          <button onClick={async ()=>{
+            try {
+              await loadJsQR();
+              setQrScanning(true);
+              setTimeout(async () => {
+                try {
+                  const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } }
+                  });
+                  setupStreamRef.current = stream;
+                  if (setupVideoRef.current) {
+                    setupVideoRef.current.srcObject = stream;
+                    setupVideoRef.current.play();
+                    const canvas = document.createElement("canvas");
+                    const ctx = canvas.getContext("2d");
+                    const scanLoop = () => {
+                      if (!setupStreamRef.current) return;
+                      const v = setupVideoRef.current;
+                      if (!v || v.readyState < 2) { requestAnimationFrame(scanLoop); return; }
+                      canvas.width = v.videoWidth;
+                      canvas.height = v.videoHeight;
+                      ctx.drawImage(v, 0, 0);
+                      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                      const code = window.jsQR(imgData.data, canvas.width, canvas.height, { inversionAttempts: "dontInvert" });
+                      if (code?.data) {
+                        try {
+                          let syncData = code.data;
+                          if (syncData.startsWith("http")) {
+                            const url = new URL(syncData);
+                            syncData = url.searchParams.get("sync");
+                          }
+                          if (!syncData) throw new Error("no sync");
+                          const payload = JSON.parse(decodeURIComponent(escape(atob(syncData))));
+                          if (!payload.v || !payload.c?.k) throw new Error("invalid");
+                          // 성공! 스트림 정리
+                          setupStreamRef.current?.getTracks().forEach(t => t.stop());
+                          setupStreamRef.current = null;
+                          setQrScanning(false);
+                          // config 적용 + 연결
+                          const newConfig = { apiKey: payload.c.k, apiSecret: payload.c.s, isPaper: payload.c.p !== false, connected: true };
+                          setConfig(newConfig);
+                          save(KEYS.config, newConfig);
+                          // tradeSettings 등도 저장
+                          if (payload.t) save(KEYS.settings, payload.t);
+                          if (typeof payload.ae === "boolean") save(KEYS.autoTrade, payload.ae);
+                          if (typeof payload.as === "boolean") save("di_auto_scan", payload.as);
+                          if (typeof payload.th === "boolean") save("di_trading_halted", payload.th);
+                          // 계좌 확인
+                          try {
+                            const acc = await alpacaAPI("account", newConfig);
+                            if (acc.id) onConnect(acc);
+                          } catch {}
+                          return;
+                        } catch {
+                          requestAnimationFrame(scanLoop);
+                          return;
+                        }
+                      }
+                      requestAnimationFrame(scanLoop);
+                    };
+                    requestAnimationFrame(scanLoop);
+                  }
+                } catch (e) {
+                  alert("카메라 접근 실패: " + e.message);
+                  setQrScanning(false);
+                }
+              }, 200);
+            } catch (e) {
+              alert("QR 스캐너 로드 실패: " + e.message);
+            }
+          }} style={{
+            width:"100%",padding:"14px",borderRadius:"12px",fontSize:"15px",fontWeight:700,
+            background:C.card2,color:C.green,border:`1px solid ${C.green}44`,cursor:"pointer",
+            display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",
+          }}>
+            <span style={{fontSize:"20px"}}>📷</span> QR로 불러오기
+          </button>
+        ) : (
+          <div>
+            <div style={{borderRadius:"12px",overflow:"hidden",background:"#000",position:"relative",marginBottom:"8px"}}>
+              <video ref={setupVideoRef} style={{width:"100%",height:"auto",display:"block"}} playsInline muted />
+              <div style={{
+                position:"absolute",top:"50%",left:"50%",transform:"translate(-50%,-50%)",
+                width:"180px",height:"180px",border:"3px solid "+C.green,borderRadius:"16px",
+                boxShadow:"0 0 0 2000px rgba(0,0,0,0.5)"
+              }} />
+              <div style={{
+                position:"absolute",bottom:"12px",left:"50%",transform:"translateX(-50%)",
+                fontSize:"12px",color:"#fff",background:"rgba(0,0,0,0.7)",padding:"4px 12px",borderRadius:"20px",
+              }}>PC에 표시된 QR 코드를 비추세요</div>
+            </div>
+            <button onClick={()=>{
+              setupStreamRef.current?.getTracks().forEach(t => t.stop());
+              setupStreamRef.current = null;
+              setQrScanning(false);
+            }} style={{
+              width:"100%",padding:"10px",borderRadius:"10px",fontSize:"13px",fontWeight:600,
+              background:C.card2,color:C.text3,border:`1px solid ${C.border2}`,cursor:"pointer",
+            }}>취소</button>
+          </div>
+        )}
+        <div style={{fontSize:"10px",color:C.text3,marginTop:"8px",textAlign:"center"}}>
+          PC 자동매매 설정에서 QR 생성 → 여기서 스캔
+        </div>
       </div>
     </div>
   );
@@ -648,34 +765,10 @@ function applySyncPayload(payload, setConfig, setTradeSettings, setAutoTradeEnab
 }
 
 // ══════════════════════════════════════════════════════════════
-// URL ?sync= 파라미터 선파싱 (컴포넌트 마운트 전 1회)
-// ══════════════════════════════════════════════════════════════
-function parseSyncFromURL() {
-  try {
-    const params = new URLSearchParams(window.location.search);
-    const syncCode = params.get("sync");
-    if (!syncCode) return null;
-    const payload = JSON.parse(decodeURIComponent(escape(atob(syncCode))));
-    if (!payload.v) return null;
-    return payload;
-  } catch { return null; }
-}
-
-// ══════════════════════════════════════════════════════════════
 // 메인 컴포넌트
 // ══════════════════════════════════════════════════════════════
 export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
-  // sync URL이 있으면 즉시 config에 반영 (시작하기 화면 우회)
-  const [config, setConfig] = useState(() => {
-    const saved = load(KEYS.config, {});
-    const sync = parseSyncFromURL();
-    if (sync?.c?.k) {
-      const merged = { ...saved, apiKey: sync.c.k, apiSecret: sync.c.s, isPaper: sync.c.p !== false, connected: true };
-      save(KEYS.config, merged);
-      return merged;
-    }
-    return saved;
-  });
+  const [config, setConfig] = useState(() => load(KEYS.config, {}));
   const [account, setAccount] = useState(null);
   const [positions, setPositions] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -684,12 +777,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
   const [activeTab, setActiveTab] = useState(() => load("di_pt_tab", "dashboard"));
   const [orderModal, setOrderModal] = useState(null);
 
-  const _sync = useMemo(() => parseSyncFromURL(), []);
-
-  const [autoTradeEnabled, setAutoTradeEnabled] = useState(() => {
-    if (_sync && typeof _sync.ae === "boolean") { save(KEYS.autoTrade, _sync.ae); return _sync.ae; }
-    return load(KEYS.autoTrade, false);
-  });
+  const [autoTradeEnabled, setAutoTradeEnabled] = useState(() => load(KEYS.autoTrade, false));
   const [tradeLog, setTradeLog] = useState(() => load(KEYS.tradeLog, []));
   const [executedSignals, setExecutedSignals] = useState(() => load(KEYS.executed, {}));
 
@@ -703,36 +791,27 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
   const [qrSvg, setQrSvg] = useState("");
   const videoRef = useRef(null);
   const qrStreamRef = useRef(null);
-  const [autoScanEnabled, setAutoScanEnabled] = useState(() => {
-    if (_sync && typeof _sync.as === "boolean") { save("di_auto_scan", _sync.as); return _sync.as; }
-    return load("di_auto_scan", false);
-  });
+  const [autoScanEnabled, setAutoScanEnabled] = useState(() => load("di_auto_scan", false));
 
   // 리스크 알림 상태
   const [riskAlerts, setRiskAlerts] = useState([]);
-  const [tradingHalted, setTradingHalted] = useState(() => {
-    if (_sync && typeof _sync.th === "boolean") { save("di_trading_halted", _sync.th); return _sync.th; }
-    return load("di_trading_halted", false);
-  });
+  const [tradingHalted, setTradingHalted] = useState(() => load("di_trading_halted", false));
 
-  const [tradeSettings, setTradeSettings] = useState(() => {
-    if (_sync?.t) { save(KEYS.settings, _sync.t); return _sync.t; }
-    return load(KEYS.settings, {
-      orderType: "market",
-      allocationPct: 2,
-      maxPositions: 20,
-      maxDrawdownPct: 10,
-      maxDailyLossPct: 3,
-      maxSectorPct: 35,
-      maxSinglePct: 5,
-      stopLossATR: 2,
-      takeProfitATR: 3,
-      useBracketOrders: true,
-      minConfidence: 0.5,
-      cooldownHours: 24,
-      strategies: Object.keys(STRATEGY_PORTFOLIOS),
-    });
-  });
+  const [tradeSettings, setTradeSettings] = useState(() => load(KEYS.settings, {
+    orderType: "market",
+    allocationPct: 2,
+    maxPositions: 20,
+    maxDrawdownPct: 10,
+    maxDailyLossPct: 3,
+    maxSectorPct: 35,
+    maxSinglePct: 5,
+    stopLossATR: 2,
+    takeProfitATR: 3,
+    useBracketOrders: true,
+    minConfidence: 0.5,
+    cooldownHours: 24,
+    strategies: Object.keys(STRATEGY_PORTFOLIOS),
+  }));
 
   const refreshTimer = useRef(null);
   const scanTimer = useRef(null);
@@ -751,21 +830,6 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
   useEffect(() => { save("di_auto_scan", autoScanEnabled); }, [autoScanEnabled]);
   useEffect(() => { save("di_trading_halted", tradingHalted); }, [tradingHalted]);
   useEffect(() => { save("di_pt_tab", activeTab); }, [activeTab]);
-
-  // ── URL sync 파라미터 정리 + 동기화 완료 알림 ──
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.has("sync")) {
-      // URL에서 sync 파라미터 제거 (이미 useState 초기화에서 적용됨)
-      const url = new URL(window.location);
-      url.searchParams.delete("sync");
-      window.history.replaceState({}, "", url.pathname + (url.search || ""));
-      if (_sync) {
-        const t = new Date(_sync.ts).toLocaleString("ko-KR");
-        setTimeout(() => alert(`QR 설정 동기화 완료!\n\n내보낸 시각: ${t}`), 500);
-      }
-    }
-  }, [_sync]);
 
   // ── 계좌 데이터 ──
   const refreshData = useCallback(async () => {
