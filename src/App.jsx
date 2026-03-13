@@ -1171,16 +1171,23 @@ const TAG_COLORS = {
   cmf_accumulation: C.green, cmf_distribution: C.red,
   mfi_oversold: C.purple, mfi_overbought: C.red,
   adx_bullish: C.green, adx_bearish: C.red,
+  rsi_divergence: C.yellow, near_poc: C.purple,
 };
 
 function SignalTag({ triggerKey, asset }) {
   const meta = CONDITION_META[triggerKey];
   const color = TAG_COLORS[triggerKey] || C.blue;
   if (!meta) return null;
-  // MACD 다이버전스에 bullish/bearish 타입 표시
+  // 다이버전스에 bullish/bearish 타입 표시
   let label = meta.label;
   if (triggerKey === "macd_divergence" && asset?.macdDivType) {
     label = asset.macdDivType === "bullish" ? "MACD 상승 다이버전스" : "MACD 하락 다이버전스";
+  }
+  if (triggerKey === "rsi_divergence" && asset?.rsiDivType) {
+    label = asset.rsiDivType === "bullish" ? "RSI 상승 다이버전스" : "RSI 하락 다이버전스";
+  }
+  if (triggerKey === "near_poc" && asset?.pocPrice) {
+    label = `POC 근접 ($${asset.pocPrice})`;
   }
   return (
     <span style={{
@@ -3692,6 +3699,7 @@ function AppInner() {
         }
         /* ── 태블릿 (641~899px) ── */
         @media (min-width: 641px) and (max-width: 899px) {
+          .desktop-nav button { padding: 5px 6px !important; font-size: 11px !important; }
         }
         /* ── 데스크톱 (≥900px) ── */
         @media (min-width: 900px) {
@@ -4506,6 +4514,34 @@ function AppInner() {
 
             {/* ═══ 하단 전체너비 섹션 (그리드 밖) ═══ */}
 
+            {/* ── 전략 운용 + 리스크 바로가기 위젯 ─── */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+              <div onClick={() => setTab("quant-port")} style={{
+                background: `linear-gradient(135deg, ${C.card} 0%, ${C.greenBg} 100%)`,
+                borderRadius: "14px", padding: "16px", cursor: "pointer", transition: "all .2s",
+                border: `1px solid ${C.border}`,
+              }}>
+                <div style={{ fontSize: "20px", marginBottom: "6px" }}>📊</div>
+                <div style={{ fontWeight: 700, fontSize: "14px", marginBottom: "4px" }}>전략 운용</div>
+                <div style={{ fontSize: "11px", color: C.text3 }}>32개 전략 포트폴리오</div>
+                <div style={{ fontSize: "11px", color: C.green, fontWeight: 600, marginTop: "4px" }}>
+                  실시간 수익률 추적 →
+                </div>
+              </div>
+              <div onClick={() => setTab("risk-map")} style={{
+                background: `linear-gradient(135deg, ${C.card} 0%, ${C.redBg} 100%)`,
+                borderRadius: "14px", padding: "16px", cursor: "pointer", transition: "all .2s",
+                border: `1px solid ${C.border}`,
+              }}>
+                <div style={{ fontSize: "20px", marginBottom: "6px" }}>🛡️</div>
+                <div style={{ fontWeight: 700, fontSize: "14px", marginBottom: "4px" }}>리스크 관리</div>
+                <div style={{ fontSize: "11px", color: C.text3 }}>8-Point 히트맵</div>
+                <div style={{ fontSize: "11px", color: C.red, fontWeight: 600, marginTop: "4px" }}>
+                  위험 수준 확인 →
+                </div>
+              </div>
+            </div>
+
             {/* ── 섹터 히트맵 (접기/펼치기) ─── */}
             {sectorPerf.length > 0 && (
               <div style={{ background: C.card, borderRadius: "16px", padding: "16px" }}>
@@ -4612,7 +4648,7 @@ function AppInner() {
               {/* 모멘텀 & 추세 */}
               <div style={{ fontSize: "10px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>모멘텀 & 추세</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", marginBottom: "14px" }}>
-                {["rsi_extreme","macd_divergence","ma_ribbon","adx_trend","adx_bullish","adx_bearish"].map(key => {
+                {["rsi_extreme","macd_divergence","rsi_divergence","ma_ribbon","adx_trend","adx_bullish","adx_bearish"].map(key => {
                   const meta = CONDITION_META[key];
                   const on = conditions.includes(key);
                   return (
@@ -4663,7 +4699,7 @@ function AppInner() {
               {/* 구조적 시그널 */}
               <div style={{ fontSize: "10px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>구조적 시그널</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", marginBottom: "18px" }}>
-                {["near_52w_low","near_52w_high","death_cross","golden_cross","mean_reversion"].map(key => {
+                {["near_52w_low","near_52w_high","death_cross","golden_cross","mean_reversion","near_poc"].map(key => {
                   const meta = CONDITION_META[key];
                   const on = conditions.includes(key);
                   return (
