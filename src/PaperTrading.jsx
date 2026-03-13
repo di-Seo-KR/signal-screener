@@ -657,6 +657,34 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
   useEffect(() => { save("di_trading_halted", tradingHalted); }, [tradingHalted]);
   useEffect(() => { save("di_pt_tab", activeTab); }, [activeTab]);
 
+  // ── URL 파라미터로 설정 가져오기 (공유 링크) ──
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const syncCode = params.get("sync");
+      if (!syncCode) return;
+      const payload = JSON.parse(decodeURIComponent(escape(atob(syncCode))));
+      if (!payload.v || !payload.tradeSettings) return;
+      const t = new Date(payload.ts).toLocaleString("ko-KR");
+      if (window.confirm(`다른 기기의 설정을 가져올까요?\n\n내보낸 시각: ${t}`)) {
+        if (payload.config?.apiKey) {
+          const merged = { ...config, ...payload.config, connected: config.connected };
+          setConfig(merged);
+          save(KEYS.config, merged);
+        }
+        setTradeSettings(payload.tradeSettings);
+        if (typeof payload.autoTradeEnabled === "boolean") setAutoTradeEnabled(payload.autoTradeEnabled);
+        if (typeof payload.autoScanEnabled === "boolean") setAutoScanEnabled(payload.autoScanEnabled);
+        if (typeof payload.tradingHalted === "boolean") setTradingHalted(payload.tradingHalted);
+        alert("설정을 성공적으로 가져왔습니다!");
+      }
+      // URL에서 sync 파라미터 제거
+      const url = new URL(window.location);
+      url.searchParams.delete("sync");
+      window.history.replaceState({}, "", url.pathname + url.search);
+    } catch {}
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ── 계좌 데이터 ──
   const refreshData = useCallback(async () => {
     if (!config.apiKey) return;
@@ -1383,6 +1411,86 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          {/* 설정 동기화 (PC ↔ 모바일) */}
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
+            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"4px"}}>기기 간 설정 동기화</div>
+            <div style={{fontSize:"11px",color:C.text3,marginBottom:"16px"}}>
+              PC에서 내보내기 → 모바일에서 가져오기 (또는 반대)
+            </div>
+            <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
+              <button onClick={()=>{
+                const payload = {
+                  config: { ...config, connected: undefined },
+                  tradeSettings,
+                  autoTradeEnabled,
+                  autoScanEnabled,
+                  tradingHalted,
+                  v: 1,
+                  ts: Date.now(),
+                };
+                const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+                navigator.clipboard.writeText(encoded).then(()=>{
+                  alert("설정 코드가 클립보드에 복사되었습니다!\n\n다른 기기에서 '가져오기'를 눌러 붙여넣으세요.");
+                }).catch(()=>{
+                  prompt("아래 코드를 복사하세요:", encoded);
+                });
+              }} style={{
+                flex:1,minWidth:"120px",padding:"12px",borderRadius:"10px",fontWeight:700,fontSize:"13px",
+                background:C.blueBg,color:C.blue,border:`1px solid ${C.blue}55`,cursor:"pointer"}}>
+                📤 설정 내보내기
+              </button>
+              <button onClick={()=>{
+                const code = prompt("다른 기기에서 복사한 설정 코드를 붙여넣으세요:");
+                if (!code) return;
+                try {
+                  const payload = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+                  if (!payload.v || !payload.tradeSettings) throw new Error("invalid");
+                  if (payload.config?.apiKey) {
+                    setConfig(prev => ({ ...prev, ...payload.config, connected: prev.connected }));
+                    save(KEYS.config, { ...config, ...payload.config, connected: config.connected });
+                  }
+                  setTradeSettings(payload.tradeSettings);
+                  if (typeof payload.autoTradeEnabled === "boolean") setAutoTradeEnabled(payload.autoTradeEnabled);
+                  if (typeof payload.autoScanEnabled === "boolean") setAutoScanEnabled(payload.autoScanEnabled);
+                  if (typeof payload.tradingHalted === "boolean") setTradingHalted(payload.tradingHalted);
+                  const t = new Date(payload.ts).toLocaleString("ko-KR");
+                  alert(`설정을 성공적으로 가져왔습니다!\n\n내보낸 시각: ${t}`);
+                } catch {
+                  alert("잘못된 설정 코드입니다. 다시 확인해주세요.");
+                }
+              }} style={{
+                flex:1,minWidth:"120px",padding:"12px",borderRadius:"10px",fontWeight:700,fontSize:"13px",
+                background:C.greenBg,color:C.green,border:`1px solid ${C.green}55`,cursor:"pointer"}}>
+                📥 설정 가져오기
+              </button>
+            </div>
+            <button onClick={()=>{
+                const payload = {
+                  config: { ...config, connected: undefined },
+                  tradeSettings,
+                  autoTradeEnabled,
+                  autoScanEnabled,
+                  tradingHalted,
+                  v: 1,
+                  ts: Date.now(),
+                };
+                const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+                const url = `${window.location.origin}${window.location.pathname}?tab=paper-trading&sync=${encoded}`;
+                navigator.clipboard.writeText(url).then(()=>{
+                  alert("공유 링크가 복사되었습니다!\n\n모바일 브라우저에서 이 링크를 열면 설정이 자동 적용됩니다.");
+                }).catch(()=>{
+                  prompt("아래 링크를 복사하세요:", url);
+                });
+              }} style={{
+                width:"100%",marginTop:"8px",padding:"10px",borderRadius:"10px",fontWeight:600,fontSize:"12px",
+                background:"transparent",color:C.text2,border:`1px solid ${C.border2}`,cursor:"pointer"}}>
+                🔗 공유 링크 생성 (모바일에서 열기만 하면 자동 적용)
+              </button>
+            <div style={{fontSize:"10px",color:C.text3,marginTop:"8px"}}>
+              API 키 포함 · 거래 로그 및 실행 기록은 제외
             </div>
           </div>
         </div>
