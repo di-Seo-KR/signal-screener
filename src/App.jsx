@@ -219,8 +219,7 @@ const US_ASSETS = [
   { symbol: "FAN", name: "풍력 ETF" }, { symbol: "ERTH", name: "기후 ETF" },
   { symbol: "ESGU", name: "ESG ETF" }, { symbol: "KRMA", name: "ESG 글로벌" },
   { symbol: "IBB", name: "바이오 iShares" }, { symbol: "XBI", name: "바이오 SPDR" },
-  { symbol: "ARKG", name: "ARK Genomic" }, { symbol: "GNOM", name: "게노믹스 ETF" },
-  { symbol: "ITA", name: "방산 ETF" }, { symbol: "PPA", name: "항공방산 ETF" },
+  { symbol: "GNOM", name: "게노믹스 ETF" }, { symbol: "ITA", name: "방산 ETF" }, { symbol: "PPA", name: "항공방산 ETF" },
   { symbol: "JETS", name: "항공사 ETF" }, { symbol: "AWAY", name: "여행 ETF" },
   { symbol: "BETZ", name: "스포츠베팅 ETF" }, { symbol: "HERO", name: "게임 ETF" },
   { symbol: "SOCL", name: "소셜미디어 ETF" }, { symbol: "MSOS", name: "대마 ETF" },
@@ -313,9 +312,7 @@ const US_ASSETS = [
   { symbol: "DHI", name: "D.R. Horton" }, { symbol: "LEN", name: "Lennar" },
   { symbol: "PHM", name: "PulteGroup" }, { symbol: "TOL", name: "Toll Brothers" },
   { symbol: "EL", name: "Estee Lauder" }, { symbol: "LULU", name: "Lululemon" },
-  { symbol: "DECK", name: "Deckers" }, { symbol: "ON", name: "ON Semi" },
-  { symbol: "RIVN", name: "Rivian" }, { symbol: "LCID", name: "Lucid" },
-  { symbol: "F", name: "Ford" }, { symbol: "GM", name: "General Motors" },
+  { symbol: "DECK", name: "Deckers" }, { symbol: "F", name: "Ford" }, { symbol: "GM", name: "General Motors" },
   { symbol: "STLA", name: "Stellantis" }, { symbol: "TM", name: "Toyota" },
   { symbol: "HMC", name: "Honda" }, { symbol: "RACE", name: "Ferrari" },
   // ── 추가 Mid/Small Cap 성장주 ──
@@ -328,8 +325,7 @@ const US_ASSETS = [
   { symbol: "VRNS", name: "Varonis" }, { symbol: "TENB", name: "Tenable" },
   { symbol: "PCOR", name: "Procore Tech" }, { symbol: "SMAR", name: "Smartsheet" },
   { symbol: "FROG", name: "JFrog" }, { symbol: "DT", name: "Dynatrace" },
-  { symbol: "DDOG", name: "Datadog" }, { symbol: "VEEV", name: "Veeva Systems" },
-  { symbol: "TYL", name: "Tyler Technologies" }, { symbol: "PAYC", name: "Paycom" },
+  { symbol: "VEEV", name: "Veeva Systems" }, { symbol: "TYL", name: "Tyler Technologies" }, { symbol: "PAYC", name: "Paycom" },
   { symbol: "PCTY", name: "Paylocity" }, { symbol: "WK", name: "Workiva" },
   { symbol: "BLKB", name: "Blackbaud" }, { symbol: "SSNC", name: "SS&C Technologies" },
   { symbol: "ASAN", name: "Asana" }, { symbol: "MNDY", name: "Monday.com" },
@@ -343,25 +339,20 @@ const US_ASSETS = [
   { symbol: "XME", name: "금속광산 ETF" }, { symbol: "SIL", name: "은광 ETF" },
   { symbol: "PICK", name: "금속광산 iShares" }, { symbol: "MOO", name: "농업 ETF" },
   { symbol: "PAVE", name: "인프라 ETF" }, { symbol: "IYT", name: "운송 ETF" },
-  { symbol: "SRVR", name: "데이터센터 ETF" }, { symbol: "BITO", name: "BTC선물 ETF" },
+  { symbol: "SRVR", name: "데이터센터 ETF" },
   // ── 추가 S&P500 / Mid Cap ──
-  { symbol: "ABNB", name: "Airbnb" }, { symbol: "ADSK", name: "Autodesk" },
-  { symbol: "ANSS", name: "ANSYS" }, { symbol: "CPRT", name: "Copart" },
-  { symbol: "CSGP", name: "CoStar Group" }, { symbol: "DXCM", name: "DexCom" },
-  { symbol: "ENPH", name: "Enphase" }, { symbol: "FAST", name: "Fastenal" },
+  { symbol: "ADSK", name: "Autodesk" }, { symbol: "ANSS", name: "ANSYS" }, { symbol: "CPRT", name: "Copart" },
+  { symbol: "CSGP", name: "CoStar Group" }, { symbol: "FAST", name: "Fastenal" },
   { symbol: "GEHC", name: "GE Healthcare" }, { symbol: "GEV", name: "GE Vernova" },
   { symbol: "GRMN", name: "Garmin" }, { symbol: "IDXX", name: "Idexx Labs" },
   { symbol: "KDP", name: "Keurig Dr Pepper" }, { symbol: "KHC", name: "Kraft Heinz" },
   { symbol: "KMB", name: "Kimberly-Clark" }, { symbol: "KVUE", name: "Kenvue" },
-  { symbol: "LRCX", name: "Lam Research" }, { symbol: "MAR", name: "Marriott" },
-  { symbol: "MDLZ", name: "Mondelez" }, { symbol: "MKTX", name: "MarketAxess" },
+  { symbol: "MAR", name: "Marriott" }, { symbol: "MDLZ", name: "Mondelez" }, { symbol: "MKTX", name: "MarketAxess" },
   { symbol: "MLM", name: "Martin Marietta" }, { symbol: "ODFL", name: "Old Dominion" },
-  { symbol: "ON", name: "ON Semi" }, { symbol: "OTIS", name: "Otis Worldwide" },
-  { symbol: "PCAR", name: "PACCAR" }, { symbol: "PTON", name: "Peloton" },
+  { symbol: "OTIS", name: "Otis Worldwide" }, { symbol: "PCAR", name: "PACCAR" }, { symbol: "PTON", name: "Peloton" },
   { symbol: "RCL", name: "Royal Caribbean" }, { symbol: "RMD", name: "ResMed" },
   { symbol: "RVTY", name: "Revvity" }, { symbol: "SBAC", name: "SBA Communications" },
-  { symbol: "SMCI", name: "Super Micro" }, { symbol: "SYY", name: "Sysco" },
-  { symbol: "TSCO", name: "Tractor Supply" }, { symbol: "UAL", name: "United Airlines" },
+  { symbol: "SYY", name: "Sysco" }, { symbol: "TSCO", name: "Tractor Supply" }, { symbol: "UAL", name: "United Airlines" },
   { symbol: "VMC", name: "Vulcan Materials" }, { symbol: "VRSK", name: "Verisk" },
   { symbol: "VRSN", name: "VeriSign" }, { symbol: "WAB", name: "Westinghouse Air" },
   { symbol: "WYNN", name: "Wynn Resorts" }, { symbol: "XYL", name: "Xylem" },
@@ -375,16 +366,14 @@ const US_ASSETS = [
   { symbol: "IOT", name: "Samsara" }, { symbol: "KTOS", name: "Kratos Defense" },
   { symbol: "LAW", name: "CS Disco" }, { symbol: "LEGN", name: "Legend Biotech" },
   { symbol: "LW", name: "Lamb Weston" }, { symbol: "MARA", name: "Marathon Digital" },
-  { symbol: "RIOT", name: "Riot Platforms" }, { symbol: "ROKU", name: "Roku" },
-  { symbol: "SEDG", name: "SolarEdge" }, { symbol: "SHAK", name: "Shake Shack" },
+  { symbol: "RIOT", name: "Riot Platforms" }, { symbol: "SEDG", name: "SolarEdge" }, { symbol: "SHAK", name: "Shake Shack" },
   { symbol: "SOUN", name: "SoundHound AI" }, { symbol: "UPST", name: "Upstart" },
   { symbol: "W", name: "Wayfair" }, { symbol: "WING", name: "Wingstop" },
   // ── 국제 ADR 추가 ──
   { symbol: "SAP", name: "SAP" }, { symbol: "SNY", name: "Sanofi" },
   { symbol: "AZN", name: "AstraZeneca" }, { symbol: "GSK", name: "GSK" },
   { symbol: "DEO", name: "Diageo" }, { symbol: "UL", name: "Unilever" },
-  { symbol: "SONY", name: "Sony" }, { symbol: "SHOP", name: "Shopify" },
-  { symbol: "TD", name: "TD Bank" }, { symbol: "RY", name: "Royal Bank Canada" },
+  { symbol: "SONY", name: "Sony" }, { symbol: "TD", name: "TD Bank" }, { symbol: "RY", name: "Royal Bank Canada" },
   { symbol: "MUFG", name: "Mitsubishi UFJ" }, { symbol: "SMFG", name: "Sumitomo Mitsui" },
 ];
 
@@ -477,10 +466,8 @@ const KR_ASSETS = [
   { symbol: "009290.KS", name: "광동제약" }, { symbol: "131030.KQ", name: "옵투스제약" },
   // ── 추가 코스피 중대형주 ──
   { symbol: "005490.KS", name: "POSCO홀딩스" }, { symbol: "028670.KS", name: "팬오션" },
-  { symbol: "003620.KS", name: "쌍용차" }, { symbol: "032640.KS", name: "LG유플러스" },
-  { symbol: "005940.KS", name: "NH투자증권" }, { symbol: "005440.KS", name: "현대그린푸드" },
-  { symbol: "069620.KS", name: "대웅제약" }, { symbol: "034730.KS", name: "SK" },
-  { symbol: "001450.KS", name: "현대해상" }, { symbol: "002380.KS", name: "KCC" },
+  { symbol: "003620.KS", name: "쌍용차" }, { symbol: "005940.KS", name: "NH투자증권" }, { symbol: "005440.KS", name: "현대그린푸드" },
+  { symbol: "069620.KS", name: "대웅제약" }, { symbol: "001450.KS", name: "현대해상" }, { symbol: "002380.KS", name: "KCC" },
   { symbol: "005387.KS", name: "현대차2우B" }, { symbol: "000240.KS", name: "한국앤컴퍼니" },
   { symbol: "006110.KS", name: "삼아알미늄" }, { symbol: "001740.KS", name: "SK네트웍스" },
   { symbol: "007070.KS", name: "GS리테일" }, { symbol: "003000.KS", name: "부광약품" },
@@ -493,8 +480,7 @@ const KR_ASSETS = [
   { symbol: "030610.KS", name: "교보증권" }, { symbol: "950130.KS", name: "엑셀세미콘" },
   { symbol: "001570.KS", name: "금양" }, { symbol: "000670.KS", name: "영풍" },
   { symbol: "071050.KS", name: "한국금융지주" }, { symbol: "161890.KS", name: "한국콜마" },
-  { symbol: "078930.KS", name: "GS" }, { symbol: "010060.KS", name: "OCI홀딩스" },
-  { symbol: "036530.KS", name: "SNT모티브" }, { symbol: "383220.KS", name: "F&F" },
+  { symbol: "010060.KS", name: "OCI홀딩스" }, { symbol: "036530.KS", name: "SNT모티브" }, { symbol: "383220.KS", name: "F&F" },
   { symbol: "011070.KS", name: "LG이노텍" }, { symbol: "052690.KS", name: "한전기술" },
   { symbol: "005850.KS", name: "에스엘" }, { symbol: "014680.KS", name: "한솔케미칼" },
   { symbol: "088980.KS", name: "맥쿼리인프라" }, { symbol: "003090.KS", name: "대웅" },
@@ -513,8 +499,7 @@ const KR_ASSETS = [
   { symbol: "200710.KQ", name: "에이디테크놀로지" }, { symbol: "036540.KQ", name: "SFA반도체" },
   { symbol: "058610.KQ", name: "셀진" }, { symbol: "041020.KQ", name: "폴라리스오피스" },
   { symbol: "348210.KQ", name: "넥스틴" }, { symbol: "042000.KQ", name: "카페24" },
-  { symbol: "053800.KQ", name: "안랩" }, { symbol: "090460.KQ", name: "비에이치" },
-  { symbol: "098120.KQ", name: "마이크로컨텍솔" }, { symbol: "234340.KQ", name: "제이에스코퍼레이션" },
+  { symbol: "053800.KQ", name: "안랩" }, { symbol: "098120.KQ", name: "마이크로컨텍솔" }, { symbol: "234340.KQ", name: "제이에스코퍼레이션" },
   { symbol: "340570.KQ", name: "티앤엘" }, { symbol: "352480.KQ", name: "씨앤씨인터내셔널" },
   { symbol: "141080.KQ", name: "레고켐바이오" }, { symbol: "115390.KQ", name: "락앤락" },
   { symbol: "039610.KQ", name: "화성밸브" }, { symbol: "389030.KQ", name: "지놈앤컴퍼니" },
@@ -536,8 +521,7 @@ const KR_ASSETS = [
   { symbol: "007310.KS", name: "오뚜기" }, { symbol: "002840.KS", name: "미원상사" },
   { symbol: "004490.KS", name: "세방전지" }, { symbol: "009240.KS", name: "한샘" },
   { symbol: "017800.KS", name: "현대엘리베이터" }, { symbol: "092200.KS", name: "디아이씨" },
-  { symbol: "002030.KS", name: "아세아" }, { symbol: "000990.KS", name: "DB하이텍" },
-  { symbol: "047810.KS", name: "한국항공우주" }, { symbol: "079550.KS", name: "LIG넥스원" },
+  { symbol: "002030.KS", name: "아세아" }, { symbol: "047810.KS", name: "한국항공우주" }, { symbol: "079550.KS", name: "LIG넥스원" },
   { symbol: "012800.KS", name: "대창" }, { symbol: "900140.KS", name: "엘브이엠씨홀딩스" },
   // ── 추가 코스피/코스닥 중소형 ──
   { symbol: "006120.KS", name: "SK디스커버리" }, { symbol: "017810.KS", name: "풀무원" },
@@ -553,7 +537,7 @@ const KR_ASSETS = [
   { symbol: "185750.KS", name: "종근당" }, { symbol: "000640.KS", name: "동아쏘시오홀딩스" },
   { symbol: "100220.KS", name: "비상교육" }, { symbol: "000050.KS", name: "경방" },
   { symbol: "002020.KS", name: "코오롱" }, { symbol: "001680.KS", name: "대상" },
-  { symbol: "000990.KS", name: "DB하이텍" }, { symbol: "007700.KS", name: "F&F홀딩스" },
+  { symbol: "007700.KS", name: "F&F홀딩스" },
   // ── 추가 코스닥 성장주 ──
   { symbol: "226330.KQ", name: "신테카바이오" }, { symbol: "278280.KQ", name: "천보" },
   { symbol: "067310.KQ", name: "하나마이크론" }, { symbol: "336570.KQ", name: "원텍" },
@@ -3790,9 +3774,9 @@ function AppInner() {
     const candleMap = {};
     let doneCount = 0;
 
-    // ── Yahoo 초고속 배치 (25개 × 5 동시) ──
-    const BATCH_SIZE = 25;
-    const CONCURRENT = 5;
+    // ── Yahoo 초고속 배치 (20개 × 8 동시 = 160종목/라운드) ──
+    const BATCH_SIZE = 20;
+    const CONCURRENT = 8;
     const batches = [];
     for (let b = 0; b < yahooAssets.length; b += BATCH_SIZE) {
       batches.push(yahooAssets.slice(b, b + BATCH_SIZE));
@@ -5313,7 +5297,7 @@ function AppInner() {
                     ? <span style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }}>
                         <span style={{ animation: "pulse 1s infinite" }}>⏳</span> {scanProgress.done}/{scanProgress.total}
                       </span>
-                    : `🔍 스캔 시작 ${conditions.length > 0 ? `(${conditions.length}개 조건)` : ""}`}
+                    : `🔍 ${ALL_ASSETS.length}종목 스캔 ${conditions.length > 0 ? `(${conditions.length}개 조건)` : ""}`}
                 </button>
                 {scanning && (
                   <div style={{ flex: 1, minWidth: "120px" }}>
