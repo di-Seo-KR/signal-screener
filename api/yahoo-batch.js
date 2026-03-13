@@ -84,7 +84,7 @@ export default async function handler(req, res) {
   const { symbols, interval = "1wk", range = "2y" } = req.query;
   if (!symbols) return res.status(400).json({ error: "symbols required" });
 
-  const symList = symbols.split(",").map(s => s.trim()).filter(Boolean).slice(0, 15);
+  const symList = symbols.split(",").map(s => s.trim()).filter(Boolean).slice(0, 30);
   if (!symList.length) return res.status(400).json({ error: "empty symbols" });
 
   try {

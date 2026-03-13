@@ -254,6 +254,138 @@ const US_ASSETS = [
   { symbol: "CEG", name: "Constellation Energy" }, { symbol: "TLN", name: "Talen Energy" },
   { symbol: "IONQ", name: "IonQ" }, { symbol: "RGTI", name: "Rigetti Computing" },
   { symbol: "QBTS", name: "D-Wave Quantum" }, { symbol: "SMRT", name: "SmartRent" },
+  // ── 추가 Large/Mid Cap (S&P500 채우기) ──
+  { symbol: "ACN", name: "Accenture" }, { symbol: "CSCO", name: "Cisco" },
+  { symbol: "IBM", name: "IBM" }, { symbol: "NXPI", name: "NXP Semi" },
+  { symbol: "MCHP", name: "Microchip" }, { symbol: "SWKS", name: "Skyworks" },
+  { symbol: "MPWR", name: "Monolithic Power" }, { symbol: "GFS", name: "GlobalFoundries" },
+  { symbol: "WOLF", name: "Wolfspeed" }, { symbol: "CRUS", name: "Cirrus Logic" },
+  { symbol: "ALGM", name: "Allegro MicroSystems" },
+  { symbol: "DHR", name: "Danaher" }, { symbol: "SYK", name: "Stryker" },
+  { symbol: "MDT", name: "Medtronic" }, { symbol: "BSX", name: "Boston Scientific" },
+  { symbol: "EW", name: "Edwards Lifesciences" }, { symbol: "ZTS", name: "Zoetis" },
+  { symbol: "DXCM", name: "DexCom" }, { symbol: "HOLX", name: "Hologic" },
+  { symbol: "ILMN", name: "Illumina" }, { symbol: "BIIB", name: "Biogen" },
+  { symbol: "SGEN", name: "Seagen" }, { symbol: "EXAS", name: "Exact Sciences" },
+  { symbol: "NVCR", name: "NovoCure" }, { symbol: "HALO", name: "Halozyme" },
+  { symbol: "ALNY", name: "Alnylam" }, { symbol: "PCVX", name: "Vaxcyte" },
+  { symbol: "MMM", name: "3M" }, { symbol: "EMR", name: "Emerson" },
+  { symbol: "ETN", name: "Eaton" }, { symbol: "GD", name: "General Dynamics" },
+  { symbol: "NOC", name: "Northrop Grumman" }, { symbol: "HII", name: "Huntington Ingalls" },
+  { symbol: "TDG", name: "TransDigm" }, { symbol: "WM", name: "Waste Management" },
+  { symbol: "RSG", name: "Republic Services" }, { symbol: "IR", name: "Ingersoll Rand" },
+  { symbol: "URI", name: "United Rentals" }, { symbol: "PWR", name: "Quanta Services" },
+  { symbol: "AME", name: "Ametek" }, { symbol: "ROK", name: "Rockwell Automation" },
+  { symbol: "DOV", name: "Dover" }, { symbol: "CMI", name: "Cummins" },
+  { symbol: "PH", name: "Parker Hannifin" }, { symbol: "ITW", name: "Illinois Tool Works" },
+  { symbol: "GPC", name: "Genuine Parts" }, { symbol: "SHW", name: "Sherwin-Williams" },
+  { symbol: "ECL", name: "Ecolab" }, { symbol: "APD", name: "Air Products" },
+  { symbol: "FCX", name: "Freeport-McMoRan" }, { symbol: "NEM", name: "Newmont" },
+  { symbol: "GOLD", name: "Barrick Gold" }, { symbol: "AEM", name: "Agnico Eagle" },
+  { symbol: "VALE", name: "Vale" }, { symbol: "RIO", name: "Rio Tinto" },
+  { symbol: "BHP", name: "BHP Group" }, { symbol: "DD", name: "DuPont" },
+  { symbol: "DOW", name: "Dow Inc" }, { symbol: "PPG", name: "PPG Industries" },
+  { symbol: "ALB", name: "Albemarle" }, { symbol: "LTHM", name: "Livent" },
+  { symbol: "NEE", name: "NextEra Energy" }, { symbol: "DUK", name: "Duke Energy" },
+  { symbol: "SO", name: "Southern Co" }, { symbol: "AEP", name: "American Electric" },
+  { symbol: "EXC", name: "Exelon" }, { symbol: "D", name: "Dominion Energy" },
+  { symbol: "ED", name: "Consolidated Edison" }, { symbol: "PCG", name: "PG&E" },
+  { symbol: "HAL", name: "Halliburton" }, { symbol: "BKR", name: "Baker Hughes" },
+  { symbol: "DVN", name: "Devon Energy" }, { symbol: "FANG", name: "Diamondback Energy" },
+  { symbol: "MPC", name: "Marathon Petroleum" }, { symbol: "VLO", name: "Valero Energy" },
+  { symbol: "PSX", name: "Phillips 66" },
+  { symbol: "CB", name: "Chubb" }, { symbol: "PGR", name: "Progressive" },
+  { symbol: "TRV", name: "Travelers" }, { symbol: "ALL", name: "Allstate" },
+  { symbol: "MET", name: "MetLife" }, { symbol: "AIG", name: "AIG" },
+  { symbol: "PRU", name: "Prudential Financial" },
+  { symbol: "CME", name: "CME Group" }, { symbol: "MSCI", name: "MSCI" },
+  { symbol: "FIS", name: "Fidelity National" }, { symbol: "FISV", name: "Fiserv" },
+  { symbol: "GPN", name: "Global Payments" }, { symbol: "WTW", name: "Willis Towers" },
+  { symbol: "TROW", name: "T. Rowe Price" }, { symbol: "STT", name: "State Street" },
+  { symbol: "NTRS", name: "Northern Trust" }, { symbol: "USB", name: "US Bancorp" },
+  { symbol: "PNC", name: "PNC Financial" }, { symbol: "TFC", name: "Truist" },
+  { symbol: "FITB", name: "Fifth Third" }, { symbol: "CFG", name: "Citizens Financial" },
+  { symbol: "RF", name: "Regions Financial" }, { symbol: "KEY", name: "KeyCorp" },
+  { symbol: "DG", name: "Dollar General" }, { symbol: "DLTR", name: "Dollar Tree" },
+  { symbol: "ROST", name: "Ross Stores" }, { symbol: "TJX", name: "TJX Companies" },
+  { symbol: "ORLY", name: "O'Reilly Auto" }, { symbol: "AZO", name: "AutoZone" },
+  { symbol: "YUM", name: "Yum! Brands" }, { symbol: "CMG", name: "Chipotle" },
+  { symbol: "DHI", name: "D.R. Horton" }, { symbol: "LEN", name: "Lennar" },
+  { symbol: "PHM", name: "PulteGroup" }, { symbol: "TOL", name: "Toll Brothers" },
+  { symbol: "EL", name: "Estee Lauder" }, { symbol: "LULU", name: "Lululemon" },
+  { symbol: "DECK", name: "Deckers" }, { symbol: "ON", name: "ON Semi" },
+  { symbol: "RIVN", name: "Rivian" }, { symbol: "LCID", name: "Lucid" },
+  { symbol: "F", name: "Ford" }, { symbol: "GM", name: "General Motors" },
+  { symbol: "STLA", name: "Stellantis" }, { symbol: "TM", name: "Toyota" },
+  { symbol: "HMC", name: "Honda" }, { symbol: "RACE", name: "Ferrari" },
+  // ── 추가 Mid/Small Cap 성장주 ──
+  { symbol: "MNST", name: "Monster Beverage" }, { symbol: "TOST", name: "Toast" },
+  { symbol: "FOUR", name: "Shift4 Payments" }, { symbol: "RELY", name: "Remitly" },
+  { symbol: "GLBE", name: "Global-e Online" }, { symbol: "CWAN", name: "Clearwater Analytics" },
+  { symbol: "CFLT", name: "Confluent" }, { symbol: "GTLB", name: "GitLab" },
+  { symbol: "ESTC", name: "Elastic" }, { symbol: "BRZE", name: "Braze" },
+  { symbol: "S", name: "SentinelOne" }, { symbol: "RPD", name: "Rapid7" },
+  { symbol: "VRNS", name: "Varonis" }, { symbol: "TENB", name: "Tenable" },
+  { symbol: "PCOR", name: "Procore Tech" }, { symbol: "SMAR", name: "Smartsheet" },
+  { symbol: "FROG", name: "JFrog" }, { symbol: "DT", name: "Dynatrace" },
+  { symbol: "DDOG", name: "Datadog" }, { symbol: "VEEV", name: "Veeva Systems" },
+  { symbol: "TYL", name: "Tyler Technologies" }, { symbol: "PAYC", name: "Paycom" },
+  { symbol: "PCTY", name: "Paylocity" }, { symbol: "WK", name: "Workiva" },
+  { symbol: "BLKB", name: "Blackbaud" }, { symbol: "SSNC", name: "SS&C Technologies" },
+  { symbol: "ASAN", name: "Asana" }, { symbol: "MNDY", name: "Monday.com" },
+  { symbol: "ZI", name: "ZoomInfo" }, { symbol: "TWLO", name: "Twilio" },
+  // ── 추가 ETF ──
+  { symbol: "MTUM", name: "모멘텀 ETF" }, { symbol: "QUAL", name: "퀄리티 ETF" },
+  { symbol: "VLUE", name: "밸류 ETF" }, { symbol: "SIZE", name: "스몰캡 ETF" },
+  { symbol: "USMV", name: "최소변동성 ETF" }, { symbol: "ACWI", name: "글로벌 ETF" },
+  { symbol: "IEMG", name: "이머징 Core" }, { symbol: "SPDW", name: "선진국 ex-US" },
+  { symbol: "GDX", name: "금광 ETF" }, { symbol: "GDXJ", name: "주니어 금광" },
+  { symbol: "XME", name: "금속광산 ETF" }, { symbol: "SIL", name: "은광 ETF" },
+  { symbol: "PICK", name: "금속광산 iShares" }, { symbol: "MOO", name: "농업 ETF" },
+  { symbol: "PAVE", name: "인프라 ETF" }, { symbol: "IYT", name: "운송 ETF" },
+  { symbol: "SRVR", name: "데이터센터 ETF" }, { symbol: "BITO", name: "BTC선물 ETF" },
+  // ── 추가 S&P500 / Mid Cap ──
+  { symbol: "ABNB", name: "Airbnb" }, { symbol: "ADSK", name: "Autodesk" },
+  { symbol: "ANSS", name: "ANSYS" }, { symbol: "CPRT", name: "Copart" },
+  { symbol: "CSGP", name: "CoStar Group" }, { symbol: "DXCM", name: "DexCom" },
+  { symbol: "ENPH", name: "Enphase" }, { symbol: "FAST", name: "Fastenal" },
+  { symbol: "GEHC", name: "GE Healthcare" }, { symbol: "GEV", name: "GE Vernova" },
+  { symbol: "GRMN", name: "Garmin" }, { symbol: "IDXX", name: "Idexx Labs" },
+  { symbol: "KDP", name: "Keurig Dr Pepper" }, { symbol: "KHC", name: "Kraft Heinz" },
+  { symbol: "KMB", name: "Kimberly-Clark" }, { symbol: "KVUE", name: "Kenvue" },
+  { symbol: "LRCX", name: "Lam Research" }, { symbol: "MAR", name: "Marriott" },
+  { symbol: "MDLZ", name: "Mondelez" }, { symbol: "MKTX", name: "MarketAxess" },
+  { symbol: "MLM", name: "Martin Marietta" }, { symbol: "ODFL", name: "Old Dominion" },
+  { symbol: "ON", name: "ON Semi" }, { symbol: "OTIS", name: "Otis Worldwide" },
+  { symbol: "PCAR", name: "PACCAR" }, { symbol: "PTON", name: "Peloton" },
+  { symbol: "RCL", name: "Royal Caribbean" }, { symbol: "RMD", name: "ResMed" },
+  { symbol: "RVTY", name: "Revvity" }, { symbol: "SBAC", name: "SBA Communications" },
+  { symbol: "SMCI", name: "Super Micro" }, { symbol: "SYY", name: "Sysco" },
+  { symbol: "TSCO", name: "Tractor Supply" }, { symbol: "UAL", name: "United Airlines" },
+  { symbol: "VMC", name: "Vulcan Materials" }, { symbol: "VRSK", name: "Verisk" },
+  { symbol: "VRSN", name: "VeriSign" }, { symbol: "WAB", name: "Westinghouse Air" },
+  { symbol: "WYNN", name: "Wynn Resorts" }, { symbol: "XYL", name: "Xylem" },
+  { symbol: "ZBH", name: "Zimmer Biomet" }, { symbol: "ZBRA", name: "Zebra Tech" },
+  // ── Small Cap 성장주 추가 ──
+  { symbol: "AMBA", name: "Ambarella" }, { symbol: "AXON", name: "Axon Enterprise" },
+  { symbol: "BURL", name: "Burlington" }, { symbol: "CROX", name: "Crocs" },
+  { symbol: "ELF", name: "e.l.f. Beauty" }, { symbol: "EXEL", name: "Exelixis" },
+  { symbol: "FIVE", name: "Five Below" }, { symbol: "GDRX", name: "GoodRx" },
+  { symbol: "HIMS", name: "Hims & Hers" }, { symbol: "IBKR", name: "Interactive Brokers" },
+  { symbol: "IOT", name: "Samsara" }, { symbol: "KTOS", name: "Kratos Defense" },
+  { symbol: "LAW", name: "CS Disco" }, { symbol: "LEGN", name: "Legend Biotech" },
+  { symbol: "LW", name: "Lamb Weston" }, { symbol: "MARA", name: "Marathon Digital" },
+  { symbol: "RIOT", name: "Riot Platforms" }, { symbol: "ROKU", name: "Roku" },
+  { symbol: "SEDG", name: "SolarEdge" }, { symbol: "SHAK", name: "Shake Shack" },
+  { symbol: "SOUN", name: "SoundHound AI" }, { symbol: "UPST", name: "Upstart" },
+  { symbol: "W", name: "Wayfair" }, { symbol: "WING", name: "Wingstop" },
+  // ── 국제 ADR 추가 ──
+  { symbol: "SAP", name: "SAP" }, { symbol: "SNY", name: "Sanofi" },
+  { symbol: "AZN", name: "AstraZeneca" }, { symbol: "GSK", name: "GSK" },
+  { symbol: "DEO", name: "Diageo" }, { symbol: "UL", name: "Unilever" },
+  { symbol: "SONY", name: "Sony" }, { symbol: "SHOP", name: "Shopify" },
+  { symbol: "TD", name: "TD Bank" }, { symbol: "RY", name: "Royal Bank Canada" },
+  { symbol: "MUFG", name: "Mitsubishi UFJ" }, { symbol: "SMFG", name: "Sumitomo Mitsui" },
 ];
 
 const KR_ASSETS = [
@@ -343,10 +475,100 @@ const KR_ASSETS = [
   { symbol: "048410.KQ", name: "현대바이오" }, { symbol: "950210.KQ", name: "프레스티지바이오파마" },
   // ── 제약/바이오 추가 ──
   { symbol: "009290.KS", name: "광동제약" }, { symbol: "131030.KQ", name: "옵투스제약" },
+  // ── 추가 코스피 중대형주 ──
+  { symbol: "005490.KS", name: "POSCO홀딩스" }, { symbol: "028670.KS", name: "팬오션" },
+  { symbol: "003620.KS", name: "쌍용차" }, { symbol: "032640.KS", name: "LG유플러스" },
+  { symbol: "005940.KS", name: "NH투자증권" }, { symbol: "005440.KS", name: "현대그린푸드" },
+  { symbol: "069620.KS", name: "대웅제약" }, { symbol: "034730.KS", name: "SK" },
+  { symbol: "001450.KS", name: "현대해상" }, { symbol: "002380.KS", name: "KCC" },
+  { symbol: "005387.KS", name: "현대차2우B" }, { symbol: "000240.KS", name: "한국앤컴퍼니" },
+  { symbol: "006110.KS", name: "삼아알미늄" }, { symbol: "001740.KS", name: "SK네트웍스" },
+  { symbol: "007070.KS", name: "GS리테일" }, { symbol: "003000.KS", name: "부광약품" },
+  { symbol: "006650.KS", name: "대한유화" }, { symbol: "008770.KS", name: "호텔신라" },
+  { symbol: "003850.KS", name: "보령" }, { symbol: "005180.KS", name: "빙그레" },
+  { symbol: "192820.KS", name: "코스맥스" }, { symbol: "002710.KS", name: "TCC스틸" },
+  { symbol: "000210.KS", name: "DL" }, { symbol: "069260.KS", name: "TW" },
+  { symbol: "001120.KS", name: "LX인터내셔널" }, { symbol: "004800.KS", name: "효성" },
+  { symbol: "006280.KS", name: "녹십자" }, { symbol: "138040.KS", name: "메리츠금융지주" },
+  { symbol: "030610.KS", name: "교보증권" }, { symbol: "950130.KS", name: "엑셀세미콘" },
+  { symbol: "001570.KS", name: "금양" }, { symbol: "000670.KS", name: "영풍" },
+  { symbol: "071050.KS", name: "한국금융지주" }, { symbol: "161890.KS", name: "한국콜마" },
+  { symbol: "078930.KS", name: "GS" }, { symbol: "010060.KS", name: "OCI홀딩스" },
+  { symbol: "036530.KS", name: "SNT모티브" }, { symbol: "383220.KS", name: "F&F" },
+  { symbol: "011070.KS", name: "LG이노텍" }, { symbol: "052690.KS", name: "한전기술" },
+  { symbol: "005850.KS", name: "에스엘" }, { symbol: "014680.KS", name: "한솔케미칼" },
+  { symbol: "088980.KS", name: "맥쿼리인프라" }, { symbol: "003090.KS", name: "대웅" },
+  { symbol: "036190.KS", name: "금화PSC" }, { symbol: "001800.KS", name: "오리온홀딩스" },
+  { symbol: "011780.KS", name: "금호석유" }, { symbol: "005250.KS", name: "녹십자홀딩스" },
+  // ── 추가 코스닥 ──
+  { symbol: "293490.KQ", name: "카카오게임즈" }, { symbol: "060310.KQ", name: "3S" },
+  { symbol: "035760.KQ", name: "CJ ENM" }, { symbol: "041920.KQ", name: "메디아나" },
+  { symbol: "131970.KQ", name: "테스나" }, { symbol: "039440.KQ", name: "STMicroelectronics Korea" },
+  { symbol: "214150.KQ", name: "클래시스" }, { symbol: "110990.KQ", name: "디아이티" },
+  { symbol: "257720.KQ", name: "실리콘투" }, { symbol: "237880.KQ", name: "클리오" },
+  { symbol: "041510.KQ", name: "에스엠" }, { symbol: "060280.KQ", name: "큐렉소" },
+  { symbol: "317530.KQ", name: "캐리소프트" }, { symbol: "039200.KQ", name: "오스코텍" },
+  { symbol: "950160.KQ", name: "코오롱티슈진" }, { symbol: "041190.KQ", name: "우리기술투자" },
+  { symbol: "090460.KQ", name: "비에이치" }, { symbol: "222160.KQ", name: "NPX" },
+  { symbol: "200710.KQ", name: "에이디테크놀로지" }, { symbol: "036540.KQ", name: "SFA반도체" },
+  { symbol: "058610.KQ", name: "셀진" }, { symbol: "041020.KQ", name: "폴라리스오피스" },
+  { symbol: "348210.KQ", name: "넥스틴" }, { symbol: "042000.KQ", name: "카페24" },
+  { symbol: "053800.KQ", name: "안랩" }, { symbol: "090460.KQ", name: "비에이치" },
+  { symbol: "098120.KQ", name: "마이크로컨텍솔" }, { symbol: "234340.KQ", name: "제이에스코퍼레이션" },
+  { symbol: "340570.KQ", name: "티앤엘" }, { symbol: "352480.KQ", name: "씨앤씨인터내셔널" },
+  { symbol: "141080.KQ", name: "레고켐바이오" }, { symbol: "115390.KQ", name: "락앤락" },
+  { symbol: "039610.KQ", name: "화성밸브" }, { symbol: "389030.KQ", name: "지놈앤컴퍼니" },
+  { symbol: "060150.KQ", name: "인사이트코리아" }, { symbol: "058820.KQ", name: "CMG제약" },
+  { symbol: "322510.KQ", name: "제이엘케이" }, { symbol: "950220.KQ", name: "보로노이" },
+  { symbol: "137950.KQ", name: "제이씨케미칼" }, { symbol: "052770.KQ", name: "아이톡시" },
+  { symbol: "086900.KQ", name: "메디톡스" }, { symbol: "330350.KQ", name: "위세아이텍" },
+  // ── 추가 코스피 산업재/소재 ──
+  { symbol: "010120.KS", name: "LS일렉트릭" }, { symbol: "267260.KS", name: "HD현대일렉트릭" },
+  { symbol: "298040.KS", name: "효성중공업" }, { symbol: "012450.KS", name: "한화에어로스페이스" },
+  { symbol: "064350.KS", name: "현대로템" }, { symbol: "241560.KS", name: "두산퓨얼셀" },
+  { symbol: "006890.KS", name: "태경케미칼" }, { symbol: "005070.KS", name: "코스모신소재" },
+  { symbol: "018500.KS", name: "동원F&B" }, { symbol: "014820.KS", name: "동원시스템즈" },
+  { symbol: "241590.KS", name: "화승엔터프라이즈" }, { symbol: "009420.KS", name: "한올바이오파마" },
+  { symbol: "272210.KS", name: "한화시스템" }, { symbol: "003570.KS", name: "SNT다이내믹스" },
+  { symbol: "000080.KS", name: "하이트진로" }, { symbol: "005300.KS", name: "롯데칠성" },
+  { symbol: "004150.KS", name: "한솔제지" }, { symbol: "026960.KS", name: "동서" },
+  { symbol: "044820.KS", name: "코스맥스비티아이" }, { symbol: "000500.KS", name: "가온전선" },
+  { symbol: "007310.KS", name: "오뚜기" }, { symbol: "002840.KS", name: "미원상사" },
+  { symbol: "004490.KS", name: "세방전지" }, { symbol: "009240.KS", name: "한샘" },
+  { symbol: "017800.KS", name: "현대엘리베이터" }, { symbol: "092200.KS", name: "디아이씨" },
+  { symbol: "002030.KS", name: "아세아" }, { symbol: "000990.KS", name: "DB하이텍" },
+  { symbol: "047810.KS", name: "한국항공우주" }, { symbol: "079550.KS", name: "LIG넥스원" },
+  { symbol: "012800.KS", name: "대창" }, { symbol: "900140.KS", name: "엘브이엠씨홀딩스" },
+  // ── 추가 코스피/코스닥 중소형 ──
+  { symbol: "006120.KS", name: "SK디스커버리" }, { symbol: "017810.KS", name: "풀무원" },
+  { symbol: "003960.KS", name: "사조대림" }, { symbol: "145990.KS", name: "삼양사" },
+  { symbol: "002960.KS", name: "한국쉘석유" }, { symbol: "006060.KS", name: "화승인더" },
+  { symbol: "014830.KS", name: "유니드" }, { symbol: "006380.KS", name: "동부건설" },
+  { symbol: "016380.KS", name: "KG동부제철" }, { symbol: "000060.KS", name: "메리츠화재" },
+  { symbol: "029780.KS", name: "삼성카드" }, { symbol: "003540.KS", name: "대신증권" },
+  { symbol: "030790.KS", name: "비케이이" }, { symbol: "039490.KS", name: "키움증권" },
+  { symbol: "006090.KS", name: "사조오양" }, { symbol: "004000.KS", name: "롯데정밀화학" },
+  { symbol: "020150.KS", name: "일진머티리얼즈" }, { symbol: "003350.KS", name: "한국기업평가" },
+  { symbol: "023000.KS", name: "삼원강재" }, { symbol: "214370.KS", name: "케어젠" },
+  { symbol: "185750.KS", name: "종근당" }, { symbol: "000640.KS", name: "동아쏘시오홀딩스" },
+  { symbol: "100220.KS", name: "비상교육" }, { symbol: "000050.KS", name: "경방" },
+  { symbol: "002020.KS", name: "코오롱" }, { symbol: "001680.KS", name: "대상" },
+  { symbol: "000990.KS", name: "DB하이텍" }, { symbol: "007700.KS", name: "F&F홀딩스" },
+  // ── 추가 코스닥 성장주 ──
+  { symbol: "226330.KQ", name: "신테카바이오" }, { symbol: "278280.KQ", name: "천보" },
+  { symbol: "067310.KQ", name: "하나마이크론" }, { symbol: "336570.KQ", name: "원텍" },
+  { symbol: "091990.KQ", name: "셀트리온헬스케어" }, { symbol: "145020.KQ", name: "휴젤" },
+  { symbol: "238090.KQ", name: "앤디포스" }, { symbol: "046890.KQ", name: "서울반도체" },
+  { symbol: "048260.KQ", name: "오스템임플란트" }, { symbol: "290650.KQ", name: "엘앤씨바이오" },
+  { symbol: "108320.KQ", name: "LX세미콘" }, { symbol: "078600.KQ", name: "대주전자재료" },
+  { symbol: "357550.KQ", name: "석경에이티" }, { symbol: "089860.KQ", name: "루트로닉" },
+  { symbol: "217190.KQ", name: "제너셈" }, { symbol: "060370.KQ", name: "LS마린솔루션" },
+  { symbol: "383310.KQ", name: "에코프로에이치엔" }, { symbol: "336260.KQ", name: "두산퓨얼셀" },
+  { symbol: "377190.KQ", name: "디엘이앤씨" }, { symbol: "025320.KQ", name: "시노펙스" },
 ];
 
 const CRYPTO_ASSETS = [
-  // ── Top 10 ──
+  // ── 시총 상위 10개만 ──
   { id: "bitcoin", symbol: "BTC", name: "Bitcoin" },
   { id: "ethereum", symbol: "ETH", name: "Ethereum" },
   { id: "binancecoin", symbol: "BNB", name: "BNB" },
@@ -356,80 +578,7 @@ const CRYPTO_ASSETS = [
   { id: "dogecoin", symbol: "DOGE", name: "Dogecoin" },
   { id: "tron", symbol: "TRX", name: "TRON" },
   { id: "avalanche-2", symbol: "AVAX", name: "Avalanche" },
-  { id: "polkadot", symbol: "DOT", name: "Polkadot" },
-  // ── DeFi ──
-  { id: "chainlink", symbol: "LINK", name: "Chainlink" },
-  { id: "uniswap", symbol: "UNI", name: "Uniswap" },
-  { id: "aave", symbol: "AAVE", name: "Aave" },
-  { id: "maker", symbol: "MKR", name: "Maker" },
-  { id: "lido-dao", symbol: "LDO", name: "Lido" },
-  { id: "the-graph", symbol: "GRT", name: "The Graph" },
-  { id: "compound-governance-token", symbol: "COMP", name: "Compound" },
-  { id: "1inch", symbol: "1INCH", name: "1inch" },
-  { id: "curve-dao-token", symbol: "CRV", name: "Curve" },
-  { id: "pendle", symbol: "PENDLE", name: "Pendle" },
-  { id: "jupiter-exchange-solana", symbol: "JUP", name: "Jupiter" },
-  // ── L1/L2 ──
-  { id: "near", symbol: "NEAR", name: "NEAR" },
-  { id: "sui", symbol: "SUI", name: "Sui" },
-  { id: "aptos", symbol: "APT", name: "Aptos" },
-  { id: "cosmos", symbol: "ATOM", name: "Cosmos" },
-  { id: "internet-computer", symbol: "ICP", name: "Internet Computer" },
-  { id: "filecoin", symbol: "FIL", name: "Filecoin" },
-  { id: "arbitrum", symbol: "ARB", name: "Arbitrum" },
-  { id: "optimism", symbol: "OP", name: "Optimism" },
-  { id: "polygon-ecosystem-token", symbol: "POL", name: "Polygon" },
-  { id: "starknet", symbol: "STRK", name: "Starknet" },
-  { id: "mantle", symbol: "MNT", name: "Mantle" },
-  { id: "sei-network", symbol: "SEI", name: "Sei" },
-  { id: "celestia", symbol: "TIA", name: "Celestia" },
-  // ── AI & Data ──
-  { id: "render-token", symbol: "RNDR", name: "Render" },
-  { id: "fetch-ai", symbol: "FET", name: "Fetch.ai" },
-  { id: "injective-protocol", symbol: "INJ", name: "Injective" },
-  { id: "akash-network", symbol: "AKT", name: "Akash" },
-  { id: "artificial-superintelligence-alliance", symbol: "ASI", name: "ASI Alliance" },
-  { id: "bittensor", symbol: "TAO", name: "Bittensor" },
-  // ── Meme ──
-  { id: "pepe", symbol: "PEPE", name: "Pepe" },
-  { id: "shiba-inu", symbol: "SHIB", name: "Shiba Inu" },
-  { id: "floki", symbol: "FLOKI", name: "Floki" },
-  { id: "bonk", symbol: "BONK", name: "Bonk" },
-  { id: "dogwifcoin", symbol: "WIF", name: "dogwifhat" },
-  // ── Stablecoins & Misc ──
-  { id: "wrapped-bitcoin", symbol: "WBTC", name: "Wrapped BTC" },
-  { id: "litecoin", symbol: "LTC", name: "Litecoin" },
-  { id: "bitcoin-cash", symbol: "BCH", name: "Bitcoin Cash" },
-  { id: "stellar", symbol: "XLM", name: "Stellar" },
-  { id: "hedera-hashgraph", symbol: "HBAR", name: "Hedera" },
-  { id: "algorand", symbol: "ALGO", name: "Algorand" },
-  { id: "eos", symbol: "EOS", name: "EOS" },
-  { id: "the-sandbox", symbol: "SAND", name: "The Sandbox" },
-  { id: "decentraland", symbol: "MANA", name: "Decentraland" },
-  { id: "axie-infinity", symbol: "AXS", name: "Axie Infinity" },
-  { id: "gala", symbol: "GALA", name: "Gala" },
-  { id: "ondo-finance", symbol: "ONDO", name: "Ondo Finance" },
-  // ── RWA & Infrastructure ──
-  { id: "worldcoin-wld", symbol: "WLD", name: "Worldcoin" },
-  { id: "pyth-network", symbol: "PYTH", name: "Pyth Network" },
-  { id: "jito-governance-token", symbol: "JTO", name: "Jito" },
-  { id: "ethena", symbol: "ENA", name: "Ethena" },
-  { id: "dymension", symbol: "DYM", name: "Dymension" },
-  { id: "wormhole", symbol: "W", name: "Wormhole" },
-  { id: "stacks", symbol: "STX", name: "Stacks" },
-  { id: "thorchain", symbol: "RUNE", name: "THORChain" },
-  { id: "kaspa", symbol: "KAS", name: "Kaspa" },
-  { id: "beam-2", symbol: "BEAM", name: "Beam" },
-  { id: "immutable-x", symbol: "IMX", name: "Immutable" },
-  { id: "ronin", symbol: "RON", name: "Ronin" },
   { id: "toncoin", symbol: "TON", name: "Toncoin" },
-  { id: "monero", symbol: "XMR", name: "Monero" },
-  // ── Gaming & Social ──
-  { id: "stepn", symbol: "GMT", name: "STEPN" },
-  { id: "apecoin", symbol: "APE", name: "ApeCoin" },
-  { id: "blur", symbol: "BLUR", name: "Blur" },
-  { id: "magic", symbol: "MAGIC", name: "MAGIC" },
-  { id: "illuvium", symbol: "ILV", name: "Illuvium" },
 ];
 
 // 미국 주식 한글명 매핑 (한글 검색 지원)
@@ -464,8 +613,8 @@ const US_KO_NAMES = {
 const CRYPTO_KO_NAMES = {
   "bitcoin": "비트코인", "ethereum": "이더리움", "solana": "솔라나",
   "binancecoin": "바이낸스코인", "ripple": "리플", "cardano": "카르다노",
-  "dogecoin": "도지코인", "polkadot": "폴카닷", "avalanche-2": "아발란체",
-  "chainlink": "체인링크", "polygon": "폴리곤",
+  "dogecoin": "도지코인", "tron": "트론", "avalanche-2": "아발란체",
+  "toncoin": "톤코인",
 };
 
 // 전체 자산 통합 (검색용 — 한글명 포함)
@@ -3605,116 +3754,133 @@ function AppInner() {
     return msg;
   }
 
-  // ── 스크리너 실행 (병렬 배치 최적화) ──────────────────────────
+  // ── 일간 데이터 → 주간 데이터 자체 변환 (API 호출 50% 감소) ──
+  function dailyToWeekly(dy) {
+    const wCloses = [], wVolumes = [], wHighs = [], wLows = [];
+    if (!dy?.closes?.length) return { wCloses, wVolumes, wHighs, wLows };
+    const c = dy.closes, h = dy.highs || c, l = dy.lows || c, v = dy.volumes || [];
+    // 5일 단위로 주간 데이터 생성
+    for (let i = 4; i < c.length; i += 5) {
+      const start = Math.max(0, i - 4);
+      wCloses.push(c[i]);
+      let wh = -Infinity, wl = Infinity, wv = 0;
+      for (let j = start; j <= i; j++) {
+        if (h[j] > wh) wh = h[j];
+        if (l[j] < wl) wl = l[j];
+        wv += v[j] || 0;
+      }
+      wHighs.push(wh); wLows.push(wl); wVolumes.push(wv);
+    }
+    return { wCloses, wVolumes, wHighs, wLows };
+  }
+
+  // ── 스크리너 실행 (초고속 병렬 최적화 v2) ──────────────────────
+  // 일간 데이터만 1회 fetch → 주간 자체계산 | 배치 25개 × 5동시 실행
   const runScan = useCallback(async () => {
     if (scanning) return;
     setScanning(true); setScanErrors([]);
     const yahooAssets = [
       ...US_ASSETS.map(a => ({ ...a, market: "us", symbolRaw: a.symbol })),
-      ...KR_ASSETS.map(a => ({ ...a, market: "kr", symbolRaw: a.symbol, symbol: a.symbol.replace(".KS", "") })),
+      ...KR_ASSETS.map(a => ({ ...a, market: "kr", symbolRaw: a.symbol, symbol: a.symbol.replace(".KS", "").replace(".KQ", "") })),
     ];
     const cryptoAssets = CRYPTO_ASSETS.map(a => ({ ...a, market: "crypto", symbol: a.symbol, symbolRaw: a.id }));
     const totalCount = yahooAssets.length + cryptoAssets.length;
     setScanProgress({ done: 0, total: totalCount });
     const found = [], errors = [];
-    const candleMap = {}; // 전략 알림용 캔들 데이터 수집
+    const candleMap = {};
     let doneCount = 0;
 
-    // ── Yahoo 배치 병렬 처리 (10개씩 배치 → batch API) ──
-    const YAHOO_BATCH = 10;
-    for (let b = 0; b < yahooAssets.length; b += YAHOO_BATCH) {
-      const batch = yahooAssets.slice(b, b + YAHOO_BATCH);
-      const syms = batch.map(a => a.symbolRaw);
-      try {
-        // 주간 + 일간 배치를 동시 요청
-        const [wkRes, dyRes] = await Promise.all([
-          fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(syms.join(","))}&interval=1wk&range=2y`),
-          fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(syms.join(","))}&interval=1d&range=1y`),
-        ]);
-        const wkData = wkRes.ok ? (await wkRes.json()).results || {} : {};
-        const dyData = dyRes.ok ? (await dyRes.json()).results || {} : {};
+    // ── Yahoo 초고속 배치 (25개 × 5 동시) ──
+    const BATCH_SIZE = 25;
+    const CONCURRENT = 5;
+    const batches = [];
+    for (let b = 0; b < yahooAssets.length; b += BATCH_SIZE) {
+      batches.push(yahooAssets.slice(b, b + BATCH_SIZE));
+    }
 
+    for (let g = 0; g < batches.length; g += CONCURRENT) {
+      const group = batches.slice(g, g + CONCURRENT);
+      const groupResults = await Promise.allSettled(group.map(async (batch) => {
+        const syms = batch.map(a => a.symbolRaw);
+        // 일간 데이터만 1회 fetch (주간은 클라이언트에서 계산)
+        const res = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(syms.join(","))}&interval=1d&range=1y`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const dyData = (await res.json()).results || {};
+        return { batch, dyData };
+      }));
+
+      for (const gr of groupResults) {
+        if (gr.status !== "fulfilled") {
+          const failBatch = group[groupResults.indexOf(gr)] || [];
+          failBatch.forEach?.(a => { errors.push(`${a?.market?.toUpperCase()}:${a?.symbol} — batch fail`); doneCount++; });
+          continue;
+        }
+        const { batch, dyData } = gr.value;
         for (const asset of batch) {
           try {
-            const wk = wkData[asset.symbolRaw];
             const dy = dyData[asset.symbolRaw];
-            if (!wk || wk.error || !wk.closes?.length) throw new Error("데이터 없음");
-            const wCloses = wk.closes || [];
-            const wVolumes = wk.volumes || [];
-            const wHighs = wk.highs || wCloses;
-            const wLows = wk.lows || wCloses;
-            const dCloses = dy?.closes || [];
+            if (!dy || dy.error || !dy.closes?.length || dy.closes.length < 20) throw new Error("데이터 없음");
+            // 일간 → 주간 자체 변환
+            const { wCloses, wVolumes, wHighs, wLows } = dailyToWeekly(dy);
+            const dCloses = dy.closes || [];
+            if (!wCloses.length) throw new Error("주간 변환 실패");
             const conditionsWithMkt = [...conditions]; conditionsWithMkt._marketType = asset.market;
             const result = analyzeAsset(wCloses, dCloses, wVolumes, wHighs, wLows, conditionsWithMkt);
             result.market = asset.market;
             const match = mode === "or" ? result.triggers.length > 0 : conditions.every(c => result.triggers.includes(c));
             if (match) found.push({ ...asset, ...result });
-            // 전략 알림용 캔들 캐시 (일간 데이터 기반)
+            // 전략 알림용 캔들 캐시
             const cleanSym = asset.symbol.replace(".KS", "").replace(".KQ", "");
-            if (dy && dy.closes?.length > 20) {
-              candleMap[cleanSym] = {
-                closes: dy.closes, highs: dy.highs || dy.closes, lows: dy.lows || dy.closes,
-                volumes: dy.volumes || [], market: asset.market, name: asset.name, symbolRaw: asset.symbolRaw,
-              };
-            }
+            candleMap[cleanSym] = {
+              closes: dy.closes, highs: dy.highs || dy.closes, lows: dy.lows || dy.closes,
+              volumes: dy.volumes || [], market: asset.market, name: asset.name, symbolRaw: asset.symbolRaw,
+            };
           } catch (e) { errors.push(`${asset.market.toUpperCase()}:${asset.symbol} — ${e.message}`); }
           doneCount++;
         }
-      } catch (e) {
-        // 배치 전체 실패 시 개별 에러 기록
-        batch.forEach(a => { errors.push(`${a.market.toUpperCase()}:${a.symbol} — batch ${e.message}`); doneCount++; });
       }
       setScanProgress({ done: doneCount, total: totalCount });
     }
 
-    // ── 크립토 병렬 처리 (3개 동시) ──
-    const CRYPTO_CONCURRENT = 3;
-    for (let b = 0; b < cryptoAssets.length; b += CRYPTO_CONCURRENT) {
-      const batch = cryptoAssets.slice(b, b + CRYPTO_CONCURRENT);
-      const results = await Promise.allSettled(batch.map(async (asset) => {
-        const r = await fetch(`/api/coingecko?id=${encodeURIComponent(asset.symbolRaw)}&days=365`);
-        if (!r.ok) throw new Error(`CoinGecko ${r.status}`);
-        const j = await r.json();
-        const dp = (j.prices || []).map(p => p[1]);
-        const dv = (j.total_volumes || []).map(v => v[1]);
-        const wCloses = [], wVolumes = [], wHighs = [], wLows = [];
-        for (let k = 6; k < dp.length; k += 7) {
-          const sl = dp.slice(Math.max(0, k - 6), k + 1);
-          wCloses.push(dp[k]);
-          wVolumes.push(dv.slice(Math.max(0, k - 6), k + 1).reduce((a, c) => a + c, 0));
-          wHighs.push(Math.max(...sl));
-          wLows.push(Math.min(...sl));
-        }
-        return { asset, wCloses, wVolumes, wHighs, wLows, dCloses: dp };
-      }));
-
-      for (let i = 0; i < results.length; i++) {
-        const r = results[i];
-        const asset = batch[i];
-        if (r.status === "fulfilled") {
-          try {
-            const { wCloses, wVolumes, wHighs, wLows, dCloses } = r.value;
-            if (!wCloses.length) throw new Error("데이터 없음");
-            const conditionsWithMkt = [...conditions]; conditionsWithMkt._marketType = "crypto";
-            const result = analyzeAsset(wCloses, dCloses, wVolumes, wHighs, wLows, conditionsWithMkt);
-            result.market = "crypto";
-            const match = mode === "or" ? result.triggers.length > 0 : conditions.every(c => result.triggers.includes(c));
-            if (match) found.push({ ...asset, ...result });
-            // 크립토 캔들 캐시
-            if (dCloses.length > 20) {
-              const sym = asset.symbol.replace("-USD", "");
-              candleMap[sym] = { closes: dCloses, highs: dCloses, lows: dCloses, volumes: dv || [], market: "crypto", name: asset.name, symbolRaw: asset.symbolRaw };
-            }
-          } catch (e) { errors.push(`CRYPTO:${asset.symbol} — ${e.message}`); }
-        } else {
-          errors.push(`CRYPTO:${asset.symbol} — ${r.reason?.message || "fetch 실패"}`);
-        }
-        doneCount++;
+    // ── 크립토 전체 병렬 (10개 동시) ──
+    const cryptoResults = await Promise.allSettled(cryptoAssets.map(async (asset) => {
+      const r = await fetch(`/api/coingecko?id=${encodeURIComponent(asset.symbolRaw)}&days=365`);
+      if (!r.ok) throw new Error(`CoinGecko ${r.status}`);
+      const j = await r.json();
+      const dp = (j.prices || []).map(p => p[1]);
+      const dv = (j.total_volumes || []).map(v => v[1]);
+      const wCloses = [], wVolumes = [], wHighs = [], wLows = [];
+      for (let k = 6; k < dp.length; k += 7) {
+        const sl = dp.slice(Math.max(0, k - 6), k + 1);
+        wCloses.push(dp[k]);
+        wVolumes.push(dv.slice(Math.max(0, k - 6), k + 1).reduce((a, c) => a + c, 0));
+        wHighs.push(Math.max(...sl)); wLows.push(Math.min(...sl));
       }
-      setScanProgress({ done: doneCount, total: totalCount });
-      // CoinGecko 레이트 리밋: 배치 간 800ms
-      if (b + CRYPTO_CONCURRENT < cryptoAssets.length) await new Promise(r => setTimeout(r, 800));
+      return { asset, wCloses, wVolumes, wHighs, wLows, dCloses: dp, dVolumes: dv };
+    }));
+
+    for (let i = 0; i < cryptoResults.length; i++) {
+      const r = cryptoResults[i];
+      const asset = cryptoAssets[i];
+      if (r.status === "fulfilled") {
+        try {
+          const { wCloses, wVolumes, wHighs, wLows, dCloses, dVolumes } = r.value;
+          if (!wCloses.length) throw new Error("데이터 없음");
+          const conditionsWithMkt = [...conditions]; conditionsWithMkt._marketType = "crypto";
+          const result = analyzeAsset(wCloses, dCloses, wVolumes, wHighs, wLows, conditionsWithMkt);
+          result.market = "crypto";
+          const match = mode === "or" ? result.triggers.length > 0 : conditions.every(c => result.triggers.includes(c));
+          if (match) found.push({ ...asset, ...result });
+          if (dCloses.length > 20) {
+            candleMap[asset.symbol] = { closes: dCloses, highs: dCloses, lows: dCloses, volumes: dVolumes || [], market: "crypto", name: asset.name, symbolRaw: asset.symbolRaw };
+          }
+        } catch (e) { errors.push(`CRYPTO:${asset.symbol} — ${e.message}`); }
+      } else {
+        errors.push(`CRYPTO:${asset.symbol} — ${r.reason?.message || "fetch 실패"}`);
+      }
+      doneCount++;
     }
+    setScanProgress({ done: doneCount, total: totalCount });
 
     const sorted = found.sort((a, b) => {
       if (sortBy === "rsi")     return (a.rsi ?? 999) - (b.rsi ?? 999);
