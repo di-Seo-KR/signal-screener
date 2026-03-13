@@ -2896,6 +2896,7 @@ function AppInner() {
     try { return JSON.parse(localStorage.getItem("di_trade_alerts") || "[]"); } catch { return []; }
   });
   const [alertBadge, setAlertBadge] = useState(0); // 읽지 않은 알림 수
+  const [notiPerm, setNotiPerm] = useState(() => ("Notification" in window) ? Notification.permission : "unsupported");
   const scanCandleCache = useRef({}); // 스캔 중 수집된 캔들 데이터 캐시 {symbol: {closes, highs, lows, volumes}}
 
   // 전략 이름 → 전략 객체 매핑 (generate() 호출용)
@@ -3506,6 +3507,62 @@ function AppInner() {
 
       setTradeAlerts(prev => [...newAlerts, ...prev].slice(0, 200));
       setAlertBadge(prev => prev + newAlerts.length);
+
+      // ── 브라우저 푸시 알림 ──
+      if ("Notification" in window && Notification.permission === "granted") {
+        const buys = newAlerts.filter(a => a.action === "매수");
+        const sells = newAlerts.filter(a => a.action === "매도");
+        // 전략별로 그룹핑해서 알림
+        const grouped = {};
+        for (const a of newAlerts) {
+          if (!grouped[a.strategy]) grouped[a.strategy] = [];
+          grouped[a.strategy].push(a);
+        }
+        const stratCount = Object.keys(grouped).length;
+        // 메인 요약 알림
+        const title = `DI금융 매매 시그널 ${newAlerts.length}건`;
+        const lines = [];
+        for (const [strat, items] of Object.entries(grouped).slice(0, 5)) {
+          const icon = items[0]?.strategyIcon || "📊";
+          const syms = items.map(a => `${a.action === "매수" ? "🟢" : "🔴"}${a.name}`).join(", ");
+          lines.push(`${icon} ${strat}: ${syms}`);
+        }
+        if (stratCount > 5) lines.push(`⋯ +${stratCount - 5}개 전략`);
+        try {
+          const noti = new Notification(title, {
+            body: lines.join("\n"),
+            icon: "/favicon.ico",
+            badge: "/favicon.ico",
+            tag: "di-strategy-alert",
+            renotify: true,
+            requireInteraction: false,
+            silent: false,
+          });
+          noti.onclick = () => { window.focus(); noti.close(); };
+          // 개별 전략 알림 (상위 3개 전략만)
+          let delay = 300;
+          for (const [strat, items] of Object.entries(grouped).slice(0, 3)) {
+            setTimeout(() => {
+              const icon = items[0]?.strategyIcon || "📊";
+              const body = items.slice(0, 4).map(a => {
+                const emoji = a.action === "매수" ? "🟢 매수" : "🔴 매도";
+                const priceStr = a.market === "kr" ? `₩${Math.round(a.price || 0).toLocaleString()}` : `$${(a.price || 0).toFixed(2)}`;
+                return `${emoji} ${a.flag}${a.name} ${priceStr}\n  📌 ${a.reason}`;
+              }).join("\n");
+              try {
+                const n2 = new Notification(`${icon} ${strat}`, {
+                  body: body + (items.length > 4 ? `\n⋯ +${items.length - 4}건` : ""),
+                  icon: "/favicon.ico",
+                  tag: `di-strat-${strat}`,
+                  renotify: true,
+                });
+                n2.onclick = () => { window.focus(); n2.close(); };
+              } catch {}
+            }, delay);
+            delay += 500;
+          }
+        } catch {}
+      }
 
       // 텔레그램 동시 발송 (전략 매매 알림)
       if (settings.botToken && settings.chatId && settings.strategyAlerts) {
@@ -6064,6 +6121,49 @@ function AppInner() {
                     style={{ cursor: "pointer" }} />
                   <span>텔레그램 동시 발송</span>
                 </label>
+              </div>
+
+              {/* ── 브라우저 푸시 알림 ── */}
+              <div style={{
+                background: notiPerm === "granted" ? C.greenBg : C.card2,
+                borderRadius: "12px", padding: "14px", marginBottom: "12px",
+                border: `1px solid ${notiPerm === "granted" ? C.green + "30" : notiPerm === "denied" ? C.red + "30" : C.border2}`,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "16px" }}>{notiPerm === "granted" ? "🔔" : notiPerm === "denied" ? "🔕" : "🔔"}</span>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: "13px" }}>브라우저 푸시 알림</div>
+                      <div style={{ fontSize: "11px", color: C.text3 }}>
+                        {notiPerm === "granted" ? "활성화됨 — 매매 시그널 발생 시 알림이 표시됩니다"
+                          : notiPerm === "denied" ? "차단됨 — 브라우저 설정에서 알림을 허용해주세요"
+                          : notiPerm === "unsupported" ? "이 브라우저에서 지원되지 않습니다"
+                          : "허용하면 백그라운드에서도 매매 알림을 받을 수 있습니다"}
+                      </div>
+                    </div>
+                  </div>
+                  {notiPerm === "default" && (
+                    <button onClick={async () => {
+                      const perm = await Notification.requestPermission();
+                      setNotiPerm(perm);
+                      if (perm === "granted") {
+                        new Notification("DI금융 알림 활성화", {
+                          body: "전략 매매 시그널이 감지되면 여기로 알림이 옵니다 🚀",
+                          icon: "/favicon.ico",
+                        });
+                      }
+                    }} style={{
+                      padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700, cursor: "pointer",
+                      background: C.blue, color: "#fff", border: "none", whiteSpace: "nowrap",
+                    }}>알림 허용</button>
+                  )}
+                  {notiPerm === "granted" && (
+                    <span style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, background: C.green + "20", color: C.green }}>ON</span>
+                  )}
+                  {notiPerm === "denied" && (
+                    <span style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, background: C.red + "20", color: C.red }}>차단됨</span>
+                  )}
+                </div>
               </div>
 
               {/* ── 자동 스캔 설정 ── */}
