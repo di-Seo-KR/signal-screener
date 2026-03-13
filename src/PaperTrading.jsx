@@ -547,10 +547,9 @@ function SetupPanel({ config, setConfig, onConnect }) {
                           if (typeof payload.as === "boolean") save("di_auto_scan", payload.as);
                           if (typeof payload.th === "boolean") save("di_trading_halted", payload.th);
                           // 계좌 확인
-                          try {
-                            const acc = await alpacaAPI("account", newConfig);
+                          alpacaAPI("account", newConfig).then(acc => {
                             if (acc.id) onConnect(acc);
-                          } catch {}
+                          }).catch(() => {});
                           return;
                         } catch {
                           requestAnimationFrame(scanLoop);
