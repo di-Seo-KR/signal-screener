@@ -1,6 +1,6 @@
-// DI금융 v7.2 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
+// DI금융 v7.3 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
 // Features: 스크리닝, 캔들차트, 32개 전략, 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
-// v7.2: 실제 전략 generate() 기반 매매 시그널, 터치 감도 최적화, 풀-투-리프레시 개선
+// v7.3: 퀀트 포트폴리오 실제 데이터, PC 데스크톱 사이드바+와이드 레이아웃
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 
 // ════════════════════════════════════════════════════════════════════
@@ -4241,6 +4241,10 @@ function AppInner() {
         .home-grid { display: flex; flex-direction: column; gap: 12px; }
         .home-left, .home-right { display: flex; flex-direction: column; gap: 12px; }
         .home-full { display: flex; flex-direction: column; gap: 12px; }
+        /* 사이드바 (기본 숨김) */
+        .di-sidebar { display: none; }
+        .di-app-body { display: flex; flex-direction: column; }
+        .di-main-wrap { flex: 1; }
         /* ── 모바일 (≤640px) — 폰트/간격 확대 + 터치 최적화 ── */
         @media (max-width: 640px) {
           .desktop-nav { display: none !important; }
@@ -4256,14 +4260,124 @@ function AppInner() {
         @media (min-width: 641px) and (max-width: 899px) {
           .desktop-nav button { padding: 5px 6px !important; font-size: 11px !important; }
         }
-        /* ── 데스크톱 (≥900px) ── */
-        @media (min-width: 900px) {
+        /* ── 데스크톱 중간 (900~1199px) ── */
+        @media (min-width: 900px) and (max-width: 1199px) {
           .home-grid { display: grid !important; grid-template-columns: 1fr 360px !important; gap: 16px !important; align-items: start !important; }
           .home-right { position: sticky; top: 72px; max-height: calc(100vh - 88px); overflow-y: auto; overflow-x: hidden;
             scrollbar-width: none; -ms-overflow-style: none; }
           .home-right::-webkit-scrollbar { display: none; }
         }
+        /* ── 와이드 데스크톱 (≥1200px) — TradingView 스타일 사이드바 + 와이드 레이아웃 ── */
+        @media (min-width: 1200px) {
+          .desktop-nav { display: none !important; }
+          .mobile-menu-btn { display: none !important; }
+          .di-sidebar {
+            display: flex !important; flex-direction: column; width: 220px; min-width: 220px;
+            position: fixed; top: 0; left: 0; bottom: 0; z-index: 150;
+            background: ${C.card}; border-right: 1px solid ${C.border};
+            padding: 16px 0; overflow-y: auto;
+            scrollbar-width: none; -ms-overflow-style: none;
+          }
+          .di-sidebar::-webkit-scrollbar { display: none; }
+          .di-sidebar .sb-logo { padding: 8px 20px 24px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+          .di-sidebar .sb-nav { display: flex; flex-direction: column; gap: 2px; padding: 0 10px; flex: 1; }
+          .di-sidebar .sb-item {
+            display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px;
+            font-size: 13px; font-weight: 600; cursor: pointer; border: none;
+            transition: all 0.15s ease; position: relative; text-align: left; width: 100%;
+          }
+          .di-sidebar .sb-item:hover { background: ${C.card2}; }
+          .di-sidebar .sb-item.active { background: ${C.blueBg}; color: ${C.blue}; }
+          .di-sidebar .sb-item .sb-icon { font-size: 16px; width: 24px; text-align: center; flex-shrink: 0; }
+          .di-sidebar .sb-divider { height: 1px; background: ${C.border}; margin: 12px 20px; }
+          .di-sidebar .sb-section { font-size: 10px; color: ${C.text3}; font-weight: 700; padding: 8px 24px 4px; letter-spacing: 0.05em; text-transform: uppercase; }
+          .di-app-body { flex-direction: row !important; }
+          .di-main-wrap { margin-left: 220px; flex: 1; width: calc(100% - 220px); }
+          .di-main-wrap header { left: 220px !important; width: calc(100% - 220px) !important; }
+          .di-main-wrap main { max-width: 1400px !important; padding: 20px 32px 32px !important; }
+          .home-grid { display: grid !important; grid-template-columns: 1fr 400px !important; gap: 20px !important; align-items: start !important; }
+          .home-right { position: sticky; top: 72px; max-height: calc(100vh - 88px); overflow-y: auto; overflow-x: hidden;
+            scrollbar-width: none; -ms-overflow-style: none; }
+          .home-right::-webkit-scrollbar { display: none; }
+        }
+        /* ── 초와이드 (≥1600px) ── */
+        @media (min-width: 1600px) {
+          .di-main-wrap main { max-width: 1600px !important; }
+          .home-grid { grid-template-columns: 1fr 480px !important; }
+        }
       `}</style>
+
+      {/* ── 와이드 데스크톱 사이드바 (≥1200px 에서만 표시) ── */}
+      <aside className="di-sidebar">
+        <div className="sb-logo" onClick={() => setTab("home")}>
+          <span style={{ fontSize: "22px" }}>📡</span>
+          <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
+          <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v7.3</span>
+        </div>
+        <div className="sb-section">메인</div>
+        <nav className="sb-nav">
+          {[
+            { id: "home", label: "홈 대시보드", icon: "🏠" },
+            { id: "screener", label: "스크리너", icon: "🔍" },
+            { id: "strategy", label: "퀀트 전략", icon: "🎯" },
+          ].map(t => (
+            <button key={t.id} className={`sb-item${tab === t.id ? " active" : ""}`}
+              onClick={() => { setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }}
+              style={{ background: tab === t.id ? C.blueBg : "transparent", color: tab === t.id ? C.blue : C.text2 }}>
+              <span className="sb-icon">{t.icon}</span>{t.label}
+            </button>
+          ))}
+        </nav>
+        <div className="sb-divider" />
+        <div className="sb-section">운용 & 분석</div>
+        <nav className="sb-nav">
+          {[
+            { id: "quant-port", label: "전략 운용", icon: "📊" },
+            { id: "backtest", label: "백테스트", icon: "📈" },
+            { id: "risk-map", label: "리스크 타워", icon: "🛡️" },
+            { id: "quant-report", label: "퀀트 리포트", icon: "📋" },
+          ].map(t => (
+            <button key={t.id} className={`sb-item${tab === t.id ? " active" : ""}`}
+              onClick={() => setTab(t.id)}
+              style={{ background: tab === t.id ? C.blueBg : "transparent", color: tab === t.id ? C.blue : C.text2 }}>
+              <span className="sb-icon">{t.icon}</span>{t.label}
+            </button>
+          ))}
+        </nav>
+        <div className="sb-divider" />
+        <div className="sb-section">자산 & 정보</div>
+        <nav className="sb-nav">
+          {[
+            { id: "portfolio", label: "내 포트폴리오", icon: "💼" },
+            { id: "news", label: "마켓 뉴스", icon: "📰" },
+            { id: "alerts", label: "매매 알림", icon: "🔔", badge: alertBadge },
+          ].map(t => (
+            <button key={t.id} className={`sb-item${tab === t.id ? " active" : ""}`}
+              onClick={() => { setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }}
+              style={{ background: tab === t.id ? C.blueBg : "transparent", color: tab === t.id ? C.blue : C.text2 }}>
+              <span className="sb-icon">{t.icon}</span>{t.label}
+              {t.badge > 0 && (
+                <span style={{ marginLeft: "auto", background: C.red, color: "#fff",
+                  fontSize: "9px", fontWeight: 800, borderRadius: "50%", width: "18px", height: "18px",
+                  display: "flex", alignItems: "center", justifyContent: "center" }}>{t.badge > 9 ? "9+" : t.badge}</span>
+              )}
+            </button>
+          ))}
+        </nav>
+        <div style={{ flex: 1 }} />
+        <div style={{ padding: "12px 20px", borderTop: `1px solid ${C.border}` }}>
+          <button onClick={toggleTheme} style={{
+            width: "100%", padding: "8px", borderRadius: "8px", background: C.card2,
+            border: `1px solid ${C.border}`, color: C.text2, fontSize: "12px", fontWeight: 600,
+            display: "flex", alignItems: "center", gap: "8px", justifyContent: "center",
+          }}>
+            {themeMode === "dark" ? "\u2600\uFE0F 라이트 모드" : "\uD83C\uDF19 다크 모드"}
+          </button>
+        </div>
+      </aside>
+
+      <div className="di-app-body">
+      <div className="di-main-wrap">
 
       {/* ── 헤더 ──────────────────────────────────────────────────── */}
       <header style={{
@@ -4272,12 +4386,12 @@ function AppInner() {
         borderBottom: `1px solid ${C.border}`,
         paddingTop: "env(safe-area-inset-top, 0px)",
       }}>
-        <div style={{ maxWidth: "1080px", margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "56px" }}>
+        <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 20px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "56px" }}>
           <div onClick={() => setTab("home")} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none" }}
             title="홈으로 이동">
             <span style={{ fontSize: "20px" }}>📡</span>
             <span style={{ fontWeight: 800, fontSize: "17px", letterSpacing: "-0.5px" }}>DI금융</span>
-            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: mf(10), fontWeight: 700, background: C.blueBg, color: C.blue }}>v7.2</span>
+            <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: mf(10), fontWeight: 700, background: C.blueBg, color: C.blue }}>v7.3</span>
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "2px" }}>
@@ -4339,7 +4453,7 @@ function AppInner() {
         else if (tab === "news") await fetchNews();
         else window.location.reload();
       }}>
-      <main style={{ maxWidth: "1080px", margin: "0 auto", padding: "16px 20px 24px" }}>
+      <main style={{ maxWidth: "1400px", margin: "0 auto", padding: "16px 20px 24px" }}>
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 홈 (토스 스타일 — 깔끔하고 정보 밀도 최적화)
@@ -6537,6 +6651,8 @@ function AppInner() {
         {chartAsset && <ChartModal asset={chartAsset} onClose={() => setChartAsset(null)} krwRate={krwRate} theme={themeMode} />}
       </main>
       </PullToRefresh>
+      </div>{/* di-main-wrap */}
+      </div>{/* di-app-body */}
     </div>
   );
 }

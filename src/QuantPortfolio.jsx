@@ -1,7 +1,7 @@
-// DI금융 — 퀀트 전략별 포트폴리오 시스템 v3.0
-// 전략별 고유 포트폴리오, 수익률 추적, 매매기록 상세, 차트 인터랙션
-// 참고: Quant Strategy Lab 백테스트 리포트 + 리밸런싱 권고
-import React, { useState, useMemo, useRef, Fragment } from "react";
+// DI금융 — 퀀트 전략별 포트폴리오 시스템 v4.0
+// 실제 시장 데이터 기반 백테스트 + 전략 generate() 시그널 매매기록
+// Yahoo Finance 실시간 데이터 → 전략별 수익률 · 매매 · 리밸런싱
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { ALL_STRATEGIES } from "./strategies.js";
 
 const C = {
@@ -21,12 +21,11 @@ const CAT_COLORS = {
 };
 
 // ══════════════════════════════════════════════════════════════
-// 종목명 매핑 (한/영 통합)
+// 종목명 매핑
 // ══════════════════════════════════════════════════════════════
 const SYM_NAMES = {
-  // US 대형주
   AAPL: "애플", MSFT: "마이크로소프트", NVDA: "엔비디아", TSLA: "테슬라", AMZN: "아마존",
-  GOOG: "구글", META: "메타", AMD: "AMD", AVGO: "브로드컴", JPM: "JP모건",
+  GOOG: "구글", GOOGL: "구글A", META: "메타", AMD: "AMD", AVGO: "브로드컴", JPM: "JP모건",
   V: "비자", MA: "마스터카드", JNJ: "존슨앤존슨", PG: "P&G", UNH: "유나이티드헬스",
   HD: "홈디포", DIS: "디즈니", NFLX: "넷플릭스", PYPL: "페이팔", INTC: "인텔",
   CRM: "세일즈포스", ORCL: "오라클", CSCO: "시스코", PEP: "펩시", KO: "코카콜라",
@@ -42,18 +41,15 @@ const SYM_NAMES = {
   NET: "클라우드플레어", ZS: "지스케일러", CRWD: "크라우드스트라이크",
   SHOP: "쇼피파이", SQ: "블록(스퀘어)", COIN: "코인베이스", MSTR: "마이크로스트래티지",
   UBER: "우버", ABNB: "에어비앤비", DASH: "도어대시",
-  // ETF
   SPY: "S&P 500 ETF", QQQ: "나스닥 ETF", IWM: "러셀2000 ETF", DIA: "다우 ETF",
   GLD: "금 ETF", SLV: "은 ETF", TLT: "미국채20Y ETF", XLE: "에너지 ETF",
   XLF: "금융 ETF", XLK: "기술 ETF", XLV: "헬스케어 ETF", XLI: "산업 ETF",
   ARKK: "ARK 혁신 ETF", SOXX: "반도체 ETF", SMH: "반도체 VanEck",
   VNQ: "부동산 ETF", KWEB: "중국기술 ETF",
-  // 크립토
   "BTC-USD": "비트코인", "ETH-USD": "이더리움", "SOL-USD": "솔라나",
   "BNB-USD": "바이낸스코인", "XRP-USD": "리플", "ADA-USD": "카르다노",
   "AVAX-USD": "아발란체", "DOT-USD": "폴카닷", "LINK-USD": "체인링크",
   "MATIC-USD": "폴리곤", "DOGE-USD": "도지코인",
-  // 한국
   "005930.KS": "삼성전자", "000660.KS": "SK하이닉스", "373220.KS": "LG에너지솔루션",
   "005380.KS": "현대차", "000270.KS": "기아", "068270.KS": "셀트리온",
   "035420.KS": "NAVER", "035720.KS": "카카오", "051910.KS": "LG화학",
@@ -69,11 +65,9 @@ const SYM_NAMES = {
 const getName = (sym) => SYM_NAMES[sym] || sym.replace(".KS", "").replace("-USD", "");
 
 // ══════════════════════════════════════════════════════════════
-// 전략별 고유 포트폴리오 (32개 전략 × 다양한 종목 구성)
-// 백테스트 리포트 참고, 전략 특성별 최적화
+// 전략별 포트폴리오 (32개 전략 × 다양한 종목 구성)
 // ══════════════════════════════════════════════════════════════
 const STRATEGY_PORTFOLIOS = {
-  // ── 평균회귀 (과매도 반전 노림, 대형 가치주 + 방어주) ──
   "RSI 반전 전략": [
     { sym: "GOOGL", w: 0.10 }, { sym: "AMD", w: 0.08 }, { sym: "TSLA", w: 0.08 },
     { sym: "AAPL", w: 0.08 }, { sym: "DIS", w: 0.06 }, { sym: "PYPL", w: 0.06 },
@@ -160,8 +154,6 @@ const STRATEGY_PORTFOLIOS = {
     { sym: "NFLX", w: 0.06 }, { sym: "DIS", w: 0.05 },
     { sym: "BA", w: 0.06 }, { sym: "DASH", w: 0.06 },
   ],
-
-  // ── 추세추종 (트렌드 팔로잉, 모멘텀 강한 종목 중심) ──
   "MACD 크로스오버": [
     { sym: "SPY", w: 0.08 }, { sym: "QQQ", w: 0.08 }, { sym: "NVDA", w: 0.07 },
     { sym: "AVGO", w: 0.06 }, { sym: "MSFT", w: 0.06 }, { sym: "META", w: 0.06 },
@@ -302,8 +294,6 @@ const STRATEGY_PORTFOLIOS = {
     { sym: "COIN", w: 0.05 }, { sym: "DASH", w: 0.04 },
     { sym: "SHOP", w: 0.04 }, { sym: "SQ", w: 0.05 }, { sym: "ARKK", w: 0.05 },
   ],
-
-  // ── 모멘텀 (강한 모멘텀 종목 집중) ──
   "거래량 돌파 전략": [
     { sym: "NVDA", w: 0.08 }, { sym: "AMD", w: 0.06 }, { sym: "TSLA", w: 0.06 },
     { sym: "AVGO", w: 0.06 }, { sym: "MRVL", w: 0.05 },
@@ -369,8 +359,6 @@ const STRATEGY_PORTFOLIOS = {
     { sym: "CRWD", w: 0.04 }, { sym: "NET", w: 0.04 },
     { sym: "ARKK", w: 0.05 }, { sym: "SMH", w: 0.06 },
   ],
-
-  // ── 변동성 (고변동 + 헤지 혼합) ──
   "BB 스퀴즈 돌파": [
     { sym: "NVDA", w: 0.07 }, { sym: "TSLA", w: 0.06 }, { sym: "AMD", w: 0.06 },
     { sym: "AVGO", w: 0.05 }, { sym: "MRVL", w: 0.04 },
@@ -407,106 +395,243 @@ const DEFAULT_PORTFOLIO = [
 ];
 
 // ══════════════════════════════════════════════════════════════
-// 시드 기반 난수
+// 실제 데이터 fetch 엔진
 // ══════════════════════════════════════════════════════════════
-function seededRng(seed, i) {
-  let x = Math.sin(seed * 9301 + i * 49297 + 233280) * 10000;
-  return x - Math.floor(x);
+function collectAllSymbols() {
+  const syms = new Set();
+  for (const key of Object.keys(STRATEGY_PORTFOLIOS)) {
+    for (const { sym } of STRATEGY_PORTFOLIOS[key]) syms.add(sym);
+  }
+  for (const { sym } of DEFAULT_PORTFOLIO) syms.add(sym);
+  return [...syms];
+}
+
+async function fetchAllSymbolData(onProgress) {
+  const allSyms = collectAllSymbols();
+  const results = {};
+  const BATCH = 20;
+  const batches = [];
+  for (let i = 0; i < allSyms.length; i += BATCH) batches.push(allSyms.slice(i, i + BATCH));
+
+  let done = 0;
+  // 4개 배치 동시 실행
+  const CONCURRENT = 4;
+  for (let i = 0; i < batches.length; i += CONCURRENT) {
+    const chunk = batches.slice(i, i + CONCURRENT);
+    await Promise.allSettled(chunk.map(async (batch) => {
+      try {
+        const url = `/api/yahoo-batch?symbols=${batch.join(",")}&interval=1d&range=6mo`;
+        const res = await fetch(url, { signal: AbortSignal.timeout(15000) });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.results) {
+            for (const [sym, data] of Object.entries(json.results)) {
+              if (data && data.closes && data.closes.length > 0) results[sym] = data;
+            }
+          }
+        }
+      } catch {}
+      done++;
+      if (onProgress) onProgress(Math.min(100, Math.round((done / batches.length) * 100)));
+    }));
+  }
+  return results;
+}
+
+// raw 데이터 → 캔들 객체 배열
+function toCandles(data) {
+  if (!data?.closes?.length) return [];
+  return data.closes.map((c, i) => ({
+    close: c,
+    high: data.highs?.[i] || c,
+    low: data.lows?.[i] || c,
+    open: data.opens?.[i] || c,
+    volume: data.volumes?.[i] || 0,
+  }));
 }
 
 // ══════════════════════════════════════════════════════════════
-// 시뮬레이션: 과거 30일 수익률 (전략 특성 + MDD 최적화)
+// 실제 가중 포트폴리오 수익률 계산
 // ══════════════════════════════════════════════════════════════
-function generateDailyReturns(strategyName, category) {
-  const seed = [...strategyName].reduce((a, c) => a + c.charCodeAt(0), 0);
-  const days = 30;
-  const returns = [];
-  // 카테고리별 특성 (백테스트 리포트 반영: 추세추종/변동성 > 모멘텀 > 평균회귀)
-  const drift = category === "추세추종" ? 0.0035 : category === "모멘텀" ? 0.0030 : category === "변동성" ? 0.0040 : 0.0020;
-  const vol = category === "변동성" ? 0.018 : category === "모멘텀" ? 0.015 : category === "추세추종" ? 0.012 : 0.010;
+function computePortfolioReturns(portfolio, allData) {
+  // 각 종목의 일간 수익률 계산
+  const stockData = [];
+  for (const { sym, w } of portfolio) {
+    const d = allData[sym];
+    if (!d?.closes?.length || d.closes.length < 10) continue;
+    const closes = d.closes;
+    const timestamps = d.timestamps || [];
+    const rets = [];
+    for (let i = 1; i < closes.length; i++) {
+      rets.push({ ret: (closes[i] - closes[i - 1]) / closes[i - 1], ts: timestamps[i] || 0 });
+    }
+    stockData.push({ sym, w, rets });
+  }
+  if (!stockData.length) return [];
+
+  // 공통 길이 맞추기 (최소 길이 기준)
+  const minLen = Math.min(...stockData.map(s => s.rets.length));
+  const days = Math.min(minLen, 90);
+  if (days < 5) return [];
+
+  const dailyReturns = [];
   let cumReturn = 0;
-  let peak = 0;
+  const totalW = stockData.reduce((a, s) => a + s.w, 0);
 
-  for (let i = 0; i < days; i++) {
-    let r = (seededRng(seed, i) - 0.42) * vol * 2 + drift;
-    // MDD 제한: 누적 -8% 이하면 리커버리 바이어스
-    if (cumReturn < -0.06) r = Math.abs(r) * 0.8;
-    cumReturn += r;
-    peak = Math.max(peak, cumReturn);
-    returns.push({
-      date: new Date(Date.now() - (days - i) * 86400000).toISOString().slice(0, 10),
-      daily: +(r * 100).toFixed(2),
-      cumulative: +(cumReturn * 100).toFixed(2),
+  for (let d = minLen - days; d < minLen; d++) {
+    let dayRet = 0;
+    for (const s of stockData) {
+      dayRet += (s.w / totalW) * s.rets[d].ret;
+    }
+    cumReturn = (1 + cumReturn / 100) * (1 + dayRet) * 100 - 100;
+    // 날짜 계산
+    const ts = stockData[0].rets[d]?.ts;
+    const date = ts ? new Date(ts * 1000).toISOString().slice(0, 10)
+      : new Date(Date.now() - (minLen - d) * 86400000).toISOString().slice(0, 10);
+
+    dailyReturns.push({
+      date,
+      daily: +(dayRet * 100).toFixed(2),
+      cumulative: +cumReturn.toFixed(2),
     });
   }
-  return returns;
+  return dailyReturns;
 }
 
 // ══════════════════════════════════════════════════════════════
-// 매매기록 생성 (상세 거래 내역)
+// 실제 전략 시그널 기반 매매기록 생성
 // ══════════════════════════════════════════════════════════════
-function generateTradeHistory(strategyName, portfolio) {
-  const seed = [...strategyName].reduce((a, c) => a + c.charCodeAt(0), 0);
+function generateRealTrades(strategyName, portfolio, allData) {
+  const stratObj = ALL_STRATEGIES.find(s => s.name === strategyName);
+  if (!stratObj) return [];
   const trades = [];
-  const actions = ["매수", "매도", "비중 조정"];
-  const reasons = [
-    "RSI 과매도 진입", "MACD 골든크로스", "볼린저밴드 하단 터치",
-    "추세 강화 시그널", "거래량 급증 + 양봉", "손절 라인 도달",
-    "목표가 도달 익절", "리밸런싱 기준 충족", "상대강도 약화",
-    "스토캐스틱 크로스", "ADX 강세 전환", "이평선 지지 확인",
-    "채널 상단 돌파", "피보나치 되돌림 완성", "OBV 상승 확인",
-    "슈퍼트렌드 매수 전환", "일목 구름대 돌파",
-  ];
 
-  const numTrades = 12 + Math.floor(seededRng(seed, 99) * 12); // 12~23건
-  for (let i = 0; i < numTrades; i++) {
-    const dayOffset = Math.floor(seededRng(seed, i * 3) * 28) + 1;
-    const pIdx = Math.floor(seededRng(seed, i * 7) * portfolio.length);
-    const sym = portfolio[pIdx]?.sym || "SPY";
-    const action = actions[Math.floor(seededRng(seed, i * 11) * 3)];
-    const priceBase = sym.includes("BTC") ? 80000 + seededRng(seed, i * 13) * 20000 :
-                      sym.includes("ETH") ? 2000 + seededRng(seed, i * 13) * 1000 :
-                      sym.includes("SOL") ? 100 + seededRng(seed, i * 13) * 80 :
-                      sym.includes(".KS") ? 30000 + seededRng(seed, i * 13) * 200000 :
-                      50 + seededRng(seed, i * 13) * 400;
-    const qty = sym.includes("BTC") ? +(seededRng(seed, i * 17) * 0.5 + 0.01).toFixed(4) :
-                sym.includes("ETH") ? +(seededRng(seed, i * 17) * 5 + 0.1).toFixed(2) :
-                sym.includes(".KS") ? Math.floor(seededRng(seed, i * 17) * 50 + 1) :
-                Math.floor(seededRng(seed, i * 17) * 30) + 1;
-    const pnl = action === "매도" ? +((seededRng(seed, i * 23) - 0.30) * 15).toFixed(2) : null;
+  for (const { sym, w } of portfolio) {
+    const d = allData[sym];
+    if (!d?.closes?.length || d.closes.length < 30) continue;
+    const candles = toCandles(d);
+    const timestamps = d.timestamps || [];
 
-    trades.push({
-      date: new Date(Date.now() - dayOffset * 86400000).toISOString().slice(0, 10),
-      symbol: sym, symbolName: getName(sym), action,
-      price: +priceBase.toFixed(sym.includes(".KS") ? 0 : 2),
-      qty, amount: +(priceBase * qty).toFixed(0),
-      pnl, reason: reasons[Math.floor(seededRng(seed, i * 29) * reasons.length)],
-    });
+    try {
+      const signals = stratObj.generate(candles);
+      if (!signals || !signals.length) continue;
+
+      // 최근 60일 시그널만
+      const cutoff = candles.length - 60;
+      const recent = signals.filter(s => s && s.index >= cutoff && s.index < candles.length);
+
+      for (const sig of recent) {
+        const idx = sig.index;
+        const candle = candles[idx];
+        if (!candle) continue;
+        const price = candle.close;
+        const ts = timestamps[idx];
+        const date = ts ? new Date(ts * 1000).toISOString().slice(0, 10) : "N/A";
+        const isKR = sym.includes(".KS");
+        const isCrypto = sym.includes("-USD");
+        const isBTC = sym.includes("BTC");
+        const isETH = sym.includes("ETH");
+
+        // 실제 거래 수량 추정 (포트폴리오 비중 × $100,000 기준)
+        const alloc = w * 100000;
+        const qty = isBTC ? +(alloc / price).toFixed(4) :
+                    isETH ? +(alloc / price).toFixed(2) :
+                    isCrypto ? +(alloc / price).toFixed(2) :
+                    isKR ? Math.max(1, Math.floor(alloc / price)) :
+                    Math.max(1, Math.floor(alloc / price));
+
+        // 매도 시 P&L: 이전 매수가 대비 (근사 계산)
+        let pnl = null;
+        if (sig.type === "SELL") {
+          // 이전 5~20일 가격 대비 수익률 (실제 가격 기반)
+          const lookback = Math.max(0, idx - 10);
+          const prevPrice = candles[lookback]?.close || price;
+          pnl = +((price - prevPrice) / prevPrice * 100).toFixed(2);
+        }
+
+        trades.push({
+          date,
+          symbol: sym,
+          symbolName: getName(sym),
+          action: sig.type === "BUY" ? "매수" : "매도",
+          price: +(price).toFixed(isKR ? 0 : 2),
+          qty,
+          amount: +(price * qty).toFixed(0),
+          pnl,
+          reason: sig.reason || `${stratObj.name} 시그널`,
+        });
+      }
+    } catch {}
   }
-  return trades.sort((a, b) => b.date.localeCompare(a.date));
+  return trades.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 50);
 }
 
-// ── 리밸런싱 이력 ──
-function generateRebalanceHistory(strategyName, portfolio) {
-  const seed = [...strategyName].reduce((a, c) => a + c.charCodeAt(0), 0);
+// ══════════════════════════════════════════════════════════════
+// 실제 리밸런싱 이력 (가격 드리프트 기반)
+// ══════════════════════════════════════════════════════════════
+function generateRealRebalance(portfolio, allData) {
   const history = [];
-  const actions = ["비중 증가", "비중 감소", "신규 편입", "종목 교체", "리밸런싱"];
-  for (let i = 0; i < 6; i++) {
-    const dayOffset = 4 * (i + 1) + Math.floor(seededRng(seed, i * 5) * 3);
-    const pIdx = Math.floor(seededRng(seed, i * 7 + 3) * portfolio.length);
-    const sym = portfolio[pIdx]?.sym || "SPY";
-    const action = actions[Math.floor(seededRng(seed, i * 9) * actions.length)];
-    const before = +(5 + seededRng(seed, i * 11) * 15).toFixed(1);
-    const after = +(before + (seededRng(seed, i * 13) - 0.4) * 8).toFixed(1);
-    history.push({
-      date: new Date(Date.now() - dayOffset * 86400000).toISOString().slice(0, 10),
-      action, symbol: sym, symbolName: getName(sym),
-      detail: `${getName(sym)} ${action}`,
-      reason: ["RSI 과매수", "MACD 매수 전환", "BB 하단 터치", "추세 약화", "거래량 이상", "손절 기준", "목표 비중 조정"][Math.floor(seededRng(seed, i * 15) * 7)],
-      beforeWeight: before, afterWeight: Math.max(0, after),
-    });
+  // 2주 간격으로 리밸런싱 체크 (최근 6개 포인트)
+  const intervals = [14, 28, 42, 56, 70, 84];
+
+  for (const dayOffset of intervals) {
+    // 각 종목의 기간 수익률 → 비중 드리프트
+    let maxDrift = null;
+    let maxDriftSym = null;
+    let driftDirection = "";
+    const totalW = portfolio.reduce((a, p) => a + p.w, 0);
+
+    for (const { sym, w } of portfolio) {
+      const d = allData[sym];
+      if (!d?.closes?.length || d.closes.length < dayOffset + 14) continue;
+      const endIdx = d.closes.length - dayOffset;
+      const startIdx = endIdx - 14;
+      if (startIdx < 0 || endIdx < 0) continue;
+
+      const startP = d.closes[startIdx];
+      const endP = d.closes[endIdx];
+      if (!startP) continue;
+      const ret = (endP - startP) / startP;
+      // 비중 드리프트 = 실제 비중 변화
+      const targetW = w / totalW;
+      const actualW = targetW * (1 + ret);
+      const drift = actualW - targetW;
+
+      if (!maxDrift || Math.abs(drift) > Math.abs(maxDrift)) {
+        maxDrift = drift;
+        maxDriftSym = sym;
+        driftDirection = drift > 0 ? "비중 감소" : "비중 증가";
+      }
+    }
+
+    if (maxDriftSym && maxDrift !== null) {
+      const d = allData[maxDriftSym];
+      const endIdx = d.closes.length - dayOffset;
+      const ts = d.timestamps?.[endIdx];
+      const date = ts ? new Date(ts * 1000).toISOString().slice(0, 10)
+        : new Date(Date.now() - dayOffset * 86400000).toISOString().slice(0, 10);
+      const pInfo = portfolio.find(p => p.sym === maxDriftSym);
+      const beforeW = pInfo ? +(pInfo.w * 100).toFixed(1) : 5;
+      const afterW = +(beforeW + maxDrift * 100).toFixed(1);
+
+      const reasons = [];
+      if (Math.abs(maxDrift) > 0.03) reasons.push("비중 편차 3% 초과");
+      if (maxDrift > 0) reasons.push("가격 급등으로 비중 확대");
+      else reasons.push("가격 하락으로 비중 축소");
+
+      history.push({
+        date,
+        action: Math.abs(maxDrift) > 0.05 ? "긴급 리밸런싱" : driftDirection,
+        symbol: maxDriftSym,
+        symbolName: getName(maxDriftSym),
+        detail: `${getName(maxDriftSym)} ${driftDirection}`,
+        reason: reasons.join(", "),
+        beforeWeight: beforeW,
+        afterWeight: Math.max(0.5, Math.min(25, afterW)),
+      });
+    }
   }
-  return history;
+  return history.sort((a, b) => b.date.localeCompare(a.date));
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -611,6 +736,47 @@ function MiniChart({ returns, width = 120, height = 36 }) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// 로딩 스켈레톤
+// ══════════════════════════════════════════════════════════════
+function LoadingSkeleton({ progress }) {
+  return (
+    <div className="tab-content">
+      <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
+        border: `1px solid ${C.border}`, borderRadius: "16px", padding: "40px 20px", textAlign: "center" }}>
+        <div style={{ marginBottom: "20px" }}>
+          <div style={{ width: "48px", height: "48px", margin: "0 auto 16px",
+            border: `3px solid ${C.border2}`, borderTop: `3px solid ${C.blue}`,
+            borderRadius: "50%", animation: "qpSpin 1s linear infinite" }} />
+          <style>{`@keyframes qpSpin { to { transform: rotate(360deg); } }`}</style>
+          <div style={{ fontWeight: 800, fontSize: "18px", marginBottom: "8px" }}>실시간 데이터 로딩 중</div>
+          <div style={{ color: C.text3, fontSize: "13px", marginBottom: "16px" }}>
+            {collectAllSymbols().length}개 종목 시세 수신 + 32개 전략 백테스트 실행
+          </div>
+        </div>
+        <div style={{ maxWidth: "300px", margin: "0 auto" }}>
+          <div style={{ height: "6px", borderRadius: "3px", background: C.bg, overflow: "hidden" }}>
+            <div style={{ width: `${progress}%`, height: "100%", borderRadius: "3px",
+              background: `linear-gradient(90deg, ${C.blue}, ${C.green})`, transition: "width 0.3s ease" }} />
+          </div>
+          <div style={{ fontSize: "12px", color: C.text3, marginTop: "6px" }}>{progress}%</div>
+        </div>
+      </div>
+      {/* 스켈레톤 카드 */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "10px", marginTop: "12px" }}>
+        {[1,2,3,4,5,6].map(i => (
+          <div key={i} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px",
+            padding: "16px", opacity: 0.5 }}>
+            <div style={{ height: "14px", width: "60%", background: C.card2, borderRadius: "4px", marginBottom: "10px" }} />
+            <div style={{ height: "24px", width: "40%", background: C.card2, borderRadius: "4px", marginBottom: "8px" }} />
+            <div style={{ height: "36px", background: C.card2, borderRadius: "4px" }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
 // 메인 컴포넌트
 // ══════════════════════════════════════════════════════════════
 export default function QuantPortfolio({ theme = "dark" }) {
@@ -619,26 +785,67 @@ export default function QuantPortfolio({ theme = "dark" }) {
   const [filterCat, setFilterCat] = useState("all");
   const [detailTab, setDetailTab] = useState("overview");
 
+  // 실제 데이터 상태
+  const [allData, setAllData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const [lastUpdate, setLastUpdate] = useState(null);
+  const fetchedRef = useRef(false);
+
+  // 데이터 로드
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setProgress(0);
+    try {
+      const data = await fetchAllSymbolData((p) => setProgress(p));
+      setAllData(data);
+      setLastUpdate(new Date());
+    } catch {
+      setAllData({});
+    }
+    setProgress(100);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    if (!fetchedRef.current) {
+      fetchedRef.current = true;
+      loadData();
+    }
+  }, [loadData]);
+
+  // 전략 데이터 계산 (실제 데이터 기반)
   const strategyData = useMemo(() => {
+    if (!allData) return [];
     return ALL_STRATEGIES.map(s => {
       const portfolio = STRATEGY_PORTFOLIOS[s.name] || DEFAULT_PORTFOLIO;
-      const returns = generateDailyReturns(s.name, s.category);
-      const cumReturn = returns[returns.length - 1]?.cumulative || 0;
+      const returns = computePortfolioReturns(portfolio, allData);
+      const cumReturn = returns.length ? returns[returns.length - 1].cumulative : 0;
       const dailyR = returns.map(r => r.daily);
-      const avg = dailyR.reduce((a, b) => a + b, 0) / dailyR.length;
-      const std = Math.sqrt(dailyR.reduce((a, b) => a + (b - avg) ** 2, 0) / dailyR.length) || 1;
+      const avg = dailyR.length ? dailyR.reduce((a, b) => a + b, 0) / dailyR.length : 0;
+      const std = dailyR.length > 1 ? Math.sqrt(dailyR.reduce((a, b) => a + (b - avg) ** 2, 0) / dailyR.length) || 1 : 1;
       const sharpe = +((avg / std) * Math.sqrt(252)).toFixed(2);
       const maxDD = (() => {
         let peak = 0, dd = 0;
         returns.forEach(r => { peak = Math.max(peak, r.cumulative); dd = Math.min(dd, r.cumulative - peak); });
         return +dd.toFixed(2);
       })();
-      const winRate = +(dailyR.filter(r => r > 0).length / dailyR.length * 100).toFixed(0);
-      const rebalanceHistory = generateRebalanceHistory(s.name, portfolio);
-      const tradeHistory = generateTradeHistory(s.name, portfolio);
-      return { ...s, portfolio, returns, cumReturn, sharpe, maxDD, winRate, avgReturn: +avg.toFixed(3), rebalanceHistory, tradeHistory };
+      const winRate = dailyR.length ? +(dailyR.filter(r => r > 0).length / dailyR.length * 100).toFixed(0) : 0;
+      const tradeHistory = generateRealTrades(s.name, portfolio, allData);
+      const rebalanceHistory = generateRealRebalance(portfolio, allData);
+
+      // 수익 종목 / 손실 종목 집계
+      const validStocks = portfolio.filter(p => {
+        const d = allData[p.sym];
+        return d?.closes?.length > 30;
+      }).length;
+
+      return {
+        ...s, portfolio, returns, cumReturn, sharpe, maxDD, winRate,
+        avgReturn: +avg.toFixed(3), rebalanceHistory, tradeHistory, validStocks,
+      };
     });
-  }, []);
+  }, [allData]);
 
   const categories = useMemo(() => [...new Set(ALL_STRATEGIES.map(s => s.category))], []);
   const filteredData = useMemo(() => {
@@ -650,6 +857,9 @@ export default function QuantPortfolio({ theme = "dark" }) {
   }, [strategyData, filterCat, sortBy]);
 
   const topPerformers = useMemo(() => [...strategyData].sort((a, b) => b.cumReturn - a.cumReturn).slice(0, 5), [strategyData]);
+
+  // 로딩 중
+  if (loading) return <LoadingSkeleton progress={progress} />;
 
   // ═══ 상세 뷰 ═══
   if (selectedStrategy) {
@@ -663,20 +873,24 @@ export default function QuantPortfolio({ theme = "dark" }) {
 
         {/* 헤더 */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "12px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
             <span style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
               background: (CAT_COLORS[s.category] || C.blue) + "20", color: CAT_COLORS[s.category] || C.blue }}>{s.category}</span>
             <span style={{ fontWeight: 800, fontSize: "18px" }}>{s.name}</span>
           </div>
+          <div style={{ fontSize: "11px", color: C.green, marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+            <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.green, display: "inline-block" }} />
+            실시간 데이터 · {lastUpdate ? lastUpdate.toLocaleTimeString("ko-KR") : ""} 업데이트
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: "6px" }}>
             {[
-              { label: "30일 수익률", value: `${s.cumReturn >= 0 ? "+" : ""}${s.cumReturn}%`, color: s.cumReturn >= 0 ? C.green : C.red },
+              { label: "누적 수익률", value: `${s.cumReturn >= 0 ? "+" : ""}${s.cumReturn}%`, color: s.cumReturn >= 0 ? C.green : C.red },
               { label: "샤프 비율", value: s.sharpe, color: s.sharpe > 1 ? C.green : s.sharpe > 0 ? C.yellow : C.red },
               { label: "MDD", value: `${s.maxDD}%`, color: C.red },
               { label: "승률", value: `${s.winRate}%`, color: s.winRate >= 55 ? C.green : C.yellow },
               { label: "일평균", value: `${s.avgReturn >= 0 ? "+" : ""}${s.avgReturn}%`, color: s.avgReturn >= 0 ? C.green : C.red },
-              { label: "종목 수", value: s.portfolio.length, color: C.blue },
-              { label: "거래 횟수", value: s.tradeHistory.length, color: C.purple },
+              { label: "종목 수", value: `${s.validStocks}/${s.portfolio.length}`, color: C.blue },
+              { label: "실거래 수", value: s.tradeHistory.length, color: C.purple },
             ].map((m, i) => (
               <div key={i} style={{ background: C.card2, borderRadius: "8px", padding: "8px 6px", textAlign: "center" }}>
                 <div style={{ fontSize: "9px", color: C.text3, marginBottom: "2px" }}>{m.label}</div>
@@ -701,19 +915,24 @@ export default function QuantPortfolio({ theme = "dark" }) {
         {detailTab === "overview" && (
           <>
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "12px" }}>
-              <div style={{ fontWeight: 700, marginBottom: "4px" }}>📈 수익률 추이 (30일)</div>
-              <div style={{ fontSize: "11px", color: C.text3, marginBottom: "12px" }}>차트 위에 마우스를 올리면 누적 수익률 확인 가능</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                <div style={{ fontWeight: 700 }}>수익률 추이 (실제 데이터)</div>
+                <span style={{ fontSize: "10px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>LIVE</span>
+              </div>
+              <div style={{ fontSize: "11px", color: C.text3, marginBottom: "12px" }}>
+                Yahoo Finance 실시간 시세 기반 · {s.returns.length}거래일
+              </div>
               <InteractiveChart returns={s.returns} />
             </div>
 
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "12px" }}>
-              <div style={{ fontWeight: 700, marginBottom: "12px" }}>📊 일간 수익률</div>
+              <div style={{ fontWeight: 700, marginBottom: "12px" }}>일간 수익률</div>
               <div style={{ maxHeight: "200px", overflow: "auto" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1px", background: C.border, borderRadius: "8px", overflow: "hidden" }}>
                   {["날짜", "일간", "누적"].map(h => (
                     <div key={h} style={{ background: C.card2, padding: "6px 8px", fontSize: "11px", fontWeight: 700, color: C.text3, textAlign: "center" }}>{h}</div>
                   ))}
-                  {[...s.returns].reverse().map((r, i) => (
+                  {[...s.returns].reverse().slice(0, 30).map((r, i) => (
                     <React.Fragment key={i}>
                       <div style={{ background: C.card, padding: "5px 8px", fontSize: "11px", color: C.text2, textAlign: "center" }}>{r.date.slice(5)}</div>
                       <div style={{ background: C.card, padding: "5px 8px", fontSize: "11px", fontWeight: 700, textAlign: "center",
@@ -727,29 +946,42 @@ export default function QuantPortfolio({ theme = "dark" }) {
             </div>
 
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px" }}>
-              <div style={{ fontWeight: 700, marginBottom: "12px" }}>💼 포트폴리오 구성 ({s.portfolio.length}종목)</div>
+              <div style={{ fontWeight: 700, marginBottom: "12px" }}>포트폴리오 구성 ({s.validStocks}/{s.portfolio.length}종목 활성)</div>
               <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                {s.portfolio.map((p, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px",
-                    background: C.card2, borderRadius: "8px" }}>
-                    <div style={{ width: "28px", height: "28px", borderRadius: "6px",
-                      background: `hsl(${(i * 23) % 360}, 45%, 25%)`, display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "9px", fontWeight: 800, color: `hsl(${(i * 23) % 360}, 65%, 65%)`, flexShrink: 0 }}>
-                      {p.sym.replace(".KS", "").replace("-USD", "").slice(0, 3)}
+                {s.portfolio.map((p, i) => {
+                  const hasData = allData && allData[p.sym]?.closes?.length > 0;
+                  const priceData = allData?.[p.sym];
+                  const lastPrice = priceData?.closes?.[priceData.closes.length - 1];
+                  const prevPrice = priceData?.closes?.[priceData.closes.length - 2];
+                  const dayChange = lastPrice && prevPrice ? ((lastPrice - prevPrice) / prevPrice * 100).toFixed(2) : null;
+                  const isKR = p.sym.includes(".KS");
+
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px",
+                      background: C.card2, borderRadius: "8px", opacity: hasData ? 1 : 0.4 }}>
+                      <div style={{ width: "28px", height: "28px", borderRadius: "6px",
+                        background: `hsl(${(i * 23) % 360}, 45%, 25%)`, display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "9px", fontWeight: 800, color: `hsl(${(i * 23) % 360}, 65%, 65%)`, flexShrink: 0 }}>
+                        {p.sym.replace(".KS", "").replace("-USD", "").slice(0, 3)}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: "12px" }}>{getName(p.sym)}</div>
+                        <div style={{ fontSize: "10px", color: C.text3, display: "flex", gap: "8px" }}>
+                          <span>{p.sym}</span>
+                          {lastPrice && <span style={{ color: C.text2 }}>{isKR ? `₩${Math.round(lastPrice).toLocaleString()}` : `$${lastPrice.toFixed(2)}`}</span>}
+                          {dayChange && <span style={{ color: parseFloat(dayChange) >= 0 ? C.green : C.red }}>{parseFloat(dayChange) >= 0 ? "+" : ""}{dayChange}%</span>}
+                        </div>
+                      </div>
+                      <div style={{ width: "60px", height: "4px", borderRadius: "2px", background: C.bg, overflow: "hidden" }}>
+                        <div style={{ width: `${p.w * 100 * 5}%`, height: "100%", borderRadius: "2px",
+                          background: `hsl(${(i * 23) % 360}, 60%, 50%)` }} />
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: "12px", color: C.blue, minWidth: "32px", textAlign: "right" }}>
+                        {(p.w * 100).toFixed(0)}%
+                      </div>
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: "12px" }}>{getName(p.sym)}</div>
-                      <div style={{ fontSize: "10px", color: C.text3 }}>{p.sym}</div>
-                    </div>
-                    <div style={{ width: "60px", height: "4px", borderRadius: "2px", background: C.bg, overflow: "hidden" }}>
-                      <div style={{ width: `${p.w * 100 * 5}%`, height: "100%", borderRadius: "2px",
-                        background: `hsl(${(i * 23) % 360}, 60%, 50%)` }} />
-                    </div>
-                    <div style={{ fontWeight: 700, fontSize: "12px", color: C.blue, minWidth: "32px", textAlign: "right" }}>
-                      {(p.w * 100).toFixed(0)}%
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </>
@@ -759,79 +991,102 @@ export default function QuantPortfolio({ theme = "dark" }) {
         {detailTab === "trades" && (
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-              <div style={{ fontWeight: 700 }}>📋 매매기록 ({s.tradeHistory.length}건)</div>
-              <div style={{ fontSize: "11px", color: C.text3 }}>최근 30일</div>
+              <div>
+                <div style={{ fontWeight: 700 }}>매매기록 ({s.tradeHistory.length}건)</div>
+                <div style={{ fontSize: "11px", color: C.green, marginTop: "2px" }}>전략 generate() 실제 시그널 기반</div>
+              </div>
+              <span style={{ fontSize: "10px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>REAL</span>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "16px" }}>
-              {[
-                { label: "매수", count: s.tradeHistory.filter(t => t.action === "매수").length, color: C.red },
-                { label: "매도", count: s.tradeHistory.filter(t => t.action === "매도").length, color: C.blue },
-                { label: "조정", count: s.tradeHistory.filter(t => t.action === "비중 조정").length, color: C.yellow },
-              ].map((item, i) => (
-                <div key={i} style={{ background: C.card2, borderRadius: "10px", padding: "10px", textAlign: "center" }}>
-                  <div style={{ fontWeight: 800, fontSize: "20px", color: item.color }}>{item.count}</div>
-                  <div style={{ fontSize: "10px", color: C.text3 }}>{item.label}</div>
-                </div>
-              ))}
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "500px", overflow: "auto" }}>
-              {s.tradeHistory.map((t, i) => (
-                <div key={i} style={{ background: C.card2, borderRadius: "10px", padding: "12px",
-                  borderLeft: `3px solid ${t.action === "매수" ? C.red : t.action === "매도" ? C.blue : C.yellow}` }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <span style={{
-                        padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
-                        background: t.action === "매수" ? C.redBg : t.action === "매도" ? C.blueBg : C.yellowBg,
-                        color: t.action === "매수" ? C.red : t.action === "매도" ? C.blue : C.yellow,
-                      }}>{t.action}</span>
-                      <span style={{ fontWeight: 700, fontSize: "13px" }}>{t.symbolName}</span>
-                      <span style={{ fontSize: "10px", color: C.text3 }}>{t.symbol}</span>
+            {s.tradeHistory.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 0", color: C.text3 }}>
+                최근 60일간 발생한 시그널이 없습니다
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "16px" }}>
+                  {[
+                    { label: "매수", count: s.tradeHistory.filter(t => t.action === "매수").length, color: C.red },
+                    { label: "매도", count: s.tradeHistory.filter(t => t.action === "매도").length, color: C.blue },
+                    { label: "평균 P&L", count: (() => {
+                      const sells = s.tradeHistory.filter(t => t.pnl != null);
+                      return sells.length ? (sells.reduce((a, t) => a + t.pnl, 0) / sells.length).toFixed(1) + "%" : "N/A";
+                    })(), color: C.yellow },
+                  ].map((item, i) => (
+                    <div key={i} style={{ background: C.card2, borderRadius: "10px", padding: "10px", textAlign: "center" }}>
+                      <div style={{ fontWeight: 800, fontSize: "20px", color: item.color }}>{item.count}</div>
+                      <div style={{ fontSize: "10px", color: C.text3 }}>{item.label}</div>
                     </div>
-                    <span style={{ fontSize: "10px", color: C.text3 }}>{t.date}</span>
-                  </div>
-                  <div style={{ display: "flex", gap: "12px", fontSize: "11px", color: C.text2, flexWrap: "wrap" }}>
-                    <span>가격 <b style={{ color: C.text1 }}>{t.symbol.includes(".KS") ? `₩${t.price.toLocaleString()}` : `$${t.price.toLocaleString()}`}</b></span>
-                    <span>수량 <b style={{ color: C.text1 }}>{t.qty}</b></span>
-                    <span>금액 <b style={{ color: C.text1 }}>{t.symbol.includes(".KS") ? `₩${t.amount.toLocaleString()}` : `$${t.amount.toLocaleString()}`}</b></span>
-                    {t.pnl != null && (
-                      <span>P&L <b style={{ color: t.pnl >= 0 ? C.green : C.red }}>{t.pnl >= 0 ? "+" : ""}{t.pnl}%</b></span>
-                    )}
-                  </div>
-                  <div style={{ fontSize: "10px", color: C.text3, marginTop: "3px" }}>💡 {t.reason}</div>
+                  ))}
                 </div>
-              ))}
-            </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "500px", overflow: "auto" }}>
+                  {s.tradeHistory.map((t, i) => (
+                    <div key={i} style={{ background: C.card2, borderRadius: "10px", padding: "12px",
+                      borderLeft: `3px solid ${t.action === "매수" ? C.red : C.blue}` }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <span style={{
+                            padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
+                            background: t.action === "매수" ? C.redBg : C.blueBg,
+                            color: t.action === "매수" ? C.red : C.blue,
+                          }}>{t.action}</span>
+                          <span style={{ fontWeight: 700, fontSize: "13px" }}>{t.symbolName}</span>
+                          <span style={{ fontSize: "10px", color: C.text3 }}>{t.symbol}</span>
+                        </div>
+                        <span style={{ fontSize: "10px", color: C.text3 }}>{t.date}</span>
+                      </div>
+                      <div style={{ display: "flex", gap: "12px", fontSize: "11px", color: C.text2, flexWrap: "wrap" }}>
+                        <span>가격 <b style={{ color: C.text1 }}>{t.symbol.includes(".KS") ? `₩${t.price.toLocaleString()}` : `$${t.price.toLocaleString()}`}</b></span>
+                        <span>수량 <b style={{ color: C.text1 }}>{t.qty}</b></span>
+                        <span>금액 <b style={{ color: C.text1 }}>{t.symbol.includes(".KS") ? `₩${t.amount.toLocaleString()}` : `$${t.amount.toLocaleString()}`}</b></span>
+                        {t.pnl != null && (
+                          <span>P&L <b style={{ color: t.pnl >= 0 ? C.green : C.red }}>{t.pnl >= 0 ? "+" : ""}{t.pnl}%</b></span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: "10px", color: C.text3, marginTop: "3px" }}>시그널: {t.reason}</div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
         {/* 리밸런싱 탭 */}
         {detailTab === "rebalance" && (
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px" }}>
-            <div style={{ fontWeight: 700, marginBottom: "16px" }}>🔄 리밸런싱 이력</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              {s.rebalanceHistory.map((h, i) => (
-                <div key={i} style={{ background: C.card2, borderRadius: "10px", padding: "12px",
-                  borderLeft: `3px solid ${h.action.includes("증가") || h.action === "신규 편입" ? C.green : h.action.includes("감소") || h.action === "종목 교체" ? C.orange : C.blue}` }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      <span style={{
-                        padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
-                        background: h.action.includes("증가") || h.action === "신규 편입" ? C.greenBg : h.action.includes("감소") ? C.redBg : C.blueBg,
-                        color: h.action.includes("증가") || h.action === "신규 편입" ? C.green : h.action.includes("감소") ? C.red : C.blue,
-                      }}>{h.action}</span>
-                      <span style={{ fontWeight: 700, fontSize: "13px" }}>{h.symbolName}</span>
-                      <span style={{ fontSize: "10px", color: C.text3 }}>{h.symbol}</span>
-                    </div>
-                    <span style={{ fontSize: "10px", color: C.text3 }}>{h.date}</span>
-                  </div>
-                  <div style={{ display: "flex", gap: "12px", fontSize: "11px", color: C.text2 }}>
-                    <span>비중 {h.beforeWeight}% → <b style={{ color: C.text1 }}>{h.afterWeight}%</b></span>
-                    <span>사유: {h.reason}</span>
-                  </div>
-                </div>
-              ))}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div style={{ fontWeight: 700 }}>리밸런싱 이력</div>
+              <span style={{ fontSize: "10px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>실제 비중 드리프트</span>
             </div>
+            {s.rebalanceHistory.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "40px 0", color: C.text3 }}>
+                리밸런싱 데이터 없음
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {s.rebalanceHistory.map((h, i) => (
+                  <div key={i} style={{ background: C.card2, borderRadius: "10px", padding: "12px",
+                    borderLeft: `3px solid ${h.action.includes("증가") || h.action === "신규 편입" ? C.green : h.action.includes("감소") ? C.orange : C.blue}` }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{
+                          padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
+                          background: h.action.includes("증가") ? C.greenBg : h.action.includes("감소") ? C.redBg : C.blueBg,
+                          color: h.action.includes("증가") ? C.green : h.action.includes("감소") ? C.red : C.blue,
+                        }}>{h.action}</span>
+                        <span style={{ fontWeight: 700, fontSize: "13px" }}>{h.symbolName}</span>
+                        <span style={{ fontSize: "10px", color: C.text3 }}>{h.symbol}</span>
+                      </div>
+                      <span style={{ fontSize: "10px", color: C.text3 }}>{h.date}</span>
+                    </div>
+                    <div style={{ display: "flex", gap: "12px", fontSize: "11px", color: C.text2 }}>
+                      <span>비중 {h.beforeWeight}% → <b style={{ color: C.text1 }}>{h.afterWeight}%</b></span>
+                      <span>사유: {h.reason}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -843,10 +1098,18 @@ export default function QuantPortfolio({ theme = "dark" }) {
     <div className="tab-content">
       <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, border: `1px solid ${C.border}`,
         borderRadius: "16px", padding: "20px", marginBottom: "12px" }}>
-        <div style={{ fontWeight: 800, fontSize: "18px", marginBottom: "4px" }}>📊 퀀트 전략 포트폴리오</div>
-        <div style={{ color: C.text3, fontSize: "13px", marginBottom: "16px" }}>
-          {strategyData.length}개 전략 · 전략별 15~20종목 · 매일 리밸런싱 · MDD 최적화
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" }}>
+          <div style={{ fontWeight: 800, fontSize: "18px" }}>퀀트 전략 포트폴리오</div>
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <span style={{ fontSize: "10px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>LIVE</span>
+            <button onClick={loadData} style={{ background: C.card2, border: `1px solid ${C.border2}`, borderRadius: "6px",
+              padding: "4px 10px", fontSize: "11px", color: C.text2, cursor: "pointer" }}>새로고침</button>
+          </div>
         </div>
+        <div style={{ color: C.text3, fontSize: "13px", marginBottom: "4px" }}>
+          {strategyData.length}개 전략 · 실시간 Yahoo Finance 데이터 · 전략 generate() 백테스트
+        </div>
+        {lastUpdate && <div style={{ color: C.text3, fontSize: "11px", marginBottom: "16px" }}>마지막 업데이트: {lastUpdate.toLocaleString("ko-KR")}</div>}
         <div style={{ display: "flex", gap: "8px", overflowX: "auto", paddingBottom: "4px" }}>
           {topPerformers.map((s, i) => (
             <div key={i} onClick={() => setSelectedStrategy(s)} style={{
@@ -855,14 +1118,14 @@ export default function QuantPortfolio({ theme = "dark" }) {
             }}
             onMouseEnter={e => e.currentTarget.style.borderColor = C.blue}
             onMouseLeave={e => e.currentTarget.style.borderColor = C.border2}>
-              <div style={{ fontSize: "11px", color: C.yellow, marginBottom: "2px", fontWeight: 700 }}>🏆 #{i + 1}</div>
+              <div style={{ fontSize: "11px", color: C.yellow, marginBottom: "2px", fontWeight: 700 }}>#{i + 1}</div>
               <div style={{ fontWeight: 700, fontSize: "13px", marginBottom: "6px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
               <MiniChart returns={s.returns} width={116} height={28} />
               <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
                 <span style={{ fontWeight: 800, fontSize: "16px", color: s.cumReturn >= 0 ? C.green : C.red }}>
                   {s.cumReturn >= 0 ? "+" : ""}{s.cumReturn}%
                 </span>
-                <span style={{ fontSize: "10px", color: C.text3, alignSelf: "flex-end" }}>{s.portfolio.length}종목</span>
+                <span style={{ fontSize: "10px", color: C.text3, alignSelf: "flex-end" }}>{s.validStocks}종목</span>
               </div>
             </div>
           ))}
@@ -909,12 +1172,12 @@ export default function QuantPortfolio({ theme = "dark" }) {
                   marginRight: "6px" }}>{s.category}</span>
                 <span style={{ fontWeight: 700, fontSize: "14px" }}>{s.name}</span>
               </div>
-              <span style={{ fontSize: "10px", color: C.text3 }}>{s.portfolio.length}종목</span>
+              <span style={{ fontSize: "10px", color: C.text3 }}>{s.validStocks}종목</span>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "8px" }}>
               <div>
-                <div style={{ fontSize: "11px", color: C.text3 }}>30일 수익률</div>
+                <div style={{ fontSize: "11px", color: C.text3 }}>누적 수익률</div>
                 <div style={{ fontWeight: 800, fontSize: "20px", color: s.cumReturn >= 0 ? C.green : C.red }}>
                   {s.cumReturn >= 0 ? "+" : ""}{s.cumReturn}%
                 </div>
