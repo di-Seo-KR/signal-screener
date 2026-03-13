@@ -108,7 +108,9 @@ function collectUSSymbols() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// Storage
+// Storage (localStorage + cookie 이중 저장 — iOS 홈화면 추가 대응)
+// iOS standalone PWA는 Safari와 localStorage가 분리되므로
+// config는 cookie에도 저장하여 브라우저↔홈화면 앱 간 공유
 // ══════════════════════════════════════════════════════════════
 const KEYS = {
   config: "di_alpaca_config",
@@ -120,11 +122,43 @@ const KEYS = {
   peakEquity: "di_peak_equity",
 };
 
+function setCookie(name, val, days = 365) {
+  try {
+    const d = new Date(); d.setTime(d.getTime() + days * 86400000);
+    document.cookie = `${name}=${encodeURIComponent(val)};expires=${d.toUTCString()};path=/;SameSite=Lax`;
+  } catch {}
+}
+function getCookie(name) {
+  try {
+    const m = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+    return m ? decodeURIComponent(m[1]) : null;
+  } catch { return null; }
+}
+
 function load(key, fallback) {
-  try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch { return fallback; }
+  try {
+    // localStorage 우선, 없으면 cookie fallback (iOS standalone 대응)
+    const ls = localStorage.getItem(key);
+    if (ls) return JSON.parse(ls);
+    if (key === KEYS.config) {
+      const ck = getCookie("di_config");
+      if (ck) { const parsed = JSON.parse(ck); localStorage.setItem(key, ck); return parsed; }
+    }
+    if (key === KEYS.settings) {
+      const ck = getCookie("di_settings");
+      if (ck) { const parsed = JSON.parse(ck); localStorage.setItem(key, ck); return parsed; }
+    }
+    return fallback;
+  } catch { return fallback; }
 }
 function save(key, val) {
-  try { localStorage.setItem(key, JSON.stringify(val)); } catch {}
+  try {
+    const json = JSON.stringify(val);
+    localStorage.setItem(key, json);
+    // config와 settings는 cookie에도 저장 (iOS standalone 공유)
+    if (key === KEYS.config) setCookie("di_config", json);
+    if (key === KEYS.settings) setCookie("di_settings", json);
+  } catch {}
 }
 
 // ══════════════════════════════════════════════════════════════
