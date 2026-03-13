@@ -2946,7 +2946,14 @@ function AppInner() {
     });
   }, []);
 
-  const [tab, setTab] = useState("home");
+  const [tab, setTab] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const t = p.get("tab");
+      if (t && ["paper-trading","portfolio","screener","alerts","news","quant-portfolio","sector-flow","backtest"].includes(t)) return t;
+    } catch {}
+    return "home";
+  });
   const [menuOpen, setMenuOpen] = useState(false);
 
   // ── 모바일 감지 (폰트 크기 보정용) ──

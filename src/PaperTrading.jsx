@@ -405,8 +405,6 @@ function SetupPanel({ config, setConfig, onConnect }) {
   const [showSecret, setShowSecret] = useState(false);
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState("");
-  const [qrStatus, setQrStatus] = useState(""); // "" | "loading" | "decoding" | "error"
-  const fileInputRef = useRef(null);
 
   const handleConnect = async () => {
     if (!key.trim() || !secret.trim()) { setError("API Key와 Secret을 모두 입력해주세요"); return; }
@@ -486,92 +484,11 @@ function SetupPanel({ config, setConfig, onConnect }) {
           color: "#fff", border: "none", cursor: testing ? "default" : "pointer",
         }}>{testing ? "연결 중..." : "트레이딩 연결"}</button>
 
-        {/* 구분선 */}
-        <div style={{display:"flex",alignItems:"center",gap:"12px",margin:"20px 0 16px"}}>
-          <div style={{flex:1,height:"1px",background:C.border2}} />
-          <span style={{fontSize:"11px",color:C.text3,fontWeight:600}}>또는</span>
-          <div style={{flex:1,height:"1px",background:C.border2}} />
-        </div>
-
-        {/* QR 스캔으로 불러오기 — 네이티브 카메라 촬영 방식 */}
-        <input ref={fileInputRef} type="file" accept="image/*" capture="environment"
-          style={{display:"none"}} onChange={async (e)=>{
-          const file = e.target.files?.[0];
-          if (!file) return;
-          setQrStatus("decoding");
-          try {
-            await loadJsQR();
-            const img = new Image();
-            const url = URL.createObjectURL(file);
-            img.onload = () => {
-              const canvas = document.createElement("canvas");
-              canvas.width = img.width;
-              canvas.height = img.height;
-              const ctx = canvas.getContext("2d");
-              ctx.drawImage(img, 0, 0);
-              URL.revokeObjectURL(url);
-              // 이미지가 너무 크면 리사이즈 (인식 속도+정확도)
-              const MAX_DIM = 1024;
-              if (canvas.width > MAX_DIM || canvas.height > MAX_DIM) {
-                const scale = MAX_DIM / Math.max(canvas.width, canvas.height);
-                const sw = Math.round(canvas.width * scale);
-                const sh = Math.round(canvas.height * scale);
-                const small = document.createElement("canvas");
-                small.width = sw; small.height = sh;
-                small.getContext("2d").drawImage(canvas, 0, 0, sw, sh);
-                canvas.width = sw; canvas.height = sh;
-                ctx.drawImage(small, 0, 0);
-              }
-              const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-              // attemptBoth: 흰배경+검은QR / 검은배경+흰QR 둘 다 시도
-              const code = window.jsQR(imgData.data, canvas.width, canvas.height, { inversionAttempts: "attemptBoth" });
-              if (!code?.data) {
-                setQrStatus("error");
-                setError("QR 코드를 인식하지 못했습니다. QR이 화면에 크게 나오도록 다시 촬영해주세요.");
-                return;
-              }
-              try {
-                const raw = code.data.trim();
-                const payload = JSON.parse(atob(raw));
-                if (!payload.v || !payload.k) throw new Error("invalid");
-                const newConfig = { apiKey: payload.k, apiSecret: payload.s, isPaper: payload.p !== 0, connected: true };
-                setConfig(newConfig);
-                save(KEYS.config, newConfig);
-                setQrStatus("");
-                alpacaAPI("account", newConfig).then(acc => {
-                  if (acc.id) onConnect(acc);
-                }).catch(() => {});
-              } catch {
-                setQrStatus("error");
-                setError("QR 인식 실패. PC에서 생성한 QR을 다시 촬영하세요.");
-              }
-            };
-            img.onerror = () => { setQrStatus("error"); setError("이미지 로드 실패"); };
-            img.src = url;
-          } catch {
-            setQrStatus("error");
-            setError("QR 스캐너 로드 실패");
-          }
-          // input 초기화 (같은 파일 재선택 가능)
-          e.target.value = "";
-        }} />
-        <button onClick={()=>{
-          setError("");
-          setQrStatus("loading");
-          fileInputRef.current?.click();
-          // 파일 선택 안 하고 취소한 경우 복구
-          setTimeout(() => { if (qrStatus === "loading") setQrStatus(""); }, 10000);
-        }} disabled={qrStatus==="decoding"} style={{
-          width:"100%",padding:"14px",borderRadius:"12px",fontSize:"15px",fontWeight:700,
-          background:C.card2,color:qrStatus==="decoding"?C.text3:C.green,
-          border:`1px solid ${C.green}44`,cursor:qrStatus==="decoding"?"default":"pointer",
-          display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",
-        }}>
-          <span style={{fontSize:"20px"}}>📷</span>
-          {qrStatus==="decoding"?"QR 인식 중...":"QR로 불러오기"}
-        </button>
-        <div style={{fontSize:"10px",color:C.text3,marginTop:"8px",textAlign:"center"}}>
-          PC 자동매매 설정에서 QR 생성 → 여기서 스캔
+        {/* QR 동기화 안내 */}
+        <div style={{marginTop:"20px",padding:"14px",borderRadius:"12px",background:C.card2,border:`1px solid ${C.border2}`,textAlign:"center"}}>
+          <div style={{fontSize:"13px",color:C.text2,lineHeight:1.6}}>
+            <span style={{fontSize:"16px"}}>📱</span> PC에서 QR 생성 후 <b style={{color:C.green}}>카메라 앱</b>으로 스캔하면<br/>자동으로 연결됩니다
+          </div>
         </div>
       </div>
     </div>
@@ -684,7 +601,7 @@ function OrderModal({ symbol: initSymbol, side, reason, config, onClose, onOrder
 }
 
 // ══════════════════════════════════════════════════════════════
-// QR 코드 생성 (동적 CDN 로드) + 스캔 (jsQR)
+// QR 코드 생성 (동적 CDN 로드)
 // ══════════════════════════════════════════════════════════════
 let _qrLib = null;
 async function loadQRGenerator() {
@@ -698,23 +615,30 @@ async function loadQRGenerator() {
   });
 }
 
-let _jsQR = null;
-async function loadJsQR() {
-  if (_jsQR) return _jsQR;
-  return new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js";
-    s.onload = () => { _jsQR = window.jsQR; resolve(_jsQR); };
-    s.onerror = reject;
-    document.head.appendChild(s);
-  });
-}
-
 // ══════════════════════════════════════════════════════════════
+// URL ?sync= 파라미터 선파싱 (카메라 앱 → 브라우저 → 자동 적용)
+function _parseSyncParam() {
+  try {
+    const s = new URLSearchParams(window.location.search).get("sync");
+    if (!s) return null;
+    const p = JSON.parse(atob(s));
+    return (p.v && p.k) ? p : null;
+  } catch { return null; }
+}
+const _syncOnce = _parseSyncParam();
+
 // 메인 컴포넌트
 // ══════════════════════════════════════════════════════════════
 export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
-  const [config, setConfig] = useState(() => load(KEYS.config, {}));
+  const [config, setConfig] = useState(() => {
+    const saved = load(KEYS.config, {});
+    if (_syncOnce?.k) {
+      const merged = { apiKey: _syncOnce.k, apiSecret: _syncOnce.s, isPaper: _syncOnce.p !== 0, connected: true };
+      save(KEYS.config, merged);
+      return merged;
+    }
+    return saved;
+  });
   const [account, setAccount] = useState(null);
   const [positions, setPositions] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -759,6 +683,16 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
   const refreshTimer = useRef(null);
   const scanTimer = useRef(null);
   const isConnected = config.connected && config.apiKey;
+
+  // URL sync 정리 (카메라 앱 → 브라우저로 열렸을 때)
+  useEffect(() => {
+    if (_syncOnce) {
+      const url = new URL(window.location);
+      url.searchParams.delete("sync");
+      url.searchParams.delete("tab");
+      window.history.replaceState({}, "", url.pathname + (url.search || ""));
+    }
+  }, []);
 
   // persist
   useEffect(() => { save(KEYS.tradeLog, tradeLog.slice(0, 300)); }, [tradeLog]);
@@ -1553,9 +1487,9 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
               <button onClick={async ()=>{
                 if (!config.apiKey) { alert("API 키가 설정되어 있지 않습니다."); return; }
                 try {
-                  // QR에는 API 키+시크릿만 (최소 데이터 → 스캔 인식률 극대화)
-                  const mini = JSON.stringify({k:config.apiKey,s:config.apiSecret,p:config.isPaper!==false?1:0,v:1});
-                  const encoded = btoa(mini);
+                  // URL에 API키를 최소 base64로 → 카메라 앱 스캔 시 브라우저 자동 오픈
+                  const mini = btoa(JSON.stringify({k:config.apiKey,s:config.apiSecret,p:config.isPaper!==false?1:0,v:1}));
+                  const syncUrl = `${window.location.origin}/?tab=paper-trading&sync=${mini}`;
                   await loadQRGenerator();
                   setQrModal("generate");
                   setTimeout(() => {
@@ -1563,12 +1497,12 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
                     if (!container) return;
                     container.innerHTML = "";
                     new window.QRCode(container, {
-                      text: encoded,
-                      width: 260,
-                      height: 260,
+                      text: syncUrl,
+                      width: 280,
+                      height: 280,
                       colorDark: "#000000",
                       colorLight: "#ffffff",
-                      correctLevel: window.QRCode.CorrectLevel.M,
+                      correctLevel: window.QRCode.CorrectLevel.L,
                     });
                   }, 100);
                 } catch (e) {
@@ -1764,7 +1698,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
               <>
                 <div style={{fontWeight:800,fontSize:"18px",marginBottom:"6px"}}>📱 QR 코드</div>
                 <div style={{fontSize:"12px",color:C.text3,marginBottom:"20px"}}>
-                  모바일에서 카메라로 스캔하세요
+                  모바일 카메라 앱으로 스캔하세요
                 </div>
                 <div id="di-qr-container" style={{
                   display:"inline-block",padding:"16px",background:"#ffffff",borderRadius:"16px",
