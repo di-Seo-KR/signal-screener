@@ -175,6 +175,16 @@ export default async function handler(req, res) {
         break;
       }
 
+      // ── 특정 주문 조회 ──
+      case "get_order": {
+        const orderId = req.query.order_id;
+        if (!orderId) return res.status(400).json({ error: "order_id required" });
+        const r = await fetch(`${baseUrl}/v2/orders/${orderId}`, { headers });
+        result = await r.json();
+        if (!r.ok) return res.status(r.status).json(result);
+        break;
+      }
+
       // ── 마켓 상태 확인 ──
       case "clock": {
         const r = await fetch(`${baseUrl}/v2/clock`, { headers });
