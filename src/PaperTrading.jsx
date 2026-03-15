@@ -1331,7 +1331,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
               background: C.redBg, border: `1px solid ${C.red}33`, color: C.red, cursor: "pointer" }}>연결 해제</button>
           </div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: "8px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "8px" }}>
           {[
             { label: "총 자산", value: fmtUSD(equity), color: C.text1 },
             { label: "현금", value: fmtUSD(cash), color: C.blue },
@@ -1340,17 +1340,19 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
             { label: "총 수익", value: fmtUSD(totalPL), sub: fmtPct(totalPLPct), color: totalPL >= 0 ? C.green : C.red },
             { label: "포지션 P&L", value: fmtUSD(positionPL), color: positionPL >= 0 ? C.green : C.red },
           ].map((m, i) => (
-            <div key={i} style={{ background: C.card2, borderRadius: "10px", padding: "10px 12px" }}>
-              <div style={{ fontSize: "10px", color: C.text3, marginBottom: "2px" }}>{m.label}</div>
-              <div style={{ fontWeight: 800, fontSize: "15px", color: m.color }}>{m.value}</div>
-              {m.sub && <div style={{ fontSize: "10px", color: m.color }}>{m.sub}</div>}
+            <div key={i} style={{ background: C.card2, borderRadius: "10px", padding: "12px 14px" }}>
+              <div style={{ fontSize: "11px", color: C.text3, marginBottom: "3px", fontWeight: 500 }}>{m.label}</div>
+              <div style={{ fontWeight: 800, fontSize: "16px", color: m.color, letterSpacing: "-0.3px" }}>{m.value}</div>
+              {m.sub && <div style={{ fontSize: "11px", color: m.color, marginTop: "1px" }}>{m.sub}</div>}
             </div>
           ))}
         </div>
       </div>
 
       {/* ── 탭 ── */}
-      <div style={{ display: "flex", gap: "4px", marginBottom: "12px", overflowX: "auto" }}>
+      <div style={{ display: "flex", gap: "6px", marginBottom: "12px", overflowX: "auto",
+        scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch",
+        padding: "2px 0" }}>
         {[
           ["dashboard","포지션",positions.length],
           ["orders","주문",orders.filter(o=>["new","partially_filled","accepted","pending_new"].includes(o.status)).length],
@@ -1360,10 +1362,11 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
           ["log","로그",tradeLog.length],
         ].map(([id,label,count])=>(
           <button key={id} onClick={()=>setActiveTab(id)} style={{
-            padding:"8px 12px",borderRadius:"8px",fontSize:"12px",fontWeight:600,
+            padding:"10px 14px",borderRadius:"10px",fontSize:"13px",fontWeight:600,
             background:activeTab===id?C.blueBg:"transparent",color:activeTab===id?C.blue:C.text3,
-            border:`1px solid ${activeTab===id?C.blue:C.border2}`,cursor:"pointer",whiteSpace:"nowrap",
-            display:"flex",alignItems:"center",gap:"6px",
+            border:`1px solid ${activeTab===id?C.blue+"88":C.border2}`,cursor:"pointer",whiteSpace:"nowrap",
+            display:"flex",alignItems:"center",gap:"6px",minHeight:"40px",
+            transition:"all 0.15s ease",
           }}>
             {label}
             {count!=null&&count>0&&(

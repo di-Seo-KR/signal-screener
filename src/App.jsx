@@ -4240,7 +4240,8 @@ function AppInner() {
         button, a { cursor: pointer; font-family: inherit; transition: all 0.15s ease; }
         button:active { transform: scale(0.97); }
         input, select { font-family: inherit; font-size: 14px; transition: border-color 0.2s ease; }
-        input:focus { border-color: ${C.blue} !important; box-shadow: 0 0 0 3px ${C.blue}18; outline: none; }
+        input:focus { border-color: ${C.blue} !important; box-shadow: 0 0 0 3px ${C.blue}30; outline: none; }
+        select:focus { border-color: ${C.blue} !important; box-shadow: 0 0 0 3px ${C.blue}30; outline: none; }
         .skeleton { background: linear-gradient(90deg, ${C.card2} 25%, ${C.border} 50%, ${C.card2} 75%);
           background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
         .tab-content { animation: slideUp 0.25s ease; }
@@ -4257,16 +4258,20 @@ function AppInner() {
         @media (max-width: 640px) {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
-          main { padding-left: 12px !important; padding-right: 12px !important;
+          main { padding-left: 14px !important; padding-right: 14px !important;
             font-size: 15px !important; }
           .tab-content { font-size: 15px; }
-          button { min-height: 40px; }
-          select { min-height: 40px; }
+          button { min-height: 42px; }
+          select { min-height: 42px; }
           .screener-cond-btn { padding: 8px 14px !important; font-size: 13px !important; }
+          /* 모바일 카드 간격 균일화 */
+          .home-grid { gap: 10px !important; }
         }
         /* ── 태블릿 (641~899px) ── */
         @media (min-width: 641px) and (max-width: 899px) {
-          .desktop-nav button { padding: 5px 6px !important; font-size: 11px !important; }
+          .desktop-nav { gap: 3px !important; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+          .desktop-nav::-webkit-scrollbar { display: none; }
+          .desktop-nav button { padding: 6px 8px !important; font-size: 12px !important; }
         }
         /* ── 데스크톱 중간 (900~1199px) ── */
         @media (min-width: 900px) and (max-width: 1199px) {
@@ -4403,7 +4408,7 @@ function AppInner() {
             <span style={{ padding: "1px 7px", borderRadius: "4px", fontSize: mf(10), fontWeight: 700, background: C.blueBg, color: C.blue }}>v7.3</span>
           </div>
           {/* 데스크톱 네비게이션 */}
-          <nav className="desktop-nav" style={{ display: "flex", gap: "2px" }}>
+          <nav className="desktop-nav" style={{ display: "flex", gap: "4px", alignItems: "center" }}>
             {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-port", label: "전략 운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "자동매매", icon: "🤖" }].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }} style={{
                 padding: "6px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
@@ -4442,15 +4447,15 @@ function AppInner() {
         {menuOpen && (
           <div style={{
             background: C.card, borderTop: `1px solid ${C.border}`,
-            padding: "8px 16px 12px", display: "flex", flexDirection: "column", gap: "2px",
+            padding: "10px 16px 14px", display: "flex", flexDirection: "column", gap: "4px",
           }}>
             {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-port", label: "전략 운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "퀀트 자동매매", icon: "🤖" }].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); setMenuOpen(false); }} style={{
-                padding: "10px 14px", borderRadius: "10px", fontSize: "14px", fontWeight: 600,
+                padding: "12px 16px", borderRadius: "10px", fontSize: "15px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
                 color: tab === t.id ? C.blue : C.text2, border: "none",
-                textAlign: "left", cursor: "pointer",
-              }}>{t.icon} {t.label}</button>
+                textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: "10px",
+              }}><span style={{fontSize:"18px",width:"24px",textAlign:"center"}}>{t.icon}</span> {t.label}</button>
             ))}
           </div>
         )}
