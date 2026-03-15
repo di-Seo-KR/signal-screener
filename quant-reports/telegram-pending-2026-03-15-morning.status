@@ -1,0 +1,7 @@
+status: PENDING
+reason: Chrome browser timeout (all tabs unresponsive) + Vercel API blocked by proxy
+attempted: 2026-03-15T09:00:00+09:00
+retries: 3
+message_file: telegram-pending-2026-03-15-morning.txt
+report_file: morning-picks-2026-03-15.md
+next_retry: next scheduled task execution

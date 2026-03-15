@@ -1,0 +1,7 @@
+status: pending
+created: 2026-03-13T22:00:00+09:00
+type: evening-picks
+reason: Chrome browser tools timed out, VM proxy blocked signal-screener.vercel.app and api.telegram.org
+retry_method: Chrome browser → signal-screener.vercel.app → fetch("/api/telegram-send", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({text: <message from telegram-pending-2026-03-13-evening.txt>})})
+message_file: telegram-pending-2026-03-13-evening.txt
+report_file: evening-picks-2026-03-13.md

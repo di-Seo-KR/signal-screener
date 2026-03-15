@@ -1,0 +1,5 @@
+PENDING - Chrome browser unresponsive (all MCP tools timed out)
+Created: 2026-03-14 08:13 KST
+Retry 1: 2026-03-14 10:04 KST — Chrome still unresponsive (navigate + javascript_tool all timed out)
+Retry needed: telegram send via Chrome
+Alert file: telegram-pending-2026-03-14-alert-0813.txt

@@ -1,0 +1,6 @@
+pending - VM network egress fully blocked (proxy + DNS resolution both failing).
+Created: 2026-03-15T00:00:00 KST
+Attempts: 3 (curl exit 56, Python proxy error, Python DNS failure)
+Action needed: Send via Chrome browser when tabs are responsive, or manually forward
+Message file: telegram-pending-2026-03-15-backtest.txt
+Report file: backtest-report-2026-03-15.md

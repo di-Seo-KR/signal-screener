@@ -724,7 +724,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       if (isCrypto) {
         const { days } = CRYPTO_TF[tf] || CRYPTO_TF["1d"];
         const coinId = asset.cryptoId || asset.symbolRaw || asset.id || asset.symbol.toLowerCase();
-        const r = await fetch(`/api/coingecko-ohlc?id=${encodeURIComponent(coinId)}&days=${days}`);
+        const r = await fetch(`/api/coingecko?id=${encodeURIComponent(coinId)}&days=${days}&type=ohlc`);
         if (!r.ok) throw new Error(`CoinGecko ${r.status}`);
         const j = await r.json();
         candles = (j.candles || []).map(c => ({ ...c, time: tsToTime(c.time, tf) }));

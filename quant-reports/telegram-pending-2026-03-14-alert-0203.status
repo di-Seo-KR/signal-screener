@@ -1,0 +1,12 @@
+pending
+reason: Chrome MCP fully unresponsive (all tabs timeout 60s) + VM egress proxy 403
+created: 2026-03-14T02:03:00+09:00
+attempts: 3
+last_attempt: 2026-03-14T02:10:00+09:00
+errors:
+  - Chrome javascript_tool timeout x3 (tabs 1685900612, 1685900614, 1685900677)
+  - Chrome navigate timeout x2
+  - Chrome screenshot timeout x2
+  - curl exit code 56
+  - python urllib 403 Forbidden (egress proxy)
+action_needed: retry on next scheduled run or send manually

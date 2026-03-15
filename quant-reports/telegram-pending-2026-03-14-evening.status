@@ -1,0 +1,7 @@
+pending - Chrome browser unresponsive (22 tabs open, all MCP calls timeout 60s).
+Created: 2026-03-14T22:00:00 KST
+Attempts: 6 (tabs: 1685900612, 1685900614, 1685900655, 1685900682 + navigate/js/screenshot)
+All attempts: MCP timeout after 60s
+Action needed: Close excess tabs in Chrome, then retry telegram send
+Message file: telegram-pending-2026-03-14-evening.txt
+Report file: evening-picks-2026-03-14.md

@@ -1,0 +1,4 @@
+pending
+reason: Chrome MCP timeout - all browser calls failed
+created: 2026-03-15T00:14:00+09:00
+retry_needed: true

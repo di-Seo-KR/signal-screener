@@ -1,0 +1,6 @@
+status: send_failed
+reason: Chrome browser unresponsive - all MCP operations timed out (60s)
+attempted_at: 2026-03-13T22:03:00+09:00
+attempts: 5
+message_file: telegram-pending-2026-03-13-alert-2203.txt
+next_action: retry on next scheduled run or manual send required

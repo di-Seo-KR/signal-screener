@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-03-15 00:23",
+  "sourceTimestamp": "2026-03-10T05:50:05.735Z",
+  "dataSource": "re-analyzed from 2026-03-13 cached data (Sunday auto-run)",
+  "totalResults": 384,
+  "strategyCount": 24,
+  "newStrategiesCount": 8,
+  "assetCount": 16,
+  "overallAvgReturn": 12.32,
+  "positiveRate": "224/384",
+  "avgSharpe": 13.36,
+  "avgWinRate": 51.8
+}

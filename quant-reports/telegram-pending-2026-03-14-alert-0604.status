@@ -1,0 +1,5 @@
+pending
+reason: Chrome MCP tools timed out repeatedly - unable to send via browser
+created: 2026-03-14T06:04:00+09:00
+attempts: 5 (all timed out)
+next_action: retry on next scheduled run or send manually
