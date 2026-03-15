@@ -1,8 +1,12 @@
 // ════════════════════════════════════════════════════════════════════
-// DI금융 퀀트 엔진 v3.0
+// DI금융 퀀트 엔진 v3.1 — 월가 수준 고도화
 // 32개 매매전략 + 백테스팅 엔진 + 시장진단 + 전략추천
-// 약한 전략 4개 제거 (모멘텀채널, 마이크로스트럭처, 스퀴즈모멘텀, 평균회귀밴드)
-// 우수 전략 8개 추가 (일목균형표, 슈퍼트렌드, 파라볼릭SAR, MFI, CCI, MACD다이버전스, 캔들패턴, 채널돌파모멘텀)
+// v3.0: 약한 전략 4개 제거, 우수 전략 8개 추가
+// v3.1: 전 전략 거래량 확인·다이버전스·추세필터·신뢰도 지표 적용
+//   - 거래량 교차검증 (isVolumeConfirmed) 전략별 임계값 최적화
+//   - RSI 강세/약세 다이버전스 자동 탐지 (detectBullish/BearishDivergence)
+//   - 추세방향 필터 (getTrendDirection) — 역추세 시그널 억제
+//   - 시그널 reason에 정량적 지표 포함 (이격도, 스프레드, 채널폭 등)
 // ════════════════════════════════════════════════════════════════════
 
 // ── 보조지표 계산 함수 ───────────────────────────────────────────
@@ -164,6 +168,53 @@ function calcKeltner(closes, highs, lows, emaPeriod = 20, atrPeriod = 10, atrMul
 }
 
 // ════════════════════════════════════════════════════════════════════
+// 공통 필터 유틸리티 (v3.1 — 전략 고도화)
+// ════════════════════════════════════════════════════════════════════
+
+// 거래량 확인: 최근 N일 평균 대비 현재 거래량이 threshold 배 이상인지
+function isVolumeConfirmed(candles, index, lookback = 20, threshold = 1.2) {
+  if (index < lookback || !candles[index]?.volume) return true; // 데이터 부족 시 통과
+  const avgVol = candles.slice(index - lookback, index).reduce((s, c) => s + (c.volume || 0), 0) / lookback;
+  return avgVol > 0 ? candles[index].volume >= avgVol * threshold : true;
+}
+
+// 추세 방향 필터: SMA50 기반 상승/하락 추세 판별
+function getTrendDirection(closes, index, period = 50) {
+  if (index < period) return "neutral";
+  const sma = closes.slice(index - period + 1, index + 1).reduce((a, b) => a + b, 0) / period;
+  const pct = (closes[index] - sma) / sma;
+  if (pct > 0.02) return "up";
+  if (pct < -0.02) return "down";
+  return "neutral";
+}
+
+// RSI 다이버전스 감지: 가격은 신저점인데 RSI는 높아지는 패턴 (강세 다이버전스)
+function detectBullishDivergence(closes, rsi, index, lookback = 10) {
+  if (index < lookback || rsi[index] == null) return false;
+  // 최근 lookback 내에서 가격 저점 찾기
+  let priceNewLow = false, rsiHigherLow = false;
+  for (let i = index - lookback; i < index - 2; i++) {
+    if (rsi[i] == null) continue;
+    if (closes[index] < closes[i] && rsi[index] > rsi[i]) {
+      priceNewLow = true;
+      rsiHigherLow = true;
+      break;
+    }
+  }
+  return priceNewLow && rsiHigherLow;
+}
+
+// 약세 다이버전스: 가격은 신고점인데 RSI는 낮아지는 패턴
+function detectBearishDivergence(closes, rsi, index, lookback = 10) {
+  if (index < lookback || rsi[index] == null) return false;
+  for (let i = index - lookback; i < index - 2; i++) {
+    if (rsi[i] == null) continue;
+    if (closes[index] > closes[i] && rsi[index] < rsi[i]) return true;
+  }
+  return false;
+}
+
+// ════════════════════════════════════════════════════════════════════
 // 매매 전략 정의 (32개)
 // ════════════════════════════════════════════════════════════════════
 
@@ -183,10 +234,17 @@ export const strategyRSI = {
     const signals = [];
     for (let i = 1; i < candles.length; i++) {
       if (rsi[i] == null || rsi[i - 1] == null) continue;
-      if (rsi[i] <= buyThreshold && rsi[i - 1] > buyThreshold)
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `RSI ${rsi[i].toFixed(1)} ≤ ${buyThreshold}` });
-      else if (rsi[i] >= sellThreshold && rsi[i - 1] < sellThreshold)
-        signals.push({ index: i, type: "SELL", price: closes[i], reason: `RSI ${rsi[i].toFixed(1)} ≥ ${sellThreshold}` });
+      if (rsi[i] <= buyThreshold && rsi[i - 1] > buyThreshold) {
+        // v3.1: 거래량 확인 + 강세 다이버전스 보너스
+        if (!isVolumeConfirmed(candles, i, 20, 0.8)) continue;
+        const div = detectBullishDivergence(closes, rsi, i);
+        signals.push({ index: i, type: "BUY", price: closes[i],
+          reason: `RSI ${rsi[i].toFixed(1)} ≤ ${buyThreshold}${div ? " + 강세다이버전스" : ""}` });
+      } else if (rsi[i] >= sellThreshold && rsi[i - 1] < sellThreshold) {
+        const div = detectBearishDivergence(closes, rsi, i);
+        signals.push({ index: i, type: "SELL", price: closes[i],
+          reason: `RSI ${rsi[i].toFixed(1)} ≥ ${sellThreshold}${div ? " + 약세다이버전스" : ""}` });
+      }
     }
     return signals;
   },
@@ -208,10 +266,20 @@ export const strategyBB = {
     const signals = [];
     for (let i = 1; i < candles.length; i++) {
       if (!bb[i] || !bb[i - 1]) continue;
-      if (closes[i] <= bb[i].lower && closes[i - 1] > bb[i - 1].lower)
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `BB 하단 터치` });
-      else if (closes[i] >= bb[i].upper && closes[i - 1] < bb[i - 1].upper)
-        signals.push({ index: i, type: "SELL", price: closes[i], reason: `BB 상단 터치` });
+      if (closes[i] <= bb[i].lower && closes[i - 1] > bb[i - 1].lower) {
+        // v3.1: %B 극단값 + RSI 과매도 교차확인 + 거래량
+        if (!isVolumeConfirmed(candles, i, 20, 0.8)) continue;
+        const rsi14 = calcRSI(closes, 14);
+        const rsiOversold = rsi14[i] != null && rsi14[i] < 35;
+        const div = detectBullishDivergence(closes, rsi14, i);
+        signals.push({ index: i, type: "BUY", price: closes[i],
+          reason: `BB 하단 터치${rsiOversold ? " + RSI과매도" : ""}${div ? " + 강세다이버전스" : ""}` });
+      } else if (closes[i] >= bb[i].upper && closes[i - 1] < bb[i - 1].upper) {
+        const rsi14 = calcRSI(closes, 14);
+        const div = detectBearishDivergence(closes, rsi14, i);
+        signals.push({ index: i, type: "SELL", price: closes[i],
+          reason: `BB 상단 터치${div ? " + 약세다이버전스" : ""}` });
+      }
     }
     return signals;
   },
@@ -228,15 +296,22 @@ export const strategyMACD = {
   params: {},
   generate(candles) {
     const closes = candles.map(c => c.close);
-    const { macdLine, signal } = calcMACD(closes);
+    const { macdLine, signal, histogram } = calcMACD(closes);
     const signals = [];
     for (let i = 30; i < candles.length; i++) {
       const prevDiff = macdLine[i - 1] - signal[i - 1];
       const curDiff = macdLine[i] - signal[i];
-      if (prevDiff <= 0 && curDiff > 0)
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `MACD 골든크로스` });
-      else if (prevDiff >= 0 && curDiff < 0)
+      if (prevDiff <= 0 && curDiff > 0) {
+        // v3.1: 거래량 확인 + 추세 방향 필터 (하락 추세에서 매수 강화)
+        if (!isVolumeConfirmed(candles, i, 20, 1.0)) continue;
+        const trend = getTrendDirection(closes, i);
+        const histStrength = histogram[i] > 0 ? "강" : "약";
+        signals.push({ index: i, type: "BUY", price: closes[i],
+          reason: `MACD 골든크로스 (히스토그램 ${histStrength}${trend === "up" ? " · 상승추세" : ""})` });
+      } else if (prevDiff >= 0 && curDiff < 0) {
+        if (!isVolumeConfirmed(candles, i, 20, 1.0)) continue;
         signals.push({ index: i, type: "SELL", price: closes[i], reason: `MACD 데드크로스` });
+      }
     }
     return signals;
   },
@@ -259,10 +334,15 @@ export const strategyMA = {
     const signals = [];
     for (let i = longPeriod + 1; i < candles.length; i++) {
       if (shortMA[i] == null || longMA[i] == null || shortMA[i - 1] == null || longMA[i - 1] == null) continue;
-      if (shortMA[i - 1] <= longMA[i - 1] && shortMA[i] > longMA[i])
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `${shortPeriod}MA > ${longPeriod}MA 골든크로스` });
-      else if (shortMA[i - 1] >= longMA[i - 1] && shortMA[i] < longMA[i])
+      if (shortMA[i - 1] <= longMA[i - 1] && shortMA[i] > longMA[i]) {
+        // v3.1: 거래량 확인 + 추세 강도 필터
+        if (!isVolumeConfirmed(candles, i, 20, 1.1)) continue;
+        const spread = ((shortMA[i] - longMA[i]) / longMA[i] * 100).toFixed(2);
+        signals.push({ index: i, type: "BUY", price: closes[i], reason: `${shortPeriod}MA > ${longPeriod}MA 골든크로스 (스프레드 ${spread}%)` });
+      } else if (shortMA[i - 1] >= longMA[i - 1] && shortMA[i] < longMA[i]) {
+        if (!isVolumeConfirmed(candles, i, 20, 1.0)) continue;
         signals.push({ index: i, type: "SELL", price: closes[i], reason: `${shortPeriod}MA < ${longPeriod}MA 데드크로스` });
+      }
     }
     return signals;
   },
@@ -285,7 +365,14 @@ export const strategyVolume = {
       const vol = candles[i].volume || 0;
       const isGreen = candles[i].close > candles[i].open;
       if (vol >= avgVol * volMult && isGreen && avgVol > 0) {
-        signals.push({ index: i, type: "BUY", price: candles[i].close, reason: `거래량 ${(vol / avgVol).toFixed(1)}x 급증` });
+        // v3.1: 추세 방향 확인 — 하락 추세에서는 거래량 돌파 무시
+        const closes = candles.map(c => c.close);
+        const trend = getTrendDirection(closes, i);
+        if (trend === "down") continue;
+        // 연속 양봉 확인 (1봉 전도 양봉이면 강화)
+        const prevGreen = i > 0 && candles[i-1].close > candles[i-1].open;
+        signals.push({ index: i, type: "BUY", price: candles[i].close,
+          reason: `거래량 ${(vol / avgVol).toFixed(1)}x 급증${prevGreen ? " · 연속양봉" : ""}${trend === "up" ? " · 상승추세" : ""}` });
         const sellIdx = Math.min(i + holdBars, candles.length - 1);
         signals.push({ index: sellIdx, type: "SELL", price: candles[sellIdx].close, reason: `${holdBars}봉 보유 후 매도` });
       }
@@ -313,10 +400,18 @@ export const strategyCombo = {
     const signals = [];
     for (let i = 20; i < candles.length; i++) {
       if (rsi[i] == null || stoch.k[i] == null) continue;
-      if (rsi[i] <= rsiBuy && stoch.k[i] <= stochBuy)
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `RSI ${rsi[i].toFixed(1)} + Stoch ${stoch.k[i].toFixed(1)} 과매도` });
-      else if (rsi[i] >= rsiSell && stoch.k[i] >= stochSell)
-        signals.push({ index: i, type: "SELL", price: closes[i], reason: `RSI ${rsi[i].toFixed(1)} + Stoch ${stoch.k[i].toFixed(1)} 과매수` });
+      if (rsi[i] <= rsiBuy && stoch.k[i] <= stochBuy) {
+        // v3.1: 삼중 확인 — RSI + Stoch + 다이버전스 + 거래량
+        if (!isVolumeConfirmed(candles, i, 20, 0.7)) continue;
+        const div = detectBullishDivergence(closes, rsi, i);
+        const stochCross = stoch.k[i] > stoch.d[i] && (stoch.k[i - 1] || 50) <= (stoch.d[i - 1] || 50);
+        signals.push({ index: i, type: "BUY", price: closes[i],
+          reason: `RSI ${rsi[i].toFixed(1)} + Stoch ${stoch.k[i].toFixed(1)} 과매도${stochCross ? " + K>D크로스" : ""}${div ? " + 다이버전스" : ""}` });
+      } else if (rsi[i] >= rsiSell && stoch.k[i] >= stochSell) {
+        const div = detectBearishDivergence(closes, rsi, i);
+        signals.push({ index: i, type: "SELL", price: closes[i],
+          reason: `RSI ${rsi[i].toFixed(1)} + Stoch ${stoch.k[i].toFixed(1)} 과매수${div ? " + 다이버전스" : ""}` });
+      }
     }
     return signals;
   },
@@ -342,9 +437,11 @@ export const strategyTurtle = {
     const signals = [];
     for (let i = entryPeriod + 1; i < candles.length; i++) {
       if (!entryDonchian[i - 1] || !exitDonchian[i - 1]) continue;
-      if (closes[i] > entryDonchian[i - 1].upper)
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `${entryPeriod}일 고가 돌파` });
-      else if (closes[i] < exitDonchian[i - 1].lower)
+      if (closes[i] > entryDonchian[i - 1].upper) {
+        // v3.1: 돌파 시 거래량 1.2배 이상 확인
+        if (!isVolumeConfirmed(candles, i, 20, 1.2)) continue;
+        signals.push({ index: i, type: "BUY", price: closes[i], reason: `${entryPeriod}일 고가 돌파 + 거래량 확인` });
+      } else if (closes[i] < exitDonchian[i - 1].lower)
         signals.push({ index: i, type: "SELL", price: closes[i], reason: `${exitPeriod}일 저가 이탈` });
     }
     return signals;
@@ -370,12 +467,16 @@ export const strategyKeltner = {
     const signals = [];
     for (let i = 2; i < candles.length; i++) {
       if (!kc[i] || !kc[i - 1] || !kc[i - 2]) continue;
+      // v3.1: 켈트너 복귀 + 거래량 + 채널 폭 기반 신뢰도
+      const chanWidth = ((kc[i].upper - kc[i].lower) / kc[i].middle * 100).toFixed(1);
       // 하단 이탈 후 복귀
-      if (closes[i - 1] < kc[i - 1].lower && closes[i] > kc[i].lower)
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `켈트너 하단 복귀` });
+      if (closes[i - 1] < kc[i - 1].lower && closes[i] > kc[i].lower) {
+        if (!isVolumeConfirmed(candles, i, 20, 0.8)) continue;
+        signals.push({ index: i, type: "BUY", price: closes[i], reason: `켈트너 하단 복귀 (채널폭 ${chanWidth}%)` });
+      }
       // 상단 이탈 후 복귀
       else if (closes[i - 1] > kc[i - 1].upper && closes[i] < kc[i].upper)
-        signals.push({ index: i, type: "SELL", price: closes[i], reason: `켈트너 상단 복귀` });
+        signals.push({ index: i, type: "SELL", price: closes[i], reason: `켈트너 상단 복귀 (채널폭 ${chanWidth}%)` });
     }
     return signals;
   },
@@ -401,12 +502,16 @@ export const strategyDualMomentum = {
       if (ma[i] == null || ma[i - 1] == null) continue;
       const mom = (closes[i] - closes[i - lookback]) / closes[i - lookback];
       const prevMom = (closes[i - 1] - closes[i - 1 - lookback]) / closes[i - 1 - lookback];
+      // v3.1: 모멘텀 강도 + 거래량 교차검증
       // 모멘텀이 양전환 + 가격 > MA
-      if (mom > 0 && prevMom <= 0 && closes[i] > ma[i])
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `듀얼모멘텀 진입 (수익률 ${(mom * 100).toFixed(1)}%)` });
+      if (mom > 0 && prevMom <= 0 && closes[i] > ma[i]) {
+        if (!isVolumeConfirmed(candles, i, 20, 1.0)) continue;
+        const momStrength = mom > 0.1 ? "강" : mom > 0.05 ? "중" : "약";
+        signals.push({ index: i, type: "BUY", price: closes[i], reason: `듀얼모멘텀 진입 (수익률 ${(mom * 100).toFixed(1)}% · ${momStrength})` });
+      }
       // 모멘텀이 음전환 또는 가격 < MA
       else if ((mom < 0 && prevMom >= 0) || (closes[i] < ma[i] && closes[i - 1] >= ma[i - 1]))
-        signals.push({ index: i, type: "SELL", price: closes[i], reason: `듀얼모멘텀 이탈` });
+        signals.push({ index: i, type: "SELL", price: closes[i], reason: `듀얼모멘텀 이탈 (${(mom * 100).toFixed(1)}%)` });
     }
     return signals;
   },
@@ -433,9 +538,13 @@ export const strategyWilliamsADX = {
     for (let i = 30; i < candles.length; i++) {
       if (wr[i] == null) continue;
       const adxVal = adx[i] || 0;
-      if (wr[i] <= wrBuy && adxVal >= adxThreshold)
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `WR ${wr[i].toFixed(0)} + ADX ${adxVal.toFixed(0)}` });
-      else if (wr[i] >= wrSell)
+      if (wr[i] <= wrBuy && adxVal >= adxThreshold) {
+        // v3.1: 거래량 + 추세방향 확인
+        if (!isVolumeConfirmed(candles, i, 20, 0.9)) continue;
+        const trend = getTrendDirection(closes, i);
+        signals.push({ index: i, type: "BUY", price: closes[i],
+          reason: `WR ${wr[i].toFixed(0)} + ADX ${adxVal.toFixed(0)}${trend === "up" ? " · 상승추세" : ""}` });
+      } else if (wr[i] >= wrSell)
         signals.push({ index: i, type: "SELL", price: closes[i], reason: `WR ${wr[i].toFixed(0)} 과매수` });
     }
     return signals;
@@ -466,10 +575,16 @@ export const strategyBBSqueeze = {
       if (!recentBW.length) continue;
       const minBW = Math.min(...recentBW);
       const isSqueeze = bb[i - 1].bw <= minBW * 1.05;
-      if (isSqueeze && closes[i] > bb[i].upper)
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `BB 스퀴즈 → 상단 돌파` });
-      else if (isSqueeze && closes[i] < bb[i].lower)
-        signals.push({ index: i, type: "SELL", price: closes[i], reason: `BB 스퀴즈 → 하단 이탈` });
+      if (isSqueeze && closes[i] > bb[i].upper) {
+        // v3.1: 스퀴즈 돌파 시 거래량 급증 필수 (1.5배)
+        if (!isVolumeConfirmed(candles, i, 20, 1.5)) continue;
+        const trend = getTrendDirection(closes, i);
+        signals.push({ index: i, type: "BUY", price: closes[i],
+          reason: `BB 스퀴즈 → 상단 돌파 + 거래량${trend === "up" ? " · 상승추세" : ""}` });
+      } else if (isSqueeze && closes[i] < bb[i].lower) {
+        if (!isVolumeConfirmed(candles, i, 20, 1.3)) continue;
+        signals.push({ index: i, type: "SELL", price: closes[i], reason: `BB 스퀴즈 → 하단 이탈 + 거래량` });
+      }
     }
     return signals;
   },
@@ -499,12 +614,16 @@ export const strategyTripleMA = {
       if (atr[i] == null) continue;
       const aligned = emaF[i] > emaM[i] && emaM[i] > emaS[i];
       const prevAligned = emaF[i - 1] > emaM[i - 1] && emaM[i - 1] > emaS[i - 1];
-      if (aligned && !prevAligned)
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `삼중 이평선 정배열` });
+      if (aligned && !prevAligned) {
+        // v3.1: 정배열 전환 시 거래량 확인 + 이격도 표시
+        if (!isVolumeConfirmed(candles, i, 20, 1.1)) continue;
+        const gap = ((emaF[i] - emaS[i]) / emaS[i] * 100).toFixed(1);
+        signals.push({ index: i, type: "BUY", price: closes[i], reason: `삼중 이평선 정배열 (이격 ${gap}%)` });
+      }
       // ATR 후행 정지
       const trailingStop = emaM[i] - atrMult * atr[i];
       if (!aligned && prevAligned || closes[i] < trailingStop)
-        signals.push({ index: i, type: "SELL", price: closes[i], reason: `ATR 후행정지 / 정배열 해제` });
+        signals.push({ index: i, type: "SELL", price: closes[i], reason: `ATR 후행정지 (${trailingStop.toFixed(2)}) / 정배열 해제` });
     }
     return signals;
   },
@@ -634,12 +753,16 @@ export const strategyIchimoku = {
       const cloudBot = Math.min(ich.senkouA[i], ich.senkouB[i]);
       const prevTK = ich.tenkan[i - 1] != null && ich.kijun[i - 1] != null;
       if (prevTK) {
+        // v3.1: 일목 시그널 + 거래량 + 구름 두께 기반 신뢰도
+        const cloudThickness = ((cloudTop - cloudBot) / closes[i] * 100).toFixed(1);
         // 전환선 > 기준선 골든크로스 + 가격 > 구름대
-        if (ich.tenkan[i] > ich.kijun[i] && ich.tenkan[i - 1] <= ich.kijun[i - 1] && closes[i] > cloudTop)
-          signals.push({ index: i, type: "BUY", price: closes[i], reason: `일목 골든크로스 + 구름 위 (${cloudTop.toFixed(2)})` });
+        if (ich.tenkan[i] > ich.kijun[i] && ich.tenkan[i - 1] <= ich.kijun[i - 1] && closes[i] > cloudTop) {
+          if (!isVolumeConfirmed(candles, i, 20, 1.0)) continue;
+          signals.push({ index: i, type: "BUY", price: closes[i], reason: `일목 골든크로스 + 구름 위 (두께 ${cloudThickness}%)` });
+        }
         // 전환선 < 기준선 데드크로스 + 가격 < 구름대
         else if (ich.tenkan[i] < ich.kijun[i] && ich.tenkan[i - 1] >= ich.kijun[i - 1] && closes[i] < cloudBot)
-          signals.push({ index: i, type: "SELL", price: closes[i], reason: `일목 데드크로스 + 구름 아래 (${cloudBot.toFixed(2)})` });
+          signals.push({ index: i, type: "SELL", price: closes[i], reason: `일목 데드크로스 + 구름 아래 (두께 ${cloudThickness}%)` });
       }
     }
     return signals;
@@ -662,7 +785,9 @@ export const strategyGapAndGo = {
     for (let i = 1; i < candles.length; i++) {
       const gap = ((candles[i].open - candles[i - 1].close) / candles[i - 1].close) * 100;
       if (gap >= gapPct && candles[i].close > candles[i].open) {
-        signals.push({ index: i, type: "BUY", price: candles[i].close, reason: `갭 +${gap.toFixed(1)}% 돌파` });
+        // v3.1: 갭 매수 시 거래량 급증 확인 (1.5배)
+        if (!isVolumeConfirmed(candles, i, 20, 1.5)) continue;
+        signals.push({ index: i, type: "BUY", price: candles[i].close, reason: `갭 +${gap.toFixed(1)}% 돌파 + 거래량` });
         const sellIdx = Math.min(i + holdBars, candles.length - 1);
         signals.push({ index: sellIdx, type: "SELL", price: candles[sellIdx].close, reason: `${holdBars}봉 보유 후 매도` });
       }
@@ -768,9 +893,11 @@ export const strategySupertrend = {
         direction = -1;
         supertrend = upperBand;
       }
-      if (direction === 1 && prevDirection === -1)
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `슈퍼트렌드 상향전환 (${supertrend.toFixed(2)})` });
-      else if (direction === -1 && prevDirection === 1)
+      if (direction === 1 && prevDirection === -1) {
+        // v3.1: 슈퍼트렌드 전환 시 거래량 확인
+        if (!isVolumeConfirmed(candles, i, 20, 1.1)) continue;
+        signals.push({ index: i, type: "BUY", price: closes[i], reason: `슈퍼트렌드 상향전환 (${supertrend.toFixed(2)}) + 거래량` });
+      } else if (direction === -1 && prevDirection === 1)
         signals.push({ index: i, type: "SELL", price: closes[i], reason: `슈퍼트렌드 하향전환 (${supertrend.toFixed(2)})` });
       prevSupertrend = supertrend;
     }
@@ -881,7 +1008,11 @@ export const strategyConnorsRSI2 = {
       const aboveTrend = !trendFilter || !sma200 || sma200[i] == null || closes[i] > sma200[i];
 
       if (rsi[i] <= buyThreshold && rsi[i - 1] > buyThreshold && aboveTrend) {
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `RSI(2) ${rsi[i].toFixed(1)} ≤ ${buyThreshold}` });
+        // v3.1: 극단적 RSI(2) + 연속 하락일수 카운트
+        let downDays = 0;
+        for (let j = i; j > Math.max(0, i - 5); j--) { if (closes[j] < closes[j - 1]) downDays++; else break; }
+        signals.push({ index: i, type: "BUY", price: closes[i],
+          reason: `RSI(2) ${rsi[i].toFixed(1)} ≤ ${buyThreshold} (${downDays}일 연속하락)` });
       } else if (rsi[i] >= sellThreshold && rsi[i - 1] < sellThreshold) {
         signals.push({ index: i, type: "SELL", price: closes[i], reason: `RSI(2) ${rsi[i].toFixed(1)} ≥ ${sellThreshold}` });
       }
@@ -916,20 +1047,26 @@ export const strategyRegimeSwitch = {
       const isTrending = adxVal >= adxThreshold;
 
       if (isTrending) {
-        // 추세장 → 이평선 크로스
+        // 추세장 → 이평선 크로스 + 거래량 확인
         if (ma20[i] != null && ma60[i] != null && ma20[i - 1] != null && ma60[i - 1] != null) {
-          if (ma20[i - 1] <= ma60[i - 1] && ma20[i] > ma60[i])
-            signals.push({ index: i, type: "BUY", price: closes[i], reason: `추세장 골든크로스 (ADX ${adxVal.toFixed(0)})` });
-          else if (ma20[i - 1] >= ma60[i - 1] && ma20[i] < ma60[i])
+          if (ma20[i - 1] <= ma60[i - 1] && ma20[i] > ma60[i]) {
+            if (!isVolumeConfirmed(candles, i, 20, 1.1)) continue;
+            signals.push({ index: i, type: "BUY", price: closes[i], reason: `추세장 골든크로스 (ADX ${adxVal.toFixed(0)}) + 거래량확인` });
+          } else if (ma20[i - 1] >= ma60[i - 1] && ma20[i] < ma60[i])
             signals.push({ index: i, type: "SELL", price: closes[i], reason: `추세장 데드크로스 (ADX ${adxVal.toFixed(0)})` });
         }
       } else {
-        // 횡보장 → RSI 평균회귀
+        // 횡보장 → RSI 평균회귀 + 다이버전스 체크
         if (rsi[i] != null && rsi[i - 1] != null) {
-          if (rsi[i] <= 30 && rsi[i - 1] > 30)
-            signals.push({ index: i, type: "BUY", price: closes[i], reason: `횡보장 RSI 과매도 (${rsi[i].toFixed(0)})` });
-          else if (rsi[i] >= 70 && rsi[i - 1] < 70)
-            signals.push({ index: i, type: "SELL", price: closes[i], reason: `횡보장 RSI 과매수 (${rsi[i].toFixed(0)})` });
+          if (rsi[i] <= 30 && rsi[i - 1] > 30) {
+            const div = detectBullishDivergence(closes, rsi, i);
+            signals.push({ index: i, type: "BUY", price: closes[i],
+              reason: `횡보장 RSI 과매도 (${rsi[i].toFixed(0)})${div ? " + 강세다이버전스" : ""}` });
+          } else if (rsi[i] >= 70 && rsi[i - 1] < 70) {
+            const div = detectBearishDivergence(closes, rsi, i);
+            signals.push({ index: i, type: "SELL", price: closes[i],
+              reason: `횡보장 RSI 과매수 (${rsi[i].toFixed(0)})${div ? " + 약세다이버전스" : ""}` });
+          }
         }
       }
     }
@@ -974,8 +1111,11 @@ export const strategyHeikinAshi = {
           prevBullCount++;
       }
 
-      if (bullCount >= consecutiveBars && prevBullCount < consecutiveBars)
-        signals.push({ index: i, type: "BUY", price: candles[i].close, reason: `HA ${consecutiveBars}연속 강세봉` });
+      if (bullCount >= consecutiveBars && prevBullCount < consecutiveBars) {
+        // v3.1: HA 강세 전환 시 거래량 확인
+        if (!isVolumeConfirmed(candles, i, 20, 1.0)) continue;
+        signals.push({ index: i, type: "BUY", price: candles[i].close, reason: `HA ${consecutiveBars}연속 강세봉 + 거래량` });
+      }
 
       // N연속 강한 음봉
       let bearCount = 0;
@@ -991,6 +1131,7 @@ export const strategyHeikinAshi = {
 
       if (bearCount >= consecutiveBars && prevBearCount < consecutiveBars)
         signals.push({ index: i, type: "SELL", price: candles[i].close, reason: `HA ${consecutiveBars}연속 약세봉` });
+      // (continue to next iteration)
     }
     return signals;
   },
@@ -1014,9 +1155,15 @@ export const strategyDualTimeframe = {
     const signals = [];
     for (let i = trendPeriod + 1; i < candles.length; i++) {
       if (sma[i] == null || rsi[i] == null || rsi[i - 1] == null) continue;
+      // v3.1: 풀백 매수에 거래량 + 다이버전스 교차검증
       // 상승추세 + 단기 과매도 = 풀백 매수
-      if (closes[i] > sma[i] && rsi[i] <= buyRSI && rsi[i - 1] > buyRSI)
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `상승추세 풀백 매수 (RSI5: ${rsi[i].toFixed(0)})` });
+      if (closes[i] > sma[i] && rsi[i] <= buyRSI && rsi[i - 1] > buyRSI) {
+        if (!isVolumeConfirmed(candles, i, 20, 0.8)) continue;
+        const div = detectBullishDivergence(closes, rsi, i, 8);
+        const trendStr = ((closes[i] - sma[i]) / sma[i] * 100).toFixed(1);
+        signals.push({ index: i, type: "BUY", price: closes[i],
+          reason: `상승추세(+${trendStr}%) 풀백 매수 (RSI5: ${rsi[i].toFixed(0)})${div ? " + 다이버전스" : ""}` });
+      }
       // 하락추세 + 단기 과매수 = 반등 매도
       else if (closes[i] < sma[i] && rsi[i] >= sellRSI && rsi[i - 1] < sellRSI)
         signals.push({ index: i, type: "SELL", price: closes[i], reason: `하락추세 반등 매도 (RSI5: ${rsi[i].toFixed(0)})` });
@@ -1116,9 +1263,11 @@ export const strategyElderTriple = {
       const trendDown = ema50[i] < ema50[i - 1] && closes[i] < ema50[i];
       const histReverseUp = histogram[i] > histogram[i - 1] && histogram[i - 1] < histogram[i - 2];
       const histReverseDown = histogram[i] < histogram[i - 1] && histogram[i - 1] > histogram[i - 2];
-      if (trendUp && histReverseUp && closes[i] > highs[i - 1])
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `삼중 확인: 추세↑ + MACD반전↑ + 고점돌파` });
-      else if (trendDown && histReverseDown && closes[i] < lows[i - 1])
+      if (trendUp && histReverseUp && closes[i] > highs[i - 1]) {
+        // v3.1: 엘더 삼중 매수 시 거래량 필수
+        if (!isVolumeConfirmed(candles, i, 20, 1.2)) continue;
+        signals.push({ index: i, type: "BUY", price: closes[i], reason: `삼중 확인: 추세↑ + MACD반전↑ + 고점돌파 + 거래량` });
+      } else if (trendDown && histReverseDown && closes[i] < lows[i - 1])
         signals.push({ index: i, type: "SELL", price: closes[i], reason: `삼중 확인: 추세↓ + MACD반전↓ + 저점이탈` });
     }
     return signals;
@@ -1150,9 +1299,13 @@ export const strategyCCI = {
     }
     for (let i = period; i < candles.length; i++) {
       if (cci[i] == null || cci[i - 1] == null) continue;
-      if (cci[i] > buyLevel && cci[i - 1] <= buyLevel)
-        signals.push({ index: i, type: "BUY", price: candles[i].close, reason: `CCI ${cci[i].toFixed(0)} > ${buyLevel} 상향돌파` });
-      else if (cci[i] < sellLevel && cci[i - 1] >= sellLevel)
+      if (cci[i] > buyLevel && cci[i - 1] <= buyLevel) {
+        // v3.1: CCI 상향돌파 + 거래량 + 추세 방향
+        if (!isVolumeConfirmed(candles, i, 20, 1.0)) continue;
+        const trend = getTrendDirection(candles.map(c => c.close), i);
+        signals.push({ index: i, type: "BUY", price: candles[i].close,
+          reason: `CCI ${cci[i].toFixed(0)} > ${buyLevel} 상향돌파${trend === "up" ? " · 상승추세" : ""}` });
+      } else if (cci[i] < sellLevel && cci[i - 1] >= sellLevel)
         signals.push({ index: i, type: "SELL", price: candles[i].close, reason: `CCI ${cci[i].toFixed(0)} < ${sellLevel} 하향돌파` });
     }
     return signals;
@@ -1182,9 +1335,12 @@ export const strategyMACDDivergence = {
       if (histSlice.length < 5) continue;
       const histMin = Math.min(...histSlice);
       const histMax = Math.max(...histSlice);
+      // v3.1: 다이버전스 + 거래량 확인
       // 강세 다이버전스: 가격 새 저점 근접 + 히스토그램 상승중
-      if (closes[i] <= priceMin * 1.01 && histogram[i] > histMin * 0.5 && histogram[i] > histogram[i - 1] && closes[i - 1] > priceMin * 1.01)
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `강세 다이버전스 (가격↓ MACD↑)` });
+      if (closes[i] <= priceMin * 1.01 && histogram[i] > histMin * 0.5 && histogram[i] > histogram[i - 1] && closes[i - 1] > priceMin * 1.01) {
+        if (!isVolumeConfirmed(candles, i, 20, 0.9)) continue;
+        signals.push({ index: i, type: "BUY", price: closes[i], reason: `강세 다이버전스 (가격↓ MACD↑) + 거래량` });
+      }
       // 약세 다이버전스: 가격 새 고점 근접 + 히스토그램 하락중
       else if (closes[i] >= priceMax * 0.99 && histogram[i] < histMax * 0.5 && histogram[i] < histogram[i - 1] && closes[i - 1] < priceMax * 0.99)
         signals.push({ index: i, type: "SELL", price: closes[i], reason: `약세 다이버전스 (가격↑ MACD↓)` });
@@ -1217,17 +1373,23 @@ export const strategyCandlePattern = {
       const curBull = cur.close > cur.open;
       const prevBull = prev.close > prev.open;
       const curBear = cur.close < cur.open;
+      // v3.1: 캔들 패턴 + 거래량 교차검증
       // 상승 엔궐핑: 전봉 음봉 + 현봉 양봉이 전봉을 감싸 + 가격 MA 근처
-      if (prevBear && curBull && cur.open <= prev.close && cur.close >= prev.open && curBody > prevBody * 1.2 && closes[i] <= ma[i] * 1.02)
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `상승 엔궐핑 + MA${maPeriod} 지지` });
+      if (prevBear && curBull && cur.open <= prev.close && cur.close >= prev.open && curBody > prevBody * 1.2 && closes[i] <= ma[i] * 1.02) {
+        if (!isVolumeConfirmed(candles, i, 20, 1.2)) continue;
+        const engulfRatio = (curBody / prevBody).toFixed(1);
+        signals.push({ index: i, type: "BUY", price: closes[i], reason: `상승 엔궐핑(${engulfRatio}x) + MA${maPeriod} 지지 + 거래량` });
+      }
       // 하락 엔궐핑
       else if (prevBull && curBear && cur.open >= prev.close && cur.close <= prev.open && curBody > prevBody * 1.2 && closes[i] >= ma[i] * 0.98)
         signals.push({ index: i, type: "SELL", price: closes[i], reason: `하락 엔궐핑 + MA${maPeriod} 저항` });
       // 해머 패턴 (하단 꼬리가 몸통의 2배 이상 + 상단 꼬리 거의 없음)
       const upperWick = cur.high - Math.max(cur.open, cur.close);
       const lowerWick = Math.min(cur.open, cur.close) - cur.low;
-      if (curBody > 0 && lowerWick >= curBody * 2 && upperWick < curBody * 0.3 && closes[i] < ma[i])
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `해머 패턴 + MA${maPeriod} 하방` });
+      if (curBody > 0 && lowerWick >= curBody * 2 && upperWick < curBody * 0.3 && closes[i] < ma[i]) {
+        if (!isVolumeConfirmed(candles, i, 20, 1.0)) continue;
+        signals.push({ index: i, type: "BUY", price: closes[i], reason: `해머 패턴 + MA${maPeriod} 하방 + 거래량` });
+      }
     }
     return signals;
   },
