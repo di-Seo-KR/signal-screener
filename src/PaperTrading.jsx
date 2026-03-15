@@ -259,16 +259,124 @@ function calcATR(candles, period = 14) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// 시그널 감지 + 신뢰도 점수
+// 마켓 레짐 감지 (Wall Street Regime Detection)
+// VIX/변동성 기반 시장 상태: trending / mean-reverting / volatile
+// 레짐에 따라 전략 가중치를 동적으로 조절
+// ══════════════════════════════════════════════════════════════
+function detectMarketRegime(candleMap) {
+  // SPY를 시장 대리지표로 사용
+  const spy = candleMap["SPY"] || candleMap["QQQ"];
+  if (!spy || spy.length < 60) return { regime: "unknown", strength: 0.5, volatility: "normal" };
+
+  const len = spy.length;
+  const recent = spy.slice(-20);
+  const mid = spy.slice(-40, -20);
+
+  // 1) 추세 강도: 20일 수익률 방향성
+  const returns20d = (recent[recent.length - 1].close - recent[0].close) / recent[0].close;
+  const absReturns20d = Math.abs(returns20d);
+
+  // 2) 변동성 레짐: 최근 20일 표준편차 vs 40일 전 20일 표준편차
+  const calcStdDev = (candles) => {
+    const rets = [];
+    for (let i = 1; i < candles.length; i++) {
+      rets.push((candles[i].close - candles[i - 1].close) / candles[i - 1].close);
+    }
+    const mean = rets.reduce((s, r) => s + r, 0) / rets.length;
+    const variance = rets.reduce((s, r) => s + (r - mean) ** 2, 0) / rets.length;
+    return Math.sqrt(variance);
+  };
+
+  const recentVol = calcStdDev(recent);
+  const pastVol = mid.length >= 10 ? calcStdDev(mid) : recentVol;
+  const volRatio = pastVol > 0 ? recentVol / pastVol : 1;
+  const annualizedVol = recentVol * Math.sqrt(252) * 100; // 연환산 %
+
+  // 3) ADX 유사 계산 (추세 강도)
+  let plusDM = 0, minusDM = 0, trSum = 0;
+  for (let i = len - 14; i < len; i++) {
+    const c = spy[i], p = spy[i - 1];
+    const upMove = c.high - p.high;
+    const downMove = p.low - c.low;
+    plusDM += (upMove > downMove && upMove > 0) ? upMove : 0;
+    minusDM += (downMove > upMove && downMove > 0) ? downMove : 0;
+    trSum += Math.max(c.high - c.low, Math.abs(c.high - p.close), Math.abs(c.low - p.close));
+  }
+  const adxProxy = trSum > 0 ? Math.abs(plusDM - minusDM) / trSum * 100 : 0;
+
+  // 4) 레짐 분류
+  let regime, strength;
+  const volatility = annualizedVol > 25 ? "high" : annualizedVol > 15 ? "normal" : "low";
+
+  if (adxProxy > 20 && absReturns20d > 0.03) {
+    regime = "trending";     // 강한 추세 (모멘텀 전략 유리)
+    strength = Math.min(1, adxProxy / 40);
+  } else if (volatility === "high" && volRatio > 1.3) {
+    regime = "volatile";     // 고변동성 (리스크 축소, 방어적)
+    strength = Math.min(1, volRatio / 2);
+  } else {
+    regime = "mean-reverting"; // 박스권 (평균회귀 전략 유리)
+    strength = Math.min(1, (1 - absReturns20d / 0.05));
+  }
+
+  return { regime, strength, volatility, annualizedVol, adxProxy, trendDir: returns20d > 0 ? "bull" : "bear" };
+}
+
+// 레짐별 전략 카테고리 가중치
+const REGIME_WEIGHTS = {
+  "trending":       { "추세추종": 1.4, "모멘텀": 1.3, "평균회귀": 0.6, "패턴": 0.9, "복합": 1.1 },
+  "mean-reverting": { "추세추종": 0.7, "모멘텀": 0.7, "평균회귀": 1.4, "패턴": 1.1, "복합": 1.0 },
+  "volatile":       { "추세추종": 0.5, "모멘텀": 0.5, "평균회귀": 0.8, "패턴": 0.7, "복합": 1.2 },
+  "unknown":        { "추세추종": 1.0, "모멘텀": 1.0, "평균회귀": 1.0, "패턴": 1.0, "복합": 1.0 },
+};
+
+// 전략명 → 카테고리 매핑
+const STRATEGY_CATEGORY_MAP = {
+  "이평선 크로스 (20/60)": "추세추종", "MACD 크로스오버": "추세추종", "거래량 돌파 전략": "추세추종",
+  "터틀 트레이딩": "추세추종", "슈퍼트렌드": "추세추종", "OBV 추세 추종": "추세추종",
+  "채널 돌파 모멘텀": "추세추종", "헤이킨 아시 추세": "추세추종", "파라볼릭 SAR": "추세추종",
+  "듀얼 모멘텀": "모멘텀", "듀얼 타임프레임 모멘텀": "모멘텀", "모멘텀·거래량 가중": "모멘텀",
+  "갭 앤 고": "모멘텀",
+  "RSI 반전 전략": "평균회귀", "볼린저밴드 바운스": "평균회귀", "켈트너 채널 회귀": "평균회귀",
+  "VWAP 반전": "평균회귀", "래리 코너스 RSI(2)": "평균회귀", "MFI 자금유입": "평균회귀",
+  "스토캐스틱+RSI 콤보": "평균회귀", "CCI 오실레이터": "평균회귀",
+  "피보나치 되돌림": "패턴", "캔들 패턴 (엔궐핑)": "패턴", "BB 스퀴즈 돌파": "패턴",
+  "일목균형표": "패턴", "MACD 다이버전스": "패턴",
+  "엘더 삼중 필터": "복합", "레짐 전환 적응형": "복합", "삼중 이평선 + ATR 정지": "복합",
+  "Williams %R + ADX": "복합", "통계적 차익 (Z-Score)": "복합", "ATR 스윙": "복합",
+};
+
+// ══════════════════════════════════════════════════════════════
+// 전략 성과 추적 (동적 가중치 — 최근 승률 기반)
+// ══════════════════════════════════════════════════════════════
+function loadStrategyPerformance() {
+  return load("di_strat_perf", {});
+}
+function saveStrategyPerformance(perf) {
+  save("di_strat_perf", perf);
+}
+function getStrategyDynamicWeight(stratName) {
+  const perf = loadStrategyPerformance();
+  const s = perf[stratName];
+  if (!s || (s.wins + s.losses) < 3) return 1.0; // 데이터 부족 시 기본값
+  const winRate = s.wins / (s.wins + s.losses);
+  // 승률 50% 기준 — 60%면 1.2배, 40%면 0.8배
+  return Math.max(0.4, Math.min(1.6, 0.4 + winRate * 1.6));
+}
+
+// ══════════════════════════════════════════════════════════════
+// 앙상블 시그널 감지 (Wall Street Ensemble Scoring)
+// 여러 전략이 같은 종목·방향에 동시 신호 → 복합 신뢰도 합산
 // ══════════════════════════════════════════════════════════════
 function detectSignals(candleMap) {
-  const signals = [];
+  const rawSignals = [];
   const now = Date.now();
+  const regime = detectMarketRegime(candleMap);
 
   for (const [stratName, holdings] of Object.entries(STRATEGY_PORTFOLIOS)) {
     const strategy = STRATEGY_MAP[stratName];
     if (!strategy?.generate) continue;
-    const confidence = STRATEGY_CONFIDENCE[stratName] || 0.5;
+    const baseConfidence = STRATEGY_CONFIDENCE[stratName] || 0.5;
 
     for (const { sym, w } of holdings) {
       const candles = candleMap[sym];
@@ -278,24 +386,29 @@ function detectSignals(candleMap) {
         const sigs = strategy.generate(candles);
         if (!sigs?.length) continue;
 
-        // 최근 3 캔들만 (더 엄격: 이전엔 5)
         const recent = sigs.filter(s => s.index >= candles.length - 3);
         for (const sig of recent) {
           const candle = candles[sig.index] || candles[candles.length - 1];
           const atr = calcATR(candles);
           const lastPrice = candles[candles.length - 1].close;
-
-          // 시그널 나이 (0=오늘, 1=어제, 2=그저께)
           const signalAge = candles.length - 1 - sig.index;
-          // 시그널이 오래될수록 감점
           const agePenalty = 1 - (signalAge * 0.15);
-          const finalConfidence = Math.max(0.1, confidence * agePenalty);
 
-          signals.push({
+          // 레짐 가중치
+          const cat = STRATEGY_CATEGORY_MAP[stratName] || "복합";
+          const regimeW = (REGIME_WEIGHTS[regime.regime] || REGIME_WEIGHTS.unknown)[cat] || 1.0;
+
+          // 동적 성과 가중치
+          const perfW = getStrategyDynamicWeight(stratName);
+
+          // 최종 개별 신뢰도 = 기본 × 나이감쇠 × 레짐 × 성과
+          const finalConfidence = Math.max(0.05, baseConfidence * agePenalty * regimeW * perfW);
+
+          rawSignals.push({
             id: `${stratName}-${sym}-${sig.type}-${candle.time}`,
             strategy: stratName,
             strategyIcon: strategy.icon || "📊",
-            category: strategy.category || "",
+            category: cat,
             symbol: sym,
             sector: SECTOR_MAP[sym] || "Other",
             type: sig.type,
@@ -304,24 +417,73 @@ function detectSignals(candleMap) {
             reason: sig.reason || `${stratName} ${sig.type}`,
             weight: w,
             confidence: finalConfidence,
-            atr: atr,
-            atrPct: lastPrice > 0 ? (atr / lastPrice) * 100 : 0,
-            time: candle.time,
-            detectedAt: now,
-            signalAge,
+            atr, atrPct: lastPrice > 0 ? (atr / lastPrice) * 100 : 0,
+            time: candle.time, detectedAt: now, signalAge,
+            regimeBoost: regimeW, perfBoost: perfW,
           });
         }
       } catch {}
     }
   }
 
+  // ── 앙상블 합산: 같은 (종목 + 방향) 시그널을 합쳐서 복합 점수 ──
+  const ensembleMap = {}; // key: "SYM|BUY" → aggregated signal
+  for (const sig of rawSignals) {
+    const key = `${sig.symbol}|${sig.type}`;
+    if (!ensembleMap[key]) {
+      ensembleMap[key] = {
+        ...sig,
+        strategies: [sig.strategy],
+        ensembleCount: 1,
+        rawConfidences: [sig.confidence],
+        // 앙상블 ID (합산된 시그널은 첫 번째 ID 사용)
+        originalIds: [sig.id],
+      };
+    } else {
+      const e = ensembleMap[key];
+      e.strategies.push(sig.strategy);
+      e.ensembleCount++;
+      e.rawConfidences.push(sig.confidence);
+      e.originalIds.push(sig.id);
+      // 최고 신뢰도 시그널의 정보를 기본으로
+      if (sig.confidence > e.confidence) {
+        e.strategy = sig.strategy;
+        e.strategyIcon = sig.strategyIcon;
+        e.reason = sig.reason;
+        e.signalPrice = sig.signalPrice;
+        e.time = sig.time;
+      }
+    }
+  }
+
+  // 앙상블 스코어 계산
+  const signals = Object.values(ensembleMap).map(e => {
+    // 앙상블 보너스: 2개 전략 합의 → +30%, 3개 → +50%, 4+ → +65%
+    const bonusMap = { 1: 1.0, 2: 1.3, 3: 1.5, 4: 1.65 };
+    const bonus = bonusMap[Math.min(e.ensembleCount, 4)] || 1.65;
+    // 최고 신뢰도 기반 + 앙상블 보너스 (cap: 0.95)
+    const maxConf = Math.max(...e.rawConfidences);
+    const avgConf = e.rawConfidences.reduce((s, c) => s + c, 0) / e.rawConfidences.length;
+    // 가중 합산: 70% 최고 + 30% 평균 → × 앙상블 보너스
+    e.confidence = Math.min(0.95, (maxConf * 0.7 + avgConf * 0.3) * bonus);
+    e.ensembleScore = e.confidence;
+    e.reason = e.ensembleCount > 1
+      ? `[앙상블 ${e.ensembleCount}x] ${e.strategies.slice(0, 3).join(" + ")}${e.ensembleCount > 3 ? ` 외 ${e.ensembleCount - 3}개` : ""}`
+      : e.reason;
+    return e;
+  });
+
   // 신뢰도 높은 순 → 최신 순
   signals.sort((a, b) => b.confidence - a.confidence || b.time - a.time);
+
+  // 레짐 정보를 signals 배열에 첨부
+  signals._regime = regime;
   return signals;
 }
 
 // ══════════════════════════════════════════════════════════════
-// 리스크 관리 엔진
+// 리스크 관리 엔진 v2 (Wall Street Grade)
+// 켈리 기준 포지션 사이징 · 상관관계 필터 · 동적 리스크 조절
 // ══════════════════════════════════════════════════════════════
 class RiskManager {
   constructor(settings, account, positions) {
@@ -333,29 +495,33 @@ class RiskManager {
     save(KEYS.peakEquity, this.peakEquity);
   }
 
-  // 현재 드로다운 %
   get drawdown() {
     return this.peakEquity > 0 ? ((this.peakEquity - this.equity) / this.peakEquity) * 100 : 0;
   }
 
-  // 일일 P&L % (last_equity 대비)
   dailyPL(account) {
     const lastEq = parseFloat(account?.last_equity || account?.equity || 0);
     return lastEq > 0 ? ((this.equity - lastEq) / lastEq) * 100 : 0;
   }
 
-  // 드로다운 보호: 최대 드로다운 초과 시 거래 중단
   isDrawdownBreached() {
     return this.drawdown >= (this.s.maxDrawdownPct || 10);
   }
 
-  // 일일 손실 한도 체크
   isDailyLossBreached(account) {
-    const dailyPct = this.dailyPL(account);
-    return dailyPct <= -(this.s.maxDailyLossPct || 3);
+    return this.dailyPL(account) <= -(this.s.maxDailyLossPct || 3);
   }
 
-  // 섹터 집중도 체크
+  // 드로다운 단계별 리스크 축소 (Progressive Risk Reduction)
+  // 0-3%: 100%, 3-5%: 70%, 5-8%: 40%, 8%+: 20%
+  get drawdownMultiplier() {
+    const dd = this.drawdown;
+    if (dd < 3) return 1.0;
+    if (dd < 5) return 0.7;
+    if (dd < 8) return 0.4;
+    return 0.2;
+  }
+
   getSectorExposure() {
     const sectorVal = {};
     const totalVal = this.positions.reduce((s, p) => s + Math.abs(parseFloat(p.market_value || 0)), 0);
@@ -372,12 +538,11 @@ class RiskManager {
 
   canAddToSector(symbol) {
     const sector = SECTOR_MAP[symbol] || "Other";
-    if (sector === "ETF") return true; // ETF는 제한 없음
+    if (sector === "ETF") return true;
     const exposure = this.getSectorExposure();
     return (exposure[sector] || 0) < (this.s.maxSectorPct || 35);
   }
 
-  // 개별 종목 한도 체크
   canAddToSymbol(symbol) {
     const existing = this.positions.find(p => p.symbol === symbol);
     if (!existing) return true;
@@ -386,16 +551,59 @@ class RiskManager {
     return posValue < maxPosValue;
   }
 
-  // 변동성 기반 포지션 사이징
-  calcPositionSize(signal) {
+  // 상관관계 필터: 같은 섹터에 이미 2+ 포지션이면 추가 진입 제한
+  isCorrelatedRisk(symbol) {
+    const sector = SECTOR_MAP[symbol] || "Other";
+    if (sector === "ETF") return false;
+    const sameSector = this.positions.filter(p => (SECTOR_MAP[p.symbol] || "Other") === sector);
+    // 같은 섹터 3개 이상이면 상관위험 경고
+    return sameSector.length >= 3;
+  }
+
+  // 켈리 기준 포지션 사이징 (Half-Kelly for safety)
+  // f* = (bp - q) / b  →  b=승배비, p=승률, q=패률
+  calcKellyFraction(signal) {
+    const perf = loadStrategyPerformance();
+    const s = perf[signal.strategy];
+    // 충분한 데이터 없으면 보수적 디폴트
+    if (!s || (s.wins + s.losses) < 5) return 0.02; // 기본 2%
+    const p = s.wins / (s.wins + s.losses);
+    const q = 1 - p;
+    const avgWin = s.avgWin || 1;
+    const avgLoss = s.avgLoss || 1;
+    const b = avgLoss > 0 ? avgWin / avgLoss : 1.5;
+    const kelly = (b * p - q) / b;
+    // Half-Kelly (안전계수 50%), 최소 0.5%, 최대 5%
+    return Math.max(0.005, Math.min(0.05, kelly * 0.5));
+  }
+
+  // 향상된 포지션 사이징 (ATR + 켈리 + 레짐 + 드로다운 조절)
+  calcPositionSize(signal, regime) {
     const baseAlloc = this.equity * (this.s.allocationPct || 2) / 100;
-    // ATR 기반 조정: 변동성 높으면 사이즈 줄임
+
+    // ATR 변동성 조정
     const atrPct = signal.atrPct || 2;
-    const volAdjust = Math.min(1.5, Math.max(0.3, 2 / atrPct)); // 2%가 기준
-    // 신뢰도 가중
+    const volAdjust = Math.min(1.5, Math.max(0.3, 2 / atrPct));
+
+    // 켈리 기준 보정
+    const kellyF = this.calcKellyFraction(signal);
+    const kellySize = this.equity * kellyF;
+
+    // 신뢰도 가중 (앙상블 보너스 반영)
     const confAdjust = Math.max(0.5, signal.confidence);
-    const adjusted = baseAlloc * volAdjust * confAdjust;
-    // 최소 $10, 최대 equity의 5%
+
+    // 레짐 기반 전체 리스크 스케일링
+    let regimeScale = 1.0;
+    if (regime) {
+      if (regime.volatility === "high") regimeScale = 0.6;      // 고변동: 축소
+      else if (regime.regime === "trending") regimeScale = 1.15; // 추세: 약간 확대
+    }
+
+    // 드로다운 단계별 축소
+    const ddMult = this.drawdownMultiplier;
+
+    // 최종: min(ATR 기반, 켈리 기반) × 보정팩터
+    const adjusted = Math.min(baseAlloc * volAdjust, kellySize) * confAdjust * regimeScale * ddMult;
     return Math.round(Math.max(10, Math.min(adjusted, this.equity * 0.05)));
   }
 
@@ -769,6 +977,49 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
     }
   }, [isConnected, refreshData]);
 
+  // ── 전략 성과 추적 (체결 주문 → 승패 판정) ──
+  useEffect(() => {
+    if (!orders.length || !positions.length) return;
+    const pending = load("di_pending_orders", []);
+    if (!pending.length) return;
+    const perf = loadStrategyPerformance();
+    const remaining = [];
+
+    for (const p of pending) {
+      // 24시간 지난 주문은 포기
+      if (Date.now() - p.time > 86400000) continue;
+
+      // 매수 주문: 현재 포지션에서 P&L 확인
+      if (p.side === "BUY") {
+        const pos = positions.find(pp => pp.symbol === p.symbol);
+        if (!pos) {
+          // 이미 청산됨 → filled orders에서 체결가 확인
+          const filledOrder = orders.find(o => o.client_order_id?.startsWith(`di-${p.symbol}`) && o.status === "filled" && o.side === "sell");
+          if (filledOrder) {
+            const fillPrice = parseFloat(filledOrder.filled_avg_price || 0);
+            const isWin = fillPrice > p.price;
+            const pct = p.price > 0 ? Math.abs(fillPrice - p.price) / p.price : 0;
+            for (const strat of (p.strategies || [p.strategy])) {
+              if (!perf[strat]) perf[strat] = { wins: 0, losses: 0, avgWin: 0, avgLoss: 0, total: 0 };
+              if (isWin) { perf[strat].wins++; perf[strat].avgWin = (perf[strat].avgWin * (perf[strat].wins - 1) + pct) / perf[strat].wins; }
+              else { perf[strat].losses++; perf[strat].avgLoss = (perf[strat].avgLoss * (perf[strat].losses - 1) + pct) / perf[strat].losses; }
+              perf[strat].total++;
+            }
+          } else {
+            remaining.push(p); // 아직 청산 안 됨
+          }
+        } else {
+          remaining.push(p); // 아직 보유 중
+        }
+      }
+    }
+
+    if (remaining.length !== pending.length) {
+      save("di_pending_orders", remaining);
+      saveStrategyPerformance(perf);
+    }
+  }, [orders, positions]);
+
   // ── 리스크 체크 (계좌 갱신 시마다) ──
   useEffect(() => {
     if (!account || !isConnected) return;
@@ -833,38 +1084,47 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
     setScanProgress(100);
   }, [scanning, autoTradeEnabled, isConnected, config, executedSignals, tradeSettings, account, positions, clock, tradingHalted]);
 
-  // ── 자동 주문 실행 (리스크 관리 적용) ──
+  // ── 자동 주문 실행 (Wall Street Grade 리스크 관리) ──
   const executeAutoTrades = async (signals) => {
     if (!account) return;
     const rm = new RiskManager(tradeSettings, account, positions);
+    const regime = signals._regime || { regime: "unknown", volatility: "normal" };
 
     // 최종 리스크 체크
     if (rm.isDrawdownBreached() || rm.isDailyLossBreached(account)) {
+      if (!tradingHalted) {
+        setTradingHalted(true);
+        setRiskAlerts(prev => [...prev, { type: "critical", msg: "드로다운/일일 손실 한도 초과 — 자동매매 중단", time: Date.now() }]);
+      }
       setTradeLog(prev => [{ time: new Date().toLocaleString("ko-KR"),
         symbol: "SYSTEM", side: "HALT", strategy: "리스크 관리",
-        reason: "드로다운/일일 손실 한도 초과로 자동매매 중단",
+        reason: `드로다운 ${rm.drawdown.toFixed(1)}% / 일일P&L ${rm.dailyPL(account).toFixed(1)}%`,
         error: "RISK_HALT" }, ...prev]);
       return;
     }
 
+    // 고변동성 레짐: 주문 속도 제한 (1회 3건)
+    const MAX_ORDERS_PER_SCAN = regime.volatility === "high" ? 3 : 5;
+
     let newExecuted = { ...executedSignals };
     let newLog = [...tradeLog];
     let ordersPlaced = 0;
-    const MAX_ORDERS_PER_SCAN = 5; // 1회 스캔당 최대 주문 수
 
     for (const sig of signals) {
       if (ordersPlaced >= MAX_ORDERS_PER_SCAN) break;
 
-      // 중복 체크
-      if (newExecuted[sig.id]) continue;
+      // 앙상블 시그널은 originalIds 전부 체크
+      const sigIds = sig.originalIds || [sig.id];
+      if (sigIds.some(id => newExecuted[id])) continue;
 
-      // 전략 활성 체크
-      if (!tradeSettings.strategies.includes(sig.strategy)) continue;
+      // 전략 활성 체크 (앙상블은 하나라도 활성이면 OK)
+      const activeStrategies = sig.strategies || [sig.strategy];
+      if (!activeStrategies.some(s => tradeSettings.strategies.includes(s))) continue;
 
       // 신뢰도 필터
       if (sig.confidence < (tradeSettings.minConfidence || 0.5)) continue;
 
-      // 쿨다운 체크 (같은 종목 최근 N시간 내 주문 여부)
+      // 쿨다운 체크
       const cooldownMs = (tradeSettings.cooldownHours || 24) * 3600000;
       const recentSameSymbol = Object.entries(newExecuted).some(([k, v]) =>
         k.includes(sig.symbol) && (Date.now() - v) < cooldownMs
@@ -884,12 +1144,17 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
             strategy: sig.strategy, reason: `개별 종목 한도 초과`, error: "POSITION_LIMIT" });
           continue;
         }
+        // 상관관계 필터
+        if (rm.isCorrelatedRisk(sig.symbol) && sig.confidence < 0.7) {
+          newLog.unshift({ time: new Date().toLocaleString("ko-KR"), symbol: sig.symbol, side: "BUY",
+            strategy: sig.strategy, reason: `동일 섹터 3+포지션 — 상관위험 (신뢰도 ${(sig.confidence*100).toFixed(0)}% < 70%)`, error: "CORR_RISK" });
+          continue;
+        }
       }
 
       // 매도: 보유 중인 종목만
       if (sig.type === "SELL") {
-        const hasPos = positions.some(p => p.symbol === sig.symbol);
-        if (!hasPos) continue;
+        if (!positions.some(p => p.symbol === sig.symbol)) continue;
       }
 
       try {
@@ -902,11 +1167,9 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
         };
 
         if (sig.type === "BUY") {
-          // ATR 기반 포지션 사이징
-          const positionSize = rm.calcPositionSize(sig);
+          const positionSize = rm.calcPositionSize(sig, regime);
           orderParams.notional = Math.max(1, positionSize);
 
-          // 브래킷 주문 (스탑로스 + 익절)
           if (tradeSettings.useBracketOrders) {
             const bracket = rm.calcBracket(sig);
             orderParams.order_class = "bracket";
@@ -914,14 +1177,12 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
             orderParams.stop_loss = { stop_price: String(bracket.stopLoss) };
           }
         } else {
-          // 매도: 전량 청산
           const pos = positions.find(p => p.symbol === sig.symbol);
           orderParams.qty = pos ? parseFloat(pos.qty) : 1;
         }
 
         const order = await alpacaAPI("submit_order", config, orderParams);
 
-        // 주문 상태 확인 (체결 검증)
         let verifiedStatus = order.status;
         if (order.id) {
           try {
@@ -931,16 +1192,19 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
           } catch {}
         }
 
-        newExecuted[sig.id] = Date.now();
+        // 모든 관련 시그널 ID 실행 기록
+        sigIds.forEach(id => { newExecuted[id] = Date.now(); });
         const bracket = tradeSettings.useBracketOrders && sig.type === "BUY" ? rm.calcBracket(sig) : null;
         newLog.unshift({
           time: new Date().toLocaleString("ko-KR"),
           symbol: sig.symbol,
           side: sig.type,
-          strategy: sig.strategy,
+          strategy: sig.reason, // 앙상블 정보 포함
           reason: sig.reason,
           confidence: sig.confidence,
-          amount: sig.type === "BUY" ? `$${rm.calcPositionSize(sig)}` : `${orderParams.qty}주 청산`,
+          ensembleCount: sig.ensembleCount || 1,
+          regime: regime.regime,
+          amount: sig.type === "BUY" ? `$${rm.calcPositionSize(sig, regime)}` : `${orderParams.qty}주 청산`,
           stopLoss: bracket ? `$${bracket.stopLoss}` : null,
           takeProfit: bracket ? `$${bracket.takeProfit}` : null,
           orderId: order.id,
@@ -948,16 +1212,19 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
           atrPct: sig.atrPct,
         });
         ordersPlaced++;
+
+        // 전략 성과 추적 (주문 성공 기록 → 나중에 체결 후 승패 판정)
+        const perfKey = `di_pending_orders`;
+        const pending = load(perfKey, []);
+        pending.push({ orderId: order.id, strategy: sig.strategy, strategies: activeStrategies,
+          symbol: sig.symbol, side: sig.type, price: sig.price, time: Date.now() });
+        save(perfKey, pending.slice(-100));
       } catch (e) {
-        newExecuted[sig.id] = Date.now();
+        sigIds.forEach(id => { newExecuted[id] = Date.now(); });
         newLog.unshift({
           time: new Date().toLocaleString("ko-KR"),
-          symbol: sig.symbol,
-          side: sig.type,
-          strategy: sig.strategy,
-          reason: sig.reason,
-          confidence: sig.confidence,
-          error: e.message,
+          symbol: sig.symbol, side: sig.type, strategy: sig.strategy,
+          reason: sig.reason, confidence: sig.confidence, error: e.message,
         });
       }
     }
@@ -1114,7 +1381,38 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
       </div>
 
       {/* ── 포지션 ── */}
-      {activeTab==="dashboard"&&(
+      {activeTab==="dashboard"&&(<>
+        {/* 마켓 레짐 인디케이터 */}
+        {detectedSignals._regime && (()=>{
+          const r = detectedSignals._regime;
+          const regimeInfo = {
+            trending: { icon: "📈", label: "추세장", color: C.green, desc: "모멘텀·추세추종 전략 유리" },
+            "mean-reverting": { icon: "↔️", label: "박스권", color: C.yellow, desc: "평균회귀·오실레이터 전략 유리" },
+            volatile: { icon: "⚡", label: "고변동", color: C.red, desc: "리스크 축소, 방어적 운용" },
+            unknown: { icon: "❓", label: "분석중", color: C.text3, desc: "데이터 수집 중" },
+          }[r.regime] || { icon: "❓", label: "분석중", color: C.text3, desc: "" };
+          return (
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"16px",marginBottom:"12px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
+                <div style={{fontSize:"28px"}}>{regimeInfo.icon}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:700,fontSize:"14px",display:"flex",alignItems:"center",gap:"8px"}}>
+                    마켓 레짐: <span style={{color:regimeInfo.color}}>{regimeInfo.label}</span>
+                    {r.trendDir && <span style={{fontSize:"11px",color:r.trendDir==="bull"?C.green:C.red,fontWeight:600}}>
+                      {r.trendDir==="bull"?"BULL":"BEAR"}
+                    </span>}
+                  </div>
+                  <div style={{fontSize:"11px",color:C.text3,marginTop:"2px"}}>{regimeInfo.desc}</div>
+                </div>
+                <div style={{textAlign:"right",fontSize:"11px",color:C.text3}}>
+                  {r.annualizedVol!=null && <div>변동성 <b style={{color:C.text2}}>{r.annualizedVol.toFixed(1)}%</b></div>}
+                  {r.adxProxy!=null && <div>추세강도 <b style={{color:C.text2}}>{r.adxProxy.toFixed(0)}</b></div>}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
           <div style={{fontWeight:700,marginBottom:"16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <span>보유 포지션 ({positions.length}/{tradeSettings.maxPositions})</span>
@@ -1166,7 +1464,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
             </div>
           )}
         </div>
-      )}
+      </>)}
 
       {/* ── 주문 ── */}
       {activeTab==="orders"&&(
@@ -1265,16 +1563,20 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
               <div style={{display:"flex",flexDirection:"column",gap:"6px",maxHeight:"500px",overflow:"auto"}}>
                 {detectedSignals.slice(0,60).map((sig,i)=>{
                   const isBuy=sig.type==="BUY";
-                  const wasExec=executedSignals[sig.id];
+                  const sigIds = sig.originalIds || [sig.id];
+                  const wasExec=sigIds.some(id=>executedSignals[id]);
                   const confColor=sig.confidence>=0.7?C.green:sig.confidence>=0.5?C.yellow:C.red;
+                  const isEnsemble = (sig.ensembleCount||1) > 1;
                   return (
                     <div key={i} style={{background:C.card2,borderRadius:"10px",padding:"12px",
-                      borderLeft:`3px solid ${isBuy?C.red:C.blue}`,opacity:wasExec?0.5:1}}>
+                      borderLeft:`3px solid ${isEnsemble?C.purple:isBuy?C.red:C.blue}`,opacity:wasExec?0.5:1}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}>
                         <div style={{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap"}}>
                           <span style={{padding:"2px 6px",borderRadius:"4px",fontSize:"10px",fontWeight:700,
                             background:isBuy?C.redBg:C.blueBg,color:isBuy?C.red:C.blue}}>{isBuy?"매수":"매도"}</span>
                           <span style={{fontWeight:700}}>{sig.symbol}</span>
+                          {isEnsemble && <span style={{fontSize:"9px",padding:"1px 5px",borderRadius:"10px",fontWeight:800,
+                            background:C.purpleBg,color:C.purple}}>앙상블 {sig.ensembleCount}x</span>}
                           <span style={{fontSize:"10px",color:C.purple}}>{sig.strategyIcon} {sig.strategy}</span>
                           <span style={{fontSize:"9px",padding:"1px 4px",borderRadius:"3px",fontWeight:700,
                             background:sig.confidence>=0.7?C.greenBg:sig.confidence>=0.5?C.yellowBg:C.redBg,
