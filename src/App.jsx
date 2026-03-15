@@ -4667,12 +4667,18 @@ function AppInner() {
           {[
             { id: "home", label: "홈 대시보드", icon: "🏠" },
             { id: "screener", label: "스크리너", icon: "🔍" },
+            { id: "anomaly", label: "이상 탐지", icon: "⚡", badge: anomalies.length },
             { id: "strategy", label: "퀀트 전략", icon: "🎯" },
           ].map(t => (
             <button key={t.id} className={`sb-item${tab === t.id ? " active" : ""}`}
               onClick={() => { setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }}
               style={{ background: tab === t.id ? C.blueBg : "transparent", color: tab === t.id ? C.blue : C.text2 }}>
               <span className="sb-icon">{t.icon}</span>{t.label}
+              {t.badge > 0 && (
+                <span style={{ marginLeft: "auto", background: C.red, color: "#fff",
+                  fontSize: "9px", fontWeight: 800, borderRadius: "50%", width: "18px", height: "18px",
+                  display: "flex", alignItems: "center", justifyContent: "center" }}>{t.badge > 9 ? "9+" : t.badge}</span>
+              )}
             </button>
           ))}
         </nav>
