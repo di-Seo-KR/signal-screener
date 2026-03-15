@@ -3386,6 +3386,144 @@ function AppInner() {
     });
     setHotAssets(hotResults);
 
+    // ── 관심종목 + 핫 종목 기술적 지표 보강 (1년 데이터 기반) ──
+    const enrichSymbols = [...new Set([
+      ...watchlist.map(w => w.symbol),
+      ...hotResults.slice(0, 15).map(h => h.symbol),
+    ])].filter(s => !s.startsWith("BTC") && !s.startsWith("ETH") && !s.startsWith("SOL")); // 크립토는 별도
+    if (enrichSymbols.length > 0) {
+      const enrichChunkSize = 10;
+      for (let ei = 0; ei < enrichSymbols.length; ei += enrichChunkSize) {
+        const eChunk = enrichSymbols.slice(ei, ei + enrichChunkSize);
+        const eSyms = eChunk.join(",");
+        try {
+          const er = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(eSyms)}&interval=1d&range=1y`, { signal });
+          if (er.ok) {
+            const eBatch = (await er.json()).results || {};
+            setHotAssets(prev => {
+              const updated = [...prev];
+              for (const sym of eChunk) {
+                const d = eBatch[sym];
+                if (!d || !d.closes || d.closes.length < 20) continue;
+                const idx = updated.findIndex(a => a.symbol === sym || a.symbolRaw === sym);
+                if (idx === -1) continue;
+                const closes = d.closes, volumes = d.volumes || [], highs = d.highs || [], lows = d.lows || [];
+                const n = closes.length;
+
+                // RSI (14)
+                let rsi = null;
+                if (n >= 15) {
+                  let gains = 0, losses = 0;
+                  for (let i = n - 14; i < n; i++) {
+                    const diff = closes[i] - closes[i - 1];
+                    if (diff > 0) gains += diff; else losses -= diff;
+                  }
+                  const avgGain = gains / 14, avgLoss = losses / 14;
+                  rsi = avgLoss === 0 ? 100 : Math.round(100 - 100 / (1 + avgGain / avgLoss));
+                }
+
+                // MA50, MA200
+                const ma50 = n >= 50 ? closes.slice(-50).reduce((s, v) => s + v, 0) / 50 : null;
+                const ma200 = n >= 200 ? closes.slice(-200).reduce((s, v) => s + v, 0) / 200 : null;
+                const curPrice = closes[n - 1];
+                const ma200Dist = ma200 ? ((curPrice - ma200) / ma200 * 100) : null;
+
+                // 52주 고저
+                const yearHighs = highs.length >= 200 ? highs.slice(-252) : highs;
+                const yearLows = lows.length >= 200 ? lows.slice(-252) : lows;
+                const high52w = Math.max(...yearHighs);
+                const low52w = Math.min(...yearLows.filter(l => l > 0));
+
+                // 거래량 비율 (최근 5일 평균 / 20일 평균)
+                let volRatio = null;
+                if (volumes.length >= 20) {
+                  const vol5 = volumes.slice(-5).reduce((s, v) => s + v, 0) / 5;
+                  const vol20 = volumes.slice(-20).reduce((s, v) => s + v, 0) / 20;
+                  volRatio = vol20 > 0 ? +(vol5 / vol20).toFixed(2) : null;
+                }
+
+                // 주간 변동률
+                const weekChange = n >= 6 ? +((curPrice - closes[n - 6]) / closes[n - 6] * 100).toFixed(2) : null;
+
+                // 스토캐스틱 (14일)
+                let stoch = null;
+                if (n >= 14 && highs.length >= 14 && lows.length >= 14) {
+                  const h14 = Math.max(...highs.slice(-14));
+                  const l14 = Math.min(...lows.slice(-14).filter(l => l > 0));
+                  const k = h14 - l14 > 0 ? Math.round((curPrice - l14) / (h14 - l14) * 100) : 50;
+                  stoch = { k, d: k }; // 단순 K만 (D는 K의 3일 MA이지만 근사)
+                }
+
+                // MFI (14일) - Money Flow Index
+                let mfi = null;
+                if (n >= 15 && volumes.length >= 15 && highs.length >= 15 && lows.length >= 15) {
+                  let posFlow = 0, negFlow = 0;
+                  for (let i = n - 14; i < n; i++) {
+                    const tp = (highs[i] + lows[i] + closes[i]) / 3;
+                    const prevTp = (highs[i-1] + lows[i-1] + closes[i-1]) / 3;
+                    const mf = tp * (volumes[i] || 0);
+                    if (tp > prevTp) posFlow += mf; else negFlow += mf;
+                  }
+                  mfi = negFlow > 0 ? Math.round(100 - 100 / (1 + posFlow / negFlow)) : 100;
+                }
+
+                // Williams %R (14일)
+                let wr = null;
+                if (n >= 14 && highs.length >= 14 && lows.length >= 14) {
+                  const hh = Math.max(...highs.slice(-14));
+                  const ll = Math.min(...lows.slice(-14).filter(l => l > 0));
+                  wr = hh - ll > 0 ? Math.round((hh - curPrice) / (hh - ll) * -100) : -50;
+                }
+
+                // RSI 다이버전스 (간단 버전: 가격 하락 + RSI 상승 = bullish)
+                let rsiDivType = null;
+                if (n >= 28 && rsi != null) {
+                  const prevCloses14 = closes.slice(-28, -14);
+                  let prevGains = 0, prevLosses = 0;
+                  for (let i = 1; i < prevCloses14.length; i++) {
+                    const diff = prevCloses14[i] - prevCloses14[i-1];
+                    if (diff > 0) prevGains += diff; else prevLosses -= diff;
+                  }
+                  const prevRsi = prevLosses === 0 ? 100 : Math.round(100 - 100 / (1 + (prevGains/13) / (prevLosses/13)));
+                  if (curPrice < closes[n - 14] && rsi > prevRsi) rsiDivType = "bullish";
+                  else if (curPrice > closes[n - 14] && rsi < prevRsi) rsiDivType = "bearish";
+                }
+
+                // CMF (20일)
+                let cmf = null;
+                if (n >= 20 && volumes.length >= 20 && highs.length >= 20 && lows.length >= 20) {
+                  let mfvSum = 0, volSum = 0;
+                  for (let i = n - 20; i < n; i++) {
+                    const hl = highs[i] - lows[i];
+                    const mfm = hl > 0 ? ((closes[i] - lows[i]) - (highs[i] - closes[i])) / hl : 0;
+                    mfvSum += mfm * (volumes[i] || 0);
+                    volSum += volumes[i] || 0;
+                  }
+                  cmf = volSum > 0 ? +(mfvSum / volSum).toFixed(3) : null;
+                }
+
+                // GAP (전일 종가 vs 당일 시가)
+                let gap = null;
+                if (d.opens && d.opens.length >= 2) {
+                  const todayOpen = d.opens[d.opens.length - 1];
+                  const prevClose = closes[n - 2];
+                  if (prevClose > 0) gap = +((todayOpen - prevClose) / prevClose * 100).toFixed(2);
+                }
+
+                updated[idx] = {
+                  ...updated[idx],
+                  rsi, fiftyDayAvg: ma50, twoHundredDayAvg: ma200, ma200Dist,
+                  high52w, low52w, volRatio, weekChange, stoch, mfi, wr,
+                  rsiDivType, cmf, gap,
+                };
+              }
+              return updated;
+            });
+          }
+        } catch {}
+      }
+    }
+
     // ── 공포/탐욕 지수 ──
     const fgData = { stock: null, crypto: null };
     // CNN Fear & Greed (via proxy API)
