@@ -3072,6 +3072,8 @@ function AppInner() {
 
   // ── 이상 탐지 (Anomaly Detection) ──
   const [anomalies, setAnomalies] = useState([]);
+  const [anomalyHistory, setAnomalyHistory] = useState(() => { try { return JSON.parse(localStorage.getItem("di_anomaly_history") || "[]"); } catch { return []; } });
+  const [anomalyFilter, setAnomalyFilter] = useState("all"); // all, surge, crash, high
   const [hotViewMode, setHotViewMode] = useState("all"); // all, gainers, losers
 
   // ── 포트폴리오 벤치마킹 ──
@@ -3123,7 +3125,21 @@ function AppInner() {
       }
     }
     detected.sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
-    setAnomalies(detected.slice(0, 10));
+    const top = detected.slice(0, 10);
+    setAnomalies(top);
+    // 히스토리 저장
+    if (top.length > 0) {
+      setAnomalyHistory(prev => {
+        const now = new Date().toISOString();
+        const newEntries = top.map(a => ({
+          symbol: a.symbol, name: a.name, change: a.change,
+          type: a.anomalyType, severity: a.severity, date: now,
+        }));
+        const merged = [...newEntries, ...prev.filter(p => !newEntries.some(n => n.symbol === p.symbol && n.date?.slice(0, 10) === p.date?.slice(0, 10)))].slice(0, 50);
+        try { localStorage.setItem("di_anomaly_history", JSON.stringify(merged)); } catch {}
+        return merged;
+      });
+    }
   }, [hotAssets]);
 
   // ── 포트폴리오 벤치마킹 계산 ──
@@ -4729,7 +4745,7 @@ function AppInner() {
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "quant-port", label: "운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "sentiment", label: "센티먼트", icon: "💬" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "자동매매", icon: "🤖" }].map(t => (
+            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "anomaly", label: "이상탐지", icon: "⚡" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "quant-port", label: "운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "sentiment", label: "센티먼트", icon: "💬" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "자동매매", icon: "🤖" }].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }} style={{
                 padding: "7px 12px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
@@ -4741,6 +4757,11 @@ function AppInner() {
                   <span style={{ position: "absolute", top: "-2px", right: "-2px", background: C.red, color: "#fff",
                     fontSize: "9px", fontWeight: 800, borderRadius: "50%", width: "16px", height: "16px",
                     display: "flex", alignItems: "center", justifyContent: "center" }}>{alertBadge > 9 ? "9+" : alertBadge}</span>
+                )}
+                {t.id === "anomaly" && anomalies.length > 0 && (
+                  <span style={{ position: "absolute", top: "-2px", right: "-2px", background: C.red, color: "#fff",
+                    fontSize: "9px", fontWeight: 800, borderRadius: "50%", width: "16px", height: "16px",
+                    display: "flex", alignItems: "center", justifyContent: "center" }}>{anomalies.length}</span>
                 )}
               </button>
             ))}
@@ -4769,7 +4790,7 @@ function AppInner() {
             background: C.card, borderTop: `1px solid ${C.border}30`,
             padding: "12px 16px 16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px",
           }}>
-            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-port", label: "전략 운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "sentiment", label: "센티먼트", icon: "💬" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "자동매매", icon: "🤖" }].map(t => (
+            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "anomaly", label: "이상탐지", icon: "⚡" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-port", label: "전략 운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "sentiment", label: "센티먼트", icon: "💬" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "자동매매", icon: "🤖" }].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); setMenuOpen(false); }} style={{
                 padding: "12px 14px", borderRadius: "12px", fontSize: "14px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : C.card2,
@@ -6277,6 +6298,261 @@ function AppInner() {
                 })}
               </div>
             )}
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 이상 탐지 (Anomaly Detection)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "anomaly" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            {/* 헤더 */}
+            <div style={{
+              background: `linear-gradient(135deg, ${C.card} 0%, ${C.purpleBg} 100%)`,
+              borderRadius: "18px", padding: "22px 24px", border: `1px solid ${C.purple}18`,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px" }}>
+                <div style={{ width: "42px", height: "42px", borderRadius: "14px",
+                  background: `linear-gradient(135deg, ${C.purple}, ${C.blue})`,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px"
+                }}>⚡</div>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 800, color: C.text1 }}>이상 탐지</h2>
+                  <div style={{ fontSize: "12px", color: C.text3, marginTop: "2px" }}>
+                    통계적 이상치 기반 실시간 시장 모니터링
+                  </div>
+                </div>
+                <div style={{ marginLeft: "auto", textAlign: "right" }}>
+                  <div style={{
+                    fontSize: "28px", fontWeight: 800,
+                    color: anomalies.length > 0 ? C.red : C.green,
+                  }}>{anomalies.length}</div>
+                  <div style={{ fontSize: "11px", color: C.text3 }}>감지됨</div>
+                </div>
+              </div>
+
+              {/* 통계 요약 3칸 */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+                {[
+                  { label: "급등", value: anomalies.filter(a => a.anomalyType === "surge").length, icon: "🚀", color: C.green },
+                  { label: "급락", value: anomalies.filter(a => a.anomalyType === "crash").length, icon: "💥", color: C.red },
+                  { label: "고위험", value: anomalies.filter(a => a.severity === "high").length, icon: "🔴", color: C.yellow },
+                ].map((s, i) => (
+                  <div key={i} style={{
+                    background: `${C.card}90`, borderRadius: "12px", padding: "12px",
+                    textAlign: "center", border: `1px solid ${C.border}40`,
+                  }}>
+                    <div style={{ fontSize: "16px", marginBottom: "4px" }}>{s.icon}</div>
+                    <div style={{ fontSize: "20px", fontWeight: 800, color: s.color }}>{s.value}</div>
+                    <div style={{ fontSize: "11px", color: C.text3 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* 필터 탭 */}
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              {[
+                { key: "all", label: "전체", icon: "📊" },
+                { key: "surge", label: "급등", icon: "🚀" },
+                { key: "crash", label: "급락", icon: "💥" },
+                { key: "high", label: "고위험", icon: "🔴" },
+              ].map(f => {
+                const count = f.key === "all" ? anomalies.length
+                  : f.key === "high" ? anomalies.filter(a => a.severity === "high").length
+                  : anomalies.filter(a => a.anomalyType === f.key).length;
+                return (
+                  <button key={f.key} onClick={() => setAnomalyFilter(f.key)} style={{
+                    padding: "8px 16px", borderRadius: "12px", fontSize: "13px", fontWeight: 600,
+                    background: anomalyFilter === f.key ? C.blueBg : C.card,
+                    color: anomalyFilter === f.key ? C.blue : C.text2,
+                    border: `1px solid ${anomalyFilter === f.key ? C.blue : C.border}40`,
+                    cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
+                  }}>
+                    {f.icon} {f.label}
+                    <span style={{
+                      background: anomalyFilter === f.key ? `${C.blue}30` : `${C.text3}20`,
+                      padding: "1px 7px", borderRadius: "8px", fontSize: "11px",
+                    }}>{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 이상 탐지 리스트 */}
+            {(() => {
+              const filtered = anomalyFilter === "all" ? anomalies
+                : anomalyFilter === "high" ? anomalies.filter(a => a.severity === "high")
+                : anomalies.filter(a => a.anomalyType === anomalyFilter);
+              if (filtered.length === 0) return (
+                <div style={{
+                  background: C.card, borderRadius: "18px", padding: "48px 24px",
+                  textAlign: "center", border: `1px solid ${C.border}20`,
+                }}>
+                  <div style={{ fontSize: "48px", marginBottom: "16px" }}>
+                    {anomalies.length === 0 ? "✅" : "🔍"}
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: "17px", color: C.text1, marginBottom: "8px" }}>
+                    {anomalies.length === 0 ? "이상 징후 없음" : "해당 필터 결과 없음"}
+                  </div>
+                  <div style={{ color: C.text3, fontSize: "13px", lineHeight: 1.7 }}>
+                    {anomalies.length === 0
+                      ? <>현재 시장에서 통계적 이상치가 감지되지 않았습니다<br/>2σ 이상 변동, 3x 이상 거래량 폭증 시 알림됩니다</>
+                      : <>다른 필터를 선택하거나 전체 보기를 이용하세요</>}
+                  </div>
+                </div>
+              );
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  {filtered.map((a, i) => {
+                    const isSurge = a.anomalyType === "surge";
+                    const accentColor = isSurge ? C.green : C.red;
+                    return (
+                      <div key={`${a.symbol}-${i}`} style={{
+                        background: C.card, borderRadius: "16px",
+                        padding: "18px 20px", border: `1px solid ${accentColor}20`,
+                        cursor: "pointer", transition: "all .2s",
+                      }}
+                      onClick={() => setChartAsset(a)}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = `${accentColor}50`; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = `${accentColor}20`; e.currentTarget.style.transform = "none"; }}
+                      >
+                        {/* 상단: 종목명 + 변동률 + 심각도 */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+                          <div style={{
+                            width: "36px", height: "36px", borderRadius: "12px",
+                            background: `${accentColor}15`, display: "flex",
+                            alignItems: "center", justifyContent: "center", fontSize: "18px",
+                          }}>{isSurge ? "🚀" : "💥"}</div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>{a.name}</div>
+                            <div style={{ fontSize: "12px", color: C.text3, marginTop: "1px" }}>{a.symbol}</div>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontWeight: 800, fontSize: "18px", color: accentColor }}>
+                              {a.change >= 0 ? "+" : ""}{a.change?.toFixed(2)}%
+                            </div>
+                            <div style={{ fontSize: "12px", color: C.text3 }}>
+                              ${a.price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </div>
+                          </div>
+                          <div style={{
+                            padding: "4px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: 700,
+                            background: a.severity === "high" ? `${C.red}20` : `${C.yellow}20`,
+                            color: a.severity === "high" ? C.red : C.yellow,
+                          }}>
+                            {a.severity === "high" ? "🔴 HIGH" : "🟡 MED"}
+                          </div>
+                        </div>
+
+                        {/* 이상 탐지 이유 */}
+                        <div style={{
+                          display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px",
+                        }}>
+                          {a.anomalyReasons.map((r, ri) => (
+                            <span key={ri} style={{
+                              padding: "4px 10px", borderRadius: "8px", fontSize: "11px",
+                              background: `${accentColor}12`, color: accentColor, fontWeight: 600,
+                            }}>⚠️ {r}</span>
+                          ))}
+                        </div>
+
+                        {/* 지표 그리드 */}
+                        <div style={{
+                          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))",
+                          gap: "8px", padding: "12px", background: `${C.card2}80`,
+                          borderRadius: "12px",
+                        }}>
+                          {[
+                            a.rsi != null && { label: "RSI", value: a.rsi.toFixed(1), color: a.rsi > 70 ? C.red : a.rsi < 30 ? C.green : C.text2 },
+                            a.volRatio != null && { label: "거래량 비율", value: `${a.volRatio.toFixed(1)}x`, color: a.volRatio > 3 ? C.red : C.text2 },
+                            a.ma200Dist != null && { label: "MA200 괴리", value: `${a.ma200Dist > 0 ? "+" : ""}${a.ma200Dist.toFixed(1)}%`, color: a.ma200Dist > 20 ? C.red : a.ma200Dist < -20 ? C.green : C.text2 },
+                            a.weeklyChange != null && { label: "주간 변동", value: `${a.weeklyChange > 0 ? "+" : ""}${a.weeklyChange.toFixed(1)}%`, color: a.weeklyChange >= 0 ? C.green : C.red },
+                            a.stochasticK != null && { label: "Stoch K", value: a.stochasticK.toFixed(1), color: a.stochasticK > 80 ? C.red : a.stochasticK < 20 ? C.green : C.text2 },
+                            a.williamsR != null && { label: "Williams %R", value: a.williamsR.toFixed(1), color: a.williamsR > -20 ? C.red : a.williamsR < -80 ? C.green : C.text2 },
+                          ].filter(Boolean).map((ind, ii) => (
+                            <div key={ii} style={{ textAlign: "center" }}>
+                              <div style={{ fontSize: "11px", color: C.text3, marginBottom: "3px" }}>{ind.label}</div>
+                              <div style={{ fontSize: "14px", fontWeight: 700, color: ind.color }}>{ind.value}</div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* 감지 시간 */}
+                        <div style={{ fontSize: "11px", color: C.text3, marginTop: "10px", textAlign: "right" }}>
+                          감지: {a.detectedAt ? new Date(a.detectedAt).toLocaleTimeString("ko-KR") : "-"}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
+            {/* ── 이상 탐지 히스토리 ── */}
+            <div style={{
+              background: C.card, borderRadius: "18px", padding: "20px",
+              border: `1px solid ${C.border}20`,
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+                <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: C.text1 }}>📜 탐지 히스토리</h3>
+                {anomalyHistory.length > 0 && (
+                  <button onClick={() => { setAnomalyHistory([]); try { localStorage.removeItem("di_anomaly_history"); } catch {} }} style={{
+                    padding: "4px 12px", borderRadius: "8px", fontSize: "11px",
+                    background: `${C.red}15`, color: C.red, border: "none", cursor: "pointer", fontWeight: 600,
+                  }}>초기화</button>
+                )}
+              </div>
+              {anomalyHistory.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "24px 0", color: C.text3, fontSize: "13px" }}>
+                  아직 기록된 이상 탐지 히스토리가 없습니다
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "300px", overflowY: "auto" }}>
+                  {anomalyHistory.slice(0, 20).map((h, i) => (
+                    <div key={i} style={{
+                      display: "flex", alignItems: "center", gap: "10px",
+                      padding: "10px 12px", borderRadius: "10px",
+                      background: `${C.card2}60`, fontSize: "13px",
+                    }}>
+                      <span>{h.type === "surge" ? "🚀" : "💥"}</span>
+                      <span style={{ fontWeight: 600, color: C.text1, flex: 1 }}>{h.name}</span>
+                      <span style={{ fontWeight: 700, color: h.change >= 0 ? C.green : C.red }}>
+                        {h.change >= 0 ? "+" : ""}{h.change?.toFixed(2)}%
+                      </span>
+                      <span style={{ fontSize: "11px", color: C.text3 }}>
+                        {h.date ? new Date(h.date).toLocaleDateString("ko-KR", { month: "short", day: "numeric" }) : "-"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 탐지 기준 설명 */}
+            <div style={{
+              background: C.card, borderRadius: "18px", padding: "18px 20px",
+              border: `1px solid ${C.border}20`,
+            }}>
+              <h3 style={{ margin: "0 0 12px", fontSize: "14px", fontWeight: 700, color: C.text1 }}>📐 탐지 기준</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                {[
+                  { icon: "📈", title: "가격 이상 변동", desc: "전체 평균 대비 2σ 이상 + 3% 이상 변동" },
+                  { icon: "📊", title: "거래량 폭증", desc: "5일 평균 대비 3배 이상 거래량" },
+                  { icon: "⬆️", title: "급격한 갭", desc: "전일 종가 대비 3% 이상 갭 발생" },
+                  { icon: "🔴", title: "고위험 등급", desc: "평균 대비 3σ 이상 극단적 변동" },
+                ].map((c, i) => (
+                  <div key={i} style={{
+                    padding: "12px", borderRadius: "12px",
+                    background: `${C.card2}60`, border: `1px solid ${C.border}20`,
+                  }}>
+                    <div style={{ fontSize: "18px", marginBottom: "6px" }}>{c.icon}</div>
+                    <div style={{ fontSize: "13px", fontWeight: 600, color: C.text1, marginBottom: "3px" }}>{c.title}</div>
+                    <div style={{ fontSize: "11px", color: C.text3, lineHeight: 1.5 }}>{c.desc}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
