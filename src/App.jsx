@@ -2950,7 +2950,7 @@ function AppInner() {
     try {
       const p = new URLSearchParams(window.location.search);
       const t = p.get("tab");
-      if (t && ["paper-trading","portfolio","screener","alerts","news","quant-portfolio","sector-flow","backtest"].includes(t)) return t;
+      if (t && ["paper-trading","portfolio","screener","alerts","news","quant-portfolio","sector-flow","backtest","sentiment"].includes(t)) return t;
     } catch {}
     return "home";
   });
@@ -3063,6 +3063,11 @@ function AppInner() {
   const [newsItems, setNewsItems] = useState([]);
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsSort, setNewsSort] = useState("time"); // time, positive, negative
+
+  // 소셜 센티먼트
+  const [sentimentData, setSentimentData] = useState(null);
+  const [sentimentLoading, setSentimentLoading] = useState(false);
+  const [sentimentSymbol, setSentimentSymbol] = useState("SPY");
 
   useEffect(() => { saveSettings({ botToken: settings.botToken, chatId: settings.chatId, autoSend: settings.autoSend, strategyAlerts: settings.strategyAlerts, autoScanEnabled: settings.autoScanEnabled, autoScanInterval: settings.autoScanInterval, syncPin }); }, [settings, syncPin]);
   useEffect(() => { savePortfolio(portfolio); }, [portfolio]);
@@ -4129,6 +4134,18 @@ function AppInner() {
 
   useEffect(() => { if (tab === "news") fetchNews(); }, [tab]);
 
+  // ── 소셜 센티먼트 ──
+  const fetchSentiment = useCallback(async (sym) => {
+    setSentimentLoading(true);
+    try {
+      const r = await fetch(`/api/social-sentiment?symbol=${sym || sentimentSymbol}&_t=${Date.now()}`);
+      if (r.ok) setSentimentData(await r.json());
+    } catch {}
+    setSentimentLoading(false);
+  }, [sentimentSymbol]);
+
+  useEffect(() => { if (tab === "sentiment") fetchSentiment(); }, [tab]);
+
   // ── 환율 가져오기 ──────────────────────────────────────────────
   useEffect(() => {
     (async () => {
@@ -4363,6 +4380,7 @@ function AppInner() {
           {[
             { id: "portfolio", label: "내 포트폴리오", icon: "💼" },
             { id: "news", label: "마켓 뉴스", icon: "📰" },
+            { id: "sentiment", label: "소셜 센티먼트", icon: "💬" },
             { id: "alerts", label: "매매 알림", icon: "🔔", badge: alertBadge },
             { id: "paper-trading", label: "퀀트 자동매매", icon: "🤖" },
           ].map(t => (
@@ -4409,7 +4427,7 @@ function AppInner() {
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-port", label: "전략 운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "자동매매", icon: "🤖" }].map(t => (
+            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "quant-port", label: "운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "sentiment", label: "센티먼트", icon: "💬" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "자동매매", icon: "🤖" }].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }} style={{
                 padding: "6px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
@@ -4449,7 +4467,7 @@ function AppInner() {
             background: C.card, borderTop: `1px solid ${C.border}`,
             padding: "10px 16px 14px", display: "flex", flexDirection: "column", gap: "4px",
           }}>
-            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-port", label: "전략 운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "퀀트 자동매매", icon: "🤖" }].map(t => (
+            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-port", label: "전략 운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "sentiment", label: "소셜 센티먼트", icon: "💬" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "퀀트 자동매매", icon: "🤖" }].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); setMenuOpen(false); }} style={{
                 padding: "12px 16px", borderRadius: "10px", fontSize: "15px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
@@ -6645,6 +6663,158 @@ function AppInner() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 소셜 센티먼트 분석
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "sentiment" && (
+          <div className="tab-content">
+            {/* 헤더 */}
+            <div style={{background:`linear-gradient(135deg, ${C.card} 0%, #0D1B2A 100%)`,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"12px"}}>
+                <div>
+                  <div style={{fontWeight:800,fontSize:"18px",marginBottom:"4px"}}>소셜 센티먼트 분석</div>
+                  <div style={{fontSize:"12px",color:C.text3}}>StockTwits · Reddit(WSB) 기반 실시간 투자 심리</div>
+                </div>
+                <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
+                  <input value={sentimentSymbol} onChange={e=>setSentimentSymbol(e.target.value.toUpperCase())}
+                    placeholder="SPY" onKeyDown={e=>{if(e.key==="Enter")fetchSentiment(sentimentSymbol);}}
+                    style={{width:"100px",padding:"8px 12px",borderRadius:"8px",fontSize:"14px",fontWeight:700,
+                      background:C.card2,border:`1px solid ${C.border2}`,color:C.text1,outline:"none",textAlign:"center"}} />
+                  <button onClick={()=>fetchSentiment(sentimentSymbol)} disabled={sentimentLoading} style={{
+                    padding:"8px 16px",borderRadius:"8px",fontSize:"13px",fontWeight:700,
+                    background:sentimentLoading?C.card2:`linear-gradient(135deg,${C.purple},#6D28D9)`,
+                    color:"#fff",border:"none",cursor:sentimentLoading?"default":"pointer",
+                  }}>{sentimentLoading?"분석 중...":"분석"}</button>
+                </div>
+              </div>
+              {/* 빠른 심볼 버튼 */}
+              <div style={{display:"flex",gap:"6px",marginTop:"12px",flexWrap:"wrap"}}>
+                {["SPY","AAPL","NVDA","TSLA","MSFT","AMZN","META","AMD","GOOG","COIN"].map(s=>(
+                  <button key={s} onClick={()=>{setSentimentSymbol(s);fetchSentiment(s);}} style={{
+                    padding:"4px 10px",borderRadius:"6px",fontSize:"11px",fontWeight:600,
+                    background:sentimentSymbol===s?C.blueBg:C.card2,color:sentimentSymbol===s?C.blue:C.text3,
+                    border:`1px solid ${sentimentSymbol===s?C.blue+"55":C.border2}`,cursor:"pointer",
+                  }}>{s}</button>
+                ))}
+              </div>
+            </div>
+
+            {sentimentLoading && (
+              <div style={{textAlign:"center",padding:"60px 0",color:C.text3}}>
+                <div style={{fontSize:"40px",marginBottom:"12px",animation:"pulse 1.5s infinite"}}>💬</div>
+                <div>소셜 데이터 수집 중...</div>
+              </div>
+            )}
+
+            {!sentimentLoading && sentimentData && (<>
+              {/* 종합 센티먼트 게이지 */}
+              {sentimentData.sentiment && (
+                <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"24px",marginBottom:"12px",textAlign:"center"}}>
+                  <div style={{fontSize:"11px",color:C.text3,marginBottom:"8px",fontWeight:600}}>
+                    {sentimentData.symbol} 종합 센티먼트
+                  </div>
+                  <div style={{fontSize:"48px",fontWeight:900,color:
+                    sentimentData.sentiment.score>=60?C.green:sentimentData.sentiment.score>=40?C.yellow:C.red,
+                    letterSpacing:"-2px",marginBottom:"4px"}}>
+                    {sentimentData.sentiment.score}
+                  </div>
+                  <div style={{fontSize:"14px",fontWeight:700,color:
+                    sentimentData.sentiment.score>=60?C.green:sentimentData.sentiment.score>=40?C.yellow:C.red,marginBottom:"16px"}}>
+                    {sentimentData.sentiment.label}
+                  </div>
+                  {/* 센티먼트 바 */}
+                  <div style={{display:"flex",height:"8px",borderRadius:"4px",overflow:"hidden",marginBottom:"8px"}}>
+                    <div style={{width:`${sentimentData.sentiment.bullish}%`,background:C.green,transition:"width 0.5s"}} />
+                    <div style={{width:`${sentimentData.sentiment.neutral}%`,background:C.text3,transition:"width 0.5s"}} />
+                    <div style={{width:`${sentimentData.sentiment.bearish}%`,background:C.red,transition:"width 0.5s"}} />
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:"11px"}}>
+                    <span style={{color:C.green,fontWeight:600}}>긍정 {sentimentData.sentiment.bullish}%</span>
+                    <span style={{color:C.text3}}>중립 {sentimentData.sentiment.neutral}%</span>
+                    <span style={{color:C.red,fontWeight:600}}>부정 {sentimentData.sentiment.bearish}%</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 소스별 상세 */}
+              {sentimentData.sources?.map((src,i)=>(
+                <div key={i} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
+                    <div style={{fontWeight:700,fontSize:"15px"}}>{src.name}</div>
+                    <span style={{fontSize:"11px",color:C.text3}}>{src.total}개 포스트 분석</span>
+                  </div>
+                  {/* 소스 센티먼트 바 */}
+                  <div style={{display:"flex",gap:"8px",marginBottom:"16px"}}>
+                    {[{label:"긍정",val:src.bullish,color:C.green,bg:C.greenBg},
+                      {label:"중립",val:src.neutral,color:C.text3,bg:C.card2},
+                      {label:"부정",val:src.bearish,color:C.red,bg:C.redBg}].map(s=>(
+                      <div key={s.label} style={{flex:1,background:s.bg,borderRadius:"8px",padding:"10px",textAlign:"center"}}>
+                        <div style={{fontSize:"18px",fontWeight:800,color:s.color}}>{s.val}%</div>
+                        <div style={{fontSize:"10px",color:s.color,fontWeight:600}}>{s.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* 최근 포스트 */}
+                  {(src.posts?.length > 0 ? src.posts : src.allPosts || []).slice(0,6).map((p,j)=>(
+                    <div key={j} style={{background:C.card2,borderRadius:"8px",padding:"10px 12px",marginBottom:"6px",
+                      borderLeft:`3px solid ${p.sentiment==="bullish"||p.sentiment==="Bullish"?C.green:p.sentiment==="bearish"||p.sentiment==="Bearish"?C.red:C.text3}`}}>
+                      <div style={{fontSize:"12px",color:C.text2,lineHeight:1.5}}>
+                        {(p.title || p.body || "").slice(0, 150)}
+                      </div>
+                      <div style={{display:"flex",gap:"8px",marginTop:"4px",fontSize:"10px",color:C.text3}}>
+                        <span style={{fontWeight:600,color:p.sentiment==="bullish"||p.sentiment==="Bullish"?C.green:p.sentiment==="bearish"||p.sentiment==="Bearish"?C.red:C.text3}}>
+                          {p.sentiment==="bullish"||p.sentiment==="Bullish"?"BULL":p.sentiment==="bearish"||p.sentiment==="Bearish"?"BEAR":"NEUTRAL"}
+                        </span>
+                        {p.user && <span>@{p.user}</span>}
+                        {p.score > 0 && <span>{p.score} pts</span>}
+                        {p.likes > 0 && <span>{p.likes} likes</span>}
+                        {p.comments > 0 && <span>{p.comments} comments</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+
+              {/* 트렌딩 심볼 */}
+              {sentimentData.trending?.length > 0 && (
+                <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
+                  <div style={{fontWeight:700,fontSize:"15px",marginBottom:"12px"}}>트렌딩 심볼</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
+                    {sentimentData.trending.map((t,i)=>(
+                      <button key={i} onClick={()=>{setSentimentSymbol(t.symbol);fetchSentiment(t.symbol);}} style={{
+                        padding:"8px 14px",borderRadius:"8px",fontSize:"12px",fontWeight:600,
+                        background:C.card2,border:`1px solid ${C.border2}`,color:C.text1,cursor:"pointer",
+                        display:"flex",alignItems:"center",gap:"6px",
+                      }}>
+                        <span style={{fontWeight:800}}>{t.symbol}</span>
+                        {t.watchers && <span style={{fontSize:"10px",color:C.text3}}>{(t.watchers/1000).toFixed(0)}K</span>}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* 데이터 없는 경우 */}
+              {(!sentimentData.sources || sentimentData.sources.length === 0) && !sentimentData.sentiment && (
+                <div style={{textAlign:"center",padding:"40px 0",color:C.text3}}>
+                  <div style={{fontSize:"40px",marginBottom:"8px"}}>📭</div>
+                  <div>'{sentimentData.symbol}'에 대한 센티먼트 데이터가 없습니다</div>
+                  <div style={{fontSize:"12px",marginTop:"4px"}}>다른 심볼을 검색해보세요</div>
+                </div>
+              )}
+            </>)}
+
+            {/* 초기 상태 */}
+            {!sentimentLoading && !sentimentData && (
+              <div style={{textAlign:"center",padding:"60px 0",color:C.text3}}>
+                <div style={{fontSize:"48px",marginBottom:"12px"}}>💬</div>
+                <div style={{fontWeight:600,fontSize:"15px",marginBottom:"4px"}}>소셜 센티먼트 분석</div>
+                <div style={{fontSize:"12px"}}>심볼을 입력하고 "분석" 버튼을 클릭하세요</div>
+              </div>
+            )}
           </div>
         )}
 
