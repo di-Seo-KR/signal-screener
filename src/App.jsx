@@ -1,4 +1,4 @@
-// DI금융 v9.0 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
+// DI금융 v9.1 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
 // Features: 스크리닝, 캔들차트, 32개 전략, 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
 // v7.3: 퀀트 포트폴리오 실제 데이터, PC 데스크톱 사이드바+와이드 레이아웃
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
@@ -2301,8 +2301,8 @@ function AssetCard({ asset, onChart }) {
   const mcBg = asset.market === "us" ? "#1A2C4F" : asset.market === "kr" ? "#1A2A1E" : "#1E1A2A";
   const mcColor = asset.market === "us" ? C.blue : asset.market === "kr" ? C.green : C.purple;
 
-  // 퀵 진단 (카드 펼칠 때 계산)
-  const diag = useMemo(() => expanded ? quickDiagnosis(asset) : null, [expanded, asset]);
+  // 퀵 진단 (항상 계산 — 카드 미리보기 + 정렬용)
+  const diag = useMemo(() => quickDiagnosis(asset), [asset]);
 
   return (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", overflow: "hidden" }}>
@@ -2319,6 +2319,13 @@ function AssetCard({ asset, onChart }) {
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
             <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>{asset.name}</span>
             <span style={{ fontSize: "12px", color: C.text3 }}>{asset.symbol}</span>
+            {diag && (
+              <span style={{
+                fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", marginLeft: "auto",
+                background: diag.score >= 68 ? `${C.green}20` : diag.score >= 42 ? `${C.yellow}20` : `${C.red}20`,
+                color: diag.score >= 68 ? C.green : diag.score >= 42 ? C.yellow : C.red,
+              }}>{diag.score}점 {diag.opinion}</span>
+            )}
           </div>
           <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
             {asset.triggers.map(t => <SignalTag key={t} triggerKey={t} asset={asset} />)}
@@ -3828,11 +3835,11 @@ function AppInner() {
     setAiInput("");
     setAiLoading(true);
 
-    // 로컬 퀀트 데이터 기반 응답 생성
+    // v9.1 — 고도화된 로컬 퀀트 데이터 기반 응답
     setTimeout(() => {
       let reply = "";
       const msgLow = msg.toLowerCase();
-      // 종목 검색
+      // 종목 검색 (더 넓은 매칭)
       const matchedAsset = hotAssets.find(a =>
         msgLow.includes(a.name.toLowerCase()) || msgLow.includes(a.symbol.toLowerCase().replace(".ks",""))
       ) || watchlist.find(w => msgLow.includes(w.name?.toLowerCase()) || msgLow.includes(w.symbol.toLowerCase().replace(".ks","")));
@@ -3842,74 +3849,180 @@ function AppInner() {
         const diag = hot ? quickDiagnosis(hot) : null;
         const buyLvls = hot ? calcBuyLevels(hot) : null;
         const pick = dailyPicks.find(p => p.symbol === matchedAsset.symbol);
-        reply = `📊 **${matchedAsset.name}** 분석\n\n`;
+        const ext = extendedHours[matchedAsset.symbolRaw || matchedAsset.symbol];
+        reply = `📊 ${matchedAsset.name} (${matchedAsset.symbol.replace(".KS","")}) 분석\n\n`;
         if (hot) {
           reply += `현재가: ${fmtPrice(hot.price, matchedAsset.market)} (${hot.change >= 0 ? "+" : ""}${hot.change}%)\n`;
+          if (ext) reply += `${ext.isPreMarket ? "프리마켓" : "애프터마켓"}: ${ext.price ? fmtPrice(ext.price, matchedAsset.market) : ""} ${ext.change != null ? `(${ext.change >= 0 ? "+" : ""}${ext.change.toFixed(1)}%)` : ""}\n`;
         }
         if (diag) {
-          reply += `퀀트 점수: ${diag.score}/100 → ${diag.opinion}\n`;
-          reply += `근거: ${diag.rationale}\n`;
+          reply += `\n퀀트 점수: ${diag.score}/100 → ${diag.opinion}\n`;
           if (diag.categories) {
-            reply += `5축: ${diag.categories.map(c => `${c.name} ${c.score}`).join(" · ")}\n`;
+            reply += `${diag.categories.map(c => `${c.name}: ${c.score}점`).join(" | ")}\n`;
           }
+          reply += `분석: ${diag.rationale}\n`;
         }
         if (buyLvls?.levels?.length > 0) {
-          reply += `\n🎯 매수 타점:\n`;
+          reply += `\n🎯 분할 매수 타점:\n`;
           buyLvls.levels.forEach(lv => {
-            reply += `  ${lv.label}: $${lv.price.toLocaleString()} (-${lv.discount}%) — ${lv.rationale}\n`;
+            reply += `  ${lv.label}: ${matchedAsset.market === "kr" ? "₩" : "$"}${lv.price < 1 ? lv.price.toFixed(4) : lv.price.toLocaleString()} (-${lv.discount}%)\n`;
           });
         }
         if (pick) {
-          reply += `\n오늘 추천 순위: ${dailyPicks.indexOf(pick) + 1}위 (${pick.reason})\n`;
+          reply += `\n추천 순위: ${dailyPicks.indexOf(pick) + 1}위 — ${pick.reason}\n`;
         }
         const anomaly = anomalies.find(a => a.symbol === matchedAsset.symbol);
         if (anomaly) {
-          reply += `⚠️ 이상 탐지: ${anomaly.anomalyReasons.join(", ")}\n`;
+          reply += `\n⚠️ 이상 탐지: ${anomaly.anomalyReasons.join(", ")}\n`;
         }
-        reply += `\n💡 ${diag?.score >= 68 ? "긍정적 시그널이 우세합니다. 1차 매수 타점에서 분할 진입을 고려해보세요." : diag?.score >= 42 ? "혼조 신호입니다. 2~3차 매수 타점까지 기다리는 것을 추천합니다." : "하락 신호가 우세합니다. 3차 매수 타점 도달 전까지 관망을 추천합니다."}`;
-      } else if (msgLow.includes("시장") || msgLow.includes("마켓") || msgLow.includes("현황")) {
+        // 전략적 제안
+        if (diag) {
+          reply += `\n💡 `;
+          if (diag.score >= 68) {
+            reply += "매수 시그널이 우세합니다. 1차 매수 타점에서 분할 진입을 고려해보세요. 목표가까지 2~3차에 걸쳐 비중을 확대하는 전략이 유효합니다.";
+          } else if (diag.score >= 50) {
+            reply += "혼조 구간입니다. 현재가보다는 2차 매수 타점까지 기다리며, 거래량 변화와 추세 전환 신호를 확인한 후 진입하세요.";
+          } else if (diag.score >= 35) {
+            reply += "약세 신호가 우세합니다. 신규 진입보다는 관망하세요. 3차 매수 타점까지 하락 시 소량 분할 매수를 검토할 수 있습니다.";
+          } else {
+            reply += "강한 하락 신호입니다. 보유 중이라면 손절선 준수, 미보유라면 반등 확인 전까지 관망을 권합니다.";
+          }
+        }
+      } else if (msgLow.includes("시장") || msgLow.includes("마켓") || msgLow.includes("현황") || msgLow.includes("오늘")) {
         const sp = marketIndices.find(i => i.symbol === "^GSPC");
         const nq = marketIndices.find(i => i.symbol === "^IXIC");
+        const ks = marketIndices.find(i => i.symbol === "^KS11");
+        const vix = marketIndices.find(i => i.symbol === "^VIX");
         const fg = fearGreed.stock?.value;
-        reply = `📈 **시장 현황 요약**\n\n`;
-        if (sp) reply += `S&P 500: ${sp.change >= 0 ? "+" : ""}${sp.change}%\n`;
-        if (nq) reply += `나스닥: ${nq.change >= 0 ? "+" : ""}${nq.change}%\n`;
-        if (fg) reply += `공포탐욕 지수: ${fg} (${fg <= 25 ? "극도의 공포" : fg <= 40 ? "공포" : fg <= 60 ? "중립" : fg <= 75 ? "탐욕" : "극도의 탐욕"})\n`;
         const upCnt = hotAssets.filter(a => a.change > 0).length;
-        reply += `\n상승 ${upCnt}개 / 하락 ${hotAssets.length - upCnt}개`;
-        if (anomalies.length > 0) reply += `\n\n⚠️ 이상 탐지 ${anomalies.length}건 — ${anomalies[0].name} ${anomalies[0].change >= 0 ? "+" : ""}${anomalies[0].change}% 외`;
-      } else if (msgLow.includes("추천") || msgLow.includes("뭐 살") || msgLow.includes("매수")) {
-        const top3 = dailyPicks.slice(0, 3);
-        reply = `🎯 **오늘의 추천 TOP 3**\n\n`;
-        top3.forEach((p, i) => {
-          reply += `${i + 1}. ${p.name} — ${p.reason} (${p.change >= 0 ? "+" : ""}${p.change}%)\n`;
+        const dnCnt = hotAssets.filter(a => a.change < 0).length;
+        reply = `📈 시장 현황 요약\n\n`;
+        if (sp) reply += `S&P 500: ${sp.price?.toLocaleString(undefined, {maximumFractionDigits: 0})} (${sp.change >= 0 ? "+" : ""}${sp.change}%)\n`;
+        if (nq) reply += `나스닥: ${nq.price?.toLocaleString(undefined, {maximumFractionDigits: 0})} (${nq.change >= 0 ? "+" : ""}${nq.change}%)\n`;
+        if (ks) reply += `코스피: ${ks.price?.toLocaleString(undefined, {maximumFractionDigits: 0})} (${ks.change >= 0 ? "+" : ""}${ks.change}%)\n`;
+        if (vix) reply += `VIX: ${vix.price?.toFixed(1)} (${vix.price > 30 ? "고변동" : vix.price > 20 ? "보통" : "안정"})\n`;
+        if (fg) reply += `공포탐욕: ${fg} (${fg <= 25 ? "극도의 공포" : fg <= 40 ? "공포" : fg <= 60 ? "중립" : fg <= 75 ? "탐욕" : "극도의 탐욕"})\n`;
+        reply += `\n등락: 상승 ${upCnt} / 하락 ${dnCnt} (${hotAssets.length > 0 ? `상승률 ${(upCnt / hotAssets.length * 100).toFixed(0)}%` : ""})`;
+        if (anomalies.length > 0) reply += `\n\n⚡ 이상 탐지 ${anomalies.length}건:\n${anomalies.slice(0, 3).map(a => `  ${a.name} ${a.change >= 0 ? "+" : ""}${a.change}%`).join("\n")}`;
+        // 종합 판단
+        let mktScore = 50;
+        if (sp) mktScore += sp.change > 1 ? 10 : sp.change > 0.3 ? 5 : sp.change > -0.3 ? 0 : -5;
+        if (fg) mktScore += fg > 55 ? 5 : fg > 40 ? 0 : -5;
+        mktScore += (upCnt / Math.max(upCnt + dnCnt, 1)) > 0.55 ? 5 : -5;
+        mktScore = Math.max(0, Math.min(100, mktScore));
+        reply += `\n\n💡 ${mktScore >= 60 ? "매수 우위 장세입니다. 관심종목 1차 진입을 검토하세요." : mktScore >= 45 ? "혼조 장세입니다. 방향성 확인 후 접근하세요." : "약세 장세입니다. 비중 축소와 현금 확보를 권합니다."}`;
+      } else if (msgLow.includes("추천") || msgLow.includes("뭐 살") || msgLow.includes("매수") || msgLow.includes("top") || msgLow.includes("best")) {
+        const top5 = dailyPicks.slice(0, 5);
+        reply = `🎯 오늘의 추천 TOP ${Math.min(5, top5.length)}\n\n`;
+        top5.forEach((p, i) => {
+          const hot = hotAssets.find(h => h.symbol === p.symbol);
+          const d = hot ? quickDiagnosis(hot) : null;
+          reply += `${i + 1}. ${p.name} — ${p.reason}\n`;
+          reply += `   ${p.change >= 0 ? "+" : ""}${p.change}%${d ? ` · 퀀트 ${d.score}점 (${d.opinion})` : ""}\n`;
         });
-        reply += `\n총 ${dailyPicks.length}개 종목 분석 완료. 상세한 분석은 종목명을 물어봐주세요.`;
-      } else if (msgLow.includes("포트폴리오") || msgLow.includes("내 자산") || msgLow.includes("수익")) {
-        if (benchmarkData) {
-          reply = `💼 **포트폴리오 현황**\n\n`;
+        reply += `\n총 ${dailyPicks.length}개 분석 완료. 상세 분석은 종목명을 물어봐주세요.`;
+      } else if (msgLow.includes("포트폴리오") || msgLow.includes("내 자산") || msgLow.includes("수익") || msgLow.includes("성과")) {
+        if (portfolio.length > 0 && benchmarkData) {
+          reply = `💼 포트폴리오 현황\n\n`;
+          reply += `보유 종목: ${portfolio.length}개\n`;
           reply += `총 수익률: ${benchmarkData.myReturn >= 0 ? "+" : ""}${benchmarkData.myReturn.toFixed(2)}%\n`;
-          if (benchmarkData.spReturn != null) reply += `vs S&P 500: ${benchmarkData.alpha >= 0 ? "+" : ""}${benchmarkData.alpha.toFixed(2)}% ${benchmarkData.beatsSP ? "✅ 아웃퍼폼" : "❌ 언더퍼폼"}\n`;
-          reply += `\n${benchmarkData.myReturn >= 3 ? "좋은 성과입니다! 현재 전략을 유지하세요." : benchmarkData.myReturn >= 0 ? "양호합니다. 리밸런싱 시점을 확인해보세요." : "손실 구간입니다. 포지션 축소를 고려하세요."}`;
+          if (benchmarkData.spReturn != null) reply += `vs S&P 500: ${benchmarkData.alpha >= 0 ? "+" : ""}${benchmarkData.alpha.toFixed(2)}% ${benchmarkData.beatsSP ? "(아웃퍼폼)" : "(언더퍼폼)"}\n`;
+          // 관심종목 진단 요약
+          if (watchlist.length > 0) {
+            const wDiags = watchlist.map(w => {
+              const h = hotAssets.find(x => x.symbol === w.symbol || x.symbol === w.symbolRaw);
+              return h ? { name: w.name, ...quickDiagnosis(h) } : null;
+            }).filter(Boolean);
+            if (wDiags.length > 0) {
+              const avgScore = Math.round(wDiags.reduce((s, d) => s + d.score, 0) / wDiags.length);
+              reply += `\n관심종목 평균 퀀트 점수: ${avgScore}/100\n`;
+              const best = wDiags.sort((a, b) => b.score - a.score)[0];
+              const worst = wDiags.sort((a, b) => a.score - b.score)[0];
+              if (best) reply += `최고: ${best.name} ${best.score}점 (${best.opinion})\n`;
+              if (worst && worst.name !== best?.name) reply += `최저: ${worst.name} ${worst.score}점 (${worst.opinion})\n`;
+            }
+          }
+          reply += `\n💡 ${benchmarkData.myReturn >= 5 ? "좋은 성과입니다! 수익 구간에서 일부 차익실현을 고려해보세요." : benchmarkData.myReturn >= 0 ? "양호합니다. 리밸런싱 시점을 확인해보세요." : "손실 구간입니다. 손절선을 점검하고 비중 조절을 고려하세요."}`;
+        } else if (portfolio.length > 0) {
+          reply = "포트폴리오가 있지만 벤치마크 데이터가 아직 로딩 중입니다. 잠시 후 다시 물어봐주세요.";
         } else {
-          reply = "포트폴리오에 종목을 추가하면 수익률 분석을 해드릴게요.";
+          reply = "포트폴리오에 종목을 추가하면 수익률 분석, 벤치마킹, 리밸런싱 제안을 해드릴게요.\n\n홈 화면 > 포트폴리오 탭에서 종목을 추가할 수 있어요.";
         }
-      } else if (msgLow.includes("이상") || msgLow.includes("anomaly") || msgLow.includes("비정상")) {
+      } else if (msgLow.includes("이상") || msgLow.includes("anomaly") || msgLow.includes("비정상") || msgLow.includes("급등") || msgLow.includes("급락")) {
         if (anomalies.length > 0) {
-          reply = `⚠️ **이상 탐지 현황** (${anomalies.length}건)\n\n`;
+          reply = `⚡ 이상 탐지 현황 (${anomalies.length}건)\n\n`;
           anomalies.slice(0, 5).forEach((a, i) => {
-            reply += `${i + 1}. ${a.name} ${a.change >= 0 ? "+" : ""}${a.change}% — ${a.anomalyReasons.join(", ")}\n`;
+            const d = quickDiagnosis(a);
+            reply += `${i + 1}. ${a.name} ${a.change >= 0 ? "+" : ""}${a.change}%\n`;
+            reply += `   사유: ${a.anomalyReasons.join(", ")}\n`;
+            reply += `   퀀트: ${d.score}점 (${d.opinion})\n\n`;
           });
+          reply += `💡 이상 변동이 감지된 종목은 추가 조사 후 진입을 결정하세요. 급등 종목은 추격 매수보다 눌림목을 기다리는 것이 유리합니다.`;
         } else {
-          reply = "현재 이상 탐지된 종목이 없습니다. 시장이 안정적인 상태입니다.";
+          reply = "현재 이상 탐지된 종목이 없습니다. 시장이 비교적 안정적인 상태예요.";
+        }
+      } else if (msgLow.includes("관심") || msgLow.includes("워치") || msgLow.includes("watch")) {
+        if (watchlist.length > 0) {
+          reply = `📌 관심종목 현황 (${watchlist.length}개)\n\n`;
+          watchlist.forEach((w, i) => {
+            const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
+            const d = hot ? quickDiagnosis(hot) : null;
+            reply += `${i + 1}. ${w.name} — ${hot ? `${hot.change >= 0 ? "+" : ""}${hot.change}%` : "데이터 없음"}`;
+            if (d) reply += ` · ${d.score}점 (${d.opinion})`;
+            reply += "\n";
+          });
+          const avgScore = watchlist.reduce((s, w) => {
+            const h = hotAssets.find(x => x.symbol === w.symbol || x.symbol === w.symbolRaw);
+            return h ? s + quickDiagnosis(h).score : s;
+          }, 0) / Math.max(watchlist.filter(w => hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw)).length, 1);
+          reply += `\n평균 퀀트 점수: ${Math.round(avgScore)}/100`;
+        } else {
+          reply = "관심종목이 비어있어요. 홈 화면에서 종목을 추가해보세요!";
+        }
+      } else if (msgLow.includes("리스크") || msgLow.includes("위험") || msgLow.includes("risk")) {
+        const vix = marketIndices.find(i => i.symbol === "^VIX");
+        const fg = fearGreed.stock?.value;
+        reply = `🛡️ 리스크 점검\n\n`;
+        if (vix) reply += `VIX: ${vix.price?.toFixed(1)} — ${vix.price > 30 ? "⚠️ 고변동성 경고" : vix.price > 20 ? "보통 수준" : "안정적"}\n`;
+        if (fg) reply += `공포탐욕: ${fg} — ${fg <= 25 ? "극도의 공포 (역발상 매수 고려)" : fg <= 40 ? "공포 (저가 매수 기회 탐색)" : fg >= 75 ? "극도의 탐욕 (과열 경고)" : fg >= 60 ? "탐욕 (차익실현 고려)" : "중립"}\n`;
+        const anomCnt = anomalies.length;
+        reply += `이상 탐지: ${anomCnt}건\n`;
+        if (portfolio.length > 0 && benchmarkData) {
+          reply += `포트폴리오: ${benchmarkData.myReturn >= 0 ? "+" : ""}${benchmarkData.myReturn.toFixed(2)}%\n`;
+        }
+        let riskLevel = "보통";
+        if ((vix?.price > 25) || (fg && fg <= 30) || anomCnt > 3) riskLevel = "높음";
+        else if ((vix?.price < 15) && (fg && fg > 40 && fg < 70) && anomCnt === 0) riskLevel = "낮음";
+        reply += `\n종합 리스크: ${riskLevel === "높음" ? "🔴" : riskLevel === "낮음" ? "🟢" : "🟡"} ${riskLevel}\n`;
+        reply += `\n💡 ${riskLevel === "높음" ? "현금 비중을 확대하고 보유 종목의 손절선을 재점검하세요." : riskLevel === "낮음" ? "시장이 안정적입니다. 계획대로 투자를 이어가세요." : "일반적 리스크 수준입니다. 포지션 사이즈를 적절히 관리하세요."}`;
+      } else if (msgLow.includes("비교") || msgLow.includes("compare") || msgLow.includes("vs")) {
+        // 두 종목 비교
+        const tokens = msgLow.replace(/vs|비교|와|과|,/g, " ").split(/\s+/).filter(Boolean);
+        const found = tokens.map(t => hotAssets.find(a => a.name.toLowerCase() === t || a.symbol.toLowerCase().replace(".ks","") === t)).filter(Boolean);
+        if (found.length >= 2) {
+          const [a, b] = found;
+          const da = quickDiagnosis(a), db = quickDiagnosis(b);
+          reply = `⚖️ ${a.name} vs ${b.name}\n\n`;
+          reply += `변동률: ${a.change >= 0 ? "+" : ""}${a.change}% vs ${b.change >= 0 ? "+" : ""}${b.change}%\n`;
+          reply += `퀀트: ${da.score}점 (${da.opinion}) vs ${db.score}점 (${db.opinion})\n`;
+          if (da.categories && db.categories) {
+            da.categories.forEach((c, i) => {
+              const bc = db.categories[i];
+              if (bc) reply += `${c.name}: ${c.score} vs ${bc.score}\n`;
+            });
+          }
+          const winner = da.score > db.score ? a : b;
+          reply += `\n💡 퀀트 기준 ${winner.name}이(가) 더 유리한 상황입니다.`;
+        } else {
+          reply = "두 종목을 비교하려면 'AAPL vs MSFT' 또는 'Apple 비교 Microsoft'처럼 입력해주세요.";
         }
       } else {
-        reply = `안녕하세요! DI금융 AI 어시스턴트입니다.\n\n다음과 같이 물어보세요:\n• 종목명 (예: "삼성전자 어때?", "NVDA 분석해줘")\n• "시장 현황" — 오늘의 마켓 요약\n• "추천 종목" — 오늘의 추천 TOP\n• "내 포트폴리오" — 수익률 & 벤치마킹\n• "이상 탐지" — 비정상 변동 종목`;
+        reply = `안녕하세요! DI금융 AI 어시스턴트입니다.\n\n이런 것들을 물어보세요:\n\n• 종목명 → "NVDA 분석해줘", "삼성전자 어때?"\n• 시장 현황 → 지수, 등락, 센티먼트 요약\n• 추천 종목 → 오늘의 TOP 매수 추천\n• 포트폴리오 → 수익률 & 벤치마킹\n• 이상 탐지 → 급등락 비정상 종목\n• 관심종목 → 관심종목 전체 진단\n• 리스크 점검 → VIX, 공포지수, 위험도\n• 종목 비교 → "AAPL vs MSFT"`;
       }
       setAiMessages(prev => [...prev, { role: "ai", text: reply }]);
       setAiLoading(false);
-    }, 600);
-  }, [hotAssets, watchlist, dailyPicks, marketIndices, fearGreed, anomalies, benchmarkData]);
+    }, 500);
+  }, [hotAssets, watchlist, dailyPicks, marketIndices, fearGreed, anomalies, benchmarkData, portfolio, extendedHours]);
 
   // ── useMemo: 경제 캘린더 필터/정렬 결과 ──
   const filteredEconEvents = useMemo(() => {
@@ -3925,9 +4038,13 @@ function AppInner() {
     return sorted;
   }, [econEvents, econFilter, econSort]);
 
-  // ── useMemo: 스크리너 결과 정렬 ──
+  // ── useMemo: 스크리너 결과 정렬 (퀀트점수 추가) ──
   const sortedResults = useMemo(() => {
     return [...results].sort((a, b) => {
+      if (sortBy === "score") {
+        const da = quickDiagnosis(a), db = quickDiagnosis(b);
+        return db.score - da.score;
+      }
       if (sortBy === "rsi")     return (a.rsi ?? 999) - (b.rsi ?? 999);
       if (sortBy === "change")  return a.weekChange - b.weekChange;
       if (sortBy === "vol")     return b.volRatio - a.volRatio;
@@ -5394,7 +5511,7 @@ function AppInner() {
         <div className="sb-logo" onClick={() => setTab("home")}>
           <span style={{ fontSize: "22px" }}>📡</span>
           <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
-          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v9.0</span>
+          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v9.1</span>
         </div>
         <div className="sb-section">메인</div>
         <nav className="sb-nav">
@@ -5481,7 +5598,7 @@ function AppInner() {
             title="홈으로 이동">
             <span style={{ fontSize: "22px" }}>📡</span>
             <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
-            <span style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v9.0</span>
+            <span style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v9.1</span>
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
@@ -5592,6 +5709,7 @@ function AppInner() {
                       <div style={{ fontSize: "13px", color: C.text3, fontWeight: 500 }}>
                         {greeting} 마켓 브리핑
                         {marketIndices.length > 0 && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.green, display: "inline-block", marginLeft: "6px", animation: "livePulse 1.5s ease-in-out infinite" }} />}
+                        {!marketLoading && marketIndices.length > 0 && <span style={{ fontSize: "10px", color: C.text3, marginLeft: "6px" }}>LIVE</span>}
                       </div>
                       <button onClick={fetchMarketOverview} disabled={marketLoading} style={{
                         background: "none", border: "none", fontSize: "12px", color: C.text3, cursor: "pointer", padding: "4px 8px",
@@ -5889,10 +6007,13 @@ function AppInner() {
             </div>{/* end home-left */}
             <div className="home-right" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
-            {/* ── 관심종목 ─── */}
+            {/* ── 관심종목 (v9.1 개선) ─── */}
             <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: watchlist.length > 0 ? "14px" : "0" }}>
-                <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>관심종목</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>관심종목</span>
+                  {watchlist.length > 0 && <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "10px", background: C.blueBg, color: C.blue, fontWeight: 700 }}>{watchlist.length}</span>}
+                </div>
                 <SearchBar compact placeholder="+ 종목 추가" onSelect={(asset) => {
                   if (!watchlist.some(w => w.symbol === asset.symbol)) {
                     setWatchlist(prev => [...prev, { symbol: asset.symbol, name: asset.name, market: asset.market, symbolRaw: asset.symbolRaw || asset.symbol, id: asset.id }]);
@@ -5900,10 +6021,21 @@ function AppInner() {
                 }} />
               </div>
               {watchlist.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "28px 12px 16px" }}>
-                  <div style={{ fontSize: "28px", marginBottom: "10px" }}>📌</div>
-                  <div style={{ fontSize: "14px", fontWeight: 600, color: C.text2, marginBottom: "4px" }}>관심종목이 없습니다</div>
-                  <div style={{ fontSize: "12px", color: C.text3 }}>위 검색으로 종목을 추가하면 실시간 진단과 매수 타점을 확인할 수 있어요</div>
+                <div style={{ textAlign: "center", padding: "32px 16px 20px" }}>
+                  <div style={{ width: "56px", height: "56px", borderRadius: "16px", background: C.blueBg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", fontSize: "24px" }}>📌</div>
+                  <div style={{ fontSize: "15px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>관심종목을 추가해보세요</div>
+                  <div style={{ fontSize: "13px", color: C.text3, lineHeight: 1.6 }}>실시간 퀀트 진단, 매수 타점, 전략 시그널을<br />한눈에 확인할 수 있어요</div>
+                  <div style={{ display: "flex", gap: "6px", justifyContent: "center", marginTop: "16px", flexWrap: "wrap" }}>
+                    {["NVDA","AAPL","TSLA","MSFT"].map(s => {
+                      const a = hotAssets.find(h => h.symbol === s);
+                      return a ? (
+                        <button key={s} onClick={() => setWatchlist(prev => [...prev, { symbol: a.symbol, name: a.name, market: a.market, symbolRaw: a.symbolRaw || a.symbol }])} style={{
+                          padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+                          background: C.card2, color: C.text2, border: `1px solid ${C.border2}`, cursor: "pointer",
+                        }}>+ {a.name}</button>
+                      ) : null;
+                    })}
+                  </div>
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column" }}>
@@ -5911,6 +6043,8 @@ function AppInner() {
                     const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
                     const ext = extendedHours[w.symbolRaw || w.symbol];
                     const flag = w.market === "us" ? "🇺🇸" : w.market === "kr" ? "🇰🇷" : "₿";
+                    const diag = hot ? quickDiagnosis(hot) : null;
+                    const diagColor = diag ? (diag.score >= 60 ? C.green : diag.score >= 40 ? C.yellow : C.red) : C.text3;
                     return (
                       <div key={w.symbol} onClick={() => setSelectedAsset(w)}
                         style={{
@@ -5921,9 +6055,19 @@ function AppInner() {
                         onMouseEnter={e => e.currentTarget.style.background = `${C.card2}80`}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
-                          <span style={{ fontSize: mf(11) }}>{flag}</span>
+                          {/* 퀀트 점수 미니뱃지 */}
+                          {diag ? (
+                            <div style={{
+                              width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0,
+                              background: `${diagColor}14`, display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: "12px", fontWeight: 800, color: diagColor,
+                            }}>{diag.score}</div>
+                          ) : (
+                            <span style={{ fontSize: mf(14), width: "32px", textAlign: "center", flexShrink: 0 }}>{flag}</span>
+                          )}
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontWeight: 600, fontSize: "14px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.name || w.symbol}</div>
+                            {diag && <div style={{ fontSize: "10px", color: diagColor, fontWeight: 600, marginTop: "1px" }}>{diag.opinion}</div>}
                           </div>
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -5943,10 +6087,13 @@ function AppInner() {
                             </div>
                           )}
                           <button onClick={(e) => { e.stopPropagation(); setWatchlist(prev => prev.filter(x => x.symbol !== w.symbol)); }}
-                            style={{ width: "20px", height: "20px", borderRadius: "50%", border: "none",
+                            style={{ width: "24px", height: "24px", borderRadius: "8px", border: "none",
                               background: "transparent", color: C.text3, fontSize: mf(10), cursor: "pointer",
-                              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: 0.5,
-                            }}>✕</button>
+                              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: 0.4,
+                              transition: "opacity .15s, background .15s",
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.background = `${C.red}15`; e.currentTarget.style.color = C.red; }}
+                            onMouseLeave={e => { e.currentTarget.style.opacity = "0.4"; e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = C.text3; }}>✕</button>
                         </div>
                       </div>
                     );
@@ -6655,7 +6802,7 @@ function AppInner() {
                 ))}
                 <div style={{ marginLeft: "auto", display: "flex", gap: "5px", alignItems: "center" }}>
                   <span style={{ fontSize: "11px", color: C.text3 }}>정렬</span>
-                  {[["rsi","RSI"], ["change","변동률"], ["vol","거래량"], ["signals","시그널"]].map(([v, l]) => (
+                  {[["score","퀀트점수"], ["rsi","RSI"], ["change","변동률"], ["vol","거래량"], ["signals","시그널"]].map(([v, l]) => (
                     <button key={v} onClick={() => setSortBy(v)} style={{
                       padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 600,
                       background: sortBy === v ? C.blueBg : "transparent", color: sortBy === v ? C.blue : C.text3,
@@ -7546,6 +7693,58 @@ function AppInner() {
                 </div>
               </div>
 
+              {/* 섹터별 퍼포먼스 히트맵 (v9.1) */}
+              {hotAssets.length > 0 && (() => {
+                const sectors = {
+                  "반도체": ["NVDA","AMD","INTC","AVGO","QCOM","MU","TSM","ASML","ARM","SMCI","MRVL","LRCX","KLAC","AMAT","ON","TXN","ADI"],
+                  "빅테크": ["AAPL","MSFT","GOOGL","AMZN","META","NFLX","TSLA"],
+                  "소프트웨어": ["CRM","ORCL","ADBE","NOW","SNOW","DDOG","NET","PLTR","PANW","CRWD"],
+                  "핀테크": ["COIN","SQ","PYPL","AFRM","SOFI","HOOD","MSTR"],
+                  "헬스케어": ["UNH","JNJ","LLY","NVO","ABBV","PFE","MRK","AMGN"],
+                  "에너지": ["XOM","CVX","LNG","COP","SLB","OXY","EOG"],
+                  "소비재": ["WMT","COST","HD","MCD","DIS","SBUX","NKE"],
+                  "금융": ["JPM","GS","BAC","V","MA","BLK","MS"],
+                  "EV/클린": ["RIVN","LCID","LI","NIO","XPEV","ENPH","FSLR"],
+                  "중국ADR": ["BABA","JD","PDD","BIDU","NTES"],
+                };
+                const sectorData = Object.entries(sectors).map(([name, syms]) => {
+                  const matched = syms.map(s => hotAssets.find(a => a.symbol === s)).filter(Boolean);
+                  if (matched.length === 0) return null;
+                  const avgChange = matched.reduce((s, a) => s + (a.change || 0), 0) / matched.length;
+                  const upRatio = matched.filter(a => a.change > 0).length / matched.length;
+                  return { name, avgChange: +avgChange.toFixed(2), count: matched.length, upRatio };
+                }).filter(Boolean).sort((a, b) => b.avgChange - a.avgChange);
+                if (sectorData.length === 0) return null;
+                const maxAbs = Math.max(...sectorData.map(s => Math.abs(s.avgChange)), 1);
+                return (
+                  <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+                    <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "14px" }}>섹터 퍼포먼스</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "6px" }}>
+                      {sectorData.map(s => {
+                        const intensity = Math.min(Math.abs(s.avgChange) / maxAbs, 1);
+                        const bgColor = s.avgChange >= 0
+                          ? `rgba(${C.isDark ? "16,185,129" : "5,150,105"},${0.08 + intensity * 0.18})`
+                          : `rgba(${C.isDark ? "239,68,68" : "220,38,38"},${0.08 + intensity * 0.18})`;
+                        return (
+                          <div key={s.name} style={{
+                            padding: "10px 12px", borderRadius: "10px", background: bgColor,
+                            textAlign: "center", transition: "transform .15s", cursor: "default",
+                          }}>
+                            <div style={{ fontSize: "12px", fontWeight: 700, color: C.text1, marginBottom: "3px" }}>{s.name}</div>
+                            <div style={{ fontSize: "15px", fontWeight: 800, color: s.avgChange >= 0 ? C.green : C.red }}>
+                              {s.avgChange >= 0 ? "+" : ""}{s.avgChange}%
+                            </div>
+                            <div style={{ fontSize: "9px", color: C.text3, marginTop: "2px" }}>
+                              {s.count}종목 · {(s.upRatio * 100).toFixed(0)}% 상승
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* 급등/급락 TOP 5 */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                 <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
@@ -7686,6 +7885,40 @@ function AppInner() {
                 </div>
               )}
 
+              {/* 오늘의 액션 플랜 */}
+              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+                <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "14px" }}>📋 오늘의 액션 플랜</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {(() => {
+                    const actions = [];
+                    if (mktScore >= 60) actions.push({ icon: "🟢", text: "매수 우위 — 관심종목 1차 진입 검토", color: C.green });
+                    else if (mktScore >= 45) actions.push({ icon: "🟡", text: "혼조세 — 신규 진입보다 관망 우선", color: C.yellow });
+                    else actions.push({ icon: "🔴", text: "약세장 — 비중 축소 및 현금 확보", color: C.red });
+                    if (anomalies.length > 0) actions.push({ icon: "⚡", text: `이상 탐지 ${anomalies.length}건 — 급등락 종목 주의`, color: C.yellow });
+                    if (buyPicks > 3) actions.push({ icon: "🎯", text: `매수 신호 ${buyPicks}건 — 상위 종목 분할 매수 고려`, color: C.green });
+                    if (sellPicks > 3) actions.push({ icon: "🛡️", text: `매도 신호 ${sellPicks}건 — 보유 종목 점검 필요`, color: C.red });
+                    if (fg && fg <= 25) actions.push({ icon: "💎", text: "극도의 공포 — 역발상 매수 기회 탐색", color: C.purple });
+                    if (fg && fg >= 75) actions.push({ icon: "⚠️", text: "극도의 탐욕 — 차익실현 고려", color: C.red });
+                    const vix = marketIndices.find(i => i.symbol === "^VIX");
+                    if (vix?.price > 30) actions.push({ icon: "🌊", text: `VIX ${vix.price.toFixed(1)} — 고변동성, 포지션 축소`, color: C.red });
+                    if (portfolio.length > 0 && benchmarkData) {
+                      if (benchmarkData.myReturn < -5) actions.push({ icon: "📊", text: "포트폴리오 손실 중 — 리밸런싱 검토", color: C.yellow });
+                      else if (benchmarkData.alpha > 3) actions.push({ icon: "🏆", text: `시장 대비 +${benchmarkData.alpha.toFixed(1)}% 초과 수익`, color: C.green });
+                    }
+                    return actions.map((a, i) => (
+                      <div key={i} style={{
+                        display: "flex", alignItems: "center", gap: "10px",
+                        padding: "10px 12px", borderRadius: "10px", background: `${a.color}08`,
+                        border: `1px solid ${a.color}15`,
+                      }}>
+                        <span style={{ fontSize: "15px", flexShrink: 0 }}>{a.icon}</span>
+                        <span style={{ fontSize: "13px", fontWeight: 600, color: C.text1 }}>{a.text}</span>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              </div>
+
               {/* 종합 의견 */}
               <div style={{
                 background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`,
@@ -7732,73 +7965,113 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "news" && (
           <div className="tab-content">
-            <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "20px", marginBottom: "12px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ fontWeight: 700 }}>📰 투자 뉴스</span>
-                  <button onClick={fetchNews} disabled={newsLoading} style={{
-                    padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 600,
-                    background: C.card2, color: C.text3, border: `1px solid ${C.border2}`, cursor: "pointer",
-                  }}>{newsLoading ? "⏳" : "🔄 새로고침"}</button>
+            {/* 뉴스 헤더 (v9.1 개선) */}
+            <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, ${C.isDark ? "#0D1B2A" : "#E3F2FD"} 100%)`, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "22px 24px", marginBottom: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap", marginBottom: "14px" }}>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: "18px", color: C.text1, marginBottom: "3px" }}>마켓 뉴스</div>
+                  <div style={{ fontSize: "12px", color: C.text3 }}>실시간 글로벌 투자 뉴스 · AI 센티먼트 분석</div>
                 </div>
-                <div style={{ display: "flex", gap: "4px" }}>
-                  {[
-                    ["time", "시간순"],
-                    ["positive", "긍정순"],
-                    ["negative", "부정순"],
-                  ].map(([v, l]) => (
-                    <button key={v} onClick={() => setNewsSort(v)} style={{
-                      padding: "4px 10px", borderRadius: "8px", fontSize: "11px", fontWeight: 600,
-                      background: newsSort === v ? C.blueBg : "transparent",
-                      color: newsSort === v ? C.blue : C.text3,
-                      border: `1px solid ${newsSort === v ? C.blue : C.border2}`,
-                    }}>{l}</button>
-                  ))}
-                </div>
+                <button onClick={fetchNews} disabled={newsLoading} style={{
+                  padding: "8px 16px", borderRadius: "10px", fontSize: "12px", fontWeight: 700,
+                  background: newsLoading ? C.card2 : C.blue, color: newsLoading ? C.text3 : "#fff",
+                  border: "none", cursor: newsLoading ? "default" : "pointer",
+                }}>{newsLoading ? "로딩 중..." : "새로고침"}</button>
+              </div>
+              {/* 센티먼트 요약 바 */}
+              {sortedNews.length > 0 && (() => {
+                const posCnt = sortedNews.filter(n => analyzeSentiment(n.title) === "positive").length;
+                const negCnt = sortedNews.filter(n => analyzeSentiment(n.title) === "negative").length;
+                const neuCnt = sortedNews.length - posCnt - negCnt;
+                return (
+                  <div>
+                    <div style={{ display: "flex", height: "6px", borderRadius: "3px", overflow: "hidden", marginBottom: "6px" }}>
+                      <div style={{ width: `${(posCnt / sortedNews.length) * 100}%`, background: C.green, transition: "width .5s" }} />
+                      <div style={{ width: `${(neuCnt / sortedNews.length) * 100}%`, background: C.text3 + "40", transition: "width .5s" }} />
+                      <div style={{ width: `${(negCnt / sortedNews.length) * 100}%`, background: C.red, transition: "width .5s" }} />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px" }}>
+                      <span style={{ color: C.green, fontWeight: 600 }}>긍정 {posCnt}</span>
+                      <span style={{ color: C.text3 }}>중립 {neuCnt}</span>
+                      <span style={{ color: C.red, fontWeight: 600 }}>부정 {negCnt}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+              {/* 정렬 옵션 */}
+              <div style={{ display: "flex", gap: "6px", marginTop: "12px" }}>
+                {[
+                  ["time", "최신순"],
+                  ["positive", "긍정"],
+                  ["negative", "부정"],
+                ].map(([v, l]) => (
+                  <button key={v} onClick={() => setNewsSort(v)} style={{
+                    padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+                    background: newsSort === v ? (v === "positive" ? C.greenBg : v === "negative" ? C.redBg : C.blueBg) : "transparent",
+                    color: newsSort === v ? (v === "positive" ? C.green : v === "negative" ? C.red : C.blue) : C.text3,
+                    border: "none", cursor: "pointer", transition: "all .15s",
+                  }}>{l}</button>
+                ))}
               </div>
             </div>
 
             {newsLoading ? (
-              <div style={{ textAlign: "center", padding: "32px", color: C.text3 }}>뉴스 로딩 중...</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {[1,2,3,4].map(i => <div key={i} className="skeleton" style={{ height: "100px", borderRadius: "14px" }} />)}
+              </div>
             ) : sortedNews.length === 0 ? (
               <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "48px 24px", textAlign: "center" }}>
-                <div style={{ fontSize: "44px", marginBottom: "16px" }}>📰</div>
-                <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "8px" }}>뉴스 없음</div>
-                <div style={{ color: C.text3, fontSize: "14px" }}>최신 뉴스가 없습니다</div>
+                <div style={{ width: "56px", height: "56px", borderRadius: "16px", background: C.blueBg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", fontSize: "24px" }}>📰</div>
+                <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "6px", color: C.text1 }}>뉴스를 불러오는 중</div>
+                <div style={{ color: C.text3, fontSize: "13px" }}>새로고침을 눌러 최신 뉴스를 확인하세요</div>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 {sortedNews.map((news, i) => {
                   const sentiment = analyzeSentiment(news.title);
-                  const sentimentBadge = sentiment === "positive" ? "🟢 긍정" : sentiment === "negative" ? "🔴 부정" : "⚪ 중립";
+                  const sentColor = sentiment === "positive" ? C.green : sentiment === "negative" ? C.red : C.text3;
+                  const sentLabel = sentiment === "positive" ? "긍정" : sentiment === "negative" ? "부정" : "중립";
+                  const sentIcon = sentiment === "positive" ? "▲" : sentiment === "negative" ? "▼" : "●";
                   const pubDate = new Date(news.date || news.publishedAt || news.pubDate || Date.now());
+                  const timeAgo = (() => {
+                    const diff = Date.now() - pubDate.getTime();
+                    const mins = Math.floor(diff / 60000);
+                    if (mins < 60) return `${mins}분 전`;
+                    const hrs = Math.floor(mins / 60);
+                    if (hrs < 24) return `${hrs}시간 전`;
+                    return `${Math.floor(hrs / 24)}일 전`;
+                  })();
                   return (
                     <a key={i} href={news.url || news.link || "#"} target="_blank" rel="noopener" style={{
                       background: C.card, border: `1px solid ${C.border}20`, borderRadius: "14px", padding: "16px 18px",
                       textDecoration: "none", color: "inherit", display: "block", transition: "all .2s",
+                      borderLeft: `3px solid ${sentColor}60`,
                     }}
-                    onMouseEnter={e => e.currentTarget.style.borderColor = C.blue}
-                    onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
-                      <div style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = C.blue; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = "translateY(0)"; }}>
+                      <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "6px", color: C.text1, lineHeight: 1.5 }}>{news.title}</div>
-                          <div style={{ fontSize: "12px", color: C.text3, marginBottom: "8px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                            <span>{news.source || "Unknown"}</span>
-                            <span>·</span>
-                            <span>{pubDate.toLocaleString("ko-KR")}</span>
-                          </div>
+                          <div style={{ fontWeight: 600, fontSize: "14px", marginBottom: "8px", color: C.text1, lineHeight: 1.5 }}>{news.title}</div>
                           {(news.desc || news.description) && (
-                            <div style={{ fontSize: "12px", color: C.text2, lineHeight: 1.5 }}>{(news.desc || news.description).slice(0, 120)}</div>
+                            <div style={{ fontSize: "12px", color: C.text2, lineHeight: 1.6, marginBottom: "8px" }}>{(news.desc || news.description).slice(0, 150)}</div>
                           )}
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: "11px", fontWeight: 600, color: sentColor, display: "flex", alignItems: "center", gap: "3px" }}>
+                              <span style={{ fontSize: "8px" }}>{sentIcon}</span> {sentLabel}
+                            </span>
+                            <span style={{ width: "1px", height: "10px", background: C.border }} />
+                            <span style={{ fontSize: "11px", color: C.text3 }}>{news.source || "Unknown"}</span>
+                            <span style={{ width: "1px", height: "10px", background: C.border }} />
+                            <span style={{ fontSize: "11px", color: C.text3 }}>{timeAgo}</span>
+                          </div>
                           {news.tags?.length > 0 && (
-                            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "6px" }}>
-                              {news.tags.map((tag, ti) => (
-                                <span key={ti} style={{ padding: "2px 6px", borderRadius: "4px", fontSize: "10px", background: C.card2, color: C.text3 }}>{tag}</span>
+                            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "8px" }}>
+                              {news.tags.slice(0, 4).map((tag, ti) => (
+                                <span key={ti} style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "10px", background: C.card2, color: C.text3, fontWeight: 500 }}>{tag}</span>
                               ))}
                             </div>
                           )}
                         </div>
-                        <div style={{ fontSize: "11px", whiteSpace: "nowrap", color: C.text2, padding: "4px 8px", background: C.card2, borderRadius: "6px" }}>{sentimentBadge}</div>
                       </div>
                     </a>
                   );
@@ -8099,10 +8372,10 @@ function AppInner() {
         {tab === "sentiment" && (
           <div className="tab-content">
             {/* 헤더 */}
-            <div style={{background:`linear-gradient(135deg, ${C.card} 0%, #0D1B2A 100%)`,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:"22px 24px",marginBottom:"12px"}}>
+            <div style={{background:`linear-gradient(135deg, ${C.card} 0%, ${C.isDark ? "#0D1B2A" : "#EDE7F6"} 100%)`,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:"22px 24px",marginBottom:"12px"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"12px"}}>
                 <div>
-                  <div style={{fontWeight:800,fontSize:"18px",marginBottom:"4px"}}>소셜 센티먼트 분석</div>
+                  <div style={{fontWeight:800,fontSize:"18px",marginBottom:"4px",color:C.text1}}>소셜 센티먼트 분석</div>
                   <div style={{fontSize:"12px",color:C.text3}}>StockTwits · Reddit(WSB) 기반 실시간 투자 심리</div>
                 </div>
                 <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
@@ -8308,15 +8581,22 @@ function AppInner() {
           {/* 메시지 영역 */}
           <div style={{ flex: 1, overflow: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: "12px", minHeight: "200px" }}>
             {aiMessages.length === 0 && (
-              <div style={{ textAlign: "center", padding: "20px 0", color: C.text3, fontSize: "13px" }}>
-                <div style={{ fontSize: "32px", marginBottom: "8px" }}>👋</div>
-                안녕하세요! 종목, 시장 현황, 포트폴리오에<br />대해 물어보세요.
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "12px", justifyContent: "center" }}>
-                  {["시장 현황", "추천 종목", "내 포트폴리오", "이상 탐지"].map(q => (
+              <div style={{ textAlign: "center", padding: "16px 0", color: C.text3, fontSize: "13px" }}>
+                <div style={{ fontSize: "28px", marginBottom: "8px" }}>👋</div>
+                <div style={{ fontWeight: 600, color: C.text1, marginBottom: "4px" }}>무엇이든 물어보세요</div>
+                <div style={{ fontSize: "11px", marginBottom: "14px" }}>종목 분석, 시장 현황, 리스크 점검까지</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                  {[["시장 현황 요약", "📈"], ["추천 종목 TOP 5", "🎯"], ["리스크 점검", "🛡️"], ["관심종목 진단", "📌"], ["이상 탐지 현황", "⚡"]].map(([q, icon]) => (
                     <button key={q} onClick={() => handleAiChat(q)} style={{
-                      padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
-                      background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}33`, cursor: "pointer",
-                    }}>{q}</button>
+                      padding: "8px 14px", borderRadius: "10px", fontSize: "12px", fontWeight: 600,
+                      background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: "8px", textAlign: "left", transition: "all .15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = C.blueBg; e.currentTarget.style.borderColor = C.blue + "40"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = C.card2; e.currentTarget.style.borderColor = C.border2; }}>
+                      <span>{icon}</span>
+                      <span>{q}</span>
+                    </button>
                   ))}
                 </div>
               </div>
