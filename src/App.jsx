@@ -2611,12 +2611,96 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
         const recentVol = volumes.length >= 5 ? volumes.slice(-5).reduce((a, b) => a + b, 0) / 5 : 0;
         const avgVol = volumes.length >= 20 ? volumes.slice(-20).reduce((a, b) => a + b, 0) / 20 : recentVol;
         const volRatio = avgVol > 0 ? +(recentVol / avgVol).toFixed(2) : 1;
-        const h14 = Math.max(...highs.slice(-14)), l14 = Math.min(...lows.slice(-14));
+        const h14 = Math.max(...highs.slice(-14)), l14 = Math.min(...lows.slice(-14).filter(l => l > 0));
         const stochK = h14 !== l14 ? +((last - l14) / (h14 - l14) * 100).toFixed(1) : 50;
+        // Stochastic %D (3-period SMA of %K)
+        let stochD = stochK;
+        if (n >= 16 && highs.length >= 16 && lows.length >= 16) {
+          const kVals = [];
+          for (let si = 0; si < 3; si++) {
+            const off = si;
+            const sh = Math.max(...highs.slice(-14 - off, n - off)), sl = Math.min(...lows.slice(-14 - off, n - off).filter(l => l > 0));
+            kVals.push(sh !== sl ? (closes[n - 1 - off] - sl) / (sh - sl) * 100 : 50);
+          }
+          stochD = +(kVals.reduce((a, b) => a + b, 0) / kVals.length).toFixed(1);
+        }
         const wr = h14 !== l14 ? +(((h14 - last) / (h14 - l14)) * -100).toFixed(1) : -50;
-        const high52w = Math.max(...highs), low52w = Math.min(...lows);
+        const high52w = Math.max(...highs), low52w = Math.min(...lows.filter(l => l > 0));
         const wkAgo = n >= 5 ? closes[n - 5] : closes[0];
         const weekChange = +((last - wkAgo) / wkAgo * 100).toFixed(2);
+
+        // ── 추가 지표: bbWidth, atr14Pct, cmf, mfi, adx, rsiDivType ──
+        // BB Width
+        let bbWidth = null;
+        if (closes.length >= 20 && ma20) {
+          const bb20Std = Math.sqrt(closes.slice(-20).reduce((a, v) => a + (v - ma20) ** 2, 0) / 20);
+          bbWidth = ma20 > 0 ? +(bb20Std * 4 / ma20).toFixed(4) : null;
+        }
+        // ATR(14) %
+        let atr14Pct = null;
+        if (n >= 15 && highs.length >= 15 && lows.length >= 15) {
+          let atrSum = 0;
+          for (let ai = n - 14; ai < n; ai++) {
+            atrSum += Math.max(highs[ai] - lows[ai], Math.abs(highs[ai] - closes[ai - 1]), Math.abs(lows[ai] - closes[ai - 1]));
+          }
+          atr14Pct = last > 0 ? +(atrSum / 14 / last * 100).toFixed(2) : null;
+        }
+        // CMF (20일)
+        let cmf = null;
+        if (n >= 20 && volumes.length >= 20 && highs.length >= 20 && lows.length >= 20) {
+          let mfvSum = 0, volCmfSum = 0;
+          for (let ci = n - 20; ci < n; ci++) {
+            const hl = highs[ci] - lows[ci];
+            const mfm = hl > 0 ? ((closes[ci] - lows[ci]) - (highs[ci] - closes[ci])) / hl : 0;
+            mfvSum += mfm * (volumes[ci] || 0);
+            volCmfSum += volumes[ci] || 0;
+          }
+          cmf = volCmfSum > 0 ? +(mfvSum / volCmfSum).toFixed(3) : null;
+        }
+        // MFI (14일)
+        let mfi = null;
+        if (n >= 15 && volumes.length >= 15 && highs.length >= 15 && lows.length >= 15) {
+          let posFlow = 0, negFlow = 0;
+          for (let mi = n - 14; mi < n; mi++) {
+            const tp = (highs[mi] + lows[mi] + closes[mi]) / 3;
+            const prevTp = (highs[mi-1] + lows[mi-1] + closes[mi-1]) / 3;
+            const mf = tp * (volumes[mi] || 0);
+            if (tp > prevTp) posFlow += mf; else negFlow += mf;
+          }
+          mfi = negFlow > 0 ? Math.round(100 - 100 / (1 + posFlow / negFlow)) : 100;
+        }
+        // ADX (14일) — 간소화
+        let adxBullish = false, adxBearish = false;
+        if (n >= 28 && highs.length >= 28 && lows.length >= 28) {
+          let sumPDM = 0, sumNDM = 0, sumTR = 0;
+          for (let di = n - 14; di < n; di++) {
+            const upMove = highs[di] - highs[di - 1];
+            const downMove = lows[di - 1] - lows[di];
+            sumPDM += upMove > downMove && upMove > 0 ? upMove : 0;
+            sumNDM += downMove > upMove && downMove > 0 ? downMove : 0;
+            sumTR += Math.max(highs[di] - lows[di], Math.abs(highs[di] - closes[di - 1]), Math.abs(lows[di] - closes[di - 1]));
+          }
+          const plusDI = sumTR > 0 ? sumPDM / sumTR * 100 : 0;
+          const minusDI = sumTR > 0 ? sumNDM / sumTR * 100 : 0;
+          const dx = (plusDI + minusDI) > 0 ? Math.abs(plusDI - minusDI) / (plusDI + minusDI) * 100 : 0;
+          if (dx > 25 && plusDI > minusDI) adxBullish = true;
+          if (dx > 25 && minusDI > plusDI) adxBearish = true;
+        }
+        // RSI 다이버전스
+        let rsiDivType = null;
+        if (n >= 28) {
+          const prevCloses14 = closes.slice(-28, -14);
+          if (prevCloses14.length >= 13) {
+            let pGains = 0, pLosses = 0;
+            for (let ri = 1; ri < prevCloses14.length; ri++) {
+              const dd = prevCloses14[ri] - prevCloses14[ri-1];
+              if (dd > 0) pGains += dd; else pLosses -= dd;
+            }
+            const pRsi = pLosses === 0 ? 100 : Math.round(100 - 100 / (1 + (pGains/13) / (pLosses/13)));
+            if (last < closes[n - 14] && rsi > pRsi) rsiDivType = "bullish";
+            else if (last > closes[n - 14] && rsi < pRsi) rsiDivType = "bearish";
+          }
+        }
 
         // ── 다중 모델 적정주가 (Multi-Model Fair Value Engine) ──
         const analystQ = analystData?.quotes?.[sym] || {};
@@ -2707,8 +2791,10 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           const advLevels = calcAdvancedLevels(closes, highs, lows, volumes, enrichedForLevels, fairValue, analystTarget, analystHigh, analystLow);
 
           setTechData({
-            price: last, rsi, ma50, ma200, ma200Dist, volRatio,
-            stoch: { k: stochK }, wr, high52w, low52w, weekChange,
+            price: last, rsi, ma50, ma200, fiftyDayAvg: ma50, twoHundredDayAvg: ma200,
+            ma200Dist, volRatio,
+            stoch: { k: stochK, d: stochD }, wr, high52w, low52w, weekChange,
+            bbWidth, atr14Pct, cmf, mfi, adxBullish, adxBearish, rsiDivType,
             // 고도화된 적정주가 데이터
             fairValue, fairPremium, models,
             analystTarget, analystHigh, analystLow,
@@ -2811,6 +2897,28 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
   const enriched = techData ? { ...asset, ...techData } : asset;
   const diag = useMemo(() => quickDiagnosis(enriched), [enriched]);
   const buyLevels = useMemo(() => calcBuyLevels(enriched), [enriched]);
+
+  // Yahoo Finance 밸류에이션 fallback (Financial Datasets API 실패 시)
+  const yahooFund = useMemo(() => {
+    if (fundamentals) return null; // Financial Datasets API가 작동하면 불필요
+    if (!techData) return null;
+    const td = techData;
+    const hasAny = td.trailingPE || td.forwardPE || td.priceToBook || td.marketCap;
+    if (!hasAny) return null;
+    return {
+      peRatio: td.forwardPE || td.trailingPE,
+      pbRatio: td.priceToBook,
+      psRatio: null,
+      evToEbitda: null,
+      roe: null, roa: null, debtToEquity: null, currentRatio: null,
+      marketCap: td.marketCap,
+      dividendYield: td.dividendYield,
+      beta: td.beta,
+      eps: td.forwardEps || td.trailingEps,
+      earningsDate: td.earningsDate,
+      source: "Yahoo Finance",
+    };
+  }, [fundamentals, techData]);
 
   return (
     <div onClick={onClose} onTouchMove={e => e.stopPropagation()} style={{
@@ -3004,14 +3112,14 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
         </div>
 
         {/* ═══ 펀더멘털 분석 (Financial Datasets API) ═══ */}
-        {(fundamentals || fundLoading) && (
+        {(fundamentals || fundLoading || yahooFund) && (
           <div style={{ padding: "0 20px 12px" }}>
             <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                 <span style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>📑 펀더멘털 분석</span>
-                {fundamentals?.fiscal_date && (
-                  <span style={{ fontSize: "10px", color: C.text3 }}>{fundamentals.fiscal_date} 기준</span>
-                )}
+                <span style={{ fontSize: "10px", color: C.text3 }}>
+                  {fundamentals?.fiscal_date ? `${fundamentals.fiscal_date} 기준` : yahooFund ? "Yahoo Finance" : ""}
+                </span>
               </div>
               {fundLoading && !fundamentals ? (
                 <div style={{ display: "flex", gap: "8px" }}>
@@ -3168,6 +3276,48 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                   )}
                   <div style={{ fontSize: "9px", color: C.text3, marginTop: "8px", textAlign: "right", opacity: 0.6 }}>
                     via {fundamentals.source}
+                  </div>
+                </>
+              ) : yahooFund ? (
+                <>
+                  {/* Yahoo Finance 밸류에이션 fallback */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginBottom: "10px" }}>
+                    {[
+                      { label: "PER", value: yahooFund.peRatio },
+                      { label: "PBR", value: yahooFund.pbRatio },
+                      { label: "EPS", value: yahooFund.eps },
+                    ].filter(i => i.value != null).map(item => (
+                      <div key={item.label} style={{ background: C.card, borderRadius: "10px", padding: "10px 8px", textAlign: "center" }}>
+                        <div style={{ fontSize: "10px", color: C.text3, marginBottom: "3px" }}>{item.label}</div>
+                        <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>
+                          {typeof item.value === "number" ? item.value.toFixed(2) : item.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginBottom: "6px" }}>
+                    {[
+                      { label: "시가총액", value: yahooFund.marketCap, fmt: "cap" },
+                      { label: "배당률", value: yahooFund.dividendYield, fmt: "pct" },
+                      { label: "베타", value: yahooFund.beta, fmt: "num" },
+                    ].filter(i => i.value != null).map(item => (
+                      <div key={item.label} style={{ background: C.card, borderRadius: "10px", padding: "10px 8px", textAlign: "center" }}>
+                        <div style={{ fontSize: "10px", color: C.text3, marginBottom: "3px" }}>{item.label}</div>
+                        <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>
+                          {item.fmt === "cap" ? (item.value >= 1e12 ? `$${(item.value/1e12).toFixed(1)}T` : item.value >= 1e9 ? `$${(item.value/1e9).toFixed(0)}B` : `$${(item.value/1e6).toFixed(0)}M`)
+                           : item.fmt === "pct" ? `${(item.value * 100).toFixed(2)}%`
+                           : typeof item.value === "number" ? item.value.toFixed(2) : item.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {yahooFund.earningsDate && (
+                    <div style={{ fontSize: "10px", color: C.text3, marginTop: "6px" }}>
+                      다음 실적 발표: <span style={{ color: C.yellow, fontWeight: 600 }}>{new Date(yahooFund.earningsDate * 1000).toLocaleDateString("ko-KR")}</span>
+                    </div>
+                  )}
+                  <div style={{ fontSize: "9px", color: C.text3, marginTop: "6px", textAlign: "right", opacity: 0.6 }}>
+                    via Yahoo Finance (상세 데이터는 Financial Datasets API 키 설정 필요)
                   </div>
                 </>
               ) : null}
@@ -4306,11 +4456,47 @@ function AppInner() {
                   if (prevClose > 0) gap = +((todayOpen - prevClose) / prevClose * 100).toFixed(2);
                 }
 
+                // BB Width (20일)
+                let bbWidth = null;
+                const ma20h = n >= 20 ? closes.slice(-20).reduce((s, v) => s + v, 0) / 20 : null;
+                if (ma20h) {
+                  const bbStd = Math.sqrt(closes.slice(-20).reduce((a, v) => a + (v - ma20h) ** 2, 0) / 20);
+                  bbWidth = ma20h > 0 ? +(bbStd * 4 / ma20h).toFixed(4) : null;
+                }
+
+                // ATR(14) %
+                let atr14Pct = null;
+                if (n >= 15 && highs.length >= 15 && lows.length >= 15) {
+                  let atrS = 0;
+                  for (let ai = n - 14; ai < n; ai++) {
+                    atrS += Math.max(highs[ai] - lows[ai], Math.abs(highs[ai] - closes[ai - 1]), Math.abs(lows[ai] - closes[ai - 1]));
+                  }
+                  atr14Pct = curPrice > 0 ? +(atrS / 14 / curPrice * 100).toFixed(2) : null;
+                }
+
+                // ADX (간소화)
+                let adxBullish = false, adxBearish = false;
+                if (n >= 28 && highs.length >= 28 && lows.length >= 28) {
+                  let sPDM = 0, sNDM = 0, sTR = 0;
+                  for (let di = n - 14; di < n; di++) {
+                    const upM = highs[di] - highs[di - 1];
+                    const downM = lows[di - 1] - lows[di];
+                    sPDM += upM > downM && upM > 0 ? upM : 0;
+                    sNDM += downM > upM && downM > 0 ? downM : 0;
+                    sTR += Math.max(highs[di] - lows[di], Math.abs(highs[di] - closes[di - 1]), Math.abs(lows[di] - closes[di - 1]));
+                  }
+                  const pDI = sTR > 0 ? sPDM / sTR * 100 : 0;
+                  const mDI = sTR > 0 ? sNDM / sTR * 100 : 0;
+                  const dxV = (pDI + mDI) > 0 ? Math.abs(pDI - mDI) / (pDI + mDI) * 100 : 0;
+                  if (dxV > 25 && pDI > mDI) adxBullish = true;
+                  if (dxV > 25 && mDI > pDI) adxBearish = true;
+                }
+
                 updated[idx] = {
                   ...updated[idx],
-                  rsi, fiftyDayAvg: ma50, twoHundredDayAvg: ma200, ma200Dist,
+                  rsi, fiftyDayAvg: ma50, twoHundredDayAvg: ma200, ma50, ma200, ma200Dist,
                   high52w, low52w, volRatio, weekChange, stoch, mfi, wr,
-                  rsiDivType, cmf, gap,
+                  rsiDivType, cmf, gap, bbWidth, atr14Pct, adxBullish, adxBearish,
                 };
               }
               return updated;
