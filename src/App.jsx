@@ -2888,16 +2888,18 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
     (async () => {
       setFundLoading(true);
       try {
-        const [incomeRes, metricsRes, estimatesRes] = await Promise.all([
+        const [incomeRes, metricsRes, estimatesRes, snapRes] = await Promise.all([
           fetch(`/api/financial-datasets?type=income&ticker=${ticker}&period=quarterly&limit=4`).then(r => r.ok ? r.json() : null).catch(() => null),
           fetch(`/api/financial-datasets?type=metrics&ticker=${ticker}&period=quarterly&limit=4`).then(r => r.ok ? r.json() : null).catch(() => null),
-          fetch(`/api/financial-datasets?type=estimates&ticker=${ticker}&period=quarterly&limit=2`).then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch(`/api/financial-datasets?type=estimates&ticker=${ticker}&period=quarterly&limit=4`).then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch(`/api/financial-datasets?type=metrics-snapshot&ticker=${ticker}`).then(r => r.ok ? r.json() : null).catch(() => null),
         ]);
         if (cancelled) return;
         const inc = incomeRes?.income_statements || incomeRes?.results || [];
         const met = metricsRes?.financial_metrics || metricsRes?.results || [];
         const est = estimatesRes?.analyst_estimates || estimatesRes?.results || [];
-        if (inc.length === 0 && met.length === 0 && est.length === 0) {
+        const snap = snapRes?.snapshot || snapRes || {};
+        if (inc.length === 0 && met.length === 0 && est.length === 0 && !snap.market_cap) {
           setFundLoading(false);
           return;
         }
@@ -2927,21 +2929,25 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           fiscal_date: latest.report_period || latest.fiscal_date,
           // 성장률
           revGrowthQoQ, revGrowthYoY, niGrowthYoY,
-          // Financial Metrics
-          peRatio: latestMetric.pe_ratio || latestMetric.price_to_earnings_ratio,
-          pbRatio: latestMetric.pb_ratio || latestMetric.price_to_book_ratio,
-          psRatio: latestMetric.ps_ratio || latestMetric.price_to_sales_ratio,
-          evToEbitda: latestMetric.ev_to_ebitda || latestMetric.enterprise_value_to_ebitda,
-          roe: latestMetric.return_on_equity,
-          roa: latestMetric.return_on_assets,
-          debtToEquity: latestMetric.debt_to_equity || latestMetric.total_debt_to_equity,
-          currentRatio: latestMetric.current_ratio,
-          freeCashFlowPerShare: latestMetric.free_cash_flow_per_share,
-          revenuePerShare: latestMetric.revenue_per_share,
-          marketCap: latestMetric.market_cap || latestMetric.market_capitalization,
+          // Financial Metrics (historical quarterly → snapshot fallback)
+          peRatio: latestMetric.pe_ratio || latestMetric.price_to_earnings_ratio || snap.pe_ratio,
+          pbRatio: latestMetric.pb_ratio || latestMetric.price_to_book_ratio || snap.pb_ratio,
+          psRatio: latestMetric.ps_ratio || latestMetric.price_to_sales_ratio || snap.ps_ratio,
+          evToEbitda: latestMetric.ev_to_ebitda || latestMetric.enterprise_value_to_ebitda || snap.ev_to_ebitda,
+          roe: latestMetric.return_on_equity || snap.return_on_equity,
+          roa: latestMetric.return_on_assets || snap.return_on_assets,
+          debtToEquity: latestMetric.debt_to_equity || latestMetric.total_debt_to_equity || snap.debt_to_equity,
+          currentRatio: latestMetric.current_ratio || snap.current_ratio,
+          freeCashFlowPerShare: latestMetric.free_cash_flow_per_share || snap.free_cash_flow_per_share,
+          revenuePerShare: latestMetric.revenue_per_share || snap.revenue_per_share,
+          marketCap: latestMetric.market_cap || latestMetric.market_capitalization || snap.market_cap,
+          // Snapshot 추가 지표 (배당, EPS 등)
+          dividendYield: snap.dividend_yield,
+          earningsPerShare: snap.earnings_per_share,
+          forwardPE: snap.forward_pe_ratio,
           // Analyst Estimates
-          estRevenue: latestEstimate.estimated_revenue_avg,
-          estEps: latestEstimate.estimated_eps_avg,
+          estRevenue: latestEstimate.estimated_revenue_avg || latestEstimate.revenue_estimate_avg,
+          estEps: latestEstimate.estimated_eps_avg || latestEstimate.eps_estimate_avg,
           numAnalysts: latestEstimate.number_of_analysts,
           // 분기별 추이 (차트용)
           quarterlyRevenue: inc.map(q => ({ period: q.report_period || q.fiscal_date, revenue: q.revenue, netIncome: q.net_income })).reverse(),
@@ -3415,7 +3421,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             )}
 
             {/* ── 4. 애널리스트 컨센서스 (목표주가 시각화) ── */}
-            {(techData?.analystTarget || fd?.numAnalysts > 0) && (() => {
+            {(techData?.analystTarget || fd?.numAnalysts > 0 || fd?.estRevenue || fd?.estEps) && (() => {
               const curP = techData?.price || enriched.price;
               const tgt = techData?.analystTarget;
               const tgtHigh = techData?.analystHigh;

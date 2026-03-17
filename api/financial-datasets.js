@@ -40,9 +40,13 @@ const ENDPOINTS = {
 
   // ── Financial Metrics ──
   metrics: {
-    path: '/financials/metrics',
+    path: '/financial-metrics',
     requiredParams: ['ticker'],
     optionalParams: ['period', 'limit'],
+  },
+  'metrics-snapshot': {
+    path: '/financial-metrics/snapshot',
+    requiredParams: ['ticker'],
   },
 
   // ── Stock Prices ──
@@ -69,7 +73,7 @@ const ENDPOINTS = {
 
   // ── Analyst Estimates ──
   estimates: {
-    path: '/estimates/analyst',
+    path: '/analyst-estimates',
     requiredParams: ['ticker'],
     optionalParams: ['period', 'limit'],
   },
