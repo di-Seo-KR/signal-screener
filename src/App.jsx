@@ -1712,12 +1712,69 @@ function quickDiagnosis(asset) {
   }
   volScore = Math.max(0, Math.min(100, volScore));
 
-  // ── 종합 점수 (5축 가중 합산 — 시장유형별 적응 가중치) ──
+  // ── 펀더멘털 점수 (6th axis — 데이터 있을 때만 반영) ──
+  let fundScore = 50;
+  let hasFundData = false;
+  // PER 밸류에이션
+  const pe = asset.forwardPE || asset.trailingPE || asset.peRatio;
+  if (pe != null && pe > 0) {
+    hasFundData = true;
+    if (pe < 10) { fundScore += 15; signals.push({ type: "bullish", name: `PER 매우 저평가 (${pe.toFixed(1)})` }); }
+    else if (pe < 15) { fundScore += 8; signals.push({ type: "bullish", name: `PER 저평가 (${pe.toFixed(1)})` }); }
+    else if (pe < 25) fundScore += 3;
+    else if (pe < 35) fundScore -= 3;
+    else if (pe < 50) { fundScore -= 8; signals.push({ type: "bearish", name: `PER 고평가 (${pe.toFixed(1)})` }); }
+    else { fundScore -= 14; signals.push({ type: "bearish", name: `PER 극단 고평가 (${pe.toFixed(1)})` }); }
+  }
+  // 적정주가 괴리율 (fairPremium)
+  if (asset.fairPremium != null) {
+    hasFundData = true;
+    if (asset.fairPremium < -15) { fundScore += 14; signals.push({ type: "bullish", name: `적정가 대비 ${asset.fairPremium}% 저평가` }); }
+    else if (asset.fairPremium < -5) fundScore += 6;
+    else if (asset.fairPremium > 15) { fundScore -= 12; signals.push({ type: "bearish", name: `적정가 대비 +${asset.fairPremium}% 고평가` }); }
+    else if (asset.fairPremium > 5) fundScore -= 5;
+  }
+  // 영업이익률 (operatingMargin)
+  if (asset.operatingMargin != null) {
+    hasFundData = true;
+    if (asset.operatingMargin > 25) fundScore += 6;
+    else if (asset.operatingMargin > 15) fundScore += 3;
+    else if (asset.operatingMargin < 0) fundScore -= 8;
+    else if (asset.operatingMargin < 5) fundScore -= 3;
+  }
+  // 매출 성장률 (YoY)
+  if (asset.revGrowthYoY != null) {
+    hasFundData = true;
+    if (asset.revGrowthYoY > 30) { fundScore += 10; signals.push({ type: "bullish", name: `매출 YoY +${asset.revGrowthYoY}%` }); }
+    else if (asset.revGrowthYoY > 10) fundScore += 5;
+    else if (asset.revGrowthYoY < -10) { fundScore -= 8; signals.push({ type: "bearish", name: `매출 YoY ${asset.revGrowthYoY}%` }); }
+    else if (asset.revGrowthYoY < 0) fundScore -= 3;
+  }
+  // ROE
+  if (asset.roe != null) {
+    hasFundData = true;
+    if (asset.roe > 0.2) fundScore += 5;
+    else if (asset.roe > 0.1) fundScore += 2;
+    else if (asset.roe < 0) fundScore -= 6;
+  }
+  fundScore = Math.max(0, Math.min(100, fundScore));
+
+  // ── 종합 점수 (6축 가중 합산 — 시장유형별 적응 가중치) ──
   const mkt = asset.market || "us";
-  const w = mkt === "crypto" ? { t: 0.22, m: 0.28, s: 0.28, p: 0.12, v: 0.10 }
-          : mkt === "kr"     ? { t: 0.28, m: 0.22, s: 0.25, p: 0.13, v: 0.12 }
-          :                    { t: 0.30, m: 0.22, s: 0.18, p: 0.18, v: 0.12 };
-  const totalScore = Math.round(trendScore * w.t + momScore * w.m + supScore * w.s + posScore * w.p + volScore * w.v);
+  let w, totalScore;
+  if (hasFundData) {
+    // 펀더멘털 데이터 있으면 6축 (기술 70% + 펀더멘털 30%)
+    w = mkt === "crypto" ? { t: 0.18, m: 0.22, s: 0.22, p: 0.10, v: 0.08, f: 0.20 }
+      : mkt === "kr"     ? { t: 0.20, m: 0.16, s: 0.18, p: 0.10, v: 0.08, f: 0.28 }
+      :                    { t: 0.22, m: 0.16, s: 0.14, p: 0.13, v: 0.08, f: 0.27 };
+    totalScore = Math.round(trendScore * w.t + momScore * w.m + supScore * w.s + posScore * w.p + volScore * w.v + fundScore * w.f);
+  } else {
+    // 기술적 지표만 (기존 5축)
+    w = mkt === "crypto" ? { t: 0.22, m: 0.28, s: 0.28, p: 0.12, v: 0.10 }
+      : mkt === "kr"     ? { t: 0.28, m: 0.22, s: 0.25, p: 0.13, v: 0.12 }
+      :                    { t: 0.30, m: 0.22, s: 0.18, p: 0.18, v: 0.12 };
+    totalScore = Math.round(trendScore * w.t + momScore * w.m + supScore * w.s + posScore * w.p + volScore * w.v);
+  }
 
   let verdict;
   if (totalScore >= 80) verdict = "적극 매수";
@@ -1735,7 +1792,7 @@ function quickDiagnosis(asset) {
   if (totalScore >= 68) {
     opinion = "매수";
     opinionColor = "green";
-    rationale = bullSigs.slice(0, 2).map(s => s.name).join(", ") || "기술적 상승 신호 우세";
+    rationale = bullSigs.slice(0, 2).map(s => s.name).join(", ") || "상승 신호 우세";
   } else if (totalScore >= 58) {
     opinion = "매수 관망";
     opinionColor = "green";
@@ -1754,19 +1811,22 @@ function quickDiagnosis(asset) {
   } else {
     opinion = "매도";
     opinionColor = "red";
-    rationale = bearSigs.slice(0, 2).map(s => s.name).join(", ") || "기술적 하락 신호 우세";
+    rationale = bearSigs.slice(0, 2).map(s => s.name).join(", ") || "하락 신호 우세";
   }
 
-  // 핵심 시그널 요약 (최대 3개)
-  const keySignals = signals.slice(0, 3).map(s => s.name);
+  // 핵심 시그널 요약 (최대 4개)
+  const keySignals = signals.slice(0, 4).map(s => s.name);
 
-  return { score: totalScore, verdict, opinion, opinionColor, rationale, signals, keySignals, categories: [
+  const categories = [
     { name: "추세", score: trendScore },
     { name: "모멘텀", score: momScore },
     { name: "수급", score: supScore },
     { name: "위치", score: posScore },
     { name: "변동성", score: volScore },
-  ]};
+  ];
+  if (hasFundData) categories.push({ name: "펀더멘털", score: fundScore });
+
+  return { score: totalScore, verdict, opinion, opinionColor, rationale, signals, keySignals, categories, hasFundData };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -2393,10 +2453,10 @@ function AssetCard({ asset, onChart }) {
                     }}>{diag.opinion}</span>
                   </div>
                   {/* 카테고리 미니 바 */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: diag.categories.length > 5 ? "1fr 1fr 1fr" : "1fr 1fr", gap: "4px" }}>
                     {diag.categories.map(cat => (
                       <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ fontSize: "9px", color: C.text3, width: "28px" }}>{cat.name}</span>
+                        <span style={{ fontSize: "9px", color: C.text3, width: "36px" }}>{cat.name}</span>
                         <div style={{ flex: 1, height: "4px", background: C.border, borderRadius: "2px", overflow: "hidden" }}>
                           <div style={{
                             height: "100%", borderRadius: "2px",
@@ -2893,8 +2953,17 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
     return () => { cancelled = true; };
   }, [asset.symbol, asset.market]);
 
-  // 진단: techData가 있으면 enriched, 없으면 기본 asset
-  const enriched = techData ? { ...asset, ...techData } : asset;
+  // 진단: techData + fundamentals 병합
+  const enriched = useMemo(() => {
+    let e = techData ? { ...asset, ...techData } : { ...asset };
+    if (fundamentals) {
+      e.operatingMargin = fundamentals.operatingMargin;
+      e.revGrowthYoY = fundamentals.revGrowthYoY;
+      e.roe = fundamentals.roe;
+      e.peRatio = fundamentals.peRatio || e.forwardPE || e.trailingPE;
+    }
+    return e;
+  }, [asset, techData, fundamentals]);
   const diag = useMemo(() => quickDiagnosis(enriched), [enriched]);
   const buyLevels = useMemo(() => calcBuyLevels(enriched), [enriched]);
 
@@ -3042,10 +3111,10 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                     </span>
                     <span style={{ fontSize: "10px", color: C.text3 }}>{diag.rationale}</span>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "5px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: diag.categories.length > 5 ? "1fr 1fr 1fr" : "1fr 1fr", gap: "5px" }}>
                     {diag.categories.map(cat => (
                       <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ fontSize: "10px", color: C.text3, width: "30px" }}>{cat.name}</span>
+                        <span style={{ fontSize: "10px", color: C.text3, width: "36px" }}>{cat.name}</span>
                         <div style={{ flex: 1, height: "5px", background: C.border, borderRadius: "3px", overflow: "hidden" }}>
                           <div style={{
                             height: "100%", borderRadius: "3px",
