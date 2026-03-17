@@ -5435,23 +5435,38 @@ function AppInner() {
         .ui-list-item:hover { background: ${C.card2}60; }
         .ui-section-title { font-size: 16px; font-weight: 700; color: ${C.text1}; margin-bottom: 4px; }
         .ui-section-sub { font-size: 13px; color: ${C.text3}; }
-        /* ── 모바일 (≤640px) — 폰트/간격 확대 + 터치 최적화 ── */
+        /* ── 모바일 (≤640px) — 폰트/간격 확대 + 터치 최적화 (v9.1) ── */
         @media (max-width: 640px) {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
-          main { padding-left: 12px !important; padding-right: 12px !important;
+          main { padding-left: 10px !important; padding-right: 10px !important;
             font-size: 15px !important; }
           .tab-content { font-size: 15px; }
           button { min-height: 44px; }
           select { min-height: 44px; }
           .screener-cond-btn { padding: 10px 16px !important; font-size: 13px !important; min-height: 44px !important; }
-          .home-grid { gap: 14px !important; }
-          .ui-card { padding: 14px !important; }
+          .home-grid { gap: 12px !important; }
+          .ui-card { padding: 14px !important; border-radius: 14px !important; }
           .ui-list-item { padding: 12px 6px; }
           /* 모바일에서 지표 그리드 2열로 축소 */
           .indicator-grid { grid-template-columns: repeat(2, 1fr) !important; }
           /* 시그널 태그 터치 영역 확대 */
-          span[title] { padding: 4px 8px !important; font-size: 11px !important; }
+          span[title] { padding: 5px 10px !important; font-size: 12px !important; }
+          /* 뉴스 카드 패딩 최적화 */
+          .tab-content a { padding: 14px !important; }
+          /* 섹터 히트맵 모바일 2열 */
+          .sector-heatmap-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          /* 모바일 하단 여백 (FAB 버튼과 겹침 방지) */
+          .tab-content { padding-bottom: 80px !important; }
+          /* 모바일 카드 간격 조정 */
+          .home-right { gap: 10px !important; }
+          .home-left { gap: 10px !important; }
+        }
+        /* ── 매우 작은 화면 (≤380px) ── */
+        @media (max-width: 380px) {
+          main { padding-left: 8px !important; padding-right: 8px !important; }
+          .ui-card { padding: 12px !important; }
+          .home-grid { gap: 10px !important; }
         }
         /* ── 태블릿 (641~899px) ── */
         @media (min-width: 641px) and (max-width: 899px) {
@@ -5634,29 +5649,76 @@ function AppInner() {
             </button>
             <button className="mobile-menu-btn" onClick={() => setMenuOpen(!menuOpen)} style={{
               display: "none", alignItems: "center", justifyContent: "center",
-              background: "none", border: "none", color: C.text1,
-              fontSize: "24px", width: "40px", height: "40px", cursor: "pointer",
+              background: menuOpen ? C.card2 : "none", border: "none", color: C.text1,
+              fontSize: "22px", width: "40px", height: "40px", cursor: "pointer",
+              borderRadius: "12px", position: "relative", transition: "all .2s",
             }}>
               {menuOpen ? "\u2715" : "\u2630"}
+              {!menuOpen && (alertBadge > 0 || anomalies.length > 0) && (
+                <span style={{ position: "absolute", top: "4px", right: "4px", width: "8px", height: "8px", borderRadius: "50%", background: C.red }} />
+              )}
             </button>
           </div>
         </div>
-        {/* 모바일 햄버거 드롭다운 */}
+        {/* 모바일 햄버거 드롭다운 (v9.1 개선) */}
         {menuOpen && (
+          <>
+          {/* 배경 오버레이 */}
+          <div onClick={() => setMenuOpen(false)} style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.3)",
+            zIndex: 99, animation: "fadeIn 0.15s ease",
+          }} />
           <div style={{
             background: C.card, borderTop: `1px solid ${C.border}30`,
-            padding: "12px 16px calc(16px + env(safe-area-inset-bottom, 0px))", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px",
-            animation: "slideUp 0.2s ease",
+            padding: "16px 16px calc(20px + env(safe-area-inset-bottom, 0px))",
+            display: "flex", flexDirection: "column", gap: "8px",
+            animation: "slideUp 0.2s ease", position: "relative", zIndex: 100,
           }}>
-            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "anomaly", label: "이상탐지", icon: "⚡" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-port", label: "전략 운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "sentiment", label: "센티먼트", icon: "💬" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "자동매매", icon: "🤖" }].map(t => (
-              <button key={t.id} onClick={() => { setTab(t.id); setMenuOpen(false); }} style={{
-                padding: "12px 14px", borderRadius: "12px", fontSize: "14px", fontWeight: 600,
-                background: tab === t.id ? C.blueBg : C.card2,
-                color: tab === t.id ? C.blue : C.text2, border: tab === t.id ? `1px solid ${C.blue}30` : `1px solid ${C.border}20`,
-                textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", gap: "10px",
-              }}><span style={{fontSize:"17px",width:"22px",textAlign:"center"}}>{t.icon}</span> {t.label}</button>
+            {/* 섹션 구분 */}
+            {[
+              { section: "메인", items: [
+                { id: "home", label: "홈 대시보드", icon: "🏠" },
+                { id: "screener", label: "스크리너", icon: "🔍" },
+                { id: "anomaly", label: "이상 탐지", icon: "⚡" },
+              ]},
+              { section: "분석", items: [
+                { id: "strategy", label: "퀀트 전략", icon: "🎯" },
+                { id: "quant-report", label: "퀀트 리포트", icon: "📋" },
+                { id: "backtest", label: "백테스트", icon: "📈" },
+              ]},
+              { section: "운용", items: [
+                { id: "quant-port", label: "전략 운용", icon: "📊" },
+                { id: "risk-map", label: "리스크맵", icon: "🛡️" },
+                { id: "portfolio", label: "포트폴리오", icon: "💼" },
+                { id: "paper-trading", label: "자동매매", icon: "🤖" },
+              ]},
+              { section: "정보", items: [
+                { id: "news", label: "마켓 뉴스", icon: "📰" },
+                { id: "sentiment", label: "센티먼트", icon: "💬" },
+                { id: "alerts", label: "알림 설정", icon: "🔔" },
+              ]},
+            ].map(group => (
+              <div key={group.section}>
+                <div style={{ fontSize: "10px", fontWeight: 700, color: C.text3, padding: "4px 4px 6px", letterSpacing: "0.05em", textTransform: "uppercase" }}>{group.section}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "5px" }}>
+                  {group.items.map(t => (
+                    <button key={t.id} onClick={() => { setTab(t.id); setMenuOpen(false); }} style={{
+                      padding: "10px 8px", borderRadius: "12px", fontSize: "12px", fontWeight: 600,
+                      background: tab === t.id ? C.blueBg : C.card2,
+                      color: tab === t.id ? C.blue : C.text2,
+                      border: tab === t.id ? `1px solid ${C.blue}30` : `1px solid transparent`,
+                      textAlign: "center", cursor: "pointer", display: "flex", flexDirection: "column",
+                      alignItems: "center", gap: "4px", minHeight: "auto",
+                    }}>
+                      <span style={{fontSize:"18px"}}>{t.icon}</span>
+                      <span style={{ fontSize: "11px", lineHeight: 1.2 }}>{t.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
+          </>
         )}
       </header>
 

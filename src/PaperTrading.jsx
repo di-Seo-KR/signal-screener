@@ -579,46 +579,49 @@ class RiskManager {
   calcKellyFraction(signal) {
     const perf = loadStrategyPerformance();
     const s = perf[signal.strategy];
-    // 충분한 데이터 없으면 보수적 디폴트
-    if (!s || (s.wins + s.losses) < 5) return 0.02; // 기본 2%
+    // 충분한 데이터 없으면 기본값
+    if (!s || (s.wins + s.losses) < 5) return 0.05; // 기본 5%
     const p = s.wins / (s.wins + s.losses);
     const q = 1 - p;
     const avgWin = s.avgWin || 1;
     const avgLoss = s.avgLoss || 1;
     const b = avgLoss > 0 ? avgWin / avgLoss : 1.5;
     const kelly = (b * p - q) / b;
-    // Half-Kelly (안전계수 50%), 최소 0.5%, 최대 5%
-    return Math.max(0.005, Math.min(0.05, kelly * 0.5));
+    // Half-Kelly (안전계수 50%), 최소 1%, 최대 12%
+    return Math.max(0.01, Math.min(0.12, kelly * 0.5));
   }
 
   // 향상된 포지션 사이징 (ATR + 켈리 + 레짐 + 드로다운 조절)
   calcPositionSize(signal, regime) {
-    const baseAlloc = this.equity * (this.s.allocationPct || 2) / 100;
+    const allocPct = this.s.allocationPct || 5;
+    const baseAlloc = this.equity * allocPct / 100;
 
     // ATR 변동성 조정
     const atrPct = signal.atrPct || 2;
-    const volAdjust = Math.min(1.5, Math.max(0.3, 2 / atrPct));
+    const volAdjust = Math.min(1.5, Math.max(0.5, 2 / atrPct));
 
     // 켈리 기준 보정
     const kellyF = this.calcKellyFraction(signal);
     const kellySize = this.equity * kellyF;
 
     // 신뢰도 가중 (앙상블 보너스 반영)
-    const confAdjust = Math.max(0.5, signal.confidence);
+    const confAdjust = Math.max(0.6, signal.confidence);
 
     // 레짐 기반 전체 리스크 스케일링
     let regimeScale = 1.0;
     if (regime) {
-      if (regime.volatility === "high") regimeScale = 0.6;      // 고변동: 축소
-      else if (regime.regime === "trending") regimeScale = 1.15; // 추세: 약간 확대
+      if (regime.volatility === "high") regimeScale = 0.7;      // 고변동: 축소
+      else if (regime.regime === "trending") regimeScale = 1.2;  // 추세: 확대
     }
 
     // 드로다운 단계별 축소
     const ddMult = this.drawdownMultiplier;
 
-    // 최종: min(ATR 기반, 켈리 기반) × 보정팩터
-    const adjusted = Math.min(baseAlloc * volAdjust, kellySize) * confAdjust * regimeScale * ddMult;
-    return Math.round(Math.max(10, Math.min(adjusted, this.equity * 0.05)));
+    // 최종: max(ATR 기반, 켈리 기반) × 보정팩터 — 더 큰 값 채택
+    const adjusted = Math.max(baseAlloc * volAdjust, kellySize) * confAdjust * regimeScale * ddMult;
+    // 최대 개별 포지션: 자산의 maxSinglePct% (기본 8%)
+    const maxSingle = this.equity * (this.s.maxSinglePct || 8) / 100;
+    return Math.round(Math.max(50, Math.min(adjusted, maxSingle)));
   }
 
   // 스탑로스/익절 가격 계산 (ATR 기반 + 트레일링 지원)
@@ -927,12 +930,12 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
 
   const [tradeSettings, setTradeSettings] = useState(() => load(KEYS.settings, {
     orderType: "market",
-    allocationPct: 2,
+    allocationPct: 5,
     maxPositions: 20,
     maxDrawdownPct: 10,
     maxDailyLossPct: 3,
     maxSectorPct: 35,
-    maxSinglePct: 5,
+    maxSinglePct: 8,
     stopLossATR: 2,
     takeProfitATR: 3,
     useBracketOrders: true,
@@ -940,6 +943,9 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
     cooldownHours: 24,
     strategies: Object.keys(STRATEGY_PORTFOLIOS),
   }));
+
+  // 대기 주문 큐 (장 마감 시 스캔한 시그널을 저장, 장 시작 시 자동 실행)
+  const [pendingOrders, setPendingOrders] = useState(() => load("di_queued_signals", []));
 
   const refreshTimer = useRef(null);
   const scanTimer = useRef(null);
@@ -967,6 +973,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
   useEffect(() => { save(KEYS.settings, tradeSettings); }, [tradeSettings]);
   useEffect(() => { save("di_auto_scan", autoScanEnabled); }, [autoScanEnabled]);
   useEffect(() => { save("di_trading_halted", tradingHalted); }, [tradingHalted]);
+  useEffect(() => { save("di_queued_signals", pendingOrders); }, [pendingOrders]);
   useEffect(() => { save("di_pt_tab", activeTab); }, [activeTab]);
 
   // ── 계좌 데이터 ──
@@ -995,6 +1002,31 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
       return () => clearInterval(refreshTimer.current);
     }
   }, [isConnected, refreshData]);
+
+  // ── 장 시작 시 대기 주문 자동 실행 ──
+  const prevClockOpen = useRef(false);
+  useEffect(() => {
+    const isOpen = clock?.is_open === true;
+    const wasJustOpened = isOpen && !prevClockOpen.current;
+    prevClockOpen.current = isOpen;
+
+    if (wasJustOpened && autoTradeEnabled && isConnected && !tradingHalted && pendingOrders.length > 0) {
+      // 만료되지 않은 대기 시그널만 필터
+      const validQueued = pendingOrders.filter(sig => sig.expiresAt > Date.now());
+      if (validQueued.length > 0) {
+        setRiskAlerts(prev => [...prev, {
+          level: "info",
+          msg: `장 시작 — 대기 주문 ${validQueued.length}건 실행 중...`,
+          time: Date.now(),
+        }]);
+        executeAutoTrades(validQueued).then(() => {
+          setPendingOrders([]);
+        });
+      } else {
+        setPendingOrders([]);
+      }
+    }
+  }, [clock?.is_open]);
 
   // ── 전략 성과 추적 (체결 주문 → 승패 판정) ──
   useEffect(() => {
@@ -1094,6 +1126,28 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
       if (autoTradeEnabled && isConnected && signals.length > 0 && !tradingHalted) {
         if (clock?.is_open) {
           await executeAutoTrades(signals);
+        } else {
+          // 장 마감 시: 시그널을 대기 주문 큐에 저장 (장 시작 시 자동 실행)
+          const newPending = signals.filter(sig => {
+            const sigIds = sig.originalIds || [sig.id];
+            return !sigIds.some(id => executedSignals[id]);
+          }).map(sig => ({
+            ...sig,
+            queuedAt: Date.now(),
+            expiresAt: Date.now() + 24 * 3600000, // 24시간 유효
+          }));
+          if (newPending.length > 0) {
+            setPendingOrders(prev => {
+              const existingIds = new Set(prev.map(p => p.id));
+              const fresh = newPending.filter(p => !existingIds.has(p.id));
+              return [...fresh, ...prev].slice(0, 50);
+            });
+            setRiskAlerts(prev => {
+              const msg = `장 마감 — ${newPending.length}건 대기 주문 큐에 추가 (장 시작 시 자동 실행)`;
+              if (prev.some(a => a.msg === msg)) return prev;
+              return [...prev, { level: "info", msg, time: Date.now() }];
+            });
+          }
         }
       }
     } catch (e) {
@@ -1336,6 +1390,10 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
                 <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
                   background: C.redBg, color: C.red }}>HALTED</span>
               )}
+              {pendingOrders.length > 0 && (
+                <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
+                  background: C.yellowBg, color: C.yellow }}>대기 {pendingOrders.length}</span>
+              )}
             </div>
             <div style={{ fontSize: "11px", color: C.text3, display: "flex", gap: "8px", flexWrap: "wrap" }}>
               <span>{loading ? "갱신 중..." : "30초 자동 갱신"}</span>
@@ -1577,6 +1635,41 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
                 <span style={{fontSize:"12px",color:C.blue,fontWeight:600}}>매도 {detectedSignals.filter(s=>s.type==="SELL").length}</span>
               )}
             </div>
+            {/* 대기 주문 큐 표시 */}
+            {pendingOrders.length > 0 && (
+              <div style={{background:C.card2,border:`1px solid ${C.yellow}40`,borderRadius:"10px",padding:"12px",marginBottom:"10px"}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"8px"}}>
+                  <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
+                    <span style={{fontSize:"16px"}}>⏳</span>
+                    <span style={{fontWeight:700,fontSize:"13px",color:C.yellow}}>대기 주문 ({pendingOrders.filter(p=>p.expiresAt>Date.now()).length}건)</span>
+                  </div>
+                  <button onClick={()=>{setPendingOrders([]);setRiskAlerts(p=>[...p,{level:"info",msg:"대기 주문 전체 취소",time:Date.now()}])}} style={{
+                    padding:"4px 10px",borderRadius:"6px",fontSize:"11px",fontWeight:600,
+                    background:C.redBg,color:C.red,border:`1px solid ${C.red}40`,cursor:"pointer"}}>전체 취소</button>
+                </div>
+                <div style={{fontSize:"11px",color:C.text3,marginBottom:"6px"}}>장 마감 중 감지된 시그널 — 장 시작 시 자동 실행됩니다</div>
+                <div style={{display:"flex",flexDirection:"column",gap:"4px",maxHeight:"150px",overflow:"auto"}}>
+                  {pendingOrders.filter(p=>p.expiresAt>Date.now()).map((sig,i)=>(
+                    <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
+                      padding:"6px 8px",background:C.bg,borderRadius:"6px",fontSize:"12px"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
+                        <span style={{padding:"1px 5px",borderRadius:"3px",fontWeight:700,fontSize:"10px",
+                          background:sig.type==="BUY"?C.redBg:C.blueBg,
+                          color:sig.type==="BUY"?C.red:C.blue}}>{sig.type==="BUY"?"매수":"매도"}</span>
+                        <span style={{fontWeight:600}}>{sig.symbol}</span>
+                        <span style={{color:C.text3,fontSize:"10px"}}>{sig.strategy}</span>
+                      </div>
+                      <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
+                        <span style={{color:C.text3,fontSize:"10px"}}>{new Date(sig.queuedAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}</span>
+                        <button onClick={()=>setPendingOrders(p=>p.filter((_,j)=>j!==i))} style={{
+                          padding:"2px 6px",borderRadius:"4px",fontSize:"10px",
+                          background:"transparent",color:C.red,border:`1px solid ${C.red}40`,cursor:"pointer"}}>취소</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {detectedSignals.length===0?(
               <div style={{textAlign:"center",padding:"40px 0",color:C.text3}}>
                 <div style={{fontSize:"40px",marginBottom:"8px"}}>📡</div>
@@ -1678,17 +1771,17 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
               {[
                 { id:"conservative", label:"안정형", icon:"🛡️", color:C.blue, bg:C.blueBg,
                   desc:"소액·저위험·높은 신뢰도만",
-                  s:{allocationPct:1,maxPositions:10,maxDrawdownPct:5,maxDailyLossPct:2,maxSectorPct:25,maxSinglePct:3,
+                  s:{allocationPct:3,maxPositions:10,maxDrawdownPct:5,maxDailyLossPct:2,maxSectorPct:25,maxSinglePct:5,
                     stopLossATR:1.5,takeProfitATR:2.5,useBracketOrders:true,minConfidence:0.7,cooldownHours:48,orderType:"market",
                     strategies:Object.keys(STRATEGY_PORTFOLIOS).filter(n=>(STRATEGY_CONFIDENCE[n]||0)>=0.7)}},
                 { id:"balanced", label:"균형형", icon:"⚖️", color:C.green, bg:C.greenBg,
                   desc:"적정 리스크·다양한 전략",
-                  s:{allocationPct:2,maxPositions:20,maxDrawdownPct:10,maxDailyLossPct:3,maxSectorPct:35,maxSinglePct:5,
+                  s:{allocationPct:5,maxPositions:20,maxDrawdownPct:10,maxDailyLossPct:3,maxSectorPct:35,maxSinglePct:8,
                     stopLossATR:2,takeProfitATR:3,useBracketOrders:true,minConfidence:0.5,cooldownHours:24,orderType:"market",
                     strategies:Object.keys(STRATEGY_PORTFOLIOS)}},
                 { id:"aggressive", label:"공격형", icon:"🔥", color:C.orange, bg:C.orangeBg,
                   desc:"고비중·전략 전체·빠른 회전",
-                  s:{allocationPct:4,maxPositions:30,maxDrawdownPct:15,maxDailyLossPct:5,maxSectorPct:45,maxSinglePct:8,
+                  s:{allocationPct:8,maxPositions:30,maxDrawdownPct:15,maxDailyLossPct:5,maxSectorPct:45,maxSinglePct:12,
                     stopLossATR:2.5,takeProfitATR:4,useBracketOrders:true,minConfidence:0.4,cooldownHours:12,orderType:"market",
                     strategies:Object.keys(STRATEGY_PORTFOLIOS)}},
               ].map(p=>{
@@ -1718,7 +1811,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
               <div>
                 <label style={{fontSize:"12px",color:C.text3,fontWeight:600,display:"block",marginBottom:"6px"}}>1건당 투자 비율</label>
                 <div style={{display:"flex",gap:"4px"}}>
-                  {[1,2,3,5].map(pct=>(
+                  {[2,3,5,8,12].map(pct=>(
                     <button key={pct} onClick={()=>setTradeSettings(p=>({...p,allocationPct:pct}))} style={{
                       flex:1,padding:"8px",borderRadius:"8px",fontSize:"12px",fontWeight:600,
                       background:tradeSettings.allocationPct===pct?C.blueBg:"transparent",
