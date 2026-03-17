@@ -370,6 +370,59 @@ function runDiagnosis(candles) {
   const obvSlope = n >= 20 ? (obv[n - 1] - obv[n - 20]) : 0;
   const obvTrend = obvSlope > 0 ? "up" : obvSlope < 0 ? "down" : "flat";
 
+  // VWAP 근사 (20일 거래량 가중 평균가)
+  let vwap = null;
+  if (n >= 20) {
+    let sumPV = 0, sumV = 0;
+    for (let i = n - 20; i < n; i++) {
+      const typical = (highs[i] + lows[i] + closes[i]) / 3;
+      sumPV += typical * (volumes[i] || 0);
+      sumV += (volumes[i] || 0);
+    }
+    vwap = sumV > 0 ? sumPV / sumV : null;
+  }
+  const vwapDeviation = vwap && last > 0 ? ((last - vwap) / vwap) * 100 : null;
+
+  // 지지/저항 레벨 탐지 (피벗 포인트 기반)
+  const supportResistance = (() => {
+    if (n < 20) return { supports: [], resistances: [] };
+    const lookback = Math.min(n, 60);
+    const supports = [], resistances = [];
+    for (let i = n - lookback + 2; i < n - 2; i++) {
+      // 로컬 저점 (지지)
+      if (lows[i] <= lows[i - 1] && lows[i] <= lows[i - 2] && lows[i] <= lows[i + 1] && lows[i] <= lows[i + 2]) {
+        supports.push(lows[i]);
+      }
+      // 로컬 고점 (저항)
+      if (highs[i] >= highs[i - 1] && highs[i] >= highs[i - 2] && highs[i] >= highs[i + 1] && highs[i] >= highs[i + 2]) {
+        resistances.push(highs[i]);
+      }
+    }
+    // 현재가에 가장 가까운 지지/저항 정렬
+    supports.sort((a, b) => b - a); // 높은 순 (현재가 아래)
+    resistances.sort((a, b) => a - b); // 낮은 순 (현재가 위)
+    const nearSupport = supports.filter(s => s < last).slice(0, 3);
+    const nearResist = resistances.filter(r => r > last).slice(0, 3);
+    return { supports: nearSupport, resistances: nearResist };
+  })();
+
+  // 가장 가까운 지지/저항까지 거리 (%)
+  const nearestSupport = supportResistance.supports[0];
+  const nearestResist = supportResistance.resistances[0];
+  const distToSupport = nearestSupport ? ((last - nearestSupport) / last) * 100 : null;
+  const distToResist = nearestResist ? ((nearestResist - last) / last) * 100 : null;
+
+  // 추세 전환 조기 감지 (MA 수렴도)
+  const maConvergence = (() => {
+    if (!sma5 || !sma20) return null;
+    const spread = Math.abs(sma5 - sma20) / sma20 * 100;
+    const prevSpread5 = n >= 6 ? Math.abs(
+      closes.slice(-6, -1).reduce((a,b) => a+b, 0) / 5 -
+      closes.slice(-21, -1).reduce((a,b) => a+b, 0) / 20
+    ) / (closes.slice(-21, -1).reduce((a,b) => a+b, 0) / 20) * 100 : spread;
+    return { spread, converging: spread < prevSpread5 && spread < 1.5 };
+  })();
+
   // 52주 범위
   const high52 = n >= 52 ? Math.max(...highs.slice(-260)) : Math.max(...highs);
   const low52 = n >= 52 ? Math.min(...lows.slice(-260)) : Math.min(...lows);
@@ -464,6 +517,15 @@ function runDiagnosis(candles) {
   else if (change5 > 2) trendScore += 2;
   else if (change5 < -5) trendScore -= 4;
   else if (change5 < -2) trendScore -= 2;
+  // VWAP 위치 (기관 수급 프록시)
+  if (vwapDeviation != null) {
+    if (vwapDeviation > 3) { trendScore += 3; signals.push({ type: "bullish", name: `VWAP 상회 (+${vwapDeviation.toFixed(1)}%)`, detail: "기관 평균 매수가 위 — 수급 우위" }); }
+    else if (vwapDeviation < -5) { trendScore -= 2; signals.push({ type: "bearish", name: `VWAP 하회 (${vwapDeviation.toFixed(1)}%)`, detail: "기관 평균 매수가 아래 — 매도 압력" }); }
+  }
+  // 추세 전환 조기 감지
+  if (maConvergence?.converging) {
+    signals.push({ type: "neutral", name: "MA 수렴 (추세 전환 임박)", detail: `MA5-MA20 스프레드 ${maConvergence.spread.toFixed(2)}% — 방향 전환 주의` });
+  }
   trendScore = Math.max(0, Math.min(100, trendScore));
   const trendDetail = last > (sma20 || last)
     ? `상승세 (MA20 +${((last / sma20 - 1) * 100).toFixed(1)}%, 배열: ${maAlignment === "perfect_bull" ? "정배열" : maAlignment === "bull" ? "정배열↑" : "혼합"})`
@@ -481,13 +543,20 @@ function runDiagnosis(candles) {
     else if (rsi >= 20) { momScore += 12; signals.push({ type: "bullish", name: `RSI 과매도 (${rsi.toFixed(0)})`, detail: "매도 과열 — 반등 가능 구간" }); }
     else { momScore += 16; signals.push({ type: "bullish", name: `RSI 극단 과매도 (${rsi.toFixed(0)})`, detail: "극심한 매도 압력 — 강한 반등 기대" }); }
   }
-  // RSI 다이버전스 (간이 감지)
-  if (rsi != null && n >= 10) {
-    const prevRSI = rsiArr[n - 10];
-    if (prevRSI != null) {
-      if (last < closes[n - 10] && rsi > prevRSI) { momScore += 8; signals.push({ type: "bullish", name: "RSI 강세 다이버전스", detail: "가격 하락 vs RSI 상승 — 하락 둔화 / 반전 신호" }); }
-      if (last > closes[n - 10] && rsi < prevRSI) { momScore -= 6; signals.push({ type: "bearish", name: "RSI 약세 다이버전스", detail: "가격 상승 vs RSI 하락 — 상승 둔화 / 조정 신호" }); }
+  // RSI 다이버전스 (다중 기간 감지: 5일, 10일, 20일)
+  if (rsi != null && n >= 20) {
+    let bullDiv = 0, bearDiv = 0;
+    for (const lookback of [5, 10, 20]) {
+      if (n < lookback) continue;
+      const prevRSI = rsiArr[n - lookback];
+      if (prevRSI == null) continue;
+      if (last < closes[n - lookback] && rsi > prevRSI) bullDiv++;
+      if (last > closes[n - lookback] && rsi < prevRSI) bearDiv++;
     }
+    if (bullDiv >= 2) { momScore += 12; signals.push({ type: "bullish", name: `RSI 강세 다이버전스 (${bullDiv}중 확인)`, detail: "다중 기간에서 가격 하락 vs RSI 상승 — 강한 반전 신호" }); }
+    else if (bullDiv === 1) { momScore += 6; signals.push({ type: "bullish", name: "RSI 강세 다이버전스", detail: "가격 하락 vs RSI 상승 — 하락 둔화 / 반전 신호" }); }
+    if (bearDiv >= 2) { momScore -= 10; signals.push({ type: "bearish", name: `RSI 약세 다이버전스 (${bearDiv}중 확인)`, detail: "다중 기간에서 가격 상승 vs RSI 하락 — 강한 조정 신호" }); }
+    else if (bearDiv === 1) { momScore -= 5; signals.push({ type: "bearish", name: "RSI 약세 다이버전스", detail: "가격 상승 vs RSI 하락 — 상승 둔화 / 조정 신호" }); }
   }
   // MACD
   if (macdVal != null && sigVal != null) {
@@ -576,8 +645,11 @@ function runDiagnosis(candles) {
   else if (fromHigh < -25) { posScore += 6; signals.push({ type: "bullish", name: `고점 대비 ${fromHigh.toFixed(0)}%`, detail: "상당한 조정 후 — 반등 가능" }); }
   // 신고가 돌파
   if (pos52 >= 98 && change5 > 0) { posScore += 8; signals.push({ type: "bullish", name: "52주 신고가 돌파", detail: "강력한 상승 모멘텀 — 추세 추종 구간" }); }
+  // 지지/저항 레벨 근접도
+  if (distToSupport != null && distToSupport < 2) { posScore += 6; signals.push({ type: "bullish", name: `지지선 근접 (${distToSupport.toFixed(1)}%)`, detail: `$${nearestSupport.toFixed(2)} 지지 레벨 — 반등 기대 구간` }); }
+  if (distToResist != null && distToResist < 2) { posScore -= 3; signals.push({ type: "neutral", name: `저항선 근접 (${distToResist.toFixed(1)}%)`, detail: `$${nearestResist.toFixed(2)} 저항 레벨 — 돌파 또는 되돌림 주의` }); }
   posScore = Math.max(0, Math.min(100, posScore));
-  const posDetail = `52주 위치 ${pos52.toFixed(0)}% | 고점대비 ${fromHigh.toFixed(1)}%`;
+  const posDetail = `52주 위치 ${pos52.toFixed(0)}% | 고점대비 ${fromHigh.toFixed(1)}%${distToSupport != null ? ` | 지지 ${distToSupport.toFixed(1)}%` : ""}`;
 
   // ── 6. 캔들패턴 & 단기추세 점수 — 가중치 10% ──
   let patternScore = 50;
@@ -668,6 +740,9 @@ function runDiagnosis(candles) {
     currentPrice: last,
     rsi, macdVal, stochK, stochD, wr, adx, volRatio, volTrend, pos52, fromHigh, change1, change5, change10, change20, change60,
     atrPct, disp20, maAlignment,
+    vwap, vwapDeviation,
+    supportResistance, distToSupport, distToResist,
+    maConvergence,
   };
 }
 

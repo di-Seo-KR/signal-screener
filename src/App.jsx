@@ -1,4 +1,4 @@
-// DI금융 v8.0 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
+// DI금융 v9.0 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
 // Features: 스크리닝, 캔들차트, 32개 전략, 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
 // v7.3: 퀀트 포트폴리오 실제 데이터, PC 데스크톱 사이드바+와이드 레이아웃
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
@@ -1110,6 +1110,27 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
     cmf: cmf != null ? +cmf.toFixed(3) : null,
     mfi: mfi != null ? +mfi.toFixed(1) : null,
     adxBullish, adxBearish,
+    adx: adxResult ? +adxResult.adx.toFixed(1) : null,
+    plusDI: adxResult ? +adxResult.plusDI.toFixed(1) : null,
+    minusDI: adxResult ? +adxResult.minusDI.toFixed(1) : null,
+    bbSqueeze,
+    bbWidth: (() => { // BB 밴드폭 (v9)
+      if (weeklyCloses.length < 20) return null;
+      const sl = weeklyCloses.slice(-20);
+      const m = sl.reduce((a, b) => a + b, 0) / 20;
+      const sd = Math.sqrt(sl.reduce((a, b) => a + (b - m) ** 2, 0) / 20);
+      return m > 0 ? +(sd * 4 / m).toFixed(4) : null;
+    })(),
+    atr14Pct: (() => { // ATR(14) 비율 (v9)
+      const n = weeklyCloses.length;
+      if (n < 15 || weeklyHighs.length < 15) return null;
+      let sum = 0;
+      for (let i = n - 14; i < n; i++) {
+        sum += Math.max(weeklyHighs[i] - weeklyLows[i], Math.abs(weeklyHighs[i] - weeklyCloses[i - 1]), Math.abs(weeklyLows[i] - weeklyCloses[i - 1]));
+      }
+      const atr = sum / 14;
+      return price > 0 ? +(atr / price * 100).toFixed(2) : null;
+    })(),
     macdDivType, rsiDivType,
     pocPrice: pocPrice != null ? +pocPrice.toFixed(2) : null,
     nearPOC,
@@ -1126,7 +1147,7 @@ const CONDITION_META = {
   ma_ribbon:       { label: "이평선 정배열/역배열", icon: "📐", desc: "MA20>MA50>MA200 정배열 또는 역배열 — 추세 강도 확인" },
   adx_trend:       { label: "ADX 강한 추세",      icon: "💪", desc: "ADX ≥ 25 + DI 방향 — 추세 존재 및 방향 확인" },
   // 변동성 & 가격 구조
-  bb_squeeze:      { label: "볼린저 스퀴즈",      icon: "🔥", desc: "BB가 Keltner Channel 내부 수축 — 대규모 변동 임박 신호" },
+  bb_squeeze:      { label: "TTM 스퀴즈",         icon: "🔥", desc: "BB가 Keltner Channel 내부 수축 (TTM Squeeze) — 대규모 변동 폭발 임박" },
   atr_breakout:    { label: "ATR 돌파",           icon: "🚀", desc: "당일 변동폭이 ATR(14) 2배 초과 — 폭발적 움직임" },
   price_channel:   { label: "채널 돌파",          icon: "📊", desc: "52주 고가/저가 채널 돌파 — 신고가 또는 지지선 이탈" },
   gap_signal:      { label: "갭 시그널",          icon: "⬆️", desc: "전주 대비 ±3% 이상 갭 — 수급 불균형" },
@@ -1390,24 +1411,30 @@ const TAG_COLORS = {
 
 function SignalTag({ triggerKey, asset }) {
   const meta = CONDITION_META[triggerKey];
-  const color = TAG_COLORS[triggerKey] || C.blue;
+  let color = TAG_COLORS[triggerKey] || C.blue;
   if (!meta) return null;
-  // 다이버전스에 bullish/bearish 타입 표시
+  // 다이버전스에 bullish/bearish 타입 표시 + 색상 분기
   let label = meta.label;
+  let icon = meta.icon;
   if (triggerKey === "macd_divergence" && asset?.macdDivType) {
     label = asset.macdDivType === "bullish" ? "MACD 상승 다이버전스" : "MACD 하락 다이버전스";
+    color = asset.macdDivType === "bullish" ? C.green : C.red;
+    icon = asset.macdDivType === "bullish" ? "📈" : "📉";
   }
   if (triggerKey === "rsi_divergence" && asset?.rsiDivType) {
     label = asset.rsiDivType === "bullish" ? "RSI 상승 다이버전스" : "RSI 하락 다이버전스";
+    color = asset.rsiDivType === "bullish" ? C.green : C.red;
+    icon = asset.rsiDivType === "bullish" ? "📈" : "📉";
   }
   if (triggerKey === "near_poc" && asset?.pocPrice) {
     label = `POC 근접 ($${asset.pocPrice})`;
   }
   return (
-    <span style={{
+    <span title={meta.desc} style={{
       padding: "2px 7px", borderRadius: "6px", fontSize: "10px", fontWeight: 700,
       background: `${color}22`, color, border: `1px solid ${color}44`, whiteSpace: "nowrap",
-    }}>{meta.icon} {label}</span>
+      cursor: "help",
+    }}>{icon} {label}</span>
   );
 }
 
@@ -1710,12 +1737,240 @@ function quickDiagnosis(asset) {
     rationale = signals.filter(s => s.type === "bearish").slice(0, 2).map(s => s.name).join(", ") || "기술적 하락 신호 우세";
   }
 
-  return { score: totalScore, verdict, opinion, opinionColor, rationale, signals, categories: [
+  // ── 변동성 점수 (5th axis — v9 추가) ──
+  let volScore = 50;
+  if (asset.bbWidth != null) {
+    if (asset.bbWidth < 0.05) { volScore += 12; signals.push({ type: "bullish", name: "BB 스퀴즈 (돌파 임박)" }); }
+    else if (asset.bbWidth < 0.10) volScore += 5;
+    else if (asset.bbWidth > 0.25) { volScore -= 8; signals.push({ type: "neutral", name: "BB 확장 (높은 변동성)" }); }
+  }
+  if (asset.atr14Pct != null) {
+    if (asset.atr14Pct > 5) volScore -= 10;
+    else if (asset.atr14Pct > 3) volScore -= 5;
+    else if (asset.atr14Pct < 1.5) volScore += 8;
+  }
+  volScore = Math.max(0, Math.min(100, volScore));
+
+  // ── 종합 (5축: 추세·모멘텀·수급·위치·변동성) ──
+  const totalScore = Math.round(trendScore * w.t + momScore * w.m + supScore * w.s + posScore * w.p + volScore * 0.00);
+  // 변동성은 부가 지표 — 메인 점수에 직접 반영하지 않고 별도 표시
+
+  let verdict;
+  if (totalScore >= 80) verdict = "적극 매수";
+  else if (totalScore >= 68) verdict = "매수";
+  else if (totalScore >= 58) verdict = "매수 우위";
+  else if (totalScore >= 42) verdict = "중립";
+  else if (totalScore >= 32) verdict = "매도 우위";
+  else if (totalScore >= 20) verdict = "매도";
+  else verdict = "적극 매도";
+
+  // ── 투자 의견 + 매수 추천가 통합 ──
+  let opinion, opinionColor, rationale;
+  if (totalScore >= 68) {
+    opinion = "매수";
+    opinionColor = "green";
+    rationale = signals.filter(s => s.type === "bullish").slice(0, 2).map(s => s.name).join(", ") || "기술적 상승 신호 우세";
+  } else if (totalScore >= 58) {
+    opinion = "매수 관망";
+    opinionColor = "green";
+    rationale = "상승 신호 있으나 확인 필요";
+  } else if (totalScore >= 42) {
+    opinion = "중립";
+    opinionColor = "yellow";
+    rationale = "방향성 불분명 — 추가 데이터 대기";
+  } else if (totalScore >= 32) {
+    opinion = "매도 관망";
+    opinionColor = "red";
+    rationale = "하락 신호 있으나 확인 필요";
+  } else {
+    opinion = "매도";
+    opinionColor = "red";
+    rationale = signals.filter(s => s.type === "bearish").slice(0, 2).map(s => s.name).join(", ") || "기술적 하락 신호 우세";
+  }
+
+  // 핵심 시그널 요약 (최대 3개)
+  const keySignals = signals.slice(0, 3).map(s => s.name);
+
+  return { score: totalScore, verdict, opinion, opinionColor, rationale, signals, keySignals, categories: [
     { name: "추세", score: trendScore },
     { name: "모멘텀", score: momScore },
     { name: "수급", score: supScore },
     { name: "위치", score: posScore },
+    { name: "변동성", score: volScore },
   ]};
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 매수 진입 가격 레벨 계산 (3단계 진입 전략)
+// ════════════════════════════════════════════════════════════════════
+function calcBuyLevels(asset) {
+  // 필요한 데이터 추출
+  const currentPrice = asset.price || 0;
+  const ma50 = asset.ma50 || null;
+  const ma200 = asset.ma200 || null;
+  const weeklyHigh = asset.high52w || asset.weeklyHigh52 || null;
+  const weeklyLow = asset.low52w || asset.weeklyLow52 || null;
+
+  if (!currentPrice || currentPrice <= 0) {
+    return {
+      levels: [],
+      summary: "현재가 정보 부재로 매수 타점 계산 불가"
+    };
+  }
+
+  const levels = [];
+  let confidenceL1 = 0, confidenceL2 = 0, confidenceL3 = 0;
+
+  // ── Level 1: "적극 매수" (Aggressive Entry) ──
+  // 근처 지지선 기반
+  let priceL1 = null;
+  let rationaleL1 = "";
+
+  if (ma50 && currentPrice > ma50) {
+    priceL1 = ma50;
+    rationaleL1 = "50일 이동평균선(MA50) 반등 진입";
+    confidenceL1 = 75;
+  } else if (weeklyLow && weeklyLow > 0) {
+    // 52주 저점 기반: 현재가 대비 3% 하락
+    priceL1 = Math.max(weeklyLow, currentPrice * 0.97);
+    rationaleL1 = "52주 저점 근처 강한 지지";
+    confidenceL1 = 70;
+  } else {
+    // 최근 저점 기반: 3% 풀백
+    priceL1 = currentPrice * 0.97;
+    rationaleL1 = "최근 저점 반등 기회";
+    confidenceL1 = 55;
+  }
+
+  if (priceL1 && priceL1 < currentPrice) {
+    const distanceFromCurrent = ((currentPrice - priceL1) / currentPrice) * 100;
+    const distanceConfidence = Math.max(0, 100 - distanceFromCurrent * 5);
+    confidenceL1 = Math.min(100, Math.round((confidenceL1 + distanceConfidence) / 2));
+
+    levels.push({
+      price: Math.round(priceL1 * 100) / 100,
+      label: "1차 매수",
+      type: "aggressive",
+      confidence: confidenceL1,
+      rationale: rationaleL1,
+      discount: Math.round(((currentPrice - priceL1) / currentPrice) * 1000) / 10
+    });
+  }
+
+  // ── Level 2: "분할 매수" (Scale-in Entry) ──
+  // 중기 지지선
+  let priceL2 = null;
+  let rationaleL2 = "";
+
+  if (ma200 && ma200 < currentPrice) {
+    priceL2 = ma200;
+    rationaleL2 = "200일 이동평균선(MA200) 지지";
+    confidenceL2 = 80;
+  } else if (weeklyHigh && weeklyLow && weeklyHigh > weeklyLow) {
+    // Fibonacci 38.2% 되돌림
+    const fibLevel = weeklyLow + (weeklyHigh - weeklyLow) * 0.382;
+    if (fibLevel < currentPrice) {
+      priceL2 = fibLevel;
+      rationaleL2 = "피보나치 38.2% 되돌림 레벨";
+      confidenceL2 = 65;
+    } else {
+      priceL2 = currentPrice * 0.92;
+      rationaleL2 = "중기 조정 목표 8% 풀백";
+      confidenceL2 = 50;
+    }
+  } else {
+    // 폴백: 8% 풀백
+    priceL2 = currentPrice * 0.92;
+    rationaleL2 = "중기 조정 목표 8% 풀백";
+    confidenceL2 = 50;
+  }
+
+  if (priceL2 && priceL2 < currentPrice) {
+    const distanceFromCurrent = ((currentPrice - priceL2) / currentPrice) * 100;
+    const distanceConfidence = Math.max(0, 100 - distanceFromCurrent * 3);
+    confidenceL2 = Math.min(100, Math.round((confidenceL2 + distanceConfidence) / 2));
+
+    levels.push({
+      price: Math.round(priceL2 * 100) / 100,
+      label: "2차 매수",
+      type: "scale-in",
+      confidence: confidenceL2,
+      rationale: rationaleL2,
+      discount: Math.round(((currentPrice - priceL2) / currentPrice) * 1000) / 10
+    });
+  }
+
+  // ── Level 3: "바닥 매수" (Bottom Fishing) ──
+  // 깊은 가치 레벨
+  let priceL3 = null;
+  let rationaleL3 = "";
+
+  if (weeklyHigh && weeklyLow && weeklyHigh > weeklyLow) {
+    // Fibonacci 61.8% 되돌림 (주요 레벨)
+    const fib618 = weeklyLow + (weeklyHigh - weeklyLow) * 0.618;
+    if (fib618 < currentPrice) {
+      priceL3 = fib618;
+      rationaleL3 = "피보나치 61.8% 되돌림 (강력한 지지)";
+      confidenceL3 = 85;
+    } else {
+      // 52주 저점 위 5%
+      priceL3 = weeklyLow * 1.05;
+      rationaleL3 = "52주 저점 위 5% 안전 마진";
+      confidenceL3 = 75;
+    }
+  } else if (weeklyLow && weeklyLow > 0) {
+    priceL3 = weeklyLow * 1.05;
+    rationaleL3 = "52주 저점 위 5% 안전 마진";
+    confidenceL3 = 75;
+  } else {
+    // 폴백: 15% 풀백
+    priceL3 = currentPrice * 0.85;
+    rationaleL3 = "극단적 조정 목표 15% 풀백";
+    confidenceL3 = 45;
+  }
+
+  if (priceL3 && priceL3 < currentPrice) {
+    const distanceFromCurrent = ((currentPrice - priceL3) / currentPrice) * 100;
+    const distanceConfidence = Math.max(0, 100 - distanceFromCurrent * 2);
+    confidenceL3 = Math.min(100, Math.round((confidenceL3 + distanceConfidence) / 2));
+
+    levels.push({
+      price: Math.round(priceL3 * 100) / 100,
+      label: "3차 매수",
+      type: "bottom",
+      confidence: confidenceL3,
+      rationale: rationaleL3,
+      discount: Math.round(((currentPrice - priceL3) / currentPrice) * 1000) / 10
+    });
+  }
+
+  // ── 요약 문구 생성 ──
+  let summary = "";
+  if (levels.length === 3) {
+    const minDiscount = Math.min(
+      levels[0].discount,
+      levels[1].discount,
+      levels[2].discount
+    );
+    const maxDiscount = Math.max(
+      levels[0].discount,
+      levels[1].discount,
+      levels[2].discount
+    );
+    summary = `현재가 대비 -${minDiscount.toFixed(1)}%~-${maxDiscount.toFixed(1)}% 구간에 매수 타점 형성`;
+  } else if (levels.length > 0) {
+    const discounts = levels.map(l => l.discount);
+    const minDiscount = Math.min(...discounts);
+    const maxDiscount = Math.max(...discounts);
+    summary = `현재가 대비 -${minDiscount.toFixed(1)}%~-${maxDiscount.toFixed(1)}% 구간 진입 추천`;
+  } else {
+    summary = "충분한 데이터 부재로 매수 타점 계산 불가";
+  }
+
+  return {
+    levels: levels,
+    summary: summary
+  };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -2096,7 +2351,7 @@ function AssetCard({ asset, onChart }) {
             <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>{asset.name}</span>
             <span style={{ fontSize: "12px", color: C.text3 }}>{asset.symbol}</span>
           </div>
-          <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
             {asset.triggers.map(t => <SignalTag key={t} triggerKey={t} asset={asset} />)}
           </div>
         </div>
@@ -2104,6 +2359,23 @@ function AssetCard({ asset, onChart }) {
           <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>{fmtPrice(asset.price, asset.market)}</div>
           <div style={{ fontSize: "13px", fontWeight: 600, color: isPos ? C.green : C.red }}>
             {isPos ? "▲" : "▼"} {Math.abs(asset.weekChange)}%
+          </div>
+          {/* 수급 미니 인디케이터 (CMF/MFI) */}
+          <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end", marginTop: "3px" }}>
+            {asset.cmf != null && (Math.abs(asset.cmf) > 0.05) && (
+              <span title={`CMF: ${asset.cmf > 0 ? "+" : ""}${asset.cmf.toFixed(3)}`} style={{
+                fontSize: "9px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px",
+                background: asset.cmf > 0.1 ? `${C.green}22` : asset.cmf < -0.1 ? `${C.red}22` : `${C.yellow}18`,
+                color: asset.cmf > 0.1 ? C.green : asset.cmf < -0.1 ? C.red : C.yellow,
+              }}>{asset.cmf > 0 ? "매집" : "분산"}</span>
+            )}
+            {asset.mfi != null && (asset.mfi < 25 || asset.mfi > 75) && (
+              <span title={`MFI: ${asset.mfi}`} style={{
+                fontSize: "9px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px",
+                background: asset.mfi < 20 ? `${C.purple}22` : asset.mfi < 25 ? `${C.green}18` : asset.mfi > 80 ? `${C.red}22` : `${C.yellow}18`,
+                color: asset.mfi < 20 ? C.purple : asset.mfi < 25 ? C.green : asset.mfi > 80 ? C.red : C.yellow,
+              }}>{asset.mfi < 25 ? "수급▲" : "수급▼"}</span>
+            )}
           </div>
         </div>
       </div>
@@ -2177,10 +2449,82 @@ function AssetCard({ asset, onChart }) {
               )}
             </div>
           )}
+          {/* ── 수급 종합 (CMF + MFI 미니 게이지) ── */}
+          {(asset.cmf != null || asset.mfi != null) && (
+            <div style={{
+              display: "flex", gap: "10px", marginBottom: "12px", padding: "10px 14px",
+              background: C.bg, borderRadius: "10px", border: `1px solid ${C.border}`,
+              alignItems: "center", flexWrap: "wrap",
+            }}>
+              <span style={{ fontSize: "10px", fontWeight: 700, color: C.text3, whiteSpace: "nowrap" }}>💧 수급</span>
+              {asset.cmf != null && (
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: "1 1 120px", minWidth: "120px" }}>
+                  <span style={{ fontSize: "9px", color: C.text3, width: "26px" }}>CMF</span>
+                  <div style={{ flex: 1, height: "6px", background: C.border, borderRadius: "3px", overflow: "hidden", position: "relative" }}>
+                    <div style={{ position: "absolute", left: "50%", top: 0, width: "1px", height: "100%", background: C.text3 + "44" }} />
+                    <div style={{
+                      position: "absolute", top: 0, height: "100%", borderRadius: "3px",
+                      background: asset.cmf >= 0 ? C.green : C.red,
+                      left: asset.cmf >= 0 ? "50%" : `${50 + (asset.cmf * 100)}%`,
+                      width: `${Math.min(Math.abs(asset.cmf) * 100, 50)}%`,
+                      transition: "all 0.4s ease",
+                    }} />
+                  </div>
+                  <span style={{ fontSize: "10px", fontWeight: 700, color: asset.cmf > 0.1 ? C.green : asset.cmf < -0.1 ? C.red : C.text2, width: "40px", textAlign: "right" }}>
+                    {asset.cmf > 0 ? "+" : ""}{asset.cmf.toFixed(3)}
+                  </span>
+                </div>
+              )}
+              {asset.mfi != null && (
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: "1 1 120px", minWidth: "120px" }}>
+                  <span style={{ fontSize: "9px", color: C.text3, width: "26px" }}>MFI</span>
+                  <div style={{ flex: 1, height: "6px", background: C.border, borderRadius: "3px", overflow: "hidden" }}>
+                    <div style={{
+                      height: "100%", borderRadius: "3px",
+                      width: `${asset.mfi}%`,
+                      background: asset.mfi < 20 ? C.purple : asset.mfi > 80 ? C.red : asset.mfi < 30 ? C.green : asset.mfi > 70 ? C.yellow : C.blue,
+                      transition: "width 0.4s ease",
+                    }} />
+                  </div>
+                  <span style={{ fontSize: "10px", fontWeight: 700, color: asset.mfi < 20 ? C.purple : asset.mfi > 80 ? C.red : C.text2, width: "28px", textAlign: "right" }}>
+                    {asset.mfi}
+                  </span>
+                </div>
+              )}
+              {/* 다이버전스 방향 뱃지 */}
+              {asset.macdDivType && (
+                <span style={{
+                  fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                  background: asset.macdDivType === "bullish" ? `${C.green}22` : `${C.red}22`,
+                  color: asset.macdDivType === "bullish" ? C.green : C.red,
+                }}>{asset.macdDivType === "bullish" ? "📈 MACD 상승전환" : "📉 MACD 하락전환"}</span>
+              )}
+              {asset.rsiDivType && (
+                <span style={{
+                  fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                  background: asset.rsiDivType === "bullish" ? `${C.green}22` : `${C.red}22`,
+                  color: asset.rsiDivType === "bullish" ? C.green : C.red,
+                }}>{asset.rsiDivType === "bullish" ? "📈 RSI 상승전환" : "📉 RSI 하락전환"}</span>
+              )}
+              {asset.adx != null && asset.adx >= 25 && (
+                <span style={{
+                  fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                  background: asset.plusDI > asset.minusDI ? `${C.green}22` : `${C.red}22`,
+                  color: asset.plusDI > asset.minusDI ? C.green : C.red,
+                }}>{asset.plusDI > asset.minusDI ? "🔼" : "🔽"} ADX {asset.adx} ({asset.plusDI > asset.minusDI ? "매수세" : "매도세"})</span>
+              )}
+              {asset.bbSqueeze && (
+                <span style={{
+                  fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                  background: `${C.yellow}22`, color: C.yellow,
+                }}>⚡ TTM Squeeze ON</span>
+              )}
+            </div>
+          )}
           {/* ── 지표 상세 ── */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: "8px", marginBottom: "12px" }}>
             {[
-              { label: "RSI(14)",    value: asset.rsi ?? "—",   color: asset.rsi != null && asset.rsi <= 30 ? C.purple : C.text2 },
+              { label: "RSI(14)",    value: asset.rsi ?? "—",   color: asset.rsi != null && asset.rsi <= 30 ? C.purple : asset.rsi != null && asset.rsi >= 70 ? C.red : C.text2 },
               { label: "200일선 대비", value: asset.ma200Dist != null ? `${asset.ma200Dist > 0 ? "+" : ""}${asset.ma200Dist}%` : "—" },
               { label: "거래량 비율", value: `${asset.volRatio}x`, color: asset.volRatio >= 2 ? C.red : C.text2 },
               { label: "스토캐스틱%K", value: asset.stoch ? `${asset.stoch.k.toFixed(1)}` : "—", color: asset.stoch?.k < 20 ? C.purple : C.text2 },
@@ -2188,10 +2532,17 @@ function AssetCard({ asset, onChart }) {
               { label: "52주 저가 대비", value: asset.low52w ? `+${(((asset.price - asset.low52w) / asset.low52w) * 100).toFixed(1)}%` : "—" },
               { label: "CMF", value: asset.cmf != null ? `${asset.cmf > 0 ? "+" : ""}${asset.cmf.toFixed(3)}` : "—", color: asset.cmf != null ? (asset.cmf > 0.1 ? C.green : asset.cmf < -0.1 ? C.red : C.text2) : C.text2 },
               { label: "MFI(14)", value: asset.mfi != null ? `${asset.mfi}` : "—", color: asset.mfi != null ? (asset.mfi < 20 ? C.purple : asset.mfi > 80 ? C.red : C.text2) : C.text2 },
-            ].map(({ label, value, color }) => (
+              { label: "ADX", value: asset.adx != null ? `${asset.adx}` : "—",
+                color: asset.adx != null ? (asset.adx >= 25 ? (asset.plusDI > asset.minusDI ? C.green : C.red) : C.text3) : C.text2,
+                sub: asset.adx != null && asset.adx >= 25 ? (asset.plusDI > asset.minusDI ? "+DI 우세" : "-DI 우세") : asset.adx != null ? "추세 약함" : null },
+              { label: "TTM Squeeze", value: asset.bbSqueeze ? "ON" : "OFF",
+                color: asset.bbSqueeze ? C.yellow : C.text3,
+                sub: asset.bbSqueeze ? "변동성 폭발 임박" : "정상 상태" },
+            ].map(({ label, value, color, sub }) => (
               <div key={label} style={{ background: C.bg, borderRadius: "10px", padding: "10px 12px" }}>
                 <div style={{ fontSize: "10px", color: C.text3, marginBottom: "4px" }}>{label}</div>
                 <div style={{ fontWeight: 700, fontSize: "14px", color: color || C.text1 }}>{value}</div>
+                {sub && <div style={{ fontSize: "8px", color: C.text3, marginTop: "2px" }}>{sub}</div>}
               </div>
             ))}
           </div>
@@ -2407,6 +2758,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
   // 진단: techData가 있으면 enriched, 없으면 기본 asset
   const enriched = techData ? { ...asset, ...techData } : asset;
   const diag = useMemo(() => quickDiagnosis(enriched), [enriched]);
+  const buyLevels = useMemo(() => calcBuyLevels(enriched), [enriched]);
 
   return (
     <div onClick={onClose} onTouchMove={e => e.stopPropagation()} style={{
@@ -2557,6 +2909,42 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                       color: sig.type === "bullish" ? C.green : sig.type === "bearish" ? C.red : C.yellow,
                     }}>{sig.type === "bullish" ? "▲" : sig.type === "bearish" ? "▼" : "●"} {sig.name}</span>
                   ))}
+                </div>
+              )}
+
+              {/* 매수 추천가 3단계 */}
+              {buyLevels.levels.length > 0 && (
+                <div style={{ marginTop: "12px", padding: "14px", borderRadius: "14px", background: `${C.blueBg}60`, border: `1px solid ${C.blue}20` }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>🎯 매수 추천가</span>
+                    <span style={{ fontSize: "10px", color: C.text3 }}>{buyLevels.summary}</span>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    {buyLevels.levels.map((lv, li) => {
+                      const lvColors = [C.blue, C.purple, C.green];
+                      const lvIcons = ["1️⃣", "2️⃣", "3️⃣"];
+                      return (
+                        <div key={li} style={{
+                          flex: 1, padding: "10px 8px", borderRadius: "12px",
+                          background: `${lvColors[li]}12`, textAlign: "center",
+                          border: `1px solid ${lvColors[li]}20`,
+                        }}>
+                          <div style={{ fontSize: "11px", fontWeight: 700, color: lvColors[li], marginBottom: "4px" }}>{lvIcons[li]} {lv.label}</div>
+                          <div style={{ fontSize: "16px", fontWeight: 800, color: C.text1 }}>
+                            {asset.market === "kr" ? `₩${Math.round(lv.price).toLocaleString()}` : `$${lv.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
+                          </div>
+                          <div style={{ fontSize: "11px", fontWeight: 700, color: C.red, marginTop: "2px" }}>-{lv.discount}%</div>
+                          <div style={{ fontSize: "9px", color: C.text3, marginTop: "4px", lineHeight: 1.3 }}>{lv.rationale}</div>
+                          <div style={{ marginTop: "4px" }}>
+                            <div style={{ height: "3px", borderRadius: "2px", background: `${C.border}40`, overflow: "hidden" }}>
+                              <div style={{ height: "100%", width: `${lv.confidence}%`, background: lvColors[li], borderRadius: "2px" }} />
+                            </div>
+                            <div style={{ fontSize: "9px", color: C.text3, marginTop: "2px" }}>신뢰도 {lv.confidence}%</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
@@ -2879,6 +3267,54 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 </div>
               ))}
             </div>
+            {/* 수급 지표 (CMF/MFI) */}
+            {(enriched.cmf != null || enriched.mfi != null) && (
+              <div style={{
+                display: "flex", gap: "8px", marginTop: "8px", padding: "10px 12px",
+                background: C.bg, borderRadius: "10px", border: `1px solid ${C.border}`,
+                alignItems: "center", flexWrap: "wrap",
+              }}>
+                <span style={{ fontSize: "10px", fontWeight: 700, color: C.text3 }}>💧 수급</span>
+                {enriched.cmf != null && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "5px", flex: "1 1 110px" }}>
+                    <span style={{ fontSize: "9px", color: C.text3, width: "24px" }}>CMF</span>
+                    <div style={{ flex: 1, height: "5px", background: C.border, borderRadius: "3px", overflow: "hidden", position: "relative" }}>
+                      <div style={{ position: "absolute", left: "50%", top: 0, width: "1px", height: "100%", background: C.text3 + "44" }} />
+                      <div style={{
+                        position: "absolute", top: 0, height: "100%", borderRadius: "3px",
+                        background: enriched.cmf >= 0 ? C.green : C.red,
+                        left: enriched.cmf >= 0 ? "50%" : `${50 + (enriched.cmf * 100)}%`,
+                        width: `${Math.min(Math.abs(enriched.cmf) * 100, 50)}%`,
+                      }} />
+                    </div>
+                    <span style={{ fontSize: "10px", fontWeight: 700, color: enriched.cmf > 0.1 ? C.green : enriched.cmf < -0.1 ? C.red : C.text2, width: "38px", textAlign: "right" }}>
+                      {enriched.cmf > 0 ? "+" : ""}{enriched.cmf.toFixed(3)}
+                    </span>
+                  </div>
+                )}
+                {enriched.mfi != null && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "5px", flex: "1 1 110px" }}>
+                    <span style={{ fontSize: "9px", color: C.text3, width: "24px" }}>MFI</span>
+                    <div style={{ flex: 1, height: "5px", background: C.border, borderRadius: "3px", overflow: "hidden" }}>
+                      <div style={{
+                        height: "100%", borderRadius: "3px",
+                        width: `${enriched.mfi}%`,
+                        background: enriched.mfi < 20 ? C.purple : enriched.mfi > 80 ? C.red : enriched.mfi < 30 ? C.green : enriched.mfi > 70 ? C.yellow : C.blue,
+                      }} />
+                    </div>
+                    <span style={{ fontSize: "10px", fontWeight: 700, color: enriched.mfi < 20 ? C.purple : enriched.mfi > 80 ? C.red : C.text2, width: "24px", textAlign: "right" }}>
+                      {Math.round(enriched.mfi)}
+                    </span>
+                  </div>
+                )}
+                {enriched.macdDivType && (
+                  <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                    background: enriched.macdDivType === "bullish" ? `${C.green}22` : `${C.red}22`,
+                    color: enriched.macdDivType === "bullish" ? C.green : C.red,
+                  }}>{enriched.macdDivType === "bullish" ? "📈 MACD↑" : "📉 MACD↓"}</span>
+                )}
+              </div>
+            )}
             {/* 시가총액 + 배당 + 실적 */}
             {(techData.marketCap || techData.dividendYield || techData.earningsDate) && (
               <div style={{ display: "flex", gap: "6px", marginTop: "6px", flexWrap: "wrap" }}>
@@ -3187,23 +3623,33 @@ function AppInner() {
       if (matchedAsset) {
         const hot = hotAssets.find(h => h.symbol === matchedAsset.symbol || h.symbol === matchedAsset.symbolRaw);
         const diag = hot ? quickDiagnosis(hot) : null;
+        const buyLvls = hot ? calcBuyLevels(hot) : null;
         const pick = dailyPicks.find(p => p.symbol === matchedAsset.symbol);
         reply = `📊 **${matchedAsset.name}** 분석\n\n`;
         if (hot) {
           reply += `현재가: ${fmtPrice(hot.price, matchedAsset.market)} (${hot.change >= 0 ? "+" : ""}${hot.change}%)\n`;
         }
         if (diag) {
-          reply += `퀀트 점수: ${diag.score}/10 → ${diag.opinion}\n`;
+          reply += `퀀트 점수: ${diag.score}/100 → ${diag.opinion}\n`;
           reply += `근거: ${diag.rationale}\n`;
+          if (diag.categories) {
+            reply += `5축: ${diag.categories.map(c => `${c.name} ${c.score}`).join(" · ")}\n`;
+          }
+        }
+        if (buyLvls?.levels?.length > 0) {
+          reply += `\n🎯 매수 타점:\n`;
+          buyLvls.levels.forEach(lv => {
+            reply += `  ${lv.label}: $${lv.price.toLocaleString()} (-${lv.discount}%) — ${lv.rationale}\n`;
+          });
         }
         if (pick) {
-          reply += `오늘 추천 순위: ${dailyPicks.indexOf(pick) + 1}위 (${pick.reason})\n`;
+          reply += `\n오늘 추천 순위: ${dailyPicks.indexOf(pick) + 1}위 (${pick.reason})\n`;
         }
         const anomaly = anomalies.find(a => a.symbol === matchedAsset.symbol);
         if (anomaly) {
           reply += `⚠️ 이상 탐지: ${anomaly.anomalyReasons.join(", ")}\n`;
         }
-        reply += `\n💡 ${diag?.score >= 7 ? "긍정적 시그널이 많습니다. 분할 매수 고려해볼 만합니다." : diag?.score >= 4 ? "혼조 신호입니다. 추가 확인 후 진입을 추천합니다." : "주의 구간입니다. 리스크 관리에 유의하세요."}`;
+        reply += `\n💡 ${diag?.score >= 68 ? "긍정적 시그널이 우세합니다. 1차 매수 타점에서 분할 진입을 고려해보세요." : diag?.score >= 42 ? "혼조 신호입니다. 2~3차 매수 타점까지 기다리는 것을 추천합니다." : "하락 신호가 우세합니다. 3차 매수 타점 도달 전까지 관망을 추천합니다."}`;
       } else if (msgLow.includes("시장") || msgLow.includes("마켓") || msgLow.includes("현황")) {
         const sp = marketIndices.find(i => i.symbol === "^GSPC");
         const nq = marketIndices.find(i => i.symbol === "^IXIC");
@@ -4033,30 +4479,50 @@ function AppInner() {
 
   // 전략 매매 알림 텔레그램 포맷 (실제 전략 시그널 기반)
   function formatStrategyAlertTelegram(alerts) {
+    const now = new Date();
+    const timeStr = now.toLocaleString("ko-KR", { month: "short", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" });
     let msg = `🚨 *DI금융 퀀트 전략 매매 시그널*\n`;
-    msg += `📅 ${new Date().toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `📅 ${timeStr}\n`;
     msg += `⚙️ _실제 전략 generate() 시그널 기반_\n\n`;
+
     const grouped = {};
     for (const a of alerts) {
       if (!grouped[a.strategy]) grouped[a.strategy] = [];
       grouped[a.strategy].push(a);
     }
+
+    // 전략별 신뢰도 표시
     for (const [strategy, items] of Object.entries(grouped)) {
       const icon = items[0]?.strategyIcon || "📊";
-      msg += `*${icon} ${strategy}*\n`;
-      for (const a of items.slice(0, 4)) {
+      const buyCount = items.filter(i => i.action === "매수").length;
+      const sellCount = items.filter(i => i.action === "매도").length;
+      msg += `*${icon} ${strategy}* (매수${buyCount}/매도${sellCount})\n`;
+      msg += `┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈┈\n`;
+
+      for (const a of items.slice(0, 5)) {
         const emoji = a.action === "매수" ? "🟢" : "🔴";
         const priceStr = a.market === "kr" ? `₩${Math.round(a.price || 0).toLocaleString()}` : `$${(a.price || 0).toLocaleString(undefined, {maximumFractionDigits: 2})}`;
-        msg += `  ${emoji} ${a.flag} *${a.name}* (\`${a.symbol}\`) — *${a.action}*\n`;
-        msg += `     ${priceStr} (${Number(a.change) >= 0 ? "+" : ""}${a.change}%)\n`;
-        msg += `     📌 ${a.reason}\n`;
+        const changeEmoji = Number(a.change) >= 2 ? "🔥" : Number(a.change) >= 0 ? "▲" : Number(a.change) <= -2 ? "💧" : "▼";
+        const changeStr = `${Number(a.change) >= 0 ? "+" : ""}${a.change}%`;
+        // 신뢰도 바 (강도 기반)
+        const strength = a.strength || a.score || 5;
+        const bar = strength >= 8 ? "🟩🟩🟩" : strength >= 6 ? "🟩🟩⬜" : strength >= 4 ? "🟨🟨⬜" : "🟥⬜⬜";
+        msg += `${emoji} *${a.name}* (\`${a.symbol}\`)\n`;
+        msg += `   ${priceStr} ${changeEmoji}${changeStr} — *${a.action}* ${bar}\n`;
+        msg += `   📌 ${a.reason}\n\n`;
       }
-      if (items.length > 4) msg += `  ⋯ +${items.length - 4}건\n`;
+      if (items.length > 5) msg += `  ⋯ +${items.length - 5}건 더\n`;
       msg += `\n`;
     }
+
     const buys = alerts.filter(a => a.action === "매수").length;
     const sells = alerts.filter(a => a.action === "매도").length;
-    msg += `📊 총 ${alerts.length}건 시그널 (🟢매수 ${buys} / 🔴매도 ${sells})`;
+    msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `📊 *총 ${alerts.length}건* 시그널\n`;
+    msg += `   🟢 매수 ${buys}건 | 🔴 매도 ${sells}건\n`;
+    msg += `   비율: 매수 ${alerts.length > 0 ? (buys / alerts.length * 100).toFixed(0) : 0}% / 매도 ${alerts.length > 0 ? (sells / alerts.length * 100).toFixed(0) : 0}%\n`;
+    msg += `\n_⚠️ 본 시그널은 참고용이며 투자 결정은 본인 판단에 따르세요_`;
     return msg;
   }
 
@@ -4350,6 +4816,41 @@ function AppInner() {
               else if (vs200 < -5)  { score += 2; }
             }
 
+            // 8) 이익률 (Profit Margin) — 수익 품질 평가
+            const margin = q.profitMargin;
+            if (margin != null) {
+              if (margin > 0.25)       { score += 8; reasons.push(`이익률 ${(margin * 100).toFixed(0)}% 고수익`); }
+              else if (margin > 0.15)  { score += 5; }
+              else if (margin > 0.05)  { score += 2; }
+              else if (margin < -0.05) { score -= 6; reasons.push(`적자 (이익률 ${(margin * 100).toFixed(0)}%)`); }
+              else if (margin < 0)     { score -= 3; }
+            }
+
+            // 9) 매출 성장률 — 성장성 가산
+            const revGrowth = q.revenueGrowth;
+            if (revGrowth != null) {
+              if (revGrowth > 0.30)       { score += 8; reasons.push(`매출성장 +${(revGrowth * 100).toFixed(0)}%`); }
+              else if (revGrowth > 0.15)  { score += 5; }
+              else if (revGrowth > 0.05)  { score += 2; }
+              else if (revGrowth < -0.10) { score -= 5; reasons.push(`매출감소 ${(revGrowth * 100).toFixed(0)}%`); }
+            }
+
+            // 10) 밸류 + 모멘텀 복합 — 가격이 반등 중인 저평가주 가산
+            if (q.fiftyDayAvg && q.twoHundredDayAvg && q.price) {
+              const above50d = q.price > q.fiftyDayAvg;
+              const below200d = q.price < q.twoHundredDayAvg;
+              if (above50d && below200d && per && per < 20) {
+                score += 6; reasons.push("밸류+모멘텀 복합 (50일선↑ + 200일선↓ + 저PER)");
+              }
+            }
+
+            // 11) 애널리스트 컨센서스 신뢰도 (분석가 수 가중)
+            if (q.analystCount && q.analystCount >= 10 && upside && upside > 20) {
+              score += 4; reasons.push(`컨센서스 강력 (${q.analystCount}명 커버)`);
+            } else if (q.analystCount && q.analystCount < 3 && upside) {
+              score -= 2; // 커버리지 부족 시 목표가 신뢰도 감점
+            }
+
             score = Math.max(0, Math.min(100, score));
 
             allResults.push({
@@ -4369,6 +4870,8 @@ function AppInner() {
               marketCap: q.marketCap || null,
               low52: low52 || null,
               high52: high52 || null,
+              profitMargin: margin || null,
+              revenueGrowth: revGrowth || null,
               reasons,
             });
             done++;
@@ -4565,17 +5068,27 @@ function AppInner() {
         ::-webkit-scrollbar-thumb { background: ${C.border2}; border-radius: 3px; }
         button, a { cursor: pointer; font-family: inherit; transition: all 0.15s ease; }
         button:active { transform: scale(0.97); }
-        input, select { font-family: inherit; font-size: 14px; transition: border-color 0.2s ease; }
+        button:focus-visible { outline: 2px solid ${C.blue}; outline-offset: 2px; }
+        input, select { font-family: inherit; font-size: 14px; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
         input:focus { border-color: ${C.blue} !important; box-shadow: 0 0 0 3px ${C.blue}30; outline: none; }
         select:focus { border-color: ${C.blue} !important; box-shadow: 0 0 0 3px ${C.blue}30; outline: none; }
+        /* 부드러운 테마 전환 */
+        *, *::before, *::after { transition-property: background-color, border-color, color; transition-duration: 0.15s; transition-timing-function: ease; }
         .skeleton { background: linear-gradient(90deg, ${C.card2} 25%, ${C.border} 50%, ${C.card2} 75%);
           background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
         .tab-content { animation: slideUp 0.25s ease; }
-        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+        .card-hover { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,${C.isDark ? '0.25' : '0.08'}); }
+        .card-hover:active { transform: translateY(0); }
+        @keyframes countUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .score-animate { animation: countUp 0.4s ease-out; }
         /* ── 기본 홈 그리드 (모바일 1컬럼) ── */
         .home-grid { display: flex; flex-direction: column; gap: 20px; }
         .home-left, .home-right { display: flex; flex-direction: column; gap: 12px; }
         .home-full { display: flex; flex-direction: column; gap: 16px; }
+        /* 가로 스크롤 영역 스크롤바 숨김 */
+        .hscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; }
+        .hscroll::-webkit-scrollbar { display: none; }
         /* 사이드바 (기본 숨김) */
         .di-sidebar { display: none; }
         .di-app-body { display: flex; flex-direction: column; }
@@ -4592,15 +5105,19 @@ function AppInner() {
         @media (max-width: 640px) {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
-          main { padding-left: 16px !important; padding-right: 16px !important;
+          main { padding-left: 12px !important; padding-right: 12px !important;
             font-size: 15px !important; }
           .tab-content { font-size: 15px; }
           button { min-height: 44px; }
           select { min-height: 44px; }
-          .screener-cond-btn { padding: 10px 16px !important; font-size: 13px !important; }
+          .screener-cond-btn { padding: 10px 16px !important; font-size: 13px !important; min-height: 44px !important; }
           .home-grid { gap: 14px !important; }
-          .ui-card { padding: 16px !important; }
+          .ui-card { padding: 14px !important; }
           .ui-list-item { padding: 12px 6px; }
+          /* 모바일에서 지표 그리드 2열로 축소 */
+          .indicator-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          /* 시그널 태그 터치 영역 확대 */
+          span[title] { padding: 4px 8px !important; font-size: 11px !important; }
         }
         /* ── 태블릿 (641~899px) ── */
         @media (min-width: 641px) and (max-width: 899px) {
@@ -4660,7 +5177,7 @@ function AppInner() {
         <div className="sb-logo" onClick={() => setTab("home")}>
           <span style={{ fontSize: "22px" }}>📡</span>
           <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
-          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v8.0</span>
+          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v9.0</span>
         </div>
         <div className="sb-section">메인</div>
         <nav className="sb-nav">
@@ -4747,7 +5264,7 @@ function AppInner() {
             title="홈으로 이동">
             <span style={{ fontSize: "22px" }}>📡</span>
             <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
-            <span style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v8.0</span>
+            <span style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v9.0</span>
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
@@ -4794,7 +5311,8 @@ function AppInner() {
         {menuOpen && (
           <div style={{
             background: C.card, borderTop: `1px solid ${C.border}30`,
-            padding: "12px 16px 16px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px",
+            padding: "12px 16px calc(16px + env(safe-area-inset-bottom, 0px))", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px",
+            animation: "slideUp 0.2s ease",
           }}>
             {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "anomaly", label: "이상탐지", icon: "⚡" }, { id: "strategy", label: "퀀트 전략", icon: "🎯" }, { id: "quant-port", label: "전략 운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "sentiment", label: "센티먼트", icon: "💬" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "자동매매", icon: "🤖" }].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); setMenuOpen(false); }} style={{
@@ -4882,7 +5400,7 @@ function AppInner() {
                   </div>
 
                   {/* 하단 인덱스 카드 + 시그널 가로 스크롤 */}
-                  <div style={{ padding: "14px 16px 16px", display: "flex", gap: "8px", overflow: "auto", WebkitOverflowScrolling: "touch" }}>
+                  <div className="hscroll" style={{ padding: "14px 16px 16px", display: "flex", gap: "8px" }}>
                     {marketIndices.length === 0 && marketLoading ? (
                       [1,2,3,4].map(i => <div key={i} className="skeleton" style={{ minWidth: "110px", height: "60px", borderRadius: "12px", flexShrink: 0 }} />)
                     ) : (
@@ -5165,8 +5683,10 @@ function AppInner() {
                 }} />
               </div>
               {watchlist.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "20px 0 10px", color: C.text3, fontSize: "13px" }}>
-                  검색으로 관심종목을 추가해보세요
+                <div style={{ textAlign: "center", padding: "28px 12px 16px" }}>
+                  <div style={{ fontSize: "28px", marginBottom: "10px" }}>📌</div>
+                  <div style={{ fontSize: "14px", fontWeight: 600, color: C.text2, marginBottom: "4px" }}>관심종목이 없습니다</div>
+                  <div style={{ fontSize: "12px", color: C.text3 }}>위 검색으로 종목을 추가하면 실시간 진단과 매수 타점을 확인할 수 있어요</div>
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column" }}>
@@ -5218,47 +5738,100 @@ function AppInner() {
               )}
             </div>
 
-            {/* ── 관심종목 퀀트 전략 (quickDiagnosis 기반) ─── */}
+            {/* ── 관심종목 투자 진단 + 매수 타점 (v9 고도화) ─── */}
             {watchlist.length > 0 && hotAssets.length > 0 && (() => {
               const watchDiags = watchlist.map(w => {
                 const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
                 if (!hot) return null;
                 const d = quickDiagnosis(hot);
-                return { ...w, ...hot, diag: d };
+                const buyLvls = calcBuyLevels(hot);
+                return { ...w, ...hot, diag: d, buyLevels: buyLvls };
               }).filter(Boolean).sort((a, b) => b.diag.score - a.diag.score);
               if (!watchDiags.length) return null;
               return (
                 <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                    <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>관심종목 퀀트 전략</span>
-                    <span style={{ fontSize: mf(11), color: C.text3 }}>자동 분석</span>
+                    <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>📊 투자 진단 & 매수 타점</span>
+                    <span style={{ fontSize: mf(11), color: C.text3 }}>실시간 분석</span>
                   </div>
                   {watchDiags.map((w, i) => {
                     const d = w.diag;
+                    const bl = w.buyLevels;
                     const opColor = d.opinionColor === "green" ? C.green : d.opinionColor === "red" ? C.red : C.yellow;
                     return (
-                      <div key={w.symbol} onClick={() => setSelectedAsset(w)} style={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "12px 8px", cursor: "pointer", borderRadius: "10px",
-                        transition: "background .15s",
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = `${C.card2}80`}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            width: "32px", height: "32px", borderRadius: "50%", flexShrink: 0,
-                            background: `${opColor}18`, display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: "13px", fontWeight: 800, color: opColor,
-                          }}>{d.score}</div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, fontSize: "14px", color: C.text1 }}>{w.name}</div>
-                            <div style={{ fontSize: mf(11), color: C.text3, marginTop: "2px" }}>{d.rationale}</div>
+                      <div key={w.symbol} style={{ marginBottom: i < watchDiags.length - 1 ? "8px" : 0 }}>
+                        {/* 종목 헤더 */}
+                        <div onClick={() => setSelectedAsset(w)} style={{
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                          padding: "12px 8px", cursor: "pointer", borderRadius: "10px",
+                          transition: "background .15s",
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = `${C.card2}80`}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              width: "36px", height: "36px", borderRadius: "50%", flexShrink: 0,
+                              background: `${opColor}18`, display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: "14px", fontWeight: 800, color: opColor,
+                            }}>{d.score}</div>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <span style={{ fontWeight: 600, fontSize: "14px", color: C.text1 }}>{w.name}</span>
+                                <span style={{ fontSize: "11px", color: C.text3 }}>${w.price?.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
+                              </div>
+                              <div style={{ fontSize: mf(11), color: C.text3, marginTop: "2px" }}>{d.rationale}</div>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ fontSize: "12px", fontWeight: 700, color: w.change >= 0 ? C.green : C.red }}>
+                              {w.change >= 0 ? "+" : ""}{w.change?.toFixed(2)}%
+                            </span>
+                            <span style={{
+                              fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "8px",
+                              background: `${opColor}18`, color: opColor, whiteSpace: "nowrap",
+                            }}>{d.opinion}</span>
                           </div>
                         </div>
-                        <span style={{
-                          fontSize: "12px", fontWeight: 700, padding: "4px 12px", borderRadius: "8px",
-                          background: `${opColor}18`, color: opColor, whiteSpace: "nowrap",
-                        }}>{d.opinion}</span>
+
+                        {/* 4축 미니 바 + 매수 타점 */}
+                        <div style={{ padding: "6px 12px 10px", display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-start" }}>
+                          {/* 4축 진단 미니바 */}
+                          <div style={{ display: "flex", gap: "6px", flex: "1 1 auto", minWidth: "140px" }}>
+                            {d.categories.map(c => {
+                              const catColor = c.score >= 60 ? C.green : c.score >= 40 ? C.yellow : C.red;
+                              return (
+                                <div key={c.name} style={{ flex: 1, textAlign: "center" }}>
+                                  <div style={{ fontSize: "10px", color: C.text3, marginBottom: "3px" }}>{c.name}</div>
+                                  <div style={{ height: "4px", borderRadius: "2px", background: `${C.border}40`, overflow: "hidden" }}>
+                                    <div style={{ height: "100%", width: `${c.score}%`, background: catColor, borderRadius: "2px", transition: "width .5s" }} />
+                                  </div>
+                                  <div style={{ fontSize: "10px", fontWeight: 700, color: catColor, marginTop: "2px" }}>{c.score}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* 매수 타점 3단계 */}
+                          {bl.levels.length > 0 && (
+                            <div style={{ display: "flex", gap: "4px", flex: "0 0 auto" }}>
+                              {bl.levels.map((lv, li) => {
+                                const lvColor = li === 0 ? C.blue : li === 1 ? C.purple : C.green;
+                                return (
+                                  <div key={li} style={{
+                                    padding: "4px 8px", borderRadius: "8px",
+                                    background: `${lvColor}15`, textAlign: "center", minWidth: "58px",
+                                  }}>
+                                    <div style={{ fontSize: "9px", color: lvColor, fontWeight: 700 }}>{lv.label}</div>
+                                    <div style={{ fontSize: "12px", fontWeight: 800, color: C.text1, marginTop: "1px" }}>
+                                      ${lv.price < 1 ? lv.price.toFixed(4) : lv.price.toLocaleString(undefined, {maximumFractionDigits: 2})}
+                                    </div>
+                                    <div style={{ fontSize: "9px", color: C.red }}>-{lv.discount}%</div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
@@ -5299,7 +5872,7 @@ function AppInner() {
               const reportTime = now.toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 
               return (
-                <div onClick={() => setTab("quant-report")} style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? "#0d2818" : mktScore < 45 ? "#28100d" : "#1a1a0d"})`, borderRadius: "18px", padding: "20px", cursor: "pointer", border: `1px solid ${C.border}18` }}>
+                <div onClick={() => setTab("quant-report")} style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`, borderRadius: "18px", padding: "20px", cursor: "pointer", border: `1px solid ${C.border}18` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
                     <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>퀀트 리포트</span>
                     <span style={{ fontSize: mf(11), color: C.text3 }}>{reportTime} 기준 →</span>
@@ -6627,7 +7200,7 @@ function AppInner() {
           return (
             <div className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {/* 헤더 */}
-              <div style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? "#0d2818" : mktScore < 45 ? "#28100d" : "#1a1a0d"})`, borderRadius: "18px", padding: "22px 24px" }}>
+              <div style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`, borderRadius: "18px", padding: "22px 24px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
                   <span style={{ fontWeight: 800, fontSize: "20px", color: C.text1 }}>퀀트 리포트</span>
                   <span style={{ fontSize: mf(10), color: C.text3 }}>{reportTime} 기준</span>
@@ -6898,7 +7471,7 @@ function AppInner() {
 
               {/* 종합 의견 */}
               <div style={{
-                background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? "#0d2818" : mktScore < 45 ? "#28100d" : "#1a1a0d"})`,
+                background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`,
                 borderRadius: "16px", padding: "20px",
               }}>
                 <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "14px" }}>종합 의견</div>

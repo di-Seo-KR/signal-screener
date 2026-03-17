@@ -555,35 +555,58 @@ export const strategyWilliamsADX = {
 // 볼린저밴드 폭이 최소인 상태(스퀴즈)에서 가격 돌파 시 진입
 export const strategyBBSqueeze = {
   id: "bb_squeeze",
-  name: "BB 스퀴즈 돌파",
-  desc: "볼린저밴드 폭이 20봉 최소(스퀴즈) → 상단 돌파 시 매수. 대폭발 전조 포착.",
+  name: "TTM 스퀴즈 돌파",
+  desc: "볼린저밴드가 켈트너 채널 안으로 수축(TTM Squeeze) → 돌파 시 매수. 대폭발 전조 포착.",
   category: "변동성",
   risk: "높음",
   icon: "⚡",
-  params: { period: 20, mult: 2, squeezeLookback: 20 },
+  params: { period: 20, bbMult: 2, kcEmaPeriod: 20, kcAtrPeriod: 10, kcAtrMult: 1.5, squeezeLookback: 20 },
   generate(candles, params = {}) {
-    const { period = 20, mult = 2, squeezeLookback = 20 } = { ...this.params, ...params };
+    const { period = 20, bbMult = 2, kcEmaPeriod = 20, kcAtrPeriod = 10, kcAtrMult = 1.5, squeezeLookback = 20 } = { ...this.params, ...params };
     const closes = candles.map(c => c.close);
-    const bb = calcBB(closes, period, mult);
+    const highs = candles.map(c => c.high);
+    const lows = candles.map(c => c.low);
+    const bb = calcBB(closes, period, bbMult);
+    const kc = calcKeltner(closes, highs, lows, kcEmaPeriod, kcAtrPeriod, kcAtrMult);
+    // 모멘텀 오실레이터: 선형회귀 잔차 기반 (TTM 스퀴즈 핵심)
+    const mom = closes.map((_, i) => {
+      if (i < period) return 0;
+      const sl = closes.slice(i - period + 1, i + 1);
+      const n = sl.length;
+      const xMean = (n - 1) / 2, yMean = sl.reduce((a, b) => a + b, 0) / n;
+      let num = 0, den = 0;
+      for (let j = 0; j < n; j++) { num += (j - xMean) * (sl[j] - yMean); den += (j - xMean) ** 2; }
+      const slope = den ? num / den : 0;
+      const intercept = yMean - slope * xMean;
+      return closes[i] - (intercept + slope * (n - 1));
+    });
     const signals = [];
-    for (let i = squeezeLookback + period; i < candles.length; i++) {
-      if (!bb[i] || !bb[i - 1]) continue;
+    for (let i = Math.max(squeezeLookback + period, kcAtrPeriod + 2); i < candles.length; i++) {
+      if (!bb[i] || !bb[i - 1] || !kc[i] || !kc[i - 1]) continue;
+      // TTM Squeeze: BB가 KC 안에 있으면 스퀴즈 상태
+      const squeezeNow = bb[i].upper < kc[i].upper && bb[i].lower > kc[i].lower;
+      const squeezePrev = bb[i - 1].upper < kc[i - 1].upper && bb[i - 1].lower > kc[i - 1].lower;
+      // 폴백: 기존 BW 최소값 방식도 보조 사용
       const recentBW = [];
-      for (let j = i - squeezeLookback; j < i; j++) {
-        if (bb[j]) recentBW.push(bb[j].bw);
-      }
-      if (!recentBW.length) continue;
-      const minBW = Math.min(...recentBW);
-      const isSqueeze = bb[i - 1].bw <= minBW * 1.05;
+      for (let j = i - squeezeLookback; j < i; j++) { if (bb[j]) recentBW.push(bb[j].bw); }
+      const minBW = recentBW.length ? Math.min(...recentBW) : 0;
+      const bwSqueeze = bb[i - 1].bw <= minBW * 1.05;
+      const isSqueeze = squeezeNow || squeezePrev || bwSqueeze;
+      // 스퀴즈 해제 직후 (fired) = 가장 강력한 신호
+      const squeezeFired = squeezePrev && !squeezeNow;
       if (isSqueeze && closes[i] > bb[i].upper) {
-        // v3.1: 스퀴즈 돌파 시 거래량 급증 필수 (1.5배)
-        if (!isVolumeConfirmed(candles, i, 20, 1.5)) continue;
+        if (!isVolumeConfirmed(candles, i, 20, squeezeFired ? 1.2 : 1.5)) continue;
         const trend = getTrendDirection(closes, i);
+        const momDir = mom[i] > mom[i - 1] ? "↑" : "↓";
+        const label = squeezeFired ? "TTM 스퀴즈 해제" : "BB 스퀴즈";
         signals.push({ index: i, type: "BUY", price: closes[i],
-          reason: `BB 스퀴즈 → 상단 돌파 + 거래량${trend === "up" ? " · 상승추세" : ""}` });
+          reason: `${label} → 상단 돌파 + 거래량 · 모멘텀${momDir}${trend === "up" ? " · 상승추세" : ""}` });
       } else if (isSqueeze && closes[i] < bb[i].lower) {
-        if (!isVolumeConfirmed(candles, i, 20, 1.3)) continue;
-        signals.push({ index: i, type: "SELL", price: closes[i], reason: `BB 스퀴즈 → 하단 이탈 + 거래량` });
+        if (!isVolumeConfirmed(candles, i, 20, squeezeFired ? 1.0 : 1.3)) continue;
+        const momDir = mom[i] < mom[i - 1] ? "↓" : "↑";
+        const label = squeezeFired ? "TTM 스퀴즈 해제" : "BB 스퀴즈";
+        signals.push({ index: i, type: "SELL", price: closes[i],
+          reason: `${label} → 하단 이탈 + 거래량 · 모멘텀${momDir}` });
       }
     }
     return signals;

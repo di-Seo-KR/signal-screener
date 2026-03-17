@@ -189,7 +189,7 @@ export default function StrategyPanel({ onRunBacktest }) {
       {/* 전체 전략 목록 */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px" }}>
         <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "14px" }}>📋 전체 전략 목록 ({ALL_STRATEGIES.length}개)</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "10px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(240px, 100%), 1fr))", gap: "10px" }}>
           {ALL_STRATEGIES.map(s => {
             const catColor = CAT_COLORS[s.category] || C.blue;
             return (
@@ -198,14 +198,14 @@ export default function StrategyPanel({ onRunBacktest }) {
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
                   <span style={{ fontSize: "16px" }}>{s.icon}</span>
-                  <span style={{ fontWeight: 700, fontSize: "13px", color: C.text1 }}>{s.name}</span>
-                </div>
-                <div style={{ fontSize: "11px", color: C.text2, marginBottom: "8px", lineHeight: 1.5 }}>{s.desc}</div>
-                <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+                  <span style={{ fontWeight: 700, fontSize: "13px", color: C.text1, flex: 1 }}>{s.name}</span>
                   <span style={{
                     padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: 600,
-                    background: `${catColor}22`, color: catColor,
+                    background: `${catColor}22`, color: catColor, flexShrink: 0,
                   }}>{s.category}</span>
+                </div>
+                <div style={{ fontSize: "11px", color: C.text2, marginBottom: "8px", lineHeight: 1.5 }}>{s.desc}</div>
+                <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", alignItems: "center" }}>
                   <span style={{
                     padding: "2px 6px", borderRadius: "4px", fontSize: "10px",
                     background: C.card, color: C.text3,
