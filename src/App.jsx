@@ -1698,46 +1698,7 @@ function quickDiagnosis(asset) {
   }
   posScore = Math.max(0, Math.min(100, posScore));
 
-  // ── 종합 점수 (시장유형별 적응 가중치) ──
-  const mkt = asset.market || "us";
-  const w = mkt === "crypto" ? { t: 0.25, m: 0.30, s: 0.30, p: 0.15 }
-          : mkt === "kr"     ? { t: 0.30, m: 0.25, s: 0.30, p: 0.15 }
-          :                    { t: 0.35, m: 0.25, s: 0.20, p: 0.20 };
-  const totalScore = Math.round(trendScore * w.t + momScore * w.m + supScore * w.s + posScore * w.p);
-  let verdict;
-  if (totalScore >= 80) verdict = "적극 매수";
-  else if (totalScore >= 68) verdict = "매수";
-  else if (totalScore >= 58) verdict = "매수 우위";
-  else if (totalScore >= 42) verdict = "중립";
-  else if (totalScore >= 32) verdict = "매도 우위";
-  else if (totalScore >= 20) verdict = "매도";
-  else verdict = "적극 매도";
-
-  // ── 매수/매도/중립 투자 의견 ──
-  let opinion, opinionColor, rationale;
-  if (totalScore >= 68) {
-    opinion = "매수";
-    opinionColor = "green";
-    rationale = signals.filter(s => s.type === "bullish").slice(0, 2).map(s => s.name).join(", ") || "기술적 상승 신호 우세";
-  } else if (totalScore >= 58) {
-    opinion = "매수 관망";
-    opinionColor = "green";
-    rationale = "상승 신호 있으나 확인 필요";
-  } else if (totalScore >= 42) {
-    opinion = "중립";
-    opinionColor = "yellow";
-    rationale = "방향성 불분명 — 추가 데이터 대기";
-  } else if (totalScore >= 32) {
-    opinion = "매도 관망";
-    opinionColor = "red";
-    rationale = "하락 신호 있으나 확인 필요";
-  } else {
-    opinion = "매도";
-    opinionColor = "red";
-    rationale = signals.filter(s => s.type === "bearish").slice(0, 2).map(s => s.name).join(", ") || "기술적 하락 신호 우세";
-  }
-
-  // ── 변동성 점수 (5th axis — v9 추가) ──
+  // ── 변동성 점수 (5th axis) ──
   let volScore = 50;
   if (asset.bbWidth != null) {
     if (asset.bbWidth < 0.05) { volScore += 12; signals.push({ type: "bullish", name: "BB 스퀴즈 (돌파 임박)" }); }
@@ -1751,9 +1712,12 @@ function quickDiagnosis(asset) {
   }
   volScore = Math.max(0, Math.min(100, volScore));
 
-  // ── 종합 (5축: 추세·모멘텀·수급·위치·변동성) ──
-  const totalScore = Math.round(trendScore * w.t + momScore * w.m + supScore * w.s + posScore * w.p + volScore * 0.00);
-  // 변동성은 부가 지표 — 메인 점수에 직접 반영하지 않고 별도 표시
+  // ── 종합 점수 (5축 가중 합산 — 시장유형별 적응 가중치) ──
+  const mkt = asset.market || "us";
+  const w = mkt === "crypto" ? { t: 0.22, m: 0.28, s: 0.28, p: 0.12, v: 0.10 }
+          : mkt === "kr"     ? { t: 0.28, m: 0.22, s: 0.25, p: 0.13, v: 0.12 }
+          :                    { t: 0.30, m: 0.22, s: 0.18, p: 0.18, v: 0.12 };
+  const totalScore = Math.round(trendScore * w.t + momScore * w.m + supScore * w.s + posScore * w.p + volScore * w.v);
 
   let verdict;
   if (totalScore >= 80) verdict = "적극 매수";
@@ -1764,28 +1728,33 @@ function quickDiagnosis(asset) {
   else if (totalScore >= 20) verdict = "매도";
   else verdict = "적극 매도";
 
-  // ── 투자 의견 + 매수 추천가 통합 ──
+  // ── 투자 의견 ──
   let opinion, opinionColor, rationale;
+  const bullSigs = signals.filter(s => s.type === "bullish");
+  const bearSigs = signals.filter(s => s.type === "bearish");
   if (totalScore >= 68) {
     opinion = "매수";
     opinionColor = "green";
-    rationale = signals.filter(s => s.type === "bullish").slice(0, 2).map(s => s.name).join(", ") || "기술적 상승 신호 우세";
+    rationale = bullSigs.slice(0, 2).map(s => s.name).join(", ") || "기술적 상승 신호 우세";
   } else if (totalScore >= 58) {
     opinion = "매수 관망";
     opinionColor = "green";
-    rationale = "상승 신호 있으나 확인 필요";
+    rationale = bullSigs.length > bearSigs.length
+      ? `${bullSigs[0]?.name || "상승 신호"} 확인 중` : "상승 신호 있으나 확인 필요";
   } else if (totalScore >= 42) {
     opinion = "중립";
     opinionColor = "yellow";
-    rationale = "방향성 불분명 — 추가 데이터 대기";
+    rationale = bullSigs.length > 0 && bearSigs.length > 0
+      ? `${bullSigs[0]?.name} vs ${bearSigs[0]?.name}` : "방향성 불분명 — 추가 데이터 대기";
   } else if (totalScore >= 32) {
     opinion = "매도 관망";
     opinionColor = "red";
-    rationale = "하락 신호 있으나 확인 필요";
+    rationale = bearSigs.length > bullSigs.length
+      ? `${bearSigs[0]?.name || "하락 신호"} 주의` : "하락 신호 있으나 확인 필요";
   } else {
     opinion = "매도";
     opinionColor = "red";
-    rationale = signals.filter(s => s.type === "bearish").slice(0, 2).map(s => s.name).join(", ") || "기술적 하락 신호 우세";
+    rationale = bearSigs.slice(0, 2).map(s => s.name).join(", ") || "기술적 하락 신호 우세";
   }
 
   // 핵심 시그널 요약 (최대 3개)
