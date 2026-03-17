@@ -3180,219 +3180,422 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           )}
         </div>
 
-        {/* ═══ 펀더멘털 분석 (Financial Datasets API) ═══ */}
-        {(fundamentals || fundLoading || yahooFund) && (
+        {/* ═══ 펀더멘털 분석 (토스 증권 스타일) ═══ */}
+        {(fundamentals || fundLoading || yahooFund) && (() => {
+          const fd = fundamentals;
+          const yf = yahooFund;
+          const fmtMoney = (v) => v == null ? "—" : Math.abs(v) >= 1e9 ? `$${(v / 1e9).toFixed(1)}B` : Math.abs(v) >= 1e6 ? `$${(v / 1e6).toFixed(0)}M` : `$${v.toLocaleString()}`;
+          const fmtGrowth = (v) => v == null ? null : `${v > 0 ? "+" : ""}${v}%`;
+          const growthColor = (v) => v == null ? C.text3 : v > 0 ? C.green : v < 0 ? C.red : C.text3;
+          // 통합 데이터소스 (Financial Datasets 우선, Yahoo 폴백)
+          const per = fd?.peRatio || yf?.peRatio || techData?.forwardPE || techData?.trailingPE;
+          const pbr = fd?.pbRatio || yf?.pbRatio || techData?.priceToBook;
+          const psr = fd?.psRatio;
+          const evEbitda = fd?.evToEbitda;
+          const mcap = fd?.marketCap || yf?.marketCap || techData?.marketCap;
+          const divYield = yf?.dividendYield || techData?.dividendYield;
+          const beta = yf?.beta || techData?.beta;
+          const eps = fd?.eps || yf?.eps || techData?.forwardEps || techData?.trailingEps;
+          const roe = fd?.roe;
+          const roa = fd?.roa;
+          const dte = fd?.debtToEquity;
+          const cr = fd?.currentRatio;
+
+          return (
           <div style={{ padding: "0 20px 12px" }}>
-            <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-                <span style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>📑 펀더멘털 분석</span>
-                <span style={{ fontSize: "10px", color: C.text3 }}>
-                  {fundamentals?.fiscal_date ? `${fundamentals.fiscal_date} 기준` : yahooFund ? "Yahoo Finance" : ""}
-                </span>
+            {/* ── 섹션 헤더 ── */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
+              <span style={{ fontSize: "15px", fontWeight: 800, color: C.text1 }}>기업 정보</span>
+              <span style={{ fontSize: "10px", color: C.text3, background: C.card2, padding: "2px 8px", borderRadius: "4px" }}>
+                {fd?.fiscal_date || (fd ? "Financial Datasets" : "Yahoo Finance")}
+              </span>
+            </div>
+
+            {fundLoading && !fd ? (
+              <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+                {[1,2,3].map(i => <div key={i} className="skeleton" style={{ flex: 1, height: "70px", borderRadius: "12px" }} />)}
               </div>
-              {fundLoading && !fundamentals ? (
-                <div style={{ display: "flex", gap: "8px" }}>
-                  {[1,2,3].map(i => <div key={i} className="skeleton" style={{ flex: 1, height: "60px", borderRadius: "10px" }} />)}
-                </div>
-              ) : fundamentals ? (
-                <>
-                  {/* 손익 요약 */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px", marginBottom: "10px" }}>
-                    {[
-                      { label: "매출", value: fundamentals.revenue, fmt: "money" },
-                      { label: "영업이익", value: fundamentals.operatingIncome, fmt: "money" },
-                      { label: "순이익", value: fundamentals.netIncome, fmt: "money" },
-                    ].map(item => (
-                      <div key={item.label} style={{ background: C.card, borderRadius: "10px", padding: "10px 8px", textAlign: "center" }}>
-                        <div style={{ fontSize: "10px", color: C.text3, marginBottom: "3px" }}>{item.label}</div>
-                        <div style={{ fontSize: "13px", fontWeight: 700, color: item.value > 0 ? C.text1 : item.value < 0 ? C.red : C.text3 }}>
-                          {item.value != null
-                            ? (Math.abs(item.value) >= 1e9 ? `$${(item.value / 1e9).toFixed(1)}B`
-                              : Math.abs(item.value) >= 1e6 ? `$${(item.value / 1e6).toFixed(0)}M`
-                              : `$${item.value.toLocaleString()}`)
-                            : "—"}
-                        </div>
+            ) : (
+            <>
+            {/* ── 1. 실적 요약 (Financial Datasets만) ── */}
+            {fd && fd.revenue != null && (
+              <div style={{ background: C.card, borderRadius: "14px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>실적 요약</div>
+                {/* 매출/영업이익/순이익 */}
+                <div style={{ display: "flex", gap: "0", marginBottom: "12px" }}>
+                  {[
+                    { label: "매출", value: fd.revenue, growth: fd.revGrowthYoY },
+                    { label: "영업이익", value: fd.operatingIncome, growth: null },
+                    { label: "순이익", value: fd.netIncome, growth: fd.niGrowthYoY },
+                  ].map((item, idx) => (
+                    <div key={item.label} style={{
+                      flex: 1, textAlign: "center", position: "relative",
+                      ...(idx < 2 ? { borderRight: `1px solid ${C.border}` } : {}),
+                    }}>
+                      <div style={{ fontSize: "10px", color: C.text3, marginBottom: "4px" }}>{item.label}</div>
+                      <div style={{ fontSize: "15px", fontWeight: 800, color: item.value > 0 ? C.text1 : item.value < 0 ? C.red : C.text3 }}>
+                        {fmtMoney(item.value)}
                       </div>
-                    ))}
-                  </div>
-
-                  {/* 마진 + 성장률 */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px", marginBottom: "10px" }}>
-                    {[
-                      { label: "매출총이익률", value: fundamentals.grossMargin, suffix: "%" },
-                      { label: "영업이익률", value: fundamentals.operatingMargin, suffix: "%" },
-                      { label: "순이익률", value: fundamentals.netMargin, suffix: "%" },
-                    ].map(item => (
-                      <div key={item.label} style={{ background: C.card, borderRadius: "10px", padding: "10px 8px", textAlign: "center" }}>
-                        <div style={{ fontSize: "10px", color: C.text3, marginBottom: "3px" }}>{item.label}</div>
-                        <div style={{ fontSize: "13px", fontWeight: 700, color: item.value > 0 ? C.green : item.value < 0 ? C.red : C.text3 }}>
-                          {item.value != null ? `${item.value}${item.suffix}` : "—"}
+                      {item.growth != null && (
+                        <div style={{ fontSize: "10px", fontWeight: 700, color: growthColor(item.growth), marginTop: "2px" }}>
+                          YoY {fmtGrowth(item.growth)}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* 성장률 */}
-                  {(fundamentals.revGrowthYoY != null || fundamentals.niGrowthYoY != null) && (
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px", marginBottom: "10px" }}>
-                      {[
-                        { label: "매출 YoY", value: fundamentals.revGrowthYoY },
-                        { label: "순이익 YoY", value: fundamentals.niGrowthYoY },
-                        { label: "매출 QoQ", value: fundamentals.revGrowthQoQ },
-                      ].map(item => (
-                        <div key={item.label} style={{ background: C.card, borderRadius: "10px", padding: "10px 8px", textAlign: "center" }}>
-                          <div style={{ fontSize: "10px", color: C.text3, marginBottom: "3px" }}>{item.label}</div>
-                          <div style={{ fontSize: "13px", fontWeight: 700, color: item.value > 0 ? C.green : item.value < 0 ? C.red : C.text3 }}>
-                            {item.value != null ? `${item.value > 0 ? "+" : ""}${item.value}%` : "—"}
-                          </div>
-                        </div>
-                      ))}
+                      )}
                     </div>
-                  )}
+                  ))}
+                </div>
 
-                  {/* 밸류에이션 지표 */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px", marginBottom: "10px" }}>
+                {/* 마진율 바 */}
+                {(fd.grossMargin != null || fd.operatingMargin != null || fd.netMargin != null) && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                     {[
-                      { label: "PER", value: fundamentals.peRatio },
-                      { label: "PBR", value: fundamentals.pbRatio },
-                      { label: "PSR", value: fundamentals.psRatio },
-                      { label: "EV/EBITDA", value: fundamentals.evToEbitda },
-                    ].map(item => (
-                      <div key={item.label} style={{ background: C.card, borderRadius: "10px", padding: "8px 6px", textAlign: "center" }}>
-                        <div style={{ fontSize: "9px", color: C.text3, marginBottom: "2px" }}>{item.label}</div>
-                        <div style={{ fontSize: "12px", fontWeight: 700, color: C.text1 }}>
-                          {item.value != null ? (typeof item.value === "number" ? item.value.toFixed(1) : item.value) : "—"}
+                      { label: "매출총이익률", value: fd.grossMargin, color: C.blue },
+                      { label: "영업이익률", value: fd.operatingMargin, color: C.green },
+                      { label: "순이익률", value: fd.netMargin, color: fd.netMargin >= 0 ? C.purple : C.red },
+                    ].filter(m => m.value != null).map(m => (
+                      <div key={m.label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "10px", color: C.text3, width: "64px", flexShrink: 0 }}>{m.label}</span>
+                        <div style={{ flex: 1, height: "6px", background: `${C.border}60`, borderRadius: "3px", overflow: "hidden" }}>
+                          <div style={{
+                            height: "100%", borderRadius: "3px", transition: "width 0.5s ease",
+                            width: `${Math.min(Math.max(m.value, 0), 100)}%`, background: m.color,
+                          }} />
                         </div>
+                        <span style={{ fontSize: "11px", fontWeight: 700, color: m.value >= 0 ? C.text1 : C.red, width: "36px", textAlign: "right" }}>
+                          {m.value}%
+                        </span>
                       </div>
                     ))}
                   </div>
+                )}
 
-                  {/* 수익성 + 재무건전성 */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px", marginBottom: "6px" }}>
+                {/* 성장률 */}
+                {(fd.revGrowthQoQ != null || fd.revGrowthYoY != null) && (
+                  <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
                     {[
-                      { label: "ROE", value: fundamentals.roe, suffix: "%", scale: 100 },
-                      { label: "ROA", value: fundamentals.roa, suffix: "%", scale: 100 },
-                      { label: "부채비율", value: fundamentals.debtToEquity, suffix: "" },
-                      { label: "유동비율", value: fundamentals.currentRatio, suffix: "" },
-                    ].map(item => (
-                      <div key={item.label} style={{ background: C.card, borderRadius: "10px", padding: "8px 6px", textAlign: "center" }}>
-                        <div style={{ fontSize: "9px", color: C.text3, marginBottom: "2px" }}>{item.label}</div>
-                        <div style={{ fontSize: "12px", fontWeight: 700, color: C.text1 }}>
-                          {item.value != null
-                            ? `${(item.scale ? item.value * item.scale : item.value).toFixed(1)}${item.suffix}`
-                            : "—"}
-                        </div>
+                      { label: "매출 QoQ", value: fd.revGrowthQoQ },
+                      { label: "매출 YoY", value: fd.revGrowthYoY },
+                      { label: "순이익 YoY", value: fd.niGrowthYoY },
+                    ].filter(g => g.value != null).map(g => (
+                      <div key={g.label} style={{
+                        flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "8px",
+                        background: g.value > 0 ? `${C.green}10` : g.value < 0 ? `${C.red}10` : C.card2,
+                      }}>
+                        <div style={{ fontSize: "9px", color: C.text3 }}>{g.label}</div>
+                        <div style={{ fontSize: "13px", fontWeight: 800, color: growthColor(g.value) }}>{fmtGrowth(g.value)}</div>
                       </div>
                     ))}
                   </div>
+                )}
 
-                  {/* 분기별 매출 미니 차트 */}
-                  {fundamentals.quarterlyRevenue?.length >= 2 && (() => {
-                    const qr = fundamentals.quarterlyRevenue.filter(q => q.revenue);
-                    if (qr.length < 2) return null;
-                    const maxRev = Math.max(...qr.map(q => Math.abs(q.revenue)));
-                    return (
-                      <div style={{ marginTop: "8px" }}>
-                        <div style={{ fontSize: "10px", color: C.text3, marginBottom: "6px" }}>분기별 매출 추이</div>
-                        <div style={{ display: "flex", gap: "4px", alignItems: "flex-end", height: "48px" }}>
-                          {qr.map((q, i) => {
-                            const pct = maxRev > 0 ? Math.abs(q.revenue) / maxRev : 0;
-                            const prevQ = qr[i - 1];
-                            const growth = prevQ?.revenue ? (q.revenue - prevQ.revenue) / Math.abs(prevQ.revenue) : 0;
-                            return (
-                              <div key={q.period} style={{ flex: 1, textAlign: "center" }}>
+                {/* 분기별 매출 추이 바 차트 */}
+                {fd.quarterlyRevenue?.length >= 2 && (() => {
+                  const qr = fd.quarterlyRevenue.filter(q => q.revenue);
+                  if (qr.length < 2) return null;
+                  const maxRev = Math.max(...qr.map(q => Math.abs(q.revenue)));
+                  const maxNI = Math.max(...qr.filter(q => q.netIncome).map(q => Math.abs(q.netIncome)), 1);
+                  return (
+                    <div style={{ marginTop: "12px" }}>
+                      <div style={{ fontSize: "10px", color: C.text3, marginBottom: "8px" }}>분기별 추이</div>
+                      <div style={{ display: "flex", gap: "6px", alignItems: "flex-end", height: "60px" }}>
+                        {qr.map((q, i) => {
+                          const revPct = maxRev > 0 ? Math.abs(q.revenue) / maxRev : 0;
+                          const niPct = q.netIncome && maxNI > 0 ? Math.abs(q.netIncome) / maxRev : 0;
+                          const prevQ = qr[i - 1];
+                          const growth = prevQ?.revenue ? (q.revenue - prevQ.revenue) / Math.abs(prevQ.revenue) * 100 : 0;
+                          return (
+                            <div key={q.period || i} style={{ flex: 1, textAlign: "center" }}>
+                              <div style={{ display: "flex", gap: "2px", justifyContent: "center", alignItems: "flex-end", height: "42px" }}>
                                 <div style={{
-                                  height: `${Math.max(pct * 36, 4)}px`, borderRadius: "4px 4px 0 0",
-                                  background: growth >= 0 ? `${C.green}60` : `${C.red}60`,
-                                  transition: "height 0.3s",
+                                  width: "45%", height: `${Math.max(revPct * 42, 3)}px`, borderRadius: "3px 3px 0 0",
+                                  background: `${C.blue}80`, transition: "height 0.4s ease",
                                 }} />
-                                <div style={{ fontSize: "8px", color: C.text3, marginTop: "3px" }}>
-                                  {(q.period || "").slice(5, 7)}Q
-                                </div>
+                                {q.netIncome != null && (
+                                  <div style={{
+                                    width: "45%", height: `${Math.max(niPct * 42, 2)}px`, borderRadius: "3px 3px 0 0",
+                                    background: q.netIncome >= 0 ? `${C.green}80` : `${C.red}60`, transition: "height 0.4s ease",
+                                  }} />
+                                )}
                               </div>
-                            );
-                          })}
+                              <div style={{ fontSize: "9px", color: C.text3, marginTop: "4px", lineHeight: 1.2 }}>
+                                {(q.period || "").slice(2, 4)}/{(q.period || "").slice(5, 7)}
+                              </div>
+                              <div style={{ fontSize: "8px", fontWeight: 700, color: growthColor(growth), marginTop: "1px" }}>
+                                {i > 0 ? `${growth > 0 ? "+" : ""}${growth.toFixed(0)}%` : ""}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ display: "flex", gap: "12px", justifyContent: "center", marginTop: "6px" }}>
+                        <span style={{ fontSize: "9px", color: C.text3 }}><span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "2px", background: `${C.blue}80`, marginRight: "3px", verticalAlign: "middle" }} />매출</span>
+                        <span style={{ fontSize: "9px", color: C.text3 }}><span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "2px", background: `${C.green}80`, marginRight: "3px", verticalAlign: "middle" }} />순이익</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* ── 2. 밸류에이션 ── */}
+            {(per != null || pbr != null || psr != null || evEbitda != null) && (
+              <div style={{ background: C.card, borderRadius: "14px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>밸류에이션</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0" }}>
+                  {[
+                    { label: "PER", value: per, desc: per ? (per < 15 ? "저평가" : per < 25 ? "적정" : per < 40 ? "고평가" : "매우 고평가") : null,
+                      color: per ? (per < 15 ? C.green : per < 25 ? C.text1 : per < 40 ? C.yellow : C.red) : C.text3 },
+                    { label: "PBR", value: pbr, desc: pbr ? (pbr < 1 ? "저평가" : pbr < 3 ? "적정" : "고평가") : null,
+                      color: pbr ? (pbr < 1 ? C.green : pbr < 3 ? C.text1 : C.yellow) : C.text3 },
+                    { label: "PSR", value: psr, desc: null, color: C.text1 },
+                    { label: "EV/EBITDA", value: evEbitda, desc: null, color: C.text1 },
+                  ].filter(v => v.value != null).map((item, idx) => (
+                    <div key={item.label} style={{
+                      padding: "10px 12px",
+                      borderBottom: idx < 2 ? `1px solid ${C.border}40` : "none",
+                      borderRight: idx % 2 === 0 ? `1px solid ${C.border}40` : "none",
+                    }}>
+                      <div style={{ fontSize: "10px", color: C.text3, marginBottom: "2px" }}>{item.label}</div>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
+                        <span style={{ fontSize: "16px", fontWeight: 800, color: item.color }}>
+                          {typeof item.value === "number" ? item.value.toFixed(1) : item.value}
+                        </span>
+                        {item.desc && <span style={{ fontSize: "9px", fontWeight: 600, color: item.color, opacity: 0.8 }}>{item.desc}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {/* 추가 지표 한 줄 */}
+                <div style={{ display: "flex", gap: "0", marginTop: "8px", borderTop: `1px solid ${C.border}40`, paddingTop: "8px" }}>
+                  {[
+                    { label: "EPS", value: eps, fmt: v => `$${v.toFixed(2)}` },
+                    { label: "시총", value: mcap, fmt: v => v >= 1e12 ? `$${(v/1e12).toFixed(1)}T` : v >= 1e9 ? `$${(v/1e9).toFixed(0)}B` : `$${(v/1e6).toFixed(0)}M` },
+                    { label: "배당률", value: divYield, fmt: v => `${(v * 100).toFixed(2)}%` },
+                    { label: "베타", value: beta, fmt: v => v.toFixed(2) },
+                  ].filter(v => v.value != null).map(item => (
+                    <div key={item.label} style={{ flex: 1, textAlign: "center" }}>
+                      <div style={{ fontSize: "9px", color: C.text3 }}>{item.label}</div>
+                      <div style={{ fontSize: "11px", fontWeight: 700, color: C.text1 }}>{item.fmt(item.value)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── 3. 수익성 & 재무 건전성 ── */}
+            {(roe != null || roa != null || dte != null || cr != null) && (
+              <div style={{ background: C.card, borderRadius: "14px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>수익성 & 재무건전성</div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  {[
+                    { label: "ROE", value: roe, scale: 100, suffix: "%", good: v => v > 15, bad: v => v < 0, barMax: 40, barColor: C.green },
+                    { label: "ROA", value: roa, scale: 100, suffix: "%", good: v => v > 8, bad: v => v < 0, barMax: 25, barColor: C.blue },
+                    { label: "부채비율", value: dte, scale: 1, suffix: "", good: v => v < 1, bad: v => v > 3, barMax: 5, barColor: C.orange, invert: true },
+                    { label: "유동비율", value: cr, scale: 1, suffix: "", good: v => v > 1.5, bad: v => v < 1, barMax: 4, barColor: C.purple },
+                  ].filter(m => m.value != null).map(m => {
+                    const displayVal = m.scale !== 1 ? m.value * m.scale : m.value;
+                    const barPct = Math.min(Math.abs(displayVal) / m.barMax * 100, 100);
+                    const color = m.invert
+                      ? (m.bad(displayVal) ? C.red : m.good(displayVal) ? C.green : m.barColor)
+                      : (m.good(displayVal) ? C.green : m.bad(displayVal) ? C.red : m.barColor);
+                    return (
+                      <div key={m.label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "11px", color: C.text3, width: "52px", flexShrink: 0 }}>{m.label}</span>
+                        <div style={{ flex: 1, height: "8px", background: `${C.border}40`, borderRadius: "4px", overflow: "hidden" }}>
+                          <div style={{ height: "100%", borderRadius: "4px", width: `${barPct}%`, background: color, transition: "width 0.5s ease" }} />
                         </div>
+                        <span style={{ fontSize: "12px", fontWeight: 800, color, width: "48px", textAlign: "right" }}>
+                          {displayVal.toFixed(1)}{m.suffix}
+                        </span>
                       </div>
                     );
-                  })()}
+                  })}
+                </div>
+              </div>
+            )}
 
-                  {/* 애널리스트 컨센서스 */}
-                  {fundamentals.numAnalysts > 0 && (
-                    <div style={{
-                      marginTop: "10px", padding: "10px 12px", borderRadius: "10px",
-                      background: `${C.blueBg}60`, border: `1px solid ${C.blue}15`,
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
+            {/* ── 4. 애널리스트 컨센서스 (목표주가 시각화) ── */}
+            {(techData?.analystTarget || fd?.numAnalysts > 0) && (() => {
+              const curP = techData?.price || enriched.price;
+              const tgt = techData?.analystTarget;
+              const tgtHigh = techData?.analystHigh;
+              const tgtLow = techData?.analystLow;
+              const cnt = techData?.analystCount || fd?.numAnalysts || 0;
+              const rec = techData?.recommendation;
+              const recScore = techData?.recommendationScore;
+              const upside = tgt && curP ? +((tgt - curP) / curP * 100).toFixed(1) : null;
+
+              // 가격 범위 바 계산
+              const minP = tgtLow || (curP * 0.7);
+              const maxP = tgtHigh || (tgt ? tgt * 1.2 : curP * 1.3);
+              const rangeP = maxP - minP || 1;
+              const curPct = ((curP - minP) / rangeP) * 100;
+              const tgtPct = tgt ? ((tgt - minP) / rangeP) * 100 : null;
+
+              const recLabels = { buy: "매수", strongBuy: "적극 매수", strong_buy: "적극 매수", hold: "보유", sell: "매도", underperform: "비중축소", overweight: "비중확대" };
+              const recColors = { buy: C.green, strongBuy: C.green, strong_buy: C.green, hold: C.yellow, sell: C.red, underperform: C.red, overweight: C.green };
+
+              return (
+              <div style={{ background: C.card, borderRadius: "14px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                  <span style={{ fontSize: "12px", fontWeight: 700, color: C.text3 }}>애널리스트 컨센서스</span>
+                  {cnt > 0 && <span style={{ fontSize: "10px", color: C.text3, background: C.card2, padding: "2px 6px", borderRadius: "4px" }}>{cnt}명</span>}
+                </div>
+
+                {/* 투자의견 배지 */}
+                {rec && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                    <span style={{
+                      fontSize: "13px", fontWeight: 800, padding: "4px 12px", borderRadius: "8px",
+                      background: `${recColors[rec] || C.yellow}18`, color: recColors[rec] || C.yellow,
                     }}>
-                      <div>
-                        <div style={{ fontSize: "10px", color: C.text3 }}>애널리스트 컨센서스 ({fundamentals.numAnalysts}명)</div>
-                        <div style={{ display: "flex", gap: "12px", marginTop: "3px" }}>
-                          {fundamentals.estRevenue && (
-                            <span style={{ fontSize: "11px", color: C.text2 }}>
-                              예상매출 <span style={{ fontWeight: 700, color: C.text1 }}>
-                                ${fundamentals.estRevenue >= 1e9 ? `${(fundamentals.estRevenue / 1e9).toFixed(1)}B` : `${(fundamentals.estRevenue / 1e6).toFixed(0)}M`}
-                              </span>
-                            </span>
-                          )}
-                          {fundamentals.estEps && (
-                            <span style={{ fontSize: "11px", color: C.text2 }}>
-                              예상EPS <span style={{ fontWeight: 700, color: C.text1 }}>${fundamentals.estEps.toFixed(2)}</span>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  <div style={{ fontSize: "9px", color: C.text3, marginTop: "8px", textAlign: "right", opacity: 0.6 }}>
-                    via {fundamentals.source}
+                      {recLabels[rec] || rec}
+                    </span>
+                    {recScore && (
+                      <span style={{ fontSize: "10px", color: C.text3 }}>
+                        점수 {recScore.toFixed(1)}/5
+                      </span>
+                    )}
                   </div>
-                </>
-              ) : yahooFund ? (
-                <>
-                  {/* Yahoo Finance 밸류에이션 fallback */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginBottom: "10px" }}>
+                )}
+
+                {/* 목표주가 요약 */}
+                {tgt && (
+                  <div style={{ display: "flex", gap: "0", marginBottom: "12px" }}>
                     {[
-                      { label: "PER", value: yahooFund.peRatio },
-                      { label: "PBR", value: yahooFund.pbRatio },
-                      { label: "EPS", value: yahooFund.eps },
-                    ].filter(i => i.value != null).map(item => (
-                      <div key={item.label} style={{ background: C.card, borderRadius: "10px", padding: "10px 8px", textAlign: "center" }}>
-                        <div style={{ fontSize: "10px", color: C.text3, marginBottom: "3px" }}>{item.label}</div>
-                        <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>
-                          {typeof item.value === "number" ? item.value.toFixed(2) : item.value}
+                      { label: "목표가", value: tgt, main: true },
+                      { label: "최고", value: tgtHigh },
+                      { label: "최저", value: tgtLow },
+                    ].filter(v => v.value).map((item, idx) => (
+                      <div key={item.label} style={{
+                        flex: 1, textAlign: "center",
+                        ...(idx < 2 ? { borderRight: `1px solid ${C.border}40` } : {}),
+                      }}>
+                        <div style={{ fontSize: "9px", color: C.text3 }}>{item.label}</div>
+                        <div style={{ fontSize: item.main ? "17px" : "13px", fontWeight: 800, color: item.main ? (upside > 0 ? C.green : C.red) : C.text2 }}>
+                          ${item.value.toFixed(2)}
                         </div>
+                        {item.main && upside != null && (
+                          <div style={{ fontSize: "11px", fontWeight: 700, color: upside > 0 ? C.green : C.red, marginTop: "1px" }}>
+                            {upside > 0 ? "▲" : "▼"} {Math.abs(upside)}%
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px", marginBottom: "6px" }}>
-                    {[
-                      { label: "시가총액", value: yahooFund.marketCap, fmt: "cap" },
-                      { label: "배당률", value: yahooFund.dividendYield, fmt: "pct" },
-                      { label: "베타", value: yahooFund.beta, fmt: "num" },
-                    ].filter(i => i.value != null).map(item => (
-                      <div key={item.label} style={{ background: C.card, borderRadius: "10px", padding: "10px 8px", textAlign: "center" }}>
-                        <div style={{ fontSize: "10px", color: C.text3, marginBottom: "3px" }}>{item.label}</div>
-                        <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>
-                          {item.fmt === "cap" ? (item.value >= 1e12 ? `$${(item.value/1e12).toFixed(1)}T` : item.value >= 1e9 ? `$${(item.value/1e9).toFixed(0)}B` : `$${(item.value/1e6).toFixed(0)}M`)
-                           : item.fmt === "pct" ? `${(item.value * 100).toFixed(2)}%`
-                           : typeof item.value === "number" ? item.value.toFixed(2) : item.value}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {yahooFund.earningsDate && (
-                    <div style={{ fontSize: "10px", color: C.text3, marginTop: "6px" }}>
-                      다음 실적 발표: <span style={{ color: C.yellow, fontWeight: 600 }}>{new Date(yahooFund.earningsDate * 1000).toLocaleDateString("ko-KR")}</span>
+                )}
+
+                {/* 가격 범위 바 (현재가 vs 목표가 시각화) */}
+                {tgt && curP && (
+                  <div style={{ position: "relative", height: "36px", marginBottom: "4px" }}>
+                    {/* 바 배경 */}
+                    <div style={{ position: "absolute", top: "14px", left: 0, right: 0, height: "8px", background: `${C.border}50`, borderRadius: "4px" }}>
+                      {/* 목표 범위 (Low~High) */}
+                      {tgtLow && tgtHigh && (
+                        <div style={{
+                          position: "absolute", top: 0, height: "100%", borderRadius: "4px",
+                          left: `${Math.max(((tgtLow - minP) / rangeP) * 100, 0)}%`,
+                          width: `${Math.min(((tgtHigh - tgtLow) / rangeP) * 100, 100)}%`,
+                          background: `${C.blue}25`,
+                        }} />
+                      )}
                     </div>
-                  )}
-                  <div style={{ fontSize: "9px", color: C.text3, marginTop: "6px", textAlign: "right", opacity: 0.6 }}>
-                    via Yahoo Finance (상세 데이터는 Financial Datasets API 키 설정 필요)
+                    {/* 현재가 마커 */}
+                    <div style={{
+                      position: "absolute", top: "6px", left: `${Math.min(Math.max(curPct, 2), 98)}%`, transform: "translateX(-50%)",
+                      display: "flex", flexDirection: "column", alignItems: "center",
+                    }}>
+                      <div style={{ fontSize: "8px", fontWeight: 700, color: C.text2, whiteSpace: "nowrap" }}>현재</div>
+                      <div style={{ width: "3px", height: "16px", background: C.text1, borderRadius: "2px" }} />
+                    </div>
+                    {/* 목표가 마커 */}
+                    {tgtPct != null && (
+                      <div style={{
+                        position: "absolute", top: "6px", left: `${Math.min(Math.max(tgtPct, 2), 98)}%`, transform: "translateX(-50%)",
+                        display: "flex", flexDirection: "column", alignItems: "center",
+                      }}>
+                        <div style={{ fontSize: "8px", fontWeight: 700, color: C.blue, whiteSpace: "nowrap" }}>목표</div>
+                        <div style={{ width: "3px", height: "16px", background: C.blue, borderRadius: "2px" }} />
+                      </div>
+                    )}
                   </div>
-                </>
-              ) : null}
+                )}
+
+                {/* Financial Datasets 추가 정보 */}
+                {fd?.estRevenue && (
+                  <div style={{ display: "flex", gap: "12px", paddingTop: "8px", borderTop: `1px solid ${C.border}40` }}>
+                    {fd.estRevenue && <span style={{ fontSize: "10px", color: C.text3 }}>예상매출 <span style={{ fontWeight: 700, color: C.text1 }}>{fmtMoney(fd.estRevenue)}</span></span>}
+                    {fd.estEps && <span style={{ fontSize: "10px", color: C.text3 }}>예상EPS <span style={{ fontWeight: 700, color: C.text1 }}>${fd.estEps.toFixed(2)}</span></span>}
+                  </div>
+                )}
+              </div>
+              );
+            })()}
+
+            {/* ── 5. 적정주가 ── */}
+            {techData?.fairValue != null && (() => {
+              const fv = techData.fairValue;
+              const fp = techData.fairPremium;
+              const curP = techData.price;
+              const models = techData.models || [];
+              return (
+              <div style={{ background: C.card, borderRadius: "14px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: "12px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>적정주가 분석</div>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px" }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: "10px", color: C.text3 }}>종합 적정주가</div>
+                    <div style={{ fontSize: "20px", fontWeight: 800, color: C.text1 }}>${fv.toFixed(2)}</div>
+                  </div>
+                  <div style={{
+                    padding: "6px 14px", borderRadius: "10px", textAlign: "center",
+                    background: fp > 10 ? `${C.red}15` : fp > 5 ? `${C.yellow}15` : fp < -10 ? `${C.green}15` : fp < -5 ? `${C.green}10` : `${C.text3}10`,
+                  }}>
+                    <div style={{ fontSize: "10px", color: C.text3 }}>현재가 괴리</div>
+                    <div style={{
+                      fontSize: "16px", fontWeight: 800,
+                      color: fp > 5 ? C.red : fp < -5 ? C.green : C.yellow,
+                    }}>{fp > 0 ? "+" : ""}{fp}%</div>
+                    <div style={{
+                      fontSize: "9px", fontWeight: 700,
+                      color: fp > 5 ? C.red : fp < -5 ? C.green : C.yellow,
+                    }}>
+                      {fp > 15 ? "매우 고평가" : fp > 10 ? "고평가" : fp > 5 ? "약간 고평가" : fp < -15 ? "매우 저평가" : fp < -10 ? "저평가" : fp < -5 ? "약간 저평가" : "적정 범위"}
+                    </div>
+                  </div>
+                </div>
+                {/* 모델별 상세 */}
+                {models.length > 0 && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    {models.map(m => {
+                      const diff = curP ? ((curP - m.value) / m.value * 100) : 0;
+                      return (
+                        <div key={m.name} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "10px" }}>
+                          <span style={{ width: "14px" }}>{m.icon}</span>
+                          <span style={{ color: C.text3, flex: 1 }}>{m.name}</span>
+                          <span style={{ fontWeight: 700, color: C.text1 }}>${m.value.toFixed(2)}</span>
+                          <span style={{
+                            fontWeight: 700, width: "42px", textAlign: "right",
+                            color: diff > 5 ? C.red : diff < -5 ? C.green : C.text3,
+                          }}>{diff > 0 ? "+" : ""}{diff.toFixed(0)}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              );
+            })()}
+
+            {/* 데이터 출처 */}
+            <div style={{ fontSize: "9px", color: C.text3, textAlign: "right", opacity: 0.5, marginTop: "2px" }}>
+              via {fd ? "Financial Datasets API" : "Yahoo Finance"}
+              {techData?.earningsDate && ` · 다음 실적 ${new Date(techData.earningsDate * 1000).toLocaleDateString("ko-KR")}`}
             </div>
+            </>
+            )}
           </div>
-        )}
+          );
+        })()}
 
         {/* ═══ 투자 전략 (Advanced Investment Strategy) ═══ */}
         {techData && !loading && (() => {
@@ -3557,229 +3760,81 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           );
         })()}
 
-        {/* ═══ 적정주가 (Multi-Model Fair Value) ═══ */}
-        {techData?.fairValue != null && (
-          <div style={{ padding: "0 20px 12px" }}>
-            <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
-              {/* 종합 적정주가 헤더 */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-                <div>
-                  <div style={{ fontSize: "10px", color: C.text3, marginBottom: "4px", display: "flex", alignItems: "center", gap: "4px" }}>
-                    📊 종합 적정주가 <span style={{ fontSize: "8px", padding: "1px 5px", borderRadius: "3px", background: C.card2 }}>{techData.models?.length || 0}개 모델</span>
-                  </div>
-                  <div style={{ fontSize: "22px", fontWeight: 800, color: C.text1 }}>
-                    {asset.market === "kr" ? `₩${Math.round(techData.fairValue).toLocaleString()}` : `$${techData.fairValue.toFixed(2)}`}
-                  </div>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{
-                    fontSize: "18px", fontWeight: 800,
-                    color: techData.fairPremium > 5 ? C.red : techData.fairPremium < -5 ? C.green : C.yellow,
-                  }}>
-                    {techData.fairPremium > 0 ? "+" : ""}{techData.fairPremium}%
-                  </div>
-                  <div style={{
-                    fontSize: "11px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px", display: "inline-block",
-                    background: techData.fairPremium > 10 ? C.redBg : techData.fairPremium > 5 ? `${C.red}12` : techData.fairPremium < -10 ? C.greenBg : techData.fairPremium < -5 ? `${C.green}12` : C.yellowBg,
-                    color: techData.fairPremium > 5 ? C.red : techData.fairPremium < -5 ? C.green : C.yellow,
-                  }}>
-                    {techData.fairPremium > 15 ? "매우 고평가" : techData.fairPremium > 10 ? "고평가" : techData.fairPremium > 5 ? "약간 고평가" : techData.fairPremium < -15 ? "매우 저평가" : techData.fairPremium < -10 ? "저평가" : techData.fairPremium < -5 ? "약간 저평가" : "적정 범위"}
-                  </div>
-                </div>
-              </div>
+        {/* 적정주가 섹션은 위 토스 스타일 기업정보 5번 섹션으로 통합됨 */}
 
-              {/* 적정주가 바 시각화 (현재가 위치) */}
-              {techData.analystLow && techData.analystHigh && (
-                <div style={{ marginBottom: "12px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px", color: C.text3, marginBottom: "4px" }}>
-                    <span>저점 {asset.market === "kr" ? `₩${Math.round(techData.analystLow).toLocaleString()}` : `$${techData.analystLow.toFixed(0)}`}</span>
-                    <span>고점 {asset.market === "kr" ? `₩${Math.round(techData.analystHigh).toLocaleString()}` : `$${techData.analystHigh.toFixed(0)}`}</span>
-                  </div>
-                  <div style={{ position: "relative", height: "8px", background: C.border, borderRadius: "4px", overflow: "visible" }}>
-                    {/* 적정주가 범위 */}
-                    <div style={{
-                      position: "absolute", left: "20%", right: "20%", top: 0, bottom: 0,
-                      background: `${C.blue}30`, borderRadius: "4px",
-                    }} />
-                    {/* 현재가 마커 */}
-                    {(() => {
-                      const pos = Math.max(0, Math.min(100, ((techData.price - techData.analystLow) / (techData.analystHigh - techData.analystLow)) * 100));
-                      return (
-                        <div style={{
-                          position: "absolute", left: `${pos}%`, top: "-3px",
-                          width: "14px", height: "14px", borderRadius: "50%",
-                          background: C.blue, border: `2px solid ${C.card}`,
-                          transform: "translateX(-7px)", boxShadow: `0 0 6px ${C.blue}66`,
-                        }} />
-                      );
-                    })()}
-                    {/* 적정주가 마커 */}
-                    {(() => {
-                      const fvPos = Math.max(0, Math.min(100, ((techData.fairValue - techData.analystLow) / (techData.analystHigh - techData.analystLow)) * 100));
-                      return (
-                        <div style={{
-                          position: "absolute", left: `${fvPos}%`, top: "-2px",
-                          width: "12px", height: "12px", borderRadius: "2px", transform: "translateX(-6px) rotate(45deg)",
-                          background: C.yellow, border: `2px solid ${C.card}`,
-                        }} />
-                      );
-                    })()}
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "center", gap: "12px", marginTop: "6px", fontSize: "9px", color: C.text3 }}>
-                    <span><span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: C.blue, marginRight: "3px", verticalAlign: "middle" }}/>현재가</span>
-                    <span><span style={{ display: "inline-block", width: "7px", height: "7px", borderRadius: "1px", background: C.yellow, marginRight: "3px", verticalAlign: "middle", transform: "rotate(45deg)" }}/>적정가</span>
-                  </div>
-                </div>
-              )}
-
-              {/* 개별 모델 브레이크다운 */}
-              {techData.models?.length > 0 && (
-                <div style={{ marginBottom: "10px" }}>
-                  <div style={{ fontSize: "10px", color: C.text3, fontWeight: 600, marginBottom: "6px" }}>모델별 산출가</div>
-                  {techData.models.map((m, i) => {
-                    const prem = +((techData.price - m.value) / m.value * 100).toFixed(1);
-                    return (
-                      <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "5px 0", borderBottom: i < techData.models.length - 1 ? `1px solid ${C.border}` : "none" }}>
-                        <span style={{ fontSize: "13px", width: "20px", textAlign: "center" }}>{m.icon}</span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: "11px", color: C.text2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{m.name}</div>
-                        </div>
-                        <div style={{ fontSize: "12px", fontWeight: 700, color: C.text1, whiteSpace: "nowrap" }}>
-                          {asset.market === "kr" ? `₩${Math.round(m.value).toLocaleString()}` : `$${m.value.toFixed(2)}`}
-                        </div>
-                        <div style={{
-                          fontSize: "10px", fontWeight: 600, width: "48px", textAlign: "right",
-                          color: prem > 5 ? C.red : prem < -5 ? C.green : C.text3,
-                        }}>
-                          {prem > 0 ? "+" : ""}{prem}%
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* 애널리스트 컨센서스 요약 */}
-              {techData.analystCount > 0 && (
-                <div style={{
-                  background: C.card, borderRadius: "10px", padding: "10px 12px",
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  border: `1px solid ${C.border}`,
-                }}>
-                  <div>
-                    <div style={{ fontSize: "9px", color: C.text3, marginBottom: "2px" }}>🏦 애널리스트 ({techData.analystCount}명)</div>
-                    <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>
-                      {asset.market === "kr" ? `₩${Math.round(techData.analystTarget).toLocaleString()}` : `$${techData.analystTarget?.toFixed(2) || "—"}`}
-                    </div>
-                  </div>
-                  {techData.recommendation && (
-                    <div style={{
-                      padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
-                      background: techData.recommendation === "buy" || techData.recommendation === "strong_buy" ? C.greenBg : techData.recommendation === "sell" || techData.recommendation === "strong_sell" ? C.redBg : C.yellowBg,
-                      color: techData.recommendation === "buy" || techData.recommendation === "strong_buy" ? C.green : techData.recommendation === "sell" || techData.recommendation === "strong_sell" ? C.red : C.yellow,
-                    }}>
-                      {techData.recommendation === "strong_buy" ? "적극 매수" : techData.recommendation === "buy" ? "매수" : techData.recommendation === "hold" ? "보유" : techData.recommendation === "sell" ? "매도" : techData.recommendation === "strong_sell" ? "적극 매도" : techData.recommendation}
-                    </div>
-                  )}
-                  {techData.analystLow && techData.analystHigh && (
-                    <div style={{ textAlign: "right", fontSize: "10px", color: C.text3, lineHeight: 1.5 }}>
-                      <div>{asset.market === "kr" ? `₩${Math.round(techData.analystLow).toLocaleString()}` : `$${techData.analystLow.toFixed(0)}`} ~ {asset.market === "kr" ? `₩${Math.round(techData.analystHigh).toLocaleString()}` : `$${techData.analystHigh.toFixed(0)}`}</div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* ═══ 밸류에이션 + 기술적 지표 ═══ */}
+        {/* ═══ 기술적 지표 요약 ═══ */}
         {techData && (
           <div style={{ padding: "0 20px 16px" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
-              {[
-                { label: "RSI(14)", value: techData.rsi, color: techData.rsi <= 30 ? C.purple : techData.rsi >= 70 ? C.red : C.text2 },
-                { label: "200일선", value: techData.ma200Dist != null ? `${techData.ma200Dist > 0 ? "+" : ""}${techData.ma200Dist}%` : "—" },
-                { label: "거래량", value: `${techData.volRatio}x`, color: techData.volRatio >= 2 ? C.red : C.text2 },
-                techData.forwardPE ? { label: "Forward PE", value: techData.forwardPE.toFixed(1), color: techData.forwardPE > 30 ? C.red : techData.forwardPE < 15 ? C.green : C.text2 } : { label: "스토캐스틱", value: `${techData.stoch.k}`, color: techData.stoch.k < 20 ? C.purple : techData.stoch.k > 80 ? C.red : C.text2 },
-                techData.priceToBook ? { label: "PBR", value: techData.priceToBook.toFixed(2), color: techData.priceToBook > 5 ? C.red : techData.priceToBook < 1.5 ? C.green : C.text2 } : { label: "W%R", value: `${techData.wr}`, color: techData.wr < -80 ? C.purple : techData.wr > -20 ? C.red : C.text2 },
-                techData.beta ? { label: "베타", value: techData.beta.toFixed(2), color: techData.beta > 1.5 ? C.red : techData.beta < 0.8 ? C.green : C.text2 } : { label: "52주 위치", value: techData.high52w && techData.low52w ? `${((techData.price - techData.low52w) / (techData.high52w - techData.low52w) * 100).toFixed(0)}%` : "—" },
-              ].map(({ label, value, color }) => (
-                <div key={label} style={{ background: C.bg, borderRadius: "10px", padding: "8px 10px", textAlign: "center" }}>
-                  <div style={{ fontSize: "9px", color: C.text3, marginBottom: "3px" }}>{label}</div>
-                  <div style={{ fontWeight: 700, fontSize: "13px", color: color || C.text1 }}>{value}</div>
+            <div style={{ background: C.card, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>기술적 지표</div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
+                {[
+                  { label: "RSI(14)", value: techData.rsi, color: techData.rsi <= 30 ? C.purple : techData.rsi >= 70 ? C.red : C.text2 },
+                  { label: "200일선 괴리", value: techData.ma200Dist != null ? `${techData.ma200Dist > 0 ? "+" : ""}${techData.ma200Dist}%` : "—", color: techData.ma200Dist > 10 ? C.red : techData.ma200Dist < -10 ? C.green : C.text2 },
+                  { label: "거래량 비율", value: `${techData.volRatio}x`, color: techData.volRatio >= 2 ? C.red : C.text2 },
+                  { label: "스토캐스틱", value: techData.stoch ? `${techData.stoch.k}` : "—", color: techData.stoch?.k < 20 ? C.purple : techData.stoch?.k > 80 ? C.red : C.text2 },
+                  { label: "W%R", value: techData.wr != null ? `${techData.wr}` : "—", color: techData.wr < -80 ? C.purple : techData.wr > -20 ? C.red : C.text2 },
+                  { label: "52주 위치", value: techData.high52w && techData.low52w ? `${((techData.price - techData.low52w) / (techData.high52w - techData.low52w) * 100).toFixed(0)}%` : "—" },
+                ].map(({ label, value, color }) => (
+                  <div key={label} style={{ background: C.card2, borderRadius: "10px", padding: "8px 10px", textAlign: "center" }}>
+                    <div style={{ fontSize: "9px", color: C.text3, marginBottom: "3px" }}>{label}</div>
+                    <div style={{ fontWeight: 700, fontSize: "13px", color: color || C.text1 }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+              {/* 수급 지표 (CMF/MFI) */}
+              {(enriched.cmf != null || enriched.mfi != null) && (
+                <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${C.border}40` }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "10px", fontWeight: 700, color: C.text3 }}>수급 흐름</span>
+                    {enriched.macdDivType && (
+                      <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                        background: enriched.macdDivType === "bullish" ? `${C.green}18` : `${C.red}18`,
+                        color: enriched.macdDivType === "bullish" ? C.green : C.red,
+                      }}>{enriched.macdDivType === "bullish" ? "MACD ↑" : "MACD ↓"}</span>
+                    )}
+                  </div>
+                  {enriched.cmf != null && (
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "10px", color: C.text3, width: "30px", flexShrink: 0 }}>CMF</span>
+                      <div style={{ flex: 1, height: "6px", background: `${C.border}40`, borderRadius: "3px", overflow: "hidden", position: "relative" }}>
+                        <div style={{ position: "absolute", left: "50%", top: 0, width: "1px", height: "100%", background: C.text3 + "44" }} />
+                        <div style={{
+                          position: "absolute", top: 0, height: "100%", borderRadius: "3px",
+                          background: enriched.cmf >= 0 ? C.green : C.red,
+                          left: enriched.cmf >= 0 ? "50%" : `${50 + (enriched.cmf * 100)}%`,
+                          width: `${Math.min(Math.abs(enriched.cmf) * 100, 50)}%`,
+                        }} />
+                      </div>
+                      <span style={{ fontSize: "11px", fontWeight: 700, color: enriched.cmf > 0.1 ? C.green : enriched.cmf < -0.1 ? C.red : C.text2, width: "42px", textAlign: "right" }}>
+                        {enriched.cmf > 0 ? "+" : ""}{enriched.cmf.toFixed(3)}
+                      </span>
+                    </div>
+                  )}
+                  {enriched.mfi != null && (
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "10px", color: C.text3, width: "30px", flexShrink: 0 }}>MFI</span>
+                      <div style={{ flex: 1, height: "6px", background: `${C.border}40`, borderRadius: "3px", overflow: "hidden" }}>
+                        <div style={{
+                          height: "100%", borderRadius: "3px",
+                          width: `${enriched.mfi}%`,
+                          background: enriched.mfi < 20 ? C.purple : enriched.mfi > 80 ? C.red : enriched.mfi < 30 ? C.green : enriched.mfi > 70 ? C.yellow : C.blue,
+                        }} />
+                      </div>
+                      <span style={{ fontSize: "11px", fontWeight: 700, color: enriched.mfi < 20 ? C.purple : enriched.mfi > 80 ? C.red : C.text2, width: "24px", textAlign: "right" }}>
+                        {Math.round(enriched.mfi)}
+                      </span>
+                    </div>
+                  )}
                 </div>
-              ))}
+              )}
+              {/* 실적 발표일 */}
+              {techData.earningsDate && (
+                <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: `1px solid ${C.border}40`, fontSize: "10px", color: C.text3, textAlign: "center" }}>
+                  📅 다음 실적 발표 <span style={{ fontWeight: 700, color: C.text2 }}>{new Date(techData.earningsDate * 1000).toLocaleDateString("ko-KR", { year: "numeric", month: "short", day: "numeric" })}</span>
+                </div>
+              )}
             </div>
-            {/* 수급 지표 (CMF/MFI) */}
-            {(enriched.cmf != null || enriched.mfi != null) && (
-              <div style={{
-                display: "flex", gap: "8px", marginTop: "8px", padding: "10px 12px",
-                background: C.bg, borderRadius: "10px", border: `1px solid ${C.border}`,
-                alignItems: "center", flexWrap: "wrap",
-              }}>
-                <span style={{ fontSize: "10px", fontWeight: 700, color: C.text3 }}>💧 수급</span>
-                {enriched.cmf != null && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "5px", flex: "1 1 110px" }}>
-                    <span style={{ fontSize: "9px", color: C.text3, width: "24px" }}>CMF</span>
-                    <div style={{ flex: 1, height: "5px", background: C.border, borderRadius: "3px", overflow: "hidden", position: "relative" }}>
-                      <div style={{ position: "absolute", left: "50%", top: 0, width: "1px", height: "100%", background: C.text3 + "44" }} />
-                      <div style={{
-                        position: "absolute", top: 0, height: "100%", borderRadius: "3px",
-                        background: enriched.cmf >= 0 ? C.green : C.red,
-                        left: enriched.cmf >= 0 ? "50%" : `${50 + (enriched.cmf * 100)}%`,
-                        width: `${Math.min(Math.abs(enriched.cmf) * 100, 50)}%`,
-                      }} />
-                    </div>
-                    <span style={{ fontSize: "10px", fontWeight: 700, color: enriched.cmf > 0.1 ? C.green : enriched.cmf < -0.1 ? C.red : C.text2, width: "38px", textAlign: "right" }}>
-                      {enriched.cmf > 0 ? "+" : ""}{enriched.cmf.toFixed(3)}
-                    </span>
-                  </div>
-                )}
-                {enriched.mfi != null && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "5px", flex: "1 1 110px" }}>
-                    <span style={{ fontSize: "9px", color: C.text3, width: "24px" }}>MFI</span>
-                    <div style={{ flex: 1, height: "5px", background: C.border, borderRadius: "3px", overflow: "hidden" }}>
-                      <div style={{
-                        height: "100%", borderRadius: "3px",
-                        width: `${enriched.mfi}%`,
-                        background: enriched.mfi < 20 ? C.purple : enriched.mfi > 80 ? C.red : enriched.mfi < 30 ? C.green : enriched.mfi > 70 ? C.yellow : C.blue,
-                      }} />
-                    </div>
-                    <span style={{ fontSize: "10px", fontWeight: 700, color: enriched.mfi < 20 ? C.purple : enriched.mfi > 80 ? C.red : C.text2, width: "24px", textAlign: "right" }}>
-                      {Math.round(enriched.mfi)}
-                    </span>
-                  </div>
-                )}
-                {enriched.macdDivType && (
-                  <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
-                    background: enriched.macdDivType === "bullish" ? `${C.green}22` : `${C.red}22`,
-                    color: enriched.macdDivType === "bullish" ? C.green : C.red,
-                  }}>{enriched.macdDivType === "bullish" ? "📈 MACD↑" : "📉 MACD↓"}</span>
-                )}
-              </div>
-            )}
-            {/* 시가총액 + 배당 + 실적 */}
-            {(techData.marketCap || techData.dividendYield || techData.earningsDate) && (
-              <div style={{ display: "flex", gap: "6px", marginTop: "6px", flexWrap: "wrap" }}>
-                {techData.marketCap && (
-                  <span style={{ fontSize: "10px", padding: "3px 8px", borderRadius: "6px", background: C.card2, color: C.text3 }}>
-                    시총 {asset.market === "kr"
-                      ? (techData.marketCap >= 1e12 ? `₩${(techData.marketCap / 1e12).toFixed(1)}조` : techData.marketCap >= 1e8 ? `₩${(techData.marketCap / 1e8).toFixed(0)}억` : `₩${Math.round(techData.marketCap).toLocaleString()}`)
-                      : (techData.marketCap >= 1e12 ? `$${(techData.marketCap / 1e12).toFixed(1)}T` : techData.marketCap >= 1e9 ? `$${(techData.marketCap / 1e9).toFixed(1)}B` : `$${(techData.marketCap / 1e6).toFixed(0)}M`)}
-                  </span>
-                )}
-                {techData.dividendYield && techData.dividendYield > 0 && (
-                  <span style={{ fontSize: "10px", padding: "3px 8px", borderRadius: "6px", background: `${C.green}12`, color: C.green }}>
-                    배당 {(techData.dividendYield * 100).toFixed(2)}%
-                  </span>
-                )}
-                {techData.earningsDate && (
-                  <span style={{ fontSize: "10px", padding: "3px 8px", borderRadius: "6px", background: C.card2, color: C.text3 }}>
-                    실적 {new Date(techData.earningsDate * 1000).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}
-                  </span>
-                )}
-              </div>
-            )}
           </div>
         )}
 
