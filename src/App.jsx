@@ -2572,6 +2572,8 @@ function AssetCard({ asset, onChart }) {
 function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHours = {}, isWatched = false, onToggleWatch = () => {} }) {
   const [techData, setTechData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [fundamentals, setFundamentals] = useState(null);
+  const [fundLoading, setFundLoading] = useState(false);
 
   // 팝업 열릴 때 배경 스크롤 차단
   useEffect(() => {
@@ -2754,6 +2756,80 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
     })();
     return () => { cancelled = true; };
   }, [asset.symbol]);
+
+  // Financial Datasets API — 펀더멘털 데이터 (US 종목만)
+  useEffect(() => {
+    if (asset.market !== "us") return;
+    let cancelled = false;
+    const ticker = (asset.symbolRaw || asset.symbol || "").replace(".KS", "");
+    if (!ticker || ticker.startsWith("^")) return;
+    (async () => {
+      setFundLoading(true);
+      try {
+        const [incomeRes, metricsRes, estimatesRes] = await Promise.all([
+          fetch(`/api/financial-datasets?type=income&ticker=${ticker}&period=quarterly&limit=4`).then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch(`/api/financial-datasets?type=metrics&ticker=${ticker}&period=quarterly&limit=4`).then(r => r.ok ? r.json() : null).catch(() => null),
+          fetch(`/api/financial-datasets?type=estimates&ticker=${ticker}&period=quarterly&limit=2`).then(r => r.ok ? r.json() : null).catch(() => null),
+        ]);
+        if (cancelled) return;
+        const inc = incomeRes?.income_statements || incomeRes?.results || [];
+        const met = metricsRes?.financial_metrics || metricsRes?.results || [];
+        const est = estimatesRes?.analyst_estimates || estimatesRes?.results || [];
+        if (inc.length === 0 && met.length === 0 && est.length === 0) {
+          setFundLoading(false);
+          return;
+        }
+        // 최신 분기 데이터
+        const latest = inc[0] || {};
+        const latestMetric = met[0] || {};
+        const latestEstimate = est[0] || {};
+        // 전분기 비교
+        const prev = inc[1] || {};
+        const revGrowthQoQ = latest.revenue && prev.revenue ? +((latest.revenue - prev.revenue) / Math.abs(prev.revenue) * 100).toFixed(1) : null;
+        // YoY (4분기 전)
+        const yoyQ = inc[3] || {};
+        const revGrowthYoY = latest.revenue && yoyQ.revenue ? +((latest.revenue - yoyQ.revenue) / Math.abs(yoyQ.revenue) * 100).toFixed(1) : null;
+        const niGrowthYoY = latest.net_income && yoyQ.net_income ? +((latest.net_income - yoyQ.net_income) / Math.abs(yoyQ.net_income) * 100).toFixed(1) : null;
+
+        setFundamentals({
+          // 손익계산서
+          revenue: latest.revenue,
+          netIncome: latest.net_income,
+          grossProfit: latest.gross_profit,
+          operatingIncome: latest.operating_income,
+          eps: latest.earnings_per_share || latest.eps_diluted,
+          grossMargin: latest.revenue ? +((latest.gross_profit || 0) / latest.revenue * 100).toFixed(1) : null,
+          operatingMargin: latest.revenue ? +((latest.operating_income || 0) / latest.revenue * 100).toFixed(1) : null,
+          netMargin: latest.revenue && latest.net_income ? +((latest.net_income) / latest.revenue * 100).toFixed(1) : null,
+          period: latest.period || latest.report_period,
+          fiscal_date: latest.report_period || latest.fiscal_date,
+          // 성장률
+          revGrowthQoQ, revGrowthYoY, niGrowthYoY,
+          // Financial Metrics
+          peRatio: latestMetric.pe_ratio || latestMetric.price_to_earnings_ratio,
+          pbRatio: latestMetric.pb_ratio || latestMetric.price_to_book_ratio,
+          psRatio: latestMetric.ps_ratio || latestMetric.price_to_sales_ratio,
+          evToEbitda: latestMetric.ev_to_ebitda || latestMetric.enterprise_value_to_ebitda,
+          roe: latestMetric.return_on_equity,
+          roa: latestMetric.return_on_assets,
+          debtToEquity: latestMetric.debt_to_equity || latestMetric.total_debt_to_equity,
+          currentRatio: latestMetric.current_ratio,
+          freeCashFlowPerShare: latestMetric.free_cash_flow_per_share,
+          revenuePerShare: latestMetric.revenue_per_share,
+          marketCap: latestMetric.market_cap || latestMetric.market_capitalization,
+          // Analyst Estimates
+          estRevenue: latestEstimate.estimated_revenue_avg,
+          estEps: latestEstimate.estimated_eps_avg,
+          numAnalysts: latestEstimate.number_of_analysts,
+          // 분기별 추이 (차트용)
+          quarterlyRevenue: inc.map(q => ({ period: q.report_period || q.fiscal_date, revenue: q.revenue, netIncome: q.net_income })).reverse(),
+          source: "Financial Datasets API",
+        });
+      } catch { /* silent */ }
+      if (!cancelled) setFundLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, [asset.symbol, asset.market]);
 
   // 진단: techData가 있으면 enriched, 없으면 기본 asset
   const enriched = techData ? { ...asset, ...techData } : asset;
@@ -2950,6 +3026,178 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             </div>
           )}
         </div>
+
+        {/* ═══ 펀더멘털 분석 (Financial Datasets API) ═══ */}
+        {(fundamentals || fundLoading) && (
+          <div style={{ padding: "0 20px 12px" }}>
+            <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                <span style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>📑 펀더멘털 분석</span>
+                {fundamentals?.fiscal_date && (
+                  <span style={{ fontSize: "10px", color: C.text3 }}>{fundamentals.fiscal_date} 기준</span>
+                )}
+              </div>
+              {fundLoading && !fundamentals ? (
+                <div style={{ display: "flex", gap: "8px" }}>
+                  {[1,2,3].map(i => <div key={i} className="skeleton" style={{ flex: 1, height: "60px", borderRadius: "10px" }} />)}
+                </div>
+              ) : fundamentals ? (
+                <>
+                  {/* 손익 요약 */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px", marginBottom: "10px" }}>
+                    {[
+                      { label: "매출", value: fundamentals.revenue, fmt: "money" },
+                      { label: "영업이익", value: fundamentals.operatingIncome, fmt: "money" },
+                      { label: "순이익", value: fundamentals.netIncome, fmt: "money" },
+                    ].map(item => (
+                      <div key={item.label} style={{ background: C.card, borderRadius: "10px", padding: "10px 8px", textAlign: "center" }}>
+                        <div style={{ fontSize: "10px", color: C.text3, marginBottom: "3px" }}>{item.label}</div>
+                        <div style={{ fontSize: "13px", fontWeight: 700, color: item.value > 0 ? C.text1 : item.value < 0 ? C.red : C.text3 }}>
+                          {item.value != null
+                            ? (Math.abs(item.value) >= 1e9 ? `$${(item.value / 1e9).toFixed(1)}B`
+                              : Math.abs(item.value) >= 1e6 ? `$${(item.value / 1e6).toFixed(0)}M`
+                              : `$${item.value.toLocaleString()}`)
+                            : "—"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 마진 + 성장률 */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px", marginBottom: "10px" }}>
+                    {[
+                      { label: "매출총이익률", value: fundamentals.grossMargin, suffix: "%" },
+                      { label: "영업이익률", value: fundamentals.operatingMargin, suffix: "%" },
+                      { label: "순이익률", value: fundamentals.netMargin, suffix: "%" },
+                    ].map(item => (
+                      <div key={item.label} style={{ background: C.card, borderRadius: "10px", padding: "10px 8px", textAlign: "center" }}>
+                        <div style={{ fontSize: "10px", color: C.text3, marginBottom: "3px" }}>{item.label}</div>
+                        <div style={{ fontSize: "13px", fontWeight: 700, color: item.value > 0 ? C.green : item.value < 0 ? C.red : C.text3 }}>
+                          {item.value != null ? `${item.value}${item.suffix}` : "—"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 성장률 */}
+                  {(fundamentals.revGrowthYoY != null || fundamentals.niGrowthYoY != null) && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "6px", marginBottom: "10px" }}>
+                      {[
+                        { label: "매출 YoY", value: fundamentals.revGrowthYoY },
+                        { label: "순이익 YoY", value: fundamentals.niGrowthYoY },
+                        { label: "매출 QoQ", value: fundamentals.revGrowthQoQ },
+                      ].map(item => (
+                        <div key={item.label} style={{ background: C.card, borderRadius: "10px", padding: "10px 8px", textAlign: "center" }}>
+                          <div style={{ fontSize: "10px", color: C.text3, marginBottom: "3px" }}>{item.label}</div>
+                          <div style={{ fontSize: "13px", fontWeight: 700, color: item.value > 0 ? C.green : item.value < 0 ? C.red : C.text3 }}>
+                            {item.value != null ? `${item.value > 0 ? "+" : ""}${item.value}%` : "—"}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 밸류에이션 지표 */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px", marginBottom: "10px" }}>
+                    {[
+                      { label: "PER", value: fundamentals.peRatio },
+                      { label: "PBR", value: fundamentals.pbRatio },
+                      { label: "PSR", value: fundamentals.psRatio },
+                      { label: "EV/EBITDA", value: fundamentals.evToEbitda },
+                    ].map(item => (
+                      <div key={item.label} style={{ background: C.card, borderRadius: "10px", padding: "8px 6px", textAlign: "center" }}>
+                        <div style={{ fontSize: "9px", color: C.text3, marginBottom: "2px" }}>{item.label}</div>
+                        <div style={{ fontSize: "12px", fontWeight: 700, color: C.text1 }}>
+                          {item.value != null ? (typeof item.value === "number" ? item.value.toFixed(1) : item.value) : "—"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 수익성 + 재무건전성 */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px", marginBottom: "6px" }}>
+                    {[
+                      { label: "ROE", value: fundamentals.roe, suffix: "%", scale: 100 },
+                      { label: "ROA", value: fundamentals.roa, suffix: "%", scale: 100 },
+                      { label: "부채비율", value: fundamentals.debtToEquity, suffix: "" },
+                      { label: "유동비율", value: fundamentals.currentRatio, suffix: "" },
+                    ].map(item => (
+                      <div key={item.label} style={{ background: C.card, borderRadius: "10px", padding: "8px 6px", textAlign: "center" }}>
+                        <div style={{ fontSize: "9px", color: C.text3, marginBottom: "2px" }}>{item.label}</div>
+                        <div style={{ fontSize: "12px", fontWeight: 700, color: C.text1 }}>
+                          {item.value != null
+                            ? `${(item.scale ? item.value * item.scale : item.value).toFixed(1)}${item.suffix}`
+                            : "—"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* 분기별 매출 미니 차트 */}
+                  {fundamentals.quarterlyRevenue?.length >= 2 && (() => {
+                    const qr = fundamentals.quarterlyRevenue.filter(q => q.revenue);
+                    if (qr.length < 2) return null;
+                    const maxRev = Math.max(...qr.map(q => Math.abs(q.revenue)));
+                    return (
+                      <div style={{ marginTop: "8px" }}>
+                        <div style={{ fontSize: "10px", color: C.text3, marginBottom: "6px" }}>분기별 매출 추이</div>
+                        <div style={{ display: "flex", gap: "4px", alignItems: "flex-end", height: "48px" }}>
+                          {qr.map((q, i) => {
+                            const pct = maxRev > 0 ? Math.abs(q.revenue) / maxRev : 0;
+                            const prevQ = qr[i - 1];
+                            const growth = prevQ?.revenue ? (q.revenue - prevQ.revenue) / Math.abs(prevQ.revenue) : 0;
+                            return (
+                              <div key={q.period} style={{ flex: 1, textAlign: "center" }}>
+                                <div style={{
+                                  height: `${Math.max(pct * 36, 4)}px`, borderRadius: "4px 4px 0 0",
+                                  background: growth >= 0 ? `${C.green}60` : `${C.red}60`,
+                                  transition: "height 0.3s",
+                                }} />
+                                <div style={{ fontSize: "8px", color: C.text3, marginTop: "3px" }}>
+                                  {(q.period || "").slice(5, 7)}Q
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* 애널리스트 컨센서스 */}
+                  {fundamentals.numAnalysts > 0 && (
+                    <div style={{
+                      marginTop: "10px", padding: "10px 12px", borderRadius: "10px",
+                      background: `${C.blueBg}60`, border: `1px solid ${C.blue}15`,
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                    }}>
+                      <div>
+                        <div style={{ fontSize: "10px", color: C.text3 }}>애널리스트 컨센서스 ({fundamentals.numAnalysts}명)</div>
+                        <div style={{ display: "flex", gap: "12px", marginTop: "3px" }}>
+                          {fundamentals.estRevenue && (
+                            <span style={{ fontSize: "11px", color: C.text2 }}>
+                              예상매출 <span style={{ fontWeight: 700, color: C.text1 }}>
+                                ${fundamentals.estRevenue >= 1e9 ? `${(fundamentals.estRevenue / 1e9).toFixed(1)}B` : `${(fundamentals.estRevenue / 1e6).toFixed(0)}M`}
+                              </span>
+                            </span>
+                          )}
+                          {fundamentals.estEps && (
+                            <span style={{ fontSize: "11px", color: C.text2 }}>
+                              예상EPS <span style={{ fontWeight: 700, color: C.text1 }}>${fundamentals.estEps.toFixed(2)}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ fontSize: "9px", color: C.text3, marginTop: "8px", textAlign: "right", opacity: 0.6 }}>
+                    via {fundamentals.source}
+                  </div>
+                </>
+              ) : null}
+            </div>
+          </div>
+        )}
 
         {/* ═══ 투자 전략 (Advanced Investment Strategy) ═══ */}
         {techData && !loading && (() => {

@@ -1,6 +1,19 @@
 /**
  * Vercel Serverless Function: Financial Datasets API Proxy
  * Proxies requests to https://api.financialdatasets.ai
+ *
+ * Supported endpoints (via ?type= parameter):
+ *   income          — Income Statements
+ *   balance         — Balance Sheets
+ *   cashflow        — Cash Flow Statements
+ *   metrics         — Financial Metrics (P/E, EV, revenue per share, etc.)
+ *   prices          — Historical Stock Prices
+ *   price-snapshot  — Current Stock Price Snapshot
+ *   crypto          — Crypto Prices
+ *   estimates       — Analyst Estimates
+ *   news            — Market / Company News
+ *   segmented-revenue — Revenue by Segment
+ *   insider         — Insider Trades
  */
 
 const BASE_URL = 'https://api.financialdatasets.ai';
@@ -8,29 +21,78 @@ const API_KEY = process.env.FINANCIAL_DATASETS_API_KEY;
 
 // Map of type parameter to endpoint configuration
 const ENDPOINTS = {
-  prices: {
-    path: '/prices',
-    requiredParams: ['ticker'],
-  },
-  financials: {
-    path: '/financials',
-    requiredParams: ['ticker'],
-  },
+  // ── Financial Statements ──
   income: {
     path: '/financials/income-statements',
     requiredParams: ['ticker'],
+    optionalParams: ['period', 'limit'],   // period: annual|quarterly|ttm
   },
   balance: {
     path: '/financials/balance-sheets',
     requiredParams: ['ticker'],
+    optionalParams: ['period', 'limit'],
   },
   cashflow: {
     path: '/financials/cash-flow-statements',
     requiredParams: ['ticker'],
+    optionalParams: ['period', 'limit'],
   },
-  snapshot: {
-    path: '/financials/snapshots',
+
+  // ── Financial Metrics ──
+  metrics: {
+    path: '/financials/metrics',
     requiredParams: ['ticker'],
+    optionalParams: ['period', 'limit'],
+  },
+
+  // ── Stock Prices ──
+  prices: {
+    path: '/prices',
+    requiredParams: ['ticker'],
+    optionalParams: ['interval', 'interval_multiplier', 'start_date', 'end_date', 'limit'],
+  },
+  'price-snapshot': {
+    path: '/prices/snapshot',
+    requiredParams: ['ticker'],
+  },
+
+  // ── Crypto ──
+  crypto: {
+    path: '/prices/crypto',
+    requiredParams: ['ticker'],
+    optionalParams: ['interval', 'interval_multiplier', 'start_date', 'end_date', 'limit'],
+  },
+  'crypto-snapshot': {
+    path: '/prices/crypto/snapshot',
+    requiredParams: ['ticker'],
+  },
+
+  // ── Analyst Estimates ──
+  estimates: {
+    path: '/estimates/analyst',
+    requiredParams: ['ticker'],
+    optionalParams: ['period', 'limit'],
+  },
+
+  // ── News ──
+  news: {
+    path: '/news',
+    requiredParams: [],
+    optionalParams: ['ticker', 'start_date', 'end_date', 'limit'],
+  },
+
+  // ── Segmented Revenue ──
+  'segmented-revenue': {
+    path: '/financials/segmented-revenues',
+    requiredParams: ['ticker'],
+    optionalParams: ['period', 'limit'],
+  },
+
+  // ── Insider Trades ──
+  insider: {
+    path: '/insider-trades',
+    requiredParams: ['ticker'],
+    optionalParams: ['start_date', 'end_date', 'limit'],
   },
 };
 
@@ -149,8 +211,10 @@ export default async function handler(req, res) {
     // Fetch from Financial Datasets API
     const data = await fetchFromAPI(endpoint.path, queryString);
 
-    // Set caching headers
-    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
+    // Set caching headers — financial data: short for prices, longer for fundamentals
+    const isRealtime = ['prices', 'price-snapshot', 'crypto', 'crypto-snapshot'].includes(type);
+    const maxAge = isRealtime ? 300 : 3600;
+    res.setHeader('Cache-Control', `s-maxage=${maxAge}, stale-while-revalidate=86400`);
     res.setHeader('Content-Type', 'application/json');
 
     // Return successful response
