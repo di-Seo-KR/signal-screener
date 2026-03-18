@@ -1,6 +1,6 @@
-// DI금융 v9.1 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
+// DI금융 v9.7 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
 // Features: 스크리닝, 캔들차트, 32개 전략, 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
-// v7.3: 퀀트 포트폴리오 실제 데이터, PC 데스크톱 사이드바+와이드 레이아웃
+// v9.7: 다중 타임프레임 RSI, findSwings 리팩토링, 카드 호버 UX, 모바일 터치 최적화
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 
 // ════════════════════════════════════════════════════════════════════
@@ -792,6 +792,16 @@ function calcSimpleADX(highs, lows, closes, period = 14) {
   return { adx: dx, plusDI, minusDI };
 }
 
+// ── 공유 유틸: swing high/low 탐지 (MACD/RSI 다이버전스 공용) ──
+function findSwingPoints(arr, type, count = 3) {
+  const swings = [];
+  for (let i = 1; i < arr.length - 1; i++) {
+    if (type === "high" && arr[i] > arr[i - 1] && arr[i] >= arr[i + 1]) swings.push({ idx: i, val: arr[i] });
+    if (type === "low" && arr[i] < arr[i - 1] && arr[i] <= arr[i + 1]) swings.push({ idx: i, val: arr[i] });
+  }
+  return swings.slice(-count);
+}
+
 function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, weeklyLows, conditions) {
   const price = weeklyCloses[weeklyCloses.length - 1];
   const rsi = calcRSI(weeklyCloses, 14);
@@ -812,6 +822,9 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
 
   const prev = weeklyCloses.length >= 2 ? weeklyCloses[weeklyCloses.length - 2] : price;
   const weekChange = ((price - prev) / prev) * 100;
+
+  // ── 다중 타임프레임 RSI: 일간 RSI(14) 추가 ──
+  const dailyRsi = dailyCloses.length >= 15 ? calcRSI(dailyCloses, 14) : null;
 
   // BB 스퀴즈 (Keltner Channel 기반 고도화)
   // BB가 Keltner Channel 안에 들어오면 진정한 스퀴즈
@@ -960,20 +973,11 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
     const lookback = Math.min(weeklyCloses.length, 24);
     const fullHist = calcMACDHistogram(weeklyCloses);
     const macdHist = fullHist.length >= lookback ? fullHist.slice(-lookback) : fullHist;
-    // swing high/low 찾기 (최소 2개 피크/트러프 필요)
-    const findSwings = (arr, type) => {
-      const swings = [];
-      for (let i = 1; i < arr.length - 1; i++) {
-        if (type === "high" && arr[i] > arr[i-1] && arr[i] >= arr[i+1]) swings.push({ idx: i, val: arr[i] });
-        if (type === "low" && arr[i] < arr[i-1] && arr[i] <= arr[i+1]) swings.push({ idx: i, val: arr[i] });
-      }
-      return swings.slice(-3); // 최근 3개
-    };
     const priceSlice = weeklyCloses.slice(-lookback);
-    const priceHighs = findSwings(priceSlice, "high");
-    const priceLows = findSwings(priceSlice, "low");
-    const macdHighs = findSwings(macdHist, "high");
-    const macdLows = findSwings(macdHist, "low");
+    const priceHighs = findSwingPoints(priceSlice, "high");
+    const priceLows = findSwingPoints(priceSlice, "low");
+    const macdHighs = findSwingPoints(macdHist, "high");
+    const macdLows = findSwingPoints(macdHist, "low");
     // Bearish: 가격 higher-high + MACD lower-high
     if (priceHighs.length >= 2 && macdHighs.length >= 2) {
       const [ph1, ph2] = priceHighs.slice(-2);
@@ -997,18 +1001,10 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
     const rsiSlice = rsiArr.length >= rsiLookback ? rsiArr.slice(-rsiLookback) : rsiArr;
     const priceSliceRsi = weeklyCloses.slice(-rsiSlice.length);
     if (rsiSlice.length >= 6) {
-      const findSwingsRsi = (arr, type) => {
-        const swings = [];
-        for (let i = 1; i < arr.length - 1; i++) {
-          if (type === "high" && arr[i] > arr[i-1] && arr[i] >= arr[i+1]) swings.push({ idx: i, val: arr[i] });
-          if (type === "low" && arr[i] < arr[i-1] && arr[i] <= arr[i+1]) swings.push({ idx: i, val: arr[i] });
-        }
-        return swings.slice(-3);
-      };
-      const pHighs = findSwingsRsi(priceSliceRsi, "high");
-      const pLows = findSwingsRsi(priceSliceRsi, "low");
-      const rHighs = findSwingsRsi(rsiSlice, "high");
-      const rLows = findSwingsRsi(rsiSlice, "low");
+      const pHighs = findSwingPoints(priceSliceRsi, "high");
+      const pLows = findSwingPoints(priceSliceRsi, "low");
+      const rHighs = findSwingPoints(rsiSlice, "high");
+      const rLows = findSwingPoints(rsiSlice, "low");
       // Bearish RSI Divergence: 가격 higher-high + RSI lower-high
       if (pHighs.length >= 2 && rHighs.length >= 2) {
         const [ph1, ph2] = pHighs.slice(-2);
@@ -1134,6 +1130,7 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
     macdDivType, rsiDivType,
     pocPrice: pocPrice != null ? +pocPrice.toFixed(2) : null,
     nearPOC,
+    dailyRsi: dailyRsi != null ? +dailyRsi.toFixed(1) : null,
   };
 }
 
@@ -1645,6 +1642,14 @@ function quickDiagnosis(asset) {
   // RSI 다이버전스 반영 — 반전 시그널이므로 모멘텀 점수에 영향
   if (asset.rsiDivType === "bullish") { momScore += 8; signals.push({ type: "bullish", name: "RSI 강세 다이버전스" }); }
   else if (asset.rsiDivType === "bearish") { momScore -= 8; signals.push({ type: "bearish", name: "RSI 약세 다이버전스" }); }
+  // ── 다중 타임프레임 RSI 확인 (주간+일간 동시 과매도/과매수) ──
+  if (asset.rsi != null && asset.dailyRsi != null) {
+    if (asset.rsi <= 30 && asset.dailyRsi <= 30) {
+      momScore += 6; signals.push({ type: "bullish", name: `MTF RSI 동시 과매도 (W:${asset.rsi} D:${asset.dailyRsi})` });
+    } else if (asset.rsi >= 70 && asset.dailyRsi >= 70) {
+      momScore -= 6; signals.push({ type: "bearish", name: `MTF RSI 동시 과매수 (W:${asset.rsi} D:${asset.dailyRsi})` });
+    }
+  }
   momScore = Math.max(0, Math.min(100, momScore));
 
   // ── 수급: 거래량 + 가격-거래량 상관 ──
@@ -2365,7 +2370,7 @@ function AssetCard({ asset, onChart }) {
   const diag = useMemo(() => quickDiagnosis(asset), [asset]);
 
   return (
-    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", overflow: "hidden" }}>
+    <div className="asset-card" style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", overflow: "hidden", transition: "border-color 0.2s ease, box-shadow 0.2s ease" }}>
       <div onClick={() => setExpanded(!expanded)}
         style={{ display: "flex", alignItems: "center", padding: "14px 18px", cursor: "pointer", gap: "12px" }}>
         <div style={{
@@ -2560,7 +2565,9 @@ function AssetCard({ asset, onChart }) {
           {/* ── 지표 상세 ── */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: "8px", marginBottom: "12px" }}>
             {[
-              { label: "RSI(14)",    value: asset.rsi ?? "—",   color: asset.rsi != null && asset.rsi <= 30 ? C.purple : asset.rsi != null && asset.rsi >= 70 ? C.red : C.text2 },
+              { label: "RSI(14) 주간", value: asset.rsi ?? "—",  color: asset.rsi != null && asset.rsi <= 30 ? C.purple : asset.rsi != null && asset.rsi >= 70 ? C.red : C.text2 },
+              { label: "RSI(14) 일간", value: asset.dailyRsi ?? "—", color: asset.dailyRsi != null && asset.dailyRsi <= 30 ? C.purple : asset.dailyRsi != null && asset.dailyRsi >= 70 ? C.red : C.text2,
+                sub: asset.rsi != null && asset.dailyRsi != null ? (asset.rsi <= 30 && asset.dailyRsi <= 30 ? "MTF 과매도 ✓" : asset.rsi >= 70 && asset.dailyRsi >= 70 ? "MTF 과매수 ✓" : null) : null },
               { label: "200일선 대비", value: asset.ma200Dist != null ? `${asset.ma200Dist > 0 ? "+" : ""}${asset.ma200Dist}%` : "—" },
               { label: "거래량 비율", value: `${asset.volRatio}x`, color: asset.volRatio >= 2 ? C.red : C.text2 },
               { label: "스토캐스틱%K", value: asset.stoch ? `${asset.stoch.k.toFixed(1)}` : "—", color: asset.stoch?.k < 20 ? C.purple : C.text2 },
@@ -2582,18 +2589,20 @@ function AssetCard({ asset, onChart }) {
               </div>
             ))}
           </div>
-          <div style={{ display: "flex", gap: "8px" }}>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             <button onClick={(e) => { e.stopPropagation(); onChart(); }} style={{
-              padding: "8px 16px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
-              background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}44`,
+              padding: "10px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 600, minHeight: "44px",
+              background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}44`, cursor: "pointer",
+              transition: "background 0.15s ease",
             }}>📈 차트 보기</button>
             <a href={asset.market === "crypto"
                 ? `https://www.coingecko.com/en/coins/${asset.symbolRaw}`
                 : `https://finance.yahoo.com/quote/${asset.symbolRaw || asset.symbol}`}
               target="_blank" rel="noopener" onClick={e => e.stopPropagation()}
               style={{
-                padding: "8px 16px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                padding: "10px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 600, minHeight: "44px",
                 background: C.card, color: C.text3, border: `1px solid ${C.border2}`, textDecoration: "none",
+                display: "inline-flex", alignItems: "center",
               }}>🔗 상세 정보</a>
           </div>
         </div>
@@ -5749,6 +5758,8 @@ function AppInner() {
         .ui-divider { height: 1px; background: ${C.border}; opacity: 0.2; margin: 4px 0; }
         .ui-list-item { display: flex; align-items: center; padding: 14px 8px; cursor: pointer; border-radius: 10px; transition: background 0.15s; }
         .ui-list-item:hover { background: ${C.card2}60; }
+        .asset-card:hover { border-color: ${C.blue}44 !important; box-shadow: 0 2px 12px ${C.blue}12; }
+        .asset-card:active { transform: scale(0.995); }
         .ui-section-title { font-size: 16px; font-weight: 700; color: ${C.text1}; margin-bottom: 4px; }
         .ui-section-sub { font-size: 13px; color: ${C.text3}; }
         /* ── 모바일 (≤640px) — 폰트/간격 확대 + 터치 최적화 (v9.1) ── */
@@ -5842,7 +5853,7 @@ function AppInner() {
         <div className="sb-logo" onClick={() => setTab("home")}>
           <span style={{ fontSize: "22px" }}>📡</span>
           <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
-          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v9.1</span>
+          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v9.7</span>
         </div>
         <div className="sb-section">메인</div>
         <nav className="sb-nav">
