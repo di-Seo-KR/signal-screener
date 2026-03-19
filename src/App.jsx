@@ -1,6 +1,6 @@
-// DI금융 v9.7 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
+// DI금융 v9.8 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
 // Features: 스크리닝, 캔들차트, 32개 전략, 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
-// v9.7: 다중 타임프레임 RSI, findSwings 리팩토링, 카드 호버 UX, 모바일 터치 최적화
+// v9.8: Quick Wins UX 업그레이드 — 추천 수 제한, 투자심리 강조, 뉴스 카테고리 필터, 매매알림 필터, 포트폴리오 온보딩, 리포트 마켓별 분리, 사이드바 접기
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 
 // ════════════════════════════════════════════════════════════════════
@@ -3904,6 +3904,7 @@ function AppInner() {
     return "home";
   });
   const [menuOpen, setMenuOpen] = useState(false);
+  const [sbCollapsed, setSbCollapsed] = useState({ main: false, ops: false, info: false });
 
   // ── 모바일 감지 (폰트 크기 보정용) ──
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
@@ -3987,6 +3988,7 @@ function AppInner() {
     try { return JSON.parse(localStorage.getItem("di_trade_alerts") || "[]"); } catch { return []; }
   });
   const [alertBadge, setAlertBadge] = useState(0); // 읽지 않은 알림 수
+  const [alertFilter, setAlertFilter] = useState("all"); // all, buy, sell
   const [notiPerm, setNotiPerm] = useState(() => ("Notification" in window) ? Notification.permission : "unsupported");
   const scanCandleCache = useRef({}); // 스캔 중 수집된 캔들 데이터 캐시 {symbol: {closes, highs, lows, volumes}}
 
@@ -4013,6 +4015,7 @@ function AppInner() {
   const [newsItems, setNewsItems] = useState([]);
   const [newsLoading, setNewsLoading] = useState(false);
   const [newsSort, setNewsSort] = useState("time"); // time, positive, negative
+  const [newsCat, setNewsCat] = useState("all"); // all, us, kr, crypto
 
   // 소셜 센티먼트
   const [sentimentData, setSentimentData] = useState(null);
@@ -5510,6 +5513,47 @@ function AppInner() {
               score -= 2; // 커버리지 부족 시 목표가 신뢰도 감점
             }
 
+            // 12) ROE (자기자본이익률) — 수익 품질 보강
+            const roe = q.returnOnEquity;
+            if (roe != null) {
+              if (roe > 0.25)       { score += 7; reasons.push(`ROE ${(roe * 100).toFixed(0)}% 고효율`); }
+              else if (roe > 0.15)  { score += 4; }
+              else if (roe > 0.08)  { score += 1; }
+              else if (roe < 0)     { score -= 6; reasons.push(`ROE ${(roe * 100).toFixed(0)}% 적자`); }
+              else if (roe < 0.03)  { score -= 3; }
+            }
+
+            // 13) 부채비율 — 밸류 트랩 감지 (고부채 + 저PER는 위험)
+            const debtEquity = q.debtToEquity;
+            if (debtEquity != null) {
+              if (debtEquity > 300)     { score -= 10; reasons.push(`부채비율 ${debtEquity.toFixed(0)}% 위험`); }
+              else if (debtEquity > 200) { score -= 6; reasons.push(`부채비율 ${debtEquity.toFixed(0)}% 과다`); }
+              else if (debtEquity > 150) { score -= 3; }
+              else if (debtEquity < 30)  { score += 4; reasons.push("저부채 우량"); }
+              else if (debtEquity < 50)  { score += 2; }
+            }
+
+            // 14) 밸류 트랩 감지 — 저PER + 적자/매출감소 = 함정
+            if (per && per < 10 && margin != null && margin < 0) {
+              score -= 12; reasons.push("밸류 트랩 경고 (저PER + 적자)");
+            } else if (per && per < 12 && revGrowth != null && revGrowth < -0.15) {
+              score -= 8; reasons.push("밸류 트랩 주의 (저PER + 매출 급감)");
+            }
+
+            // 15) FCF Yield 대용 — 이익률 + 저PER 시너지
+            if (margin != null && margin > 0.15 && per != null && per > 0 && per < 15) {
+              const impliedFCFYield = (margin * 100) / per;
+              if (impliedFCFYield > 2) { score += 6; reasons.push(`높은 수익효율 (이익률/PER ${impliedFCFYield.toFixed(1)})`); }
+              else if (impliedFCFYield > 1.2) { score += 3; }
+            }
+
+            // 16) 시가총액 크기별 안정성 보정
+            if (q.marketCap) {
+              if (q.marketCap >= 200e9) { score += 3; } // 초대형 안정성
+              else if (q.marketCap >= 50e9) { score += 1; }
+              else if (q.marketCap < 2e9) { score -= 3; reasons.push("소형주 리스크"); }
+            }
+
             score = Math.max(0, Math.min(100, score));
 
             allResults.push({
@@ -5531,6 +5575,8 @@ function AppInner() {
               high52: high52 || null,
               profitMargin: margin || null,
               revenueGrowth: revGrowth || null,
+              roe: roe || null,
+              debtToEquity: debtEquity || null,
               reasons,
             });
             done++;
@@ -5686,8 +5732,22 @@ function AppInner() {
     };
   }, { invested: 0, current: 0, pnl: 0, hasPrices: false });
 
-  // 뉴스 정렬
-  const sortedNews = [...newsItems].sort((a, b) => {
+  // 뉴스 카테고리 필터 + 정렬
+  const filteredNews = useMemo(() => {
+    if (newsCat === "all") return newsItems;
+    return newsItems.filter(n => {
+      const title = (n.title || "").toLowerCase();
+      const tags = (n.tags || []).map(t => t.toLowerCase()).join(" ");
+      const src = (n.source || "").toLowerCase();
+      const txt = title + " " + tags + " " + src;
+      if (newsCat === "crypto") return txt.match(/crypto|bitcoin|btc|ethereum|eth|solana|sol|코인|가상화폐|비트코인|이더리움|크립토|coingecko|트렌딩/);
+      if (newsCat === "kr") return txt.match(/코스피|코스닥|한국|삼성|현대|sk|lg|카카오|네이버|한화|포스코|🇰🇷/);
+      if (newsCat === "us") return !txt.match(/crypto|bitcoin|btc|ethereum|eth|solana|코인|가상화폐|비트코인|코스피|코스닥/) || txt.match(/s&p|nasdaq|nyse|미국|뉴욕증시|🇺🇸/);
+      return true;
+    });
+  }, [newsItems, newsCat]);
+
+  const sortedNews = [...filteredNews].sort((a, b) => {
     if (newsSort === "time") {
       return new Date(b.date || b.publishedAt || b.pubDate || 0) - new Date(a.date || a.publishedAt || a.pubDate || 0);
     } else if (newsSort === "positive") {
@@ -5853,9 +5913,13 @@ function AppInner() {
         <div className="sb-logo" onClick={() => setTab("home")}>
           <span style={{ fontSize: "22px" }}>📡</span>
           <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
-          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v9.7</span>
+          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v9.8</span>
         </div>
-        <div className="sb-section">메인</div>
+        <div className="sb-section" onClick={() => setSbCollapsed(p => ({...p, main: !p.main}))} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}>
+          <span>메인</span>
+          <span style={{ fontSize: "10px", color: C.text3, transition: "transform .2s", transform: sbCollapsed.main ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
+        </div>
+        {!sbCollapsed.main && (
         <nav className="sb-nav">
           {[
             { id: "home", label: "홈 대시보드", icon: "🏠" },
@@ -5875,8 +5939,13 @@ function AppInner() {
             </button>
           ))}
         </nav>
+        )}
         <div className="sb-divider" />
-        <div className="sb-section">운용 & 분석</div>
+        <div className="sb-section" onClick={() => setSbCollapsed(p => ({...p, ops: !p.ops}))} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}>
+          <span>운용 & 분석</span>
+          <span style={{ fontSize: "10px", color: C.text3, transition: "transform .2s", transform: sbCollapsed.ops ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
+        </div>
+        {!sbCollapsed.ops && (
         <nav className="sb-nav">
           {[
             { id: "quant-port", label: "전략 운용", icon: "📊" },
@@ -5891,8 +5960,13 @@ function AppInner() {
             </button>
           ))}
         </nav>
+        )}
         <div className="sb-divider" />
-        <div className="sb-section">자산 & 정보</div>
+        <div className="sb-section" onClick={() => setSbCollapsed(p => ({...p, info: !p.info}))} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}>
+          <span>자산 & 정보</span>
+          <span style={{ fontSize: "10px", color: C.text3, transition: "transform .2s", transform: sbCollapsed.info ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
+        </div>
+        {!sbCollapsed.info && (
         <nav className="sb-nav">
           {[
             { id: "portfolio", label: "내 포트폴리오", icon: "💼" },
@@ -5913,6 +5987,7 @@ function AppInner() {
             </button>
           ))}
         </nav>
+        )}
         <div style={{ flex: 1 }} />
         <div style={{ padding: "12px 20px", borderTop: `1px solid ${C.border}` }}>
           <button onClick={toggleTheme} style={{
@@ -6148,12 +6223,21 @@ function AppInner() {
                             </div>
                           </div>
                         ))}
-                        {/* 투자심리 칩 */}
+                        {/* 투자심리 카드 (강조) */}
                         {fgVal && (
-                          <div style={{ minWidth: "105px", padding: "12px 14px", borderRadius: "12px", flexShrink: 0, background: `${fgColor}12` }}>
+                          <div style={{
+                            minWidth: "130px", padding: "12px 16px", borderRadius: "12px", flexShrink: 0,
+                            background: `linear-gradient(135deg, ${fgColor}18, ${fgColor}08)`,
+                            border: `1px solid ${fgColor}30`,
+                          }}>
                             <div style={{ fontSize: "11px", color: C.text3, marginBottom: "5px", fontWeight: 500 }}>투자심리</div>
-                            <div style={{ fontWeight: 700, fontSize: "14px", color: fgColor }}>{fgVal}</div>
-                            <div style={{ fontSize: "11px", color: C.text3, marginTop: "2px" }}>{fgLabel}</div>
+                            <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
+                              <span style={{ fontWeight: 800, fontSize: "22px", color: fgColor }}>{fgVal}</span>
+                              <span style={{ fontSize: "11px", fontWeight: 700, color: fgColor }}>{fgLabel}</span>
+                            </div>
+                            <div style={{ marginTop: "6px", height: "4px", borderRadius: "2px", background: C.card2, overflow: "hidden" }}>
+                              <div style={{ height: "100%", width: `${fgVal}%`, background: fgColor, borderRadius: "2px", transition: "width .5s ease" }} />
+                            </div>
                           </div>
                         )}
                         {/* 환율 칩 (인덱스에 없을 때) */}
@@ -6276,7 +6360,7 @@ function AppInner() {
                   }}>{picksExpanded ? "접기" : `더보기 (${dailyPicks.length})`}</button>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  {dailyPicks.slice(0, picksExpanded ? 40 : 8).map((pick, i) => {
+                  {dailyPicks.slice(0, picksExpanded ? 15 : 5).map((pick, i) => {
                     const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
                     const isPos = pick.change >= 0;
                     return (
@@ -7513,10 +7597,37 @@ function AppInner() {
 
             {/* 포트폴리오 아이템 */}
             {portfolio.length === 0 ? (
-              <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "48px 24px", textAlign: "center" }}>
+              <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "40px 24px", textAlign: "center" }}>
                 <div style={{ fontSize: "44px", marginBottom: "16px" }}>💼</div>
-                <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "8px", color: C.text1 }}>포트폴리오 비어있음</div>
-                <div style={{ color: C.text3, fontSize: "14px" }}>자산을 추가하여 시작하세요</div>
+                <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "8px", color: C.text1 }}>포트폴리오를 시작하세요</div>
+                <div style={{ color: C.text3, fontSize: "14px", marginBottom: "24px", lineHeight: 1.6 }}>
+                  보유 종목을 추가하면 실시간 수익률 추적,<br/>리스크 분석, 매매 시그널 알림을 받을 수 있어요
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxWidth: "320px", margin: "0 auto", textAlign: "left" }}>
+                  {[
+                    { icon: "1️⃣", text: "우측 상단 '+ 추가' 버튼을 클릭하세요" },
+                    { icon: "2️⃣", text: "종목 검색 후 매입가와 수량을 입력하세요" },
+                    { icon: "3️⃣", text: "실시간 수익률과 AI 분석을 확인하세요" },
+                  ].map((step, i) => (
+                    <div key={i} style={{
+                      display: "flex", alignItems: "center", gap: "10px", padding: "10px 14px",
+                      background: C.card2, borderRadius: "10px",
+                    }}>
+                      <span style={{ fontSize: "16px" }}>{step.icon}</span>
+                      <span style={{ fontSize: "13px", color: C.text2, fontWeight: 500 }}>{step.text}</span>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ marginTop: "20px", display: "flex", gap: "8px", justifyContent: "center" }}>
+                  <button onClick={() => setTab("screener")} style={{
+                    padding: "10px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
+                    background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}30`, cursor: "pointer",
+                  }}>🔍 종목 탐색하기</button>
+                  <button onClick={() => setTab("quant-report")} style={{
+                    padding: "10px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
+                    background: C.card2, color: C.text2, border: `1px solid ${C.border}`, cursor: "pointer",
+                  }}>📋 오늘의 추천 보기</button>
+                </div>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -7942,10 +8053,16 @@ function AppInner() {
           const krUp = krStocks.filter(a => a.change > 0).length;
           const cryptoUp = cryptos.filter(a => a.change > 0).length;
 
-          // 상위 상승/하락 5개
+          // 상위 상승/하락 5개 (마켓별 분리)
           const sorted = [...hotAssets].sort((a, b) => b.change - a.change);
-          const topGainers = sorted.slice(0, 5);
-          const topLosers = sorted.slice(-5).reverse();
+          const usGainers = usStocks.sort((a, b) => b.change - a.change).slice(0, 3);
+          const krGainers = krStocks.sort((a, b) => b.change - a.change).slice(0, 3);
+          const cryptoGainers = cryptos.sort((a, b) => b.change - a.change).slice(0, 3);
+          const topGainers = [...usGainers, ...krGainers, ...cryptoGainers].sort((a, b) => b.change - a.change).slice(0, 5);
+          const usLosers = [...usStocks].sort((a, b) => a.change - b.change).slice(0, 3);
+          const krLosers = [...krStocks].sort((a, b) => a.change - b.change).slice(0, 3);
+          const cryptoLosers = [...cryptos].sort((a, b) => a.change - b.change).slice(0, 3);
+          const topLosers = [...usLosers, ...krLosers, ...cryptoLosers].sort((a, b) => a.change - b.change).slice(0, 5);
 
           // 추천 종목 상위
           const topPicks = dailyPicks.filter(p => p.score >= 6).slice(0, 5);
@@ -8150,7 +8267,7 @@ function AppInner() {
                     }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: 1, minWidth: 0 }}>
                         <span style={{ fontSize: "10px", fontWeight: 700, color: C.text3, width: "14px" }}>{i + 1}</span>
-                        <span style={{ fontSize: "12px", fontWeight: 600, color: C.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</span>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: C.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.market === "kr" ? "🇰🇷" : a.market === "crypto" ? "₿" : "🇺🇸"} {a.name}</span>
                       </div>
                       <span style={{ fontSize: "12px", fontWeight: 700, color: C.green, flexShrink: 0 }}>+{a.change}%</span>
                     </div>
@@ -8170,7 +8287,7 @@ function AppInner() {
                     }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: 1, minWidth: 0 }}>
                         <span style={{ fontSize: "10px", fontWeight: 700, color: C.text3, width: "14px" }}>{i + 1}</span>
-                        <span style={{ fontSize: "12px", fontWeight: 600, color: C.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.name}</span>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: C.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.market === "kr" ? "🇰🇷" : a.market === "crypto" ? "₿" : "🇺🇸"} {a.name}</span>
                       </div>
                       <span style={{ fontSize: "12px", fontWeight: 700, color: C.red, flexShrink: 0 }}>{a.change}%</span>
                     </div>
@@ -8387,8 +8504,23 @@ function AppInner() {
                   </div>
                 );
               })()}
-              {/* 정렬 옵션 */}
-              <div style={{ display: "flex", gap: "6px", marginTop: "12px" }}>
+              {/* 카테고리 필터 */}
+              <div style={{ display: "flex", gap: "6px", marginTop: "12px", flexWrap: "wrap" }}>
+                {[
+                  ["all", "전체"],
+                  ["us", "🇺🇸 미국"],
+                  ["kr", "🇰🇷 한국"],
+                  ["crypto", "₿ 크립토"],
+                ].map(([v, l]) => (
+                  <button key={v} onClick={() => setNewsCat(v)} style={{
+                    padding: "5px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+                    background: newsCat === v ? C.blueBg : "transparent",
+                    color: newsCat === v ? C.blue : C.text3,
+                    border: `1px solid ${newsCat === v ? C.blue + "40" : "transparent"}`,
+                    cursor: "pointer", transition: "all .15s",
+                  }}>{l}</button>
+                ))}
+                <div style={{ width: "1px", background: C.border, margin: "0 4px" }} />
                 {[
                   ["time", "최신순"],
                   ["positive", "긍정"],
@@ -8599,6 +8731,25 @@ function AppInner() {
                 )}
               </div>
 
+              {/* 알림 필터 탭 */}
+              {tradeAlerts.length > 0 && (
+                <div style={{ display: "flex", gap: "6px", marginBottom: "12px" }}>
+                  {[
+                    ["all", "전체", tradeAlerts.length],
+                    ["buy", "매수", tradeAlerts.filter(a => a.action === "매수").length],
+                    ["sell", "매도", tradeAlerts.filter(a => a.action !== "매수").length],
+                  ].map(([v, l, cnt]) => (
+                    <button key={v} onClick={() => setAlertFilter(v)} style={{
+                      padding: "6px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+                      background: alertFilter === v ? (v === "buy" ? C.greenBg : v === "sell" ? C.redBg : C.blueBg) : C.card2,
+                      color: alertFilter === v ? (v === "buy" ? C.green : v === "sell" ? C.red : C.blue) : C.text3,
+                      border: `1px solid ${alertFilter === v ? (v === "buy" ? C.green + "40" : v === "sell" ? C.red + "40" : C.blue + "40") : "transparent"}`,
+                      cursor: "pointer", transition: "all .15s",
+                    }}>{l} <span style={{ opacity: 0.7 }}>{cnt}</span></button>
+                  ))}
+                </div>
+              )}
+
               {/* 알림 피드 */}
               {tradeAlerts.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "40px 0", color: C.text3 }}>
@@ -8608,7 +8759,7 @@ function AppInner() {
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "520px", overflow: "auto" }}>
-                  {tradeAlerts.slice(0, 50).map((alert, i) => {
+                  {tradeAlerts.filter(a => alertFilter === "all" ? true : alertFilter === "buy" ? a.action === "매수" : a.action !== "매수").slice(0, 50).map((alert, i) => {
                     const isBuy = alert.action === "매수";
                     const time = new Date(alert.timestamp);
                     const timeStr = time.toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });

@@ -1,0 +1,17 @@
+📊 DI금융 스크리닝 고도화 보고서 (3/16 월)
+
+🔴 P1 긴급
+• goldenCross/deathCross return 누락 2일째 — quickDiagnosis에서 접근 불가. 2줄 추가로 해결
+
+🟡 P2 주요 (4일째 미구현 포함)
+• [신규⚠️] stoch 반환값이 배열 → momScore ±8점 stochastic 판정 미작동 가능성. 즉시 검증 권고
+• MACD div → quickDiagnosis ±10점 반영 4일째 미구현
+• GC/DC 이벤트 보너스 ±12점 4일째 미구현 (P1 blocker)
+• BB 스퀴즈 폴백 저변동성 오탐, RSI 크립토 보정, calcMACD 네이밍
+
+🟢 신규 지표 제안
+• 복합 다이버전스 (RSI+MACD 동시) ±15점
+• MACD 히스토그램 크로스 +6점
+• StochRSI 스크리닝 조건
+
+💡 핵심: 상위 4건(return추가→stoch수정→MACD div→GC/DC) ~20줄 수정으로 quickDiagnosis 즉시 개선 가능. stoch 버그 최우선 확인!

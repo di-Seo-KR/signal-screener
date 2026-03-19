@@ -1,0 +1,7 @@
+pending
+reason: Chrome MCP 도구 전체 타임아웃 (브라우저 미응답)
+created: 2026-03-17T00:03:00+09:00
+attempts: 4 (navigate x2, javascript_tool x1, screenshot x1 — 모두 60s 타임아웃)
+action_needed: 브라우저 재시작 후 수동 발송 또는 다음 스케줄에서 재시도
+alert_file: telegram-pending-2026-03-17-alert-0003.txt
+signal: SPY +1% 갭업 확정 마감, WTI 급락 -2.9%, NVIDIA GTC Vera Rubin 공개, FOMC 개시, BTC $73,860 고점권 유지

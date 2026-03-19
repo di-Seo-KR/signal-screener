@@ -1,0 +1,5 @@
+PENDING — Chrome browser timeout, 텔레그램 발송 실패
+시각: 2026-03-17 20:03 KST
+사유: Chrome MCP 전체 timeout (navigate, javascript_tool, screenshot 모두 60s 초과)
+메시지 파일: telegram-pending-2026-03-17-alert-2003.txt
+다음 세션에서 발송 재시도 필요

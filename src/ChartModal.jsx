@@ -459,6 +459,53 @@ function runDiagnosis(candles) {
     return "mixed";
   })();
 
+  // ── 일목균형표 (Ichimoku Cloud) ──
+  const ichimoku = (() => {
+    if (n < 52) return null;
+    // 전환선 (9일), 기준선 (26일)
+    const tenkan = (Math.max(...highs.slice(-9)) + Math.min(...lows.slice(-9))) / 2;
+    const kijun = (Math.max(...highs.slice(-26)) + Math.min(...lows.slice(-26))) / 2;
+    // 선행스팬A (26일 후), 선행스팬B (52일)
+    const senkouA = (tenkan + kijun) / 2;
+    const senkouB = (Math.max(...highs.slice(-52)) + Math.min(...lows.slice(-52))) / 2;
+    const cloudTop = Math.max(senkouA, senkouB);
+    const cloudBot = Math.min(senkouA, senkouB);
+    const aboveCloud = last > cloudTop;
+    const belowCloud = last < cloudBot;
+    const inCloud = !aboveCloud && !belowCloud;
+    const cloudThickness = cloudTop > 0 ? ((cloudTop - cloudBot) / cloudTop) * 100 : 0;
+    const tkCross = tenkan > kijun ? "bull" : tenkan < kijun ? "bear" : "flat";
+    return { tenkan, kijun, senkouA, senkouB, cloudTop, cloudBot, aboveCloud, belowCloud, inCloud, cloudThickness, tkCross };
+  })();
+
+  // ── 피보나치 되돌림 레벨 ──
+  const fibonacci = (() => {
+    if (n < 60) return null;
+    const lookback = Math.min(n, 120);
+    const recentHigh = Math.max(...highs.slice(-lookback));
+    const recentLow = Math.min(...lows.slice(-lookback));
+    const diff = recentHigh - recentLow;
+    if (diff <= 0) return null;
+    const levels = {
+      0: recentHigh,
+      0.236: recentHigh - diff * 0.236,
+      0.382: recentHigh - diff * 0.382,
+      0.5: recentHigh - diff * 0.5,
+      0.618: recentHigh - diff * 0.618,
+      0.786: recentHigh - diff * 0.786,
+      1: recentLow,
+    };
+    // 가장 가까운 피보나치 레벨
+    let nearestLevel = null;
+    let nearestDist = Infinity;
+    for (const [ratio, price] of Object.entries(levels)) {
+      const dist = Math.abs(last - price);
+      if (dist < nearestDist) { nearestDist = dist; nearestLevel = { ratio: parseFloat(ratio), price }; }
+    }
+    const distPct = nearestLevel ? (nearestDist / last) * 100 : null;
+    return { levels, nearestLevel, distPct };
+  })();
+
   // 캔들패턴 감지 (최근 3일)
   const candlePatterns = [];
   if (n >= 3) {
@@ -525,6 +572,27 @@ function runDiagnosis(candles) {
   // 추세 전환 조기 감지
   if (maConvergence?.converging) {
     signals.push({ type: "neutral", name: "MA 수렴 (추세 전환 임박)", detail: `MA5-MA20 스프레드 ${maConvergence.spread.toFixed(2)}% — 방향 전환 주의` });
+  }
+  // ── 일목균형표 신호 ──
+  if (ichimoku) {
+    if (ichimoku.aboveCloud && ichimoku.tkCross === "bull") {
+      trendScore += 8; signals.push({ type: "bullish", name: "일목 구름 상방 + 전환/기준 골든크로스", detail: `구름 두께 ${ichimoku.cloudThickness.toFixed(1)}% — 강한 상승 추세 확인` });
+    } else if (ichimoku.aboveCloud) {
+      trendScore += 4; signals.push({ type: "bullish", name: "일목 구름 상방", detail: "현재가가 구름대 위 — 상승 추세 지속" });
+    } else if (ichimoku.belowCloud && ichimoku.tkCross === "bear") {
+      trendScore -= 8; signals.push({ type: "bearish", name: "일목 구름 하방 + 전환/기준 데드크로스", detail: `구름 두께 ${ichimoku.cloudThickness.toFixed(1)}% — 강한 하락 추세 확인` });
+    } else if (ichimoku.belowCloud) {
+      trendScore -= 4; signals.push({ type: "bearish", name: "일목 구름 하방", detail: "현재가가 구름대 아래 — 하락 추세" });
+    } else if (ichimoku.inCloud) {
+      signals.push({ type: "neutral", name: "일목 구름 내부 (비추세)", detail: "가격이 구름대 안 — 추세 불명확, 돌파 대기" });
+    }
+  }
+  // ── 피보나치 근접 레벨 ──
+  if (fibonacci && fibonacci.distPct < 1.5) {
+    const ratio = fibonacci.nearestLevel.ratio;
+    const levelName = ratio === 0.618 ? "황금비율(0.618)" : ratio === 0.382 ? "0.382" : ratio === 0.5 ? "0.5" : `${ratio}`;
+    signals.push({ type: "neutral", name: `피보나치 ${levelName} 레벨 근접`, detail: `$${fibonacci.nearestLevel.price.toFixed(2)} (${fibonacci.distPct.toFixed(1)}% 이내) — 반전/지지 가능 구간` });
+    if (ratio >= 0.618 && change5 < -3) { trendScore += 4; } // 깊은 되돌림 후 반등 기대
   }
   trendScore = Math.max(0, Math.min(100, trendScore));
   const trendDetail = last > (sma20 || last)
@@ -693,7 +761,7 @@ function runDiagnosis(candles) {
   else if (totalScore >= 20) { verdict = "매도"; summary = "다수의 하락 신호가 감지됩니다. 포지션 정리 또는 손절을 고려하세요."; }
   else { verdict = "적극 매도"; summary = "강한 하락 신호가 다수 감지됩니다. 즉각적인 리스크 관리가 필요합니다."; }
 
-  // ── 적정가치 추정 (다중 모델 기반) ──
+  // ── 적정가치 추정 (다중 모델 앙상블) ──
   let fairValue = null;
   let fairValueMethod = "";
   if (n >= 50) {
@@ -701,19 +769,54 @@ function runDiagnosis(candles) {
     const sma200Val = sma200 || sma120 || sma50Val;
     const bbMid = bb ? bb.middle : sma20;
 
-    // 기본 적정가: 이동평균 + BB 가중 평균
-    let base = sma20 * 0.20 + sma50Val * 0.25 + sma200Val * 0.25 + bbMid * 0.15 + last * 0.15;
+    // 모델 1: MA 앙상블 (이동평균 가중 합성)
+    const maModel = sma20 * 0.15 + sma50Val * 0.25 + sma200Val * 0.30 + bbMid * 0.15 + last * 0.15;
 
-    // 추세 보정: 강한 추세시 현재가 비중 증가
-    if (trendScore >= 75) base = base * 0.6 + last * 0.4;
-    else if (trendScore <= 25) base = base * 0.6 + last * 0.4;
+    // 모델 2: VWAP + 일목 기준선 복합 (수급 기반)
+    const vwapModel = (() => {
+      const components = [];
+      if (vwap) components.push({ val: vwap, w: 0.35 });
+      if (ichimoku) components.push({ val: ichimoku.kijun, w: 0.30 });
+      components.push({ val: sma50Val, w: 0.20 });
+      components.push({ val: last, w: 0.15 });
+      const totalW = components.reduce((s, c) => s + c.w, 0);
+      return components.reduce((s, c) => s + c.val * (c.w / totalW), 0);
+    })();
+
+    // 모델 3: 평균회귀 모델 (ATR 기반 적정 레인지 중심)
+    const meanRevModel = (() => {
+      const center = sma200Val || sma50Val;
+      const atrBand = atr ? atr * 2 : 0;
+      // 현재가가 과매도면 중심 + ATR 쪽, 과매수면 중심 - ATR 쪽
+      if (rsi != null && rsi < 35) return center + atrBand * 0.3;
+      if (rsi != null && rsi > 65) return center - atrBand * 0.3;
+      return center;
+    })();
+
+    // 앙상블: 모델별 가중 평균 (시장 상태에 따라 가중치 조정)
+    let w1 = 0.40, w2 = 0.30, w3 = 0.30; // 기본 가중치
+    if (trendScore >= 70) { w1 = 0.50; w2 = 0.30; w3 = 0.20; } // 강한 추세 → MA 모델 비중↑
+    else if (trendScore <= 30) { w1 = 0.25; w2 = 0.25; w3 = 0.50; } // 약한 추세 → 평균회귀 비중↑
+    else if (supScore >= 65) { w1 = 0.30; w2 = 0.45; w3 = 0.25; } // 수급 강한 → VWAP 모델↑
+
+    let base = maModel * w1 + vwapModel * w2 + meanRevModel * w3;
+
+    // 추세 보정: 강한 추세시 현재가 방향으로 보정
+    if (trendScore >= 75) base = base * 0.7 + last * 0.3;
+    else if (trendScore <= 25) base = base * 0.7 + last * 0.3;
 
     // 모멘텀 보정
-    if (momScore >= 70) base *= 1.02; // 강한 모멘텀 → 적정가 약간 상향
+    if (momScore >= 70) base *= 1.02;
     else if (momScore <= 30) base *= 0.98;
 
+    // 일목균형표 구름대 보정
+    if (ichimoku) {
+      if (ichimoku.aboveCloud) base = Math.max(base, ichimoku.cloudTop * 0.98);
+      if (ichimoku.belowCloud) base = Math.min(base, ichimoku.cloudBot * 1.02);
+    }
+
     fairValue = base;
-    fairValueMethod = "MA/BB/추세/모멘텀 복합 모델";
+    fairValueMethod = "MA앙상블 + VWAP/일목 + 평균회귀 (3모델 가중)";
 
     const premium = ((last - fairValue) / fairValue) * 100;
     if (premium > 20) signals.push({ type: "bearish", name: `적정가 대비 +${premium.toFixed(0)}% 고평가`, detail: `기술적 적정가 $${fairValue.toFixed(2)} 대비 상당한 프리미엄` });
@@ -743,6 +846,7 @@ function runDiagnosis(candles) {
     vwap, vwapDeviation,
     supportResistance, distToSupport, distToResist,
     maConvergence,
+    ichimoku, fibonacci,
   };
 }
 

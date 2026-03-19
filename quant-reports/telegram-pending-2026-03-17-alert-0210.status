@@ -1,0 +1,6 @@
+pending
+reason: Chrome browser tools timed out - all javascript_tool and navigate calls failed after 60s
+created: 2026-03-17T02:10:00+09:00
+attempts: 1
+last_attempt: 2026-03-17T02:15:00+09:00
+next_action: retry on next scheduled run or manual send

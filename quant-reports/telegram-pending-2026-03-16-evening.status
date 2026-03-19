@@ -1,0 +1,8 @@
+status: pending
+reason: Chrome browser MCP connection entirely unresponsive - all tab operations timing out (10+ attempts across multiple tabs)
+created: 2026-03-16T22:00:00+09:00
+attempts: 10
+last_attempt: 2026-03-16T22:10:00+09:00
+action_needed: Manual send or retry when Chrome MCP recovers
+message_file: telegram-pending-2026-03-16-evening.txt
+report_file: evening-picks-2026-03-16.md

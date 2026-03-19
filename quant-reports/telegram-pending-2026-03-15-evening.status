@@ -1,0 +1,7 @@
+status: PENDING
+reason: Chrome browser timeout (all tabs unresponsive, navigate/javascript_tool all timed out after 60s)
+attempted: 2026-03-15T22:00:00+09:00
+retries: 3
+message_file: telegram-pending-2026-03-15-evening.txt
+report_file: evening-picks-2026-03-15.md
+next_retry: next scheduled task execution

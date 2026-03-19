@@ -1,0 +1,7 @@
+pending
+reason: Chrome MCP 도구 전체 타임아웃 (브라우저 미응답)
+created: 2026-03-16T22:04:00+09:00
+attempts: 8 (navigate x3, javascript_tool x4, screenshot x1 — 모두 60s 타임아웃)
+action_needed: 브라우저 재시작 후 수동 발송 또는 다음 스케줄에서 재시도
+alert_file: telegram-pending-2026-03-16-alert-2204.txt
+signal: Crypto F&G 15→23 급반등, 미국 본장 개장 임박 SPY +1.05% 갭업, BTC $74,100 40일 신고가 유지

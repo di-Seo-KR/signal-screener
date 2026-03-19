@@ -1,0 +1,6 @@
+pending - 브라우저 타임아웃으로 발송 대기 중
+생성: 2026-03-17 12:04 KST
+사유: Chrome MCP 도구 반복 타임아웃 (navigate, screenshot, javascript 모두 60s 초과)
+     WebFetch 대체 시도도 EGRESS_BLOCKED
+조치: telegram-pending 파일 생성 완료, 다음 실행 시 발송 시도 필요
+시그널: BTC $75K 돌파, 삼성전자 -21% 주간, SK하이닉스 +7%, 공포지수 극단 등 복수 긴급 시그널

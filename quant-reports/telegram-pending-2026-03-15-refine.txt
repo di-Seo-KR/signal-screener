@@ -1,0 +1,19 @@
+📊 스크리닝 고도화 리포트 (3/15)
+
+🔴 P1 긴급 — goldenCross/deathCross return 누락
+- analyzeAsset에서 계산되나 return 미포함
+- quickDiagnosis 접근 불가 → GC/DC 보너스 blocker
+- 수정: return 객체에 2줄 추가
+
+🟡 P2 미구현 3일째
+1) MACD div → quickDiagnosis (±10점)
+2) GC/DC 이벤트 보너스 (±12점)
+→ P1 해결 후 ~15줄로 즉시 구현 가능
+
+🟡 P2 신규 발견
+3) BB 스퀴즈 폴백: 저변동성 종목 오탐 가능
+4) RSI 임계값: 크립토 마켓 미보정
+
+📈 신규 제안: MACD 히스토그램 크로스 활용, VP POC 52주 제한
+
+⏱ 총 ~15줄 수정으로 점수 예측력 즉시 개선 가능
