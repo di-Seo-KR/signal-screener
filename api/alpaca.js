@@ -175,6 +175,30 @@ export default async function handler(req, res) {
         break;
       }
 
+      // ── 크립토 최신 시세 (Alpaca Crypto Data API) ──
+      case "crypto_quote": {
+        const symbol = req.query.symbol; // e.g. "BTC/USD"
+        if (!symbol) return res.status(400).json({ error: "symbol required (e.g. BTC/USD)" });
+        const encoded = encodeURIComponent(symbol);
+        const r = await fetch(`${dataUrl}/v1beta3/crypto/us/latest/quotes?symbols=${encoded}`, { headers });
+        result = await r.json();
+        if (!r.ok) return res.status(r.status).json(result);
+        break;
+      }
+
+      // ── 크립토 바 (캔들) 데이터 ──
+      case "crypto_bars": {
+        const symbol = req.query.symbol;
+        const timeframe = req.query.timeframe || "1Day";
+        const limit = req.query.limit || "200";
+        if (!symbol) return res.status(400).json({ error: "symbol required" });
+        const encoded = encodeURIComponent(symbol);
+        const r = await fetch(`${dataUrl}/v1beta3/crypto/us/bars?symbols=${encoded}&timeframe=${timeframe}&limit=${limit}`, { headers });
+        result = await r.json();
+        if (!r.ok) return res.status(r.status).json(result);
+        break;
+      }
+
       // ── 특정 주문 조회 ──
       case "get_order": {
         const orderId = req.query.order_id;
@@ -194,7 +218,7 @@ export default async function handler(req, res) {
       }
 
       default:
-        return res.status(400).json({ error: `Unknown action: ${action}. Supported: account, positions, orders, submit_order, cancel_order, cancel_all, close_all, close_position, activities, latest_quote, clock` });
+        return res.status(400).json({ error: `Unknown action: ${action}. Supported: account, positions, orders, submit_order, cancel_order, cancel_all, close_all, close_position, activities, latest_quote, crypto_quote, crypto_bars, clock` });
     }
 
     res.setHeader("Cache-Control", "no-store");
