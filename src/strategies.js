@@ -1,6 +1,7 @@
 // ════════════════════════════════════════════════════════════════════
-// DI금융 퀀트 엔진 v3.1 — 월가 수준 고도화
-// 32개 매매전략 + 백테스팅 엔진 + 시장진단 + 전략추천
+// DI금융 퀀트 엔진 v3.2 — 월가 수준 고도화
+// 33개 매매전략 + 백테스팅 엔진 + 시장진단 + 전략추천
+// v3.2: BTC 알파 전략 추가 (비트코인 전용 멀티팩터 자동매매)
 // v3.0: 약한 전략 4개 제거, 우수 전략 8개 추가
 // v3.1: 전 전략 거래량 확인·다이버전스·추세필터·신뢰도 지표 적용
 //   - 거래량 교차검증 (isVolumeConfirmed) 전략별 임계값 최적화
@@ -215,7 +216,7 @@ function detectBearishDivergence(closes, rsi, index, lookback = 10) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 매매 전략 정의 (32개)
+// 매매 전략 정의 (33개)
 // ════════════════════════════════════════════════════════════════════
 
 // ━━━ 전략 1: RSI 반전 전략 ━━━
@@ -1451,6 +1452,259 @@ export const strategyChannelMomentum = {
   },
 };
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 전략 33: BTC 알파 — 비트코인 전용 멀티팩터 자동매매
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 비트코인 특성 최적화:
+//   1. 고변동성 대응: BB(2.5σ) + ATR 동적 임계값
+//   2. 모멘텀 확인: RSI(14) 크립토 조정 임계값 (25/75)
+//   3. 거래량 폭발: 평균 대비 2x 거래량 급증 감지
+//   4. 추세 필터: EMA 21/55 크로스 + ADX 추세 강도
+//   5. MACD 히스토그램 가속도로 모멘텀 강화 확인
+//   6. 스퀴즈 브레이크아웃: BB 폭 축소 후 방향성 돌파
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+export const strategyBTCAlpha = {
+  id: "btc_alpha",
+  name: "₿ BTC 알파 전략",
+  desc: "비트코인 전용 멀티팩터 전략. RSI(25/75) + BB(2.5σ) + 거래량 폭증 + EMA 추세필터 + MACD 가속도를 결합하여 BTC의 고변동성·모멘텀 특성에 최적화된 매매 시그널 생성.",
+  category: "크립토",
+  risk: "고",
+  icon: "₿",
+  params: {
+    rsiPeriod: 14,
+    rsiBuy: 25,
+    rsiSell: 75,
+    bbPeriod: 20,
+    bbMult: 2.5,
+    emaFast: 21,
+    emaSlow: 55,
+    volSurge: 2.0,
+    adxThreshold: 20,
+    squeezeLen: 6,
+  },
+  generate(candles, params = {}) {
+    const {
+      rsiPeriod = 14, rsiBuy = 25, rsiSell = 75,
+      bbPeriod = 20, bbMult = 2.5,
+      emaFast = 21, emaSlow = 55,
+      volSurge = 2.0, adxThreshold = 20, squeezeLen = 6,
+    } = { ...this.params, ...params };
+
+    if (candles.length < emaSlow + 10) return [];
+
+    const closes = candles.map(c => c.close);
+    const highs = candles.map(c => c.high);
+    const lows = candles.map(c => c.low);
+    const volumes = candles.map(c => c.volume || 0);
+
+    // ── 지표 계산 ──
+    const rsi = calcRSI(closes, rsiPeriod);
+    const bb = calcBB(closes, bbPeriod, bbMult);
+    const ema21 = calcEMA(closes, emaFast);
+    const ema55 = calcEMA(closes, emaSlow);
+    const { macdLine, signal: macdSig, histogram } = calcMACD(closes);
+    const adx = calcADX(highs, lows, closes, 14);
+    const atr = calcATR(highs, lows, closes, 14);
+
+    // ── 거래량 SMA (20일) ──
+    const volSMA = calcSMA(volumes, 20);
+
+    const signals = [];
+    const minIdx = Math.max(emaSlow, bbPeriod, 30);
+
+    for (let i = minIdx; i < candles.length; i++) {
+      if (rsi[i] == null || !bb[i] || histogram[i] == null) continue;
+
+      const price = closes[i];
+      const prevPrice = closes[i - 1];
+
+      // ── 팩터 계산 ──
+      // 1) 추세 방향: EMA21 > EMA55 = 상승추세
+      const trendUp = ema21[i] > ema55[i];
+      const trendDown = ema21[i] < ema55[i];
+      const emaCrossUp = ema21[i] > ema55[i] && ema21[i - 1] <= ema55[i - 1];
+      const emaCrossDown = ema21[i] < ema55[i] && ema21[i - 1] >= ema55[i - 1];
+
+      // 2) RSI 상태
+      const rsiOversold = rsi[i] <= rsiBuy;
+      const rsiOverbought = rsi[i] >= rsiSell;
+      const rsiBounce = rsi[i] > rsiBuy && rsi[i - 1] <= rsiBuy; // 과매도 탈출
+      const rsiDrop = rsi[i] < rsiSell && rsi[i - 1] >= rsiSell; // 과매수 탈출
+
+      // 3) BB 위치
+      const bbLower = price <= bb[i].lower;
+      const bbUpper = price >= bb[i].upper;
+      const bbBounce = prevPrice <= bb[i - 1]?.lower && price > bb[i].lower;
+      const bbReject = prevPrice >= bb[i - 1]?.upper && price < bb[i].upper;
+
+      // 4) 거래량 폭증
+      const volAvg = volSMA[i] || 0;
+      const curVol = volumes[i];
+      const volExplosion = volAvg > 0 && curVol >= volAvg * volSurge;
+
+      // 5) MACD 가속도 (히스토그램 방향 전환)
+      const macdAccelUp = histogram[i] > histogram[i - 1] && histogram[i - 1] <= histogram[i - 2];
+      const macdAccelDown = histogram[i] < histogram[i - 1] && histogram[i - 1] >= histogram[i - 2];
+      const macdCrossUp = macdLine[i] > macdSig[i] && macdLine[i - 1] <= macdSig[i - 1];
+      const macdCrossDown = macdLine[i] < macdSig[i] && macdLine[i - 1] >= macdSig[i - 1];
+
+      // 6) ADX 추세 강도
+      const adxStrong = adx[i] != null && adx[i] >= adxThreshold;
+
+      // 7) BB 스퀴즈 (밴드폭 축소 → 돌파)
+      let isSqueeze = false;
+      if (i >= squeezeLen && bb[i] && bb[i - squeezeLen]) {
+        const bwNow = bb[i].bw;
+        const bwPrev = bb[i - squeezeLen].bw;
+        isSqueeze = bwPrev > 0 && bwNow < bwPrev * 0.6; // 밴드폭 40% 이상 축소
+      }
+
+      // 8) RSI 강세 다이버전스
+      const bullDiv = detectBullishDivergence(closes, rsi, i, 15);
+      const bearDiv = detectBearishDivergence(closes, rsi, i, 15);
+
+      // 9) ATR 기반 변동성 비율
+      const atrPct = atr[i] && price > 0 ? (atr[i] / price) * 100 : 0;
+
+      // ════════════════════════════════════════════════════════════
+      // 매수 시그널 로직 (멀티팩터 합산)
+      // ════════════════════════════════════════════════════════════
+      let buyScore = 0;
+      const buyReasons = [];
+
+      // A) RSI 과매도 탈출 + 추세 상승
+      if (rsiBounce) {
+        buyScore += 3;
+        buyReasons.push(`RSI ${rsi[i].toFixed(1)} 과매도 탈출`);
+      }
+
+      // B) BB 하단 바운스
+      if (bbBounce) {
+        buyScore += 2;
+        buyReasons.push("BB 하단 반등");
+      }
+
+      // C) 거래량 폭증 + 양봉
+      if (volExplosion && price > prevPrice) {
+        buyScore += 2;
+        buyReasons.push(`거래량 ${(curVol / volAvg).toFixed(1)}x 폭증`);
+      }
+
+      // D) MACD 골든크로스 또는 가속 상승
+      if (macdCrossUp) {
+        buyScore += 2;
+        buyReasons.push("MACD 골든크로스");
+      } else if (macdAccelUp && histogram[i] > 0) {
+        buyScore += 1;
+        buyReasons.push("MACD 가속↑");
+      }
+
+      // E) EMA 정배열 크로스
+      if (emaCrossUp) {
+        buyScore += 3;
+        buyReasons.push("EMA21/55 골든크로스");
+      } else if (trendUp) {
+        buyScore += 1;
+      }
+
+      // F) BB 스퀴즈 후 상방 돌파
+      if (isSqueeze && price > bb[i].middle && volExplosion) {
+        buyScore += 3;
+        buyReasons.push("스퀴즈 상방돌파");
+      }
+
+      // G) 강세 다이버전스
+      if (bullDiv) {
+        buyScore += 2;
+        buyReasons.push("RSI 강세 다이버전스");
+      }
+
+      // H) ADX 추세 확인 보너스
+      if (adxStrong && trendUp) {
+        buyScore += 1;
+        if (!buyReasons.some(r => r.includes("ADX")))
+          buyReasons.push(`ADX ${adx[i].toFixed(0)} 추세강화`);
+      }
+
+      // 매수 조건: 스코어 5 이상 (멀티팩터 확인)
+      if (buyScore >= 5) {
+        signals.push({
+          index: i,
+          type: "BUY",
+          price,
+          reason: `₿ [${buyScore}pt] ${buyReasons.join(" + ")}`,
+        });
+      }
+
+      // ════════════════════════════════════════════════════════════
+      // 매도 시그널 로직
+      // ════════════════════════════════════════════════════════════
+      let sellScore = 0;
+      const sellReasons = [];
+
+      // A) RSI 과매수 탈출
+      if (rsiDrop) {
+        sellScore += 3;
+        sellReasons.push(`RSI ${rsi[i].toFixed(1)} 과매수 탈출`);
+      }
+
+      // B) BB 상단 거부
+      if (bbReject) {
+        sellScore += 2;
+        sellReasons.push("BB 상단 거부");
+      }
+
+      // C) MACD 데드크로스
+      if (macdCrossDown) {
+        sellScore += 2;
+        sellReasons.push("MACD 데드크로스");
+      } else if (macdAccelDown && histogram[i] < 0) {
+        sellScore += 1;
+        sellReasons.push("MACD 가속↓");
+      }
+
+      // D) EMA 역배열 크로스
+      if (emaCrossDown) {
+        sellScore += 3;
+        sellReasons.push("EMA21/55 데드크로스");
+      } else if (trendDown) {
+        sellScore += 1;
+      }
+
+      // E) 약세 다이버전스
+      if (bearDiv) {
+        sellScore += 2;
+        sellReasons.push("RSI 약세 다이버전스");
+      }
+
+      // F) 거래량 폭증 + 음봉 (패닉셀)
+      if (volExplosion && price < prevPrice) {
+        sellScore += 2;
+        sellReasons.push(`거래량 ${(curVol / volAvg).toFixed(1)}x + 음봉`);
+      }
+
+      // G) 스퀴즈 후 하방 돌파
+      if (isSqueeze && price < bb[i].middle && price < prevPrice) {
+        sellScore += 2;
+        sellReasons.push("스퀴즈 하방돌파");
+      }
+
+      // 매도 조건: 스코어 5 이상
+      if (sellScore >= 5) {
+        signals.push({
+          index: i,
+          type: "SELL",
+          price,
+          reason: `₿ [${sellScore}pt] ${sellReasons.join(" + ")}`,
+        });
+      }
+    }
+
+    return signals;
+  },
+};
+
 // ── 전략 목록 ────────────────────────────────────────────────────
 export const ALL_STRATEGIES = [
   strategyRSI,
@@ -1485,6 +1739,7 @@ export const ALL_STRATEGIES = [
   strategyMACDDivergence,   // NEW: MACD 다이버전스
   strategyCandlePattern,    // NEW: 캔들 패턴
   strategyChannelMomentum,  // NEW: 채널 돌파 모멘텀
+  strategyBTCAlpha,         // NEW: ₿ BTC 전용 멀티팩터
 ];
 
 // ════════════════════════════════════════════════════════════════════
@@ -1696,6 +1951,9 @@ export function diagnoseMarket(candles) {
 export function recommendStrategies(marketDiagnosis) {
   const { regime, trend, volatility, momentum } = marketDiagnosis;
   const recs = [];
+
+  // BTC 알파: 크립토 전용 (모든 시장 국면에서 높은 우선순위)
+  recs.push({ strategy: strategyBTCAlpha, score: 10, reason: "₿ BTC 전용 멀티팩터 — 고변동성 크립토 시장 최적화 전략" });
 
   if (regime === "안정적 상승" || trend === "상승") {
     recs.push({ strategy: strategyMA, score: 9, reason: "상승 추세에서 이평선 크로스가 가장 효과적" });

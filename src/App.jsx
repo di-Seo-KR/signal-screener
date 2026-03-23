@@ -1,6 +1,6 @@
-// DI금융 v9.8 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
-// Features: 스크리닝, 캔들차트, 32개 전략, 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
-// v9.8: Quick Wins UX 업그레이드 — 추천 수 제한, 투자심리 강조, 뉴스 카테고리 필터, 매매알림 필터, 포트폴리오 온보딩, 리포트 마켓별 분리, 사이드바 접기
+// DI금융 v9.9 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
+// Features: 스크리닝, 캔들차트, 33개 전략(BTC 알파 포함), 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
+// v9.9: BTC 알파 전략 추가 + Daily Improvement (전략 수 정정, 콘솔로그 정리, 컬러 토큰화)
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 
 // ════════════════════════════════════════════════════════════════════
@@ -5358,7 +5358,6 @@ function AppInner() {
     updateNext();
 
     autoScanTimerRef.current = setInterval(() => {
-      console.log("[DI금융] 자동 스캔 실행 —", new Date().toLocaleTimeString("ko-KR"));
       runScan();
       updateNext();
     }, intervalMs);
@@ -5913,7 +5912,7 @@ function AppInner() {
         <div className="sb-logo" onClick={() => setTab("home")}>
           <span style={{ fontSize: "22px" }}>📡</span>
           <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
-          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v9.8</span>
+          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v9.9</span>
         </div>
         <div className="sb-section" onClick={() => setSbCollapsed(p => ({...p, main: !p.main}))} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}>
           <span>메인</span>
@@ -6015,7 +6014,7 @@ function AppInner() {
             title="홈으로 이동">
             <span style={{ fontSize: "22px" }}>📡</span>
             <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
-            <span style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v9.8</span>
+            <span style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v9.9</span>
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
@@ -7022,7 +7021,7 @@ function AppInner() {
               onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
                 <div style={{ fontSize: "22px", marginBottom: "8px" }}>📊</div>
                 <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "5px", color: C.text1 }}>전략 운용</div>
-                <div style={{ fontSize: "12px", color: C.text3 }}>32개 전략 포트폴리오</div>
+                <div style={{ fontSize: "12px", color: C.text3 }}>33개 전략 포트폴리오</div>
                 <div style={{ fontSize: "12px", color: C.green, fontWeight: 600, marginTop: "6px" }}>
                   실시간 수익률 추적 →
                 </div>
@@ -8613,7 +8612,7 @@ function AppInner() {
                 <div>
                   <div style={{ fontWeight: 800, fontSize: "18px" }}>🚨 전략 매매 알림</div>
                   <div style={{ fontSize: "12px", color: C.text3, marginTop: "2px" }}>
-                    32개 퀀트 전략의 generate() 함수로 실제 매매 시그널을 감지합니다
+                    33개 퀀트 전략의 generate() 함수로 실제 매매 시그널을 감지합니다
                   </div>
                 </div>
                 {tradeAlerts.length > 0 && (
@@ -8755,7 +8754,7 @@ function AppInner() {
                 <div style={{ textAlign: "center", padding: "40px 0", color: C.text3 }}>
                   <div style={{ fontSize: "40px", marginBottom: "12px" }}>🔕</div>
                   <div style={{ fontSize: "14px", fontWeight: 600, marginBottom: "4px" }}>아직 전략 매매 알림이 없습니다</div>
-                  <div style={{ fontSize: "12px" }}>스크리너를 실행하면 32개 퀀트 전략이 실제 generate() 시그널을 감지합니다</div>
+                  <div style={{ fontSize: "12px" }}>스크리너를 실행하면 33개 퀀트 전략이 실제 generate() 시그널을 감지합니다</div>
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "520px", overflow: "auto" }}>
