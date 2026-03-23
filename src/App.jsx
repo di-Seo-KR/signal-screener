@@ -44,6 +44,7 @@ import BacktestPanel from "./BacktestPanel.jsx";
 import QuantPortfolio from "./QuantPortfolio.jsx";
 import RiskHeatmap from "./RiskHeatmap.jsx";
 import PaperTrading from "./PaperTrading.jsx";
+import BTCTrading from "./BTCTrading.jsx";
 import { ALL_STRATEGIES } from "./strategies.js";
 
 // ════════════════════════════════════════════════════════════════════
@@ -3899,7 +3900,7 @@ function AppInner() {
     try {
       const p = new URLSearchParams(window.location.search);
       const t = p.get("tab");
-      if (t && ["paper-trading","portfolio","screener","alerts","news","quant-portfolio","sector-flow","backtest","sentiment"].includes(t)) return t;
+      if (t && ["paper-trading","btc-trading","portfolio","screener","alerts","news","quant-portfolio","sector-flow","backtest","sentiment"].includes(t)) return t;
     } catch {}
     return "home";
   });
@@ -5973,6 +5974,7 @@ function AppInner() {
             { id: "sentiment", label: "소셜 센티먼트", icon: "💬" },
             { id: "alerts", label: "매매 알림", icon: "🔔", badge: alertBadge },
             { id: "paper-trading", label: "퀀트 자동매매", icon: "🤖" },
+            { id: "btc-trading", label: "₿ BTC 자동매매", icon: "₿" },
           ].map(t => (
             <button key={t.id} className={`sb-item${tab === t.id ? " active" : ""}`}
               onClick={() => { setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }}
@@ -6092,6 +6094,7 @@ function AppInner() {
                 { id: "risk-map", label: "리스크맵", icon: "🛡️" },
                 { id: "portfolio", label: "포트폴리오", icon: "💼" },
                 { id: "paper-trading", label: "자동매매", icon: "🤖" },
+                { id: "btc-trading", label: "BTC 매매", icon: "₿" },
               ]},
               { section: "정보", items: [
                 { id: "news", label: "마켓 뉴스", icon: "📰" },
@@ -9062,6 +9065,13 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "paper-trading" && (
           <PaperTrading strategyAlerts={tradeAlerts} theme={themeMode} />
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: ₿ BTC 자동매매
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "btc-trading" && (
+          <BTCTrading theme={themeMode} />
         )}
 
         {/* 종목 상세 팝업 */}
