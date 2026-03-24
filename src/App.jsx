@@ -1,7 +1,9 @@
-// DI금융 v10.1 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
+// DI금융 v10.2 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
 // Features: 스크리닝, 캔들차트, 33개 전략(BTC 알파 포함), 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
-// v10.1: 데스크톱 네비 BTC 추가 + 시그널 필터링 + 약전략 고도화 + 에지케이스 수정
+// v10.2: Supabase 인증 시스템 (이메일/Google/GitHub 로그인)
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
+import AuthProvider, { useAuth } from "./AuthProvider.jsx";
+import AuthPage from "./AuthPage.jsx";
 
 // ════════════════════════════════════════════════════════════════════
 // ErrorBoundary — 런타임 에러 시 앱 전체 크래시 방지
@@ -3927,8 +3929,22 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
 // 메인 앱
 // ════════════════════════════════════════════════════════════════════
 function AppInner() {
+  const { user, loading: authLoading, signOut } = useAuth();
   const [themeMode, setThemeMode] = useState(loadTheme);
   C = themeMode === "dark" ? DARK : LIGHT;
+
+  // ── 인증 체크: 로딩 중이면 스플래시, 미인증이면 로그인 페이지 ──
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "48px", marginBottom: "12px" }}>🐋</div>
+          <div style={{ color: C.text2, fontSize: "14px" }}>로딩 중...</div>
+        </div>
+      </div>
+    );
+  }
+  if (!user) return <AuthPage theme={themeMode} />;
   const toggleTheme = useCallback(() => {
     setThemeMode(prev => {
       const next = prev === "dark" ? "light" : "dark";
@@ -6017,7 +6033,7 @@ function AppInner() {
         <div className="sb-logo" onClick={() => setTab("home")}>
           <span style={{ fontSize: "22px" }}>📡</span>
           <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
-          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v10.1</span>
+          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v10.2</span>
         </div>
         <div className="sb-section" onClick={() => setSbCollapsed(p => ({...p, main: !p.main}))} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}>
           <span>메인</span>
@@ -6094,13 +6110,31 @@ function AppInner() {
         </nav>
         )}
         <div style={{ flex: 1 }} />
-        <div style={{ padding: "12px 20px", borderTop: `1px solid ${C.border}` }}>
+        <div style={{ padding: "12px 20px", borderTop: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: "8px" }}>
+          {/* 유저 정보 */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 8px", borderRadius: "8px", background: C.card2, border: `1px solid ${C.border}` }}>
+            <div style={{ width: "26px", height: "26px", borderRadius: "50%", background: C.blueBg,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "12px", fontWeight: 700, color: C.blue, flexShrink: 0 }}>
+              {(user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()}
+            </div>
+            <span style={{ fontSize: "12px", color: C.text2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+              {user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User"}
+            </span>
+          </div>
           <button onClick={toggleTheme} style={{
             width: "100%", padding: "8px", borderRadius: "8px", background: C.card2,
             border: `1px solid ${C.border}`, color: C.text2, fontSize: "12px", fontWeight: 600,
-            display: "flex", alignItems: "center", gap: "8px", justifyContent: "center",
+            display: "flex", alignItems: "center", gap: "8px", justifyContent: "center", cursor: "pointer",
           }}>
             {themeMode === "dark" ? "\u2600\uFE0F 라이트 모드" : "\uD83C\uDF19 다크 모드"}
+          </button>
+          <button onClick={() => { if (confirm("로그아웃 하시겠습니까?")) signOut(); }} style={{
+            width: "100%", padding: "8px", borderRadius: "8px", background: "transparent",
+            border: `1px solid ${C.border}`, color: C.text3, fontSize: "12px", fontWeight: 600,
+            display: "flex", alignItems: "center", gap: "8px", justifyContent: "center", cursor: "pointer",
+          }}>
+            ⏻ 로그아웃
           </button>
         </div>
       </aside>
@@ -6120,7 +6154,7 @@ function AppInner() {
             title="홈으로 이동">
             <span style={{ fontSize: "22px" }}>📡</span>
             <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
-            <span style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v10.1</span>
+            <span style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v10.2</span>
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
@@ -6145,8 +6179,25 @@ function AppInner() {
               </button>
             ))}
           </nav>
-          {/* 테마 토글 + 햄버거 */}
+          {/* 유저 + 테마 토글 + 햄버거 */}
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {/* 유저 메뉴 */}
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 12px 4px 6px",
+              background: C.card2, borderRadius: "12px", border: `1px solid ${C.border}30` }}>
+              <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: C.blueBg,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "13px", fontWeight: 700, color: C.blue }}>
+                {(user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()}
+              </div>
+              <span style={{ fontSize: "12px", color: C.text2, maxWidth: "80px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User"}
+              </span>
+              <button onClick={() => { if (confirm("로그아웃 하시겠습니까?")) signOut(); }}
+                title="로그아웃" style={{ background: "none", border: "none", cursor: "pointer",
+                color: C.text3, fontSize: "14px", padding: "2px 4px", lineHeight: 1 }}>
+                ⏻
+              </button>
+            </div>
             <button onClick={toggleTheme} title={themeMode === "dark" ? "라이트 모드" : "다크 모드"} style={{
               background: C.card2, border: `1px solid ${C.border}30`, borderRadius: "12px",
               width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center",
@@ -9333,7 +9384,9 @@ function AppInner() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <AppInner />
+      <AuthProvider>
+        <AppInner />
+      </AuthProvider>
     </ErrorBoundary>
   );
 }
