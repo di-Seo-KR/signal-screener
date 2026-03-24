@@ -1,5 +1,8 @@
 {
   "rewrites": [
+    { "source": "/api/yahoo-ohlc", "destination": "/api/yahoo?_mode=ohlc" },
+    { "source": "/api/yahoo-batch", "destination": "/api/yahoo?_mode=batch" },
+    { "source": "/api/yahoo-quote", "destination": "/api/yahoo?_mode=quote" },
     { "source": "/api/(.*)", "destination": "/api/$1" }
   ],
   "headers": [
@@ -10,5 +13,14 @@
       ]
     }
   ],
-  "crons": []
+  "crons": [
+    {
+      "path": "/api/btc-cron",
+      "schedule": "0 */4 * * *"
+    },
+    {
+      "path": "/api/quant-research",
+      "schedule": "0 6 * * *"
+    }
+  ]
 }
