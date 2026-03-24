@@ -663,7 +663,8 @@ function fmtPct(n) { return n == null ? "—" : `${Number(n) >= 0 ? "+" : ""}${f
 // ══════════════════════════════════════════════════════════════
 // 설정 패널
 // ══════════════════════════════════════════════════════════════
-function SetupPanel({ config, setConfig, onConnect }) {
+function SetupPanel({ config, setConfig, onConnect, theme }) {
+  const C = theme === "light" ? LIGHT_C : DARK_C;
   const [key, setKey] = useState(config.apiKey || "");
   const [secret, setSecret] = useState(config.apiSecret || "");
   const [showSecret, setShowSecret] = useState(false);
@@ -1331,7 +1332,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
     setConfig({}); save(KEYS.config, {}); setAccount(null); setPositions([]); setOrders([]);
   };
 
-  if (!isConnected) return <SetupPanel config={config} setConfig={setConfig} onConnect={acc => setAccount(acc)} />;
+  if (!isConnected) return <SetupPanel config={config} setConfig={setConfig} onConnect={acc => setAccount(acc)} theme={theme} />;
 
   const equity = parseFloat(account?.equity || 0);
   const cash = parseFloat(account?.cash || 0);
