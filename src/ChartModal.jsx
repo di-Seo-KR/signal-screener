@@ -320,6 +320,61 @@ function calcOBV(closes, volumes) {
   return obv;
 }
 
+// ── CMF (Chaikin Money Flow) ── 수급 방향성 정밀 분석
+function calcCMF(highs, lows, closes, volumes, period = 20) {
+  const n = closes.length;
+  if (n < period) return null;
+  let sumMFV = 0, sumVol = 0;
+  for (let i = n - period; i < n; i++) {
+    const hl = highs[i] - lows[i];
+    const mfm = hl > 0 ? ((closes[i] - lows[i]) - (highs[i] - closes[i])) / hl : 0;
+    sumMFV += mfm * (volumes[i] || 0);
+    sumVol += (volumes[i] || 0);
+  }
+  return sumVol > 0 ? sumMFV / sumVol : 0;
+}
+
+// ── +DI / -DI 추출 (ADX 함수와 별도로 방향성 지표 리턴) ──
+function calcDMI(highs, lows, closes, period = 14) {
+  const n = highs.length;
+  if (n < period + 1) return { pDI: null, nDI: null };
+  const pDM = [], nDM = [], tr = [];
+  for (let i = 1; i < n; i++) {
+    const upMove = highs[i] - highs[i - 1];
+    const dnMove = lows[i - 1] - lows[i];
+    pDM.push(upMove > dnMove && upMove > 0 ? upMove : 0);
+    nDM.push(dnMove > upMove && dnMove > 0 ? dnMove : 0);
+    tr.push(Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[i - 1]), Math.abs(lows[i] - closes[i - 1])));
+  }
+  const smooth = (arr) => {
+    const s = [arr.slice(0, period).reduce((a, b) => a + b, 0)];
+    for (let i = period; i < arr.length; i++) s.push(s[s.length - 1] - s[s.length - 1] / period + arr[i]);
+    return s;
+  };
+  const sTR = smooth(tr), sPDM = smooth(pDM), sNDM = smooth(nDM);
+  const last = sTR.length - 1;
+  const pDI = sTR[last] > 0 ? (sPDM[last] / sTR[last]) * 100 : 0;
+  const nDI = sTR[last] > 0 ? (sNDM[last] / sTR[last]) * 100 : 0;
+  return { pDI, nDI };
+}
+
+// ── Keltner Channel ── BB와 병행하여 스퀴즈 정밀 감지
+function calcKeltner(closes, highs, lows, emaPeriod = 20, atrPeriod = 10, mult = 1.5) {
+  const n = closes.length;
+  if (n < Math.max(emaPeriod, atrPeriod)) return null;
+  // EMA
+  const k = 2 / (emaPeriod + 1);
+  let ema = closes.slice(0, emaPeriod).reduce((a, b) => a + b, 0) / emaPeriod;
+  for (let i = emaPeriod; i < n; i++) ema = closes[i] * k + ema * (1 - k);
+  // ATR
+  let atr = 0;
+  for (let i = n - atrPeriod; i < n; i++) {
+    atr += Math.max(highs[i] - lows[i], Math.abs(highs[i] - closes[Math.max(0, i - 1)]), Math.abs(lows[i] - closes[Math.max(0, i - 1)]));
+  }
+  atr /= atrPeriod;
+  return { mid: ema, upper: ema + mult * atr, lower: ema - mult * atr, atr };
+}
+
 function runDiagnosis(candles) {
   if (!candles || candles.length < 20) return null;
   const closes = candles.map(c => c.close);
@@ -369,6 +424,15 @@ function runDiagnosis(candles) {
   // OBV 트렌드 (20일 OBV 기울기)
   const obvSlope = n >= 20 ? (obv[n - 1] - obv[n - 20]) : 0;
   const obvTrend = obvSlope > 0 ? "up" : obvSlope < 0 ? "down" : "flat";
+
+  // ── CMF (Chaikin Money Flow) — 기관 수급 방향성 ──
+  const cmf = calcCMF(highs, lows, closes, volumes, 20);
+
+  // ── +DI / -DI 방향성 지표 ──
+  const dmi = calcDMI(highs, lows, closes, 14);
+
+  // ── Keltner Channel (BB 스퀴즈 보조) ──
+  const keltner = calcKeltner(closes, highs, lows, 20, 10, 1.5);
 
   // VWAP 근사 (20일 거래량 가중 평균가)
   let vwap = null;
@@ -553,11 +617,19 @@ function runDiagnosis(candles) {
   // 골든/데드크로스
   if (sma50 && sma200 && sma50 > sma200) { trendScore += 6; signals.push({ type: "bullish", name: "골든크로스 구간", detail: "50일선이 200일선 위 — 장기 상승 추세" }); }
   if (sma50 && sma200 && sma50 < sma200) { trendScore -= 4; signals.push({ type: "bearish", name: "데드크로스 구간", detail: "50일선이 200일선 아래 — 장기 하락 추세" }); }
-  // ADX (추세 강도)
+  // ADX (추세 강도) + DMI 방향성
   if (adx != null) {
     if (adx > 40) { trendScore += 5; signals.push({ type: "neutral", name: `ADX ${adx.toFixed(0)} (강한 추세)`, detail: "추세 방향 확인 필요 — 현재 추세가 강력" }); }
     else if (adx > 25) trendScore += 2;
     else if (adx < 15) { trendScore -= 3; signals.push({ type: "neutral", name: `ADX ${adx.toFixed(0)} (약한 추세)`, detail: "추세 미약 — 횡보 가능성" }); }
+  }
+  // +DI/-DI 방향성 (DMI 크로스)
+  if (dmi.pDI != null && dmi.nDI != null) {
+    const diDiff = dmi.pDI - dmi.nDI;
+    if (diDiff > 15 && adx > 25) { trendScore += 6; signals.push({ type: "bullish", name: `DMI 강세 (+DI ${dmi.pDI.toFixed(0)} > -DI ${dmi.nDI.toFixed(0)})`, detail: "매수세가 매도세를 압도 — 추세 강도와 방향 동시 확인" }); }
+    else if (diDiff > 8) { trendScore += 3; }
+    else if (diDiff < -15 && adx > 25) { trendScore -= 6; signals.push({ type: "bearish", name: `DMI 약세 (-DI ${dmi.nDI.toFixed(0)} > +DI ${dmi.pDI.toFixed(0)})`, detail: "매도세가 매수세를 압도 — 하락 추세 강도 확인" }); }
+    else if (diDiff < -8) { trendScore -= 3; }
   }
   // 단기 방향
   if (change5 > 5) trendScore += 4;
@@ -670,6 +742,14 @@ function runDiagnosis(candles) {
     if (atrPct > 5) volScore -= 5; // 고변동
     else if (atrPct < 1) volScore += 3; // 안정적
   }
+  // ── Keltner + BB 교차 스퀴즈 (TTM Squeeze 프록시) ──
+  if (keltner && bb) {
+    const bbInside = bb.lower > keltner.lower && bb.upper < keltner.upper;
+    if (bbInside) {
+      volScore += 8;
+      signals.push({ type: "neutral", name: "TTM 스퀴즈 (BB⊂Keltner)", detail: "볼린저 밴드가 켈트너 채널 안에 수축 — 폭발적 변동 임박" });
+    }
+  }
   volScore = Math.max(0, Math.min(100, volScore));
   const bbPos = bb ? ((last - bb.lower) / (bb.upper - bb.lower) * 100).toFixed(0) : "—";
   const volDetail = bb ? `BB ${bbPos}% | 이격도 ${disp20.toFixed(0)}%${atrPct ? ` | ATR ${atrPct.toFixed(1)}%` : ""}` : "데이터 부족";
@@ -695,8 +775,20 @@ function runDiagnosis(candles) {
   if (obvTrend === "down" && change20 > 0) { supScore -= 5; signals.push({ type: "bearish", name: "OBV 약세 다이버전스", detail: "가격 상승 중 OBV 하락 — 수급 약화" }); }
   if (obvTrend === "up" && change20 < 0) { supScore += 5; signals.push({ type: "bullish", name: "OBV 강세 다이버전스", detail: "가격 하락 중 OBV 상승 — 저점 매집 가능" }); }
 
+  // ── CMF (Chaikin Money Flow) — 기관 수급 흐름 ──
+  if (cmf != null) {
+    if (cmf > 0.15) { supScore += 8; signals.push({ type: "bullish", name: `CMF ${cmf.toFixed(2)} (강한 매집)`, detail: "Chaikin Money Flow 강세 — 기관 매집 구간" }); }
+    else if (cmf > 0.05) { supScore += 4; }
+    else if (cmf < -0.15) { supScore -= 8; signals.push({ type: "bearish", name: `CMF ${cmf.toFixed(2)} (강한 유출)`, detail: "Chaikin Money Flow 약세 — 기관 이탈 구간" }); }
+    else if (cmf < -0.05) { supScore -= 4; }
+    // CMF + 가격 다이버전스
+    if (cmf > 0.10 && change20 < -5) { supScore += 5; signals.push({ type: "bullish", name: "CMF 강세 다이버전스", detail: "가격 하락 중 자금 유입 — 스마트 머니 매집 가능" }); }
+    if (cmf < -0.10 && change20 > 5) { supScore -= 5; signals.push({ type: "bearish", name: "CMF 약세 다이버전스", detail: "가격 상승 중 자금 유출 — 기관 이익 실현 가능" }); }
+  }
+
   supScore = Math.max(0, Math.min(100, supScore));
-  const supDetail = `거래량 ${volRatio.toFixed(1)}x | 5일 추세 ${volTrend.toFixed(1)}x | OBV ${obvTrend === "up" ? "↑" : obvTrend === "down" ? "↓" : "→"}`;
+  const cmfStr = cmf != null ? ` | CMF ${cmf.toFixed(2)}` : "";
+  const supDetail = `거래량 ${volRatio.toFixed(1)}x | 5일 추세 ${volTrend.toFixed(1)}x | OBV ${obvTrend === "up" ? "↑" : obvTrend === "down" ? "↓" : "→"}${cmfStr}`;
 
   // ── 5. 가격위치 & 구조 (Position) 점수 — 가중치 10% ──
   let posScore = 50;
@@ -847,6 +939,7 @@ function runDiagnosis(candles) {
     supportResistance, distToSupport, distToResist,
     maConvergence,
     ichimoku, fibonacci,
+    cmf, dmi, keltner,
   };
 }
 

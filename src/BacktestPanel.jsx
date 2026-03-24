@@ -1,5 +1,6 @@
-// DI금융 — 백테스트 패널
+// DI금융 — 백테스트 패널 v3.3
 // 전략 선택 → 데이터 로드 → 백테스트 실행 → 성과 시각화
+// v3.3: 트레일링 스톱 옵션 + Sortino/Calmar/알파 지표 표시
 import { useState, useCallback, useRef, useEffect } from "react";
 import { ALL_STRATEGIES, runBacktest } from "./strategies.js";
 
@@ -205,6 +206,7 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
   const [capital, setCapital] = useState(10000);
   const [stopLoss, setStopLoss] = useState("");
   const [takeProfit, setTakeProfit] = useState("");
+  const [trailingStop, setTrailingStop] = useState(""); // v3.3
 
   useEffect(() => {
     if (initialStrategy) setStrategyId(initialStrategy.id);
@@ -231,6 +233,7 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
         positionSize: 1.0,
         stopLoss: stopLoss ? parseFloat(stopLoss) : null,
         takeProfit: takeProfit ? parseFloat(takeProfit) : null,
+        trailingStop: trailingStop ? parseFloat(trailingStop) : null, // v3.3
       });
 
       setResult({ ...btResult, strategyName: strategy.name, strategyIcon: strategy.icon, symbol, candles });
@@ -239,7 +242,7 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
     } finally {
       setLoading(false);
     }
-  }, [strategyId, symbol, timeframe, range, capital, stopLoss, takeProfit]);
+  }, [strategyId, symbol, timeframe, range, capital, stopLoss, takeProfit, trailingStop]);
 
   const strategy = ALL_STRATEGIES.find(s => s.id === strategyId);
 
@@ -321,6 +324,13 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
               background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none", boxSizing: "border-box",
             }} />
           </div>
+          <div>
+            <label style={{ fontSize: "11px", color: C.text3, display: "block", marginBottom: "4px" }}>트레일링 스톱 (%, 선택)</label>
+            <input type="number" value={trailingStop} onChange={e => setTrailingStop(e.target.value)} placeholder="예: 8" style={{
+              width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "13px",
+              background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none", boxSizing: "border-box",
+            }} />
+          </div>
         </div>
 
         <button onClick={execute} disabled={loading} style={{
@@ -367,9 +377,19 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
                 color={result.maxDrawdown <= 10 ? C.green : result.maxDrawdown <= 20 ? C.yellow : C.red} />
               <MetricCard label="프로핏 팩터" value={result.profitFactor === Infinity ? "∞" : result.profitFactor}
                 color={result.profitFactor >= 1.5 ? C.green : result.profitFactor >= 1 ? C.yellow : C.red} />
-              <MetricCard label="평균 수익" value={`${result.avgWin >= 0 ? "+" : ""}${result.avgWin}%`} color={C.green} />
+              <MetricCard label="소르티노" value={result.sortinoRatio || "—"}
+                color={result.sortinoRatio >= 1.5 ? C.green : result.sortinoRatio >= 1 ? C.yellow : C.red}
+                sub={result.sortinoRatio >= 2 ? "우수" : result.sortinoRatio >= 1 ? "양호" : "개선필요"} />
+              <MetricCard label="칼마 비율" value={result.calmarRatio || "—"}
+                color={result.calmarRatio >= 1 ? C.green : result.calmarRatio >= 0.5 ? C.yellow : C.red}
+                sub="연수익/최대낙폭" />
+              <MetricCard label="알파" value={`${result.alpha >= 0 ? "+" : ""}${result.alpha}%`}
+                color={result.alpha >= 0 ? C.green : C.red}
+                sub="vs Buy&Hold" />
+              <MetricCard label="평균 수익" value={`${result.avgWin >= 0 ? "+" : ""}${result.avgWin}%`} color={C.green}
+                sub={`연속승: ${result.maxConsecWin || 0}회`} />
               <MetricCard label="평균 손실" value={`${result.avgLoss}%`} color={C.red}
-                sub={`최대연속: ${result.maxConsecLoss}회`} />
+                sub={`연속패: ${result.maxConsecLoss}회`} />
             </div>
 
             {/* 자산 곡선 */}

@@ -1,6 +1,6 @@
-// DI금융 v9.9 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
+// DI금융 v10.1 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
 // Features: 스크리닝, 캔들차트, 33개 전략(BTC 알파 포함), 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
-// v9.9: BTC 알파 전략 추가 + Daily Improvement (전략 수 정정, 콘솔로그 정리, 컬러 토큰화)
+// v10.1: 데스크톱 네비 BTC 추가 + 시그널 필터링 + 약전략 고도화 + 에지케이스 수정
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 
 // ════════════════════════════════════════════════════════════════════
@@ -1224,21 +1224,57 @@ function analyzeSentiment(title) {
 // ════════════════════════════════════════════════════════════════════
 async function sendTelegramAlert(botToken, chatId, assets, conditions) {
   const labels = Object.fromEntries(Object.entries(CONDITION_META).map(([k, v]) => [k, `${v.icon} ${v.label}`]));
-  let msg = `🚨 *DI금융 알림*\n\n`;
-  msg += `📅 ${new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}\n`;
+  const now = new Date();
+  const timeStr = now.toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "short", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" });
+
+  let msg = `🚨 *DI금융 시그널 알림*\n`;
+  msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+  msg += `📅 ${timeStr}\n`;
   msg += `📊 시그널 감지: *${assets.length}개* 자산\n\n`;
-  assets.slice(0, 15).forEach(a => {
+
+  // 시장별 요약 헤더
+  const usAssets = assets.filter(a => a.market === "us");
+  const krAssets = assets.filter(a => a.market === "kr");
+  const cryptoAssets = assets.filter(a => a.market !== "us" && a.market !== "kr");
+  if (usAssets.length > 0 || krAssets.length > 0 || cryptoAssets.length > 0) {
+    msg += `📌 *시장별 분포*\n`;
+    if (usAssets.length) msg += `   🇺🇸 미국 ${usAssets.length}종목`;
+    if (krAssets.length) msg += `${usAssets.length ? " | " : "   "}🇰🇷 한국 ${krAssets.length}종목`;
+    if (cryptoAssets.length) msg += `${(usAssets.length || krAssets.length) ? " | " : "   "}₿ 크립토 ${cryptoAssets.length}종목`;
+    msg += `\n\n`;
+  }
+
+  // 시그널 강도 분류
+  const strong = assets.filter(a => a.triggers && a.triggers.length >= 3);
+  const moderate = assets.filter(a => a.triggers && a.triggers.length === 2);
+  if (strong.length > 0) {
+    msg += `🔥 *강력 시그널 (3개+)*\n`;
+    strong.slice(0, 5).forEach(a => {
+      const flag = a.market === "us" ? "🇺🇸" : a.market === "kr" ? "🇰🇷" : "₿";
+      const price = a.market === "kr" ? `₩${Math.round(a.price).toLocaleString()}` : `$${a.price?.toLocaleString(undefined, { maximumFractionDigits: a.price < 1 ? 6 : 2 })}`;
+      const chg = a.weekChange >= 0 ? `+${a.weekChange}%` : `${a.weekChange}%`;
+      msg += `${flag} *${a.name}* \`${a.symbol}\`\n`;
+      msg += `   ${price} | ${chg} | RSI ${a.rsi ?? "—"}\n`;
+      msg += `   ${a.triggers.map(t => labels[t] || t).join(" · ")}\n\n`;
+    });
+  }
+
+  // 나머지 종목
+  const rest = assets.filter(a => !strong.includes(a));
+  rest.slice(0, 10).forEach(a => {
     const flag = a.market === "us" ? "🇺🇸" : a.market === "kr" ? "🇰🇷" : "₿";
-    const price = a.market === "kr"
-      ? `₩${Math.round(a.price).toLocaleString()}`
-      : `$${a.price?.toLocaleString(undefined, { maximumFractionDigits: a.price < 1 ? 6 : 2 })}`;
+    const price = a.market === "kr" ? `₩${Math.round(a.price).toLocaleString()}` : `$${a.price?.toLocaleString(undefined, { maximumFractionDigits: a.price < 1 ? 6 : 2 })}`;
     const chg = a.weekChange >= 0 ? `+${a.weekChange}%` : `${a.weekChange}%`;
     msg += `${flag} *${a.name}* \`${a.symbol}\`\n`;
     msg += `   ${price} | ${chg} | RSI ${a.rsi ?? "—"}\n`;
     msg += `   ${a.triggers.map(t => labels[t] || t).join(" · ")}\n\n`;
   });
-  if (assets.length > 15) msg += `_...외 ${assets.length - 15}개_\n\n`;
-  msg += `_⚠️ 기술적 지표 기반 — 투자 추천 아님_`;
+  const shown = strong.slice(0, 5).length + rest.slice(0, 10).length;
+  if (assets.length > shown) msg += `_...외 ${assets.length - shown}개_\n\n`;
+
+  msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+  msg += `_⚠️ 기술적 지표 기반 참고 자료 — 투자 추천 아님_\n`;
+  msg += `_DI금융 Signal Screener_`;
   const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1611,18 +1647,19 @@ function quickDiagnosis(asset) {
   else if (asset.weekChange < -3) trendScore -= 3;
   trendScore = Math.max(0, Math.min(100, trendScore));
 
-  // ── 모멘텀: RSI 연속 그라데이션 (P2 수정) + 스토캐스틱 + W%R ──
+  // ── 모멘텀: RSI 연속 그라데이션 (v3.3 최적화) + 스토캐스틱 + W%R ──
+  // v3.3: RSI 구간별 가중치 재조정 — 55~65 중립 강세구간 세분화, 과매도 보상 강화
   if (asset.rsi != null) {
     if (asset.rsi >= 80) { momScore -= 18; signals.push({ type: "bearish", name: `RSI 극단 과매수 (${asset.rsi})` }); }
-    else if (asset.rsi >= 70) { momScore -= 10; signals.push({ type: "bearish", name: `RSI 과매수 (${asset.rsi})` }); }
-    else if (asset.rsi >= 55) momScore += 6;
-    else if (asset.rsi >= 45) momScore += 0;
-    else if (asset.rsi >= 40) momScore -= 1;       // 약간 약세 (기존: 30~45 모두 -4)
-    else if (asset.rsi >= 35) momScore += 2;        // 반등 기대 시작
-    else if (asset.rsi >= 30) momScore += 5;        // 과매도 진입
-    else if (asset.rsi >= 25) { momScore += 10; signals.push({ type: "bullish", name: `RSI 과매도 (${asset.rsi})` }); }
-    else if (asset.rsi >= 20) { momScore += 14; signals.push({ type: "bullish", name: `RSI 강한 과매도 (${asset.rsi})` }); }
-    else { momScore += 18; signals.push({ type: "bullish", name: `RSI 극단 과매도 (${asset.rsi})` }); }
+    else if (asset.rsi >= 72) { momScore -= 12; signals.push({ type: "bearish", name: `RSI 과매수 (${asset.rsi})` }); }
+    else if (asset.rsi >= 65) momScore -= 4; // v3.3: 과열 경고 구간 (기존 70에서 하향)
+    else if (asset.rsi >= 55) momScore += 6; // 건강한 강세
+    else if (asset.rsi >= 45) momScore += 2; // v3.3: 중립구간도 약간 플러스 (시장 평균)
+    else if (asset.rsi >= 40) momScore += 0; // v3.3: 약세 진입 (기존 -1 → 0)
+    else if (asset.rsi >= 35) momScore += 3; // v3.3: 반등 기대 (기존 +2 → +3)
+    else if (asset.rsi >= 28) { momScore += 8; signals.push({ type: "bullish", name: `RSI 과매도 (${asset.rsi})` }); }
+    else if (asset.rsi >= 20) { momScore += 15; signals.push({ type: "bullish", name: `RSI 강한 과매도 (${asset.rsi})` }); }
+    else { momScore += 20; signals.push({ type: "bullish", name: `RSI 극단 과매도 (${asset.rsi})` }); }
   }
   // MFI (거래량 가중 RSI) 추가 반영
   if (asset.mfi != null) {
@@ -3791,10 +3828,14 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                   { label: "스토캐스틱", value: techData.stoch ? `${techData.stoch.k}` : "—", color: techData.stoch?.k < 20 ? C.purple : techData.stoch?.k > 80 ? C.red : C.text2 },
                   { label: "W%R", value: techData.wr != null ? `${techData.wr}` : "—", color: techData.wr < -80 ? C.purple : techData.wr > -20 ? C.red : C.text2 },
                   { label: "52주 위치", value: techData.high52w && techData.low52w ? `${((techData.price - techData.low52w) / (techData.high52w - techData.low52w) * 100).toFixed(0)}%` : "—" },
-                ].map(({ label, value, color }) => (
+                  { label: "CMF", value: enriched.cmf != null ? `${enriched.cmf > 0 ? "+" : ""}${enriched.cmf.toFixed(3)}` : "—", color: enriched.cmf != null ? (enriched.cmf > 0.1 ? C.green : enriched.cmf < -0.1 ? C.red : C.text2) : C.text2, sub: enriched.cmf != null ? (enriched.cmf > 0.1 ? "매집 강세" : enriched.cmf < -0.1 ? "분산 경고" : "중립") : null },
+                  { label: "MFI(14)", value: enriched.mfi != null ? `${Math.round(enriched.mfi)}` : "—", color: enriched.mfi != null ? (enriched.mfi < 20 ? C.purple : enriched.mfi > 80 ? C.red : C.text2) : C.text2, sub: enriched.mfi != null ? (enriched.mfi < 20 ? "과매도" : enriched.mfi > 80 ? "과매수" : enriched.mfi < 40 ? "약세" : enriched.mfi > 60 ? "강세" : "중립") : null },
+                  { label: "ADX", value: enriched.adx != null ? `${enriched.adx}` : "—", color: enriched.adx != null ? (enriched.adx >= 25 ? (enriched.plusDI > enriched.minusDI ? C.green : C.red) : C.text3) : C.text2, sub: enriched.adx != null ? (enriched.adx >= 25 ? (enriched.plusDI > enriched.minusDI ? "+DI 우세" : "-DI 우세") : "추세 약함") : null },
+                ].map(({ label, value, color, sub }) => (
                   <div key={label} style={{ background: C.card2, borderRadius: "10px", padding: "8px 10px", textAlign: "center" }}>
                     <div style={{ fontSize: "9px", color: C.text3, marginBottom: "3px" }}>{label}</div>
                     <div style={{ fontWeight: 700, fontSize: "13px", color: color || C.text1 }}>{value}</div>
+                    {sub && <div style={{ fontSize: "8px", color: C.text3, marginTop: "2px" }}>{sub}</div>}
                   </div>
                 ))}
               </div>
@@ -3990,6 +4031,7 @@ function AppInner() {
   });
   const [alertBadge, setAlertBadge] = useState(0); // 읽지 않은 알림 수
   const [alertFilter, setAlertFilter] = useState("all"); // all, buy, sell
+  const [alertMarketFilter, setAlertMarketFilter] = useState("all"); // all, us, kr, crypto
   const [notiPerm, setNotiPerm] = useState(() => ("Notification" in window) ? Notification.permission : "unsupported");
   const scanCandleCache = useRef({}); // 스캔 중 수집된 캔들 데이터 캐시 {symbol: {closes, highs, lows, volumes}}
 
@@ -5181,11 +5223,28 @@ function AppInner() {
 
     const buys = alerts.filter(a => a.action === "매수").length;
     const sells = alerts.filter(a => a.action === "매도").length;
+
+    // 시장 센티먼트 게이지
+    const sentiment = alerts.length > 0 ? (buys / alerts.length * 100) : 50;
+    const sentimentIcon = sentiment >= 70 ? "🟢" : sentiment >= 50 ? "🟡" : sentiment >= 30 ? "🟠" : "🔴";
+    const sentimentLabel = sentiment >= 70 ? "강세" : sentiment >= 50 ? "중립~강세" : sentiment >= 30 ? "중립~약세" : "약세";
+
     msg += `━━━━━━━━━━━━━━━━━━━━\n`;
     msg += `📊 *총 ${alerts.length}건* 시그널\n`;
     msg += `   🟢 매수 ${buys}건 | 🔴 매도 ${sells}건\n`;
-    msg += `   비율: 매수 ${alerts.length > 0 ? (buys / alerts.length * 100).toFixed(0) : 0}% / 매도 ${alerts.length > 0 ? (sells / alerts.length * 100).toFixed(0) : 0}%\n`;
-    msg += `\n_⚠️ 본 시그널은 참고용이며 투자 결정은 본인 판단에 따르세요_`;
+    msg += `   ${sentimentIcon} 센티먼트: *${sentimentLabel}* (매수 ${sentiment.toFixed(0)}%)\n`;
+
+    // 가장 강한 시그널 하이라이트
+    const strongest = alerts.reduce((best, a) => {
+      const s = a.strength || a.score || 0;
+      return s > (best.strength || best.score || 0) ? a : best;
+    }, alerts[0]);
+    if (strongest) {
+      msg += `\n⭐ *최강 시그널*: ${strongest.action} ${strongest.name} (${strongest.strategy})\n`;
+    }
+
+    msg += `\n_⚠️ 본 시그널은 참고용이며 투자 결정은 본인 판단에 따르세요_\n`;
+    msg += `_DI금융 퀀트 전략 엔진_`;
     return msg;
   }
 
@@ -5554,6 +5613,47 @@ function AppInner() {
               else if (q.marketCap < 2e9) { score -= 3; reasons.push("소형주 리스크"); }
             }
 
+            // 17) EV/EBITDA 프록시 — 기업가치 대비 수익성
+            const evToEbitda = q.enterpriseToEbitda;
+            if (evToEbitda != null && evToEbitda > 0) {
+              if (evToEbitda < 6)       { score += 10; reasons.push(`EV/EBITDA ${evToEbitda.toFixed(1)} 초저평가`); }
+              else if (evToEbitda < 10) { score += 6; reasons.push(`EV/EBITDA ${evToEbitda.toFixed(1)} 저평가`); }
+              else if (evToEbitda < 15) { score += 2; }
+              else if (evToEbitda > 30) { score -= 6; reasons.push(`EV/EBITDA ${evToEbitda.toFixed(1)} 고평가`); }
+              else if (evToEbitda > 20) { score -= 3; }
+            }
+
+            // 18) Piotroski 스타일 재무 품질 체크 (가용 데이터 기반 간이 F-Score)
+            let fScore = 0;
+            if (margin != null && margin > 0) fScore++;           // 흑자
+            if (roe != null && roe > 0.05) fScore++;              // 양호한 ROE
+            if (revGrowth != null && revGrowth > 0) fScore++;     // 매출 성장
+            if (debtEquity != null && debtEquity < 100) fScore++; // 적정 부채
+            if (margin != null && margin > 0.10) fScore++;        // 이익률 10%+
+            if (fScore >= 4) { score += 5; reasons.push(`재무 품질 우수 (F${fScore}/5)`); }
+            else if (fScore <= 1) { score -= 5; reasons.push(`재무 품질 취약 (F${fScore}/5)`); }
+
+            // 19) 가격 모멘텀 품질 — 저평가 + 반등세 = 가산, 저평가 + 추가 하락 = 감점
+            if (q.fiftyDayAvg && q.price) {
+              const mom50 = (q.price - q.fiftyDayAvg) / q.fiftyDayAvg * 100;
+              // 단기 반등 중인 저PER주
+              if (per && per < 15 && mom50 > 3 && mom50 < 20) {
+                score += 4; reasons.push("저평가 반등 모멘텀 감지");
+              }
+              // 낙하 중인 저PER주 — 추가 하락 리스크
+              if (per && per < 12 && mom50 < -15) {
+                score -= 4; reasons.push("저평가지만 하락 가속 중");
+              }
+            }
+
+            // 20) PEG 비율 프록시 (Forward PE / 매출성장률) — 성장 대비 밸류
+            if (fpe != null && fpe > 0 && revGrowth != null && revGrowth > 0.05) {
+              const pegProxy = fpe / (revGrowth * 100);
+              if (pegProxy < 0.8)      { score += 6; reasons.push(`PEG ${pegProxy.toFixed(1)} 성장 대비 저평가`); }
+              else if (pegProxy < 1.2) { score += 3; }
+              else if (pegProxy > 3.0) { score -= 4; reasons.push(`PEG ${pegProxy.toFixed(1)} 성장 대비 고평가`); }
+            }
+
             score = Math.max(0, Math.min(100, score));
 
             allResults.push({
@@ -5831,7 +5931,11 @@ function AppInner() {
           .tab-content { font-size: 15px; }
           button { min-height: 44px; }
           select { min-height: 44px; }
-          .screener-cond-btn { padding: 10px 16px !important; font-size: 13px !important; min-height: 44px !important; }
+          .screener-cond-btn { padding: 10px 16px !important; font-size: 13px !important; min-height: 44px !important; border-radius: 12px !important; }
+          /* 모바일에서 스크리닝 옵션 버튼 터치 최적화 */
+          .tab-content button { min-height: 44px; }
+          /* 지표 그리드 3열→2열 전환 */
+          .tech-grid-popup { grid-template-columns: repeat(2, 1fr) !important; }
           .home-grid { gap: 12px !important; }
           .ui-card { padding: 14px !important; border-radius: 14px !important; }
           .ui-list-item { padding: 12px 6px; }
@@ -5913,7 +6017,7 @@ function AppInner() {
         <div className="sb-logo" onClick={() => setTab("home")}>
           <span style={{ fontSize: "22px" }}>📡</span>
           <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
-          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v9.9</span>
+          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v10.1</span>
         </div>
         <div className="sb-section" onClick={() => setSbCollapsed(p => ({...p, main: !p.main}))} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}>
           <span>메인</span>
@@ -6016,11 +6120,11 @@ function AppInner() {
             title="홈으로 이동">
             <span style={{ fontSize: "22px" }}>📡</span>
             <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
-            <span style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v9.9</span>
+            <span style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v10.1</span>
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "anomaly", label: "이상탐지", icon: "⚡" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "quant-port", label: "운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "sentiment", label: "센티먼트", icon: "💬" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "자동매매", icon: "🤖" }].map(t => (
+            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "anomaly", label: "이상탐지", icon: "⚡" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "quant-port", label: "운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "sentiment", label: "센티먼트", icon: "💬" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "자동매매", icon: "🤖" }, { id: "btc-trading", label: "₿ BTC", icon: "₿" }].map(t => (
               <button key={t.id} onClick={() => { setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }} style={{
                 padding: "7px 12px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
@@ -8733,9 +8837,31 @@ function AppInner() {
                 )}
               </div>
 
-              {/* 알림 필터 탭 */}
+              {/* 마켓 타입 필터 */}
+              {tradeAlerts.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
+                  <div style={{ fontSize: "11px", color: C.text3, fontWeight: 600, alignSelf: "center", marginRight: "4px" }}>마켓:</div>
+                  {[
+                    ["all", "전체"],
+                    ["us", "🇺🇸 미국"],
+                    ["kr", "🇰🇷 한국"],
+                    ["crypto", "₿ 크립토"],
+                  ].map(([v, l]) => (
+                    <button key={v} onClick={() => setAlertMarketFilter(v)} style={{
+                      padding: "5px 12px", borderRadius: "8px", fontSize: "11px", fontWeight: 600,
+                      background: alertMarketFilter === v ? C.blueBg : C.card2,
+                      color: alertMarketFilter === v ? C.blue : C.text3,
+                      border: `1px solid ${alertMarketFilter === v ? C.blue + "40" : "transparent"}`,
+                      cursor: "pointer", transition: "all .15s",
+                    }}>{l}</button>
+                  ))}
+                </div>
+              )}
+
+              {/* 시그널 타입 필터 탭 */}
               {tradeAlerts.length > 0 && (
                 <div style={{ display: "flex", gap: "6px", marginBottom: "12px" }}>
+                  <div style={{ fontSize: "11px", color: C.text3, fontWeight: 600, alignSelf: "center", marginRight: "4px" }}>시그널:</div>
                   {[
                     ["all", "전체", tradeAlerts.length],
                     ["buy", "매수", tradeAlerts.filter(a => a.action === "매수").length],
@@ -8761,7 +8887,11 @@ function AppInner() {
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "520px", overflow: "auto" }}>
-                  {tradeAlerts.filter(a => alertFilter === "all" ? true : alertFilter === "buy" ? a.action === "매수" : a.action !== "매수").slice(0, 50).map((alert, i) => {
+                  {tradeAlerts.filter(a => {
+                    const signalMatch = alertFilter === "all" ? true : alertFilter === "buy" ? a.action === "매수" : a.action !== "매수";
+                    const marketMatch = alertMarketFilter === "all" ? true : a.market === alertMarketFilter;
+                    return signalMatch && marketMatch;
+                  }).slice(0, 50).map((alert, i) => {
                     const isBuy = alert.action === "매수";
                     const time = new Date(alert.timestamp);
                     const timeStr = time.toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });

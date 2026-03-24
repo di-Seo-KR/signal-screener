@@ -65,44 +65,45 @@ STRATEGIES = {
 # ============================================================================
 
 def fetch_stock_data(ticker: str, days: int = 365) -> Optional[pd.DataFrame]:
-    """Fetch stock data using Yahoo Finance CSV endpoint"""
+    """Fetch stock data using Yahoo Finance v8 chart API"""
     try:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=days)
 
-        url = f"https://query1.finance.yahoo.com/v7/finance/download/{ticker}"
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
         params = {
             'period1': int(start_date.timestamp()),
             'period2': int(end_date.timestamp()),
             'interval': '1d',
-            'events': 'history',
-            'includeAdjustedClose': 'true'
         }
 
         headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, params=params, headers=headers, timeout=10)
+        response = requests.get(url, params=params, headers=headers, timeout=15)
         response.raise_for_status()
 
-        lines = response.text.strip().split('\n')
-        if len(lines) < 2:
-            return None
+        import json as _json
+        chart_data = response.json()
+        result = chart_data['chart']['result'][0]
+        timestamps = result['timestamp']
+        quote = result['indicators']['quote'][0]
 
         data = []
-        for line in lines[1:]:
-            parts = line.split(',')
-            if len(parts) < 6 or parts[1] == 'null':
+        for i in range(len(timestamps)):
+            o = quote['open'][i]
+            h = quote['high'][i]
+            l = quote['low'][i]
+            c = quote['close'][i]
+            v = quote['volume'][i]
+            if o is None or h is None or l is None or c is None:
                 continue
-            try:
-                data.append({
-                    'Date': pd.to_datetime(parts[0]),
-                    'Open': float(parts[1]),
-                    'High': float(parts[2]),
-                    'Low': float(parts[3]),
-                    'Close': float(parts[4]),
-                    'Volume': float(parts[5]) if parts[5] != '' else 0
-                })
-            except:
-                continue
+            data.append({
+                'Date': pd.to_datetime(datetime.fromtimestamp(timestamps[i]).strftime('%Y-%m-%d')),
+                'Open': float(o),
+                'High': float(h),
+                'Low': float(l),
+                'Close': float(c),
+                'Volume': float(v) if v is not None else 0
+            })
 
         if not data:
             return None
@@ -956,7 +957,7 @@ def main():
     print()
 
     # Save JSON results
-    json_path = f"/sessions/nifty-vigilant-cannon/mnt/signal-screener-project/quant-reports/data-{execution_date}-backtest.json"
+    json_path = f"quant-reports/data-{execution_date}-backtest.json"
     with open(json_path, 'w') as f:
         json.dump(results, f, indent=2)
     print(f"결과 저장: {json_path}")
@@ -1168,7 +1169,7 @@ def generate_report(results: List[Dict], execution_date: str):
 *생성: DI금융 퀀트 연구소 자동 리포트 | {execution_date}*
 """
 
-    report_path = f"/sessions/nifty-vigilant-cannon/mnt/signal-screener-project/quant-reports/backtest-report-{execution_date}.md"
+    report_path = f"quant-reports/backtest-report-{execution_date}.md"
     with open(report_path, 'w') as f:
         f.write(md)
 
@@ -1276,7 +1277,7 @@ Sharpe: {avg_sharpe:.2f} | MDD: {avg_mdd:.1f}%
 🤖 DI금융 퀀트 연구소 자동 생성"""
 
     # Save telegram report
-    tg_path = f"/sessions/nifty-vigilant-cannon/mnt/signal-screener-project/quant-reports/telegram-pending-{execution_date}-backtest.txt"
+    tg_path = f"quant-reports/telegram-pending-{execution_date}-backtest.txt"
     with open(tg_path, 'w') as f:
         f.write(msg)
     print(f"텔레그램 리포트 생성: {tg_path}")
