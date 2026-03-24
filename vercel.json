@@ -18,6 +18,14 @@
     {
       "path": "/api/cron",
       "schedule": "0 9 * * 1-5"
+    },
+    {
+      "path": "/api/btc-cron",
+      "schedule": "0 */4 * * *"
+    },
+    {
+      "path": "/api/quant-research",
+      "schedule": "0 6 * * *"
     }
   ]
 }
