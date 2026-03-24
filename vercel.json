@@ -10,14 +10,5 @@
       ]
     }
   ],
-  "crons": [
-    {
-      "path": "/api/btc-cron",
-      "schedule": "0 */4 * * *"
-    },
-    {
-      "path": "/api/quant-research",
-      "schedule": "0 6 * * *"
-    }
-  ]
+  "crons": []
 }
