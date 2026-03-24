@@ -12,14 +12,6 @@
   ],
   "crons": [
     {
-      "path": "/api/cron",
-      "schedule": "30 1 * * 1-5"
-    },
-    {
-      "path": "/api/cron",
-      "schedule": "0 9 * * 1-5"
-    },
-    {
       "path": "/api/btc-cron",
       "schedule": "0 */4 * * *"
     },
