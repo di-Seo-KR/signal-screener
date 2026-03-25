@@ -2421,16 +2421,20 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
               </div>
 
               {/* 리스크 스코어 (0-100) */}
-              <div style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
-                <div style={{fontSize:"10px",color:C.text3}}>종합 리스크 스코어</div>
-                <div style={{fontWeight:800,fontSize:"18px",color:(() => {
-                  const riskScore = (rm.drawdown / 10) * 30 + (rm.calcPortfolioHeat() / 100) * 30 + ((rm.calcPortfolioBeta() - 1) / 1) * 20 + 20;
-                  return Math.round(riskScore) > 70 ? C.red : Math.round(riskScore) > 40 ? C.yellow : C.green;
-                })()}>
-                  {Math.round((rm.drawdown / 10) * 30 + (rm.calcPortfolioHeat() / 100) * 30 + ((rm.calcPortfolioBeta() - 1) / 1) * 20 + 20)}
-                </div>
-                <div style={{fontSize:"9px",color:C.text3}}>0(안전) ~ 100(위험)</div>
-              </div>
+              {(() => {
+                const ddPart = (rm.drawdown * 3);
+                const heatPart = (rm.calcPortfolioHeat() * 0.3);
+                const betaPart = (Math.max(0, rm.calcPortfolioBeta() - 1) * 20);
+                const riskScore = Math.min(100, Math.max(0, Math.round(ddPart + heatPart + betaPart + 20)));
+                const riskColor = riskScore > 70 ? C.red : riskScore > 40 ? C.yellow : C.green;
+                return (
+                  <div style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
+                    <div style={{fontSize:"10px",color:C.text3}}>종합 리스크 스코어</div>
+                    <div style={{fontWeight:800,fontSize:"18px",color:riskColor}}>{riskScore}</div>
+                    <div style={{fontSize:"9px",color:C.text3}}>0(안전) ~ 100(위험)</div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* 리스크 한도 설정 */}
