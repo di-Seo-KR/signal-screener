@@ -3969,25 +3969,14 @@ function AppInner() {
   const LOGIN_REQUIRED_TABS = ["paper-trading", "btc-trading", "portfolio", "alerts"];
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  // ── 인증 체크: 로딩 중이면 스플래시 ──
-  if (authLoading) {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "48px", marginBottom: "12px" }}>🐋</div>
-          <div style={{ color: C.text2, fontSize: "14px" }}>로딩 중...</div>
-        </div>
-      </div>
-    );
-  }
   // 게스트 접근 허용 — 로그인 필요 기능만 제한
-  const requireLogin = (targetTab) => {
+  const requireLogin = useCallback((targetTab) => {
     if (!user && LOGIN_REQUIRED_TABS.includes(targetTab)) {
       setShowAuthModal(true);
       return true;
     }
     return false;
-  };
+  }, [user]);
 
   const toggleTheme = useCallback(() => {
     setThemeMode(prev => {
@@ -5927,6 +5916,19 @@ function AppInner() {
   });
 
   // ────────────────────────────────────────────────────────────────
+
+  // ── 인증 로딩 중이면 스플래시 (hooks 뒤에 배치해야 hook 수 일관) ──
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "48px", marginBottom: "12px" }}>🐋</div>
+          <div style={{ color: C.text2, fontSize: "14px" }}>로딩 중...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text1, fontFamily: "'Pretendard', 'Apple SD Gothic Neo', system-ui, sans-serif" }}>
       <style>{`
