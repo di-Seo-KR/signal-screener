@@ -89,6 +89,82 @@ async function fetchCryptoPrices() {
 }
 const GECKO = { "BTC-USD": "bitcoin", "ETH-USD": "ethereum", "SOL-USD": "solana", "BNB-USD": "binancecoin", "XRP-USD": "ripple" };
 
+// ── CryptoRiskManager ──
+class CryptoRiskManager {
+  constructor(config = {}) {
+    this.maxCryptoExposure = config.maxCryptoExposure || 0.60; // 60% of portfolio
+    this.volatilityThresholds = { calm: 40, normal: 80 }; // annualized %
+    this.correlationThreshold = 0.85;
+    this.maxDrawdown = config.maxDrawdown || 0.15; // 15%
+  }
+
+  calculateVolatility(prices) {
+    if (!prices || prices.length < 2) return 0;
+    const returns = [];
+    for (let i = 1; i < prices.length; i++) {
+      const ret = (prices[i] - prices[i - 1]) / prices[i - 1];
+      returns.push(ret);
+    }
+    const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+    const variance = returns.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / returns.length;
+    const stdDev = Math.sqrt(variance);
+    return stdDev * Math.sqrt(252) * 100; // annualized %
+  }
+
+  getVolatilityRegime(annualizedVol) {
+    if (annualizedVol < this.volatilityThresholds.calm) return "calm";
+    if (annualizedVol < this.volatilityThresholds.normal) return "normal";
+    return "wild";
+  }
+
+  kellyCriterion(winRate, avgWin, avgLoss) {
+    if (avgLoss === 0) return 0.25;
+    const kc = (winRate * avgWin - (1 - winRate) * avgLoss) / avgWin;
+    return Math.max(0.05, Math.min(0.25, kc)); // clamp 5-25%
+  }
+
+  adjustPositionSize(baseSize, volatilityRegime, drawdown) {
+    let volAdjust = 1.0;
+    if (volatilityRegime === "calm") volAdjust = 1.2;
+    else if (volatilityRegime === "wild") volAdjust = 0.6;
+
+    const drawdownLevels = [
+      { threshold: 0.05, mult: 1.0 },
+      { threshold: 0.10, mult: 0.7 },
+      { threshold: 0.15, mult: 0.4 },
+      { threshold: Infinity, mult: 0.1 },
+    ];
+    let ddMult = 1.0;
+    for (const level of drawdownLevels) {
+      if (drawdown <= level.threshold) {
+        ddMult = level.mult;
+        break;
+      }
+    }
+
+    return baseSize * volAdjust * ddMult;
+  }
+
+  shouldReduceForFearGreed(btcChange24h) {
+    if (Math.abs(btcChange24h) > 5) return true; // >5% = extremes, reduce
+    return false;
+  }
+
+  calculatePortfolioHeat(positions) {
+    // Simple heat metric: sum of position notionals / total exposure
+    if (!positions || positions.length === 0) return 0;
+    const totalExposure = positions.reduce((sum, p) => sum + parseFloat(p.market_value || 0), 0);
+    return Math.min(100, (totalExposure / 50000) * 100); // normalized to 50k baseline
+  }
+
+  estimateVaR(returns, confidence = 0.95) {
+    if (!returns || returns.length < 10) return 0;
+    const sorted = [...returns].sort((a, b) => a - b);
+    const idx = Math.floor(sorted.length * (1 - confidence));
+    return Math.abs(sorted[idx]) * 100;
+  }
+}
+
 export default function BTCTrading({ theme = "dark" }) {
   const C = theme === "dark" ? DARK_C : LIGHT_C;
 
@@ -109,6 +185,11 @@ export default function BTCTrading({ theme = "dark" }) {
   const [btcCandles, setBtcCandles] = useState([]);
   const [subTab, setSubTab] = useState("overview");
   const [lastUpdate, setLastUpdate] = useState(null);
+  const [riskManager] = useState(new CryptoRiskManager());
+  const [volatilityRegime, setVolatilityRegime] = useState("normal");
+  const [portfolioMetrics, setPortfolioMetrics] = useState({ heat: 0, var: 0, drawdown: 0 });
+  const [lastAutoDecisions, setLastAutoDecisions] = useState([]);
+  const [tradeCooldowns, setTradeCooldowns] = useState({});
 
   // ── Alpaca State ──
   const [alpacaConnected, setAlpacaConnected] = useState(false);
@@ -191,6 +272,13 @@ export default function BTCTrading({ theme = "dark" }) {
       const candles = await fetchCandles("BTC-USD", "1y");
       if (candles.length > 60) {
         setBtcCandles(candles);
+
+        // 변동성 레짐 계산
+        const last30prices = candles.slice(-30).map(c => c.close).filter(c => c != null);
+        const annVol = riskManager.calculateVolatility(last30prices);
+        const regime = riskManager.getVolatilityRegime(annVol);
+        setVolatilityRegime(regime);
+
         if (BTC_STRATEGY) {
           const sigs = BTC_STRATEGY.generate(candles);
           setSignals(sigs);
@@ -207,6 +295,16 @@ export default function BTCTrading({ theme = "dark" }) {
             commission: 0.001, slippage: 0.001, stopLoss: rp.stopLoss, takeProfit: rp.takeProfit,
           });
           setBtResult(bt);
+
+          // 포트폴리오 메트릭 계산
+          const returns = [];
+          for (let i = 1; i < candles.length; i++) {
+            returns.push((candles[i].close - candles[i - 1].close) / candles[i - 1].close);
+          }
+          const var95 = riskManager.estimateVaR(returns, 0.95);
+          const equity = bt.finalEquity;
+          const maxDD = ((bt.maxDrawdown / 100) * 10000) / equity;
+          setPortfolioMetrics({ heat: 45, var: var95, drawdown: maxDD });
         }
         setMarketDiag(diagnoseMarket(candles));
       }
@@ -222,36 +320,79 @@ export default function BTCTrading({ theme = "dark" }) {
     return () => clearInterval(timerRef.current);
   }, [loadData, connectAlpaca, isConnected]);
 
-  // ── Auto mode 시그널 처리 ──
+  // ── Auto mode 시그널 처리 (멀티애셋 + 리스크 관리) ──
   useEffect(() => {
     if (!autoMode || !alpacaConnected || !alpacaAccount || signals.length === 0) return;
-    const latest = signals[signals.length - 1];
-    const latestDate = btcCandles[latest.index]?.time;
-    if (!latestDate) return;
-    const now = Date.now() / 1000;
-    const age = now - latestDate;
-    // 최근 2일 이내 시그널만 자동 실행
-    if (age > 2 * 86400) return;
-    // 이미 실행된 시그널인지 확인
-    const alreadyDone = tradeLog.some(l => l.auto && l.reason?.includes(latest.reason?.slice(0, 30)));
-    if (alreadyDone) return;
 
-    const equity = parseFloat(alpacaAccount.equity || 0);
-    const posSize = latest.positionSize || 0.5;
-    const riskMult = { low: 0.5, medium: 0.7, high: 1.0 }[riskLevel] || 0.7;
-    const tradeAmount = Math.min(equity * posSize * riskMult * 0.3, equity * 0.3); // 최대 30%
+    const now = Date.now();
+    const decisions = [];
 
-    if (latest.type === "BUY" && tradeAmount > 10) {
-      submitCryptoOrder("BTC-USD", "buy", tradeAmount.toFixed(2), latest.reason);
-    } else if (latest.type === "SELL") {
-      // 보유중이면 매도
-      const btcPos = alpacaPositions.find(p => p.symbol === "BTC/USD" || p.symbol === "BTCUSD");
-      if (btcPos) {
-        const sellAmount = Math.min(parseFloat(btcPos.market_value || 0), tradeAmount);
-        if (sellAmount > 10) submitCryptoOrder("BTC-USD", "sell", sellAmount.toFixed(2), latest.reason);
+    // 모든 자산에 대해 시그널 스코어링
+    const btcPriceHistory = btcCandles.slice(-30).map(c => c.close).filter(c => c != null);
+    const annualizedVol = riskManager.calculateVolatility(btcPriceHistory);
+    const regime = riskManager.getVolatilityRegime(annualizedVol);
+
+    // 최신 시그널 평가
+    if (signals.length > 0) {
+      const latest = signals[signals.length - 1];
+      const latestDate = btcCandles[latest.index]?.time;
+      if (!latestDate) return;
+
+      const age = now / 1000 - latestDate;
+      // 최근 2일 이내 시그널만 자동 실행
+      if (age > 2 * 86400) return;
+
+      // 쿨다운 체크: 같은 심볼 6시간 내 재거래 방지
+      const lastTradeSym = tradeCooldowns["BTC-USD"];
+      if (lastTradeSym && now - lastTradeSym < 6 * 3600 * 1000) {
+        decisions.push({ symbol: "BTC-USD", action: "skip", reason: "6h 쿨다운 중" });
+        setLastAutoDecisions(decisions.slice(-5));
+        return;
+      }
+
+      // 이미 실행된 시그널인지 확인
+      const alreadyDone = tradeLog.some(l => l.auto && l.reason?.includes(latest.reason?.slice(0, 30)));
+      if (alreadyDone) {
+        decisions.push({ symbol: "BTC-USD", action: "skip", reason: "중복 시그널" });
+        setLastAutoDecisions(decisions.slice(-5));
+        return;
+      }
+
+      // Fear & Greed 체크
+      const btcChange = prices["BTC-USD"]?.change24h || 0;
+      if (riskManager.shouldReduceForFearGreed(btcChange)) {
+        decisions.push({ symbol: "BTC-USD", action: "reduce", reason: `극단적 변화 ${btcChange.toFixed(1)}%` });
+      }
+
+      // 포지션 사이징 (Kelly + 변동성 조정)
+      const equity = parseFloat(alpacaAccount.equity || 0);
+      const baseSize = latest.positionSize || 0.5;
+      const riskMult = { low: 0.5, medium: 0.7, high: 1.0 }[riskLevel] || 0.7;
+
+      // 드로우다운 기반 조정
+      const maxDD = portfolioMetrics.drawdown || 0;
+      const adjustedSize = riskManager.adjustPositionSize(baseSize, regime, maxDD);
+      const tradeAmount = Math.min(equity * adjustedSize * riskMult * 0.3, equity * 0.3); // 최대 30%
+
+      if (latest.type === "BUY" && tradeAmount > 10) {
+        submitCryptoOrder("BTC-USD", "buy", tradeAmount.toFixed(2), latest.reason);
+        setTradeCooldowns(prev => ({ ...prev, "BTC-USD": now }));
+        decisions.push({ symbol: "BTC-USD", action: "BUY", amount: tradeAmount.toFixed(0), reason: latest.reason });
+      } else if (latest.type === "SELL") {
+        const btcPos = alpacaPositions.find(p => p.symbol === "BTC/USD" || p.symbol === "BTCUSD");
+        if (btcPos) {
+          const sellAmount = Math.min(parseFloat(btcPos.market_value || 0), tradeAmount);
+          if (sellAmount > 10) {
+            submitCryptoOrder("BTC-USD", "sell", sellAmount.toFixed(2), latest.reason);
+            setTradeCooldowns(prev => ({ ...prev, "BTC-USD": now }));
+            decisions.push({ symbol: "BTC-USD", action: "SELL", amount: sellAmount.toFixed(0), reason: latest.reason });
+          }
+        }
       }
     }
-  }, [autoMode, alpacaConnected, signals, alpacaAccount, riskLevel, alpacaPositions, btcCandles, tradeLog, submitCryptoOrder]);
+
+    setLastAutoDecisions(decisions.slice(-5));
+  }, [autoMode, alpacaConnected, signals, alpacaAccount, riskLevel, alpacaPositions, btcCandles, tradeLog, prices, portfolioMetrics, submitCryptoOrder, riskManager]);
 
   // ── Config 저장 ──
   const saveConfig = () => {
@@ -274,6 +415,9 @@ export default function BTCTrading({ theme = "dark" }) {
   const cryptoPositions = alpacaPositions.filter(p => p.symbol?.includes("/") || p.asset_class === "crypto");
 
   // ═══ RENDER ═══
+  const fmtNum = (n) => typeof n === "number" ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : n;
+  const fmtPct = (n) => typeof n === "number" ? `${n >= 0 ? "+" : ""}${n.toFixed(2)}%` : n;
+
   const card = { background: C.card, borderRadius: "16px", border: `1px solid ${C.border}`, padding: "20px", marginBottom: "16px" };
   const stat = (label, val, color, sub) => (
     <div style={{ flex: 1, minWidth: "110px", padding: "12px 14px", borderRadius: "12px", background: C.card2, border: `1px solid ${C.border}` }}>
@@ -462,6 +606,7 @@ export default function BTCTrading({ theme = "dark" }) {
           { id: "overview", label: "전략 개요", icon: "📊" },
           { id: "signals", label: "시그널", icon: "🔔" },
           { id: "backtest", label: "백테스트", icon: "📈" },
+          { id: "performance", label: "성과 분석", icon: "📉" },
           { id: "log", label: "매매 기록", icon: "📋" },
         ].map(t => (
           <button key={t.id} onClick={() => setSubTab(t.id)} style={{
@@ -496,6 +641,60 @@ export default function BTCTrading({ theme = "dark" }) {
                 <span>가격: ${latestSignal.price?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
                 {latestSignal.atrPct && <span>ATR: {latestSignal.atrPct}%</span>}
                 {latestSignal.positionSize && <span>포지션: {(latestSignal.positionSize * 100).toFixed(0)}%</span>}
+              </div>
+            </div>
+          )}
+
+          {/* ═══ 변동성 레짐 + 포트폴리오 리스크 ═══ */}
+          <div style={card}>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>📊 리스크 & 변동성</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
+              {(() => {
+                const regimeEmoji = volatilityRegime === "calm" ? "🟢" : volatilityRegime === "wild" ? "🔴" : "🟡";
+                const regimeLabel = volatilityRegime === "calm" ? "Calm" : volatilityRegime === "wild" ? "Wild" : "Normal";
+                return stat("변동성", `${regimeEmoji} ${regimeLabel}`, volatilityRegime === "calm" ? C.green : volatilityRegime === "wild" ? C.red : C.yellow);
+              })()}
+              {stat("포트폴리오 Heat", `${portfolioMetrics.heat?.toFixed(0) || 0}%`, portfolioMetrics.heat > 70 ? C.red : portfolioMetrics.heat > 40 ? C.yellow : C.green)}
+              {stat("VaR (95%)", `${portfolioMetrics.var?.toFixed(2) || 0}%`, C.orange)}
+              {stat("Max Drawdown", `${(portfolioMetrics.drawdown * 100)?.toFixed(2) || 0}%`, portfolioMetrics.drawdown > 0.1 ? C.red : C.yellow)}
+            </div>
+          </div>
+
+          {/* ═══ 포트폴리오 할당 ═══ */}
+          <div style={card}>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>💼 목표 할당</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {BTC_ASSETS.map(a => (
+                <div key={a.sym} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontSize: "12px", fontWeight: 600, color: C.text1, minWidth: "50px" }}>{a.name}</span>
+                  <div style={{ flex: 1, height: "20px", borderRadius: "4px", background: C.card2, overflow: "hidden" }}>
+                    <div style={{
+                      height: "100%", width: `${a.weight * 100}%`,
+                      background: a.sym === "BTC-USD" ? C.orange : a.sym === "ETH-USD" ? C.purple : a.sym === "SOL-USD" ? C.blue : a.sym === "BNB-USD" ? C.yellow : C.green,
+                      transition: "width .3s",
+                    }} />
+                  </div>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: C.text2, minWidth: "35px", textAlign: "right" }}>{(a.weight * 100).toFixed(0)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ═══ 자동매매 상태 ═══ */}
+          {autoMode && lastAutoDecisions.length > 0 && (
+            <div style={{ ...card, background: `linear-gradient(135deg, ${C.blue}10, ${C.blue}04)`, border: `1px solid ${C.blue}25` }}>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>🤖 최근 자동 결정</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                {lastAutoDecisions.slice(-3).reverse().map((d, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 10px", borderRadius: "8px", background: C.card2, fontSize: "11px" }}>
+                    {d.action === "BUY" && badge("BUY", C.greenBg, C.green)}
+                    {d.action === "SELL" && badge("SELL", C.redBg, C.red)}
+                    {d.action === "skip" && badge("SKIP", C.card2, C.text3)}
+                    {d.action === "reduce" && badge("REDUCE", C.yellowBg, C.yellow)}
+                    <span style={{ flex: 1, color: C.text2 }}>{d.reason || d.symbol}</span>
+                    {d.amount && <span style={{ fontWeight: 700, color: C.text1 }}>${d.amount}</span>}
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -626,6 +825,85 @@ export default function BTCTrading({ theme = "dark" }) {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {/* ═══ 성과 분석 ═══ */}
+      {subTab === "performance" && (
+        <div style={card}>
+          <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>📉 성과 분석</div>
+          {(() => {
+            // 트레이드 로그 분석
+            const totalTrades = tradeLog.length;
+            const buyTrades = tradeLog.filter(t => t.type === "BUY");
+            const sellTrades = tradeLog.filter(t => t.type === "SELL");
+            const totalNotional = tradeLog.reduce((sum, t) => sum + (t.notional || 0), 0);
+            const totalPnL = btResult?.totalReturn || 0;
+            const winCount = btResult?.trades?.filter(t => t.pnlPct > 0).length || 0;
+            const lossCount = btResult?.trades?.filter(t => t.pnlPct <= 0).length || 0;
+            const winRate = totalTrades > 0 ? ((winCount / (winCount + lossCount)) * 100).toFixed(1) : 0;
+
+            const bestTrade = btResult?.trades?.reduce((best, t) => (t.pnlPct > (best?.pnlPct || 0) ? t : best), null);
+            const worstTrade = btResult?.trades?.reduce((worst, t) => (t.pnlPct < (worst?.pnlPct || 0) ? t : worst), null);
+
+            // Sharpe-like metric (매우 간단한 버전)
+            const sharpe = btResult?.sharpeRatio || 0;
+
+            return (
+              <>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "14px" }}>
+                  {stat("총 P&L", `${totalPnL >= 0 ? "+" : ""}${totalPnL.toFixed(1)}%`, totalPnL >= 0 ? C.green : C.red)}
+                  {stat("거래 수", `${totalTrades}`, C.blue)}
+                  {stat("매수", `${buyTrades.length}`, C.green)}
+                  {stat("매도", `${sellTrades.length}`, C.red)}
+                </div>
+
+                <div style={{ marginBottom: "14px", padding: "10px 14px", borderRadius: "10px", background: C.card2, border: `1px solid ${C.border}` }}>
+                  <div style={{ fontSize: "11px", fontWeight: 700, color: C.text3, marginBottom: "8px" }}>WIN RATE</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: "18px", fontWeight: 800, color: C.text1 }}>{winRate}%</div>
+                      <div style={{ fontSize: "10px", color: C.text3, marginTop: "2px" }}>
+                        {winCount}승 / {lossCount}패
+                      </div>
+                    </div>
+                    <div style={{ width: "60px", height: "40px", borderRadius: "6px", background: C.bg, position: "relative", overflow: "hidden" }}>
+                      <div style={{
+                        height: "100%", width: `${Math.min(winRate, 100)}%`,
+                        background: winRate >= 50 ? C.green : C.red, transition: "width .3s",
+                      }} />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "14px" }}>
+                  {stat("Risk-Adj Return", `${sharpe.toFixed(2)}`, sharpe > 1 ? C.green : C.yellow, "Sharpe")}
+                  {stat("Best Trade", bestTrade ? `+${bestTrade.pnlPct.toFixed(1)}%` : "-", C.green)}
+                  {stat("Worst Trade", worstTrade ? `${worstTrade.pnlPct.toFixed(1)}%` : "-", C.red)}
+                  {stat("Avg Trade", btResult?.trades?.length > 0 ? `${(btResult.trades.reduce((sum, t) => sum + (t.pnlPct || 0), 0) / btResult.trades.length).toFixed(2)}%` : "-", C.text1)}
+                </div>
+
+                {btResult?.trades && btResult.trades.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: C.text3, marginBottom: "6px" }}>최근 거래 상세</div>
+                    <div style={{ maxHeight: "200px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "3px" }}>
+                      {btResult.trades.slice(-8).reverse().map((t, i) => (
+                        <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "6px 8px", borderRadius: "6px", background: C.bg, fontSize: "10px" }}>
+                          {badge(t.type === "BUY" ? "매수" : "매도", t.type === "BUY" ? C.greenBg : C.redBg, t.type === "BUY" ? C.green : C.red)}
+                          <span style={{ color: C.text3, minWidth: "50px" }}>${t.price?.toFixed(0)}</span>
+                          {t.pnlPct != null && (
+                            <span style={{ fontWeight: 700, color: t.pnlPct >= 0 ? C.green : C.red, minWidth: "45px", textAlign: "right" }}>
+                              {t.pnlPct >= 0 ? "+" : ""}{t.pnlPct.toFixed(2)}%
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
 

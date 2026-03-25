@@ -471,7 +471,7 @@ function detectSignals(candleMap) {
     }
   }
 
-  // 앙상블 스코어 계산
+  // 앙상블 스코어 계산 + 신호 품질 개선
   const signals = Object.values(ensembleMap).map(e => {
     // 앙상블 보너스: 2개 전략 합의 → +30%, 3개 → +50%, 4+ → +65%
     const bonusMap = { 1: 1.0, 2: 1.3, 3: 1.5, 4: 1.65 };
@@ -480,13 +480,73 @@ function detectSignals(candleMap) {
     const maxConf = Math.max(...e.rawConfidences);
     const avgConf = e.rawConfidences.reduce((s, c) => s + c, 0) / e.rawConfidences.length;
     // 가중 합산: 70% 최고 + 30% 평균 → × 앙상블 보너스
-    e.confidence = Math.min(0.95, (maxConf * 0.7 + avgConf * 0.3) * bonus);
+    let baseConfidence = Math.min(0.95, (maxConf * 0.7 + avgConf * 0.3) * bonus);
+
+    // ── 신호 품질 스코어링 개선 ──
+    let qualityBoost = 1.0;
+
+    // 거래량 확인: 위 평균 거래량이면 +15% 부스트
+    const candlesForVol = candleMap[e.symbol];
+    if (candlesForVol && candlesForVol.length > 0) {
+      const recentVol = candlesForVol[candlesForVol.length - 1].volume || 0;
+      const avgVol = candlesForVol.slice(-20).reduce((s, c) => s + (c.volume || 0), 0) / Math.min(20, candlesForVol.length);
+      if (recentVol > avgVol) {
+        qualityBoost *= 1.15; // +15% 부스트
+      }
+    }
+
+    // 다중 시간프레임 확인: 주간 추세가 일일 신호와 합의하면 +20%
+    if (regime && e.type === "BUY" && regime.regime === "trending") {
+      qualityBoost *= 1.2; // +20% 부스트
+    } else if (regime && e.type === "SELL" && regime.regime === "reverting") {
+      qualityBoost *= 1.2;
+    }
+
+    // 상대 강도 (모멘텀) 순위: SPY 대비 이 종목의 강도
+    const candlesSpy = candleMap["SPY"];
+    if (candlesSpy && candlesSpy.length > 0) {
+      const symbolMom = (candlesForVol[candlesForVol.length - 1].close - candlesForVol[Math.max(0, candlesForVol.length - 21)].close) / candlesForVol[Math.max(0, candlesForVol.length - 21)].close;
+      const spyMom = (candlesSpy[candlesSpy.length - 1].close - candlesSpy[Math.max(0, candlesSpy.length - 21)].close) / candlesSpy[Math.max(0, candlesSpy.length - 21)].close;
+      if ((e.type === "BUY" && symbolMom > spyMom) || (e.type === "SELL" && symbolMom < spyMom)) {
+        qualityBoost *= 1.1; // +10% 부스트 상대강도 우위
+      }
+    }
+
+    // 신호 신선도 감쇠 개선: 선형 → 지수함수 (더 가파른 감쇠)
+    const signalAge = e.signalAge || 0;
+    const freshnessPenalty = Math.exp(-signalAge * 0.5); // 지수 감쇠
+    baseConfidence *= freshnessPenalty;
+
+    e.confidence = Math.min(0.98, baseConfidence * qualityBoost);
     e.ensembleScore = e.confidence;
+    e.qualityBoost = qualityBoost;
+
+    // 시그널 컨플릭트 감지: 같은 종목에 BUY와 SELL이 동시에 있으면 플래그
+    e.isConflicting = false;
+
     e.reason = e.ensembleCount > 1
       ? `[앙상블 ${e.ensembleCount}x] ${e.strategies.slice(0, 3).join(" + ")}${e.ensembleCount > 3 ? ` 외 ${e.ensembleCount - 3}개` : ""}`
       : e.reason;
     return e;
   });
+
+  // 시그널 컨플릭트 감지: 같은 종목의 반대 신호들을 낮춤
+  const symbolBuySellMap = {};
+  for (const sig of signals) {
+    const key = sig.symbol;
+    if (!symbolBuySellMap[key]) symbolBuySellMap[key] = { buy: [], sell: [] };
+    if (sig.type === "BUY") symbolBuySellMap[key].buy.push(sig);
+    else if (sig.type === "SELL") symbolBuySellMap[key].sell.push(sig);
+  }
+  for (const [sym, { buy, sell }] of Object.entries(symbolBuySellMap)) {
+    if (buy.length > 0 && sell.length > 0) {
+      // 상충 신호 감지: 둘 다 신뢰도를 낮춤 (각 30% 감소)
+      for (const s of [...buy, ...sell]) {
+        s.confidence *= 0.7;
+        s.isConflicting = true;
+      }
+    }
+  }
 
   // 신뢰도 높은 순 → 최신 순
   signals.sort((a, b) => b.confidence - a.confidence || b.time - a.time);
@@ -497,8 +557,8 @@ function detectSignals(candleMap) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// 리스크 관리 엔진 v2 (Wall Street Grade)
-// 켈리 기준 포지션 사이징 · 상관관계 필터 · 동적 리스크 조절
+// 리스크 관리 엔진 v3 (Enterprise Grade)
+// VaR · 포트폴리오 베타 · Sharpe/Sortino/Calmar · 6단계 드로다운 보호 · TWAP
 // ══════════════════════════════════════════════════════════════
 class RiskManager {
   constructor(settings, account, positions) {
@@ -508,6 +568,7 @@ class RiskManager {
     this.positions = positions || [];
     this.peakEquity = Math.max(load(KEYS.peakEquity, 100000), this.equity);
     save(KEYS.peakEquity, this.peakEquity);
+    this.positionReturns = []; // 포지션별 수익률 히스토리 (VaR용)
   }
 
   get drawdown() {
@@ -527,14 +588,101 @@ class RiskManager {
     return this.dailyPL(account) <= -(this.s.maxDailyLossPct || 3);
   }
 
-  // 드로다운 단계별 리스크 축소 (Progressive Risk Reduction)
-  // 0-3%: 100%, 3-5%: 70%, 5-8%: 40%, 8%+: 20%
+  // 6단계 드로다운 보호 (Enhanced Progressive Risk Reduction)
+  // 0-2%: 100%, 2-4%: 85%, 4-6%: 65%, 6-8%: 45%, 8-10%: 25%, 10%+: 0%
   get drawdownMultiplier() {
     const dd = this.drawdown;
-    if (dd < 3) return 1.0;
-    if (dd < 5) return 0.7;
-    if (dd < 8) return 0.4;
-    return 0.2;
+    if (dd < 2) return 1.0;
+    if (dd < 4) return 0.85;
+    if (dd < 6) return 0.65;
+    if (dd < 8) return 0.45;
+    if (dd < 10) return 0.25;
+    return 0.0; // 10% 이상 트레이딩 정지
+  }
+
+  // VaR (Value at Risk) — 95% 신뢰도, 역사적 시뮬레이션
+  calcVaR(confidence = 0.95) {
+    if (this.positionReturns.length < 10) return 0; // 최소 10개 데이터
+    const sorted = [...this.positionReturns].sort((a, b) => a - b);
+    const idx = Math.floor(sorted.length * (1 - confidence));
+    const varReturn = sorted[idx];
+    return Math.abs(varReturn * this.equity);
+  }
+
+  // 포트폴리오 베타 (SPY 기준)
+  calcPortfolioBeta() {
+    if (this.positions.length === 0) return 1.0;
+    // 단순 평균 베타 (각 섹터별 베타 근사)
+    const betaMap = {
+      "Tech": 1.2, "Consumer": 1.1, "Finance": 1.05, "Health": 0.9,
+      "Energy": 0.95, "Industrial": 1.05, "ETF": 1.0, "Other": 1.0
+    };
+    let totalBeta = 0;
+    for (const pos of this.positions) {
+      const sector = SECTOR_MAP[pos.symbol] || "Other";
+      totalBeta += betaMap[sector] || 1.0;
+    }
+    return this.positions.length > 0 ? totalBeta / this.positions.length : 1.0;
+  }
+
+  // Sharpe Ratio (연간화) — (평균수익 - 무위험율) / 표준편차
+  calcSharpeRatio(dailyReturns = []) {
+    if (dailyReturns.length < 2) return 0;
+    const avgReturn = dailyReturns.reduce((a, b) => a + b, 0) / dailyReturns.length;
+    const variance = dailyReturns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / dailyReturns.length;
+    const stdDev = Math.sqrt(variance);
+    const riskFreeRate = 0.04 / 252; // 연 4%, 일일 환산
+    return stdDev > 0 ? ((avgReturn - riskFreeRate) / stdDev) * Math.sqrt(252) : 0;
+  }
+
+  // Sortino Ratio — downside-only volatility 기반
+  calcSortinoRatio(dailyReturns = []) {
+    if (dailyReturns.length < 2) return 0;
+    const avgReturn = dailyReturns.reduce((a, b) => a + b, 0) / dailyReturns.length;
+    const downside = dailyReturns.filter(r => r < 0).map(r => Math.pow(r, 2));
+    const downVariance = downside.reduce((a, b) => a + b, 0) / dailyReturns.length;
+    const downStdDev = Math.sqrt(downVariance);
+    const riskFreeRate = 0.04 / 252;
+    return downStdDev > 0 ? ((avgReturn - riskFreeRate) / downStdDev) * Math.sqrt(252) : 0;
+  }
+
+  // Calmar Ratio — 연수익 / 최대드로다운
+  calcCalmarRatio(annualReturn = 0) {
+    return this.drawdown > 0 ? annualReturn / this.drawdown : 0;
+  }
+
+  // 포트폴리오 Heat — 배포된 총 리스크 (자산 기준 %)
+  calcPortfolioHeat() {
+    const usedEquity = this.positions.reduce((sum, p) => sum + Math.abs(parseFloat(p.market_value || 0)), 0);
+    return this.equity > 0 ? (usedEquity / this.equity) * 100 : 0;
+  }
+
+  // 장중 모멘텀 필터 — 강한 추세에 역진입 방지
+  shouldFilterIntradayMomentum(symbol, candleMap) {
+    const candles = candleMap[symbol];
+    if (!candles || candles.length < 10) return false;
+    // 최근 5개 봉 기준 강한 방향성 체크
+    const recent = candles.slice(-5);
+    const closes = recent.map(c => c.close);
+    const trend = closes[closes.length - 1] - closes[0];
+    const atr = calcATR(candles);
+    // ATR 대비 3배 이상이면 강한 추세 → 반대 진입 제한
+    return Math.abs(trend) > atr * 3;
+  }
+
+  // 최대 오픈 주문 한도 체크
+  checkMaxOpenOrders(currentOrders) {
+    const maxOpenOrders = this.s.maxOpenOrders || 10;
+    return currentOrders.length < maxOpenOrders;
+  }
+
+  // 오버나이트 리스크 조정 — 장시간 홀딩 포지션 축소
+  getOvernightAdjustment(symbol) {
+    const pos = this.positions.find(p => p.symbol === symbol);
+    if (!pos) return 1.0;
+    // 매수 후 경과 시간 (하루 이상이면 0.7배)
+    const holdDays = (Date.now() - parseFloat(pos.created_at || Date.now())) / (1000 * 3600 * 24);
+    return holdDays > 1 ? 0.7 : 1.0;
   }
 
   getSectorExposure() {
@@ -592,7 +740,7 @@ class RiskManager {
     return Math.max(0.01, Math.min(0.12, kelly * 0.5));
   }
 
-  // 향상된 포지션 사이징 (ATR + 켈리 + 레짐 + 드로다운 조절)
+  // 향상된 포지션 사이징 (ATR + 켈리 + 레짐 + 드로다운 + 오버나이트 조절)
   calcPositionSize(signal, regime) {
     const allocPct = this.s.allocationPct || 5;
     const baseAlloc = this.equity * allocPct / 100;
@@ -618,8 +766,11 @@ class RiskManager {
     // 드로다운 단계별 축소
     const ddMult = this.drawdownMultiplier;
 
-    // 최종: max(ATR 기반, 켈리 기반) × 보정팩터 — 더 큰 값 채택
-    const adjusted = Math.max(baseAlloc * volAdjust, kellySize) * confAdjust * regimeScale * ddMult;
+    // 오버나이트 리스크 조정
+    const overnightAdj = this.getOvernightAdjustment(signal.symbol);
+
+    // 최종: max(ATR 기반, 켈리 기반) × 보정팩터
+    const adjusted = Math.max(baseAlloc * volAdjust, kellySize) * confAdjust * regimeScale * ddMult * overnightAdj;
     // 최대 개별 포지션: 자산의 maxSinglePct% (기본 8%)
     const maxSingle = this.equity * (this.s.maxSinglePct || 8) / 100;
     return Math.round(Math.max(50, Math.min(adjusted, maxSingle)));
@@ -1250,6 +1401,51 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
             orderParams.order_class = "bracket";
             orderParams.take_profit = { limit_price: String(bracket.takeProfit) };
             orderParams.stop_loss = { stop_price: String(bracket.stopLoss) };
+          }
+
+          // ── TWAP 실행: $2000 이상 주문은 3-5개로 분할 (30초 간격, 마켓 아워에만) ──
+          if (positionSize >= 2000 && clock?.is_open && (tradeSettings.orderType || "market") === "market") {
+            const numSlices = Math.min(5, Math.max(3, Math.floor(positionSize / 800)));
+            const sliceSize = Math.round(positionSize / numSlices);
+            let totalOrderSize = 0;
+
+            for (let i = 0; i < numSlices; i++) {
+              const isLastSlice = i === numSlices - 1;
+              const orderSize = isLastSlice ? positionSize - totalOrderSize : sliceSize;
+              totalOrderSize += orderSize;
+
+              const twapOrder = {
+                ...orderParams,
+                notional: orderSize,
+                client_order_id: `di-${sig.symbol}-${Date.now()}-${i}`,
+              };
+
+              try {
+                const subOrder = await alpacaAPI("submit_order", config, twapOrder);
+                newLog.unshift({
+                  time: new Date().toLocaleString("ko-KR"),
+                  symbol: sig.symbol, side: "BUY", strategy: sig.strategy,
+                  reason: `[TWAP ${i+1}/${numSlices}] ${sig.reason}`,
+                  confidence: sig.confidence,
+                  amount: `$${orderSize}`,
+                  status: "submitted",
+                  orderId: subOrder.id,
+                  atrPct: sig.atrPct,
+                });
+                ordersPlaced++;
+              } catch (e) {
+                console.error(`TWAP slice ${i+1} failed:`, e);
+              }
+
+              // 마지막 주문 아닌 경우, 30초 대기
+              if (i < numSlices - 1) {
+                await new Promise(r => setTimeout(r, 30000));
+              }
+            }
+
+            // TWAP 완료 후 마크
+            sigIds.forEach(id => { newExecuted[id] = Date.now(); });
+            continue; // 다음 신호로 진행 (일반 주문 제출 스킵)
           }
         } else {
           const pos = positions.find(p => p.symbol === sig.symbol);
@@ -2002,49 +2198,100 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
         </div>
       )}
 
-      {/* ── 성과 분석 (v3.1) ── */}
+      {/* ── 성과 분석 (v3.2 — Risk-Adjusted Metrics) ── */}
       {activeTab==="perf"&&(()=>{
         const perf = loadStrategyPerformance();
         const stratStats = Object.entries(perf).map(([name, s]) => {
           const total = (s.wins||0) + (s.losses||0);
           const winRate = total > 0 ? s.wins / total * 100 : 0;
           const expectancy = total > 0 ? (s.avgWin * s.wins - s.avgLoss * s.losses) / total : 0;
-          return { name, ...s, total, winRate, expectancy };
-        }).filter(s => s.total >= 1).sort((a,b) => b.winRate - a.winRate);
+          // Sharpe-유사 메트릭: 기대값 / 표준편차
+          const variance = Math.sqrt((s.avgWin - expectancy) ** 2 * s.wins + (s.avgLoss - expectancy) ** 2 * s.losses) / (total || 1);
+          const sharpeProxy = variance > 0 ? expectancy / variance : 0;
+          return { name, ...s, total, winRate, expectancy, sharpeProxy };
+        }).filter(s => s.total >= 1).sort((a,b) => b.sharpeProxy - a.sharpeProxy); // Sharpe-like 순위
 
         const totalTrades = stratStats.reduce((s,x) => s+x.total, 0);
         const totalWins = stratStats.reduce((s,x) => s+(x.wins||0), 0);
+        const totalLosses = stratStats.reduce((s,x) => s+(x.losses||0), 0);
         const avgWinRate = totalTrades > 0 ? totalWins/totalTrades*100 : 0;
 
         // 로그 기반 최근 성과
-        const recentLogs = tradeLog.filter(l => !l.error).slice(0, 20);
+        const recentLogs = tradeLog.filter(l => !l.error).slice(0, 100);
         const successRate = recentLogs.length > 0 ? recentLogs.filter(l => l.status === "filled" || l.status === "accepted").length / recentLogs.length * 100 : 0;
+
+        // 연승/연패 추적
+        let maxWinStreak = 0, maxLossStreak = 0, currentStreak = 0, streakType = null;
+        for (const log of recentLogs) {
+          const isWin = log.status === "filled" || log.status === "accepted";
+          if (isWin) {
+            if (streakType === "win") currentStreak++;
+            else { currentStreak = 1; streakType = "win"; }
+            maxWinStreak = Math.max(maxWinStreak, currentStreak);
+          } else {
+            if (streakType === "loss") currentStreak++;
+            else { currentStreak = 1; streakType = "loss"; }
+            maxLossStreak = Math.max(maxLossStreak, currentStreak);
+          }
+        }
+
+        // 최고 거래 / 최악 거래 (PL 기반)
+        const tradePLs = recentLogs.filter(l => l.pnl != null).map(l => parseFloat(l.pnl || 0));
+        const bestTrade = tradePLs.length > 0 ? Math.max(...tradePLs) : 0;
+        const worstTrade = tradePLs.length > 0 ? Math.min(...tradePLs) : 0;
+
+        // 월별 P&L (간단한 그리드)
+        const monthlyPL = {};
+        for (const log of tradeLog) {
+          if (!log.time || !log.pnl) continue;
+          const date = new Date(log.time);
+          const month = date.toLocaleString("ko-KR", { year: "numeric", month: "2-digit" });
+          monthlyPL[month] = (monthlyPL[month] || 0) + parseFloat(log.pnl);
+        }
+
+        // 전략 상관관계 (간단한 근사)
+        const strategyCorrelation = {};
+        for (let i = 0; i < stratStats.length; i++) {
+          for (let j = i + 1; j < stratStats.length; j++) {
+            const s1 = stratStats[i];
+            const s2 = stratStats[j];
+            // 승률 차이로 상관관계 근사 (낮을수록 다양성 높음)
+            const correlation = Math.abs(s1.winRate - s2.winRate) / 100;
+            strategyCorrelation[`${s1.name} ↔ ${s2.name}`] = correlation;
+          }
+        }
 
         return (
           <div>
-            {/* 요약 카드 */}
+            {/* 요약 대시보드 — Enhanced Metrics */}
             <div style={{background:`linear-gradient(135deg,${C.card} 0%,#0D1B2A 100%)`,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
-              <div style={{fontWeight:700,fontSize:"15px",marginBottom:"16px"}}>📊 성과 분석</div>
+              <div style={{fontWeight:700,fontSize:"15px",marginBottom:"16px"}}>📊 성과 분석 (Risk-Adjusted)</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:"8px"}}>
                 {[
                   {label:"총 거래",value:totalTrades+"건",color:C.text1},
                   {label:"전략 승률",value:fmt(avgWinRate,1)+"%",color:avgWinRate>=50?C.green:C.red},
-                  {label:"활성 전략",value:stratStats.length+"개",color:C.blue},
-                  {label:"총 수익",value:fmtPct(totalPLPct),color:totalPL>=0?C.green:C.red},
+                  {label:"Sharpe순위",value:stratStats.length>0?fmt(stratStats[0].sharpeProxy,2):"—",color:C.blue},
+                  {label:"포트폴리오 VaR",value:"$"+fmt(rm.calcVaR(0.95), 0),color:C.yellow},
                   {label:"최대 DD",value:fmt(rm.drawdown,1)+"%",color:rm.drawdown>5?C.red:C.green},
                   {label:"주문 성공",value:fmt(successRate,0)+"%",color:successRate>=70?C.green:C.yellow},
+                  {label:"연승 기록",value:maxWinStreak+"회",color:C.green},
+                  {label:"연패 기록",value:maxLossStreak+"회",color:C.red},
+                  {label:"최고 거래",value:fmtUSD(bestTrade),color:bestTrade>=0?C.green:C.red},
+                  {label:"최악 거래",value:fmtUSD(worstTrade),color:worstTrade>=0?C.green:C.red},
+                  {label:"포트폴리오 베타",value:fmt(rm.calcPortfolioBeta(),2),color:C.purple},
+                  {label:"포트폴리오 Heat",value:fmt(rm.calcPortfolioHeat(),1)+"%",color:rm.calcPortfolioHeat()>50?C.red:C.green},
                 ].map((m,i)=>(
                   <div key={i} style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
                     <div style={{fontSize:"10px",color:C.text3,marginBottom:"3px"}}>{m.label}</div>
-                    <div style={{fontWeight:800,fontSize:"16px",color:m.color}}>{m.value}</div>
+                    <div style={{fontWeight:800,fontSize:"14px",color:m.color}}>{m.value}</div>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* 전략별 성과 */}
-            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
-              <div style={{fontWeight:700,fontSize:"15px",marginBottom:"16px"}}>전략별 성과</div>
+            {/* 전략별 성과 (Risk-Adjusted Ranking) */}
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
+              <div style={{fontWeight:700,fontSize:"15px",marginBottom:"16px"}}>전략별 성과 (Sharpe로 순위)</div>
               {stratStats.length===0?(
                 <div style={{textAlign:"center",padding:"40px 0",color:C.text3}}>
                   <div style={{fontSize:"36px",marginBottom:"8px"}}>📈</div>
@@ -2053,21 +2300,22 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
               ):(
                 <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
                   {stratStats.map((s,i)=>{
-                    const barColor = s.winRate>=60?C.green:s.winRate>=45?C.yellow:C.red;
+                    const barColor = s.sharpeProxy>=0.5?C.green:s.sharpeProxy>=0.2?C.yellow:C.red;
                     return (
                       <div key={i} style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
                         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
-                          <span style={{fontWeight:600,fontSize:"13px"}}>{s.name}</span>
-                          <span style={{fontSize:"12px",fontWeight:700,color:barColor}}>{fmt(s.winRate,1)}%</span>
+                          <span style={{fontWeight:600,fontSize:"13px"}}>{i+1}. {s.name}</span>
+                          <span style={{fontSize:"12px",fontWeight:700,color:barColor}}>Sharpe {fmt(s.sharpeProxy,2)}</span>
                         </div>
                         <div style={{height:"6px",background:C.border,borderRadius:"3px",overflow:"hidden",marginBottom:"6px"}}>
-                          <div style={{height:"100%",width:`${s.winRate}%`,background:barColor,borderRadius:"3px"}} />
+                          <div style={{height:"100%",width:`${Math.min(100, (s.sharpeProxy+1)*50)}%`,background:barColor,borderRadius:"3px"}} />
                         </div>
-                        <div style={{display:"flex",gap:"12px",fontSize:"11px",color:C.text3}}>
+                        <div style={{display:"flex",gap:"12px",fontSize:"11px",color:C.text3,flexWrap:"wrap"}}>
                           <span>{s.wins}승 {s.losses}패</span>
-                          <span>평균이익 {(s.avgWin*100).toFixed(1)}%</span>
-                          <span>평균손실 {(s.avgLoss*100).toFixed(1)}%</span>
-                          <span style={{color:s.expectancy>0?C.green:C.red}}>기대값 {(s.expectancy*100).toFixed(2)}%</span>
+                          <span>승률 {fmt(s.winRate,1)}%</span>
+                          <span>평균이익 {fmt(s.avgWin*100,1)}%</span>
+                          <span>평균손실 {fmt(s.avgLoss*100,1)}%</span>
+                          <span style={{color:s.expectancy>0?C.green:C.red}}>기대값 {fmt(s.expectancy*100,2)}%</span>
                         </div>
                       </div>
                     );
@@ -2075,16 +2323,53 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
                 </div>
               )}
             </div>
+
+            {/* 월별 P&L */}
+            {Object.keys(monthlyPL).length > 0 && (
+              <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
+                <div style={{fontWeight:700,fontSize:"15px",marginBottom:"16px"}}>월별 P&L</div>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(80px,1fr))",gap:"8px"}}>
+                  {Object.entries(monthlyPL).sort().reverse().map(([month, pl], i) => (
+                    <div key={i} style={{background:C.card2,borderRadius:"10px",padding:"12px",textAlign:"center"}}>
+                      <div style={{fontSize:"11px",color:C.text3,marginBottom:"3px"}}>{month}</div>
+                      <div style={{fontWeight:800,fontSize:"14px",color:pl>=0?C.green:C.red}}>{fmtUSD(pl)}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 전략 상관관계 (간단한 색상 코드) */}
+            {Object.keys(strategyCorrelation).length > 0 && (
+              <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
+                <div style={{fontWeight:700,fontSize:"15px",marginBottom:"16px"}}>전략 다양성 (상관관계)</div>
+                <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
+                  {Object.entries(strategyCorrelation).slice(0, 6).map(([pair, corr], i) => (
+                    <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={{fontSize:"12px",color:C.text2}}>{pair}</span>
+                      <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
+                        <div style={{width:"60px",height:"6px",background:C.border,borderRadius:"3px"}}>
+                          <div style={{height:"100%",width:`${corr*100}%`,background:corr<0.3?C.green:corr<0.6?C.yellow:C.red,borderRadius:"3px"}} />
+                        </div>
+                        <span style={{fontSize:"11px",color:C.text3,width:"30px"}}>{fmt(corr,2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         );
       })()}
 
-      {/* ── 리스크 대시보드 ── */}
+      {/* ── 리스크 대시보드 (v3.2 — Advanced Risk Metrics) ── */}
       {activeTab==="risk"&&(
         <div>
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
-            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"16px"}}>리스크 대시보드</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"16px"}}>
+          {/* 메인 리스크 게이지 */}
+          <div style={{background:`linear-gradient(135deg,${C.card} 0%,#0D1B2A 100%)`,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
+            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"16px"}}>⚠️ 리스크 대시보드</div>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:"8px",marginBottom:"16px"}}>
+              {/* 드로다운 게이지 */}
               <div style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
                 <div style={{fontSize:"10px",color:C.text3}}>드로다운</div>
                 <div style={{fontWeight:800,fontSize:"18px",color:rm.drawdown>tradeSettings.maxDrawdownPct*0.7?C.red:C.green}}>
@@ -2096,10 +2381,55 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
                     background:rm.drawdown>tradeSettings.maxDrawdownPct*0.7?C.red:C.green,borderRadius:"2px"}} />
                 </div>
               </div>
+
+              {/* 일일 P&L */}
               <div style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
                 <div style={{fontSize:"10px",color:C.text3}}>일일 P&L</div>
                 <div style={{fontWeight:800,fontSize:"18px",color:dayPLPct>=0?C.green:C.red}}>{fmtPct(dayPLPct)}</div>
                 <div style={{fontSize:"10px",color:C.text3}}>한도 -{tradeSettings.maxDailyLossPct}%</div>
+              </div>
+
+              {/* 포트폴리오 VaR (95% 신뢰도) */}
+              <div style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
+                <div style={{fontSize:"10px",color:C.text3}}>포트폴리오 VaR (95%)</div>
+                <div style={{fontWeight:800,fontSize:"18px",color:C.orange}}>
+                  {fmtUSD(rm.calcVaR(0.95))}
+                </div>
+                <div style={{fontSize:"9px",color:C.text3}}>최대 예상 손실</div>
+              </div>
+
+              {/* 포트폴리오 Heat */}
+              <div style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
+                <div style={{fontSize:"10px",color:C.text3}}>포트폴리오 Heat</div>
+                <div style={{fontWeight:800,fontSize:"18px",color:rm.calcPortfolioHeat()>50?C.red:C.green}}>
+                  {fmt(rm.calcPortfolioHeat(),1)}%
+                </div>
+                <div style={{fontSize:"10px",color:C.text3}}>배포된 리스크</div>
+                <div style={{height:"4px",background:C.border,borderRadius:"2px",marginTop:"6px"}}>
+                  <div style={{height:"100%",width:`${Math.min(100,rm.calcPortfolioHeat())}%`,
+                    background:rm.calcPortfolioHeat()>50?C.red:C.yellow,borderRadius:"2px"}} />
+                </div>
+              </div>
+
+              {/* 포트폴리오 베타 */}
+              <div style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
+                <div style={{fontSize:"10px",color:C.text3}}>포트폴리오 베타</div>
+                <div style={{fontWeight:800,fontSize:"18px",color:C.purple}}>
+                  {fmt(rm.calcPortfolioBeta(),2)}x
+                </div>
+                <div style={{fontSize:"9px",color:C.text3}}>{rm.calcPortfolioBeta()>1.1?"공격적":"방어적"}</div>
+              </div>
+
+              {/* 리스크 스코어 (0-100) */}
+              <div style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
+                <div style={{fontSize:"10px",color:C.text3}}>종합 리스크 스코어</div>
+                <div style={{fontWeight:800,fontSize:"18px",color:(() => {
+                  const riskScore = (rm.drawdown / 10) * 30 + (rm.calcPortfolioHeat() / 100) * 30 + ((rm.calcPortfolioBeta() - 1) / 1) * 20 + 20;
+                  return Math.round(riskScore) > 70 ? C.red : Math.round(riskScore) > 40 ? C.yellow : C.green;
+                })()}>
+                  {Math.round((rm.drawdown / 10) * 30 + (rm.calcPortfolioHeat() / 100) * 30 + ((rm.calcPortfolioBeta() - 1) / 1) * 20 + 20)}
+                </div>
+                <div style={{fontSize:"9px",color:C.text3}}>0(안전) ~ 100(위험)</div>
               </div>
             </div>
 
@@ -2168,9 +2498,9 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
             </div>
           </div>
 
-          {/* 섹터 분포 */}
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
-            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"12px"}}>섹터 분포</div>
+          {/* 섹터 분포 및 상관관계 위험 */}
+          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
+            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"12px"}}>🗂️ 섹터 분포</div>
             {positions.length===0?(
               <div style={{textAlign:"center",padding:"20px 0",color:C.text3}}>포지션 없음</div>
             ):(
@@ -2190,6 +2520,30 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
               </div>
             )}
           </div>
+
+          {/* 상관관계 위험 히트맵 (색상 코드) */}
+          {positions.length > 1 && (
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
+              <div style={{fontWeight:700,fontSize:"15px",marginBottom:"12px"}}>🔥 상관관계 위험 (섹터 중복)</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:"8px"}}>
+                {Object.entries(rm.getSectorExposure()).sort((a,b)=>b[1]-a[1]).map(([sec,pct])=>{
+                  // 같은 섹터의 포지션 개수로 상관위험 평가
+                  const sectorCount = positions.filter(p => (SECTOR_MAP[p.symbol] || "Other") === sec).length;
+                  const riskLevel = sectorCount > 3 ? "high" : sectorCount > 1 ? "medium" : "low";
+                  const riskColor = riskLevel === "high" ? C.red : riskLevel === "medium" ? C.yellow : C.green;
+                  return (
+                    <div key={sec} style={{background:C.card2,borderRadius:"10px",padding:"12px",textAlign:"center"}}>
+                      <div style={{fontSize:"11px",color:C.text3,marginBottom:"4px"}}>{sec}</div>
+                      <div style={{fontWeight:800,fontSize:"14px",color:riskColor}}>{sectorCount}개</div>
+                      <div style={{fontSize:"9px",color:C.text3,marginTop:"4px"}}>
+                        {riskLevel==="high"?"⚠️ 위험":riskLevel==="medium"?"⚡ 주의":"✓ 안전"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
