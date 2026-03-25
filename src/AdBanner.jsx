@@ -644,6 +644,33 @@ export function CoupangFloatingBanner({ theme = "dark", context = "default", aut
   );
 }
 
+// ── 쿠팡 파트너스 다이내믹 캐러셀 배너 (680x140) ──
+// iframe 방식으로 React SPA에서 안전하게 렌더링
+export function CoupangCarouselBanner({ style = {} }) {
+  return (
+    <div style={{
+      textAlign: "center",
+      overflow: "hidden",
+      maxWidth: "100%",
+      borderRadius: "8px",
+      ...style,
+    }}>
+      <iframe
+        src="https://ads-partners.coupang.com/widgets.html?id=975402&template=carousel&trackingCode=AF0857541&subId=toit&width=680&height=140&tsource="
+        width="680"
+        height="140"
+        frameBorder="0"
+        scrolling="no"
+        referrerPolicy="unsafe-url"
+        style={{ maxWidth: "100%", border: "none", borderRadius: "4px" }}
+      />
+      <div style={{
+        fontSize: "8px", color: "#888", marginTop: "4px", textAlign: "center",
+      }}>이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</div>
+    </div>
+  );
+}
+
 // ── Google AdSense 배너 (향후 사용) ──
 export function GoogleAd({ slot, format = "auto", style = {} }) {
   const adRef = useRef(null);
@@ -680,6 +707,7 @@ export default {
   GoogleAd,
   CoupangBanner,
   CoupangOfficialBanner,
+  CoupangCarouselBanner,
   CoupangInlineBanner,
   CoupangButtonAd,
   CoupangInterstitial,

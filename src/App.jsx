@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
 import AuthPage from "./AuthPage.jsx";
-import { CoupangBanner, CoupangOfficialBanner, CoupangInlineBanner, CoupangInterstitial, CoupangNativeCard, CoupangStripBanner, CoupangButtonAd, CoupangFloatingBanner, GoogleAd } from "./AdBanner.jsx";
+import { CoupangBanner, CoupangOfficialBanner, CoupangCarouselBanner, CoupangInlineBanner, CoupangInterstitial, CoupangNativeCard, CoupangStripBanner, CoupangButtonAd, CoupangFloatingBanner, GoogleAd } from "./AdBanner.jsx";
 
 // ════════════════════════════════════════════════════════════════════
 // ErrorBoundary — 런타임 에러 시 앱 전체 크래시 방지
@@ -6914,13 +6914,8 @@ function AppInner() {
               </div>
             )}
 
-            {/* 홈 피드 네이티브 광고 (자연스러운 콘텐츠 형태) */}
-            <CoupangNativeCard theme={themeMode} context="home" />
-            {/* 쿠팡 파트너스 공식 배너 (728x90) */}
+            {/* 쿠팡 파트너스 공식 배너 (728x90) — 홈에는 1개만 */}
             <CoupangOfficialBanner width="728" height="90" bannerId={975392} style={{ margin: "8px 0" }} />
-            <CoupangOfficialBanner width="728" height="90" bannerId={975393} style={{ margin: "8px 0" }} />
-            {/* 쿠팡 CTA 버튼 광고 */}
-            <CoupangButtonAd theme={themeMode} context="home" />
 
             {/* ── 주요 종목 (통합: 전체 / 급등 / 급락 탭) ─── */}
             {hotAssets.length > 0 && (() => {
@@ -7596,8 +7591,7 @@ function AppInner() {
             </div>{/* end home-right */}
             </div>{/* end home-grid */}
 
-            {/* ═══ 하단 인라인 광고 (홈 하단 - 덜 침습적) ═══ */}
-            <CoupangInlineBanner theme={themeMode} />
+            {/* 홈 하단 광고 제거 — 다른 탭으로 분산 배치 */}
 
             {/* ═══ 하단 전체너비 섹션 (그리드 밖) ═══ */}
 
@@ -7970,8 +7964,8 @@ function AppInner() {
               </div>
             )}
 
-            {/* 스크리너 컨텍스트 광고 */}
-            {(results.length > 0 || lastScan) && <CoupangNativeCard theme={themeMode} context="screener" />}
+            {/* 스크리너 컨텍스트 광고 — 캐러셀 배너 */}
+            {(results.length > 0 || lastScan) && <CoupangCarouselBanner style={{ margin: "12px 0" }} />}
 
             {/* ═══════════════════════════════════════════════════════
                 저평가 종목 통합 조회
@@ -8393,6 +8387,9 @@ function AppInner() {
                 })}
               </div>
             )}
+
+            {/* 포트폴리오 하단 — 쿠팡 캐러셀 배너 */}
+            <CoupangCarouselBanner style={{ margin: "16px 0" }} />
           </div>
         )}
 
@@ -8651,6 +8648,8 @@ function AppInner() {
                 ))}
               </div>
             </div>
+            {/* 이상 탐지 하단 — 쿠팡 인라인 배너 */}
+            <CoupangInlineBanner theme={themeMode} />
           </div>
         )}
 
@@ -9260,6 +9259,9 @@ function AppInner() {
                 })}
               </div>
             )}
+
+            {/* 뉴스 하단 — 쿠팡 공식 배너 */}
+            <CoupangOfficialBanner width="728" height="90" bannerId={975393} style={{ margin: "12px 0" }} />
           </div>
         )}
 
@@ -9745,6 +9747,9 @@ function AppInner() {
                 <div style={{fontSize:"12px"}}>심볼을 입력하고 "분석" 버튼을 클릭하세요</div>
               </div>
             )}
+
+            {/* 센티먼트 하단 — 쿠팡 네이티브 카드 */}
+            <CoupangNativeCard theme={themeMode} context="default" />
           </div>
         )}
 
