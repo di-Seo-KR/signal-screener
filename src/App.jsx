@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
 import AuthPage from "./AuthPage.jsx";
-import { CoupangBanner, CoupangInlineBanner, CoupangInterstitial, CoupangNativeCard, CoupangStripBanner, GoogleAd } from "./AdBanner.jsx";
+import { CoupangBanner, CoupangInlineBanner, CoupangInterstitial, CoupangNativeCard, CoupangStripBanner, CoupangButtonAd, CoupangFloatingBanner, GoogleAd } from "./AdBanner.jsx";
 
 // ════════════════════════════════════════════════════════════════════
 // ErrorBoundary — 런타임 에러 시 앱 전체 크래시 방지
@@ -4200,19 +4200,17 @@ function AppInner() {
 
   // ── 탭 타이틀 실시간 업데이트 (토스증권 스타일) ──
   useEffect(() => {
-    const sp = marketIndices.find(i => i.symbol === "^GSPC");
-    if (sp && tab === "home") {
-      const sign = sp.change >= 0 ? "+" : "";
-      document.title = `S&P ${sp.price?.toLocaleString()} ${sign}${sp.change}% | DI금융`;
+    if (tab === "home") {
+      document.title = "DI금융";
     } else if (selectedAsset && hotAssets.length > 0) {
       const h = hotAssets.find(a => a.symbol === selectedAsset.symbol);
       if (h) {
         const sign = h.change >= 0 ? "+" : "";
         const price = h.market === "kr" ? `₩${h.price?.toLocaleString()}` : `$${h.price?.toLocaleString()}`;
-        document.title = `${price} ${sign}${h.change}% | ${h.name}`;
+        document.title = `${h.name} ${price} ${sign}${h.change}% | DI금융`;
       }
     } else {
-      document.title = "DI금융 — 전문 투자 스크리너 & 퀀트 엔진";
+      document.title = "DI금융";
     }
   }, [marketIndices, tab, selectedAsset, hotAssets]);
 
@@ -4479,8 +4477,201 @@ function AppInner() {
         } else {
           reply = "두 종목을 비교하려면 'AAPL vs MSFT' 또는 'Apple 비교 Microsoft'처럼 입력해주세요.";
         }
+      } else if (msgLow.includes("섹터") || msgLow.includes("업종") || msgLow.includes("산업") || msgLow.includes("sector") || msgLow.includes("industry")) {
+        // 섹터 분석
+        reply = `🏭 섹터 분석\n\n`;
+        const sectorMap = {};
+        hotAssets.forEach(a => {
+          const sector = a.sector || "기타";
+          if (!sectorMap[sector]) sectorMap[sector] = [];
+          sectorMap[sector].push(a);
+        });
+        const sectorStats = Object.entries(sectorMap).map(([sector, assets]) => {
+          const avgChange = assets.reduce((s, a) => s + a.change, 0) / assets.length;
+          const bestAsset = assets.sort((a, b) => b.change - a.change)[0];
+          const worstAsset = assets.sort((a, b) => a.change - b.change)[0];
+          return { sector, assets: assets.length, avgChange, best: bestAsset, worst: worstAsset };
+        }).sort((a, b) => b.avgChange - a.avgChange);
+
+        sectorStats.forEach((s, i) => {
+          const emoji = s.avgChange >= 0 ? "📈" : "📉";
+          reply += `${emoji} ${s.sector} (${s.assets}개) — 평균 ${s.avgChange >= 0 ? "+" : ""}${s.avgChange.toFixed(2)}%\n`;
+          if (s.best) reply += `  최고: ${s.best.name} +${s.best.change}%\n`;
+          if (s.worst && s.worst.symbol !== s.best.symbol) reply += `  최저: ${s.worst.name} ${s.worst.change}%\n`;
+        });
+        const topSector = sectorStats[0];
+        const bottomSector = sectorStats[sectorStats.length - 1];
+        reply += `\n💡 ${topSector.sector}이(가) 강세이고 ${bottomSector.sector}이(가) 약세입니다. 섹터 로테이션 기회를 살펴보세요.`;
+        reply += `\n\n💬 이어서 물어보기: "기술주 추천" · "금융주 분석" · "에너지 업종"`;
+      } else if (msgLow.includes("타이밍") || msgLow.includes("매매 시점") || msgLow.includes("언제 사") || msgLow.includes("entry") || msgLow.includes("timing")) {
+        // 매매 타이밍 분석
+        const vix = marketIndices.find(i => i.symbol === "^VIX");
+        const fg = fearGreed.stock?.value;
+        const sp = marketIndices.find(i => i.symbol === "^GSPC");
+        const upCnt = hotAssets.filter(a => a.change > 0).length;
+        const dnCnt = hotAssets.filter(a => a.change < 0).length;
+
+        let timingScore = 50;
+        if (vix) timingScore += vix.price > 30 ? 10 : vix.price > 20 ? 0 : -5;
+        if (fg) timingScore += fg <= 30 ? 15 : fg <= 45 ? 10 : fg >= 75 ? -10 : 0;
+        if (sp) timingScore += sp.change > 1 ? 5 : sp.change < -1 ? -5 : 0;
+        timingScore += (upCnt / (upCnt + dnCnt)) > 0.6 ? 5 : (upCnt / (upCnt + dnCnt)) < 0.4 ? -5 : 0;
+        timingScore = Math.max(0, Math.min(100, timingScore));
+
+        reply = `⏰ 매매 타이밍 분석\n\n`;
+        reply += `VIX: ${vix?.price?.toFixed(1)} — ${vix?.price > 30 ? "고변동 (역발상 기회)" : vix?.price > 20 ? "중간" : "안정"}\n`;
+        reply += `공포탐욕: ${fg} — ${fg <= 30 ? "극도 공포 (매수 기회!)" : fg <= 45 ? "공포 (저가 매수)" : fg >= 75 ? "극도 탐욕 (조심)" : "중립"}\n`;
+        reply += `시장 방향: S&P 500 ${sp?.change >= 0 ? "+" : ""}${sp?.change}% | 상승 ${upCnt} 하락 ${dnCnt}\n`;
+        reply += `\n타이밍 점수: ${timingScore}/100\n`;
+        reply += `\n💡 `;
+        if (timingScore >= 70) {
+          reply += "매수 신호가 강합니다! 관심종목 1차 진입을 시작하기 좋은 시점입니다.";
+        } else if (timingScore >= 50) {
+          reply += "혼합 신호입니다. 분할 매수 전략으로 진입을 시작하세요.";
+        } else if (timingScore >= 30) {
+          reply += "약세 신호가 우세합니다. 추가 조정을 기다리거나 매우 제한적으로 진입하세요.";
+        } else {
+          reply += "매도 신호가 강합니다. 기존 포지션을 정리하고 관망하세요.";
+        }
+        reply += `\n\n💬 이어서 물어보기: "추천 종목" · "섹터 분석" · "리스크 점검"`;
+      } else if (msgLow.includes("최적화") || msgLow.includes("리밸런싱") || msgLow.includes("rebalance") || msgLow.includes("optimize")) {
+        // 포트폴리오 최적화 제안
+        if (portfolio.length === 0) {
+          reply = "포트폴리오에 종목이 없어서 최적화 제안을 드릴 수 없습니다. 먼저 종목을 추가해주세요.";
+        } else {
+          reply = `🎯 포트폴리오 최적화 제안\n\n`;
+          const sectorConc = {};
+          let totalBuySignals = 0, totalSellSignals = 0;
+          portfolio.forEach(item => {
+            const hot = hotAssets.find(h => h.symbol === item.symbol || h.symbol === item.symbolRaw);
+            if (hot) {
+              const sector = hot.sector || "기타";
+              sectorConc[sector] = (sectorConc[sector] || 0) + 1;
+              const diag = quickDiagnosis(hot);
+              if (diag.score >= 60) totalBuySignals++;
+              else if (diag.score < 40) totalSellSignals++;
+            }
+          });
+
+          reply += `현재 구성: ${portfolio.length}개 종목\n`;
+          Object.entries(sectorConc).forEach(([sector, count]) => {
+            const pct = (count / portfolio.length * 100).toFixed(0);
+            reply += `  ${sector}: ${count}개 (${pct}%)\n`;
+          });
+
+          const maxSectorPct = Math.max(...Object.values(sectorConc).map(c => c / portfolio.length));
+          if (maxSectorPct > 0.4) {
+            reply += `\n⚠️ ${Object.entries(sectorConc).find(([, c]) => c / portfolio.length === maxSectorPct)[0]} 집중도가 높습니다. 분산을 권장합니다.\n`;
+          }
+
+          reply += `\n강한 신호: ${totalBuySignals}개 매수신호, ${totalSellSignals}개 약세신호\n`;
+          reply += `\n💡 `;
+          if (totalSellSignals > portfolio.length * 0.3) {
+            reply += "약세 신호가 많습니다. 약한 종목부터 정리하고 신규 종목으로 교체를 고려하세요.";
+          } else if (totalBuySignals > portfolio.length * 0.6) {
+            reply += "강한 매수신호가 많습니다. 현재 포지션을 유지하거나 강한 종목에 비중을 확대하세요.";
+          } else {
+            reply += "포트폴리오가 균형 상태입니다. 분기별 리밸런싱으로 섹터 가중치를 조정하세요.";
+          }
+          reply += `\n\n💬 이어서 물어보기: "포트폴리오 현황" · "리스크 점검" · "추천 종목"`;
+        }
+      } else if (msgLow.includes("모멘텀") || msgLow.includes("추세") || msgLow.includes("momentum") || msgLow.includes("trend")) {
+        // 모멘텀 분석
+        reply = `🚀 모멘텀 분석\n\n`;
+        const sorted = [...hotAssets].sort((a, b) => b.change - a.change);
+        const gainers = sorted.slice(0, 5);
+        const losers = sorted.slice(-5).reverse();
+
+        reply += `📈 강한 모멘텀 (TOP 5 상승주)\n`;
+        gainers.forEach((g, i) => {
+          const diag = quickDiagnosis(g);
+          reply += `${i + 1}. ${g.name} +${g.change}% (퀀트: ${diag.score}점)\n`;
+          if (g.volRatio) reply += `   거래량: ${g.volRatio.toFixed(1)}배\n`;
+        });
+
+        reply += `\n📉 약한 모멘텀 (TOP 5 하락주)\n`;
+        losers.forEach((l, i) => {
+          const diag = quickDiagnosis(l);
+          reply += `${i + 1}. ${l.name} ${l.change}% (퀀트: ${diag.score}점)\n`;
+          if (l.volRatio) reply += `   거래량: ${l.volRatio.toFixed(1)}배\n`;
+        });
+
+        const momentumStrength = gainers.reduce((s, g) => s + g.change, 0) / gainers.length;
+        reply += `\n💡 `;
+        if (momentumStrength > 5) {
+          reply += "상승 모멘텀이 강합니다. 하지만 추격 매수는 피하고, 조정 후 진입을 권합니다.";
+        } else if (momentumStrength < -2) {
+          reply += "하락 모멘텀이 우세입니다. 저점 테스트까지 기다리세요.";
+        } else {
+          reply += "모멘텀이 약세 상태입니다. 추세 전환 신호를 확인 후 진입하세요.";
+        }
+        reply += `\n\n💬 이어서 물어보기: "매매 타이밍" · "섹터 분석" · "시장 현황"`;
+      } else if (msgLow.includes("배당") || msgLow.includes("가치주") || msgLow.includes("dividend") || msgLow.includes("value")) {
+        // 배당/가치 분석
+        reply = `💰 배당/가치주 분석\n\n`;
+        const valueAssets = hotAssets.filter(a => {
+          const diag = quickDiagnosis(a);
+          return diag.score > 55 && a.change < 5 && a.pe && a.pe < 20;
+        }).slice(0, 10);
+
+        if (valueAssets.length > 0) {
+          reply += `가치주 후보 (${valueAssets.length}개)\n`;
+          valueAssets.forEach((v, i) => {
+            const diag = quickDiagnosis(v);
+            reply += `${i + 1}. ${v.name}\n`;
+            reply += `   가격: ${fmtPrice(v.price, v.market)} | 변동: ${v.change >= 0 ? "+" : ""}${v.change}%\n`;
+            if (v.pe) reply += `   PER: ${v.pe.toFixed(1)}배 | 퀀트: ${diag.score}점\n`;
+          });
+          reply += `\n💡 저평가 구간의 안정적인 종목들입니다. 배당 재투자로 복리 효과를 극대화하세요.`;
+        } else {
+          reply += `현재 저평가 가치주 후보가 부족합니다.\n시장 조정 시점까지 기다리거나, 특정 섹터의 방어주를 검토하세요.`;
+        }
+        reply += `\n\n💬 이어서 물어보기: "섹터 분석" · "추천 종목" · "매매 타이밍"`;
+      } else if (msgLow.includes("종합") || msgLow.includes("전체분석") || msgLow.includes("overview") || msgLow.includes("진단")) {
+        // 종합 진단
+        const sp = marketIndices.find(i => i.symbol === "^GSPC");
+        const ks = marketIndices.find(i => i.symbol === "^KS11");
+        const vix = marketIndices.find(i => i.symbol === "^VIX");
+        const fg = fearGreed.stock?.value;
+        const upCnt = hotAssets.filter(a => a.change > 0).length;
+        const dnCnt = hotAssets.filter(a => a.change < 0).length;
+
+        reply = `🔍 시장 & 포트폴리오 종합 진단\n\n`;
+        reply += `── 시장 상황 ──\n`;
+        reply += `S&P 500: ${sp?.price?.toLocaleString()} (${sp?.change >= 0 ? "+" : ""}${sp?.change}%)\n`;
+        reply += `코스피: ${ks?.price?.toLocaleString()} (${ks?.change >= 0 ? "+" : ""}${ks?.change}%)\n`;
+        reply += `VIX: ${vix?.price?.toFixed(1)} (${vix?.price > 30 ? "고변동" : vix?.price > 20 ? "중간" : "안정"})\n`;
+        reply += `공포탐욕: ${fg} (${fg <= 30 ? "극도 공포" : fg >= 75 ? "극도 탐욕" : "중립"})\n`;
+        reply += `상승/하락: ${upCnt} / ${dnCnt}\n`;
+
+        reply += `\n── 포트폴리오 상황 ──\n`;
+        if (portfolio.length > 0 && benchmarkData) {
+          reply += `수익률: ${benchmarkData.myReturn >= 0 ? "+" : ""}${benchmarkData.myReturn.toFixed(2)}%\n`;
+          if (benchmarkData.spReturn != null) reply += `vs S&P: ${benchmarkData.alpha >= 0 ? "+" : ""}${benchmarkData.alpha.toFixed(2)}% (${benchmarkData.beatsSP ? "아웃퍼폼" : "언더퍼폼"})\n`;
+        } else {
+          reply += `포트폴리오가 비어있거나 로딩 중입니다.\n`;
+        }
+
+        reply += `\n── 리스크 평가 ──\n`;
+        let riskLevel = "보통";
+        if ((vix?.price > 25) || (fg && fg <= 30) || anomalies.length > 3) riskLevel = "높음";
+        else if ((vix?.price < 15) && (fg && fg > 40 && fg < 70) && anomalies.length === 0) riskLevel = "낮음";
+        reply += `종합 리스크: ${riskLevel === "높음" ? "🔴" : riskLevel === "낮음" ? "🟢" : "🟡"} ${riskLevel}\n`;
+        reply += `이상 탐지: ${anomalies.length}건\n`;
+
+        reply += `\n── 전략 제안 ──\n`;
+        let strategyMsg = "";
+        if (riskLevel === "높음") {
+          strategyMsg = "• 현금 비중 확대\n• 강한 종목에 집중\n• 손절선 재점검";
+        } else if (riskLevel === "낮음") {
+          strategyMsg = "• 신규 진입 기회 활용\n• 적극적 리밸런싱\n• 성장주 비중 확대";
+        } else {
+          strategyMsg = "• 분할 매수 지속\n• 섹터 로테이션 검토\n• 분산투자 유지";
+        }
+        reply += strategyMsg;
+        reply += `\n\n💬 이어서 물어보기: "추천 종목" · "리스크 점검" · "포트폴리오 현황"`;
       } else {
-        reply = `안녕하세요! DI금융 AI 어시스턴트입니다.\n\n이런 것들을 물어보세요:\n\n• 종목명 → "NVDA 분석해줘", "삼성전자 어때?"\n• 시장 현황 → 지수, 등락, 센티먼트 요약\n• 추천 종목 → 오늘의 TOP 매수 추천\n• 포트폴리오 → 수익률 & 벤치마킹\n• 이상 탐지 → 급등락 비정상 종목\n• 관심종목 → 관심종목 전체 진단\n• 리스크 점검 → VIX, 공포지수, 위험도\n• 종목 비교 → "AAPL vs MSFT"`;
+        reply = `안녕하세요! DI금융 AI 어시스턴트입니다.\n\n이런 것들을 물어보세요:\n\n── 기본 분석 ──\n• 종목명 → "NVDA 분석해줘", "삼성전자 어때?"\n• 시장 현황 → "시장 현황", "오늘 마켓"\n• 추천 종목 → "뭐 살까?", "오늘 TOP"\n\n── 고도화 기능 ──\n• 섹터 분석 → "섹터 분석", "tech sector"\n• 매매 타이밍 → "언제 사?", "진입 타이밍"\n• 포트폴리오 최적화 → "최적화", "리밸런싱"\n• 모멘텀 분석 → "모멘텀", "추세"\n• 가치주/배당 → "가치주", "배당"\n• 종합 진단 → "종합분석", "전체 진단"\n\n── 기타 ──\n• 포트폴리오 → "내 자산", "수익률"\n• 이상 탐지 → "급등락", "비정상"\n• 관심종목 → "관심종목"\n• 리스크 점검 → "리스크", "위험도"\n• 종목 비교 → "AAPL vs MSFT"`;
       }
       setAiMessages(prev => [...prev, { role: "ai", text: reply }]);
       setAiLoading(false);
@@ -6051,7 +6242,7 @@ function AppInner() {
         *, *::before, *::after { transition-property: background-color, border-color, color; transition-duration: 0.15s; transition-timing-function: ease; }
         .skeleton { background: linear-gradient(90deg, ${C.card2} 25%, ${C.border} 50%, ${C.card2} 75%);
           background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
-        .tab-content { animation: slideUp 0.25s ease; }
+        .tab-content { animation: slideUp 0.25s ease; display: flex; flex-direction: column; gap: 16px; }
         .card-hover { transition: transform 0.2s ease, box-shadow 0.2s ease; }
         .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,${C.isDark ? '0.25' : '0.08'}); }
         .card-hover:active { transform: translateY(0); }
@@ -6068,23 +6259,26 @@ function AppInner() {
         .di-sidebar { display: none; }
         .di-app-body { display: flex; flex-direction: column; }
         .di-main-wrap { flex: 1; }
-        /* v7.4: 공통 카드 스타일 */
-        .ui-card { background: ${C.card}; border-radius: 16px; padding: 20px; border: 1px solid ${C.border}20; }
-        .ui-card-compact { background: ${C.card}; border-radius: 14px; padding: 16px; border: 1px solid ${C.border}18; }
-        .ui-divider { height: 1px; background: ${C.border}; opacity: 0.2; margin: 4px 0; }
-        .ui-list-item { display: flex; align-items: center; padding: 14px 8px; cursor: pointer; border-radius: 10px; transition: background 0.15s; }
+        /* v7.5: 공통 카드 스타일 — 개선된 간격 ── */
+        .ui-card { background: ${C.card}; border-radius: 14px; padding: 20px; border: 1px solid ${C.border}20; overflow: hidden; }
+        .ui-card-compact { background: ${C.card}; border-radius: 12px; padding: 16px; border: 1px solid ${C.border}18; overflow: hidden; }
+        .ui-divider { height: 1px; background: ${C.border}; opacity: 0.2; margin: 12px 0; }
+        .ui-list-item { display: flex; align-items: center; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s; gap: 8px; }
         .ui-list-item:hover { background: ${C.card2}60; }
-        .asset-card:hover { border-color: ${C.blue}44 !important; box-shadow: 0 2px 12px ${C.blue}12; }
+        .ui-list-item:active { background: ${C.card2}90; }
+        .asset-card { border-radius: 12px; transition: all 0.15s ease; }
+        .asset-card:hover { border-color: ${C.blue}44 !important; box-shadow: 0 2px 12px ${C.blue}12; transform: translateY(-1px); }
         .asset-card:active { transform: scale(0.995); }
-        .ui-section-title { font-size: 16px; font-weight: 700; color: ${C.text1}; margin-bottom: 4px; }
-        .ui-section-sub { font-size: 13px; color: ${C.text3}; }
-        /* ── 모바일 (≤640px) — 폰트/간격 확대 + 터치 최적화 (v9.1) ── */
+        .ui-section-title { font-size: 16px; font-weight: 700; color: ${C.text1}; margin-bottom: 12px; }
+        .ui-section-sub { font-size: 13px; color: ${C.text3}; margin-bottom: 8px; }
+        /* ── 모바일 (≤640px) — 폰트/간격 확대 + 터치 최적화 (v9.2 개선) ── */
         @media (max-width: 640px) {
+          header { padding: 0 10px !important; height: 52px !important; }
+          header div { padding: 0 4px !important; height: 52px !important; }
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
-          main { padding-left: 10px !important; padding-right: 10px !important;
-            font-size: 15px !important; }
-          .tab-content { font-size: 15px; }
+          main { padding: 16px 14px 90px !important; font-size: 15px !important; }
+          .tab-content { font-size: 15px; padding-bottom: 80px !important; }
           button { min-height: 44px; }
           select { min-height: 44px; }
           .screener-cond-btn { padding: 10px 16px !important; font-size: 13px !important; min-height: 44px !important; border-radius: 12px !important; }
@@ -6092,79 +6286,80 @@ function AppInner() {
           .tab-content button { min-height: 44px; }
           /* 지표 그리드 3열→2열 전환 */
           .tech-grid-popup { grid-template-columns: repeat(2, 1fr) !important; }
-          .home-grid { gap: 12px !important; }
-          .ui-card { padding: 14px !important; border-radius: 14px !important; }
-          .ui-list-item { padding: 12px 6px; }
+          .home-grid { gap: 16px !important; }
+          .home-left { gap: 14px !important; }
+          .home-right { gap: 14px !important; }
+          .ui-card { padding: 16px !important; border-radius: 14px !important; }
+          .ui-card-compact { padding: 14px !important; }
+          .ui-list-item { padding: 12px 8px; }
           /* 모바일에서 지표 그리드 2열로 축소 */
           .indicator-grid { grid-template-columns: repeat(2, 1fr) !important; }
           /* 시그널 태그 터치 영역 확대 */
-          span[title] { padding: 5px 10px !important; font-size: 12px !important; }
+          span[title] { padding: 6px 12px !important; font-size: 12px !important; }
           /* 뉴스 카드 패딩 최적화 */
           .tab-content a { padding: 14px !important; }
           /* 섹터 히트맵 모바일 2열 */
           .sector-heatmap-grid { grid-template-columns: repeat(2, 1fr) !important; }
-          /* 모바일 하단 여백 (FAB 버튼과 겹침 방지) */
-          .tab-content { padding-bottom: 80px !important; }
-          /* 모바일 카드 간격 조정 */
-          .home-right { gap: 10px !important; }
-          .home-left { gap: 10px !important; }
+          /* 하단 ticker 모바일 최적화 */
+          [style*="position: fixed"][style*="bottom: 0"] { padding: 4px 0 !important; }
+          [style*="position: fixed"][style*="bottom: 0"] span { font-size: 11px !important; gap: 4px !important; }
         }
-        /* ── 매우 작은 화면 (≤380px) ── */
+        /* ── 매우 작은 화면 (≤380px) — 극저해상도 최적화 ── */
         @media (max-width: 380px) {
-          main { padding-left: 8px !important; padding-right: 8px !important; }
-          .ui-card { padding: 12px !important; }
-          .home-grid { gap: 10px !important; }
+          main { padding: 14px 10px 90px !important; }
+          .ui-card { padding: 12px !important; border-radius: 12px !important; }
+          .ui-card-compact { padding: 10px !important; }
+          .home-grid { gap: 12px !important; }
+          .home-left { gap: 12px !important; }
+          .home-right { gap: 12px !important; }
+          .ui-section-title { font-size: 15px !important; margin-bottom: 3px; }
+          h2, h3 { font-size: 15px !important; }
         }
-        /* ── 태블릿 (641~899px) ── */
+        /* ── 태블릿 (641~899px) — 중간화면 최적화 ── */
         @media (min-width: 641px) and (max-width: 899px) {
+          main { padding: 18px 20px 80px !important; }
           .desktop-nav { gap: 4px !important; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
           .desktop-nav::-webkit-scrollbar { display: none; }
           .desktop-nav button { padding: 7px 10px !important; font-size: 12px !important; }
+          .home-grid { display: grid !important; grid-template-columns: 1fr !important; gap: 18px !important; align-items: start !important; }
+          .ui-card { padding: 16px !important; }
+          .home-left { gap: 14px !important; }
+          .home-right { gap: 14px !important; }
         }
-        /* ── 데스크톱 중간 (900~1199px) ── */
+        /* ── 데스크톱 중간 (900~1199px) — 두 컬럼 레이아웃 ── */
         @media (min-width: 900px) and (max-width: 1199px) {
+          main { padding: 22px 28px 32px !important; }
           .home-grid { display: grid !important; grid-template-columns: 1fr 360px !important; gap: 20px !important; align-items: start !important; }
           .home-right { position: sticky; top: 72px; max-height: calc(100vh - 88px); overflow-y: auto; overflow-x: hidden;
             scrollbar-width: none; -ms-overflow-style: none; }
           .home-right::-webkit-scrollbar { display: none; }
+          .ui-card { padding: 18px !important; }
+          .home-left { gap: 16px !important; }
+          .home-right { gap: 16px !important; }
         }
-        /* ── 와이드 데스크톱 (≥1200px) — 사이드바 + 와이드 레이아웃 ── */
+        /* ── 데스크톱 (≥1200px) — 전체폭 헤더 + 와이드 레이아웃 ── */
         @media (min-width: 1200px) {
-          .desktop-nav { display: none !important; }
+          .desktop-nav { display: flex !important; }
           .mobile-menu-btn { display: none !important; }
-          .di-sidebar {
-            display: flex !important; flex-direction: column; width: 240px; min-width: 240px;
-            position: fixed; top: 0; left: 0; bottom: 0; z-index: 150;
-            background: ${C.card}; border-right: 1px solid ${C.border}30;
-            padding: 20px 0; overflow-y: auto;
-            scrollbar-width: none; -ms-overflow-style: none;
-          }
-          .di-sidebar::-webkit-scrollbar { display: none; }
-          .di-sidebar .sb-logo { padding: 4px 24px 28px; display: flex; align-items: center; gap: 12px; cursor: pointer; }
-          .di-sidebar .sb-nav { display: flex; flex-direction: column; gap: 3px; padding: 0 12px; flex: 1; }
-          .di-sidebar .sb-item {
-            display: flex; align-items: center; gap: 12px; padding: 11px 16px; border-radius: 12px;
-            font-size: 14px; font-weight: 600; cursor: pointer; border: none;
-            transition: all 0.15s ease; position: relative; text-align: left; width: 100%;
-          }
-          .di-sidebar .sb-item:hover { background: ${C.card2}; }
-          .di-sidebar .sb-item.active { background: ${C.blueBg}; color: ${C.blue}; }
-          .di-sidebar .sb-item .sb-icon { font-size: 17px; width: 26px; text-align: center; flex-shrink: 0; }
-          .di-sidebar .sb-divider { height: 1px; background: ${C.border}40; margin: 14px 24px; }
-          .di-sidebar .sb-section { font-size: 11px; color: ${C.text3}; font-weight: 700; padding: 12px 28px 6px; letter-spacing: 0.06em; text-transform: uppercase; }
-          .di-app-body { flex-direction: row !important; }
-          .di-main-wrap { margin-left: 240px; flex: 1; width: calc(100% - 240px); }
-          .di-main-wrap header { left: 240px !important; width: calc(100% - 240px) !important; }
+          .di-app-body { flex-direction: column !important; }
+          .di-main-wrap { margin-left: 0; flex: 1; width: 100%; }
+          .di-main-wrap header { left: 0 !important; width: 100% !important; }
           .di-main-wrap main { max-width: 1400px !important; padding: 24px 36px 36px !important; }
           .home-grid { display: grid !important; grid-template-columns: 1fr 400px !important; gap: 24px !important; align-items: start !important; }
           .home-right { position: sticky; top: 76px; max-height: calc(100vh - 92px); overflow-y: auto; overflow-x: hidden;
             scrollbar-width: none; -ms-overflow-style: none; }
           .home-right::-webkit-scrollbar { display: none; }
+          .ui-card { padding: 20px !important; }
+          .home-left { gap: 18px !important; }
+          .home-right { gap: 18px !important; }
         }
-        /* ── 초와이드 (≥1600px) ── */
+        /* ── 초와이드 (≥1600px) — 최대 폭 레이아웃 ── */
         @media (min-width: 1600px) {
-          .di-main-wrap main { max-width: 1600px !important; }
-          .home-grid { grid-template-columns: 1fr 480px !important; }
+          .di-main-wrap main { max-width: 1600px !important; padding: 28px 48px 40px !important; }
+          .home-grid { grid-template-columns: 1fr 480px !important; gap: 28px !important; }
+          .ui-card { padding: 22px !important; }
+          .home-left { gap: 20px !important; }
+          .home-right { gap: 20px !important; }
         }
         @keyframes tickerScroll {
           0% { transform: translateX(0); }
@@ -6172,172 +6367,63 @@ function AppInner() {
         }
       `}</style>
 
-      {/* ── 와이드 데스크톱 사이드바 (≥1200px 에서만 표시) ── */}
-      <aside className="di-sidebar">
-        <div className="sb-logo" onClick={() => setTab("home")}>
-          <span style={{ fontSize: "22px" }}>📡</span>
-          <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
-          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v11.0</span>
-        </div>
-        <div className="sb-section" onClick={() => setSbCollapsed(p => ({...p, main: !p.main}))} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}>
-          <span>메인</span>
-          <span style={{ fontSize: "10px", color: C.text3, transition: "transform .2s", transform: sbCollapsed.main ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
-        </div>
-        {!sbCollapsed.main && (
-        <nav className="sb-nav">
-          {[
-            { id: "home", label: "홈 대시보드", icon: "🏠" },
-            { id: "screener", label: "주식 골라보기", icon: "🔍" },
-            { id: "anomaly", label: "이상 탐지", icon: "⚡", badge: anomalies.length },
-            { id: "strategy", label: "퀀트 전략", icon: "🎯" },
-          ].map(t => (
-            <button key={t.id} className={`sb-item${tab === t.id ? " active" : ""}`}
-              onClick={() => { setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }}
-              style={{ background: tab === t.id ? C.blueBg : "transparent", color: tab === t.id ? C.blue : C.text2 }}>
-              <span className="sb-icon">{t.icon}</span>{t.label}
-              {t.badge > 0 && (
-                <span style={{ marginLeft: "auto", background: C.red, color: "#fff",
-                  fontSize: "9px", fontWeight: 800, borderRadius: "50%", width: "18px", height: "18px",
-                  display: "flex", alignItems: "center", justifyContent: "center" }}>{t.badge > 9 ? "9+" : t.badge}</span>
-              )}
-            </button>
-          ))}
-        </nav>
-        )}
-        <div className="sb-divider" />
-        <div className="sb-section" onClick={() => setSbCollapsed(p => ({...p, ops: !p.ops}))} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}>
-          <span>운용 & 분석</span>
-          <span style={{ fontSize: "10px", color: C.text3, transition: "transform .2s", transform: sbCollapsed.ops ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
-        </div>
-        {!sbCollapsed.ops && (
-        <nav className="sb-nav">
-          {[
-            { id: "quant-port", label: "전략 운용", icon: "📊" },
-            { id: "backtest", label: "백테스트", icon: "📈" },
-            { id: "risk-map", label: "리스크 타워", icon: "🛡️" },
-            { id: "quant-report", label: "퀀트 리포트", icon: "📋" },
-          ].map(t => (
-            <button key={t.id} className={`sb-item${tab === t.id ? " active" : ""}`}
-              onClick={() => setTab(t.id)}
-              style={{ background: tab === t.id ? C.blueBg : "transparent", color: tab === t.id ? C.blue : C.text2 }}>
-              <span className="sb-icon">{t.icon}</span>{t.label}
-            </button>
-          ))}
-        </nav>
-        )}
-        <div className="sb-divider" />
-        <div className="sb-section" onClick={() => setSbCollapsed(p => ({...p, info: !p.info}))} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}>
-          <span>자산 & 정보</span>
-          <span style={{ fontSize: "10px", color: C.text3, transition: "transform .2s", transform: sbCollapsed.info ? "rotate(-90deg)" : "rotate(0)" }}>▼</span>
-        </div>
-        {!sbCollapsed.info && (
-        <nav className="sb-nav">
-          {[
-            { id: "portfolio", label: "내 포트폴리오", icon: "💼", locked: true },
-            { id: "news", label: "마켓 뉴스", icon: "📰" },
-            { id: "sentiment", label: "소셜 센티먼트", icon: "💬" },
-            { id: "alerts", label: "매매 알림", icon: "🔔", badge: alertBadge, locked: true },
-            { id: "auto-trading", label: "AI 자동매매", icon: "🤖", locked: true },
-          ].map(t => (
-            <button key={t.id} className={`sb-item${tab === t.id ? " active" : ""}`}
-              onClick={() => { if (t.locked && requireLogin(t.id)) return; setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }}
-              style={{ background: tab === t.id ? C.blueBg : "transparent", color: tab === t.id ? C.blue : C.text2 }}>
-              <span className="sb-icon">{t.icon}</span>{t.label}
-              {t.locked && !user && <span style={{ marginLeft: "4px", fontSize: "10px", opacity: 0.5 }}>🔒</span>}
-              {t.badge > 0 && (
-                <span style={{ marginLeft: "auto", background: C.red, color: "#fff",
-                  fontSize: "9px", fontWeight: 800, borderRadius: "50%", width: "18px", height: "18px",
-                  display: "flex", alignItems: "center", justifyContent: "center" }}>{t.badge > 9 ? "9+" : t.badge}</span>
-              )}
-            </button>
-          ))}
-        </nav>
-        )}
-        <div style={{ flex: 1 }} />
-        <div style={{ padding: "12px 20px", borderTop: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: "8px" }}>
-          {/* 유저 정보 또는 로그인 */}
-          {user ? (
-          <>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 8px", borderRadius: "8px", background: C.card2, border: `1px solid ${C.border}` }}>
-            <div style={{ width: "26px", height: "26px", borderRadius: "50%", background: C.blueBg,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "12px", fontWeight: 700, color: C.blue, flexShrink: 0 }}>
-              {(user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()}
-            </div>
-            <span style={{ fontSize: "12px", color: C.text2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-              {user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User"}
-            </span>
-          </div>
-          <button onClick={() => { if (confirm("로그아웃 하시겠습니까?")) signOut(); }} style={{
-            width: "100%", padding: "8px", borderRadius: "8px", background: "transparent",
-            border: `1px solid ${C.border}`, color: C.text3, fontSize: "12px", fontWeight: 600,
-            display: "flex", alignItems: "center", gap: "8px", justifyContent: "center", cursor: "pointer",
-          }}>
-            ⏻ 로그아웃
-          </button>
-          </>
-          ) : (
-          <button onClick={() => setShowAuthModal(true)} style={{
-            width: "100%", padding: "10px", borderRadius: "10px", background: C.blue,
-            border: "none", color: "#fff", fontSize: "13px", fontWeight: 700,
-            display: "flex", alignItems: "center", gap: "8px", justifyContent: "center", cursor: "pointer",
-          }}>
-            로그인 / 회원가입
-          </button>
-          )}
-          <button onClick={toggleTheme} style={{
-            width: "100%", padding: "8px", borderRadius: "8px", background: C.card2,
-            border: `1px solid ${C.border}`, color: C.text2, fontSize: "12px", fontWeight: 600,
-            display: "flex", alignItems: "center", gap: "8px", justifyContent: "center", cursor: "pointer",
-          }}>
-            {themeMode === "dark" ? "\u2600\uFE0F 라이트 모드" : "\uD83C\uDF19 다크 모드"}
-          </button>
-        </div>
-      </aside>
 
       <div className="di-app-body">
       <div className="di-main-wrap">
 
-      {/* ── 헤더 ──────────────────────────────────────────────────── */}
+      {/* ── GNB 헤더 (로고 + 수평 네비게이션 + 우측 도구) ──────────────────────────────────────────────────── */}
       <header style={{
         position: "sticky", top: 0, zIndex: 100,
-        background: `${C.bg}ee`, backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+        background: `${C.bg}F8`, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
         borderBottom: `1px solid ${C.border}30`,
         paddingTop: "env(safe-area-inset-top, 0px)",
       }}>
-        <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "60px" }}>
-          <div onClick={() => setTab("home")} style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer", userSelect: "none" }}
-            title="홈으로 이동">
-            <span style={{ fontSize: "22px" }}>📡</span>
-            <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
-            <span style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v11.0</span>
+        <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "56px", gap: "16px" }}>
+
+          {/* 좌측: 로고 */}
+          <div onClick={() => setTab("home")} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none", marginRight: "16px", flexShrink: 0, title: "홈으로 이동" }}>
+            <span style={{ fontSize: "20px" }}>📈</span>
+            <span style={{ fontWeight: 800, fontSize: "17px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
           </div>
-          {/* 데스크톱 네비게이션 */}
-          <nav className="desktop-nav" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "anomaly", label: "이상탐지", icon: "⚡" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "quant-port", label: "운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼", locked: true }, { id: "news", label: "뉴스", icon: "📰" }, { id: "sentiment", label: "센티먼트", icon: "💬" }, { id: "alerts", label: "알림", icon: "🔔", locked: true }, { id: "auto-trading", label: "자동매매", icon: "🤖", locked: true }].map(t => (
-              <button key={t.id} onClick={() => { if (t.locked && requireLogin(t.id)) return; setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }} style={{
-                padding: "7px 12px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+
+          {/* 중앙: 수평 네비게이션 탭 */}
+          <nav className="desktop-nav" style={{ display: "flex", alignItems: "center", gap: "2px", flex: 1, overflowX: "auto", scrollbarWidth: "none" }}>
+            {[
+              { id: "home", label: "홈" },
+              { id: "screener", label: "종목 탐색" },
+              { id: "anomaly", label: "이상 탐지" },
+              { id: "strategy", label: "퀀트 전략" },
+              { id: "quant-port", label: "전략 운용" },
+              { id: "backtest", label: "백테스트" },
+              { id: "portfolio", label: "포트폴리오", locked: true },
+              { id: "news", label: "뉴스" },
+              { id: "auto-trading", label: "자동매매", locked: true },
+            ].map(t => (
+              <button key={t.id} onClick={() => { if (t.locked && requireLogin(t.id)) return; setTab(t.id); }} style={{
+                padding: "8px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
-                color: tab === t.id ? C.blue : C.text2, border: "none", whiteSpace: "nowrap",
-                position: "relative", transition: "all 0.15s",
+                color: tab === t.id ? C.blue : C.text2,
+                border: "none", cursor: "pointer", whiteSpace: "nowrap",
+                transition: "all 0.15s",
               }}>
-                {t.icon} {t.label}
-                {t.id === "alerts" && alertBadge > 0 && (
-                  <span style={{ position: "absolute", top: "-2px", right: "-2px", background: C.red, color: "#fff",
-                    fontSize: "9px", fontWeight: 800, borderRadius: "50%", width: "16px", height: "16px",
-                    display: "flex", alignItems: "center", justifyContent: "center" }}>{alertBadge > 9 ? "9+" : alertBadge}</span>
-                )}
-                {t.id === "anomaly" && anomalies.length > 0 && (
-                  <span style={{ position: "absolute", top: "-2px", right: "-2px", background: C.red, color: "#fff",
-                    fontSize: "9px", fontWeight: 800, borderRadius: "50%", width: "16px", height: "16px",
-                    display: "flex", alignItems: "center", justifyContent: "center" }}>{anomalies.length}</span>
-                )}
+                {t.label}
+                {t.locked && !user && <span style={{ fontSize: "9px", marginLeft: "3px", opacity: 0.5 }}>🔒</span>}
               </button>
             ))}
           </nav>
-          {/* 유저 + 테마 토글 + 햄버거 */}
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            {/* 유저 메뉴 또는 로그인 버튼 */}
+
+          {/* 우측: 검색 + 사용자 + 테마 + 햄버거 */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+            <button onClick={() => setGlobalSearchOpen(true)} style={{
+              display: "flex", alignItems: "center", gap: "6px",
+              padding: "7px 14px", borderRadius: "10px",
+              background: C.card2, border: `1px solid ${C.border}30`,
+              fontSize: "12px", color: C.text3, cursor: "pointer",
+            }}>
+              🔍 검색 <span style={{ fontSize: "10px", padding: "1px 5px", borderRadius: "3px", background: C.bg, color: C.text3 }}>/</span>
+            </button>
+
+            {/* 사용자 섹션 */}
             {user ? (
             <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 12px 4px 6px",
               background: C.card2, borderRadius: "12px", border: `1px solid ${C.border}30` }}>
@@ -6364,15 +6450,8 @@ function AppInner() {
               로그인
             </button>
             )}
-            <button onClick={() => setGlobalSearchOpen(true)} title="종목 검색 (/ 키)" style={{
-              background: C.card2, border: `1px solid ${C.border}30`, borderRadius: "12px",
-              padding: "0 14px", height: "40px", display: "flex", alignItems: "center", gap: "8px",
-              cursor: "pointer", color: C.text3, fontSize: "13px", transition: "all 0.2s",
-            }}>
-              <span style={{ fontSize: "14px" }}>🔍</span>
-              <span style={{ color: C.text3 }}>검색</span>
-              <span style={{ fontSize: "11px", color: C.text3, background: C.bg, padding: "2px 6px", borderRadius: "4px", fontFamily: "monospace" }}>/</span>
-            </button>
+
+            {/* 테마 토글 */}
             <button onClick={toggleTheme} title={themeMode === "dark" ? "라이트 모드" : "다크 모드"} style={{
               background: C.card2, border: `1px solid ${C.border}30`, borderRadius: "12px",
               width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center",
@@ -6380,6 +6459,8 @@ function AppInner() {
             }}>
               {themeMode === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"}
             </button>
+
+            {/* 모바일 햄버거 버튼 */}
             <button className="mobile-menu-btn" onClick={() => setMenuOpen(!menuOpen)} style={{
               display: "none", alignItems: "center", justifyContent: "center",
               background: menuOpen ? C.card2 : "none", border: "none", color: C.text1,
@@ -6461,15 +6542,14 @@ function AppInner() {
         else if (tab === "news") await fetchNews();
         else window.location.reload();
       }}>
-      <main style={{ maxWidth: "1400px", margin: "0 auto", padding: "20px 24px 32px" }}>
+      <main style={{ maxWidth: "1400px", margin: "0 auto", padding: "22px 28px 36px" }}>
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 홈 (토스 스타일 — 깔끔하고 정보 밀도 최적화)
         ═══════════════════════════════════════════════════════════ */}
         {tab === "home" && (
           <div className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            {/* 검색바 */}
-            <SearchBar onSelect={(asset) => setSelectedAsset(asset)} />
+            {/* 검색바는 이제 헤더 GNB에 통합됨 */}
 
             {/* 2컬럼 그리드 (데스크톱) / 1컬럼 (모바일) */}
             <div className="home-grid">
@@ -6734,6 +6814,8 @@ function AppInner() {
 
             {/* 홈 피드 네이티브 광고 (자연스러운 콘텐츠 형태) */}
             <CoupangNativeCard theme={themeMode} context="home" />
+            {/* 쿠팡 CTA 버튼 광고 */}
+            <CoupangButtonAd theme={themeMode} context="home" />
 
             {/* ── 주요 종목 (통합: 전체 / 급등 / 급락 탭) ─── */}
             {hotAssets.length > 0 && (() => {
@@ -9579,7 +9661,6 @@ function AppInner() {
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <span style={{ fontSize: "16px" }}>📡</span>
             <span style={{ fontWeight: 700, fontSize: "13px", color: C.text2 }}>DI금융</span>
-            <span style={{ fontSize: "11px", color: C.text3 }}>v10.2</span>
           </div>
           <div style={{ fontSize: "11px", color: C.text3, display: "flex", gap: "16px", flexWrap: "wrap" }}>
             <span>투자의 판단과 책임은 본인에게 있습니다</span>
@@ -9619,10 +9700,10 @@ function AppInner() {
       {/* ═══ AI 투자 어시스턴트 플로팅 채팅 ═══ */}
       {/* FAB 버튼 */}
       <button onClick={() => setAiChatOpen(!aiChatOpen)} style={{
-        position: "fixed", bottom: isMobile ? "20px" : "28px", right: isMobile ? "16px" : "28px",
-        width: "52px", height: "52px", borderRadius: "16px", border: "none",
+        position: "fixed", bottom: isMobile ? "18px" : "28px", right: isMobile ? "14px" : "28px",
+        width: isMobile ? "48px" : "56px", height: isMobile ? "48px" : "56px", borderRadius: isMobile ? "14px" : "16px", border: "none",
         background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`,
-        color: "#fff", fontSize: "22px", cursor: "pointer",
+        color: "#fff", fontSize: isMobile ? "20px" : "24px", cursor: "pointer",
         boxShadow: "0 4px 20px rgba(59,130,246,0.4)",
         zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center",
         transition: "transform .2s, box-shadow .2s",
@@ -9635,11 +9716,12 @@ function AppInner() {
       {/* 채팅 패널 */}
       {aiChatOpen && (
         <div style={{
-          position: "fixed", bottom: isMobile ? "80px" : "90px", right: isMobile ? "12px" : "28px",
-          width: isMobile ? "calc(100vw - 24px)" : "380px", maxHeight: isMobile ? "60vh" : "520px",
+          position: "fixed", bottom: isMobile ? "76px" : "90px", right: isMobile ? "14px" : "28px",
+          width: isMobile ? "calc(100vw - 28px)" : "400px", maxHeight: isMobile ? "55vh" : "540px",
           background: C.card, borderRadius: "20px", border: `1px solid ${C.border}`,
           boxShadow: `0 12px 48px ${C.isDark ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.15)"}`,
           zIndex: 9999, display: "flex", flexDirection: "column", overflow: "hidden",
+          maxWidth: "100vw",
         }}>
           {/* 헤더 */}
           <div style={{
@@ -9693,23 +9775,24 @@ function AppInner() {
           </div>
 
           {/* 입력 */}
-          <div style={{ padding: "12px 16px", borderTop: `1px solid ${C.border}20`, display: "flex", gap: "8px" }}>
+          <div style={{ padding: isMobile ? "10px 12px" : "12px 16px", borderTop: `1px solid ${C.border}20`, display: "flex", gap: "8px" }}>
             <input
               value={aiInput}
               onChange={e => setAiInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAiChat(aiInput); } }}
               placeholder="종목명이나 질문을 입력하세요..."
               style={{
-                flex: 1, padding: "10px 14px", borderRadius: "12px", fontSize: "13px",
+                flex: 1, padding: isMobile ? "10px 12px" : "10px 14px", borderRadius: "12px", fontSize: isMobile ? "13px" : "14px",
                 background: C.bg, border: `1px solid ${C.border2}`, color: C.text1,
-                outline: "none",
+                outline: "none", minHeight: "40px",
               }}
             />
             <button onClick={() => handleAiChat(aiInput)} disabled={aiLoading || !aiInput.trim()} style={{
-              padding: "10px 16px", borderRadius: "12px", fontSize: "13px", fontWeight: 700,
+              padding: isMobile ? "10px 14px" : "10px 18px", borderRadius: "12px", fontSize: isMobile ? "12px" : "13px", fontWeight: 700,
               background: aiInput.trim() ? C.blue : C.card2,
               color: aiInput.trim() ? "#fff" : C.text3,
-              border: "none", cursor: aiInput.trim() ? "pointer" : "default",
+              border: "none", cursor: aiInput.trim() ? "pointer" : "default", whiteSpace: "nowrap",
+              minHeight: "40px", display: "flex", alignItems: "center",
             }}>전송</button>
           </div>
         </div>
@@ -9761,6 +9844,9 @@ function AppInner() {
           </div>
         </div>
       )}
+
+      {/* ═══ 쿠팡 플로팅 배너 (30초 후 자동 표시) ═══ */}
+      <CoupangFloatingBanner theme={themeMode} context={tab} />
 
     </div>
   );

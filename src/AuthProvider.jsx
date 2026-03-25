@@ -46,6 +46,7 @@ export default function AuthProvider({ children }) {
   const [toast, setToast] = useState(null);
   const codeExchanged = useRef(false);
   const toastTimer = useRef(null);
+  const wasSignedIn = useRef(false);
 
   // ── 토스트 표시 함수 ──
   const showToast = useCallback((type, message, duration = 4000) => {
@@ -71,7 +72,8 @@ export default function AuthProvider({ children }) {
         setSession(s);
         setUser(s?.user ?? null);
 
-        if (event === "SIGNED_IN") {
+        if (event === "SIGNED_IN" && !wasSignedIn.current) {
+          wasSignedIn.current = true;
           const displayName = s?.user?.user_metadata?.full_name
             || s?.user?.user_metadata?.display_name
             || s?.user?.email?.split("@")[0]
@@ -84,11 +86,17 @@ export default function AuthProvider({ children }) {
             window.history.replaceState({}, "", url.origin + url.pathname);
           }
         } else if (event === "SIGNED_OUT") {
+          wasSignedIn.current = false;
           showToast("success", "로그아웃 되었습니다.");
         }
 
         if (["SIGNED_IN", "SIGNED_OUT", "TOKEN_REFRESHED", "INITIAL_SESSION"].includes(event)) {
           setLoading(false);
+        }
+
+        // Mark as already signed in for session restoration (prevents duplicate toasts)
+        if (event === "INITIAL_SESSION" && s?.user) {
+          wasSignedIn.current = true;
         }
       }
     );
