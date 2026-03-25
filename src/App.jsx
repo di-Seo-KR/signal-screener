@@ -6352,7 +6352,7 @@ function AppInner() {
         /* ── 태블릿 (641~899px) — 중간화면 최적화 ── */
         @media (min-width: 641px) and (max-width: 899px) {
           main { padding: 18px 20px 80px !important; }
-          .desktop-nav { gap: 4px !important; overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+          .desktop-nav { gap: 4px !important; overflow: visible !important; }
           .desktop-nav::-webkit-scrollbar { display: none; }
           .desktop-nav button { padding: 7px 10px !important; font-size: 12px !important; }
           .home-grid { display: grid !important; grid-template-columns: 1fr !important; gap: 18px !important; align-items: start !important; }
@@ -6411,6 +6411,7 @@ function AppInner() {
         background: `${C.bg}F8`, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
         borderBottom: `1px solid ${C.border}30`,
         paddingTop: "env(safe-area-inset-top, 0px)",
+        overflow: "visible",
       }}>
         <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "56px", gap: "16px" }}>
 
@@ -6431,7 +6432,7 @@ function AppInner() {
           </div>
 
           {/* 중앙: GNB — 호버 시 LNB 드롭다운, 클릭 비활성 (홈만 클릭 이동) */}
-          <nav className="desktop-nav" style={{ display: "flex", alignItems: "center", gap: "2px", flex: 1, overflowX: "auto", scrollbarWidth: "none" }}>
+          <nav className="desktop-nav" style={{ display: "flex", alignItems: "center", gap: "2px", flex: 1, overflow: "visible" }}>
             {[
               { id: "home", label: "홈", catId: "home" },
               { id: "analysis", label: "분석", catId: "analysis", items: [
@@ -6480,11 +6481,11 @@ function AppInner() {
                 {/* LNB 드롭다운 */}
                 {cat.items && gnbHover === cat.catId && (
                   <div style={{
-                    position: "absolute", top: "100%", left: 0, marginTop: "4px",
-                    background: C.card, border: `1px solid ${C.border}30`,
+                    position: "absolute", top: "calc(100% + 4px)", left: 0,
+                    background: C.card, border: `1px solid ${C.border}40`,
                     borderRadius: "12px", padding: "8px", minWidth: "180px",
-                    boxShadow: `0 8px 24px ${C.bg}80`,
-                    zIndex: 200, animation: "fadeIn 0.12s ease",
+                    boxShadow: `0 8px 32px rgba(0,0,0,0.3)`,
+                    zIndex: 9999, animation: "fadeIn 0.12s ease",
                   }}>
                     {cat.items.map(item => (
                       <button key={item.id} onClick={() => {
