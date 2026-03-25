@@ -7,36 +7,42 @@ import { useEffect, useRef, useState } from "react";
 const COUPANG_PARTNER_ID = "AF0857541";
 const COUPANG_SUBID = "toit";
 
-// ── 쿠팡 파트너스 추천 상품 (카테고리별 풍부한 상품 풀) ──
+// ── 쿠팡 파트너스 정식 어필리에이트 링크 ──
+// partners.coupang.com 대시보드에서 생성한 link.coupang.com 형태의 링크가 수수료 추적됨
+// 추가 링크는 파트너스 대시보드에서 카테고리별로 생성 후 아래 배열에 추가
+const COUPANG_AFFILIATE_LINK = "https://link.coupang.com/a/ebqKhn";
+
+// ── 쿠팡 파트너스 추천 상품 (카테고리별) ──
+// partnerLink가 있으면 정식 파트너스 링크 사용, 없으면 검색 URL + subId 폴백
 const COUPANG_PRODUCTS = [
   // 📚 투자/재테크 도서
-  { title: "투자 베스트셀러", desc: "올해 가장 많이 읽힌 투자 도서", emoji: "📚", url: "https://www.coupang.com/np/search?component=&q=투자+책+베스트셀러&channel=user", category: "book" },
-  { title: "주식 투자 입문서", desc: "처음 시작하는 주식 투자", emoji: "📖", url: "https://www.coupang.com/np/search?component=&q=주식+투자+입문&channel=user", category: "book" },
-  { title: "워렌 버핏 투자법", desc: "가치투자의 바이블", emoji: "📕", url: "https://www.coupang.com/np/search?component=&q=워렌버핏+투자&channel=user", category: "book" },
-  { title: "재테크 베스트셀러", desc: "돈 관리의 첫걸음", emoji: "💰", url: "https://www.coupang.com/np/search?component=&q=재테크+책+베스트셀러&channel=user", category: "book" },
-  { title: "경제 경영 도서", desc: "시장 흐름을 읽는 법", emoji: "📈", url: "https://www.coupang.com/np/search?component=&q=경제+경영+도서&channel=user", category: "book" },
+  { title: "투자 베스트셀러", desc: "올해 가장 많이 읽힌 투자 도서", url: "https://www.coupang.com/np/search?component=&q=투자+책+베스트셀러&channel=user", category: "book" },
+  { title: "주식 투자 입문서", desc: "처음 시작하는 주식 투자", url: "https://www.coupang.com/np/search?component=&q=주식+투자+입문&channel=user", category: "book" },
+  { title: "워렌 버핏 투자법", desc: "가치투자의 바이블", url: "https://www.coupang.com/np/search?component=&q=워렌버핏+투자&channel=user", category: "book" },
+  { title: "재테크 베스트셀러", desc: "돈 관리의 첫걸음", url: "https://www.coupang.com/np/search?component=&q=재테크+책+베스트셀러&channel=user", category: "book" },
+  { title: "경제 경영 도서", desc: "시장 흐름을 읽는 법", url: "https://www.coupang.com/np/search?component=&q=경제+경영+도서&channel=user", category: "book" },
   // 🖥️ 트레이딩/IT 장비
-  { title: "트레이딩 모니터", desc: "듀얼 모니터로 효율 2배", emoji: "🖥️", url: "https://www.coupang.com/np/search?component=&q=트레이딩+모니터&channel=user", category: "tech" },
-  { title: "울트라와이드 모니터", desc: "차트 한눈에 보기", emoji: "🖥️", url: "https://www.coupang.com/np/search?component=&q=울트라와이드+모니터&channel=user", category: "tech" },
-  { title: "무선 키보드 마우스", desc: "깔끔한 데스크 셋업", emoji: "⌨️", url: "https://www.coupang.com/np/search?component=&q=무선+키보드+마우스+세트&channel=user", category: "tech" },
-  { title: "노이즈캔슬링 이어폰", desc: "집중 투자를 위한 필수템", emoji: "🎧", url: "https://www.coupang.com/np/search?component=&q=노이즈캔슬링+이어폰&channel=user", category: "tech" },
-  { title: "아이패드 + 거치대", desc: "보조 스크린으로 활용", emoji: "📱", url: "https://www.coupang.com/np/search?component=&q=아이패드+거치대&channel=user", category: "tech" },
-  { title: "무선 충전기 세트", desc: "스마트한 충전 경험", emoji: "🔌", url: "https://www.coupang.com/np/search?component=&q=무선+충전기&channel=user", category: "tech" },
+  { title: "트레이딩 모니터", desc: "듀얼 모니터로 효율 2배", url: "https://www.coupang.com/np/search?component=&q=트레이딩+모니터&channel=user", category: "tech" },
+  { title: "울트라와이드 모니터", desc: "차트 한눈에 보기", url: "https://www.coupang.com/np/search?component=&q=울트라와이드+모니터&channel=user", category: "tech" },
+  { title: "무선 키보드 마우스", desc: "깔끔한 데스크 셋업", url: "https://www.coupang.com/np/search?component=&q=무선+키보드+마우스+세트&channel=user", category: "tech" },
+  { title: "노이즈캔슬링 이어폰", desc: "집중 투자를 위한 필수템", url: "https://www.coupang.com/np/search?component=&q=노이즈캔슬링+이어폰&channel=user", category: "tech" },
+  { title: "아이패드 + 거치대", desc: "보조 스크린으로 활용", url: "https://www.coupang.com/np/search?component=&q=아이패드+거치대&channel=user", category: "tech" },
+  { title: "무선 충전기 세트", desc: "스마트한 충전 경험", url: "https://www.coupang.com/np/search?component=&q=무선+충전기&channel=user", category: "tech" },
   // 🪑 오피스/생활
-  { title: "에르고 의자", desc: "장시간 트레이딩도 편안하게", emoji: "🪑", url: "https://www.coupang.com/np/search?component=&q=사무용+의자+인체공학&channel=user", category: "office" },
-  { title: "LED 데스크 조명", desc: "눈 피로 줄이는 스마트 조명", emoji: "💡", url: "https://www.coupang.com/np/search?component=&q=LED+데스크+조명&channel=user", category: "office" },
-  { title: "모니터 받침대", desc: "목 건강을 위한 높이 조절", emoji: "🗄️", url: "https://www.coupang.com/np/search?component=&q=모니터+받침대&channel=user", category: "office" },
-  { title: "책상 정리용품", desc: "효율적인 작업 공간 구성", emoji: "📦", url: "https://www.coupang.com/np/search?component=&q=책상+정리용품&channel=user", category: "office" },
-  { title: "공기청정기", desc: "쾌적한 트레이딩 환경 조성", emoji: "🌬️", url: "https://www.coupang.com/np/search?component=&q=공기청정기&channel=user", category: "office" },
+  { title: "에르고 의자", desc: "장시간 트레이딩도 편안하게", url: "https://www.coupang.com/np/search?component=&q=사무용+의자+인체공학&channel=user", category: "office" },
+  { title: "LED 데스크 조명", desc: "눈 피로 줄이는 스마트 조명", url: "https://www.coupang.com/np/search?component=&q=LED+데스크+조명&channel=user", category: "office" },
+  { title: "모니터 받침대", desc: "목 건강을 위한 높이 조절", url: "https://www.coupang.com/np/search?component=&q=모니터+받침대&channel=user", category: "office" },
+  { title: "책상 정리용품", desc: "효율적인 작업 공간 구성", url: "https://www.coupang.com/np/search?component=&q=책상+정리용품&channel=user", category: "office" },
+  { title: "공기청정기", desc: "쾌적한 트레이딩 환경 조성", url: "https://www.coupang.com/np/search?component=&q=공기청정기&channel=user", category: "office" },
   // 🎁 쿠팡 이벤트
-  { title: "오늘의 골드박스", desc: "쿠팡 특가 상품 모음", emoji: "🎁", url: "https://www.coupang.com/np/goldbox", category: "deal" },
-  { title: "로켓배송 베스트", desc: "내일 도착 인기 상품", emoji: "🚀", url: "https://www.coupang.com/np/search?component=&q=로켓배송+베스트&channel=user", category: "deal" },
-  { title: "쿠팡 와우 멤버십", desc: "로켓배송 무료 이용", emoji: "⭐", url: "https://www.coupang.com/np/benefit/wow", category: "deal" },
+  { title: "오늘의 골드박스", desc: "쿠팡 특가 상품 모음", url: "https://www.coupang.com/np/goldbox", category: "deal" },
+  { title: "로켓배송 베스트", desc: "내일 도착 인기 상품", url: "https://www.coupang.com/np/search?component=&q=로켓배송+베스트&channel=user", category: "deal" },
+  { title: "쿠팡 와우 멤버십", desc: "로켓배송 무료 이용", url: "https://www.coupang.com/np/benefit/wow", category: "deal" },
   // ☕ 카페/간식 (트레이딩 라이프)
-  { title: "캡슐 커피머신", desc: "트레이딩하며 한 잔의 여유", emoji: "☕", url: "https://www.coupang.com/np/search?component=&q=캡슐+커피머신&channel=user", category: "lifestyle" },
-  { title: "건강 간식 세트", desc: "집중력 유지 에너지 간식", emoji: "🥜", url: "https://www.coupang.com/np/search?component=&q=건강+간식+세트&channel=user", category: "lifestyle" },
-  { title: "프리미엄 초콜릿", desc: "스트레스 해소 선물", emoji: "🍫", url: "https://www.coupang.com/np/search?component=&q=프리미엄+초콜릿&channel=user", category: "lifestyle" },
-  { title: "비타민 영양제", desc: "건강한 투자 생활", emoji: "💊", url: "https://www.coupang.com/np/search?component=&q=비타민+영양제&channel=user", category: "lifestyle" },
+  { title: "캡슐 커피머신", desc: "트레이딩하며 한 잔의 여유", url: "https://www.coupang.com/np/search?component=&q=캡슐+커피머신&channel=user", category: "lifestyle" },
+  { title: "건강 간식 세트", desc: "집중력 유지 에너지 간식", url: "https://www.coupang.com/np/search?component=&q=건강+간식+세트&channel=user", category: "lifestyle" },
+  { title: "프리미엄 초콜릿", desc: "스트레스 해소 선물", url: "https://www.coupang.com/np/search?component=&q=프리미엄+초콜릿&channel=user", category: "lifestyle" },
+  { title: "비타민 영양제", desc: "건강한 투자 생활", url: "https://www.coupang.com/np/search?component=&q=비타민+영양제&channel=user", category: "lifestyle" },
 ];
 
 // 탭/컨텍스트에 따른 상품 추천 로직
@@ -55,9 +61,12 @@ function getContextualProducts(context = "default") {
 }
 
 // 쿠팡 파트너스 링크 생성 함수
-function makeCoupangLink(url) {
-  const sep = url.includes("?") ? "&" : "?";
-  return `${url}${sep}subId=${COUPANG_PARTNER_ID}&subId1=${COUPANG_SUBID}`;
+// 정식 파트너스 링크(link.coupang.com)가 있으면 우선 사용 → 수수료 정상 추적
+// product에 partnerLink 필드가 있으면 해당 링크 사용, 없으면 메인 어필리에이트 링크로 연결
+function makeCoupangLink(url, product) {
+  if (product?.partnerLink) return product.partnerLink;
+  // 메인 어필리에이트 링크 사용 (정식 수수료 추적)
+  return COUPANG_AFFILIATE_LINK;
 }
 
 // ── 쿠팡 파트너스 사이드바 배너 (실제 광고 단위 스타일) ──
@@ -105,7 +114,7 @@ export function CoupangBanner({ theme = "dark", style = {}, context = "home" }) 
 
       {/* CTA 버튼 - 심플 */}
       <a
-        href={makeCoupangLink(product.url)}
+        href={makeCoupangLink(product.url, product)}
         target="_blank"
         rel="noopener noreferrer"
         style={{
@@ -153,7 +162,7 @@ export function CoupangInlineBanner({ theme = "dark" }) {
 
   return (
     <a
-      href={makeCoupangLink(product.url)}
+      href={makeCoupangLink(product.url, product)}
       target="_blank"
       rel="noopener noreferrer"
       style={{
@@ -188,7 +197,7 @@ export function CoupangButtonAd({ theme = "dark", context = "default" }) {
       padding: "12px 0",
     }}>
       <a
-        href={makeCoupangLink(product.url)}
+        href={makeCoupangLink(product.url, product)}
         target="_blank"
         rel="noopener noreferrer"
         style={{
@@ -294,7 +303,7 @@ export function CoupangInterstitial({ theme = "dark", onClose, featureName = "�
 
         {/* CTA */}
         <a
-          href={makeCoupangLink(product.url)}
+          href={makeCoupangLink(product.url, product)}
           target="_blank"
           rel="noopener noreferrer"
           style={{
@@ -364,7 +373,7 @@ export function CoupangNativeCard({ theme = "dark", context = "default" }) {
 
       {/* CTA 버튼 */}
       <a
-        href={makeCoupangLink(product.url)}
+        href={makeCoupangLink(product.url, product)}
         target="_blank"
         rel="noopener noreferrer"
         style={{
@@ -419,7 +428,7 @@ export function CoupangStripBanner({ theme = "dark", context = "default" }) {
       {[p1, p2].map((product, i) => (
         <a
           key={i}
-          href={makeCoupangLink(product.url)}
+          href={makeCoupangLink(product.url, product)}
           target="_blank"
           rel="noopener noreferrer"
           style={{
@@ -527,7 +536,7 @@ export function CoupangFloatingBanner({ theme = "dark", context = "default", aut
 
         {/* CTA 버튼 */}
         <a
-          href={makeCoupangLink(product.url)}
+          href={makeCoupangLink(product.url, product)}
           target="_blank"
           rel="noopener noreferrer"
           style={{
