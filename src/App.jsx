@@ -3969,6 +3969,13 @@ function AppInner() {
   const LOGIN_REQUIRED_TABS = ["paper-trading", "btc-trading", "portfolio", "alerts"];
   const [showAuthModal, setShowAuthModal] = useState(false);
 
+  // 로그인 성공 시 모달 자동 닫기
+  useEffect(() => {
+    if (user && showAuthModal) {
+      setShowAuthModal(false);
+    }
+  }, [user, showAuthModal]);
+
   // 게스트 접근 허용 — 로그인 필요 기능만 제한
   const requireLogin = useCallback((targetTab) => {
     if (!user && LOGIN_REQUIRED_TABS.includes(targetTab)) {

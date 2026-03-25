@@ -1,6 +1,6 @@
-// DI금융 — 백테스트 패널 v3.3
+// DI금융 — 백테스트 패널 v3.5
 // 전략 선택 → 데이터 로드 → 백테스트 실행 → 성과 시각화
-// v3.3: 트레일링 스톱 옵션 + Sortino/Calmar/알파 지표 표시
+// v3.5: MAE/MFE + Expectancy + Recovery Factor + 평균 보유기간 표시
 import { useState, useCallback, useRef, useEffect } from "react";
 import { ALL_STRATEGIES, runBacktest } from "./strategies.js";
 
@@ -390,6 +390,18 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
                 sub={`연속승: ${result.maxConsecWin || 0}회`} />
               <MetricCard label="평균 손실" value={`${result.avgLoss}%`} color={C.red}
                 sub={`연속패: ${result.maxConsecLoss}회`} />
+              <MetricCard label="기대값" value={result.expectancy > 0 ? `+${result.expectancy}` : `${result.expectancy}`}
+                color={result.expectancy > 0 ? C.green : C.red}
+                sub="트레이드당 기대수익" />
+              <MetricCard label="회복계수" value={result.recoveryFactor}
+                color={result.recoveryFactor >= 2 ? C.green : result.recoveryFactor >= 1 ? C.yellow : C.red}
+                sub="수익/최대낙폭" />
+              <MetricCard label="평균 MAE" value={`${result.avgMAE}%`} color={C.red}
+                sub="거래 중 최대 역행" />
+              <MetricCard label="평균 MFE" value={`+${result.avgMFE}%`} color={C.green}
+                sub="거래 중 최대 순행" />
+              <MetricCard label="보유기간" value={`${result.avgHoldBars}봉`} color={C.text1}
+                sub="평균 보유 기간" />
             </div>
 
             {/* 자산 곡선 */}

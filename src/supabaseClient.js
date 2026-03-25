@@ -10,7 +10,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: true,
+    detectSessionInUrl: false,   // 수동 exchangeCodeForSession 사용 — 이중 교환 방지
     flowType: 'pkce',
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
   },
