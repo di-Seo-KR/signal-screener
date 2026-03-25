@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
 import AuthPage from "./AuthPage.jsx";
-import { CoupangBanner, CoupangInlineBanner, CoupangInterstitial, CoupangNativeCard, CoupangStripBanner, CoupangButtonAd, CoupangFloatingBanner, GoogleAd } from "./AdBanner.jsx";
+import { CoupangBanner, CoupangOfficialBanner, CoupangInlineBanner, CoupangInterstitial, CoupangNativeCard, CoupangStripBanner, CoupangButtonAd, CoupangFloatingBanner, GoogleAd } from "./AdBanner.jsx";
 
 // ════════════════════════════════════════════════════════════════════
 // ErrorBoundary — 런타임 에러 시 앱 전체 크래시 방지
@@ -4064,6 +4064,8 @@ function AppInner() {
     setGnbCategory(newCategory);
   }, [tab]);
 
+  const [gnbHover, setGnbHover] = useState(null); // GNB 호버 드롭다운 상태
+  const gnbHoverTimeout = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [sbCollapsed, setSbCollapsed] = useState({ main: false, ops: false, info: false });
 
@@ -6428,34 +6430,85 @@ function AppInner() {
             <span style={{ fontWeight: 800, fontSize: "17px", letterSpacing: "-0.5px", color: C.text1 }}>Toit</span>
           </div>
 
-          {/* 중앙: 수평 네비게이션 탭 (GNB - 카테고리만 표시) */}
+          {/* 중앙: GNB — 호버 시 LNB 드롭다운, 클릭 비활성 (홈만 클릭 이동) */}
           <nav className="desktop-nav" style={{ display: "flex", alignItems: "center", gap: "2px", flex: 1, overflowX: "auto", scrollbarWidth: "none" }}>
             {[
               { id: "home", label: "홈", catId: "home" },
-              { id: "analysis", label: "분석", catId: "analysis" },
-              { id: "management", label: "운용", catId: "management" },
-              { id: "info", label: "정보", catId: "info" },
+              { id: "analysis", label: "분석", catId: "analysis", items: [
+                { id: "screener", label: "종목 탐색", icon: "🔍" },
+                { id: "anomaly", label: "이상 탐지", icon: "⚡" },
+                { id: "strategy", label: "퀀트 전략", icon: "🎯" },
+                { id: "quant-report", label: "퀀트 리포트", icon: "📋" },
+                { id: "backtest", label: "백테스트", icon: "📈" },
+              ]},
+              { id: "management", label: "운용", catId: "management", items: [
+                { id: "quant-port", label: "전략 운용", icon: "📊" },
+                { id: "risk-map", label: "리스크맵", icon: "🛡️" },
+                { id: "portfolio", label: "포트폴리오", icon: "💼" },
+                { id: "auto-trading", label: "AI 자동매매", icon: "🤖" },
+              ]},
+              { id: "info", label: "정보", catId: "info", items: [
+                { id: "news", label: "마켓 뉴스", icon: "📰" },
+                { id: "sentiment", label: "센티먼트", icon: "💬" },
+                { id: "alerts", label: "알림 설정", icon: "🔔" },
+              ]},
             ].map(cat => (
-              <button key={cat.id} onClick={() => {
-                if (cat.catId === "home") {
-                  setTab("home");
-                  setGnbCategory("home");
-                } else {
-                  setGnbCategory(cat.catId);
-                  // Select first item in category
-                  if (cat.catId === "analysis") setTab("screener");
-                  else if (cat.catId === "management") setTab("quant-port");
-                  else if (cat.catId === "info") setTab("news");
-                }
-              }} style={{
-                padding: "8px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
-                background: gnbCategory === cat.catId ? C.blueBg : "transparent",
-                color: gnbCategory === cat.catId ? C.blue : C.text2,
-                border: "none", cursor: "pointer", whiteSpace: "nowrap",
-                transition: "all 0.15s",
-              }}>
-                {cat.label}
-              </button>
+              <div key={cat.id} style={{ position: "relative" }}
+                onMouseEnter={() => {
+                  if (gnbHoverTimeout.current) clearTimeout(gnbHoverTimeout.current);
+                  if (cat.items) setGnbHover(cat.catId);
+                }}
+                onMouseLeave={() => {
+                  gnbHoverTimeout.current = setTimeout(() => setGnbHover(null), 150);
+                }}
+              >
+                <button
+                  onClick={() => {
+                    if (cat.catId === "home") { setTab("home"); setGnbCategory("home"); setGnbHover(null); }
+                    // 홈 외 GNB 카테고리는 클릭 비활성 — 호버로만 LNB 표시
+                  }}
+                  style={{
+                    padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                    background: (gnbCategory === cat.catId || gnbHover === cat.catId) ? C.blueBg : "transparent",
+                    color: (gnbCategory === cat.catId || gnbHover === cat.catId) ? C.blue : C.text2,
+                    border: "none", cursor: cat.catId === "home" ? "pointer" : "default", whiteSpace: "nowrap",
+                    transition: "all 0.15s",
+                  }}>
+                  {cat.label}
+                  {cat.items && <span style={{ fontSize: "9px", marginLeft: "3px", opacity: 0.5 }}>▾</span>}
+                </button>
+                {/* LNB 드롭다운 */}
+                {cat.items && gnbHover === cat.catId && (
+                  <div style={{
+                    position: "absolute", top: "100%", left: 0, marginTop: "4px",
+                    background: C.card, border: `1px solid ${C.border}30`,
+                    borderRadius: "12px", padding: "8px", minWidth: "180px",
+                    boxShadow: `0 8px 24px ${C.bg}80`,
+                    zIndex: 200, animation: "fadeIn 0.12s ease",
+                  }}>
+                    {cat.items.map(item => (
+                      <button key={item.id} onClick={() => {
+                        if (item.locked && requireLogin(item.id)) return;
+                        setTab(item.id); setGnbHover(null);
+                      }} style={{
+                        display: "flex", alignItems: "center", gap: "8px", width: "100%",
+                        padding: "10px 12px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                        background: tab === item.id ? C.blueBg : "transparent",
+                        color: tab === item.id ? C.blue : C.text2,
+                        border: "none", cursor: "pointer", whiteSpace: "nowrap",
+                        transition: "all 0.12s", textAlign: "left",
+                      }}
+                        onMouseEnter={e => { if (tab !== item.id) e.currentTarget.style.background = C.card2; }}
+                        onMouseLeave={e => { if (tab !== item.id) e.currentTarget.style.background = "transparent"; }}
+                      >
+                        <span style={{ fontSize: "14px" }}>{item.icon}</span>
+                        {item.label}
+                        {item.locked && !user && <span style={{ fontSize: "9px", opacity: 0.5 }}>🔒</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </nav>
 
@@ -6583,67 +6636,7 @@ function AppInner() {
         )}
       </header>
 
-      {/* ── LNB (Left Navigation Bar) — GNB 카테고리별 서브항목 ── */}
-      {gnbCategory !== "home" && (
-        <nav className="lnb-sidebar" style={{
-          display: "flex", gap: "8px", padding: "12px 16px", borderBottom: `1px solid ${C.border}30`,
-          background: C.bg, overflowX: "auto", scrollbarWidth: "none", alignItems: "center",
-        }}>
-          {gnbCategory === "analysis" && [
-            { id: "screener", label: "종목 탐색", icon: "🔍" },
-            { id: "anomaly", label: "이상 탐지", icon: "⚡" },
-            { id: "strategy", label: "퀀트 전략", icon: "🎯" },
-            { id: "quant-report", label: "퀀트 리포트", icon: "📋" },
-            { id: "backtest", label: "백테스트", icon: "📈" },
-          ].map(item => (
-            <button key={item.id} onClick={() => setTab(item.id)} style={{
-              display: "flex", alignItems: "center", gap: "4px", padding: "8px 12px", borderRadius: "8px",
-              fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap",
-              background: tab === item.id ? C.blueBg : "transparent",
-              color: tab === item.id ? C.blue : C.text2,
-              border: "none", cursor: "pointer", transition: "all 0.15s",
-            }}>
-              <span style={{ fontSize: "14px" }}>{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
-          {gnbCategory === "management" && [
-            { id: "quant-port", label: "전략 운용", icon: "📊" },
-            { id: "risk-map", label: "리스크맵", icon: "🛡️" },
-            { id: "portfolio", label: "포트폴리오", icon: "💼" },
-            { id: "auto-trading", label: "AI 자동매매", icon: "🤖" },
-          ].map(item => (
-            <button key={item.id} onClick={() => { if (item.locked && requireLogin(item.id)) return; setTab(item.id); }} style={{
-              display: "flex", alignItems: "center", gap: "4px", padding: "8px 12px", borderRadius: "8px",
-              fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap",
-              background: tab === item.id ? C.blueBg : "transparent",
-              color: tab === item.id ? C.blue : C.text2,
-              border: "none", cursor: "pointer", transition: "all 0.15s",
-            }}>
-              <span style={{ fontSize: "14px" }}>{item.icon}</span>
-              {item.label}
-              {item.locked && !user && <span style={{ fontSize: "9px", opacity: 0.5 }}>🔒</span>}
-            </button>
-          ))}
-          {gnbCategory === "info" && [
-            { id: "news", label: "마켓 뉴스", icon: "📰" },
-            { id: "sentiment", label: "센티먼트", icon: "💬" },
-            { id: "alerts", label: "알림 설정", icon: "🔔", locked: true },
-          ].map(item => (
-            <button key={item.id} onClick={() => { if (item.locked && requireLogin(item.id)) return; setTab(item.id); }} style={{
-              display: "flex", alignItems: "center", gap: "4px", padding: "8px 12px", borderRadius: "8px",
-              fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap",
-              background: tab === item.id ? C.blueBg : "transparent",
-              color: tab === item.id ? C.blue : C.text2,
-              border: "none", cursor: "pointer", transition: "all 0.15s",
-            }}>
-              <span style={{ fontSize: "14px" }}>{item.icon}</span>
-              {item.label}
-              {item.locked && !user && <span style={{ fontSize: "9px", opacity: 0.5 }}>🔒</span>}
-            </button>
-          ))}
-        </nav>
-      )}
+      {/* LNB는 이제 GNB 호버 드롭다운에 통합됨 */}
 
       <PullToRefresh onRefresh={async () => {
         if (tab === "home") await fetchMarketOverview();
@@ -6658,54 +6651,7 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "home" && (
           <div className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            {/* 홈 검색바 - 크고 눈에 띄는 스타일 */}
-            <div style={{
-              display: "flex",
-              justifyContent: "center",
-              padding: "24px 20px 12px 20px",
-            }}>
-              <div
-                onClick={() => setGlobalSearchOpen(true)}
-                style={{
-                  width: "100%",
-                  maxWidth: "600px",
-                  padding: "12px 18px",
-                  height: "50px",
-                  borderRadius: "14px",
-                  background: C.card2,
-                  border: `1.5px solid ${C.border}40`,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  cursor: "pointer",
-                  transition: "all 0.2s ease",
-                  fontSize: "16px",
-                  fontWeight: 500,
-                  color: C.text3,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = C.card;
-                  e.currentTarget.style.borderColor = `${C.border}60`;
-                  e.currentTarget.style.boxShadow = `0 2px 8px ${C.border}20`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = C.card2;
-                  e.currentTarget.style.borderColor = `${C.border}40`;
-                  e.currentTarget.style.boxShadow = "none";
-                }}
-              >
-                <span style={{ fontSize: "18px" }}>🔍</span>
-                <span>종목명 또는 티커를 검색하세요</span>
-                <span style={{
-                  marginLeft: "auto",
-                  fontSize: "12px",
-                  color: C.text3,
-                  opacity: 0.6,
-                }}>
-                  /
-                </span>
-              </div>
-            </div>
+            {/* 검색은 헤더 GNB에 통합 — 중복 제거 */}
 
             {/* 2컬럼 그리드 (데스크톱) / 1컬럼 (모바일) */}
             <div className="home-grid">
@@ -6970,6 +6916,9 @@ function AppInner() {
 
             {/* 홈 피드 네이티브 광고 (자연스러운 콘텐츠 형태) */}
             <CoupangNativeCard theme={themeMode} context="home" />
+            {/* 쿠팡 파트너스 공식 배너 (728x90) */}
+            <CoupangOfficialBanner width="728" height="90" bannerId={975392} style={{ margin: "8px 0" }} />
+            <CoupangOfficialBanner width="728" height="90" bannerId={975393} style={{ margin: "8px 0" }} />
             {/* 쿠팡 CTA 버튼 광고 */}
             <CoupangButtonAd theme={themeMode} context="home" />
 

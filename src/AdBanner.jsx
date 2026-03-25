@@ -37,7 +37,7 @@ const COUPANG_PRODUCTS = [
   // 🎁 쿠팡 이벤트
   { title: "오늘의 골드박스", desc: "쿠팡 특가 상품 모음", url: "https://www.coupang.com/np/goldbox", category: "deal" },
   { title: "로켓배송 베스트", desc: "내일 도착 인기 상품", url: "https://www.coupang.com/np/search?component=&q=로켓배송+베스트&channel=user", category: "deal" },
-  { title: "쿠팡 와우 멤버십", desc: "로켓배송 무료 이용", url: "https://www.coupang.com/np/benefit/wow", category: "deal" },
+  { title: "쿠팡 와우 멤버십", desc: "로켓배송 무료 이용", url: "https://www.coupang.com/np/search?component=&q=로켓와우+추천&channel=user", category: "deal" },
   // ☕ 카페/간식 (트레이딩 라이프)
   { title: "캡슐 커피머신", desc: "트레이딩하며 한 잔의 여유", url: "https://www.coupang.com/np/search?component=&q=캡슐+커피머신&channel=user", category: "lifestyle" },
   { title: "건강 간식 세트", desc: "집중력 유지 에너지 간식", url: "https://www.coupang.com/np/search?component=&q=건강+간식+세트&channel=user", category: "lifestyle" },
@@ -67,6 +67,56 @@ function makeCoupangLink(url, product) {
   if (product?.partnerLink) return product.partnerLink;
   // 메인 어필리에이트 링크 사용 (정식 수수료 추적)
   return COUPANG_AFFILIATE_LINK;
+}
+
+// ── 쿠팡 파트너스 공식 배너 (PartnersCoupang.G SDK) ──
+// index.html에서 https://ads-partners.coupang.com/g.js 로드 필요
+// 쿠팡 파트너스 대시보드에서 생성한 배너 ID를 bannerId로 전달
+export function CoupangOfficialBanner({ width = "728", height = "90", template = "banner", bannerId = 975392, style = {} }) {
+  const containerRef = useRef(null);
+  const initialized = useRef(false);
+
+  useEffect(() => {
+    if (initialized.current || !containerRef.current) return;
+    const tryInit = () => {
+      if (typeof window !== "undefined" && window.PartnersCoupang) {
+        try {
+          // 컨테이너에 배너 렌더링을 위해 ID 설정
+          containerRef.current.id = `coupang-banner-${bannerId}`;
+          new window.PartnersCoupang.G({
+            id: bannerId,
+            template: template,
+            trackingCode: "AF0857541",
+            width: width,
+            height: height,
+          });
+          initialized.current = true;
+        } catch (e) {
+          console.warn("[CoupangBanner] init error:", e);
+        }
+      }
+    };
+    if (window.PartnersCoupang) {
+      tryInit();
+    } else {
+      const timer = setInterval(() => {
+        if (window.PartnersCoupang) { clearInterval(timer); tryInit(); }
+      }, 500);
+      const cleanup = setTimeout(() => clearInterval(timer), 10000);
+      return () => { clearInterval(timer); clearTimeout(cleanup); };
+    }
+  }, [bannerId]);
+
+  return (
+    <div ref={containerRef} style={{
+      textAlign: "center",
+      overflow: "hidden",
+      maxWidth: "100%",
+      ...style,
+    }}>
+      {/* g.js SDK가 이 div 내부에 배너를 렌더링함 */}
+    </div>
+  );
 }
 
 // ── 쿠팡 파트너스 사이드바 배너 (실제 광고 단위 스타일) ──
@@ -626,6 +676,7 @@ export function GoogleAd({ slot, format = "auto", style = {} }) {
 export default {
   GoogleAd,
   CoupangBanner,
+  CoupangOfficialBanner,
   CoupangInlineBanner,
   CoupangButtonAd,
   CoupangInterstitial,
