@@ -6306,8 +6306,8 @@ function AppInner() {
         .ui-section-sub { font-size: 13px; color: ${C.text3}; margin-bottom: 8px; }
         /* ── 모바일 (≤640px) — 폰트/간격 확대 + 터치 최적화 (v9.2 개선) ── */
         @media (max-width: 640px) {
-          header { padding: 0 10px !important; padding-top: calc(env(safe-area-inset-top, 0px) + 8px) !important; height: 52px !important; }
-          header div { padding: 0 4px !important; height: 52px !important; }
+          header { padding: 0 10px !important; padding-top: 0 !important; height: auto !important; min-height: 48px !important; }
+          header > div { padding: 0 8px !important; height: 48px !important; }
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
           .lnb-sidebar { display: none !important; }
@@ -6410,7 +6410,6 @@ function AppInner() {
         position: "sticky", top: 0, zIndex: 100,
         background: `${C.bg}F8`, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
         borderBottom: `1px solid ${C.border}30`,
-        paddingTop: "env(safe-area-inset-top, 0px)",
         overflow: "visible",
       }}>
         <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "56px", gap: "16px" }}>
