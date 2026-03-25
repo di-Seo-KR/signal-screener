@@ -4,7 +4,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
 import AuthPage from "./AuthPage.jsx";
-import { CoupangBanner, CoupangInlineBanner, CoupangInterstitial, GoogleAd } from "./AdBanner.jsx";
+import { CoupangBanner, CoupangInlineBanner, CoupangInterstitial, CoupangNativeCard, CoupangStripBanner, GoogleAd } from "./AdBanner.jsx";
 
 // ════════════════════════════════════════════════════════════════════
 // ErrorBoundary — 런타임 에러 시 앱 전체 크래시 방지
@@ -6732,6 +6732,9 @@ function AppInner() {
               </div>
             )}
 
+            {/* 홈 피드 네이티브 광고 (자연스러운 콘텐츠 형태) */}
+            <CoupangNativeCard theme={themeMode} context="home" />
+
             {/* ── 주요 종목 (통합: 전체 / 급등 / 급락 탭) ─── */}
             {hotAssets.length > 0 && (() => {
               const sorted = [...hotAssets].sort((a, b) => b.change - a.change);
@@ -7769,6 +7772,9 @@ function AppInner() {
                 <div style={{ fontSize: "12px", color: C.text3 }}>다른 시장 필터를 선택해보세요 (전체 {results.length}건 발견)</div>
               </div>
             )}
+
+            {/* 스크리너 컨텍스트 광고 */}
+            {(results.length > 0 || lastScan) && <CoupangNativeCard theme={themeMode} context="screener" />}
 
             {/* ═══════════════════════════════════════════════════════
                 저평가 종목 통합 조회
@@ -9014,7 +9020,9 @@ function AppInner() {
                     if (hrs < 24) return `${hrs}시간 전`;
                     return `${Math.floor(hrs / 24)}일 전`;
                   })();
-                  return (
+                  return (<>
+                    {/* 뉴스 5번째 뒤에 자연스럽게 스트립 배너 삽입 */}
+                    {i === 5 && <CoupangStripBanner key="ad-strip-5" theme={themeMode} context="news" />}
                     <a key={i} href={news.url || news.link || "#"} target="_blank" rel="noopener" style={{
                       background: C.card, border: `1px solid ${C.border}20`, borderRadius: "14px", padding: "16px 18px",
                       textDecoration: "none", color: "inherit", display: "block", transition: "all .2s",
@@ -9047,7 +9055,7 @@ function AppInner() {
                         </div>
                       </div>
                     </a>
-                  );
+                  </>);
                 })}
               </div>
             )}
