@@ -131,12 +131,28 @@ export default function AuthProvider({ children }) {
           }
         }
 
-        // URL에 error 파라미터가 있으면 (OAuth 거부 등)
+        // URL에 error 파라미터가 있으면 (OAuth 거부 등) — 쿼리 + 해시 모두 체크
         const errorParam = url.searchParams.get("error");
         const errorDesc = url.searchParams.get("error_description");
-        if (errorParam) {
-          console.error("[DI금융 Auth] OAuth error in URL:", errorParam, errorDesc);
-          if (mounted) showToast("error", errorDesc || "소셜 로그인이 취소되었습니다.");
+        // Supabase는 해시에도 에러를 넣을 수 있음 (#error=...&error_description=...)
+        const hashParams = new URLSearchParams(url.hash.replace("#", ""));
+        const hashError = hashParams.get("error");
+        const hashErrorDesc = hashParams.get("error_description");
+        const finalError = errorParam || hashError;
+        const finalErrorDesc = errorDesc || hashErrorDesc;
+
+        if (finalError) {
+          console.error("[DI금융 Auth] OAuth error in URL:", finalError, finalErrorDesc);
+          // 한글 에러 메시지 매핑
+          let userMessage = "소셜 로그인 중 오류가 발생했습니다.";
+          if (finalErrorDesc?.includes("Unable to exchange external code")) {
+            userMessage = "Google 인증 코드 교환에 실패했습니다. Supabase 대시보드에서 Google OAuth Client Secret을 확인해주세요.";
+          } else if (finalErrorDesc?.includes("access_denied")) {
+            userMessage = "로그인이 취소되었습니다.";
+          } else if (finalErrorDesc) {
+            userMessage = finalErrorDesc;
+          }
+          if (mounted) showToast("error", userMessage, 8000);
           window.history.replaceState({}, "", url.origin + url.pathname);
         }
 
@@ -175,18 +191,38 @@ export default function AuthProvider({ children }) {
         data: { display_name: displayName || email.split("@")[0] },
       },
     });
-    if (!error && data?.user) {
-      // Supabase 이메일 확인이 꺼져있으면 바로 로그인됨
+
+    if (error) {
+      // 명시적 에러
+      const msg = error.message === "User already registered"
+        ? "이미 가입된 이메일입니다. 로그인을 이용해주세요."
+        : error.message.includes("rate limit")
+        ? "요청이 너무 많습니다. 잠시 후 다시 시도해주세요."
+        : `회원가입 실패: ${error.message}`;
+      showToast("error", msg);
+      return { data, error: { ...error, userMessage: msg } };
+    }
+
+    if (data?.user) {
+      // Supabase는 이미 존재하는 이메일로 signUp 시에도 에러를 안 줄 수 있음
+      // 대신 identities 배열이 비어있으면 이미 가입된 유저
+      const isExistingUser = data.user.identities && data.user.identities.length === 0;
+
+      if (isExistingUser) {
+        const msg = "이미 가입된 이메일입니다. 로그인을 이용해주세요.";
+        showToast("error", msg);
+        return { data, error: { message: msg, userMessage: msg } };
+      }
+
       if (data.session) {
+        // 이메일 확인 꺼져있으면 바로 로그인
         showToast("success", "회원가입 완료! 환영합니다! 🎉");
       } else {
-        showToast("success", "회원가입 완료! 이메일 인증 링크를 확인해주세요. 📧");
+        // 이메일 확인 필요
+        showToast("success", "회원가입 완료! 이메일 인증 링크를 확인해주세요. 📧", 6000);
       }
-    } else if (error) {
-      showToast("error", error.message === "User already registered"
-        ? "이미 등록된 이메일입니다."
-        : `회원가입 실패: ${error.message}`);
     }
+
     return { data, error };
   };
 

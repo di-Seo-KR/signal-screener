@@ -2166,7 +2166,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
                 try {
                   // URL에 API키를 최소 base64로 → 카메라 앱 스캔 시 브라우저 자동 오픈
                   const mini = btoa(JSON.stringify({k:config.apiKey,s:config.apiSecret,p:config.isPaper!==false?1:0,v:1}));
-                  const syncUrl = `${window.location.origin}/?tab=paper-trading&sync=${mini}`;
+                  const syncUrl = `${window.location.origin}/?tab=auto-trading&sync=${mini}`;
                   await loadQRGenerator();
                   setQrModal("generate");
                   setTimeout(() => {

@@ -46,8 +46,7 @@ import StrategyPanel from "./StrategyPanel.jsx";
 import BacktestPanel from "./BacktestPanel.jsx";
 import QuantPortfolio from "./QuantPortfolio.jsx";
 import RiskHeatmap from "./RiskHeatmap.jsx";
-import PaperTrading from "./PaperTrading.jsx";
-import BTCTrading from "./BTCTrading.jsx";
+import AutoTrading from "./AutoTrading.jsx";
 import { ALL_STRATEGIES } from "./strategies.js";
 
 // ════════════════════════════════════════════════════════════════════
@@ -3966,7 +3965,7 @@ function AppInner() {
   C = themeMode === "dark" ? DARK : LIGHT;
 
   // ── 로그인 필요 탭 정의 ──
-  const LOGIN_REQUIRED_TABS = ["paper-trading", "btc-trading", "portfolio", "alerts"];
+  const LOGIN_REQUIRED_TABS = ["auto-trading", "portfolio", "alerts"];
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   // 로그인 성공 시 모달 자동 닫기
@@ -3997,7 +3996,7 @@ function AppInner() {
     try {
       const p = new URLSearchParams(window.location.search);
       const t = p.get("tab");
-      if (t && ["paper-trading","btc-trading","portfolio","screener","alerts","news","quant-portfolio","sector-flow","backtest","sentiment"].includes(t)) return t;
+      if (t && ["auto-trading","portfolio","screener","alerts","news","quant-portfolio","sector-flow","backtest","sentiment"].includes(t)) return t;
     } catch {}
     return "home";
   });
@@ -6146,8 +6145,7 @@ function AppInner() {
             { id: "news", label: "마켓 뉴스", icon: "📰" },
             { id: "sentiment", label: "소셜 센티먼트", icon: "💬" },
             { id: "alerts", label: "매매 알림", icon: "🔔", badge: alertBadge, locked: true },
-            { id: "paper-trading", label: "퀀트 자동매매", icon: "🤖", locked: true },
-            { id: "btc-trading", label: "₿ BTC 자동매매", icon: "₿", locked: true },
+            { id: "auto-trading", label: "AI 자동매매", icon: "🤖", locked: true },
           ].map(t => (
             <button key={t.id} className={`sb-item${tab === t.id ? " active" : ""}`}
               onClick={() => { if (t.locked && requireLogin(t.id)) return; setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }}
@@ -6224,7 +6222,7 @@ function AppInner() {
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "anomaly", label: "이상탐지", icon: "⚡" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "quant-port", label: "운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼", locked: true }, { id: "news", label: "뉴스", icon: "📰" }, { id: "sentiment", label: "센티먼트", icon: "💬" }, { id: "alerts", label: "알림", icon: "🔔", locked: true }, { id: "paper-trading", label: "자동매매", icon: "🤖", locked: true }, { id: "btc-trading", label: "₿ BTC", icon: "₿", locked: true }].map(t => (
+            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "anomaly", label: "이상탐지", icon: "⚡" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "quant-port", label: "운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼", locked: true }, { id: "news", label: "뉴스", icon: "📰" }, { id: "sentiment", label: "센티먼트", icon: "💬" }, { id: "alerts", label: "알림", icon: "🔔", locked: true }, { id: "auto-trading", label: "자동매매", icon: "🤖", locked: true }].map(t => (
               <button key={t.id} onClick={() => { if (t.locked && requireLogin(t.id)) return; setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }} style={{
                 padding: "7px 12px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
@@ -6324,8 +6322,7 @@ function AppInner() {
                 { id: "quant-port", label: "전략 운용", icon: "📊" },
                 { id: "risk-map", label: "리스크맵", icon: "🛡️" },
                 { id: "portfolio", label: "포트폴리오", icon: "💼", locked: true },
-                { id: "paper-trading", label: "자동매매", icon: "🤖", locked: true },
-                { id: "btc-trading", label: "BTC 매매", icon: "₿", locked: true },
+                { id: "auto-trading", label: "AI 자동매매", icon: "🤖", locked: true },
               ]},
               { section: "정보", items: [
                 { id: "news", label: "마켓 뉴스", icon: "📰" },
@@ -7974,7 +7971,10 @@ function AppInner() {
                           background: C.card2, color: C.text2, border: `1px solid ${C.border2}`,
                           display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
                         }}>🔗 상세</button>
-                        <button onClick={() => setPortfolio(p => p.filter((_, i) => i !== idx))} style={{
+                        <button onClick={() => {
+                          if (!confirm("이 포트폴리오를 삭제하시겠습니까?")) return;
+                          setPortfolio(p => p.filter((_, i) => i !== idx));
+                        }} style={{
                           padding: "9px 14px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
                           background: C.redBg, color: C.red, border: `1px solid ${C.red}33`,
                         }}>삭제</button>
@@ -8183,7 +8183,10 @@ function AppInner() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
                 <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: C.text1 }}>📜 탐지 히스토리</h3>
                 {anomalyHistory.length > 0 && (
-                  <button onClick={() => { setAnomalyHistory([]); try { localStorage.removeItem("di_anomaly_history"); } catch {} }} style={{
+                  <button onClick={() => {
+                    if (!confirm("이상 탐지 히스토리를 전부 삭제하시겠습니까?")) return;
+                    setAnomalyHistory([]); try { localStorage.removeItem("di_anomaly_history"); } catch {}
+                  }} style={{
                     padding: "4px 12px", borderRadius: "8px", fontSize: "11px",
                     background: `${C.red}15`, color: C.red, border: "none", cursor: "pointer", fontWeight: 600,
                   }}>초기화</button>
@@ -8860,7 +8863,10 @@ function AppInner() {
                   </div>
                 </div>
                 {tradeAlerts.length > 0 && (
-                  <button onClick={() => { setTradeAlerts([]); setAlertBadge(0); }} style={{
+                  <button onClick={() => {
+                    if (!confirm("매매 알림을 전부 삭제하시겠습니까?")) return;
+                    setTradeAlerts([]); setAlertBadge(0);
+                  }} style={{
                     padding: "6px 12px", borderRadius: "8px", fontSize: "11px", fontWeight: 600,
                     background: C.card2, color: C.text3, border: `1px solid ${C.border2}`, cursor: "pointer",
                   }}>전체 삭제</button>
@@ -9328,17 +9334,10 @@ function AppInner() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════
-            TAB: 페이퍼 트레이딩 (Alpaca)
+            TAB: AI 자동매매 (주식 + 크립토 통합)
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "paper-trading" && (
-          <PaperTrading strategyAlerts={tradeAlerts} theme={themeMode} />
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════
-            TAB: ₿ BTC 자동매매
-        ═══════════════════════════════════════════════════════════ */}
-        {tab === "btc-trading" && (
-          <BTCTrading theme={themeMode} />
+        {tab === "auto-trading" && (
+          <AutoTrading theme={themeMode} user={user} />
         )}
 
         {/* 종목 상세 팝업 */}
