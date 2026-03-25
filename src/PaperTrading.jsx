@@ -127,15 +127,20 @@ function collectUSSymbols() {
 // iOS standalone PWA는 Safari와 localStorage가 분리되므로
 // config는 cookie에도 저장하여 브라우저↔홈화면 앱 간 공유
 // ══════════════════════════════════════════════════════════════
-const KEYS = {
-  config: "di_alpaca_config",
-  autoTrade: "di_auto_trade_v3",
-  tradeLog: "di_trade_log_v3",
-  executed: "di_executed_v3",
-  settings: "di_trade_settings_v3",
-  riskState: "di_risk_state",
-  peakEquity: "di_peak_equity",
-};
+// userId가 있으면 유저별 키, 없으면 기본 키 (하위호환)
+function makeKeys(userId) {
+  const p = userId ? `di_${userId.slice(0, 8)}_` : "di_";
+  return {
+    config: `${p}alpaca_config`,
+    autoTrade: `${p}auto_trade_v3`,
+    tradeLog: `${p}trade_log_v3`,
+    executed: `${p}executed_v3`,
+    settings: `${p}trade_settings_v3`,
+    riskState: `${p}risk_state`,
+    peakEquity: `${p}peak_equity`,
+  };
+}
+let KEYS = makeKeys(null);
 
 function setCookie(name, val, days = 365) {
   try {
@@ -1045,7 +1050,11 @@ const _syncOnce = _parseSyncParam();
 
 // 메인 컴포넌트
 // ══════════════════════════════════════════════════════════════
-export default function PaperTrading({ strategyAlerts = [], theme = "dark" }) {
+export default function PaperTrading({ strategyAlerts = [], theme = "dark", user, botPreset }) {
+  // 유저별 localStorage 키 분리
+  const userId = user?.id || null;
+  KEYS = makeKeys(userId);
+
   const C = theme === "light" ? LIGHT_C : DARK_C;
   const [config, setConfig] = useState(() => {
     const saved = load(KEYS.config, {});

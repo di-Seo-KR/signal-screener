@@ -41,8 +41,12 @@ const BTC_ASSETS = [
 
 const BTC_STRATEGY = ALL_STRATEGIES.find(s => s.id === "btc_alpha");
 
-// ── Storage ──
-const KEYS = { config: "di_btc_alpaca_config", log: "di_btc_trade_log_v2", settings: "di_btc_settings_v2" };
+// ── Storage (유저별 키 분리) ──
+function makeBtcKeys(userId) {
+  const p = userId ? `di_${userId.slice(0, 8)}_btc_` : "di_btc_";
+  return { config: `${p}alpaca_config`, log: `${p}trade_log_v2`, settings: `${p}settings_v2` };
+}
+let KEYS = makeBtcKeys(null);
 function load(k, fb) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch { return fb; } }
 function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 
@@ -165,7 +169,11 @@ class CryptoRiskManager {
   }
 }
 
-export default function BTCTrading({ theme = "dark" }) {
+export default function BTCTrading({ theme = "dark", user, botPreset }) {
+  // 유저별 localStorage 키 분리
+  const userId = user?.id || null;
+  KEYS = makeBtcKeys(userId);
+
   const C = theme === "dark" ? DARK_C : LIGHT_C;
 
   // ── Config State ──
