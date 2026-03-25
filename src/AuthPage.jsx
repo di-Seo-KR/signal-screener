@@ -24,7 +24,7 @@ const LIGHT = {
   isDark: false,
 };
 
-export default function AuthPage({ theme = "dark" }) {
+export default function AuthPage({ theme = "dark", embedded = false, onClose }) {
   const C = theme === "dark" ? DARK : LIGHT;
   const { signIn, signUp, signInWithOAuth, resetPassword } = useAuth();
   const [mode, setMode] = useState("login"); // login | signup | reset
@@ -168,20 +168,10 @@ export default function AuthPage({ theme = "dark" }) {
     },
   };
 
-  return (
-    <div style={S.wrap}>
-      <div style={S.container}>
-        {/* ── 로고 ── */}
-        <div style={S.logo}>
-          <div style={S.logoIcon}>🐋</div>
-          <h1 style={S.logoTitle}>
-            DI금융 <span style={S.logoVer}>v10.1</span>
-          </h1>
-          <p style={S.logoSub}>전문 투자 스크리너 & 퀀트 엔진</p>
-        </div>
-
+  const content = (
+    <>
         {/* ── 카드 ── */}
-        <div style={S.card}>
+        <div style={embedded ? {} : S.card}>
           {/* 탭 (reset 모드에선 숨김) */}
           {mode !== "reset" && (
             <div style={S.tabRow}>
@@ -298,6 +288,23 @@ export default function AuthPage({ theme = "dark" }) {
             ? <span>이미 계정이 있으신가요? <button onClick={() => { setMode("login"); setError(""); setSuccess(""); }} style={S.link}>로그인</button></span>
             : null}
         </div>
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <div style={S.wrap}>
+      <div style={S.container}>
+        {/* ── 로고 ── */}
+        <div style={S.logo}>
+          <div style={S.logoIcon}>🐋</div>
+          <h1 style={S.logoTitle}>
+            DI금융 <span style={S.logoVer}>v10.2</span>
+          </h1>
+          <p style={S.logoSub}>전문 투자 스크리너 & 퀀트 엔진</p>
+        </div>
+        {content}
       </div>
     </div>
   );

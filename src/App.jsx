@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
 import AuthPage from "./AuthPage.jsx";
+import { CoupangBanner, GoogleAd } from "./AdBanner.jsx";
 
 // ════════════════════════════════════════════════════════════════════
 // ErrorBoundary — 런타임 에러 시 앱 전체 크래시 방지
@@ -911,8 +912,9 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
   // 거래량 고갈
   const volumeDry = volRatio <= 0.3;
 
-  // OBV 다이버전스 — 룩백 8주 + 선형회귀 기울기 비교 (P2 수정)
+  // OBV 다이버전스 — 룩백 8주 + 선형회귀 기울기 비교 (P2 수정) + 방향성 추가 (v6.8)
   let obvDivergence = false;
+  let obvDivType = null; // "bullish" | "bearish" — 가격↓+OBV↑ = bullish, 가격↑+OBV↓ = bearish
   const obvLookback = Math.min(obvArr.length, 8);
   if (obvArr.length >= obvLookback && obvLookback >= 4) {
     const priceSlice8 = weeklyCloses.slice(-obvLookback);
@@ -926,7 +928,8 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
     };
     const priceSlope = linSlope(priceSlice8);
     const obvSlope = linSlope(obvSlice8);
-    obvDivergence = (priceSlope > 0 && obvSlope < 0) || (priceSlope < 0 && obvSlope > 0);
+    if (priceSlope < 0 && obvSlope > 0) { obvDivergence = true; obvDivType = "bullish"; }
+    else if (priceSlope > 0 && obvSlope < 0) { obvDivergence = true; obvDivType = "bearish"; }
   }
 
   // ── 신규 지표: CMF (Chaikin Money Flow) ──
@@ -1130,7 +1133,7 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
       const atr = sum / 14;
       return price > 0 ? +(atr / price * 100).toFixed(2) : null;
     })(),
-    macdDivType, rsiDivType,
+    macdDivType, rsiDivType, obvDivType,
     pocPrice: pocPrice != null ? +pocPrice.toFixed(2) : null,
     nearPOC,
     dailyRsi: dailyRsi != null ? +dailyRsi.toFixed(1) : null,
@@ -1462,6 +1465,11 @@ function SignalTag({ triggerKey, asset }) {
     color = asset.rsiDivType === "bullish" ? C.green : C.red;
     icon = asset.rsiDivType === "bullish" ? "📈" : "📉";
   }
+  if (triggerKey === "obv_divergence" && asset?.obvDivType) {
+    label = asset.obvDivType === "bullish" ? "OBV 매집 다이버전스" : "OBV 분산 다이버전스";
+    color = asset.obvDivType === "bullish" ? C.green : C.red;
+    icon = asset.obvDivType === "bullish" ? "📊" : "📊";
+  }
   if (triggerKey === "near_poc" && asset?.pocPrice) {
     label = `POC 근접 ($${asset.pocPrice})`;
   }
@@ -1649,19 +1657,26 @@ function quickDiagnosis(asset) {
   else if (asset.weekChange < -3) trendScore -= 3;
   trendScore = Math.max(0, Math.min(100, trendScore));
 
-  // ── 모멘텀: RSI 연속 그라데이션 (v3.3 최적화) + 스토캐스틱 + W%R ──
-  // v3.3: RSI 구간별 가중치 재조정 — 55~65 중립 강세구간 세분화, 과매도 보상 강화
+  // ── 모멘텀: RSI 연속 그라데이션 (v3.5 최적화) + 스토캐스틱 + W%R ──
+  // v3.5: RSI 구간 세분화 — 과매도 27/73 기준 정렬, MACD 모멘텀 반영
   if (asset.rsi != null) {
     if (asset.rsi >= 80) { momScore -= 18; signals.push({ type: "bearish", name: `RSI 극단 과매수 (${asset.rsi})` }); }
-    else if (asset.rsi >= 72) { momScore -= 12; signals.push({ type: "bearish", name: `RSI 과매수 (${asset.rsi})` }); }
-    else if (asset.rsi >= 65) momScore -= 4; // v3.3: 과열 경고 구간 (기존 70에서 하향)
+    else if (asset.rsi >= 73) { momScore -= 12; signals.push({ type: "bearish", name: `RSI 과매수 (${asset.rsi})` }); }
+    else if (asset.rsi >= 65) momScore -= 4; // 과열 경고
     else if (asset.rsi >= 55) momScore += 6; // 건강한 강세
-    else if (asset.rsi >= 45) momScore += 2; // v3.3: 중립구간도 약간 플러스 (시장 평균)
-    else if (asset.rsi >= 40) momScore += 0; // v3.3: 약세 진입 (기존 -1 → 0)
-    else if (asset.rsi >= 35) momScore += 3; // v3.3: 반등 기대 (기존 +2 → +3)
-    else if (asset.rsi >= 28) { momScore += 8; signals.push({ type: "bullish", name: `RSI 과매도 (${asset.rsi})` }); }
-    else if (asset.rsi >= 20) { momScore += 15; signals.push({ type: "bullish", name: `RSI 강한 과매도 (${asset.rsi})` }); }
-    else { momScore += 20; signals.push({ type: "bullish", name: `RSI 극단 과매도 (${asset.rsi})` }); }
+    else if (asset.rsi >= 45) momScore += 2; // 중립
+    else if (asset.rsi >= 40) momScore += 0; // 약세 진입
+    else if (asset.rsi >= 35) momScore += 4; // v3.5: 반등 기대 (기존 +3 → +4)
+    else if (asset.rsi >= 27) { momScore += 10; signals.push({ type: "bullish", name: `RSI 과매도 (${asset.rsi})` }); } // v3.5: 27 기준, 보상 +10
+    else if (asset.rsi >= 20) { momScore += 16; signals.push({ type: "bullish", name: `RSI 강한 과매도 (${asset.rsi})` }); }
+    else { momScore += 22; signals.push({ type: "bullish", name: `RSI 극단 과매도 (${asset.rsi})` }); }
+  }
+  // v3.5: MACD 히스토그램 모멘텀 — 방향과 가속도 반영
+  if (asset.macdHist != null && asset.macdHistPrev != null) {
+    if (asset.macdHist > 0 && asset.macdHist > asset.macdHistPrev) momScore += 4; // 양의 가속
+    else if (asset.macdHist < 0 && asset.macdHist < asset.macdHistPrev) momScore -= 4; // 음의 가속
+    else if (asset.macdHist > 0) momScore += 2; // 양의 모멘텀
+    else if (asset.macdHist < 0) momScore -= 2; // 음의 모멘텀
   }
   // MFI (거래량 가중 RSI) 추가 반영
   if (asset.mfi != null) {
@@ -1718,6 +1733,9 @@ function quickDiagnosis(asset) {
   // ADX 방향성 추가 반영 (추세 점수에도)
   if (asset.adxBullish) { trendScore = Math.min(100, trendScore + 5); supScore += 3; }
   if (asset.adxBearish) { trendScore = Math.max(0, trendScore - 5); supScore -= 3; }
+  // OBV 다이버전스 방향성 반영 (v6.8: 스마트머니 방향 포착)
+  if (asset.obvDivType === "bullish") { supScore += 7; signals.push({ type: "bullish", name: "OBV 강세 다이버전스 (매집)" }); }
+  else if (asset.obvDivType === "bearish") { supScore -= 7; signals.push({ type: "bearish", name: "OBV 약세 다이버전스 (분산)" }); }
   supScore = Math.max(0, Math.min(100, supScore));
 
   // ── 가격위치: 52주 세분화 ──
@@ -2587,6 +2605,13 @@ function AssetCard({ asset, onChart }) {
                   color: asset.rsiDivType === "bullish" ? C.green : C.red,
                 }}>{asset.rsiDivType === "bullish" ? "📈 RSI 상승전환" : "📉 RSI 하락전환"}</span>
               )}
+              {asset.obvDivType && (
+                <span style={{
+                  fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                  background: asset.obvDivType === "bullish" ? `${C.green}22` : `${C.red}22`,
+                  color: asset.obvDivType === "bullish" ? C.green : C.red,
+                }}>{asset.obvDivType === "bullish" ? "📊 OBV 매집" : "📊 OBV 분산"}</span>
+              )}
               {asset.adx != null && asset.adx >= 25 && (
                 <span style={{
                   fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
@@ -2612,7 +2637,8 @@ function AssetCard({ asset, onChart }) {
               { label: "거래량 비율", value: `${asset.volRatio}x`, color: asset.volRatio >= 2 ? C.red : C.text2 },
               { label: "스토캐스틱%K", value: asset.stoch ? `${asset.stoch.k.toFixed(1)}` : "—", color: asset.stoch?.k < 20 ? C.purple : C.text2 },
               { label: "Williams %R", value: asset.wr != null ? `${asset.wr}` : "—", color: asset.wr != null && asset.wr < -80 ? C.purple : C.text2 },
-              { label: "52주 저가 대비", value: asset.low52w ? `+${(((asset.price - asset.low52w) / asset.low52w) * 100).toFixed(1)}%` : "—" },
+              { label: "52주 저가 대비", value: asset.low52w ? `${(((asset.price - asset.low52w) / asset.low52w) * 100) >= 0 ? "+" : ""}${(((asset.price - asset.low52w) / asset.low52w) * 100).toFixed(1)}%` : "—",
+                color: asset.low52w ? ((asset.price - asset.low52w) / asset.low52w * 100 < 5 ? C.purple : C.text2) : C.text2 },
               { label: "CMF", value: asset.cmf != null ? `${asset.cmf > 0 ? "+" : ""}${asset.cmf.toFixed(3)}` : "—", color: asset.cmf != null ? (asset.cmf > 0.1 ? C.green : asset.cmf < -0.1 ? C.red : C.text2) : C.text2 },
               { label: "MFI(14)", value: asset.mfi != null ? `${asset.mfi}` : "—", color: asset.mfi != null ? (asset.mfi < 20 ? C.purple : asset.mfi > 80 ? C.red : C.text2) : C.text2 },
               { label: "ADX", value: asset.adx != null ? `${asset.adx}` : "—",
@@ -3852,6 +3878,12 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                         color: enriched.macdDivType === "bullish" ? C.green : C.red,
                       }}>{enriched.macdDivType === "bullish" ? "MACD ↑" : "MACD ↓"}</span>
                     )}
+                    {enriched.obvDivType && (
+                      <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                        background: enriched.obvDivType === "bullish" ? `${C.green}18` : `${C.red}18`,
+                        color: enriched.obvDivType === "bullish" ? C.green : C.red,
+                      }}>{enriched.obvDivType === "bullish" ? "OBV ↑" : "OBV ↓"}</span>
+                    )}
                   </div>
                   {enriched.cmf != null && (
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -3933,7 +3965,11 @@ function AppInner() {
   const [themeMode, setThemeMode] = useState(loadTheme);
   C = themeMode === "dark" ? DARK : LIGHT;
 
-  // ── 인증 체크: 로딩 중이면 스플래시, 미인증이면 로그인 페이지 ──
+  // ── 로그인 필요 탭 정의 ──
+  const LOGIN_REQUIRED_TABS = ["paper-trading", "btc-trading", "portfolio", "alerts"];
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  // ── 인증 체크: 로딩 중이면 스플래시 ──
   if (authLoading) {
     return (
       <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg }}>
@@ -3944,7 +3980,15 @@ function AppInner() {
       </div>
     );
   }
-  if (!user) return <AuthPage theme={themeMode} />;
+  // 게스트 접근 허용 — 로그인 필요 기능만 제한
+  const requireLogin = (targetTab) => {
+    if (!user && LOGIN_REQUIRED_TABS.includes(targetTab)) {
+      setShowAuthModal(true);
+      return true;
+    }
+    return false;
+  };
+
   const toggleTheme = useCallback(() => {
     setThemeMode(prev => {
       const next = prev === "dark" ? "light" : "dark";
@@ -6089,17 +6133,18 @@ function AppInner() {
         {!sbCollapsed.info && (
         <nav className="sb-nav">
           {[
-            { id: "portfolio", label: "내 포트폴리오", icon: "💼" },
+            { id: "portfolio", label: "내 포트폴리오", icon: "💼", locked: true },
             { id: "news", label: "마켓 뉴스", icon: "📰" },
             { id: "sentiment", label: "소셜 센티먼트", icon: "💬" },
-            { id: "alerts", label: "매매 알림", icon: "🔔", badge: alertBadge },
-            { id: "paper-trading", label: "퀀트 자동매매", icon: "🤖" },
-            { id: "btc-trading", label: "₿ BTC 자동매매", icon: "₿" },
+            { id: "alerts", label: "매매 알림", icon: "🔔", badge: alertBadge, locked: true },
+            { id: "paper-trading", label: "퀀트 자동매매", icon: "🤖", locked: true },
+            { id: "btc-trading", label: "₿ BTC 자동매매", icon: "₿", locked: true },
           ].map(t => (
             <button key={t.id} className={`sb-item${tab === t.id ? " active" : ""}`}
-              onClick={() => { setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }}
+              onClick={() => { if (t.locked && requireLogin(t.id)) return; setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }}
               style={{ background: tab === t.id ? C.blueBg : "transparent", color: tab === t.id ? C.blue : C.text2 }}>
               <span className="sb-icon">{t.icon}</span>{t.label}
+              {t.locked && !user && <span style={{ marginLeft: "4px", fontSize: "10px", opacity: 0.5 }}>🔒</span>}
               {t.badge > 0 && (
                 <span style={{ marginLeft: "auto", background: C.red, color: "#fff",
                   fontSize: "9px", fontWeight: 800, borderRadius: "50%", width: "18px", height: "18px",
@@ -6111,7 +6156,9 @@ function AppInner() {
         )}
         <div style={{ flex: 1 }} />
         <div style={{ padding: "12px 20px", borderTop: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: "8px" }}>
-          {/* 유저 정보 */}
+          {/* 유저 정보 또는 로그인 */}
+          {user ? (
+          <>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 8px", borderRadius: "8px", background: C.card2, border: `1px solid ${C.border}` }}>
             <div style={{ width: "26px", height: "26px", borderRadius: "50%", background: C.blueBg,
               display: "flex", alignItems: "center", justifyContent: "center",
@@ -6122,19 +6169,29 @@ function AppInner() {
               {user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User"}
             </span>
           </div>
-          <button onClick={toggleTheme} style={{
-            width: "100%", padding: "8px", borderRadius: "8px", background: C.card2,
-            border: `1px solid ${C.border}`, color: C.text2, fontSize: "12px", fontWeight: 600,
-            display: "flex", alignItems: "center", gap: "8px", justifyContent: "center", cursor: "pointer",
-          }}>
-            {themeMode === "dark" ? "\u2600\uFE0F 라이트 모드" : "\uD83C\uDF19 다크 모드"}
-          </button>
           <button onClick={() => { if (confirm("로그아웃 하시겠습니까?")) signOut(); }} style={{
             width: "100%", padding: "8px", borderRadius: "8px", background: "transparent",
             border: `1px solid ${C.border}`, color: C.text3, fontSize: "12px", fontWeight: 600,
             display: "flex", alignItems: "center", gap: "8px", justifyContent: "center", cursor: "pointer",
           }}>
             ⏻ 로그아웃
+          </button>
+          </>
+          ) : (
+          <button onClick={() => setShowAuthModal(true)} style={{
+            width: "100%", padding: "10px", borderRadius: "10px", background: C.blue,
+            border: "none", color: "#fff", fontSize: "13px", fontWeight: 700,
+            display: "flex", alignItems: "center", gap: "8px", justifyContent: "center", cursor: "pointer",
+          }}>
+            로그인 / 회원가입
+          </button>
+          )}
+          <button onClick={toggleTheme} style={{
+            width: "100%", padding: "8px", borderRadius: "8px", background: C.card2,
+            border: `1px solid ${C.border}`, color: C.text2, fontSize: "12px", fontWeight: 600,
+            display: "flex", alignItems: "center", gap: "8px", justifyContent: "center", cursor: "pointer",
+          }}>
+            {themeMode === "dark" ? "\u2600\uFE0F 라이트 모드" : "\uD83C\uDF19 다크 모드"}
           </button>
         </div>
       </aside>
@@ -6158,8 +6215,8 @@ function AppInner() {
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "anomaly", label: "이상탐지", icon: "⚡" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "quant-port", label: "운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼" }, { id: "news", label: "뉴스", icon: "📰" }, { id: "sentiment", label: "센티먼트", icon: "💬" }, { id: "alerts", label: "알림", icon: "🔔" }, { id: "paper-trading", label: "자동매매", icon: "🤖" }, { id: "btc-trading", label: "₿ BTC", icon: "₿" }].map(t => (
-              <button key={t.id} onClick={() => { setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }} style={{
+            {[{ id: "home", label: "홈", icon: "🏠" }, { id: "screener", label: "스크리너", icon: "🔍" }, { id: "anomaly", label: "이상탐지", icon: "⚡" }, { id: "strategy", label: "전략", icon: "🎯" }, { id: "quant-port", label: "운용", icon: "📊" }, { id: "risk-map", label: "리스크", icon: "🛡️" }, { id: "quant-report", label: "리포트", icon: "📋" }, { id: "backtest", label: "백테스트", icon: "📈" }, { id: "portfolio", label: "포트폴리오", icon: "💼", locked: true }, { id: "news", label: "뉴스", icon: "📰" }, { id: "sentiment", label: "센티먼트", icon: "💬" }, { id: "alerts", label: "알림", icon: "🔔", locked: true }, { id: "paper-trading", label: "자동매매", icon: "🤖", locked: true }, { id: "btc-trading", label: "₿ BTC", icon: "₿", locked: true }].map(t => (
+              <button key={t.id} onClick={() => { if (t.locked && requireLogin(t.id)) return; setTab(t.id); if (t.id === "alerts") setAlertBadge(0); }} style={{
                 padding: "7px 12px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
                 background: tab === t.id ? C.blueBg : "transparent",
                 color: tab === t.id ? C.blue : C.text2, border: "none", whiteSpace: "nowrap",
@@ -6181,7 +6238,8 @@ function AppInner() {
           </nav>
           {/* 유저 + 테마 토글 + 햄버거 */}
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            {/* 유저 메뉴 */}
+            {/* 유저 메뉴 또는 로그인 버튼 */}
+            {user ? (
             <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 12px 4px 6px",
               background: C.card2, borderRadius: "12px", border: `1px solid ${C.border}30` }}>
               <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: C.blueBg,
@@ -6198,6 +6256,15 @@ function AppInner() {
                 ⏻
               </button>
             </div>
+            ) : (
+            <button onClick={() => setShowAuthModal(true)} style={{
+              padding: "8px 18px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
+              background: C.blue, color: "#fff", border: "none", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: "6px", transition: "all 0.2s",
+            }}>
+              로그인
+            </button>
+            )}
             <button onClick={toggleTheme} title={themeMode === "dark" ? "라이트 모드" : "다크 모드"} style={{
               background: C.card2, border: `1px solid ${C.border}30`, borderRadius: "12px",
               width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center",
@@ -6247,21 +6314,21 @@ function AppInner() {
               { section: "운용", items: [
                 { id: "quant-port", label: "전략 운용", icon: "📊" },
                 { id: "risk-map", label: "리스크맵", icon: "🛡️" },
-                { id: "portfolio", label: "포트폴리오", icon: "💼" },
-                { id: "paper-trading", label: "자동매매", icon: "🤖" },
-                { id: "btc-trading", label: "BTC 매매", icon: "₿" },
+                { id: "portfolio", label: "포트폴리오", icon: "💼", locked: true },
+                { id: "paper-trading", label: "자동매매", icon: "🤖", locked: true },
+                { id: "btc-trading", label: "BTC 매매", icon: "₿", locked: true },
               ]},
               { section: "정보", items: [
                 { id: "news", label: "마켓 뉴스", icon: "📰" },
                 { id: "sentiment", label: "센티먼트", icon: "💬" },
-                { id: "alerts", label: "알림 설정", icon: "🔔" },
+                { id: "alerts", label: "알림 설정", icon: "🔔", locked: true },
               ]},
             ].map(group => (
               <div key={group.section}>
                 <div style={{ fontSize: "10px", fontWeight: 700, color: C.text3, padding: "4px 4px 6px", letterSpacing: "0.05em", textTransform: "uppercase" }}>{group.section}</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "5px" }}>
                   {group.items.map(t => (
-                    <button key={t.id} onClick={() => { setTab(t.id); setMenuOpen(false); }} style={{
+                    <button key={t.id} onClick={() => { if (t.locked && requireLogin(t.id)) { setMenuOpen(false); return; } setTab(t.id); setMenuOpen(false); }} style={{
                       padding: "10px 8px", borderRadius: "12px", fontSize: "12px", fontWeight: 600,
                       background: tab === t.id ? C.blueBg : C.card2,
                       color: tab === t.id ? C.blue : C.text2,
@@ -6270,7 +6337,7 @@ function AppInner() {
                       alignItems: "center", gap: "4px", minHeight: "auto",
                     }}>
                       <span style={{fontSize:"18px"}}>{t.icon}</span>
-                      <span style={{ fontSize: "11px", lineHeight: 1.2 }}>{t.label}</span>
+                      <span style={{ fontSize: "11px", lineHeight: 1.2 }}>{t.label}{t.locked && !user ? " 🔒" : ""}</span>
                     </button>
                   ))}
                 </div>
@@ -6296,6 +6363,33 @@ function AppInner() {
           <div className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             {/* 검색바 */}
             <SearchBar onSelect={(asset) => setSelectedAsset(asset)} />
+
+            {/* ── 게스트 웰컴 배너 ── */}
+            {!user && tab === "home" && (
+              <div style={{
+                background: `linear-gradient(135deg, ${C.blue}15, ${C.purple || "#8B5CF6"}15)`,
+                borderRadius: "16px", padding: "20px 24px",
+                border: `1px solid ${C.blue}25`,
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                flexWrap: "wrap", gap: "12px",
+              }}>
+                <div>
+                  <div style={{ fontSize: "16px", fontWeight: 800, color: C.text1, marginBottom: "4px" }}>
+                    DI금융에 오신 것을 환영합니다
+                  </div>
+                  <div style={{ fontSize: "13px", color: C.text2 }}>
+                    실시간 시장 분석, AI 퀀트 전략, 자동매매까지. 로그인하면 모든 기능을 이용할 수 있습니다.
+                  </div>
+                </div>
+                <button onClick={() => setShowAuthModal(true)} style={{
+                  padding: "10px 24px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
+                  background: C.blue, color: "#fff", border: "none", cursor: "pointer",
+                  whiteSpace: "nowrap", flexShrink: 0,
+                }}>
+                  무료 회원가입
+                </button>
+              </div>
+            )}
 
             {/* 2컬럼 그리드 (데스크톱) / 1컬럼 (모바일) */}
             <div className="home-grid">
@@ -7163,8 +7257,18 @@ function AppInner() {
               );
             })()}
 
+            {/* 사이드 광고 (쿠팡 파트너스) */}
+            {!user && <CoupangBanner theme={themeMode} />}
+
             </div>{/* end home-right */}
             </div>{/* end home-grid */}
+
+            {/* ═══ 하단 광고 배너 ═══ */}
+            {!user && (
+              <div style={{ margin: "16px 0" }}>
+                <GoogleAd slot="HOME_BOTTOM_BANNER" format="horizontal" style={{ minHeight: "90px" }} />
+              </div>
+            )}
 
             {/* ═══ 하단 전체너비 섹션 (그리드 밖) ═══ */}
 
@@ -9270,6 +9374,26 @@ function AppInner() {
 
         {/* 차트 모달 */}
         {chartAsset && <ChartModal asset={chartAsset} onClose={() => setChartAsset(null)} krwRate={krwRate} theme={themeMode} />}
+
+        {/* ═══ 풋터 ═══ */}
+        <footer style={{
+          maxWidth: "1400px", margin: "40px auto 0", padding: "24px 24px calc(24px + env(safe-area-inset-bottom, 0px))",
+          borderTop: `1px solid ${C.border}30`,
+          display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "12px",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ fontSize: "16px" }}>📡</span>
+            <span style={{ fontWeight: 700, fontSize: "13px", color: C.text2 }}>DI금융</span>
+            <span style={{ fontSize: "11px", color: C.text3 }}>v10.2</span>
+          </div>
+          <div style={{ fontSize: "11px", color: C.text3, display: "flex", gap: "16px", flexWrap: "wrap" }}>
+            <span>투자의 판단과 책임은 본인에게 있습니다</span>
+            <span>문의: donginseo0421@gmail.com</span>
+          </div>
+          <div style={{ fontSize: "10px", color: C.text3 }}>
+            쿠팡 파트너스 활동의 일환으로 수수료를 제공받을 수 있습니다
+          </div>
+        </footer>
       </main>
       </PullToRefresh>
       </div>{/* di-main-wrap */}
@@ -9374,6 +9498,37 @@ function AppInner() {
       )}
 
       </div>{/* di-app-body */}
+
+      {/* ═══ 로그인 필요 모달 ═══ */}
+      {showAuthModal && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.6)", backdropFilter: "blur(8px)",
+          zIndex: 99999, display: "flex", alignItems: "center", justifyContent: "center",
+          padding: "24px",
+        }} onClick={(e) => { if (e.target === e.currentTarget) setShowAuthModal(false); }}>
+          <div style={{
+            width: "100%", maxWidth: "440px", maxHeight: "90vh", overflowY: "auto",
+            borderRadius: "20px", background: C.card,
+            border: `1px solid ${C.border}`,
+            boxShadow: C.isDark ? "0 20px 60px rgba(0,0,0,0.5)" : "0 20px 60px rgba(0,0,0,0.15)",
+          }}>
+            <div style={{ padding: "24px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: C.text1 }}>로그인이 필요합니다</h3>
+                <p style={{ margin: "4px 0 0", fontSize: "13px", color: C.text3 }}>이 기능을 사용하려면 로그인해주세요</p>
+              </div>
+              <button onClick={() => setShowAuthModal(false)} style={{
+                background: "none", border: "none", color: C.text3, fontSize: "20px", cursor: "pointer", padding: "4px",
+              }}>✕</button>
+            </div>
+            <div style={{ padding: "16px 24px 24px" }}>
+              <AuthPage theme={themeMode} embedded onClose={() => setShowAuthModal(false)} />
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

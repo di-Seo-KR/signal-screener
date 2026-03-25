@@ -18,20 +18,68 @@ export default function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 현재 세션 확인
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      setUser(s?.user ?? null);
-      setLoading(false);
-    });
-
-    // 세션 변경 리스너
+    // ── 1. 세션 변경 리스너 (최우선 등록) ──
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, s) => {
+      (event, s) => {
+        console.log("[DI금융 Auth]", event, s?.user?.email);
         setSession(s);
         setUser(s?.user ?? null);
+        if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
+          setLoading(false);
+        }
+        // OAuth 로그인 성공 후 URL 정리
+        if (event === "SIGNED_IN") {
+          const url = new URL(window.location.href);
+          if (url.searchParams.has("code") || url.hash.includes("access_token")) {
+            window.history.replaceState({}, "", window.location.origin + window.location.pathname);
+          }
+        }
       }
     );
+
+    // ── 2. 현재 세션 확인 + URL 코드 교환 ──
+    const initAuth = async () => {
+      try {
+        // URL에 code 파라미터가 있으면 PKCE 교환 시도
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get("code");
+
+        if (code) {
+          console.log("[DI금융 Auth] OAuth code detected, exchanging...");
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.error("[DI금융 Auth] Code exchange error:", error.message);
+            // 코드 교환 실패 시 URL 정리
+            window.history.replaceState({}, "", window.location.origin + window.location.pathname);
+          } else {
+            console.log("[DI금융 Auth] Code exchange success:", data?.user?.email);
+            setSession(data.session);
+            setUser(data.session?.user ?? null);
+            setLoading(false);
+            return;
+          }
+        }
+
+        // URL hash에 access_token이 있는 경우 (implicit flow fallback)
+        if (window.location.hash.includes("access_token")) {
+          console.log("[DI금융 Auth] Hash token detected, getting session...");
+        }
+
+        // 기존 세션 확인
+        const { data: { session: s }, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error("[DI금융 Auth] getSession error:", error.message);
+        }
+        setSession(s);
+        setUser(s?.user ?? null);
+      } catch (err) {
+        console.error("[DI금융 Auth] Init error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
 
     return () => subscription.unsubscribe();
   }, []);
@@ -63,14 +111,21 @@ export default function AuthProvider({ children }) {
       provider,
       options: {
         redirectTo: window.location.origin,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     });
+    if (error) console.error("[DI금융 Auth] OAuth error:", error.message);
     return { data, error };
   };
 
   // ── 로그아웃 ──
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
+    setUser(null);
+    setSession(null);
     return { error };
   };
 
