@@ -6366,33 +6366,6 @@ function AppInner() {
             {/* 검색바 */}
             <SearchBar onSelect={(asset) => setSelectedAsset(asset)} />
 
-            {/* ── 게스트 웰컴 배너 ── */}
-            {!user && tab === "home" && (
-              <div style={{
-                background: `linear-gradient(135deg, ${C.blue}15, ${C.purple || "#8B5CF6"}15)`,
-                borderRadius: "16px", padding: "20px 24px",
-                border: `1px solid ${C.blue}25`,
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                flexWrap: "wrap", gap: "12px",
-              }}>
-                <div>
-                  <div style={{ fontSize: "16px", fontWeight: 800, color: C.text1, marginBottom: "4px" }}>
-                    DI금융에 오신 것을 환영합니다
-                  </div>
-                  <div style={{ fontSize: "13px", color: C.text2 }}>
-                    실시간 시장 분석, AI 퀀트 전략, 자동매매까지. 로그인하면 모든 기능을 이용할 수 있습니다.
-                  </div>
-                </div>
-                <button onClick={() => setShowAuthModal(true)} style={{
-                  padding: "10px 24px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
-                  background: C.blue, color: "#fff", border: "none", cursor: "pointer",
-                  whiteSpace: "nowrap", flexShrink: 0,
-                }}>
-                  무료 회원가입
-                </button>
-              </div>
-            )}
-
             {/* 2컬럼 그리드 (데스크톱) / 1컬럼 (모바일) */}
             <div className="home-grid">
             <div className="home-left" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
