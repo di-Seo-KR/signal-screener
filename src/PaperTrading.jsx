@@ -1,4 +1,4 @@
-// DI금융 — 퀀트 전략 기반 자동매매 시스템 v3.0 (Production-Grade)
+// Toit — 퀀트 전략 기반 자동매매 시스템 v3.0 (Production-Grade)
 // 리스크 관리 · 브래킷 주문 · 드로다운 보호 · 시그널 신뢰도 · 변동성 사이징
 // Alpaca Trading API 연동 (Paper / Live)
 import React, { useState, useEffect, useCallback, useRef } from "react";

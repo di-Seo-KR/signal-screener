@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 
 const COUPANG_PARTNER_ID = "AF0857541";
-const COUPANG_SUBID = "di-finance";
+const COUPANG_SUBID = "toit";
 
 // ── 쿠팡 파트너스 추천 상품 (카테고리별 풍부한 상품 풀) ──
 const COUPANG_PRODUCTS = [
@@ -60,7 +60,7 @@ function makeCoupangLink(url) {
   return `${url}${sep}subId=${COUPANG_PARTNER_ID}&subId1=${COUPANG_SUBID}`;
 }
 
-// ── 쿠팡 파트너스 사이드바 배너 (세련된 카드형) ──
+// ── 쿠팡 파트너스 사이드바 배너 (실제 광고 단위 스타일) ──
 export function CoupangBanner({ theme = "dark", style = {}, context = "home" }) {
   const isDark = theme === "dark";
   const products = getContextualProducts(context);
@@ -70,120 +70,77 @@ export function CoupangBanner({ theme = "dark", style = {}, context = "home" }) 
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentIdx(prev => (prev + 1) % products.length);
-    }, 15000); // 15초마다 상품 로테이션 (덜 산만하게)
+    }, 15000);
     return () => clearInterval(timer);
   }, []);
 
   return (
     <div style={{
-      borderRadius: "14px",
-      background: isDark
-        ? "linear-gradient(135deg, #131B2E 0%, #0F1724 100%)"
-        : "linear-gradient(135deg, #F8FAFF 0%, #F0F4FA 100%)",
-      border: `1px solid ${isDark ? "#1F2E42" : "#E2E5EA"}`,
-      padding: "16px",
+      borderRadius: "2px",
+      background: isDark ? "#1A1A1A" : "#FFFFFF",
+      border: `1px solid ${isDark ? "#333333" : "#DDDDDD"}`,
+      padding: "12px",
       position: "relative",
       overflow: "hidden",
       ...style,
     }}>
-      {/* AD 라벨 */}
+      {/* 광고 라벨 */}
       <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        marginBottom: "12px",
-      }}>
-        <span style={{
-          fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px",
-          background: isDark ? "#1E2D45" : "#E8EDF4",
-          color: isDark ? "#5A7A9A" : "#8B9CB8",
-          letterSpacing: "0.5px",
-        }}>SPONSORED</span>
-        <span style={{ fontSize: "10px", color: isDark ? "#3B5068" : "#B0BEC5" }}>쿠팡파트너스</span>
-      </div>
+        fontSize: "8px", fontWeight: 700, padding: "2px 4px",
+        background: isDark ? "#333333" : "#F0F0F0",
+        color: isDark ? "#888888" : "#999999",
+        borderRadius: "2px",
+        marginBottom: "8px",
+        display: "inline-block",
+        letterSpacing: "0.5px",
+      }}>광고</div>
 
-      {/* 상품 카드 */}
-      <div
-        style={{
-          display: "flex", alignItems: "center", gap: "12px",
-          padding: "10px 12px",
-          borderRadius: "10px",
-          background: isDark ? "#182236" : "#FFFFFF",
-          border: `1px solid ${isDark ? "#243350" : "#E8ECF2"}`,
-          transition: "all 0.3s ease",
-        }}
-      >
-        <span style={{ fontSize: "24px", flexShrink: 0 }}>{product.emoji}</span>
-        <div>
-          <div style={{
-            fontSize: "13px", fontWeight: 700,
-            color: isDark ? "#E2E8F0" : "#1E293B",
-            lineHeight: 1.3,
-          }}>{product.title}</div>
-          <div style={{
-            fontSize: "11px",
-            color: isDark ? "#64748B" : "#94A3B8",
-            marginTop: "2px",
-          }}>{product.desc}</div>
-        </div>
-      </div>
+      {/* 상품 카테고리 */}
+      <div style={{
+        fontSize: "12px", fontWeight: 600,
+        color: isDark ? "#CCCCCC" : "#333333",
+        marginBottom: "8px",
+        lineHeight: 1.3,
+      }}>{product.title}</div>
 
-      {/* CTA 버튼 */}
+      {/* CTA 버튼 - 심플 */}
       <a
         href={makeCoupangLink(product.url)}
         target="_blank"
         rel="noopener noreferrer"
         style={{
           display: "block",
-          marginTop: "12px",
-          padding: "10px 16px",
-          borderRadius: "10px",
-          background: "linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)",
+          padding: "8px 12px",
+          borderRadius: "2px",
+          background: isDark ? "#3B82F6" : "#0066CC",
           color: "#FFFFFF",
-          fontSize: "13px",
-          fontWeight: 700,
+          fontSize: "12px",
+          fontWeight: 600,
           textDecoration: "none",
           textAlign: "center",
-          transition: "all 0.3s ease",
+          transition: "all 0.2s ease",
           border: "none",
           cursor: "pointer",
+          marginBottom: "6px",
         }}
         onMouseEnter={e => {
-          e.currentTarget.style.transform = "translateY(-2px)";
-          e.currentTarget.style.boxShadow = "0 8px 16px rgba(59, 130, 246, 0.4)";
+          e.currentTarget.style.opacity = "0.9";
         }}
         onMouseLeave={e => {
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "0 4px 8px rgba(59, 130, 246, 0.2)";
+          e.currentTarget.style.opacity = "1";
         }}
       >
-        지금 보러가기
+        쿠팡에서 확인하기
       </a>
-
-      {/* 로테이션 인디케이터 */}
-      <div style={{
-        display: "flex", gap: "4px", justifyContent: "center", marginTop: "10px",
-      }}>
-        {products.map((_, i) => (
-          <div key={i} style={{
-            width: i === currentIdx ? "12px" : "4px",
-            height: "4px",
-            borderRadius: "2px",
-            background: i === currentIdx
-              ? (isDark ? "#3B82F6" : "#2563EB")
-              : (isDark ? "#1E2D45" : "#D1D5DC"),
-            transition: "all 0.3s ease",
-          }} />
-        ))}
-      </div>
 
       {/* 공시 */}
       <div style={{
-        fontSize: "9px",
-        color: isDark ? "#2A3F58" : "#C0C8D4",
-        marginTop: "8px",
+        fontSize: "8px",
+        color: isDark ? "#666666" : "#999999",
         textAlign: "center",
-        lineHeight: 1.4,
+        lineHeight: 1.3,
       }}>
-        이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.
+        쿠팡 파트너스 활동
       </div>
     </div>
   );
@@ -218,7 +175,7 @@ export function CoupangInlineBanner({ theme = "dark" }) {
   );
 }
 
-// ── 쿠팡 버튼 광고 (프리미엄 CTA 버튼) ──
+// ── 쿠팡 버튼 광고 (CTA 버튼) ──
 export function CoupangButtonAd({ theme = "dark", context = "default" }) {
   const isDark = theme === "dark";
   const products = getContextualProducts(context);
@@ -228,75 +185,53 @@ export function CoupangButtonAd({ theme = "dark", context = "default" }) {
   return (
     <div style={{
       display: "flex", flexDirection: "column", alignItems: "center", gap: "8px",
-      padding: "16px 0",
+      padding: "12px 0",
     }}>
       <a
         href={makeCoupangLink(product.url)}
         target="_blank"
         rel="noopener noreferrer"
         style={{
-          display: "inline-flex", alignItems: "center", gap: "8px",
-          padding: "14px 28px",
-          borderRadius: "12px",
-          background: isHovered
-            ? "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)"
-            : "linear-gradient(135deg, #3B82F6 0%, #2563EB 100%)",
+          display: "inline-flex", alignItems: "center", gap: "6px",
+          padding: "10px 20px",
+          borderRadius: "3px",
+          background: isHovered ? "#0052A3" : "#0066CC",
           color: "#FFFFFF",
-          fontSize: "15px",
-          fontWeight: 700,
+          fontSize: "13px",
+          fontWeight: 600,
           textDecoration: "none",
-          transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+          transition: "all 0.2s",
           border: "none",
           cursor: "pointer",
-          boxShadow: isHovered
-            ? "0 12px 24px rgba(59, 130, 246, 0.5)"
-            : "0 6px 12px rgba(59, 130, 246, 0.3)",
-          transform: isHovered ? "translateY(-3px) scale(1.02)" : "translateY(0) scale(1)",
+          boxShadow: isHovered ? "0 4px 8px rgba(0, 102, 204, 0.3)" : "0 2px 4px rgba(0, 102, 204, 0.2)",
+          transform: isHovered ? "translateY(-1px)" : "translateY(0)",
           position: "relative",
           overflow: "hidden",
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {isHovered && (
-          <span style={{
-            display: "inline-block",
-            animation: "pulse 0.6s ease-in-out",
-            fontSize: "16px",
-          }}>
-            ✨
-          </span>
-        )}
-        {product.emoji} {product.title}
+        {product.title}
         <span style={{
-          marginLeft: "4px",
-          fontSize: "16px",
-          transition: "transform 0.3s ease",
-          transform: isHovered ? "translateX(4px)" : "translateX(0)",
-        }}>→</span>
+          transition: "transform 0.2s ease",
+          transform: isHovered ? "translateX(2px)" : "translateX(0)",
+        }}>›</span>
       </a>
 
       {/* 공시 */}
       <div style={{
-        fontSize: "9px",
-        color: isDark ? "#2A3F58" : "#C0C8D4",
+        fontSize: "8px",
+        color: isDark ? "#666666" : "#999999",
         textAlign: "center",
-        lineHeight: 1.4,
+        lineHeight: 1.3,
       }}>
-        쿠팡파트너스 활동의 일환으로 수수료를 제공받습니다.
+        쿠팡 파트너스
       </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(1.2); opacity: 0.8; }
-        }
-      `}</style>
     </div>
   );
 }
 
-// ── 쿠팡 인터스티셜 (기능 잠금 해제 전 표시) ──
+// ── 쿠팡 인터스티셜 (CTA 팝업 - 3초 카운트다운) ──
 export function CoupangInterstitial({ theme = "dark", onClose, featureName = "이 기능" }) {
   const isDark = theme === "dark";
   const [countdown, setCountdown] = useState(3);
@@ -317,61 +252,59 @@ export function CoupangInterstitial({ theme = "dark", onClose, featureName = "�
     <div style={{
       position: "fixed", inset: 0, zIndex: 10000,
       display: "flex", alignItems: "center", justifyContent: "center",
-      background: "rgba(0,0,0,0.7)",
-      backdropFilter: "blur(4px)",
+      background: "rgba(0,0,0,0.5)",
+      backdropFilter: "blur(2px)",
     }}>
       <div style={{
-        width: "380px", maxWidth: "90vw",
-        borderRadius: "20px",
-        background: isDark ? "#0F1724" : "#FFFFFF",
-        border: `1px solid ${isDark ? "#1F2E42" : "#E2E5EA"}`,
-        padding: "28px 24px",
+        width: "320px", maxWidth: "90vw",
+        borderRadius: "4px",
+        background: isDark ? "#1A1A1A" : "#FFFFFF",
+        border: `1px solid ${isDark ? "#333333" : "#DDDDDD"}`,
+        padding: "20px",
         textAlign: "center",
       }}>
         {/* 클로즈 버튼 */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "8px" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "12px" }}>
           <button
             onClick={canClose ? onClose : undefined}
             style={{
               background: "none", border: "none", cursor: canClose ? "pointer" : "default",
-              fontSize: "12px", fontWeight: 600,
-              color: canClose ? (isDark ? "#94A3B8" : "#64748B") : (isDark ? "#2A3F58" : "#CBD5E1"),
-              padding: "4px 8px", borderRadius: "6px",
+              fontSize: "14px", fontWeight: 600,
+              color: canClose ? (isDark ? "#CCCCCC" : "#333333") : (isDark ? "#666666" : "#AAAAAA"),
+              padding: "2px 6px", borderRadius: "2px",
             }}
           >
-            {canClose ? "닫기 ✕" : `${countdown}초 후 닫기`}
+            {canClose ? "✕" : countdown}
           </button>
         </div>
 
-        <div style={{ fontSize: "36px", marginBottom: "12px" }}>{product.emoji}</div>
+        {/* 광고 라벨 */}
         <div style={{
-          fontSize: "11px", fontWeight: 600, color: isDark ? "#4A6080" : "#94A3B8",
-          marginBottom: "16px", letterSpacing: "0.5px",
-        }}>SPONSORED</div>
+          fontSize: "9px", fontWeight: 700, color: isDark ? "#666666" : "#999999",
+          marginBottom: "12px", letterSpacing: "0.5px",
+        }}>광고</div>
 
+        {/* 상품명 */}
         <div style={{
-          fontSize: "15px", fontWeight: 700,
-          color: isDark ? "#F0F2F7" : "#0F172A",
-          marginBottom: "6px",
+          fontSize: "14px", fontWeight: 600,
+          color: isDark ? "#E0E0E0" : "#333333",
+          marginBottom: "12px",
+          lineHeight: 1.3,
         }}>{product.title}</div>
-        <div style={{
-          fontSize: "13px",
-          color: isDark ? "#64748B" : "#94A3B8",
-          marginBottom: "20px",
-        }}>{product.desc}</div>
 
+        {/* CTA */}
         <a
           href={makeCoupangLink(product.url)}
           target="_blank"
           rel="noopener noreferrer"
           style={{
             display: "inline-block",
-            padding: "12px 32px",
-            borderRadius: "12px",
-            background: "#3B82F6",
+            padding: "8px 24px",
+            borderRadius: "2px",
+            background: isDark ? "#0066CC" : "#0066CC",
             color: "#FFFFFF",
-            fontSize: "14px",
-            fontWeight: 700,
+            fontSize: "13px",
+            fontWeight: 600,
             textDecoration: "none",
             transition: "all 0.2s",
           }}
@@ -380,12 +313,12 @@ export function CoupangInterstitial({ theme = "dark", onClose, featureName = "�
         </a>
 
         <div style={{
-          fontSize: "9px",
-          color: isDark ? "#2A3F58" : "#C0C8D4",
-          marginTop: "16px",
-          lineHeight: 1.4,
+          fontSize: "8px",
+          color: isDark ? "#666666" : "#999999",
+          marginTop: "10px",
+          lineHeight: 1.3,
         }}>
-          이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.
+          쿠팡 파트너스
         </div>
       </div>
     </div>
@@ -401,48 +334,33 @@ export function CoupangNativeCard({ theme = "dark", context = "default" }) {
 
   return (
     <div style={{
-      display: "flex", flexDirection: "column", gap: "12px",
-      padding: "18px",
-      borderRadius: "14px",
-      background: isDark
-        ? "linear-gradient(135deg, #131B2E 0%, #0F1724 100%)"
-        : "linear-gradient(135deg, #FFFFFF 0%, #F8FAFF 100%)",
-      border: `1px solid ${isDark ? "#1F2E42" : "#E2E5EA"}`,
+      display: "flex", flexDirection: "column", gap: "10px",
+      padding: "14px",
+      borderRadius: "4px",
+      background: isDark ? "#1F1F1F" : "#F8F8F8",
+      border: `1px solid ${isDark ? "#2F2F2F" : "#E8E8E8"}`,
       textDecoration: "none",
-      transition: "all 0.3s ease",
-      cursor: "pointer",
+      transition: "all 0.2s ease",
     }}>
-      {/* 헤더 */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      {/* 헤더: AD 배지 */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: "6px",
+        fontSize: "9px", fontWeight: 700,
+        color: isDark ? "#888888" : "#AAAAAA",
+      }}>
         <span style={{
-          fontSize: "8px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px",
-          background: isDark ? "#1E2D45" : "#E8EDF4",
-          color: isDark ? "#5A7A9A" : "#8B9CB8",
-          letterSpacing: "0.5px",
-        }}>AD · 쿠팡파트너스</span>
+          padding: "2px 4px", borderRadius: "2px",
+          background: isDark ? "#2F2F2F" : "#EEEEEE",
+        }}>AD</span>
+        <span>쿠팡</span>
       </div>
 
-      {/* 상품 정보 */}
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
-        <div style={{
-          width: "60px", height: "60px", borderRadius: "12px", flexShrink: 0,
-          background: isDark ? "#1A2438" : "#F1F3F6",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: "28px",
-          border: `2px solid ${isDark ? "#243350" : "#E2E8F0"}`,
-        }}>{product.emoji}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{
-            fontSize: "14px", fontWeight: 700,
-            color: isDark ? "#E2E8F0" : "#1E293B",
-            marginBottom: "4px",
-          }}>{product.title}</div>
-          <div style={{
-            fontSize: "12px", color: isDark ? "#64748B" : "#94A3B8",
-            lineHeight: 1.4,
-          }}>{product.desc}</div>
-        </div>
-      </div>
+      {/* 상품 정보 - 심플 */}
+      <div style={{
+        fontSize: "13px", fontWeight: 600,
+        color: isDark ? "#E0E0E0" : "#333333",
+        lineHeight: 1.3,
+      }}>{product.title}</div>
 
       {/* CTA 버튼 */}
       <a
@@ -451,38 +369,36 @@ export function CoupangNativeCard({ theme = "dark", context = "default" }) {
         rel="noopener noreferrer"
         style={{
           display: "block",
-          padding: "10px 14px",
-          borderRadius: "10px",
-          background: "#3B82F6",
+          padding: "8px",
+          borderRadius: "2px",
+          background: isDark ? "#0066CC" : "#0066CC",
           color: "#FFFFFF",
-          fontSize: "13px",
-          fontWeight: 700,
+          fontSize: "12px",
+          fontWeight: 600,
           textDecoration: "none",
           textAlign: "center",
-          transition: "all 0.3s ease",
+          transition: "all 0.2s ease",
           border: "none",
           cursor: "pointer",
         }}
         onMouseEnter={e => {
-          e.currentTarget.style.background = "#2563EB";
-          e.currentTarget.style.transform = "translateY(-1px)";
+          e.currentTarget.style.opacity = "0.9";
         }}
         onMouseLeave={e => {
-          e.currentTarget.style.background = "#3B82F6";
-          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.opacity = "1";
         }}
       >
-        쿠팡에서 보기 →
+        쿠팡에서 보기
       </a>
 
       {/* 공시 */}
       <div style={{
-        fontSize: "9px",
-        color: isDark ? "#2A3F58" : "#C0C8D4",
+        fontSize: "8px",
+        color: isDark ? "#666666" : "#AAAAAA",
         textAlign: "center",
-        lineHeight: 1.4,
+        lineHeight: 1.2,
       }}>
-        이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.
+        쿠팡 파트너스
       </div>
     </div>
   );
@@ -498,7 +414,7 @@ export function CoupangStripBanner({ theme = "dark", context = "default" }) {
 
   return (
     <div style={{
-      display: "flex", gap: "8px", padding: "6px 0",
+      display: "flex", gap: "6px", padding: "6px 0",
     }}>
       {[p1, p2].map((product, i) => (
         <a
@@ -507,20 +423,19 @@ export function CoupangStripBanner({ theme = "dark", context = "default" }) {
           target="_blank"
           rel="noopener noreferrer"
           style={{
-            flex: 1, display: "flex", alignItems: "center", gap: "8px",
-            padding: "8px 12px", borderRadius: "10px",
-            background: isDark ? "#0F172440" : "#F8F9FB",
-            border: `1px solid ${isDark ? "#1E2D45" : "#E2E5EA"}30`,
+            flex: 1, display: "flex", alignItems: "center", gap: "6px",
+            padding: "8px 10px", borderRadius: "3px",
+            background: isDark ? "#1F1F1F" : "#F5F5F5",
+            border: `1px solid ${isDark ? "#333333" : "#E0E0E0"}`,
             textDecoration: "none",
             transition: "all 0.15s",
           }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = isDark ? "#3B82F640" : "#93C5FD40"; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = isDark ? "#1E2D4530" : "#E2E5EA30"; }}
+          onMouseEnter={e => { e.currentTarget.style.opacity = "0.9"; }}
+          onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
         >
-          <span style={{ fontSize: "16px" }}>{product.emoji}</span>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: "11px", fontWeight: 600, color: isDark ? "#CBD5E1" : "#334155", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{product.title}</div>
-            <div style={{ fontSize: "9px", color: isDark ? "#475569" : "#94A3B8" }}>AD · 쿠팡</div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: "11px", fontWeight: 600, color: isDark ? "#D0D0D0" : "#333333", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{product.title}</div>
+            <div style={{ fontSize: "8px", color: isDark ? "#666666" : "#999999" }}>쿠팡</div>
           </div>
         </a>
       ))}
@@ -528,7 +443,7 @@ export function CoupangStripBanner({ theme = "dark", context = "default" }) {
   );
 }
 
-// ── 쿠팡 플로팅 배너 (우측 하단 떠있는 배너) ──
+// ── 쿠팡 플로팅 배너 (우측 하단 떠있는 배너 - 심플) ──
 export function CoupangFloatingBanner({ theme = "dark", context = "default", autoShowDelay = 30000 }) {
   const isDark = theme === "dark";
   const products = getContextualProducts(context);
@@ -536,7 +451,6 @@ export function CoupangFloatingBanner({ theme = "dark", context = "default", aut
   const [product, setProduct] = useState(null);
 
   useEffect(() => {
-    // autoShowDelay 후에 자동으로 표시
     const timer = setTimeout(() => {
       setProduct(products[Math.floor(Math.random() * products.length)]);
       setVisible(true);
@@ -556,81 +470,60 @@ export function CoupangFloatingBanner({ theme = "dark", context = "default", aut
       animation: "slideIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",
     }}>
       <div style={{
-        borderRadius: "14px",
-        background: isDark
-          ? "linear-gradient(135deg, #131B2E 0%, #0F1724 100%)"
-          : "linear-gradient(135deg, #FFFFFF 0%, #F8FAFF 100%)",
-        border: `1px solid ${isDark ? "#1F2E42" : "#E2E5EA"}`,
-        padding: "14px",
-        maxWidth: "280px",
-        boxShadow: "0 12px 32px rgba(0,0,0,0.3)",
+        borderRadius: "4px",
+        background: isDark ? "#1F1F1F" : "#FFFFFF",
+        border: `1px solid ${isDark ? "#333333" : "#DDDDDD"}`,
+        padding: "12px",
+        maxWidth: "240px",
+        boxShadow: "0 8px 16px rgba(0,0,0,0.25)",
       }}>
         {/* 클로즈 버튼 */}
         <button
           onClick={() => setVisible(false)}
           style={{
             position: "absolute",
-            top: "10px",
-            right: "10px",
+            top: "6px",
+            right: "6px",
             background: "none",
             border: "none",
-            fontSize: "18px",
+            fontSize: "14px",
             cursor: "pointer",
-            color: isDark ? "#64748B" : "#94A3B8",
+            color: isDark ? "#666666" : "#999999",
             padding: "0",
-            width: "24px",
-            height: "24px",
+            width: "20px",
+            height: "20px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             transition: "all 0.2s",
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.color = isDark ? "#E2E8F0" : "#1E293B";
-            e.currentTarget.style.transform = "scale(1.1)";
+            e.currentTarget.style.color = isDark ? "#CCCCCC" : "#333333";
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.color = isDark ? "#64748B" : "#94A3B8";
-            e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.color = isDark ? "#666666" : "#999999";
           }}
         >
-          ✕
+          x
         </button>
 
         {/* 광고 라벨 */}
         <div style={{
           fontSize: "8px",
           fontWeight: 700,
-          color: isDark ? "#5A7A9A" : "#8B9CB8",
+          color: isDark ? "#666666" : "#999999",
+          marginBottom: "6px",
           letterSpacing: "0.5px",
-          marginBottom: "8px",
-          paddingRight: "24px",
-        }}>SPECIAL DEAL</div>
+        }}>광고</div>
 
-        {/* 상품 정보 */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
-          <span style={{
-            fontSize: "32px",
-            flexShrink: 0,
-          }}>{product.emoji}</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{
-              fontSize: "12px",
-              fontWeight: 700,
-              color: isDark ? "#E2E8F0" : "#1E293B",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}>{product.title}</div>
-            <div style={{
-              fontSize: "10px",
-              color: isDark ? "#64748B" : "#94A3B8",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}>{product.desc}</div>
-          </div>
-        </div>
+        {/* 상품 정보 - 심플 */}
+        <div style={{
+          fontSize: "12px",
+          fontWeight: 600,
+          color: isDark ? "#D0D0D0" : "#333333",
+          marginBottom: "8px",
+          lineHeight: 1.3,
+        }}>{product.title}</div>
 
         {/* CTA 버튼 */}
         <a
@@ -639,12 +532,12 @@ export function CoupangFloatingBanner({ theme = "dark", context = "default", aut
           rel="noopener noreferrer"
           style={{
             display: "block",
-            padding: "8px 12px",
-            borderRadius: "8px",
-            background: "#3B82F6",
+            padding: "6px 10px",
+            borderRadius: "2px",
+            background: isDark ? "#0066CC" : "#0066CC",
             color: "#FFFFFF",
-            fontSize: "12px",
-            fontWeight: 700,
+            fontSize: "11px",
+            fontWeight: 600,
             textDecoration: "none",
             textAlign: "center",
             transition: "all 0.2s",
@@ -652,33 +545,31 @@ export function CoupangFloatingBanner({ theme = "dark", context = "default", aut
             cursor: "pointer",
           }}
           onMouseEnter={e => {
-            e.currentTarget.style.background = "#2563EB";
-            e.currentTarget.style.transform = "translateY(-1px)";
+            e.currentTarget.style.opacity = "0.9";
           }}
           onMouseLeave={e => {
-            e.currentTarget.style.background = "#3B82F6";
-            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.opacity = "1";
           }}
         >
-          보러가기
+          쿠팡 보기
         </a>
 
         {/* 공시 */}
         <div style={{
           fontSize: "7px",
-          color: isDark ? "#2A3F58" : "#C0C8D4",
-          marginTop: "8px",
+          color: isDark ? "#666666" : "#999999",
+          marginTop: "6px",
           textAlign: "center",
-          lineHeight: 1.3,
+          lineHeight: 1.2,
         }}>
-          쿠팡파트너스 활동의 일환으로 수수료를 제공받습니다.
+          쿠팡 파트너스
         </div>
       </div>
 
       <style>{`
         @keyframes slideIn {
           from {
-            transform: translateX(350px) translateY(350px);
+            transform: translateX(280px) translateY(280px);
             opacity: 0;
           }
           to {

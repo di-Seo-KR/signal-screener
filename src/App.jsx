@@ -1,4 +1,4 @@
-// DI금융 v11.0 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 스크리너 프리셋
+// Toit v11.0 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 스크리너 프리셋
 // Features: 스크리닝, 캔들차트, 33개 전략(BTC 알파 포함), 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
 // v11.0: 토스증권 벤치마킹 기반 대개편 — 스크리너 프리셋, 글로벌 검색, 위험종목 필터, 실시간 티커
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
@@ -12,7 +12,7 @@ import { CoupangBanner, CoupangInlineBanner, CoupangInterstitial, CoupangNativeC
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
-  componentDidCatch(error, info) { console.error("[DI금융 ErrorBoundary]", error, info.componentStack); }
+  componentDidCatch(error, info) { console.error("[Toit ErrorBoundary]", error, info.componentStack); }
   render() {
     if (this.state.hasError) {
       return (
@@ -1242,7 +1242,7 @@ async function sendTelegramAlert(botToken, chatId, assets, conditions) {
   const now = new Date();
   const timeStr = now.toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "short", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" });
 
-  let msg = `🚨 *DI금융 시그널 알림*\n`;
+  let msg = `🚨 *Toit 시그널 알림*\n`;
   msg += `━━━━━━━━━━━━━━━━━━━━\n`;
   msg += `📅 ${timeStr}\n`;
   msg += `📊 시그널 감지: *${assets.length}개* 자산\n\n`;
@@ -1289,7 +1289,7 @@ async function sendTelegramAlert(botToken, chatId, assets, conditions) {
 
   msg += `━━━━━━━━━━━━━━━━━━━━\n`;
   msg += `_⚠️ 기술적 지표 기반 참고 자료 — 투자 추천 아님_\n`;
-  msg += `_DI금융 Signal Screener_`;
+  msg += `_Toit Signal Screener_`;
   const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -4004,7 +4004,7 @@ function AppInner() {
   C = themeMode === "dark" ? DARK : LIGHT;
 
   // ── 로그인 필요 탭 정의 ──
-  const LOGIN_REQUIRED_TABS = ["auto-trading", "portfolio", "alerts"];
+  const LOGIN_REQUIRED_TABS = ["alerts"];
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   // 로그인 성공 시 모달 자동 닫기
@@ -4039,6 +4039,31 @@ function AppInner() {
     } catch {}
     return "home";
   });
+
+  // ── GNB 카테고리 상태 ──
+  const gnbCategoryMap = {
+    "home": "home",
+    "screener": "analysis",
+    "anomaly": "analysis",
+    "strategy": "analysis",
+    "quant-report": "analysis",
+    "backtest": "analysis",
+    "quant-port": "management",
+    "risk-map": "management",
+    "portfolio": "management",
+    "auto-trading": "management",
+    "news": "info",
+    "sentiment": "info",
+    "alerts": "info",
+  };
+  const [gnbCategory, setGnbCategory] = useState(() => gnbCategoryMap[tab] || "home");
+
+  // ── GNB 카테고리 동기화 (tab 변경 시) ──
+  useEffect(() => {
+    const newCategory = gnbCategoryMap[tab] || "home";
+    setGnbCategory(newCategory);
+  }, [tab]);
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [sbCollapsed, setSbCollapsed] = useState({ main: false, ops: false, info: false });
 
@@ -4147,6 +4172,9 @@ function AppInner() {
   const [btStrategy, setBtStrategy] = useState(null);
   const [btSymbol, setBtSymbol] = useState(null);
 
+  // ── 쿠팡 CTA 광고 상태 ────────────────────────────────────────
+  const [showCoupangCTA, setShowCoupangCTA] = useState(false);
+
   // ── 통화 (KRW/USD) ──────────────────────────────────────────
   const [currency, setCurrency] = useState("USD");
   const [krwRate, setKrwRate] = useState(1350); // 기본 환율
@@ -4201,16 +4229,16 @@ function AppInner() {
   // ── 탭 타이틀 실시간 업데이트 (토스증권 스타일) ──
   useEffect(() => {
     if (tab === "home") {
-      document.title = "DI금융";
+      document.title = "Toit";
     } else if (selectedAsset && hotAssets.length > 0) {
       const h = hotAssets.find(a => a.symbol === selectedAsset.symbol);
       if (h) {
         const sign = h.change >= 0 ? "+" : "";
         const price = h.market === "kr" ? `₩${h.price?.toLocaleString()}` : `$${h.price?.toLocaleString()}`;
-        document.title = `${h.name} ${price} ${sign}${h.change}% | DI금융`;
+        document.title = `${h.name} ${price} ${sign}${h.change}% | Toit`;
       }
     } else {
-      document.title = "DI금융";
+      document.title = "Toit";
     }
   }, [marketIndices, tab, selectedAsset, hotAssets]);
 
@@ -4671,7 +4699,7 @@ function AppInner() {
         reply += strategyMsg;
         reply += `\n\n💬 이어서 물어보기: "추천 종목" · "리스크 점검" · "포트폴리오 현황"`;
       } else {
-        reply = `안녕하세요! DI금융 AI 어시스턴트입니다.\n\n이런 것들을 물어보세요:\n\n── 기본 분석 ──\n• 종목명 → "NVDA 분석해줘", "삼성전자 어때?"\n• 시장 현황 → "시장 현황", "오늘 마켓"\n• 추천 종목 → "뭐 살까?", "오늘 TOP"\n\n── 고도화 기능 ──\n• 섹터 분석 → "섹터 분석", "tech sector"\n• 매매 타이밍 → "언제 사?", "진입 타이밍"\n• 포트폴리오 최적화 → "최적화", "리밸런싱"\n• 모멘텀 분석 → "모멘텀", "추세"\n• 가치주/배당 → "가치주", "배당"\n• 종합 진단 → "종합분석", "전체 진단"\n\n── 기타 ──\n• 포트폴리오 → "내 자산", "수익률"\n• 이상 탐지 → "급등락", "비정상"\n• 관심종목 → "관심종목"\n• 리스크 점검 → "리스크", "위험도"\n• 종목 비교 → "AAPL vs MSFT"`;
+        reply = `안녕하세요! Toit AI 어시스턴트입니다.\n\n이런 것들을 물어보세요:\n\n── 기본 분석 ──\n• 종목명 → "NVDA 분석해줘", "삼성전자 어때?"\n• 시장 현황 → "시장 현황", "오늘 마켓"\n• 추천 종목 → "뭐 살까?", "오늘 TOP"\n\n── 고도화 기능 ──\n• 섹터 분석 → "섹터 분석", "tech sector"\n• 매매 타이밍 → "언제 사?", "진입 타이밍"\n• 포트폴리오 최적화 → "최적화", "리밸런싱"\n• 모멘텀 분석 → "모멘텀", "추세"\n• 가치주/배당 → "가치주", "배당"\n• 종합 진단 → "종합분석", "전체 진단"\n\n── 기타 ──\n• 포트폴리오 → "내 자산", "수익률"\n• 이상 탐지 → "급등락", "비정상"\n• 관심종목 → "관심종목"\n• 리스크 점검 → "리스크", "위험도"\n• 종목 비교 → "AAPL vs MSFT"`;
       }
       setAiMessages(prev => [...prev, { role: "ai", text: reply }]);
       setAiLoading(false);
@@ -5445,7 +5473,7 @@ function AppInner() {
         }
         const stratCount = Object.keys(grouped).length;
         // 메인 요약 알림
-        const title = `DI금융 매매 시그널 ${newAlerts.length}건`;
+        const title = `Toit 매매 시그널 ${newAlerts.length}건`;
         const lines = [];
         for (const [strat, items] of Object.entries(grouped).slice(0, 5)) {
           const icon = items[0]?.strategyIcon || "📊";
@@ -5505,7 +5533,7 @@ function AppInner() {
   function formatStrategyAlertTelegram(alerts) {
     const now = new Date();
     const timeStr = now.toLocaleString("ko-KR", { month: "short", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" });
-    let msg = `🚨 *DI금융 퀀트 전략 매매 시그널*\n`;
+    let msg = `🚨 *Toit 퀀트 전략 매매 시그널*\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━\n`;
     msg += `📅 ${timeStr}\n`;
     msg += `⚙️ _실제 전략 generate() 시그널 기반_\n\n`;
@@ -5563,7 +5591,7 @@ function AppInner() {
     }
 
     msg += `\n_⚠️ 본 시그널은 참고용이며 투자 결정은 본인 판단에 따르세요_\n`;
-    msg += `_DI금융 퀀트 전략 엔진_`;
+    msg += `_Toit 퀀트 전략 엔진_`;
     return msg;
   }
 
@@ -6255,6 +6283,9 @@ function AppInner() {
         /* 가로 스크롤 영역 스크롤바 숨김 */
         .hscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; }
         .hscroll::-webkit-scrollbar { display: none; }
+        /* 좌측 네비게이션 바 (LNB) */
+        .lnb-sidebar { display: flex !important; }
+        .lnb-sidebar::-webkit-scrollbar { display: none; }
         /* 사이드바 (기본 숨김) */
         .di-sidebar { display: none; }
         .di-app-body { display: flex; flex-direction: column; }
@@ -6273,10 +6304,11 @@ function AppInner() {
         .ui-section-sub { font-size: 13px; color: ${C.text3}; margin-bottom: 8px; }
         /* ── 모바일 (≤640px) — 폰트/간격 확대 + 터치 최적화 (v9.2 개선) ── */
         @media (max-width: 640px) {
-          header { padding: 0 10px !important; height: 52px !important; }
+          header { padding: 0 10px !important; padding-top: calc(env(safe-area-inset-top, 0px) + 8px) !important; height: 52px !important; }
           header div { padding: 0 4px !important; height: 52px !important; }
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
+          .lnb-sidebar { display: none !important; }
           main { padding: 16px 14px 90px !important; font-size: 15px !important; }
           .tab-content { font-size: 15px; padding-bottom: 80px !important; }
           button { min-height: 44px; }
@@ -6382,32 +6414,47 @@ function AppInner() {
 
           {/* 좌측: 로고 */}
           <div onClick={() => setTab("home")} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none", marginRight: "16px", flexShrink: 0, title: "홈으로 이동" }}>
-            <span style={{ fontSize: "20px" }}>📈</span>
-            <span style={{ fontWeight: 800, fontSize: "17px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
+            <svg width="24" height="24" viewBox="0 0 32 32" style={{ flexShrink: 0 }}>
+              <defs>
+                <linearGradient id="toitGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" style={{ stopColor: "#3182F6", stopOpacity: 1 }} />
+                  <stop offset="100%" style={{ stopColor: "#60A5FA", stopOpacity: 1 }} />
+                </linearGradient>
+              </defs>
+              <rect width="32" height="32" fill="none"/>
+              <path d="M 8 4 L 8 28 M 8 4 L 14 4 Q 14 16 8 16" stroke="url(#toitGradient)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M 14 12 L 24 4 M 24 4 L 24 28" stroke="url(#toitGradient)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span style={{ fontWeight: 800, fontSize: "17px", letterSpacing: "-0.5px", color: C.text1 }}>Toit</span>
           </div>
 
-          {/* 중앙: 수평 네비게이션 탭 */}
+          {/* 중앙: 수평 네비게이션 탭 (GNB - 카테고리만 표시) */}
           <nav className="desktop-nav" style={{ display: "flex", alignItems: "center", gap: "2px", flex: 1, overflowX: "auto", scrollbarWidth: "none" }}>
             {[
-              { id: "home", label: "홈" },
-              { id: "screener", label: "종목 탐색" },
-              { id: "anomaly", label: "이상 탐지" },
-              { id: "strategy", label: "퀀트 전략" },
-              { id: "quant-port", label: "전략 운용" },
-              { id: "backtest", label: "백테스트" },
-              { id: "portfolio", label: "포트폴리오", locked: true },
-              { id: "news", label: "뉴스" },
-              { id: "auto-trading", label: "자동매매", locked: true },
-            ].map(t => (
-              <button key={t.id} onClick={() => { if (t.locked && requireLogin(t.id)) return; setTab(t.id); }} style={{
+              { id: "home", label: "홈", catId: "home" },
+              { id: "analysis", label: "분석", catId: "analysis" },
+              { id: "management", label: "운용", catId: "management" },
+              { id: "info", label: "정보", catId: "info" },
+            ].map(cat => (
+              <button key={cat.id} onClick={() => {
+                if (cat.catId === "home") {
+                  setTab("home");
+                  setGnbCategory("home");
+                } else {
+                  setGnbCategory(cat.catId);
+                  // Select first item in category
+                  if (cat.catId === "analysis") setTab("screener");
+                  else if (cat.catId === "management") setTab("quant-port");
+                  else if (cat.catId === "info") setTab("news");
+                }
+              }} style={{
                 padding: "8px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
-                background: tab === t.id ? C.blueBg : "transparent",
-                color: tab === t.id ? C.blue : C.text2,
+                background: gnbCategory === cat.catId ? C.blueBg : "transparent",
+                color: gnbCategory === cat.catId ? C.blue : C.text2,
                 border: "none", cursor: "pointer", whiteSpace: "nowrap",
                 transition: "all 0.15s",
               }}>
-                {t.label}
-                {t.locked && !user && <span style={{ fontSize: "9px", marginLeft: "3px", opacity: 0.5 }}>🔒</span>}
+                {cat.label}
               </button>
             ))}
           </nav>
@@ -6503,8 +6550,8 @@ function AppInner() {
               { section: "운용", items: [
                 { id: "quant-port", label: "전략 운용", icon: "📊" },
                 { id: "risk-map", label: "리스크맵", icon: "🛡️" },
-                { id: "portfolio", label: "포트폴리오", icon: "💼", locked: true },
-                { id: "auto-trading", label: "AI 자동매매", icon: "🤖", locked: true },
+                { id: "portfolio", label: "포트폴리오", icon: "💼" },
+                { id: "auto-trading", label: "AI 자동매매", icon: "🤖" },
               ]},
               { section: "정보", items: [
                 { id: "news", label: "마켓 뉴스", icon: "📰" },
@@ -6536,6 +6583,68 @@ function AppInner() {
         )}
       </header>
 
+      {/* ── LNB (Left Navigation Bar) — GNB 카테고리별 서브항목 ── */}
+      {gnbCategory !== "home" && (
+        <nav className="lnb-sidebar" style={{
+          display: "flex", gap: "8px", padding: "12px 16px", borderBottom: `1px solid ${C.border}30`,
+          background: C.bg, overflowX: "auto", scrollbarWidth: "none", alignItems: "center",
+        }}>
+          {gnbCategory === "analysis" && [
+            { id: "screener", label: "종목 탐색", icon: "🔍" },
+            { id: "anomaly", label: "이상 탐지", icon: "⚡" },
+            { id: "strategy", label: "퀀트 전략", icon: "🎯" },
+            { id: "quant-report", label: "퀀트 리포트", icon: "📋" },
+            { id: "backtest", label: "백테스트", icon: "📈" },
+          ].map(item => (
+            <button key={item.id} onClick={() => setTab(item.id)} style={{
+              display: "flex", alignItems: "center", gap: "4px", padding: "8px 12px", borderRadius: "8px",
+              fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap",
+              background: tab === item.id ? C.blueBg : "transparent",
+              color: tab === item.id ? C.blue : C.text2,
+              border: "none", cursor: "pointer", transition: "all 0.15s",
+            }}>
+              <span style={{ fontSize: "14px" }}>{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
+          {gnbCategory === "management" && [
+            { id: "quant-port", label: "전략 운용", icon: "📊" },
+            { id: "risk-map", label: "리스크맵", icon: "🛡️" },
+            { id: "portfolio", label: "포트폴리오", icon: "💼" },
+            { id: "auto-trading", label: "AI 자동매매", icon: "🤖" },
+          ].map(item => (
+            <button key={item.id} onClick={() => { if (item.locked && requireLogin(item.id)) return; setTab(item.id); }} style={{
+              display: "flex", alignItems: "center", gap: "4px", padding: "8px 12px", borderRadius: "8px",
+              fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap",
+              background: tab === item.id ? C.blueBg : "transparent",
+              color: tab === item.id ? C.blue : C.text2,
+              border: "none", cursor: "pointer", transition: "all 0.15s",
+            }}>
+              <span style={{ fontSize: "14px" }}>{item.icon}</span>
+              {item.label}
+              {item.locked && !user && <span style={{ fontSize: "9px", opacity: 0.5 }}>🔒</span>}
+            </button>
+          ))}
+          {gnbCategory === "info" && [
+            { id: "news", label: "마켓 뉴스", icon: "📰" },
+            { id: "sentiment", label: "센티먼트", icon: "💬" },
+            { id: "alerts", label: "알림 설정", icon: "🔔", locked: true },
+          ].map(item => (
+            <button key={item.id} onClick={() => { if (item.locked && requireLogin(item.id)) return; setTab(item.id); }} style={{
+              display: "flex", alignItems: "center", gap: "4px", padding: "8px 12px", borderRadius: "8px",
+              fontSize: "13px", fontWeight: 600, whiteSpace: "nowrap",
+              background: tab === item.id ? C.blueBg : "transparent",
+              color: tab === item.id ? C.blue : C.text2,
+              border: "none", cursor: "pointer", transition: "all 0.15s",
+            }}>
+              <span style={{ fontSize: "14px" }}>{item.icon}</span>
+              {item.label}
+              {item.locked && !user && <span style={{ fontSize: "9px", opacity: 0.5 }}>🔒</span>}
+            </button>
+          ))}
+        </nav>
+      )}
+
       <PullToRefresh onRefresh={async () => {
         if (tab === "home") await fetchMarketOverview();
         else if (tab === "portfolio") await fetchPortfolioPrices();
@@ -6549,7 +6658,54 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "home" && (
           <div className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            {/* 검색바는 이제 헤더 GNB에 통합됨 */}
+            {/* 홈 검색바 - 크고 눈에 띄는 스타일 */}
+            <div style={{
+              display: "flex",
+              justifyContent: "center",
+              padding: "24px 20px 12px 20px",
+            }}>
+              <div
+                onClick={() => setGlobalSearchOpen(true)}
+                style={{
+                  width: "100%",
+                  maxWidth: "600px",
+                  padding: "12px 18px",
+                  height: "50px",
+                  borderRadius: "14px",
+                  background: C.card2,
+                  border: `1.5px solid ${C.border}40`,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  fontSize: "16px",
+                  fontWeight: 500,
+                  color: C.text3,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = C.card;
+                  e.currentTarget.style.borderColor = `${C.border}60`;
+                  e.currentTarget.style.boxShadow = `0 2px 8px ${C.border}20`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = C.card2;
+                  e.currentTarget.style.borderColor = `${C.border}40`;
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <span style={{ fontSize: "18px" }}>🔍</span>
+                <span>종목명 또는 티커를 검색하세요</span>
+                <span style={{
+                  marginLeft: "auto",
+                  fontSize: "12px",
+                  color: C.text3,
+                  opacity: 0.6,
+                }}>
+                  /
+                </span>
+              </div>
+            </div>
 
             {/* 2컬럼 그리드 (데스크톱) / 1컬럼 (모바일) */}
             <div className="home-grid">
@@ -6949,6 +7105,10 @@ function AppInner() {
                 {user && <SearchBar compact placeholder="+ 종목 추가" onSelect={(asset) => {
                   if (!watchlist.some(w => w.symbol === asset.symbol)) {
                     setWatchlist(prev => [...prev, { symbol: asset.symbol, name: asset.name, market: asset.market, symbolRaw: asset.symbolRaw || asset.symbol, id: asset.id }]);
+                    // 쿠팡 CTA 광고 표시 (20% 확률)
+                    if (Math.random() < 0.2) {
+                      setShowCoupangCTA(true);
+                    }
                   }
                 }} />}
               </div>
@@ -6971,7 +7131,13 @@ function AppInner() {
                     {["NVDA","AAPL","TSLA","MSFT"].map(s => {
                       const a = hotAssets.find(h => h.symbol === s);
                       return a ? (
-                        <button key={s} onClick={() => setWatchlist(prev => [...prev, { symbol: a.symbol, name: a.name, market: a.market, symbolRaw: a.symbolRaw || a.symbol }])} style={{
+                        <button key={s} onClick={() => {
+                          setWatchlist(prev => [...prev, { symbol: a.symbol, name: a.name, market: a.market, symbolRaw: a.symbolRaw || a.symbol }]);
+                          // 쿠팡 CTA 광고 표시 (20% 확률)
+                          if (Math.random() < 0.2) {
+                            setShowCoupangCTA(true);
+                          }
+                        }} style={{
                           padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
                           background: C.card2, color: C.text2, border: `1px solid ${C.border2}`, cursor: "pointer",
                         }}>+ {a.name}</button>
@@ -8544,6 +8710,10 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "strategy" && <StrategyPanel onRunBacktest={(strategy, symbol) => {
           setBtStrategy(strategy); setBtSymbol(symbol); setTab("backtest");
+          // 쿠팡 CTA 광고 표시 (20% 확률)
+          if (Math.random() < 0.2) {
+            setShowCoupangCTA(true);
+          }
         }} />}
 
         {/* ═══════════════════════════════════════════════════════════
@@ -9209,7 +9379,7 @@ function AppInner() {
                       const perm = await Notification.requestPermission();
                       setNotiPerm(perm);
                       if (perm === "granted") {
-                        new Notification("DI금융 알림 활성화", {
+                        new Notification("Toit 알림 활성화", {
                           body: "전략 매매 시그널이 감지되면 여기로 알림이 옵니다 🚀",
                           icon: "/favicon.ico",
                         });
@@ -9428,7 +9598,7 @@ function AppInner() {
                       const r = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendMessage`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ chat_id: settings.chatId, text: "🚨 *DI금융 테스트*\n\n텔레그램 연결 테스트 성공!", parse_mode: "Markdown" }),
+                        body: JSON.stringify({ chat_id: settings.chatId, text: "🚨 *Toit 테스트*\n\n텔레그램 연결 테스트 성공!", parse_mode: "Markdown" }),
                       });
                       if (r.ok) setTgStatus("✅ 텔레그램 연결 완료");
                       else setTgStatus("❌ 전송 실패");
@@ -9660,7 +9830,7 @@ function AppInner() {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <span style={{ fontSize: "16px" }}>📡</span>
-            <span style={{ fontWeight: 700, fontSize: "13px", color: C.text2 }}>DI금융</span>
+            <span style={{ fontWeight: 700, fontSize: "13px", color: C.text2 }}>Toit</span>
           </div>
           <div style={{ fontSize: "11px", color: C.text3, display: "flex", gap: "16px", flexWrap: "wrap" }}>
             <span>투자의 판단과 책임은 본인에게 있습니다</span>
@@ -9847,6 +10017,15 @@ function AppInner() {
 
       {/* ═══ 쿠팡 플로팅 배너 (30초 후 자동 표시) ═══ */}
       <CoupangFloatingBanner theme={themeMode} context={tab} />
+
+      {/* ═══ 쿠팡 CTA 광고 (관심종목 추가, 백테스트 실행 등) ═══ */}
+      {showCoupangCTA && (
+        <CoupangInterstitial
+          theme={themeMode}
+          onClose={() => setShowCoupangCTA(false)}
+          featureName="기능"
+        />
+      )}
 
     </div>
   );

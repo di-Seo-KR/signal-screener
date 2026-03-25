@@ -67,7 +67,7 @@ export default function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, s) => {
         if (!mounted) return;
-        console.log("[DI금융 Auth] Event:", event, s?.user?.email ?? "(no user)");
+        console.log("[Toit Auth] Event:", event, s?.user?.email ?? "(no user)");
 
         setSession(s);
         setUser(s?.user ?? null);
@@ -110,16 +110,16 @@ export default function AuthProvider({ children }) {
         // PKCE 코드가 URL에 있으면 세션 교환
         if (code && !codeExchanged.current) {
           codeExchanged.current = true;
-          console.log("[DI금융 Auth] OAuth code detected, exchanging for session...");
+          console.log("[Toit Auth] OAuth code detected, exchanging for session...");
 
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
           if (error) {
-            console.error("[DI금융 Auth] Code exchange failed:", error.message);
+            console.error("[Toit Auth] Code exchange failed:", error.message);
 
             // 이미 사용된 코드이면 기존 세션 확인
             if (error.message.includes("already used") || error.message.includes("expired")) {
-              console.log("[DI금융 Auth] Code already used, checking existing session...");
+              console.log("[Toit Auth] Code already used, checking existing session...");
             } else {
               if (mounted) showToast("error", `로그인 실패: ${error.message}`);
             }
@@ -127,7 +127,7 @@ export default function AuthProvider({ children }) {
             // URL 정리
             window.history.replaceState({}, "", url.origin + url.pathname);
           } else if (data?.session) {
-            console.log("[DI금융 Auth] Code exchange success:", data.session.user?.email);
+            console.log("[Toit Auth] Code exchange success:", data.session.user?.email);
             if (mounted) {
               setSession(data.session);
               setUser(data.session.user ?? null);
@@ -150,7 +150,7 @@ export default function AuthProvider({ children }) {
         const finalErrorDesc = errorDesc || hashErrorDesc;
 
         if (finalError) {
-          console.error("[DI금융 Auth] OAuth error in URL:", finalError, finalErrorDesc);
+          console.error("[Toit Auth] OAuth error in URL:", finalError, finalErrorDesc);
           // 한글 에러 메시지 매핑
           let userMessage = "소셜 로그인 중 오류가 발생했습니다.";
           if (finalErrorDesc?.includes("Unable to exchange external code")) {
@@ -167,14 +167,14 @@ export default function AuthProvider({ children }) {
         // 기존 저장된 세션 확인
         const { data: { session: existingSession }, error: sessionError } = await supabase.auth.getSession();
         if (sessionError) {
-          console.error("[DI금융 Auth] getSession error:", sessionError.message);
+          console.error("[Toit Auth] getSession error:", sessionError.message);
         }
         if (mounted) {
           setSession(existingSession);
           setUser(existingSession?.user ?? null);
         }
       } catch (err) {
-        console.error("[DI금융 Auth] Init error:", err);
+        console.error("[Toit Auth] Init error:", err);
         if (mounted) showToast("error", "인증 초기화 오류가 발생했습니다.");
       } finally {
         if (mounted) setLoading(false);
@@ -251,7 +251,7 @@ export default function AuthProvider({ children }) {
   // ── 소셜 로그인 (Google, GitHub) ──
   const signInWithOAuth = async (provider) => {
     const currentOrigin = window.location.origin;
-    console.log("[DI금융 Auth] Starting OAuth:", provider, "redirect:", currentOrigin);
+    console.log("[Toit Auth] Starting OAuth:", provider, "redirect:", currentOrigin);
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider,
@@ -265,7 +265,7 @@ export default function AuthProvider({ children }) {
     });
 
     if (error) {
-      console.error("[DI금융 Auth] OAuth initiation error:", error.message);
+      console.error("[Toit Auth] OAuth initiation error:", error.message);
       showToast("error", `${provider} 로그인 시작 실패: ${error.message}`);
     }
     // OAuth는 리다이렉트 방식이므로 여기서 페이지가 이동됨
