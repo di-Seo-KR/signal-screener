@@ -1,10 +1,10 @@
-// DI금융 v10.2 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 실전 전략 매매 알림
+// DI금융 v11.0 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 스크리너 프리셋
 // Features: 스크리닝, 캔들차트, 33개 전략(BTC 알파 포함), 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
-// v10.2: Supabase 인증 시스템 (이메일/Google/GitHub 로그인)
+// v11.0: 토스증권 벤치마킹 기반 대개편 — 스크리너 프리셋, 글로벌 검색, 위험종목 필터, 실시간 티커
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
 import AuthPage from "./AuthPage.jsx";
-import { CoupangBanner, GoogleAd } from "./AdBanner.jsx";
+import { CoupangBanner, CoupangInlineBanner, CoupangInterstitial, GoogleAd } from "./AdBanner.jsx";
 
 // ════════════════════════════════════════════════════════════════════
 // ErrorBoundary — 런타임 에러 시 앱 전체 크래시 방지
@@ -623,6 +623,17 @@ const ALL_ASSETS = [
       searchKey: `${a.symbol} ${a.name} ${a.id} ${ko}`.toLowerCase() };
   }),
 ];
+
+// 고위험 종목 (레버리지/인버스 ETF, 페니스톡 등)
+const RISKY_SYMBOLS = new Set([
+  // 레버리지/인버스 ETF
+  "TQQQ","SQQQ","UPRO","SPXS","SOXL","SOXS","TECL","TECS","FAS","FAZ",
+  "LABU","LABD","TNA","TZA","SPXU","UDOW","SDOW","WEBL","WEBS","FNGU","FNGD",
+  "NAIL","TMF","TMV","NUGT","DUST","JNUG","JDST","BOIL","KOLD","UCO","SCO",
+  "UVXY","SVXY","VXX","VIXY","BITX","SBIT",
+  // SPACs & 고위험 소형주
+  "SMRT","LAW","PLUG","LCID","RIVN","NVCR","WOLF",
+]);
 
 // ════════════════════════════════════════════════════════════════════
 // 기술 지표 계산
@@ -3957,6 +3968,34 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
 }
 
 // ════════════════════════════════════════════════════════════════════
+// 스크리너 프리셋 설정
+// ════════════════════════════════════════════════════════════════════
+const SCREENER_PRESETS = [
+  { id: "momentum_up", name: "연속 상승세", icon: "🚀", desc: "강한 상승 모멘텀 종목", popular: true,
+    conditions: ["adx_bullish", "ma_ribbon", "volume_climax"], mode: "and", color: "green" },
+  { id: "undervalued_growth", name: "저평가 성장주", icon: "💎", desc: "성장성 대비 저평가 종목", popular: true,
+    conditions: ["rsi_extreme", "mean_reversion", "obv_divergence"], mode: "or", color: "blue" },
+  { id: "value_cheap", name: "아직 저렴한 가치주", icon: "🏷️", desc: "52주 저점 근처 반등 가능",
+    conditions: ["near_52w_low", "rsi_extreme", "volume_dry"], mode: "or", color: "purple" },
+  { id: "dividend_steady", name: "꾸준한 배당주", icon: "💰", desc: "안정적 배당 + 저변동성", popular: true,
+    conditions: ["mean_reversion", "near_poc"], mode: "and", color: "green" },
+  { id: "money_maker", name: "돈 잘버는 회사", icon: "🏦", desc: "높은 수익성 + 상승 추세",
+    conditions: ["adx_trend", "ma_ribbon", "cmf_accumulation"], mode: "and", color: "blue" },
+  { id: "reversal", name: "저평가 탈출", icon: "🔄", desc: "반등 시그널 포착",
+    conditions: ["rsi_extreme", "bb_squeeze", "golden_cross"], mode: "or", color: "yellow" },
+  { id: "future_dividend", name: "미래의 배당왕", icon: "👑", desc: "배당 성장 잠재력",
+    conditions: ["adx_bullish", "cmf_accumulation", "volume_climax"], mode: "and", color: "purple" },
+  { id: "growth_expect", name: "성장 기대주", icon: "🌱", desc: "고성장 모멘텀 종목",
+    conditions: ["macd_divergence", "atr_breakout", "volume_climax"], mode: "or", color: "green" },
+  { id: "double_buy", name: "쌍끌이 매수", icon: "🎯", desc: "기관 + 외인 동시 매수 시그널",
+    conditions: ["cmf_accumulation", "obv_divergence", "adx_bullish"], mode: "and", color: "blue" },
+  { id: "high_yield_underval", name: "고수익 저평가", icon: "⚡", desc: "수익률 높은 저평가 종목",
+    conditions: ["near_52w_low", "bb_squeeze", "mfi_oversold"], mode: "or", color: "red" },
+  { id: "stable_growth", name: "안정 성장주", icon: "🛡️", desc: "낮은 변동성 + 꾸준한 상승",
+    conditions: ["adx_trend", "ma_ribbon", "near_poc"], mode: "and", color: "green" },
+];
+
+// ════════════════════════════════════════════════════════════════════
 // 메인 앱
 // ════════════════════════════════════════════════════════════════════
 function AppInner() {
@@ -4056,9 +4095,11 @@ function AppInner() {
   const [filterMarket, setFilterMarket] = useState("all");
   const [sortBy, setSortBy]           = useState("rsi");
   const [scanErrors, setScanErrors]   = useState([]);
+  const [activePreset, setActivePreset] = useState(null);
   const [lastScan, setLastScan]       = useState(null);
   const [chartAsset, setChartAsset]   = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null); // 종목 상세 팝업
+  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
 
   // ── 저평가 종목 스캔 ──
   const [valueResults, setValueResults] = useState([]);
@@ -4067,7 +4108,12 @@ function AppInner() {
   const [valueFilter, setValueFilter] = useState("all"); // all, us, kr
   const [valueSortBy, setValueSortBy] = useState("score"); // score, per, pbr, div, upside
   const [valueLastScan, setValueLastScan] = useState(null);
-  const [watchlist, setWatchlist] = useState(() => { try { return JSON.parse(localStorage.getItem("di_watchlist") || "[]"); } catch { return []; } });
+  // 관심종목: userId 기반 격리 (비로그인 시 빈 배열)
+  const watchlistKey = user ? `di_${user.id.slice(0, 8)}_watchlist` : null;
+  const [watchlist, setWatchlist] = useState(() => {
+    if (!watchlistKey) return [];
+    try { return JSON.parse(localStorage.getItem(watchlistKey) || "[]"); } catch { return []; }
+  });
 
   // ── 포트폴리오 상태 ───────────────────────────────────────────
   const [portfolio, setPortfolio]         = useState(loadPortfolio);
@@ -4125,6 +4171,7 @@ function AppInner() {
   const [anomalyHistory, setAnomalyHistory] = useState(() => { try { return JSON.parse(localStorage.getItem("di_anomaly_history") || "[]"); } catch { return []; } });
   const [anomalyFilter, setAnomalyFilter] = useState("all"); // all, surge, crash, high
   const [hotViewMode, setHotViewMode] = useState("all"); // all, gainers, losers
+  const [hideRisky, setHideRisky] = useState(false);
 
   // ── 포트폴리오 벤치마킹 ──
   const [benchmarkData, setBenchmarkData] = useState(null);
@@ -4140,8 +4187,34 @@ function AppInner() {
   // 전략 알림 저장 (최대 100개 유지)
   useEffect(() => { try { localStorage.setItem("di_trade_alerts", JSON.stringify(tradeAlerts.slice(0, 100))); } catch {} }, [tradeAlerts]);
 
-  // 관심종목 저장
-  useEffect(() => { try { localStorage.setItem("di_watchlist", JSON.stringify(watchlist)); } catch {} }, [watchlist]);
+  // 관심종목 저장 (로그인 시에만)
+  useEffect(() => { if (watchlistKey) { try { localStorage.setItem(watchlistKey, JSON.stringify(watchlist)); } catch {} } }, [watchlist, watchlistKey]);
+  // 로그인/로그아웃 시 관심종목 재로드
+  useEffect(() => {
+    if (watchlistKey) {
+      try { setWatchlist(JSON.parse(localStorage.getItem(watchlistKey) || "[]")); } catch { setWatchlist([]); }
+    } else {
+      setWatchlist([]);
+    }
+  }, [watchlistKey]);
+
+  // ── 탭 타이틀 실시간 업데이트 (토스증권 스타일) ──
+  useEffect(() => {
+    const sp = marketIndices.find(i => i.symbol === "^GSPC");
+    if (sp && tab === "home") {
+      const sign = sp.change >= 0 ? "+" : "";
+      document.title = `S&P ${sp.price?.toLocaleString()} ${sign}${sp.change}% | DI금융`;
+    } else if (selectedAsset && hotAssets.length > 0) {
+      const h = hotAssets.find(a => a.symbol === selectedAsset.symbol);
+      if (h) {
+        const sign = h.change >= 0 ? "+" : "";
+        const price = h.market === "kr" ? `₩${h.price?.toLocaleString()}` : `$${h.price?.toLocaleString()}`;
+        document.title = `${price} ${sign}${h.change}% | ${h.name}`;
+      }
+    } else {
+      document.title = "DI금융 — 전문 투자 스크리너 & 퀀트 엔진";
+    }
+  }, [marketIndices, tab, selectedAsset, hotAssets]);
 
   // ── 이상 탐지: hotAssets에서 비정상 변동/거래량 감지 ──
   useEffect(() => {
@@ -5832,6 +5905,21 @@ function AppInner() {
     })();
   }, []);
 
+  // ── 글로벌 검색 단축키 (/ 키) ──
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "/" && !e.ctrlKey && !e.metaKey && !["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName)) {
+        e.preventDefault();
+        setGlobalSearchOpen(true);
+      }
+      if (e.key === "Escape") {
+        setGlobalSearchOpen(false);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
   // ── 포트폴리오 동기화 ─────────────────────────────────────────
   const syncUpload = useCallback(async () => {
     if (!syncPin || syncPin.length < 4) { setSyncStatus("❌ PIN 4자리 이상 필요"); return; }
@@ -6078,6 +6166,10 @@ function AppInner() {
           .di-main-wrap main { max-width: 1600px !important; }
           .home-grid { grid-template-columns: 1fr 480px !important; }
         }
+        @keyframes tickerScroll {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
       `}</style>
 
       {/* ── 와이드 데스크톱 사이드바 (≥1200px 에서만 표시) ── */}
@@ -6085,7 +6177,7 @@ function AppInner() {
         <div className="sb-logo" onClick={() => setTab("home")}>
           <span style={{ fontSize: "22px" }}>📡</span>
           <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
-          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v10.2</span>
+          <span style={{ padding: "2px 8px", borderRadius: "5px", fontSize: "10px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v11.0</span>
         </div>
         <div className="sb-section" onClick={() => setSbCollapsed(p => ({...p, main: !p.main}))} style={{ cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", userSelect: "none" }}>
           <span>메인</span>
@@ -6095,7 +6187,7 @@ function AppInner() {
         <nav className="sb-nav">
           {[
             { id: "home", label: "홈 대시보드", icon: "🏠" },
-            { id: "screener", label: "스크리너", icon: "🔍" },
+            { id: "screener", label: "주식 골라보기", icon: "🔍" },
             { id: "anomaly", label: "이상 탐지", icon: "⚡", badge: anomalies.length },
             { id: "strategy", label: "퀀트 전략", icon: "🎯" },
           ].map(t => (
@@ -6218,7 +6310,7 @@ function AppInner() {
             title="홈으로 이동">
             <span style={{ fontSize: "22px" }}>📡</span>
             <span style={{ fontWeight: 800, fontSize: "18px", letterSpacing: "-0.5px", color: C.text1 }}>DI금융</span>
-            <span style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v10.2</span>
+            <span style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: 700, background: C.blueBg, color: C.blue }}>v11.0</span>
           </div>
           {/* 데스크톱 네비게이션 */}
           <nav className="desktop-nav" style={{ display: "flex", gap: "6px", alignItems: "center" }}>
@@ -6272,6 +6364,15 @@ function AppInner() {
               로그인
             </button>
             )}
+            <button onClick={() => setGlobalSearchOpen(true)} title="종목 검색 (/ 키)" style={{
+              background: C.card2, border: `1px solid ${C.border}30`, borderRadius: "12px",
+              padding: "0 14px", height: "40px", display: "flex", alignItems: "center", gap: "8px",
+              cursor: "pointer", color: C.text3, fontSize: "13px", transition: "all 0.2s",
+            }}>
+              <span style={{ fontSize: "14px" }}>🔍</span>
+              <span style={{ color: C.text3 }}>검색</span>
+              <span style={{ fontSize: "11px", color: C.text3, background: C.bg, padding: "2px 6px", borderRadius: "4px", fontFamily: "monospace" }}>/</span>
+            </button>
             <button onClick={toggleTheme} title={themeMode === "dark" ? "라이트 모드" : "다크 모드"} style={{
               background: C.card2, border: `1px solid ${C.border}30`, borderRadius: "12px",
               width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center",
@@ -6310,7 +6411,7 @@ function AppInner() {
             {[
               { section: "메인", items: [
                 { id: "home", label: "홈 대시보드", icon: "🏠" },
-                { id: "screener", label: "스크리너", icon: "🔍" },
+                { id: "screener", label: "주식 골라보기", icon: "🔍" },
                 { id: "anomaly", label: "이상 탐지", icon: "⚡" },
               ]},
               { section: "분석", items: [
@@ -6634,9 +6735,11 @@ function AppInner() {
             {/* ── 주요 종목 (통합: 전체 / 급등 / 급락 탭) ─── */}
             {hotAssets.length > 0 && (() => {
               const sorted = [...hotAssets].sort((a, b) => b.change - a.change);
-              const displayAssets = hotViewMode === "gainers" ? sorted.filter(a => a.change > 0).slice(0, hotExpanded ? 30 : 8)
-                : hotViewMode === "losers" ? sorted.filter(a => a.change < 0).slice(0, hotExpanded ? 30 : 8)
-                : hotAssets.slice(0, hotExpanded ? 50 : 10);
+              const baseAssets = hideRisky ? [...hotAssets].filter(a => !RISKY_SYMBOLS.has(a.symbol?.replace(".KS",""))) : hotAssets;
+              const baseSorted = hideRisky ? sorted.filter(a => !RISKY_SYMBOLS.has(a.symbol?.replace(".KS",""))) : sorted;
+              const displayAssets = hotViewMode === "gainers" ? baseSorted.filter(a => a.change > 0).slice(0, hotExpanded ? 30 : 8)
+                : hotViewMode === "losers" ? baseSorted.filter(a => a.change < 0).slice(0, hotExpanded ? 30 : 8)
+                : baseAssets.slice(0, hotExpanded ? 50 : 10);
               return (
                 <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
@@ -6650,9 +6753,25 @@ function AppInner() {
                         }}>{l}</button>
                       ))}
                     </div>
-                    <button onClick={() => setHotExpanded(!hotExpanded)} style={{
-                      fontSize: "12px", color: C.blue, background: "none", border: "none", cursor: "pointer", fontWeight: 600,
-                    }}>{hotExpanded ? "접기" : "더보기"}</button>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", fontSize: "11px", color: C.text3 }}>
+                        <span onClick={() => setHideRisky(!hideRisky)} style={{
+                          width: "32px", height: "18px", borderRadius: "9px", position: "relative",
+                          background: hideRisky ? C.blue : C.card2, border: `1px solid ${hideRisky ? C.blue : C.border2}`,
+                          transition: "all 0.2s", display: "inline-block", cursor: "pointer",
+                        }}>
+                          <span style={{
+                            position: "absolute", top: "2px", left: hideRisky ? "15px" : "2px",
+                            width: "12px", height: "12px", borderRadius: "50%", background: "#fff",
+                            transition: "left 0.2s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
+                          }} />
+                        </span>
+                        위험종목 숨기기
+                      </label>
+                      <button onClick={() => setHotExpanded(!hotExpanded)} style={{
+                        fontSize: "12px", color: C.blue, background: "none", border: "none", cursor: "pointer", fontWeight: 600,
+                      }}>{hotExpanded ? "접기" : "더보기"}</button>
+                    </div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column" }}>
                     {displayAssets.map((asset, i) => {
@@ -6707,23 +6826,58 @@ function AppInner() {
               );
             })()}
 
+            {/* ── 섹터별 성과 (미니 카드) ── */}
+            {sectorPerf.length > 0 && (
+              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+                  <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>섹터 성과</span>
+                  <span style={{ fontSize: "12px", color: C.text3 }}>오늘</span>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: "8px" }}>
+                  {sectorPerf.slice(0, 11).map(s => (
+                    <div key={s.name} style={{
+                      padding: "10px 12px", borderRadius: "10px",
+                      background: s.change >= 0 ? `${C.green}08` : `${C.red}08`,
+                      border: `1px solid ${s.change >= 0 ? C.green : C.red}15`,
+                      textAlign: "center",
+                    }}>
+                      <div style={{ fontSize: "11px", color: C.text3, marginBottom: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700, color: s.change >= 0 ? C.green : C.red }}>
+                        {s.change >= 0 ? "+" : ""}{s.change?.toFixed(1)}%
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             </div>{/* end home-left */}
             <div className="home-right" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
-            {/* ── 관심종목 (v9.1 개선) ─── */}
+            {/* ── 관심종목 (v10.3 유저별 격리) ─── */}
             <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: watchlist.length > 0 ? "14px" : "0" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>관심종목</span>
                   {watchlist.length > 0 && <span style={{ fontSize: "11px", padding: "2px 8px", borderRadius: "10px", background: C.blueBg, color: C.blue, fontWeight: 700 }}>{watchlist.length}</span>}
                 </div>
-                <SearchBar compact placeholder="+ 종목 추가" onSelect={(asset) => {
+                {user && <SearchBar compact placeholder="+ 종목 추가" onSelect={(asset) => {
                   if (!watchlist.some(w => w.symbol === asset.symbol)) {
                     setWatchlist(prev => [...prev, { symbol: asset.symbol, name: asset.name, market: asset.market, symbolRaw: asset.symbolRaw || asset.symbol, id: asset.id }]);
                   }
-                }} />
+                }} />}
               </div>
-              {watchlist.length === 0 ? (
+              {!user ? (
+                <div style={{ textAlign: "center", padding: "32px 16px 20px" }}>
+                  <div style={{ width: "56px", height: "56px", borderRadius: "16px", background: C.blueBg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", fontSize: "24px" }}>🔒</div>
+                  <div style={{ fontSize: "15px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>로그인하고 관심종목을 관리하세요</div>
+                  <div style={{ fontSize: "13px", color: C.text3, lineHeight: 1.6, marginBottom: "16px" }}>실시간 퀀트 진단, 매수 타점, 전략 시그널을<br />한눈에 확인할 수 있어요</div>
+                  <button onClick={() => setShowAuth(true)} style={{
+                    padding: "10px 24px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
+                    background: C.blue, color: "#fff", border: "none", cursor: "pointer",
+                  }}>로그인 / 회원가입</button>
+                </div>
+              ) : watchlist.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "32px 16px 20px" }}>
                   <div style={{ width: "56px", height: "56px", borderRadius: "16px", background: C.blueBg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", fontSize: "24px" }}>📌</div>
                   <div style={{ fontSize: "15px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>관심종목을 추가해보세요</div>
@@ -7236,18 +7390,14 @@ function AppInner() {
               );
             })()}
 
-            {/* 사이드 광고 (쿠팡 파트너스) */}
-            {!user && <CoupangBanner theme={themeMode} />}
+            {/* 사이드 쿠팡 파트너스 (모든 유저에게 자연스럽게 노출) */}
+            <CoupangBanner theme={themeMode} />
 
             </div>{/* end home-right */}
             </div>{/* end home-grid */}
 
-            {/* ═══ 하단 광고 배너 ═══ */}
-            {!user && (
-              <div style={{ margin: "16px 0" }}>
-                <GoogleAd slot="HOME_BOTTOM_BANNER" format="horizontal" style={{ minHeight: "90px" }} />
-              </div>
-            )}
+            {/* ═══ 하단 인라인 광고 (홈 하단 - 덜 침습적) ═══ */}
+            <CoupangInlineBanner theme={themeMode} />
 
             {/* ═══ 하단 전체너비 섹션 (그리드 밖) ═══ */}
 
@@ -7373,8 +7523,63 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "screener" && (
           <div className="tab-content">
-            {/* 조건 선택 패널 */}
-            <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "22px 24px", marginBottom: "16px" }}>
+            {/* ── 스크리너 프리셋 (토스 스타일) ── */}
+            <div style={{ marginBottom: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+                <div style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>주식 골라보기</div>
+                <span style={{ fontSize: "12px", color: C.text3 }}>프리셋 선택 또는 직접 조건 설정</span>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "10px" }}>
+                {SCREENER_PRESETS.map(preset => {
+                  const isActive = activePreset === preset.id;
+                  const presetColor = preset.color === "green" ? C.green : preset.color === "blue" ? C.blue : preset.color === "red" ? C.red : preset.color === "yellow" ? C.yellow : C.purple;
+                  const presetBg = preset.color === "green" ? C.greenBg : preset.color === "blue" ? C.blueBg : preset.color === "red" ? C.redBg : preset.color === "yellow" ? C.yellowBg : C.purpleBg;
+                  return (
+                    <button key={preset.id} onClick={() => {
+                      if (isActive) {
+                        setActivePreset(null);
+                        setConditions([]);
+                        setMode("or");
+                      } else {
+                        setActivePreset(preset.id);
+                        setConditions(preset.conditions);
+                        setMode(preset.mode);
+                      }
+                    }} style={{
+                      padding: "14px 16px", borderRadius: "14px", textAlign: "left", cursor: "pointer",
+                      background: isActive ? presetBg : C.card,
+                      border: `1px solid ${isActive ? `${presetColor}40` : `${C.border}20`}`,
+                      transition: "all 0.2s ease", position: "relative", overflow: "hidden",
+                    }}
+                    onMouseEnter={e => { if (!isActive) { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = `${presetColor}30`; } }}
+                    onMouseLeave={e => { if (!isActive) { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${C.border}20`; } }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                        <span style={{ fontSize: "18px" }}>{preset.icon}</span>
+                        <span style={{ fontWeight: 700, fontSize: "14px", color: isActive ? presetColor : C.text1 }}>{preset.name}</span>
+                        {preset.popular && <span style={{ fontSize: "9px", padding: "2px 6px", borderRadius: "4px", background: `${C.red}20`, color: C.red, fontWeight: 700 }}>인기</span>}
+                      </div>
+                      <div style={{ fontSize: "12px", color: isActive ? presetColor : C.text3, lineHeight: 1.4 }}>{preset.desc}</div>
+                      {isActive && <div style={{ position: "absolute", top: "8px", right: "8px", width: "20px", height: "20px", borderRadius: "50%", background: presetColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", color: "#fff" }}>✓</div>}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ── 직접 조건 설정 (접이식) ── */}
+            <details style={{ marginBottom: "16px" }} open={!activePreset}>
+              <summary style={{
+                padding: "14px 20px", borderRadius: "14px", cursor: "pointer",
+                background: C.card, border: `1px solid ${C.border}20`,
+                fontWeight: 700, fontSize: "14px", color: C.text1,
+                display: "flex", alignItems: "center", gap: "8px", listStyle: "none",
+              }}>
+                <span>⚙️ 직접 조건 설정</span>
+                <span style={{ fontSize: "12px", color: C.text3, fontWeight: 500, marginLeft: "auto" }}>
+                  {conditions.length > 0 ? `${conditions.length}개 선택됨` : "조건을 직접 선택하세요"}
+                </span>
+              </summary>
+            <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "0 0 18px 18px", padding: "22px 24px", marginTop: "-1px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
                 <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>⚙️ 스크리닝 옵션</div>
                 <div style={{ display: "flex", gap: "6px" }}>
@@ -7501,6 +7706,7 @@ function AppInner() {
                 </details>
               )}
             </div>
+            </details>
 
             {/* 결과 필터 */}
             {results.length > 0 && (
@@ -9377,6 +9583,29 @@ function AppInner() {
         </footer>
       </main>
       </PullToRefresh>
+
+      {/* ── 하단 실시간 티커 바 ── */}
+      {marketIndices.length > 0 && (
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 90,
+          background: `${C.bg}F0`, borderTop: `1px solid ${C.border}30`,
+          backdropFilter: "blur(8px)", padding: "6px 0", overflow: "hidden",
+        }}>
+          <div style={{
+            display: "flex", gap: "24px", animation: "tickerScroll 30s linear infinite",
+            whiteSpace: "nowrap", paddingLeft: "100%",
+          }}>
+            {[...marketIndices, ...marketIndices].map((idx, i) => (
+              <span key={`${idx.symbol}-${i}`} style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", flexShrink: 0 }}>
+                <span style={{ color: C.text3, fontWeight: 500 }}>{idx.flag} {idx.name}</span>
+                <span style={{ color: C.text1, fontWeight: 700 }}>{idx.price?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                <span style={{ color: idx.change >= 0 ? C.green : C.red, fontWeight: 600 }}>{idx.change >= 0 ? "+" : ""}{idx.change}%</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       </div>{/* di-main-wrap */}
 
       {/* ═══ AI 투자 어시스턴트 플로팅 채팅 ═══ */}
@@ -9479,6 +9708,21 @@ function AppInner() {
       )}
 
       </div>{/* di-app-body */}
+
+      {/* ── 글로벌 검색 (/ 단축키) ── */}
+      {globalSearchOpen && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "15vh" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setGlobalSearchOpen(false); }}>
+          <div style={{ width: "520px", maxWidth: "90vw", background: C.card, borderRadius: "20px", border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.4)", padding: "8px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px", borderBottom: `1px solid ${C.border}30`, marginBottom: "4px" }}>
+              <span style={{ fontSize: "16px", color: C.text3 }}>🔍</span>
+              <span style={{ fontSize: "14px", fontWeight: 600, color: C.text1 }}>종목 검색</span>
+              <span style={{ marginLeft: "auto", fontSize: "11px", color: C.text3, background: C.card2, padding: "2px 8px", borderRadius: "4px" }}>ESC</span>
+            </div>
+            <SearchBar onSelect={(asset) => { setSelectedAsset(asset); setGlobalSearchOpen(false); }} placeholder="종목명 또는 티커 입력 (예: NVDA, 삼성전자)" />
+          </div>
+        </div>
+      )}
 
       {/* ═══ 로그인 필요 모달 ═══ */}
       {showAuthModal && (
