@@ -9964,8 +9964,7 @@ function AppInner() {
         </div>
       )}
 
-      {/* ═══ 쿠팡 플로팅 배너 (30초 후 자동 표시) ═══ */}
-      <CoupangFloatingBanner theme={themeMode} context={tab} />
+      {/* 플로팅 배너 제거됨 — 거슬림 */}
 
       {/* ═══ 쿠팡 CTA 광고 (관심종목 추가, 백테스트 실행 등) ═══ */}
       {showCoupangCTA && (
