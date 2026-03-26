@@ -2671,7 +2671,6 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
         </div>
       )}
       </div>{/* end main content */}
-      </div>{/* end grid container */}
 
       {/* ── QR 모달 (생성 / 스캔) ── */}
       {qrModal && (

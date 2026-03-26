@@ -7180,6 +7180,7 @@ function AppInner() {
 
             </div>
             </div>
+          </div>
         )}
 
         {tab === "screener" && (
