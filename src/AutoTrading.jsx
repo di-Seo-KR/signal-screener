@@ -789,24 +789,8 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
               const share = 1 / activeBots.length;
               return { data: equityHistory.map(h => 100 + ((h.equity - base) * share / base) * 100), source: "alpaca" };
             }
-            // 3순위 (폴백): 봇 활성화 이후 경과시간 기반 시뮬레이션 커브
-            const startedAt = ab.startedAt || Date.now();
-            const elapsedHrs = Math.max(1, (Date.now() - startedAt) / 3600000);
-            const points = Math.min(30, Math.max(8, Math.floor(elapsedHrs)));
-            const expRet = bot.expectedReturn ? parseFloat(bot.expectedReturn.replace(/[^0-9.-]/g, "")) : 5;
-            const dailyRet = expRet / 365;
-            // 결정론적 시드 기반 곡선 — botId 해시
-            let seed = 7;
-            for (let ci = 0; ci < (ab.botId || "x").length; ci++) seed = (seed * 31 + (ab.botId || "x").charCodeAt(ci)) & 0x7fffffff;
-            seed = (seed % 2147483646) + 1;
-            const rng = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
-            const curve = [100];
-            for (let i = 1; i <= points; i++) {
-              const prev = curve[i - 1];
-              const noise = (rng() - 0.5) * 0.8;
-              curve.push(Math.max(90, prev * (1 + dailyRet / 100 + noise / 100)));
-            }
-            return { data: curve, source: "simulation" };
+            // 데이터 없음
+            return { data: [], source: "none" };
           })();
 
           const pnlData = botPnlCurve?.data || [];
@@ -867,27 +851,27 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
                 }}>운영 중</div>
               </div>
 
-              {/* 봇별 P&L 차트 */}
-              {pnlData.length >= 2 && (
-                <div style={{ background: c.card2, borderRadius: "10px", padding: "12px" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                    <span style={{ fontSize: "11px", fontWeight: 700, color: c.text3 }}>
-                      {pnlSource === "trade_log" ? "실제 P&L" : pnlSource === "alpaca" ? "계좌 P&L" : "예상 P&L"}
-                      {pnlSource === "simulation" && <span style={{ fontSize: "9px", opacity: 0.6, marginLeft: "4px" }}>(시뮬레이션)</span>}
-                    </span>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      {botPnlDollar != null && (
-                        <span style={{ fontSize: "12px", fontWeight: 700, color: botPnlDollar >= 0 ? c.green : c.red }}>
-                          {botPnlDollar >= 0 ? "+" : ""}${Math.abs(botPnlDollar).toFixed(2)}
-                        </span>
-                      )}
-                      {botReturn != null && (
-                        <span style={{ fontSize: "13px", fontWeight: 800, color: botIsPositive ? c.green : c.red }}>
-                          {botIsPositive ? "+" : ""}{botReturn.toFixed(2)}%
-                        </span>
-                      )}
-                    </div>
+              {/* 봇별 P&L 차트 — 항상 표시 */}
+              <div style={{ background: c.card2, borderRadius: "10px", padding: "12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: c.text3 }}>
+                    {pnlSource === "trade_log" ? "실제 P&L" : pnlSource === "alpaca" ? "계좌 P&L" : "수익률 차트"}
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    {botPnlDollar != null && (
+                      <span style={{ fontSize: "12px", fontWeight: 700, color: botPnlDollar >= 0 ? c.green : c.red }}>
+                        {botPnlDollar >= 0 ? "+" : ""}${Math.abs(botPnlDollar).toFixed(2)}
+                      </span>
+                    )}
+                    {botReturn != null && (
+                      <span style={{ fontSize: "13px", fontWeight: 800, color: botIsPositive ? c.green : c.red }}>
+                        {botIsPositive ? "+" : ""}{botReturn.toFixed(2)}%
+                      </span>
+                    )}
                   </div>
+                </div>
+                {pnlData.length >= 2 ? (
+                  <>
                   {(() => {
                     const w = 300, h = 64;
                     const min = Math.min(...pnlData) * 0.998;
@@ -920,8 +904,26 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
                       {botDateLabels.map((l, i) => <span key={i} style={{ fontSize: "9px", color: c.text3 }}>{l}</span>)}
                     </div>
                   )}
-                </div>
-              )}
+                  </>
+                ) : (
+                  /* 데이터 없는 빈 차트 UI */
+                  <div style={{
+                    height: "64px", display: "flex", flexDirection: "column",
+                    alignItems: "center", justifyContent: "center",
+                    borderRadius: "4px", background: `${c.text3}08`,
+                    border: `1px dashed ${c.text3}25`,
+                  }}>
+                    <svg width="100%" height="44" viewBox="0 0 300 44" preserveAspectRatio="none" style={{ opacity: 0.15 }}>
+                      <line x1="0" y1="22" x2="300" y2="22" stroke={c.text3} strokeWidth="1" strokeDasharray="4,4" />
+                      <line x1="0" y1="10" x2="300" y2="10" stroke={c.text3} strokeWidth="0.5" strokeDasharray="2,4" />
+                      <line x1="0" y1="34" x2="300" y2="34" stroke={c.text3} strokeWidth="0.5" strokeDasharray="2,4" />
+                    </svg>
+                    <span style={{ fontSize: "10px", color: c.text3, opacity: 0.6, marginTop: "2px" }}>
+                      거래 데이터 수집 중...
+                    </span>
+                  </div>
+                )}
+              </div>
 
               <div style={{
                 display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px",
