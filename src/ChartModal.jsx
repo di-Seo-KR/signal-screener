@@ -698,6 +698,15 @@ function runDiagnosis(candles) {
     if (bearDiv >= 2) { momScore -= 10; signals.push({ type: "bearish", name: `RSI 약세 다이버전스 (${bearDiv}중 확인)`, detail: "다중 기간에서 가격 상승 vs RSI 하락 — 강한 조정 신호" }); }
     else if (bearDiv === 1) { momScore -= 5; signals.push({ type: "bearish", name: "RSI 약세 다이버전스", detail: "가격 상승 vs RSI 하락 — 상승 둔화 / 조정 신호" }); }
   }
+  // RSI 기울기 분석 (모멘텀 가속/감속)
+  if (rsi != null && n >= 5) {
+    const rsi5ago = rsiArr[n - 5];
+    if (rsi5ago != null) {
+      const rsiSlope = rsi - rsi5ago;
+      if (rsiSlope > 15 && rsi < 60) { momScore += 5; signals.push({ type: "bullish", name: `RSI 급가속 (+${rsiSlope.toFixed(0)})`, detail: "5일간 RSI 급등 — 모멘텀 전환 초기" }); }
+      else if (rsiSlope < -15 && rsi > 40) { momScore -= 5; signals.push({ type: "bearish", name: `RSI 급감속 (${rsiSlope.toFixed(0)})`, detail: "5일간 RSI 급락 — 모멘텀 약화" }); }
+    }
+  }
   // MACD
   if (macdVal != null && sigVal != null) {
     if (macdVal > sigVal && prevHist != null && histVal > prevHist) { momScore += 10; signals.push({ type: "bullish", name: "MACD 상승 가속", detail: "히스토그램 확대 — 매수 모멘텀 강화" }); }
@@ -917,6 +926,35 @@ function runDiagnosis(candles) {
     else if (premium < -10) signals.push({ type: "bullish", name: `적정가 대비 ${premium.toFixed(0)}% 저평가`, detail: `기술적 적정가 대비 저평가 구간` });
   }
 
+  // ── 리스크/리워드 분석 & 손절/익절 레벨 ──
+  const riskReward = (() => {
+    const stopLoss = nearestSupport
+      ? nearestSupport * 0.99  // 지지선 1% 아래
+      : (atr ? last - atr * 2 : last * 0.95);
+    const takeProfit = nearestResist
+      ? nearestResist * 0.99  // 저항선 1% 아래
+      : (atr ? last + atr * 3 : last * 1.10);
+    const risk = last - stopLoss;
+    const reward = takeProfit - last;
+    const ratio = risk > 0 ? reward / risk : 0;
+    return { stopLoss, takeProfit, riskPct: (risk / last * 100), rewardPct: (reward / last * 100), ratio };
+  })();
+
+  // ── 종합 리스크 등급 ──
+  const riskLevel = (() => {
+    let riskPts = 0;
+    if (atrPct > 4) riskPts += 3;
+    else if (atrPct > 2.5) riskPts += 2;
+    else if (atrPct > 1.5) riskPts += 1;
+    if (volRatio > 2.5) riskPts += 2;
+    else if (volRatio > 1.5) riskPts += 1;
+    if (adx != null && adx > 40) riskPts += 1;
+    if (Math.abs(fromHigh) > 30) riskPts += 1;
+    if (riskPts >= 5) return { level: "높음", icon: "🔴", detail: "고변동 + 고위험 구간" };
+    if (riskPts >= 3) return { level: "보통", icon: "🟡", detail: "적정 수준의 변동성" };
+    return { level: "낮음", icon: "🟢", detail: "안정적 구간" };
+  })();
+
   return {
     score: totalScore,
     verdict,
@@ -940,6 +978,8 @@ function runDiagnosis(candles) {
     maConvergence,
     ichimoku, fibonacci,
     cmf, dmi, keltner,
+    riskReward,
+    riskLevel,
   };
 }
 

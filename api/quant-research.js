@@ -270,45 +270,61 @@ export default async function handler(req, res) {
     const date = today.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
     const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
 
-    let msg = `🔬 DI금융 퀀트 연구 리포트\n`;
-    msg += `📅 ${date} (${dayNames[dayOfWeek]}) — ${batch.name}\n`;
-    msg += `📊 ${fetchCount}종목 × ${testCount}건 백테스트\n\n`;
+    let msg = `🔬 DI금융 퀀트 리서치 v2.0\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `📅 ${date} (${dayNames[dayOfWeek]}) | ${batch.name}\n`;
+    msg += `📊 ${fetchCount}종목 × ${testCount}건 백테스트 (${dur}s)\n\n`;
+
+    // 시장 센티먼트 요약
+    const avgAllSharpe = results.length > 0 ? results.reduce((s, r) => s + (r.sharpe || 0), 0) / results.length : 0;
+    const bullSignals = actionable.filter(r => r.lastSignal?.type === "BUY").length;
+    const bearSignals = actionable.filter(r => r.lastSignal?.type === "SELL").length;
+    const sentiment = avgAllSharpe > 0.3 ? "🟢 강세" : avgAllSharpe > 0 ? "🟡 중립" : "🔴 약세";
+    msg += `📡 시장 센티먼트: ${sentiment} (avg Sharpe ${avgAllSharpe.toFixed(2)})\n`;
+    msg += `   매수 ${bullSignals} | 매도 ${bearSignals} 시그널\n\n`;
 
     // Top 5 Sharpe
-    msg += `🏆 Top 5 Sharpe Ratio\n`;
+    msg += `🏆 Top 5 리스크 조정 수익\n`;
     topSharpe.slice(0, 5).forEach((r, i) => {
-      msg += `${i + 1}. ${r.name} × ${r.strat}\n`;
-      msg += `   Sharpe ${r.sharpe?.toFixed(2)} | 수익 ${r.ret?.toFixed(1)}% | 승률 ${r.winRate?.toFixed(0)}% | MDD ${r.mdd?.toFixed(1)}%\n`;
+      const medal = ["🥇","🥈","🥉","4️⃣","5️⃣"][i];
+      msg += `${medal} ${r.name} × ${r.strat}\n`;
+      msg += `   Sharpe ${r.sharpe?.toFixed(2)} | Sortino ${r.sortino?.toFixed(2)} | 수익 ${r.ret?.toFixed(1)}%\n`;
+      msg += `   승률 ${r.winRate?.toFixed(0)}% | MDD ${r.mdd?.toFixed(1)}% | PF ${r.pf?.toFixed(1)}\n`;
     });
 
     // Top 5 수익
-    msg += `\n💰 Top 5 수익률\n`;
+    msg += `\n💰 Top 5 절대수익\n`;
     topReturn.slice(0, 5).forEach((r, i) => {
-      msg += `${i + 1}. ${r.name} × ${r.strat}: ${r.ret?.toFixed(1)}% (Sharpe ${r.sharpe?.toFixed(2)})\n`;
+      msg += `${i + 1}. ${r.name} × ${r.strat}: ${r.ret?.toFixed(1)}%`;
+      msg += ` (Sharpe ${r.sharpe?.toFixed(2)}, MDD ${r.mdd?.toFixed(1)}%)\n`;
     });
 
-    // 전략 랭킹
-    msg += `\n📈 전략 평균 성과\n`;
-    stratRank.slice(0, 8).forEach(s => {
-      msg += `${s.name}: Sharpe ${s.avgSharpe.toFixed(2)} | 수익 ${s.avgReturn.toFixed(1)}% | 승률 ${s.avgWinRate.toFixed(0)}% (${s.count}건)\n`;
+    // 전략 랭킹 (간소화)
+    msg += `\n📈 전략 성과 TOP 5\n`;
+    stratRank.slice(0, 5).forEach((s, i) => {
+      msg += `${i + 1}. ${s.name}: Sharpe ${s.avgSharpe.toFixed(2)} | 수익 ${s.avgReturn.toFixed(1)}% | 승률 ${s.avgWinRate.toFixed(0)}%\n`;
     });
 
-    // 실전 시그널
+    // 실전 시그널 (강화)
     if (actionable.length > 0) {
-      msg += `\n🎯 실전 시그널 (최근 3봉 이내, Sharpe>0.5)\n`;
+      msg += `\n🎯 실전 시그널 (최근 3봉, Sharpe>0.5)\n`;
+      msg += `━━━━━━━━━━━━━━━━━━━━\n`;
       actionable.slice(0, 5).forEach(r => {
-        const icon = r.lastSignal.type === "BUY" ? "🟢" : "🔴";
-        msg += `${icon} ${r.name} ${r.lastSignal.type} @ $${r.lastSignal.price?.toFixed(2)} (${r.strat}, Sharpe ${r.sharpe?.toFixed(2)})\n`;
+        const icon = r.lastSignal.type === "BUY" ? "🟢 매수" : "🔴 매도";
+        const conf = r.sharpe >= 1.5 ? "⭐⭐⭐" : r.sharpe >= 1.0 ? "⭐⭐" : "⭐";
+        msg += `${icon} ${r.name} @ $${r.lastSignal.price?.toFixed(2)} ${conf}\n`;
+        msg += `   ${r.strat} | Sharpe ${r.sharpe?.toFixed(2)} | MDD ${r.mdd?.toFixed(1)}%\n`;
       });
     }
 
-    // 종목별 최적
-    msg += `\n📋 종목별 최적 전략\n`;
-    Object.values(bestBySymbol).forEach(r => {
-      msg += `${r.name}: ${r.strat} (Sharpe ${(r.sharpe || 0).toFixed(2)})\n`;
+    // 종목별 최적 (간소화)
+    msg += `\n📋 종목별 베스트\n`;
+    Object.values(bestBySymbol).sort((a, b) => (b.sharpe || 0) - (a.sharpe || 0)).forEach(r => {
+      msg += `${r.name}: ${r.strat} (S${(r.sharpe || 0).toFixed(1)})\n`;
     });
 
-    msg += `\n⏱️ ${dur}s | 내일: ${BATCHES[(dayOfWeek + 1) % 7].name}`;
+    msg += `\n━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `⏱️ ${dur}s | 내일: ${BATCHES[(dayOfWeek + 1) % 7].name}`;
 
     await sendTG(TG_TOKEN, TG_CHAT, msg);
     L(`📨 리포트 전송 완료`);

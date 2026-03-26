@@ -1667,19 +1667,29 @@ function quickDiagnosis(asset) {
   else if (asset.weekChange < -3) trendScore -= 3;
   trendScore = Math.max(0, Math.min(100, trendScore));
 
-  // ── 모멘텀: RSI 연속 그라데이션 (v3.5 최적화) + 스토캐스틱 + W%R ──
-  // v3.5: RSI 구간 세분화 — 과매도 27/73 기준 정렬, MACD 모멘텀 반영
+  // ── 모멘텀: RSI 연속 그라데이션 (v3.6 최적화) + 스토캐스틱 + W%R ──
+  // v3.6: ATR 레짐 기반 RSI 임계값 동적 조정 + RSI 변화율 반영
+  const isHighVol = asset.atr14Pct != null && asset.atr14Pct > 3;
+  const isLowVol = asset.atr14Pct != null && asset.atr14Pct < 1.2;
+  const rsiOB = isHighVol ? 75 : isLowVol ? 70 : 73; // v3.6: 변동성 레짐 기반 과매수 기준
+  const rsiOS = isHighVol ? 25 : isLowVol ? 30 : 27; // v3.6: 변동성 레짐 기반 과매도 기준
   if (asset.rsi != null) {
     if (asset.rsi >= 80) { momScore -= 18; signals.push({ type: "bearish", name: `RSI 극단 과매수 (${asset.rsi})` }); }
-    else if (asset.rsi >= 73) { momScore -= 12; signals.push({ type: "bearish", name: `RSI 과매수 (${asset.rsi})` }); }
-    else if (asset.rsi >= 65) momScore -= 4; // 과열 경고
-    else if (asset.rsi >= 55) momScore += 6; // 건강한 강세
-    else if (asset.rsi >= 45) momScore += 2; // 중립
-    else if (asset.rsi >= 40) momScore += 0; // 약세 진입
-    else if (asset.rsi >= 35) momScore += 4; // v3.5: 반등 기대 (기존 +3 → +4)
-    else if (asset.rsi >= 27) { momScore += 10; signals.push({ type: "bullish", name: `RSI 과매도 (${asset.rsi})` }); } // v3.5: 27 기준, 보상 +10
+    else if (asset.rsi >= rsiOB) { momScore -= 12; signals.push({ type: "bearish", name: `RSI 과매수 (${asset.rsi}${isHighVol ? " · 고변동" : ""})` }); }
+    else if (asset.rsi >= 65) momScore -= 4;
+    else if (asset.rsi >= 55) momScore += 6;
+    else if (asset.rsi >= 45) momScore += 2;
+    else if (asset.rsi >= 40) momScore += 0;
+    else if (asset.rsi >= 35) momScore += 4;
+    else if (asset.rsi >= rsiOS) { momScore += 10; signals.push({ type: "bullish", name: `RSI 과매도 (${asset.rsi}${isLowVol ? " · 저변동" : ""})` }); }
     else if (asset.rsi >= 20) { momScore += 16; signals.push({ type: "bullish", name: `RSI 강한 과매도 (${asset.rsi})` }); }
     else { momScore += 22; signals.push({ type: "bullish", name: `RSI 극단 과매도 (${asset.rsi})` }); }
+    // v3.6: RSI 변화율 보너스 — 전주 대비 RSI 급반등 시 추가 점수
+    if (asset.rsiPrev != null) {
+      const rsiDelta = asset.rsi - asset.rsiPrev;
+      if (rsiDelta > 15 && asset.rsi < 50) momScore += 4; // 과매도→반등 가속
+      else if (rsiDelta < -15 && asset.rsi > 50) momScore -= 4; // 과매수→하락 가속
+    }
   }
   // v3.5: MACD 히스토그램 모멘텀 — 방향과 가속도 반영
   if (asset.macdHist != null && asset.macdHistPrev != null) {
@@ -4051,7 +4061,7 @@ function AppInner() {
     "quant-port": "management",
     "risk-map": "management",
     "portfolio": "management",
-    "auto-trading": "management",
+    "auto-trading": "ai-quant",
     "news": "info",
     "sentiment": "info",
     "alerts": "info",
@@ -5972,35 +5982,32 @@ function AppInner() {
               else if (evToEbitda > 20) { score -= 3; }
             }
 
-            // 18) Piotroski 스타일 재무 품질 체크 (가용 데이터 기반 간이 F-Score)
-            let fScore = 0;
-            if (margin != null && margin > 0) fScore++;           // 흑자
-            if (roe != null && roe > 0.05) fScore++;              // 양호한 ROE
-            if (revGrowth != null && revGrowth > 0) fScore++;     // 매출 성장
-            if (debtEquity != null && debtEquity < 100) fScore++; // 적정 부채
-            if (margin != null && margin > 0.10) fScore++;        // 이익률 10%+
-            if (fScore >= 4) { score += 5; reasons.push(`재무 품질 우수 (F${fScore}/5)`); }
-            else if (fScore <= 1) { score -= 5; reasons.push(`재무 품질 취약 (F${fScore}/5)`); }
+            // 18) PEG Ratio 프록시 — 성장 대비 밸류에이션
+            if (per != null && per > 0 && revGrowth != null && revGrowth > 0.05) {
+              const pegProxy = per / (revGrowth * 100);
+              if (pegProxy < 0.8)       { score += 8; reasons.push(`PEG ${pegProxy.toFixed(1)} 초저평가`); }
+              else if (pegProxy < 1.2)  { score += 5; reasons.push(`PEG ${pegProxy.toFixed(1)} 양호`); }
+              else if (pegProxy > 2.5)  { score -= 5; reasons.push(`PEG ${pegProxy.toFixed(1)} 성장둔화 대비 고평가`); }
+            }
 
-            // 19) 가격 모멘텀 품질 — 저평가 + 반등세 = 가산, 저평가 + 추가 하락 = 감점
-            if (q.fiftyDayAvg && q.price) {
-              const mom50 = (q.price - q.fiftyDayAvg) / q.fiftyDayAvg * 100;
-              // 단기 반등 중인 저PER주
-              if (per && per < 15 && mom50 > 3 && mom50 < 20) {
-                score += 4; reasons.push("저평가 반등 모멘텀 감지");
-              }
-              // 낙하 중인 저PER주 — 추가 하락 리스크
-              if (per && per < 12 && mom50 < -15) {
-                score -= 4; reasons.push("저평가지만 하락 가속 중");
+            // 19) 이익 안정성 — 고마진 + 성장 시너지 (Quality Factor)
+            if (margin != null && margin > 0.10 && roe != null && roe > 0.12 && revGrowth != null && revGrowth > 0) {
+              score += 6; reasons.push("퀄리티 팩터 (고마진+고ROE+성장)");
+            }
+
+            // 20) 역발상 지표 — 급락 후 펀더멘탈 건전 종목
+            if (q.fiftyTwoWeekHigh && q.price && q.fiftyTwoWeekHigh > 0) {
+              const drawdown = (q.price - q.fiftyTwoWeekHigh) / q.fiftyTwoWeekHigh;
+              if (drawdown < -0.30 && margin != null && margin > 0.05 && roe != null && roe > 0.08) {
+                score += 10; reasons.push(`급락 후 건전 (낙폭 ${(drawdown * 100).toFixed(0)}% + 흑자)`);
+              } else if (drawdown < -0.20 && margin != null && margin > 0.10) {
+                score += 5; reasons.push(`조정 후 건전 (낙폭 ${(drawdown * 100).toFixed(0)}%)`);
               }
             }
 
-            // 20) PEG 비율 프록시 (Forward PE / 매출성장률) — 성장 대비 밸류
-            if (fpe != null && fpe > 0 && revGrowth != null && revGrowth > 0.05) {
-              const pegProxy = fpe / (revGrowth * 100);
-              if (pegProxy < 0.8)      { score += 6; reasons.push(`PEG ${pegProxy.toFixed(1)} 성장 대비 저평가`); }
-              else if (pegProxy < 1.2) { score += 3; }
-              else if (pegProxy > 3.0) { score -= 4; reasons.push(`PEG ${pegProxy.toFixed(1)} 성장 대비 고평가`); }
+            // 21) 현금흐름 건전성 프록시 — 저부채 + 고마진 + 고배당
+            if (debtEquity != null && debtEquity < 50 && margin != null && margin > 0.15 && dy > 2) {
+              score += 5; reasons.push("현금흐름 우량 (저부채+고마진+배당)");
             }
 
             score = Math.max(0, Math.min(100, score));
@@ -6255,6 +6262,11 @@ function AppInner() {
         /* 모바일 앱처럼 전체 화면 확대/축소 방지 */
         html, body { touch-action: manipulation; -ms-touch-action: manipulation; }
         * { -webkit-touch-callout: none; }
+        /* v3.7: 노치/다이나믹 아일랜드 대응 safe-area */
+        @supports (padding: env(safe-area-inset-top)) {
+          body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+          [style*="position: fixed"][style*="bottom: 0"] { padding-bottom: calc(4px + env(safe-area-inset-bottom)) !important; }
+        }
         @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
         * { box-sizing: border-box; margin: 0; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
         html { font-size: 16px; line-height: 1.5; scroll-behavior: smooth; }
@@ -6337,6 +6349,11 @@ function AppInner() {
           /* 하단 ticker 모바일 최적화 */
           [style*="position: fixed"][style*="bottom: 0"] { padding: 4px 0 !important; }
           [style*="position: fixed"][style*="bottom: 0"] span { font-size: 11px !important; gap: 4px !important; }
+          /* v3.7: 스크리너 카드 모바일 가독성 개선 */
+          .asset-card { padding: 14px 12px !important; }
+          .asset-card .indicator-grid { gap: 6px !important; }
+          /* v3.7: 수급 게이지 모바일 최소 높이 확보 */
+          .asset-card div[style*="gap: 3px"] { gap: 5px !important; }
         }
         /* ── 매우 작은 화면 (≤380px) — 극저해상도 최적화 ── */
         @media (max-width: 380px) {
@@ -6445,8 +6462,8 @@ function AppInner() {
                 { id: "quant-port", label: "전략 운용", icon: "📊" },
                 { id: "risk-map", label: "리스크맵", icon: "🛡️" },
                 { id: "portfolio", label: "포트폴리오", icon: "💼" },
-                { id: "auto-trading", label: "AI 자동매매", icon: "🤖" },
               ]},
+              { id: "ai-quant", label: "AI 퀀트", catId: "ai-quant" },
               { id: "info", label: "정보", catId: "info", items: [
                 { id: "news", label: "마켓 뉴스", icon: "📰" },
                 { id: "sentiment", label: "센티먼트", icon: "💬" },
@@ -6465,13 +6482,14 @@ function AppInner() {
                 <button
                   onClick={() => {
                     if (cat.catId === "home") { setTab("home"); setGnbCategory("home"); setGnbHover(null); }
-                    // 홈 외 GNB 카테고리는 클릭 비활성 — 호버로만 LNB 표시
+                    else if (cat.catId === "ai-quant") { setTab("auto-trading"); setGnbCategory("ai-quant"); setGnbHover(null); }
+                    // 홈/AI퀀트 외 GNB 카테고리는 클릭 비활성 — 호버로만 LNB 표시
                   }}
                   style={{
                     padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
-                    background: (gnbCategory === cat.catId || gnbHover === cat.catId) ? C.blueBg : "transparent",
-                    color: (gnbCategory === cat.catId || gnbHover === cat.catId) ? C.blue : C.text2,
-                    border: "none", cursor: cat.catId === "home" ? "pointer" : "default", whiteSpace: "nowrap",
+                    background: (gnbCategory === cat.catId || gnbHover === cat.catId) ? (cat.catId === "ai-quant" ? `${C.purple}20` : C.blueBg) : "transparent",
+                    color: (gnbCategory === cat.catId || gnbHover === cat.catId) ? (cat.catId === "ai-quant" ? C.purple : C.blue) : C.text2,
+                    border: "none", cursor: (cat.catId === "home" || cat.catId === "ai-quant") ? "pointer" : "default", whiteSpace: "nowrap",
                     transition: "all 0.15s",
                   }}>
                   {cat.label}
@@ -6604,7 +6622,9 @@ function AppInner() {
                 { id: "quant-port", label: "전략 운용", icon: "📊" },
                 { id: "risk-map", label: "리스크맵", icon: "🛡️" },
                 { id: "portfolio", label: "포트폴리오", icon: "💼" },
-                { id: "auto-trading", label: "AI 자동매매", icon: "🤖" },
+              ]},
+              { section: "AI 퀀트", items: [
+                { id: "auto-trading", label: "AI 퀀트 전략", icon: "🤖" },
               ]},
               { section: "정보", items: [
                 { id: "news", label: "마켓 뉴스", icon: "📰" },
@@ -7624,6 +7644,34 @@ function AppInner() {
                 <div style={{ fontSize: "12px", color: C.red, fontWeight: 600, marginTop: "6px" }}>
                   위험 수준 확인 →
                 </div>
+              </div>
+            </div>
+
+            {/* ── AI 퀀트 전략 하이라이트 ─── */}
+            <div onClick={() => setTab("auto-trading")} style={{
+              background: `linear-gradient(135deg, ${C.card} 0%, ${C.isDark ? "#1a0a2e" : "#EDE7F6"} 100%)`,
+              borderRadius: "16px", padding: "22px 24px", cursor: "pointer", transition: "all .2s",
+              border: `1px solid ${C.purple}25`, position: "relative", overflow: "hidden",
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+            onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
+              <div style={{ position: "absolute", top: "-20px", right: "-10px", fontSize: "80px", opacity: 0.06 }}>🤖</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                <div style={{
+                  width: "48px", height: "48px", borderRadius: "14px",
+                  background: `linear-gradient(135deg, ${C.purple}, #6D28D9)`,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0,
+                }}>🤖</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 800, fontSize: "16px", color: C.text1, marginBottom: "4px" }}>AI 퀀트 전략</div>
+                  <div style={{ fontSize: "12px", color: C.text3, lineHeight: 1.4 }}>
+                    AI 기반 자동매매 · 주식/크립토 통합 · 실시간 시그널
+                  </div>
+                </div>
+                <div style={{
+                  padding: "8px 16px", borderRadius: "10px", fontSize: "12px", fontWeight: 700,
+                  background: `${C.purple}20`, color: C.purple, flexShrink: 0,
+                }}>바로가기 →</div>
               </div>
             </div>
 
@@ -9754,7 +9802,7 @@ function AppInner() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════
-            TAB: AI 자동매매 (주식 + 크립토 통합)
+            TAB: AI 퀀트 전략 (주식 + 크립토 통합)
         ═══════════════════════════════════════════════════════════ */}
         {tab === "auto-trading" && (
           <AutoTrading theme={themeMode} user={user} />
