@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import PaperTrading from "./PaperTrading.jsx";
 import BTCTrading from "./BTCTrading.jsx";
 import { useAuth } from "./AuthProvider.jsx";
@@ -573,47 +573,210 @@ function BotCatalog({ onActivate, theme }) {
   );
 }
 
-// ── 운영 중 봇 대시보드 ──
-function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme }) {
+// ── 알파카 페이퍼트레이딩 실제 데이터 로드 ──
+function useAlpacaRealData(userId) {
+  const [account, setAccount] = useState(null);
+  const [equityHistory, setEquityHistory] = useState([]); // [{timestamp, equity}]
+  const [tradeLog, setTradeLog] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const fetched = useRef(false);
+
+  useEffect(() => {
+    if (!userId || fetched.current) return;
+    fetched.current = true;
+
+    // 1) localStorage에서 알파카 config 가져오기
+    const prefix = `di_${userId.slice(0, 8)}_`;
+    let config;
+    try { config = JSON.parse(localStorage.getItem(`${prefix}alpaca_config`) || "null"); } catch {}
+    if (!config?.apiKey || !config?.apiSecret) return;
+
+    // 2) localStorage에서 trade log 가져오기 (주식 + 크립토)
+    try {
+      const stockLog = JSON.parse(localStorage.getItem(`${prefix}trade_log_v3`) || "[]");
+      const cryptoLog = JSON.parse(localStorage.getItem(`${prefix}trade_log_v2`) || "[]");
+      setTradeLog([...stockLog, ...cryptoLog].sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0)));
+    } catch {}
+
+    // 3) 알파카 API에서 계좌 + 포트폴리오 히스토리 가져오기
+    const headers = {
+      "Content-Type": "application/json",
+      "x-alpaca-key": config.apiKey,
+      "x-alpaca-secret": config.apiSecret,
+      "x-alpaca-paper": String(config.isPaper !== false),
+    };
+
+    setLoading(true);
+
+    Promise.allSettled([
+      fetch("/api/alpaca?action=account", { headers }).then(r => r.json()),
+      fetch("/api/alpaca?action=portfolio_history&period=1M&timeframe=1D", { headers }).then(r => r.json()),
+    ]).then(([accRes, histRes]) => {
+      if (accRes.status === "fulfilled" && accRes.value?.equity) {
+        setAccount(accRes.value);
+      }
+      if (histRes.status === "fulfilled" && histRes.value?.equity && histRes.value?.timestamp) {
+        const hist = histRes.value.timestamp.map((ts, i) => ({
+          timestamp: ts * 1000,
+          equity: histRes.value.equity[i],
+          profitLoss: histRes.value.profit_loss?.[i] || 0,
+          profitLossPct: histRes.value.profit_loss_pct?.[i] || 0,
+        }));
+        setEquityHistory(hist);
+      }
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [userId]);
+
+  return { account, equityHistory, tradeLog, loading };
+}
+
+// ── 운영 중 봇 대시보드 (실제 알파카 데이터 기반) ──
+function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId }) {
   const c = colors[theme];
+  const { account, equityHistory, tradeLog, loading } = useAlpacaRealData(userId);
+
   if (!activeBots || activeBots.length === 0) return null;
+
+  // 실제 데이터 기반 지표 계산
+  const totalTrades = tradeLog.length;
+  const filledTrades = tradeLog.filter(t => t.status === "filled" || t.status === "accepted" || t.type);
+  const winTrades = tradeLog.filter(t => (t.pnl != null && parseFloat(t.pnl) > 0));
+  const realWinRate = filledTrades.length > 0 ? (winTrades.length / filledTrades.length * 100) : null;
+
+  // 에쿼티 커브 → 차트 데이터 (100 기준 정규화)
+  const equityChartData = useMemo(() => {
+    if (equityHistory.length >= 2) {
+      const base = equityHistory[0].equity;
+      return equityHistory.map(h => (h.equity / base) * 100);
+    }
+    // 알파카 히스토리가 없으면 trade log에서 누적 P&L 커브 생성
+    if (tradeLog.length > 0) {
+      const sorted = [...tradeLog].filter(t => t.time && t.pnl != null).sort((a, b) => new Date(a.time) - new Date(b.time));
+      if (sorted.length >= 2) {
+        let cum = 100;
+        const curve = [100];
+        for (const t of sorted) {
+          cum += parseFloat(t.pnl || 0) * 0.01; // 정규화
+          curve.push(cum);
+        }
+        return curve;
+      }
+    }
+    return null; // 데이터 없음
+  }, [equityHistory, tradeLog]);
+
+  // 현재 수익률
+  const currentReturn = account
+    ? ((parseFloat(account.equity) - parseFloat(account.last_equity || account.equity)) / parseFloat(account.last_equity || account.equity) * 100)
+    : equityHistory.length >= 2
+      ? ((equityHistory[equityHistory.length - 1].equity - equityHistory[0].equity) / equityHistory[0].equity * 100)
+      : null;
+
+  const totalEquity = account ? parseFloat(account.equity) : null;
+  const totalPL = account ? (parseFloat(account.equity) - (parseFloat(account.last_equity) || parseFloat(account.equity))) : null;
+
+  // 날짜 라벨 생성
+  const dateLabels = useMemo(() => {
+    if (equityHistory.length < 2) return [];
+    const step = Math.max(1, Math.floor(equityHistory.length / 5));
+    return equityHistory.filter((_, i) => i % step === 0 || i === equityHistory.length - 1)
+      .map(h => new Date(h.timestamp).toLocaleDateString("ko-KR", { month: "short", day: "numeric" }));
+  }, [equityHistory]);
 
   return (
     <div style={{ marginBottom: "32px" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: c.green, animation: "livePulse 1.5s ease-in-out infinite" }} />
-          <h2 style={{ margin: 0, color: c.text1, fontSize: "20px", fontWeight: 700 }}>운영 중인 봇</h2>
+          <h2 style={{ margin: 0, color: c.text1, fontSize: "20px", fontWeight: 700 }}>운영 현황</h2>
           <span style={{ fontSize: "12px", padding: "3px 10px", borderRadius: "12px", background: `${c.green}20`, color: c.green, fontWeight: 700 }}>
             {activeBots.length}개 활성
           </span>
+          {loading && <span style={{ fontSize: "11px", color: c.text3 }}>데이터 로딩...</span>}
         </div>
       </div>
+
+      {/* 종합 계좌 요약 (알파카 실데이터) */}
+      {account && (
+        <div style={{
+          background: `linear-gradient(135deg, ${c.card} 0%, ${totalPL >= 0 ? c.green : c.red}10 100%)`,
+          border: `1px solid ${c.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px",
+        }}>
+          <div style={{ fontSize: "12px", color: c.text3, marginBottom: "8px" }}>알파카 페이퍼트레이딩 계좌</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "12px" }}>
+            <div>
+              <div style={{ fontSize: "10px", color: c.text3 }}>총 자산</div>
+              <div style={{ fontSize: "18px", fontWeight: 800, color: c.text1 }}>${totalEquity?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: "10px", color: c.text3 }}>오늘 P&L</div>
+              <div style={{ fontSize: "18px", fontWeight: 800, color: totalPL >= 0 ? c.green : c.red }}>
+                {totalPL >= 0 ? "+" : ""}${totalPL?.toFixed(2)}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: "10px", color: c.text3 }}>총 거래</div>
+              <div style={{ fontSize: "18px", fontWeight: 800, color: c.text1 }}>{totalTrades}건</div>
+            </div>
+            <div>
+              <div style={{ fontSize: "10px", color: c.text3 }}>실제 승률</div>
+              <div style={{ fontSize: "18px", fontWeight: 800, color: realWinRate != null && realWinRate >= 50 ? c.green : c.red }}>
+                {realWinRate != null ? `${realWinRate.toFixed(1)}%` : "—"}
+              </div>
+            </div>
+          </div>
+
+          {/* 실제 에쿼티 커브 */}
+          {equityChartData && equityChartData.length >= 2 && (
+            <div style={{ marginTop: "16px", background: c.card2, borderRadius: "10px", padding: "12px 14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                <span style={{ fontSize: "11px", fontWeight: 700, color: c.text3 }}>
+                  {equityHistory.length >= 2 ? "실제 에쿼티 커브 (1개월)" : "누적 P&L 커브"}
+                </span>
+                {currentReturn != null && (
+                  <span style={{ fontSize: "13px", fontWeight: 800, color: currentReturn >= 0 ? c.green : c.red }}>
+                    {currentReturn >= 0 ? "+" : ""}{currentReturn.toFixed(2)}%
+                  </span>
+                )}
+              </div>
+              <MiniEquityChart data={equityChartData} color={currentReturn >= 0 ? c.green : c.red} theme={theme} />
+              {dateLabels.length > 0 && (
+                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+                  {dateLabels.map((l, i) => <span key={i} style={{ fontSize: "9px", color: c.text3 }}>{l}</span>)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 활성 봇 목록 */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "16px" }}>
         {activeBots.map(ab => {
           const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
           const elapsed = Date.now() - (ab.startedAt || Date.now());
           const days = Math.floor(elapsed / 86400000);
           const hours = Math.floor((elapsed % 86400000) / 3600000);
-          const rColor = getRiskColor(bot.riskColor || "blue", theme);
-          // 시뮬레이션 수익률 (실행 시간 비례)
-          const curve = generateEquityCurve(bot, 12);
-          const monthProgress = Math.min(Math.floor(elapsed / (86400000 * 30)), 11);
-          const currentReturn = ((curve[monthProgress + 1] - 100) / 100 * 100);
-          const isProfit = currentReturn >= 0;
+          const isStock = STOCK_BOTS.some(b => b.id === ab.botId);
+
+          // 해당 봇의 실제 거래 수 (로그에서 카운트)
+          const botTrades = tradeLog.filter(t => {
+            if (isStock) return !t.symbol?.includes("/") && !t.symbol?.includes("BTC");
+            return t.symbol?.includes("/") || t.symbol?.includes("BTC") || t.symbol?.includes("ETH");
+          }).length;
 
           return (
             <div key={ab.botId} style={{
               background: c.card, border: `1px solid ${c.border}`, borderRadius: "14px", padding: "20px",
               display: "flex", flexDirection: "column", gap: "14px",
             }}>
-              {/* 헤더 */}
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <span style={{ fontSize: "28px" }}>{bot.icon}</span>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 700, fontSize: "15px", color: c.text1 }}>{bot.name}</div>
                   <div style={{ fontSize: "11px", color: c.text3 }}>
-                    {days > 0 ? `${days}일 ` : ""}{hours}시간 운영 중
+                    {days > 0 ? `${days}일 ` : ""}{hours}시간 운영 · {isStock ? "주식" : "크립토"}
                   </div>
                 </div>
                 <div style={{
@@ -622,33 +785,24 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme }) {
                 }}>운영 중</div>
               </div>
 
-              {/* 핵심 지표 */}
               <div style={{
                 display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px",
                 background: c.card2, borderRadius: "10px", padding: "12px",
               }}>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>현재 수익률</div>
-                  <div style={{ fontSize: "16px", fontWeight: 800, color: isProfit ? c.green : c.red }}>
-                    {isProfit ? "+" : ""}{currentReturn.toFixed(1)}%
-                  </div>
-                </div>
-                <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>거래 횟수</div>
-                  <div style={{ fontSize: "16px", fontWeight: 800, color: c.text1 }}>{ab.trades || 0}</div>
+                  <div style={{ fontSize: "16px", fontWeight: 800, color: c.text1 }}>{botTrades || ab.trades || 0}</div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>승률</div>
-                  <div style={{ fontSize: "16px", fontWeight: 800, color: c.blue }}>{bot.stats?.winRate || "—"}</div>
+                  <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>위험도</div>
+                  <div style={{ fontSize: "14px", fontWeight: 700, color: getRiskColor(bot.riskColor || "blue", theme) }}>{bot.risk || "—"}</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>예상 수익</div>
+                  <div style={{ fontSize: "14px", fontWeight: 700, color: c.green }}>{bot.expectedReturn || "—"}</div>
                 </div>
               </div>
 
-              {/* 미니 차트 */}
-              <div style={{ background: c.card2, borderRadius: "8px", padding: "10px 12px" }}>
-                <MiniEquityChart data={curve.slice(0, monthProgress + 2)} color={rColor} theme={theme} />
-              </div>
-
-              {/* 액션 버튼 */}
               <div style={{ display: "flex", gap: "8px" }}>
                 <button onClick={() => onSelectBot(bot)} style={{
                   flex: 1, padding: "10px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
@@ -737,6 +891,7 @@ export default function AutoTrading({ theme = "dark", user }) {
             onSelectBot={(bot) => setActiveBot(bot)}
             onStopBot={handleStopBot}
             theme={theme}
+            userId={user?.id}
           />
         )}
 
