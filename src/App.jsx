@@ -7200,30 +7200,7 @@ function AppInner() {
               );
             })()}
 
-            {/* ── 섹터별 성과 (미니 카드) ── */}
-            {sectorPerf.length > 0 && (
-              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                  <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>섹터 성과</span>
-                  <span style={{ fontSize: "12px", color: C.text3 }}>오늘</span>
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))", gap: "8px" }}>
-                  {sectorPerf.slice(0, 11).map(s => (
-                    <div key={s.name} style={{
-                      padding: "10px 12px", borderRadius: "10px",
-                      background: s.change >= 0 ? `${C.green}08` : `${C.red}08`,
-                      border: `1px solid ${s.change >= 0 ? C.green : C.red}15`,
-                      textAlign: "center",
-                    }}>
-                      <div style={{ fontSize: "11px", color: C.text3, marginBottom: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
-                      <div style={{ fontSize: "14px", fontWeight: 700, color: s.change >= 0 ? C.green : C.red }}>
-                        {s.change >= 0 ? "+" : ""}{s.change?.toFixed(1)}%
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* 섹터별 성과 미니 카드 제거 — 우측 사이드바 히트맵으로 통합 */}
 
             </div>{/* end home-left */}
             <div className="home-right" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
