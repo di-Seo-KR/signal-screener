@@ -6262,9 +6262,11 @@ function AppInner() {
         /* 모바일 앱처럼 전체 화면 확대/축소 방지 */
         html, body { touch-action: manipulation; -ms-touch-action: manipulation; }
         * { -webkit-touch-callout: none; }
-        /* v3.7: 노치/다이나믹 아일랜드 대응 safe-area */
+        /* v3.8: 노치/다이나믹 아일랜드 대응 — body가 아닌 header에서 safe-area 처리 */
         @supports (padding: env(safe-area-inset-top)) {
-          body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+          header { top: env(safe-area-inset-top) !important; }
+          body { padding-bottom: env(safe-area-inset-bottom); }
+          main { padding-top: env(safe-area-inset-top) !important; }
           [style*="position: fixed"][style*="bottom: 0"] { padding-bottom: calc(4px + env(safe-area-inset-bottom)) !important; }
         }
         @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
@@ -6318,7 +6320,7 @@ function AppInner() {
         .ui-section-sub { font-size: 13px; color: ${C.text3}; margin-bottom: 8px; }
         /* ── 모바일 (≤640px) — 폰트/간격 확대 + 터치 최적화 (v9.2 개선) ── */
         @media (max-width: 640px) {
-          header { padding: 0 10px !important; padding-top: 0 !important; height: auto !important; min-height: 48px !important; }
+          header { padding: 0 10px !important; height: auto !important; min-height: 48px !important; }
           header > div { padding: 0 8px !important; height: 48px !important; }
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
