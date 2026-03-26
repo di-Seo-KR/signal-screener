@@ -4,7 +4,7 @@ import BTCTrading from "./BTCTrading.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { supabase } from "./supabaseClient.js";
 
-// ── 시뮬레이션 에쿼티 커브 생성 (전략 파라미터 기반, 결정론적) ──
+// ── 에쿼티 커브 생성 (전략 파라미터 기반) ──
 function generateEquityCurve(bot, months = 12) {
   const winRate = parseFloat(bot.stats.winRate) / 100;
   const mdd = parseFloat(bot.stats.mdd) / 100;
@@ -99,13 +99,9 @@ function MiniEquityChart({ data, color, width = 280, height = 80, theme }) {
   const totalReturn = ((lastVal - data[0]) / data[0] * 100).toFixed(1);
   const isPositive = lastVal >= data[0];
 
-  // 월별 라벨
-  const monthLabels = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
-
   return (
     <div style={{ position: "relative" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-        <span style={{ fontSize: "11px", fontWeight: 700, color: c.text3 }}>12개월 시뮬레이션 수익률</span>
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: "4px" }}>
         <span style={{ fontSize: "13px", fontWeight: 800, color: isPositive ? c.green : c.red }}>
           {isPositive ? "+" : ""}{totalReturn}%
         </span>
@@ -117,19 +113,10 @@ function MiniEquityChart({ data, color, width = 280, height = 80, theme }) {
             <stop offset="100%" stopColor={color} stopOpacity="0.02" />
           </linearGradient>
         </defs>
-        {/* 기준선 (100) */}
-        <line x1="0" y1={height - ((100 - min) / range) * (height - 8) - 4} x2={width} y2={height - ((100 - min) / range) * (height - 8) - 4}
-          stroke={c.text3} strokeWidth="0.5" strokeDasharray="3,3" opacity="0.4" />
         <path d={areaPath} fill={`url(#eq-grad-${color.replace("#","")})`} />
         <path d={linePath} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        {/* 끝점 */}
         <circle cx={((data.length - 1) * xStep).toFixed(1)} cy={(height - ((lastVal - min) / range) * (height - 8) - 4).toFixed(1)} r="3" fill={color} />
       </svg>
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
-        {[0, 3, 6, 9, 11].map(i => (
-          <span key={i} style={{ fontSize: "9px", color: c.text3 }}>{monthLabels[i]}</span>
-        ))}
-      </div>
     </div>
   );
 }
@@ -935,9 +922,9 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
                   <div style={{ fontSize: "16px", fontWeight: 800, color: c.text1 }}>{botTrades || ab.trades || 0}</div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>배분 금액</div>
+                  <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>투입 금액</div>
                   <div style={{ fontSize: "14px", fontWeight: 700, color: c.blue }}>
-                    ${account ? Math.floor(parseFloat(account.equity) / activeBots.length).toLocaleString() : (ab.allocation || "—")}
+                    ${ab.allocation ? ab.allocation.toLocaleString() : "—"}
                   </div>
                 </div>
                 <div style={{ textAlign: "center" }}>
@@ -1068,6 +1055,9 @@ export default function AutoTrading({ theme = "dark", user }) {
     }).catch(() => {});
   }, [user, alpacaConnected]);
 
+  // 수동 배분 모달 상태
+  const [allocationInput, setAllocationInput] = useState("");
+
   const handleActivateBot = useCallback((bot) => {
     if (!user) {
       showToast("error", "로그인이 필요합니다. 먼저 로그인해주세요.");
@@ -1078,20 +1068,32 @@ export default function AutoTrading({ theme = "dark", user }) {
       setActiveBot(bot);
       return;
     }
-    // 알파카 잔고 기반 자동 배분 (잔고 ÷ (활성봇+1))
+    // 수동 배분 모달 표시
+    setPendingBot(bot);
+    // 기본값: 알파카 잔고 있으면 균등 배분값을 힌트로 표시
     const nextBotCount = activeBots.length + 1;
-    const autoAllocation = alpacaEquity
-      ? Math.floor(alpacaEquity / nextBotCount)
-      : 1000; // 알파카 미연동 시 기본값
+    const hint = alpacaEquity ? Math.floor(alpacaEquity / nextBotCount) : 1000;
+    setAllocationInput(String(hint));
+  }, [user, showToast, activeBots, alpacaEquity]);
+
+  const handleConfirmAllocation = useCallback(() => {
+    if (!pendingBot) return;
+    const amount = parseInt(allocationInput, 10);
+    if (!amount || amount <= 0) {
+      showToast("error", "투입 금액을 올바르게 입력해주세요.");
+      return;
+    }
     setActiveBots(prev => [...prev, {
-      botId: bot.id,
+      botId: pendingBot.id,
       startedAt: Date.now(),
       trades: 0,
-      allocation: autoAllocation,
+      allocation: amount,
     }]);
-    setActiveBot(bot);
-    showToast("success", `${bot.name} 운영 시작 — $${autoAllocation.toLocaleString()} 자동 배분 (계좌 잔고 기준)`);
-  }, [user, showToast, activeBots, alpacaEquity]);
+    setActiveBot(pendingBot);
+    showToast("success", `${pendingBot.name} 운영 시작 — $${amount.toLocaleString()} 투입`);
+    setPendingBot(null);
+    setAllocationInput("");
+  }, [pendingBot, allocationInput, showToast]);
 
   const handleStopBot = useCallback((botId) => {
     setActiveBots(prev => prev.filter(ab => ab.botId !== botId));
@@ -1183,7 +1185,62 @@ export default function AutoTrading({ theme = "dark", user }) {
           </div>
         )}
 
-        {/* 알파카 잔고 기반 봇 배분 표시 */}
+        {/* 수동 배분 모달 */}
+        {pendingBot && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 9999,
+          }} onClick={() => setPendingBot(null)}>
+            <div style={{
+              background: c.card, borderRadius: "16px", padding: "28px", width: "min(400px, 90vw)",
+              border: `1px solid ${c.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+            }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+                <span style={{ fontSize: "32px" }}>{pendingBot.icon}</span>
+                <div>
+                  <h3 style={{ margin: 0, color: c.text1, fontSize: "18px" }}>{pendingBot.name}</h3>
+                  <span style={{ fontSize: "12px", color: c.text2 }}>투입 금액을 설정해주세요</span>
+                </div>
+              </div>
+              {alpacaEquity != null && (
+                <div style={{
+                  padding: "8px 12px", background: `${c.blue}08`, borderRadius: "8px",
+                  border: `1px solid ${c.blue}15`, marginBottom: "16px", fontSize: "12px", color: c.text2,
+                }}>
+                  계좌 잔고: <strong style={{ color: c.text1 }}>${alpacaEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
+                </div>
+              )}
+              <div style={{ marginBottom: "20px" }}>
+                <label style={{ fontSize: "13px", color: c.text2, display: "block", marginBottom: "6px" }}>투입 금액 (USD)</label>
+                <input
+                  type="number"
+                  value={allocationInput}
+                  onChange={e => setAllocationInput(e.target.value)}
+                  placeholder="예: 5000"
+                  style={{
+                    width: "100%", padding: "12px", borderRadius: "8px", border: `1px solid ${c.border}`,
+                    background: c.card2, color: c.text1, fontSize: "16px", fontWeight: 600, boxSizing: "border-box",
+                  }}
+                  onKeyDown={e => e.key === "Enter" && handleConfirmAllocation()}
+                  autoFocus
+                />
+              </div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button onClick={() => setPendingBot(null)} style={{
+                  flex: 1, padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
+                  background: c.card2, color: c.text2, border: `1px solid ${c.border}`, cursor: "pointer",
+                }}>취소</button>
+                <button onClick={handleConfirmAllocation} style={{
+                  flex: 1, padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
+                  background: c.blue, color: "#fff", border: "none", cursor: "pointer",
+                }}>운영 시작</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 알파카 계좌 잔고 표시 */}
         {user && alpacaConnected && alpacaEquity != null && activeBots.length > 0 && !activeBot && (
           <div style={{
             display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px",
@@ -1191,7 +1248,6 @@ export default function AutoTrading({ theme = "dark", user }) {
           }}>
             <span style={{ fontSize: "12px", color: c.text2 }}>
               계좌 잔고 <strong style={{ color: c.text1 }}>${alpacaEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
-              {" · "}봇당 자동 배분 <strong style={{ color: c.blue }}>${Math.floor(alpacaEquity / activeBots.length).toLocaleString()}</strong>
             </span>
           </div>
         )}

@@ -8314,6 +8314,15 @@ function AppInner() {
                 </div>
               )}
             </div>
+
+            {/* 스크리너 중간 — 추가 쿠팡 광고 섹션 */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "22px 24px", marginTop: "20px" }}>
+              <div style={{ fontSize: "14px", fontWeight: 700, marginBottom: "14px", color: C.text1 }}>📚 투자에 유용한 도구</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <CoupangNativeCard theme={themeMode} context="screener" />
+                <CoupangButtonAd theme={themeMode} context="screener" />
+              </div>
+            </div>
           </div>
         )}
 
@@ -8850,23 +8859,41 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 전략
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "strategy" && <StrategyPanel onRunBacktest={(strategy, symbol) => {
-          setBtStrategy(strategy); setBtSymbol(symbol); setTab("backtest");
-          // 쿠팡 CTA 광고 표시 (20% 확률)
-          if (Math.random() < 0.2) {
-            setShowCoupangCTA(true);
-          }
-        }} />}
+        {tab === "strategy" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <StrategyPanel onRunBacktest={(strategy, symbol) => {
+              setBtStrategy(strategy); setBtSymbol(symbol); setTab("backtest");
+              // 쿠팡 CTA 광고 표시 (20% 확률)
+              if (Math.random() < 0.2) {
+                setShowCoupangCTA(true);
+              }
+            }} />
+            {/* 전략 하단 — 쿠팡 인라인 배너 */}
+            <CoupangInlineBanner theme={themeMode} />
+          </div>
+        )}
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 전략 운용 (퀀트 포트폴리오)
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "quant-port" && <QuantPortfolio theme={themeMode} />}
+        {tab === "quant-port" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <QuantPortfolio theme={themeMode} />
+            {/* 퀀트 포트폴리오 하단 — 쿠팡 네이티브 카드 */}
+            <CoupangNativeCard theme={themeMode} context="portfolio" />
+          </div>
+        )}
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 리스크 히트맵
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "risk-map" && <RiskHeatmap marketIndices={marketIndices} fearGreed={fearGreed} />}
+        {tab === "risk-map" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <RiskHeatmap marketIndices={marketIndices} fearGreed={fearGreed} />
+            {/* 리스크맵 하단 — 쿠팡 스트립 배너 */}
+            <CoupangStripBanner theme={themeMode} context="portfolio" />
+          </div>
+        )}
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 퀀트 리포트
@@ -9312,6 +9339,13 @@ function AppInner() {
             </div>
           );
         })()}
+
+        {/* 퀀트 리포트 하단 — 쿠팡 버튼 광고 */}
+        {tab === "quant-report" && (
+          <div style={{ margin: "16px 0" }}>
+            <CoupangButtonAd theme={themeMode} context="strategy" />
+          </div>
+        )}
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 백테스트
@@ -9789,6 +9823,13 @@ function AppInner() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* 알림 탭 하단 — 쿠팡 인라인 배너 */}
+        {tab === "alerts" && (
+          <div style={{ margin: "12px 0" }}>
+            <CoupangInlineBanner theme={themeMode} />
           </div>
         )}
 
@@ -10277,7 +10318,8 @@ function AppInner() {
         </div>
       )}
 
-      {/* 플로팅 배너 제거됨 — 거슬림 */}
+      {/* 플로팅 배너 — 45초 후 자동 표시 (우측 하단) */}
+      <CoupangFloatingBanner theme={themeMode} context="default" autoShowDelay={45000} />
 
       {/* ═══ 쿠팡 CTA 광고 (관심종목 추가, 백테스트 실행 등) ═══ */}
       {showCoupangCTA && (
