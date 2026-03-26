@@ -2,6 +2,7 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import PaperTrading from "./PaperTrading.jsx";
 import BTCTrading from "./BTCTrading.jsx";
 import { useAuth } from "./AuthProvider.jsx";
+import { supabase } from "./supabaseClient.js";
 
 // ── 시뮬레이션 에쿼티 커브 생성 (전략 파라미터 기반, 결정론적) ──
 function generateEquityCurve(bot, months = 12) {
@@ -1000,26 +1001,45 @@ export default function AutoTrading({ theme = "dark", user }) {
     }
   }, [user, alpacaKey, alpacaSecret, alpacaPaper, alpacaPrefix, showToast]);
 
-  // 운영 중인 봇 목록 (localStorage 기반)
+  // 운영 중인 봇 목록 (Supabase user_metadata + localStorage 캐시)
   const storageKey = user ? `toit_${user.id.slice(0,8)}_active_bots` : null;
   const [activeBots, setActiveBots] = useState(() => {
+    // localStorage에서 캐시된 값으로 빠른 초기 렌더
     if (!storageKey) return [];
     try { return JSON.parse(localStorage.getItem(storageKey) || "[]"); } catch { return []; }
   });
+  const botsLoaded = useRef(false);
+  const botsSaving = useRef(false);
 
-  // 로그인 변경 시 재로드
-  React.useEffect(() => {
-    if (storageKey) {
-      try { setActiveBots(JSON.parse(localStorage.getItem(storageKey) || "[]")); } catch { setActiveBots([]); }
-    } else { setActiveBots([]); }
-  }, [storageKey]);
-
-  // 저장
-  React.useEffect(() => {
-    if (storageKey) {
-      try { localStorage.setItem(storageKey, JSON.stringify(activeBots)); } catch {}
+  // Supabase에서 봇 목록 로드 (기기간 동기화)
+  useEffect(() => {
+    if (!user || botsLoaded.current) return;
+    botsLoaded.current = true;
+    const remoteBots = user?.user_metadata?.active_bots;
+    if (Array.isArray(remoteBots) && remoteBots.length > 0) {
+      setActiveBots(remoteBots);
+      // localStorage 캐시도 업데이트
+      if (storageKey) try { localStorage.setItem(storageKey, JSON.stringify(remoteBots)); } catch {}
     }
-  }, [activeBots, storageKey]);
+  }, [user, storageKey]);
+
+  // activeBots 변경 시 → Supabase + localStorage 동시 저장
+  const saveBotsTimeout = useRef(null);
+  useEffect(() => {
+    if (!user || !botsLoaded.current) return;
+    // localStorage 즉시 저장
+    if (storageKey) try { localStorage.setItem(storageKey, JSON.stringify(activeBots)); } catch {}
+    // Supabase는 디바운스 (500ms)
+    if (saveBotsTimeout.current) clearTimeout(saveBotsTimeout.current);
+    saveBotsTimeout.current = setTimeout(async () => {
+      if (botsSaving.current) return;
+      botsSaving.current = true;
+      try {
+        await supabase.auth.updateUser({ data: { active_bots: activeBots } });
+      } catch (e) { console.warn("[Toit] 봇 동기화 실패:", e); }
+      botsSaving.current = false;
+    }, 500);
+  }, [activeBots, user, storageKey]);
 
   const handleActivateBot = useCallback((bot) => {
     if (!user) {
