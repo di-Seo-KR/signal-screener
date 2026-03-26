@@ -6282,6 +6282,7 @@ function AppInner() {
           [style*="position: fixed"][style*="bottom: 0"] { padding-bottom: calc(4px + env(safe-area-inset-bottom)) !important; }
         }
         @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes slideDown { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:translateY(0)} }
         * { box-sizing: border-box; margin: 0; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
         html { font-size: 16px; line-height: 1.5; scroll-behavior: smooth; }
         body { letter-spacing: -0.01em; transition: background 0.3s ease, color 0.3s ease; }
@@ -6620,18 +6621,19 @@ function AppInner() {
         }} />
         {/* 메뉴 패널 */}
         <div className="mobile-menu-panel" style={{
-          position: "fixed", left: 0, right: 0, bottom: 0,
+          position: "fixed", left: 0, right: 0, top: 0,
           background: C.bg, overflowY: "auto",
-          padding: "16px 16px calc(24px + env(safe-area-inset-bottom, 0px))",
+          padding: "calc(16px + env(safe-area-inset-top, 0px)) 16px 24px",
           display: "flex", flexDirection: "column", gap: "10px",
-          animation: "slideUp 0.2s ease", zIndex: 201,
-          borderRadius: "20px 20px 0 0",
-          boxShadow: "0 -8px 32px rgba(0,0,0,0.3)",
-          maxHeight: "75vh",
+          animation: "slideDown 0.2s ease", zIndex: 201,
+          borderRadius: "0 0 20px 20px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+          maxHeight: "80vh",
         }}>
-          {/* 드래그 핸들 */}
-          <div style={{ display: "flex", justifyContent: "center", paddingBottom: "4px" }}>
-            <div style={{ width: "36px", height: "4px", borderRadius: "2px", background: C.text3, opacity: 0.4 }} />
+          {/* 상단 헤더 — 로고 + 닫기 */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "8px" }}>
+            <span style={{ fontSize: "15px", fontWeight: 800, color: C.blue }}>Toit 메뉴</span>
+            <button onClick={() => setMenuOpen(false)} style={{ background: "none", border: "none", color: C.text2, fontSize: "22px", cursor: "pointer", padding: "4px" }}>✕</button>
           </div>
           {/* 섹션 구분 */}
           {[
