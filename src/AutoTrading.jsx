@@ -784,10 +784,13 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
           const pnlData = botPnlCurve?.data || [];
           const pnlSource = botPnlCurve?.source || "none";
 
-          const botReturn = pnlData.length >= 2
-            ? ((pnlData[pnlData.length - 1] - pnlData[0]) / pnlData[0] * 100)
-            : null;
-          const botIsPositive = botReturn != null ? botReturn >= 0 : true;
+          const botReturn = pnlData.length >= 2 && pnlData[0] !== 0
+            ? ((pnlData[pnlData.length - 1] - pnlData[0]) / Math.abs(pnlData[0]) * 100)
+            : pnlData.length >= 2 && ab.allocation
+              ? ((pnlData[pnlData.length - 1] - pnlData[0]) / ab.allocation * 100)
+              : null;
+          const safeBotReturn = (botReturn != null && isFinite(botReturn)) ? botReturn : null;
+          const botIsPositive = safeBotReturn != null ? safeBotReturn >= 0 : true;
 
           // 봇 P&L 달러 계산
           const botPnlDollar = (() => {
@@ -846,14 +849,14 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
                     {pnlSource === "trade_log" ? "실제 P&L" : pnlSource === "alpaca" ? "계좌 P&L" : "수익률 차트"}
                   </span>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    {botPnlDollar != null && (
+                    {botPnlDollar != null && isFinite(botPnlDollar) && (
                       <span style={{ fontSize: "12px", fontWeight: 700, color: botPnlDollar >= 0 ? c.green : c.red }}>
                         {botPnlDollar >= 0 ? "+" : ""}${Math.abs(botPnlDollar).toFixed(2)}
                       </span>
                     )}
-                    {botReturn != null && (
+                    {safeBotReturn != null && (
                       <span style={{ fontSize: "13px", fontWeight: 800, color: botIsPositive ? c.green : c.red }}>
-                        {botIsPositive ? "+" : ""}{botReturn.toFixed(2)}%
+                        {botIsPositive ? "+" : ""}{safeBotReturn.toFixed(2)}%
                       </span>
                     )}
                   </div>
@@ -1070,10 +1073,10 @@ export default function AutoTrading({ theme = "dark", user }) {
     }
     // 수동 배분 모달 표시
     setPendingBot(bot);
-    // 기본값: 알파카 잔고 있으면 균등 배분값을 힌트로 표시
-    const nextBotCount = activeBots.length + 1;
-    const hint = alpacaEquity ? Math.floor(alpacaEquity / nextBotCount) : 1000;
-    setAllocationInput(String(hint));
+    // 기본값: 잔고에서 기존 봇 배분액 차감한 잔여 금액
+    const allocatedTotal = activeBots.reduce((sum, ab) => sum + (ab.allocation || 0), 0);
+    const remaining = alpacaEquity ? Math.max(0, Math.floor(alpacaEquity - allocatedTotal)) : 1000;
+    setAllocationInput(String(remaining));
   }, [user, showToast, activeBots, alpacaEquity]);
 
   const handleConfirmAllocation = useCallback(() => {
@@ -1203,14 +1206,22 @@ export default function AutoTrading({ theme = "dark", user }) {
                   <span style={{ fontSize: "12px", color: c.text2 }}>투입 금액을 설정해주세요</span>
                 </div>
               </div>
-              {alpacaEquity != null && (
-                <div style={{
-                  padding: "8px 12px", background: `${c.blue}08`, borderRadius: "8px",
-                  border: `1px solid ${c.blue}15`, marginBottom: "16px", fontSize: "12px", color: c.text2,
-                }}>
-                  계좌 잔고: <strong style={{ color: c.text1 }}>${alpacaEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
-                </div>
-              )}
+              {alpacaEquity != null && (() => {
+                const used = activeBots.reduce((s, ab) => s + (ab.allocation || 0), 0);
+                const left = Math.max(0, alpacaEquity - used);
+                return (
+                  <div style={{
+                    padding: "8px 12px", background: `${c.blue}08`, borderRadius: "8px",
+                    border: `1px solid ${c.blue}15`, marginBottom: "16px", fontSize: "12px", color: c.text2,
+                  }}>
+                    계좌 잔고: <strong style={{ color: c.text1 }}>${alpacaEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
+                    {used > 0 && <>
+                      {" · "}배분 완료: <strong style={{ color: c.orange || c.yellow }}>${used.toLocaleString()}</strong>
+                      {" · "}잔여: <strong style={{ color: left > 0 ? c.green : c.red }}>${left.toLocaleString()}</strong>
+                    </>}
+                  </div>
+                );
+              })()}
               <div style={{ marginBottom: "20px" }}>
                 <label style={{ fontSize: "13px", color: c.text2, display: "block", marginBottom: "6px" }}>투입 금액 (USD)</label>
                 <input
@@ -1241,16 +1252,22 @@ export default function AutoTrading({ theme = "dark", user }) {
         )}
 
         {/* 알파카 계좌 잔고 표시 */}
-        {user && alpacaConnected && alpacaEquity != null && activeBots.length > 0 && !activeBot && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px",
-            padding: "8px 14px", background: `${c.blue}08`, borderRadius: "10px", border: `1px solid ${c.blue}15`,
-          }}>
-            <span style={{ fontSize: "12px", color: c.text2 }}>
-              계좌 잔고 <strong style={{ color: c.text1 }}>${alpacaEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
-            </span>
-          </div>
-        )}
+        {user && alpacaConnected && alpacaEquity != null && activeBots.length > 0 && !activeBot && (() => {
+          const used = activeBots.reduce((s, ab) => s + (ab.allocation || 0), 0);
+          const left = Math.max(0, alpacaEquity - used);
+          return (
+            <div style={{
+              display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px",
+              padding: "8px 14px", background: `${c.blue}08`, borderRadius: "10px", border: `1px solid ${c.blue}15`,
+            }}>
+              <span style={{ fontSize: "12px", color: c.text2 }}>
+                계좌 잔고 <strong style={{ color: c.text1 }}>${alpacaEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
+                {" · "}배분 완료 <strong style={{ color: c.orange || c.yellow }}>${used.toLocaleString()}</strong>
+                {" · "}잔여 <strong style={{ color: left > 0 ? c.green : c.red }}>${left.toLocaleString()}</strong>
+              </span>
+            </div>
+          );
+        })()}
 
         {/* 운영 중인 봇 대시보드 (활성 봇이 있을 때만 표시) */}
         {!activeBot && activeBots.length > 0 && (
