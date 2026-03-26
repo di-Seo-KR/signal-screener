@@ -521,7 +521,9 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
               const fullLastEq = parseFloat(alpacaAccount.last_equity || alpacaAccount.equity || 0);
               const ratio = (botAllocation && fullEq > 0) ? (botAllocation / fullEq) : 1;
               const dispEq = botAllocation || fullEq;
-              const dispBp = Math.round(fullBp * ratio);
+              const dispBp = botAllocation
+                ? Math.min(Math.round(fullBp * ratio), botAllocation)
+                : Math.round(fullBp);
               const fullPL = fullEq - fullLastEq;
               const dispPL = (fullPL * ratio).toFixed(2);
               return <>

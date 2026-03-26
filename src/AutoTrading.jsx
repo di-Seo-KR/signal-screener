@@ -768,6 +768,9 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
           const botTrades = botTradeLog.length;
 
           // 봇별 실제 누적 P&L 차트 데이터 생성
+          // 봇 배분 비율 계산 (전체 배분 대비 이 봇의 비중)
+          const totalAllocated = activeBots.reduce((s, b) => s + (b.allocation || 0), 0);
+          const botAllocRatio = (ab.allocation && totalAllocated > 0) ? (ab.allocation / totalAllocated) : (1 / activeBots.length);
           const botPnlCurve = (() => {
             // 1순위: 실제 trade log에서 P&L 커브
             const withPnl = botTradeLog
@@ -780,14 +783,13 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
                 cum += parseFloat(t.pnl || 0);
                 curve.push(cum);
               }
-              const initEquity = account ? parseFloat(account.equity) / activeBots.length : 10000;
+              const initEquity = ab.allocation || (account ? parseFloat(account.equity) * botAllocRatio : 10000);
               return { data: curve.map(v => 100 + (v / initEquity) * 100), source: "trade_log" };
             }
-            // 2순위: 알파카 포트폴리오 히스토리
+            // 2순위: 알파카 포트폴리오 히스토리 (배분 비율 적용)
             if (equityHistory.length >= 2 && activeBots.length > 0) {
               const base = equityHistory[0].equity;
-              const share = 1 / activeBots.length;
-              return { data: equityHistory.map(h => 100 + ((h.equity - base) * share / base) * 100), source: "alpaca" };
+              return { data: equityHistory.map(h => 100 + ((h.equity - base) * botAllocRatio / base) * 100), source: "alpaca" };
             }
             // 데이터 없음
             return { data: [], source: "none" };
@@ -804,13 +806,13 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
           const safeBotReturn = (botReturn != null && isFinite(botReturn)) ? botReturn : null;
           const botIsPositive = safeBotReturn != null ? safeBotReturn >= 0 : true;
 
-          // 봇 P&L 달러 계산
+          // 봇 P&L 달러 계산 (배분 비율 적용)
           const botPnlDollar = (() => {
             const withPnl = botTradeLog.filter(t => t.pnl != null);
             if (withPnl.length > 0) return withPnl.reduce((s, t) => s + parseFloat(t.pnl || 0), 0);
             if (equityHistory.length >= 2 && activeBots.length > 0) {
               const totalPnl = equityHistory[equityHistory.length - 1].equity - equityHistory[0].equity;
-              return totalPnl / activeBots.length;
+              return totalPnl * botAllocRatio;
             }
             return null;
           })();

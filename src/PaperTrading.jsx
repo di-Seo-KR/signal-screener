@@ -1546,7 +1546,9 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
   const allocRatio = (botAllocation && fullEquity > 0) ? (botAllocation / fullEquity) : 1;
   const equity = botAllocation ? botAllocation : fullEquity;
   const cash = Math.round(fullCash * allocRatio * 100) / 100;
-  const buyingPower = Math.round(fullBuyingPower * allocRatio * 100) / 100;
+  const buyingPower = botAllocation
+    ? Math.min(Math.round(fullBuyingPower * allocRatio * 100) / 100, botAllocation)
+    : fullBuyingPower;
   const fullDayPL = parseFloat(account?.equity) - parseFloat(account?.last_equity || account?.equity);
   const dayPL = Math.round(fullDayPL * allocRatio * 100) / 100;
   const dayPLPct = parseFloat(account?.last_equity) ? (fullDayPL / parseFloat(account.last_equity) * 100) : 0;
@@ -1560,119 +1562,175 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
   const rm = new RiskManager(tradeSettings, account, positions);
 
   return (
-    <div className="tab-content">
-      {orderModal && <OrderModal symbol={orderModal.symbol} side={orderModal.side} reason={orderModal.reason}
-        config={config} onClose={() => setOrderModal(null)} onOrderPlaced={handleOrderPlaced} />}
-
-      {/* ── 리스크 알림 배너 ── */}
-      {riskAlerts.length > 0 && (
-        <div style={{ marginBottom: "12px", display: "flex", flexDirection: "column", gap: "6px" }}>
-          {riskAlerts.map((a, i) => (
-            <div key={i} style={{
-              background: a.level === "critical" ? C.redBg : a.level === "warning" ? C.yellowBg : C.blueBg,
-              border: `1px solid ${a.level === "critical" ? C.red : a.level === "warning" ? C.yellow : C.blue}33`,
-              borderRadius: "10px", padding: "10px 14px", fontSize: "12px",
-              color: a.level === "critical" ? C.red : a.level === "warning" ? C.yellow : C.blue,
-              display: "flex", alignItems: "center", gap: "8px",
-            }}>
-              <span style={{ fontSize: "14px" }}>{a.level === "critical" ? "🚨" : a.level === "warning" ? "⚠️" : "ℹ️"}</span>
-              {a.msg}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* ── 상단 계좌 요약 ── */}
-      <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, #0D1B2A 100%)`,
-        border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "12px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-          <div>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
-              <span style={{ fontWeight: 800, fontSize: "18px" }}>퀀트 자동매매 v3</span>
-              <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
-                background: config.isPaper ? C.yellowBg : C.greenBg, color: config.isPaper ? C.yellow : C.green }}>
-                {config.isPaper ? "PAPER" : "LIVE"}</span>
-              <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
-                background: marketOpen ? C.greenBg : C.redBg, color: marketOpen ? C.green : C.red }}>
-                {marketOpen ? "장중" : "장 마감"}</span>
-              {autoTradeEnabled && !tradingHalted && (
-                <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
-                  background: C.purpleBg, color: C.purple }}>AUTO</span>
-              )}
-              {tradingHalted && (
-                <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
-                  background: C.redBg, color: C.red }}>HALTED</span>
-              )}
-              {pendingOrders.length > 0 && (
-                <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
-                  background: C.yellowBg, color: C.yellow }}>대기 {pendingOrders.length}</span>
-              )}
-            </div>
-            <div style={{ fontSize: "11px", color: C.text3, display: "flex", gap: "8px", flexWrap: "wrap" }}>
-              <span>{loading ? "갱신 중..." : "30초 자동 갱신"}</span>
-              <span>DD: {fmt(rm.drawdown)}%/{tradeSettings.maxDrawdownPct}%</span>
-              {lastScanTime && <span>스캔 {lastScanTime.toLocaleTimeString("ko-KR")}</span>}
-            </div>
-          </div>
-          <div style={{ display: "flex", gap: "6px" }}>
-            <button onClick={refreshData} style={{ padding: "6px 12px", borderRadius: "8px", fontSize: "11px", fontWeight: 600,
-              background: C.card2, border: `1px solid ${C.border2}`, color: C.text2, cursor: "pointer" }}>새로고침</button>
-            <button onClick={disconnect} style={{ padding: "6px 12px", borderRadius: "8px", fontSize: "11px", fontWeight: 600,
-              background: C.redBg, border: `1px solid ${C.red}33`, color: C.red, cursor: "pointer" }}>연결 해제</button>
-          </div>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "8px" }}>
-          {[
-            { label: botAllocation ? "봇 자산" : "총 자산", value: fmtUSD(equity), color: C.text1 },
-            { label: "현금", value: fmtUSD(cash), color: C.blue },
-            { label: "매수가능", value: fmtUSD(buyingPower), color: C.blueL },
-            { label: "오늘 P&L", value: fmtUSD(dayPL), sub: fmtPct(dayPLPct), color: dayPL >= 0 ? C.green : C.red },
-            { label: "총 수익", value: fmtUSD(totalPL), sub: fmtPct(totalPLPct), color: totalPL >= 0 ? C.green : C.red },
-            { label: "포지션 P&L", value: fmtUSD(positionPL), color: positionPL >= 0 ? C.green : C.red },
-          ].map((m, i) => (
-            <div key={i} style={{ background: C.card2, borderRadius: "10px", padding: "12px 14px" }}>
-              <div style={{ fontSize: "11px", color: C.text3, marginBottom: "3px", fontWeight: 500 }}>{m.label}</div>
-              <div style={{ fontWeight: 800, fontSize: "16px", color: m.color, letterSpacing: "-0.3px" }}>{m.value}</div>
-              {m.sub && <div style={{ fontSize: "11px", color: m.color, marginTop: "1px" }}>{m.sub}</div>}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── 탭 ── */}
-      <div style={{ display: "flex", gap: "6px", marginBottom: "12px", overflowX: "auto",
-        scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch",
-        padding: "2px 0" }}>
+    <div className="tab-content" style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: "0", minHeight: "100vh" }}>
+      {/* ═══════════════════════════════════════════════════════════
+          LEFT SIDEBAR: 네비게이션 (토스 스타일)
+      ═══════════════════════════════════════════════════════════ */}
+      <div style={{
+        background: C.card, borderRight: `1px solid ${C.border}`, padding: "20px 0",
+        display: "flex", flexDirection: "column", gap: "0", position: "sticky", top: "0", maxHeight: "100vh", overflowY: "auto",
+      }}>
         {[
-          ["dashboard","포지션",positions.length],
-          ["orders","주문",orders.filter(o=>["new","partially_filled","accepted","pending_new"].includes(o.status)).length],
-          ["signals","시그널",detectedSignals.length],
-          ["auto","자동매매",null],
-          ["perf","성과분석",null],
-          ["risk","리스크",riskAlerts.length],
-          ["log","로그",tradeLog.length],
-        ].map(([id,label,count])=>(
-          <button key={id} onClick={()=>setActiveTab(id)} style={{
-            padding:"10px 14px",borderRadius:"10px",fontSize:"13px",fontWeight:600,
-            background:activeTab===id?C.blueBg:"transparent",color:activeTab===id?C.blue:C.text3,
-            border:`1px solid ${activeTab===id?C.blue+"88":C.border2}`,cursor:"pointer",whiteSpace:"nowrap",
-            display:"flex",alignItems:"center",gap:"6px",minHeight:"40px",
-            transition:"all 0.15s ease",
-          }}>
-            {label}
-            {count!=null&&count>0&&(
-              <span style={{background:activeTab===id?C.blue:C.border2,color:activeTab===id?"#fff":C.text3,
-                fontSize:"10px",fontWeight:700,borderRadius:"50%",width:"18px",height:"18px",
-                display:"flex",alignItems:"center",justifyContent:"center"}}>{count>99?"99+":count}</span>
+          { id: "dashboard", label: "포지션", count: positions.length },
+          { id: "orders", label: "주문내역", count: orders.filter(o=>["new","partially_filled","accepted","pending_new"].includes(o.status)).length },
+          { id: "signals", label: "시그널", count: detectedSignals.length },
+          { id: "auto", label: "자동매매", count: null },
+          { id: "perf", label: "성과분석", count: null },
+          { id: "risk", label: "리스크", count: riskAlerts.length },
+          { id: "log", label: "로그", count: tradeLog.length },
+        ].map(({ id, label, count }) => (
+          <button
+            key={id}
+            onClick={() => setActiveTab(id)}
+            style={{
+              padding: "14px 20px", margin: "0", border: "none",
+              background: activeTab === id ? `${C.blue}14` : "transparent",
+              color: activeTab === id ? C.blue : C.text2,
+              borderLeft: activeTab === id ? `3px solid ${C.blue}` : `3px solid transparent`,
+              fontSize: "13px", fontWeight: activeTab === id ? 700 : 600,
+              cursor: "pointer", textAlign: "left", transition: "all 0.15s",
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px",
+            }}
+            onMouseEnter={e => {
+              if (activeTab !== id) {
+                e.currentTarget.style.background = `${C.card2}80`;
+              }
+            }}
+            onMouseLeave={e => {
+              if (activeTab !== id) {
+                e.currentTarget.style.background = "transparent";
+              }
+            }}>
+            <span>{label}</span>
+            {count != null && count > 0 && (
+              <span style={{
+                background: activeTab === id ? C.blue : C.border2,
+                color: activeTab === id ? "#fff" : C.text3,
+                fontSize: "10px", fontWeight: 700, borderRadius: "50%",
+                width: "20px", height: "20px",
+                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+              }}>
+                {count > 99 ? "99+" : count}
+              </span>
             )}
           </button>
         ))}
-        <div style={{flex:1}} />
-        <button onClick={()=>setOrderModal({symbol:"",side:"buy",reason:"수동 주문"})} style={{
-          padding:"8px 14px",borderRadius:"8px",fontSize:"12px",fontWeight:700,
-          background:`linear-gradient(135deg,${C.blue},#2563EB)`,color:"#fff",border:"none",cursor:"pointer",whiteSpace:"nowrap",
-        }}>+ 주문</button>
+
+        <div style={{ flex: 1 }} />
+
+        <div style={{ padding: "0 20px", display: "flex", gap: "6px", flexDirection: "column" }}>
+          <button onClick={() => setOrderModal({ symbol: "", side: "buy", reason: "수동 주문" })} style={{
+            padding: "10px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
+            background: `linear-gradient(135deg,${C.blue},#2563EB)`, color: "#fff", border: "none",
+            cursor: "pointer", whiteSpace: "nowrap",
+          }}>
+            + 주문하기
+          </button>
+          <button onClick={refreshData} style={{
+            padding: "10px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 600,
+            background: C.card2, border: `1px solid ${C.border2}`, color: C.text2, cursor: "pointer",
+          }}>
+            새로고침
+          </button>
+          <button onClick={disconnect} style={{
+            padding: "10px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 600,
+            background: C.redBg, border: `1px solid ${C.red}33`, color: C.red, cursor: "pointer",
+          }}>
+            연결 해제
+          </button>
+        </div>
       </div>
+
+      {/* ═══════════════════════════════════════════════════════════
+          MAIN CONTENT: 우측 패널 (큰 잔액 표시 + 탭 콘텐츠)
+      ═══════════════════════════════════════════════════════════ */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "20px", padding: "20px", overflowY: "auto" }}>
+        {orderModal && <OrderModal symbol={orderModal.symbol} side={orderModal.side} reason={orderModal.reason}
+          config={config} onClose={() => setOrderModal(null)} onOrderPlaced={handleOrderPlaced} />}
+
+        {/* ── 리스크 알림 배너 ── */}
+        {riskAlerts.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {riskAlerts.map((a, i) => (
+              <div key={i} style={{
+                background: a.level === "critical" ? C.redBg : a.level === "warning" ? C.yellowBg : C.blueBg,
+                border: `1px solid ${a.level === "critical" ? C.red : a.level === "warning" ? C.yellow : C.blue}33`,
+                borderRadius: "10px", padding: "10px 14px", fontSize: "12px",
+                color: a.level === "critical" ? C.red : a.level === "warning" ? C.yellow : C.blue,
+                display: "flex", alignItems: "center", gap: "8px",
+              }}>
+                <span style={{ fontSize: "14px" }}>{a.level === "critical" ? "🚨" : a.level === "warning" ? "⚠️" : "ℹ️"}</span>
+                {a.msg}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── 큰 잔액 표시 (토스 스타일) ── */}
+        <div style={{
+          background: `linear-gradient(135deg, ${C.card} 0%, #0D1B2A 100%)`,
+          border: `1px solid ${C.border}`, borderRadius: "16px", padding: "28px 32px",
+        }}>
+          <div style={{ fontSize: "13px", color: C.text3, fontWeight: 500, marginBottom: "8px" }}>총 자산</div>
+          <div style={{
+            fontWeight: 800, fontSize: "42px", color: C.text1, lineHeight: 1, marginBottom: "12px",
+            letterSpacing: "-1px",
+          }}>
+            {fmtUSD(equity)}
+          </div>
+          <div style={{
+            display: "flex", alignItems: "baseline", gap: "12px", fontSize: "13px", fontWeight: 600,
+          }}>
+            <span style={{ color: dayPL >= 0 ? C.green : C.red }}>
+              {dayPL >= 0 ? "+" : ""}{fmtUSD(dayPL)}
+            </span>
+            <span style={{ color: dayPL >= 0 ? C.green : C.red, fontSize: "12px" }}>
+              {fmtPct(dayPLPct)} 오늘
+            </span>
+          </div>
+
+          <div style={{ marginTop: "20px", display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
+            {[
+              { label: "현금", value: fmtUSD(cash), color: C.blue },
+              { label: "매수가능", value: fmtUSD(buyingPower), color: C.blueL },
+              { label: "총 수익", value: fmtUSD(totalPL), sub: fmtPct(totalPLPct), color: totalPL >= 0 ? C.green : C.red },
+              { label: "포지션 P&L", value: fmtUSD(positionPL), color: positionPL >= 0 ? C.green : C.red },
+            ].map((m, i) => (
+              <div key={i} style={{ background: C.card2, borderRadius: "10px", padding: "12px" }}>
+                <div style={{ fontSize: "10px", color: C.text3, marginBottom: "3px", fontWeight: 500 }}>{m.label}</div>
+                <div style={{ fontWeight: 800, fontSize: "14px", color: m.color }}>{m.value}</div>
+                {m.sub && <div style={{ fontSize: "10px", color: m.color, marginTop: "2px" }}>{m.sub}</div>}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ marginTop: "16px", fontSize: "11px", color: C.text3, display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <span>{loading ? "갱신 중..." : "30초 자동 갱신"}</span>
+            <span>DD: {fmt(rm.drawdown)}%/{tradeSettings.maxDrawdownPct}%</span>
+            {lastScanTime && <span>스캔 {lastScanTime.toLocaleTimeString("ko-KR")}</span>}
+          </div>
+
+          <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
+              background: config.isPaper ? C.yellowBg : C.greenBg, color: config.isPaper ? C.yellow : C.green }}>
+              {config.isPaper ? "PAPER" : "LIVE"}</span>
+            <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
+              background: marketOpen ? C.greenBg : C.redBg, color: marketOpen ? C.green : C.red }}>
+              {marketOpen ? "장중" : "장 마감"}</span>
+            {autoTradeEnabled && !tradingHalted && (
+              <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
+                background: C.purpleBg, color: C.purple }}>AUTO</span>
+            )}
+            {tradingHalted && (
+              <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
+                background: C.redBg, color: C.red }}>HALTED</span>
+            )}
+            {pendingOrders.length > 0 && (
+              <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 700,
+                background: C.yellowBg, color: C.yellow }}>대기 {pendingOrders.length}</span>
+            )}
+          </div>
+        </div>
 
       {/* ── 포지션 ── */}
       {activeTab==="dashboard"&&(<>
@@ -2612,6 +2670,8 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
           )}
         </div>
       )}
+      </div>{/* end main content */}
+      </div>{/* end grid container */}
 
       {/* ── QR 모달 (생성 / 스캔) ── */}
       {qrModal && (
