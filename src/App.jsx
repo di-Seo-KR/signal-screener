@@ -4065,6 +4065,7 @@ function AppInner() {
     "news": "info",
     "sentiment": "info",
     "alerts": "info",
+    "econ-calendar": "info",
   };
   const [gnbCategory, setGnbCategory] = useState(() => gnbCategoryMap[tab] || "home");
 
@@ -4119,6 +4120,8 @@ function AppInner() {
   const [picksExpanded, setPicksExpanded] = useState(false);
   const [econSort, setEconSort] = useState("date-asc"); // date-asc, date-desc, type
   const [econFilter, setEconFilter] = useState("all"); // all, upcoming, past, FOMC, CPI, NFP, GDP, PCE
+  const [calYear, setCalYear] = useState(() => new Date().getFullYear());
+  const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
   const [homeSection, setHomeSection] = useState({
     market: true, watchlist: true, calendar: false, fearGreed: false,
     sector: false, signal: false, hotAssets: true, allAssets: false,
@@ -5098,9 +5101,10 @@ function AppInner() {
     for (const h of hotResults) {
       if (h.market === "us" && h.symbolRaw && !h.symbolRaw.includes(".KS")) extSymSet.add(h.symbolRaw);
     }
-    // watchlist에서 US 종목 추가 (올바른 키: di_watchlist)
+    // watchlist에서 US 종목 추가 (유저별 키)
     try {
-      const wl = JSON.parse(localStorage.getItem("di_watchlist") || "[]");
+      const wlKey = user ? `di_${user.id.slice(0, 8)}_watchlist` : null;
+      const wl = wlKey ? JSON.parse(localStorage.getItem(wlKey) || "[]") : [];
       for (const w of wl) {
         if (w.market === "us" && w.symbolRaw && !w.symbolRaw.includes(".KS")) extSymSet.add(w.symbolRaw);
         else if (w.market === "us" && w.symbol && !w.symbol.includes(".KS")) extSymSet.add(w.symbol);
@@ -6495,6 +6499,7 @@ function AppInner() {
               { id: "info", label: "정보", catId: "info", items: [
                 { id: "news", label: "마켓 뉴스", icon: "📰" },
                 { id: "sentiment", label: "센티먼트", icon: "💬" },
+                { id: "econ-calendar", label: "경제 캘린더", icon: "📅" },
                 { id: "alerts", label: "알림 설정", icon: "🔔" },
               ]},
             ].map(cat => (
@@ -6776,6 +6781,7 @@ function AppInner() {
             { section: "정보", items: [
               { id: "news", label: "마켓 뉴스", icon: "📰" },
               { id: "sentiment", label: "센티먼트", icon: "💬" },
+              { id: "econ-calendar", label: "경제 캘린더", icon: "📅" },
               { id: "alerts", label: "알림 설정", icon: "🔔", locked: true },
             ]},
           ].map(group => (
@@ -9505,6 +9511,272 @@ function AppInner() {
             <CoupangOfficialBanner width="728" height="90" bannerId={975393} style={{ margin: "12px 0" }} />
           </div>
         )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 경제 캘린더 (토스증권 스타일)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "econ-calendar" && (() => {
+          // 오늘 기준 캘린더 데이터
+          const today = new Date();
+          const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=일
+          const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+          const monthNames = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+
+          // 주차별 이벤트 그룹화
+          const getWeekOfMonth = (date) => Math.ceil((date.getDate() + new Date(date.getFullYear(), date.getMonth(), 1).getDay()) / 7);
+          const eventsByWeek = {};
+          const calFilterTabs = [
+            { key: "all", label: "전체" },
+            { key: "경제지표", label: "경제지표" },
+            { key: "FOMC", label: "FOMC" },
+            { key: "CPI", label: "CPI" },
+            { key: "NFP", label: "고용" },
+            { key: "GDP", label: "GDP" },
+          ];
+
+          // 이벤트 필터링
+          let calEvents = econEvents;
+          if (econFilter !== "all") {
+            calEvents = econEvents.filter(e => {
+              if (econFilter === "경제지표") return true;
+              return e.type === econFilter;
+            });
+          }
+
+          calEvents.forEach(evt => {
+            const kstDate = new Date(evt.date.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+            const weekKey = `${kstDate.getFullYear()}-${String(kstDate.getMonth()+1).padStart(2,"0")}-W${getWeekOfMonth(kstDate)}`;
+            const monthLabel = `${kstDate.getFullYear()}년 ${kstDate.getMonth()+1}월`;
+            const weekLabel = `${getWeekOfMonth(kstDate)}주차`;
+            if (!eventsByWeek[weekKey]) eventsByWeek[weekKey] = { monthLabel, weekLabel, events: [] };
+            eventsByWeek[weekKey].events.push(evt);
+          });
+          const weekGroups = Object.values(eventsByWeek).sort((a, b) => {
+            const aFirst = a.events[0]?.date || 0;
+            const bFirst = b.events[0]?.date || 0;
+            return aFirst - bFirst;
+          });
+
+          // 이번주 핵심 이벤트 AI 요약
+          const thisWeekEvents = econEvents.filter(e => e.daysUntil >= 0 && e.daysUntil <= 7);
+          const importantThisWeek = thisWeekEvents.filter(e => /FOMC|CPI|NFP|GDP|PCE|ISM|PMI/i.test(e.event)).slice(0, 3);
+
+          // 이벤트가 있는 날짜 세트
+          const eventDates = new Set();
+          calEvents.forEach(evt => {
+            const kd = new Date(evt.date.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+            if (kd.getMonth() === calMonth && kd.getFullYear() === calYear) {
+              eventDates.add(kd.getDate());
+            }
+          });
+
+          return (
+            <div className="tab-content">
+              <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: "20px", alignItems: "start" }}>
+
+                {/* ── 좌측: 미니 캘린더 + AI 요약 ── */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px", position: "sticky", top: "80px" }}>
+                  {/* 미니 캘린더 */}
+                  <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20` }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                      <button onClick={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y-1); } else setCalMonth(m => m-1); }}
+                        style={{ background: "none", border: "none", color: C.text2, fontSize: "16px", cursor: "pointer", padding: "4px 8px" }}>‹</button>
+                      <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>{calYear}년 {monthNames[calMonth]}</span>
+                      <button onClick={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y+1); } else setCalMonth(m => m+1); }}
+                        style={{ background: "none", border: "none", color: C.text2, fontSize: "16px", cursor: "pointer", padding: "4px 8px" }}>›</button>
+                    </div>
+                    {/* 요일 헤더 */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "2px", marginBottom: "4px" }}>
+                      {["월","화","수","목","금","토","일"].map(d => (
+                        <div key={d} style={{ textAlign: "center", fontSize: "11px", fontWeight: 600, color: C.text3, padding: "4px 0" }}>{d}</div>
+                      ))}
+                    </div>
+                    {/* 날짜 그리드 */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: "2px" }}>
+                      {/* 빈칸 (월요일 기준) */}
+                      {Array.from({ length: (firstDay + 6) % 7 }).map((_, i) => <div key={`e-${i}`} />)}
+                      {Array.from({ length: daysInMonth }).map((_, i) => {
+                        const day = i + 1;
+                        const isToday = day === today.getDate() && calMonth === today.getMonth() && calYear === today.getFullYear();
+                        const hasEvent = eventDates.has(day);
+                        return (
+                          <div key={day} style={{
+                            textAlign: "center", padding: "6px 0", borderRadius: "8px",
+                            fontSize: "13px", fontWeight: isToday ? 800 : 500, position: "relative",
+                            color: isToday ? "#fff" : hasEvent ? C.text1 : C.text3,
+                            background: isToday ? C.blue : "transparent",
+                            cursor: hasEvent ? "pointer" : "default",
+                          }}>
+                            {day}
+                            {hasEvent && !isToday && (
+                              <div style={{ width: "4px", height: "4px", borderRadius: "50%", background: C.blue, margin: "2px auto 0" }} />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* AI 이번주 요약 */}
+                  {importantThisWeek.length > 0 && (
+                    <div style={{
+                      background: `linear-gradient(135deg, ${C.card} 0%, ${C.blue}0A 100%)`,
+                      borderRadius: "16px", padding: "20px", border: `1px solid ${C.blue}20`,
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "12px" }}>
+                        <span style={{ fontSize: "14px" }}>✦</span>
+                        <span style={{ fontWeight: 700, fontSize: "13px", color: C.blue }}>이번주 AI 요약</span>
+                      </div>
+                      <div style={{ fontSize: "13px", color: C.text1, lineHeight: 1.6 }}>
+                        {importantThisWeek.map((evt, i) => {
+                          const kd = new Date(evt.date.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+                          const dayName = ["일","월","화","수","목","금","토"][kd.getDay()];
+                          return (
+                            <div key={i} style={{ marginBottom: i < importantThisWeek.length - 1 ? "8px" : 0 }}>
+                              <strong>{evt.name}</strong> 발표가 {kd.getDate()}일({dayName}) 예정되어 있어요
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <div style={{ marginTop: "10px", fontSize: "12px", color: C.blue, cursor: "pointer", fontWeight: 600 }}>
+                        자세히 보기 ›
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── 우측: 이벤트 목록 ── */}
+                <div>
+                  {/* 필터 탭 */}
+                  <div style={{ display: "flex", gap: "6px", marginBottom: "20px", flexWrap: "wrap" }}>
+                    {calFilterTabs.map(ft => (
+                      <button key={ft.key} onClick={() => setEconFilter(ft.key)} style={{
+                        padding: "8px 18px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                        background: econFilter === ft.key ? C.blueBg : C.card,
+                        color: econFilter === ft.key ? C.blue : C.text2,
+                        border: `1px solid ${econFilter === ft.key ? C.blue + "44" : C.border + "30"}`,
+                        cursor: "pointer", transition: "all 0.15s",
+                      }}>{ft.label}</button>
+                    ))}
+                  </div>
+
+                  {/* 주차별 이벤트 그룹 */}
+                  {weekGroups.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: "60px 0", color: C.text3 }}>
+                      <div style={{ fontSize: "32px", marginBottom: "12px" }}>📅</div>
+                      <div style={{ fontSize: "14px" }}>해당 필터에 맞는 이벤트가 없습니다</div>
+                    </div>
+                  ) : weekGroups.map((group, gi) => (
+                    <div key={gi} style={{ marginBottom: "24px" }}>
+                      {/* 주차 헤더 */}
+                      <div style={{ fontSize: "15px", fontWeight: 700, color: C.text1, marginBottom: "12px", padding: "0 4px" }}>
+                        {group.monthLabel} {group.weekLabel}
+                      </div>
+
+                      {/* 테이블 헤더 */}
+                      <div style={{
+                        display: "grid", gridTemplateColumns: "60px 1fr 80px 80px 80px",
+                        gap: "4px", padding: "8px 16px",
+                        fontSize: "11px", fontWeight: 700, color: C.text3,
+                        background: C.card, borderRadius: "12px 12px 0 0", border: `1px solid ${C.border}20`, borderBottom: "none",
+                      }}>
+                        <span></span>
+                        <span></span>
+                        <span style={{ textAlign: "right" }}>발표</span>
+                        <span style={{ textAlign: "right" }}>예측</span>
+                        <span style={{ textAlign: "right" }}>이전</span>
+                      </div>
+
+                      {/* 이벤트 목록 */}
+                      <div style={{
+                        background: C.card, borderRadius: "0 0 12px 12px", border: `1px solid ${C.border}20`, borderTop: `1px solid ${C.border}15`,
+                        overflow: "hidden",
+                      }}>
+                        {group.events.map((evt, i) => {
+                          const kstDate = new Date(evt.date.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+                          const d = kstDate.getDate();
+                          const dayName = ["일","월","화","수","목","금","토"][kstDate.getDay()];
+                          const invertedIndicator = /CPI|PCE|PPI|Unemployment/i.test(evt.event);
+                          const hasActual = evt.actual != null && evt.estimate != null;
+                          const beat = hasActual ? (invertedIndicator ? evt.actual < evt.estimate : evt.actual > evt.estimate) : null;
+                          const miss = hasActual ? (invertedIndicator ? evt.actual > evt.estimate : evt.actual < evt.estimate) : null;
+                          const isPast = evt.daysUntil < 0;
+                          const isToday = evt.status === "오늘";
+                          const kstHour = String(kstDate.getHours()).padStart(2, "0");
+                          const kstMin = String(kstDate.getMinutes()).padStart(2, "0");
+
+                          return (
+                            <div key={`${evt.event}-${i}`} style={{
+                              display: "grid", gridTemplateColumns: "60px 1fr 80px 80px 80px",
+                              gap: "4px", alignItems: "center", padding: "14px 16px",
+                              borderBottom: i < group.events.length - 1 ? `1px solid ${C.border}10` : "none",
+                              opacity: isPast ? 0.6 : 1,
+                              background: isToday ? `${C.blue}08` : "transparent",
+                              transition: "background 0.12s",
+                            }}
+                            onMouseEnter={e => { if (!isToday) e.currentTarget.style.background = `${C.card2}80`; }}
+                            onMouseLeave={e => { if (!isToday) e.currentTarget.style.background = "transparent"; }}
+                            >
+                              {/* 날짜 */}
+                              <div>
+                                <span style={{
+                                  fontSize: "14px", fontWeight: 700,
+                                  color: isToday ? C.blue : C.text1,
+                                }}>{d}{dayName}</span>
+                              </div>
+
+                              {/* 이벤트명 */}
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                                <span style={{ fontSize: "14px", flexShrink: 0 }}>{evt.icon}</span>
+                                <div style={{ minWidth: 0 }}>
+                                  <div style={{ fontWeight: 600, fontSize: "13px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                                    {evt.name}
+                                  </div>
+                                  {evt.daysUntil >= 0 && (
+                                    <div style={{ fontSize: "11px", color: C.text3 }}>
+                                      {isToday ? `오늘 ${kstHour}:${kstMin}` : `오후 ${kstHour}:${kstMin} 발표 예정`}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* 발표 */}
+                              <div style={{ textAlign: "right" }}>
+                                {evt.actual != null ? (
+                                  <span style={{ fontSize: "13px", fontWeight: 700, color: beat ? C.green : miss ? C.red : C.text1, fontVariantNumeric: "tabular-nums" }}>
+                                    {evt.actual}{evt.unit}
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: "11px", color: C.text3 }}>
+                                    {isPast ? "발표 대기" : `${kstHour}시 발표 예정`}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* 예측 */}
+                              <div style={{ textAlign: "right" }}>
+                                <span style={{ fontSize: "13px", color: C.text2, fontVariantNumeric: "tabular-nums" }}>
+                                  {evt.estimate != null ? `${evt.estimate}${evt.unit}` : "—"}
+                                </span>
+                              </div>
+
+                              {/* 이전 */}
+                              <div style={{ textAlign: "right" }}>
+                                <span style={{ fontSize: "13px", color: C.text3, fontVariantNumeric: "tabular-nums" }}>
+                                  {evt.previous != null ? `${evt.previous}${evt.unit}` : "—"}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 알림
