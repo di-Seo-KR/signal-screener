@@ -760,11 +760,76 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
           const hours = Math.floor((elapsed % 86400000) / 3600000);
           const isStock = STOCK_BOTS.some(b => b.id === ab.botId);
 
-          // 해당 봇의 실제 거래 수 (로그에서 카운트)
-          const botTrades = tradeLog.filter(t => {
-            if (isStock) return !t.symbol?.includes("/") && !t.symbol?.includes("BTC");
+          // 해당 봇의 실제 거래 로그 필터링
+          const botTradeLog = tradeLog.filter(t => {
+            if (isStock) return !t.symbol?.includes("/") && !t.symbol?.includes("BTC") && !t.symbol?.includes("ETH");
             return t.symbol?.includes("/") || t.symbol?.includes("BTC") || t.symbol?.includes("ETH");
-          }).length;
+          });
+          const botTrades = botTradeLog.length;
+
+          // 봇별 실제 누적 P&L 차트 데이터 생성
+          const botPnlCurve = (() => {
+            const withPnl = botTradeLog
+              .filter(t => t.time && t.pnl != null)
+              .sort((a, b) => new Date(a.time) - new Date(b.time));
+            if (withPnl.length < 2) {
+              // 알파카 포트폴리오 히스토리에서 봇 비율만큼 분배
+              if (equityHistory.length >= 2 && activeBots.length > 0) {
+                const base = equityHistory[0].equity;
+                const share = 1 / activeBots.length; // 균등 분배
+                return equityHistory.map(h => {
+                  const totalPnl = h.equity - base;
+                  return 100 + (totalPnl * share / base) * 100;
+                });
+              }
+              return null;
+            }
+            let cum = 0;
+            const curve = [0];
+            for (const t of withPnl) {
+              cum += parseFloat(t.pnl || 0);
+              curve.push(cum);
+            }
+            // 달러 P&L → 100 기준 정규화
+            const initEquity = account ? parseFloat(account.equity) / activeBots.length : 10000;
+            return curve.map(v => 100 + (v / initEquity) * 100);
+          })();
+
+          const botReturn = botPnlCurve && botPnlCurve.length >= 2
+            ? ((botPnlCurve[botPnlCurve.length - 1] - botPnlCurve[0]) / botPnlCurve[0] * 100)
+            : null;
+          const botIsPositive = botReturn != null ? botReturn >= 0 : true;
+
+          // 봇 P&L 달러 계산
+          const botPnlDollar = (() => {
+            const withPnl = botTradeLog.filter(t => t.pnl != null);
+            if (withPnl.length > 0) return withPnl.reduce((s, t) => s + parseFloat(t.pnl || 0), 0);
+            if (equityHistory.length >= 2 && activeBots.length > 0) {
+              const totalPnl = equityHistory[equityHistory.length - 1].equity - equityHistory[0].equity;
+              return totalPnl / activeBots.length;
+            }
+            return null;
+          })();
+
+          // 봇 P&L 날짜 라벨
+          const botDateLabels = (() => {
+            const withTime = botTradeLog.filter(t => t.time).sort((a, b) => new Date(a.time) - new Date(b.time));
+            if (withTime.length >= 2) {
+              const first = new Date(withTime[0].time);
+              const last = new Date(withTime[withTime.length - 1].time);
+              return [
+                first.toLocaleDateString("ko-KR", { month: "short", day: "numeric" }),
+                last.toLocaleDateString("ko-KR", { month: "short", day: "numeric" }),
+              ];
+            }
+            if (equityHistory.length >= 2) {
+              return [
+                new Date(equityHistory[0].timestamp).toLocaleDateString("ko-KR", { month: "short", day: "numeric" }),
+                new Date(equityHistory[equityHistory.length - 1].timestamp).toLocaleDateString("ko-KR", { month: "short", day: "numeric" }),
+              ];
+            }
+            return [];
+          })();
 
           return (
             <div key={ab.botId} style={{
@@ -784,6 +849,59 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
                   background: `${c.green}15`, color: c.green,
                 }}>운영 중</div>
               </div>
+
+              {/* 봇별 실제 P&L 차트 */}
+              {botPnlCurve && botPnlCurve.length >= 2 && (
+                <div style={{ background: c.card2, borderRadius: "10px", padding: "12px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: c.text3 }}>실제 P&L</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      {botPnlDollar != null && (
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: botPnlDollar >= 0 ? c.green : c.red }}>
+                          {botPnlDollar >= 0 ? "+" : ""}${Math.abs(botPnlDollar).toFixed(2)}
+                        </span>
+                      )}
+                      {botReturn != null && (
+                        <span style={{ fontSize: "13px", fontWeight: 800, color: botIsPositive ? c.green : c.red }}>
+                          {botIsPositive ? "+" : ""}{botReturn.toFixed(2)}%
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {(() => {
+                    const w = 300, h = 64;
+                    const min = Math.min(...botPnlCurve) * 0.998;
+                    const max = Math.max(...botPnlCurve) * 1.002;
+                    const rng = max - min || 1;
+                    const xStep = w / (botPnlCurve.length - 1);
+                    const pts = botPnlCurve.map((v, i) => `${(i * xStep).toFixed(1)},${(h - ((v - min) / rng) * (h - 6) - 3).toFixed(1)}`);
+                    const linePath = `M${pts.join(" L")}`;
+                    const areaPath = `${linePath} L${w},${h} L0,${h} Z`;
+                    const clr = botIsPositive ? c.green : c.red;
+                    const baseY = h - ((100 - min) / rng) * (h - 6) - 3;
+                    const gradId = `bot-pnl-${ab.botId.replace(/[^a-z0-9]/gi, "")}`;
+                    return (
+                      <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ borderRadius: "4px", overflow: "hidden" }}>
+                        <defs>
+                          <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor={clr} stopOpacity="0.25" />
+                            <stop offset="100%" stopColor={clr} stopOpacity="0.02" />
+                          </linearGradient>
+                        </defs>
+                        <line x1="0" y1={baseY} x2={w} y2={baseY} stroke={c.text3} strokeWidth="0.5" strokeDasharray="2,2" opacity="0.3" />
+                        <path d={areaPath} fill={`url(#${gradId})`} />
+                        <path d={linePath} fill="none" stroke={clr} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        <circle cx={((botPnlCurve.length - 1) * xStep).toFixed(1)} cy={pts[pts.length - 1].split(",")[1]} r="2.5" fill={clr} />
+                      </svg>
+                    );
+                  })()}
+                  {botDateLabels.length >= 2 && (
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: "3px" }}>
+                      {botDateLabels.map((l, i) => <span key={i} style={{ fontSize: "9px", color: c.text3 }}>{l}</span>)}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div style={{
                 display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px",
