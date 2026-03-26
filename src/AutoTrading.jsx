@@ -1,7 +1,98 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import PaperTrading from "./PaperTrading.jsx";
 import BTCTrading from "./BTCTrading.jsx";
 import { useAuth } from "./AuthProvider.jsx";
+
+// ── 시뮬레이션 에쿼티 커브 생성 (시드 기반 결정론적) ──
+function generateEquityCurve(bot, months = 12) {
+  const winRate = parseFloat(bot.stats.winRate) / 100;
+  const mdd = parseFloat(bot.stats.mdd) / 100;
+  const sharpe = parseFloat(bot.stats.sharpeRatio);
+  // 월평균 수익률 추정 (연간 기대수익의 중간값 / 12)
+  const expectedRange = bot.expectedReturn.replace("%+", "").replace("%", "").split("-");
+  const midReturn = (parseFloat(expectedRange[0]) + parseFloat(expectedRange[1] || expectedRange[0])) / 2;
+  const monthlyMu = midReturn / 12 / 100;
+  const monthlySigma = monthlyMu / (sharpe / Math.sqrt(12) || 1);
+
+  // 시드 해시 (봇 ID 기반)
+  let seed = 0;
+  for (let i = 0; i < bot.id.length; i++) seed = ((seed << 5) - seed + bot.id.charCodeAt(i)) | 0;
+  const rng = () => { seed = (seed * 16807 + 0) % 2147483647; return (seed & 0x7fffffff) / 0x7fffffff; };
+
+  const curve = [100];
+  let peak = 100;
+  for (let m = 1; m <= months; m++) {
+    // Box-Muller 근사
+    const u1 = rng(), u2 = rng();
+    const z = Math.sqrt(-2 * Math.log(u1 + 0.001)) * Math.cos(2 * Math.PI * u2);
+    let ret = monthlyMu + monthlySigma * z * 0.6;
+    // 승률 편향
+    if (rng() > winRate) ret = -Math.abs(ret) * 0.8;
+    // MDD 제약
+    const next = curve[m - 1] * (1 + ret);
+    peak = Math.max(peak, next);
+    const dd = (peak - next) / peak;
+    if (dd > mdd) {
+      curve.push(peak * (1 - mdd));
+    } else {
+      curve.push(next);
+    }
+  }
+  return curve;
+}
+
+// ── SVG 미니 에쿼티 차트 ──
+function MiniEquityChart({ data, color, width = 280, height = 80, theme }) {
+  const c = colors[theme];
+  if (!data || data.length < 2) return null;
+
+  const min = Math.min(...data) * 0.998;
+  const max = Math.max(...data) * 1.002;
+  const range = max - min || 1;
+  const xStep = width / (data.length - 1);
+
+  const points = data.map((v, i) => `${(i * xStep).toFixed(1)},${(height - ((v - min) / range) * (height - 8) - 4).toFixed(1)}`);
+  const linePath = `M${points.join(" L")}`;
+  const areaPath = `${linePath} L${width},${height} L0,${height} Z`;
+
+  const lastVal = data[data.length - 1];
+  const totalReturn = ((lastVal - data[0]) / data[0] * 100).toFixed(1);
+  const isPositive = lastVal >= data[0];
+
+  // 월별 라벨
+  const monthLabels = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+
+  return (
+    <div style={{ position: "relative" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
+        <span style={{ fontSize: "11px", fontWeight: 700, color: c.text3 }}>12개월 시뮬레이션 수익률</span>
+        <span style={{ fontSize: "13px", fontWeight: 800, color: isPositive ? c.green : c.red }}>
+          {isPositive ? "+" : ""}{totalReturn}%
+        </span>
+      </div>
+      <svg width="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ borderRadius: "6px", overflow: "hidden" }}>
+        <defs>
+          <linearGradient id={`eq-grad-${color.replace("#","")}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        {/* 기준선 (100) */}
+        <line x1="0" y1={height - ((100 - min) / range) * (height - 8) - 4} x2={width} y2={height - ((100 - min) / range) * (height - 8) - 4}
+          stroke={c.text3} strokeWidth="0.5" strokeDasharray="3,3" opacity="0.4" />
+        <path d={areaPath} fill={`url(#eq-grad-${color.replace("#","")})`} />
+        <path d={linePath} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        {/* 끝점 */}
+        <circle cx={((data.length - 1) * xStep).toFixed(1)} cy={(height - ((lastVal - min) / range) * (height - 8) - 4).toFixed(1)} r="3" fill={color} />
+      </svg>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
+        {[0, 3, 6, 9, 11].map(i => (
+          <span key={i} style={{ fontSize: "9px", color: c.text3 }}>{monthLabels[i]}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const colors = {
   dark: {
@@ -199,6 +290,8 @@ function getRiskColor(riskColor, theme) {
 
 function BotCard({ bot, onActivate, theme }) {
   const c = colors[theme];
+  const equityCurve = useMemo(() => generateEquityCurve(bot, 12), [bot.id]);
+  const chartColor = getRiskColor(bot.riskColor, theme);
 
   return (
     <div
@@ -304,6 +397,16 @@ function BotCard({ bot, onActivate, theme }) {
         </div>
       </div>
 
+      {/* Equity Curve Chart */}
+      <div style={{
+        backgroundColor: c.card2,
+        padding: "12px 14px",
+        borderRadius: "8px",
+        border: `1px solid ${c.border}60`,
+      }}>
+        <MiniEquityChart data={equityCurve} color={chartColor} theme={theme} />
+      </div>
+
       {/* Action button */}
       <button
         onClick={() => onActivate(bot)}
@@ -350,10 +453,10 @@ function BotCatalog({ onActivate, theme }) {
         }}
       >
         <h1 style={{ margin: "0 0 16px 0", color: c.text1, fontSize: "40px", fontWeight: "700" }}>
-          AI 퀀트 자동매매
+          AI 퀀트 전략
         </h1>
-        <p style={{ margin: "0", color: c.text2, fontSize: "18px" }}>
-          전문 트레이딩 봇으로 24/7 시장을 모니터링하고 자동으로 수익을 창출하세요
+        <p style={{ margin: "0", color: c.text2, fontSize: "18px", maxWidth: "600px", marginLeft: "auto", marginRight: "auto" }}>
+          AI 기반 퀀트 봇이 24/7 시장을 분석하고 최적의 매매 시그널을 생성합니다
         </p>
       </div>
 
