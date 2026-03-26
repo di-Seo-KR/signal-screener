@@ -654,12 +654,24 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
     return null; // 데이터 없음
   }, [equityHistory, tradeLog]);
 
-  // 현재 수익률
-  const currentReturn = account
-    ? ((parseFloat(account.equity) - parseFloat(account.last_equity || account.equity)) / parseFloat(account.last_equity || account.equity) * 100)
-    : equityHistory.length >= 2
-      ? ((equityHistory[equityHistory.length - 1].equity - equityHistory[0].equity) / equityHistory[0].equity * 100)
-      : null;
+  // 현재 수익률 (NaN 방지)
+  const currentReturn = (() => {
+    if (account) {
+      const eq = parseFloat(account.equity);
+      const lastEq = parseFloat(account.last_equity || account.equity);
+      if (!lastEq || !isFinite(lastEq)) return null;
+      const ret = ((eq - lastEq) / lastEq * 100);
+      return isFinite(ret) ? ret : null;
+    }
+    if (equityHistory.length >= 2) {
+      const first = equityHistory[0].equity;
+      const last = equityHistory[equityHistory.length - 1].equity;
+      if (!first || !isFinite(first)) return null;
+      const ret = ((last - first) / first * 100);
+      return isFinite(ret) ? ret : null;
+    }
+    return null;
+  })();
 
   const totalEquity = account ? parseFloat(account.equity) : null;
   const totalPL = account ? (parseFloat(account.equity) - (parseFloat(account.last_equity) || parseFloat(account.equity))) : null;

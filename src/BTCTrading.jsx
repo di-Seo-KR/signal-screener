@@ -624,7 +624,6 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
         {[
           { id: "overview", label: "전략 개요", icon: "📊" },
           { id: "signals", label: "시그널", icon: "🔔" },
-          { id: "backtest", label: "백테스트", icon: "📈" },
           { id: "performance", label: "성과 분석", icon: "📉" },
           { id: "log", label: "매매 기록", icon: "📋" },
         ].map(t => (

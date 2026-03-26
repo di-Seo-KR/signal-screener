@@ -10280,19 +10280,114 @@ function AppInner() {
       </div>{/* di-app-body */}
 
       {/* ── 글로벌 검색 (/ 단축키) ── */}
-      {globalSearchOpen && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "15vh" }}
-          onClick={(e) => { if (e.target === e.currentTarget) setGlobalSearchOpen(false); }}>
-          <div style={{ width: "520px", maxWidth: "90vw", background: C.card, borderRadius: "20px", border: `1px solid ${C.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.4)", padding: "8px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px", borderBottom: `1px solid ${C.border}30`, marginBottom: "4px" }}>
-              <span style={{ fontSize: "16px", color: C.text3 }}>🔍</span>
-              <span style={{ fontSize: "14px", fontWeight: 600, color: C.text1 }}>종목 검색</span>
-              <span style={{ marginLeft: "auto", fontSize: "11px", color: C.text3, background: C.card2, padding: "2px 8px", borderRadius: "4px" }}>ESC</span>
+      {globalSearchOpen && (() => {
+        const popularStocks = [
+          { symbol: "NVDA", name: "NVIDIA", market: "us", icon: "🟢" },
+          { symbol: "AAPL", name: "Apple", market: "us", icon: "🍎" },
+          { symbol: "TSLA", name: "Tesla", market: "us", icon: "⚡" },
+          { symbol: "MSFT", name: "Microsoft", market: "us", icon: "🪟" },
+          { symbol: "GOOG", name: "Alphabet", market: "us", icon: "🔍" },
+          { symbol: "AMZN", name: "Amazon", market: "us", icon: "📦" },
+        ];
+        const cryptoQuick = [
+          { symbol: "BTC-USD", name: "Bitcoin", market: "crypto", icon: "₿" },
+          { symbol: "ETH-USD", name: "Ethereum", market: "crypto", icon: "Ξ" },
+          { symbol: "SOL-USD", name: "Solana", market: "crypto", icon: "◎" },
+        ];
+        const categories = [
+          { label: "AI/반도체", tab: "screener", icon: "🧠" },
+          { label: "배당주", tab: "screener", icon: "💰" },
+          { label: "성장주", tab: "screener", icon: "📈" },
+          { label: "크립토", tab: "auto-trading", icon: "₿" },
+        ];
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "12vh" }}
+            onClick={(e) => { if (e.target === e.currentTarget) setGlobalSearchOpen(false); }}>
+            <div style={{ width: "560px", maxWidth: "92vw", background: C.card, borderRadius: "20px", border: `1px solid ${C.border}`, boxShadow: "0 24px 80px rgba(0,0,0,0.5)", overflow: "hidden" }}>
+              {/* 검색 헤더 */}
+              <div style={{ padding: "16px 20px 12px" }}>
+                <SearchBar onSelect={(asset) => { setSelectedAsset(asset); setGlobalSearchOpen(false); }} placeholder="종목명 또는 티커 입력 (예: NVDA, 삼성전자)" />
+              </div>
+
+              {/* 빠른 카테고리 */}
+              <div style={{ padding: "0 20px 12px", display: "flex", gap: "8px" }}>
+                {categories.map(cat => (
+                  <button key={cat.label} onClick={() => { setTab(cat.tab); setGlobalSearchOpen(false); }} style={{
+                    padding: "6px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 600,
+                    background: C.card2, color: C.text2, border: `1px solid ${C.border}30`, cursor: "pointer",
+                    transition: "all 0.15s", display: "flex", alignItems: "center", gap: "4px",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = C.blueBg; e.currentTarget.style.color = C.blue; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = C.card2; e.currentTarget.style.color = C.text2; }}
+                  >
+                    <span style={{ fontSize: "11px" }}>{cat.icon}</span>
+                    {cat.label}
+                  </button>
+                ))}
+                <span style={{ marginLeft: "auto", fontSize: "11px", color: C.text3, background: C.card2, padding: "6px 10px", borderRadius: "6px", alignSelf: "center" }}>ESC</span>
+              </div>
+
+              <div style={{ height: "1px", background: `${C.border}30` }} />
+
+              {/* 인기 종목 */}
+              <div style={{ padding: "16px 20px 8px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: C.text3, marginBottom: "10px", letterSpacing: "0.5px", textTransform: "uppercase" }}>인기 종목</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                  {popularStocks.map(s => {
+                    const asset = ALL_ASSETS.find(a => a.symbol === s.symbol);
+                    return (
+                      <button key={s.symbol} onClick={() => { if (asset) { setSelectedAsset(asset); setGlobalSearchOpen(false); }}} style={{
+                        display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px",
+                        borderRadius: "10px", background: "transparent", border: "none", cursor: "pointer",
+                        transition: "all 0.12s", textAlign: "left", width: "100%",
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = C.card2}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                      >
+                        <div style={{
+                          width: "32px", height: "32px", borderRadius: "8px", flexShrink: 0,
+                          background: "#1A2C4F", display: "flex", alignItems: "center", justifyContent: "center",
+                          fontWeight: 800, fontSize: "8px", color: C.blue,
+                        }}>{s.symbol.slice(0, 4)}</div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, fontSize: "13px", color: C.text1 }}>{s.name}</div>
+                          <div style={{ fontSize: "11px", color: C.text3 }}>🇺🇸 {s.symbol}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 크립토 바로가기 */}
+              <div style={{ padding: "8px 20px 16px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: C.text3, marginBottom: "10px", letterSpacing: "0.5px", textTransform: "uppercase" }}>크립토</div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  {cryptoQuick.map(c => {
+                    const asset = ALL_ASSETS.find(a => a.symbol === c.symbol || a.symbol === c.symbol.replace("-USD", "/USD"));
+                    return (
+                      <button key={c.symbol} onClick={() => { if (asset) { setSelectedAsset(asset); setGlobalSearchOpen(false); } else { setTab("auto-trading"); setGlobalSearchOpen(false); }}} style={{
+                        flex: 1, display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px",
+                        borderRadius: "10px", background: C.card2, border: `1px solid ${C.border}20`, cursor: "pointer",
+                        transition: "all 0.12s",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.purple + "40"; e.currentTarget.style.background = `${C.purple}10`; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border + "20"; e.currentTarget.style.background = C.card2; }}
+                      >
+                        <span style={{ fontSize: "18px", fontWeight: 800, color: C.purple }}>{c.icon}</span>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: "12px", color: C.text1 }}>{c.name}</div>
+                          <div style={{ fontSize: "10px", color: C.text3 }}>{c.symbol}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-            <SearchBar onSelect={(asset) => { setSelectedAsset(asset); setGlobalSearchOpen(false); }} placeholder="종목명 또는 티커 입력 (예: NVDA, 삼성전자)" />
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ═══ 로그인 필요 모달 ═══ */}
       {showAuthModal && (
