@@ -4076,6 +4076,8 @@ function AppInner() {
 
   const [gnbHover, setGnbHover] = useState(null); // GNB 호버 드롭다운 상태
   const gnbHoverTimeout = useRef(null);
+  const [userDropOpen, setUserDropOpen] = useState(false); // 유저 드롭다운 상태
+  const userDropTimeout = useRef(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [sbCollapsed, setSbCollapsed] = useState({ main: false, ops: false, info: false });
 
@@ -6341,13 +6343,11 @@ function AppInner() {
         /* ── 모바일 (≤640px) — 폰트/간격 확대 + 터치 최적화 (v9.2 개선) ── */
         @media (max-width: 640px) {
           header { padding: 0 6px !important; height: auto !important; min-height: 48px !important; }
-          header > div { padding: 0 6px !important; height: 48px !important; gap: 4px !important; }
-          /* 모바일 헤더: 유저 이름/검색 텍스트 숨김 → 오버플로 방지 */
-          .header-user-name { display: none !important; }
-          .header-user-chip { padding: 3px !important; }
+          header > div { padding: 0 6px !important; height: 48px !important; gap: 6px !important; }
+          /* 모바일: 로고 + 검색 + 햄버거만. 유저칩/테마/로그인 버튼 숨김 → 햄버거 메뉴로 이동 */
+          .desktop-only { display: none !important; }
           .header-search-label { display: none !important; }
-          .header-search-btn { padding: 7px 8px !important; }
-          .header-theme-btn { width: 32px !important; height: 32px !important; font-size: 14px !important; }
+          .header-search-btn { padding: 7px 9px !important; }
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
           .lnb-sidebar { display: none !important; }
@@ -6558,9 +6558,9 @@ function AppInner() {
             ))}
           </nav>
 
-          {/* 우측: 검색 + 사용자 + 테마 + 햄버거 */}
+          {/* 우측: 검색 + 사용자(데스크톱) + 테마(데스크톱) + 햄버거(모바일) */}
           <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-            {/* 검색 — 데스크탑: 텍스트 포함, 모바일: 아이콘만 */}
+            {/* 검색 */}
             <button className="header-search-btn" onClick={() => setGlobalSearchOpen(true)} aria-label="검색" style={{
               display: "flex", alignItems: "center", gap: "6px",
               padding: "7px 14px", borderRadius: "10px",
@@ -6572,23 +6572,95 @@ function AppInner() {
               <span className="header-search-label" style={{ fontSize: "10px", padding: "1px 5px", borderRadius: "3px", background: C.bg, color: C.text3 }}>/</span>
             </button>
 
-            {/* 사용자 섹션 */}
+            {/* 데스크톱: 사용자 칩 + 호버 드롭다운 (네이버 스타일) */}
             {user ? (
-            <button className="header-user-chip" onClick={() => setTab("profile")} aria-label="내 프로필" style={{
-              display: "flex", alignItems: "center", gap: "6px", padding: "4px 10px 4px 4px",
-              background: C.card2, borderRadius: "12px", border: `1px solid ${C.border}30`, cursor: "pointer",
-            }}>
-              <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: C.blueBg,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "13px", fontWeight: 700, color: C.blue, flexShrink: 0 }}>
-                {(user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()}
-              </div>
-              <span className="header-user-name" style={{ fontSize: "12px", color: C.text2, maxWidth: "80px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User"}
-              </span>
-            </button>
+            <div className="desktop-only" style={{ position: "relative" }}
+              onMouseEnter={() => { if (userDropTimeout.current) clearTimeout(userDropTimeout.current); setUserDropOpen(true); }}
+              onMouseLeave={() => { userDropTimeout.current = setTimeout(() => setUserDropOpen(false), 200); }}
+            >
+              <button aria-label="내 계정" style={{
+                display: "flex", alignItems: "center", gap: "6px", padding: "4px 10px 4px 4px",
+                background: userDropOpen ? C.blueBg : C.card2, borderRadius: "12px",
+                border: `1px solid ${userDropOpen ? C.blue + "40" : C.border + "30"}`, cursor: "pointer",
+                transition: "all 0.15s",
+              }}>
+                <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: C.blueBg,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "13px", fontWeight: 700, color: C.blue, flexShrink: 0 }}>
+                  {(user?.user_metadata?.avatar_url)
+                    ? <img src={user.user_metadata.avatar_url} alt="" style={{ width: "28px", height: "28px", borderRadius: "50%", objectFit: "cover" }} />
+                    : (user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()
+                  }
+                </div>
+                <span style={{ fontSize: "12px", color: C.text2, maxWidth: "80px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User"}
+                </span>
+                <span style={{ fontSize: "9px", opacity: 0.5, transition: "transform 0.15s", transform: userDropOpen ? "rotate(180deg)" : "none" }}>▾</span>
+              </button>
+              {/* 유저 드롭다운 LNB */}
+              {userDropOpen && (
+                <div style={{
+                  position: "absolute", top: "calc(100% + 6px)", right: 0,
+                  background: C.card, border: `1px solid ${C.border}40`,
+                  borderRadius: "14px", padding: "8px", minWidth: "200px",
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.25)", zIndex: 9999,
+                  animation: "fadeIn 0.12s ease",
+                }}>
+                  {/* 유저 정보 헤더 */}
+                  <div style={{ padding: "10px 12px 12px", borderBottom: `1px solid ${C.border}20` }}>
+                    <div style={{ fontSize: "14px", fontWeight: 700, color: C.text1 }}>
+                      {user?.user_metadata?.display_name || user?.user_metadata?.full_name || user?.email?.split("@")[0]}
+                    </div>
+                    <div style={{ fontSize: "11px", color: C.text3, marginTop: "2px" }}>{user?.email}</div>
+                  </div>
+                  {/* 메뉴 항목 */}
+                  {[
+                    { id: "profile", label: "회원정보", icon: "👤" },
+                    { id: "auto-trading", label: "봇 운영현황", icon: "🤖" },
+                    { id: "portfolio", label: "포트폴리오", icon: "💼" },
+                  ].map(item => (
+                    <button key={item.id} onClick={() => { setTab(item.id); setUserDropOpen(false); }} style={{
+                      display: "flex", alignItems: "center", gap: "10px", width: "100%",
+                      padding: "10px 12px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                      background: tab === item.id ? C.blueBg : "transparent",
+                      color: tab === item.id ? C.blue : C.text2,
+                      border: "none", cursor: "pointer", textAlign: "left", transition: "all 0.1s",
+                    }}
+                      onMouseEnter={e => { if (tab !== item.id) e.currentTarget.style.background = C.card2; }}
+                      onMouseLeave={e => { if (tab !== item.id) e.currentTarget.style.background = "transparent"; }}
+                    >
+                      <span style={{ fontSize: "14px" }}>{item.icon}</span>{item.label}
+                    </button>
+                  ))}
+                  <div style={{ height: "1px", background: C.border, opacity: 0.2, margin: "4px 0" }} />
+                  {/* 테마 토글 */}
+                  <button onClick={toggleTheme} style={{
+                    display: "flex", alignItems: "center", gap: "10px", width: "100%",
+                    padding: "10px 12px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                    background: "transparent", color: C.text2, border: "none", cursor: "pointer", textAlign: "left",
+                  }}
+                    onMouseEnter={e => e.currentTarget.style.background = C.card2}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <span style={{ fontSize: "14px" }}>{themeMode === "dark" ? "☀️" : "🌙"}</span>
+                    {themeMode === "dark" ? "라이트 모드" : "다크 모드"}
+                  </button>
+                  {/* 로그아웃 */}
+                  <button onClick={() => { if (confirm("로그아웃 하시겠습니까?")) { signOut(); setUserDropOpen(false); } }} style={{
+                    display: "flex", alignItems: "center", gap: "10px", width: "100%",
+                    padding: "10px 12px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                    background: "transparent", color: C.red, border: "none", cursor: "pointer", textAlign: "left",
+                  }}
+                    onMouseEnter={e => e.currentTarget.style.background = `${C.red}10`}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <span style={{ fontSize: "14px" }}>🚪</span>로그아웃
+                  </button>
+                </div>
+              )}
+            </div>
             ) : (
-            <button onClick={() => setShowAuthModal(true)} style={{
+            <button className="desktop-only" onClick={() => setShowAuthModal(true)} style={{
               padding: "8px 16px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
               background: C.blue, color: "#fff", border: "none", cursor: "pointer",
               display: "flex", alignItems: "center", gap: "6px", transition: "all 0.2s",
@@ -6598,14 +6670,16 @@ function AppInner() {
             </button>
             )}
 
-            {/* 테마 토글 */}
-            <button className="header-theme-btn" onClick={toggleTheme} aria-label={themeMode === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환"} title={themeMode === "dark" ? "라이트 모드" : "다크 모드"} style={{
+            {/* 데스크톱: 테마 토글 (비로그인 시에만 독립 표시. 로그인하면 드롭다운에 포함) */}
+            {!user && (
+            <button className="desktop-only header-theme-btn" onClick={toggleTheme} aria-label={themeMode === "dark" ? "라이트 모드" : "다크 모드"} style={{
               background: C.card2, border: `1px solid ${C.border}30`, borderRadius: "12px",
               width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: "16px", cursor: "pointer", color: C.text1, transition: "all 0.2s", flexShrink: 0,
             }}>
               {themeMode === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"}
             </button>
+            )}
 
             {/* 모바일 햄버거 버튼 */}
             <button className="mobile-menu-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="메뉴 열기" style={{
@@ -6644,10 +6718,29 @@ function AppInner() {
           boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
           maxHeight: "80vh",
         }}>
-          {/* 상단 헤더 — 로고 + 닫기 */}
+          {/* 상단: 유저 영역 or 로그인 + 닫기 */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "8px" }}>
-            <span style={{ fontSize: "15px", fontWeight: 800, color: C.blue }}>Toit 메뉴</span>
-            <button onClick={() => setMenuOpen(false)} style={{ background: "none", border: "none", color: C.text2, fontSize: "22px", cursor: "pointer", padding: "4px" }}>✕</button>
+            {user ? (
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: C.blueBg,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "15px", fontWeight: 700, color: C.blue }}>
+                  {(user?.user_metadata?.avatar_url)
+                    ? <img src={user.user_metadata.avatar_url} alt="" style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover" }} />
+                    : (user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()
+                  }
+                </div>
+                <div>
+                  <div style={{ fontSize: "14px", fontWeight: 700, color: C.text1 }}>
+                    {user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User"}
+                  </div>
+                  <div style={{ fontSize: "11px", color: C.text3 }}>{user?.email}</div>
+                </div>
+              </div>
+            ) : (
+              <span style={{ fontSize: "15px", fontWeight: 800, color: C.blue }}>Toit</span>
+            )}
+            <button onClick={() => setMenuOpen(false)} style={{ background: "none", border: "none", color: C.text2, fontSize: "22px", cursor: "pointer", padding: "4px", minHeight: "36px", minWidth: "36px" }}>✕</button>
           </div>
           {/* 섹션 구분 */}
           {[
@@ -6672,9 +6765,6 @@ function AppInner() {
               { id: "sentiment", label: "센티먼트", icon: "💬" },
               { id: "alerts", label: "알림 설정", icon: "🔔", locked: true },
             ]},
-            ...(user ? [{ section: "계정", items: [
-              { id: "profile", label: "내 프로필", icon: "👤" },
-            ]}] : []),
           ].map(group => (
             <div key={group.section}>
               <div style={{ fontSize: "10px", fontWeight: 700, color: C.text3, padding: "4px 4px 6px", letterSpacing: "0.05em", textTransform: "uppercase" }}>{group.section}</div>
@@ -6695,6 +6785,42 @@ function AppInner() {
               </div>
             </div>
           ))}
+          {/* 하단: 테마/로그인/로그아웃 */}
+          <div style={{ borderTop: `1px solid ${C.border}20`, paddingTop: "10px", display: "flex", gap: "8px" }}>
+            <button onClick={() => { toggleTheme(); }} style={{
+              flex: 1, padding: "10px", borderRadius: "12px", fontSize: "13px", fontWeight: 600,
+              background: C.card2, color: C.text2, border: "none", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+            }}>
+              {themeMode === "dark" ? "☀️ 라이트" : "🌙 다크"}
+            </button>
+            {user ? (
+              <>
+              <button onClick={() => { setTab("profile"); setMenuOpen(false); }} style={{
+                flex: 1, padding: "10px", borderRadius: "12px", fontSize: "13px", fontWeight: 600,
+                background: C.blueBg, color: C.blue, border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+              }}>
+                👤 내 정보
+              </button>
+              <button onClick={() => { if (confirm("로그아웃 하시겠습니까?")) { signOut(); setMenuOpen(false); } }} style={{
+                flex: 1, padding: "10px", borderRadius: "12px", fontSize: "13px", fontWeight: 600,
+                background: `${C.red}12`, color: C.red, border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+              }}>
+                로그아웃
+              </button>
+              </>
+            ) : (
+              <button onClick={() => { setShowAuthModal(true); setMenuOpen(false); }} style={{
+                flex: 2, padding: "10px", borderRadius: "12px", fontSize: "13px", fontWeight: 700,
+                background: C.blue, color: "#fff", border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+              }}>
+                로그인
+              </button>
+            )}
+          </div>
         </div>
         </>
       )}
@@ -9914,7 +10040,12 @@ function AppInner() {
               <div style={{ padding: "14px 20px", fontSize: "12px", fontWeight: 700, color: C.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>투자 설정</div>
               {[
                 { label: "관심 종목", value: `${watchlist.length}개`, action: () => setTab("screener") },
-                { label: "운영 중 봇", value: `${activeBots.length}개`, action: () => setTab("auto-trading") },
+                { label: "운영 중 봇", value: (() => {
+                  try {
+                    const k = `toit_${user.id.slice(0, 8)}_active_bots`;
+                    return `${JSON.parse(localStorage.getItem(k) || "[]").length}개`;
+                  } catch { return "0개"; }
+                })(), action: () => setTab("auto-trading") },
                 { label: "알파카 연동", value: (() => {
                   try {
                     const prefix = `di_${user.id.slice(0, 8)}_`;

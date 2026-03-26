@@ -966,6 +966,39 @@ export default function AutoTrading({ theme = "dark", user }) {
   const c = colors[theme];
   const { showToast } = useAuth();
   const [activeBot, setActiveBot] = useState(null);
+  const [showAlpacaSetup, setShowAlpacaSetup] = useState(false);
+  const [alpacaKey, setAlpacaKey] = useState("");
+  const [alpacaSecret, setAlpacaSecret] = useState("");
+  const [alpacaPaper, setAlpacaPaper] = useState(true);
+
+  // 알파카 설정 로드
+  const alpacaPrefix = user ? `di_${user.id.slice(0, 8)}_` : "";
+  const [alpacaConnected, setAlpacaConnected] = useState(() => {
+    if (!user) return false;
+    try {
+      const cfg = JSON.parse(localStorage.getItem(`${alpacaPrefix}alpaca_config`) || "null");
+      return !!(cfg?.apiKey && cfg?.apiSecret);
+    } catch { return false; }
+  });
+
+  const handleSaveAlpaca = useCallback(() => {
+    if (!user || !alpacaKey.trim() || !alpacaSecret.trim()) {
+      showToast("error", "API Key와 Secret Key를 모두 입력해주세요.");
+      return;
+    }
+    try {
+      localStorage.setItem(`${alpacaPrefix}alpaca_config`, JSON.stringify({
+        apiKey: alpacaKey.trim(),
+        apiSecret: alpacaSecret.trim(),
+        isPaper: alpacaPaper,
+      }));
+      setAlpacaConnected(true);
+      setShowAlpacaSetup(false);
+      showToast("success", "알파카 API가 연결되었습니다! 새로고침하면 실제 데이터가 표시됩니다.");
+    } catch (e) {
+      showToast("error", "저장 실패: " + e.message);
+    }
+  }, [user, alpacaKey, alpacaSecret, alpacaPaper, alpacaPrefix, showToast]);
 
   // 운영 중인 봇 목록 (localStorage 기반)
   const storageKey = user ? `toit_${user.id.slice(0,8)}_active_bots` : null;
@@ -1024,6 +1057,75 @@ export default function AutoTrading({ theme = "dark", user }) {
       }}
     >
       <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
+        {/* 알파카 API 연동 배너 */}
+        {user && !alpacaConnected && (
+          <div style={{
+            background: `linear-gradient(135deg, ${c.card} 0%, ${c.blue}08 100%)`,
+            border: `1px solid ${c.blue}30`, borderRadius: "14px", padding: "16px 20px", marginBottom: "20px",
+            display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "12px",
+          }}>
+            <div>
+              <div style={{ fontSize: "14px", fontWeight: 700, color: c.text1, marginBottom: "4px" }}>🔗 알파카 페이퍼트레이딩 연동</div>
+              <div style={{ fontSize: "12px", color: c.text3 }}>실제 수익률 데이터를 확인하려면 Alpaca API 키를 연결하세요</div>
+            </div>
+            <button onClick={() => setShowAlpacaSetup(true)} style={{
+              padding: "8px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
+              background: c.blue, color: "#fff", border: "none", cursor: "pointer",
+            }}>API 키 설정</button>
+          </div>
+        )}
+        {user && alpacaConnected && !showAlpacaSetup && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px",
+            padding: "8px 14px", background: `${c.green}10`, borderRadius: "10px", border: `1px solid ${c.green}20`,
+          }}>
+            <span style={{ fontSize: "12px", color: c.green, fontWeight: 600 }}>✅ 알파카 연동됨</span>
+            <button onClick={() => setShowAlpacaSetup(true)} style={{
+              fontSize: "11px", color: c.text3, background: "none", border: "none", cursor: "pointer", textDecoration: "underline",
+            }}>재설정</button>
+          </div>
+        )}
+        {/* 알파카 API 키 설정 폼 */}
+        {showAlpacaSetup && (
+          <div style={{
+            background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px",
+            padding: "24px", marginBottom: "20px",
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: c.text1 }}>Alpaca API 설정</h3>
+              <button onClick={() => setShowAlpacaSetup(false)} style={{ background: "none", border: "none", color: c.text3, fontSize: "18px", cursor: "pointer" }}>✕</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: 600, color: c.text2, marginBottom: "4px", display: "block" }}>API Key</label>
+                <input value={alpacaKey} onChange={e => setAlpacaKey(e.target.value)} placeholder="PKXXXXXXXXXXXXXXXXXX"
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: `1px solid ${c.border}`, background: c.card2, color: c.text1, fontSize: "13px", boxSizing: "border-box", outline: "none" }}
+                  onFocus={e => e.target.style.borderColor = c.blue} onBlur={e => e.target.style.borderColor = c.border}
+                />
+              </div>
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: 600, color: c.text2, marginBottom: "4px", display: "block" }}>Secret Key</label>
+                <input value={alpacaSecret} onChange={e => setAlpacaSecret(e.target.value)} type="password" placeholder="••••••••••••••••••"
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: `1px solid ${c.border}`, background: c.card2, color: c.text1, fontSize: "13px", boxSizing: "border-box", outline: "none" }}
+                  onFocus={e => e.target.style.borderColor = c.blue} onBlur={e => e.target.style.borderColor = c.border}
+                />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <input type="checkbox" checked={alpacaPaper} onChange={e => setAlpacaPaper(e.target.checked)} id="alpaca-paper" />
+                <label htmlFor="alpaca-paper" style={{ fontSize: "12px", color: c.text2 }}>페이퍼 트레이딩 (테스트 환경)</label>
+              </div>
+              <div style={{ fontSize: "11px", color: c.text3, lineHeight: 1.5 }}>
+                API 키는 브라우저 로컬 스토리지에만 저장되며, 서버로 전송되지 않습니다.
+                <br />
+                <a href="https://app.alpaca.markets/paper/dashboard/overview" target="_blank" rel="noopener noreferrer" style={{ color: c.blue }}>Alpaca 대시보드에서 API 키 발급 →</a>
+              </div>
+              <button onClick={handleSaveAlpaca} style={{
+                padding: "12px", borderRadius: "10px", fontSize: "14px", fontWeight: 700,
+                background: c.blue, color: "#fff", border: "none", cursor: "pointer",
+              }}>저장</button>
+            </div>
+          </div>
+        )}
         {/* 운영 중인 봇 대시보드 (활성 봇이 있을 때만 표시) */}
         {!activeBot && activeBots.length > 0 && (
           <ActiveBotsDashboard
