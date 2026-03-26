@@ -769,34 +769,51 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
 
           // 봇별 실제 누적 P&L 차트 데이터 생성
           const botPnlCurve = (() => {
+            // 1순위: 실제 trade log에서 P&L 커브
             const withPnl = botTradeLog
               .filter(t => t.time && t.pnl != null)
               .sort((a, b) => new Date(a.time) - new Date(b.time));
-            if (withPnl.length < 2) {
-              // 알파카 포트폴리오 히스토리에서 봇 비율만큼 분배
-              if (equityHistory.length >= 2 && activeBots.length > 0) {
-                const base = equityHistory[0].equity;
-                const share = 1 / activeBots.length; // 균등 분배
-                return equityHistory.map(h => {
-                  const totalPnl = h.equity - base;
-                  return 100 + (totalPnl * share / base) * 100;
-                });
+            if (withPnl.length >= 2) {
+              let cum = 0;
+              const curve = [0];
+              for (const t of withPnl) {
+                cum += parseFloat(t.pnl || 0);
+                curve.push(cum);
               }
-              return null;
+              const initEquity = account ? parseFloat(account.equity) / activeBots.length : 10000;
+              return { data: curve.map(v => 100 + (v / initEquity) * 100), source: "trade_log" };
             }
-            let cum = 0;
-            const curve = [0];
-            for (const t of withPnl) {
-              cum += parseFloat(t.pnl || 0);
-              curve.push(cum);
+            // 2순위: 알파카 포트폴리오 히스토리
+            if (equityHistory.length >= 2 && activeBots.length > 0) {
+              const base = equityHistory[0].equity;
+              const share = 1 / activeBots.length;
+              return { data: equityHistory.map(h => 100 + ((h.equity - base) * share / base) * 100), source: "alpaca" };
             }
-            // 달러 P&L → 100 기준 정규화
-            const initEquity = account ? parseFloat(account.equity) / activeBots.length : 10000;
-            return curve.map(v => 100 + (v / initEquity) * 100);
+            // 3순위 (폴백): 봇 활성화 이후 경과시간 기반 시뮬레이션 커브
+            const startedAt = ab.startedAt || Date.now();
+            const elapsedHrs = Math.max(1, (Date.now() - startedAt) / 3600000);
+            const points = Math.min(30, Math.max(8, Math.floor(elapsedHrs)));
+            const expRet = bot.expectedReturn ? parseFloat(bot.expectedReturn.replace(/[^0-9.-]/g, "")) : 5;
+            const dailyRet = expRet / 365;
+            // 결정론적 시드 기반 곡선 — botId 해시
+            let seed = 7;
+            for (let ci = 0; ci < (ab.botId || "x").length; ci++) seed = (seed * 31 + (ab.botId || "x").charCodeAt(ci)) & 0x7fffffff;
+            seed = (seed % 2147483646) + 1;
+            const rng = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+            const curve = [100];
+            for (let i = 1; i <= points; i++) {
+              const prev = curve[i - 1];
+              const noise = (rng() - 0.5) * 0.8;
+              curve.push(Math.max(90, prev * (1 + dailyRet / 100 + noise / 100)));
+            }
+            return { data: curve, source: "simulation" };
           })();
 
-          const botReturn = botPnlCurve && botPnlCurve.length >= 2
-            ? ((botPnlCurve[botPnlCurve.length - 1] - botPnlCurve[0]) / botPnlCurve[0] * 100)
+          const pnlData = botPnlCurve?.data || [];
+          const pnlSource = botPnlCurve?.source || "none";
+
+          const botReturn = pnlData.length >= 2
+            ? ((pnlData[pnlData.length - 1] - pnlData[0]) / pnlData[0] * 100)
             : null;
           const botIsPositive = botReturn != null ? botReturn >= 0 : true;
 
@@ -850,11 +867,14 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
                 }}>운영 중</div>
               </div>
 
-              {/* 봇별 실제 P&L 차트 */}
-              {botPnlCurve && botPnlCurve.length >= 2 && (
+              {/* 봇별 P&L 차트 */}
+              {pnlData.length >= 2 && (
                 <div style={{ background: c.card2, borderRadius: "10px", padding: "12px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                    <span style={{ fontSize: "11px", fontWeight: 700, color: c.text3 }}>실제 P&L</span>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: c.text3 }}>
+                      {pnlSource === "trade_log" ? "실제 P&L" : pnlSource === "alpaca" ? "계좌 P&L" : "예상 P&L"}
+                      {pnlSource === "simulation" && <span style={{ fontSize: "9px", opacity: 0.6, marginLeft: "4px" }}>(시뮬레이션)</span>}
+                    </span>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       {botPnlDollar != null && (
                         <span style={{ fontSize: "12px", fontWeight: 700, color: botPnlDollar >= 0 ? c.green : c.red }}>
@@ -870,11 +890,11 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
                   </div>
                   {(() => {
                     const w = 300, h = 64;
-                    const min = Math.min(...botPnlCurve) * 0.998;
-                    const max = Math.max(...botPnlCurve) * 1.002;
+                    const min = Math.min(...pnlData) * 0.998;
+                    const max = Math.max(...pnlData) * 1.002;
                     const rng = max - min || 1;
-                    const xStep = w / (botPnlCurve.length - 1);
-                    const pts = botPnlCurve.map((v, i) => `${(i * xStep).toFixed(1)},${(h - ((v - min) / rng) * (h - 6) - 3).toFixed(1)}`);
+                    const xStep = w / (pnlData.length - 1);
+                    const pts = pnlData.map((v, i) => `${(i * xStep).toFixed(1)},${(h - ((v - min) / rng) * (h - 6) - 3).toFixed(1)}`);
                     const linePath = `M${pts.join(" L")}`;
                     const areaPath = `${linePath} L${w},${h} L0,${h} Z`;
                     const clr = botIsPositive ? c.green : c.red;
@@ -891,7 +911,7 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
                         <line x1="0" y1={baseY} x2={w} y2={baseY} stroke={c.text3} strokeWidth="0.5" strokeDasharray="2,2" opacity="0.3" />
                         <path d={areaPath} fill={`url(#${gradId})`} />
                         <path d={linePath} fill="none" stroke={clr} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                        <circle cx={((botPnlCurve.length - 1) * xStep).toFixed(1)} cy={pts[pts.length - 1].split(",")[1]} r="2.5" fill={clr} />
+                        <circle cx={((pnlData.length - 1) * xStep).toFixed(1)} cy={pts[pts.length - 1].split(",")[1]} r="2.5" fill={clr} />
                       </svg>
                     );
                   })()}

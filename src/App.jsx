@@ -6283,6 +6283,13 @@ function AppInner() {
         }
         @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
         @keyframes slideDown { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:translateY(0)} }
+        /* ── 접근성: 포커스 표시, 터치 타깃 ── */
+        *:focus-visible { outline: 2px solid ${C.blue}; outline-offset: 2px; border-radius: 4px; }
+        button:focus:not(:focus-visible), a:focus:not(:focus-visible) { outline: none; }
+        @media (pointer: coarse) { button, a, [role="button"] { min-height: 44px; min-width: 44px; } }
+        /* skip-to-content 링크 (키보드 접근성) */
+        .skip-link { position: absolute; top: -100px; left: 16px; padding: 8px 16px; background: ${C.blue}; color: #fff; border-radius: 8px; font-size: 14px; font-weight: 700; z-index: 9999; text-decoration: none; transition: top 0.2s; }
+        .skip-link:focus { top: 8px; }
         * { box-sizing: border-box; margin: 0; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
         html { font-size: 16px; line-height: 1.5; scroll-behavior: smooth; }
         body { letter-spacing: -0.01em; transition: background 0.3s ease, color 0.3s ease; }
@@ -6333,8 +6340,14 @@ function AppInner() {
         .ui-section-sub { font-size: 13px; color: ${C.text3}; margin-bottom: 8px; }
         /* ── 모바일 (≤640px) — 폰트/간격 확대 + 터치 최적화 (v9.2 개선) ── */
         @media (max-width: 640px) {
-          header { padding: 0 10px !important; height: auto !important; min-height: 48px !important; }
-          header > div { padding: 0 8px !important; height: 48px !important; }
+          header { padding: 0 6px !important; height: auto !important; min-height: 48px !important; }
+          header > div { padding: 0 6px !important; height: 48px !important; gap: 4px !important; }
+          /* 모바일 헤더: 유저 이름/검색 텍스트 숨김 → 오버플로 방지 */
+          .header-user-name { display: none !important; }
+          .header-user-chip { padding: 3px !important; }
+          .header-search-label { display: none !important; }
+          .header-search-btn { padding: 7px 8px !important; }
+          .header-theme-btn { width: 32px !important; height: 32px !important; font-size: 14px !important; }
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
           .lnb-sidebar { display: none !important; }
@@ -6546,59 +6559,60 @@ function AppInner() {
           </nav>
 
           {/* 우측: 검색 + 사용자 + 테마 + 햄버거 */}
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-            <button onClick={() => setGlobalSearchOpen(true)} style={{
+          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
+            {/* 검색 — 데스크탑: 텍스트 포함, 모바일: 아이콘만 */}
+            <button className="header-search-btn" onClick={() => setGlobalSearchOpen(true)} aria-label="검색" style={{
               display: "flex", alignItems: "center", gap: "6px",
               padding: "7px 14px", borderRadius: "10px",
               background: C.card2, border: `1px solid ${C.border}30`,
               fontSize: "12px", color: C.text3, cursor: "pointer",
             }}>
-              🔍 검색 <span style={{ fontSize: "10px", padding: "1px 5px", borderRadius: "3px", background: C.bg, color: C.text3 }}>/</span>
+              <span>🔍</span>
+              <span className="header-search-label">검색</span>
+              <span className="header-search-label" style={{ fontSize: "10px", padding: "1px 5px", borderRadius: "3px", background: C.bg, color: C.text3 }}>/</span>
             </button>
 
             {/* 사용자 섹션 */}
             {user ? (
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "4px 12px 4px 6px",
-              background: C.card2, borderRadius: "12px", border: `1px solid ${C.border}30` }}>
+            <button className="header-user-chip" onClick={() => setTab("profile")} aria-label="내 프로필" style={{
+              display: "flex", alignItems: "center", gap: "6px", padding: "4px 10px 4px 4px",
+              background: C.card2, borderRadius: "12px", border: `1px solid ${C.border}30`, cursor: "pointer",
+            }}>
               <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: C.blueBg,
                 display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: "13px", fontWeight: 700, color: C.blue }}>
+                fontSize: "13px", fontWeight: 700, color: C.blue, flexShrink: 0 }}>
                 {(user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()}
               </div>
-              <span style={{ fontSize: "12px", color: C.text2, maxWidth: "80px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span className="header-user-name" style={{ fontSize: "12px", color: C.text2, maxWidth: "80px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User"}
               </span>
-              <button onClick={() => { if (confirm("로그아웃 하시겠습니까?")) signOut(); }}
-                title="로그아웃" style={{ background: "none", border: "none", cursor: "pointer",
-                color: C.text3, fontSize: "14px", padding: "2px 4px", lineHeight: 1 }}>
-                ⏻
-              </button>
-            </div>
+            </button>
             ) : (
             <button onClick={() => setShowAuthModal(true)} style={{
-              padding: "8px 18px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
+              padding: "8px 16px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
               background: C.blue, color: "#fff", border: "none", cursor: "pointer",
               display: "flex", alignItems: "center", gap: "6px", transition: "all 0.2s",
+              whiteSpace: "nowrap",
             }}>
               로그인
             </button>
             )}
 
             {/* 테마 토글 */}
-            <button onClick={toggleTheme} title={themeMode === "dark" ? "라이트 모드" : "다크 모드"} style={{
+            <button className="header-theme-btn" onClick={toggleTheme} aria-label={themeMode === "dark" ? "라이트 모드로 전환" : "다크 모드로 전환"} title={themeMode === "dark" ? "라이트 모드" : "다크 모드"} style={{
               background: C.card2, border: `1px solid ${C.border}30`, borderRadius: "12px",
-              width: "40px", height: "40px", display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "17px", cursor: "pointer", color: C.text1, transition: "all 0.2s",
+              width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "16px", cursor: "pointer", color: C.text1, transition: "all 0.2s", flexShrink: 0,
             }}>
               {themeMode === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"}
             </button>
 
             {/* 모바일 햄버거 버튼 */}
-            <button className="mobile-menu-btn" onClick={() => setMenuOpen(!menuOpen)} style={{
+            <button className="mobile-menu-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="메뉴 열기" style={{
               display: "none", alignItems: "center", justifyContent: "center",
               background: menuOpen ? C.card2 : "none", border: "none", color: C.text1,
-              fontSize: "22px", width: "40px", height: "40px", cursor: "pointer",
-              borderRadius: "12px", position: "relative", transition: "all .2s",
+              fontSize: "22px", width: "36px", height: "36px", cursor: "pointer",
+              borderRadius: "12px", position: "relative", transition: "all .2s", flexShrink: 0,
             }}>
               {menuOpen ? "\u2715" : "\u2630"}
               {!menuOpen && (alertBadge > 0 || anomalies.length > 0) && (
@@ -6658,6 +6672,9 @@ function AppInner() {
               { id: "sentiment", label: "센티먼트", icon: "💬" },
               { id: "alerts", label: "알림 설정", icon: "🔔", locked: true },
             ]},
+            ...(user ? [{ section: "계정", items: [
+              { id: "profile", label: "내 프로필", icon: "👤" },
+            ]}] : []),
           ].map(group => (
             <div key={group.section}>
               <div style={{ fontSize: "10px", fontWeight: 700, color: C.text3, padding: "4px 4px 6px", letterSpacing: "0.05em", textTransform: "uppercase" }}>{group.section}</div>
@@ -9847,6 +9864,108 @@ function AppInner() {
           />
         )}
 
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 프로필 / 회원정보
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "profile" && user && (
+          <div className="tab-content" style={{ maxWidth: "640px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "20px" }}>
+            {/* 프로필 헤더 */}
+            <div style={{ textAlign: "center", padding: "32px 20px 24px" }}>
+              <div style={{
+                width: "72px", height: "72px", borderRadius: "50%",
+                background: `linear-gradient(135deg, ${C.blue}, ${C.purple || "#a855f7"})`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "28px", fontWeight: 800, color: "#fff", margin: "0 auto 16px",
+                boxShadow: `0 4px 20px ${C.blue}40`,
+              }}>
+                {(user?.user_metadata?.avatar_url)
+                  ? <img src={user.user_metadata.avatar_url} alt="" style={{ width: "72px", height: "72px", borderRadius: "50%", objectFit: "cover" }} />
+                  : (user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()
+                }
+              </div>
+              <h2 style={{ margin: "0 0 4px", fontSize: "20px", fontWeight: 800, color: C.text1 }}>
+                {user?.user_metadata?.display_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User"}
+              </h2>
+              <div style={{ fontSize: "13px", color: C.text3 }}>{user?.email || ""}</div>
+            </div>
+
+            {/* 계정 정보 */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", fontSize: "12px", fontWeight: 700, color: C.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>계정 정보</div>
+              {[
+                { label: "이메일", value: user?.email || "—" },
+                { label: "로그인 방식", value: user?.app_metadata?.provider === "google" ? "Google 로그인" : user?.app_metadata?.provider || "이메일" },
+                { label: "가입일", value: user?.created_at ? new Date(user.created_at).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" }) : "—" },
+                { label: "마지막 로그인", value: user?.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—" },
+                { label: "사용자 ID", value: user?.id ? user.id.slice(0, 8) + "..." : "—" },
+              ].map((item, i) => (
+                <div key={i} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "14px 20px", borderTop: `1px solid ${C.border}20`,
+                }}>
+                  <span style={{ fontSize: "14px", color: C.text2 }}>{item.label}</span>
+                  <span style={{ fontSize: "14px", fontWeight: 600, color: C.text1, textAlign: "right", maxWidth: "60%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* 투자 설정 현황 */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", fontSize: "12px", fontWeight: 700, color: C.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>투자 설정</div>
+              {[
+                { label: "관심 종목", value: `${watchlist.length}개`, action: () => setTab("screener") },
+                { label: "운영 중 봇", value: `${activeBots.length}개`, action: () => setTab("auto-trading") },
+                { label: "알파카 연동", value: (() => {
+                  try {
+                    const prefix = `di_${user.id.slice(0, 8)}_`;
+                    const cfg = JSON.parse(localStorage.getItem(`${prefix}alpaca_config`) || "null");
+                    return cfg?.apiKey ? "연결됨" : "미연결";
+                  } catch { return "미연결"; }
+                })() },
+              ].map((item, i) => (
+                <div key={i} onClick={item.action} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "14px 20px", borderTop: `1px solid ${C.border}20`,
+                  cursor: item.action ? "pointer" : "default",
+                }}>
+                  <span style={{ fontSize: "14px", color: C.text2 }}>{item.label}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "14px", fontWeight: 600, color: C.text1 }}>{item.value}</span>
+                    {item.action && <span style={{ fontSize: "12px", color: C.text3 }}>›</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 앱 설정 */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", fontSize: "12px", fontWeight: 700, color: C.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>앱 설정</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderTop: `1px solid ${C.border}20` }}>
+                <span style={{ fontSize: "14px", color: C.text2 }}>테마</span>
+                <button onClick={toggleTheme} style={{
+                  padding: "6px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                  background: C.card2, border: `1px solid ${C.border}30`, color: C.text1, cursor: "pointer",
+                }}>
+                  {themeMode === "dark" ? "다크 모드" : "라이트 모드"} {themeMode === "dark" ? "🌙" : "☀️"}
+                </button>
+              </div>
+            </div>
+
+            {/* 로그아웃 */}
+            <button onClick={() => { if (confirm("로그아웃 하시겠습니까?")) { signOut(); setTab("home"); } }} style={{
+              width: "100%", padding: "14px", borderRadius: "12px", fontSize: "15px", fontWeight: 700,
+              background: `${C.red}12`, color: C.red, border: `1px solid ${C.red}25`, cursor: "pointer",
+              transition: "all 0.2s",
+            }}>
+              로그아웃
+            </button>
+
+            <div style={{ textAlign: "center", padding: "8px 0 20px" }}>
+              <span style={{ fontSize: "11px", color: C.text3 }}>Toit v10.0 · donginseo0421@gmail.com</span>
+            </div>
+          </div>
+        )}
+
         {/* 차트 모달 */}
         {chartAsset && <ChartModal asset={chartAsset} onClose={() => setChartAsset(null)} krwRate={krwRate} theme={themeMode} />}
 
@@ -10028,9 +10147,16 @@ function AppInner() {
             boxShadow: C.isDark ? "0 20px 60px rgba(0,0,0,0.5)" : "0 20px 60px rgba(0,0,0,0.15)",
           }}>
             <div style={{ padding: "24px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: C.text1 }}>로그인이 필요합니다</h3>
-                <p style={{ margin: "4px 0 0", fontSize: "13px", color: C.text3 }}>이 기능을 사용하려면 로그인해주세요</p>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <svg width="28" height="28" viewBox="0 0 32 32" style={{ flexShrink: 0 }}>
+                  <defs><linearGradient id="authToitGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style={{ stopColor: "#3182F6" }} /><stop offset="100%" style={{ stopColor: "#60A5FA" }} /></linearGradient></defs>
+                  <path d="M 8 4 L 8 28 M 8 4 L 14 4 Q 14 16 8 16" stroke="url(#authToitGrad)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M 14 12 L 24 4 M 24 4 L 24 28" stroke="url(#authToitGrad)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: C.text1 }}>Toit 로그인</h3>
+                  <p style={{ margin: "2px 0 0", fontSize: "12px", color: C.text3 }}>투자 서비스를 이용하려면 로그인하세요</p>
+                </div>
               </div>
               <button onClick={() => setShowAuthModal(false)} style={{
                 background: "none", border: "none", color: C.text3, fontSize: "20px", cursor: "pointer", padding: "4px",
