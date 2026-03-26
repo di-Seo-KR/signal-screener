@@ -4227,16 +4227,28 @@ function AppInner() {
   // 전략 알림 저장 (최대 100개 유지)
   useEffect(() => { try { localStorage.setItem("di_trade_alerts", JSON.stringify(tradeAlerts.slice(0, 100))); } catch {} }, [tradeAlerts]);
 
-  // 관심종목 저장 (로그인 시에만)
-  useEffect(() => { if (watchlistKey) { try { localStorage.setItem(watchlistKey, JSON.stringify(watchlist)); } catch {} } }, [watchlist, watchlistKey]);
-  // 로그인/로그아웃 시 관심종목 재로드
+  // 로그인/로그아웃 시 관심종목 재로드 (저장보다 먼저 선언)
+  const watchlistLoaded = useRef(false);
   useEffect(() => {
     if (watchlistKey) {
-      try { setWatchlist(JSON.parse(localStorage.getItem(watchlistKey) || "[]")); } catch { setWatchlist([]); }
+      try {
+        const saved = JSON.parse(localStorage.getItem(watchlistKey) || "[]");
+        setWatchlist(saved);
+      } catch { setWatchlist([]); }
     } else {
       setWatchlist([]);
     }
+    // 로드 직후에는 저장 방지 (빈 배열이 기존 데이터를 덮어쓰는 것 방지)
+    watchlistLoaded.current = false;
+    const t = setTimeout(() => { watchlistLoaded.current = true; }, 200);
+    return () => clearTimeout(t);
   }, [watchlistKey]);
+  // 관심종목 저장 (로그인 시에만, 로드 직후 덮어쓰기 방지)
+  useEffect(() => {
+    if (watchlistKey && watchlistLoaded.current) {
+      try { localStorage.setItem(watchlistKey, JSON.stringify(watchlist)); } catch {}
+    }
+  }, [watchlist, watchlistKey]);
 
   // ── 탭 타이틀 실시간 업데이트 (토스증권 스타일) ──
   useEffect(() => {
