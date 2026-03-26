@@ -771,10 +771,12 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
           // 봇 배분 비율 계산 (전체 배분 대비 이 봇의 비중)
           const totalAllocated = activeBots.reduce((s, b) => s + (b.allocation || 0), 0);
           const botAllocRatio = (ab.allocation && totalAllocated > 0) ? (ab.allocation / totalAllocated) : (1 / activeBots.length);
+          // 봇 시작 시간 이후의 데이터만 사용
+          const botStartTime = ab.startedAt || Date.now();
           const botPnlCurve = (() => {
-            // 1순위: 실제 trade log에서 P&L 커브
+            // 1순위: 실제 trade log에서 P&L 커브 (봇 시작 이후만)
             const withPnl = botTradeLog
-              .filter(t => t.time && t.pnl != null)
+              .filter(t => t.time && t.pnl != null && new Date(t.time).getTime() >= botStartTime)
               .sort((a, b) => new Date(a.time) - new Date(b.time));
             if (withPnl.length >= 2) {
               let cum = 0;
@@ -783,15 +785,18 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
                 cum += parseFloat(t.pnl || 0);
                 curve.push(cum);
               }
-              const initEquity = ab.allocation || (account ? parseFloat(account.equity) * botAllocRatio : 10000);
+              const initEquity = ab.allocation || 10000;
               return { data: curve.map(v => 100 + (v / initEquity) * 100), source: "trade_log" };
             }
-            // 2순위: 알파카 포트폴리오 히스토리 (배분 비율 적용)
+            // 2순위: 알파카 포트폴리오 히스토리 (봇 시작 이후 + 배분 비율)
             if (equityHistory.length >= 2 && activeBots.length > 0) {
-              const base = equityHistory[0].equity;
-              return { data: equityHistory.map(h => 100 + ((h.equity - base) * botAllocRatio / base) * 100), source: "alpaca" };
+              const filtered = equityHistory.filter(h => new Date(h.timestamp).getTime() >= botStartTime);
+              if (filtered.length >= 2) {
+                const base = filtered[0].equity;
+                return { data: filtered.map(h => 100 + ((h.equity - base) * botAllocRatio / base) * 100), source: "alpaca" };
+              }
             }
-            // 데이터 없음
+            // 데이터 없음 — 봇 시작 직후라 아직 데이터 없음
             return { data: [], source: "none" };
           })();
 
@@ -806,13 +811,26 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
           const safeBotReturn = (botReturn != null && isFinite(botReturn)) ? botReturn : null;
           const botIsPositive = safeBotReturn != null ? safeBotReturn >= 0 : true;
 
-          // 봇 P&L 달러 계산 (배분 비율 적용)
-          const botPnlDollar = (() => {
-            const withPnl = botTradeLog.filter(t => t.pnl != null);
-            if (withPnl.length > 0) return withPnl.reduce((s, t) => s + parseFloat(t.pnl || 0), 0);
-            if (equityHistory.length >= 2 && activeBots.length > 0) {
-              const totalPnl = equityHistory[equityHistory.length - 1].equity - equityHistory[0].equity;
-              return totalPnl * botAllocRatio;
+          // 봇 P&L 퍼센트 계산 (봇 시작 이후, 배분 금액 기준)
+          const botPnlPct = (() => {
+            const alloc = ab.allocation || 0;
+            if (!alloc) return null;
+            // trade log 기반
+            const withPnl = botTradeLog.filter(t => t.pnl != null && t.time && new Date(t.time).getTime() >= botStartTime);
+            if (withPnl.length > 0) {
+              const totalPnl = withPnl.reduce((s, t) => s + parseFloat(t.pnl || 0), 0);
+              const pct = (totalPnl / alloc) * 100;
+              return isFinite(pct) ? pct : null;
+            }
+            // 에쿼티 히스토리 기반 (봇 시작 이후)
+            if (equityHistory.length >= 2) {
+              const filtered = equityHistory.filter(h => new Date(h.timestamp).getTime() >= botStartTime);
+              if (filtered.length >= 2) {
+                const base = filtered[0].equity;
+                const last = filtered[filtered.length - 1].equity;
+                const pct = ((last - base) * botAllocRatio / alloc) * 100;
+                return isFinite(pct) ? pct : null;
+              }
             }
             return null;
           })();
@@ -863,15 +881,18 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
                     {pnlSource === "trade_log" ? "실제 P&L" : pnlSource === "alpaca" ? "계좌 P&L" : "수익률 차트"}
                   </span>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    {botPnlDollar != null && isFinite(botPnlDollar) && (
-                      <span style={{ fontSize: "12px", fontWeight: 700, color: botPnlDollar >= 0 ? c.green : c.red }}>
-                        {botPnlDollar >= 0 ? "+" : ""}${Math.abs(botPnlDollar).toFixed(2)}
+                    {botPnlPct != null && (
+                      <span style={{ fontSize: "13px", fontWeight: 800, color: botPnlPct >= 0 ? c.green : c.red }}>
+                        {botPnlPct >= 0 ? "+" : ""}{botPnlPct.toFixed(2)}%
                       </span>
                     )}
-                    {safeBotReturn != null && (
+                    {botPnlPct == null && safeBotReturn != null && (
                       <span style={{ fontSize: "13px", fontWeight: 800, color: botIsPositive ? c.green : c.red }}>
                         {botIsPositive ? "+" : ""}{safeBotReturn.toFixed(2)}%
                       </span>
+                    )}
+                    {botPnlPct == null && safeBotReturn == null && (
+                      <span style={{ fontSize: "12px", fontWeight: 600, color: c.text3 }}>데이터 수집 중</span>
                     )}
                   </div>
                 </div>
