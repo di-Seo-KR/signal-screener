@@ -6274,11 +6274,11 @@ function AppInner() {
         /* 모바일 앱처럼 전체 화면 확대/축소 방지 */
         html, body { touch-action: manipulation; -ms-touch-action: manipulation; }
         * { -webkit-touch-callout: none; }
-        /* v3.8: 노치/다이나믹 아일랜드 대응 — body가 아닌 header에서 safe-area 처리 */
+        /* v3.8: 노치/다이나믹 아일랜드 대응 — header top + main padding 보정 */
         @supports (padding: env(safe-area-inset-top)) {
           header { top: env(safe-area-inset-top) !important; }
           body { padding-bottom: env(safe-area-inset-bottom); }
-          main { padding-top: env(safe-area-inset-top) !important; }
+          main { padding-top: calc(68px + env(safe-area-inset-top)) !important; }
           [style*="position: fixed"][style*="bottom: 0"] { padding-bottom: calc(4px + env(safe-area-inset-bottom)) !important; }
         }
         @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
@@ -6337,7 +6337,7 @@ function AppInner() {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
           .lnb-sidebar { display: none !important; }
-          main { padding: 16px 14px 90px !important; font-size: 15px !important; }
+          main { padding: 60px 14px 90px !important; font-size: 15px !important; }
           .tab-content { font-size: 15px; padding-bottom: 80px !important; }
           button { min-height: 44px; }
           select { min-height: 44px; }
@@ -6371,7 +6371,7 @@ function AppInner() {
         }
         /* ── 매우 작은 화면 (≤380px) — 극저해상도 최적화 ── */
         @media (max-width: 380px) {
-          main { padding: 14px 10px 90px !important; }
+          main { padding: 58px 10px 90px !important; }
           .ui-card { padding: 12px !important; border-radius: 12px !important; }
           .ui-card-compact { padding: 10px !important; }
           .home-grid { gap: 12px !important; }
@@ -6393,7 +6393,7 @@ function AppInner() {
         }
         /* ── 데스크톱 중간 (900~1199px) — 두 컬럼 레이아웃 ── */
         @media (min-width: 900px) and (max-width: 1199px) {
-          main { padding: 22px 28px 32px !important; }
+          main { padding: 68px 28px 32px !important; }
           .home-grid { display: grid !important; grid-template-columns: 1fr 360px !important; gap: 20px !important; align-items: start !important; }
           .home-right { position: sticky; top: 72px; max-height: calc(100vh - 88px); overflow-y: auto; overflow-x: hidden;
             scrollbar-width: none; -ms-overflow-style: none; }
@@ -6409,7 +6409,7 @@ function AppInner() {
           .di-app-body { flex-direction: column !important; }
           .di-main-wrap { margin-left: 0; flex: 1; width: 100%; }
           .di-main-wrap header { left: 0 !important; width: 100% !important; }
-          .di-main-wrap main { max-width: 1400px !important; padding: 24px 36px 36px !important; }
+          .di-main-wrap main { max-width: 1400px !important; padding: 68px 36px 36px !important; }
           .home-grid { display: grid !important; grid-template-columns: 1fr 400px !important; gap: 24px !important; align-items: start !important; }
           .home-right { position: sticky; top: 76px; max-height: calc(100vh - 92px); overflow-y: auto; overflow-x: hidden;
             scrollbar-width: none; -ms-overflow-style: none; }
@@ -6465,6 +6465,7 @@ function AppInner() {
           <nav className="desktop-nav" style={{ display: "flex", alignItems: "center", gap: "2px", flex: 1, overflow: "visible" }}>
             {[
               { id: "home", label: "홈", catId: "home" },
+              { id: "ai-quant", label: "AI 퀀트", catId: "ai-quant" },
               { id: "analysis", label: "분석", catId: "analysis", items: [
                 { id: "screener", label: "종목 탐색", icon: "🔍" },
                 { id: "anomaly", label: "이상 탐지", icon: "⚡" },
@@ -6477,7 +6478,6 @@ function AppInner() {
                 { id: "risk-map", label: "리스크맵", icon: "🛡️" },
                 { id: "portfolio", label: "포트폴리오", icon: "💼" },
               ]},
-              { id: "ai-quant", label: "AI 퀀트", catId: "ai-quant" },
               { id: "info", label: "정보", catId: "info", items: [
                 { id: "news", label: "마켓 뉴스", icon: "📰" },
                 { id: "sentiment", label: "센티먼트", icon: "💬" },
@@ -6609,25 +6609,28 @@ function AppInner() {
         {/* 모바일 햄버거 드롭다운 (v9.1 개선) */}
         {menuOpen && (
           <>
-          {/* 배경 오버레이 */}
+          {/* 배경 오버레이 (전체 화면 덮기) */}
           <div onClick={() => setMenuOpen(false)} style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.3)",
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)",
+            backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
             zIndex: 99, animation: "fadeIn 0.15s ease",
           }} />
           <div style={{
-            background: C.card, borderTop: `1px solid ${C.border}30`,
+            position: "fixed", top: "56px", left: 0, right: 0, bottom: 0,
+            background: C.bg, overflowY: "auto",
             padding: "16px 16px calc(20px + env(safe-area-inset-bottom, 0px))",
             display: "flex", flexDirection: "column", gap: "8px",
-            animation: "slideUp 0.2s ease", position: "relative", zIndex: 100,
+            animation: "slideUp 0.2s ease", zIndex: 100,
           }}>
             {/* 섹션 구분 */}
             {[
               { section: "메인", items: [
                 { id: "home", label: "홈 대시보드", icon: "🏠" },
-                { id: "screener", label: "주식 골라보기", icon: "🔍" },
-                { id: "anomaly", label: "이상 탐지", icon: "⚡" },
+                { id: "auto-trading", label: "AI 퀀트 전략", icon: "🤖" },
               ]},
               { section: "분석", items: [
+                { id: "screener", label: "종목 탐색", icon: "🔍" },
+                { id: "anomaly", label: "이상 탐지", icon: "⚡" },
                 { id: "strategy", label: "퀀트 전략", icon: "🎯" },
                 { id: "quant-report", label: "퀀트 리포트", icon: "📋" },
                 { id: "backtest", label: "백테스트", icon: "📈" },
@@ -6636,9 +6639,6 @@ function AppInner() {
                 { id: "quant-port", label: "전략 운용", icon: "📊" },
                 { id: "risk-map", label: "리스크맵", icon: "🛡️" },
                 { id: "portfolio", label: "포트폴리오", icon: "💼" },
-              ]},
-              { section: "AI 퀀트", items: [
-                { id: "auto-trading", label: "AI 퀀트 전략", icon: "🤖" },
               ]},
               { section: "정보", items: [
                 { id: "news", label: "마켓 뉴스", icon: "📰" },
@@ -6678,7 +6678,7 @@ function AppInner() {
         else if (tab === "news") await fetchNews();
         else window.location.reload();
       }}>
-      <main style={{ maxWidth: "1400px", margin: "0 auto", padding: "22px 28px 36px" }}>
+      <main style={{ maxWidth: "1400px", margin: "0 auto", padding: "68px 28px 36px" }}>
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 홈 (토스 스타일 — 깔끔하고 정보 밀도 최적화)

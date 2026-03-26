@@ -573,20 +573,148 @@ function BotCatalog({ onActivate, theme }) {
   );
 }
 
-// ActiveBotPanel removed — logic moved inline to AutoTrading component
+// ── 운영 중 봇 대시보드 ──
+function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme }) {
+  const c = colors[theme];
+  if (!activeBots || activeBots.length === 0) return null;
+
+  return (
+    <div style={{ marginBottom: "32px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: c.green, animation: "livePulse 1.5s ease-in-out infinite" }} />
+          <h2 style={{ margin: 0, color: c.text1, fontSize: "20px", fontWeight: 700 }}>운영 중인 봇</h2>
+          <span style={{ fontSize: "12px", padding: "3px 10px", borderRadius: "12px", background: `${c.green}20`, color: c.green, fontWeight: 700 }}>
+            {activeBots.length}개 활성
+          </span>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "16px" }}>
+        {activeBots.map(ab => {
+          const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
+          const elapsed = Date.now() - (ab.startedAt || Date.now());
+          const days = Math.floor(elapsed / 86400000);
+          const hours = Math.floor((elapsed % 86400000) / 3600000);
+          const rColor = getRiskColor(bot.riskColor || "blue", theme);
+          // 시뮬레이션 수익률 (실행 시간 비례)
+          const curve = generateEquityCurve(bot, 12);
+          const monthProgress = Math.min(Math.floor(elapsed / (86400000 * 30)), 11);
+          const currentReturn = ((curve[monthProgress + 1] - 100) / 100 * 100);
+          const isProfit = currentReturn >= 0;
+
+          return (
+            <div key={ab.botId} style={{
+              background: c.card, border: `1px solid ${c.border}`, borderRadius: "14px", padding: "20px",
+              display: "flex", flexDirection: "column", gap: "14px",
+            }}>
+              {/* 헤더 */}
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{ fontSize: "28px" }}>{bot.icon}</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700, fontSize: "15px", color: c.text1 }}>{bot.name}</div>
+                  <div style={{ fontSize: "11px", color: c.text3 }}>
+                    {days > 0 ? `${days}일 ` : ""}{hours}시간 운영 중
+                  </div>
+                </div>
+                <div style={{
+                  padding: "4px 10px", borderRadius: "12px", fontSize: "11px", fontWeight: 700,
+                  background: `${c.green}15`, color: c.green,
+                }}>운영 중</div>
+              </div>
+
+              {/* 핵심 지표 */}
+              <div style={{
+                display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px",
+                background: c.card2, borderRadius: "10px", padding: "12px",
+              }}>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>현재 수익률</div>
+                  <div style={{ fontSize: "16px", fontWeight: 800, color: isProfit ? c.green : c.red }}>
+                    {isProfit ? "+" : ""}{currentReturn.toFixed(1)}%
+                  </div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>거래 횟수</div>
+                  <div style={{ fontSize: "16px", fontWeight: 800, color: c.text1 }}>{ab.trades || 0}</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>승률</div>
+                  <div style={{ fontSize: "16px", fontWeight: 800, color: c.blue }}>{bot.stats?.winRate || "—"}</div>
+                </div>
+              </div>
+
+              {/* 미니 차트 */}
+              <div style={{ background: c.card2, borderRadius: "8px", padding: "10px 12px" }}>
+                <MiniEquityChart data={curve.slice(0, monthProgress + 2)} color={rColor} theme={theme} />
+              </div>
+
+              {/* 액션 버튼 */}
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button onClick={() => onSelectBot(bot)} style={{
+                  flex: 1, padding: "10px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                  background: c.blue, color: "#fff", border: "none", cursor: "pointer",
+                }}>상세 보기</button>
+                <button onClick={() => onStopBot(ab.botId)} style={{
+                  padding: "10px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                  background: `${c.red}15`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer",
+                }}>중지</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <style>{`@keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
+    </div>
+  );
+}
 
 export default function AutoTrading({ theme = "dark", user }) {
   const c = colors[theme];
   const { showToast } = useAuth();
   const [activeBot, setActiveBot] = useState(null);
 
+  // 운영 중인 봇 목록 (localStorage 기반)
+  const storageKey = user ? `toit_${user.id.slice(0,8)}_active_bots` : null;
+  const [activeBots, setActiveBots] = useState(() => {
+    if (!storageKey) return [];
+    try { return JSON.parse(localStorage.getItem(storageKey) || "[]"); } catch { return []; }
+  });
+
+  // 로그인 변경 시 재로드
+  React.useEffect(() => {
+    if (storageKey) {
+      try { setActiveBots(JSON.parse(localStorage.getItem(storageKey) || "[]")); } catch { setActiveBots([]); }
+    } else { setActiveBots([]); }
+  }, [storageKey]);
+
+  // 저장
+  React.useEffect(() => {
+    if (storageKey) {
+      try { localStorage.setItem(storageKey, JSON.stringify(activeBots)); } catch {}
+    }
+  }, [activeBots, storageKey]);
+
   const handleActivateBot = useCallback((bot) => {
     if (!user) {
       showToast("error", "로그인이 필요합니다. 먼저 로그인해주세요.");
       return;
     }
+    // 이미 활성화된 봇이면 바로 상세 진입
+    if (activeBots.some(ab => ab.botId === bot.id)) {
+      setActiveBot(bot);
+      return;
+    }
+    // 새 봇 활성화
+    setActiveBots(prev => [...prev, { botId: bot.id, startedAt: Date.now(), trades: Math.floor(Math.random() * 20) + 3 }]);
     setActiveBot(bot);
-  }, [user, showToast]);
+    showToast("success", `${bot.name} 운영을 시작합니다.`);
+  }, [user, showToast, activeBots]);
+
+  const handleStopBot = useCallback((botId) => {
+    setActiveBots(prev => prev.filter(ab => ab.botId !== botId));
+    if (activeBot?.id === botId) setActiveBot(null);
+    showToast("success", "봇 운영을 중지했습니다.");
+  }, [activeBot, showToast]);
 
   const handleBackToCatalog = useCallback(() => {
     setActiveBot(null);
@@ -602,6 +730,16 @@ export default function AutoTrading({ theme = "dark", user }) {
       }}
     >
       <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
+        {/* 운영 중인 봇 대시보드 (활성 봇이 있을 때만 표시) */}
+        {!activeBot && activeBots.length > 0 && (
+          <ActiveBotsDashboard
+            activeBots={activeBots}
+            onSelectBot={(bot) => setActiveBot(bot)}
+            onStopBot={handleStopBot}
+            theme={theme}
+          />
+        )}
+
         {activeBot ? (
           <div>
             <button
