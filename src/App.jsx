@@ -6607,68 +6607,78 @@ function AppInner() {
           </div>
         </div>
         {/* 모바일 햄버거 드롭다운 (v9.1 개선) */}
-        {menuOpen && (
-          <>
-          {/* 배경 오버레이 (전체 화면 덮기) */}
-          <div onClick={() => setMenuOpen(false)} style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)",
-            backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
-            zIndex: 99, animation: "fadeIn 0.15s ease",
-          }} />
-          <div style={{
-            position: "fixed", top: "56px", left: 0, right: 0, bottom: 0,
-            background: C.bg, overflowY: "auto",
-            padding: "16px 16px calc(20px + env(safe-area-inset-bottom, 0px))",
-            display: "flex", flexDirection: "column", gap: "8px",
-            animation: "slideUp 0.2s ease", zIndex: 100,
-          }}>
-            {/* 섹션 구분 */}
-            {[
-              { section: "메인", items: [
-                { id: "home", label: "홈 대시보드", icon: "🏠" },
-                { id: "auto-trading", label: "AI 퀀트 전략", icon: "🤖" },
-              ]},
-              { section: "분석", items: [
-                { id: "screener", label: "종목 탐색", icon: "🔍" },
-                { id: "anomaly", label: "이상 탐지", icon: "⚡" },
-                { id: "strategy", label: "퀀트 전략", icon: "🎯" },
-                { id: "quant-report", label: "퀀트 리포트", icon: "📋" },
-                { id: "backtest", label: "백테스트", icon: "📈" },
-              ]},
-              { section: "운용", items: [
-                { id: "quant-port", label: "전략 운용", icon: "📊" },
-                { id: "risk-map", label: "리스크맵", icon: "🛡️" },
-                { id: "portfolio", label: "포트폴리오", icon: "💼" },
-              ]},
-              { section: "정보", items: [
-                { id: "news", label: "마켓 뉴스", icon: "📰" },
-                { id: "sentiment", label: "센티먼트", icon: "💬" },
-                { id: "alerts", label: "알림 설정", icon: "🔔", locked: true },
-              ]},
-            ].map(group => (
-              <div key={group.section}>
-                <div style={{ fontSize: "10px", fontWeight: 700, color: C.text3, padding: "4px 4px 6px", letterSpacing: "0.05em", textTransform: "uppercase" }}>{group.section}</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "5px" }}>
-                  {group.items.map(t => (
-                    <button key={t.id} onClick={() => { if (t.locked && requireLogin(t.id)) { setMenuOpen(false); return; } setTab(t.id); setMenuOpen(false); }} style={{
-                      padding: "10px 8px", borderRadius: "12px", fontSize: "12px", fontWeight: 600,
-                      background: tab === t.id ? C.blueBg : C.card2,
-                      color: tab === t.id ? C.blue : C.text2,
-                      border: tab === t.id ? `1px solid ${C.blue}30` : `1px solid transparent`,
-                      textAlign: "center", cursor: "pointer", display: "flex", flexDirection: "column",
-                      alignItems: "center", gap: "4px", minHeight: "auto",
-                    }}>
-                      <span style={{fontSize:"18px"}}>{t.icon}</span>
-                      <span style={{ fontSize: "11px", lineHeight: 1.2 }}>{t.label}{t.locked && !user ? " 🔒" : ""}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-          </>
-        )}
       </header>
+
+      {/* 모바일 햄버거 메뉴 — header 밖에서 렌더링 (overflow 제약 회피) */}
+      {menuOpen && (
+        <>
+        {/* 배경 오버레이 */}
+        <div onClick={() => setMenuOpen(false)} style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)",
+          backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
+          zIndex: 200, animation: "fadeIn 0.15s ease",
+        }} />
+        {/* 메뉴 패널 */}
+        <div className="mobile-menu-panel" style={{
+          position: "fixed", left: 0, right: 0, bottom: 0,
+          background: C.bg, overflowY: "auto",
+          padding: "16px 16px calc(24px + env(safe-area-inset-bottom, 0px))",
+          display: "flex", flexDirection: "column", gap: "10px",
+          animation: "slideUp 0.2s ease", zIndex: 201,
+          borderRadius: "20px 20px 0 0",
+          boxShadow: "0 -8px 32px rgba(0,0,0,0.3)",
+          maxHeight: "75vh",
+        }}>
+          {/* 드래그 핸들 */}
+          <div style={{ display: "flex", justifyContent: "center", paddingBottom: "4px" }}>
+            <div style={{ width: "36px", height: "4px", borderRadius: "2px", background: C.text3, opacity: 0.4 }} />
+          </div>
+          {/* 섹션 구분 */}
+          {[
+            { section: "메인", items: [
+              { id: "home", label: "홈 대시보드", icon: "🏠" },
+              { id: "auto-trading", label: "AI 퀀트 전략", icon: "🤖" },
+            ]},
+            { section: "분석", items: [
+              { id: "screener", label: "종목 탐색", icon: "🔍" },
+              { id: "anomaly", label: "이상 탐지", icon: "⚡" },
+              { id: "strategy", label: "퀀트 전략", icon: "🎯" },
+              { id: "quant-report", label: "퀀트 리포트", icon: "📋" },
+              { id: "backtest", label: "백테스트", icon: "📈" },
+            ]},
+            { section: "운용", items: [
+              { id: "quant-port", label: "전략 운용", icon: "📊" },
+              { id: "risk-map", label: "리스크맵", icon: "🛡️" },
+              { id: "portfolio", label: "포트폴리오", icon: "💼" },
+            ]},
+            { section: "정보", items: [
+              { id: "news", label: "마켓 뉴스", icon: "📰" },
+              { id: "sentiment", label: "센티먼트", icon: "💬" },
+              { id: "alerts", label: "알림 설정", icon: "🔔", locked: true },
+            ]},
+          ].map(group => (
+            <div key={group.section}>
+              <div style={{ fontSize: "10px", fontWeight: 700, color: C.text3, padding: "4px 4px 6px", letterSpacing: "0.05em", textTransform: "uppercase" }}>{group.section}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "5px" }}>
+                {group.items.map(t => (
+                  <button key={t.id} onClick={() => { if (t.locked && requireLogin(t.id)) { setMenuOpen(false); return; } setTab(t.id); setMenuOpen(false); }} style={{
+                    padding: "10px 8px", borderRadius: "12px", fontSize: "12px", fontWeight: 600,
+                    background: tab === t.id ? C.blueBg : C.card2,
+                    color: tab === t.id ? C.blue : C.text2,
+                    border: tab === t.id ? `1px solid ${C.blue}30` : `1px solid transparent`,
+                    textAlign: "center", cursor: "pointer", display: "flex", flexDirection: "column",
+                    alignItems: "center", gap: "4px", minHeight: "auto",
+                  }}>
+                    <span style={{fontSize:"18px"}}>{t.icon}</span>
+                    <span style={{ fontSize: "11px", lineHeight: 1.2 }}>{t.label}{t.locked && !user ? " 🔒" : ""}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        </>
+      )}
 
       {/* LNB는 이제 GNB 호버 드롭다운에 통합됨 */}
 
