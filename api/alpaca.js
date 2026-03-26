@@ -199,6 +199,16 @@ export default async function handler(req, res) {
         break;
       }
 
+      // ── 포트폴리오 히스토리 (에쿼티 커브) ──
+      case "portfolio_history": {
+        const period = req.query.period || "1M";
+        const timeframe = req.query.timeframe || "1D";
+        const r = await fetch(`${baseUrl}/v2/account/portfolio/history?period=${period}&timeframe=${timeframe}&extended_hours=true`, { headers });
+        result = await r.json();
+        if (!r.ok) return res.status(r.status).json(result);
+        break;
+      }
+
       // ── 특정 주문 조회 ──
       case "get_order": {
         const orderId = req.query.order_id;

@@ -9,18 +9,40 @@
     {
       "source": "/api/(.*)",
       "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" }
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type, x-alpaca-key, x-alpaca-secret, x-alpaca-paper, Authorization" },
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+        { "key": "X-XSS-Protection", "value": "1; mode=block" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains; preload" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=()" }
       ]
     }
   ],
   "crons": [
     {
       "path": "/api/btc-cron",
-      "schedule": "0 6 * * *"
+      "schedule": "0 */4 * * *"
+    },
+    {
+      "path": "/api/stock-cron",
+      "schedule": "30 13 * * 1-5"
     },
     {
       "path": "/api/quant-research",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/portfolio-rebalance",
+      "schedule": "0 14 * * 1-5"
     }
   ]
 }

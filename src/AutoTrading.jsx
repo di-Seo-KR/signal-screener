@@ -927,12 +927,18 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
               </div>
 
               <div style={{
-                display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px",
+                display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px",
                 background: c.card2, borderRadius: "10px", padding: "12px",
               }}>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>거래 횟수</div>
                   <div style={{ fontSize: "16px", fontWeight: 800, color: c.text1 }}>{botTrades || ab.trades || 0}</div>
+                </div>
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>배분 금액</div>
+                  <div style={{ fontSize: "14px", fontWeight: 700, color: c.blue }}>
+                    ${account ? Math.floor(parseFloat(account.equity) / activeBots.length).toLocaleString() : (ab.allocation || "—")}
+                  </div>
                 </div>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>위험도</div>
@@ -971,6 +977,7 @@ export default function AutoTrading({ theme = "dark", user }) {
   const [alpacaKey, setAlpacaKey] = useState("");
   const [alpacaSecret, setAlpacaSecret] = useState("");
   const [alpacaPaper, setAlpacaPaper] = useState(true);
+  const [pendingBot, setPendingBot] = useState(null);
 
   // 알파카 설정 로드
   const alpacaPrefix = user ? `di_${user.id.slice(0, 8)}_` : "";
@@ -1041,6 +1048,26 @@ export default function AutoTrading({ theme = "dark", user }) {
     }, 500);
   }, [activeBots, user, storageKey]);
 
+  // 알파카 계좌 잔고 로드 (봇 배분 기준)
+  const [alpacaEquity, setAlpacaEquity] = useState(null);
+  useEffect(() => {
+    if (!user || !alpacaConnected) return;
+    const prefix = `di_${user.id.slice(0, 8)}_`;
+    let cfg;
+    try { cfg = JSON.parse(localStorage.getItem(`${prefix}alpaca_config`) || "null"); } catch {}
+    if (!cfg?.apiKey) return;
+    fetch("/api/alpaca?action=account", {
+      headers: {
+        "Content-Type": "application/json",
+        "x-alpaca-key": cfg.apiKey,
+        "x-alpaca-secret": cfg.apiSecret,
+        "x-alpaca-paper": String(cfg.isPaper !== false),
+      },
+    }).then(r => r.json()).then(data => {
+      if (data?.equity) setAlpacaEquity(parseFloat(data.equity));
+    }).catch(() => {});
+  }, [user, alpacaConnected]);
+
   const handleActivateBot = useCallback((bot) => {
     if (!user) {
       showToast("error", "로그인이 필요합니다. 먼저 로그인해주세요.");
@@ -1051,11 +1078,20 @@ export default function AutoTrading({ theme = "dark", user }) {
       setActiveBot(bot);
       return;
     }
-    // 새 봇 활성화
-    setActiveBots(prev => [...prev, { botId: bot.id, startedAt: Date.now(), trades: Math.floor(Math.random() * 20) + 3 }]);
+    // 알파카 잔고 기반 자동 배분 (잔고 ÷ (활성봇+1))
+    const nextBotCount = activeBots.length + 1;
+    const autoAllocation = alpacaEquity
+      ? Math.floor(alpacaEquity / nextBotCount)
+      : 1000; // 알파카 미연동 시 기본값
+    setActiveBots(prev => [...prev, {
+      botId: bot.id,
+      startedAt: Date.now(),
+      trades: 0,
+      allocation: autoAllocation,
+    }]);
     setActiveBot(bot);
-    showToast("success", `${bot.name} 운영을 시작합니다.`);
-  }, [user, showToast, activeBots]);
+    showToast("success", `${bot.name} 운영 시작 — $${autoAllocation.toLocaleString()} 자동 배분 (계좌 잔고 기준)`);
+  }, [user, showToast, activeBots, alpacaEquity]);
 
   const handleStopBot = useCallback((botId) => {
     setActiveBots(prev => prev.filter(ab => ab.botId !== botId));
@@ -1146,6 +1182,20 @@ export default function AutoTrading({ theme = "dark", user }) {
             </div>
           </div>
         )}
+
+        {/* 알파카 잔고 기반 봇 배분 표시 */}
+        {user && alpacaConnected && alpacaEquity != null && activeBots.length > 0 && !activeBot && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px",
+            padding: "8px 14px", background: `${c.blue}08`, borderRadius: "10px", border: `1px solid ${c.blue}15`,
+          }}>
+            <span style={{ fontSize: "12px", color: c.text2 }}>
+              계좌 잔고 <strong style={{ color: c.text1 }}>${alpacaEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
+              {" · "}봇당 자동 배분 <strong style={{ color: c.blue }}>${Math.floor(alpacaEquity / activeBots.length).toLocaleString()}</strong>
+            </span>
+          </div>
+        )}
+
         {/* 운영 중인 봇 대시보드 (활성 봇이 있을 때만 표시) */}
         {!activeBot && activeBots.length > 0 && (
           <ActiveBotsDashboard

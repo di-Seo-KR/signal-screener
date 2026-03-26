@@ -1,6 +1,11 @@
-// Vercel Cron — BTC 자동매매 서버사이드 엔진
-// 4시간마다 실행: BTC 캔들 데이터 → 전략 시그널 생성 → Alpaca 주문
+// Vercel Cron — 멀티 자산 암호화폐 자동매매 서버사이드 엔진
+// 4시간마다 실행: BTC, ETH, SOL 캔들 데이터 → 전략 시그널 생성 → Alpaca 주문
 // 환경변수: ALPACA_API_KEY, ALPACA_SECRET_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+
+const CRYPTO_ASSETS = ["BTC/USD", "ETH/USD", "SOL/USD"];
+const YAHOO_TICKERS = { "BTC/USD": "BTC-USD", "ETH/USD": "ETH-USD", "SOL/USD": "SOL-USD" };
+const MAX_POSITION_PER_ASSET = 0.30; // 자산당 최대 30% 에쿼티
+const MAX_TOTAL_CRYPTO_EXPOSURE = 0.80; // 총 암호화폐 노출 최대 80%
 
 export default async function handler(req, res) {
   const startTime = Date.now();
@@ -8,7 +13,7 @@ export default async function handler(req, res) {
   const addLog = (msg) => { log.push(`[${new Date().toISOString()}] ${msg}`); console.log(msg); };
 
   try {
-    addLog("🚀 BTC 자동매매 Cron 시작");
+    addLog("🚀 멀티 자산 암호화폐 자동매매 Cron 시작");
 
     // ── 환경변수 확인 ──
     const ALPACA_KEY = process.env.ALPACA_API_KEY;
@@ -21,81 +26,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: false, error: "Missing Alpaca credentials", log });
     }
 
-    // ── 1) Yahoo Finance에서 BTC 캔들 데이터 가져오기 ──
-    addLog("📊 BTC-USD 캔들 데이터 로딩...");
-    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD?range=1y&interval=1d`;
-    const yahooRes = await fetch(yahooUrl, {
-      headers: { "User-Agent": "Mozilla/5.0 (DI-Financial Cron)" },
-    });
-    const yahooData = await yahooRes.json();
-    const result = yahooData?.chart?.result?.[0];
-    if (!result || !result.timestamp) {
-      addLog("❌ Yahoo Finance 데이터 없음");
-      return res.status(200).json({ ok: false, error: "No Yahoo data", log });
-    }
-
-    const timestamps = result.timestamp;
-    const q = result.indicators.quote[0];
-    const candles = timestamps.map((t, i) => ({
-      time: t,
-      open: q.open[i],
-      high: q.high[i],
-      low: q.low[i],
-      close: q.close[i],
-      volume: q.volume[i],
-    })).filter(c => c.close != null && c.high != null && c.low != null);
-
-    addLog(`✅ ${candles.length}개 캔들 로드 완료 (최신: $${candles[candles.length - 1]?.close?.toFixed(0)})`);
-
-    if (candles.length < 220) {
-      addLog("❌ 캔들 데이터 부족 (최소 220개 필요)");
-      return res.status(200).json({ ok: false, error: "Insufficient candle data", log });
-    }
-
-    // ── 2) 지표 계산 ──
-    addLog("🧮 기술 지표 계산 중...");
-    const closes = candles.map(c => c.close);
-    const highs = candles.map(c => c.high);
-    const lows = candles.map(c => c.low);
-    const volumes = candles.map(c => c.volume || 0);
-
-    const rsi = calcRSI(closes, 14);
-    const bb = calcBB(closes, 20, 2.5);
-    const ema21 = calcEMA(closes, 21);
-    const ema55 = calcEMA(closes, 55);
-    const ema200 = calcEMA(closes, 200);
-    const { macdLine, signal: macdSig, histogram } = calcMACD(closes);
-    const adx = calcADX(highs, lows, closes, 14);
-    const atr = calcATR(highs, lows, closes, 14);
-    const stoch = calcStochastic(highs, lows, closes, 14, 3);
-    const obv = calcOBV(closes, volumes);
-    const obvEma = calcEMA(obv, 20);
-    const volSMA = calcSMA(volumes, 20);
-
-    // 주봉 추세
-    const weeklyCandles = resampleWeekly(candles);
-    const wCloses = weeklyCandles.map(c => c.close);
-    const wEma10 = wCloses.length > 10 ? calcEMA(wCloses, 10) : [];
-    const wEma30 = wCloses.length > 30 ? calcEMA(wCloses, 30) : [];
-    const weeklyTrendUp = wEma10.length > 0 && wEma30.length > 0
-      ? wEma10[wEma10.length - 1] > wEma30[wEma30.length - 1] : null;
-
-    // ── 3) 최근 시그널 분석 (마지막 5봉) ──
-    addLog("🔍 최근 시그널 스캔...");
-    const latestSignal = analyzeLatest(candles, closes, highs, lows, volumes, {
-      rsi, bb, ema21, ema55, ema200, macdLine, macdSig, histogram,
-      adx, atr, stoch, obv, obvEma, volSMA, weeklyTrendUp,
-    });
-
-    if (!latestSignal) {
-      addLog("⏸️ 시그널 없음 — 대기");
-      await sendTelegram(TG_TOKEN, TG_CHAT, `🤖 BTC Cron (${new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })})\n⏸️ 시그널 없음 — 대기\nBTC: $${closes[closes.length - 1]?.toFixed(0)}\nRSI: ${rsi[rsi.length - 1]?.toFixed(1)}`);
-      return res.status(200).json({ ok: true, action: "wait", log });
-    }
-
-    addLog(`🎯 시그널 발견: ${latestSignal.type} | ${latestSignal.confidence}급 | ${latestSignal.score}pt | ${latestSignal.reason}`);
-
-    // ── 4) Alpaca 계좌 확인 ──
+    // ── Alpaca 계좌 확인 ──
     addLog("💰 Alpaca 계좌 조회...");
     const alpacaBase = "https://paper-api.alpaca.markets";
     const alpacaHeaders = {
@@ -115,106 +46,226 @@ export default async function handler(req, res) {
     const buyingPower = parseFloat(account.buying_power || 0);
     addLog(`✅ 계좌: $${equity.toFixed(0)} (매수력: $${buyingPower.toFixed(0)})`);
 
-    // ── 5) 포지션 확인 ──
+    // ── 포지션 확인 ──
     const posRes = await fetch(`${alpacaBase}/v2/positions`, { headers: alpacaHeaders });
     const positions = await posRes.json();
-    const btcPos = Array.isArray(positions) ? positions.find(p => p.symbol === "BTC/USD" || p.symbol === "BTCUSD") : null;
-
-    if (btcPos) {
-      addLog(`📊 BTC 보유: ${btcPos.qty} ($${parseFloat(btcPos.market_value || 0).toFixed(0)}) P&L: $${parseFloat(btcPos.unrealized_pl || 0).toFixed(2)}`);
-    } else {
-      addLog("📊 BTC 보유 없음");
+    const positionMap = {};
+    if (Array.isArray(positions)) {
+      for (const asset of CRYPTO_ASSETS) {
+        const pos = positions.find(p => p.symbol === asset);
+        if (pos) positionMap[asset] = pos;
+      }
     }
 
-    // ── 6) 주문 실행 ──
-    const posSize = latestSignal.positionSize || 0.5;
-    const tradeAmount = Math.min(equity * posSize * 0.25, equity * 0.25); // 최대 25%
-
-    let orderResult = null;
-
-    if (latestSignal.type === "BUY" && tradeAmount > 10 && !btcPos) {
-      addLog(`🟢 매수 주문: $${tradeAmount.toFixed(0)}`);
-      const orderRes = await fetch(`${alpacaBase}/v2/orders`, {
-        method: "POST",
-        headers: alpacaHeaders,
-        body: JSON.stringify({
-          symbol: "BTC/USD",
-          notional: tradeAmount.toFixed(2),
-          side: "buy",
-          type: "market",
-          time_in_force: "gtc",
-        }),
-      });
-      orderResult = await orderRes.json();
-      if (orderRes.ok) {
-        addLog(`✅ 매수 완료: ${orderResult.id}`);
-      } else {
-        addLog(`❌ 매수 실패: ${JSON.stringify(orderResult)}`);
+    // ── Fear & Greed Index 페치 ──
+    let fngData = null;
+    let fngValue = 50; // 기본값: Neutral
+    let fngClassification = "Neutral";
+    try {
+      const fngRes = await fetch("https://api.alternative.me/fng/?limit=1");
+      const fngJson = await fngRes.json();
+      if (fngJson.data && fngJson.data.length > 0) {
+        fngValue = parseInt(fngJson.data[0].value);
+        fngClassification = fngJson.data[0].value_classification;
+        fngData = { value: fngValue, classification: fngClassification };
+        addLog(`📊 Fear & Greed: ${fngValue} (${fngClassification})`);
       }
-    } else if (latestSignal.type === "SELL" && btcPos) {
-      const sellAmount = Math.min(parseFloat(btcPos.market_value || 0), tradeAmount);
-      if (sellAmount > 10) {
-        addLog(`🔴 매도 주문: $${sellAmount.toFixed(0)}`);
-        const orderRes = await fetch(`${alpacaBase}/v2/orders`, {
-          method: "POST",
-          headers: alpacaHeaders,
-          body: JSON.stringify({
-            symbol: "BTC/USD",
-            notional: sellAmount.toFixed(2),
-            side: "sell",
-            type: "market",
-            time_in_force: "gtc",
-          }),
+    } catch (e) {
+      addLog(`⚠️ FNG API 오류: ${e.message} (기본값 사용)`);
+    }
+
+    // ── 멀티 자산 스캔 및 주문 실행 ──
+    const assetResults = [];
+    let totalCryptoExposure = 0;
+
+    for (const asset of CRYPTO_ASSETS) {
+      addLog(`\n📊 ${asset} 스캔 중...`);
+      const yahooTicker = YAHOO_TICKERS[asset];
+
+      // Yahoo Finance 데이터 로드
+      const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooTicker}?range=1y&interval=1d`;
+      let yahooData, result;
+      try {
+        const yahooRes = await fetch(yahooUrl, {
+          headers: { "User-Agent": "Mozilla/5.0 (DI-Financial Cron)" },
         });
-        orderResult = await orderRes.json();
-        if (orderRes.ok) {
-          addLog(`✅ 매도 완료: ${orderResult.id}`);
-        } else {
-          addLog(`❌ 매도 실패: ${JSON.stringify(orderResult)}`);
+        yahooData = await yahooRes.json();
+        result = yahooData?.chart?.result?.[0];
+      } catch (e) {
+        addLog(`❌ ${asset} Yahoo 데이터 오류: ${e.message}`);
+        assetResults.push({ asset, ok: false, error: "Yahoo data fetch failed" });
+        continue;
+      }
+
+      if (!result || !result.timestamp) {
+        addLog(`❌ ${asset} Yahoo 데이터 없음`);
+        assetResults.push({ asset, ok: false, error: "No Yahoo data" });
+        continue;
+      }
+
+      const timestamps = result.timestamp;
+      const q = result.indicators.quote[0];
+      const candles = timestamps.map((t, i) => ({
+        time: t,
+        open: q.open[i],
+        high: q.high[i],
+        low: q.low[i],
+        close: q.close[i],
+        volume: q.volume[i],
+      })).filter(c => c.close != null && c.high != null && c.low != null);
+
+      if (candles.length < 220) {
+        addLog(`❌ ${asset} 캔들 부족 (${candles.length}개 < 220개)`);
+        assetResults.push({ asset, ok: false, error: "Insufficient candle data" });
+        continue;
+      }
+
+      addLog(`✅ ${asset}: ${candles.length}개 캔들 로드 (최신: $${candles[candles.length - 1]?.close?.toFixed(0)})`);
+
+      // 지표 계산
+      const closes = candles.map(c => c.close);
+      const highs = candles.map(c => c.high);
+      const lows = candles.map(c => c.low);
+      const volumes = candles.map(c => c.volume || 0);
+
+      const rsi = calcRSI(closes, 14);
+      const bb = calcBB(closes, 20, 2.0); // BB multiplier 2.0으로 변경
+      const ema21 = calcEMA(closes, 21);
+      const ema55 = calcEMA(closes, 55);
+      const ema200 = calcEMA(closes, 200);
+      const { macdLine, signal: macdSig, histogram } = calcMACD(closes);
+      const adx = calcADX(highs, lows, closes, 14);
+      const atr = calcATR(highs, lows, closes, 14);
+      const stoch = calcStochastic(highs, lows, closes, 14, 3);
+      const obv = calcOBV(closes, volumes);
+      const obvEma = calcEMA(obv, 20);
+      const volSMA = calcSMA(volumes, 20);
+
+      // 주봉 추세
+      const weeklyCandles = resampleWeekly(candles);
+      const wCloses = weeklyCandles.map(c => c.close);
+      const wEma10 = wCloses.length > 10 ? calcEMA(wCloses, 10) : [];
+      const wEma30 = wCloses.length > 30 ? calcEMA(wCloses, 30) : [];
+      const weeklyTrendUp = wEma10.length > 0 && wEma30.length > 0
+        ? wEma10[wEma10.length - 1] > wEma30[wEma30.length - 1] : null;
+
+      // 최근 5봉 시그널 분석
+      const latestSignal = analyzeLatest(candles, closes, highs, lows, volumes, {
+        rsi, bb, ema21, ema55, ema200, macdLine, macdSig, histogram,
+        adx, atr, stoch, obv, obvEma, volSMA, weeklyTrendUp,
+      }, fngValue);
+
+      if (!latestSignal) {
+        addLog(`⏸️ ${asset} 시그널 없음`);
+        assetResults.push({ asset, ok: true, action: "wait", signal: null });
+        continue;
+      }
+
+      addLog(`🎯 ${asset} 시그널: ${latestSignal.type} | ${latestSignal.confidence}급 | ${latestSignal.score}pt`);
+
+      // 현재 포지션 확인
+      const pos = positionMap[asset];
+      const currentExposure = pos ? parseFloat(pos.market_value || 0) : 0;
+      const positionSize = latestSignal.positionSize || 0.5;
+
+      // 포지션 크기 결정
+      const maxAssetValue = equity * MAX_POSITION_PER_ASSET;
+      let tradeAmount = 0;
+
+      // Trailing stop-loss 확인: 포지션이 있으면 -5% 체크
+      let shouldSellForStopLoss = false;
+      if (pos && pos.unrealized_pl != null) {
+        const plPct = (parseFloat(pos.unrealized_pl) / parseFloat(pos.cost_basis || 1)) * 100;
+        if (plPct <= -5) {
+          shouldSellForStopLoss = true;
+          addLog(`🛑 ${asset} 손절: P&L ${plPct.toFixed(1)}%`);
         }
       }
-    } else {
-      const reason = latestSignal.type === "BUY" && btcPos ? "이미 보유 중" :
-                     latestSignal.type === "BUY" && tradeAmount <= 10 ? "주문금액 부족" :
-                     latestSignal.type === "SELL" && !btcPos ? "보유 포지션 없음" : "조건 미충족";
-      addLog(`⏭️ 주문 스킵: ${reason}`);
+
+      // BUY 주문 실행
+      if ((latestSignal.type === "BUY" || shouldSellForStopLoss === false) && !shouldSellForStopLoss) {
+        // 포지션 스케일링: 기존 포지션이 있으면 추가 진입 가능
+        if (pos) {
+          const newExposure = currentExposure + (equity * positionSize * 0.25);
+          if (newExposure <= maxAssetValue && (totalCryptoExposure + newExposure) <= (equity * MAX_TOTAL_CRYPTO_EXPOSURE)) {
+            tradeAmount = Math.min(equity * positionSize * 0.25, maxAssetValue - currentExposure);
+          }
+        } else {
+          // 신규 포지션
+          tradeAmount = Math.min(equity * positionSize * 0.25, maxAssetValue);
+          if ((totalCryptoExposure + tradeAmount) > (equity * MAX_TOTAL_CRYPTO_EXPOSURE)) {
+            tradeAmount = Math.max(0, equity * MAX_TOTAL_CRYPTO_EXPOSURE - totalCryptoExposure);
+          }
+        }
+
+        if (latestSignal.type === "BUY" && tradeAmount > 10) {
+          addLog(`🟢 ${asset} 매수: $${tradeAmount.toFixed(0)}`);
+          const orderRes = await fetch(`${alpacaBase}/v2/orders`, {
+            method: "POST",
+            headers: alpacaHeaders,
+            body: JSON.stringify({
+              symbol: asset,
+              notional: tradeAmount.toFixed(2),
+              side: "buy",
+              type: "market",
+              time_in_force: "gtc",
+            }),
+          });
+          const orderResult = await orderRes.json();
+          if (orderRes.ok) {
+            addLog(`✅ ${asset} 매수 완료: ${orderResult.id}`);
+            assetResults.push({ asset, ok: true, type: "BUY", signal: latestSignal, order: orderResult.id, amount: tradeAmount });
+            totalCryptoExposure += tradeAmount;
+          } else {
+            addLog(`❌ ${asset} 매수 실패: ${JSON.stringify(orderResult)}`);
+            assetResults.push({ asset, ok: false, error: `Buy failed: ${orderResult.code}` });
+          }
+        }
+      }
+
+      // SELL 주문 실행
+      if ((latestSignal.type === "SELL" || shouldSellForStopLoss) && pos) {
+        const sellAmount = parseFloat(pos.market_value || 0);
+        if (sellAmount > 10) {
+          addLog(`🔴 ${asset} 매도: $${sellAmount.toFixed(0)}`);
+          const orderRes = await fetch(`${alpacaBase}/v2/orders`, {
+            method: "POST",
+            headers: alpacaHeaders,
+            body: JSON.stringify({
+              symbol: asset,
+              notional: sellAmount.toFixed(2),
+              side: "sell",
+              type: "market",
+              time_in_force: "gtc",
+            }),
+          });
+          const orderResult = await orderRes.json();
+          if (orderRes.ok) {
+            addLog(`✅ ${asset} 매도 완료: ${orderResult.id}`);
+            assetResults.push({ asset, ok: true, type: "SELL", signal: latestSignal, order: orderResult.id, amount: sellAmount });
+            totalCryptoExposure -= sellAmount;
+          } else {
+            addLog(`❌ ${asset} 매도 실패: ${JSON.stringify(orderResult)}`);
+            assetResults.push({ asset, ok: false, error: `Sell failed: ${orderResult.code}` });
+          }
+        }
+      }
+
+      if (!latestSignal || (latestSignal.type === "BUY" && tradeAmount <= 10)) {
+        assetResults.push({ asset, ok: true, action: "skip", signal: latestSignal });
+      }
     }
 
-    // ── 7) 텔레그램 알림 ──
+    // ── 텔레그램 알림 ──
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    const tgMsg = [
-      `🤖 BTC 자동매매 엔진 v2.0`,
-      `━━━━━━━━━━━━━━━━━━━━`,
-      `📅 ${new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`,
-      ``,
-      `${latestSignal.type === "BUY" ? "🟢" : "🔴"} ${latestSignal.type} 시그널`,
-      `등급: ${latestSignal.confidence === "A" ? "⭐⭐⭐ A급" : latestSignal.confidence === "B" ? "⭐⭐ B급" : "⭐ C급"}`,
-      `스코어: ${latestSignal.score}pt / ${latestSignal.factors}팩터`,
-      `근거: ${latestSignal.reason}`,
-      ``,
-      `📊 시장 현황`,
-      `━━━━━━━━━━━━━━━━━━━━`,
-      `BTC: $${closes[closes.length - 1]?.toFixed(0)} (${((closes[closes.length - 1] - closes[closes.length - 2]) / closes[closes.length - 2] * 100).toFixed(1)}%)`,
-      `RSI: ${rsi[rsi.length - 1]?.toFixed(1)} | ADX: ${(adx[adx.length - 1] || 0).toFixed(1)}`,
-      `MACD: ${histogram[histogram.length - 1] > 0 ? "📈 양전" : "📉 음전"} (${histogram[histogram.length - 1]?.toFixed(0)})`,
-      `EMA21/55: ${ema21[ema21.length - 1] > ema55[ema55.length - 1] ? "🟢 정배열" : "🔴 역배열"}`,
-      ``,
-      `💰 포트폴리오`,
-      `━━━━━━━━━━━━━━━━━━━━`,
-      `계좌: $${equity.toFixed(0)} | 매수력: $${buyingPower.toFixed(0)}`,
-      btcPos ? `BTC 보유: $${parseFloat(btcPos.market_value || 0).toFixed(0)} (P&L: $${parseFloat(btcPos.unrealized_pl || 0).toFixed(2)})` : "BTC 보유 없음",
-      ``,
-      orderResult?.id ? `✅ 주문 체결: ${orderResult.id}` : `⏭️ 주문 없음`,
-      `⏱️ ${duration}s`,
-    ].join("\n");
+    const tgMsg = buildTelegramMessage(assetResults, positionMap, equity, buyingPower, duration, fngData);
 
     await sendTelegram(TG_TOKEN, TG_CHAT, tgMsg);
     addLog(`📨 텔레그램 전송 완료 (${duration}s)`);
 
     return res.status(200).json({
       ok: true,
-      signal: latestSignal,
-      order: orderResult?.id || null,
+      results: assetResults,
       duration: `${duration}s`,
       log,
     });
@@ -226,14 +277,92 @@ export default async function handler(req, res) {
 }
 
 // ════════════════════════════════════════════════════════
-// 최근 시그널 분석 (마지막 3봉 스캔)
+// 텔레그램 메시지 생성
 // ════════════════════════════════════════════════════════
-function analyzeLatest(candles, closes, highs, lows, volumes, ind) {
+function buildTelegramMessage(assetResults, positionMap, equity, buyingPower, duration, fngData) {
+  const lines = [
+    `🤖 멀티 자산 암호화폐 엔진`,
+    `━━━━━━━━━━━━━━━━━━━━`,
+    `📅 ${new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`,
+  ];
+
+  if (fngData) {
+    lines.push(`📊 Fear & Greed: ${fngData.value} (${fngData.classification})`);
+  }
+
+  lines.push(``);
+
+  for (const result of assetResults) {
+    if (result.signal) {
+      const icon = result.signal.type === "BUY" ? "🟢" : "🔴";
+      const grade = result.signal.confidence === "A" ? "⭐⭐⭐" : result.signal.confidence === "B" ? "⭐⭐" : "⭐";
+      lines.push(`${icon} ${result.asset}: ${result.signal.type} (${grade} ${result.signal.score}pt)`);
+      lines.push(`  근거: ${result.signal.reason.substring(0, 60)}...`);
+    } else if (result.action === "wait") {
+      lines.push(`⏸️ ${result.asset}: 신호 없음`);
+    }
+  }
+
+  lines.push(``, `💰 포트폴리오`);
+  lines.push(`━━━━━━━━━━━━━━━━━━━━`);
+  lines.push(`계좌: $${equity.toFixed(0)} | 매수력: $${buyingPower.toFixed(0)}`);
+
+  for (const asset of CRYPTO_ASSETS) {
+    const pos = positionMap[asset];
+    if (pos) {
+      const pl = parseFloat(pos.unrealized_pl || 0);
+      const icon = pl >= 0 ? "📈" : "📉";
+      lines.push(`${icon} ${asset}: $${parseFloat(pos.market_value || 0).toFixed(0)} (P&L: $${pl.toFixed(2)})`);
+    }
+  }
+
+  lines.push(``, `⏱️ ${duration}s`);
+  return lines.join("\n");
+}
+
+// ════════════════════════════════════════════════════════
+// 최근 시그널 분석 (마지막 5봉 스캔)
+// ════════════════════════════════════════════════════════
+function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50) {
   const { rsi, bb, ema21, ema55, ema200, macdLine, macdSig, histogram,
     adx, atr, stoch, obv, obvEma, volSMA, weeklyTrendUp } = ind;
 
-  // 마지막 3봉에서 시그널 검색 (최신 우선)
-  for (let offset = 0; offset < 3; offset++) {
+  // Fear & Greed에 따른 동적 임계값 설정
+  let buyThreshold, buyFactorsThreshold, sellThreshold, sellFactorsThreshold;
+  if (fngValue <= 25) {
+    // 극도의 공포 (0-25): 매수 임계값 낮춤 (좋은 매수 기회)
+    buyThreshold = 3;
+    buyFactorsThreshold = 2;
+    sellThreshold = 6;
+    sellFactorsThreshold = 3;
+  } else if (fngValue <= 45) {
+    // 공포 (26-45): 기본값 유지
+    buyThreshold = 3;
+    buyFactorsThreshold = 2;
+    sellThreshold = 5;
+    sellFactorsThreshold = 3;
+  } else if (fngValue <= 55) {
+    // 중립 (46-55): 기본값
+    buyThreshold = 4;
+    buyFactorsThreshold = 2;
+    sellThreshold = 4;
+    sellFactorsThreshold = 2;
+  } else if (fngValue <= 75) {
+    // 탐욕 (56-75): 매수 임계값 높임 (신중)
+    buyThreshold = 5;
+    buyFactorsThreshold = 3;
+    sellThreshold = 4;
+    sellFactorsThreshold = 2;
+  } else {
+    // 극도의 탐욕 (76-100): 매수 매우 신중, 매도 쉬움
+    buyThreshold = 6;
+    buyFactorsThreshold = 3;
+    sellThreshold = 3;
+    sellFactorsThreshold = 2;
+  }
+
+  // 마지막 5봉에서 시그널 검색 (최신 우선)
+  for (let offset = 0; offset < 5; offset++) {
     const i = candles.length - 1 - offset;
     if (i < 210 || rsi[i] == null || !bb[i] || histogram[i] == null) continue;
 
@@ -314,7 +443,7 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind) {
     if (adxStrong && trendUp) { buyScore += 1; buyReasons.push(`ADX ${(adx[i] || 0).toFixed(0)}`); }
     if (bullMomentum && trendUp) { buyScore += 1; buyReasons.push("연속 상승"); }
 
-    if (buyScore >= 5 && buyFactors >= 3) {
+    if (buyScore >= buyThreshold && buyFactors >= buyFactorsThreshold) {
       return {
         type: "BUY",
         confidence: buyScore >= 9 ? "A" : buyScore >= 7 ? "B" : "C",
@@ -345,7 +474,7 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind) {
     if (adxStrong && trendDown) { sellScore += 1; sellReasons.push(`ADX ${(adx[i] || 0).toFixed(0)}`); }
     if (bearMomentum && trendDown) { sellScore += 1; sellReasons.push("연속 하락"); }
 
-    if (sellScore >= 5 && sellFactors >= 3) {
+    if (sellScore >= sellThreshold && sellFactors >= sellFactorsThreshold) {
       return {
         type: "SELL",
         confidence: sellScore >= 9 ? "A" : sellScore >= 7 ? "B" : "C",
