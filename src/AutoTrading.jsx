@@ -3,41 +3,80 @@ import PaperTrading from "./PaperTrading.jsx";
 import BTCTrading from "./BTCTrading.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 
-// ── 시뮬레이션 에쿼티 커브 생성 (시드 기반 결정론적) ──
+// ── 시뮬레이션 에쿼티 커브 생성 (전략 파라미터 기반, 결정론적) ──
 function generateEquityCurve(bot, months = 12) {
   const winRate = parseFloat(bot.stats.winRate) / 100;
   const mdd = parseFloat(bot.stats.mdd) / 100;
   const sharpe = parseFloat(bot.stats.sharpeRatio);
-  // 월평균 수익률 추정 (연간 기대수익의 중간값 / 12)
-  const expectedRange = bot.expectedReturn.replace("%+", "").replace("%", "").split("-");
-  const midReturn = (parseFloat(expectedRange[0]) + parseFloat(expectedRange[1] || expectedRange[0])) / 2;
-  const monthlyMu = midReturn / 12 / 100;
-  const monthlySigma = monthlyMu / (sharpe / Math.sqrt(12) || 1);
 
-  // 시드 해시 (봇 ID 기반)
-  let seed = 0;
-  for (let i = 0; i < bot.id.length; i++) seed = ((seed << 5) - seed + bot.id.charCodeAt(i)) | 0;
-  const rng = () => { seed = (seed * 16807 + 0) % 2147483647; return (seed & 0x7fffffff) / 0x7fffffff; };
+  // 예상 수익 범위 파싱
+  const cleaned = bot.expectedReturn.replace(/%\+?/g, "");
+  const parts = cleaned.split("-");
+  const lo = parseFloat(parts[0]) || 10;
+  const hi = parseFloat(parts[1]) || lo * 1.5;
 
-  const curve = [100];
-  let peak = 100;
+  // 시드 해시 — 반드시 0이 아닌 양수 보장
+  let seed = 7;
+  for (let i = 0; i < bot.id.length; i++) {
+    seed = ((seed * 31) + bot.id.charCodeAt(i)) & 0x7fffffff;
+  }
+  seed = (seed % 2147483646) + 1; // 1 ~ 2147483646 범위 보장
+  const rng = () => {
+    seed = (seed * 16807) % 2147483647;
+    return seed / 2147483647;
+  };
+
+  // 목표 연간 수익률 (예상 범위의 중간~상단)
+  const targetAnnual = (lo + hi) / 2 + (rng() - 0.3) * (hi - lo) * 0.4;
+  const targetFinal = 100 * (1 + targetAnnual / 100);
+
+  // 월별 평균 수익률과 변동성
+  const monthlyMu = Math.pow(targetFinal / 100, 1 / months) - 1;
+  const monthlySigma = Math.abs(monthlyMu) / Math.max(sharpe / Math.sqrt(12), 0.3);
+
+  // 원시 커브 생성 (노이즈 + 승률 반영)
+  const raw = [100];
   for (let m = 1; m <= months; m++) {
-    // Box-Muller 근사
-    const u1 = rng(), u2 = rng();
-    const z = Math.sqrt(-2 * Math.log(u1 + 0.001)) * Math.cos(2 * Math.PI * u2);
-    let ret = monthlyMu + monthlySigma * z * 0.6;
-    // 승률 편향
-    if (rng() > winRate) ret = -Math.abs(ret) * 0.8;
-    // MDD 제약
-    const next = curve[m - 1] * (1 + ret);
-    peak = Math.max(peak, next);
-    const dd = (peak - next) / peak;
-    if (dd > mdd) {
-      curve.push(peak * (1 - mdd));
-    } else {
-      curve.push(next);
+    const u1 = Math.max(rng(), 0.001);
+    const u2 = rng();
+    const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    let ret = monthlyMu + monthlySigma * z * 0.5;
+    // 승률 반영: 패배 월은 손실 방향으로
+    if (rng() > winRate) ret = -Math.abs(ret) * (0.5 + rng() * 0.5);
+    raw.push(raw[m - 1] * (1 + ret));
+  }
+
+  // 최종 값을 목표에 맞게 스케일링 (예상수익과 차트 싱크)
+  const rawFinal = raw[months];
+  const scaleFactor = rawFinal > 100
+    ? (targetFinal - 100) / (rawFinal - 100)
+    : rawFinal < 100
+      ? (targetFinal - 100) / (rawFinal - 100)
+      : 1;
+
+  const scaled = raw.map(v => 100 + (v - 100) * scaleFactor);
+
+  // MDD 제약 적용
+  const curve = [scaled[0]];
+  let peak = scaled[0];
+  for (let m = 1; m <= months; m++) {
+    peak = Math.max(peak, curve[m - 1]);
+    let val = scaled[m];
+    const dd = (peak - val) / peak;
+    if (dd > mdd) val = peak * (1 - mdd);
+    curve.push(val);
+  }
+
+  // 최종 수익률이 예상 범위에서 크게 벗어나면 재보정
+  const finalRet = (curve[months] - 100) / 100 * 100;
+  if (finalRet > hi * 1.3 || finalRet < lo * 0.5) {
+    const clampedTarget = Math.min(hi * 1.1, Math.max(lo * 0.8, targetAnnual));
+    const adjustRatio = clampedTarget / (finalRet || 1);
+    for (let m = 1; m <= months; m++) {
+      curve[m] = 100 + (curve[m] - 100) * adjustRatio;
     }
   }
+
   return curve;
 }
 
