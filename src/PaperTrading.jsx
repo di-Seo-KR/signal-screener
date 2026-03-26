@@ -1050,7 +1050,7 @@ const _syncOnce = _parseSyncParam();
 
 // 메인 컴포넌트
 // ══════════════════════════════════════════════════════════════
-export default function PaperTrading({ strategyAlerts = [], theme = "dark", user, botPreset }) {
+export default function PaperTrading({ strategyAlerts = [], theme = "dark", user, botPreset, botAllocation }) {
   // 유저별 localStorage 키 분리
   const userId = user?.id || null;
   KEYS = makeKeys(userId);
@@ -1539,13 +1539,19 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
 
   if (!isConnected) return <SetupPanel config={config} setConfig={setConfig} onConnect={acc => setAccount(acc)} theme={theme} />;
 
-  const equity = parseFloat(account?.equity || 0);
-  const cash = parseFloat(account?.cash || 0);
-  const buyingPower = parseFloat(account?.buying_power || 0);
-  const dayPL = parseFloat(account?.equity) - parseFloat(account?.last_equity || account?.equity);
-  const dayPLPct = parseFloat(account?.last_equity) ? (dayPL / parseFloat(account.last_equity) * 100) : 0;
-  const totalPL = equity - 100000;
-  const totalPLPct = (totalPL / 100000) * 100;
+  const fullEquity = parseFloat(account?.equity || 0);
+  const fullCash = parseFloat(account?.cash || 0);
+  const fullBuyingPower = parseFloat(account?.buying_power || 0);
+  // 봇 배분 비율: botAllocation이 있으면 해당 봇에 배분된 비율만큼만 표시
+  const allocRatio = (botAllocation && fullEquity > 0) ? (botAllocation / fullEquity) : 1;
+  const equity = botAllocation ? botAllocation : fullEquity;
+  const cash = Math.round(fullCash * allocRatio * 100) / 100;
+  const buyingPower = Math.round(fullBuyingPower * allocRatio * 100) / 100;
+  const fullDayPL = parseFloat(account?.equity) - parseFloat(account?.last_equity || account?.equity);
+  const dayPL = Math.round(fullDayPL * allocRatio * 100) / 100;
+  const dayPLPct = parseFloat(account?.last_equity) ? (fullDayPL / parseFloat(account.last_equity) * 100) : 0;
+  const totalPL = equity - (botAllocation || 100000);
+  const totalPLPct = botAllocation ? (totalPL / botAllocation * 100) : ((equity - 100000) / 100000 * 100);
   const positionPL = positions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
   const openOrders = orders.filter(o => ["new","accepted","pending_new","partially_filled"].includes(o.status));
   const filledOrders = orders.filter(o => o.status === "filled");
@@ -1617,7 +1623,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "8px" }}>
           {[
-            { label: "총 자산", value: fmtUSD(equity), color: C.text1 },
+            { label: botAllocation ? "봇 자산" : "총 자산", value: fmtUSD(equity), color: C.text1 },
             { label: "현금", value: fmtUSD(cash), color: C.blue },
             { label: "매수가능", value: fmtUSD(buyingPower), color: C.blueL },
             { label: "오늘 P&L", value: fmtUSD(dayPL), sub: fmtPct(dayPLPct), color: dayPL >= 0 ? C.green : C.red },

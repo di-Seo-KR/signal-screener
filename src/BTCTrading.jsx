@@ -169,7 +169,7 @@ class CryptoRiskManager {
   }
 }
 
-export default function BTCTrading({ theme = "dark", user, botPreset }) {
+export default function BTCTrading({ theme = "dark", user, botPreset, botAllocation }) {
   // 유저별 localStorage 키 분리
   const userId = user?.id || null;
   KEYS = makeBtcKeys(userId);
@@ -515,10 +515,21 @@ export default function BTCTrading({ theme = "dark", user, botPreset }) {
             {badge("Paper Trading", C.yellowBg, C.yellow)}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
-            {stat("총 자산", `$${parseFloat(alpacaAccount.equity || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`, C.text1)}
-            {stat("매수 가능", `$${parseFloat(alpacaAccount.buying_power || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`, C.green)}
-            {stat("총 P&L", `$${(parseFloat(alpacaAccount.equity || 0) - parseFloat(alpacaAccount.last_equity || alpacaAccount.equity || 0)).toFixed(2)}`,
-              parseFloat(alpacaAccount.equity || 0) >= parseFloat(alpacaAccount.last_equity || alpacaAccount.equity || 0) ? C.green : C.red, "오늘")}
+            {(() => {
+              const fullEq = parseFloat(alpacaAccount.equity || 0);
+              const fullBp = parseFloat(alpacaAccount.buying_power || 0);
+              const fullLastEq = parseFloat(alpacaAccount.last_equity || alpacaAccount.equity || 0);
+              const ratio = (botAllocation && fullEq > 0) ? (botAllocation / fullEq) : 1;
+              const dispEq = botAllocation || fullEq;
+              const dispBp = Math.round(fullBp * ratio);
+              const fullPL = fullEq - fullLastEq;
+              const dispPL = (fullPL * ratio).toFixed(2);
+              return <>
+                {stat("봇 자산", `$${dispEq.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, C.text1)}
+                {stat("매수 가능", `$${dispBp.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, C.green)}
+                {stat("총 P&L", `$${dispPL}`, parseFloat(dispPL) >= 0 ? C.green : C.red, "오늘")}
+              </>;
+            })()}
           </div>
           {/* 크립토 포지션 */}
           {cryptoPositions.length > 0 && (

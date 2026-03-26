@@ -6511,17 +6511,30 @@ function AppInner() {
                   onClick={() => {
                     if (cat.catId === "home") { setTab("home"); setGnbCategory("home"); setGnbHover(null); }
                     else if (cat.catId === "ai-quant") { setTab("auto-trading"); setGnbCategory("ai-quant"); setGnbHover(null); }
-                    // 홈/AI퀀트 외 GNB 카테고리는 클릭 비활성 — 호버로만 LNB 표시
+                    else if (cat.items) { setGnbHover(gnbHover === cat.catId ? null : cat.catId); }
                   }}
                   style={{
                     padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
                     background: (gnbCategory === cat.catId || gnbHover === cat.catId) ? (cat.catId === "ai-quant" ? `${C.purple}20` : C.blueBg) : "transparent",
                     color: (gnbCategory === cat.catId || gnbHover === cat.catId) ? (cat.catId === "ai-quant" ? C.purple : C.blue) : C.text2,
-                    border: "none", cursor: (cat.catId === "home" || cat.catId === "ai-quant") ? "pointer" : "default", whiteSpace: "nowrap",
-                    transition: "all 0.15s",
-                  }}>
+                    border: "none", cursor: "pointer", whiteSpace: "nowrap",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={e => {
+                    if (gnbCategory !== cat.catId && gnbHover !== cat.catId) {
+                      e.currentTarget.style.background = C.card2;
+                      e.currentTarget.style.color = C.text1;
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (gnbCategory !== cat.catId && gnbHover !== cat.catId) {
+                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.color = C.text2;
+                    }
+                  }}
+                >
                   {cat.label}
-                  {cat.items && <span style={{ fontSize: "9px", marginLeft: "3px", opacity: 0.5 }}>▾</span>}
+                  {cat.items && <span style={{ fontSize: "9px", marginLeft: "3px", opacity: 0.5, transition: "transform 0.2s", display: "inline-block", transform: gnbHover === cat.catId ? "rotate(180deg)" : "none" }}>▾</span>}
                 </button>
                 {/* LNB 드롭다운 */}
                 {cat.items && gnbHover === cat.catId && (
@@ -7761,6 +7774,34 @@ function AppInner() {
 
             {/* ═══ 하단 전체너비 섹션 (그리드 밖) ═══ */}
 
+            {/* ── AI 퀀트 전략 하이라이트 (핵심 기능 → 최상단) ─── */}
+            <div onClick={() => setTab("auto-trading")} style={{
+              background: `linear-gradient(135deg, ${C.card} 0%, ${C.isDark ? "#1a0a2e" : "#EDE7F6"} 100%)`,
+              borderRadius: "16px", padding: "22px 24px", cursor: "pointer", transition: "all .2s",
+              border: `1px solid ${C.purple}25`, position: "relative", overflow: "hidden",
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+            onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
+              <div style={{ position: "absolute", top: "-20px", right: "-10px", fontSize: "80px", opacity: 0.06 }}>🤖</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                <div style={{
+                  width: "48px", height: "48px", borderRadius: "14px",
+                  background: `linear-gradient(135deg, ${C.purple}, #6D28D9)`,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0,
+                }}>🤖</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 800, fontSize: "16px", color: C.text1, marginBottom: "4px" }}>AI 퀀트 전략</div>
+                  <div style={{ fontSize: "12px", color: C.text3, lineHeight: 1.4 }}>
+                    AI 기반 자동매매 · 주식/크립토 통합 · 실시간 시그널
+                  </div>
+                </div>
+                <div style={{
+                  padding: "8px 16px", borderRadius: "10px", fontSize: "12px", fontWeight: 700,
+                  background: `${C.purple}20`, color: C.purple, flexShrink: 0,
+                }}>바로가기 →</div>
+              </div>
+            </div>
+
             {/* ── 전략 운용 + 리스크 바로가기 위젯 ─── */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
               <div onClick={() => setTab("quant-port")} style={{
@@ -7790,34 +7831,6 @@ function AppInner() {
                 <div style={{ fontSize: "12px", color: C.red, fontWeight: 600, marginTop: "6px" }}>
                   위험 수준 확인 →
                 </div>
-              </div>
-            </div>
-
-            {/* ── AI 퀀트 전략 하이라이트 ─── */}
-            <div onClick={() => setTab("auto-trading")} style={{
-              background: `linear-gradient(135deg, ${C.card} 0%, ${C.isDark ? "#1a0a2e" : "#EDE7F6"} 100%)`,
-              borderRadius: "16px", padding: "22px 24px", cursor: "pointer", transition: "all .2s",
-              border: `1px solid ${C.purple}25`, position: "relative", overflow: "hidden",
-            }}
-            onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
-            onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
-              <div style={{ position: "absolute", top: "-20px", right: "-10px", fontSize: "80px", opacity: 0.06 }}>🤖</div>
-              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                <div style={{
-                  width: "48px", height: "48px", borderRadius: "14px",
-                  background: `linear-gradient(135deg, ${C.purple}, #6D28D9)`,
-                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0,
-                }}>🤖</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 800, fontSize: "16px", color: C.text1, marginBottom: "4px" }}>AI 퀀트 전략</div>
-                  <div style={{ fontSize: "12px", color: C.text3, lineHeight: 1.4 }}>
-                    AI 기반 자동매매 · 주식/크립토 통합 · 실시간 시그널
-                  </div>
-                </div>
-                <div style={{
-                  padding: "8px 16px", borderRadius: "10px", fontSize: "12px", fontWeight: 700,
-                  background: `${C.purple}20`, color: C.purple, flexShrink: 0,
-                }}>바로가기 →</div>
               </div>
             </div>
 

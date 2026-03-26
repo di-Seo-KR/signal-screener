@@ -1135,17 +1135,74 @@ export default function AutoTrading({ theme = "dark", user }) {
             }}>API 키 설정</button>
           </div>
         )}
-        {user && alpacaConnected && !showAlpacaSetup && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px",
-            padding: "8px 14px", background: `${c.green}10`, borderRadius: "10px", border: `1px solid ${c.green}20`,
-          }}>
-            <span style={{ fontSize: "12px", color: c.green, fontWeight: 600 }}>✅ 알파카 연동됨</span>
-            <button onClick={() => setShowAlpacaSetup(true)} style={{
-              fontSize: "11px", color: c.text3, background: "none", border: "none", cursor: "pointer", textDecoration: "underline",
-            }}>재설정</button>
-          </div>
-        )}
+        {user && alpacaConnected && !showAlpacaSetup && (() => {
+          const used = activeBots.reduce((s, ab) => s + (ab.allocation || 0), 0);
+          const left = alpacaEquity != null ? Math.max(0, alpacaEquity - used) : null;
+          return (
+            <div style={{
+              background: `linear-gradient(135deg, ${c.card} 0%, ${c.blue}0A 50%, ${c.green}08 100%)`,
+              border: `1px solid ${c.border}`,
+              borderRadius: "16px", padding: "24px", marginBottom: "20px",
+            }}>
+              {/* 상단: 연동 상태 + 재설정 */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: c.green, boxShadow: `0 0 8px ${c.green}80` }} />
+                  <span style={{ fontSize: "13px", fontWeight: 700, color: c.text1 }}>Alpaca Paper Trading</span>
+                  <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "10px", background: `${c.green}15`, color: c.green, fontWeight: 600 }}>연동됨</span>
+                </div>
+                <button onClick={() => setShowAlpacaSetup(true)} style={{
+                  fontSize: "11px", color: c.text3, background: c.card2, border: `1px solid ${c.border}`, borderRadius: "6px",
+                  padding: "4px 10px", cursor: "pointer",
+                }}>재설정</button>
+              </div>
+
+              {/* 수치 카드 그리드 */}
+              {alpacaEquity != null && (
+                <div style={{ display: "grid", gridTemplateColumns: activeBots.length > 0 ? "1fr 1fr 1fr" : "1fr", gap: "12px" }}>
+                  {/* 총 자산 */}
+                  <div style={{
+                    background: c.card, borderRadius: "12px", padding: "16px 20px",
+                    border: `1px solid ${c.border}`,
+                  }}>
+                    <div style={{ fontSize: "11px", color: c.text3, marginBottom: "6px", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>총 자산</div>
+                    <div style={{ fontSize: "28px", fontWeight: 800, color: c.text1, letterSpacing: "-1px" }}>
+                      ${alpacaEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </div>
+                  </div>
+                  {/* 배분 완료 */}
+                  {activeBots.length > 0 && (
+                    <div style={{
+                      background: c.card, borderRadius: "12px", padding: "16px 20px",
+                      border: `1px solid ${c.border}`,
+                    }}>
+                      <div style={{ fontSize: "11px", color: c.text3, marginBottom: "6px", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>봇 배분</div>
+                      <div style={{ fontSize: "28px", fontWeight: 800, color: c.orange || c.yellow, letterSpacing: "-1px" }}>
+                        ${used.toLocaleString()}
+                      </div>
+                      <div style={{ fontSize: "11px", color: c.text3, marginTop: "4px" }}>{activeBots.length}개 봇 운영 중</div>
+                    </div>
+                  )}
+                  {/* 잔여 */}
+                  {activeBots.length > 0 && left != null && (
+                    <div style={{
+                      background: c.card, borderRadius: "12px", padding: "16px 20px",
+                      border: `1px solid ${left > 0 ? c.border : c.red + "30"}`,
+                    }}>
+                      <div style={{ fontSize: "11px", color: c.text3, marginBottom: "6px", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>잔여 금액</div>
+                      <div style={{ fontSize: "28px", fontWeight: 800, color: left > 0 ? c.green : c.red, letterSpacing: "-1px" }}>
+                        ${left.toLocaleString()}
+                      </div>
+                      <div style={{ fontSize: "11px", color: c.text3, marginTop: "4px" }}>
+                        {alpacaEquity > 0 ? `${((left / alpacaEquity) * 100).toFixed(1)}% 가용` : ""}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })()}
         {/* 알파카 API 키 설정 폼 */}
         {showAlpacaSetup && (
           <div style={{
@@ -1251,23 +1308,7 @@ export default function AutoTrading({ theme = "dark", user }) {
           </div>
         )}
 
-        {/* 알파카 계좌 잔고 표시 */}
-        {user && alpacaConnected && alpacaEquity != null && activeBots.length > 0 && !activeBot && (() => {
-          const used = activeBots.reduce((s, ab) => s + (ab.allocation || 0), 0);
-          const left = Math.max(0, alpacaEquity - used);
-          return (
-            <div style={{
-              display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px",
-              padding: "8px 14px", background: `${c.blue}08`, borderRadius: "10px", border: `1px solid ${c.blue}15`,
-            }}>
-              <span style={{ fontSize: "12px", color: c.text2 }}>
-                계좌 잔고 <strong style={{ color: c.text1 }}>${alpacaEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
-                {" · "}배분 완료 <strong style={{ color: c.orange || c.yellow }}>${used.toLocaleString()}</strong>
-                {" · "}잔여 <strong style={{ color: left > 0 ? c.green : c.red }}>${left.toLocaleString()}</strong>
-              </span>
-            </div>
-          );
-        })()}
+        {/* 잔고 카드는 상단 연동 배너에 통합됨 */}
 
         {/* 운영 중인 봇 대시보드 (활성 봇이 있을 때만 표시) */}
         {!activeBot && activeBots.length > 0 && (
@@ -1337,12 +1378,16 @@ export default function AutoTrading({ theme = "dark", user }) {
               </div>
             </div>
 
-            {/* Trading Panel */}
-            {STOCK_BOTS.some((b) => b.id === activeBot.id) ? (
-              <PaperTrading theme={theme} user={user} botPreset={activeBot} />
-            ) : (
-              <BTCTrading theme={theme} user={user} botPreset={activeBot} />
-            )}
+            {/* Trading Panel — 봇 배분 금액 전달 */}
+            {(() => {
+              const ab = activeBots.find(b => b.botId === activeBot.id);
+              const alloc = ab?.allocation || null;
+              return STOCK_BOTS.some((b) => b.id === activeBot.id) ? (
+                <PaperTrading theme={theme} user={user} botPreset={activeBot} botAllocation={alloc} />
+              ) : (
+                <BTCTrading theme={theme} user={user} botPreset={activeBot} botAllocation={alloc} />
+              );
+            })()}
           </div>
         ) : (
           <BotCatalog onActivate={handleActivateBot} theme={theme} />
