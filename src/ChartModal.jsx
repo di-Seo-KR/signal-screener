@@ -926,6 +926,55 @@ function runDiagnosis(candles) {
     else if (premium < -10) signals.push({ type: "bullish", name: `적정가 대비 ${premium.toFixed(0)}% 저평가`, detail: `기술적 적정가 대비 저평가 구간` });
   }
 
+  // ── 복합 오실레이터 컨센서스 (RSI + Stoch + Williams %R 일치) ──
+  if (rsi != null && stochK != null && wr != null) {
+    const oscBull = (rsi < 35 ? 1 : 0) + (stochK < 25 ? 1 : 0) + (wr < -75 ? 1 : 0);
+    const oscBear = (rsi > 65 ? 1 : 0) + (stochK > 75 ? 1 : 0) + (wr > -25 ? 1 : 0);
+    if (oscBull === 3) {
+      momScore = Math.min(100, momScore + 8);
+      signals.push({ type: "bullish", name: "오실레이터 3중 과매도 컨센서스", detail: "RSI + Stoch + WR 모두 과매도 — 강력한 반등 가능성" });
+    } else if (oscBear === 3) {
+      momScore = Math.min(100, momScore - 8);
+      signals.push({ type: "bearish", name: "오실레이터 3중 과매수 컨센서스", detail: "RSI + Stoch + WR 모두 과매수 — 조정 가능성 높음" });
+    }
+  }
+
+  // ── BB %B + RSI 평균회귀 콤보 ──
+  if (bb && rsi != null) {
+    const bbPercentB = (last - bb.lower) / (bb.upper - bb.lower);
+    if (bbPercentB < 0.10 && rsi < 30) {
+      volScore = Math.min(100, volScore + 6);
+      signals.push({ type: "bullish", name: "BB %B + RSI 극단 매도", detail: `%B ${(bbPercentB * 100).toFixed(0)}% + RSI ${rsi.toFixed(0)} — 평균회귀 매수 구간` });
+    } else if (bbPercentB > 0.90 && rsi > 70) {
+      volScore = Math.max(0, volScore - 6);
+      signals.push({ type: "bearish", name: "BB %B + RSI 극단 매수", detail: `%B ${(bbPercentB * 100).toFixed(0)}% + RSI ${rsi.toFixed(0)} — 평균회귀 매도 구간` });
+    }
+  }
+
+  // ── 추세 강도 신뢰도 (ADX + MA배열 + 거래량 삼박자) ──
+  const trendConfidence = (() => {
+    let conf = 0;
+    if (adx != null && adx > 25) conf++;
+    if (maAlignment === "perfect_bull" || maAlignment === "perfect_bear") conf++;
+    if (volTrend > 1.2 && obvTrend === (maAlignment.includes("bull") ? "up" : "down")) conf++;
+    if (ichimoku && (ichimoku.aboveCloud || ichimoku.belowCloud)) conf++;
+    return { score: conf, label: conf >= 3 ? "매우 높음" : conf >= 2 ? "높음" : conf >= 1 ? "보통" : "낮음" };
+  })();
+  if (trendConfidence.score >= 3) {
+    signals.push({ type: "neutral", name: `추세 신뢰도: ${trendConfidence.label} (${trendConfidence.score}/4)`, detail: "ADX·MA배열·거래량·일목균형표 다중 확인 — 추세 방향 신뢰 가능" });
+  }
+
+  // ── 거래량 클라이맥스 감지 (극단적 거래량 + 가격 반전 조합) ──
+  if (volRatio >= 3 && Math.abs(change1) > 3) {
+    const isBuyClímax = change1 > 3 && rsi != null && rsi > 75;
+    const isSellClimax = change1 < -3 && rsi != null && rsi < 25;
+    if (isBuyClímax) {
+      signals.push({ type: "bearish", name: "매수 클라이맥스", detail: `거래량 ${volRatio.toFixed(1)}x + 급등 ${change1.toFixed(1)}% + RSI 과매수 — 천정 가능성` });
+    } else if (isSellClimax) {
+      signals.push({ type: "bullish", name: "매도 클라이맥스", detail: `거래량 ${volRatio.toFixed(1)}x + 급락 ${change1.toFixed(1)}% + RSI 과매도 — 바닥 가능성` });
+    }
+  }
+
   // ── 리스크/리워드 분석 & 손절/익절 레벨 ──
   const riskReward = (() => {
     const stopLoss = nearestSupport
@@ -980,6 +1029,7 @@ function runDiagnosis(candles) {
     cmf, dmi, keltner,
     riskReward,
     riskLevel,
+    trendConfidence,
   };
 }
 

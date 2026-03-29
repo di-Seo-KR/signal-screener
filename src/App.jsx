@@ -1667,28 +1667,34 @@ function quickDiagnosis(asset) {
   else if (asset.weekChange < -3) trendScore -= 3;
   trendScore = Math.max(0, Math.min(100, trendScore));
 
-  // ── 모멘텀: RSI 연속 그라데이션 (v3.6 최적화) + 스토캐스틱 + W%R ──
-  // v3.6: ATR 레짐 기반 RSI 임계값 동적 조정 + RSI 변화율 반영
+  // ── 모멘텀: RSI 연속 그라데이션 (v3.7 최적화) + 스토캐스틱 + W%R ──
+  // v3.7: 4단계 변동성 레짐 기반 RSI 임계값 동적 조정 + RSI 변화율 반영
+  const isExtremeVol = asset.atr14Pct != null && asset.atr14Pct > 4.5; // v3.7: 극단 변동성 (위기 상황)
   const isHighVol = asset.atr14Pct != null && asset.atr14Pct > 3;
+  const isMedVol = asset.atr14Pct != null && asset.atr14Pct >= 2 && asset.atr14Pct <= 3; // v3.7: 중간 변동성
   const isLowVol = asset.atr14Pct != null && asset.atr14Pct < 1.2;
-  const rsiOB = isHighVol ? 75 : isLowVol ? 70 : 73; // v3.6: 변동성 레짐 기반 과매수 기준
-  const rsiOS = isHighVol ? 25 : isLowVol ? 30 : 27; // v3.6: 변동성 레짐 기반 과매도 기준
+  const rsiOB = isExtremeVol ? 78 : isHighVol ? 75 : isMedVol ? 72 : isLowVol ? 70 : 73; // v3.7: 4단계 레짐
+  const rsiOS = isExtremeVol ? 22 : isHighVol ? 25 : isMedVol ? 28 : isLowVol ? 30 : 27; // v3.7: 4단계 레짐
   if (asset.rsi != null) {
     if (asset.rsi >= 80) { momScore -= 18; signals.push({ type: "bearish", name: `RSI 극단 과매수 (${asset.rsi})` }); }
     else if (asset.rsi >= rsiOB) { momScore -= 12; signals.push({ type: "bearish", name: `RSI 과매수 (${asset.rsi}${isHighVol ? " · 고변동" : ""})` }); }
     else if (asset.rsi >= 65) momScore -= 4;
     else if (asset.rsi >= 55) momScore += 6;
-    else if (asset.rsi >= 45) momScore += 2;
-    else if (asset.rsi >= 40) momScore += 0;
-    else if (asset.rsi >= 35) momScore += 4;
+    else if (asset.rsi >= 48) momScore += 2;  // v3.7: 중립 구간 축소 (48→55)
+    else if (asset.rsi >= 42) momScore += 0;  // v3.7: 약세 중립 구간
+    else if (asset.rsi >= 35) momScore += 4;  // v3.7: 약세 과매도 접근
     else if (asset.rsi >= rsiOS) { momScore += 10; signals.push({ type: "bullish", name: `RSI 과매도 (${asset.rsi}${isLowVol ? " · 저변동" : ""})` }); }
     else if (asset.rsi >= 20) { momScore += 16; signals.push({ type: "bullish", name: `RSI 강한 과매도 (${asset.rsi})` }); }
     else { momScore += 22; signals.push({ type: "bullish", name: `RSI 극단 과매도 (${asset.rsi})` }); }
-    // v3.6: RSI 변화율 보너스 — 전주 대비 RSI 급반등 시 추가 점수
+    // v3.7: RSI 변화율 보너스 — 전주 대비 RSI 급반등/급락 시 추가 점수 (3단계)
     if (asset.rsiPrev != null) {
       const rsiDelta = asset.rsi - asset.rsiPrev;
-      if (rsiDelta > 15 && asset.rsi < 50) momScore += 4; // 과매도→반등 가속
-      else if (rsiDelta < -15 && asset.rsi > 50) momScore -= 4; // 과매수→하락 가속
+      if (rsiDelta > 20 && asset.rsi < 45) { momScore += 6; signals.push({ type: "bullish", name: `RSI 급반등 (+${rsiDelta.toFixed(0)})` }); }
+      else if (rsiDelta > 12 && asset.rsi < 50) momScore += 4; // 과매도→반등 가속
+      else if (rsiDelta > 8 && asset.rsi < 40) momScore += 2; // v3.7: 저RSI 완만 반등
+      else if (rsiDelta < -20 && asset.rsi > 55) { momScore -= 6; signals.push({ type: "bearish", name: `RSI 급락 (${rsiDelta.toFixed(0)})` }); }
+      else if (rsiDelta < -12 && asset.rsi > 50) momScore -= 4; // 과매수→하락 가속
+      else if (rsiDelta < -8 && asset.rsi > 60) momScore -= 2; // v3.7: 고RSI 완만 하락
     }
   }
   // v3.5: MACD 히스토그램 모멘텀 — 방향과 가속도 반영
@@ -1737,7 +1743,11 @@ function quickDiagnosis(asset) {
   else if (asset.volRatio >= 2) supScore += 4;
   else if (asset.volRatio >= 1.5) supScore += 8;
   else if (asset.volRatio >= 1.0) supScore += 2;
-  else if (asset.volRatio <= 0.3) { supScore -= 12; signals.push({ type: "neutral", name: "거래량 극감" }); }
+  else if (asset.volRatio <= 0.3) {
+    // v3.7: 거래량 극감 + BB 스퀴즈 = 돌파 임박 (방향 불명이므로 중립 점수, 시그널만)
+    if (asset.bbWidth != null && asset.bbWidth < 0.08) { supScore += 2; signals.push({ type: "neutral", name: "거래량 극감 + BB스퀴즈 (돌파 임박)" }); }
+    else { supScore -= 12; signals.push({ type: "neutral", name: "거래량 극감" }); }
+  }
   else if (asset.volRatio <= 0.5) supScore -= 6;
   // 가격-거래량 상관
   if (asset.weekChange > 0 && asset.volRatio > 1.3) { supScore += 8; signals.push({ type: "bullish", name: "가격↑ + 거래량↑" }); }
@@ -1842,27 +1852,43 @@ function quickDiagnosis(asset) {
   }
   fundScore = Math.max(0, Math.min(100, fundScore));
 
-  // ── 종합 점수 (6축 가중 합산 — 시장유형별 적응 가중치) ──
+  // ── 종합 점수 (6축 가중 합산 — 시장유형 + 변동성 레짐 적응 가중치) v3.7 ──
   const mkt = asset.market || "us";
+  const volRegime = isExtremeVol ? "extreme" : isHighVol ? "high" : isMedVol ? "med" : isLowVol ? "low" : "normal";
   let w, totalScore;
   if (hasFundData) {
-    // 펀더멘털 데이터 있으면 6축 (기술 70% + 펀더멘털 30%)
-    w = mkt === "crypto" ? { t: 0.18, m: 0.22, s: 0.22, p: 0.10, v: 0.08, f: 0.20 }
-      : mkt === "kr"     ? { t: 0.20, m: 0.16, s: 0.18, p: 0.10, v: 0.08, f: 0.28 }
-      :                    { t: 0.22, m: 0.16, s: 0.14, p: 0.13, v: 0.08, f: 0.27 };
+    // v3.7: 변동성 레짐에 따라 가중치 동적 조정
+    // 고변동 시: 수급·변동성 가중치 ↑, 추세 가중치 ↓ (추세가 빠르게 변하므로)
+    if (volRegime === "extreme" || volRegime === "high") {
+      w = mkt === "crypto" ? { t: 0.14, m: 0.20, s: 0.24, p: 0.10, v: 0.12, f: 0.20 }
+        : mkt === "kr"     ? { t: 0.16, m: 0.16, s: 0.20, p: 0.10, v: 0.12, f: 0.26 }
+        :                    { t: 0.18, m: 0.16, s: 0.18, p: 0.12, v: 0.12, f: 0.24 };
+    } else {
+      w = mkt === "crypto" ? { t: 0.18, m: 0.22, s: 0.22, p: 0.10, v: 0.08, f: 0.20 }
+        : mkt === "kr"     ? { t: 0.20, m: 0.16, s: 0.18, p: 0.10, v: 0.08, f: 0.28 }
+        :                    { t: 0.22, m: 0.16, s: 0.14, p: 0.13, v: 0.08, f: 0.27 };
+    }
     totalScore = Math.round(trendScore * w.t + momScore * w.m + supScore * w.s + posScore * w.p + volScore * w.v + fundScore * w.f);
   } else {
-    // 기술적 지표만 (기존 5축)
-    w = mkt === "crypto" ? { t: 0.22, m: 0.28, s: 0.28, p: 0.12, v: 0.10 }
-      : mkt === "kr"     ? { t: 0.28, m: 0.22, s: 0.25, p: 0.13, v: 0.12 }
-      :                    { t: 0.30, m: 0.22, s: 0.18, p: 0.18, v: 0.12 };
+    // 기술적 지표만 (5축) — 변동성 레짐 적응
+    if (volRegime === "extreme" || volRegime === "high") {
+      w = mkt === "crypto" ? { t: 0.18, m: 0.26, s: 0.28, p: 0.12, v: 0.16 }
+        : mkt === "kr"     ? { t: 0.22, m: 0.22, s: 0.26, p: 0.12, v: 0.18 }
+        :                    { t: 0.24, m: 0.22, s: 0.22, p: 0.16, v: 0.16 };
+    } else {
+      w = mkt === "crypto" ? { t: 0.22, m: 0.28, s: 0.28, p: 0.12, v: 0.10 }
+        : mkt === "kr"     ? { t: 0.28, m: 0.22, s: 0.25, p: 0.13, v: 0.12 }
+        :                    { t: 0.30, m: 0.22, s: 0.18, p: 0.18, v: 0.12 };
+    }
     totalScore = Math.round(trendScore * w.t + momScore * w.m + supScore * w.s + posScore * w.p + volScore * w.v);
   }
 
+  // v3.7: 변동성 레짐 적응 판정 임계값 — 고변동 시 매수 기준 상향 (보수적)
+  const buyThresholdAdj = (volRegime === "extreme" || volRegime === "high") ? 3 : 0; // 고변동 시 +3 상향
   let verdict;
-  if (totalScore >= 80) verdict = "적극 매수";
-  else if (totalScore >= 68) verdict = "매수";
-  else if (totalScore >= 58) verdict = "매수 우위";
+  if (totalScore >= 80 + buyThresholdAdj) verdict = "적극 매수";
+  else if (totalScore >= 68 + buyThresholdAdj) verdict = "매수";
+  else if (totalScore >= 58 + Math.floor(buyThresholdAdj / 2)) verdict = "매수 우위";
   else if (totalScore >= 42) verdict = "중립";
   else if (totalScore >= 32) verdict = "매도 우위";
   else if (totalScore >= 20) verdict = "매도";
@@ -6027,6 +6053,38 @@ function AppInner() {
             // 21) 현금흐름 건전성 프록시 — 저부채 + 고마진 + 고배당
             if (debtEquity != null && debtEquity < 50 && margin != null && margin > 0.15 && dy > 2) {
               score += 5; reasons.push("현금흐름 우량 (저부채+고마진+배당)");
+            }
+
+            // 22) 배당 안전성 검증 — 고배당이지만 적자/고부채면 감점 (배당 컷 위험)
+            if (dy > 5 && margin != null && margin < 0) {
+              score -= 8; reasons.push("배당 지속성 위험 (고배당 + 적자)");
+            } else if (dy > 6 && debtEquity != null && debtEquity > 200) {
+              score -= 6; reasons.push("배당 안전성 경고 (고배당 + 고부채)");
+            }
+
+            // 23) EPS 성장 가속도 — Forward PE vs Trailing PE 비율로 추정
+            if (fpe != null && per != null && fpe > 0 && per > 0) {
+              const earningsAccel = (per - fpe) / per; // 양수 = 이익 성장 가속
+              if (earningsAccel > 0.30) { score += 7; reasons.push(`이익 가속 (Forward PE ${fpe.toFixed(1)} << Trailing ${per.toFixed(1)})`); }
+              else if (earningsAccel > 0.15) { score += 4; reasons.push("이익 성장 가속"); }
+              else if (earningsAccel < -0.20) { score -= 5; reasons.push("이익 감속 경고"); }
+            }
+
+            // 24) 시가총액 대비 밸류에이션 세그먼트 보정 — 대형주와 소형주의 적정 PER 차등
+            if (per != null && per > 0 && q.marketCap) {
+              const isLargeCap = q.marketCap >= 50e9;
+              const isSmallCap = q.marketCap < 5e9;
+              if (isLargeCap && per < 15 && margin != null && margin > 0.10) {
+                score += 4; reasons.push("대형주 저PER 매력");
+              } else if (isSmallCap && per < 8 && roe != null && roe > 0.10) {
+                score += 5; reasons.push("소형 가치주 (저PER + 고ROE)");
+              }
+            }
+
+            // 25) 매출 + 이익 동시 성장 — 진정한 성장 품질
+            if (revGrowth != null && revGrowth > 0.10 && margin != null && margin > 0.10 &&
+                fpe != null && per != null && fpe < per) {
+              score += 5; reasons.push("매출+이익 동시 성장 (품질 성장)");
             }
 
             score = Math.max(0, Math.min(100, score));
