@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
 import AuthPage from "./AuthPage.jsx";
-import { CoupangOfficialBanner, CoupangSearchWidget, GoogleAd } from "./AdBanner.jsx";
+import { CoupangOfficialBanner, CoupangSearchWidget, CoupangInterstitial, GoogleAd } from "./AdBanner.jsx";
 
 // ════════════════════════════════════════════════════════════════════
 // ErrorBoundary — 런타임 에러 시 앱 전체 크래시 방지
@@ -4048,6 +4048,7 @@ const SCREENER_PRESETS = [
 function AppInner() {
   const { user, loading: authLoading, signOut } = useAuth();
   const [themeMode, setThemeMode] = useState(loadTheme);
+  const [showCoupangCTA, setShowCoupangCTA] = useState(false);
   C = themeMode === "dark" ? DARK : LIGHT;
 
   // ── 로그인 필요 탭 정의 ──
@@ -7337,6 +7338,7 @@ function AppInner() {
                 {user && <SearchBar compact placeholder="+ 종목 추가" onSelect={(asset) => {
                   if (!watchlist.some(w => w.symbol === asset.symbol)) {
                     setWatchlist(prev => [...prev, { symbol: asset.symbol, name: asset.name, market: asset.market, symbolRaw: asset.symbolRaw || asset.symbol, id: asset.id }]);
+                    if (Math.random() < 0.3) setShowCoupangCTA(true);
                   }
                 }} />}
               </div>
@@ -7361,6 +7363,7 @@ function AppInner() {
                       return a ? (
                         <button key={s} onClick={() => {
                           setWatchlist(prev => [...prev, { symbol: a.symbol, name: a.name, market: a.market, symbolRaw: a.symbolRaw || a.symbol }]);
+                          if (Math.random() < 0.3) setShowCoupangCTA(true);
                         }} style={{
                           padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
                           background: C.card2, color: C.text2, border: `1px solid ${C.border2}`, cursor: "pointer",
@@ -7568,7 +7571,7 @@ function AppInner() {
               const reportTime = now.toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 
               return (
-                <div onClick={() => setTab("quant-report")} style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`, borderRadius: "18px", padding: "20px", cursor: "pointer", border: `1px solid ${C.border}18` }}>
+                <div onClick={() => { setTab("quant-report"); if (Math.random() < 0.3) setShowCoupangCTA(true); }} style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`, borderRadius: "18px", padding: "20px", cursor: "pointer", border: `1px solid ${C.border}18` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
                     <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>퀀트 리포트</span>
                     <span style={{ fontSize: mf(11), color: C.text3 }}>{reportTime} 기준 →</span>
@@ -7997,7 +8000,7 @@ function AppInner() {
                       return (
                         <div key={`${asset.symbol}-${i}`}
                           onTouchStart={onTouchCardStart} onTouchMove={onTouchCardMove}
-                          onClick={() => { if (isTouchTap()) setSelectedAsset(asset); }}
+                          onClick={() => { if (isTouchTap()) { setSelectedAsset(asset); if (Math.random() < 0.3) setShowCoupangCTA(true); } }}
                           style={{
                             padding: "8px 10px", borderRadius: "8px", cursor: "pointer",
                             display: "flex", alignItems: "center", gap: "6px", transition: "background .15s",
@@ -10784,6 +10787,8 @@ function AppInner() {
         </div>
       )}
 
+      {/* ── CTA 광고 (쿠팡 인터스티셜) ── */}
+      {showCoupangCTA && <CoupangInterstitial theme={themeMode} onClose={() => setShowCoupangCTA(false)} featureName="이 기능" />}
 
     </div>
   );

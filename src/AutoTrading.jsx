@@ -464,7 +464,7 @@ function BotCard({ bot, onActivate, theme }) {
   );
 }
 
-function BotCatalog({ onActivate, theme }) {
+function BotCatalog({ onActivate, theme, isMobile }) {
   const c = colors[theme];
 
   return (
@@ -1453,7 +1453,7 @@ export default function AutoTrading({ theme = "dark", user }) {
             })()}
           </div>
         ) : (
-          <BotCatalog onActivate={handleActivateBot} theme={theme} />
+          <BotCatalog onActivate={handleActivateBot} theme={theme} isMobile={isMobile} />
         )}
       </div>
     </div>
