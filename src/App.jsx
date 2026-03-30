@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
 import AuthPage from "./AuthPage.jsx";
-import { CoupangBanner, CoupangOfficialBanner, CoupangCarouselBanner, CoupangInlineBanner, CoupangInterstitial, CoupangNativeCard, CoupangStripBanner, CoupangButtonAd, CoupangFloatingBanner, GoogleAd } from "./AdBanner.jsx";
+import { CoupangOfficialBanner, CoupangSearchWidget, GoogleAd } from "./AdBanner.jsx";
 
 // ════════════════════════════════════════════════════════════════════
 // ErrorBoundary — 런타임 에러 시 앱 전체 크래시 방지
@@ -4227,8 +4227,6 @@ function AppInner() {
   const [btStrategy, setBtStrategy] = useState(null);
   const [btSymbol, setBtSymbol] = useState(null);
 
-  // ── 쿠팡 CTA 광고 상태 ────────────────────────────────────────
-  const [showCoupangCTA, setShowCoupangCTA] = useState(false);
 
   // ── 통화 (KRW/USD) ──────────────────────────────────────────
   const [currency, setCurrency] = useState("USD");
@@ -7227,8 +7225,6 @@ function AppInner() {
               </div>
             )}
 
-            {/* 쿠팡 파트너스 공식 배너 (728x90) — 홈에는 1개만 */}
-            <CoupangOfficialBanner width="728" height="90" bannerId={975392} style={{ margin: "8px 0" }} />
 
             {/* ── 주요 종목 (통합: 전체 / 급등 / 급락 탭) ─── */}
             {hotAssets.length > 0 && (() => {
@@ -7339,10 +7335,6 @@ function AppInner() {
                 {user && <SearchBar compact placeholder="+ 종목 추가" onSelect={(asset) => {
                   if (!watchlist.some(w => w.symbol === asset.symbol)) {
                     setWatchlist(prev => [...prev, { symbol: asset.symbol, name: asset.name, market: asset.market, symbolRaw: asset.symbolRaw || asset.symbol, id: asset.id }]);
-                    // 쿠팡 CTA 광고 표시 (20% 확률)
-                    if (Math.random() < 0.2) {
-                      setShowCoupangCTA(true);
-                    }
                   }
                 }} />}
               </div>
@@ -7367,10 +7359,6 @@ function AppInner() {
                       return a ? (
                         <button key={s} onClick={() => {
                           setWatchlist(prev => [...prev, { symbol: a.symbol, name: a.name, market: a.market, symbolRaw: a.symbolRaw || a.symbol }]);
-                          // 쿠팡 CTA 광고 표시 (20% 확률)
-                          if (Math.random() < 0.2) {
-                            setShowCoupangCTA(true);
-                          }
                         }} style={{
                           padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
                           background: C.card2, color: C.text2, border: `1px solid ${C.border2}`, cursor: "pointer",
@@ -7875,8 +7863,6 @@ function AppInner() {
               );
             })()}
 
-            {/* 사이드 쿠팡 파트너스 (모든 유저에게 자연스럽게 노출) */}
-            <CoupangBanner theme={themeMode} />
 
             </div>{/* end home-right */}
             </div>{/* end home-grid */}
@@ -8027,6 +8013,12 @@ function AppInner() {
                 </>
               )}
             </div>
+
+            {/* 쿠팡 검색 위젯 — 홈 하단 */}
+            <CoupangSearchWidget style={{ margin: "12px 0" }} />
+
+            {/* 쿠팡 파트너스 공식 배너 (728x90) — 홈 하단에만 1개 */}
+            <CoupangOfficialBanner width="728" height="90" bannerId={975392} style={{ margin: "8px 0" }} />
           </div>
         )}
 
@@ -8282,8 +8274,6 @@ function AppInner() {
               </div>
             )}
 
-            {/* 스크리너 컨텍스트 광고 — 캐러셀 배너 */}
-            {(results.length > 0 || lastScan) && <CoupangCarouselBanner style={{ margin: "12px 0" }} />}
 
             {/* ═══════════════════════════════════════════════════════
                 저평가 종목 통합 조회
@@ -8439,14 +8429,6 @@ function AppInner() {
               )}
             </div>
 
-            {/* 스크리너 중간 — 추가 쿠팡 광고 섹션 */}
-            <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "22px 24px", marginTop: "20px" }}>
-              <div style={{ fontSize: "14px", fontWeight: 700, marginBottom: "14px", color: C.text1 }}>📚 투자에 유용한 도구</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                <CoupangNativeCard theme={themeMode} context="screener" />
-                <CoupangButtonAd theme={themeMode} context="screener" />
-              </div>
-            </div>
           </div>
         )}
 
@@ -8715,8 +8697,6 @@ function AppInner() {
               </div>
             )}
 
-            {/* 포트폴리오 하단 — 쿠팡 캐러셀 배너 */}
-            <CoupangCarouselBanner style={{ margin: "16px 0" }} />
           </div>
         )}
 
@@ -8975,8 +8955,6 @@ function AppInner() {
                 ))}
               </div>
             </div>
-            {/* 이상 탐지 하단 — 쿠팡 인라인 배너 */}
-            <CoupangInlineBanner theme={themeMode} />
           </div>
         )}
 
@@ -8987,13 +8965,7 @@ function AppInner() {
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <StrategyPanel onRunBacktest={(strategy, symbol) => {
               setBtStrategy(strategy); setBtSymbol(symbol); setTab("backtest");
-              // 쿠팡 CTA 광고 표시 (20% 확률)
-              if (Math.random() < 0.2) {
-                setShowCoupangCTA(true);
-              }
             }} />
-            {/* 전략 하단 — 쿠팡 인라인 배너 */}
-            <CoupangInlineBanner theme={themeMode} />
           </div>
         )}
 
@@ -9003,8 +8975,6 @@ function AppInner() {
         {tab === "quant-port" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <QuantPortfolio theme={themeMode} />
-            {/* 퀀트 포트폴리오 하단 — 쿠팡 네이티브 카드 */}
-            <CoupangNativeCard theme={themeMode} context="portfolio" />
           </div>
         )}
 
@@ -9014,8 +8984,6 @@ function AppInner() {
         {tab === "risk-map" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <RiskHeatmap marketIndices={marketIndices} fearGreed={fearGreed} />
-            {/* 리스크맵 하단 — 쿠팡 스트립 배너 */}
-            <CoupangStripBanner theme={themeMode} context="portfolio" />
           </div>
         )}
 
@@ -9464,12 +9432,6 @@ function AppInner() {
           );
         })()}
 
-        {/* 퀀트 리포트 하단 — 쿠팡 버튼 광고 */}
-        {tab === "quant-report" && (
-          <div style={{ margin: "16px 0" }}>
-            <CoupangButtonAd theme={themeMode} context="strategy" />
-          </div>
-        )}
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 백테스트
@@ -9573,8 +9535,6 @@ function AppInner() {
                     return `${Math.floor(hrs / 24)}일 전`;
                   })();
                   return (<>
-                    {/* 뉴스 5번째 뒤에 자연스럽게 스트립 배너 삽입 */}
-                    {i === 5 && <CoupangStripBanner key="ad-strip-5" theme={themeMode} context="news" />}
                     <a key={i} href={news.url || news.link || "#"} target="_blank" rel="noopener" style={{
                       background: C.card, border: `1px solid ${C.border}20`, borderRadius: "14px", padding: "16px 18px",
                       textDecoration: "none", color: "inherit", display: "block", transition: "all .2s",
@@ -10235,12 +10195,6 @@ function AppInner() {
           </div>
         )}
 
-        {/* 알림 탭 하단 — 쿠팡 인라인 배너 */}
-        {tab === "alerts" && (
-          <div style={{ margin: "12px 0" }}>
-            <CoupangInlineBanner theme={themeMode} />
-          </div>
-        )}
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 소셜 센티먼트 분석
@@ -10392,8 +10346,6 @@ function AppInner() {
               </div>
             )}
 
-            {/* 센티먼트 하단 — 쿠팡 네이티브 카드 */}
-            <CoupangNativeCard theme={themeMode} context="default" />
           </div>
         )}
 
@@ -10822,17 +10774,6 @@ function AppInner() {
         </div>
       )}
 
-      {/* 플로팅 배너 — 45초 후 자동 표시 (우측 하단) */}
-      <CoupangFloatingBanner theme={themeMode} context="default" autoShowDelay={45000} />
-
-      {/* ═══ 쿠팡 CTA 광고 (관심종목 추가, 백테스트 실행 등) ═══ */}
-      {showCoupangCTA && (
-        <CoupangInterstitial
-          theme={themeMode}
-          onClose={() => setShowCoupangCTA(false)}
-          featureName="기능"
-        />
-      )}
 
     </div>
   );

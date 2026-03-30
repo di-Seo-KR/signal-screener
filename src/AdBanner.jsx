@@ -703,10 +703,32 @@ export function GoogleAd({ slot, format = "auto", style = {} }) {
   );
 }
 
+// ── 쿠팡 검색 위젯 ──
+export function CoupangSearchWidget({ style = {} }) {
+  return (
+    <div style={{
+      textAlign: "center", overflow: "hidden", maxWidth: "100%",
+      borderRadius: "8px", ...style,
+    }}>
+      <iframe
+        src="https://coupa.ng/cl8Z6J"
+        width="100%"
+        height="75"
+        frameBorder="0"
+        scrolling="no"
+        referrerPolicy="unsafe-url"
+        style={{ maxWidth: "728px", borderRadius: "4px" }}
+        title="쿠팡 검색"
+      />
+    </div>
+  );
+}
+
 export default {
   GoogleAd,
   CoupangBanner,
   CoupangOfficialBanner,
+  CoupangSearchWidget,
   CoupangCarouselBanner,
   CoupangInlineBanner,
   CoupangButtonAd,
