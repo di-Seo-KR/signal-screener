@@ -169,7 +169,7 @@ class CryptoRiskManager {
   }
 }
 
-export default function BTCTrading({ theme = "dark", user, botPreset, botAllocation }) {
+export default function BTCTrading({ theme = "dark", user, botPreset, botAllocation, isMobile = false }) {
   // 유저별 localStorage 키 분리
   const userId = user?.id || null;
   KEYS = makeBtcKeys(userId);
@@ -347,8 +347,8 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
       if (!latestDate) return;
 
       const age = now / 1000 - latestDate;
-      // 최근 2일 이내 시그널만 자동 실행
-      if (age > 2 * 86400) return;
+      // 최근 5일 이내 시그널만 자동 실행 (일봉 기준 허용 범위 확대)
+      if (age > 5 * 86400) return;
 
       // 쿨다운 체크: 같은 심볼 6시간 내 재거래 방지
       const lastTradeSym = tradeCooldowns["BTC-USD"];

@@ -1,4 +1,4 @@
-// Toit — 백테스트 패널 v3.6
+// Toit — 백테스트 패널 v3.9
 // 전략 선택 → 데이터 로드 → 백테스트 실행 → 성과 시각화
 // v3.5: MAE/MFE + Expectancy + Recovery Factor + 평균 보유기간 표시
 import { useState, useCallback, useRef, useEffect } from "react";
@@ -207,6 +207,7 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
   const [stopLoss, setStopLoss] = useState("");
   const [takeProfit, setTakeProfit] = useState("");
   const [trailingStop, setTrailingStop] = useState(""); // v3.3
+  const [maxDDLimit, setMaxDDLimit] = useState(""); // v3.7: 낙폭 서킷브레이커
 
   useEffect(() => {
     if (initialStrategy) setStrategyId(initialStrategy.id);
@@ -234,6 +235,8 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
         stopLoss: stopLoss ? parseFloat(stopLoss) : null,
         takeProfit: takeProfit ? parseFloat(takeProfit) : null,
         trailingStop: trailingStop ? parseFloat(trailingStop) : null, // v3.3
+        maxDrawdownLimit: maxDDLimit ? parseFloat(maxDDLimit) : null, // v3.7
+        volScaledSlippage: true, // v3.7: 변동성 적응 슬리피지
       });
 
       setResult({ ...btResult, strategyName: strategy.name, strategyIcon: strategy.icon, symbol, candles });
@@ -242,7 +245,7 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
     } finally {
       setLoading(false);
     }
-  }, [strategyId, symbol, timeframe, range, capital, stopLoss, takeProfit, trailingStop]);
+  }, [strategyId, symbol, timeframe, range, capital, stopLoss, takeProfit, trailingStop, maxDDLimit]);
 
   const strategy = ALL_STRATEGIES.find(s => s.id === strategyId);
 
@@ -331,6 +334,13 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
               background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none", boxSizing: "border-box",
             }} />
           </div>
+          <div>
+            <label style={{ fontSize: "11px", color: C.text3, display: "block", marginBottom: "4px" }}>낙폭 제한 (%, 선택)</label>
+            <input type="number" value={maxDDLimit} onChange={e => setMaxDDLimit(e.target.value)} placeholder="예: 15" style={{
+              width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "13px",
+              background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none", boxSizing: "border-box",
+            }} />
+          </div>
         </div>
 
         <button onClick={execute} disabled={loading} style={{
@@ -386,6 +396,9 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
               <MetricCard label="알파" value={`${result.alpha >= 0 ? "+" : ""}${result.alpha}%`}
                 color={result.alpha >= 0 ? C.green : C.red}
                 sub="vs Buy&Hold" />
+              <MetricCard label="CAGR" value={`${result.cagr >= 0 ? "+" : ""}${result.cagr}%`}
+                color={result.cagr >= 15 ? C.green : result.cagr >= 0 ? C.yellow : C.red}
+                sub={result.circuitBroken ? "서킷브레이커 발동" : "복합 연간 성장률"} />
               <MetricCard label="평균 수익" value={`${result.avgWin >= 0 ? "+" : ""}${result.avgWin}%`} color={C.green}
                 sub={`연속승: ${result.maxConsecWin || 0}회`} />
               <MetricCard label="평균 손실" value={`${result.avgLoss}%`} color={C.red}
@@ -405,6 +418,12 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
               <MetricCard label="월 승률" value={`${result.monthlyWinRate || 0}%`}
                 color={result.monthlyWinRate >= 60 ? C.green : result.monthlyWinRate >= 50 ? C.yellow : C.red}
                 sub="양수 수익 월 비율" />
+              <MetricCard label="Ulcer Index" value={result.ulcerIndex ?? "—"}
+                color={result.ulcerIndex <= 5 ? C.green : result.ulcerIndex <= 10 ? C.yellow : C.red}
+                sub="낙폭 지속성 (낮을수록 좋음)" />
+              <MetricCard label="UPI" value={result.upiRatio ?? "—"}
+                color={result.upiRatio >= 1 ? C.green : result.upiRatio >= 0 ? C.yellow : C.red}
+                sub="초과수익/Ulcer Index" />
             </div>
 
             {/* 자산 곡선 */}

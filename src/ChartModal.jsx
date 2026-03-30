@@ -975,6 +975,83 @@ function runDiagnosis(candles) {
     }
   }
 
+  // ── Choppiness Index (변동 횡보 vs 추세 구간 감지) ──
+  const choppiness = (() => {
+    if (n < 14 || !atr) return null;
+    let atrSum = 0;
+    for (let k = n - 14; k < n; k++) {
+      const tr = Math.max(
+        highs[k] - lows[k],
+        k > 0 ? Math.abs(highs[k] - closes[k - 1]) : 0,
+        k > 0 ? Math.abs(lows[k] - closes[k - 1]) : 0
+      );
+      atrSum += tr;
+    }
+    const highestHigh = Math.max(...highs.slice(n - 14, n));
+    const lowestLow = Math.min(...lows.slice(n - 14, n));
+    const range = highestHigh - lowestLow;
+    if (range <= 0) return null;
+    return (Math.log10(atrSum / range) / Math.log10(14)) * 100;
+  })();
+  if (choppiness != null) {
+    if (choppiness > 61.8) {
+      signals.push({ type: "neutral", name: `횡보 구간 (CI ${choppiness.toFixed(0)})`, detail: "Choppiness Index 고값 — 방향성 부재, 브레이크아웃 대기" });
+      trendScore = Math.max(0, trendScore - 4);
+    } else if (choppiness < 38.2) {
+      signals.push({ type: "neutral", name: `강한 추세 구간 (CI ${choppiness.toFixed(0)})`, detail: "Choppiness Index 저값 — 추세 진행 중, 추세 고갈 주의" });
+      trendScore = Math.min(100, trendScore + 3);
+    }
+  }
+
+  // ── ROC(Rate of Change) 다중 기간 모멘텀 분석 ──
+  if (n >= 20) {
+    const roc5 = change5;
+    const roc20 = change20;
+    // 단기·중기 ROC 동시 양수 = 강한 모멘텀 확인
+    if (roc5 > 3 && roc20 > 8) {
+      momScore = Math.min(100, momScore + 5);
+      signals.push({ type: "bullish", name: `ROC 다중 상승 (5일 +${roc5.toFixed(1)}%, 20일 +${roc20.toFixed(1)}%)`, detail: "단기+중기 모멘텀 동시 확인 — 추세 지속 가능성 높음" });
+    } else if (roc5 < -3 && roc20 < -8) {
+      momScore = Math.max(0, momScore - 5);
+      signals.push({ type: "bearish", name: `ROC 다중 하락 (5일 ${roc5.toFixed(1)}%, 20일 ${roc20.toFixed(1)}%)`, detail: "단기+중기 모멘텀 동시 하락 — 약세 지속 가능성" });
+    }
+    // 단기 반전 감지: 중기 하락 중 단기 반등
+    if (roc5 > 2 && roc20 < -5) {
+      signals.push({ type: "neutral", name: "ROC 단기 반등 (중기 하락 중)", detail: `5일 +${roc5.toFixed(1)}% vs 20일 ${roc20.toFixed(1)}% — 데드캣 바운스 or 진짜 반전 확인 필요` });
+    }
+  }
+
+  // ── 거래량 가중 RSI 다이버전스 보정 ──
+  if (rsi != null && n >= 10) {
+    const recentAvgVol = volumes.slice(-5).reduce((a, b) => a + b, 0) / 5;
+    const priorAvgVol = volumes.slice(-10, -5).reduce((a, b) => a + b, 0) / 5;
+    const volSupport = recentAvgVol > priorAvgVol * 1.3;
+    // 다이버전스 + 거래량 뒷받침 = 더 신뢰도 높은 신호
+    if (volSupport && rsi < 40 && change5 < -2 && rsiArr[n - 5] != null && rsi > rsiArr[n - 5]) {
+      momScore = Math.min(100, momScore + 4);
+      signals.push({ type: "bullish", name: "거래량 확인 RSI 다이버전스", detail: "RSI 반등 + 거래량 증가 — 바닥 확인 신뢰도 상승" });
+    }
+    if (volSupport && rsi > 60 && change5 > 2 && rsiArr[n - 5] != null && rsi < rsiArr[n - 5]) {
+      momScore = Math.max(0, momScore - 4);
+      signals.push({ type: "bearish", name: "거래량 확인 RSI 약세 다이버전스", detail: "RSI 하락 + 거래량 증가 — 천정 확인 신뢰도 상승" });
+    }
+  }
+
+  // ── 일목균형표 시간론 (전환선/기준선 교차 타이밍) ──
+  if (ichimoku && n >= 52) {
+    const prevTenkan = (Math.max(...highs.slice(-10, -1)) + Math.min(...lows.slice(-10, -1))) / 2;
+    const prevKijun = (Math.max(...highs.slice(-27, -1)) + Math.min(...lows.slice(-27, -1))) / 2;
+    const tkCrossNow = ichimoku.tenkan > ichimoku.kijun;
+    const tkCrossPrev = prevTenkan > prevKijun;
+    if (tkCrossNow && !tkCrossPrev) {
+      trendScore = Math.min(100, trendScore + 5);
+      signals.push({ type: "bullish", name: "일목 전환/기준선 골든크로스 (신규)", detail: "전환선이 기준선 상향 돌파 — 단기 상승 전환 신호" });
+    } else if (!tkCrossNow && tkCrossPrev) {
+      trendScore = Math.max(0, trendScore - 5);
+      signals.push({ type: "bearish", name: "일목 전환/기준선 데드크로스 (신규)", detail: "전환선이 기준선 하향 돌파 — 단기 하락 전환 신호" });
+    }
+  }
+
   // ── 리스크/리워드 분석 & 손절/익절 레벨 ──
   const riskReward = (() => {
     const stopLoss = nearestSupport

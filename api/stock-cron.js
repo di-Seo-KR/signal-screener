@@ -647,78 +647,113 @@ export default async function handler(req, res) {
     // Build telegram report (structured format)
     const now = new Date();
     const timeStr = now.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false });
-    let report = `📊 *DI금융 자동매매 리포트*\n`;
-    report += `━━━━━━━━━━━━━━━━━━\n`;
-    report += `🕐 ${timeStr} (KST)\n`;
-    report += `💰 총 자산: $${startEquity.toLocaleString('en-US', { minimumFractionDigits: 2 })}\n`;
-    report += `💵 현금: $${startCash.toLocaleString('en-US', { minimumFractionDigits: 2 })}\n\n`;
+    const cashPct = startEquity > 0 ? ((startCash / startEquity) * 100).toFixed(1) : '0.0';
+    const investedPct = (100 - parseFloat(cashPct)).toFixed(1);
 
-    // Portfolio positions summary
+    let report = `📊 *DI금융 주식 자동매매 리포트*\n`;
+    report += `━━━━━━━━━━━━━━━━━━\n`;
+    report += `🕐 ${timeStr} (KST)\n\n`;
+
+    // Account summary with allocation
+    report += `💰 *계좌 요약*\n`;
+    report += `  자산: $${startEquity.toLocaleString('en-US', { minimumFractionDigits: 2 })}\n`;
+    report += `  현금: $${startCash.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${cashPct}%)\n`;
+    report += `  투자: ${investedPct}% 배분\n\n`;
+
+    // Portfolio positions summary with enhanced metrics
     if (positions.length > 0) {
-      report += `📋 *보유 포지션 (${positions.length}종목)*\n`;
+      report += `📋 *보유 포지션 (${positions.length}/${WATCHLIST.length}종목)*\n`;
       let totalPnL = 0;
-      positions.forEach(pos => {
+      let totalMV = 0;
+      let bestPos = null, worstPos = null;
+      const posDetails = positions.map(pos => {
         const mv = parseFloat(pos.market_value) || 0;
         const entry = parseFloat(pos.avg_entry_price) || 0;
         const cur = parseFloat(pos.current_price) || entry;
         const pnl = parseFloat(pos.unrealized_pl) || 0;
         const pnlPct = entry > 0 ? ((cur - entry) / entry * 100) : 0;
         totalPnL += pnl;
-        const pnlEmoji = pnl >= 0 ? '📈' : '📉';
-        report += `  ${pnlEmoji} ${pos.symbol}: ${pos.qty}주 @ $${cur.toFixed(2)} (${pnlPct >= 0 ? '+' : ''}${pnlPct.toFixed(1)}%)\n`;
+        totalMV += mv;
+        if (!bestPos || pnlPct > bestPos.pnlPct) bestPos = { symbol: pos.symbol, pnlPct };
+        if (!worstPos || pnlPct < worstPos.pnlPct) worstPos = { symbol: pos.symbol, pnlPct };
+        return { symbol: pos.symbol, qty: pos.qty, cur, pnlPct, pnl, mv, weight: startEquity > 0 ? (mv / startEquity * 100) : 0 };
       });
-      report += `  💎 총 미실현 P/L: $${totalPnL >= 0 ? '+' : ''}${totalPnL.toFixed(2)}\n\n`;
+      posDetails.sort((a, b) => b.pnlPct - a.pnlPct);
+      posDetails.forEach(p => {
+        const icon = p.pnlPct >= 0 ? '📈' : '📉';
+        report += `  ${icon} ${p.symbol}: ${p.qty}주 $${p.cur.toFixed(2)} (${p.pnlPct >= 0 ? '+' : ''}${p.pnlPct.toFixed(1)}%) [${p.weight.toFixed(0)}%]\n`;
+      });
+      const totalPnLPct = totalMV > 0 ? ((totalPnL / (totalMV - totalPnL)) * 100) : 0;
+      report += `  ──\n`;
+      report += `  💎 미실현 P/L: $${totalPnL >= 0 ? '+' : ''}${totalPnL.toFixed(2)} (${totalPnLPct >= 0 ? '+' : ''}${totalPnLPct.toFixed(1)}%)\n`;
+      if (bestPos && worstPos && positions.length >= 2) {
+        report += `  🏆 최고: ${bestPos.symbol} +${bestPos.pnlPct.toFixed(1)}% | 최저: ${worstPos.symbol} ${worstPos.pnlPct.toFixed(1)}%\n`;
+      }
+      report += `\n`;
     }
 
-    // Trading signals
+    // Market overview (signal heatmap)
     if (signals.length > 0) {
       const buySignals = signals.filter(s => s.buySignal);
       const sellSignals = signals.filter(s => s.sellSignal);
       const holdSignals = signals.filter(s => !s.buySignal && !s.sellSignal);
+      const avgRSI = signals.reduce((s, x) => s + (x.lastRSI || 50), 0) / signals.length;
+      const marketSentiment = avgRSI >= 60 ? '🟢 강세' : avgRSI <= 40 ? '🔴 약세' : '⚪ 중립';
 
-      report += `🔍 *시그널 분석 (${signals.length}종목)*\n`;
+      report += `🌡️ *시장 온도: ${marketSentiment}* (평균RSI ${avgRSI.toFixed(0)})\n`;
+      report += `🔍 *시그널: 매수 ${buySignals.length} | 매도 ${sellSignals.length} | 관망 ${holdSignals.length}*\n`;
+
       if (buySignals.length > 0) {
-        report += `\n  🟢 *매수 신호 (${buySignals.length})*\n`;
+        report += `\n  🟢 *매수 (${buySignals.length})*\n`;
         buySignals.forEach(sig => {
-          const adxStr = sig.lastADX ? ` ADX:${sig.lastADX.toFixed(0)}` : '';
-          const pattern = sig.candlePattern ? ` 🕯${sig.candlePattern}` : '';
-          report += `    ✅ ${sig.symbol} $${sig.lastClose.toFixed(2)}\n`;
-          report += `       RSI:${sig.lastRSI.toFixed(0)} MACD:${(sig.lastMACD - sig.lastSignal).toFixed(3)}${adxStr}${pattern}\n`;
-          report += `       점수: Buy ${sig.buyScore} (${sig.buyFactors}팩터)\n`;
+          const strength = sig.buyScore >= 6 ? '🔥' : sig.buyScore >= 4 ? '✅' : '💡';
+          const emaPos = sig.lastEMA21 > sig.lastEMA55 ? '정배열' : '역배열';
+          const bbPos = sig.lastBB ? ((sig.lastClose - sig.lastBB.lower) / (sig.lastBB.upper - sig.lastBB.lower) * 100).toFixed(0) : '—';
+          report += `    ${strength} *${sig.symbol}* $${sig.lastClose.toFixed(2)}\n`;
+          report += `       RSI:${sig.lastRSI.toFixed(0)} | BB:${bbPos}% | ${emaPos} | Buy:${sig.buyScore}(${sig.buyFactors}F)\n`;
+          if (sig.candlePattern) report += `       🕯 ${sig.candlePattern}`;
+          if (sig.bullDivergence) report += ` | 강세 다이버전스`;
+          if (sig.candlePattern || sig.bullDivergence) report += '\n';
         });
       }
       if (sellSignals.length > 0) {
-        report += `\n  🔴 *매도 신호 (${sellSignals.length})*\n`;
+        report += `\n  🔴 *매도 (${sellSignals.length})*\n`;
         sellSignals.forEach(sig => {
-          const pattern = sig.candlePattern ? ` 🕯${sig.candlePattern}` : '';
-          report += `    ⛔ ${sig.symbol} $${sig.lastClose.toFixed(2)}\n`;
-          report += `       RSI:${sig.lastRSI.toFixed(0)} MACD:${(sig.lastMACD - sig.lastSignal).toFixed(3)}${pattern}\n`;
-          report += `       점수: Sell ${sig.sellScore} (${sig.sellFactors}팩터)\n`;
+          const strength = sig.sellScore >= 6 ? '⚠️' : '⛔';
+          const emaPos = sig.lastEMA21 > sig.lastEMA55 ? '정배열' : '역배열';
+          report += `    ${strength} *${sig.symbol}* $${sig.lastClose.toFixed(2)}\n`;
+          report += `       RSI:${sig.lastRSI.toFixed(0)} | ${emaPos} | Sell:${sig.sellScore}(${sig.sellFactors}F)\n`;
+          if (sig.candlePattern) report += `       🕯 ${sig.candlePattern}\n`;
         });
       }
       if (holdSignals.length > 0) {
-        report += `\n  ⚪ *관망 (${holdSignals.length})*: `;
-        report += holdSignals.map(s => `${s.symbol}(RSI:${s.lastRSI.toFixed(0)})`).join(', ') + '\n';
+        report += `\n  ⚪ *관망 (${holdSignals.length})*\n  `;
+        report += holdSignals.map(s => {
+          const rsiIcon = s.lastRSI > 60 ? '↑' : s.lastRSI < 40 ? '↓' : '→';
+          return `${s.symbol}(${s.lastRSI.toFixed(0)}${rsiIcon})`;
+        }).join(' ') + '\n';
       }
     }
 
     // Orders executed
     if (orders.length > 0) {
-      report += `\n⚡ *체결 주문 (${orders.length}건)*\n`;
+      report += `\n⚡ *체결 ${orders.length}건*\n`;
       report += `━━━━━━━━━━━━━━━━━━\n`;
       orders.forEach(ord => {
         const emoji = ord.side === 'BUY' ? '🟢' : ord.side.includes('SL') ? '🛑' : '🔴';
-        report += `  ${emoji} ${ord.symbol} ${ord.side}: ${ord.qty}주 @ $${ord.price.toFixed(2)}`;
-        if (ord.reason) report += ` (${ord.reason})`;
+        const value = (ord.qty * ord.price);
+        report += `  ${emoji} ${ord.symbol} ${ord.side}: ${ord.qty}주 @ $${ord.price.toFixed(2)} ($${value.toFixed(0)})`;
+        if (ord.reason) report += ` — ${ord.reason}`;
         report += '\n';
       });
-      report += `\n  💸 총 거래금액: $${totalTradeValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}\n`;
+      report += `  💸 총 거래: $${totalTradeValue.toLocaleString('en-US', { minimumFractionDigits: 0 })}\n`;
     } else {
-      report += `\n✋ 오늘 체결 주문 없음\n`;
+      report += `\n✋ 체결 주문 없음\n`;
     }
 
+    const elapsed = ((Date.now() - now.getTime()) / 1000).toFixed(1);
     report += `\n━━━━━━━━━━━━━━━━━━\n`;
-    report += `🤖 DI금융 Auto-Trading v2`;
+    report += `🤖 DI금융 Stock Auto v3 | ${elapsed}s`;
 
     await sendTelegramReport('Stock Auto-Trading', report);
 

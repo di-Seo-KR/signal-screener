@@ -280,43 +280,77 @@ export default async function handler(req, res) {
 // 텔레그램 메시지 생성
 // ════════════════════════════════════════════════════════
 function buildTelegramMessage(assetResults, positionMap, equity, buyingPower, duration, fngData) {
+  const now = new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul", hour12: false });
   const lines = [
-    `🤖 멀티 자산 암호화폐 엔진`,
+    `🤖 *DI금융 크립토 자동매매 리포트*`,
     `━━━━━━━━━━━━━━━━━━━━`,
-    `📅 ${new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`,
+    `📅 ${now}`,
   ];
 
+  // Fear & Greed with visual gauge
   if (fngData) {
-    lines.push(`📊 Fear & Greed: ${fngData.value} (${fngData.classification})`);
+    const fVal = fngData.value;
+    const fBar = fVal <= 25 ? '🟥🟥🟥⬜⬜' : fVal <= 45 ? '🟧🟧🟧⬜⬜' : fVal <= 55 ? '🟨🟨🟨⬜⬜' : fVal <= 75 ? '🟩🟩🟩⬜⬜' : '🟩🟩🟩🟩🟩';
+    const fAdvice = fVal <= 25 ? '극공포 → 매수 기회 탐색' : fVal <= 45 ? '공포 → 선별적 매수' : fVal <= 55 ? '중립 → 시그널 대기' : fVal <= 75 ? '탐욕 → 신중한 매수' : '극탐욕 → 이익 확보 우선';
+    lines.push(`📊 F&G: ${fVal} ${fBar}`);
+    lines.push(`   ${fngData.classification} → ${fAdvice}`);
   }
 
   lines.push(``);
+
+  // Asset signals with detailed breakdown
+  const hasAction = assetResults.some(r => r.signal);
+  if (hasAction) {
+    lines.push(`🔍 *시그널 분석*`);
+  }
 
   for (const result of assetResults) {
     if (result.signal) {
       const icon = result.signal.type === "BUY" ? "🟢" : "🔴";
       const grade = result.signal.confidence === "A" ? "⭐⭐⭐" : result.signal.confidence === "B" ? "⭐⭐" : "⭐";
-      lines.push(`${icon} ${result.asset}: ${result.signal.type} (${grade} ${result.signal.score}pt)`);
-      lines.push(`  근거: ${result.signal.reason.substring(0, 60)}...`);
-    } else if (result.action === "wait") {
-      lines.push(`⏸️ ${result.asset}: 신호 없음`);
+      const actionEmoji = result.type === "BUY" ? " → 매수 체결!" : result.type === "SELL" ? " → 매도 체결!" : "";
+      lines.push(`${icon} *${result.asset}*: ${result.signal.type} ${grade} (${result.signal.score}pt/${result.signal.factors}F)${actionEmoji}`);
+      lines.push(`   📝 ${result.signal.reason}`);
+      if (result.amount) {
+        lines.push(`   💵 체결: $${result.amount.toFixed(0)}`);
+      }
+    } else if (result.action === "wait" || result.action === "skip") {
+      lines.push(`⏸️ ${result.asset}: 시그널 대기`);
+    } else if (!result.ok) {
+      lines.push(`⚠️ ${result.asset}: ${result.error || '오류'}`);
     }
   }
 
-  lines.push(``, `💰 포트폴리오`);
+  // Portfolio with risk metrics
+  lines.push(``, `💰 *포트폴리오*`);
   lines.push(`━━━━━━━━━━━━━━━━━━━━`);
-  lines.push(`계좌: $${equity.toFixed(0)} | 매수력: $${buyingPower.toFixed(0)}`);
+  const cashPct = equity > 0 ? ((buyingPower / equity) * 100) : 0;
+  lines.push(`계좌: $${equity.toFixed(0)} | 현금: $${buyingPower.toFixed(0)} (${cashPct.toFixed(0)}%)`);
 
+  let totalCryptoValue = 0;
+  let totalCryptoPnL = 0;
   for (const asset of CRYPTO_ASSETS) {
     const pos = positionMap[asset];
     if (pos) {
+      const mv = parseFloat(pos.market_value || 0);
       const pl = parseFloat(pos.unrealized_pl || 0);
+      const cost = parseFloat(pos.cost_basis || 0);
+      const plPct = cost > 0 ? ((pl / cost) * 100) : 0;
+      const weight = equity > 0 ? ((mv / equity) * 100) : 0;
+      totalCryptoValue += mv;
+      totalCryptoPnL += pl;
       const icon = pl >= 0 ? "📈" : "📉";
-      lines.push(`${icon} ${asset}: $${parseFloat(pos.market_value || 0).toFixed(0)} (P&L: $${pl.toFixed(2)})`);
+      lines.push(`${icon} ${asset}: $${mv.toFixed(0)} (${plPct >= 0 ? '+' : ''}${plPct.toFixed(1)}%) [${weight.toFixed(0)}%]`);
     }
   }
 
-  lines.push(``, `⏱️ ${duration}s`);
+  if (totalCryptoValue > 0) {
+    const totalExposure = equity > 0 ? ((totalCryptoValue / equity) * 100) : 0;
+    lines.push(`──`);
+    lines.push(`📊 크립토 노출: ${totalExposure.toFixed(0)}%/${(MAX_TOTAL_CRYPTO_EXPOSURE * 100).toFixed(0)}% | P/L: $${totalCryptoPnL >= 0 ? '+' : ''}${totalCryptoPnL.toFixed(0)}`);
+  }
+
+  lines.push(``, `⏱️ ${duration}s | DI금융 Crypto v3`);
   return lines.join("\n");
 }
 

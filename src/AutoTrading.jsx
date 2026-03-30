@@ -760,10 +760,25 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
           const hours = Math.floor((elapsed % 86400000) / 3600000);
           const isStock = STOCK_BOTS.some(b => b.id === ab.botId);
 
-          // 해당 봇의 실제 거래 로그 필터링
+          // 해당 봇의 실제 거래 로그 필터링 (개선된 로직)
           const botTradeLog = tradeLog.filter(t => {
-            if (isStock) return !t.symbol?.includes("/") && !t.symbol?.includes("BTC") && !t.symbol?.includes("ETH");
-            return t.symbol?.includes("/") || t.symbol?.includes("BTC") || t.symbol?.includes("ETH");
+            if (isStock) {
+              // 주식: "/" 없고, BTC/ETH/SOL/BNB/XRP 포함 안 함
+              const isCrypto = t.symbol?.includes("/") ||
+                             t.symbol?.includes("BTC") ||
+                             t.symbol?.includes("ETH") ||
+                             t.symbol?.includes("SOL") ||
+                             t.symbol?.includes("BNB") ||
+                             t.symbol?.includes("XRP");
+              return !isCrypto;
+            }
+            // 크립토: BTC/USD, ETH/USD, SOL/USD 등 또는 BTC, ETH 등이름 포함
+            return t.symbol?.includes("/") ||
+                   t.symbol?.includes("BTC") ||
+                   t.symbol?.includes("ETH") ||
+                   t.symbol?.includes("SOL") ||
+                   t.symbol?.includes("BNB") ||
+                   t.symbol?.includes("XRP");
           });
           const botTrades = botTradeLog.length;
 
@@ -788,16 +803,18 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
               const initEquity = ab.allocation || 10000;
               return { data: curve.map(v => 100 + (v / initEquity) * 100), source: "trade_log" };
             }
-            // 2순위: 알파카 포트폴리오 히스토리 (봇 시작 이후 + 배분 비율)
+            // 2순위: 알파카 포트폴리오 히스토리 (봇 시작 이후만, 배분 비율 적용)
             if (equityHistory.length >= 2 && activeBots.length > 0) {
               const filtered = equityHistory.filter(h => new Date(h.timestamp).getTime() >= botStartTime);
               if (filtered.length >= 2) {
                 const base = filtered[0].equity;
-                return { data: filtered.map(h => 100 + ((h.equity - base) * botAllocRatio / base) * 100), source: "alpaca" };
+                // 크립토/주식 봇 구분: 크립토는 배분 비율을 더 신중하게 적용
+                const adjustedRatio = isStock ? botAllocRatio : Math.min(botAllocRatio, 0.3); // 크립토는 최대 30% 가중
+                return { data: filtered.map(h => 100 + ((h.equity - base) * adjustedRatio / base) * 100), source: "alpaca" };
               }
             }
-            // 데이터 없음 — 봇 시작 직후라 아직 데이터 없음
-            return { data: [], source: "none" };
+            // 데이터 없음 — 봇 시작 직후라 아직 데이터 수집 중
+            return { data: [], source: "none", collecting: true };
           })();
 
           const pnlData = botPnlCurve?.data || [];
@@ -997,12 +1014,22 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
 export default function AutoTrading({ theme = "dark", user }) {
   const c = colors[theme];
   const { showToast } = useAuth();
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
   const [activeBot, setActiveBot] = useState(null);
   const [showAlpacaSetup, setShowAlpacaSetup] = useState(false);
   const [alpacaKey, setAlpacaKey] = useState("");
   const [alpacaSecret, setAlpacaSecret] = useState("");
   const [alpacaPaper, setAlpacaPaper] = useState(true);
   const [pendingBot, setPendingBot] = useState(null);
+
+  // 모바일 반응형 감지
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth <= 640);
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // 알파카 설정 로드
   const alpacaPrefix = user ? `di_${user.id.slice(0, 8)}_` : "";
@@ -1418,9 +1445,9 @@ export default function AutoTrading({ theme = "dark", user }) {
               const ab = activeBots.find(b => b.botId === activeBot.id);
               const alloc = ab?.allocation || null;
               return STOCK_BOTS.some((b) => b.id === activeBot.id) ? (
-                <PaperTrading theme={theme} user={user} botPreset={activeBot} botAllocation={alloc} />
+                <PaperTrading theme={theme} user={user} botPreset={activeBot} botAllocation={alloc} isMobile={isMobile} />
               ) : (
-                <BTCTrading theme={theme} user={user} botPreset={activeBot} botAllocation={alloc} />
+                <BTCTrading theme={theme} user={user} botPreset={activeBot} botAllocation={alloc} isMobile={isMobile} />
               );
             })()}
           </div>

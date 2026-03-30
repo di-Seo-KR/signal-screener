@@ -1,6 +1,18 @@
 // ════════════════════════════════════════════════════════════════════
-// Toit 퀀트 엔진 v3.7 — 야간 전략 고도화 (2026-03-26)
+// Toit 퀀트 엔진 v3.9 — 하위전략 2차 안전필터 강화 (2026-03-30)
 // 33개 매매전략 + 백테스팅 엔진 + 시장진단 + 전략추천
+// v3.9: 3/30 백테스트 결과 기반 하위전략 2차 강화
+//   - 일목균형표: ADX 최소 25로 상향 + MA200 방향 필터 + RSI 하한 40
+//   - 스토캐스틱+RSI: MA200 하락추세 시 임계값 보수적 조정(30→25/20→15) + RSI 기울기 확인
+//   - 레짐 전환: 횡보장 RSI 진입 30→25 보수적 조정 + 연속 과매도 2봉 확인
+//   - 볼린저밴드 바운스: 연속 2봉 BB 하단 확인 + RSI 추가 하한(25) 필터
+//   - 듀얼 타임프레임: MA200 위 추가 확인 + RSI 기울기 반전 확인
+// v3.8: Sharpe 하위 5개 전략 안전필터 강화 (BB/VWAP/일목/레짐전환/삼중EMA)
+//   - BB 바운스: MA200 추세필터 — 하락추세 매수 시 다이버전스 필수
+//   - VWAP 반전: ATR 동적 임계값 + RSI<45 확인 + 하락추세 억제
+//   - 일목균형표: ADX<20 비추세장 비활성화 + 구름 두께 최소 0.5% 기준
+//   - 레짐 전환: ADX 히스테리시스(25/20) + MA200 추세방향 필터 + ATR 급등 억제
+//   - 삼중 이평선: ADX≥18 추세강도 필터 + 이격도>8% 과열 억제 + RSI<75 확인
 // v3.7: 하위전략 파라미터 최적화 (일목/듀얼모멘텀/채널돌파/MFI)
 //   - 일목균형표: 구름 근접성 완화(99% 허용) + 치쿠스팬 추세확인 + RSI 교차검증
 //   - 듀얼 모멘텀: ADX 추세강도 필터(≥18) + RSI 모멘텀 확인 + 3봉 모멘텀 기울기
@@ -234,7 +246,7 @@ function detectBearishDivergence(closes, rsi, index, lookback = 10) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 매매 전략 정의 (33개)
+// 매매 전략 정의 (33개) — v3.9 전략 업데이트
 // ════════════════════════════════════════════════════════════════════
 
 // ━━━ 전략 1: RSI 반전 전략 ━━━
@@ -269,9 +281,9 @@ export const strategyRSI = {
         if (atrCnt > 0) atrAvg = atrSum / atrCnt;
       }
       const volRegime = atrPct > atrAvg * 1.3 ? "high" : atrPct < atrAvg * 0.7 ? "low" : "normal";
-      // v3.6: 레짐 기반 임계값 — 고변동: 과매도 깊게, 저변동: 완화
-      const regimeBuy = volRegime === "high" ? buyThreshold - 2 : volRegime === "low" ? buyThreshold + 3 : buyThreshold;
-      const regimeSell = volRegime === "high" ? sellThreshold + 2 : volRegime === "low" ? sellThreshold - 3 : sellThreshold;
+      // v3.9: 레짐 기반 임계값 — 고변동: 과매도 더 깊게(-4), 저변동: 완화(+3)
+      const regimeBuy = volRegime === "high" ? buyThreshold - 4 : volRegime === "low" ? buyThreshold + 3 : buyThreshold;
+      const regimeSell = volRegime === "high" ? sellThreshold + 4 : volRegime === "low" ? sellThreshold - 3 : sellThreshold;
       const volAdj = Math.min(Math.max(atrPct / 1.5 - 1, -3), 3);
       const adjBuy = regimeBuy + volAdj;
       const adjSell = regimeSell - volAdj;
@@ -309,7 +321,7 @@ export const strategyRSI = {
 export const strategyBB = {
   id: "bb_bounce",
   name: "볼린저밴드 바운스",
-  desc: "가격이 BB 하단에 닿으면 매수, 상단에 닿으면 매도. 밴드 내 왕복 수익을 추구.",
+  desc: "가격이 BB 하단에 닿으면 매수, 상단에 닿으면 매도. v3.8: MA200 추세필터 — 하락추세 매수 억제 + RSI 다이버전스 필수.",
   category: "평균회귀",
   risk: "중",
   icon: "🎯",
@@ -319,6 +331,7 @@ export const strategyBB = {
     const closes = candles.map(c => c.close);
     const bb = calcBB(closes, period, mult);
     const rsi14 = calcRSI(closes, 14);
+    const ma200 = calcSMA(closes, 200);
     const signals = [];
     for (let i = 1; i < candles.length; i++) {
       if (!bb[i] || !bb[i - 1]) continue;
@@ -336,11 +349,16 @@ export const strategyBB = {
         if (bwRatio < 0.5) continue; // 극단적 수축 시 평균회귀 부적합
         const rsiOversold = rsi14[i] != null && rsi14[i] < 35;
         const div = detectBullishDivergence(closes, rsi14, i);
-        // v3.6: 종가가 하단 대비 1% 이상 이탈해야 유효 (노이즈 필터)
+        // v3.9: 종가 이탈 기준을 ATR 비례로 조정 (고변동: 완화, 저변동: 엄격)
         const penetration = bb[i].lower > 0 ? ((bb[i].lower - closes[i]) / bb[i].lower) * 100 : 0;
-        if (penetration < 0.3 && !rsiOversold) continue;
+        const dynPenThreshold = Math.max(0.1, Math.min(0.5, atrPct * 0.15));
+        if (penetration < dynPenThreshold && !rsiOversold) continue;
+        // v3.8: MA200 추세 필터 — 가격이 MA200 아래이면 하락추세로 간주, 다이버전스 필수
+        const belowMA200 = ma200[i] != null && closes[i] < ma200[i];
+        if (belowMA200 && !div) continue; // 하락추세에서 다이버전스 없으면 매수 억제
+        const trendTag = belowMA200 ? " · MA200↓" : "";
         signals.push({ index: i, type: "BUY", price: closes[i],
-          reason: `BB 하단 (%B=${pctB.toFixed(2)})${rsiOversold ? ` + RSI${rsi14[i].toFixed(0)}` : ""}${div ? " + 강세다이버전스" : ""}${bwRatio < 0.8 ? " · 밴드수축" : ""}` });
+          reason: `BB 하단 (%B=${pctB.toFixed(2)})${rsiOversold ? ` + RSI${rsi14[i].toFixed(0)}` : ""}${div ? " + 강세다이버전스" : ""}${bwRatio < 0.8 ? " · 밴드수축" : ""}${trendTag}` });
       } else if (closes[i] >= bb[i].upper && closes[i - 1] < bb[i - 1].upper) {
         if (bwRatio < 0.5) continue; // v3.6: 스퀴즈 구간 보호
         const div = detectBearishDivergence(closes, rsi14, i);
@@ -496,7 +514,7 @@ export const strategyVolume = {
 export const strategyCombo = {
   id: "stoch_rsi_combo",
   name: "스토캐스틱+RSI 콤보",
-  desc: "RSI < 35 AND Stoch %K < 25 동시 충족 매수. 이중 필터로 가짜 신호 제거.",
+  desc: "RSI < 35 AND Stoch %K < 25 동시 충족 매수. v3.9: MA200 하락추세 보수적 임계값(RSI<25,K<15) + RSI 기울기 반전 확인.",
   category: "평균회귀",
   risk: "낮음",
   icon: "🌊",
@@ -508,16 +526,25 @@ export const strategyCombo = {
     const lows = candles.map(c => c.low);
     const rsi = calcRSI(closes);
     const stoch = calcStochastic(highs, lows, closes);
+    const ma200 = calcSMA(closes, 200);
     const signals = [];
     for (let i = 20; i < candles.length; i++) {
       if (rsi[i] == null || stoch.k[i] == null) continue;
-      if (rsi[i] <= rsiBuy && stoch.k[i] <= stochBuy) {
+      // v3.9: MA200 하락추세 시 보수적 임계값 적용
+      const belowMA200 = ma200[i] != null && closes[i] < ma200[i];
+      const effRsiBuy = belowMA200 ? 25 : rsiBuy;
+      const effStochBuy = belowMA200 ? 15 : stochBuy;
+      if (rsi[i] <= effRsiBuy && stoch.k[i] <= effStochBuy) {
         // v3.1: 삼중 확인 — RSI + Stoch + 다이버전스 + 거래량
         if (!isVolumeConfirmed(candles, i, 20, 0.7)) continue;
+        // v3.9: RSI 기울기 반전 확인 — RSI가 직전 봉보다 높아야 (바닥 확인)
+        if (rsi[i - 1] != null && rsi[i] < rsi[i - 1]) continue;
         const div = detectBullishDivergence(closes, rsi, i);
+        // v3.9: MA200 아래이면 다이버전스 필수
+        if (belowMA200 && !div) continue;
         const stochCross = stoch.k[i] > stoch.d[i] && (stoch.k[i - 1] || 50) <= (stoch.d[i - 1] || 50);
         signals.push({ index: i, type: "BUY", price: closes[i],
-          reason: `RSI ${rsi[i].toFixed(1)} + Stoch ${stoch.k[i].toFixed(1)} 과매도${stochCross ? " + K>D크로스" : ""}${div ? " + 다이버전스" : ""}` });
+          reason: `RSI ${rsi[i].toFixed(1)} + Stoch ${stoch.k[i].toFixed(1)} 과매도${stochCross ? " + K>D크로스" : ""}${div ? " + 다이버전스" : ""}${belowMA200 ? " · MA200↓" : ""}` });
       } else if (rsi[i] >= rsiSell && stoch.k[i] >= stochSell) {
         const div = detectBearishDivergence(closes, rsi, i);
         signals.push({ index: i, type: "SELL", price: closes[i],
@@ -736,7 +763,7 @@ export const strategyBBSqueeze = {
 export const strategyTripleMA = {
   id: "triple_ma_atr",
   name: "삼중 이평선 + ATR 정지",
-  desc: "EMA(5) > EMA(20) > EMA(60) 정배열 매수, 가격이 EMA(20) - 2×ATR 이하 시 매도. 추세 라이딩 전략.",
+  desc: "EMA(5) > EMA(20) > EMA(60) 정배열 매수. v3.8: ADX 추세강도 필터 + 이격도 과열 억제 + RSI 확인.",
   category: "추세추종",
   risk: "중",
   icon: "🎿",
@@ -750,6 +777,8 @@ export const strategyTripleMA = {
     const emaM = calcEMA(closes, mid);
     const emaS = calcEMA(closes, slow);
     const atr = calcATR(highs, lows, closes);
+    const adx = calcADX(highs, lows, closes, 14);
+    const rsi = calcRSI(closes, 14);
     const signals = [];
     for (let i = slow + 1; i < candles.length; i++) {
       if (atr[i] == null) continue;
@@ -758,8 +787,16 @@ export const strategyTripleMA = {
       if (aligned && !prevAligned) {
         // v3.1: 정배열 전환 시 거래량 확인 + 이격도 표시
         if (!isVolumeConfirmed(candles, i, 20, 1.1)) continue;
-        const gap = ((emaF[i] - emaS[i]) / emaS[i] * 100).toFixed(1);
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `삼중 이평선 정배열 (이격 ${gap}%)` });
+        const gap = ((emaF[i] - emaS[i]) / emaS[i] * 100);
+        // v3.8: ADX 추세강도 필터 — ADX < 18이면 약한 추세, 정배열이어도 매수 보류
+        const adxVal = adx[i] || 0;
+        if (adxVal < 18) continue;
+        // v3.8: 이격도 과열 억제 — 이격 > 8%면 이미 과열, 추격매수 방지
+        if (gap > 8) continue;
+        // v3.8: RSI 확인 — 과매수(>75) 상태에서 정배열 전환은 고점 신호
+        const rsiVal = rsi[i] || 50;
+        if (rsiVal > 75) continue;
+        signals.push({ index: i, type: "BUY", price: closes[i], reason: `삼중 이평선 정배열 (이격 ${gap.toFixed(1)}% · ADX ${adxVal.toFixed(0)} · RSI ${rsiVal.toFixed(0)})` });
       }
       // ATR 후행 정지
       const trailingStop = emaM[i] - atrMult * atr[i];
@@ -775,13 +812,18 @@ export const strategyTripleMA = {
 export const strategyVWAP = {
   id: "vwap_reversion",
   name: "VWAP 반전",
-  desc: "가격이 VWAP(20봉 근사) 아래로 -2% 이상 이탈 후 복귀 시 매수. 기관 매집 가능성 포착.",
+  desc: "가격이 VWAP(20봉 근사) 아래로 이탈 후 복귀 시 매수. v3.8: ATR 동적 임계값 + RSI 과매도 확인 + 추세필터.",
   category: "평균회귀",
   risk: "중",
   icon: "🏦",
   params: { period: 20, threshold: 0.02 },
   generate(candles, params = {}) {
     const { period = 20, threshold = 0.02 } = { ...this.params, ...params };
+    const closes = candles.map(c => c.close);
+    const highs = candles.map(c => c.high);
+    const lows = candles.map(c => c.low);
+    const atr = calcATR(highs, lows, closes);
+    const rsi = calcRSI(closes, 14);
     const signals = [];
     for (let i = period; i < candles.length; i++) {
       // VWAP 근사: 기간 내 (TP*Vol)/Vol 합
@@ -793,6 +835,9 @@ export const strategyVWAP = {
       }
       const vwap = volSum > 0 ? tpvSum / volSum : candles[i].close;
       const deviation = (candles[i].close - vwap) / vwap;
+      // v3.8: ATR 기반 동적 임계값 (변동성 높으면 임계값 확대)
+      const atrVal = atr[i] || 0;
+      const dynamicThreshold = Math.max(threshold, atrVal > 0 ? (atrVal / closes[i]) * 1.5 : threshold);
       const prevDeviation = i > period ? (() => {
         let pTpv = 0, pVol = 0;
         for (let j = i - period; j < i; j++) {
@@ -802,9 +847,16 @@ export const strategyVWAP = {
         }
         return pVol > 0 ? (candles[i - 1].close - pTpv / pVol) / (pTpv / pVol) : 0;
       })() : 0;
-      if (deviation > -threshold && prevDeviation <= -threshold)
-        signals.push({ index: i, type: "BUY", price: candles[i].close, reason: `VWAP 복귀 (${(deviation * 100).toFixed(1)}%)` });
-      else if (deviation > threshold && prevDeviation <= threshold)
+      if (deviation > -dynamicThreshold && prevDeviation <= -dynamicThreshold) {
+        // v3.8: RSI 과매도 확인 (RSI < 45이어야 매수)
+        const rsiVal = rsi[i] || 50;
+        if (rsiVal > 45) continue;
+        // v3.8: 추세 필터 — 극단적 하락추세에서는 억제
+        const trend = getTrendDirection(closes, i);
+        if (trend === "down" && rsiVal > 35) continue; // 하락추세에서는 RSI 35 이하만
+        signals.push({ index: i, type: "BUY", price: candles[i].close, reason: `VWAP 복귀 (${(deviation * 100).toFixed(1)}%) · RSI ${rsiVal.toFixed(0)}${trend === "down" ? " · 하락추세" : ""}` });
+      }
+      else if (deviation > dynamicThreshold && prevDeviation <= dynamicThreshold)
         signals.push({ index: i, type: "SELL", price: candles[i].close, reason: `VWAP 상단 이탈 (${(deviation * 100).toFixed(1)}%)` });
     }
     return signals;
@@ -884,7 +936,7 @@ function calcIchimoku(highs, lows, tenkanP = 9, kijunP = 26, senkouP = 52) {
 export const strategyIchimoku = {
   id: "ichimoku_cloud",
   name: "일목균형표",
-  desc: "전환선(9) > 기준선(26) + 가격 > 구름대 상단 시 매수. 일본 전통 추세/지지/저항 통합 분석.",
+  desc: "전환선(9) > 기준선(26) + 가격 > 구름대 상단 시 매수. v3.9: ADX≥25 + MA200 방향 필터 + RSI 하한 40.",
   category: "추세추종",
   risk: "중",
   icon: "☁️",
@@ -897,14 +949,21 @@ export const strategyIchimoku = {
     const ich = calcIchimoku(highs, lows, tp, kp, sp);
     const signals = [];
     const rsi = calcRSI(closes, 14);
+    const adx = calcADX(highs, lows, closes, 14);
+    const ma200 = calcSMA(closes, 200);
     for (let i = sp + 1; i < candles.length; i++) {
       if (ich.tenkan[i] == null || ich.kijun[i] == null || ich.senkouA[i] == null || ich.senkouB[i] == null) continue;
+      // v3.9: ADX 최소 25로 상향 — 약한 추세에서 일목 시그널 비활성화
+      const adxVal = adx[i] || 0;
+      if (adxVal < 25) continue;
       const cloudTop = Math.max(ich.senkouA[i], ich.senkouB[i]);
       const cloudBot = Math.min(ich.senkouA[i], ich.senkouB[i]);
+      // v3.8: 구름 두께가 가격 대비 0.5% 미만이면 의미없는 시그널 → 스킵
+      const cloudThicknessPct = closes[i] > 0 ? ((cloudTop - cloudBot) / closes[i]) * 100 : 0;
+      if (cloudThicknessPct < 0.5) continue;
       const prevTK = ich.tenkan[i - 1] != null && ich.kijun[i - 1] != null;
       if (prevTK) {
-        // v3.7: 일목 시그널 + 거래량 + 구름 근접성 완화 + RSI 확인 + 치쿠스팬 추세
-        const cloudThickness = ((cloudTop - cloudBot) / closes[i] * 100).toFixed(1);
+        const cloudThickness = cloudThicknessPct.toFixed(1);
         const rsiVal = rsi[i] || 50;
         // 치쿠스팬 (26봉 전 가격과 현재 가격 비교)로 추세 보조 확인
         const chikouBullish = i >= kp && closes[i] > closes[i - kp];
@@ -912,14 +971,18 @@ export const strategyIchimoku = {
         // v3.7: 구름 근접성 완화 — 구름 내부도 허용 (구름 상단 -1% 이상이면 진입 가능)
         const nearCloud = closes[i] >= cloudTop * 0.99;
         // 전환선 > 기준선 골든크로스 + 가격 구름 근접/위
-        if (ich.tenkan[i] > ich.kijun[i] && ich.tenkan[i - 1] <= ich.kijun[i - 1] && nearCloud && rsiVal > 35) {
+        // v3.9: RSI 하한 40으로 상향 (약세장 진입 방지) + MA200 방향 필터
+        if (ich.tenkan[i] > ich.kijun[i] && ich.tenkan[i - 1] <= ich.kijun[i - 1] && nearCloud && rsiVal > 40) {
           if (!isVolumeConfirmed(candles, i, 20, 0.9)) continue;
-          const grade = closes[i] > cloudTop ? "A" : "B";
-          signals.push({ index: i, type: "BUY", price: closes[i], reason: `일목 골든크로스(${grade}) + 구름${closes[i] > cloudTop ? " 위" : " 근접"} (두께 ${cloudThickness}%)${chikouBullish ? " + 치쿠↑" : ""}` });
+          // v3.9: MA200 아래이면 골든크로스 매수 억제 (하락추세 함정)
+          const belowMA200 = ma200[i] != null && closes[i] < ma200[i];
+          if (belowMA200 && !chikouBullish) continue;
+          const grade = closes[i] > cloudTop ? "A" : belowMA200 ? "C" : "B";
+          signals.push({ index: i, type: "BUY", price: closes[i], reason: `일목 골든크로스(${grade}) + 구름${closes[i] > cloudTop ? " 위" : " 근접"} (두께 ${cloudThickness}% · ADX ${adxVal.toFixed(0)})${chikouBullish ? " + 치쿠↑" : ""}${belowMA200 ? " · MA200↓" : ""}` });
         }
         // v3.7: 데드크로스도 구름 근접성 완화
         else if (ich.tenkan[i] < ich.kijun[i] && ich.tenkan[i - 1] >= ich.kijun[i - 1] && closes[i] <= cloudBot * 1.01 && rsiVal < 65)
-          signals.push({ index: i, type: "SELL", price: closes[i], reason: `일목 데드크로스 + 구름${closes[i] < cloudBot ? " 아래" : " 근접"} (두께 ${cloudThickness}%)${chikouBearish ? " + 치쿠↓" : ""}` });
+          signals.push({ index: i, type: "SELL", price: closes[i], reason: `일목 데드크로스 + 구름${closes[i] < cloudBot ? " 아래" : " 근접"} (두께 ${cloudThickness}% · ADX ${adxVal.toFixed(0)})${chikouBearish ? " + 치쿠↓" : ""}` });
       }
     }
     return signals;
@@ -1197,7 +1260,7 @@ export const strategyConnorsRSI2 = {
 export const strategyRegimeSwitch = {
   id: "regime_switch",
   name: "레짐 전환 적응형",
-  desc: "ADX로 추세/횡보 구분 → 추세장: MA 크로스 매매, 횡보장: RSI 평균회귀 매매. 시장 적응형.",
+  desc: "ADX로 추세/횡보 구분 → 추세장: MA 크로스 매매, 횡보장: RSI 평균회귀 매매. v3.9: 횡보 RSI 25 보수적 + 연속 과매도 2봉 확인.",
   category: "추세추종",
   risk: "중",
   icon: "🔄",
@@ -1211,28 +1274,47 @@ export const strategyRegimeSwitch = {
     const rsi = calcRSI(closes, 14);
     const ma20 = calcSMA(closes, 20);
     const ma60 = calcSMA(closes, 60);
+    const ma200 = calcSMA(closes, 200);
+    const atr = calcATR(highs, lows, closes);
     const signals = [];
+    // v3.8: 레짐 전환 히스테리시스 — 추세→횡보 전환은 ADX<20에서만 (잦은 전환 방지)
+    let currentRegime = "unknown"; // "trending" | "ranging" | "unknown"
 
     for (let i = 61; i < candles.length; i++) {
       const adxVal = adx[i] || 0;
-      const isTrending = adxVal >= adxThreshold;
+      // v3.8: 히스테리시스 적용 — 추세 진입은 ADX>=25, 횡보 전환은 ADX<20
+      if (adxVal >= adxThreshold) currentRegime = "trending";
+      else if (adxVal < 20) currentRegime = "ranging";
+      // ADX 20~25 구간은 이전 레짐 유지 (whipsaw 방지)
 
-      if (isTrending) {
-        // 추세장 → 이평선 크로스 + 거래량 확인
+      if (currentRegime === "trending") {
+        // 추세장 → 이평선 크로스 + 거래량 확인 + 추세방향 필터
         if (ma20[i] != null && ma60[i] != null && ma20[i - 1] != null && ma60[i - 1] != null) {
           if (ma20[i - 1] <= ma60[i - 1] && ma20[i] > ma60[i]) {
             if (!isVolumeConfirmed(candles, i, 20, 1.1)) continue;
+            // v3.8: MA200 위에서만 골든크로스 매수 (하락추세 함정 방지)
+            const aboveMA200 = ma200[i] != null && closes[i] > ma200[i];
+            if (!aboveMA200 && ma200[i] != null) continue;
             signals.push({ index: i, type: "BUY", price: closes[i], reason: `추세장 골든크로스 (ADX ${adxVal.toFixed(0)}) + 거래량확인` });
           } else if (ma20[i - 1] >= ma60[i - 1] && ma20[i] < ma60[i])
             signals.push({ index: i, type: "SELL", price: closes[i], reason: `추세장 데드크로스 (ADX ${adxVal.toFixed(0)})` });
         }
-      } else {
+      } else if (currentRegime === "ranging") {
         // 횡보장 → RSI 평균회귀 + 다이버전스 체크
         if (rsi[i] != null && rsi[i - 1] != null) {
-          if (rsi[i] <= 30 && rsi[i - 1] > 30) {
+          // v3.8: ATR 변동성 체크 — 횡보장에서 ATR이 급등하면 돌파 전환 임박이므로 억제
+          const atrVal = atr[i] || 0;
+          const recentATRs = [];
+          for (let j = Math.max(14, i - 20); j < i; j++) if (atr[j]) recentATRs.push(atr[j]);
+          const avgATR = recentATRs.length > 0 ? recentATRs.reduce((a, b) => a + b, 0) / recentATRs.length : atrVal;
+          if (atrVal > avgATR * 1.5) continue; // ATR 급등 시 평균회귀 부적합
+          // v3.9: RSI 25로 보수적 조정 + 연속 2봉 과매도 확인
+          if (rsi[i] <= 25 && rsi[i - 1] != null && rsi[i - 1] <= 30) {
             const div = detectBullishDivergence(closes, rsi, i);
+            // v3.9: RSI 기울기 반전 필수 (바닥 확인 후 진입)
+            if (rsi[i] < rsi[i - 1] && !div) continue;
             signals.push({ index: i, type: "BUY", price: closes[i],
-              reason: `횡보장 RSI 과매도 (${rsi[i].toFixed(0)})${div ? " + 강세다이버전스" : ""}` });
+              reason: `횡보장 RSI 과매도 (${rsi[i].toFixed(0)}) · 2봉확인${div ? " + 강세다이버전스" : ""}` });
           } else if (rsi[i] >= 70 && rsi[i - 1] < 70) {
             const div = detectBearishDivergence(closes, rsi, i);
             signals.push({ index: i, type: "SELL", price: closes[i],
@@ -1763,14 +1845,24 @@ export const strategyBTCAlpha = {
     const weeklyTrendUp = wEma10.length > 0 && wEma30.length > 0
       ? wEma10[wEma10.length - 1] > wEma30[wEma30.length - 1] : null;
 
-    // ── 변동성 적응형 임계값 ──
+    // ── 변동성 적응형 임계값 (패닉 레짐 추가) ──
     // ATR%가 높으면 RSI 임계값을 더 넓게 (20/80), 낮으면 좁게 (30/70)
+    // 패닉 레짐(ATR% > 6): RSI < 15 = 극단적 매수신호
     function getAdaptiveRSI(i) {
       const atrPct = atr[i] && closes[i] > 0 ? (atr[i] / closes[i]) * 100 : 2;
-      if (atrPct > 5) return { buy: 20, sell: 80 };       // 초고변동
-      if (atrPct > 3) return { buy: 25, sell: 75 };       // 고변동
-      if (atrPct > 1.5) return { buy: 28, sell: 72 };     // 보통
-      return { buy: 32, sell: 68 };                         // 저변동
+      if (atrPct > 6) return { buy: 15, sell: 85, isPanic: true };  // 패닉(초극고변동)
+      if (atrPct > 5) return { buy: 20, sell: 80 };                  // 초고변동
+      if (atrPct > 3) return { buy: 25, sell: 75 };                  // 고변동
+      if (atrPct > 1.5) return { buy: 28, sell: 72 };                // 보통
+      return { buy: 32, sell: 68 };                                  // 저변동
+    }
+
+    // ── 변동성 레짐별 동적 거래량 임계값 ──
+    function getVolumeSurgeThreshold(i) {
+      const atrPct = atr[i] && closes[i] > 0 ? (atr[i] / closes[i]) * 100 : 2;
+      if (atrPct > 5) return 1.5;   // 고변동 시장: 1.5배로 완화 (spikes 쉽게 포착)
+      if (atrPct > 2) return 1.8;   // 보통: 기본값
+      return 2.0;                   // 저변동: 2.0배 (높은 기준)
     }
 
     const signals = [];
@@ -1782,7 +1874,6 @@ export const strategyBTCAlpha = {
 
       const price = closes[i];
       const prevPrice = closes[i - 1];
-      const { buy: rsiBuyTh, sell: rsiSellTh } = getAdaptiveRSI(i);
 
       // ── 쿨다운 체크 ──
       if (i - lastSignalIdx < cooldown) continue;
@@ -1799,7 +1890,12 @@ export const strategyBTCAlpha = {
       const emaCrossUp = ema21[i] > ema55[i] && ema21[i - 1] <= ema55[i - 1];
       const emaCrossDown = ema21[i] < ema55[i] && ema21[i - 1] >= ema55[i - 1];
 
-      // 2) RSI (적응형 임계값)
+      // 2) RSI (적응형 임계값 + 패닉 레짐 체크)
+      const rsiThresholds = getAdaptiveRSI(i);
+      const rsiBuyTh = rsiThresholds.buy;
+      const rsiSellTh = rsiThresholds.sell;
+      const isPanic = rsiThresholds.isPanic || false;
+      const rsiExtremeOversold = isPanic && rsi[i] < 15;  // 패닉 레짐 극단 매수
       const rsiBounce = rsi[i] > rsiBuyTh && rsi[i - 1] <= rsiBuyTh;
       const rsiDrop = rsi[i] < rsiSellTh && rsi[i - 1] >= rsiSellTh;
 
@@ -1807,10 +1903,11 @@ export const strategyBTCAlpha = {
       const bbBounce = prevPrice <= (bb[i - 1]?.lower || 0) && price > bb[i].lower;
       const bbReject = prevPrice >= (bb[i - 1]?.upper || Infinity) && price < bb[i].upper;
 
-      // 4) 거래량 분석 (서지 + OBV 추세)
+      // 4) 거래량 분석 (동적 임계값 + OBV 추세)
       const volAvg = volSMA[i] || 0;
       const curVol = volumes[i];
-      const volExplosion = volAvg > 0 && curVol >= volAvg * volSurge;
+      const dynamicVolSurge = getVolumeSurgeThreshold(i);
+      const volExplosion = volAvg > 0 && curVol >= volAvg * dynamicVolSurge;
       const obvRising = obv[i] > obvEma[i] && obv[i - 1] <= obvEma[i - 1]; // OBV가 EMA 상향돌파
       const obvFalling = obv[i] < obvEma[i] && obv[i - 1] >= obvEma[i - 1];
 
@@ -1841,6 +1938,18 @@ export const strategyBTCAlpha = {
         if (closes[i - j + 1] >= closes[i - j]) bearMomentum = false;
       }
 
+      // 9b) 모멘텀 데케이 팩터 (최근 5봉 이내 같은 방향 시그널 = 추세 연속)
+      let hasRecentMomentum = false;
+      if (i >= 5) {
+        const recentBullish = signals.slice(-1).some(s =>
+          s.type === "BUY" && i - s.index <= 5 && s.index < i
+        );
+        const recentBearish = signals.slice(-1).some(s =>
+          s.type === "SELL" && i - s.index <= 5 && s.index < i
+        );
+        hasRecentMomentum = recentBullish || recentBearish;
+      }
+
       // 10) 캔들 패턴
       const pattern = detectCandlePattern(candles, i);
 
@@ -1863,8 +1972,11 @@ export const strategyBTCAlpha = {
       const buyReasons = [];
       let buyFactors = 0; // 총 발동 팩터 수
 
-      // A) RSI 과매도 탈출 (적응형)
-      if (rsiBounce) {
+      // A) RSI 과매도 탈출 (적응형) + 패닉 레짐 극단 매수
+      if (rsiExtremeOversold) {
+        buyScore += 5; buyFactors++;
+        buyReasons.push(`RSI ${rsi[i].toFixed(1)} 극단과매도 (패닉)`);
+      } else if (rsiBounce) {
         buyScore += 3; buyFactors++;
         buyReasons.push(`RSI ${rsi[i].toFixed(1)} < ${rsiBuyTh} 탈출`);
       }
@@ -1955,8 +2067,22 @@ export const strategyBTCAlpha = {
         buyReasons.push(`${momentumBars}봉 연속 상승`);
       }
 
-      // ── 매수 조건: 스코어 5+ AND 팩터 3개+ ──
-      if (buyScore >= 5 && buyFactors >= 3) {
+      // O) 모멘텀 데케이 팩터 (최근 신호 재확인 = 추세 연속성)
+      if (hasRecentMomentum && signals.slice(-1)[0]?.type === "BUY") {
+        buyScore += 1;
+        buyReasons.push("모멘텀 연속성 +1");
+      }
+
+      // ── 매수 조건: 스코어 4+ AND 팩터 2개+ (완화된 임계값) ──
+      // EMA200 필터: 가격 < EMA200 시 감소는 아니지만 보너스 미부여
+      let ema200Note = "";
+      if (longTrendUp) {
+        buyScore += 1;
+      } else if (longTrendDown) {
+        ema200Note = " [장기추세↓ 주의]";
+      }
+
+      if (buyScore >= 4 && buyFactors >= 2) {
         const grade = buyScore >= 9 ? "A" : buyScore >= 7 ? "B" : "C";
         lastSignalIdx = i;
         signals.push({
@@ -1964,7 +2090,7 @@ export const strategyBTCAlpha = {
           confidence: grade,
           positionSize: posSize,
           atrPct: +atrPct.toFixed(2),
-          reason: `₿ [${grade}급 ${buyScore}pt/${buyFactors}팩터] ${buyReasons.join(" + ")}`,
+          reason: `₿ [${grade}급 ${buyScore}pt/${buyFactors}팩터] ${buyReasons.join(" + ")}${ema200Note}`,
         });
       }
 
@@ -2052,8 +2178,8 @@ export const strategyBTCAlpha = {
         sellReasons.push("주봉추세↓");
       }
 
-      // ── 매도 조건: 스코어 5+ AND 팩터 3개+ ──
-      if (sellScore >= 5 && sellFactors >= 3) {
+      // ── 매도 조건: 스코어 4+ AND 팩터 2개+ (완화된 임계값) ──
+      if (sellScore >= 4 && sellFactors >= 2) {
         const grade = sellScore >= 9 ? "A" : sellScore >= 7 ? "B" : "C";
         lastSignalIdx = i;
         signals.push({
@@ -2112,7 +2238,7 @@ export const ALL_STRATEGIES = [
 // 슬리피지, 수수료, 포지션 사이징, 손절/익절, 봉별 자산추적
 // ════════════════════════════════════════════════════════════════════
 
-// v3.6: 연속손실 리스크 적응 + 최대보유기간 강제청산 + 월별 승률
+// v3.7: 변동성 적응 슬리피지 + 낙폭 서킷브레이커 + CAGR
 export function runBacktest(candles, signals, options = {}) {
   const {
     initialCapital = 10000,
@@ -2124,6 +2250,8 @@ export function runBacktest(candles, signals, options = {}) {
     trailingStop = null,
     maxHoldBars = 60, // v3.6: 최대 보유 기간 (봉 수), null이면 무제한
     riskAdaptive = true, // v3.6: 연속 손실 시 포지션 축소
+    maxDrawdownLimit = null, // v3.7: 최대 낙폭 서킷브레이커 (%, null이면 비활성)
+    volScaledSlippage = true, // v3.7: 변동성 비례 슬리피지 자동 조정
   } = options;
 
   let capital = initialCapital;
@@ -2141,6 +2269,26 @@ export function runBacktest(candles, signals, options = {}) {
   let currentDDStart = 0;
   // v3.6: 연속 손실 추적 (리스크 적응 포지션 사이징)
   let consecLosses = 0;
+  // v3.7: 서킷브레이커 상태
+  let circuitBroken = false;
+  let circuitBrokenAt = -1;
+
+  // v3.7: 변동성 적응 슬리피지 계산 (ATR 기반, 최근 14봉 참조)
+  function getAdaptiveSlippage(idx) {
+    if (!volScaledSlippage) return slippage;
+    const lookback = Math.min(14, idx);
+    if (lookback < 2) return slippage;
+    let atrSum = 0;
+    for (let j = idx - lookback + 1; j <= idx; j++) {
+      const tr = Math.max(candles[j].high - candles[j].low,
+        Math.abs(candles[j].high - candles[j - 1].close),
+        Math.abs(candles[j].low - candles[j - 1].close));
+      atrSum += tr;
+    }
+    const atrPct = (atrSum / lookback) / candles[idx].close;
+    // 기본 슬리피지 * (1 + ATR비율/2): ATR 3%이면 슬리피지 ~2.5배
+    return slippage * (1 + atrPct * 50);
+  }
 
   // 시그널을 인덱스 순으로 정렬
   const sorted = [...signals].sort((a, b) => a.index - b.index);
@@ -2209,14 +2357,36 @@ export function runBacktest(candles, signals, options = {}) {
       position = 0; entryPrice = 0; trailingHigh = 0; entryIndex = -1; tradeLow = Infinity; tradeHigh = -Infinity; lastAction = "SELL";
     }
 
+    // v3.9: 점진적 서킷브레이커 — 낙폭 비례 포지션 축소 (70%→차단, 회복 시 점진 해제)
+    let circuitScale = 1.0; // 1.0 = 정상, 0 = 완전 차단
+    if (maxDrawdownLimit) {
+      const currentEq = capital + (position > 0 ? position * c.close : 0);
+      const currentDD = peakEquity > 0 ? ((peakEquity - currentEq) / peakEquity) * 100 : 0;
+      if (currentDD >= maxDrawdownLimit) {
+        circuitBroken = true;
+        circuitBrokenAt = i;
+        circuitScale = 0;
+      } else if (currentDD >= maxDrawdownLimit * 0.7) {
+        // v3.9: 70% 도달 시 포지션 50% 축소 (점진적)
+        circuitScale = 0.5;
+      } else if (circuitBroken && currentEq >= peakEquity * 0.97) {
+        // v3.9: 97%까지 회복하면 50%로 재개, 99%에서 완전 해제
+        circuitBroken = false;
+        circuitScale = currentEq >= peakEquity * 0.99 ? 1.0 : 0.5;
+      } else if (circuitBroken) {
+        circuitScale = 0;
+      }
+    }
+
     // 시그널 처리
     while (sigIdx < sorted.length && sorted[sigIdx].index === i) {
       const sig = sorted[sigIdx];
-      if (sig.type === "BUY" && position === 0 && lastAction !== "BUY") {
-        const buyPrice = sig.price * (1 + slippage);
-        // v3.6: 리스크 적응 포지션 사이징 — 연속 3회 이상 손실 시 포지션 50% 축소
+      if (sig.type === "BUY" && position === 0 && lastAction !== "BUY" && circuitScale > 0) {
+        const adaptiveSlip = getAdaptiveSlippage(i);
+        const buyPrice = sig.price * (1 + adaptiveSlip);
+        // v3.9: 리스크 적응 포지션 사이징 — 연속 손실 + 서킷스케일 반영
         const riskFactor = (riskAdaptive && consecLosses >= 3) ? 0.5 : 1.0;
-        const investAmount = capital * positionSize * riskFactor;
+        const investAmount = capital * positionSize * riskFactor * circuitScale;
         const comm = investAmount * commission;
         position = (investAmount - comm) / buyPrice;
         entryPrice = buyPrice;
@@ -2227,7 +2397,8 @@ export function runBacktest(candles, signals, options = {}) {
         lastAction = "BUY";
         trades.push({ type: "BUY", index: i, price: buyPrice, qty: position, reason: sig.reason, time: c.time });
       } else if (sig.type === "SELL" && position > 0 && lastAction !== "SELL") {
-        const sellPrice = sig.price * (1 - slippage);
+        const adaptiveSellSlip = getAdaptiveSlippage(i);
+        const sellPrice = sig.price * (1 - adaptiveSellSlip);
         const proceeds = position * sellPrice;
         const comm = proceeds * commission;
         const pnl = proceeds - comm - (position * entryPrice);
@@ -2299,9 +2470,14 @@ export function runBacktest(candles, signals, options = {}) {
     ? Math.sqrt(downsideReturns.reduce((a, r) => a + r ** 2, 0) / downsideReturns.length) : 0;
   const sortinoRatio = downsideDev > 0 ? (avgReturn / downsideDev) * Math.sqrt(252) : 0;
 
-  // v3.3: 칼마 비율 — 연간수익률 / 최대낙폭 (위험 대비 효율성)
+  // v3.7: CAGR (복합 연간 성장률) — 정확한 연간화 수익률
   const tradingDays = candles.length;
-  const annualizedReturn = tradingDays > 0 ? (totalReturn / 100) * (252 / tradingDays) * 100 : 0;
+  const years = tradingDays / 252;
+  const cagr = years > 0 && finalEquity > 0
+    ? (Math.pow(finalEquity / initialCapital, 1 / years) - 1) * 100 : 0;
+
+  // v3.3: 칼마 비율 — CAGR / 최대낙폭 (v3.7: CAGR 기반으로 수정)
+  const annualizedReturn = cagr; // v3.7: CAGR 사용
   const calmarRatio = maxDrawdown > 0 ? annualizedReturn / maxDrawdown : 0;
 
   // 프로핏 팩터
@@ -2399,6 +2575,34 @@ export function runBacktest(candles, signals, options = {}) {
     maxDrawdownDuration,
     monthlyReturns,                             // v3.5
     monthlyWinRate,                             // v3.6
+    cagr: +cagr.toFixed(2),                     // v3.7
+    circuitBroken: circuitBrokenAt >= 0,        // v3.7
+    circuitBrokenAt,                            // v3.7
+    // v3.9: Ulcer Index — 낙폭의 지속성과 깊이를 측정 (낮을수록 좋음)
+    ulcerIndex: (() => {
+      if (equity.length < 2) return 0;
+      let sumSqDD = 0;
+      let peak = equity[0].value;
+      for (const e of equity) {
+        if (e.value > peak) peak = e.value;
+        const dd = peak > 0 ? ((peak - e.value) / peak) * 100 : 0;
+        sumSqDD += dd * dd;
+      }
+      return +(Math.sqrt(sumSqDD / equity.length)).toFixed(2);
+    })(),
+    // v3.9: UPI (Ulcer Performance Index) = 초과수익 / Ulcer Index
+    upiRatio: (() => {
+      if (equity.length < 2) return 0;
+      let sumSqDD = 0;
+      let peak = equity[0].value;
+      for (const e of equity) {
+        if (e.value > peak) peak = e.value;
+        const dd = peak > 0 ? ((peak - e.value) / peak) * 100 : 0;
+        sumSqDD += dd * dd;
+      }
+      const ui = Math.sqrt(sumSqDD / equity.length);
+      return ui > 0 ? +((totalReturnPct - buyHoldReturnPct) / ui).toFixed(2) : 0;
+    })(),
     trades,
     equity,
   };
@@ -2408,6 +2612,7 @@ export function runBacktest(candles, signals, options = {}) {
 // 시장 진단 엔진
 // ════════════════════════════════════════════════════════════════════
 
+// v3.9: ADX 추세강도 + 4단계 변동성 + EMA10 단기모멘텀 + 공포/탐욕 프록시
 export function diagnoseMarket(candles) {
   if (!candles || candles.length < 60) return { regime: "unknown", volatility: "unknown", trend: "unknown" };
 
@@ -2416,42 +2621,68 @@ export function diagnoseMarket(candles) {
   const lows = candles.map(c => c.low);
   const last = closes.length - 1;
 
-  // 추세 판단
+  // 추세 판단 (SMA + ADX 강도)
   const sma20 = calcSMA(closes, 20);
   const sma60 = calcSMA(closes, 60);
+  const adx = calcADX(highs, lows, closes, 14);
+  const adxLast = adx[last] || 0;
   let trend = "횡보";
   if (sma20[last] && sma60[last]) {
     if (sma20[last] > sma60[last] * 1.02) trend = "상승";
     else if (sma20[last] < sma60[last] * 0.98) trend = "하락";
   }
+  // v3.9: ADX < 15이면 추세 약화 — 횡보로 강제 재분류
+  const trendStrength = adxLast >= 30 ? "강" : adxLast >= 20 ? "보통" : "약";
+  if (adxLast < 15 && trend !== "횡보") trend = "횡보";
 
-  // 변동성 판단
+  // v3.9: 4단계 변동성 판단 (매우 높음 추가, 기존 3→2.5 하향)
   const atr = calcATR(highs, lows, closes, 14);
   const atrLast = atr[last];
   const atrPct = atrLast && closes[last] ? (atrLast / closes[last]) * 100 : 0;
   let volatility = "보통";
-  if (atrPct > 3) volatility = "높음";
-  else if (atrPct < 1) volatility = "낮음";
+  if (atrPct > 4.5) volatility = "매우 높음";
+  else if (atrPct > 2.5) volatility = "높음";
+  else if (atrPct > 1) volatility = "보통";
+  else volatility = "낮음";
 
-  // RSI
+  // RSI + v3.9 단기 모멘텀 (EMA10 5봉 변화율)
   const rsi = calcRSI(closes);
   const rsiLast = rsi[last];
+  const ema10 = calcEMA(closes, 10);
+  const shortMom = ema10[last] && ema10[last - 5] ? ((ema10[last] / ema10[last - 5]) - 1) * 100 : 0;
   let momentum = "중립";
   if (rsiLast > 70) momentum = "과매수";
   else if (rsiLast < 30) momentum = "과매도";
-  else if (rsiLast > 55) momentum = "강세";
-  else if (rsiLast < 45) momentum = "약세";
+  else if (rsiLast > 55 && shortMom > 0.5) momentum = "강세";
+  else if (rsiLast < 45 && shortMom < -0.5) momentum = "약세";
+  else if (rsiLast < 40) momentum = "약세"; // v3.9: RSI 40 이하는 약세로 분류
+
+  // v3.9: 공포/탐욕 프록시 (RSI + 변동성 + 단기모멘텀 종합)
+  const fearScore = Math.max(0, Math.min(100,
+    50 - (rsiLast - 50) * 0.8 + (atrPct - 2) * 8 - shortMom * 3
+  ));
+  let sentiment = "중립";
+  if (fearScore >= 75) sentiment = "극단적 공포";
+  else if (fearScore >= 60) sentiment = "공포";
+  else if (fearScore <= 25) sentiment = "극단적 탐욕";
+  else if (fearScore <= 40) sentiment = "탐욕";
 
   // 시장 국면
   let regime = "혼조";
-  if (trend === "상승" && volatility !== "높음") regime = "안정적 상승";
-  else if (trend === "상승" && volatility === "높음") regime = "변동성 상승";
-  else if (trend === "하락" && volatility === "높음") regime = "급락";
-  else if (trend === "하락" && volatility !== "높음") regime = "완만한 하락";
+  if (trend === "상승" && volatility !== "높음" && volatility !== "매우 높음") regime = "안정적 상승";
+  else if (trend === "상승" && (volatility === "높음" || volatility === "매우 높음")) regime = "변동성 상승";
+  else if (trend === "하락" && (volatility === "높음" || volatility === "매우 높음")) regime = "급락";
+  else if (trend === "하락" && volatility !== "높음" && volatility !== "매우 높음") regime = "완만한 하락";
   else if (trend === "횡보" && volatility === "낮음") regime = "저변동 횡보";
-  else if (trend === "횡보" && volatility === "높음") regime = "변동성 횡보";
+  else if (trend === "횡보" && (volatility === "높음" || volatility === "매우 높음")) regime = "변동성 횡보";
 
-  return { regime, trend, volatility, momentum, atrPct: +atrPct.toFixed(2), rsi: rsiLast ? +rsiLast.toFixed(1) : null };
+  return {
+    regime, trend, volatility, momentum, atrPct: +atrPct.toFixed(2),
+    rsi: rsiLast ? +rsiLast.toFixed(1) : null,
+    adx: +adxLast.toFixed(1), trendStrength, // v3.9
+    sentiment, fearScore: +fearScore.toFixed(0), // v3.9
+    shortMom: +shortMom.toFixed(2), // v3.9
+  };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -2511,7 +2742,7 @@ export function recommendStrategies(marketDiagnosis) {
     recs.push({ strategy: strategyVWAP, score: 6, reason: "VWAP 하단 이탈 후 복귀 매수" });
   }
 
-  if (volatility === "높음") {
+  if (volatility === "높음" || volatility === "매우 높음") {
     recs.push({ strategy: strategyVolume, score: 8, reason: "높은 변동성에서 거래량 돌파가 강한 시그널" });
     recs.push({ strategy: strategySupertrend, score: 8, reason: "슈퍼트렌드 — 고변동 시장 추세 추종" });
     recs.push({ strategy: strategyBBSqueeze, score: 7, reason: "변동성 압축 후 폭발 포착" });
@@ -2520,6 +2751,20 @@ export function recommendStrategies(marketDiagnosis) {
     recs.push({ strategy: strategyChannelMomentum, score: 7, reason: "채널 돌파 + ADX 필터 — 노이즈 제거" });
     recs.push({ strategy: strategyParabolicSAR, score: 6, reason: "파라볼릭 SAR — 동적 추세 추종 + 손절" });
     recs.push({ strategy: strategyGapAndGo, score: 6, reason: "갭 앤 고 — 단기 모멘텀 포착" });
+  }
+
+  // v3.9: 공포 구간 전용 추천 — 극단적 공포 시 역발상 매수 강화
+  const { sentiment, fearScore: fScore } = marketDiagnosis;
+  if (sentiment === "극단적 공포" || (fScore && fScore >= 70)) {
+    recs.push({ strategy: strategyRSI, score: 10, reason: "극단적 공포 구간 — RSI 반전 역발상 매수 최적" });
+    recs.push({ strategy: strategyConnorsRSI2, score: 9, reason: "RSI(2) 극단값 — 공포 매수 최적" });
+    recs.push({ strategy: strategyStatArb, score: 9, reason: "Z-Score 극단 이탈 — 통계적 반등 확률 높음" });
+    recs.push({ strategy: strategyMFI, score: 8, reason: "MFI 자금유입 전환 — 스마트머니 감지" });
+  }
+  if (sentiment === "극단적 탐욕" || (fScore && fScore <= 20)) {
+    recs.push({ strategy: strategyBB, score: 9, reason: "극단적 탐욕 — BB 상단 이탈 매도 시그널" });
+    recs.push({ strategy: strategyRSI, score: 8, reason: "과매수 구간 — RSI 반전 매도 유력" });
+    recs.push({ strategy: strategyMACDDivergence, score: 8, reason: "약세 다이버전스 — 고점 경고" });
   }
 
   if (trend === "하락" && volatility !== "높음") {

@@ -1050,7 +1050,7 @@ const _syncOnce = _parseSyncParam();
 
 // 메인 컴포넌트
 // ══════════════════════════════════════════════════════════════
-export default function PaperTrading({ strategyAlerts = [], theme = "dark", user, botPreset, botAllocation }) {
+export default function PaperTrading({ strategyAlerts = [], theme = "dark", user, botPreset, botAllocation, isMobile = false }) {
   // 유저별 localStorage 키 분리
   const userId = user?.id || null;
   KEYS = makeKeys(userId);
@@ -1562,11 +1562,11 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
   const rm = new RiskManager(tradeSettings, account, positions);
 
   return (
-    <div className="tab-content" style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: "0", minHeight: "100vh" }}>
+    <div className="tab-content" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "240px 1fr", gap: "0", minHeight: "100vh" }}>
       {/* ═══════════════════════════════════════════════════════════
-          LEFT SIDEBAR: 네비게이션 (토스 스타일)
+          LEFT SIDEBAR: 네비게이션 (토스 스타일) — hidden on mobile
       ═══════════════════════════════════════════════════════════ */}
-      <div style={{
+      {!isMobile && <div style={{
         background: C.card, borderRight: `1px solid ${C.border}`, padding: "20px 0",
         display: "flex", flexDirection: "column", gap: "0", position: "sticky", top: "0", maxHeight: "100vh", overflowY: "auto",
       }}>
@@ -1639,12 +1639,12 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
             연결 해제
           </button>
         </div>
-      </div>
+      </div>}
 
       {/* ═══════════════════════════════════════════════════════════
           MAIN CONTENT: 우측 패널 (큰 잔액 표시 + 탭 콘텐츠)
       ═══════════════════════════════════════════════════════════ */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "20px", padding: "20px", overflowY: "auto" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: "20px", padding: "20px", paddingBottom: isMobile ? "76px" : "20px", overflowY: "auto" }}>
         {orderModal && <OrderModal symbol={orderModal.symbol} side={orderModal.side} reason={orderModal.reason}
           config={config} onClose={() => setOrderModal(null)} onOrderPlaced={handleOrderPlaced} />}
 
@@ -2703,6 +2703,44 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
               background:C.card2,color:C.text2,border:`1px solid ${C.border2}`,cursor:"pointer",width:"100%"
             }}>닫기</button>
           </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════
+          MOBILE NAVIGATION: Horizontal tabs at bottom
+      ═══════════════════════════════════════════════════════════ */}
+      {isMobile && (
+        <div style={{
+          position: "fixed", bottom: "0", left: "0", right: "0",
+          background: C.card, borderTop: `1px solid ${C.border}`,
+          display: "flex", justifyContent: "space-around", alignItems: "center",
+          padding: "8px 0", zIndex: 100, maxHeight: "56px",
+        }}>
+          {[
+            { id: "dashboard", label: "포지션", count: positions.length },
+            { id: "orders", label: "주문", count: orders.filter(o=>["new","partially_filled","accepted","pending_new"].includes(o.status)).length },
+            { id: "signals", label: "시그널", count: detectedSignals.length },
+            { id: "auto", label: "자동", count: null },
+            { id: "perf", label: "성과", count: null },
+          ].map(({ id, label, count }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              style={{
+                flex: 1, padding: "6px 4px", border: "none",
+                background: activeTab === id ? `${C.blue}14` : "transparent",
+                color: activeTab === id ? C.blue : C.text2,
+                borderTop: activeTab === id ? `3px solid ${C.blue}` : `3px solid transparent`,
+                fontSize: "11px", fontWeight: activeTab === id ? 700 : 600,
+                cursor: "pointer", textAlign: "center", transition: "all 0.15s",
+              }}
+            >
+              {label}
+              {count != null && count > 0 && (
+                <span style={{ fontSize: "8px", marginLeft: "2px" }}>({count})</span>
+              )}
+            </button>
+          ))}
         </div>
       )}
     </div>

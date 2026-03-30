@@ -1,5 +1,7 @@
-// Toit v11.0 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 스크리너 프리셋
+// Toit v11.2 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 스크리너 프리셋
 // Features: 스크리닝, 캔들차트, 33개 전략(BTC 알파 포함), 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
+// v11.2: 퀀트 엔진 v3.9 하위전략 2차 안전필터 + 모바일 터치 UX 개선
+// v11.1: 다중 타임프레임 RSI 스크리닝 조건 + 퀀트 엔진 v3.8 하위전략 안전필터
 // v11.0: 토스증권 벤치마킹 기반 대개편 — 스크리너 프리셋, 글로벌 검색, 위험종목 필터, 실시간 티커
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
@@ -1109,6 +1111,11 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
   if (conditions.includes("adx_bearish")      && adxBearish)                                       triggers.push("adx_bearish");
   if (conditions.includes("rsi_divergence")   && rsiDivergence)                                    triggers.push("rsi_divergence");
   if (conditions.includes("near_poc")         && nearPOC)                                          triggers.push("near_poc");
+  // v6.9: 다중 타임프레임 RSI 스크리닝 조건 추가
+  const mtfOversold = rsi != null && dailyRsi != null && rsi <= 30 && dailyRsi <= 30;
+  const mtfOverbought = rsi != null && dailyRsi != null && rsi >= 70 && dailyRsi >= 70;
+  if (conditions.includes("mtf_rsi_oversold")  && mtfOversold)                                     triggers.push("mtf_rsi_oversold");
+  if (conditions.includes("mtf_rsi_overbought") && mtfOverbought)                                  triggers.push("mtf_rsi_overbought");
 
   return {
     triggers, price: +price.toFixed(6),
@@ -1184,6 +1191,9 @@ const CONDITION_META = {
   // 신규 조건 (v6.8)
   rsi_divergence:  { label: "RSI 다이버전스",       icon: "🔄", desc: "가격과 RSI 방향 불일치 — MACD보다 빈번한 단기 반전 신호" },
   near_poc:        { label: "볼륨 POC 근접",        icon: "🎯", desc: "볼륨 프로파일 POC(고거래량 가격대) ±2% — 강한 지지/저항 구간" },
+  // v6.9: 다중 타임프레임 RSI
+  mtf_rsi_oversold: { label: "MTF RSI 과매도",     icon: "📊", desc: "주간+일간 RSI 동시 ≤30 — 다중 타임프레임 과매도 확인 (높은 신뢰도)" },
+  mtf_rsi_overbought:{ label: "MTF RSI 과매수",    icon: "📊", desc: "주간+일간 RSI 동시 ≥70 — 다중 타임프레임 과매수 확인 (높은 신뢰도)" },
 };
 
 // ════════════════════════════════════════════════════════════════════
@@ -1456,6 +1466,7 @@ const TAG_COLORS = {
   mfi_oversold: C.purple, mfi_overbought: C.red,
   adx_bullish: C.green, adx_bearish: C.red,
   rsi_divergence: C.yellow, near_poc: C.purple,
+  mtf_rsi_oversold: C.purple, mtf_rsi_overbought: C.red,
 };
 
 function SignalTag({ triggerKey, asset }) {
@@ -6087,6 +6098,41 @@ function AppInner() {
               score += 5; reasons.push("매출+이익 동시 성장 (품질 성장)");
             }
 
+            // 26) 그로스마진 기반 경쟁 우위 (Moat Proxy)
+            const grossMargin = q.grossMargin;
+            if (grossMargin != null) {
+              if (grossMargin > 0.60)       { score += 6; reasons.push(`그로스마진 ${(grossMargin * 100).toFixed(0)}% 경쟁우위`); }
+              else if (grossMargin > 0.40)  { score += 3; }
+              else if (grossMargin < 0.20)  { score -= 4; reasons.push(`그로스마진 ${(grossMargin * 100).toFixed(0)}% 취약`); }
+            }
+
+            // 27) 매출성장 + 마진확대 동시 — 최상위 퀄리티 성장
+            if (revGrowth != null && revGrowth > 0.10 && margin != null && grossMargin != null) {
+              // 이전 마진 대비 현재 마진이 개선된 경우 (Forward PE 할인 = 이익 성장 = 마진 확대 프록시)
+              if (fpe != null && per != null && fpe < per * 0.85 && margin > 0.10) {
+                score += 5; reasons.push("마진 확대 + 매출 성장 (프리미엄 성장주)");
+              }
+            }
+
+            // 28) 멀티팩터 밸류 트랩 강화 감지 — 저PER + 고부채 + 마진축소
+            if (per != null && per < 10 && debtEquity != null && debtEquity > 150 &&
+                fpe != null && fpe > per) {
+              score -= 10; reasons.push("밸류 트랩 고위험 (저PER+고부채+이익감소)");
+            }
+
+            // 29) 배당 성장 기대 — 낮은 Payout Ratio 프록시 (저배당+고ROE+저부채)
+            if (dy > 0.5 && dy < 3 && roe != null && roe > 0.15 && debtEquity != null && debtEquity < 80) {
+              score += 4; reasons.push("배당 성장 잠재력 (저배당+고ROE+저부채)");
+            }
+
+            // 30) 역발상 심화 — 52주 저점 근처 + 애널리스트 업사이드 큰 종목
+            if (low52 && high52 && q.price && upside != null) {
+              const pos52 = (q.price - low52) / (high52 - low52);
+              if (pos52 < 0.25 && upside > 30 && margin != null && margin > 0) {
+                score += 7; reasons.push(`역발상 적격 (52주 하단 ${(pos52 * 100).toFixed(0)}% + 목표가 +${upside.toFixed(0)}% + 흑자)`);
+              }
+            }
+
             score = Math.max(0, Math.min(100, score));
 
             allResults.push({
@@ -7685,16 +7731,16 @@ function AppInner() {
 
                   {/* 테이블 헤더 */}
                   <div style={{
-                    display: "grid", gridTemplateColumns: "90px 1fr 48px 48px 48px",
-                    gap: "4px", padding: "6px 6px", marginBottom: "2px",
+                    display: "grid", gridTemplateColumns: isMobile ? "60px 1fr 40px" : "90px 1fr 48px 48px 48px",
+                    gap: "4px", padding: isMobile ? "6px 4px" : "6px 6px", marginBottom: "2px",
                     fontSize: mf(10), fontWeight: 700, color: C.text3, letterSpacing: "0.02em",
                     borderBottom: `1px solid ${C.border}20`,
                   }}>
                     <span>날짜</span>
                     <span>이벤트</span>
                     <span style={{ textAlign: "right" }}>실제</span>
-                    <span style={{ textAlign: "right" }}>예상</span>
-                    <span style={{ textAlign: "right" }}>이전</span>
+                    {!isMobile && <span style={{ textAlign: "right" }}>예상</span>}
+                    {!isMobile && <span style={{ textAlign: "right" }}>이전</span>}
                   </div>
 
                   {/* 이벤트 리스트 */}
@@ -7725,9 +7771,9 @@ function AppInner() {
 
                         return (
                           <div key={`${evt.event}-${y}${m}${d}-${i}`} style={{
-                            display: "grid", gridTemplateColumns: "90px 1fr 48px 48px 48px",
-                            gap: "6px", alignItems: "center",
-                            padding: "9px 8px",
+                            display: "grid", gridTemplateColumns: isMobile ? "60px 1fr 40px" : "90px 1fr 48px 48px 48px",
+                            gap: "4px", alignItems: "center",
+                            padding: isMobile ? "8px 6px" : "9px 8px",
                             opacity: isPast ? 0.65 : 1,
                             borderBottom: i < showEvents.length - 1 ? `1px solid ${C.border}10` : "none",
                             background: evt.status === "오늘" ? `${C.red}08` : "transparent",
@@ -7790,7 +7836,7 @@ function AppInner() {
                             </div>
 
                             {/* 예상 */}
-                            <div style={{ textAlign: "right" }}>
+                            {!isMobile && <div style={{ textAlign: "right" }}>
                               {evt.estimate != null ? (
                                 <span style={{ fontSize: "12px", color: C.text2, fontVariantNumeric: "tabular-nums" }}>
                                   {evt.estimate}{evt.unit}
@@ -7798,10 +7844,10 @@ function AppInner() {
                               ) : (
                                 <span style={{ fontSize: mf(11), color: C.text3 }}>—</span>
                               )}
-                            </div>
+                            </div>}
 
                             {/* 이전 */}
-                            <div style={{ textAlign: "right" }}>
+                            {!isMobile && <div style={{ textAlign: "right" }}>
                               {evt.previous != null ? (
                                 <span style={{ fontSize: "12px", color: C.text3, fontVariantNumeric: "tabular-nums" }}>
                                   {evt.previous}{evt.unit}
@@ -7809,7 +7855,7 @@ function AppInner() {
                               ) : (
                                 <span style={{ fontSize: mf(11), color: C.text3 }}>—</span>
                               )}
-                            </div>
+                            </div>}
                           </div>
                         );
                       })}
@@ -8062,7 +8108,7 @@ function AppInner() {
               {/* 모멘텀 & 추세 */}
               <div style={{ fontSize: "10px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>모멘텀 & 추세</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", marginBottom: "14px" }}>
-                {["rsi_extreme","macd_divergence","rsi_divergence","ma_ribbon","adx_trend","adx_bullish","adx_bearish"].map(key => {
+                {["rsi_extreme","macd_divergence","rsi_divergence","mtf_rsi_oversold","mtf_rsi_overbought","ma_ribbon","adx_trend","adx_bullish","adx_bearish"].map(key => {
                   const meta = CONDITION_META[key];
                   const on = conditions.includes(key);
                   return (
@@ -9631,10 +9677,10 @@ function AppInner() {
 
           return (
             <div className="tab-content">
-              <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: "20px", alignItems: "start" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "280px 1fr", gap: isMobile ? "12px" : "20px", alignItems: "start" }}>
 
                 {/* ── 좌측: 미니 캘린더 + AI 요약 ── */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "16px", position: "sticky", top: "80px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "16px", position: isMobile ? "relative" : "sticky", top: isMobile ? "0" : "80px" }}>
                   {/* 미니 캘린더 */}
                   <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20` }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
@@ -9752,16 +9798,16 @@ function AppInner() {
 
                       {/* 테이블 헤더 */}
                       <div style={{
-                        display: "grid", gridTemplateColumns: "60px 1fr 80px 80px 80px",
-                        gap: "4px", padding: "8px 16px",
+                        display: "grid", gridTemplateColumns: isMobile ? "40px 1fr 50px" : "60px 1fr 80px 80px 80px",
+                        gap: "4px", padding: isMobile ? "8px 12px" : "8px 16px",
                         fontSize: "11px", fontWeight: 700, color: C.text3,
                         background: C.card, borderRadius: "12px 12px 0 0", border: `1px solid ${C.border}20`, borderBottom: "none",
                       }}>
                         <span></span>
                         <span></span>
                         <span style={{ textAlign: "right" }}>발표</span>
-                        <span style={{ textAlign: "right" }}>예측</span>
-                        <span style={{ textAlign: "right" }}>이전</span>
+                        {!isMobile && <span style={{ textAlign: "right" }}>예측</span>}
+                        {!isMobile && <span style={{ textAlign: "right" }}>이전</span>}
                       </div>
 
                       {/* 이벤트 목록 */}
@@ -9784,8 +9830,8 @@ function AppInner() {
 
                           return (
                             <div key={`${evt.event}-${i}`} style={{
-                              display: "grid", gridTemplateColumns: "60px 1fr 80px 80px 80px",
-                              gap: "4px", alignItems: "center", padding: "14px 16px",
+                              display: "grid", gridTemplateColumns: isMobile ? "40px 1fr 50px" : "60px 1fr 80px 80px 80px",
+                              gap: "4px", alignItems: "center", padding: isMobile ? "10px 12px" : "14px 16px",
                               borderBottom: i < group.events.length - 1 ? `1px solid ${C.border}10` : "none",
                               opacity: isPast ? 0.6 : 1,
                               background: isToday ? `${C.blue}08` : "transparent",
@@ -9831,18 +9877,18 @@ function AppInner() {
                               </div>
 
                               {/* 예측 */}
-                              <div style={{ textAlign: "right" }}>
+                              {!isMobile && <div style={{ textAlign: "right" }}>
                                 <span style={{ fontSize: "13px", color: C.text2, fontVariantNumeric: "tabular-nums" }}>
                                   {evt.estimate != null ? `${evt.estimate}${evt.unit}` : "—"}
                                 </span>
-                              </div>
+                              </div>}
 
                               {/* 이전 */}
-                              <div style={{ textAlign: "right" }}>
+                              {!isMobile && <div style={{ textAlign: "right" }}>
                                 <span style={{ fontSize: "13px", color: C.text3, fontVariantNumeric: "tabular-nums" }}>
                                   {evt.previous != null ? `${evt.previous}${evt.unit}` : "—"}
                                 </span>
-                              </div>
+                              </div>}
                             </div>
                           );
                         })}
