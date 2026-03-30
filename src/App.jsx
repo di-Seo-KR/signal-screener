@@ -7225,6 +7225,8 @@ function AppInner() {
               </div>
             )}
 
+            {/* ── Google AdSense (Home - Responsive) ─── */}
+            <GoogleAd format="responsive" slot="home-main" style={{ margin: "20px 0" }} />
 
             {/* ── 주요 종목 (통합: 전체 / 급등 / 급락 탭) ─── */}
             {hotAssets.length > 0 && (() => {
@@ -8265,6 +8267,9 @@ function AppInner() {
                 <AssetCard key={`${asset.symbol}-${i}`} asset={asset} onChart={() => setChartAsset(asset)} />
               ))}
             </div>
+
+            {/* ── Google AdSense (Screener - In-Feed) ─── */}
+            {results.length > 0 && <GoogleAd format="in-feed" slot="screener-results" style={{ margin: "16px 0" }} />}
 
             {!scanning && results.length > 0 && filtered.length === 0 && (
               <div style={{ background: C.card, borderRadius: "18px", padding: "32px", textAlign: "center" }}>
@@ -9567,6 +9572,8 @@ function AppInner() {
                         </div>
                       </div>
                     </a>
+                    {/* ── Google AdSense (News - In-Feed after 3rd item) ─── */}
+                    {i === 2 && <GoogleAd format="in-feed" slot="news-feed" style={{ margin: "12px 0" }} />}
                   </>);
                 })}
               </div>
@@ -9722,6 +9729,9 @@ function AppInner() {
                       </div>
                     </div>
                   )}
+
+                  {/* ── Google AdSense (Economic Calendar - Rectangle, desktop only) ─── */}
+                  {!isMobile && <GoogleAd format="rectangle" slot="calendar-sidebar" style={{ margin: "16px 0", maxWidth: "300px" }} />}
                 </div>
 
                 {/* ── 우측: 이벤트 목록 ── */}

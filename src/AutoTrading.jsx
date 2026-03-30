@@ -489,14 +489,14 @@ function BotCatalog({ onActivate, theme }) {
 
       {/* Stock Bots Section */}
       <div style={{ marginBottom: "80px" }}>
-        <h2 style={{ color: c.text1, fontSize: "24px", fontWeight: "600", marginBottom: "32px" }}>
+        <h2 style={{ color: c.text1, fontSize: isMobile ? "20px" : "24px", fontWeight: "600", marginBottom: isMobile ? "20px" : "32px" }}>
           📊 주식 자동매매 봇
         </h2>
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-            gap: "24px",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(320px, 1fr))",
+            gap: isMobile ? "16px" : "24px",
             marginBottom: "40px",
           }}
         >
@@ -524,14 +524,14 @@ function BotCatalog({ onActivate, theme }) {
 
       {/* Crypto Bots Section */}
       <div>
-        <h2 style={{ color: c.text1, fontSize: "24px", fontWeight: "600", marginBottom: "32px" }}>
+        <h2 style={{ color: c.text1, fontSize: isMobile ? "20px" : "24px", fontWeight: "600", marginBottom: isMobile ? "20px" : "32px" }}>
           💰 크립토 자동매매 봇
         </h2>
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-            gap: "24px",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(320px, 1fr))",
+            gap: isMobile ? "16px" : "24px",
             marginBottom: "40px",
           }}
         >
@@ -620,7 +620,7 @@ function useAlpacaRealData(userId) {
 }
 
 // ── 운영 중 봇 대시보드 (실제 알파카 데이터 기반) ──
-function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId }) {
+function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId, isMobile }) {
   const c = colors[theme];
   const { account, equityHistory, tradeLog, loading } = useAlpacaRealData(userId);
 
@@ -701,27 +701,27 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
       {account && (
         <div style={{
           background: `linear-gradient(135deg, ${c.card} 0%, ${totalPL >= 0 ? c.green : c.red}10 100%)`,
-          border: `1px solid ${c.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px",
+          border: `1px solid ${c.border}`, borderRadius: "16px", padding: isMobile ? "16px 12px" : "20px", marginBottom: "16px",
         }}>
-          <div style={{ fontSize: "12px", color: c.text3, marginBottom: "8px" }}>알파카 페이퍼트레이딩 계좌</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "12px" }}>
+          <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "8px" }}>알파카 페이퍼트레이딩 계좌</div>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: isMobile ? "10px" : "12px" }}>
             <div>
-              <div style={{ fontSize: "10px", color: c.text3 }}>총 자산</div>
-              <div style={{ fontSize: "18px", fontWeight: 800, color: c.text1 }}>${totalEquity?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+              <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3 }}>총 자산</div>
+              <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 800, color: c.text1 }}>${totalEquity?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
             </div>
             <div>
-              <div style={{ fontSize: "10px", color: c.text3 }}>오늘 P&L</div>
-              <div style={{ fontSize: "18px", fontWeight: 800, color: totalPL >= 0 ? c.green : c.red }}>
+              <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3 }}>오늘 P&L</div>
+              <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 800, color: totalPL >= 0 ? c.green : c.red }}>
                 {totalPL >= 0 ? "+" : ""}${totalPL?.toFixed(2)}
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "10px", color: c.text3 }}>총 거래</div>
-              <div style={{ fontSize: "18px", fontWeight: 800, color: c.text1 }}>{totalTrades}건</div>
+              <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3 }}>총 거래</div>
+              <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 800, color: c.text1 }}>{totalTrades}건</div>
             </div>
             <div>
-              <div style={{ fontSize: "10px", color: c.text3 }}>실제 승률</div>
-              <div style={{ fontSize: "18px", fontWeight: 800, color: realWinRate != null && realWinRate >= 50 ? c.green : c.red }}>
+              <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3 }}>실제 승률</div>
+              <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 800, color: realWinRate != null && realWinRate >= 50 ? c.green : c.red }}>
                 {realWinRate != null ? `${realWinRate.toFixed(1)}%` : "—"}
               </div>
             </div>
@@ -729,7 +729,7 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
 
           {/* 실제 에쿼티 커브 */}
           {equityChartData && equityChartData.length >= 2 && (
-            <div style={{ marginTop: "16px", background: c.card2, borderRadius: "10px", padding: "12px 14px" }}>
+            <div style={{ marginTop: "16px", background: c.card2, borderRadius: "10px", padding: isMobile ? "10px 8px" : "12px 14px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
                 <span style={{ fontSize: "11px", fontWeight: 700, color: c.text3 }}>
                   {equityHistory.length >= 2 ? "실제 에쿼티 커브 (1개월)" : "누적 P&L 커브"}
@@ -752,7 +752,7 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
       )}
 
       {/* 활성 봇 목록 */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "16px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(340px, 1fr))", gap: isMobile ? "12px" : "16px" }}>
         {activeBots.map(ab => {
           const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
           const elapsed = Date.now() - (ab.startedAt || Date.now());
@@ -874,14 +874,14 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
 
           return (
             <div key={ab.botId} style={{
-              background: c.card, border: `1px solid ${c.border}`, borderRadius: "14px", padding: "20px",
-              display: "flex", flexDirection: "column", gap: "14px",
+              background: c.card, border: `1px solid ${c.border}`, borderRadius: isMobile ? "12px" : "14px", padding: isMobile ? "14px 12px" : "20px",
+              display: "flex", flexDirection: "column", gap: isMobile ? "10px" : "14px",
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                <span style={{ fontSize: "28px" }}>{bot.icon}</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700, fontSize: "15px", color: c.text1 }}>{bot.name}</div>
-                  <div style={{ fontSize: "11px", color: c.text3 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "10px" : "12px" }}>
+                <span style={{ fontSize: isMobile ? "24px" : "28px" }}>{bot.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: isMobile ? "13px" : "15px", color: c.text1, wordBreak: "break-word" }}>{bot.name}</div>
+                  <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3 }}>
                     {days > 0 ? `${days}일 ` : ""}{hours}시간 운영 · {isStock ? "주식" : "크립토"}
                   </div>
                 </div>
@@ -892,31 +892,31 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
               </div>
 
               {/* 봇별 P&L 차트 — 항상 표시 */}
-              <div style={{ background: c.card2, borderRadius: "10px", padding: "12px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                  <span style={{ fontSize: "11px", fontWeight: 700, color: c.text3 }}>
+              <div style={{ background: c.card2, borderRadius: "10px", padding: isMobile ? "10px 8px" : "12px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px", flexWrap: "wrap", gap: "8px" }}>
+                  <span style={{ fontSize: isMobile ? "10px" : "11px", fontWeight: 700, color: c.text3 }}>
                     {pnlSource === "trade_log" ? "실제 P&L" : pnlSource === "alpaca" ? "계좌 P&L" : "수익률 차트"}
                   </span>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     {botPnlPct != null && (
-                      <span style={{ fontSize: "13px", fontWeight: 800, color: botPnlPct >= 0 ? c.green : c.red }}>
+                      <span style={{ fontSize: isMobile ? "12px" : "13px", fontWeight: 800, color: botPnlPct >= 0 ? c.green : c.red }}>
                         {botPnlPct >= 0 ? "+" : ""}{botPnlPct.toFixed(2)}%
                       </span>
                     )}
                     {botPnlPct == null && safeBotReturn != null && (
-                      <span style={{ fontSize: "13px", fontWeight: 800, color: botIsPositive ? c.green : c.red }}>
+                      <span style={{ fontSize: isMobile ? "12px" : "13px", fontWeight: 800, color: botIsPositive ? c.green : c.red }}>
                         {botIsPositive ? "+" : ""}{safeBotReturn.toFixed(2)}%
                       </span>
                     )}
                     {botPnlPct == null && safeBotReturn == null && (
-                      <span style={{ fontSize: "12px", fontWeight: 600, color: c.text3 }}>데이터 수집 중</span>
+                      <span style={{ fontSize: isMobile ? "11px" : "12px", fontWeight: 600, color: c.text3 }}>데이터 수집 중</span>
                     )}
                   </div>
                 </div>
                 {pnlData.length >= 2 ? (
                   <>
                   {(() => {
-                    const w = 300, h = 64;
+                    const w = isMobile ? 260 : 300, h = isMobile ? 56 : 64;
                     const min = Math.min(...pnlData) * 0.998;
                     const max = Math.max(...pnlData) * 1.002;
                     const rng = max - min || 1;
@@ -969,37 +969,37 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
               </div>
 
               <div style={{
-                display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "8px",
-                background: c.card2, borderRadius: "10px", padding: "12px",
+                display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: isMobile ? "6px" : "8px",
+                background: c.card2, borderRadius: "10px", padding: isMobile ? "10px 8px" : "12px",
               }}>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>거래 횟수</div>
-                  <div style={{ fontSize: "16px", fontWeight: 800, color: c.text1 }}>{botTrades || ab.trades || 0}</div>
+                  <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3, marginBottom: "2px" }}>거래 횟수</div>
+                  <div style={{ fontSize: isMobile ? "13px" : "16px", fontWeight: 800, color: c.text1 }}>{botTrades || ab.trades || 0}</div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>투입 금액</div>
-                  <div style={{ fontSize: "14px", fontWeight: 700, color: c.blue }}>
+                  <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3, marginBottom: "2px" }}>투입 금액</div>
+                  <div style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 700, color: c.blue }}>
                     ${ab.allocation ? ab.allocation.toLocaleString() : "—"}
                   </div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>위험도</div>
-                  <div style={{ fontSize: "14px", fontWeight: 700, color: getRiskColor(bot.riskColor || "blue", theme) }}>{bot.risk || "—"}</div>
+                  <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3, marginBottom: "2px" }}>위험도</div>
+                  <div style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 700, color: getRiskColor(bot.riskColor || "blue", theme) }}>{bot.risk || "—"}</div>
                 </div>
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>예상 수익</div>
-                  <div style={{ fontSize: "14px", fontWeight: 700, color: c.green }}>{bot.expectedReturn || "—"}</div>
+                  <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3, marginBottom: "2px" }}>예상 수익</div>
+                  <div style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 700, color: c.green }}>{bot.expectedReturn || "—"}</div>
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: isMobile ? "6px" : "8px" }}>
                 <button onClick={() => onSelectBot(bot)} style={{
-                  flex: 1, padding: "10px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
-                  background: c.blue, color: "#fff", border: "none", cursor: "pointer",
+                  flex: 1, padding: isMobile ? "12px 8px" : "10px", borderRadius: isMobile ? "8px" : "8px", fontSize: isMobile ? "12px" : "13px", fontWeight: 600,
+                  background: c.blue, color: "#fff", border: "none", cursor: "pointer", minHeight: "44px",
                 }}>상세 보기</button>
                 <button onClick={() => onStopBot(ab.botId)} style={{
-                  padding: "10px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
-                  background: `${c.red}15`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer",
+                  padding: isMobile ? "12px 12px" : "10px 16px", borderRadius: "8px", fontSize: isMobile ? "12px" : "13px", fontWeight: 600,
+                  background: `${c.red}15`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer", minHeight: "44px",
                 }}>중지</button>
               </div>
             </div>
@@ -1221,41 +1221,41 @@ export default function AutoTrading({ theme = "dark", user }) {
 
               {/* 수치 카드 그리드 */}
               {alpacaEquity != null && (
-                <div style={{ display: "grid", gridTemplateColumns: activeBots.length > 0 ? "1fr 1fr 1fr" : "1fr", gap: "12px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : (activeBots.length > 0 ? "1fr 1fr 1fr" : "1fr"), gap: isMobile ? "10px" : "12px" }}>
                   {/* 총 자산 */}
                   <div style={{
-                    background: c.card, borderRadius: "12px", padding: "16px 20px",
+                    background: c.card, borderRadius: isMobile ? "10px" : "12px", padding: isMobile ? "12px 14px" : "16px 20px",
                     border: `1px solid ${c.border}`,
                   }}>
-                    <div style={{ fontSize: "11px", color: c.text3, marginBottom: "6px", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>총 자산</div>
-                    <div style={{ fontSize: "28px", fontWeight: 800, color: c.text1, letterSpacing: "-1px" }}>
+                    <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3, marginBottom: "6px", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>총 자산</div>
+                    <div style={{ fontSize: isMobile ? "22px" : "28px", fontWeight: 800, color: c.text1, letterSpacing: "-1px" }}>
                       ${alpacaEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </div>
                   </div>
                   {/* 배분 완료 */}
                   {activeBots.length > 0 && (
                     <div style={{
-                      background: c.card, borderRadius: "12px", padding: "16px 20px",
+                      background: c.card, borderRadius: isMobile ? "10px" : "12px", padding: isMobile ? "12px 14px" : "16px 20px",
                       border: `1px solid ${c.border}`,
                     }}>
-                      <div style={{ fontSize: "11px", color: c.text3, marginBottom: "6px", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>봇 배분</div>
-                      <div style={{ fontSize: "28px", fontWeight: 800, color: c.orange || c.yellow, letterSpacing: "-1px" }}>
+                      <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3, marginBottom: "6px", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>봇 배분</div>
+                      <div style={{ fontSize: isMobile ? "22px" : "28px", fontWeight: 800, color: c.orange || c.yellow, letterSpacing: "-1px" }}>
                         ${used.toLocaleString()}
                       </div>
-                      <div style={{ fontSize: "11px", color: c.text3, marginTop: "4px" }}>{activeBots.length}개 봇 운영 중</div>
+                      <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3, marginTop: "4px" }}>{activeBots.length}개 봇 운영 중</div>
                     </div>
                   )}
                   {/* 잔여 */}
                   {activeBots.length > 0 && left != null && (
                     <div style={{
-                      background: c.card, borderRadius: "12px", padding: "16px 20px",
+                      background: c.card, borderRadius: isMobile ? "10px" : "12px", padding: isMobile ? "12px 14px" : "16px 20px",
                       border: `1px solid ${left > 0 ? c.border : c.red + "30"}`,
                     }}>
-                      <div style={{ fontSize: "11px", color: c.text3, marginBottom: "6px", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>잔여 금액</div>
-                      <div style={{ fontSize: "28px", fontWeight: 800, color: left > 0 ? c.green : c.red, letterSpacing: "-1px" }}>
+                      <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3, marginBottom: "6px", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>잔여 금액</div>
+                      <div style={{ fontSize: isMobile ? "22px" : "28px", fontWeight: 800, color: left > 0 ? c.green : c.red, letterSpacing: "-1px" }}>
                         ${left.toLocaleString()}
                       </div>
-                      <div style={{ fontSize: "11px", color: c.text3, marginTop: "4px" }}>
+                      <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3, marginTop: "4px" }}>
                         {alpacaEquity > 0 ? `${((left / alpacaEquity) * 100).toFixed(1)}% 가용` : ""}
                       </div>
                     </div>
@@ -1268,40 +1268,40 @@ export default function AutoTrading({ theme = "dark", user }) {
         {/* 알파카 API 키 설정 폼 */}
         {showAlpacaSetup && (
           <div style={{
-            background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px",
-            padding: "24px", marginBottom: "20px",
+            background: c.card, border: `1px solid ${c.border}`, borderRadius: isMobile ? "12px" : "16px",
+            padding: isMobile ? "16px 12px" : "24px", marginBottom: "20px",
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: c.text1 }}>Alpaca API 설정</h3>
+              <h3 style={{ margin: 0, fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: c.text1 }}>Alpaca API 설정</h3>
               <button onClick={() => setShowAlpacaSetup(false)} style={{ background: "none", border: "none", color: c.text3, fontSize: "18px", cursor: "pointer" }}>✕</button>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "10px" : "12px" }}>
               <div>
-                <label style={{ fontSize: "12px", fontWeight: 600, color: c.text2, marginBottom: "4px", display: "block" }}>API Key</label>
+                <label style={{ fontSize: isMobile ? "11px" : "12px", fontWeight: 600, color: c.text2, marginBottom: "4px", display: "block" }}>API Key</label>
                 <input value={alpacaKey} onChange={e => setAlpacaKey(e.target.value)} placeholder="PKXXXXXXXXXXXXXXXXXX"
-                  style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: `1px solid ${c.border}`, background: c.card2, color: c.text1, fontSize: "13px", boxSizing: "border-box", outline: "none" }}
+                  style={{ width: "100%", padding: isMobile ? "12px" : "10px 12px", borderRadius: "8px", border: `1px solid ${c.border}`, background: c.card2, color: c.text1, fontSize: isMobile ? "14px" : "13px", boxSizing: "border-box", outline: "none", minHeight: "44px" }}
                   onFocus={e => e.target.style.borderColor = c.blue} onBlur={e => e.target.style.borderColor = c.border}
                 />
               </div>
               <div>
-                <label style={{ fontSize: "12px", fontWeight: 600, color: c.text2, marginBottom: "4px", display: "block" }}>Secret Key</label>
+                <label style={{ fontSize: isMobile ? "11px" : "12px", fontWeight: 600, color: c.text2, marginBottom: "4px", display: "block" }}>Secret Key</label>
                 <input value={alpacaSecret} onChange={e => setAlpacaSecret(e.target.value)} type="password" placeholder="••••••••••••••••••"
-                  style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: `1px solid ${c.border}`, background: c.card2, color: c.text1, fontSize: "13px", boxSizing: "border-box", outline: "none" }}
+                  style={{ width: "100%", padding: isMobile ? "12px" : "10px 12px", borderRadius: "8px", border: `1px solid ${c.border}`, background: c.card2, color: c.text1, fontSize: isMobile ? "14px" : "13px", boxSizing: "border-box", outline: "none", minHeight: "44px" }}
                   onFocus={e => e.target.style.borderColor = c.blue} onBlur={e => e.target.style.borderColor = c.border}
                 />
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "6px" : "8px" }}>
                 <input type="checkbox" checked={alpacaPaper} onChange={e => setAlpacaPaper(e.target.checked)} id="alpaca-paper" />
-                <label htmlFor="alpaca-paper" style={{ fontSize: "12px", color: c.text2 }}>페이퍼 트레이딩 (테스트 환경)</label>
+                <label htmlFor="alpaca-paper" style={{ fontSize: isMobile ? "11px" : "12px", color: c.text2 }}>페이퍼 트레이딩 (테스트 환경)</label>
               </div>
-              <div style={{ fontSize: "11px", color: c.text3, lineHeight: 1.5 }}>
+              <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3, lineHeight: 1.5 }}>
                 API 키는 브라우저 로컬 스토리지에만 저장되며, 서버로 전송되지 않습니다.
                 <br />
                 <a href="https://app.alpaca.markets/paper/dashboard/overview" target="_blank" rel="noopener noreferrer" style={{ color: c.blue }}>Alpaca 대시보드에서 API 키 발급 →</a>
               </div>
               <button onClick={handleSaveAlpaca} style={{
-                padding: "12px", borderRadius: "10px", fontSize: "14px", fontWeight: 700,
-                background: c.blue, color: "#fff", border: "none", cursor: "pointer",
+                padding: isMobile ? "14px 12px" : "12px", borderRadius: "10px", fontSize: isMobile ? "13px" : "14px", fontWeight: 700,
+                background: c.blue, color: "#fff", border: "none", cursor: "pointer", minHeight: "44px", width: "100%",
               }}>저장</button>
             </div>
           </div>
@@ -1315,14 +1315,14 @@ export default function AutoTrading({ theme = "dark", user }) {
             zIndex: 9999,
           }} onClick={() => setPendingBot(null)}>
             <div style={{
-              background: c.card, borderRadius: "16px", padding: "28px", width: "min(400px, 90vw)",
+              background: c.card, borderRadius: isMobile ? "12px" : "16px", padding: isMobile ? "20px 16px" : "28px", width: isMobile ? "min(95vw, 100%)" : "min(400px, 90vw)",
               border: `1px solid ${c.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
             }} onClick={e => e.stopPropagation()}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
-                <span style={{ fontSize: "32px" }}>{pendingBot.icon}</span>
-                <div>
-                  <h3 style={{ margin: 0, color: c.text1, fontSize: "18px" }}>{pendingBot.name}</h3>
-                  <span style={{ fontSize: "12px", color: c.text2 }}>투입 금액을 설정해주세요</span>
+              <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "10px" : "12px", marginBottom: "20px" }}>
+                <span style={{ fontSize: isMobile ? "28px" : "32px" }}>{pendingBot.icon}</span>
+                <div style={{ minWidth: 0 }}>
+                  <h3 style={{ margin: 0, color: c.text1, fontSize: isMobile ? "16px" : "18px", wordBreak: "break-word" }}>{pendingBot.name}</h3>
+                  <span style={{ fontSize: isMobile ? "11px" : "12px", color: c.text2 }}>투입 금액을 설정해주세요</span>
                 </div>
               </div>
               {alpacaEquity != null && (() => {
@@ -1330,8 +1330,8 @@ export default function AutoTrading({ theme = "dark", user }) {
                 const left = Math.max(0, alpacaEquity - used);
                 return (
                   <div style={{
-                    padding: "8px 12px", background: `${c.blue}08`, borderRadius: "8px",
-                    border: `1px solid ${c.blue}15`, marginBottom: "16px", fontSize: "12px", color: c.text2,
+                    padding: isMobile ? "10px" : "8px 12px", background: `${c.blue}08`, borderRadius: "8px",
+                    border: `1px solid ${c.blue}15`, marginBottom: "16px", fontSize: isMobile ? "11px" : "12px", color: c.text2,
                   }}>
                     계좌 잔고: <strong style={{ color: c.text1 }}>${alpacaEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
                     {used > 0 && <>
@@ -1342,28 +1342,28 @@ export default function AutoTrading({ theme = "dark", user }) {
                 );
               })()}
               <div style={{ marginBottom: "20px" }}>
-                <label style={{ fontSize: "13px", color: c.text2, display: "block", marginBottom: "6px" }}>투입 금액 (USD)</label>
+                <label style={{ fontSize: isMobile ? "12px" : "13px", color: c.text2, display: "block", marginBottom: "6px" }}>투입 금액 (USD)</label>
                 <input
                   type="number"
                   value={allocationInput}
                   onChange={e => setAllocationInput(e.target.value)}
                   placeholder="예: 5000"
                   style={{
-                    width: "100%", padding: "12px", borderRadius: "8px", border: `1px solid ${c.border}`,
-                    background: c.card2, color: c.text1, fontSize: "16px", fontWeight: 600, boxSizing: "border-box",
+                    width: "100%", padding: isMobile ? "14px" : "12px", borderRadius: "8px", border: `1px solid ${c.border}`,
+                    background: c.card2, color: c.text1, fontSize: isMobile ? "16px" : "16px", fontWeight: 600, boxSizing: "border-box", minHeight: "44px",
                   }}
                   onKeyDown={e => e.key === "Enter" && handleConfirmAllocation()}
                   autoFocus
                 />
               </div>
-              <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ display: "flex", gap: isMobile ? "8px" : "8px" }}>
                 <button onClick={() => setPendingBot(null)} style={{
-                  flex: 1, padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
-                  background: c.card2, color: c.text2, border: `1px solid ${c.border}`, cursor: "pointer",
+                  flex: 1, padding: isMobile ? "14px 12px" : "12px", borderRadius: "8px", fontSize: isMobile ? "13px" : "14px", fontWeight: 600,
+                  background: c.card2, color: c.text2, border: `1px solid ${c.border}`, cursor: "pointer", minHeight: "44px",
                 }}>취소</button>
                 <button onClick={handleConfirmAllocation} style={{
-                  flex: 1, padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
-                  background: c.blue, color: "#fff", border: "none", cursor: "pointer",
+                  flex: 1, padding: isMobile ? "14px 12px" : "12px", borderRadius: "8px", fontSize: isMobile ? "13px" : "14px", fontWeight: 600,
+                  background: c.blue, color: "#fff", border: "none", cursor: "pointer", minHeight: "44px",
                 }}>운영 시작</button>
               </div>
             </div>
@@ -1380,6 +1380,7 @@ export default function AutoTrading({ theme = "dark", user }) {
             onStopBot={handleStopBot}
             theme={theme}
             userId={user?.id}
+            isMobile={isMobile}
           />
         )}
 

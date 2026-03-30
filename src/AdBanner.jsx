@@ -671,32 +671,45 @@ export function CoupangCarouselBanner({ style = {} }) {
   );
 }
 
-// ── Google AdSense 배너 (향후 사용) ──
-export function GoogleAd({ slot, format = "auto", style = {} }) {
+// ── Google AdSense 배너 (Google AdSense 광고) ──
+// 광고 형식: banner (728x90), rectangle (300x250), in-feed (responsive article), responsive (auto-size)
+export function GoogleAd({ format = "responsive", slot = "auto", style = {} }) {
   const adRef = useRef(null);
-  const pushed = useRef(false);
 
   useEffect(() => {
-    if (pushed.current) return;
     try {
       if (window.adsbygoogle && adRef.current) {
         (window.adsbygoogle = window.adsbygoogle || []).push({});
-        pushed.current = true;
       }
     } catch (e) {
-      console.warn("[AdSense]", e);
+      // AdSense script not loaded yet
     }
   }, []);
 
+  // 광고 형식에 따른 기본 스타일 지정
+  const getAdStyle = () => {
+    switch (format) {
+      case "banner":
+        return { minHeight: "90px", maxWidth: "728px", margin: "12px auto" };
+      case "rectangle":
+        return { minHeight: "250px", maxWidth: "300px", margin: "12px auto" };
+      case "in-feed":
+        return { minHeight: "250px", margin: "16px 0" };
+      case "responsive":
+      default:
+        return { minHeight: "200px", margin: "12px 0" };
+    }
+  };
+
   return (
-    <div style={{ textAlign: "center", overflow: "hidden", ...style }}>
+    <div style={{ textAlign: "center", overflow: "hidden", ...getAdStyle(), ...style }}>
       <ins
         ref={adRef}
         className="adsbygoogle"
         style={{ display: "block" }}
-        data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" /* TODO: AdSense 퍼블리셔 ID */
+        data-ad-client="ca-pub-5897295133273451"
         data-ad-slot={slot}
-        data-ad-format={format}
+        data-ad-format={format === "responsive" ? "auto" : format === "in-feed" ? "fluid" : format}
         data-full-width-responsive="true"
       />
     </div>
