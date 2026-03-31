@@ -1,6 +1,9 @@
 // Stock Auto-Trading Cron Engine for Vercel
-// Runs weekdays at 13:30 UTC (US market open 9:30 ET)
+// 장중 30분 간격 실행: 실시간 시장 감시 + 알파 전략 기반 자동매매
+// market-monitor가 KV에 쌓은 레짐 데이터를 참조하여 적응형 매매
 // Paper-trades 10 high-liquidity US stocks via Alpaca
+
+export const config = { maxDuration: 120 };
 
 import fetch from 'node-fetch';
 
@@ -332,7 +335,7 @@ function calcEfficiencyRatio(closes, period = 10) {
   return er;
 }
 
-function analyzeLatest(symbol, data) {
+function analyzeLatest(symbol, data, marketRegime = null, stockAlerts = []) {
   if (!data || data.close.length < 100) return null;
 
   const closes = data.close;
@@ -527,10 +530,34 @@ function analyzeLatest(symbol, data) {
   if (bearDivergence) { sellScore += 2; sellFactors++; alphaReasons.push('약세 다이버전스'); }
 
   // ═══════════════════════════════════════════════════════
-  // 최종 판정: 알파 팩터 1개 이상 + 총 스코어 3+
+  // LAYER 4: market-monitor 실시간 알림 부스트
   // ═══════════════════════════════════════════════════════
-  const buySignal = buyScore >= 3 && buyFactors >= 2;
-  const sellSignal = sellScore >= 3 && sellFactors >= 2;
+  for (const alert of stockAlerts) {
+    if (alert.type === "TREND_BIRTH") {
+      if (lastClose > closes[closes.length - 2]) { buyScore += 2; buyFactors++; alphaReasons.push("모니터:추세탄생↑"); }
+      else { sellScore += 2; sellFactors++; alphaReasons.push("모니터:추세탄생↓"); }
+    }
+    if (alert.type === "VOL_EXPLOSION") {
+      if (lastClose > closes[closes.length - 2]) { buyScore += 1; alphaReasons.push("모니터:변동성폭발↑"); }
+      else { sellScore += 1; alphaReasons.push("모니터:변동성폭발↓"); }
+    }
+    if (alert.type === "SMART_MONEY") {
+      buyScore += 1; alphaReasons.push("모니터:스마트머니");
+    }
+  }
+
+  // 레짐 기반 임계값 조정
+  let buyTh = 3, sellTh = 3;
+  if (marketRegime) {
+    if (marketRegime.regime === "trending") { buyTh = 2; sellTh = 2; }
+    else if (marketRegime.regime === "mean_reverting") { buyTh = 3; sellTh = 4; }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // 최종 판정
+  // ═══════════════════════════════════════════════════════
+  const buySignal = buyScore >= buyTh && buyFactors >= 2;
+  const sellSignal = sellScore >= sellTh && sellFactors >= 2;
 
   return {
     symbol,
@@ -640,7 +667,22 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    console.log('Starting stock auto-trading cron...');
+    console.log('Starting stock auto-trading cron (30min interval)...');
+
+    // ── KV에서 market-monitor 레짐 데이터 로드 ──
+    let marketRegime = null;
+    let monitorAlerts = [];
+    try {
+      const kvModule = await import("@vercel/kv");
+      const kv = kvModule.kv;
+      marketRegime = await kv.get("di:market:regime");
+      monitorAlerts = (await kv.get("di:market:alerts")) || [];
+      if (marketRegime) {
+        console.log(`📡 마켓 모니터 레짐: ${marketRegime.regime} (H=${marketRegime.avgHurst?.toFixed(2)})`);
+      }
+    } catch {
+      console.log("⚠️ KV 미연결 — 기본 모드");
+    }
 
     const account = await getAccount();
     const positions = await getPositions();
@@ -661,7 +703,8 @@ export default async function handler(req, res) {
         continue;
       }
 
-      const analysis = analyzeLatest(symbol, data);
+      const stockAlerts = monitorAlerts.filter(a => a.ticker === symbol);
+      const analysis = analyzeLatest(symbol, data, marketRegime, stockAlerts);
       if (!analysis) continue;
 
       signals.push(analysis);

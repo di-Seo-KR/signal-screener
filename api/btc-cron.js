@@ -1,11 +1,14 @@
 // Vercel Cron — 멀티 자산 암호화폐 자동매매 서버사이드 엔진
-// 4시간마다 실행: BTC, ETH, SOL 캔들 데이터 → 전략 시그널 생성 → Alpaca 주문
+// 1시간마다 실행: BTC, ETH, SOL 캔들 데이터 → 전략 시그널 생성 → Alpaca 주문
+// market-monitor가 KV에 쌓은 레짐 데이터를 참조하여 적응형 매매
 // 환경변수: ALPACA_API_KEY, ALPACA_SECRET_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+
+export const config = { maxDuration: 120 };
 
 const CRYPTO_ASSETS = ["BTC/USD", "ETH/USD", "SOL/USD"];
 const YAHOO_TICKERS = { "BTC/USD": "BTC-USD", "ETH/USD": "ETH-USD", "SOL/USD": "SOL-USD" };
-const MAX_POSITION_PER_ASSET = 0.30; // 자산당 최대 30% 에쿼티
-const MAX_TOTAL_CRYPTO_EXPOSURE = 0.80; // 총 암호화폐 노출 최대 80%
+const MAX_POSITION_PER_ASSET = 0.30;
+const MAX_TOTAL_CRYPTO_EXPOSURE = 0.80;
 
 export default async function handler(req, res) {
   const startTime = Date.now();
@@ -13,7 +16,25 @@ export default async function handler(req, res) {
   const addLog = (msg) => { log.push(`[${new Date().toISOString()}] ${msg}`); console.log(msg); };
 
   try {
-    addLog("🚀 멀티 자산 암호화폐 자동매매 Cron 시작");
+    addLog("🚀 크립토 자동매매 Cron 시작 (1h 간격)");
+
+    // ── KV에서 market-monitor 레짐 데이터 로드 ──
+    let marketRegime = null;
+    let monitorAlerts = [];
+    try {
+      const kvModule = await import("@vercel/kv");
+      const kv = kvModule.kv;
+      marketRegime = await kv.get("di:market:regime");
+      monitorAlerts = (await kv.get("di:market:alerts")) || [];
+      if (marketRegime) {
+        addLog(`📡 마켓 모니터 레짐: ${marketRegime.regime} (H=${marketRegime.avgHurst?.toFixed(2)}, ER=${marketRegime.avgER?.toFixed(2)})`);
+      }
+      if (monitorAlerts.length > 0) {
+        addLog(`🚨 활성 알림 ${monitorAlerts.length}건`);
+      }
+    } catch {
+      addLog("⚠️ KV 미연결 — 기본 모드");
+    }
 
     // ── 환경변수 확인 ──
     const ALPACA_KEY = process.env.ALPACA_API_KEY;
@@ -149,11 +170,13 @@ export default async function handler(req, res) {
       const weeklyTrendUp = wEma10.length > 0 && wEma30.length > 0
         ? wEma10[wEma10.length - 1] > wEma30[wEma30.length - 1] : null;
 
-      // 최근 5봉 시그널 분석
+      // 최근 시그널 분석 (market-monitor 레짐 연동)
+      // monitorAlerts에서 현재 자산 관련 알림 추출
+      const assetAlerts = monitorAlerts.filter(a => a.ticker === yahooTicker);
       const latestSignal = analyzeLatest(candles, closes, highs, lows, volumes, {
         rsi, bb, ema21, ema55, ema200, macdLine, macdSig, histogram,
         adx, atr, stoch, obv, obvEma, volSMA, weeklyTrendUp,
-      }, fngValue);
+      }, fngValue, marketRegime, assetAlerts);
 
       if (!latestSignal) {
         addLog(`⏸️ ${asset} 시그널 없음`);
@@ -390,7 +413,7 @@ function calcEfficiencyRatio(closes, period = 10) {
 // ════════════════════════════════════════════════════════
 // 3-Layer 알파 시그널 분석 (최근 시그널 분석)
 // ════════════════════════════════════════════════════════
-function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50) {
+function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50, marketRegime = null, assetAlerts = []) {
   const { rsi, bb, ema21, ema55, ema200, macdLine, macdSig, histogram,
     adx, atr, stoch, obv, obvEma, volSMA, weeklyTrendUp } = ind;
 
@@ -409,6 +432,18 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
   else if (fngValue <= 55) { buyThreshold = 4; buyFactorsThreshold = 2; sellThreshold = 4; sellFactorsThreshold = 2; }
   else if (fngValue <= 75) { buyThreshold = 5; buyFactorsThreshold = 3; sellThreshold = 4; sellFactorsThreshold = 2; }
   else { buyThreshold = 6; buyFactorsThreshold = 3; sellThreshold = 3; sellFactorsThreshold = 2; }
+
+  // ── market-monitor 레짐 데이터로 임계값 미세 조정 ──
+  if (marketRegime) {
+    if (marketRegime.regime === "trending") {
+      // 추세 시장: 추세 방향 매매를 더 쉽게
+      buyThreshold = Math.max(2, buyThreshold - 1);
+      sellThreshold = Math.max(2, sellThreshold - 1);
+    } else if (marketRegime.regime === "mean_reverting") {
+      // 평균회귀 시장: 역추세 진입에 더 관대
+      buyThreshold = Math.max(2, buyThreshold - 1);
+    }
+  }
 
   let buyScore = 0, buyFactors = 0;
   let sellScore = 0, sellFactors = 0;
@@ -562,6 +597,28 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
   // 다이버전스
   if (detectBullishDivergence(closes, rsi, lastIdx, 15)) { buyScore += 2; buyFactors++; reasons.push("강세 다이버전스"); }
   if (detectBearishDivergence(closes, rsi, lastIdx, 15)) { sellScore += 2; sellFactors++; reasons.push("약세 다이버전스"); }
+
+  // ═══════════════════════════════════════════════════════
+  // LAYER 4: market-monitor 실시간 알림 부스트
+  // ═══════════════════════════════════════════════════════
+  for (const alert of assetAlerts) {
+    if (alert.type === "REGIME_SHIFT" && alert.severity === "high") {
+      // 레짐 전환 알림이 있으면 현재 방향에 보너스
+      if (price > prevPrice) { buyScore += 2; reasons.push("모니터:레짐전환↑"); }
+      else { sellScore += 2; reasons.push("모니터:레짐전환↓"); }
+    }
+    if (alert.type === "TREND_BIRTH") {
+      if (price > prevPrice) { buyScore += 2; buyFactors++; reasons.push("모니터:추세탄생↑"); }
+      else { sellScore += 2; sellFactors++; reasons.push("모니터:추세탄생↓"); }
+    }
+    if (alert.type === "VOL_EXPLOSION") {
+      if (price > prevPrice) { buyScore += 1; reasons.push("모니터:변동성폭발↑"); }
+      else { sellScore += 1; reasons.push("모니터:변동성폭발↓"); }
+    }
+    if (alert.type === "SMART_MONEY") {
+      buyScore += 1; reasons.push("모니터:스마트머니");
+    }
+  }
 
   // ═══════════════════════════════════════════════════════
   // 최종 판정
