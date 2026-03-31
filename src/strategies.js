@@ -2227,6 +2227,423 @@ export const strategyBTCAlpha = {
   },
 };
 
+// ════════════════════════════════════════════════════════════════════
+// 독자 알파 전략 — 시장 비효율성 포착 (퀀트팀 R&D)
+// ════════════════════════════════════════════════════════════════════
+
+// ── 1) Hurst Exponent 전략 — 추세/평균회귀 레짐 감지 ──
+// H > 0.5 = 추세 지속 (모멘텀 추종), H < 0.5 = 평균회귀 (역추세)
+// 대부분의 트레이더가 항상 같은 방식(모멘텀 or 역추세)으로 매매하지만,
+// 시장은 레짐이 바뀜. 이걸 실시간 감지해서 전략을 전환하는 것이 알파.
+export const strategyHurst = {
+  id: "hurst_regime",
+  name: "🧬 Hurst 레짐 스위칭",
+  desc: "Hurst 지수로 시장이 추세형(H>0.55)인지 평균회귀형(H<0.45)인지 실시간 감지. 추세형에선 돌파 매수, 평균회귀형에선 과매도 역매매. 레짐 전환점이 곧 알파.",
+  category: "알파",
+  risk: "중",
+  icon: "🧬",
+  params: { hurstWindow: 100, lookback: 20 },
+  generate(candles, params = {}) {
+    const { hurstWindow = 100, lookback = 20 } = { ...this.params, ...params };
+    if (candles.length < hurstWindow + 50) return [];
+
+    const closes = candles.map(c => c.close);
+    const highs = candles.map(c => c.high);
+    const lows = candles.map(c => c.low);
+
+    // Hurst 지수 계산 (R/S 분석)
+    function calcHurst(data) {
+      const n = data.length;
+      if (n < 20) return 0.5;
+      const logReturns = [];
+      for (let i = 1; i < n; i++) logReturns.push(Math.log(data[i] / data[i - 1]));
+      const mean = logReturns.reduce((a, b) => a + b, 0) / logReturns.length;
+      const deviations = logReturns.map(r => r - mean);
+      const cumDev = [];
+      let cum = 0;
+      for (const d of deviations) { cum += d; cumDev.push(cum); }
+      const R = Math.max(...cumDev) - Math.min(...cumDev);
+      const S = Math.sqrt(deviations.reduce((a, b) => a + b * b, 0) / deviations.length);
+      if (S === 0) return 0.5;
+      const RS = R / S;
+      return Math.log(RS) / Math.log(n);
+    }
+
+    const signals = [];
+    const rsi = calcRSI(closes, 14);
+    const atr = calcATR(highs, lows, closes, 14);
+    const ema20 = calcEMA(closes, 20);
+    const ema50 = calcEMA(closes, 50);
+    let lastIdx = -10;
+
+    for (let i = hurstWindow; i < candles.length; i++) {
+      if (i - lastIdx < 3) continue;
+      const slice = closes.slice(i - hurstWindow, i);
+      const H = calcHurst(slice);
+      const price = closes[i];
+      const atrPct = atr[i] && price > 0 ? (atr[i] / price) * 100 : 2;
+
+      if (H > 0.55) {
+        // 추세형 레짐 → 돌파 추종 전략
+        const breakoutHigh = Math.max(...highs.slice(i - lookback, i));
+        const trendUp = ema20[i] > ema50[i];
+        if (price > breakoutHigh && trendUp) {
+          lastIdx = i;
+          signals.push({
+            index: i, type: "BUY", price,
+            confidence: H > 0.65 ? "A" : "B",
+            reason: `🧬 Hurst ${H.toFixed(2)} 추세레짐 — ${lookback}봉 고점돌파 $${breakoutHigh.toFixed(0)}`,
+          });
+        }
+        const breakoutLow = Math.min(...lows.slice(i - lookback, i));
+        if (price < breakoutLow && !trendUp) {
+          lastIdx = i;
+          signals.push({
+            index: i, type: "SELL", price,
+            confidence: H > 0.65 ? "A" : "B",
+            reason: `🧬 Hurst ${H.toFixed(2)} 추세레짐 — ${lookback}봉 저점이탈 $${breakoutLow.toFixed(0)}`,
+          });
+        }
+      } else if (H < 0.45) {
+        // 평균회귀형 레짐 → 역추세 전략
+        if (rsi[i] != null && rsi[i] < 30 && rsi[i] > rsi[i - 1]) {
+          lastIdx = i;
+          signals.push({
+            index: i, type: "BUY", price,
+            confidence: H < 0.35 ? "A" : "B",
+            reason: `🧬 Hurst ${H.toFixed(2)} 회귀레짐 — RSI ${rsi[i].toFixed(1)} 반등 (평균회귀 매수)`,
+          });
+        }
+        if (rsi[i] != null && rsi[i] > 70 && rsi[i] < rsi[i - 1]) {
+          lastIdx = i;
+          signals.push({
+            index: i, type: "SELL", price,
+            confidence: H < 0.35 ? "A" : "B",
+            reason: `🧬 Hurst ${H.toFixed(2)} 회귀레짐 — RSI ${rsi[i].toFixed(1)} 하락 (평균회귀 매도)`,
+          });
+        }
+      }
+    }
+    return signals;
+  },
+};
+
+// ── 2) Volatility Clustering Breakout — 변동성 군집 돌파 ──
+// GARCH 개념을 단순화: 변동성은 군집됨 (큰 움직임 뒤에 큰 움직임).
+// 변동성 압축 구간(낮은 ATR) → 폭발 직전을 포착하는 것이 핵심 알파.
+// 기존 BB Squeeze와 다른 점: ATR 변화율 + 체제 전환 확률까지 계산.
+export const strategyVolCluster = {
+  id: "vol_cluster",
+  name: "⚡ 변동성 군집 돌파",
+  desc: "GARCH 기반 변동성 군집 효과 활용. ATR 압축 비율이 임계점 이하로 수축 후 확장 시작 시 돌파 방향으로 포지션. 변동성 폭발 직전을 포착.",
+  category: "알파",
+  risk: "고",
+  icon: "⚡",
+  params: { atrPeriod: 14, contractionThreshold: 0.5, expansionMult: 1.8 },
+  generate(candles, params = {}) {
+    const { atrPeriod = 14, contractionThreshold = 0.5, expansionMult = 1.8 } = { ...this.params, ...params };
+    if (candles.length < 80) return [];
+
+    const closes = candles.map(c => c.close);
+    const highs = candles.map(c => c.high);
+    const lows = candles.map(c => c.low);
+    const volumes = candles.map(c => c.volume || 0);
+    const atr = calcATR(highs, lows, closes, atrPeriod);
+
+    // ATR의 50봉 이동평균 (장기 변동성 기준선)
+    const atrLongMA = calcSMA(atr.map(v => v || 0), 50);
+
+    const signals = [];
+    let lastIdx = -5;
+    let inContraction = false;
+    let contractionStart = -1;
+
+    for (let i = 60; i < candles.length; i++) {
+      if (i - lastIdx < 3) continue;
+      if (!atr[i] || !atrLongMA[i] || atrLongMA[i] === 0) continue;
+
+      const atrRatio = atr[i] / atrLongMA[i]; // 현재 ATR / 장기 ATR
+      const price = closes[i];
+
+      // 수축 감지: ATR이 장기 평균 대비 50% 이하로 줄어든 상태
+      if (atrRatio < contractionThreshold && !inContraction) {
+        inContraction = true;
+        contractionStart = i;
+      }
+
+      // 폭발 감지: 수축 후 ATR이 장기 평균 * 1.8 이상으로 급등
+      if (inContraction && atrRatio > expansionMult) {
+        inContraction = false;
+        const contractionLen = i - contractionStart;
+
+        // 방향 결정: 폭발 시점의 가격 변화 방향
+        const priceChange = closes[i] - closes[i - 1];
+        const volSurge = volumes[i] > 0 && calcSMA(volumes, 20)[i] > 0
+          ? volumes[i] / calcSMA(volumes, 20)[i] : 1;
+
+        if (priceChange > 0) {
+          lastIdx = i;
+          signals.push({
+            index: i, type: "BUY", price,
+            confidence: contractionLen > 10 && volSurge > 2 ? "A" : contractionLen > 5 ? "B" : "C",
+            reason: `⚡ 변동성폭발↑ ATR비율 ${atrRatio.toFixed(2)} (${contractionLen}봉 수축후) Vol ${volSurge.toFixed(1)}x`,
+          });
+        } else {
+          lastIdx = i;
+          signals.push({
+            index: i, type: "SELL", price,
+            confidence: contractionLen > 10 && volSurge > 2 ? "A" : contractionLen > 5 ? "B" : "C",
+            reason: `⚡ 변동성폭발↓ ATR비율 ${atrRatio.toFixed(2)} (${contractionLen}봉 수축후) Vol ${volSurge.toFixed(1)}x`,
+          });
+        }
+      }
+
+      // 수축이 너무 길면 리셋 (30봉 이상 수축은 비정상)
+      if (inContraction && i - contractionStart > 30) {
+        inContraction = false;
+      }
+    }
+    return signals;
+  },
+};
+
+// ── 3) Adaptive Efficiency Ratio — 시장 효율성 측정 전략 ──
+// Kaufman의 효율성 비율(ER) 확장: ER이 높으면 순방향 모멘텀이 강함,
+// ER이 낮으면 시장이 랜덤워크에 가까움 (노이즈).
+// ER 급등 = 강한 추세 시작 감지 → 이 "추세 탄생" 순간을 포착.
+export const strategyEfficiency = {
+  id: "efficiency_ratio",
+  name: "📐 효율성 비율 전략",
+  desc: "Kaufman 효율성비율(ER) 기반. 가격 이동의 효율성(방향성/노이즈 비율)이 급등하면 새로운 추세 탄생을 포착. ER 급락은 추세 소멸 = 이탈 시그널.",
+  category: "알파",
+  risk: "중",
+  icon: "📐",
+  params: { erPeriod: 10, erSmooth: 5, threshold: 0.6 },
+  generate(candles, params = {}) {
+    const { erPeriod = 10, erSmooth = 5, threshold = 0.6 } = { ...this.params, ...params };
+    if (candles.length < erPeriod + erSmooth + 30) return [];
+
+    const closes = candles.map(c => c.close);
+
+    // 효율성 비율 계산: |방향이동| / (총경로이동)
+    const er = [];
+    for (let i = 0; i < closes.length; i++) {
+      if (i < erPeriod) { er.push(0); continue; }
+      const direction = Math.abs(closes[i] - closes[i - erPeriod]);
+      let volatility = 0;
+      for (let j = 1; j <= erPeriod; j++) {
+        volatility += Math.abs(closes[i - j + 1] - closes[i - j]);
+      }
+      er.push(volatility > 0 ? direction / volatility : 0);
+    }
+
+    // ER 스무딩
+    const erMA = calcSMA(er, erSmooth);
+
+    const signals = [];
+    let lastIdx = -5;
+
+    for (let i = erPeriod + erSmooth + 5; i < candles.length; i++) {
+      if (i - lastIdx < 3) continue;
+      const price = closes[i];
+
+      // ER 급등 감지: 이전 5봉 평균 대비 현재 ER이 threshold 이상
+      const prevAvgER = (erMA[i - 1] + erMA[i - 2] + erMA[i - 3]) / 3;
+      const curER = erMA[i];
+
+      if (curER > threshold && prevAvgER < threshold * 0.7) {
+        // 추세 탄생! 방향은 가격 변화로 판단
+        const direction = closes[i] - closes[i - erPeriod];
+        if (direction > 0) {
+          lastIdx = i;
+          signals.push({
+            index: i, type: "BUY", price,
+            confidence: curER > 0.8 ? "A" : "B",
+            reason: `📐 ER ${curER.toFixed(2)}→추세탄생↑ (이전 ${prevAvgER.toFixed(2)} 노이즈→방향성)`,
+          });
+        } else {
+          lastIdx = i;
+          signals.push({
+            index: i, type: "SELL", price,
+            confidence: curER > 0.8 ? "A" : "B",
+            reason: `📐 ER ${curER.toFixed(2)}→추세탄생↓ (이전 ${prevAvgER.toFixed(2)} 노이즈→방향성)`,
+          });
+        }
+      }
+
+      // ER 급락 = 추세 소멸 → 기존 포지션 정리 시그널
+      if (curER < 0.2 && prevAvgER > 0.5) {
+        const priceDir = closes[i] - closes[i - 3];
+        lastIdx = i;
+        signals.push({
+          index: i, type: priceDir > 0 ? "SELL" : "BUY", price,
+          confidence: "C",
+          reason: `📐 ER ${curER.toFixed(2)}→추세소멸 (${prevAvgER.toFixed(2)}→노이즈전환) 포지션정리`,
+        });
+      }
+    }
+    return signals;
+  },
+};
+
+// ── 4) Momentum Decay Rate — 모멘텀 감쇠율 기반 반전 포착 ──
+// 핵심 인사이트: 가격은 한 방향으로 움직이다가 멈추는데,
+// "멈추는 과정"은 급작스럽지 않고 감속됨. 이 감속 패턴을 수학적으로 포착.
+// 모멘텀의 1차/2차 미분 = 속도와 가속도 분석.
+export const strategyMomDecay = {
+  id: "momentum_decay",
+  name: "📉 모멘텀 감쇠 포착",
+  desc: "모멘텀의 1차/2차 미분으로 가속→감속 전환점 실시간 포착. 상승 모멘텀이 3봉 연속 둔화 + 거래량 이탈 = 고점 매도. 하락 감쇠 = 저점 매수.",
+  category: "알파",
+  risk: "중",
+  icon: "📉",
+  params: { momPeriod: 10, decayBars: 3 },
+  generate(candles, params = {}) {
+    const { momPeriod = 10, decayBars = 3 } = { ...this.params, ...params };
+    if (candles.length < momPeriod + 30) return [];
+
+    const closes = candles.map(c => c.close);
+    const volumes = candles.map(c => c.volume || 0);
+
+    // 모멘텀 (ROC: Rate of Change)
+    const mom = [];
+    for (let i = 0; i < closes.length; i++) {
+      if (i < momPeriod) { mom.push(0); continue; }
+      mom.push(((closes[i] - closes[i - momPeriod]) / closes[i - momPeriod]) * 100);
+    }
+
+    // 모멘텀의 변화율 (가속도 = 1차 미분)
+    const momDelta = [0];
+    for (let i = 1; i < mom.length; i++) {
+      momDelta.push(mom[i] - mom[i - 1]);
+    }
+
+    // 가속도의 변화율 (2차 미분 = 변곡점)
+    const momDelta2 = [0];
+    for (let i = 1; i < momDelta.length; i++) {
+      momDelta2.push(momDelta[i] - momDelta[i - 1]);
+    }
+
+    const volSMA = calcSMA(volumes, 20);
+    const signals = [];
+    let lastIdx = -5;
+
+    for (let i = momPeriod + 10; i < candles.length; i++) {
+      if (i - lastIdx < 3) continue;
+      const price = closes[i];
+
+      // 상승 모멘텀 감쇠 감지: mom > 0 이지만 decayBars 연속 둔화
+      let bullDecaying = mom[i] > 2; // 아직 양의 모멘텀
+      for (let j = 0; j < decayBars && i - j > 0; j++) {
+        if (momDelta[i - j] >= 0) { bullDecaying = false; break; } // 가속 중이면 아님
+      }
+      // 거래량 이탈 확인: 현재 거래량 < 평균의 70%
+      const volDrying = volSMA[i] > 0 && volumes[i] < volSMA[i] * 0.7;
+
+      if (bullDecaying && (volDrying || momDelta2[i] < -0.5)) {
+        lastIdx = i;
+        signals.push({
+          index: i, type: "SELL", price,
+          confidence: volDrying && momDelta2[i] < -1 ? "A" : "B",
+          reason: `📉 상승모멘텀 감쇠 ${decayBars}봉 — mom ${mom[i].toFixed(1)}%↘ 가속도 ${momDelta[i].toFixed(2)}${volDrying ? " + 거래량이탈" : ""}`,
+        });
+      }
+
+      // 하락 모멘텀 감쇠 = 바닥 다지기 → 매수 기회
+      let bearDecaying = mom[i] < -2;
+      for (let j = 0; j < decayBars && i - j > 0; j++) {
+        if (momDelta[i - j] <= 0) { bearDecaying = false; break; }
+      }
+      const volSurge = volSMA[i] > 0 && volumes[i] > volSMA[i] * 1.5;
+
+      if (bearDecaying && (volSurge || momDelta2[i] > 0.5)) {
+        lastIdx = i;
+        signals.push({
+          index: i, type: "BUY", price,
+          confidence: volSurge && momDelta2[i] > 1 ? "A" : "B",
+          reason: `📉 하락모멘텀 감쇠 ${decayBars}봉 — mom ${mom[i].toFixed(1)}%↗ 가속도 ${momDelta[i].toFixed(2)}${volSurge ? " + 거래량급증" : ""}`,
+        });
+      }
+    }
+    return signals;
+  },
+};
+
+// ── 5) Information Flow — 정보 비대칭 포착 ──
+// 핵심: "스마트머니"는 가격보다 거래량에 먼저 나타남.
+// 가격은 아직 움직이지 않았지만 거래량 패턴이 비정상적으로 변한 경우,
+// 이는 정보를 가진 대형 플레이어의 선행 포지셔닝 = 알파의 원천.
+export const strategyInfoFlow = {
+  id: "info_flow",
+  name: "🔮 정보흐름 감지",
+  desc: "가격-거래량 디커플링으로 스마트머니 선행매집 포착. 가격 보합 + 거래량 3봉 연속 급증 = 대형 플레이어 포지셔닝 감지. OBV 가속 + 가격 정체 = 매집 완료 신호.",
+  category: "알파",
+  risk: "중",
+  icon: "🔮",
+  params: { volSurgeMult: 2.0, priceFlatPct: 1.0, confirmBars: 3 },
+  generate(candles, params = {}) {
+    const { volSurgeMult = 2.0, priceFlatPct = 1.0, confirmBars = 3 } = { ...this.params, ...params };
+    if (candles.length < 60) return [];
+
+    const closes = candles.map(c => c.close);
+    const volumes = candles.map(c => c.volume || 0);
+    const obv = calcOBV(closes, volumes);
+    const obvEma = calcEMA(obv, 20);
+    const volSMA = calcSMA(volumes, 20);
+
+    const signals = [];
+    let lastIdx = -5;
+
+    for (let i = 30; i < candles.length; i++) {
+      if (i - lastIdx < 4) continue;
+      const price = closes[i];
+
+      // 가격 보합 체크: 최근 confirmBars 동안 변동 < priceFlatPct%
+      let priceFlat = true;
+      const basePrice = closes[i - confirmBars];
+      for (let j = 0; j < confirmBars; j++) {
+        const pctChange = Math.abs((closes[i - j] - basePrice) / basePrice) * 100;
+        if (pctChange > priceFlatPct) { priceFlat = false; break; }
+      }
+
+      // 거래량 서지 체크: confirmBars 연속 평균 대비 volSurgeMult 이상
+      let volSurging = true;
+      let avgVolRatio = 0;
+      for (let j = 0; j < confirmBars; j++) {
+        const ratio = volSMA[i - j] > 0 ? volumes[i - j] / volSMA[i - j] : 0;
+        if (ratio < volSurgeMult) { volSurging = false; break; }
+        avgVolRatio += ratio;
+      }
+      avgVolRatio /= confirmBars;
+
+      if (!priceFlat || !volSurging) continue;
+
+      // OBV 방향으로 스마트머니 방향 판단
+      const obvTrend = obv[i] - obv[i - confirmBars];
+      const obvAboveEma = obv[i] > obvEma[i];
+
+      if (obvTrend > 0 && obvAboveEma) {
+        // 매집 (스마트머니 매수) 감지
+        lastIdx = i;
+        signals.push({
+          index: i, type: "BUY", price,
+          confidence: avgVolRatio > 3 ? "A" : "B",
+          reason: `🔮 스마트머니 매집감지 — 가격보합 + Vol ${avgVolRatio.toFixed(1)}x×${confirmBars}봉 + OBV↑`,
+        });
+      } else if (obvTrend < 0 && !obvAboveEma) {
+        // 분산 (스마트머니 매도) 감지
+        lastIdx = i;
+        signals.push({
+          index: i, type: "SELL", price,
+          confidence: avgVolRatio > 3 ? "A" : "B",
+          reason: `🔮 스마트머니 분산감지 — 가격보합 + Vol ${avgVolRatio.toFixed(1)}x×${confirmBars}봉 + OBV↓`,
+        });
+      }
+    }
+    return signals;
+  },
+};
+
 // ── 전략 목록 ────────────────────────────────────────────────────
 export const ALL_STRATEGIES = [
   strategyRSI,
@@ -2261,7 +2678,13 @@ export const ALL_STRATEGIES = [
   strategyMACDDivergence,   // NEW: MACD 다이버전스
   strategyCandlePattern,    // NEW: 캔들 패턴
   strategyChannelMomentum,  // NEW: 채널 돌파 모멘텀
-  strategyBTCAlpha,         // NEW: ₿ BTC 전용 멀티팩터
+  strategyBTCAlpha,         // ₿ BTC 전용 멀티팩터
+  // ── 독자 알파 전략 (퀀트팀 R&D) ──
+  strategyHurst,            // 🧬 Hurst 레짐 스위칭
+  strategyVolCluster,       // ⚡ 변동성 군집 돌파
+  strategyEfficiency,       // 📐 효율성 비율
+  strategyMomDecay,         // 📉 모멘텀 감쇠 포착
+  strategyInfoFlow,         // 🔮 정보흐름 감지
 ];
 
 // ════════════════════════════════════════════════════════════════════
@@ -2759,6 +3182,13 @@ export function recommendStrategies(marketDiagnosis) {
 
   // BTC 알파: 크립토 전용 (모든 시장 국면에서 높은 우선순위)
   recs.push({ strategy: strategyBTCAlpha, score: 10, reason: "₿ BTC 전용 멀티팩터 — 고변동성 크립토 시장 최적화 전략" });
+
+  // ── 독자 알파 전략 (시장 국면 불문 추천) ──
+  recs.push({ strategy: strategyHurst, score: 11, reason: "🧬 Hurst 레짐 스위칭 — 추세/회귀 국면 자동 전환" });
+  recs.push({ strategy: strategyVolCluster, score: 10, reason: "⚡ 변동성 군집 돌파 — 압축→폭발 구간 포착" });
+  recs.push({ strategy: strategyEfficiency, score: 10, reason: "📐 효율성 비율 — 추세 탄생/소멸 시점 감지" });
+  recs.push({ strategy: strategyMomDecay, score: 10, reason: "📉 모멘텀 감쇠 — 고점/저점 반전 사전 포착" });
+  recs.push({ strategy: strategyInfoFlow, score: 10, reason: "🔮 정보흐름 — 스마트머니 매집/분산 감지" });
 
   if (regime === "안정적 상승" || trend === "상승") {
     recs.push({ strategy: strategyMA, score: 9, reason: "상승 추세에서 이평선 크로스가 가장 효과적" });

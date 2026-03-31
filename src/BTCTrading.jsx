@@ -4,7 +4,7 @@
 // CoinGecko 실시간 + Yahoo Finance 캔들 + Alpaca 크립토 주문
 // ════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { ALL_STRATEGIES, runBacktest, diagnoseMarket } from "./strategies.js";
+import { ALL_STRATEGIES, runBacktest, diagnoseMarket, strategyHurst, strategyVolCluster, strategyEfficiency, strategyMomDecay, strategyInfoFlow } from "./strategies.js";
 
 const DARK_C = {
   bg: "#0B0F19", card: "#131B2E", card2: "#1A2438",
@@ -293,15 +293,28 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
         setVolatilityRegime(regime);
 
         if (BTC_STRATEGY) {
-          // BTC 시그널
-          const btcSigs = BTC_STRATEGY.generate(candles).map(s => ({ ...s, asset: "BTC-USD" }));
-          // ETH/SOL 시그널 (같은 전략 적용, 고변동 크립토에 범용 적합)
-          const ethSigs = ethCandles.length > 60 ? BTC_STRATEGY.generate(ethCandles).map(s => ({ ...s, asset: "ETH-USD" })) : [];
-          const solSigs = solCandles.length > 60 ? BTC_STRATEGY.generate(solCandles).map(s => ({ ...s, asset: "SOL-USD" })) : [];
+          // ── 멀티 전략 앙상블: BTC Alpha v2 + 독자 알파 전략 5종 ──
+          const ALPHA_STRATEGIES = [BTC_STRATEGY, strategyHurst, strategyVolCluster, strategyEfficiency, strategyMomDecay, strategyInfoFlow];
+
+          // BTC 시그널 (6개 전략 앙상블)
+          const btcSigs = ALPHA_STRATEGIES.flatMap(strat => {
+            try { return (strat.generate(candles) || []).map(s => ({ ...s, asset: "BTC-USD", stratId: strat.id })); }
+            catch { return []; }
+          });
+          // ETH 시그널
+          const ethSigs = ethCandles.length > 60 ? ALPHA_STRATEGIES.flatMap(strat => {
+            try { return (strat.generate(ethCandles) || []).map(s => ({ ...s, asset: "ETH-USD", stratId: strat.id })); }
+            catch { return []; }
+          }) : [];
+          // SOL 시그널
+          const solSigs = solCandles.length > 60 ? ALPHA_STRATEGIES.flatMap(strat => {
+            try { return (strat.generate(solCandles) || []).map(s => ({ ...s, asset: "SOL-USD", stratId: strat.id })); }
+            catch { return []; }
+          }) : [];
           // 전체 시그널 합산 (시간순 정렬)
           const allSigs = [...btcSigs, ...ethSigs, ...solSigs].sort((a, b) => a.index - b.index);
           setSignals(allSigs);
-          const sigs = btcSigs; // 백테스트는 BTC 기준
+          const sigs = btcSigs.filter(s => s.stratId === "btc_alpha"); // 백테스트는 BTC Alpha 기준
 
           // 리스크 레벨에 따른 백테스트 파라미터
           const riskParams = {
