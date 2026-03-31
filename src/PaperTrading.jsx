@@ -120,9 +120,11 @@ const STRATEGY_PORTFOLIOS = (() => {
 const STRATEGY_MAP = {};
 ALL_STRATEGIES.forEach(s => { STRATEGY_MAP[s.name] = s; });
 
-function collectUSSymbols() {
+function collectUSSymbols(activeStrategies) {
   const syms = new Set();
-  for (const holdings of Object.values(STRATEGY_PORTFOLIOS)) {
+  for (const [name, holdings] of Object.entries(STRATEGY_PORTFOLIOS)) {
+    // activeStrategies가 주어지면 해당 전략의 종목만 수집
+    if (activeStrategies && !activeStrategies.includes(name)) continue;
     for (const { sym } of holdings) syms.add(sym);
   }
   return [...syms];
@@ -1060,6 +1062,56 @@ const _syncOnce = _parseSyncParam();
 
 // 메인 컴포넌트
 // ══════════════════════════════════════════════════════════════
+// ── 봇 프리셋 → 전략 세트 매핑 (AutoTrading에서 봇 선택 시 자동 적용) ──
+function getBotPresetSettings(presetId) {
+  if (!presetId) return null;
+  const allStrats = Object.keys(STRATEGY_PORTFOLIOS);
+  switch (presetId) {
+    case "stable-quant": return {
+      allocationPct: 3, maxPositions: 10, maxDrawdownPct: 5, maxDailyLossPct: 2,
+      maxSectorPct: 25, maxSinglePct: 5, stopLossATR: 1.5, takeProfitATR: 2.5,
+      useBracketOrders: true, minConfidence: 0.7, cooldownHours: 48, orderType: "market",
+      strategies: allStrats.filter(n => {
+        const cat = STRATEGY_CATEGORY_MAP[n] || "복합";
+        const conf = STRATEGY_CONFIDENCE[n] || 0.5;
+        return conf >= 0.65 && (cat === "복합" || cat === "평균회귀");
+      }),
+    };
+    case "balanced-quant": return {
+      allocationPct: 5, maxPositions: 20, maxDrawdownPct: 10, maxDailyLossPct: 3,
+      maxSectorPct: 35, maxSinglePct: 8, stopLossATR: 2, takeProfitATR: 3,
+      useBracketOrders: true, minConfidence: 0.5, cooldownHours: 24, orderType: "market",
+      strategies: allStrats.filter(n => {
+        const cat = STRATEGY_CATEGORY_MAP[n] || "복합";
+        const conf = STRATEGY_CONFIDENCE[n] || 0.5;
+        return conf >= 0.5 && cat !== "추세추종";
+      }),
+    };
+    case "aggressive-quant": return {
+      allocationPct: 8, maxPositions: 30, maxDrawdownPct: 15, maxDailyLossPct: 5,
+      maxSectorPct: 45, maxSinglePct: 12, stopLossATR: 2.5, takeProfitATR: 4,
+      useBracketOrders: true, minConfidence: 0.4, cooldownHours: 12, orderType: "market",
+      strategies: allStrats.filter(n => {
+        const cat = STRATEGY_CATEGORY_MAP[n] || "복합";
+        return cat === "추세추종" || cat === "모멘텀" || cat === "복합";
+      }),
+    };
+    case "trend-follow": return {
+      allocationPct: 5, maxPositions: 15, maxDrawdownPct: 12, maxDailyLossPct: 3,
+      maxSectorPct: 35, maxSinglePct: 10, stopLossATR: 2.5, takeProfitATR: 4,
+      useBracketOrders: true, minConfidence: 0.55, cooldownHours: 24, orderType: "market",
+      strategies: allStrats.filter(n => (STRATEGY_CATEGORY_MAP[n] || "복합") === "추세추종"),
+    };
+    case "mean-reversion": return {
+      allocationPct: 4, maxPositions: 15, maxDrawdownPct: 8, maxDailyLossPct: 2,
+      maxSectorPct: 30, maxSinglePct: 6, stopLossATR: 1.5, takeProfitATR: 2,
+      useBracketOrders: true, minConfidence: 0.6, cooldownHours: 36, orderType: "market",
+      strategies: allStrats.filter(n => (STRATEGY_CATEGORY_MAP[n] || "복합") === "평균회귀"),
+    };
+    default: return null;
+  }
+}
+
 export default function PaperTrading({ strategyAlerts = [], theme = "dark", user, botPreset, botAllocation, isMobile = false }) {
   // 유저별 localStorage 키 분리
   const userId = user?.id || null;
@@ -1100,21 +1152,26 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
   const [riskAlerts, setRiskAlerts] = useState([]);
   const [tradingHalted, setTradingHalted] = useState(() => load("di_trading_halted", false));
 
-  const [tradeSettings, setTradeSettings] = useState(() => load(KEYS.settings, {
-    orderType: "market",
-    allocationPct: 5,
-    maxPositions: 20,
-    maxDrawdownPct: 10,
-    maxDailyLossPct: 3,
-    maxSectorPct: 35,
-    maxSinglePct: 8,
-    stopLossATR: 2,
-    takeProfitATR: 3,
-    useBracketOrders: true,
-    minConfidence: 0.5,
-    cooldownHours: 24,
-    strategies: Object.keys(STRATEGY_PORTFOLIOS),
-  }));
+  // ── botPreset이 있으면 프리셋 설정 자동 적용, 없으면 localStorage 기본값 ──
+  const presetOverride = botPreset?.id ? getBotPresetSettings(botPreset.id) : null;
+  const [tradeSettings, setTradeSettings] = useState(() => {
+    if (presetOverride) return presetOverride;
+    return load(KEYS.settings, {
+      orderType: "market",
+      allocationPct: 5,
+      maxPositions: 20,
+      maxDrawdownPct: 10,
+      maxDailyLossPct: 3,
+      maxSectorPct: 35,
+      maxSinglePct: 8,
+      stopLossATR: 2,
+      takeProfitATR: 3,
+      useBracketOrders: true,
+      minConfidence: 0.5,
+      cooldownHours: 24,
+      strategies: Object.keys(STRATEGY_PORTFOLIOS),
+    });
+  });
 
   // 대기 주문 큐 (장 마감 시 스캔한 시그널을 저장, 장 시작 시 자동 실행)
   const [pendingOrders, setPendingOrders] = useState(() => load("di_queued_signals", []));
@@ -1289,7 +1346,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
     setScanning(true);
     setScanProgress(0);
     try {
-      const usSymbols = collectUSSymbols();
+      const usSymbols = collectUSSymbols(tradeSettings.strategies);
       const candleMap = await fetchCandleData(usSymbols, setScanProgress);
       const signals = detectSignals(candleMap);
       setDetectedSignals(signals);
@@ -1890,7 +1947,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
               <div>
                 <div style={{fontWeight:700,fontSize:"15px"}}>퀀트 전략 스캔</div>
                 <div style={{fontSize:"12px",color:C.text3,marginTop:"2px"}}>
-                  {Object.keys(STRATEGY_PORTFOLIOS).length}개 전략 · {collectUSSymbols().length}개 종목 · 신뢰도 {tradeSettings.minConfidence*100}%+ 필터
+                  {tradeSettings.strategies.length}개 전략 · {collectUSSymbols(tradeSettings.strategies).length}개 종목 · 신뢰도 {tradeSettings.minConfidence*100}%+ 필터
                 </div>
               </div>
               <button onClick={runQuantScan} disabled={scanning} style={{

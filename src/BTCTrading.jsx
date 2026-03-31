@@ -187,8 +187,13 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   const [btResult, setBtResult] = useState(null);
   const [marketDiag, setMarketDiag] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [autoMode, setAutoMode] = useState(load(KEYS.settings, { enabled: false, riskLevel: "medium" }).enabled);
-  const [riskLevel, setRiskLevel] = useState(load(KEYS.settings, { enabled: false, riskLevel: "medium" }).riskLevel);
+  // ── botPreset에 따라 riskLevel 자동 적용 ──
+  const presetRisk = botPreset?.id === "btc-alpha" ? "high"
+    : botPreset?.id === "crypto-diversity" ? "medium"
+    : botPreset?.id === "crypto-swing" ? "high"
+    : null;
+  const [autoMode, setAutoMode] = useState(presetRisk ? true : load(KEYS.settings, { enabled: false, riskLevel: "medium" }).enabled);
+  const [riskLevel, setRiskLevel] = useState(presetRisk || load(KEYS.settings, { enabled: false, riskLevel: "medium" }).riskLevel);
   const [tradeLog, setTradeLog] = useState(load(KEYS.log, []));
   const [btcCandles, setBtcCandles] = useState([]);
   const [subTab, setSubTab] = useState("overview");

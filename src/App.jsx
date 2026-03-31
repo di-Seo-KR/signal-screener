@@ -6471,13 +6471,26 @@ function AppInner() {
         /* 모바일 앱처럼 전체 화면 확대/축소 방지 */
         html, body { touch-action: manipulation; -ms-touch-action: manipulation; }
         * { -webkit-touch-callout: none; }
-        /* v3.8: 노치/다이나믹 아일랜드 대응 — header top + main padding 보정 */
-        @supports (padding: env(safe-area-inset-top)) {
-          header { top: env(safe-area-inset-top) !important; }
-          body { padding-bottom: env(safe-area-inset-bottom); }
-          main { padding-top: calc(68px + env(safe-area-inset-top)) !important; }
-          [style*="position: fixed"][style*="bottom: 0"] { padding-bottom: calc(4px + env(safe-area-inset-bottom)) !important; }
+        /* ── v4.0: 헤더 높이 CSS 변수 — 단일 소스로 모든 breakpoint 동기화 ── */
+        :root {
+          --header-h: 56px;
+          --header-gap: 16px;
+          --safe-top: 0px;
         }
+        @supports (padding: env(safe-area-inset-top)) {
+          :root { --safe-top: env(safe-area-inset-top); }
+        }
+        @media (max-width: 640px) {
+          :root { --header-h: 48px; --header-gap: 12px; }
+        }
+        @media (max-width: 380px) {
+          :root { --header-h: 48px; --header-gap: 10px; }
+        }
+        /* v3.8: 노치/다이나믹 아일랜드 대응 — header top + main padding 보정 */
+        header { top: var(--safe-top) !important; }
+        main { padding-top: calc(var(--header-h) + var(--header-gap) + var(--safe-top)) !important; }
+        body { padding-bottom: env(safe-area-inset-bottom, 0px); }
+        [style*="position: fixed"][style*="bottom: 0"] { padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)) !important; }
         @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
         @keyframes slideDown { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:translateY(0)} }
         /* ── 접근성: 포커스 표시, 터치 타깃 ── */
@@ -6546,7 +6559,7 @@ function AppInner() {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
           .lnb-sidebar { display: none !important; }
-          main { padding: 60px 14px 90px !important; font-size: 15px !important; }
+          main { padding-left: 14px !important; padding-right: 14px !important; padding-bottom: 90px !important; font-size: 15px !important; }
           .tab-content { font-size: 15px; padding-bottom: 80px !important; }
           button { min-height: 44px; }
           select { min-height: 44px; }
@@ -6580,7 +6593,7 @@ function AppInner() {
         }
         /* ── 매우 작은 화면 (≤380px) — 극저해상도 최적화 ── */
         @media (max-width: 380px) {
-          main { padding: 58px 10px 90px !important; }
+          main { padding-left: 10px !important; padding-right: 10px !important; padding-bottom: 90px !important; }
           .ui-card { padding: 12px !important; border-radius: 12px !important; }
           .ui-card-compact { padding: 10px !important; }
           .home-grid { gap: 12px !important; }
@@ -6591,7 +6604,7 @@ function AppInner() {
         }
         /* ── 태블릿 (641~899px) — 중간화면 최적화 ── */
         @media (min-width: 641px) and (max-width: 899px) {
-          main { padding: 68px 20px 80px !important; }
+          main { padding-left: 20px !important; padding-right: 20px !important; padding-bottom: 80px !important; }
           .desktop-nav { gap: 4px !important; overflow: visible !important; }
           .desktop-nav::-webkit-scrollbar { display: none; }
           .desktop-nav button { padding: 7px 10px !important; font-size: 12px !important; }
@@ -6602,9 +6615,9 @@ function AppInner() {
         }
         /* ── 데스크톱 중간 (900~1199px) — 두 컬럼 레이아웃 ── */
         @media (min-width: 900px) and (max-width: 1199px) {
-          main { padding: 68px 28px 32px !important; }
+          main { padding-left: 28px !important; padding-right: 28px !important; padding-bottom: 32px !important; }
           .home-grid { display: grid !important; grid-template-columns: 1fr 360px !important; gap: 20px !important; align-items: start !important; }
-          .home-right { position: sticky; top: 72px; max-height: calc(100vh - 88px); overflow-y: auto; overflow-x: hidden;
+          .home-right { position: sticky; top: calc(var(--header-h) + var(--header-gap) + var(--safe-top)); max-height: calc(100vh - var(--header-h) - var(--header-gap) - var(--safe-top) - 16px); overflow-y: auto; overflow-x: hidden;
             scrollbar-width: none; -ms-overflow-style: none; }
           .home-right::-webkit-scrollbar { display: none; }
           .ui-card { padding: 18px !important; }
@@ -6618,9 +6631,9 @@ function AppInner() {
           .di-app-body { flex-direction: column !important; }
           .di-main-wrap { margin-left: 0; flex: 1; width: 100%; }
           .di-main-wrap header { left: 0 !important; width: 100% !important; }
-          .di-main-wrap main { max-width: 1400px !important; padding: 68px 36px 36px !important; }
+          .di-main-wrap main { max-width: 1400px !important; padding-left: 36px !important; padding-right: 36px !important; padding-bottom: 36px !important; }
           .home-grid { display: grid !important; grid-template-columns: 1fr 400px !important; gap: 24px !important; align-items: start !important; }
-          .home-right { position: sticky; top: 76px; max-height: calc(100vh - 92px); overflow-y: auto; overflow-x: hidden;
+          .home-right { position: sticky; top: calc(var(--header-h) + var(--header-gap) + var(--safe-top)); max-height: calc(100vh - var(--header-h) - var(--header-gap) - var(--safe-top) - 16px); overflow-y: auto; overflow-x: hidden;
             scrollbar-width: none; -ms-overflow-style: none; }
           .home-right::-webkit-scrollbar { display: none; }
           .ui-card { padding: 20px !important; }
@@ -6629,7 +6642,7 @@ function AppInner() {
         }
         /* ── 초와이드 (≥1600px) — 최대 폭 레이아웃 ── */
         @media (min-width: 1600px) {
-          .di-main-wrap main { max-width: 1600px !important; padding: 68px 48px 40px !important; }
+          .di-main-wrap main { max-width: 1600px !important; padding-left: 48px !important; padding-right: 48px !important; padding-bottom: 40px !important; }
           .home-grid { grid-template-columns: 1fr 480px !important; gap: 28px !important; }
           .ui-card { padding: 22px !important; }
           .home-left { gap: 20px !important; }
@@ -7043,7 +7056,7 @@ function AppInner() {
         else if (tab === "news") await fetchNews();
         else window.location.reload();
       }}>
-      <main style={{ maxWidth: "1400px", margin: "0 auto", padding: "68px 28px 36px" }}>
+      <main style={{ maxWidth: "1400px", margin: "0 auto", padding: "28px", paddingBottom: "36px" }}>
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 홈 (토스 스타일 — 깔끔하고 정보 밀도 최적화)
