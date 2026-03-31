@@ -6661,7 +6661,7 @@ function AppInner() {
       {/* ── GNB 헤더 (로고 + 수평 네비게이션 + 우측 도구) ──────────────────────────────────────────────────── */}
       <header style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
-        background: `${C.bg}F8`, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+        background: C.bg, backdropFilter: "none", WebkitBackdropFilter: "none",
         borderBottom: `1px solid ${C.border}30`,
         overflow: "visible",
       }}>

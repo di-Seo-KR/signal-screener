@@ -1180,6 +1180,21 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
   const scanTimer = useRef(null);
   const isConnected = config.connected && config.apiKey;
 
+  // ── botPreset이 있으면 해당 봇 전략의 종목만 필터링 ──
+  const botSymbolSet = useMemo(() => {
+    if (!presetOverride) return null; // 프리셋 없으면 전체 표시
+    const syms = new Set();
+    for (const stratName of (presetOverride.strategies || [])) {
+      const holdings = STRATEGY_PORTFOLIOS[stratName];
+      if (holdings) holdings.forEach(h => syms.add(h.sym));
+    }
+    return syms;
+  }, [presetOverride]);
+  const filteredPositions = useMemo(() => {
+    if (!botSymbolSet) return positions; // 프리셋 없으면 전체
+    return positions.filter(p => botSymbolSet.has(p.symbol));
+  }, [positions, botSymbolSet]);
+
   // URL sync 정리 (카메라 앱 → 브라우저로 열렸을 때)
   useEffect(() => {
     if (_syncOnce) {
@@ -1621,7 +1636,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
   const dayPLPct = parseFloat(account?.last_equity) ? (fullDayPL / parseFloat(account.last_equity) * 100) : 0;
   const totalPL = equity - (botAllocation || 100000);
   const totalPLPct = botAllocation ? (totalPL / botAllocation * 100) : ((equity - 100000) / 100000 * 100);
-  const positionPL = positions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
+  const positionPL = filteredPositions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
   const openOrders = orders.filter(o => ["new","accepted","pending_new","partially_filled"].includes(o.status));
   const filledOrders = orders.filter(o => o.status === "filled");
   const marketOpen = clock?.is_open;
@@ -1638,7 +1653,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
         display: "flex", flexDirection: "column", gap: "0", position: "sticky", top: "0", maxHeight: "100vh", overflowY: "auto",
       }}>
         {[
-          { id: "dashboard", label: "포지션", count: positions.length },
+          { id: "dashboard", label: "포지션", count: filteredPositions.length },
           { id: "orders", label: "주문내역", count: orders.filter(o=>["new","partially_filled","accepted","pending_new"].includes(o.status)).length },
           { id: "signals", label: "시그널", count: detectedSignals.length },
           { id: "auto", label: "자동매매", count: null },
@@ -1834,20 +1849,20 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
 
         <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
           <div style={{fontWeight:700,marginBottom:"16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <span>보유 포지션 ({positions.length}/{tradeSettings.maxPositions})</span>
-            {positions.length>0&&(
+            <span>보유 포지션 ({filteredPositions.length}/{tradeSettings.maxPositions})</span>
+            {filteredPositions.length>0&&(
               <button onClick={async()=>{if(confirm("전체 청산?")){await alpacaAPI("close_all",config);setTimeout(refreshData,1000);}}}
                 style={{fontSize:"11px",color:C.red,background:"none",border:"none",cursor:"pointer"}}>전체 청산</button>
             )}
           </div>
-          {positions.length===0?(
+          {filteredPositions.length===0?(
             <div style={{textAlign:"center",padding:"40px 0",color:C.text3}}>
               <div style={{fontSize:"40px",marginBottom:"8px"}}>📭</div>
-              <div>보유 중인 포지션이 없습니다</div>
+              <div>{presetOverride ? "이 봇 전략에 해당하는 보유 종목이 없습니다" : "보유 중인 포지션이 없습니다"}</div>
             </div>
           ):(
             <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
-              {positions.map((p,i)=>{
+              {filteredPositions.map((p,i)=>{
                 const pl=parseFloat(p.unrealized_pl||0);
                 const plPct=parseFloat(p.unrealized_plpc||0)*100;
                 const mktVal=parseFloat(p.market_value||0);
@@ -2659,7 +2674,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
           {/* 섹터 분포 및 상관관계 위험 */}
           <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
             <div style={{fontWeight:700,fontSize:"15px",marginBottom:"12px"}}>🗂️ 섹터 분포</div>
-            {positions.length===0?(
+            {filteredPositions.length===0?(
               <div style={{textAlign:"center",padding:"20px 0",color:C.text3}}>포지션 없음</div>
             ):(
               <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
@@ -2680,13 +2695,13 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
           </div>
 
           {/* 상관관계 위험 히트맵 (색상 코드) */}
-          {positions.length > 1 && (
+          {filteredPositions.length > 1 && (
             <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
               <div style={{fontWeight:700,fontSize:"15px",marginBottom:"12px"}}>🔥 상관관계 위험 (섹터 중복)</div>
               <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:"8px"}}>
                 {Object.entries(rm.getSectorExposure()).sort((a,b)=>b[1]-a[1]).map(([sec,pct])=>{
                   // 같은 섹터의 포지션 개수로 상관위험 평가
-                  const sectorCount = positions.filter(p => (SECTOR_MAP[p.symbol] || "Other") === sec).length;
+                  const sectorCount = filteredPositions.filter(p => (SECTOR_MAP[p.symbol] || "Other") === sec).length;
                   const riskLevel = sectorCount > 3 ? "high" : sectorCount > 1 ? "medium" : "low";
                   const riskColor = riskLevel === "high" ? C.red : riskLevel === "medium" ? C.yellow : C.green;
                   return (
@@ -2798,7 +2813,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
           padding: "8px 0", zIndex: 100, maxHeight: "56px",
         }}>
           {[
-            { id: "dashboard", label: "포지션", count: positions.length },
+            { id: "dashboard", label: "포지션", count: filteredPositions.length },
             { id: "orders", label: "주문", count: orders.filter(o=>["new","partially_filled","accepted","pending_new"].includes(o.status)).length },
             { id: "signals", label: "시그널", count: detectedSignals.length },
             { id: "auto", label: "자동", count: null },
