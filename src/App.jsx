@@ -5812,6 +5812,15 @@ function AppInner() {
     }
   }, [scanning, conditions, mode, sortBy, settings]);
 
+  // ── 프리셋 선택 시 자동 스캔 ──────────────────────────
+  const prevPresetRef = useRef(null);
+  useEffect(() => {
+    if (activePreset && activePreset !== prevPresetRef.current && conditions.length > 0 && !scanning) {
+      runScan();
+    }
+    prevPresetRef.current = activePreset;
+  }, [activePreset, conditions, scanning, runScan]);
+
   // ── 자동 스캔 타이머 (30분 간격 등) ──────────────────────────
   const autoScanTimerRef = useRef(null);
   const [nextAutoScan, setNextAutoScan] = useState(null);
@@ -8073,6 +8082,34 @@ function AppInner() {
                   );
                 })}
               </div>
+
+              {/* ── 프리셋 선택 후 스캔 버튼 (프리셋 바로 아래) ── */}
+              {activePreset && (
+                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "12px", flexWrap: "wrap" }}>
+                  <button onClick={runScan} disabled={scanning || conditions.length === 0} style={{
+                    padding: "10px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
+                    background: scanning ? C.card2 : C.blue, color: scanning ? C.text3 : "#fff",
+                    border: "none", cursor: scanning ? "not-allowed" : "pointer", minWidth: "100px",
+                  }}>
+                    {scanning
+                      ? <span style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "center" }}>
+                          <span style={{ animation: "pulse 1s infinite" }}>⏳</span> {scanProgress.done}/{scanProgress.total}
+                        </span>
+                      : `🔍 스캔하기`}
+                  </button>
+                  {scanning && (
+                    <div style={{ flex: 1, minWidth: "80px" }}>
+                      <div style={{ height: "4px", background: C.border2, borderRadius: "2px", overflow: "hidden" }}>
+                        <div style={{ height: "100%", background: C.blue, borderRadius: "2px", width: `${scanProgress.total ? (scanProgress.done / scanProgress.total) * 100 : 0}%`, transition: "width .3s" }} />
+                      </div>
+                    </div>
+                  )}
+                  {lastScan && !scanning && (
+                    <span style={{ fontSize: "11px", color: C.text3 }}>마지막: {lastScan.toLocaleTimeString("ko-KR")}</span>
+                  )}
+                  <span style={{ fontSize: "12px", color: C.text3 }}>{conditions.length}개 조건 적용됨</span>
+                </div>
+              )}
             </div>
 
             {/* ── 직접 조건 설정 (접이식) ── */}
