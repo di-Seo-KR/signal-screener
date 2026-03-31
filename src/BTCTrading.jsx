@@ -277,7 +277,12 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
         setPrices(pm);
       }
 
-      const candles = await fetchCandles("BTC-USD", "1y");
+      // 멀티애셋 캔들 병렬 로딩 (BTC + ETH + SOL)
+      const [candles, ethCandles, solCandles] = await Promise.all([
+        fetchCandles("BTC-USD", "1y"),
+        fetchCandles("ETH-USD", "1y"),
+        fetchCandles("SOL-USD", "1y"),
+      ]);
       if (candles.length > 60) {
         setBtcCandles(candles);
 
@@ -288,8 +293,15 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
         setVolatilityRegime(regime);
 
         if (BTC_STRATEGY) {
-          const sigs = BTC_STRATEGY.generate(candles);
-          setSignals(sigs);
+          // BTC 시그널
+          const btcSigs = BTC_STRATEGY.generate(candles).map(s => ({ ...s, asset: "BTC-USD" }));
+          // ETH/SOL 시그널 (같은 전략 적용, 고변동 크립토에 범용 적합)
+          const ethSigs = ethCandles.length > 60 ? BTC_STRATEGY.generate(ethCandles).map(s => ({ ...s, asset: "ETH-USD" })) : [];
+          const solSigs = solCandles.length > 60 ? BTC_STRATEGY.generate(solCandles).map(s => ({ ...s, asset: "SOL-USD" })) : [];
+          // 전체 시그널 합산 (시간순 정렬)
+          const allSigs = [...btcSigs, ...ethSigs, ...solSigs].sort((a, b) => a.index - b.index);
+          setSignals(allSigs);
+          const sigs = btcSigs; // 백테스트는 BTC 기준
 
           // 리스크 레벨에 따른 백테스트 파라미터
           const riskParams = {
@@ -328,72 +340,78 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
     return () => clearInterval(timerRef.current);
   }, [loadData, connectAlpaca, isConnected]);
 
-  // ── Auto mode 시그널 처리 (멀티애셋 + 리스크 관리) ──
+  // ── Auto mode 시그널 처리 (멀티애셋 + 리스크 관리 v3) ──
   useEffect(() => {
     if (!autoMode || !alpacaConnected || !alpacaAccount || signals.length === 0) return;
 
     const now = Date.now();
     const decisions = [];
 
-    // 모든 자산에 대해 시그널 스코어링
+    // 변동성 레짐
     const btcPriceHistory = btcCandles.slice(-30).map(c => c.close).filter(c => c != null);
     const annualizedVol = riskManager.calculateVolatility(btcPriceHistory);
     const regime = riskManager.getVolatilityRegime(annualizedVol);
 
-    // 최신 시그널 평가
-    if (signals.length > 0) {
-      const latest = signals[signals.length - 1];
-      const latestDate = btcCandles[latest.index]?.time;
-      if (!latestDate) return;
+    // 최근 시그널 5개까지 평가 (멀티애셋 포함)
+    const recentSignals = signals.slice(-5);
 
-      const age = now / 1000 - latestDate;
-      // 최근 5일 이내 시그널만 자동 실행 (일봉 기준 허용 범위 확대)
-      if (age > 5 * 86400) return;
+    for (const sig of recentSignals) {
+      const asset = sig.asset || "BTC-USD";
+      // 캔들 인덱스 기반 시간 추정 (BTC 캔들 기준)
+      const sigDate = btcCandles[sig.index]?.time;
+      if (!sigDate) continue;
 
-      // 쿨다운 체크: 같은 심볼 6시간 내 재거래 방지
-      const lastTradeSym = tradeCooldowns["BTC-USD"];
-      if (lastTradeSym && now - lastTradeSym < 6 * 3600 * 1000) {
-        decisions.push({ symbol: "BTC-USD", action: "skip", reason: "6h 쿨다운 중" });
-        setLastAutoDecisions(decisions.slice(-5));
-        return;
+      const age = now / 1000 - sigDate;
+      if (age > 7 * 86400) continue;
+
+      // 쿨다운 체크: 동일 자산 4시간 내 재거래 방지
+      const lastTradeSym = tradeCooldowns[asset];
+      if (lastTradeSym && now - lastTradeSym < 4 * 3600 * 1000) {
+        decisions.push({ symbol: asset, action: "skip", reason: "4h 쿨다운 중" });
+        continue;
       }
 
-      // 이미 실행된 시그널인지 확인
-      const alreadyDone = tradeLog.some(l => l.auto && l.reason?.includes(latest.reason?.slice(0, 30)));
-      if (alreadyDone) {
-        decisions.push({ symbol: "BTC-USD", action: "skip", reason: "중복 시그널" });
-        setLastAutoDecisions(decisions.slice(-5));
-        return;
-      }
+      // 중복 체크: 동일 인덱스+자산 시그널만 스킵
+      const sigKey = `${asset}_${sig.type}_${sig.index}`;
+      const alreadyDone = tradeLog.some(l => l.auto && l._sigKey === sigKey);
+      if (alreadyDone) continue;
 
-      // Fear & Greed 체크
+      // Fear & Greed (BTC 기준 — 크립토 시장 전체 대표)
       const btcChange = prices["BTC-USD"]?.change24h || 0;
-      if (riskManager.shouldReduceForFearGreed(btcChange)) {
-        decisions.push({ symbol: "BTC-USD", action: "reduce", reason: `극단적 변화 ${btcChange.toFixed(1)}%` });
-      }
+      let fearGreedMult = 1.0;
+      if (Math.abs(btcChange) > 8) fearGreedMult = 0.3;
+      else if (Math.abs(btcChange) > 5) fearGreedMult = 0.5;
 
-      // 포지션 사이징 (Kelly + 변동성 조정)
+      // 포지션 사이징 (등급 + 변동성 + 자산 가중치 반영)
       const equity = parseFloat(alpacaAccount.equity || 0);
-      const baseSize = latest.positionSize || 0.5;
+      const assetInfo = BTC_ASSETS.find(a => a.sym === asset);
+      const assetWeight = assetInfo?.weight || 0.1;
+      const gradeBonus = sig.confidence === "A" ? 1.2 : sig.confidence === "B" ? 1.0 : 0.8;
+      const baseSize = (sig.positionSize || 0.5) * gradeBonus;
       const riskMult = { low: 0.5, medium: 0.7, high: 1.0 }[riskLevel] || 0.7;
 
-      // 드로우다운 기반 조정
       const maxDD = portfolioMetrics.drawdown || 0;
       const adjustedSize = riskManager.adjustPositionSize(baseSize, regime, maxDD);
-      const tradeAmount = Math.min(equity * adjustedSize * riskMult * 0.3, equity * 0.3); // 최대 30%
+      // 자산별 가중치 적용: BTC 40%, ETH 25%, SOL 15%
+      const tradeAmount = Math.min(equity * adjustedSize * riskMult * fearGreedMult * assetWeight, equity * 0.3);
 
-      if (latest.type === "BUY" && tradeAmount > 10) {
-        submitCryptoOrder("BTC-USD", "buy", tradeAmount.toFixed(2), latest.reason);
-        setTradeCooldowns(prev => ({ ...prev, "BTC-USD": now }));
-        decisions.push({ symbol: "BTC-USD", action: "BUY", amount: tradeAmount.toFixed(0), reason: latest.reason });
-      } else if (latest.type === "SELL") {
-        const btcPos = alpacaPositions.find(p => p.symbol === "BTC/USD" || p.symbol === "BTCUSD");
-        if (btcPos) {
-          const sellAmount = Math.min(parseFloat(btcPos.market_value || 0), tradeAmount);
+      if (sig.type === "BUY" && tradeAmount > 10) {
+        submitCryptoOrder(asset, "buy", tradeAmount.toFixed(2), `[${asset}] ${sig.reason}`);
+        setTradeCooldowns(prev => ({ ...prev, [asset]: now }));
+        const newLog = [{ ...tradeLog[0], _sigKey: sigKey }, ...tradeLog.slice(1)];
+        decisions.push({ symbol: asset, action: "BUY", amount: tradeAmount.toFixed(0), reason: sig.reason });
+        break;
+      } else if (sig.type === "SELL") {
+        const alpacaSym = assetInfo?.alpaca || asset.replace("-USD", "/USD");
+        const pos = alpacaPositions.find(p => p.symbol === alpacaSym || p.symbol === alpacaSym.replace("/", ""));
+        if (pos) {
+          const sellAmount = Math.min(parseFloat(pos.market_value || 0), tradeAmount);
           if (sellAmount > 10) {
-            submitCryptoOrder("BTC-USD", "sell", sellAmount.toFixed(2), latest.reason);
-            setTradeCooldowns(prev => ({ ...prev, "BTC-USD": now }));
-            decisions.push({ symbol: "BTC-USD", action: "SELL", amount: sellAmount.toFixed(0), reason: latest.reason });
+            submitCryptoOrder(asset, "sell", sellAmount.toFixed(2), `[${asset}] ${sig.reason}`);
+            setTradeCooldowns(prev => ({ ...prev, [asset]: now }));
+            const newLog = [{ ...tradeLog[0], _sigKey: sigKey }, ...tradeLog.slice(1)];
+            decisions.push({ symbol: "BTC-USD", action: "SELL", amount: sellAmount.toFixed(0), reason: sig.reason });
+            break;
           }
         }
       }

@@ -1,6 +1,11 @@
 // ════════════════════════════════════════════════════════════════════
-// Toit 퀀트 엔진 v3.9 — 하위전략 2차 안전필터 강화 (2026-03-30)
+// Toit 퀀트 엔진 v4.0 — 오전 전략 파라미터 최적화 (2026-03-31)
 // 33개 매매전략 + 백테스팅 엔진 + 시장진단 + 전략추천
+// v4.0: 3/31 오전 전략 업데이트
+//   - RSI 반전: 기본 임계값 27/73→26/74 + 거래량 확인 0.7→0.65 완화
+//   - BTC 알파: 패닉 RSI 15→18 (극단 진입 방지) + 거래량 서지 1.8→1.6
+//   - 백테스트 엔진: ATR 기반 변동성 적응 포지션 사이징 + 월별 수익률 계산 수정
+//   - 백테스트 엔진: 승리/패배 거래별 평균 보유기간 + 연간화 변동성 메트릭 추가
 // v3.9: 3/30 백테스트 결과 기반 하위전략 2차 강화
 //   - 일목균형표: ADX 최소 25로 상향 + MA200 방향 필터 + RSI 하한 40
 //   - 스토캐스틱+RSI: MA200 하락추세 시 임계값 보수적 조정(30→25/20→15) + RSI 기울기 확인
@@ -258,9 +263,9 @@ export const strategyRSI = {
   category: "평균회귀",
   risk: "중",
   icon: "📉",
-  params: { period: 14, buyThreshold: 27, sellThreshold: 73 },
+  params: { period: 14, buyThreshold: 26, sellThreshold: 74 }, // v4.0: 27/73→26/74 시그널 품질 향상
   generate(candles, params = {}) {
-    const { period = 14, buyThreshold = 27, sellThreshold = 73 } = { ...this.params, ...params };
+    const { period = 14, buyThreshold = 26, sellThreshold = 74 } = { ...this.params, ...params };
     const closes = candles.map(c => c.close);
     const highs = candles.map(c => c.high);
     const lows = candles.map(c => c.low);
@@ -288,7 +293,7 @@ export const strategyRSI = {
       const adjBuy = regimeBuy + volAdj;
       const adjSell = regimeSell - volAdj;
       if (rsi[i] <= adjBuy && rsi[i - 1] > adjBuy) {
-        if (!isVolumeConfirmed(candles, i, 20, 0.7)) continue; // v3.6: 0.8→0.7 완화
+        if (!isVolumeConfirmed(candles, i, 20, 0.65)) continue; // v4.0: 0.7→0.65 완화 (더 많은 시그널 포착)
         const trend = getTrendDirection(closes, i);
         if (trend === "down" && rsi[i] > 20) continue;
         // v3.5: 연속 하락봉 후 반전봉 확인
@@ -351,7 +356,8 @@ export const strategyBB = {
         const div = detectBullishDivergence(closes, rsi14, i);
         // v3.9: 종가 이탈 기준을 ATR 비례로 조정 (고변동: 완화, 저변동: 엄격)
         const penetration = bb[i].lower > 0 ? ((bb[i].lower - closes[i]) / bb[i].lower) * 100 : 0;
-        const dynPenThreshold = Math.max(0.1, Math.min(0.5, atrPct * 0.15));
+        const localAtrPct = bb[i].bw || 1.5; // BB bandwidth를 ATR 프록시로 활용
+        const dynPenThreshold = Math.max(0.1, Math.min(0.5, localAtrPct * 0.15));
         if (penetration < dynPenThreshold && !rsiOversold) continue;
         // v3.8: MA200 추세 필터 — 가격이 MA200 아래이면 하락추세로 간주, 다이버전스 필수
         const belowMA200 = ma200[i] != null && closes[i] < ma200[i];
@@ -1800,10 +1806,10 @@ export const strategyBTCAlpha = {
     emaFast: 21,
     emaSlow: 55,
     emaLong: 200,
-    volSurge: 1.8,
+    volSurge: 1.6,  // v4.0: 1.8→1.6 BTC 거래량 정규화 반영
     adxThreshold: 20,
     squeezeLen: 6,
-    cooldown: 3,        // 연속 시그널 방지: 최소 3봉
+    cooldown: 2,        // 연속 시그널 방지: 최소 2봉
     momentumBars: 3,    // 모멘텀 연속성 확인 봉 수
   },
   generate(candles, params = {}) {
@@ -1850,7 +1856,7 @@ export const strategyBTCAlpha = {
     // 패닉 레짐(ATR% > 6): RSI < 15 = 극단적 매수신호
     function getAdaptiveRSI(i) {
       const atrPct = atr[i] && closes[i] > 0 ? (atr[i] / closes[i]) * 100 : 2;
-      if (atrPct > 6) return { buy: 15, sell: 85, isPanic: true };  // 패닉(초극고변동)
+      if (atrPct > 6) return { buy: 18, sell: 82, isPanic: true };  // v4.0: 패닉 15→18 (너무 극단적 진입 방지)
       if (atrPct > 5) return { buy: 20, sell: 80 };                  // 초고변동
       if (atrPct > 3) return { buy: 25, sell: 75 };                  // 고변동
       if (atrPct > 1.5) return { buy: 28, sell: 72 };                // 보통
@@ -1979,12 +1985,18 @@ export const strategyBTCAlpha = {
       } else if (rsiBounce) {
         buyScore += 3; buyFactors++;
         buyReasons.push(`RSI ${rsi[i].toFixed(1)} < ${rsiBuyTh} 탈출`);
+      } else if (rsi[i] <= rsiBuyTh + 5 && rsi[i] > rsi[i - 1]) {
+        buyScore += 2; buyFactors++;
+        buyReasons.push(`RSI ${rsi[i].toFixed(1)} 과매도근접 반등`);
       }
 
-      // B) BB 하단 바운스
+      // B) BB 하단 바운스 또는 하단 근접
       if (bbBounce) {
         buyScore += 2; buyFactors++;
         buyReasons.push("BB(2.5σ) 하단 반등");
+      } else if (bb[i] && price <= bb[i].lower * 1.01) {
+        buyScore += 1; buyFactors++;
+        buyReasons.push("BB 하단 근접");
       }
 
       // C) 거래량 서지 + 양봉
@@ -1993,27 +2005,34 @@ export const strategyBTCAlpha = {
         buyReasons.push(`Vol ${(curVol / volAvg).toFixed(1)}x 폭증`);
       }
 
-      // D) OBV 상향돌파 (스마트머니 유입)
+      // D) OBV 상향돌파 또는 지속 상승 (스마트머니 유입)
       if (obvRising) {
         buyScore += 2; buyFactors++;
         buyReasons.push("OBV 스마트머니 유입");
+      } else if (obv[i] > obvEma[i] && obv[i] > obv[i - 1]) {
+        buyScore += 1; buyFactors++;
+        buyReasons.push("OBV 상승 지속");
       }
 
-      // E) MACD 골든크로스 또는 가속
+      // E) MACD 골든크로스 또는 가속 또는 양전환
       if (macdCrossUp) {
         buyScore += 2; buyFactors++;
         buyReasons.push("MACD 골든크로스");
       } else if (macdAccelUp && histogram[i] > 0) {
         buyScore += 1; buyFactors++;
         buyReasons.push("MACD 가속↑");
+      } else if (histogram[i] > 0 && histogram[i] > histogram[i - 1]) {
+        buyScore += 1; buyFactors++;
+        buyReasons.push("MACD 히스토그램 확대↑");
       }
 
-      // F) EMA 정배열 크로스
+      // F) EMA 정배열 크로스 또는 정배열 유지
       if (emaCrossUp) {
         buyScore += 3; buyFactors++;
         buyReasons.push("EMA21/55 골든크로스");
       } else if (trendUp) {
-        buyScore += 1;
+        buyScore += 1; buyFactors++;
+        buyReasons.push("EMA 정배열");
       }
 
       // G) EMA200 장기 추세 보너스
@@ -2073,8 +2092,7 @@ export const strategyBTCAlpha = {
         buyReasons.push("모멘텀 연속성 +1");
       }
 
-      // ── 매수 조건: 스코어 4+ AND 팩터 2개+ (완화된 임계값) ──
-      // EMA200 필터: 가격 < EMA200 시 감소는 아니지만 보너스 미부여
+      // ── 매수 조건: 스코어 3+ AND 팩터 2개+ ──
       let ema200Note = "";
       if (longTrendUp) {
         buyScore += 1;
@@ -2082,8 +2100,8 @@ export const strategyBTCAlpha = {
         ema200Note = " [장기추세↓ 주의]";
       }
 
-      if (buyScore >= 4 && buyFactors >= 2) {
-        const grade = buyScore >= 9 ? "A" : buyScore >= 7 ? "B" : "C";
+      if (buyScore >= 3 && buyFactors >= 2) {
+        const grade = buyScore >= 8 ? "A" : buyScore >= 5 ? "B" : "C";
         lastSignalIdx = i;
         signals.push({
           index: i, type: "BUY", price,
@@ -2101,33 +2119,43 @@ export const strategyBTCAlpha = {
       const sellReasons = [];
       let sellFactors = 0;
 
-      // A) RSI 과매수 탈출
+      // A) RSI 과매수 영역
       if (rsiDrop) {
         sellScore += 3; sellFactors++;
         sellReasons.push(`RSI ${rsi[i].toFixed(1)} > ${rsiSellTh} 탈출`);
+      } else if (rsi[i] >= rsiSellTh - 5 && rsi[i] < rsi[i - 1]) {
+        sellScore += 2; sellFactors++;
+        sellReasons.push(`RSI ${rsi[i].toFixed(1)} 과매수근접 하락`);
       }
 
-      // B) BB 상단 거부
+      // B) BB 상단 거부 또는 상단 근접
       if (bbReject) {
         sellScore += 2; sellFactors++;
         sellReasons.push("BB 상단 거부");
+      } else if (bb[i] && price >= bb[i].upper * 0.99) {
+        sellScore += 1; sellFactors++;
+        sellReasons.push("BB 상단 근접");
       }
 
-      // C) MACD 데드크로스
+      // C) MACD 데드크로스 또는 악화
       if (macdCrossDown) {
         sellScore += 2; sellFactors++;
         sellReasons.push("MACD 데드크로스");
       } else if (macdAccelDown && histogram[i] < 0) {
         sellScore += 1; sellFactors++;
         sellReasons.push("MACD 가속↓");
+      } else if (histogram[i] < 0 && histogram[i] < histogram[i - 1]) {
+        sellScore += 1; sellFactors++;
+        sellReasons.push("MACD 히스토그램 확대↓");
       }
 
-      // D) EMA 데드크로스
+      // D) EMA 역배열 크로스 또는 역배열 유지
       if (emaCrossDown) {
         sellScore += 3; sellFactors++;
         sellReasons.push("EMA21/55 데드크로스");
       } else if (trendDown) {
-        sellScore += 1;
+        sellScore += 1; sellFactors++;
+        sellReasons.push("EMA 역배열");
       }
 
       // E) EMA200 하회 (장기 추세 전환)
@@ -2142,10 +2170,13 @@ export const strategyBTCAlpha = {
         sellReasons.push("RSI 약세 다이버전스");
       }
 
-      // G) OBV 하락전환 (스마트머니 이탈)
+      // G) OBV 하락전환 또는 지속 하락
       if (obvFalling) {
         sellScore += 2; sellFactors++;
         sellReasons.push("OBV 스마트머니 이탈");
+      } else if (obv[i] < obvEma[i] && obv[i] < obv[i - 1]) {
+        sellScore += 1; sellFactors++;
+        sellReasons.push("OBV 하락 지속");
       }
 
       // H) 거래량 폭증 + 음봉
@@ -2178,9 +2209,9 @@ export const strategyBTCAlpha = {
         sellReasons.push("주봉추세↓");
       }
 
-      // ── 매도 조건: 스코어 4+ AND 팩터 2개+ (완화된 임계값) ──
-      if (sellScore >= 4 && sellFactors >= 2) {
-        const grade = sellScore >= 9 ? "A" : sellScore >= 7 ? "B" : "C";
+      // ── 매도 조건: 스코어 3+ AND 팩터 2개+ ──
+      if (sellScore >= 3 && sellFactors >= 2) {
+        const grade = sellScore >= 8 ? "A" : sellScore >= 5 ? "B" : "C";
         lastSignalIdx = i;
         signals.push({
           index: i, type: "SELL", price,
@@ -2252,6 +2283,7 @@ export function runBacktest(candles, signals, options = {}) {
     riskAdaptive = true, // v3.6: 연속 손실 시 포지션 축소
     maxDrawdownLimit = null, // v3.7: 최대 낙폭 서킷브레이커 (%, null이면 비활성)
     volScaledSlippage = true, // v3.7: 변동성 비례 슬리피지 자동 조정
+    volScaledSizing = true, // v4.0: ATR 기반 변동성 적응 포지션 사이징
   } = options;
 
   let capital = initialCapital;
@@ -2288,6 +2320,24 @@ export function runBacktest(candles, signals, options = {}) {
     const atrPct = (atrSum / lookback) / candles[idx].close;
     // 기본 슬리피지 * (1 + ATR비율/2): ATR 3%이면 슬리피지 ~2.5배
     return slippage * (1 + atrPct * 50);
+  }
+
+  // v4.0: ATR 기반 변동성 적응 포지션 사이징 — 고변동 시 축소, 저변동 시 확대
+  function getVolSizingFactor(idx) {
+    if (!volScaledSizing) return 1.0;
+    const lookback = Math.min(14, idx);
+    if (lookback < 2) return 1.0;
+    let atrSum = 0;
+    for (let j = idx - lookback + 1; j <= idx; j++) {
+      const tr = Math.max(candles[j].high - candles[j].low,
+        Math.abs(candles[j].high - candles[j - 1].close),
+        Math.abs(candles[j].low - candles[j - 1].close));
+      atrSum += tr;
+    }
+    const atrPct = (atrSum / lookback) / candles[idx].close * 100;
+    // 타겟 변동성 2%: ATR 2%이면 1.0, ATR 4%이면 0.5, ATR 1%이면 1.5 (최대 1.5배)
+    const targetVol = 2.0;
+    return Math.max(0.25, Math.min(1.5, targetVol / Math.max(atrPct, 0.5)));
   }
 
   // 시그널을 인덱스 순으로 정렬
@@ -2384,9 +2434,10 @@ export function runBacktest(candles, signals, options = {}) {
       if (sig.type === "BUY" && position === 0 && lastAction !== "BUY" && circuitScale > 0) {
         const adaptiveSlip = getAdaptiveSlippage(i);
         const buyPrice = sig.price * (1 + adaptiveSlip);
-        // v3.9: 리스크 적응 포지션 사이징 — 연속 손실 + 서킷스케일 반영
+        // v4.0: 리스크 적응 포지션 사이징 — 연속 손실 + 서킷스케일 + 변동성 적응
         const riskFactor = (riskAdaptive && consecLosses >= 3) ? 0.5 : 1.0;
-        const investAmount = capital * positionSize * riskFactor * circuitScale;
+        const volFactor = getVolSizingFactor(i);
+        const investAmount = capital * positionSize * riskFactor * circuitScale * volFactor;
         const comm = investAmount * commission;
         position = (investAmount - comm) / buyPrice;
         entryPrice = buyPrice;
@@ -2520,27 +2571,37 @@ export function runBacktest(candles, signals, options = {}) {
   const avgMFE = sellTradesWithMAE.length > 0 ? sellTradesWithMAE.reduce((a, t) => a + t.mfe, 0) / sellTradesWithMAE.length : 0;
   const avgHoldBars = sellTradesWithMAE.length > 0 ? Math.round(sellTradesWithMAE.reduce((a, t) => a + (t.holdBars || 0), 0) / sellTradesWithMAE.length) : 0;
 
-  // v3.5: 월별 수익률 — 시계열 성과 분석
+  // v4.0: 승리/패배 거래별 평균 보유 기간 분리 — 거래 효율성 심화 분석
+  const avgWinHoldBars = winTrades.length > 0 ? Math.round(winTrades.reduce((a, t) => a + (t.holdBars || 0), 0) / winTrades.length) : 0;
+  const avgLossHoldBars = loseTrades.length > 0 ? Math.round(loseTrades.reduce((a, t) => a + (t.holdBars || 0), 0) / loseTrades.length) : 0;
+
+  // v4.0: 연간화 변동성 — 일별 수익률 표준편차 × √252
+  const dailyReturns = [];
+  for (let i = 1; i < equity.length; i++) {
+    if (equity[i].value > 0 && equity[i - 1].value > 0) {
+      dailyReturns.push(equity[i].value / equity[i - 1].value - 1);
+    }
+  }
+  const annualizedVol = dailyReturns.length > 1
+    ? +(Math.sqrt(dailyReturns.reduce((a, r) => a + (r - dailyReturns.reduce((s, v) => s + v, 0) / dailyReturns.length) ** 2, 0) / (dailyReturns.length - 1)) * Math.sqrt(252) * 100).toFixed(2)
+    : 0;
+
+  // v4.0: 월별 수익률 — 개선된 시계열 성과 분석 (각 월의 마지막 equity 값 사용)
   const monthlyReturns = {};
   if (equity.length > 0) {
-    let prevMonthEq = initialCapital;
-    let prevMonth = null;
+    // 각 월의 마지막 equity 값을 수집
+    const monthEndEquity = {};
     for (const eq of equity) {
       if (!eq.time) continue;
       const d = new Date(eq.time * 1000);
       const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-      if (prevMonth && monthKey !== prevMonth) {
-        monthlyReturns[prevMonth] = +((equity.find(e => {
-          const ed = new Date(e.time * 1000);
-          return `${ed.getFullYear()}-${String(ed.getMonth() + 1).padStart(2, "0")}` === prevMonth;
-        })?.value || prevMonthEq) / prevMonthEq * 100 - 100).toFixed(2);
-      }
-      prevMonth = monthKey;
-      if (!monthlyReturns[monthKey]) prevMonthEq = eq.value;
+      monthEndEquity[monthKey] = eq.value; // 마지막 값이 덮어씌워짐 → 월말 equity
     }
-    // 마지막 달
-    if (prevMonth && equity.length > 0) {
-      monthlyReturns[prevMonth] = +((equity[equity.length - 1].value / prevMonthEq) * 100 - 100).toFixed(2);
+    const monthKeys = Object.keys(monthEndEquity).sort();
+    let prevEq = initialCapital;
+    for (const mk of monthKeys) {
+      monthlyReturns[mk] = +((monthEndEquity[mk] / prevEq) * 100 - 100).toFixed(2);
+      prevEq = monthEndEquity[mk];
     }
   }
 
@@ -2569,6 +2630,9 @@ export function runBacktest(candles, signals, options = {}) {
     avgMAE: +avgMAE.toFixed(2),                // v3.5
     avgMFE: +avgMFE.toFixed(2),                // v3.5
     avgHoldBars,                                // v3.5
+    avgWinHoldBars,                             // v4.0
+    avgLossHoldBars,                            // v4.0
+    annualizedVol,                              // v4.0
     maxConsecLoss,
     maxConsecWin,
     alpha: +alpha.toFixed(2),
@@ -2601,7 +2665,7 @@ export function runBacktest(candles, signals, options = {}) {
         sumSqDD += dd * dd;
       }
       const ui = Math.sqrt(sumSqDD / equity.length);
-      return ui > 0 ? +((totalReturnPct - buyHoldReturnPct) / ui).toFixed(2) : 0;
+      return ui > 0 ? +((totalReturn - bhReturn) / ui).toFixed(2) : 0;
     })(),
     trades,
     equity,
