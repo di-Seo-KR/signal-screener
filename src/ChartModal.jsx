@@ -1052,18 +1052,101 @@ function runDiagnosis(candles) {
     }
   }
 
-  // ── 리스크/리워드 분석 & 손절/익절 레벨 ──
+  // ── 파라볼릭 SAR 근사 (추세 반전 감지) ──
+  const parabolicSAR = (() => {
+    if (n < 30) return null;
+    let af = 0.02, maxAf = 0.20;
+    let isUpTrend = closes[n - 30] < closes[n - 15]; // 초기 추세 판단
+    let sar = isUpTrend ? Math.min(...lows.slice(n - 30, n - 25)) : Math.max(...highs.slice(n - 30, n - 25));
+    let ep = isUpTrend ? Math.max(...highs.slice(n - 30, n - 25)) : Math.min(...lows.slice(n - 30, n - 25));
+
+    for (let i = n - 25; i < n; i++) {
+      const prevSar = sar;
+      sar = sar + af * (ep - sar);
+      if (isUpTrend) {
+        sar = Math.min(sar, lows[i - 1], i >= 2 ? lows[i - 2] : lows[i - 1]);
+        if (lows[i] < sar) { isUpTrend = false; sar = ep; ep = lows[i]; af = 0.02; }
+        else { if (highs[i] > ep) { ep = highs[i]; af = Math.min(af + 0.02, maxAf); } }
+      } else {
+        sar = Math.max(sar, highs[i - 1], i >= 2 ? highs[i - 2] : highs[i - 1]);
+        if (highs[i] > sar) { isUpTrend = true; sar = ep; ep = highs[i]; af = 0.02; }
+        else { if (lows[i] < ep) { ep = lows[i]; af = Math.min(af + 0.02, maxAf); } }
+      }
+    }
+    return { sar, isUpTrend, distance: ((last - sar) / last) * 100 };
+  })();
+  if (parabolicSAR) {
+    if (parabolicSAR.isUpTrend && parabolicSAR.distance > 0 && parabolicSAR.distance < 2) {
+      signals.push({ type: "neutral", name: `SAR 상승추세 근접 ($${parabolicSAR.sar.toFixed(2)})`, detail: `파라볼릭 SAR과 ${parabolicSAR.distance.toFixed(1)}% 간격 — 추세 전환 근접 주의` });
+    } else if (!parabolicSAR.isUpTrend && parabolicSAR.distance < 0 && Math.abs(parabolicSAR.distance) < 2) {
+      signals.push({ type: "neutral", name: `SAR 하락추세 근접 ($${parabolicSAR.sar.toFixed(2)})`, detail: `파라볼릭 SAR과 ${Math.abs(parabolicSAR.distance).toFixed(1)}% 간격 — 반등 전환 가능` });
+    }
+    if (parabolicSAR.isUpTrend) trendScore = Math.min(100, trendScore + 2);
+    else trendScore = Math.max(0, trendScore - 2);
+  }
+
+  // ── 변동성 수축→확장 전환 감지 (Squeeze Momentum) ──
+  if (bb && n >= 30) {
+    const bbWidths = [];
+    for (let i = n - 20; i < n; i++) {
+      const bbAt = calcBB(closes.slice(0, i + 1), 20, 2);
+      if (bbAt.length > 0) {
+        const b = bbAt[bbAt.length - 1];
+        bbWidths.push(b.middle > 0 ? (b.upper - b.lower) / b.middle : 0);
+      }
+    }
+    if (bbWidths.length >= 10) {
+      const recentWidth = bbWidths.slice(-3).reduce((a, b) => a + b, 0) / 3;
+      const priorWidth = bbWidths.slice(0, 5).reduce((a, b) => a + b, 0) / 5;
+      if (recentWidth > priorWidth * 1.5 && priorWidth < 0.06) {
+        const expandDir = change5 > 0 ? "상방" : change5 < 0 ? "하방" : "미정";
+        signals.push({ type: "neutral", name: `스퀴즈 → 확장 돌파 (${expandDir})`, detail: `BB 폭 ${(priorWidth * 100).toFixed(1)}% → ${(recentWidth * 100).toFixed(1)}% 급확장 — 변동성 폭발 진행 중` });
+        if (expandDir === "상방") { momScore = Math.min(100, momScore + 4); }
+        else if (expandDir === "하방") { momScore = Math.max(0, momScore - 4); }
+      }
+    }
+  }
+
+  // ── 스마트머니 복합 지표 (CMF + OBV + 거래량 동시 확인) ──
+  if (cmf != null && obvTrend && volRatio > 0) {
+    const smartBull = cmf > 0.05 && obvTrend === "up" && volRatio > 1.2;
+    const smartBear = cmf < -0.05 && obvTrend === "down" && volRatio > 1.2;
+    if (smartBull && change20 < -3) {
+      supScore = Math.min(100, supScore + 7);
+      signals.push({ type: "bullish", name: "스마트머니 매집 감지", detail: `CMF(${cmf.toFixed(2)}) + OBV↑ + 거래량↑ — 하락 중 기관 매집 가능성` });
+    } else if (smartBear && change20 > 3) {
+      supScore = Math.max(0, supScore - 7);
+      signals.push({ type: "bearish", name: "스마트머니 이탈 감지", detail: `CMF(${cmf.toFixed(2)}) + OBV↓ + 거래량↑ — 상승 중 기관 이탈 가능성` });
+    }
+  }
+
+  // ── 리스크/리워드 분석 & 손절/익절 레벨 (ATR 다중 배수 + SAR 참조) ──
   const riskReward = (() => {
-    const stopLoss = nearestSupport
-      ? nearestSupport * 0.99  // 지지선 1% 아래
-      : (atr ? last - atr * 2 : last * 0.95);
-    const takeProfit = nearestResist
-      ? nearestResist * 0.99  // 저항선 1% 아래
-      : (atr ? last + atr * 3 : last * 1.10);
+    // 손절: SAR, 지지선, ATR 2배 중 가장 타이트한 값
+    const candidates = [];
+    if (nearestSupport) candidates.push(nearestSupport * 0.99);
+    if (atr) candidates.push(last - atr * 2);
+    if (parabolicSAR && parabolicSAR.isUpTrend) candidates.push(parabolicSAR.sar * 0.995);
+    const stopLoss = candidates.length > 0 ? Math.max(...candidates.filter(c => c < last)) : last * 0.95;
+
+    // 익절: 저항선, ATR 3배, 피보나치 레벨 중 최적
+    const tpCandidates = [];
+    if (nearestResist) tpCandidates.push(nearestResist * 0.99);
+    if (atr) tpCandidates.push(last + atr * 3);
+    if (fibonacci && fibonacci.levels) {
+      const aboveLevels = Object.values(fibonacci.levels).filter(p => p > last * 1.02);
+      if (aboveLevels.length > 0) tpCandidates.push(Math.min(...aboveLevels));
+    }
+    const takeProfit = tpCandidates.length > 0 ? Math.min(...tpCandidates.filter(c => c > last)) : last * 1.10;
+
     const risk = last - stopLoss;
     const reward = takeProfit - last;
     const ratio = risk > 0 ? reward / risk : 0;
-    return { stopLoss, takeProfit, riskPct: (risk / last * 100), rewardPct: (reward / last * 100), ratio };
+    // 켈리 기준 포지션 크기 근사 (승률을 totalScore 기반 추정)
+    const winProb = Math.min(0.75, Math.max(0.25, totalScore / 100));
+    const kelly = ratio > 0 ? Math.max(0, (winProb * ratio - (1 - winProb)) / ratio) : 0;
+    const positionPct = Math.min(25, Math.round(kelly * 100 * 0.5)); // Half-Kelly (보수적)
+    return { stopLoss, takeProfit, riskPct: (risk / last * 100), rewardPct: (reward / last * 100), ratio, kelly, positionPct };
   })();
 
   // ── 종합 리스크 등급 ──
@@ -1104,6 +1187,7 @@ function runDiagnosis(candles) {
     maConvergence,
     ichimoku, fibonacci,
     cmf, dmi, keltner,
+    parabolicSAR,
     riskReward,
     riskLevel,
     trendConfidence,

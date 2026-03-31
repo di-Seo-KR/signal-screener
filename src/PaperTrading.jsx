@@ -2051,20 +2051,34 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
             <div style={{display:"flex",gap:"8px"}}>
               {[
                 { id:"conservative", label:"안정형", icon:"🛡️", color:C.blue, bg:C.blueBg,
-                  desc:"소액·저위험·높은 신뢰도만",
+                  desc:"대형 우량주·저위험·검증 전략만",
                   s:{allocationPct:3,maxPositions:10,maxDrawdownPct:5,maxDailyLossPct:2,maxSectorPct:25,maxSinglePct:5,
                     stopLossATR:1.5,takeProfitATR:2.5,useBracketOrders:true,minConfidence:0.7,cooldownHours:48,orderType:"market",
-                    strategies:Object.keys(STRATEGY_PORTFOLIOS).filter(n=>(STRATEGY_CONFIDENCE[n]||0)>=0.7)}},
+                    strategies:Object.keys(STRATEGY_PORTFOLIOS).filter(n=>{
+                      const cat = STRATEGY_CATEGORY_MAP[n] || "복합";
+                      const conf = STRATEGY_CONFIDENCE[n] || 0.5;
+                      // 안정형: 복합·평균회귀 전략 + 신뢰도 0.65 이상
+                      return conf >= 0.65 && (cat === "복합" || cat === "평균회귀");
+                    })}},
                 { id:"balanced", label:"균형형", icon:"⚖️", color:C.green, bg:C.greenBg,
-                  desc:"적정 리스크·다양한 전략",
+                  desc:"분산 투자·추세+회귀 혼합",
                   s:{allocationPct:5,maxPositions:20,maxDrawdownPct:10,maxDailyLossPct:3,maxSectorPct:35,maxSinglePct:8,
                     stopLossATR:2,takeProfitATR:3,useBracketOrders:true,minConfidence:0.5,cooldownHours:24,orderType:"market",
-                    strategies:Object.keys(STRATEGY_PORTFOLIOS)}},
+                    strategies:Object.keys(STRATEGY_PORTFOLIOS).filter(n=>{
+                      const cat = STRATEGY_CATEGORY_MAP[n] || "복합";
+                      const conf = STRATEGY_CONFIDENCE[n] || 0.5;
+                      // 균형형: 추세추종 제외, 복합·평균회귀·모멘텀·패턴 + 신뢰도 0.5 이상
+                      return conf >= 0.5 && cat !== "추세추종";
+                    })}},
                 { id:"aggressive", label:"공격형", icon:"🔥", color:C.orange, bg:C.orangeBg,
-                  desc:"고비중·전략 전체·빠른 회전",
+                  desc:"고변동 종목·추세+모멘텀 집중",
                   s:{allocationPct:8,maxPositions:30,maxDrawdownPct:15,maxDailyLossPct:5,maxSectorPct:45,maxSinglePct:12,
                     stopLossATR:2.5,takeProfitATR:4,useBracketOrders:true,minConfidence:0.4,cooldownHours:12,orderType:"market",
-                    strategies:Object.keys(STRATEGY_PORTFOLIOS)}},
+                    strategies:Object.keys(STRATEGY_PORTFOLIOS).filter(n=>{
+                      const cat = STRATEGY_CATEGORY_MAP[n] || "복합";
+                      // 공격형: 추세추종·모멘텀·알파 전략 위주 (평균회귀 제외)
+                      return cat === "추세추종" || cat === "모멘텀" || cat === "복합";
+                    })}},
               ].map(p=>{
                 // 현재 설정이 이 프리셋과 일치하는지 체크
                 const match = tradeSettings.allocationPct===p.s.allocationPct

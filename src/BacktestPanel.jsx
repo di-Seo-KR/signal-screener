@@ -1,4 +1,4 @@
-// Toit — 백테스트 패널 v3.9
+// Toit — 백테스트 패널 v4.0
 // 전략 선택 → 데이터 로드 → 백테스트 실행 → 성과 시각화
 // v3.5: MAE/MFE + Expectancy + Recovery Factor + 평균 보유기간 표시
 import { useState, useCallback, useRef, useEffect } from "react";
@@ -414,7 +414,10 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
               <MetricCard label="평균 MFE" value={`+${result.avgMFE}%`} color={C.green}
                 sub="거래 중 최대 순행" />
               <MetricCard label="보유기간" value={`${result.avgHoldBars}봉`} color={C.text1}
-                sub="평균 보유 기간" />
+                sub={`승:${result.avgWinHoldBars || 0} / 패:${result.avgLossHoldBars || 0}봉`} />
+              <MetricCard label="연간변동성" value={`${result.annualizedVol || 0}%`}
+                color={result.annualizedVol <= 15 ? C.green : result.annualizedVol <= 25 ? C.yellow : C.red}
+                sub="연간화 표준편차" />
               <MetricCard label="월 승률" value={`${result.monthlyWinRate || 0}%`}
                 color={result.monthlyWinRate >= 60 ? C.green : result.monthlyWinRate >= 50 ? C.yellow : C.red}
                 sub="양수 수익 월 비율" />

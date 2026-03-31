@@ -2,6 +2,14 @@ node_modules
 dist
 .env
 .vercel
-api/telegram-send.js
 quant-reports/
 vite.config.js.timestamp-*
+# Debug / temp scripts
+find-div-issue*.js
+analyze-tags*.js
+validate-jsx.js
+verify-fix.js
+telegram-pending-*.json
+signal-alert-*.md
+signal_report_*.md
+latest-changes.bundle

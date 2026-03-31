@@ -1647,7 +1647,7 @@ function SearchBar({ onSelect, placeholder = "종목 검색 (예: AAPL, 삼성�
 }
 
 // ════════════════════════════════════════════════════════════════════
-// ── 퀵 투자진단 v2 (카드용 — API 호출 없이 기존 데이터로 즉시 계산, 정밀 산출) ──
+// ── 퀵 투자진단 v2.1 (카드용 — API 호출 없이 기존 데이터로 즉시 계산, v4.0 최적화) ──
 function quickDiagnosis(asset) {
   const signals = [];
   let trendScore = 50, momScore = 50, supScore = 50, posScore = 50;
@@ -1678,14 +1678,15 @@ function quickDiagnosis(asset) {
   else if (asset.weekChange < -3) trendScore -= 3;
   trendScore = Math.max(0, Math.min(100, trendScore));
 
-  // ── 모멘텀: RSI 연속 그라데이션 (v3.7 최적화) + 스토캐스틱 + W%R ──
-  // v3.7: 4단계 변동성 레짐 기반 RSI 임계값 동적 조정 + RSI 변화율 반영
-  const isExtremeVol = asset.atr14Pct != null && asset.atr14Pct > 4.5; // v3.7: 극단 변동성 (위기 상황)
+  // ── 모멘텀: RSI 연속 그라데이션 (v4.0 최적화) + 스토캐스틱 + W%R ──
+  // v4.0: 5단계 변동성 레짐 기반 RSI 임계값 동적 조정 + RSI 변화율 반영
+  const isExtremeVol = asset.atr14Pct != null && asset.atr14Pct > 4.5; // 극단 변동성 (위기 상황)
   const isHighVol = asset.atr14Pct != null && asset.atr14Pct > 3;
-  const isMedVol = asset.atr14Pct != null && asset.atr14Pct >= 2 && asset.atr14Pct <= 3; // v3.7: 중간 변동성
-  const isLowVol = asset.atr14Pct != null && asset.atr14Pct < 1.2;
-  const rsiOB = isExtremeVol ? 78 : isHighVol ? 75 : isMedVol ? 72 : isLowVol ? 70 : 73; // v3.7: 4단계 레짐
-  const rsiOS = isExtremeVol ? 22 : isHighVol ? 25 : isMedVol ? 28 : isLowVol ? 30 : 27; // v3.7: 4단계 레짐
+  const isMedVol = asset.atr14Pct != null && asset.atr14Pct >= 2 && asset.atr14Pct <= 3;
+  const isLowVol = asset.atr14Pct != null && asset.atr14Pct < 1.2 && asset.atr14Pct >= 0.8;
+  const isUltraLowVol = asset.atr14Pct != null && asset.atr14Pct < 0.8; // v4.0: 초저변동성 (횡보장)
+  const rsiOB = isExtremeVol ? 78 : isHighVol ? 75 : isMedVol ? 72 : isUltraLowVol ? 68 : isLowVol ? 70 : 73; // v4.0: 5단계 레짐
+  const rsiOS = isExtremeVol ? 20 : isHighVol ? 25 : isMedVol ? 28 : isUltraLowVol ? 32 : isLowVol ? 30 : 27; // v4.0: 극단변동 OS 22→20, 초저변동 32
   if (asset.rsi != null) {
     if (asset.rsi >= 80) { momScore -= 18; signals.push({ type: "bearish", name: `RSI 극단 과매수 (${asset.rsi})` }); }
     else if (asset.rsi >= rsiOB) { momScore -= 12; signals.push({ type: "bearish", name: `RSI 과매수 (${asset.rsi}${isHighVol ? " · 고변동" : ""})` }); }
@@ -1697,15 +1698,17 @@ function quickDiagnosis(asset) {
     else if (asset.rsi >= rsiOS) { momScore += 10; signals.push({ type: "bullish", name: `RSI 과매도 (${asset.rsi}${isLowVol ? " · 저변동" : ""})` }); }
     else if (asset.rsi >= 20) { momScore += 16; signals.push({ type: "bullish", name: `RSI 강한 과매도 (${asset.rsi})` }); }
     else { momScore += 22; signals.push({ type: "bullish", name: `RSI 극단 과매도 (${asset.rsi})` }); }
-    // v3.7: RSI 변화율 보너스 — 전주 대비 RSI 급반등/급락 시 추가 점수 (3단계)
+    // v4.0: RSI 변화율 보너스 — 전주 대비 RSI 급반등/급락 시 추가 점수 (4단계, 중간 임계값 추가)
     if (asset.rsiPrev != null) {
       const rsiDelta = asset.rsi - asset.rsiPrev;
       if (rsiDelta > 20 && asset.rsi < 45) { momScore += 6; signals.push({ type: "bullish", name: `RSI 급반등 (+${rsiDelta.toFixed(0)})` }); }
+      else if (rsiDelta > 15 && asset.rsi < 47) momScore += 5; // v4.0: 중간 반등 (15~20 갭 보완)
       else if (rsiDelta > 12 && asset.rsi < 50) momScore += 4; // 과매도→반등 가속
-      else if (rsiDelta > 8 && asset.rsi < 40) momScore += 2; // v3.7: 저RSI 완만 반등
+      else if (rsiDelta > 8 && asset.rsi < 40) momScore += 2; // 저RSI 완만 반등
       else if (rsiDelta < -20 && asset.rsi > 55) { momScore -= 6; signals.push({ type: "bearish", name: `RSI 급락 (${rsiDelta.toFixed(0)})` }); }
+      else if (rsiDelta < -15 && asset.rsi > 53) momScore -= 5; // v4.0: 중간 하락 (15~20 갭 보완)
       else if (rsiDelta < -12 && asset.rsi > 50) momScore -= 4; // 과매수→하락 가속
-      else if (rsiDelta < -8 && asset.rsi > 60) momScore -= 2; // v3.7: 고RSI 완만 하락
+      else if (rsiDelta < -8 && asset.rsi > 60) momScore -= 2; // 고RSI 완만 하락
     }
   }
   // v3.5: MACD 히스토그램 모멘텀 — 방향과 가속도 반영
@@ -1807,6 +1810,8 @@ function quickDiagnosis(asset) {
   if (asset.bbWidth != null) {
     if (asset.bbWidth < 0.05) { volScore += 12; signals.push({ type: "bullish", name: "BB 스퀴즈 (돌파 임박)" }); }
     else if (asset.bbWidth < 0.10) volScore += 5;
+    else if (asset.bbWidth < 0.15) volScore += 2; // v4.0: 완만한 수축 구간 (기회 준비)
+    else if (asset.bbWidth > 0.35) { volScore -= 12; signals.push({ type: "bearish", name: "BB 극단 확장 (고위험)" }); } // v4.0: 극단 확장 추가
     else if (asset.bbWidth > 0.25) { volScore -= 8; signals.push({ type: "neutral", name: "BB 확장 (높은 변동성)" }); }
   }
   if (asset.atr14Pct != null) {
@@ -1861,31 +1866,62 @@ function quickDiagnosis(asset) {
     else if (asset.roe > 0.1) fundScore += 2;
     else if (asset.roe < 0) fundScore -= 6;
   }
+  // ── Piotroski F-Score 프록시 (재무 건전성 종합 평가) v3.8 ──
+  let fScoreProxy = 0;
+  if (asset.operatingMargin != null && asset.operatingMargin > 0) fScoreProxy++; // 영업이익 양수
+  if (asset.roe != null && asset.roe > 0) fScoreProxy++; // ROE 양수
+  if (asset.revGrowthYoY != null && asset.revGrowthYoY > 0) fScoreProxy++; // 매출 성장
+  if (asset.operatingMargin != null && asset.operatingMarginPrev != null && asset.operatingMargin > asset.operatingMarginPrev) fScoreProxy++; // 마진 개선
+  if (asset.debtToEquity != null && asset.debtToEquity < 100) fScoreProxy++; // 저부채
+  if (asset.currentRatio != null && asset.currentRatio > 1) fScoreProxy++; // 유동비율 건전
+  if (pe != null && pe > 0 && pe < 25) fScoreProxy++; // 합리적 밸류에이션
+  if (fScoreProxy >= 6) { fundScore += 10; signals.push({ type: "bullish", name: `F-Score ${fScoreProxy}/7 (재무 우량)` }); }
+  else if (fScoreProxy >= 5) { fundScore += 5; }
+  else if (fScoreProxy <= 2) { fundScore -= 8; signals.push({ type: "bearish", name: `F-Score ${fScoreProxy}/7 (재무 취약)` }); }
+  else if (fScoreProxy <= 3) { fundScore -= 4; }
+
+  // ── 추세-펀더멘털 교차 검증 (기술적 vs 기본적 괴리 감지) v3.8 ──
+  if (hasFundData && fundScore >= 65 && trendScore <= 35) {
+    signals.push({ type: "neutral", name: "펀더멘털↑ vs 추세↓ (역행)", detail: "기본적 분석은 양호하나 기술적 하락 중 — 바닥 확인 후 매수 검토" });
+  } else if (hasFundData && fundScore <= 35 && trendScore >= 65) {
+    signals.push({ type: "neutral", name: "펀더멘털↓ vs 추세↑ (과열)", detail: "기술적 상승 중이나 기본적 분석 취약 — 차익실현 고려" });
+  }
+
   fundScore = Math.max(0, Math.min(100, fundScore));
 
-  // ── 종합 점수 (6축 가중 합산 — 시장유형 + 변동성 레짐 적응 가중치) v3.7 ──
+  // ── 종합 점수 (6축 가중 합산 — 시장유형 + 변동성 레짐 적응 가중치) v3.8 ──
   const mkt = asset.market || "us";
   const volRegime = isExtremeVol ? "extreme" : isHighVol ? "high" : isMedVol ? "med" : isLowVol ? "low" : "normal";
   let w, totalScore;
   if (hasFundData) {
-    // v3.7: 변동성 레짐에 따라 가중치 동적 조정
+    // v4.0: 변동성 레짐 3단계 가중치 (고/중/저) — 중간 변동성 독립 프로파일 추가
     // 고변동 시: 수급·변동성 가중치 ↑, 추세 가중치 ↓ (추세가 빠르게 변하므로)
     if (volRegime === "extreme" || volRegime === "high") {
       w = mkt === "crypto" ? { t: 0.14, m: 0.20, s: 0.24, p: 0.10, v: 0.12, f: 0.20 }
-        : mkt === "kr"     ? { t: 0.16, m: 0.16, s: 0.20, p: 0.10, v: 0.12, f: 0.26 }
+        : mkt === "kr"     ? { t: 0.16, m: 0.18, s: 0.20, p: 0.10, v: 0.12, f: 0.24 } // v4.0: KR 모멘텀 16→18, 펀더 26→24
         :                    { t: 0.18, m: 0.16, s: 0.18, p: 0.12, v: 0.12, f: 0.24 };
+    } else if (volRegime === "med") {
+      // v4.0: 중간 변동성 독립 가중치 — 추세·모멘텀 균형, 변동성 중간 반영
+      w = mkt === "crypto" ? { t: 0.16, m: 0.21, s: 0.23, p: 0.10, v: 0.10, f: 0.20 }
+        : mkt === "kr"     ? { t: 0.18, m: 0.18, s: 0.19, p: 0.10, v: 0.09, f: 0.26 }
+        :                    { t: 0.20, m: 0.16, s: 0.16, p: 0.12, v: 0.10, f: 0.26 };
     } else {
       w = mkt === "crypto" ? { t: 0.18, m: 0.22, s: 0.22, p: 0.10, v: 0.08, f: 0.20 }
-        : mkt === "kr"     ? { t: 0.20, m: 0.16, s: 0.18, p: 0.10, v: 0.08, f: 0.28 }
+        : mkt === "kr"     ? { t: 0.20, m: 0.18, s: 0.18, p: 0.10, v: 0.08, f: 0.26 } // v4.0: KR 모멘텀 16→18, 펀더 28→26
         :                    { t: 0.22, m: 0.16, s: 0.14, p: 0.13, v: 0.08, f: 0.27 };
     }
     totalScore = Math.round(trendScore * w.t + momScore * w.m + supScore * w.s + posScore * w.p + volScore * w.v + fundScore * w.f);
   } else {
-    // 기술적 지표만 (5축) — 변동성 레짐 적응
+    // 기술적 지표만 (5축) — 변동성 레짐 3단계 적응
     if (volRegime === "extreme" || volRegime === "high") {
-      w = mkt === "crypto" ? { t: 0.18, m: 0.26, s: 0.28, p: 0.12, v: 0.16 }
-        : mkt === "kr"     ? { t: 0.22, m: 0.22, s: 0.26, p: 0.12, v: 0.18 }
+      w = mkt === "crypto" ? { t: 0.18, m: 0.26, s: 0.26, p: 0.14, v: 0.16 } // v4.0: crypto 수급 28→26, 위치 12→14
+        : mkt === "kr"     ? { t: 0.22, m: 0.24, s: 0.24, p: 0.12, v: 0.18 } // v4.0: KR 모멘텀 22→24, 수급 26→24
         :                    { t: 0.24, m: 0.22, s: 0.22, p: 0.16, v: 0.16 };
+    } else if (volRegime === "med") {
+      // v4.0: 중간 변동성 독립 가중치 (5축)
+      w = mkt === "crypto" ? { t: 0.20, m: 0.27, s: 0.27, p: 0.13, v: 0.13 }
+        : mkt === "kr"     ? { t: 0.25, m: 0.23, s: 0.24, p: 0.13, v: 0.15 }
+        :                    { t: 0.27, m: 0.22, s: 0.20, p: 0.17, v: 0.14 };
     } else {
       w = mkt === "crypto" ? { t: 0.22, m: 0.28, s: 0.28, p: 0.12, v: 0.10 }
         : mkt === "kr"     ? { t: 0.28, m: 0.22, s: 0.25, p: 0.13, v: 0.12 }
@@ -1894,8 +1930,8 @@ function quickDiagnosis(asset) {
     totalScore = Math.round(trendScore * w.t + momScore * w.m + supScore * w.s + posScore * w.p + volScore * w.v);
   }
 
-  // v3.7: 변동성 레짐 적응 판정 임계값 — 고변동 시 매수 기준 상향 (보수적)
-  const buyThresholdAdj = (volRegime === "extreme" || volRegime === "high") ? 3 : 0; // 고변동 시 +3 상향
+  // v4.0: 변동성 레짐 적응 판정 임계값 — 고변동 시 매수 기준 상향, 중간 변동성 +1
+  const buyThresholdAdj = (volRegime === "extreme" || volRegime === "high") ? 3 : volRegime === "med" ? 1 : 0;
   let verdict;
   if (totalScore >= 80 + buyThresholdAdj) verdict = "적극 매수";
   else if (totalScore >= 68 + buyThresholdAdj) verdict = "매수";
@@ -6141,6 +6177,48 @@ function AppInner() {
               }
             }
 
+            // 31) Altman Z-Score 프록시 — 파산 위험 조기 감지
+            // Z' = 3.25 + 6.56*(WC/TA) + 3.26*(RE/TA) + 6.72*(EBIT/TA) + 1.05*(BV/TL)
+            // 여기선 가용 데이터로 근사: 마진+부채비율+ROE 복합 평가
+            if (margin != null && debtEquity != null && roe != null) {
+              const zProxy = (margin > 0 ? 1 : 0) + (debtEquity < 200 ? 1 : 0) + (roe > 0 ? 1 : 0) +
+                (margin > 0.10 ? 1 : 0) + (debtEquity < 100 ? 1 : 0);
+              if (zProxy <= 1) { score -= 12; reasons.push("파산 위험 경고 (Z-Score 프록시 취약)"); }
+              else if (zProxy <= 2) { score -= 6; reasons.push("재무 건전성 주의"); }
+              else if (zProxy >= 5) { score += 5; reasons.push("재무 건전성 우수"); }
+            }
+
+            // 32) 주주환원율 — 자사주 매입 + 배당 복합 프록시
+            if (dy > 1 && q.sharesOutstanding && q.sharesFloatShort != null) {
+              // 자사주매입 기업은 유통주식 감소 → 주당가치 증가
+              if (dy > 2 && margin != null && margin > 0.10 && debtEquity != null && debtEquity < 80) {
+                score += 4; reasons.push("주주환원 우량 (배당+건전재무)");
+              }
+            }
+
+            // 33) 기술적 모멘텀 보정 — 50일선 기울기로 단기 추세 확인
+            if (q.fiftyDayAvg && q.twoHundredDayAvg) {
+              const maSpread = (q.fiftyDayAvg - q.twoHundredDayAvg) / q.twoHundredDayAvg * 100;
+              // 골든크로스 초기 (50일선이 200일선 살짝 상회) + 저평가 = 최적 매수 타이밍
+              if (maSpread > 0 && maSpread < 5 && score >= 55) {
+                score += 5; reasons.push("골든크로스 초기 + 저평가 (최적 진입)");
+              }
+              // 데드크로스 심화 + 건전 펀더멘털 = 역발상 기회
+              if (maSpread < -10 && margin != null && margin > 0.10 && roe != null && roe > 0.10) {
+                score += 4; reasons.push("기술적 약세 + 건전 펀더멘털 (역발상)");
+              }
+            }
+
+            // 34) 다팩터 종합 등급 — 밸류+퀄리티+모멘텀 3축 동시 만족 보너스
+            const isValue = (per != null && per < 18 && pbr != null && pbr < 2);
+            const isQuality = (margin != null && margin > 0.12 && roe != null && roe > 0.12);
+            const hasMomentum = (q.fiftyDayAvg && q.price > q.fiftyDayAvg);
+            if (isValue && isQuality && hasMomentum) {
+              score += 8; reasons.push("3팩터 프리미엄 (밸류+퀄리티+모멘텀)");
+            } else if (isValue && isQuality) {
+              score += 4; reasons.push("밸류+퀄리티 복합");
+            }
+
             score = Math.max(0, Math.min(100, score));
 
             allResults.push({
@@ -6513,7 +6591,7 @@ function AppInner() {
         }
         /* ── 태블릿 (641~899px) — 중간화면 최적화 ── */
         @media (min-width: 641px) and (max-width: 899px) {
-          main { padding: 18px 20px 80px !important; }
+          main { padding: 68px 20px 80px !important; }
           .desktop-nav { gap: 4px !important; overflow: visible !important; }
           .desktop-nav::-webkit-scrollbar { display: none; }
           .desktop-nav button { padding: 7px 10px !important; font-size: 12px !important; }
@@ -6551,7 +6629,7 @@ function AppInner() {
         }
         /* ── 초와이드 (≥1600px) — 최대 폭 레이아웃 ── */
         @media (min-width: 1600px) {
-          .di-main-wrap main { max-width: 1600px !important; padding: 28px 48px 40px !important; }
+          .di-main-wrap main { max-width: 1600px !important; padding: 68px 48px 40px !important; }
           .home-grid { grid-template-columns: 1fr 480px !important; gap: 28px !important; }
           .ui-card { padding: 22px !important; }
           .home-left { gap: 20px !important; }
@@ -6569,7 +6647,7 @@ function AppInner() {
 
       {/* ── GNB 헤더 (로고 + 수평 네비게이션 + 우측 도구) ──────────────────────────────────────────────────── */}
       <header style={{
-        position: "sticky", top: 0, zIndex: 100,
+        position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
         background: `${C.bg}F8`, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
         borderBottom: `1px solid ${C.border}30`,
         overflow: "visible",
