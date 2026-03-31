@@ -303,8 +303,37 @@ async function fetchYahooFinanceData(symbol) {
   }
 }
 
+// ── Hurst 지수 계산 (R/S 분석) ──
+function calcHurst(data) {
+  const n = data.length;
+  if (n < 20) return 0.5;
+  const logReturns = [];
+  for (let i = 1; i < n; i++) logReturns.push(Math.log(data[i] / data[i - 1]));
+  const mean = logReturns.reduce((a, b) => a + b, 0) / logReturns.length;
+  const deviations = logReturns.map(r => r - mean);
+  const cumDev = []; let cum = 0;
+  for (const d of deviations) { cum += d; cumDev.push(cum); }
+  const R = Math.max(...cumDev) - Math.min(...cumDev);
+  const S = Math.sqrt(deviations.reduce((a, b) => a + b * b, 0) / deviations.length);
+  if (S === 0) return 0.5;
+  return Math.log(R / S) / Math.log(n);
+}
+
+// ── Kaufman 효율성 비율 ──
+function calcEfficiencyRatio(closes, period = 10) {
+  const er = [];
+  for (let i = 0; i < closes.length; i++) {
+    if (i < period) { er.push(0); continue; }
+    const direction = Math.abs(closes[i] - closes[i - period]);
+    let volatility = 0;
+    for (let j = 1; j <= period; j++) volatility += Math.abs(closes[i - j + 1] - closes[i - j]);
+    er.push(volatility > 0 ? direction / volatility : 0);
+  }
+  return er;
+}
+
 function analyzeLatest(symbol, data) {
-  if (!data || data.close.length < 50) return null;
+  if (!data || data.close.length < 100) return null;
 
   const closes = data.close;
   const highs = data.high;
@@ -321,12 +350,11 @@ function analyzeLatest(symbol, data) {
   const { adx, pDI, nDI } = calcADX(highs, lows, closes, 14);
   const { k: stochK, d: stochD } = calcStochastic(highs, lows, closes, 14, 3);
   const obv = calcOBV(closes, volumes);
+  const obvEma = calcEMA(obv, 20);
+  const volSMA = calcSMA(volumes, 20);
 
   const candles = closes.map((c, i) => ({
-    open: data.open[i],
-    high: highs[i],
-    low: lows[i],
-    close: c
+    open: data.open[i], high: highs[i], low: lows[i], close: c
   }));
 
   const candlePattern = detectCandlePattern(candles.slice(-3));
@@ -345,100 +373,164 @@ function analyzeLatest(symbol, data) {
   const lastATR = atr[atr.length - 1];
   const lastOBV = obv[lastIdx];
   const prevOBV = obv[lastIdx - 1];
-
   const lastEMA21 = ema21[ema21.length - 1];
   const lastEMA55 = ema55[ema55.length - 1];
   const lastEMA200 = ema200[ema200.length - 1];
 
   let buyScore = 0, buyFactors = 0;
   let sellScore = 0, sellFactors = 0;
+  const alphaReasons = [];
 
-  // RSI signals
-  if (lastRSI < 30) {
-    buyScore += 2;
-    buyFactors++;
-  } else if (lastRSI > 70) {
-    sellScore += 2;
-    sellFactors++;
-  }
+  // ═══════════════════════════════════════════════════════
+  // LAYER 1: 독자 알파 전략 (시장 비효율성 포착)
+  // ═══════════════════════════════════════════════════════
 
-  // Bollinger Bands
-  if (lastClose < lastBB.lower) {
-    buyScore += 2;
-    buyFactors++;
-  } else if (lastClose > lastBB.upper) {
-    sellScore += 2;
-    sellFactors++;
-  }
+  // 1) Hurst 레짐 분석
+  const hurst = calcHurst(closes.slice(-100));
+  const isHurstTrending = hurst > 0.55;
+  const isHurstMeanRev = hurst < 0.45;
 
-  // MACD cross
-  if (lastMACD > lastSignal && macdLine[macdLine.length - 2] <= signalLine[signalLine.length - 2]) {
-    buyScore += 2;
-    buyFactors++;
-  } else if (lastMACD < lastSignal && macdLine[macdLine.length - 2] >= signalLine[signalLine.length - 2]) {
-    sellScore += 2;
-    sellFactors++;
-  }
+  // 2) 효율성 비율 (추세 탄생/소멸 감지)
+  const er = calcEfficiencyRatio(closes, 10);
+  const curER = er[er.length - 1] || 0;
+  const prevER = (er[er.length - 2] + er[er.length - 3] + er[er.length - 4]) / 3 || 0;
+  const erSurge = curER > 0.6 && prevER < 0.4; // 추세 탄생
+  const erCollapse = curER < 0.2 && prevER > 0.5; // 추세 소멸
 
-  // EMA cross
-  if (lastEMA21 > lastEMA55 && lastEMA55 > lastEMA200) {
-    buyScore += 1;
-    buyFactors++;
-  } else if (lastEMA21 < lastEMA55 && lastEMA55 < lastEMA200) {
-    sellScore += 1;
-    sellFactors++;
-  }
+  // 3) 변동성 군집 분석 (ATR 수축→폭발)
+  const atrLongMA = calcSMA(atr.map(v => v || 0), 50);
+  const atrRatio = atr[lastIdx] && atrLongMA[atrLongMA.length - 1] > 0
+    ? atr[lastIdx] / atrLongMA[atrLongMA.length - 1] : 1;
+  const volExpanding = atrRatio > 1.8;
+  const volContracting = atrRatio < 0.5;
 
-  // Volume explosion
-  if (volumes[lastIdx] > volumes[lastIdx - 1] * 1.5) {
-    buyScore += 1;
-  }
+  // 4) 모멘텀 감쇠 분석
+  const mom10 = closes.length > 10 ? ((lastClose - closes[lastIdx - 10]) / closes[lastIdx - 10]) * 100 : 0;
+  const momPrev = closes.length > 11 ? ((closes[lastIdx - 1] - closes[lastIdx - 11]) / closes[lastIdx - 11]) * 100 : 0;
+  const momDecaying = mom10 > 2 && mom10 < momPrev; // 상승 감속
+  const momRecovering = mom10 < -2 && mom10 > momPrev; // 하락 감속
 
-  // OBV uptrend
-  if (lastOBV > prevOBV) {
-    buyScore += 1;
-  } else {
-    sellScore += 1;
-  }
+  // 5) 정보흐름 감지 (가격보합 + 거래량 급증)
+  const priceFlatRange = Math.abs(lastClose - closes[lastIdx - 3]) / closes[lastIdx - 3] * 100;
+  const volAvg = volSMA[volSMA.length - 1] || 1;
+  const vol3barSurge = volumes[lastIdx] > volAvg * 2 && volumes[lastIdx - 1] > volAvg * 1.5 && volumes[lastIdx - 2] > volAvg * 1.5;
+  const smartMoneyAccum = priceFlatRange < 1.5 && vol3barSurge && lastOBV > (obvEma[obvEma.length - 1] || 0);
+  const smartMoneyDist = priceFlatRange < 1.5 && vol3barSurge && lastOBV < (obvEma[obvEma.length - 1] || 0);
 
-  // Stochastic
-  if (lastStochK < 20) {
-    buyScore += 1;
-    buyFactors++;
-  } else if (lastStochK > 80) {
-    sellScore += 1;
-    sellFactors++;
-  }
+  // ═══════════════════════════════════════════════════════
+  // LAYER 2: 알파 시그널 스코어링
+  // ═══════════════════════════════════════════════════════
 
-  // Candle pattern
-  if (candlePattern === 'bullish_engulfing') {
-    buyScore += 2;
-    buyFactors++;
-  } else if (candlePattern === 'bearish_engulfing') {
-    sellScore += 2;
-    sellFactors++;
-  }
-
-  // ADX strength
-  if (lastADX > 25) {
-    if (pDI[pDI.length - 1] > nDI[nDI.length - 1]) {
-      buyScore += 1;
-    } else {
-      sellScore += 1;
+  // Hurst 추세레짐 + 돌파
+  if (isHurstTrending) {
+    const high20 = Math.max(...highs.slice(-20));
+    const low20 = Math.min(...lows.slice(-20));
+    if (lastClose >= high20 * 0.99) {
+      buyScore += 3; buyFactors++;
+      alphaReasons.push(`Hurst${hurst.toFixed(2)} 추세레짐 고점돌파`);
+    }
+    if (lastClose <= low20 * 1.01) {
+      sellScore += 3; sellFactors++;
+      alphaReasons.push(`Hurst${hurst.toFixed(2)} 추세레짐 저점이탈`);
     }
   }
 
-  // Divergence
-  if (bullDivergence) {
-    buyScore += 2;
-    buyFactors++;
-  } else if (bearDivergence) {
-    sellScore += 2;
-    sellFactors++;
+  // Hurst 회귀레짐 + RSI 역추세
+  if (isHurstMeanRev) {
+    if (lastRSI < 35 && lastRSI > rsi[rsi.length - 2]) {
+      buyScore += 3; buyFactors++;
+      alphaReasons.push(`Hurst${hurst.toFixed(2)} 회귀레짐 RSI반등`);
+    }
+    if (lastRSI > 65 && lastRSI < rsi[rsi.length - 2]) {
+      sellScore += 3; sellFactors++;
+      alphaReasons.push(`Hurst${hurst.toFixed(2)} 회귀레짐 RSI하락`);
+    }
   }
 
-  const buySignal = buyScore >= 4 && buyFactors >= 2;
-  const sellSignal = sellScore >= 4 && sellFactors >= 2;
+  // 효율성 비율 추세 탄생
+  if (erSurge) {
+    const dir = lastClose > closes[lastIdx - 10] ? 'buy' : 'sell';
+    if (dir === 'buy') { buyScore += 3; buyFactors++; alphaReasons.push(`ER ${curER.toFixed(2)} 추세탄생↑`); }
+    else { sellScore += 3; sellFactors++; alphaReasons.push(`ER ${curER.toFixed(2)} 추세탄생↓`); }
+  }
+  if (erCollapse) {
+    const dir = lastClose > closes[lastIdx - 3] ? 'sell' : 'buy';
+    if (dir === 'buy') { buyScore += 1; buyFactors++; alphaReasons.push(`ER 추세소멸 반전매수`); }
+    else { sellScore += 1; sellFactors++; alphaReasons.push(`ER 추세소멸 이탈매도`); }
+  }
+
+  // 변동성 군집 돌파
+  if (volExpanding && lastClose > closes[lastIdx - 1]) {
+    buyScore += 2; buyFactors++;
+    alphaReasons.push(`ATR폭발 ${atrRatio.toFixed(1)}x 상방`);
+  } else if (volExpanding && lastClose < closes[lastIdx - 1]) {
+    sellScore += 2; sellFactors++;
+    alphaReasons.push(`ATR폭발 ${atrRatio.toFixed(1)}x 하방`);
+  }
+
+  // 모멘텀 감쇠 (선행 반전 포착)
+  if (momDecaying && lastRSI > 60) {
+    sellScore += 2; sellFactors++;
+    alphaReasons.push(`모멘텀감쇠 ${mom10.toFixed(1)}%↘`);
+  }
+  if (momRecovering && lastRSI < 40) {
+    buyScore += 2; buyFactors++;
+    alphaReasons.push(`하락감쇠 ${mom10.toFixed(1)}%↗`);
+  }
+
+  // 스마트머니 매집/분산
+  if (smartMoneyAccum) {
+    buyScore += 3; buyFactors++;
+    alphaReasons.push(`스마트머니 매집 (가격보합+Vol급증+OBV↑)`);
+  }
+  if (smartMoneyDist) {
+    sellScore += 3; sellFactors++;
+    alphaReasons.push(`스마트머니 분산 (가격보합+Vol급증+OBV↓)`);
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // LAYER 3: 기존 지표 보조 확인 (가중치 축소)
+  // ═══════════════════════════════════════════════════════
+
+  // RSI (과매도/과매수 근접 영역도 포함)
+  if (lastRSI < 25) { buyScore += 2; buyFactors++; }
+  else if (lastRSI < 35 && lastRSI > rsi[rsi.length - 2]) { buyScore += 1; buyFactors++; }
+  if (lastRSI > 75) { sellScore += 2; sellFactors++; }
+  else if (lastRSI > 65 && lastRSI < rsi[rsi.length - 2]) { sellScore += 1; sellFactors++; }
+
+  // MACD 크로스 또는 히스토그램 확대
+  if (lastMACD > lastSignal && macdLine[macdLine.length - 2] <= signalLine[signalLine.length - 2]) {
+    buyScore += 1; buyFactors++;
+  } else if (histogram[histogram.length - 1] > 0 && histogram[histogram.length - 1] > histogram[histogram.length - 2]) {
+    buyScore += 1;
+  }
+  if (lastMACD < lastSignal && macdLine[macdLine.length - 2] >= signalLine[signalLine.length - 2]) {
+    sellScore += 1; sellFactors++;
+  } else if (histogram[histogram.length - 1] < 0 && histogram[histogram.length - 1] < histogram[histogram.length - 2]) {
+    sellScore += 1;
+  }
+
+  // EMA 정배열/역배열
+  if (lastEMA21 > lastEMA55) { buyScore += 1; buyFactors++; }
+  if (lastEMA21 < lastEMA55) { sellScore += 1; sellFactors++; }
+
+  // BB 근접
+  if (lastBB && lastClose <= lastBB.lower * 1.01) { buyScore += 1; buyFactors++; }
+  if (lastBB && lastClose >= lastBB.upper * 0.99) { sellScore += 1; sellFactors++; }
+
+  // 캔들 패턴
+  if (candlePattern === 'bullish_engulfing') { buyScore += 1; buyFactors++; }
+  if (candlePattern === 'bearish_engulfing') { sellScore += 1; sellFactors++; }
+
+  // 다이버전스
+  if (bullDivergence) { buyScore += 2; buyFactors++; alphaReasons.push('강세 다이버전스'); }
+  if (bearDivergence) { sellScore += 2; sellFactors++; alphaReasons.push('약세 다이버전스'); }
+
+  // ═══════════════════════════════════════════════════════
+  // 최종 판정: 알파 팩터 1개 이상 + 총 스코어 3+
+  // ═══════════════════════════════════════════════════════
+  const buySignal = buyScore >= 3 && buyFactors >= 2;
+  const sellSignal = sellScore >= 3 && sellFactors >= 2;
 
   return {
     symbol,
@@ -644,21 +736,31 @@ export default async function handler(req, res) {
       }
     }
 
-    // Build telegram report (structured format)
+    // Build telegram report (structured format v4)
     const now = new Date();
     const timeStr = now.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false });
     const cashPct = startEquity > 0 ? ((startCash / startEquity) * 100).toFixed(1) : '0.0';
     const investedPct = (100 - parseFloat(cashPct)).toFixed(1);
 
+    // 일간 P&L 계산 (이전 자산 대비)
+    const dayPnL = parseFloat(account.equity) - parseFloat(account.last_equity || account.equity);
+    const dayPnLPct = parseFloat(account.last_equity) > 0 ? (dayPnL / parseFloat(account.last_equity) * 100) : 0;
+    const dayPnLIcon = dayPnL >= 0 ? '📈' : '📉';
+
     let report = `📊 *DI금융 주식 자동매매 리포트*\n`;
     report += `━━━━━━━━━━━━━━━━━━\n`;
     report += `🕐 ${timeStr} (KST)\n\n`;
 
-    // Account summary with allocation
+    // Account summary with P&L
     report += `💰 *계좌 요약*\n`;
-    report += `  자산: $${startEquity.toLocaleString('en-US', { minimumFractionDigits: 2 })}\n`;
-    report += `  현금: $${startCash.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${cashPct}%)\n`;
-    report += `  투자: ${investedPct}% 배분\n\n`;
+    report += `  자산: $${startEquity.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
+    if (dayPnL !== 0) report += ` ${dayPnLIcon} ${dayPnL >= 0 ? '+' : ''}$${dayPnL.toFixed(2)} (${dayPnLPct >= 0 ? '+' : ''}${dayPnLPct.toFixed(2)}%)`;
+    report += `\n`;
+    report += `  현금: $${startCash.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${cashPct}%) | 투자: ${investedPct}%\n`;
+    // 현금비율 경고
+    if (parseFloat(cashPct) < 10) report += `  ⚠️ 현금비율 ${cashPct}% — 추가 매수 여력 부족\n`;
+    else if (parseFloat(cashPct) > 60) report += `  💡 현금비율 ${cashPct}% — 적극 매수 검토 구간\n`;
+    report += `\n`;
 
     // Portfolio positions summary with enhanced metrics
     if (positions.length > 0) {
@@ -735,6 +837,25 @@ export default async function handler(req, res) {
       }
     }
 
+    // Risk/Reward 요약 — 포트폴리오 전체 R:R 비율
+    if (signals.length > 0) {
+      const avgBuyScore = signals.reduce((s, x) => s + x.buyScore, 0) / signals.length;
+      const avgSellScore = signals.reduce((s, x) => s + x.sellScore, 0) / signals.length;
+      const overallBias = avgBuyScore > avgSellScore ? '매수 우위' : avgBuyScore < avgSellScore ? '매도 우위' : '중립';
+      report += `\n📐 *리스크 관리*\n`;
+      report += `  포지션: ${positions.length}/${WATCHLIST.length} (${(positions.length / WATCHLIST.length * 100).toFixed(0)}% 배분)\n`;
+      report += `  시그널 편향: ${overallBias} (Buy ${avgBuyScore.toFixed(1)} / Sell ${avgSellScore.toFixed(1)})\n`;
+      // ATR 기반 포트폴리오 변동성 근사
+      const avgATR = signals.filter(s => s.lastATR && s.lastClose > 0)
+        .reduce((sum, s) => sum + (s.lastATR / s.lastClose * 100), 0);
+      const atrCount = signals.filter(s => s.lastATR && s.lastClose > 0).length;
+      if (atrCount > 0) {
+        const portfolioVol = (avgATR / atrCount).toFixed(1);
+        const volLabel = portfolioVol > 3 ? '🔴 고변동' : portfolioVol > 2 ? '🟡 보통' : '🟢 안정';
+        report += `  변동성: ATR ${portfolioVol}% ${volLabel}\n`;
+      }
+    }
+
     // Orders executed
     if (orders.length > 0) {
       report += `\n⚡ *체결 ${orders.length}건*\n`;
@@ -751,9 +872,14 @@ export default async function handler(req, res) {
       report += `\n✋ 체결 주문 없음\n`;
     }
 
+    // 다음 주요 이벤트 힌트
+    const dayOfWeek = now.getUTCDay();
+    if (dayOfWeek === 5) report += `\n📅 주말 포지션 유의 — 월요일 갭 리스크\n`;
+    if (dayOfWeek === 1) report += `\n📅 주초 모멘텀 확인 구간\n`;
+
     const elapsed = ((Date.now() - now.getTime()) / 1000).toFixed(1);
     report += `\n━━━━━━━━━━━━━━━━━━\n`;
-    report += `🤖 DI금융 Stock Auto v3 | ${elapsed}s`;
+    report += `🤖 DI금융 Stock Auto v4 | ${elapsed}s`;
 
     await sendTelegramReport('Stock Auto-Trading', report);
 

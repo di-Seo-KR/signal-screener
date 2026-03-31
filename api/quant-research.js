@@ -141,6 +141,32 @@ const STRATEGY_DEFS = [
     { rsiPeriod: 10, bbMult: 2.0, emaFast: 13, emaSlow: 34, cooldown: 2 },
     { rsiPeriod: 14, bbMult: 3.0, emaFast: 21, emaSlow: 55, cooldown: 5 },
   ]},
+  // ── 알파 전략 (시장 비효율성 포착) ──
+  { name: "Hurst Regime", fn: strategyHurstRegime, params: [
+    { lookback: 100, trendTh: 0.55, meanRevTh: 0.45 },
+    { lookback: 60, trendTh: 0.58, meanRevTh: 0.42 },
+    { lookback: 150, trendTh: 0.52, meanRevTh: 0.48 },
+  ]},
+  { name: "Efficiency Ratio", fn: strategyEfficiencyRatio, params: [
+    { period: 10, surgeTh: 0.6, collapseTh: 0.2 },
+    { period: 15, surgeTh: 0.55, collapseTh: 0.25 },
+    { period: 8, surgeTh: 0.65, collapseTh: 0.15 },
+  ]},
+  { name: "Vol Cluster", fn: strategyVolCluster, params: [
+    { atrPeriod: 14, longMAPeriod: 50, explosionRatio: 1.8 },
+    { atrPeriod: 10, longMAPeriod: 40, explosionRatio: 2.0 },
+    { atrPeriod: 14, longMAPeriod: 60, explosionRatio: 1.5 },
+  ]},
+  { name: "Momentum Decay", fn: strategyMomentumDecay, params: [
+    { momPeriod: 10, rsiPeriod: 14, rsiHigh: 60, rsiLow: 40 },
+    { momPeriod: 15, rsiPeriod: 14, rsiHigh: 65, rsiLow: 35 },
+    { momPeriod: 8, rsiPeriod: 10, rsiHigh: 55, rsiLow: 45 },
+  ]},
+  { name: "Smart Money", fn: strategySmartMoney, params: [
+    { flatRange: 1.5, volMult: 2.0, obvEmaPeriod: 20 },
+    { flatRange: 1.0, volMult: 1.8, obvEmaPeriod: 15 },
+    { flatRange: 2.0, volMult: 2.5, obvEmaPeriod: 25 },
+  ]},
 ];
 
 export default async function handler(req, res) {
@@ -719,6 +745,137 @@ function strategyBTCAlpha(candles, p = {}) {
     if (obv[i] < obvE[i] && obv[i - 1] >= obvE[i - 1]) { sS += 2; sF++; }
     if (pr < e200[i]) sS += 1;
     if (sS >= 5 && sF >= 3) { last = i; sigs.push({ index: i, type: "SELL", price: pr }); }
+  }
+  return sigs;
+}
+
+// ═══════════════════════════════════════════════════════
+// 알파 전략 함수들 (시장 비효율성 포착)
+// ═══════════════════════════════════════════════════════
+
+function calcHurst(data) {
+  const n = data.length;
+  if (n < 20) return 0.5;
+  const lr = []; for (let i = 1; i < n; i++) lr.push(Math.log(data[i] / data[i - 1]));
+  const mean = lr.reduce((a, b) => a + b, 0) / lr.length;
+  const dev = lr.map(r => r - mean);
+  const cd = []; let cum = 0; for (const d of dev) { cum += d; cd.push(cum); }
+  const R = Math.max(...cd) - Math.min(...cd);
+  const S = Math.sqrt(dev.reduce((a, b) => a + b * b, 0) / dev.length);
+  if (S === 0) return 0.5;
+  return Math.log(R / S) / Math.log(n);
+}
+
+function calcEfficiencyRatio(closes, period = 10) {
+  const er = [];
+  for (let i = 0; i < closes.length; i++) {
+    if (i < period) { er.push(0); continue; }
+    const dir = Math.abs(closes[i] - closes[i - period]);
+    let vol = 0; for (let j = 1; j <= period; j++) vol += Math.abs(closes[i - j + 1] - closes[i - j]);
+    er.push(vol > 0 ? dir / vol : 0);
+  }
+  return er;
+}
+
+function strategyHurstRegime(candles, p = {}) {
+  const { lookback = 100, trendTh = 0.55, meanRevTh = 0.45 } = p;
+  const c = candles.map(x => x.close), h = candles.map(x => x.high), l = candles.map(x => x.low);
+  const rsi = calcRSI(c, 14);
+  const sigs = [];
+  let last = -10;
+  for (let i = lookback; i < c.length; i++) {
+    if (i - last < 5) continue;
+    const hurst = calcHurst(c.slice(i - lookback, i));
+    if (hurst > trendTh) {
+      const high20 = Math.max(...h.slice(i - 20, i + 1));
+      const low20 = Math.min(...l.slice(i - 20, i + 1));
+      if (c[i] >= high20 * 0.99) { last = i; sigs.push({ index: i, type: "BUY", price: c[i] }); continue; }
+      if (c[i] <= low20 * 1.01) { last = i; sigs.push({ index: i, type: "SELL", price: c[i] }); continue; }
+    }
+    if (hurst < meanRevTh && rsi[i] != null) {
+      if (rsi[i] < 30 && rsi[i] > (rsi[i - 1] || 50)) { last = i; sigs.push({ index: i, type: "BUY", price: c[i] }); continue; }
+      if (rsi[i] > 70 && rsi[i] < (rsi[i - 1] || 50)) { last = i; sigs.push({ index: i, type: "SELL", price: c[i] }); }
+    }
+  }
+  return sigs;
+}
+
+function strategyEfficiencyRatio(candles, p = {}) {
+  const { period = 10, surgeTh = 0.6, collapseTh = 0.2 } = p;
+  const c = candles.map(x => x.close);
+  const er = calcEfficiencyRatio(c, period);
+  const sigs = [];
+  let last = -10;
+  for (let i = period + 3; i < c.length; i++) {
+    if (i - last < 5) continue;
+    const curER = er[i] || 0;
+    const prevER = ((er[i - 1] || 0) + (er[i - 2] || 0) + (er[i - 3] || 0)) / 3;
+    if (curER > surgeTh && prevER < surgeTh - 0.1) {
+      const dir = c[i] > c[i - period] ? "BUY" : "SELL";
+      last = i; sigs.push({ index: i, type: dir, price: c[i] });
+    } else if (curER < collapseTh && prevER > collapseTh + 0.2) {
+      const dir = c[i] > c[i - 3] ? "SELL" : "BUY";
+      last = i; sigs.push({ index: i, type: dir, price: c[i] });
+    }
+  }
+  return sigs;
+}
+
+function strategyVolCluster(candles, p = {}) {
+  const { atrPeriod = 14, longMAPeriod = 50, explosionRatio = 1.8 } = p;
+  const c = candles.map(x => x.close), h = candles.map(x => x.high), l = candles.map(x => x.low);
+  const atr = calcATR(h, l, c, atrPeriod);
+  const atrLongMA = calcSMA(atr.map(v => v || 0), longMAPeriod);
+  const sigs = [];
+  let last = -10;
+  for (let i = longMAPeriod; i < c.length; i++) {
+    if (i - last < 5 || !atr[i] || !atrLongMA[i] || atrLongMA[i] === 0) continue;
+    const ratio = atr[i] / atrLongMA[i];
+    if (ratio > explosionRatio) {
+      const dir = c[i] > c[i - 1] ? "BUY" : "SELL";
+      last = i; sigs.push({ index: i, type: dir, price: c[i] });
+    }
+  }
+  return sigs;
+}
+
+function strategyMomentumDecay(candles, p = {}) {
+  const { momPeriod = 10, rsiPeriod = 14, rsiHigh = 60, rsiLow = 40 } = p;
+  const c = candles.map(x => x.close);
+  const rsi = calcRSI(c, rsiPeriod);
+  const sigs = [];
+  let last = -10;
+  for (let i = momPeriod + 1; i < c.length; i++) {
+    if (i - last < 5 || rsi[i] == null) continue;
+    const mom = ((c[i] - c[i - momPeriod]) / c[i - momPeriod]) * 100;
+    const momPrev = ((c[i - 1] - c[i - 1 - momPeriod]) / c[i - 1 - momPeriod]) * 100;
+    if (mom > 2 && mom < momPrev && rsi[i] > rsiHigh) {
+      last = i; sigs.push({ index: i, type: "SELL", price: c[i] }); continue;
+    }
+    if (mom < -2 && mom > momPrev && rsi[i] < rsiLow) {
+      last = i; sigs.push({ index: i, type: "BUY", price: c[i] });
+    }
+  }
+  return sigs;
+}
+
+function strategySmartMoney(candles, p = {}) {
+  const { flatRange = 1.5, volMult = 2.0, obvEmaPeriod = 20 } = p;
+  const c = candles.map(x => x.close), v = candles.map(x => x.volume || 0);
+  const obv = calcOBV(c, v);
+  const obvEma = calcEMA(obv, obvEmaPeriod);
+  const volSMA = calcSMA(v, 20);
+  const sigs = [];
+  let last = -10;
+  for (let i = 20; i < c.length; i++) {
+    if (i - last < 5 || i < 3) continue;
+    const priceFlat = Math.abs(c[i] - c[i - 3]) / c[i - 3] * 100;
+    const vAvg = volSMA[i] || 1;
+    const volSurge = v[i] > vAvg * volMult && v[i - 1] > vAvg * (volMult * 0.75) && v[i - 2] > vAvg * (volMult * 0.75);
+    if (priceFlat < flatRange && volSurge) {
+      if (obv[i] > (obvEma[i] || 0)) { last = i; sigs.push({ index: i, type: "BUY", price: c[i] }); }
+      else if (obv[i] < (obvEma[i] || 0)) { last = i; sigs.push({ index: i, type: "SELL", price: c[i] }); }
+    }
   }
   return sigs;
 }
