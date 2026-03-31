@@ -620,7 +620,7 @@ function useAlpacaRealData(userId) {
 }
 
 // ── 운영 중 봇 대시보드 (실제 알파카 데이터 기반) ──
-function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId, isMobile }) {
+function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, theme, userId, isMobile }) {
   const c = colors[theme];
   const { account, equityHistory, tradeLog, loading } = useAlpacaRealData(userId);
 
@@ -997,6 +997,10 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, theme, userId
                   flex: 1, padding: isMobile ? "12px 8px" : "10px", borderRadius: isMobile ? "8px" : "8px", fontSize: isMobile ? "12px" : "13px", fontWeight: 600,
                   background: c.blue, color: "#fff", border: "none", cursor: "pointer", minHeight: "44px",
                 }}>상세 보기</button>
+                <button onClick={() => onAddFund(ab.botId)} style={{
+                  padding: isMobile ? "12px 12px" : "10px 16px", borderRadius: "8px", fontSize: isMobile ? "12px" : "13px", fontWeight: 600,
+                  background: `${c.green}15`, color: c.green, border: `1px solid ${c.green}30`, cursor: "pointer", minHeight: "44px",
+                }}>+ 추가</button>
                 <button onClick={() => onStopBot(ab.botId)} style={{
                   padding: isMobile ? "12px 12px" : "10px 16px", borderRadius: "8px", fontSize: isMobile ? "12px" : "13px", fontWeight: 600,
                   background: `${c.red}15`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer", minHeight: "44px",
@@ -1123,6 +1127,10 @@ export default function AutoTrading({ theme = "dark", user }) {
   // 수동 배분 모달 상태
   const [allocationInput, setAllocationInput] = useState("");
 
+  // 금액 추가 모달 상태
+  const [addFundBotId, setAddFundBotId] = useState(null);
+  const [addFundInput, setAddFundInput] = useState("");
+
   const handleActivateBot = useCallback((bot) => {
     if (!user) {
       showToast("error", "로그인이 필요합니다. 먼저 로그인해주세요.");
@@ -1159,6 +1167,30 @@ export default function AutoTrading({ theme = "dark", user }) {
     setPendingBot(null);
     setAllocationInput("");
   }, [pendingBot, allocationInput, showToast]);
+
+  // 금액 추가 핸들러
+  const handleAddFund = useCallback((botId) => {
+    setAddFundBotId(botId);
+    setAddFundInput("");
+  }, []);
+
+  const handleConfirmAddFund = useCallback(() => {
+    if (!addFundBotId) return;
+    const amount = parseInt(addFundInput, 10);
+    if (!amount || amount <= 0) {
+      showToast("error", "추가 금액을 올바르게 입력해주세요.");
+      return;
+    }
+    setActiveBots(prev => prev.map(ab =>
+      ab.botId === addFundBotId
+        ? { ...ab, allocation: (ab.allocation || 0) + amount, fundHistory: [...(ab.fundHistory || []), { amount, date: Date.now() }] }
+        : ab
+    ));
+    const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === addFundBotId);
+    showToast("success", `${bot?.name || "봇"}에 $${amount.toLocaleString()} 추가 완료`);
+    setAddFundBotId(null);
+    setAddFundInput("");
+  }, [addFundBotId, addFundInput, showToast]);
 
   const handleStopBot = useCallback((botId) => {
     setActiveBots(prev => prev.filter(ab => ab.botId !== botId));
@@ -1370,6 +1402,110 @@ export default function AutoTrading({ theme = "dark", user }) {
           </div>
         )}
 
+        {/* 금액 추가 모달 */}
+        {addFundBotId && (() => {
+          const targetBot = activeBots.find(ab => ab.botId === addFundBotId);
+          const botDef = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === addFundBotId);
+          if (!targetBot || !botDef) return null;
+          const currentAlloc = targetBot.allocation || 0;
+          const used = activeBots.reduce((s, ab) => s + (ab.allocation || 0), 0);
+          const left = alpacaEquity != null ? Math.max(0, alpacaEquity - used) : null;
+          const quickAmounts = [500, 1000, 2000, 5000];
+          return (
+            <div style={{
+              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+              background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center",
+              zIndex: 9999,
+            }} onClick={() => { setAddFundBotId(null); setAddFundInput(""); }}>
+              <div style={{
+                background: c.card, borderRadius: isMobile ? "12px" : "16px", padding: isMobile ? "20px 16px" : "28px", width: isMobile ? "min(95vw, 100%)" : "min(420px, 90vw)",
+                border: `1px solid ${c.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+              }} onClick={e => e.stopPropagation()}>
+                <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "10px" : "12px", marginBottom: "16px" }}>
+                  <span style={{ fontSize: isMobile ? "28px" : "32px" }}>{botDef.icon}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <h3 style={{ margin: 0, color: c.text1, fontSize: isMobile ? "16px" : "18px", wordBreak: "break-word" }}>{botDef.name}</h3>
+                    <span style={{ fontSize: isMobile ? "11px" : "12px", color: c.text2 }}>추가 금액을 입력해주세요</span>
+                  </div>
+                </div>
+
+                {/* 현재 배분 현황 */}
+                <div style={{
+                  padding: isMobile ? "12px" : "12px 14px", background: `${c.blue}08`, borderRadius: "10px",
+                  border: `1px solid ${c.blue}15`, marginBottom: "16px", fontSize: isMobile ? "12px" : "13px", color: c.text2,
+                  display: "flex", flexDirection: "column", gap: "6px",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>현재 투입 금액</span>
+                    <strong style={{ color: c.text1 }}>${currentAlloc.toLocaleString()}</strong>
+                  </div>
+                  {alpacaEquity != null && (
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span>계좌 잔고</span>
+                      <strong style={{ color: c.text1 }}>${alpacaEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
+                    </div>
+                  )}
+                  {left != null && (
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span>잔여 가용</span>
+                      <strong style={{ color: left > 0 ? c.green : c.red }}>${left.toLocaleString()}</strong>
+                    </div>
+                  )}
+                </div>
+
+                {/* 빠른 금액 선택 */}
+                <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
+                  {quickAmounts.map(amt => (
+                    <button key={amt} onClick={() => setAddFundInput(String(amt))} style={{
+                      flex: "1 1 auto", padding: isMobile ? "10px 8px" : "8px 12px", borderRadius: "8px",
+                      fontSize: isMobile ? "12px" : "13px", fontWeight: 600, cursor: "pointer", minHeight: "40px",
+                      background: addFundInput === String(amt) ? `${c.green}20` : c.card2,
+                      color: addFundInput === String(amt) ? c.green : c.text2,
+                      border: `1px solid ${addFundInput === String(amt) ? c.green + "50" : c.border}`,
+                      transition: "all 0.15s ease",
+                    }}>${amt.toLocaleString()}</button>
+                  ))}
+                </div>
+
+                {/* 직접 입력 */}
+                <div style={{ marginBottom: "20px" }}>
+                  <label style={{ fontSize: isMobile ? "12px" : "13px", color: c.text2, display: "block", marginBottom: "6px" }}>직접 입력 (USD)</label>
+                  <input
+                    type="number"
+                    value={addFundInput}
+                    onChange={e => setAddFundInput(e.target.value)}
+                    placeholder="추가할 금액 입력"
+                    style={{
+                      width: "100%", padding: isMobile ? "14px" : "12px", borderRadius: "8px", border: `1px solid ${c.border}`,
+                      background: c.card2, color: c.text1, fontSize: isMobile ? "16px" : "16px", fontWeight: 600, boxSizing: "border-box", minHeight: "44px",
+                    }}
+                    onKeyDown={e => e.key === "Enter" && handleConfirmAddFund()}
+                    autoFocus
+                  />
+                  {addFundInput && parseInt(addFundInput, 10) > 0 && (
+                    <div style={{ marginTop: "8px", fontSize: isMobile ? "11px" : "12px", color: c.text2 }}>
+                      추가 후 총 투입 금액: <strong style={{ color: c.green }}>${(currentAlloc + parseInt(addFundInput, 10)).toLocaleString()}</strong>
+                    </div>
+                  )}
+                </div>
+
+                {/* 버튼 */}
+                <div style={{ display: "flex", gap: isMobile ? "8px" : "8px" }}>
+                  <button onClick={() => { setAddFundBotId(null); setAddFundInput(""); }} style={{
+                    flex: 1, padding: isMobile ? "14px 12px" : "12px", borderRadius: "8px", fontSize: isMobile ? "13px" : "14px", fontWeight: 600,
+                    background: c.card2, color: c.text2, border: `1px solid ${c.border}`, cursor: "pointer", minHeight: "44px",
+                  }}>취소</button>
+                  <button onClick={handleConfirmAddFund} style={{
+                    flex: 1, padding: isMobile ? "14px 12px" : "12px", borderRadius: "8px", fontSize: isMobile ? "13px" : "14px", fontWeight: 700,
+                    background: c.green, color: "#fff", border: "none", cursor: "pointer", minHeight: "44px",
+                    opacity: (!addFundInput || parseInt(addFundInput, 10) <= 0) ? 0.5 : 1,
+                  }}>금액 추가</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* 잔고 카드는 상단 연동 배너에 통합됨 */}
 
         {/* 운영 중인 봇 대시보드 (활성 봇이 있을 때만 표시) */}
@@ -1378,6 +1514,7 @@ export default function AutoTrading({ theme = "dark", user }) {
             activeBots={activeBots}
             onSelectBot={(bot) => setActiveBot(bot)}
             onStopBot={handleStopBot}
+            onAddFund={handleAddFund}
             theme={theme}
             userId={user?.id}
             isMobile={isMobile}
