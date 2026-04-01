@@ -475,13 +475,13 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
   const atrPct = atr[lastIdx] && price > 0 ? (atr[lastIdx] / price) * 100 : 2;
   const posSize = atrPct > 5 ? 0.3 : atrPct > 3 ? 0.5 : atrPct > 1.5 ? 0.7 : 0.9;
 
-  // Fear & Greed에 따른 동적 임계값 (v2: 시그널 빈도 상향)
+  // Fear & Greed에 따른 동적 임계값 (v3: 시그널 빈도 대폭 상향)
   let buyThreshold, buyFactorsThreshold, sellThreshold, sellFactorsThreshold;
-  if (fngValue <= 25) { buyThreshold = 2; buyFactorsThreshold = 1; sellThreshold = 5; sellFactorsThreshold = 2; }
-  else if (fngValue <= 45) { buyThreshold = 2; buyFactorsThreshold = 1; sellThreshold = 4; sellFactorsThreshold = 2; }
-  else if (fngValue <= 55) { buyThreshold = 3; buyFactorsThreshold = 2; sellThreshold = 3; sellFactorsThreshold = 2; }
-  else if (fngValue <= 75) { buyThreshold = 4; buyFactorsThreshold = 2; sellThreshold = 3; sellFactorsThreshold = 1; }
-  else { buyThreshold = 5; buyFactorsThreshold = 2; sellThreshold = 2; sellFactorsThreshold = 1; }
+  if (fngValue <= 25) { buyThreshold = 2; buyFactorsThreshold = 1; sellThreshold = 4; sellFactorsThreshold = 2; }
+  else if (fngValue <= 45) { buyThreshold = 2; buyFactorsThreshold = 1; sellThreshold = 3; sellFactorsThreshold = 1; }
+  else if (fngValue <= 55) { buyThreshold = 2; buyFactorsThreshold = 1; sellThreshold = 2; sellFactorsThreshold = 1; }
+  else if (fngValue <= 75) { buyThreshold = 3; buyFactorsThreshold = 1; sellThreshold = 2; sellFactorsThreshold = 1; }
+  else { buyThreshold = 4; buyFactorsThreshold = 1; sellThreshold = 2; sellFactorsThreshold = 1; }
 
   // ── market-monitor 레짐 데이터로 임계값 미세 조정 ──
   if (marketRegime) {
@@ -540,27 +540,34 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
   // LAYER 2: 알파 시그널 스코어링
   // ═══════════════════════════════════════════════════════
 
-  // Hurst 추세레짐 + 돌파
+  // Hurst 추세레짐 + 돌파 (v3: 조건 완화)
   if (isHurstTrending) {
     const high20 = Math.max(...highs.slice(-20));
     const low20 = Math.min(...lows.slice(-20));
-    if (price >= high20 * 0.99) {
+    if (price >= high20 * 0.97) {
       buyScore += 3; buyFactors++;
-      reasons.push(`Hurst${hurst.toFixed(2)} 추세레짐 고점돌파`);
+      reasons.push(`Hurst${hurst.toFixed(2)} 추세레짐 고점근접`);
     }
-    if (price <= low20 * 1.01) {
+    if (price <= low20 * 1.03) {
       sellScore += 3; sellFactors++;
-      reasons.push(`Hurst${hurst.toFixed(2)} 추세레짐 저점이탈`);
+      reasons.push(`Hurst${hurst.toFixed(2)} 추세레짐 저점근접`);
     }
   }
+  // Hurst 추세 방향만으로도 약한 시그널
+  if (hurst > 0.52 && price > ema21[lastIdx]) {
+    buyScore += 1; reasons.push(`Hurst${hurst.toFixed(2)} 상승추세`);
+  }
+  if (hurst > 0.52 && price < ema21[lastIdx]) {
+    sellScore += 1; reasons.push(`Hurst${hurst.toFixed(2)} 하락추세`);
+  }
 
-  // Hurst 평균회귀레짐 + RSI 역추세
+  // Hurst 평균회귀레짐 + RSI 역추세 (v3: RSI 완화 40/60)
   if (isHurstMeanRev) {
-    if (rsi[lastIdx] < 35 && rsi[lastIdx] > rsi[lastIdx - 1]) {
+    if (rsi[lastIdx] < 40 && rsi[lastIdx] > rsi[lastIdx - 1]) {
       buyScore += 3; buyFactors++;
       reasons.push(`Hurst${hurst.toFixed(2)} 회귀레짐 RSI반등`);
     }
-    if (rsi[lastIdx] > 65 && rsi[lastIdx] < rsi[lastIdx - 1]) {
+    if (rsi[lastIdx] > 60 && rsi[lastIdx] < rsi[lastIdx - 1]) {
       sellScore += 3; sellFactors++;
       reasons.push(`Hurst${hurst.toFixed(2)} 회귀레짐 RSI하락`);
     }
@@ -578,13 +585,19 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
     else { sellScore += 1; sellFactors++; reasons.push(`ER 추세소멸 이탈매도`); }
   }
 
-  // 변동성 군집 돌파
+  // 변동성 군집 돌파 (v3: 1.3x도 약한 시그널)
   if (volExpanding && price > prevPrice) {
     buyScore += 2; buyFactors++;
     reasons.push(`ATR폭발 ${atrRatio.toFixed(1)}x 상방`);
   } else if (volExpanding && price < prevPrice) {
     sellScore += 2; sellFactors++;
     reasons.push(`ATR폭발 ${atrRatio.toFixed(1)}x 하방`);
+  } else if (atrRatio > 1.3 && price > prevPrice) {
+    buyScore += 1; buyFactors++;
+    reasons.push(`ATR확대 ${atrRatio.toFixed(1)}x↑`);
+  } else if (atrRatio > 1.3 && price < prevPrice) {
+    sellScore += 1; sellFactors++;
+    reasons.push(`ATR확대 ${atrRatio.toFixed(1)}x↓`);
   }
 
   // 모멘텀 감쇠 (선행 반전 포착)
@@ -611,11 +624,13 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
   // LAYER 3: 기존 지표 보조 확인 (가중치 축소)
   // ═══════════════════════════════════════════════════════
 
-  // RSI 보조
-  if (rsi[lastIdx] < 25) { buyScore += 2; buyFactors++; reasons.push(`RSI ${rsi[lastIdx].toFixed(0)} 과매도`); }
-  else if (rsi[lastIdx] < 35 && rsi[lastIdx] > rsi[lastIdx - 1]) { buyScore += 1; buyFactors++; }
-  if (rsi[lastIdx] > 75) { sellScore += 2; sellFactors++; reasons.push(`RSI ${rsi[lastIdx].toFixed(0)} 과매수`); }
-  else if (rsi[lastIdx] > 65 && rsi[lastIdx] < rsi[lastIdx - 1]) { sellScore += 1; sellFactors++; }
+  // RSI 보조 (v3: 조건 완화)
+  if (rsi[lastIdx] < 25) { buyScore += 2; buyFactors++; reasons.push(`RSI ${rsi[lastIdx].toFixed(0)} 극과매도`); }
+  else if (rsi[lastIdx] < 40 && rsi[lastIdx] > rsi[lastIdx - 1]) { buyScore += 1; buyFactors++; reasons.push(`RSI ${rsi[lastIdx].toFixed(0)} 반등`); }
+  else if (rsi[lastIdx] < 45) { buyScore += 1; }
+  if (rsi[lastIdx] > 75) { sellScore += 2; sellFactors++; reasons.push(`RSI ${rsi[lastIdx].toFixed(0)} 극과매수`); }
+  else if (rsi[lastIdx] > 60 && rsi[lastIdx] < rsi[lastIdx - 1]) { sellScore += 1; sellFactors++; reasons.push(`RSI ${rsi[lastIdx].toFixed(0)} 하락`); }
+  else if (rsi[lastIdx] > 55) { sellScore += 1; }
 
   // MACD 보조
   if (macdLine[lastIdx] > macdSig[lastIdx] && macdLine[lastIdx - 1] <= macdSig[lastIdx - 1]) {
@@ -629,9 +644,21 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
     sellScore += 1;
   }
 
-  // EMA 보조
-  if (ema21[lastIdx] > ema55[lastIdx]) { buyScore += 1; buyFactors++; }
-  if (ema21[lastIdx] < ema55[lastIdx]) { sellScore += 1; sellFactors++; }
+  // EMA 보조 (v3: 크로스오버 + 추세 방향 모두 반영)
+  if (ema21[lastIdx] > ema55[lastIdx]) { buyScore += 1; buyFactors++; reasons.push("EMA21>55"); }
+  if (ema21[lastIdx] < ema55[lastIdx]) { sellScore += 1; sellFactors++; reasons.push("EMA21<55"); }
+  // EMA 골든/데드 크로스
+  if (ema21[lastIdx] > ema55[lastIdx] && ema21[lastIdx - 1] <= ema55[lastIdx - 1]) {
+    buyScore += 2; buyFactors++; reasons.push("EMA 골든크로스");
+  }
+  if (ema21[lastIdx] < ema55[lastIdx] && ema21[lastIdx - 1] >= ema55[lastIdx - 1]) {
+    sellScore += 2; sellFactors++; reasons.push("EMA 데드크로스");
+  }
+  // 가격 vs EMA200 위치
+  if (ema200.length > 0 && ema200[lastIdx]) {
+    if (price > ema200[lastIdx]) { buyScore += 1; reasons.push("EMA200↑"); }
+    else { sellScore += 1; reasons.push("EMA200↓"); }
+  }
   if (weeklyTrendUp === true) { buyScore += 1; reasons.push("주봉↑"); }
   if (weeklyTrendUp === false) { sellScore += 1; reasons.push("주봉↓"); }
 
