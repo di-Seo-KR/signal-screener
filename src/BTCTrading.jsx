@@ -638,7 +638,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
             {(() => {
               const fullEq = parseFloat(alpacaAccount.equity || 0);
-              const fullBp = parseFloat(alpacaAccount.buying_power || 0);
+              const fullBp = parseFloat(alpacaAccount.cash || 0);
               const fullLastEq = parseFloat(alpacaAccount.last_equity || alpacaAccount.equity || 0);
               const ratio = (botAllocation && fullEq > 0) ? (botAllocation / fullEq) : 1;
               const dispEq = botAllocation || fullEq;
@@ -649,7 +649,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
               const dispPL = (fullPL * ratio).toFixed(2);
               return <>
                 {stat("봇 자산", `$${dispEq.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, C.text1)}
-                {stat("매수 가능", `$${dispBp.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, C.green)}
+                {stat("현금", `$${dispBp.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, C.green)}
                 {stat("총 P&L", `$${dispPL}`, parseFloat(dispPL) >= 0 ? C.green : C.red, "오늘")}
               </>;
             })()}

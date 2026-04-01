@@ -6763,6 +6763,7 @@ function AppInner() {
           {/* 좌측: 로고 */}
           <div onClick={() => setTab("home")} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none", marginRight: "16px", flexShrink: 0, title: "홈으로 이동" }}>
             <img src="/zepta-icon-192.png" alt="Zepta" width="36" height="36" style={{ flexShrink: 0 }} />
+            <span style={{ fontSize: "18px", fontWeight: 800, color: C.text1, letterSpacing: "-0.5px" }}>Zepta</span>
           </div>
 
           {/* 중앙: GNB — 호버 시 LNB 드롭다운, 클릭 비활성 (홈만 클릭 이동) */}

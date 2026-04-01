@@ -64,8 +64,8 @@ export default async function handler(req, res) {
     }
 
     const equity = parseFloat(account.equity || 0);
-    const buyingPower = parseFloat(account.buying_power || 0);
-    addLog(`✅ 계좌: $${equity.toFixed(0)} (매수력: $${buyingPower.toFixed(0)})`);
+    const cash = parseFloat(account.cash || 0);
+    addLog(`✅ 계좌: $${equity.toFixed(0)} (현금: $${cash.toFixed(0)})`);
 
     // ── 포지션 확인 ──
     const posRes = await fetch(`${alpacaBase}/v2/positions`, { headers: alpacaHeaders });
@@ -255,20 +255,17 @@ export default async function handler(req, res) {
         }
       }
 
-      // BUY 주문 실행
+      // BUY 주문 실행 (현금 기준 — 레버리지 미사용)
       if ((latestSignal.type === "BUY" || shouldSellForStopLoss === false) && !shouldSellForStopLoss) {
-        // 포지션 스케일링: 기존 포지션이 있으면 추가 진입 가능
+        const availableCash = cash - totalCryptoExposure;
+        const maxCashPerAsset = cash * MAX_POSITION_PER_ASSET;
         if (pos) {
-          const newExposure = currentExposure + (equity * positionSize * 0.25);
-          if (newExposure <= maxAssetValue && (totalCryptoExposure + newExposure) <= (equity * MAX_TOTAL_CRYPTO_EXPOSURE)) {
-            tradeAmount = Math.min(equity * positionSize * 0.25, maxAssetValue - currentExposure);
+          const addAmount = cash * positionSize * 0.25;
+          if (currentExposure + addAmount <= maxCashPerAsset && addAmount <= availableCash) {
+            tradeAmount = Math.min(addAmount, maxCashPerAsset - currentExposure, availableCash);
           }
         } else {
-          // 신규 포지션
-          tradeAmount = Math.min(equity * positionSize * 0.25, maxAssetValue);
-          if ((totalCryptoExposure + tradeAmount) > (equity * MAX_TOTAL_CRYPTO_EXPOSURE)) {
-            tradeAmount = Math.max(0, equity * MAX_TOTAL_CRYPTO_EXPOSURE - totalCryptoExposure);
-          }
+          tradeAmount = Math.min(cash * positionSize * 0.25, maxCashPerAsset, availableCash);
         }
 
         if (latestSignal.type === "BUY" && tradeAmount > 10) {
@@ -331,7 +328,7 @@ export default async function handler(req, res) {
 
     // ── 텔레그램 알림 ──
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    const tgMsg = buildTelegramMessage(assetResults, positionMap, equity, buyingPower, duration, fngData);
+    const tgMsg = buildTelegramMessage(assetResults, positionMap, equity, cash, duration, fngData);
 
     await sendTelegram(TG_TOKEN, TG_CHAT, tgMsg);
     addLog(`📨 텔레그램 전송 완료 (${duration}s)`);
@@ -352,7 +349,7 @@ export default async function handler(req, res) {
 // ════════════════════════════════════════════════════════
 // 텔레그램 메시지 생성
 // ════════════════════════════════════════════════════════
-function buildTelegramMessage(assetResults, positionMap, equity, buyingPower, duration, fngData) {
+function buildTelegramMessage(assetResults, positionMap, equity, cash, duration, fngData) {
   const now = new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul", hour12: false });
   const lines = [
     `🤖 *DI금융 크립토 자동매매 리포트*`,
@@ -397,8 +394,8 @@ function buildTelegramMessage(assetResults, positionMap, equity, buyingPower, du
   // Portfolio with risk metrics
   lines.push(``, `💰 *포트폴리오*`);
   lines.push(`━━━━━━━━━━━━━━━━━━━━`);
-  const cashPct = equity > 0 ? ((buyingPower / equity) * 100) : 0;
-  lines.push(`계좌: $${equity.toFixed(0)} | 현금: $${buyingPower.toFixed(0)} (${cashPct.toFixed(0)}%)`);
+  const cashPct = equity > 0 ? ((cash / equity) * 100) : 0;
+  lines.push(`계좌: $${equity.toFixed(0)} | 현금: $${cash.toFixed(0)} (${cashPct.toFixed(0)}%)`);
 
   let totalCryptoValue = 0;
   let totalCryptoPnL = 0;

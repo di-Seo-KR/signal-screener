@@ -1623,7 +1623,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
 
   const fullEquity = parseFloat(account?.equity || 0);
   const fullCash = parseFloat(account?.cash || 0);
-  const fullBuyingPower = parseFloat(account?.buying_power || 0);
+  const fullBuyingPower = parseFloat(account?.cash || 0);
   // 봇 배분 비율: botAllocation이 있으면 해당 봇에 배분된 비율만큼만 표시
   const allocRatio = (botAllocation && fullEquity > 0) ? (botAllocation / fullEquity) : 1;
   const equity = botAllocation ? botAllocation : fullEquity;
@@ -1774,7 +1774,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
           <div style={{ marginTop: "20px", display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
             {[
               { label: "현금", value: fmtUSD(cash), color: C.blue },
-              { label: "매수가능", value: fmtUSD(buyingPower), color: C.blueL },
+              { label: "가용현금", value: fmtUSD(buyingPower), color: C.blueL },
               { label: "총 수익", value: fmtUSD(totalPL), sub: fmtPct(totalPLPct), color: totalPL >= 0 ? C.green : C.red },
               { label: "포지션 P&L", value: fmtUSD(positionPL), color: positionPL >= 0 ? C.green : C.red },
             ].map((m, i) => (
