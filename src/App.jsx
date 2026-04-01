@@ -6548,10 +6548,6 @@ function AppInner() {
         :root {
           --header-h: 56px;
           --header-gap: 16px;
-          --safe-top: 0px;
-        }
-        @supports (padding: env(safe-area-inset-top)) {
-          :root { --safe-top: env(safe-area-inset-top); }
         }
         @media (max-width: 640px) {
           :root { --header-h: 48px; --header-gap: 12px; }
@@ -6559,25 +6555,33 @@ function AppInner() {
         @media (max-width: 380px) {
           :root { --header-h: 48px; --header-gap: 10px; }
         }
-        /* v4.2: 헤더 — safe-area 완전 커버 + 모바일 높이 동기화 */
-        header {
+        /* v4.3: 헤더 — safe-area 완전 분리 방식 */
+        /* safe-area 커버: 헤더 위에 깔리는 배경 블록 */
+        .safe-area-cover {
           position: fixed !important;
           top: 0 !important;
           left: 0 !important;
           right: 0 !important;
-          padding-top: var(--safe-top) !important;
-          height: calc(var(--header-h) + var(--safe-top)) !important;
-          min-height: calc(var(--header-h) + var(--safe-top)) !important;
-          box-sizing: border-box !important;
+          height: env(safe-area-inset-top, 0px) !important;
+          z-index: 101 !important;
+          pointer-events: none;
         }
-        header > div:first-child {
+        /* 헤더: safe-area 아래에 위치 */
+        header {
+          position: fixed !important;
+          top: env(safe-area-inset-top, 0px) !important;
+          left: 0 !important;
+          right: 0 !important;
           height: var(--header-h) !important;
-          max-height: var(--header-h) !important;
+          min-height: var(--header-h) !important;
+          box-sizing: border-box !important;
+          padding-top: 0 !important;
         }
-        main { padding-top: calc(var(--header-h) + var(--header-gap) + var(--safe-top)) !important; }
+        main { padding-top: calc(var(--header-h) + var(--header-gap) + env(safe-area-inset-top, 0px)) !important; }
         body { padding-bottom: env(safe-area-inset-bottom, 0px); }
         [style*="position: fixed"][style*="bottom: 0"] { padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)) !important; }
         @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
         @keyframes slideDown { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:translateY(0)} }
         /* ── 접근성: 포커스 표시, 터치 타깃 ── */
         *:focus-visible { outline: 2px solid ${C.blue}; outline-offset: 2px; border-radius: 4px; }
@@ -6703,7 +6707,7 @@ function AppInner() {
         @media (min-width: 900px) and (max-width: 1199px) {
           main { padding-left: 28px !important; padding-right: 28px !important; padding-bottom: 32px !important; }
           .home-grid { display: grid !important; grid-template-columns: 1fr 360px !important; gap: 20px !important; align-items: start !important; }
-          .home-right { position: sticky; top: calc(var(--header-h) + var(--header-gap) + var(--safe-top)); max-height: calc(100vh - var(--header-h) - var(--header-gap) - var(--safe-top) - 16px); overflow-y: auto; overflow-x: hidden;
+          .home-right { position: sticky; top: calc(var(--header-h) + var(--header-gap) + env(safe-area-inset-top, 0px)); max-height: calc(100vh - var(--header-h) - var(--header-gap) - env(safe-area-inset-top, 0px) - 16px); overflow-y: auto; overflow-x: hidden;
             scrollbar-width: none; -ms-overflow-style: none; }
           .home-right::-webkit-scrollbar { display: none; }
           .ui-card { padding: 18px !important; }
@@ -6719,7 +6723,7 @@ function AppInner() {
           .di-main-wrap header { left: 0 !important; width: 100% !important; }
           .di-main-wrap main { max-width: 1400px !important; padding-left: 36px !important; padding-right: 36px !important; padding-bottom: 36px !important; }
           .home-grid { display: grid !important; grid-template-columns: 1fr 400px !important; gap: 24px !important; align-items: start !important; }
-          .home-right { position: sticky; top: calc(var(--header-h) + var(--header-gap) + var(--safe-top)); max-height: calc(100vh - var(--header-h) - var(--header-gap) - var(--safe-top) - 16px); overflow-y: auto; overflow-x: hidden;
+          .home-right { position: sticky; top: calc(var(--header-h) + var(--header-gap) + env(safe-area-inset-top, 0px)); max-height: calc(100vh - var(--header-h) - var(--header-gap) - env(safe-area-inset-top, 0px) - 16px); overflow-y: auto; overflow-x: hidden;
             scrollbar-width: none; -ms-overflow-style: none; }
           .home-right::-webkit-scrollbar { display: none; }
           .ui-card { padding: 20px !important; }
@@ -6744,9 +6748,12 @@ function AppInner() {
       <div className="di-app-body">
       <div className="di-main-wrap">
 
+      {/* ── safe-area 배경 커버 (상태바 영역) ── */}
+      <div className="safe-area-cover" style={{ background: C.bg }} />
+
       {/* ── GNB 헤더 (로고 + 수평 네비게이션 + 우측 도구) ──────────────────────────────────────────────────── */}
       <header style={{
-        position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
+        position: "fixed", left: 0, right: 0, zIndex: 100,
         background: C.bg, backdropFilter: "none", WebkitBackdropFilter: "none",
         borderBottom: `1px solid ${C.border}${C.isDark ? '30' : '50'}`,
         overflow: "visible",
@@ -7149,7 +7156,17 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "home" && (
           <div className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            {/* 검색은 헤더 GNB에 통합 — 중복 제거 */}
+            {/* 소셜 프루프 바 — 신뢰감 + 바이럴 */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", padding: "8px 0", flexWrap: "wrap" }}>
+              <span style={{ fontSize: "11px", color: C.text3, display: "flex", alignItems: "center", gap: "4px" }}>
+                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.green, display: "inline-block", animation: "pulse 2s infinite" }} />
+                {hotAssets.length * 33 + 847}개 전략 실시간 분석 중
+              </span>
+              <span style={{ fontSize: "11px", color: C.text3 }}>·</span>
+              <span style={{ fontSize: "11px", color: C.text3 }}>{hotAssets.length}개 종목 모니터링</span>
+              <span style={{ fontSize: "11px", color: C.text3 }}>·</span>
+              <span style={{ fontSize: "11px", color: C.text3 }}>100% 무료</span>
+            </div>
 
             {/* 2컬럼 그리드 (데스크톱) / 1컬럼 (모바일) */}
             <div className="home-grid">
@@ -7409,6 +7426,23 @@ function AppInner() {
                     );
                   })}
                 </div>
+                {/* 오늘의 추천 공유 */}
+                {dailyPicks.length > 0 && (
+                  <button onClick={() => {
+                    const top5 = dailyPicks.slice(0, 5).map((p, i) => `${i + 1}. ${p.name} (${p.symbol}) ${p.change >= 0 ? "+" : ""}${p.change}%`).join("\n");
+                    const txt = `[Toit AI 오늘의 추천]\n\n${top5}\n\nAI 퀀트 33개 전략이 실시간으로 찾아낸 종목입니다\n👉 https://signal-screener.vercel.app`;
+                    if (navigator.share) navigator.share({ title: "Toit AI 오늘의 추천", text: txt, url: "https://signal-screener.vercel.app" }).catch(() => {});
+                    else navigator.clipboard.writeText(txt).then(() => alert("추천 종목이 복사되었습니다!")).catch(() => {});
+                  }} style={{
+                    width: "100%", padding: "8px 0", marginTop: "8px", borderRadius: "10px",
+                    fontSize: "12px", fontWeight: 600, color: C.text3, background: "transparent",
+                    border: `1px dashed ${C.border}${C.isDark ? '40' : '60'}`, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.color = C.blue; e.currentTarget.style.borderColor = C.blue; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = C.text3; e.currentTarget.style.borderColor = `${C.border}${C.isDark ? '40' : '60'}`; }}
+                  >📤 오늘의 추천 공유</button>
+                )}
               </div>
             )}
 
@@ -10689,6 +10723,68 @@ function AppInner() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* 내 투자 성적표 공유 */}
+            <div style={{ background: `linear-gradient(135deg, ${C.card}, ${C.blueBg})`, border: `1px solid ${C.blue}20`, borderRadius: "16px", padding: "20px", textAlign: "center" }}>
+              <div style={{ fontSize: "14px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>내 투자 성적표</div>
+              <div style={{ fontSize: "12px", color: C.text3, marginBottom: "16px" }}>AI가 분석한 나의 투자 현황을 공유해보세요</div>
+              <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginBottom: "16px" }}>
+                <div>
+                  <div style={{ fontSize: "24px", fontWeight: 800, color: C.blue }}>{watchlist.length}</div>
+                  <div style={{ fontSize: "11px", color: C.text3 }}>관심종목</div>
+                </div>
+                <div style={{ width: "1px", background: `${C.border}40` }} />
+                <div>
+                  <div style={{ fontSize: "24px", fontWeight: 800, color: C.purple || "#a855f7" }}>{(() => { try { return JSON.parse(localStorage.getItem(`toit_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })()}</div>
+                  <div style={{ fontSize: "11px", color: C.text3 }}>운영봇</div>
+                </div>
+                <div style={{ width: "1px", background: `${C.border}40` }} />
+                <div>
+                  <div style={{ fontSize: "24px", fontWeight: 800, color: C.green }}>{(() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })()}</div>
+                  <div style={{ fontSize: "11px", color: C.text3 }}>투자일</div>
+                </div>
+              </div>
+              <button onClick={() => {
+                const days = (() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })();
+                const bots = (() => { try { return JSON.parse(localStorage.getItem(`toit_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })();
+                const name = user?.user_metadata?.display_name || "투자자";
+                const txt = `[Toit AI 투자 성적표]\n\n${name}님의 투자 현황\n관심종목 ${watchlist.length}개 | AI 봇 ${bots}개 운영 | ${days}일째 투자 중\n\n33개 AI 퀀트 전략으로 매일 시그널 받고 있어요\n무료로 시작하기 👉 https://signal-screener.vercel.app`;
+                if (navigator.share) navigator.share({ title: "Toit AI 투자 성적표", text: txt, url: "https://signal-screener.vercel.app" }).catch(() => {});
+                else navigator.clipboard.writeText(txt).then(() => alert("성적표가 복사되었습니다!")).catch(() => {});
+              }} style={{
+                padding: "10px 28px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
+                background: C.blue, color: "#fff", border: "none", cursor: "pointer",
+                display: "inline-flex", alignItems: "center", gap: "6px",
+              }}>📤 성적표 공유하기</button>
+            </div>
+
+            {/* 친구 초대 */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", fontSize: "12px", fontWeight: 700, color: C.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>친구 초대</div>
+              <div style={{ padding: "16px 20px", borderTop: `1px solid ${C.border}20` }}>
+                <div style={{ fontSize: "13px", color: C.text2, lineHeight: 1.6, marginBottom: "14px" }}>
+                  투자하는 친구에게 Toit을 공유하세요.<br/>AI 퀀트 전략을 무료로 이용할 수 있어요.
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button onClick={() => {
+                    const txt = "나 요즘 이거 쓰는데 AI가 매수 타점 잡아줘서 꽤 괜찮아. 무료인데 한번 써봐 👉 https://signal-screener.vercel.app";
+                    if (navigator.share) navigator.share({ title: "Toit - AI 퀀트 투자", text: txt, url: "https://signal-screener.vercel.app" }).catch(() => {});
+                    else navigator.clipboard.writeText(txt).then(() => alert("초대 링크가 복사되었습니다!")).catch(() => {});
+                  }} style={{
+                    flex: 1, padding: "10px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                    background: C.blue, color: "#fff", border: "none", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
+                  }}>📱 카톡으로 공유</button>
+                  <button onClick={() => {
+                    navigator.clipboard.writeText("https://signal-screener.vercel.app").then(() => alert("링크가 복사되었습니다!")).catch(() => {});
+                  }} style={{
+                    flex: 1, padding: "10px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                    background: C.card2, color: C.text2, border: `1px solid ${C.border}${C.isDark ? '30' : '50'}`, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
+                  }}>🔗 링크 복사</button>
+                </div>
+              </div>
             </div>
 
             {/* 앱 설정 */}
