@@ -277,14 +277,14 @@ const CRYPTO_BOTS = [
     risk: "공격",
     riskColor: "orange",
     expectedReturn: "15-40%",
-    description: "5대 크립토 분산투자 · 목표 비중 리밸런싱 · 상관관계 필터",
-    tags: ["분산투자", "리밸런싱", "5자산"],
+    description: "6대 크립토 분산투자 · 엔트로피 레짐 + 정보흐름 중기 전략",
+    tags: ["분산투자", "리밸런싱", "6자산"],
     stats: {
       winRate: "61%",
       sharpeRatio: "1.7",
       mdd: "25%",
     },
-    details: "BTC(40%), ETH(25%), SOL(15%), BNB(10%), XRP(10%) 분산투자로 리스크를 관리합니다.",
+    details: "BTC(35%), ETH(25%), SOL(15%), AVAX(10%), LINK(8%), DOGE(7%) 분산투자로 리스크를 관리합니다.",
   },
   {
     id: "crypto-swing",

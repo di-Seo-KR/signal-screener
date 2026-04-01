@@ -31,12 +31,15 @@ const LIGHT_C = {
   isDark: false,
 };
 
+// Alpaca 지원 크립토만 포함 (BNB, XRP는 Alpaca 미지원)
+// 지원 코인: BTC, ETH, SOL, AVAX, DOGE, LINK, DOT, UNI, AAVE, LTC 등
 const BTC_ASSETS = [
-  { sym: "BTC-USD", alpaca: "BTC/USD", name: "Bitcoin", icon: "₿", weight: 0.40 },
+  { sym: "BTC-USD", alpaca: "BTC/USD", name: "Bitcoin", icon: "₿", weight: 0.35 },
   { sym: "ETH-USD", alpaca: "ETH/USD", name: "Ethereum", icon: "Ξ", weight: 0.25 },
   { sym: "SOL-USD", alpaca: "SOL/USD", name: "Solana", icon: "◎", weight: 0.15 },
-  { sym: "BNB-USD", alpaca: "BNB/USD", name: "BNB", icon: "◆", weight: 0.10 },
-  { sym: "XRP-USD", alpaca: "XRP/USD", name: "XRP", icon: "✕", weight: 0.10 },
+  { sym: "AVAX-USD", alpaca: "AVAX/USD", name: "Avalanche", icon: "🔺", weight: 0.10 },
+  { sym: "LINK-USD", alpaca: "LINK/USD", name: "Chainlink", icon: "⬡", weight: 0.08 },
+  { sym: "DOGE-USD", alpaca: "DOGE/USD", name: "Dogecoin", icon: "🐕", weight: 0.07 },
 ];
 
 const BTC_STRATEGY = ALL_STRATEGIES.find(s => s.id === "btc_alpha");
@@ -87,11 +90,11 @@ async function fetchCandles(symbol, range = "1y", interval = "1d") {
 // ── CoinGecko ──
 async function fetchCryptoPrices() {
   try {
-    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,binancecoin,ripple&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true");
+    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,solana,avalanche-2,chainlink,dogecoin&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true&include_market_cap=true");
     return r.ok ? await r.json() : null;
   } catch { return null; }
 }
-const GECKO = { "BTC-USD": "bitcoin", "ETH-USD": "ethereum", "SOL-USD": "solana", "BNB-USD": "binancecoin", "XRP-USD": "ripple" };
+const GECKO = { "BTC-USD": "bitcoin", "ETH-USD": "ethereum", "SOL-USD": "solana", "AVAX-USD": "avalanche-2", "LINK-USD": "chainlink", "DOGE-USD": "dogecoin" };
 
 // ── CryptoRiskManager ──
 class CryptoRiskManager {
@@ -206,7 +209,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
       riskLevel: "medium",
       // 5대 자산 분산 — 안정적 중기 + 엔트로피/정보흐름
       strategies: ["btc_alpha", "hurst_regime", "efficiency_ratio", "info_flow", "entropy_regime", "microstructure"],
-      assets: ["BTC-USD", "ETH-USD", "SOL-USD", "BNB-USD", "XRP-USD"],  // 5자산 분산
+      assets: ["BTC-USD", "ETH-USD", "SOL-USD", "AVAX-USD", "LINK-USD", "DOGE-USD"],  // 6자산 분산
       timeframes: ["1d", "4h"],        // 중기 이상만 (스캘핑 없음)
       scalpStrategies: [],
       positionMult: 0.7,               // 보수적 사이징
@@ -328,19 +331,25 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
         setPrices(pm);
       }
 
-      // ── 멀티 타임프레임 캔들 병렬 로딩 ──
-      // 일봉(1y) + 4시간봉(60d) + 5분봉(5d) — 크립토 24/7 초단기 트레이딩
-      const [candles, ethCandles, solCandles, btc4h, eth4h, sol4h, btc5m, eth5m, sol5m] = await Promise.all([
-        fetchCandles("BTC-USD", "1y"),
-        fetchCandles("ETH-USD", "1y"),
-        fetchCandles("SOL-USD", "1y"),
-        fetchCandles("BTC-USD", "60d", "4h"),
-        fetchCandles("ETH-USD", "60d", "4h"),
-        fetchCandles("SOL-USD", "60d", "4h"),
-        fetchCandles("BTC-USD", "5d", "5m"),
-        fetchCandles("ETH-USD", "5d", "5m"),
-        fetchCandles("SOL-USD", "5d", "5m"),
-      ]);
+      // ── 멀티 타임프레임 캔들 병렬 로딩 (전체 자산 동적) ──
+      const assetSyms = BTC_ASSETS.map(a => a.sym);
+      const candlePromises = [];
+      for (const sym of assetSyms) {
+        candlePromises.push(fetchCandles(sym, "1y"));       // 일봉
+        candlePromises.push(fetchCandles(sym, "60d", "4h")); // 4시간봉
+        candlePromises.push(fetchCandles(sym, "5d", "5m"));  // 5분봉
+      }
+      const allCandleData = await Promise.all(candlePromises);
+
+      // 자산별 캔들 매핑 구성
+      const dailyMap = {}, h4Map = {}, m5Map = {};
+      assetSyms.forEach((sym, idx) => {
+        dailyMap[sym] = allCandleData[idx * 3];
+        h4Map[sym] = allCandleData[idx * 3 + 1];
+        m5Map[sym] = allCandleData[idx * 3 + 2];
+      });
+
+      const candles = dailyMap["BTC-USD"] || [];
       if (candles.length > 60) {
         setBtcCandles(candles);
 
@@ -363,11 +372,6 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
             .map(id => ALL_STRAT_MAP[id]).filter(Boolean);
           const activeAssets = presetConfig.assets;
           const activeTFs = presetConfig.timeframes;
-
-          // 자산별 캔들 매핑
-          const dailyMap = { "BTC-USD": candles, "ETH-USD": ethCandles, "SOL-USD": solCandles };
-          const h4Map = { "BTC-USD": btc4h, "ETH-USD": eth4h, "SOL-USD": sol4h };
-          const m5Map = { "BTC-USD": btc5m, "ETH-USD": eth5m, "SOL-USD": sol5m };
 
           const genSigs = (strats, candleMap, tf) => {
             if (!activeTFs.includes(tf)) return [];

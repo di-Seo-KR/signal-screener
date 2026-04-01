@@ -5,8 +5,8 @@
 
 export const config = { maxDuration: 120 };
 
-const CRYPTO_ASSETS = ["BTC/USD", "ETH/USD", "SOL/USD"];
-const YAHOO_TICKERS = { "BTC/USD": "BTC-USD", "ETH/USD": "ETH-USD", "SOL/USD": "SOL-USD" };
+const CRYPTO_ASSETS = ["BTC/USD", "ETH/USD", "SOL/USD", "AVAX/USD", "LINK/USD", "DOGE/USD"];
+const YAHOO_TICKERS = { "BTC/USD": "BTC-USD", "ETH/USD": "ETH-USD", "SOL/USD": "SOL-USD", "AVAX/USD": "AVAX-USD", "LINK/USD": "LINK-USD", "DOGE/USD": "DOGE-USD" };
 const MAX_POSITION_PER_ASSET = 0.30;
 const MAX_TOTAL_CRYPTO_EXPOSURE = 0.80;
 
