@@ -197,7 +197,7 @@ export default async function handler(req, res) {
       }, fngValue, marketRegime, assetAlerts);
 
       // 일봉에서 시그널 없으면 4시간봉으로 재시도
-      if (!latestSignal && candles4h.length >= 100) {
+      if (!latestSignal && candles4h.length >= 61) {
         addLog(`🔄 ${asset} 일봉 시그널 없음 → 4시간봉 분석...`);
         const c4h = candles4h;
         const closes4h = c4h.map(c => c.close);
@@ -256,7 +256,7 @@ export default async function handler(req, res) {
       }
 
       // BUY 주문 실행 (현금 기준 — 레버리지 미사용)
-      if ((latestSignal.type === "BUY" || shouldSellForStopLoss === false) && !shouldSellForStopLoss) {
+      if (latestSignal.type === "BUY" && !shouldSellForStopLoss) {
         const availableCash = cash - totalCryptoExposure;
         const maxCashPerAsset = cash * MAX_POSITION_PER_ASSET;
         if (pos) {
@@ -472,13 +472,14 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
   const atrPct = atr[lastIdx] && price > 0 ? (atr[lastIdx] / price) * 100 : 2;
   const posSize = atrPct > 5 ? 0.3 : atrPct > 3 ? 0.5 : atrPct > 1.5 ? 0.7 : 0.9;
 
-  // Fear & Greed에 따른 동적 임계값 (v3: 시그널 빈도 대폭 상향)
+  // Fear & Greed에 따른 동적 임계값 (v4: 훨씬 더 공격적)
+  // buyFactorsThreshold는 0 — score만 넘으면 시그널 발생
   let buyThreshold, buyFactorsThreshold, sellThreshold, sellFactorsThreshold;
-  if (fngValue <= 25) { buyThreshold = 2; buyFactorsThreshold = 1; sellThreshold = 4; sellFactorsThreshold = 2; }
-  else if (fngValue <= 45) { buyThreshold = 2; buyFactorsThreshold = 1; sellThreshold = 3; sellFactorsThreshold = 1; }
-  else if (fngValue <= 55) { buyThreshold = 2; buyFactorsThreshold = 1; sellThreshold = 2; sellFactorsThreshold = 1; }
-  else if (fngValue <= 75) { buyThreshold = 3; buyFactorsThreshold = 1; sellThreshold = 2; sellFactorsThreshold = 1; }
-  else { buyThreshold = 4; buyFactorsThreshold = 1; sellThreshold = 2; sellFactorsThreshold = 1; }
+  if (fngValue <= 25) { buyThreshold = 1; buyFactorsThreshold = 0; sellThreshold = 3; sellFactorsThreshold = 1; }
+  else if (fngValue <= 45) { buyThreshold = 1; buyFactorsThreshold = 0; sellThreshold = 2; sellFactorsThreshold = 0; }
+  else if (fngValue <= 55) { buyThreshold = 1; buyFactorsThreshold = 0; sellThreshold = 1; sellFactorsThreshold = 0; }
+  else if (fngValue <= 75) { buyThreshold = 2; buyFactorsThreshold = 0; sellThreshold = 1; sellFactorsThreshold = 0; }
+  else { buyThreshold = 3; buyFactorsThreshold = 0; sellThreshold = 1; sellFactorsThreshold = 0; }
 
   // ── market-monitor 레짐 데이터로 임계값 미세 조정 ──
   if (marketRegime) {
@@ -550,12 +551,12 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
       reasons.push(`Hurst${hurst.toFixed(2)} 추세레짐 저점근접`);
     }
   }
-  // Hurst 추세 방향만으로도 약한 시그널
-  if (hurst > 0.52 && price > ema21[lastIdx]) {
-    buyScore += 1; reasons.push(`Hurst${hurst.toFixed(2)} 상승추세`);
+  // Hurst 방향 시그널 (v4: 0.48 이상이면 방향성 참고)
+  if (hurst > 0.48 && price > ema21[lastIdx]) {
+    buyScore += 1; reasons.push(`Hurst${hurst.toFixed(2)} 상승`);
   }
-  if (hurst > 0.52 && price < ema21[lastIdx]) {
-    sellScore += 1; reasons.push(`Hurst${hurst.toFixed(2)} 하락추세`);
+  if (hurst > 0.48 && price < ema21[lastIdx]) {
+    sellScore += 1; reasons.push(`Hurst${hurst.toFixed(2)} 하락`);
   }
 
   // Hurst 평균회귀레짐 + RSI 역추세 (v3: RSI 완화 40/60)
@@ -621,13 +622,13 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
   // LAYER 3: 기존 지표 보조 확인 (가중치 축소)
   // ═══════════════════════════════════════════════════════
 
-  // RSI 보조 (v3: 조건 완화)
+  // RSI 보조 (v4: 구간 더 넓힘)
   if (rsi[lastIdx] < 25) { buyScore += 2; buyFactors++; reasons.push(`RSI ${rsi[lastIdx].toFixed(0)} 극과매도`); }
   else if (rsi[lastIdx] < 40 && rsi[lastIdx] > rsi[lastIdx - 1]) { buyScore += 1; buyFactors++; reasons.push(`RSI ${rsi[lastIdx].toFixed(0)} 반등`); }
-  else if (rsi[lastIdx] < 45) { buyScore += 1; }
+  else if (rsi[lastIdx] < 50) { buyScore += 1; reasons.push(`RSI ${rsi[lastIdx].toFixed(0)} 매수권`); }
   if (rsi[lastIdx] > 75) { sellScore += 2; sellFactors++; reasons.push(`RSI ${rsi[lastIdx].toFixed(0)} 극과매수`); }
   else if (rsi[lastIdx] > 60 && rsi[lastIdx] < rsi[lastIdx - 1]) { sellScore += 1; sellFactors++; reasons.push(`RSI ${rsi[lastIdx].toFixed(0)} 하락`); }
-  else if (rsi[lastIdx] > 55) { sellScore += 1; }
+  else if (rsi[lastIdx] > 50) { sellScore += 1; reasons.push(`RSI ${rsi[lastIdx].toFixed(0)} 매도권`); }
 
   // MACD 보조
   if (macdLine[lastIdx] > macdSig[lastIdx] && macdLine[lastIdx - 1] <= macdSig[lastIdx - 1]) {
@@ -695,9 +696,22 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
   }
 
   // ═══════════════════════════════════════════════════════
-  // 최종 판정
+  // 최종 판정 (v4: 동점 시 FNG 방향 우선, 폴백 추세추종)
   // ═══════════════════════════════════════════════════════
-  if (buyScore >= buyThreshold && buyFactors >= buyFactorsThreshold && buyScore > sellScore) {
+  const buyPass = buyScore >= buyThreshold && buyFactors >= buyFactorsThreshold;
+  const sellPass = sellScore >= sellThreshold && sellFactors >= sellFactorsThreshold;
+
+  // 동점이면 FNG 기반 방향 선택 (공포→매수 우선, 탐욕→매도 우선)
+  if (buyPass && sellPass && buyScore === sellScore) {
+    const favorBuy = fngValue <= 50;
+    if (favorBuy) {
+      return { type: "BUY", confidence: "C", score: buyScore, factors: buyFactors, positionSize: posSize * 0.5, reason: reasons.join(" + ") + " [동점→FNG매수]", bar: lastIdx, price };
+    } else {
+      return { type: "SELL", confidence: "C", score: sellScore, factors: sellFactors, positionSize: posSize * 0.5, reason: reasons.join(" + ") + " [동점→FNG매도]", bar: lastIdx, price };
+    }
+  }
+
+  if (buyPass && buyScore > sellScore) {
     return {
       type: "BUY",
       confidence: buyScore >= 9 ? "A" : buyScore >= 7 ? "B" : "C",
@@ -708,13 +722,38 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
     };
   }
 
-  if (sellScore >= sellThreshold && sellFactors >= sellFactorsThreshold && sellScore > buyScore) {
+  if (sellPass && sellScore > buyScore) {
     return {
       type: "SELL",
       confidence: sellScore >= 9 ? "A" : sellScore >= 7 ? "B" : "C",
       score: sellScore, factors: sellFactors,
       positionSize: posSize,
       reason: reasons.join(" + "),
+      bar: lastIdx, price,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // 폴백: 추세 추종 시그널 (아무 시그널도 없을 때)
+  // EMA21/55 방향 + 주봉 추세만으로 약한 시그널 발생
+  // ═══════════════════════════════════════════════════════
+  const emaUp = ema21[lastIdx] > ema55[lastIdx];
+  const emaDown = ema21[lastIdx] < ema55[lastIdx];
+  const above200 = ema200.length > 0 && ema200[lastIdx] ? price > ema200[lastIdx] : null;
+
+  if (emaUp && (weeklyTrendUp === true || above200 === true)) {
+    return {
+      type: "BUY", confidence: "C", score: 1, factors: 0,
+      positionSize: posSize * 0.3,
+      reason: "폴백: EMA상승 + " + (weeklyTrendUp ? "주봉↑" : "EMA200↑"),
+      bar: lastIdx, price,
+    };
+  }
+  if (emaDown && (weeklyTrendUp === false || above200 === false)) {
+    return {
+      type: "SELL", confidence: "C", score: 1, factors: 0,
+      positionSize: posSize * 0.3,
+      reason: "폴백: EMA하락 + " + (weeklyTrendUp === false ? "주봉↓" : "EMA200↓"),
       bar: lastIdx, price,
     };
   }
