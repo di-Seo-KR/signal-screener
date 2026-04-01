@@ -6762,17 +6762,7 @@ function AppInner() {
 
           {/* 좌측: 로고 */}
           <div onClick={() => setTab("home")} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none", marginRight: "16px", flexShrink: 0, title: "홈으로 이동" }}>
-            <svg width="24" height="24" viewBox="0 0 32 32" style={{ flexShrink: 0 }}>
-              <defs>
-                <linearGradient id="zeptaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <stop offset="0%" style={{ stopColor: "#3182F6", stopOpacity: 1 }} />
-                  <stop offset="100%" style={{ stopColor: "#60A5FA", stopOpacity: 1 }} />
-                </linearGradient>
-              </defs>
-              <rect width="32" height="32" fill="none"/>
-              <path d="M 8 4 L 8 28 M 8 4 L 14 4 Q 14 16 8 16" stroke="url(#zeptaGradient)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M 14 12 L 24 4 M 24 4 L 24 28" stroke="url(#zeptaGradient)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
+            <img src="/zepta-logo-192.png" alt="Zepta" width="28" height="28" style={{ flexShrink: 0, borderRadius: "6px" }} />
             <span style={{ fontWeight: 800, fontSize: "17px", letterSpacing: "-0.5px", color: C.text1 }}>Zepta</span>
           </div>
 
@@ -11081,11 +11071,7 @@ function AppInner() {
           }}>
             <div style={{ padding: "24px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <svg width="28" height="28" viewBox="0 0 32 32" style={{ flexShrink: 0 }}>
-                  <defs><linearGradient id="authZeptaGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style={{ stopColor: "#3182F6" }} /><stop offset="100%" style={{ stopColor: "#60A5FA" }} /></linearGradient></defs>
-                  <path d="M 8 4 L 8 28 M 8 4 L 14 4 Q 14 16 8 16" stroke="url(#authZeptaGrad)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M 14 12 L 24 4 M 24 4 L 24 28" stroke="url(#authZeptaGrad)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
+                <img src="/zepta-logo-192.png" alt="Zepta" width="28" height="28" style={{ flexShrink: 0, borderRadius: "6px" }} />
                 <div>
                   <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: C.text1 }}>Zepta 로그인</h3>
                   <p style={{ margin: "2px 0 0", fontSize: "12px", color: C.text3 }}>투자 서비스를 이용하려면 로그인하세요</p>

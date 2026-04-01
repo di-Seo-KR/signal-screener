@@ -1,7 +1,7 @@
 {
-  "name": "DI금융",
-  "short_name": "DI금융",
-  "description": "실시간 투자 스크리너 + 퀀트 엔진",
+  "name": "Zepta",
+  "short_name": "Zepta",
+  "description": "AI 퀀트 투자 플랫폼 — 33개 전략 자동매매",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -9,9 +9,14 @@
   "theme_color": "#060a12",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='80'>📡</text></svg>",
-      "sizes": "any",
-      "type": "image/svg+xml"
+      "src": "/zepta-logo-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/zepta-logo-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ]
 }
