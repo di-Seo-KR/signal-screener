@@ -2644,6 +2644,293 @@ export const strategyInfoFlow = {
   },
 };
 
+// ══════════════════════════════════════════════════════════════
+// 7) Funding Rate Reversal — 펀딩레이트 극단치 역행 전략
+// ══════════════════════════════════════════════════════════════
+// 크립토 파생상품 시장에서 펀딩레이트(선물 프리미엄)가 극단적일 때
+// 군중의 반대편에 서는 역발상 전략. 펀딩레이트 > 0.1%면 과열 → 숏,
+// < -0.05%면 공포 → 롱. 실제 펀딩레이트 API 없이 가격-추세 괴리로 추정.
+// 핵심: Open Interest의 방향성 + 가격 추세의 디커플링.
+export const strategyFundingRate = {
+  id: "funding_rate",
+  name: "💰 펀딩레이트 역행",
+  desc: "크립토 선물 시장의 펀딩레이트 극단치를 가격-거래량 괴리로 추정하여 군중 반대편 포지셔닝. 과열 시 숏, 공포 시 롱. 파생시장 오버레버리지 청산 파동 포착.",
+  category: "알파",
+  risk: "고",
+  icon: "💰",
+  params: { lookback: 20, extremeThreshold: 2.5, cooldown: 5 },
+  generate(candles, params = {}) {
+    const { lookback = 20, extremeThreshold = 2.5, cooldown = 5 } = { ...this.params, ...params };
+    if (candles.length < lookback + 50) return [];
+
+    const closes = candles.map(c => c.close);
+    const volumes = candles.map(c => c.volume || 0);
+    const highs = candles.map(c => c.high);
+    const lows = candles.map(c => c.low);
+    const atr = calcATR(highs, lows, closes, 14);
+    const rsi = calcRSI(closes, 14);
+    const volSMA = calcSMA(volumes, lookback);
+
+    // 펀딩레이트 프록시: 가격 추세 강도 vs 거래량 비정상도
+    // 선물 시장에서 과도한 레버리지 = 가격 급등 + 거래량 폭발 → 청산 임박
+    function calcFundingProxy(i) {
+      if (i < lookback) return 0;
+      // 가격 모멘텀 (z-score)
+      const returns = [];
+      for (let j = 0; j < lookback; j++) {
+        if (i - j > 0) returns.push((closes[i - j] - closes[i - j - 1]) / closes[i - j - 1]);
+      }
+      const meanRet = returns.reduce((a, b) => a + b, 0) / returns.length;
+      const stdRet = Math.sqrt(returns.reduce((a, b) => a + (b - meanRet) ** 2, 0) / returns.length);
+      const priceZ = stdRet > 0 ? meanRet / stdRet : 0;
+
+      // 거래량 비정상도
+      const volZ = volSMA[i] > 0 ? (volumes[i] / volSMA[i]) - 1 : 0;
+
+      // 펀딩 프록시: 높은 모멘텀 + 높은 거래량 = 과열
+      return priceZ * (1 + Math.min(volZ, 3));
+    }
+
+    const signals = [];
+    let lastIdx = -cooldown;
+
+    for (let i = lookback + 10; i < candles.length; i++) {
+      if (i - lastIdx < cooldown) continue;
+      const funding = calcFundingProxy(i);
+      const price = closes[i];
+      const atrPct = atr[i] && price > 0 ? (atr[i] / price) * 100 : 2;
+
+      // 극단적 과열: 펀딩 프록시 > threshold → 매도 (롱 청산 파동 예상)
+      if (funding > extremeThreshold && rsi[i] > 70) {
+        lastIdx = i;
+        signals.push({
+          index: i, type: "SELL", price,
+          confidence: funding > extremeThreshold * 1.5 ? "A" : "B",
+          reason: `💰 펀딩과열 ${funding.toFixed(2)} — RSI ${rsi[i].toFixed(0)} 레버리지 청산 임박`,
+        });
+      }
+      // 극단적 공포: 펀딩 프록시 < -threshold → 매수 (숏 청산 스퀴즈 예상)
+      else if (funding < -extremeThreshold && rsi[i] < 30) {
+        lastIdx = i;
+        signals.push({
+          index: i, type: "BUY", price,
+          confidence: funding < -extremeThreshold * 1.5 ? "A" : "B",
+          reason: `💰 펀딩공포 ${funding.toFixed(2)} — RSI ${rsi[i].toFixed(0)} 숏스퀴즈 임박`,
+        });
+      }
+    }
+    return signals;
+  },
+};
+
+// ══════════════════════════════════════════════════════════════
+// 8) Microstructure Alpha — 가격 미세구조 분석 전략
+// ══════════════════════════════════════════════════════════════
+// 고빈도 매매(HFT) 개념을 일봉/분봉에 적용.
+// 캔들의 상체/하체 비율(위꼬리/아래꼬리)로 매수/매도 압력 비대칭 감지.
+// 연속된 거래량 가중 가격 이동(VWAP 괴리) + 틱 비대칭으로 숨겨진 수급 포착.
+export const strategyMicrostructure = {
+  id: "microstructure",
+  name: "🔬 마이크로스트럭처",
+  desc: "HFT 개념의 가격 미세구조 분석. 캔들 위꼬리/아래꼬리 비율로 매수/매도 압력 비대칭 감지. VWAP 괴리 + 거래량 불균형으로 숨겨진 수급 변동 실시간 포착.",
+  category: "알파",
+  risk: "중",
+  icon: "🔬",
+  params: { wickWindow: 10, imbalanceThreshold: 0.65, vwapDeviation: 1.5 },
+  generate(candles, params = {}) {
+    const { wickWindow = 10, imbalanceThreshold = 0.65, vwapDeviation = 1.5 } = { ...this.params, ...params };
+    if (candles.length < 60) return [];
+
+    const closes = candles.map(c => c.close);
+    const volumes = candles.map(c => c.volume || 0);
+    const highs = candles.map(c => c.high);
+    const lows = candles.map(c => c.low);
+    const opens = candles.map(c => c.open);
+    const rsi = calcRSI(closes, 14);
+    const atr = calcATR(highs, lows, closes, 14);
+
+    // 틱 비대칭 (Tick Imbalance): 위꼬리 대비 아래꼬리 비율
+    function calcWickImbalance(i) {
+      let buyPressure = 0, sellPressure = 0;
+      for (let j = Math.max(0, i - wickWindow + 1); j <= i; j++) {
+        const body = Math.abs(closes[j] - opens[j]);
+        const range = highs[j] - lows[j];
+        if (range === 0) continue;
+
+        // 아래꼬리 = 매수 압력 (하락 시도 후 매수세 유입)
+        const lowerWick = Math.min(opens[j], closes[j]) - lows[j];
+        // 위꼬리 = 매도 압력 (상승 시도 후 매도세 유입)
+        const upperWick = highs[j] - Math.max(opens[j], closes[j]);
+
+        buyPressure += (lowerWick / range) * (volumes[j] || 1);
+        sellPressure += (upperWick / range) * (volumes[j] || 1);
+      }
+      const total = buyPressure + sellPressure;
+      return total > 0 ? buyPressure / total : 0.5;
+    }
+
+    // 거래량 가중 이동평균가격 (VWAP) 괴리
+    function calcVWAPDeviation(i, window = 20) {
+      let sumPV = 0, sumV = 0;
+      for (let j = Math.max(0, i - window + 1); j <= i; j++) {
+        const typicalPrice = (highs[j] + lows[j] + closes[j]) / 3;
+        sumPV += typicalPrice * (volumes[j] || 1);
+        sumV += (volumes[j] || 1);
+      }
+      const vwap = sumV > 0 ? sumPV / sumV : closes[i];
+      const atrVal = atr[i] || 1;
+      return (closes[i] - vwap) / atrVal;
+    }
+
+    const signals = [];
+    let lastIdx = -5;
+
+    for (let i = 30; i < candles.length; i++) {
+      if (i - lastIdx < 3) continue;
+      const price = closes[i];
+      const imbalance = calcWickImbalance(i);
+      const vwapDev = calcVWAPDeviation(i);
+
+      // 매수 압력 우세 + VWAP 하방 괴리 (저평가 + 매수세 강함)
+      if (imbalance > imbalanceThreshold && vwapDev < -vwapDeviation && rsi[i] < 45) {
+        lastIdx = i;
+        signals.push({
+          index: i, type: "BUY", price,
+          confidence: imbalance > 0.75 ? "A" : "B",
+          reason: `🔬 마이크로 매수압력 ${(imbalance * 100).toFixed(0)}% + VWAP괴리 ${vwapDev.toFixed(1)}σ`,
+        });
+      }
+      // 매도 압력 우세 + VWAP 상방 괴리 (고평가 + 매도세 강함)
+      else if (imbalance < (1 - imbalanceThreshold) && vwapDev > vwapDeviation && rsi[i] > 55) {
+        lastIdx = i;
+        signals.push({
+          index: i, type: "SELL", price,
+          confidence: imbalance < 0.25 ? "A" : "B",
+          reason: `🔬 마이크로 매도압력 ${((1 - imbalance) * 100).toFixed(0)}% + VWAP괴리 +${vwapDev.toFixed(1)}σ`,
+        });
+      }
+    }
+    return signals;
+  },
+};
+
+// ══════════════════════════════════════════════════════════════
+// 9) Entropy Regime — 정보 엔트로피 기반 레짐 전환 전략
+// ══════════════════════════════════════════════════════════════
+// 가격 수익률 분포의 Shannon 엔트로피로 시장 무질서도 측정.
+// 엔트로피 급감 = 시장이 한 방향으로 수렴 (트렌드 시작 임박)
+// 엔트로피 급증 = 시장이 랜덤워크 (방향성 상실 → 역추세)
+// 물리학의 상전이(phase transition) 개념을 금융 시장에 적용.
+export const strategyEntropy = {
+  id: "entropy_regime",
+  name: "🌀 엔트로피 레짐",
+  desc: "Shannon 엔트로피로 시장의 정보 무질서도를 측정. 엔트로피 급감(수렴) = 추세 시작, 엔트로피 급증(발산) = 방향 상실. 물리학 상전이 개념의 금융시장 적용.",
+  category: "알파",
+  risk: "중",
+  icon: "🌀",
+  params: { entropyWindow: 30, bins: 10, changeThreshold: 0.25 },
+  generate(candles, params = {}) {
+    const { entropyWindow = 30, bins = 10, changeThreshold = 0.25 } = { ...this.params, ...params };
+    if (candles.length < entropyWindow + 50) return [];
+
+    const closes = candles.map(c => c.close);
+    const highs = candles.map(c => c.high);
+    const lows = candles.map(c => c.low);
+    const rsi = calcRSI(closes, 14);
+    const ema20 = calcEMA(closes, 20);
+    const ema50 = calcEMA(closes, 50);
+    const atr = calcATR(highs, lows, closes, 14);
+
+    // Shannon 엔트로피 계산
+    function calcEntropy(data) {
+      if (data.length < 5) return 0;
+      const min = Math.min(...data);
+      const max = Math.max(...data);
+      const range = max - min;
+      if (range === 0) return 0;
+
+      const binCounts = new Array(bins).fill(0);
+      for (const v of data) {
+        const idx = Math.min(Math.floor(((v - min) / range) * bins), bins - 1);
+        binCounts[idx]++;
+      }
+
+      let entropy = 0;
+      for (const count of binCounts) {
+        if (count > 0) {
+          const p = count / data.length;
+          entropy -= p * Math.log2(p);
+        }
+      }
+      return entropy / Math.log2(bins); // 0~1 정규화
+    }
+
+    const signals = [];
+    let lastIdx = -5;
+
+    for (let i = entropyWindow + 10; i < candles.length; i++) {
+      if (i - lastIdx < 4) continue;
+      const price = closes[i];
+
+      // 수익률 기반 엔트로피
+      const returns = [];
+      for (let j = i - entropyWindow + 1; j <= i; j++) {
+        returns.push((closes[j] - closes[j - 1]) / closes[j - 1]);
+      }
+      const currentEntropy = calcEntropy(returns);
+
+      // 이전 구간 엔트로피 (비교용)
+      const prevReturns = [];
+      for (let j = i - entropyWindow * 2 + 1; j <= i - entropyWindow; j++) {
+        if (j > 0) prevReturns.push((closes[j] - closes[j - 1]) / closes[j - 1]);
+      }
+      const prevEntropy = prevReturns.length > 5 ? calcEntropy(prevReturns) : currentEntropy;
+
+      const entropyChange = currentEntropy - prevEntropy;
+      const trendUp = ema20[i] > ema50[i];
+      const trendDown = ema20[i] < ema50[i];
+
+      // 엔트로피 급감 (수렴) → 추세 시작 임박 → 추세 방향으로 진입
+      if (entropyChange < -changeThreshold && currentEntropy < 0.4) {
+        if (trendUp && rsi[i] > 50 && rsi[i] < 70) {
+          lastIdx = i;
+          signals.push({
+            index: i, type: "BUY", price,
+            confidence: entropyChange < -changeThreshold * 1.5 ? "A" : "B",
+            reason: `🌀 엔트로피 수렴 ${currentEntropy.toFixed(2)} (Δ${entropyChange.toFixed(2)}) — 상승추세 수렴`,
+          });
+        } else if (trendDown && rsi[i] < 50 && rsi[i] > 30) {
+          lastIdx = i;
+          signals.push({
+            index: i, type: "SELL", price,
+            confidence: entropyChange < -changeThreshold * 1.5 ? "A" : "B",
+            reason: `🌀 엔트로피 수렴 ${currentEntropy.toFixed(2)} (Δ${entropyChange.toFixed(2)}) — 하락추세 수렴`,
+          });
+        }
+      }
+      // 엔트로피 급증 (발산) → 방향성 상실 → 과매수/과매도 역추세
+      else if (entropyChange > changeThreshold && currentEntropy > 0.7) {
+        if (rsi[i] < 30) {
+          lastIdx = i;
+          signals.push({
+            index: i, type: "BUY", price,
+            confidence: "B",
+            reason: `🌀 엔트로피 발산 ${currentEntropy.toFixed(2)} (Δ+${entropyChange.toFixed(2)}) — RSI ${rsi[i].toFixed(0)} 역추세 매수`,
+          });
+        } else if (rsi[i] > 70) {
+          lastIdx = i;
+          signals.push({
+            index: i, type: "SELL", price,
+            confidence: "B",
+            reason: `🌀 엔트로피 발산 ${currentEntropy.toFixed(2)} (Δ+${entropyChange.toFixed(2)}) — RSI ${rsi[i].toFixed(0)} 역추세 매도`,
+          });
+        }
+      }
+    }
+    return signals;
+  },
+};
+
 // ── 전략 목록 ────────────────────────────────────────────────────
 export const ALL_STRATEGIES = [
   strategyRSI,
@@ -2685,6 +2972,9 @@ export const ALL_STRATEGIES = [
   strategyEfficiency,       // 📐 효율성 비율
   strategyMomDecay,         // 📉 모멘텀 감쇠 포착
   strategyInfoFlow,         // 🔮 정보흐름 감지
+  strategyFundingRate,      // 💰 펀딩레이트 역행 (크립토 특화)
+  strategyMicrostructure,   // 🔬 마이크로스트럭처 (HFT 개념)
+  strategyEntropy,          // 🌀 엔트로피 레짐 (물리학 상전이)
 ];
 
 // ════════════════════════════════════════════════════════════════════

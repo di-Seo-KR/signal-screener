@@ -4,7 +4,7 @@
 // CoinGecko 실시간 + Yahoo Finance 캔들 + Alpaca 크립토 주문
 // ════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { ALL_STRATEGIES, runBacktest, diagnoseMarket, strategyHurst, strategyVolCluster, strategyEfficiency, strategyMomDecay, strategyInfoFlow } from "./strategies.js";
+import { ALL_STRATEGIES, runBacktest, diagnoseMarket, strategyHurst, strategyVolCluster, strategyEfficiency, strategyMomDecay, strategyInfoFlow, strategyFundingRate, strategyMicrostructure, strategyEntropy } from "./strategies.js";
 
 const DARK_C = {
   bg: "#0B0F19", card: "#131B2E", card2: "#1A2438",
@@ -192,44 +192,46 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
     const pid = botPreset?.id;
     if (pid === "btc-alpha") return {
       riskLevel: "high",
-      // BTC 전용 알파 — 전 전략 풀가동, BTC 집중, 5분봉 스캘핑까지
-      strategies: ["btc_alpha", "hurst_regime", "vol_cluster", "efficiency_ratio", "momentum_decay", "info_flow"],
+      // BTC 전용 풀알파 — 9종 전략 풀가동, BTC 집중, 5분봉 스캘핑까지
+      strategies: ["btc_alpha", "hurst_regime", "vol_cluster", "efficiency_ratio", "momentum_decay", "info_flow",
+                   "funding_rate", "microstructure", "entropy_regime"],
       assets: ["BTC-USD"],             // BTC 단일 집중
       timeframes: ["1d", "4h", "5m"],  // 전 타임프레임
-      scalpStrategies: ["btc_alpha", "hurst_regime", "vol_cluster"],
+      scalpStrategies: ["btc_alpha", "hurst_regime", "vol_cluster", "microstructure"],
       positionMult: 1.2,               // 공격적 사이징
       cooldownMult: 0.8,               // 빠른 재진입
-      desc: "BTC 전용 풀 알파 전략 — 6종 앙상블 + 5분봉 스캘핑",
+      desc: "BTC 전용 9종 알파 전략 — 펀딩레이트/마이크로스트럭처/엔트로피 포함",
     };
     if (pid === "crypto-diversity") return {
       riskLevel: "medium",
-      // 5대 자산 분산 — 안정적 중기 전략 위주
-      strategies: ["btc_alpha", "hurst_regime", "efficiency_ratio", "info_flow"],
+      // 5대 자산 분산 — 안정적 중기 + 엔트로피/정보흐름
+      strategies: ["btc_alpha", "hurst_regime", "efficiency_ratio", "info_flow", "entropy_regime", "microstructure"],
       assets: ["BTC-USD", "ETH-USD", "SOL-USD", "BNB-USD", "XRP-USD"],  // 5자산 분산
       timeframes: ["1d", "4h"],        // 중기 이상만 (스캘핑 없음)
       scalpStrategies: [],
       positionMult: 0.7,               // 보수적 사이징
       cooldownMult: 1.5,               // 느린 재진입 (과매매 방지)
-      desc: "5대 크립토 분산투자 — 중기 리밸런싱 전략",
+      desc: "5대 크립토 분산 — 엔트로피 레짐 + 정보흐름 중기 전략",
     };
     if (pid === "crypto-swing") return {
       riskLevel: "high",
-      // 단기 스윙 — 변동성+모멘텀 전략 집중, BTC+ETH+SOL
-      strategies: ["btc_alpha", "vol_cluster", "momentum_decay", "hurst_regime"],
+      // 단기 스윙 — 변동성/펀딩/마이크로 집중, BTC+ETH+SOL
+      strategies: ["btc_alpha", "vol_cluster", "momentum_decay", "funding_rate", "microstructure", "hurst_regime"],
       assets: ["BTC-USD", "ETH-USD", "SOL-USD"],  // 유동성 높은 3종
       timeframes: ["4h", "5m"],        // 단기 타임프레임 집중 (일봉 제외)
-      scalpStrategies: ["btc_alpha", "vol_cluster", "hurst_regime"],
+      scalpStrategies: ["btc_alpha", "vol_cluster", "microstructure", "funding_rate"],
       positionMult: 1.5,               // 매우 공격적 사이징
       cooldownMult: 0.5,               // 매우 빠른 재진입
-      desc: "단기 스윙 — 변동성/모멘텀 전략 + 초단기 스캘핑",
+      desc: "단기 스윙 — 펀딩레이트/마이크로 + 변동성 스캘핑",
     };
     // 프리셋 없으면 기본값 (전체 전략)
     return {
       riskLevel: null,
-      strategies: ["btc_alpha", "hurst_regime", "vol_cluster", "efficiency_ratio", "momentum_decay", "info_flow"],
+      strategies: ["btc_alpha", "hurst_regime", "vol_cluster", "efficiency_ratio", "momentum_decay", "info_flow",
+                   "funding_rate", "microstructure", "entropy_regime"],
       assets: ["BTC-USD", "ETH-USD", "SOL-USD"],
       timeframes: ["1d", "4h", "5m"],
-      scalpStrategies: ["btc_alpha", "hurst_regime", "vol_cluster"],
+      scalpStrategies: ["btc_alpha", "hurst_regime", "vol_cluster", "microstructure"],
       positionMult: 1.0,
       cooldownMult: 1.0,
       desc: null,
@@ -353,6 +355,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           const ALL_STRAT_MAP = {
             btc_alpha: BTC_STRATEGY, hurst_regime: strategyHurst, vol_cluster: strategyVolCluster,
             efficiency_ratio: strategyEfficiency, momentum_decay: strategyMomDecay, info_flow: strategyInfoFlow,
+            funding_rate: strategyFundingRate, microstructure: strategyMicrostructure, entropy_regime: strategyEntropy,
           };
           const activeStrategies = presetConfig.strategies
             .map(id => ALL_STRAT_MAP[id]).filter(Boolean);
