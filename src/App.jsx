@@ -1354,16 +1354,30 @@ const DARK = {
   isDark: true,
 };
 const LIGHT = {
-  bg: "#F5F6FA", card: "#FFFFFF", card2: "#EDF0F5",
-  border: "#D8DCE4", border2: "#C8CDD6",
-  blue: "#2558D6", blueL: "#3574E8", blueBg: "#E0EAFF",
-  red: "#D42020", redBg: "#FFF0F0",
-  green: "#158A3E", greenBg: "#ECFBF0",
-  yellow: "#C06A00", yellowBg: "#FFF8E8",
-  purple: "#6B30D0", purpleBg: "#F0EBFF",
-  orange: "#D4580A",
-  text1: "#0C1222", text2: "#3A4A60", text3: "#6B7A90",
+  // 따뜻한 웜그레이 기반 — 눈 피로 최소화 (토스/카카오뱅크 참조)
+  bg: "#F2F3F6",       // 따뜻한 라이트그레이 (순백 X)
+  card: "#FAFBFC",     // 거의 흰색이지만 약간 웜톤
+  card2: "#ECEEF3",    // 카드 내부 구분용
+  border: "#DCDFE6",   // 부드러운 경계
+  border2: "#C5C9D2",  // 강한 경계
+  blue: "#3182F6",     // 토스 블루 — 선명하지만 눈 안 아픔
+  blueL: "#4C9AFF",
+  blueBg: "#E8F1FE",
+  red: "#F04452",      // 부드러운 레드
+  redBg: "#FFF0F1",
+  green: "#1DAA5A",    // 부드러운 그린
+  greenBg: "#EDFBF2",
+  yellow: "#CC7B1A",   // 따뜻한 앰버
+  yellowBg: "#FFF9EC",
+  purple: "#6E56CF",   // 부드러운 퍼플
+  purpleBg: "#F0EDFF",
+  orange: "#E8590C",
+  text1: "#191F28",    // 거의 블랙 (순검정 X — 눈 피로 방지)
+  text2: "#4E5968",    // 중간 그레이 — 가독성 ↑
+  text3: "#8B95A1",    // 연한 그레이 — 캡션/보조
   isDark: false,
+  // 라이트모드 전용: 카드 그림자 (border 대신 shadow로 깊이감)
+  cardShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.03)",
 };
 function loadTheme() { try { return localStorage.getItem(THEME_KEY) || "dark"; } catch { return "dark"; } }
 // C will be set dynamically in App component and passed through context
@@ -6558,8 +6572,8 @@ function AppInner() {
         .skeleton { background: linear-gradient(90deg, ${C.card2} 25%, ${C.border} 50%, ${C.card2} 75%);
           background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 8px; }
         .tab-content { animation: slideUp 0.25s ease; display: flex; flex-direction: column; gap: 16px; }
-        .card-hover { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,${C.isDark ? '0.25' : '0.08'}); }
+        .card-hover { transition: transform 0.2s ease, box-shadow 0.2s ease; ${!C.isDark ? 'box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.02);' : ''} }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,${C.isDark ? '0.25' : '0.10'}); }
         .card-hover:active { transform: translateY(0); }
         @keyframes countUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         .score-animate { animation: countUp 0.4s ease-out; }
@@ -6579,7 +6593,7 @@ function AppInner() {
         .di-main-wrap { flex: 1; }
         /* v7.5: 공통 카드 스타일 — 개선된 간격 ── */
         .ui-card { background: ${C.card}; border-radius: 14px; padding: 20px; border: 1px solid ${C.border}20; overflow: hidden; }
-        .ui-card-compact { background: ${C.card}; border-radius: 12px; padding: 16px; border: 1px solid ${C.border}18; overflow: hidden; }
+        .ui-card-compact { background: ${C.card}; border-radius: 12px; padding: 16px; border: 1px solid ${C.border}${C.isDark ? '18' : '40'}; overflow: hidden; }
         .ui-divider { height: 1px; background: ${C.border}; opacity: 0.2; margin: 12px 0; }
         .ui-list-item { display: flex; align-items: center; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s; gap: 8px; }
         .ui-list-item:hover { background: ${C.card2}60; }
@@ -6703,7 +6717,7 @@ function AppInner() {
       <header style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
         background: C.bg, backdropFilter: "none", WebkitBackdropFilter: "none",
-        borderBottom: `1px solid ${C.border}30`,
+        borderBottom: `1px solid ${C.border}${C.isDark ? '30' : '50'}`,
         overflow: "visible",
       }}>
         <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "56px", gap: "16px" }}>
@@ -6827,7 +6841,7 @@ function AppInner() {
             <button className="header-search-btn" onClick={() => setGlobalSearchOpen(true)} aria-label="검색" style={{
               display: "flex", alignItems: "center", gap: "6px",
               padding: "7px 14px", borderRadius: "10px",
-              background: C.card2, border: `1px solid ${C.border}30`,
+              background: C.card2, border: `1px solid ${C.border}${C.isDark ? '30' : '50'}`,
               fontSize: "12px", color: C.text3, cursor: "pointer",
             }}>
               <span>🔍</span>
@@ -6936,7 +6950,7 @@ function AppInner() {
             {/* 데스크톱: 테마 토글 (비로그인 시에만 독립 표시. 로그인하면 드롭다운에 포함) */}
             {!user && (
             <button className="desktop-only header-theme-btn" onClick={toggleTheme} aria-label={themeMode === "dark" ? "라이트 모드" : "다크 모드"} style={{
-              background: C.card2, border: `1px solid ${C.border}30`, borderRadius: "12px",
+              background: C.card2, border: `1px solid ${C.border}${C.isDark ? '30' : '50'}`, borderRadius: "12px",
               width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center",
               fontSize: "16px", cursor: "pointer", color: C.text1, transition: "all 0.2s", flexShrink: 0,
             }}>
@@ -7129,7 +7143,7 @@ function AppInner() {
               const fgLabel = fgVal ? (fgVal <= 25 ? "극도의 공포" : fgVal <= 40 ? "공포" : fgVal <= 60 ? "중립" : fgVal <= 75 ? "탐욕" : "극도의 탐욕") : "—";
 
               return (
-                <div style={{ background: C.card, borderRadius: "20px", overflow: "hidden", border: `1px solid ${C.border}18` }}>
+                <div style={{ background: C.card, borderRadius: "20px", overflow: "hidden", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   {/* 상단 배너 */}
                   <div style={{
                     background: `linear-gradient(135deg, ${C.card} 0%, ${main?.change >= 0 ? C.greenBg : C.redBg} 100%)`,
@@ -7265,7 +7279,7 @@ function AppInner() {
             {benchmarkData && (
               <div onClick={() => setTab("portfolio")} style={{
                 background: C.card, borderRadius: "18px", padding: "18px 20px", cursor: "pointer",
-                border: `1px solid ${C.border}18`, transition: "transform .15s",
+                border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`, transition: "transform .15s",
               }}
               onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
               onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
@@ -7318,7 +7332,7 @@ function AppInner() {
 
             {/* ── 오늘의 추천 ─── */}
             {dailyPicks.length > 0 && (
-              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
                   <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>오늘의 추천</span>
                   <button onClick={() => setPicksExpanded(!picksExpanded)} style={{
@@ -7379,7 +7393,7 @@ function AppInner() {
                 : hotViewMode === "losers" ? baseSorted.filter(a => a.change < 0).slice(0, hotExpanded ? 30 : 8)
                 : baseAssets.slice(0, hotExpanded ? 50 : 10);
               return (
-                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                       {[["all", "전체"], ["gainers", "급등"], ["losers", "급락"]].map(([k, l]) => (
@@ -7471,7 +7485,7 @@ function AppInner() {
             <div className="home-right" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
             {/* ── 관심종목 (v10.3 유저별 격리) ─── */}
-            <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+            <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: watchlist.length > 0 ? "14px" : "0" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>관심종목</span>
@@ -7590,7 +7604,7 @@ function AppInner() {
               }).filter(Boolean).sort((a, b) => b.diag.score - a.diag.score);
               if (!watchDiags.length) return null;
               return (
-                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
                     <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>📊 투자 진단 & 매수 타점</span>
                     <span style={{ fontSize: mf(11), color: C.text3 }}>실시간 분석</span>
@@ -7713,7 +7727,7 @@ function AppInner() {
               const reportTime = now.toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 
               return (
-                <div onClick={() => { setTab("quant-report"); if (Math.random() < 0.3) setShowCoupangCTA(true); }} style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`, borderRadius: "18px", padding: "20px", cursor: "pointer", border: `1px solid ${C.border}18` }}>
+                <div onClick={() => { setTab("quant-report"); if (Math.random() < 0.3) setShowCoupangCTA(true); }} style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`, borderRadius: "18px", padding: "20px", cursor: "pointer", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
                     <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>퀀트 리포트</span>
                     <span style={{ fontSize: mf(11), color: C.text3 }}>{reportTime} 기준 →</span>
@@ -7787,7 +7801,7 @@ function AppInner() {
               return (
                 <div onClick={() => setTab("portfolio")} style={{
                   background: C.card, borderRadius: "18px", padding: "20px 22px", cursor: "pointer",
-                  transition: "transform .15s", border: `1px solid ${C.border}18`,
+                  transition: "transform .15s", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`,
                 }}
                 onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
                 onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
@@ -7831,7 +7845,7 @@ function AppInner() {
               ];
 
               return (
-                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   {/* 헤더 */}
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
                     <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>경제 캘린더 <span style={{ fontSize: "11px", fontWeight: 500, color: C.text3 }}>(KST)</span></span>
@@ -8082,7 +8096,7 @@ function AppInner() {
 
             {/* ── 섹터 히트맵 (접기/펼치기) ─── */}
             {sectorPerf.length > 0 && (
-              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                 <div onClick={() => toggleSection("sector")} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
                   <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>섹터 성과</span>
                   <span style={{ fontSize: "12px", color: C.text3 }}>{homeSection.sector ? "▲" : "▼"}</span>
@@ -8122,7 +8136,7 @@ function AppInner() {
             )}
 
             {/* ── 전체 종목 (접기/펼치기) ─── */}
-            <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+            <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
               <div onClick={() => toggleSection("allAssets")} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
                 <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>전체 종목</span>
                 <span style={{ fontSize: "12px", color: C.text3 }}>{ALL_ASSETS.length}개 {homeSection.allAssets ? "▲" : "▼"}</span>
@@ -9251,7 +9265,7 @@ function AppInner() {
               </div>
 
               {/* 주요 지수 현황 */}
-              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                 <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "14px" }}>주요 지수</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
                   {[
@@ -9274,7 +9288,7 @@ function AppInner() {
               </div>
 
               {/* 시장 센티먼트 지표 */}
-              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                 <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "14px" }}>센티먼트 지표</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                   <div style={{ background: C.bg, borderRadius: "10px", padding: "12px" }}>
@@ -9325,7 +9339,7 @@ function AppInner() {
               </div>
 
               {/* 시장별 현황 */}
-              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                 <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "14px" }}>시장별 현황</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
                   {[
@@ -9371,7 +9385,7 @@ function AppInner() {
                 if (sectorData.length === 0) return null;
                 const maxAbs = Math.max(...sectorData.map(s => Math.abs(s.avgChange)), 1);
                 return (
-                  <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+                  <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                     <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "14px" }}>섹터 퍼포먼스</div>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "6px" }}>
                       {sectorData.map(s => {
@@ -9401,7 +9415,7 @@ function AppInner() {
 
               {/* 급등/급락 TOP 5 */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "10px" }}>
                     <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: C.green }} />
                     <span style={{ fontWeight: 700, fontSize: "14px", color: C.text1 }}>급등 TOP 5</span>
@@ -9421,7 +9435,7 @@ function AppInner() {
                     </div>
                   ))}
                 </div>
-                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "4px", marginBottom: "10px" }}>
                     <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: C.red }} />
                     <span style={{ fontWeight: 700, fontSize: "14px", color: C.text1 }}>급락 TOP 5</span>
@@ -9445,7 +9459,7 @@ function AppInner() {
 
               {/* 추천 매수 종목 */}
               {topPicks.length > 0 && (
-                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "14px" }}>추천 매수 종목</div>
                   {topPicks.map((pick, i) => {
                     const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
@@ -9487,7 +9501,7 @@ function AppInner() {
 
               {/* 종목별 퀀트 전략 Top 10 — 클릭하면 상세 팝업에서 백테스트 확인 */}
               {topPicks.length > 0 && (
-                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                     <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1 }}>종목별 퀀트 전략</span>
                     <span style={{ fontSize: "10px", color: C.text3 }}>종목 터치 → 백테스트 상세</span>
@@ -9540,7 +9554,7 @@ function AppInner() {
               )}
 
               {/* 오늘의 액션 플랜 */}
-              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}18` }}>
+              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                 <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "14px" }}>📋 오늘의 액션 플랜</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   {(() => {
@@ -10636,7 +10650,7 @@ function AppInner() {
                 <span style={{ fontSize: "14px", color: C.text2 }}>테마</span>
                 <button onClick={toggleTheme} style={{
                   padding: "6px 14px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
-                  background: C.card2, border: `1px solid ${C.border}30`, color: C.text1, cursor: "pointer",
+                  background: C.card2, border: `1px solid ${C.border}${C.isDark ? '30' : '50'}`, color: C.text1, cursor: "pointer",
                 }}>
                   {themeMode === "dark" ? "다크 모드" : "라이트 모드"} {themeMode === "dark" ? "🌙" : "☀️"}
                 </button>
@@ -10664,7 +10678,7 @@ function AppInner() {
         {/* ═══ 풋터 ═══ */}
         <footer style={{
           maxWidth: "1400px", margin: "40px auto 0", padding: "24px 24px calc(24px + env(safe-area-inset-bottom, 0px))",
-          borderTop: `1px solid ${C.border}30`,
+          borderTop: `1px solid ${C.border}${C.isDark ? '30' : '50'}`,
           display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "12px",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -10686,7 +10700,7 @@ function AppInner() {
       {marketIndices.length > 0 && (
         <div style={{
           position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 90,
-          background: `${C.bg}F0`, borderTop: `1px solid ${C.border}30`,
+          background: `${C.bg}F0`, borderTop: `1px solid ${C.border}${C.isDark ? '30' : '50'}`,
           backdropFilter: "blur(8px)", padding: "6px 0", overflow: "hidden",
         }}>
           <div style={{
@@ -10844,7 +10858,7 @@ function AppInner() {
                 {categories.map(cat => (
                   <button key={cat.label} onClick={() => { setTab(cat.tab); setGlobalSearchOpen(false); }} style={{
                     padding: "6px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 600,
-                    background: C.card2, color: C.text2, border: `1px solid ${C.border}30`, cursor: "pointer",
+                    background: C.card2, color: C.text2, border: `1px solid ${C.border}${C.isDark ? '30' : '50'}`, cursor: "pointer",
                     transition: "all 0.15s", display: "flex", alignItems: "center", gap: "4px",
                   }}
                   onMouseEnter={e => { e.currentTarget.style.background = C.blueBg; e.currentTarget.style.color = C.blue; }}
@@ -10857,7 +10871,7 @@ function AppInner() {
                 <span style={{ marginLeft: "auto", fontSize: "11px", color: C.text3, background: C.card2, padding: "6px 10px", borderRadius: "6px", alignSelf: "center" }}>ESC</span>
               </div>
 
-              <div style={{ height: "1px", background: `${C.border}30` }} />
+              <div style={{ height: "1px", background: `${C.border}${C.isDark ? '30' : '50'}` }} />
 
               {/* 인기 종목 */}
               <div style={{ padding: "16px 20px 8px" }}>
