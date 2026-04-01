@@ -716,6 +716,93 @@ export function GoogleAd({ format = "responsive", slot = "auto", style = {} }) {
   );
 }
 
+// ── Google AdSense 인터스티셜 (전면 CTA 광고) ──
+// SPA에서 페이지 전환 시 트리거되는 전면 광고
+// 애드센스 승인 후 자동으로 작동
+export function GoogleAdInterstitial({ onClose }) {
+  const adRef = useRef(null);
+  const [canClose, setCanClose] = useState(false);
+  const [countdown, setCountdown] = useState(3);
+
+  useEffect(() => {
+    // 애드센스 인터스티셜 로드 시도
+    try {
+      if (window.adsbygoogle && adRef.current) {
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      }
+    } catch (e) {
+      // AdSense not loaded — 3초 후 자동 닫기
+    }
+  }, []);
+
+  useEffect(() => {
+    if (countdown > 0) {
+      const t = setTimeout(() => setCountdown(c => c - 1), 1000);
+      return () => clearTimeout(t);
+    } else {
+      setCanClose(true);
+    }
+  }, [countdown]);
+
+  // 애드센스 미로드 시 5초 후 자동 닫기
+  useEffect(() => {
+    const t = setTimeout(() => { if (onClose) onClose(); }, 8000);
+    return () => clearTimeout(t);
+  }, []);
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 10001,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      background: "rgba(0,0,0,0.6)",
+      backdropFilter: "blur(3px)",
+    }}>
+      <div style={{
+        width: "400px", maxWidth: "92vw", maxHeight: "80vh",
+        borderRadius: "12px",
+        background: "#FFFFFF",
+        padding: "16px",
+        position: "relative",
+        boxShadow: "0 20px 40px rgba(0,0,0,0.3)",
+      }}>
+        {/* 닫기 버튼 */}
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "8px" }}>
+          <button
+            onClick={canClose ? onClose : undefined}
+            style={{
+              background: "none", border: "none", cursor: canClose ? "pointer" : "default",
+              fontSize: "14px", fontWeight: 600,
+              color: canClose ? "#333" : "#AAA",
+              padding: "4px 8px", borderRadius: "4px",
+            }}
+          >
+            {canClose ? "✕ 닫기" : `${countdown}초 후 닫기`}
+          </button>
+        </div>
+
+        {/* 광고 라벨 */}
+        <div style={{
+          fontSize: "9px", fontWeight: 700, color: "#999",
+          marginBottom: "8px", letterSpacing: "0.5px", textAlign: "center",
+        }}>AD · Google</div>
+
+        {/* 애드센스 광고 슬롯 */}
+        <div style={{ minHeight: "250px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <ins
+            ref={adRef}
+            className="adsbygoogle"
+            style={{ display: "block", width: "100%", minHeight: "250px" }}
+            data-ad-client="ca-pub-5897295133273451"
+            data-ad-slot="interstitial-cta"
+            data-ad-format="auto"
+            data-full-width-responsive="true"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── 쿠팡 검색 위젯 ──
 export function CoupangSearchWidget({ style = {} }) {
   return (
@@ -739,6 +826,7 @@ export function CoupangSearchWidget({ style = {} }) {
 
 export default {
   GoogleAd,
+  GoogleAdInterstitial,
   CoupangBanner,
   CoupangOfficialBanner,
   CoupangSearchWidget,

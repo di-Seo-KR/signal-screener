@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
 import AuthPage from "./AuthPage.jsx";
-import { CoupangOfficialBanner, CoupangSearchWidget, CoupangInterstitial, GoogleAd } from "./AdBanner.jsx";
+import { CoupangOfficialBanner, CoupangSearchWidget, CoupangInterstitial, GoogleAd, GoogleAdInterstitial } from "./AdBanner.jsx";
 
 // ════════════════════════════════════════════════════════════════════
 // ErrorBoundary — 런타임 에러 시 앱 전체 크래시 방지
@@ -4073,7 +4073,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
         )}
 
         {/* 액션 버튼 */}
-        <div style={{ padding: "0 20px 20px", display: "flex", gap: "8px" }}>
+        <div style={{ padding: "0 20px 12px", display: "flex", gap: "8px" }}>
           <button onClick={() => onToggleWatch(asset.symbol)} style={{
             width: "44px", height: "44px", borderRadius: "12px", fontSize: "18px",
             background: isWatched ? `${C.yellow}22` : C.card2, border: `1px solid ${isWatched ? C.yellow : C.border2}`,
@@ -4094,6 +4094,27 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               textDecoration: "none", textAlign: "center",
               display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
             }}>🔗 상세 정보</a>
+        </div>
+        {/* 공유 버튼 — 바이럴 */}
+        <div style={{ padding: "0 20px 20px" }}>
+          <button onClick={() => {
+            const score = techData?.overallScore || 0;
+            const verdict = score >= 80 ? "강력매수" : score >= 65 ? "매수" : score >= 50 ? "중립" : score >= 35 ? "주의" : "매도";
+            const shareText = `[Toit AI 진단] ${asset.name}(${asset.symbol}) — 투자점수 ${score}점 (${verdict})\n\nAI 퀀트 33개 전략 분석 결과입니다.\n무료로 확인해보세요 👉 https://signal-screener.vercel.app`;
+            if (navigator.share) {
+              navigator.share({ title: `${asset.name} AI 투자 진단`, text: shareText, url: "https://signal-screener.vercel.app" }).catch(() => {});
+            } else {
+              navigator.clipboard.writeText(shareText).then(() => alert("진단 결과가 복사되었습니다! 커뮤니티에 공유해보세요.")).catch(() => {});
+            }
+          }} style={{
+            width: "100%", padding: "10px 0", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+            background: "transparent", color: C.text3, border: `1px solid ${C.border}${C.isDark ? '30' : '50'}`,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+            transition: "all .15s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = C.card2; e.currentTarget.style.color = C.text2; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = C.text3; }}
+          >📤 진단 결과 공유</button>
         </div>
       </div>
     </div>
@@ -4135,6 +4156,8 @@ function AppInner() {
   const { user, loading: authLoading, signOut } = useAuth();
   const [themeMode, setThemeMode] = useState(loadTheme);
   const [showCoupangCTA, setShowCoupangCTA] = useState(false);
+  const [showGoogleCTA, setShowGoogleCTA] = useState(false);
+  const ctaCountRef = useRef(0); // 쿠팡/구글 번갈아 표시
   C = themeMode === "dark" ? DARK : LIGHT;
 
   // ── 로그인 필요 탭 정의 ──
@@ -6536,12 +6559,20 @@ function AppInner() {
         @media (max-width: 380px) {
           :root { --header-h: 48px; --header-gap: 10px; }
         }
-        /* v4.1: 헤더 — safe-area 완전 커버 (top:0 + padding-top으로 노치 영역까지 배경 확장) */
+        /* v4.2: 헤더 — safe-area 완전 커버 + 모바일 높이 동기화 */
         header {
+          position: fixed !important;
           top: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
           padding-top: var(--safe-top) !important;
           height: calc(var(--header-h) + var(--safe-top)) !important;
           min-height: calc(var(--header-h) + var(--safe-top)) !important;
+          box-sizing: border-box !important;
+        }
+        header > div:first-child {
+          height: var(--header-h) !important;
+          max-height: var(--header-h) !important;
         }
         main { padding-top: calc(var(--header-h) + var(--header-gap) + var(--safe-top)) !important; }
         body { padding-bottom: env(safe-area-inset-bottom, 0px); }
@@ -6720,7 +6751,7 @@ function AppInner() {
         borderBottom: `1px solid ${C.border}${C.isDark ? '30' : '50'}`,
         overflow: "visible",
       }}>
-        <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "56px", gap: "16px" }}>
+        <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "var(--header-h)", gap: "16px" }}>
 
           {/* 좌측: 로고 */}
           <div onClick={() => setTab("home")} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none", marginRight: "16px", flexShrink: 0, title: "홈으로 이동" }}>
@@ -7244,7 +7275,7 @@ function AppInner() {
                   }}>{anomalies.length}건</span>
                 </div>
                 {anomalies.slice(0, 3).map((a, i) => (
-                  <div key={a.symbol} onClick={() => setSelectedAsset(a)} style={{
+                  <div key={a.symbol} onClick={() => { setSelectedAsset(a); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
                     padding: "10px 8px", cursor: "pointer", borderRadius: "10px", transition: "background .15s",
                   }}
@@ -7277,7 +7308,7 @@ function AppInner() {
 
             {/* ── 포트폴리오 벤치마킹 ─── */}
             {benchmarkData && (
-              <div onClick={() => setTab("portfolio")} style={{
+              <div onClick={() => { setTab("portfolio"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
                 background: C.card, borderRadius: "18px", padding: "18px 20px", cursor: "pointer",
                 border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`, transition: "transform .15s",
               }}
@@ -7344,7 +7375,7 @@ function AppInner() {
                     const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
                     const isPos = pick.change >= 0;
                     return (
-                      <div key={pick.symbol} onClick={() => setSelectedAsset(pick)}
+                      <div key={pick.symbol} onClick={() => { setSelectedAsset(pick); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }}
                         style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between",
                           padding: "12px 8px", cursor: "pointer", borderRadius: "10px",
@@ -7431,7 +7462,7 @@ function AppInner() {
                       const isPos = asset.change >= 0;
                       const ext = extendedHours[asset.symbolRaw || asset.symbol];
                       return (
-                        <div key={asset.symbol} onClick={() => setSelectedAsset(asset)}
+                        <div key={asset.symbol} onClick={() => { setSelectedAsset(asset); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }}
                           style={{
                             display: "flex", alignItems: "center", justifyContent: "space-between",
                             padding: "12px 8px", cursor: "pointer", borderRadius: "10px",
@@ -7494,7 +7525,7 @@ function AppInner() {
                 {user && <SearchBar compact placeholder="+ 종목 추가" onSelect={(asset) => {
                   if (!watchlist.some(w => w.symbol === asset.symbol)) {
                     setWatchlist(prev => [...prev, { symbol: asset.symbol, name: asset.name, market: asset.market, symbolRaw: asset.symbolRaw || asset.symbol, id: asset.id }]);
-                    if (Math.random() < 0.3) setShowCoupangCTA(true);
+                    if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); };
                   }
                 }} />}
               </div>
@@ -7519,7 +7550,7 @@ function AppInner() {
                       return a ? (
                         <button key={s} onClick={() => {
                           setWatchlist(prev => [...prev, { symbol: a.symbol, name: a.name, market: a.market, symbolRaw: a.symbolRaw || a.symbol }]);
-                          if (Math.random() < 0.3) setShowCoupangCTA(true);
+                          if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); };
                         }} style={{
                           padding: "6px 12px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
                           background: C.card2, color: C.text2, border: `1px solid ${C.border2}`, cursor: "pointer",
@@ -7537,7 +7568,7 @@ function AppInner() {
                     const diag = hot ? quickDiagnosis(hot) : null;
                     const diagColor = diag ? (diag.score >= 60 ? C.green : diag.score >= 40 ? C.yellow : C.red) : C.text3;
                     return (
-                      <div key={w.symbol} onClick={() => setSelectedAsset(w)}
+                      <div key={w.symbol} onClick={() => { setSelectedAsset(w); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }}
                         style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between",
                           padding: "12px 8px", cursor: "pointer", borderRadius: "10px",
@@ -7727,7 +7758,7 @@ function AppInner() {
               const reportTime = now.toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 
               return (
-                <div onClick={() => { setTab("quant-report"); if (Math.random() < 0.3) setShowCoupangCTA(true); }} style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`, borderRadius: "18px", padding: "20px", cursor: "pointer", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+                <div onClick={() => { setTab("quant-report"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`, borderRadius: "18px", padding: "20px", cursor: "pointer", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
                     <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>퀀트 리포트</span>
                     <span style={{ fontSize: mf(11), color: C.text3 }}>{reportTime} 기준 →</span>
@@ -7799,7 +7830,7 @@ function AppInner() {
               const pnl = totalCost > 0 ? ((totalValue - totalCost) / totalCost * 100) : 0;
               const pnlAmt = totalValue - totalCost;
               return (
-                <div onClick={() => setTab("portfolio")} style={{
+                <div onClick={() => { setTab("portfolio"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
                   background: C.card, borderRadius: "18px", padding: "20px 22px", cursor: "pointer",
                   transition: "transform .15s", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`,
                 }}
@@ -8035,7 +8066,7 @@ function AppInner() {
             {/* ═══ 하단 전체너비 섹션 (그리드 밖) ═══ */}
 
             {/* ── AI 퀀트 전략 하이라이트 (핵심 기능 → 최상단) ─── */}
-            <div onClick={() => setTab("auto-trading")} style={{
+            <div onClick={() => { setTab("auto-trading"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
               background: `linear-gradient(135deg, ${C.card} 0%, ${C.isDark ? "#1a0a2e" : "#EDE7F6"} 100%)`,
               borderRadius: "16px", padding: "22px 24px", cursor: "pointer", transition: "all .2s",
               border: `1px solid ${C.purple}25`, position: "relative", overflow: "hidden",
@@ -8064,7 +8095,7 @@ function AppInner() {
 
             {/* ── 전략 운용 + 리스크 바로가기 위젯 ─── */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-              <div onClick={() => setTab("quant-port")} style={{
+              <div onClick={() => { setTab("quant-port"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
                 background: `linear-gradient(135deg, ${C.card} 0%, ${C.greenBg} 100%)`,
                 borderRadius: "16px", padding: "20px", cursor: "pointer", transition: "all .2s",
                 border: `1px solid ${C.border}20`,
@@ -8078,7 +8109,7 @@ function AppInner() {
                   실시간 수익률 추적 →
                 </div>
               </div>
-              <div onClick={() => setTab("risk-map")} style={{
+              <div onClick={() => { setTab("risk-map"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
                 background: `linear-gradient(135deg, ${C.card} 0%, ${C.redBg} 100%)`,
                 borderRadius: "16px", padding: "20px", cursor: "pointer", transition: "all .2s",
                 border: `1px solid ${C.border}20`,
@@ -8158,7 +8189,7 @@ function AppInner() {
                       return (
                         <div key={`${asset.symbol}-${i}`}
                           onTouchStart={onTouchCardStart} onTouchMove={onTouchCardMove}
-                          onClick={() => { if (isTouchTap()) { setSelectedAsset(asset); if (Math.random() < 0.3) setShowCoupangCTA(true); } }}
+                          onClick={() => { if (isTouchTap()) { setSelectedAsset(asset); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; } }}
                           style={{
                             padding: "8px 10px", borderRadius: "8px", cursor: "pointer",
                             display: "flex", alignItems: "center", gap: "6px", transition: "background .15s",
@@ -8534,7 +8565,7 @@ function AppInner() {
                     const scoreColor = s.score >= 80 ? C.green : s.score >= 65 ? C.blue : C.yellow;
                     const scoreLabel = s.score >= 80 ? "강력 저평가" : s.score >= 70 ? "저평가" : s.score >= 60 ? "저평가 가능성" : "주의 관찰";
                     return (
-                      <div key={s.symbol} onClick={() => setSelectedAsset({ symbol: s.symbol, name: s.name })} style={{
+                      <div key={s.symbol} onClick={() => { setSelectedAsset({ symbol: s.symbol, name: s.name }); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
                         background: C.card2, borderRadius: "12px", padding: "12px 14px",
                         border: `1px solid ${C.border}`, cursor: "pointer", transition: "all .15s",
                       }}>
@@ -9155,7 +9186,7 @@ function AppInner() {
         {tab === "strategy" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <StrategyPanel onRunBacktest={(strategy, symbol) => {
-              setBtStrategy(strategy); setBtSymbol(symbol); setTab("backtest");
+              setBtStrategy(strategy); setBtSymbol(symbol); setTab("backtest"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); };
             }} />
           </div>
         )}
@@ -9235,7 +9266,24 @@ function AppInner() {
               <div style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`, borderRadius: "18px", padding: "22px 24px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "4px" }}>
                   <span style={{ fontWeight: 800, fontSize: "20px", color: C.text1 }}>퀀트 리포트</span>
-                  <span style={{ fontSize: mf(10), color: C.text3 }}>{reportTime} 기준</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <button onClick={() => {
+                      const shareText = `[Toit AI 시장 리포트] ${reportTime}\n\n시장 점수: ${mktScore}/100 (${mktVerdict})\n상승 ${upCount}개 · 하락 ${dnCount}개\n\nAI 퀀트 33개 전략 실시간 분석\n👉 https://signal-screener.vercel.app`;
+                      if (navigator.share) {
+                        navigator.share({ title: "Toit AI 시장 리포트", text: shareText, url: "https://signal-screener.vercel.app" }).catch(() => {});
+                      } else {
+                        navigator.clipboard.writeText(shareText).then(() => alert("리포트가 복사되었습니다!")).catch(() => {});
+                      }
+                    }} style={{
+                      background: "none", border: `1px solid ${C.border}${C.isDark ? '40' : '60'}`, borderRadius: "8px",
+                      padding: "4px 10px", fontSize: "11px", fontWeight: 600, color: C.text3,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: "4px",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.color = C.blue; e.currentTarget.style.borderColor = C.blue; }}
+                    onMouseLeave={e => { e.currentTarget.style.color = C.text3; e.currentTarget.style.borderColor = `${C.border}${C.isDark ? '40' : '60'}`; }}
+                    >📤 공유</button>
+                    <span style={{ fontSize: mf(10), color: C.text3 }}>{reportTime} 기준</span>
+                  </div>
                 </div>
                 <div style={{ fontSize: "12px", color: C.text3, marginBottom: "16px" }}>AI 기반 실시간 시장 분석 리포트</div>
 
@@ -9726,7 +9774,7 @@ function AppInner() {
                     return `${Math.floor(hrs / 24)}일 전`;
                   })();
                   return (<>
-                    <a key={i} href={news.url || news.link || "#"} target="_blank" rel="noopener" style={{
+                    <a key={i} href={news.url || news.link || "#"} target="_blank" rel="noopener" onClick={() => { if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
                       background: C.card, border: `1px solid ${C.border}20`, borderRadius: "14px", padding: "16px 18px",
                       textDecoration: "none", color: "inherit", display: "block", transition: "all .2s",
                       borderLeft: `3px solid ${sentColor}60`,
@@ -10972,6 +11020,9 @@ function AppInner() {
 
       {/* ── CTA 광고 (쿠팡 인터스티셜) ── */}
       {showCoupangCTA && <CoupangInterstitial theme={themeMode} onClose={() => setShowCoupangCTA(false)} featureName="이 기능" />}
+
+      {/* ── CTA 광고 (구글 애드센스 인터스티셜) ── */}
+      {showGoogleCTA && <GoogleAdInterstitial onClose={() => setShowGoogleCTA(false)} />}
 
     </div>
   );
