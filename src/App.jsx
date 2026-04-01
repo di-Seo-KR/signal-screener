@@ -6767,7 +6767,7 @@ function AppInner() {
           </div>
 
           {/* 중앙: GNB — 호버 시 LNB 드롭다운, 클릭 비활성 (홈만 클릭 이동) */}
-          <nav className="desktop-nav" style={{ display: "flex", alignItems: "center", gap: "2px", flex: 1, overflow: "visible" }}>
+          <nav className="desktop-nav" style={{ display: "flex", alignItems: "center", gap: "4px", flex: 1, overflow: "visible" }}>
             {[
               { id: "home", label: "홈", catId: "home" },
               { id: "ai-quant", label: "AI 퀀트", catId: "ai-quant" },
@@ -6806,7 +6806,7 @@ function AppInner() {
                     else if (cat.items) { setGnbHover(gnbHover === cat.catId ? null : cat.catId); }
                   }}
                   style={{
-                    padding: "8px 16px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                    padding: "10px 20px", borderRadius: "10px", fontSize: "15px", fontWeight: 600,
                     background: (gnbCategory === cat.catId || gnbHover === cat.catId) ? (cat.catId === "ai-quant" ? `${C.purple}20` : C.blueBg) : "transparent",
                     color: (gnbCategory === cat.catId || gnbHover === cat.catId) ? (cat.catId === "ai-quant" ? C.purple : C.blue) : C.text2,
                     border: "none", cursor: "pointer", whiteSpace: "nowrap",
@@ -6842,8 +6842,8 @@ function AppInner() {
                         if (item.locked && requireLogin(item.id)) return;
                         setTab(item.id); setGnbHover(null);
                       }} style={{
-                        display: "flex", alignItems: "center", gap: "8px", width: "100%",
-                        padding: "10px 12px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                        display: "flex", alignItems: "center", gap: "10px", width: "100%",
+                        padding: "11px 14px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
                         background: tab === item.id ? C.blueBg : "transparent",
                         color: tab === item.id ? C.blue : C.text2,
                         border: "none", cursor: "pointer", whiteSpace: "nowrap",
