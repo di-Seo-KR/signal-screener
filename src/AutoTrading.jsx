@@ -1065,7 +1065,7 @@ export default function AutoTrading({ theme = "dark", user }) {
   }, [user, alpacaKey, alpacaSecret, alpacaPaper, alpacaPrefix, showToast]);
 
   // 운영 중인 봇 목록 (Supabase user_metadata + localStorage 캐시)
-  const storageKey = user ? `toit_${user.id.slice(0,8)}_active_bots` : null;
+  const storageKey = user ? `zepta_${user.id.slice(0,8)}_active_bots` : null;
   const [activeBots, setActiveBots] = useState(() => {
     // localStorage에서 캐시된 값으로 빠른 초기 렌더
     if (!storageKey) return [];
@@ -1098,7 +1098,7 @@ export default function AutoTrading({ theme = "dark", user }) {
           await supabase.auth.updateUser({ data: { active_bots: localBots } });
         }
       } catch (e) {
-        console.warn("[Toit] 봇 목록 로드 실패:", e);
+        console.warn("[Zepta] 봇 목록 로드 실패:", e);
       }
       botsLoaded.current = true;
     })();
@@ -1117,7 +1117,7 @@ export default function AutoTrading({ theme = "dark", user }) {
       botsSaving.current = true;
       try {
         await supabase.auth.updateUser({ data: { active_bots: activeBots } });
-      } catch (e) { console.warn("[Toit] 봇 동기화 실패:", e); }
+      } catch (e) { console.warn("[Zepta] 봇 동기화 실패:", e); }
       botsSaving.current = false;
     }, 1000);
   }, [activeBots, user, storageKey]);

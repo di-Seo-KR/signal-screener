@@ -1,6 +1,6 @@
 // ════════════════════════════════════════════════════════════════════
 // AuthPage — 로그인 / 회원가입 / 비밀번호 재설정
-// Toit 다크/라이트 테마 호환
+// Zepta 다크/라이트 테마 호환
 // ════════════════════════════════════════════════════════════════════
 import { useState, useCallback } from "react";
 import { useAuth } from "./AuthProvider.jsx";
@@ -306,7 +306,7 @@ export default function AuthPage({ theme = "dark", embedded = false, onClose }) 
         <div style={S.logo}>
           <div style={S.logoIcon}>🐋</div>
           <h1 style={S.logoTitle}>
-            Toit <span style={S.logoVer}>v10.2</span>
+            Zepta <span style={S.logoVer}>v10.2</span>
           </h1>
           <p style={S.logoSub}>전문 투자 스크리너 & 퀀트 엔진</p>
         </div>

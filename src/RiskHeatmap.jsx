@@ -1,4 +1,4 @@
-// Toit — 리스크 컨트롤 타워 v2.0
+// Zepta — 리스크 컨트롤 타워 v2.0
 // 8-Point CP 시스템 + 시장 데이터 동적 연동 + 트렌드 히스토리 + 포트폴리오 영향도
 import { useState, useMemo } from "react";
 

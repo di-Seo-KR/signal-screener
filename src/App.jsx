@@ -1,4 +1,4 @@
-// Toit v11.2 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 스크리너 프리셋
+// Zepta v11.2 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 스크리너 프리셋
 // Features: 스크리닝, 캔들차트, 33개 전략(BTC 알파 포함), 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
 // v11.2: 퀀트 엔진 v3.9 하위전략 2차 안전필터 + 모바일 터치 UX 개선
 // v11.1: 다중 타임프레임 RSI 스크리닝 조건 + 퀀트 엔진 v3.8 하위전략 안전필터
@@ -14,7 +14,7 @@ import { CoupangOfficialBanner, CoupangSearchWidget, CoupangInterstitial, Google
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
-  componentDidCatch(error, info) { console.error("[Toit ErrorBoundary]", error, info.componentStack); }
+  componentDidCatch(error, info) { console.error("[Zepta ErrorBoundary]", error, info.componentStack); }
   render() {
     if (this.state.hasError) {
       return (
@@ -1260,7 +1260,7 @@ async function sendTelegramAlert(botToken, chatId, assets, conditions) {
   const now = new Date();
   const timeStr = now.toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "short", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" });
 
-  let msg = `🚨 *Toit 시그널 알림*\n`;
+  let msg = `🚨 *Zepta 시그널 알림*\n`;
   msg += `━━━━━━━━━━━━━━━━━━━━\n`;
   msg += `📅 ${timeStr}\n`;
   msg += `📊 시그널 감지: *${assets.length}개* 자산\n\n`;
@@ -1307,7 +1307,7 @@ async function sendTelegramAlert(botToken, chatId, assets, conditions) {
 
   msg += `━━━━━━━━━━━━━━━━━━━━\n`;
   msg += `_⚠️ 기술적 지표 기반 참고 자료 — 투자 추천 아님_\n`;
-  msg += `_Toit Signal Screener_`;
+  msg += `_Zepta Signal Screener_`;
   const r = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -4100,9 +4100,9 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           <button onClick={() => {
             const score = techData?.overallScore || 0;
             const verdict = score >= 80 ? "강력매수" : score >= 65 ? "매수" : score >= 50 ? "중립" : score >= 35 ? "주의" : "매도";
-            const shareText = `[Toit AI 진단] ${asset.name}(${asset.symbol}) — 투자점수 ${score}점 (${verdict})\n\nAI 퀀트 33개 전략 분석 결과입니다.\n무료로 확인해보세요 👉 https://signal-screener.vercel.app`;
+            const shareText = `[Zepta AI 진단] ${asset.name}(${asset.symbol}) — 투자점수 ${score}점 (${verdict})\n\nAI 퀀트 33개 전략 분석 결과입니다.\n무료로 확인해보세요 👉 https://zepta.vercel.app`;
             if (navigator.share) {
-              navigator.share({ title: `${asset.name} AI 투자 진단`, text: shareText, url: "https://signal-screener.vercel.app" }).catch(() => {});
+              navigator.share({ title: `${asset.name} AI 투자 진단`, text: shareText, url: "https://zepta.vercel.app" }).catch(() => {});
             } else {
               navigator.clipboard.writeText(shareText).then(() => alert("진단 결과가 복사되었습니다! 커뮤니티에 공유해보세요.")).catch(() => {});
             }
@@ -4404,16 +4404,16 @@ function AppInner() {
   // ── 탭 타이틀 실시간 업데이트 (토스증권 스타일) ──
   useEffect(() => {
     if (tab === "home") {
-      document.title = "Toit";
+      document.title = "Zepta";
     } else if (selectedAsset && hotAssets.length > 0) {
       const h = hotAssets.find(a => a.symbol === selectedAsset.symbol);
       if (h) {
         const sign = h.change >= 0 ? "+" : "";
         const price = h.market === "kr" ? `₩${h.price?.toLocaleString()}` : `$${h.price?.toLocaleString()}`;
-        document.title = `${h.name} ${price} ${sign}${h.change}% | Toit`;
+        document.title = `${h.name} ${price} ${sign}${h.change}% | Zepta`;
       }
     } else {
-      document.title = "Toit";
+      document.title = "Zepta";
     }
   }, [marketIndices, tab, selectedAsset, hotAssets]);
 
@@ -4874,7 +4874,7 @@ function AppInner() {
         reply += strategyMsg;
         reply += `\n\n💬 이어서 물어보기: "추천 종목" · "리스크 점검" · "포트폴리오 현황"`;
       } else {
-        reply = `안녕하세요! Toit AI 어시스턴트입니다.\n\n이런 것들을 물어보세요:\n\n── 기본 분석 ──\n• 종목명 → "NVDA 분석해줘", "삼성전자 어때?"\n• 시장 현황 → "시장 현황", "오늘 마켓"\n• 추천 종목 → "뭐 살까?", "오늘 TOP"\n\n── 고도화 기능 ──\n• 섹터 분석 → "섹터 분석", "tech sector"\n• 매매 타이밍 → "언제 사?", "진입 타이밍"\n• 포트폴리오 최적화 → "최적화", "리밸런싱"\n• 모멘텀 분석 → "모멘텀", "추세"\n• 가치주/배당 → "가치주", "배당"\n• 종합 진단 → "종합분석", "전체 진단"\n\n── 기타 ──\n• 포트폴리오 → "내 자산", "수익률"\n• 이상 탐지 → "급등락", "비정상"\n• 관심종목 → "관심종목"\n• 리스크 점검 → "리스크", "위험도"\n• 종목 비교 → "AAPL vs MSFT"`;
+        reply = `안녕하세요! Zepta AI 어시스턴트입니다.\n\n이런 것들을 물어보세요:\n\n── 기본 분석 ──\n• 종목명 → "NVDA 분석해줘", "삼성전자 어때?"\n• 시장 현황 → "시장 현황", "오늘 마켓"\n• 추천 종목 → "뭐 살까?", "오늘 TOP"\n\n── 고도화 기능 ──\n• 섹터 분석 → "섹터 분석", "tech sector"\n• 매매 타이밍 → "언제 사?", "진입 타이밍"\n• 포트폴리오 최적화 → "최적화", "리밸런싱"\n• 모멘텀 분석 → "모멘텀", "추세"\n• 가치주/배당 → "가치주", "배당"\n• 종합 진단 → "종합분석", "전체 진단"\n\n── 기타 ──\n• 포트폴리오 → "내 자산", "수익률"\n• 이상 탐지 → "급등락", "비정상"\n• 관심종목 → "관심종목"\n• 리스크 점검 → "리스크", "위험도"\n• 종목 비교 → "AAPL vs MSFT"`;
       }
       setAiMessages(prev => [...prev, { role: "ai", text: reply }]);
       setAiLoading(false);
@@ -5649,7 +5649,7 @@ function AppInner() {
         }
         const stratCount = Object.keys(grouped).length;
         // 메인 요약 알림
-        const title = `Toit 매매 시그널 ${newAlerts.length}건`;
+        const title = `Zepta 매매 시그널 ${newAlerts.length}건`;
         const lines = [];
         for (const [strat, items] of Object.entries(grouped).slice(0, 5)) {
           const icon = items[0]?.strategyIcon || "📊";
@@ -5709,7 +5709,7 @@ function AppInner() {
   function formatStrategyAlertTelegram(alerts) {
     const now = new Date();
     const timeStr = now.toLocaleString("ko-KR", { month: "short", day: "numeric", weekday: "short", hour: "2-digit", minute: "2-digit" });
-    let msg = `🚨 *Toit 퀀트 전략 매매 시그널*\n`;
+    let msg = `🚨 *Zepta 퀀트 전략 매매 시그널*\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━\n`;
     msg += `📅 ${timeStr}\n`;
     msg += `⚙️ _실제 전략 generate() 시그널 기반_\n\n`;
@@ -5767,7 +5767,7 @@ function AppInner() {
     }
 
     msg += `\n_⚠️ 본 시그널은 참고용이며 투자 결정은 본인 판단에 따르세요_\n`;
-    msg += `_Toit 퀀트 전략 엔진_`;
+    msg += `_Zepta 퀀트 전략 엔진_`;
     return msg;
   }
 
@@ -6764,16 +6764,16 @@ function AppInner() {
           <div onClick={() => setTab("home")} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none", marginRight: "16px", flexShrink: 0, title: "홈으로 이동" }}>
             <svg width="24" height="24" viewBox="0 0 32 32" style={{ flexShrink: 0 }}>
               <defs>
-                <linearGradient id="toitGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <linearGradient id="zeptaGradient" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" style={{ stopColor: "#3182F6", stopOpacity: 1 }} />
                   <stop offset="100%" style={{ stopColor: "#60A5FA", stopOpacity: 1 }} />
                 </linearGradient>
               </defs>
               <rect width="32" height="32" fill="none"/>
-              <path d="M 8 4 L 8 28 M 8 4 L 14 4 Q 14 16 8 16" stroke="url(#toitGradient)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-              <path d="M 14 12 L 24 4 M 24 4 L 24 28" stroke="url(#toitGradient)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M 8 4 L 8 28 M 8 4 L 14 4 Q 14 16 8 16" stroke="url(#zeptaGradient)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M 14 12 L 24 4 M 24 4 L 24 28" stroke="url(#zeptaGradient)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
-            <span style={{ fontWeight: 800, fontSize: "17px", letterSpacing: "-0.5px", color: C.text1 }}>Toit</span>
+            <span style={{ fontWeight: 800, fontSize: "17px", letterSpacing: "-0.5px", color: C.text1 }}>Zepta</span>
           </div>
 
           {/* 중앙: GNB — 호버 시 LNB 드롭다운, 클릭 비활성 (홈만 클릭 이동) */}
@@ -7053,7 +7053,7 @@ function AppInner() {
                 </div>
               </div>
             ) : (
-              <span style={{ fontSize: "15px", fontWeight: 800, color: C.blue }}>Toit</span>
+              <span style={{ fontSize: "15px", fontWeight: 800, color: C.blue }}>Zepta</span>
             )}
             <button onClick={() => setMenuOpen(false)} style={{ background: "none", border: "none", color: C.text2, fontSize: "22px", cursor: "pointer", padding: "4px", minHeight: "36px", minWidth: "36px" }}>✕</button>
           </div>
@@ -7418,8 +7418,8 @@ function AppInner() {
                 {dailyPicks.length > 0 && (
                   <button onClick={() => {
                     const top5 = dailyPicks.slice(0, 5).map((p, i) => `${i + 1}. ${p.name} (${p.symbol}) ${p.change >= 0 ? "+" : ""}${p.change}%`).join("\n");
-                    const txt = `[Toit AI 오늘의 추천]\n\n${top5}\n\nAI 퀀트 33개 전략이 실시간으로 찾아낸 종목입니다\n👉 https://signal-screener.vercel.app`;
-                    if (navigator.share) navigator.share({ title: "Toit AI 오늘의 추천", text: txt, url: "https://signal-screener.vercel.app" }).catch(() => {});
+                    const txt = `[Zepta AI 오늘의 추천]\n\n${top5}\n\nAI 퀀트 33개 전략이 실시간으로 찾아낸 종목입니다\n👉 https://zepta.vercel.app`;
+                    if (navigator.share) navigator.share({ title: "Zepta AI 오늘의 추천", text: txt, url: "https://zepta.vercel.app" }).catch(() => {});
                     else navigator.clipboard.writeText(txt).then(() => alert("추천 종목이 복사되었습니다!")).catch(() => {});
                   }} style={{
                     width: "100%", padding: "8px 0", marginTop: "8px", borderRadius: "10px",
@@ -9290,9 +9290,9 @@ function AppInner() {
                   <span style={{ fontWeight: 800, fontSize: "20px", color: C.text1 }}>퀀트 리포트</span>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <button onClick={() => {
-                      const shareText = `[Toit AI 시장 리포트] ${reportTime}\n\n시장 점수: ${mktScore}/100 (${mktVerdict})\n상승 ${upCount}개 · 하락 ${dnCount}개\n\nAI 퀀트 33개 전략 실시간 분석\n👉 https://signal-screener.vercel.app`;
+                      const shareText = `[Zepta AI 시장 리포트] ${reportTime}\n\n시장 점수: ${mktScore}/100 (${mktVerdict})\n상승 ${upCount}개 · 하락 ${dnCount}개\n\nAI 퀀트 33개 전략 실시간 분석\n👉 https://zepta.vercel.app`;
                       if (navigator.share) {
-                        navigator.share({ title: "Toit AI 시장 리포트", text: shareText, url: "https://signal-screener.vercel.app" }).catch(() => {});
+                        navigator.share({ title: "Zepta AI 시장 리포트", text: shareText, url: "https://zepta.vercel.app" }).catch(() => {});
                       } else {
                         navigator.clipboard.writeText(shareText).then(() => alert("리포트가 복사되었습니다!")).catch(() => {});
                       }
@@ -10193,7 +10193,7 @@ function AppInner() {
                       const perm = await Notification.requestPermission();
                       setNotiPerm(perm);
                       if (perm === "granted") {
-                        new Notification("Toit 알림 활성화", {
+                        new Notification("Zepta 알림 활성화", {
                           body: "전략 매매 시그널이 감지되면 여기로 알림이 옵니다 🚀",
                           icon: "/favicon.ico",
                         });
@@ -10412,7 +10412,7 @@ function AppInner() {
                       const r = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendMessage`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ chat_id: settings.chatId, text: "🚨 *Toit 테스트*\n\n텔레그램 연결 테스트 성공!", parse_mode: "Markdown" }),
+                        body: JSON.stringify({ chat_id: settings.chatId, text: "🚨 *Zepta 테스트*\n\n텔레그램 연결 테스트 성공!", parse_mode: "Markdown" }),
                       });
                       if (r.ok) setTgStatus("✅ 텔레그램 연결 완료");
                       else setTgStatus("❌ 전송 실패");
@@ -10687,7 +10687,7 @@ function AppInner() {
                 { label: "관심 종목", value: `${watchlist.length}개`, action: () => setTab("screener") },
                 { label: "운영 중 봇", value: (() => {
                   try {
-                    const k = `toit_${user.id.slice(0, 8)}_active_bots`;
+                    const k = `zepta_${user.id.slice(0, 8)}_active_bots`;
                     return `${JSON.parse(localStorage.getItem(k) || "[]").length}개`;
                   } catch { return "0개"; }
                 })(), action: () => setTab("auto-trading") },
@@ -10724,7 +10724,7 @@ function AppInner() {
                 </div>
                 <div style={{ width: "1px", background: `${C.border}40` }} />
                 <div>
-                  <div style={{ fontSize: "24px", fontWeight: 800, color: C.purple || "#a855f7" }}>{(() => { try { return JSON.parse(localStorage.getItem(`toit_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })()}</div>
+                  <div style={{ fontSize: "24px", fontWeight: 800, color: C.purple || "#a855f7" }}>{(() => { try { return JSON.parse(localStorage.getItem(`zepta_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })()}</div>
                   <div style={{ fontSize: "11px", color: C.text3 }}>운영봇</div>
                 </div>
                 <div style={{ width: "1px", background: `${C.border}40` }} />
@@ -10735,10 +10735,10 @@ function AppInner() {
               </div>
               <button onClick={() => {
                 const days = (() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })();
-                const bots = (() => { try { return JSON.parse(localStorage.getItem(`toit_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })();
+                const bots = (() => { try { return JSON.parse(localStorage.getItem(`zepta_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })();
                 const name = user?.user_metadata?.display_name || "투자자";
-                const txt = `[Toit AI 투자 성적표]\n\n${name}님의 투자 현황\n관심종목 ${watchlist.length}개 | AI 봇 ${bots}개 운영 | ${days}일째 투자 중\n\n33개 AI 퀀트 전략으로 매일 시그널 받고 있어요\n무료로 시작하기 👉 https://signal-screener.vercel.app`;
-                if (navigator.share) navigator.share({ title: "Toit AI 투자 성적표", text: txt, url: "https://signal-screener.vercel.app" }).catch(() => {});
+                const txt = `[Zepta AI 투자 성적표]\n\n${name}님의 투자 현황\n관심종목 ${watchlist.length}개 | AI 봇 ${bots}개 운영 | ${days}일째 투자 중\n\n33개 AI 퀀트 전략으로 매일 시그널 받고 있어요\n무료로 시작하기 👉 https://zepta.vercel.app`;
+                if (navigator.share) navigator.share({ title: "Zepta AI 투자 성적표", text: txt, url: "https://zepta.vercel.app" }).catch(() => {});
                 else navigator.clipboard.writeText(txt).then(() => alert("성적표가 복사되었습니다!")).catch(() => {});
               }} style={{
                 padding: "10px 28px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
@@ -10752,12 +10752,12 @@ function AppInner() {
               <div style={{ padding: "14px 20px", fontSize: "12px", fontWeight: 700, color: C.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>친구 초대</div>
               <div style={{ padding: "16px 20px", borderTop: `1px solid ${C.border}20` }}>
                 <div style={{ fontSize: "13px", color: C.text2, lineHeight: 1.6, marginBottom: "14px" }}>
-                  투자하는 친구에게 Toit을 공유하세요.<br/>AI 퀀트 전략을 무료로 이용할 수 있어요.
+                  투자하는 친구에게 Zepta을 공유하세요.<br/>AI 퀀트 전략을 무료로 이용할 수 있어요.
                 </div>
                 <div style={{ display: "flex", gap: "8px" }}>
                   <button onClick={() => {
-                    const txt = "나 요즘 이거 쓰는데 AI가 매수 타점 잡아줘서 꽤 괜찮아. 무료인데 한번 써봐 👉 https://signal-screener.vercel.app";
-                    if (navigator.share) navigator.share({ title: "Toit - AI 퀀트 투자", text: txt, url: "https://signal-screener.vercel.app" }).catch(() => {});
+                    const txt = "나 요즘 이거 쓰는데 AI가 매수 타점 잡아줘서 꽤 괜찮아. 무료인데 한번 써봐 👉 https://zepta.vercel.app";
+                    if (navigator.share) navigator.share({ title: "Zepta - AI 퀀트 투자", text: txt, url: "https://zepta.vercel.app" }).catch(() => {});
                     else navigator.clipboard.writeText(txt).then(() => alert("초대 링크가 복사되었습니다!")).catch(() => {});
                   }} style={{
                     flex: 1, padding: "10px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
@@ -10765,7 +10765,7 @@ function AppInner() {
                     display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
                   }}>📱 카톡으로 공유</button>
                   <button onClick={() => {
-                    navigator.clipboard.writeText("https://signal-screener.vercel.app").then(() => alert("링크가 복사되었습니다!")).catch(() => {});
+                    navigator.clipboard.writeText("https://zepta.vercel.app").then(() => alert("링크가 복사되었습니다!")).catch(() => {});
                   }} style={{
                     flex: 1, padding: "10px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
                     background: C.card2, color: C.text2, border: `1px solid ${C.border}${C.isDark ? '30' : '50'}`, cursor: "pointer",
@@ -10799,7 +10799,7 @@ function AppInner() {
             </button>
 
             <div style={{ textAlign: "center", padding: "8px 0 20px" }}>
-              <span style={{ fontSize: "11px", color: C.text3 }}>Toit v10.0 · donginseo0421@gmail.com</span>
+              <span style={{ fontSize: "11px", color: C.text3 }}>Zepta v10.0 · donginseo0421@gmail.com</span>
             </div>
           </div>
         )}
@@ -10815,7 +10815,7 @@ function AppInner() {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <span style={{ fontSize: "16px" }}>📡</span>
-            <span style={{ fontWeight: 700, fontSize: "13px", color: C.text2 }}>Toit</span>
+            <span style={{ fontWeight: 700, fontSize: "13px", color: C.text2 }}>Zepta</span>
           </div>
           <div style={{ fontSize: "11px", color: C.text3, display: "flex", gap: "16px", flexWrap: "wrap" }}>
             <span>투자의 판단과 책임은 본인에게 있습니다</span>
@@ -11082,12 +11082,12 @@ function AppInner() {
             <div style={{ padding: "24px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <svg width="28" height="28" viewBox="0 0 32 32" style={{ flexShrink: 0 }}>
-                  <defs><linearGradient id="authToitGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style={{ stopColor: "#3182F6" }} /><stop offset="100%" style={{ stopColor: "#60A5FA" }} /></linearGradient></defs>
-                  <path d="M 8 4 L 8 28 M 8 4 L 14 4 Q 14 16 8 16" stroke="url(#authToitGrad)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M 14 12 L 24 4 M 24 4 L 24 28" stroke="url(#authToitGrad)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                  <defs><linearGradient id="authZeptaGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style={{ stopColor: "#3182F6" }} /><stop offset="100%" style={{ stopColor: "#60A5FA" }} /></linearGradient></defs>
+                  <path d="M 8 4 L 8 28 M 8 4 L 14 4 Q 14 16 8 16" stroke="url(#authZeptaGrad)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M 14 12 L 24 4 M 24 4 L 24 28" stroke="url(#authZeptaGrad)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: C.text1 }}>Toit 로그인</h3>
+                  <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: C.text1 }}>Zepta 로그인</h3>
                   <p style={{ margin: "2px 0 0", fontSize: "12px", color: C.text3 }}>투자 서비스를 이용하려면 로그인하세요</p>
                 </div>
               </div>

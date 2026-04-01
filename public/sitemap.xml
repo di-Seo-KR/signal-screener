@@ -1,79 +1,79 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://signal-screener.vercel.app/</loc>
+    <loc>https://zepta.vercel.app/</loc>
     <lastmod>2026-04-01</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://signal-screener.vercel.app/#screener</loc>
+    <loc>https://zepta.vercel.app/#screener</loc>
     <lastmod>2026-04-01</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://signal-screener.vercel.app/#auto-trading</loc>
+    <loc>https://zepta.vercel.app/#auto-trading</loc>
     <lastmod>2026-04-01</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://signal-screener.vercel.app/#portfolio</loc>
+    <loc>https://zepta.vercel.app/#portfolio</loc>
     <lastmod>2026-04-01</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://signal-screener.vercel.app/#btc-trading</loc>
+    <loc>https://zepta.vercel.app/#btc-trading</loc>
     <lastmod>2026-04-01</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://signal-screener.vercel.app/#news</loc>
+    <loc>https://zepta.vercel.app/#news</loc>
     <lastmod>2026-04-01</lastmod>
     <changefreq>hourly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://signal-screener.vercel.app/#strategy</loc>
+    <loc>https://zepta.vercel.app/#strategy</loc>
     <lastmod>2026-04-01</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://signal-screener.vercel.app/#quant-report</loc>
+    <loc>https://zepta.vercel.app/#quant-report</loc>
     <lastmod>2026-04-01</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://signal-screener.vercel.app/#quant-port</loc>
+    <loc>https://zepta.vercel.app/#quant-port</loc>
     <lastmod>2026-04-01</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://signal-screener.vercel.app/#risk-map</loc>
+    <loc>https://zepta.vercel.app/#risk-map</loc>
     <lastmod>2026-04-01</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://signal-screener.vercel.app/#backtest</loc>
+    <loc>https://zepta.vercel.app/#backtest</loc>
     <lastmod>2026-04-01</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.6</priority>
   </url>
   <url>
-    <loc>https://signal-screener.vercel.app/#paper-trading</loc>
+    <loc>https://zepta.vercel.app/#paper-trading</loc>
     <lastmod>2026-04-01</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://signal-screener.vercel.app/#economic-calendar</loc>
+    <loc>https://zepta.vercel.app/#economic-calendar</loc>
     <lastmod>2026-04-01</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.6</priority>

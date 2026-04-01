@@ -1,4 +1,4 @@
-// Toit — 전략 추천 패널
+// Zepta — 전략 추천 패널
 // 시장 진단 → 전략 추천 → 상세 전략 카드
 import { useState, useCallback } from "react";
 import { ALL_STRATEGIES, diagnoseMarket, recommendStrategies } from "./strategies.js";

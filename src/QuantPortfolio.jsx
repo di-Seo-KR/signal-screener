@@ -1,4 +1,4 @@
-// Toit — 퀀트 전략별 포트폴리오 시스템 v4.0
+// Zepta — 퀀트 전략별 포트폴리오 시스템 v4.0
 // 실제 시장 데이터 기반 백테스트 + 전략 generate() 시그널 매매기록
 // Yahoo Finance 실시간 데이터 → 전략별 수익률 · 매매 · 리밸런싱
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";

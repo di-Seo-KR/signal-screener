@@ -1,4 +1,4 @@
-// Toit — 백테스트 패널 v4.0
+// Zepta — 백테스트 패널 v4.0
 // 전략 선택 → 데이터 로드 → 백테스트 실행 → 성과 시각화
 // v3.5: MAE/MFE + Expectancy + Recovery Factor + 평균 보유기간 표시
 import { useState, useCallback, useRef, useEffect } from "react";

@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 
 const COUPANG_PARTNER_ID = "AF0857541";
-const COUPANG_SUBID = "toit";
+const COUPANG_SUBID = "zepta";
 
 // ── 쿠팡 파트너스 정식 어필리에이트 링크 ──
 // partners.coupang.com 대시보드에서 생성한 link.coupang.com 형태의 링크가 수수료 추적됨
@@ -656,7 +656,7 @@ export function CoupangCarouselBanner({ style = {} }) {
       ...style,
     }}>
       <iframe
-        src="https://ads-partners.coupang.com/widgets.html?id=975402&template=carousel&trackingCode=AF0857541&subId=toit&width=680&height=140&tsource="
+        src="https://ads-partners.coupang.com/widgets.html?id=975402&template=carousel&trackingCode=AF0857541&subId=zepta&width=680&height=140&tsource="
         width="680"
         height="140"
         frameBorder="0"
