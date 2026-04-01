@@ -6762,8 +6762,7 @@ function AppInner() {
 
           {/* 좌측: 로고 */}
           <div onClick={() => setTab("home")} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none", marginRight: "16px", flexShrink: 0, title: "홈으로 이동" }}>
-            <img src="/zepta-logo-192.png" alt="Zepta" width="28" height="28" style={{ flexShrink: 0, borderRadius: "6px" }} />
-            <span style={{ fontWeight: 800, fontSize: "17px", letterSpacing: "-0.5px", color: C.text1 }}>Zepta</span>
+            <img src="/zepta-icon-192.png" alt="Zepta" width="36" height="36" style={{ flexShrink: 0 }} />
           </div>
 
           {/* 중앙: GNB — 호버 시 LNB 드롭다운, 클릭 비활성 (홈만 클릭 이동) */}
@@ -11071,7 +11070,7 @@ function AppInner() {
           }}>
             <div style={{ padding: "24px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <img src="/zepta-logo-192.png" alt="Zepta" width="28" height="28" style={{ flexShrink: 0, borderRadius: "6px" }} />
+                <img src="/zepta-icon-192.png" alt="Zepta" width="32" height="32" style={{ flexShrink: 0 }} />
                 <div>
                   <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: C.text1 }}>Zepta 로그인</h3>
                   <p style={{ margin: "2px 0 0", fontSize: "12px", color: C.text3 }}>투자 서비스를 이용하려면 로그인하세요</p>
