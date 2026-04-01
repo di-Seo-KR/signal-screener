@@ -7156,18 +7156,6 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "home" && (
           <div className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            {/* 소셜 프루프 바 — 신뢰감 + 바이럴 */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", padding: "8px 0", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "11px", color: C.text3, display: "flex", alignItems: "center", gap: "4px" }}>
-                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.green, display: "inline-block", animation: "pulse 2s infinite" }} />
-                {hotAssets.length * 33 + 847}개 전략 실시간 분석 중
-              </span>
-              <span style={{ fontSize: "11px", color: C.text3 }}>·</span>
-              <span style={{ fontSize: "11px", color: C.text3 }}>{hotAssets.length}개 종목 모니터링</span>
-              <span style={{ fontSize: "11px", color: C.text3 }}>·</span>
-              <span style={{ fontSize: "11px", color: C.text3 }}>100% 무료</span>
-            </div>
-
             {/* 2컬럼 그리드 (데스크톱) / 1컬럼 (모바일) */}
             <div className="home-grid">
             <div className="home-left" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>

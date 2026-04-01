@@ -104,7 +104,9 @@ export default async function handler(req, res) {
       const yahooTicker = YAHOO_TICKERS[asset];
 
       // Yahoo Finance 데이터 로드
+      // 멀티 타임프레임: 일봉(1y) + 4시간봉(60d) 모두 로드
       const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooTicker}?range=1y&interval=1d`;
+      const yahoo4hUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${yahooTicker}?range=60d&interval=60m`;
       let yahooData, result;
       try {
         const yahooRes = await fetch(yahooUrl, {
@@ -135,13 +137,29 @@ export default async function handler(req, res) {
         volume: q.volume[i],
       })).filter(c => c.close != null && c.high != null && c.low != null);
 
-      if (candles.length < 220) {
-        addLog(`❌ ${asset} 캔들 부족 (${candles.length}개 < 220개)`);
+      if (candles.length < 100) {
+        addLog(`❌ ${asset} 캔들 부족 (${candles.length}개 < 100개)`);
         assetResults.push({ asset, ok: false, error: "Insufficient candle data" });
         continue;
       }
 
-      addLog(`✅ ${asset}: ${candles.length}개 캔들 로드 (최신: $${candles[candles.length - 1]?.close?.toFixed(0)})`);
+      // 4시간봉 로드 (추가 시그널 소스)
+      let candles4h = [];
+      try {
+        const res4h = await fetch(yahoo4hUrl, {
+          headers: { "User-Agent": "Mozilla/5.0 (DI-Financial Cron)" },
+        });
+        const data4h = await res4h.json();
+        const r4h = data4h?.chart?.result?.[0];
+        if (r4h && r4h.timestamp) {
+          const q4h = r4h.indicators.quote[0];
+          candles4h = r4h.timestamp.map((t, i) => ({
+            time: t, open: q4h.open[i], high: q4h.high[i], low: q4h.low[i], close: q4h.close[i], volume: q4h.volume[i],
+          })).filter(c => c.close != null && c.high != null && c.low != null);
+        }
+      } catch { /* 4h 실패해도 일봉으로 계속 */ }
+
+      addLog(`✅ ${asset}: 일봉 ${candles.length}개 + 4h ${candles4h.length}개 (최신: $${candles[candles.length - 1]?.close?.toFixed(0)})`);
 
       // 지표 계산
       const closes = candles.map(c => c.close);
@@ -173,13 +191,45 @@ export default async function handler(req, res) {
       // 최근 시그널 분석 (market-monitor 레짐 연동)
       // monitorAlerts에서 현재 자산 관련 알림 추출
       const assetAlerts = monitorAlerts.filter(a => a.ticker === yahooTicker);
-      const latestSignal = analyzeLatest(candles, closes, highs, lows, volumes, {
+      let latestSignal = analyzeLatest(candles, closes, highs, lows, volumes, {
         rsi, bb, ema21, ema55, ema200, macdLine, macdSig, histogram,
         adx, atr, stoch, obv, obvEma, volSMA, weeklyTrendUp,
       }, fngValue, marketRegime, assetAlerts);
 
+      // 일봉에서 시그널 없으면 4시간봉으로 재시도
+      if (!latestSignal && candles4h.length >= 100) {
+        addLog(`🔄 ${asset} 일봉 시그널 없음 → 4시간봉 분석...`);
+        const c4h = candles4h;
+        const closes4h = c4h.map(c => c.close);
+        const highs4h = c4h.map(c => c.high);
+        const lows4h = c4h.map(c => c.low);
+        const volumes4h = c4h.map(c => c.volume || 0);
+        const rsi4h = calcRSI(closes4h, 14);
+        const bb4h = calcBB(closes4h, 20, 2.0);
+        const ema21_4h = calcEMA(closes4h, 21);
+        const ema55_4h = calcEMA(closes4h, 55);
+        const ema200_4h = closes4h.length > 200 ? calcEMA(closes4h, 200) : [];
+        const macd4h = calcMACD(closes4h);
+        const adx4h = calcADX(highs4h, lows4h, closes4h, 14);
+        const atr4h = calcATR(highs4h, lows4h, closes4h, 14);
+        const stoch4h = calcStochastic(highs4h, lows4h, closes4h, 14, 3);
+        const obv4h = calcOBV(closes4h, volumes4h);
+        const obvEma4h = calcEMA(obv4h, 20);
+        const volSMA4h = calcSMA(volumes4h, 20);
+        latestSignal = analyzeLatest(c4h, closes4h, highs4h, lows4h, volumes4h, {
+          rsi: rsi4h, bb: bb4h, ema21: ema21_4h, ema55: ema55_4h, ema200: ema200_4h,
+          macdLine: macd4h.macdLine, macdSig: macd4h.signal, histogram: macd4h.histogram,
+          adx: adx4h, atr: atr4h, stoch: stoch4h, obv: obv4h, obvEma: obvEma4h, volSMA: volSMA4h, weeklyTrendUp,
+        }, fngValue, marketRegime, assetAlerts);
+        if (latestSignal) {
+          latestSignal.reason = `[4h] ${latestSignal.reason}`;
+          // 4시간봉 시그널은 포지션 크기 50%로 축소
+          latestSignal.positionSize = (latestSignal.positionSize || 0.5) * 0.5;
+        }
+      }
+
       if (!latestSignal) {
-        addLog(`⏸️ ${asset} 시그널 없음`);
+        addLog(`⏸️ ${asset} 시그널 없음 (일봉+4시간봉 모두)`);
         assetResults.push({ asset, ok: true, action: "wait", signal: null });
         continue;
       }
@@ -418,20 +468,20 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
     adx, atr, stoch, obv, obvEma, volSMA, weeklyTrendUp } = ind;
 
   const lastIdx = closes.length - 1;
-  if (lastIdx < 210) return null;
+  if (lastIdx < 60) return null;
 
   const price = closes[lastIdx];
   const prevPrice = closes[lastIdx - 1];
   const atrPct = atr[lastIdx] && price > 0 ? (atr[lastIdx] / price) * 100 : 2;
   const posSize = atrPct > 5 ? 0.3 : atrPct > 3 ? 0.5 : atrPct > 1.5 ? 0.7 : 0.9;
 
-  // Fear & Greed에 따른 동적 임계값
+  // Fear & Greed에 따른 동적 임계값 (v2: 시그널 빈도 상향)
   let buyThreshold, buyFactorsThreshold, sellThreshold, sellFactorsThreshold;
-  if (fngValue <= 25) { buyThreshold = 3; buyFactorsThreshold = 2; sellThreshold = 6; sellFactorsThreshold = 3; }
-  else if (fngValue <= 45) { buyThreshold = 3; buyFactorsThreshold = 2; sellThreshold = 5; sellFactorsThreshold = 3; }
-  else if (fngValue <= 55) { buyThreshold = 4; buyFactorsThreshold = 2; sellThreshold = 4; sellFactorsThreshold = 2; }
-  else if (fngValue <= 75) { buyThreshold = 5; buyFactorsThreshold = 3; sellThreshold = 4; sellFactorsThreshold = 2; }
-  else { buyThreshold = 6; buyFactorsThreshold = 3; sellThreshold = 3; sellFactorsThreshold = 2; }
+  if (fngValue <= 25) { buyThreshold = 2; buyFactorsThreshold = 1; sellThreshold = 5; sellFactorsThreshold = 2; }
+  else if (fngValue <= 45) { buyThreshold = 2; buyFactorsThreshold = 1; sellThreshold = 4; sellFactorsThreshold = 2; }
+  else if (fngValue <= 55) { buyThreshold = 3; buyFactorsThreshold = 2; sellThreshold = 3; sellFactorsThreshold = 2; }
+  else if (fngValue <= 75) { buyThreshold = 4; buyFactorsThreshold = 2; sellThreshold = 3; sellFactorsThreshold = 1; }
+  else { buyThreshold = 5; buyFactorsThreshold = 2; sellThreshold = 2; sellFactorsThreshold = 1; }
 
   // ── market-monitor 레짐 데이터로 임계값 미세 조정 ──
   if (marketRegime) {
