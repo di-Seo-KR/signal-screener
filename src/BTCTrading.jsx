@@ -70,9 +70,9 @@ async function alpacaAPI(action, config, params = {}) {
 }
 
 // ── Yahoo candles ──
-async function fetchCandles(symbol, range = "1y") {
+async function fetchCandles(symbol, range = "1y", interval = "1d") {
   try {
-    const res = await fetch(`/api/yahoo-chart?symbol=${encodeURIComponent(symbol)}&range=${range}&interval=1d`);
+    const res = await fetch(`/api/yahoo-chart?symbol=${encodeURIComponent(symbol)}&range=${range}&interval=${interval}`);
     if (!res.ok) return [];
     const data = await res.json();
     const ts = data.chart?.result?.[0]?.timestamp;
@@ -282,11 +282,18 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
         setPrices(pm);
       }
 
-      // 멀티애셋 캔들 병렬 로딩 (BTC + ETH + SOL)
-      const [candles, ethCandles, solCandles] = await Promise.all([
+      // ── 멀티 타임프레임 캔들 병렬 로딩 ──
+      // 일봉(1y) + 4시간봉(60d) + 5분봉(5d) — 크립토 24/7 초단기 트레이딩
+      const [candles, ethCandles, solCandles, btc4h, eth4h, sol4h, btc5m, eth5m, sol5m] = await Promise.all([
         fetchCandles("BTC-USD", "1y"),
         fetchCandles("ETH-USD", "1y"),
         fetchCandles("SOL-USD", "1y"),
+        fetchCandles("BTC-USD", "60d", "4h"),
+        fetchCandles("ETH-USD", "60d", "4h"),
+        fetchCandles("SOL-USD", "60d", "4h"),
+        fetchCandles("BTC-USD", "5d", "5m"),
+        fetchCandles("ETH-USD", "5d", "5m"),
+        fetchCandles("SOL-USD", "5d", "5m"),
       ]);
       if (candles.length > 60) {
         setBtcCandles(candles);
@@ -301,27 +308,56 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           // ── 멀티 전략 앙상블: BTC Alpha v2 + 독자 알파 전략 5종 ──
           const ALPHA_STRATEGIES = [BTC_STRATEGY, strategyHurst, strategyVolCluster, strategyEfficiency, strategyMomDecay, strategyInfoFlow];
 
-          // BTC 시그널 (6개 전략 앙상블)
-          const btcSigs = ALPHA_STRATEGIES.flatMap(strat => {
-            try { return (strat.generate(candles) || []).map(s => ({ ...s, asset: "BTC-USD", stratId: strat.id })); }
+          // 일봉 시그널 생성
+          const btcSigsD = ALPHA_STRATEGIES.flatMap(strat => {
+            try { return (strat.generate(candles) || []).map(s => ({ ...s, asset: "BTC-USD", stratId: strat.id, tf: "1d", time: candles[s.index]?.time })); }
             catch { return []; }
           });
-          // ETH 시그널
-          const ethSigs = ethCandles.length > 60 ? ALPHA_STRATEGIES.flatMap(strat => {
-            try { return (strat.generate(ethCandles) || []).map(s => ({ ...s, asset: "ETH-USD", stratId: strat.id })); }
+          const ethSigsD = ethCandles.length > 60 ? ALPHA_STRATEGIES.flatMap(strat => {
+            try { return (strat.generate(ethCandles) || []).map(s => ({ ...s, asset: "ETH-USD", stratId: strat.id, tf: "1d", time: ethCandles[s.index]?.time })); }
             catch { return []; }
           }) : [];
-          // SOL 시그널
-          const solSigs = solCandles.length > 60 ? ALPHA_STRATEGIES.flatMap(strat => {
-            try { return (strat.generate(solCandles) || []).map(s => ({ ...s, asset: "SOL-USD", stratId: strat.id })); }
+          const solSigsD = solCandles.length > 60 ? ALPHA_STRATEGIES.flatMap(strat => {
+            try { return (strat.generate(solCandles) || []).map(s => ({ ...s, asset: "SOL-USD", stratId: strat.id, tf: "1d", time: solCandles[s.index]?.time })); }
             catch { return []; }
           }) : [];
-          // 전체 시그널 합산 (시간순 정렬)
-          const allSigs = [...btcSigs, ...ethSigs, ...solSigs].sort((a, b) => a.index - b.index);
-          setSignals(allSigs);
-          const sigs = btcSigs.filter(s => s.stratId === "btc_alpha"); // 백테스트는 BTC Alpha 기준
 
-          // 리스크 레벨에 따른 백테스트 파라미터
+          // 4시간봉 시그널 생성 (단기 트레이딩 — 크립토 핵심)
+          const btcSigs4h = btc4h.length > 60 ? ALPHA_STRATEGIES.flatMap(strat => {
+            try { return (strat.generate(btc4h) || []).map(s => ({ ...s, asset: "BTC-USD", stratId: strat.id, tf: "4h", time: btc4h[s.index]?.time })); }
+            catch { return []; }
+          }) : [];
+          const ethSigs4h = eth4h.length > 60 ? ALPHA_STRATEGIES.flatMap(strat => {
+            try { return (strat.generate(eth4h) || []).map(s => ({ ...s, asset: "ETH-USD", stratId: strat.id, tf: "4h", time: eth4h[s.index]?.time })); }
+            catch { return []; }
+          }) : [];
+          const solSigs4h = sol4h.length > 60 ? ALPHA_STRATEGIES.flatMap(strat => {
+            try { return (strat.generate(sol4h) || []).map(s => ({ ...s, asset: "SOL-USD", stratId: strat.id, tf: "4h", time: sol4h[s.index]?.time })); }
+            catch { return []; }
+          }) : [];
+
+          // 5분봉 시그널 생성 (초단기 스캘핑 — BTC Alpha + Hurst + VolCluster만 사용)
+          const SCALP_STRATEGIES = [BTC_STRATEGY, strategyHurst, strategyVolCluster].filter(Boolean);
+          const btcSigs5m = btc5m.length > 60 ? SCALP_STRATEGIES.flatMap(strat => {
+            try { return (strat.generate(btc5m) || []).map(s => ({ ...s, asset: "BTC-USD", stratId: strat.id, tf: "5m", time: btc5m[s.index]?.time })); }
+            catch { return []; }
+          }) : [];
+          const ethSigs5m = eth5m.length > 60 ? SCALP_STRATEGIES.flatMap(strat => {
+            try { return (strat.generate(eth5m) || []).map(s => ({ ...s, asset: "ETH-USD", stratId: strat.id, tf: "5m", time: eth5m[s.index]?.time })); }
+            catch { return []; }
+          }) : [];
+          const solSigs5m = sol5m.length > 60 ? SCALP_STRATEGIES.flatMap(strat => {
+            try { return (strat.generate(sol5m) || []).map(s => ({ ...s, asset: "SOL-USD", stratId: strat.id, tf: "5m", time: sol5m[s.index]?.time })); }
+            catch { return []; }
+          }) : [];
+
+          // 전체 시그널 합산 (타임스탬프 기준 정렬)
+          const allSigs = [...btcSigsD, ...ethSigsD, ...solSigsD, ...btcSigs4h, ...ethSigs4h, ...solSigs4h, ...btcSigs5m, ...ethSigs5m, ...solSigs5m]
+            .sort((a, b) => (a.time || 0) - (b.time || 0));
+          setSignals(allSigs);
+
+          // 백테스트는 BTC 일봉 Alpha 기준
+          const sigs = btcSigsD.filter(s => s.stratId === "btc_alpha");
           const riskParams = {
             low: { positionSize: 0.5, stopLoss: 5, takeProfit: 10 },
             medium: { positionSize: 0.7, stopLoss: 8, takeProfit: 15 },
@@ -354,11 +390,12 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   useEffect(() => { loadData(); }, [loadData]);
   useEffect(() => { if (isConnected) connectAlpaca(); }, [connectAlpaca, isConnected]);
   useEffect(() => {
-    timerRef.current = setInterval(() => { loadData(); if (isConnected) connectAlpaca(); }, 5 * 60 * 1000);
+    // 크립토 24/7 — 90초 간격 갱신 (5분봉 스캘핑 대응)
+    timerRef.current = setInterval(() => { loadData(); if (isConnected) connectAlpaca(); }, 90 * 1000);
     return () => clearInterval(timerRef.current);
   }, [loadData, connectAlpaca, isConnected]);
 
-  // ── Auto mode 시그널 처리 (멀티애셋 + 리스크 관리 v3) ──
+  // ── Auto mode 시그널 처리 (멀티애셋 + 리스크 관리 v4) ──
   useEffect(() => {
     if (!autoMode || !alpacaConnected || !alpacaAccount || signals.length === 0) return;
 
@@ -370,21 +407,24 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
     const annualizedVol = riskManager.calculateVolatility(btcPriceHistory);
     const regime = riskManager.getVolatilityRegime(annualizedVol);
 
-    // 최근 시그널 5개까지 평가 (멀티애셋 포함)
-    const recentSignals = signals.slice(-5);
+    // 최근 시그널 — 타임프레임별 유효기간 필터
+    const nowSec = now / 1000;
+    const recentSignals = signals.filter(sig => {
+      if (!sig.time) return false;
+      const ageSec = nowSec - sig.time;
+      if (sig.tf === "5m") return ageSec < 30 * 60;     // 5분봉: 30분 이내
+      if (sig.tf === "4h") return ageSec < 12 * 3600;   // 4시간봉: 12시간 이내
+      return ageSec < 2 * 86400;                         // 일봉: 2일 이내
+    }).slice(-15);  // 최대 15개까지 평가
 
     for (const sig of recentSignals) {
       const asset = sig.asset || "BTC-USD";
-      // 캔들 인덱스 기반 시간 추정 (BTC 캔들 기준)
-      const sigDate = btcCandles[sig.index]?.time;
-      if (!sigDate) continue;
+      if (!sig.time) continue;
 
-      const age = now / 1000 - sigDate;
-      if (age > 7 * 86400) continue;
-
-      // 쿨다운 체크: 동일 자산 4시간 내 재거래 방지
+      // 쿨다운 체크: 5m→15분, 4h→2시간, 1d→4시간
+      const cooldownMs = sig.tf === "5m" ? 15 * 60 * 1000 : sig.tf === "4h" ? 2 * 3600 * 1000 : 4 * 3600 * 1000;
       const lastTradeSym = tradeCooldowns[asset];
-      if (lastTradeSym && now - lastTradeSym < 4 * 3600 * 1000) {
+      if (lastTradeSym && now - lastTradeSym < cooldownMs) {
         decisions.push({ symbol: asset, action: "skip", reason: "4h 쿨다운 중" });
         continue;
       }
@@ -400,18 +440,20 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
       if (Math.abs(btcChange) > 8) fearGreedMult = 0.3;
       else if (Math.abs(btcChange) > 5) fearGreedMult = 0.5;
 
-      // 포지션 사이징 (등급 + 변동성 + 자산 가중치 반영)
+      // 포지션 사이징 (등급 + 변동성 + 자산 가중치 + 타임프레임 반영)
       const equity = parseFloat(alpacaAccount.equity || 0);
       const assetInfo = BTC_ASSETS.find(a => a.sym === asset);
       const assetWeight = assetInfo?.weight || 0.1;
       const gradeBonus = sig.confidence === "A" ? 1.2 : sig.confidence === "B" ? 1.0 : 0.8;
       const baseSize = (sig.positionSize || 0.5) * gradeBonus;
       const riskMult = { low: 0.5, medium: 0.7, high: 1.0 }[riskLevel] || 0.7;
+      // 타임프레임별 사이징: 5분봉은 스캘핑(작게), 4시간은 중간, 일봉은 풀
+      const tfMult = sig.tf === "5m" ? 0.15 : sig.tf === "4h" ? 0.5 : 1.0;
 
       const maxDD = portfolioMetrics.drawdown || 0;
       const adjustedSize = riskManager.adjustPositionSize(baseSize, regime, maxDD);
       // 자산별 가중치 적용: BTC 40%, ETH 25%, SOL 15%
-      const tradeAmount = Math.min(equity * adjustedSize * riskMult * fearGreedMult * assetWeight, equity * 0.3);
+      const tradeAmount = Math.min(equity * adjustedSize * riskMult * fearGreedMult * assetWeight * tfMult, equity * 0.3);
 
       if (sig.type === "BUY" && tradeAmount > 10) {
         submitCryptoOrder(asset, "buy", tradeAmount.toFixed(2), `[${asset}] ${sig.reason}`);
@@ -451,11 +493,11 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
 
   // ── Derived ──
   const recentSignals = useMemo(() =>
-    signals.slice(-20).reverse().map(s => ({
-      ...s, date: btcCandles[s.index]?.time ? new Date(btcCandles[s.index].time * 1000) : null,
+    signals.slice(-30).reverse().map(s => ({
+      ...s, date: s.time ? new Date(s.time * 1000) : (btcCandles[s.index]?.time ? new Date(btcCandles[s.index].time * 1000) : null),
     })), [signals, btcCandles]);
   const latestSignal = signals.length > 0 ? signals[signals.length - 1] : null;
-  const latestDate = latestSignal && btcCandles[latestSignal.index]?.time ? new Date(btcCandles[latestSignal.index].time * 1000) : null;
+  const latestDate = latestSignal?.time ? new Date(latestSignal.time * 1000) : (latestSignal && btcCandles[latestSignal.index]?.time ? new Date(btcCandles[latestSignal.index].time * 1000) : null);
   const cryptoPositions = alpacaPositions.filter(p => p.symbol?.includes("/") || p.asset_class === "crypto");
 
   // ═══ RENDER ═══
@@ -819,13 +861,16 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
                     {badge(s.type === "BUY" ? "매수" : "매도", s.type === "BUY" ? C.greenBg : C.redBg, s.type === "BUY" ? C.green : C.red)}
                     {s.confidence && badge(s.confidence, C.blueBg, C.blue)}
+                    {s.tf && badge(s.tf, C.purpleBg, C.purple)}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "11px", color: C.text2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.reason}</div>
+                    <div style={{ fontSize: "11px", color: C.text2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {s.asset && <span style={{ fontWeight: 700 }}>[{s.asset.replace("-USD","")}] </span>}{s.reason}
+                    </div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontSize: "12px", fontWeight: 700, color: C.text1 }}>${s.price?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-                    {s.date && <div style={{ fontSize: "9px", color: C.text3 }}>{s.date.toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}</div>}
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: C.text1 }}>${s.price?.toLocaleString(undefined, { maximumFractionDigits: s.price > 100 ? 0 : 2 })}</div>
+                    {s.date && <div style={{ fontSize: "9px", color: C.text3 }}>{s.date.toLocaleDateString("ko-KR", { month: "short", day: "numeric" })} {s.tf !== "1d" ? s.date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : ""}</div>}
                   </div>
                 </div>
               ))}

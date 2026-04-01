@@ -1074,25 +1074,43 @@ export default function AutoTrading({ theme = "dark", user }) {
   const botsLoaded = useRef(false);
   const botsSaving = useRef(false);
 
-  // Supabase에서 봇 목록 로드 (기기간 동기화)
+  // Supabase에서 봇 목록 로드 (기기간 동기화 — race condition 방지)
   useEffect(() => {
     if (!user || botsLoaded.current) return;
-    botsLoaded.current = true;
-    const remoteBots = user?.user_metadata?.active_bots;
-    if (Array.isArray(remoteBots) && remoteBots.length > 0) {
-      setActiveBots(remoteBots);
-      // localStorage 캐시도 업데이트
-      if (storageKey) try { localStorage.setItem(storageKey, JSON.stringify(remoteBots)); } catch {}
-    }
+    (async () => {
+      try {
+        // Supabase에서 최신 user 정보를 명시적으로 가져옴 (캐시 방지)
+        const { data } = await supabase.auth.getUser();
+        const remoteBots = data?.user?.user_metadata?.active_bots;
+        const localBots = (() => {
+          if (!storageKey) return [];
+          try { return JSON.parse(localStorage.getItem(storageKey) || "[]"); } catch { return []; }
+        })();
+
+        // 병합 전략: 더 많은 데이터를 가진 쪽 우선 (빈 배열로 덮어쓰기 방지)
+        if (Array.isArray(remoteBots) && remoteBots.length > 0) {
+          // 리모트에 데이터가 있으면 리모트 우선
+          setActiveBots(remoteBots);
+          if (storageKey) try { localStorage.setItem(storageKey, JSON.stringify(remoteBots)); } catch {}
+        } else if (localBots.length > 0) {
+          // 리모트는 비어있는데 로컬에 데이터가 있으면 로컬 유지 + 리모트에 복원
+          setActiveBots(localBots);
+          await supabase.auth.updateUser({ data: { active_bots: localBots } });
+        }
+      } catch (e) {
+        console.warn("[Toit] 봇 목록 로드 실패:", e);
+      }
+      botsLoaded.current = true;
+    })();
   }, [user, storageKey]);
 
-  // activeBots 변경 시 → Supabase + localStorage 동시 저장
+  // activeBots 변경 시 → Supabase + localStorage 동시 저장 (로드 완료 후에만)
   const saveBotsTimeout = useRef(null);
   useEffect(() => {
     if (!user || !botsLoaded.current) return;
     // localStorage 즉시 저장
     if (storageKey) try { localStorage.setItem(storageKey, JSON.stringify(activeBots)); } catch {}
-    // Supabase는 디바운스 (500ms)
+    // Supabase는 디바운스 (1초 — 빈번한 쓰기 방지)
     if (saveBotsTimeout.current) clearTimeout(saveBotsTimeout.current);
     saveBotsTimeout.current = setTimeout(async () => {
       if (botsSaving.current) return;
@@ -1101,7 +1119,7 @@ export default function AutoTrading({ theme = "dark", user }) {
         await supabase.auth.updateUser({ data: { active_bots: activeBots } });
       } catch (e) { console.warn("[Toit] 봇 동기화 실패:", e); }
       botsSaving.current = false;
-    }, 500);
+    }, 1000);
   }, [activeBots, user, storageKey]);
 
   // 알파카 계좌 잔고 로드 (봇 배분 기준)
