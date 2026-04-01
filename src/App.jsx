@@ -1116,6 +1116,11 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
   const mtfOverbought = rsi != null && dailyRsi != null && rsi >= 70 && dailyRsi >= 70;
   if (conditions.includes("mtf_rsi_oversold")  && mtfOversold)                                     triggers.push("mtf_rsi_oversold");
   if (conditions.includes("mtf_rsi_overbought") && mtfOverbought)                                  triggers.push("mtf_rsi_overbought");
+  // v6.9.1: 복합 다이버전스 스크리닝 조건
+  const compoundBullDiv = [macdDivType === "bullish", rsiDivType === "bullish", obvDivType === "bullish"].filter(Boolean).length >= 2;
+  const compoundBearDiv = [macdDivType === "bearish", rsiDivType === "bearish", obvDivType === "bearish"].filter(Boolean).length >= 2;
+  if (conditions.includes("compound_bull_div") && compoundBullDiv)                                 triggers.push("compound_bull_div");
+  if (conditions.includes("compound_bear_div") && compoundBearDiv)                                 triggers.push("compound_bear_div");
 
   return {
     triggers, price: +price.toFixed(6),
@@ -1194,6 +1199,9 @@ const CONDITION_META = {
   // v6.9: 다중 타임프레임 RSI
   mtf_rsi_oversold: { label: "MTF RSI 과매도",     icon: "📊", desc: "주간+일간 RSI 동시 ≤30 — 다중 타임프레임 과매도 확인 (높은 신뢰도)" },
   mtf_rsi_overbought:{ label: "MTF RSI 과매수",    icon: "📊", desc: "주간+일간 RSI 동시 ≥70 — 다중 타임프레임 과매수 확인 (높은 신뢰도)" },
+  // v6.9.1: 복합 다이버전스
+  compound_bull_div: { label: "복합 강세 다이버전스", icon: "⚡", desc: "MACD+RSI+OBV 중 2개 이상 강세 다이버전스 동시 발생 — 고신뢰 반전 시그널" },
+  compound_bear_div: { label: "복합 약세 다이버전스", icon: "⚡", desc: "MACD+RSI+OBV 중 2개 이상 약세 다이버전스 동시 발생 — 고신뢰 하락전환 시그널" },
 };
 
 // ════════════════════════════════════════════════════════════════════
@@ -1341,18 +1349,20 @@ const DARK = {
   green: "#00D47E", greenBg: "#0B2E1E",
   yellow: "#FFC233", yellowBg: "#2B2100",
   purple: "#9B6FFF", purpleBg: "#201840",
+  orange: "#FF6B2C",
   text1: "#F0F2F7", text2: "#94A3B8", text3: "#64748B",
   isDark: true,
 };
 const LIGHT = {
-  bg: "#F8F9FB", card: "#FFFFFF", card2: "#F1F3F6",
-  border: "#E2E5EA", border2: "#D1D5DC",
-  blue: "#2563EB", blueL: "#3B82F6", blueBg: "#DBEAFE",
-  red: "#DC2626", redBg: "#FEF2F2",
-  green: "#16A34A", greenBg: "#F0FDF4",
-  yellow: "#D97706", yellowBg: "#FFFBEB",
-  purple: "#7C3AED", purpleBg: "#F3F0FF",
-  text1: "#0F172A", text2: "#475569", text3: "#94A3B8",
+  bg: "#F5F6FA", card: "#FFFFFF", card2: "#EDF0F5",
+  border: "#D8DCE4", border2: "#C8CDD6",
+  blue: "#2558D6", blueL: "#3574E8", blueBg: "#E0EAFF",
+  red: "#D42020", redBg: "#FFF0F0",
+  green: "#158A3E", greenBg: "#ECFBF0",
+  yellow: "#C06A00", yellowBg: "#FFF8E8",
+  purple: "#6B30D0", purpleBg: "#F0EBFF",
+  orange: "#D4580A",
+  text1: "#0C1222", text2: "#3A4A60", text3: "#6B7A90",
   isDark: false,
 };
 function loadTheme() { try { return localStorage.getItem(THEME_KEY) || "dark"; } catch { return "dark"; } }
@@ -1467,6 +1477,7 @@ const TAG_COLORS = {
   adx_bullish: C.green, adx_bearish: C.red,
   rsi_divergence: C.yellow, near_poc: C.purple,
   mtf_rsi_oversold: C.purple, mtf_rsi_overbought: C.red,
+  compound_bull_div: C.green, compound_bear_div: C.red,
 };
 
 function SignalTag({ triggerKey, asset }) {
@@ -1780,6 +1791,23 @@ function quickDiagnosis(asset) {
   // OBV 다이버전스 방향성 반영 (v6.8: 스마트머니 방향 포착)
   if (asset.obvDivType === "bullish") { supScore += 7; signals.push({ type: "bullish", name: "OBV 강세 다이버전스 (매집)" }); }
   else if (asset.obvDivType === "bearish") { supScore -= 7; signals.push({ type: "bearish", name: "OBV 약세 다이버전스 (분산)" }); }
+  // ── v6.9.1: 복합 다이버전스 보너스 (MACD + RSI + OBV 정렬 시 고신뢰 시그널) ──
+  const bullDivCount = [asset.macdDivType === "bullish", asset.rsiDivType === "bullish", asset.obvDivType === "bullish"].filter(Boolean).length;
+  const bearDivCount = [asset.macdDivType === "bearish", asset.rsiDivType === "bearish", asset.obvDivType === "bearish"].filter(Boolean).length;
+  if (bullDivCount >= 3) {
+    supScore += 12; momScore = Math.min(100, momScore + 8);
+    signals.push({ type: "bullish", name: `⚡ 3중 강세 다이버전스 (MACD+RSI+OBV)` });
+  } else if (bullDivCount === 2) {
+    supScore += 6; momScore = Math.min(100, momScore + 4);
+    signals.push({ type: "bullish", name: `복합 강세 다이버전스 (${[asset.macdDivType === "bullish" && "MACD", asset.rsiDivType === "bullish" && "RSI", asset.obvDivType === "bullish" && "OBV"].filter(Boolean).join("+")})`});
+  }
+  if (bearDivCount >= 3) {
+    supScore -= 12; momScore = Math.max(0, momScore - 8);
+    signals.push({ type: "bearish", name: `⚡ 3중 약세 다이버전스 (MACD+RSI+OBV)` });
+  } else if (bearDivCount === 2) {
+    supScore -= 6; momScore = Math.max(0, momScore - 4);
+    signals.push({ type: "bearish", name: `복합 약세 다이버전스 (${[asset.macdDivType === "bearish" && "MACD", asset.rsiDivType === "bearish" && "RSI", asset.obvDivType === "bearish" && "OBV"].filter(Boolean).join("+")})`});
+  }
   supScore = Math.max(0, Math.min(100, supScore));
 
   // ── 가격위치: 52주 세분화 ──
@@ -2545,6 +2573,14 @@ function AssetCard({ asset, onChart }) {
           </div>
           <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
             {asset.triggers.map(t => <SignalTag key={t} triggerKey={t} asset={asset} />)}
+            {/* v6.9.1: 복합 다이버전스 뱃지 */}
+            {(() => {
+              const bd = [asset.macdDivType === "bullish", asset.rsiDivType === "bullish", asset.obvDivType === "bullish"].filter(Boolean).length;
+              const sd = [asset.macdDivType === "bearish", asset.rsiDivType === "bearish", asset.obvDivType === "bearish"].filter(Boolean).length;
+              if (bd >= 2) return <span style={{ fontSize: "9px", fontWeight: 800, padding: "2px 7px", borderRadius: "5px", background: `${C.green}28`, color: C.green, border: `1px solid ${C.green}44` }}>{bd === 3 ? "⚡3중 강세" : "복합 강세"}</span>;
+              if (sd >= 2) return <span style={{ fontSize: "9px", fontWeight: 800, padding: "2px 7px", borderRadius: "5px", background: `${C.red}28`, color: C.red, border: `1px solid ${C.red}44` }}>{sd === 3 ? "⚡3중 약세" : "복합 약세"}</span>;
+              return null;
+            })()}
           </div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -6486,8 +6522,13 @@ function AppInner() {
         @media (max-width: 380px) {
           :root { --header-h: 48px; --header-gap: 10px; }
         }
-        /* v3.8: 노치/다이나믹 아일랜드 대응 — header top + main padding 보정 */
-        header { top: var(--safe-top) !important; }
+        /* v4.1: 헤더 — safe-area 완전 커버 (top:0 + padding-top으로 노치 영역까지 배경 확장) */
+        header {
+          top: 0 !important;
+          padding-top: var(--safe-top) !important;
+          height: calc(var(--header-h) + var(--safe-top)) !important;
+          min-height: calc(var(--header-h) + var(--safe-top)) !important;
+        }
         main { padding-top: calc(var(--header-h) + var(--header-gap) + var(--safe-top)) !important; }
         body { padding-bottom: env(safe-area-inset-bottom, 0px); }
         [style*="position: fixed"][style*="bottom: 0"] { padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)) !important; }
@@ -7423,7 +7464,8 @@ function AppInner() {
               );
             })()}
 
-            {/* 섹터별 성과 미니 카드 제거 — 우측 사이드바 히트맵으로 통합 */}
+            {/* 쿠팡 파트너스 배너 — 홈 중간 */}
+            <CoupangOfficialBanner width="728" height="90" bannerId={975392} style={{ margin: "4px 0", borderRadius: "14px", overflow: "hidden" }} />
 
             </div>{/* end home-left */}
             <div className="home-right" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -7968,6 +8010,8 @@ function AppInner() {
               );
             })()}
 
+            {/* 쿠팡 파트너스 배너 — 사이드바 */}
+            <CoupangOfficialBanner width="320" height="100" bannerId={975393} style={{ margin: "4px 0", borderRadius: "14px", overflow: "hidden" }} />
 
             </div>{/* end home-right */}
             </div>{/* end home-grid */}
@@ -8121,9 +8165,6 @@ function AppInner() {
 
             {/* 쿠팡 검색 위젯 — 홈 하단 */}
             <CoupangSearchWidget style={{ margin: "12px 0" }} />
-
-            {/* 쿠팡 파트너스 공식 배너 (728x90) — 홈 하단에만 1개 */}
-            <CoupangOfficialBanner width="728" height="90" bannerId={975392} style={{ margin: "8px 0" }} />
           </div>
         )}
 
