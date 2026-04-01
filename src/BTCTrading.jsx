@@ -187,13 +187,57 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   const [btResult, setBtResult] = useState(null);
   const [marketDiag, setMarketDiag] = useState(null);
   const [loading, setLoading] = useState(true);
-  // ── botPreset에 따라 riskLevel 자동 적용 ──
-  const presetRisk = botPreset?.id === "btc-alpha" ? "high"
-    : botPreset?.id === "crypto-diversity" ? "medium"
-    : botPreset?.id === "crypto-swing" ? "high"
-    : null;
-  const [autoMode, setAutoMode] = useState(presetRisk ? true : load(KEYS.settings, { enabled: false, riskLevel: "medium" }).enabled);
-  const [riskLevel, setRiskLevel] = useState(presetRisk || load(KEYS.settings, { enabled: false, riskLevel: "medium" }).riskLevel);
+  // ── botPreset별 전략/자산/파라미터 완전 차별화 ──
+  const presetConfig = useMemo(() => {
+    const pid = botPreset?.id;
+    if (pid === "btc-alpha") return {
+      riskLevel: "high",
+      // BTC 전용 알파 — 전 전략 풀가동, BTC 집중, 5분봉 스캘핑까지
+      strategies: ["btc_alpha", "hurst_regime", "vol_cluster", "efficiency_ratio", "momentum_decay", "info_flow"],
+      assets: ["BTC-USD"],             // BTC 단일 집중
+      timeframes: ["1d", "4h", "5m"],  // 전 타임프레임
+      scalpStrategies: ["btc_alpha", "hurst_regime", "vol_cluster"],
+      positionMult: 1.2,               // 공격적 사이징
+      cooldownMult: 0.8,               // 빠른 재진입
+      desc: "BTC 전용 풀 알파 전략 — 6종 앙상블 + 5분봉 스캘핑",
+    };
+    if (pid === "crypto-diversity") return {
+      riskLevel: "medium",
+      // 5대 자산 분산 — 안정적 중기 전략 위주
+      strategies: ["btc_alpha", "hurst_regime", "efficiency_ratio", "info_flow"],
+      assets: ["BTC-USD", "ETH-USD", "SOL-USD", "BNB-USD", "XRP-USD"],  // 5자산 분산
+      timeframes: ["1d", "4h"],        // 중기 이상만 (스캘핑 없음)
+      scalpStrategies: [],
+      positionMult: 0.7,               // 보수적 사이징
+      cooldownMult: 1.5,               // 느린 재진입 (과매매 방지)
+      desc: "5대 크립토 분산투자 — 중기 리밸런싱 전략",
+    };
+    if (pid === "crypto-swing") return {
+      riskLevel: "high",
+      // 단기 스윙 — 변동성+모멘텀 전략 집중, BTC+ETH+SOL
+      strategies: ["btc_alpha", "vol_cluster", "momentum_decay", "hurst_regime"],
+      assets: ["BTC-USD", "ETH-USD", "SOL-USD"],  // 유동성 높은 3종
+      timeframes: ["4h", "5m"],        // 단기 타임프레임 집중 (일봉 제외)
+      scalpStrategies: ["btc_alpha", "vol_cluster", "hurst_regime"],
+      positionMult: 1.5,               // 매우 공격적 사이징
+      cooldownMult: 0.5,               // 매우 빠른 재진입
+      desc: "단기 스윙 — 변동성/모멘텀 전략 + 초단기 스캘핑",
+    };
+    // 프리셋 없으면 기본값 (전체 전략)
+    return {
+      riskLevel: null,
+      strategies: ["btc_alpha", "hurst_regime", "vol_cluster", "efficiency_ratio", "momentum_decay", "info_flow"],
+      assets: ["BTC-USD", "ETH-USD", "SOL-USD"],
+      timeframes: ["1d", "4h", "5m"],
+      scalpStrategies: ["btc_alpha", "hurst_regime", "vol_cluster"],
+      positionMult: 1.0,
+      cooldownMult: 1.0,
+      desc: null,
+    };
+  }, [botPreset]);
+
+  const [autoMode, setAutoMode] = useState(presetConfig.riskLevel ? true : load(KEYS.settings, { enabled: false, riskLevel: "medium" }).enabled);
+  const [riskLevel, setRiskLevel] = useState(presetConfig.riskLevel || load(KEYS.settings, { enabled: false, riskLevel: "medium" }).riskLevel);
   const [tradeLog, setTradeLog] = useState(load(KEYS.log, []));
   const [btcCandles, setBtcCandles] = useState([]);
   const [subTab, setSubTab] = useState("overview");
@@ -305,54 +349,42 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
         setVolatilityRegime(regime);
 
         if (BTC_STRATEGY) {
-          // ── 멀티 전략 앙상블: BTC Alpha v2 + 독자 알파 전략 5종 ──
-          const ALPHA_STRATEGIES = [BTC_STRATEGY, strategyHurst, strategyVolCluster, strategyEfficiency, strategyMomDecay, strategyInfoFlow];
+          // ── 봇 프리셋별 전략/자산/타임프레임 차별화 ──
+          const ALL_STRAT_MAP = {
+            btc_alpha: BTC_STRATEGY, hurst_regime: strategyHurst, vol_cluster: strategyVolCluster,
+            efficiency_ratio: strategyEfficiency, momentum_decay: strategyMomDecay, info_flow: strategyInfoFlow,
+          };
+          const activeStrategies = presetConfig.strategies
+            .map(id => ALL_STRAT_MAP[id]).filter(Boolean);
+          const scalpStrats = presetConfig.scalpStrategies
+            .map(id => ALL_STRAT_MAP[id]).filter(Boolean);
+          const activeAssets = presetConfig.assets;
+          const activeTFs = presetConfig.timeframes;
 
-          // 일봉 시그널 생성
-          const btcSigsD = ALPHA_STRATEGIES.flatMap(strat => {
-            try { return (strat.generate(candles) || []).map(s => ({ ...s, asset: "BTC-USD", stratId: strat.id, tf: "1d", time: candles[s.index]?.time })); }
-            catch { return []; }
-          });
-          const ethSigsD = ethCandles.length > 60 ? ALPHA_STRATEGIES.flatMap(strat => {
-            try { return (strat.generate(ethCandles) || []).map(s => ({ ...s, asset: "ETH-USD", stratId: strat.id, tf: "1d", time: ethCandles[s.index]?.time })); }
-            catch { return []; }
-          }) : [];
-          const solSigsD = solCandles.length > 60 ? ALPHA_STRATEGIES.flatMap(strat => {
-            try { return (strat.generate(solCandles) || []).map(s => ({ ...s, asset: "SOL-USD", stratId: strat.id, tf: "1d", time: solCandles[s.index]?.time })); }
-            catch { return []; }
-          }) : [];
+          // 자산별 캔들 매핑
+          const dailyMap = { "BTC-USD": candles, "ETH-USD": ethCandles, "SOL-USD": solCandles };
+          const h4Map = { "BTC-USD": btc4h, "ETH-USD": eth4h, "SOL-USD": sol4h };
+          const m5Map = { "BTC-USD": btc5m, "ETH-USD": eth5m, "SOL-USD": sol5m };
 
-          // 4시간봉 시그널 생성 (단기 트레이딩 — 크립토 핵심)
-          const btcSigs4h = btc4h.length > 60 ? ALPHA_STRATEGIES.flatMap(strat => {
-            try { return (strat.generate(btc4h) || []).map(s => ({ ...s, asset: "BTC-USD", stratId: strat.id, tf: "4h", time: btc4h[s.index]?.time })); }
-            catch { return []; }
-          }) : [];
-          const ethSigs4h = eth4h.length > 60 ? ALPHA_STRATEGIES.flatMap(strat => {
-            try { return (strat.generate(eth4h) || []).map(s => ({ ...s, asset: "ETH-USD", stratId: strat.id, tf: "4h", time: eth4h[s.index]?.time })); }
-            catch { return []; }
-          }) : [];
-          const solSigs4h = sol4h.length > 60 ? ALPHA_STRATEGIES.flatMap(strat => {
-            try { return (strat.generate(sol4h) || []).map(s => ({ ...s, asset: "SOL-USD", stratId: strat.id, tf: "4h", time: sol4h[s.index]?.time })); }
-            catch { return []; }
-          }) : [];
+          const genSigs = (strats, candleMap, tf) => {
+            if (!activeTFs.includes(tf)) return [];
+            return activeAssets.flatMap(asset => {
+              const c = candleMap[asset];
+              if (!c || c.length <= 60) return [];
+              return strats.flatMap(strat => {
+                try { return (strat.generate(c) || []).map(s => ({ ...s, asset, stratId: strat.id, tf, time: c[s.index]?.time })); }
+                catch { return []; }
+              });
+            });
+          };
 
-          // 5분봉 시그널 생성 (초단기 스캘핑 — BTC Alpha + Hurst + VolCluster만 사용)
-          const SCALP_STRATEGIES = [BTC_STRATEGY, strategyHurst, strategyVolCluster].filter(Boolean);
-          const btcSigs5m = btc5m.length > 60 ? SCALP_STRATEGIES.flatMap(strat => {
-            try { return (strat.generate(btc5m) || []).map(s => ({ ...s, asset: "BTC-USD", stratId: strat.id, tf: "5m", time: btc5m[s.index]?.time })); }
-            catch { return []; }
-          }) : [];
-          const ethSigs5m = eth5m.length > 60 ? SCALP_STRATEGIES.flatMap(strat => {
-            try { return (strat.generate(eth5m) || []).map(s => ({ ...s, asset: "ETH-USD", stratId: strat.id, tf: "5m", time: eth5m[s.index]?.time })); }
-            catch { return []; }
-          }) : [];
-          const solSigs5m = sol5m.length > 60 ? SCALP_STRATEGIES.flatMap(strat => {
-            try { return (strat.generate(sol5m) || []).map(s => ({ ...s, asset: "SOL-USD", stratId: strat.id, tf: "5m", time: sol5m[s.index]?.time })); }
-            catch { return []; }
-          }) : [];
+          // 타임프레임별 시그널 생성 (프리셋에 따라 자동 필터링)
+          const dailySigs = genSigs(activeStrategies, dailyMap, "1d");
+          const h4Sigs = genSigs(activeStrategies, h4Map, "4h");
+          const m5Sigs = scalpStrats.length > 0 ? genSigs(scalpStrats, m5Map, "5m") : [];
 
           // 전체 시그널 합산 (타임스탬프 기준 정렬)
-          const allSigs = [...btcSigsD, ...ethSigsD, ...solSigsD, ...btcSigs4h, ...ethSigs4h, ...solSigs4h, ...btcSigs5m, ...ethSigs5m, ...solSigs5m]
+          const allSigs = [...dailySigs, ...h4Sigs, ...m5Sigs]
             .sort((a, b) => (a.time || 0) - (b.time || 0));
           setSignals(allSigs);
 
@@ -420,9 +452,12 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
     for (const sig of recentSignals) {
       const asset = sig.asset || "BTC-USD";
       if (!sig.time) continue;
+      // 프리셋 자산 필터: 이 봇이 다루는 자산만 거래
+      if (!presetConfig.assets.includes(asset)) continue;
 
-      // 쿨다운 체크: 5m→15분, 4h→2시간, 1d→4시간
-      const cooldownMs = sig.tf === "5m" ? 15 * 60 * 1000 : sig.tf === "4h" ? 2 * 3600 * 1000 : 4 * 3600 * 1000;
+      // 쿨다운 체크: 5m→15분, 4h→2시간, 1d→4시간 (프리셋별 배수 적용)
+      const baseCooldown = sig.tf === "5m" ? 15 * 60 * 1000 : sig.tf === "4h" ? 2 * 3600 * 1000 : 4 * 3600 * 1000;
+      const cooldownMs = baseCooldown * (presetConfig.cooldownMult || 1);
       const lastTradeSym = tradeCooldowns[asset];
       if (lastTradeSym && now - lastTradeSym < cooldownMs) {
         decisions.push({ symbol: asset, action: "skip", reason: "4h 쿨다운 중" });
@@ -452,8 +487,9 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
 
       const maxDD = portfolioMetrics.drawdown || 0;
       const adjustedSize = riskManager.adjustPositionSize(baseSize, regime, maxDD);
-      // 자산별 가중치 적용: BTC 40%, ETH 25%, SOL 15%
-      const tradeAmount = Math.min(equity * adjustedSize * riskMult * fearGreedMult * assetWeight * tfMult, equity * 0.3);
+      // 자산별 가중치 + 프리셋 배수 적용
+      const presetMult = presetConfig.positionMult || 1.0;
+      const tradeAmount = Math.min(equity * adjustedSize * riskMult * fearGreedMult * assetWeight * tfMult * presetMult, equity * 0.35);
 
       if (sig.type === "BUY" && tradeAmount > 10) {
         submitCryptoOrder(asset, "buy", tradeAmount.toFixed(2), `[${asset}] ${sig.reason}`);
@@ -720,6 +756,24 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
       {/* ═══ 전략 개요 ═══ */}
       {subTab === "overview" && (
         <>
+          {/* 봇 프리셋 전략 정보 배너 */}
+          {presetConfig.desc && (
+            <div style={{
+              ...card, padding: "12px 14px",
+              background: `linear-gradient(135deg, ${C.purple}08, ${C.blue}05)`,
+              border: `1px solid ${C.purple}20`,
+            }}>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: C.purple, marginBottom: "6px" }}>
+                🎯 {presetConfig.desc}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                {presetConfig.assets.map(a => badge(a.replace("-USD",""), C.blueBg, C.blue))}
+                {presetConfig.timeframes.map(tf => badge(tf, C.purpleBg, C.purple))}
+                {badge(`전략 ${presetConfig.strategies.length}종`, C.greenBg, C.green)}
+                {badge(`사이징 x${presetConfig.positionMult}`, C.yellowBg, C.yellow)}
+              </div>
+            </div>
+          )}
           {latestSignal && (
             <div style={{
               ...card,
