@@ -779,6 +779,62 @@ export default async function handler(req, res) {
       }
     }
 
+    // ── 주식 봇별 성과 KV 저장 ──
+    try {
+      const kvModule = await import("@vercel/kv");
+      const kv = kvModule.kv;
+
+      // 주식 봇 ID 목록 (AutoTrading.jsx의 STOCK_BOTS와 동기화)
+      const STOCK_BOT_IDS = ["us-stable", "us-balanced", "us-aggressive", "us-trend", "us-meanrev"];
+
+      if (orders.length > 0) {
+        for (const botId of STOCK_BOT_IDS) {
+          const key = `di:bot:${botId}:perf`;
+          const existing = (await kv.get(key)) || {
+            botId, trades: [], realizedPL: 0, totalBuyCost: 0, totalSellRevenue: 0,
+            tradeCount: 0, winCount: 0, lastUpdated: null,
+          };
+          for (const order of orders) {
+            existing.trades = [
+              { time: new Date().toISOString(), asset: order.symbol, type: order.side.replace(' (SL)', ''),
+                amount: (order.qty || 0) * (order.price || 0), reason: order.reason || '' },
+              ...(existing.trades || []),
+            ].slice(0, 200);
+            existing.tradeCount = (existing.tradeCount || 0) + 1;
+            if (order.side === "BUY") {
+              existing.totalBuyCost = (existing.totalBuyCost || 0) + (order.qty * order.price);
+            } else {
+              existing.totalSellRevenue = (existing.totalSellRevenue || 0) + (order.qty * order.price);
+            }
+          }
+          existing.lastUpdated = new Date().toISOString();
+          await kv.set(key, existing);
+        }
+        console.log(`📊 주식 봇별 성과 KV 저장: ${orders.length}건`);
+      }
+
+      // 주식 봇별 포지션 스냅샷
+      for (const botId of STOCK_BOT_IDS) {
+        const totalMV = positions.reduce((s, p) => s + (parseFloat(p.market_value) || 0), 0);
+        const totalUnrealized = positions.reduce((s, p) => s + (parseFloat(p.unrealized_pl) || 0), 0);
+        const snapKey = `di:bot:${botId}:snapshot`;
+        const prevSnap = (await kv.get(snapKey)) || { peakValue: totalMV, mdd: 0, history: [] };
+        const peakValue = Math.max(prevSnap.peakValue || 0, totalMV);
+        const dd = peakValue > 0 ? ((peakValue - totalMV) / peakValue) * 100 : 0;
+        const mdd = Math.max(prevSnap.mdd || 0, dd);
+        const history = [...(prevSnap.history || []),
+          { time: new Date().toISOString(), value: totalMV, unrealizedPL: totalUnrealized, positions: positions.length },
+        ].slice(-500);
+        await kv.set(snapKey, {
+          botId, marketValue: totalMV, unrealizedPL: totalUnrealized,
+          positionCount: positions.length, peakValue, dd, mdd, history, lastUpdated: new Date().toISOString(),
+        });
+      }
+      console.log(`📸 주식 봇별 포지션 스냅샷 저장 완료`);
+    } catch (e) {
+      console.log(`⚠️ 주식 봇별 성과 KV 저장 실패: ${e.message}`);
+    }
+
     // Build telegram report (structured format v4)
     const now = new Date();
     const timeStr = now.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', hour12: false });

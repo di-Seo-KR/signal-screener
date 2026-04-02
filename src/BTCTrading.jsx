@@ -261,6 +261,24 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   const [alpacaError, setAlpacaError] = useState(null);
   const [orderLoading, setOrderLoading] = useState(false);
 
+  // ── 봇별 독립 성과 (KV 데이터) ──
+  const [botPerf, setBotPerf] = useState(null); // { perf, snapshot }
+  useEffect(() => {
+    const bid = botPreset?.id;
+    if (!bid) return;
+    let cancelled = false;
+    const fetchBotPerf = async () => {
+      try {
+        const res = await fetch(`/api/bot-performance?botId=${bid}`);
+        const data = await res.json();
+        if (!cancelled && data.ok) setBotPerf({ perf: data.perf, snapshot: data.snapshot });
+      } catch { /* 실패해도 기존 데이터로 폴백 */ }
+    };
+    fetchBotPerf();
+    const interval = setInterval(fetchBotPerf, 60000); // 1분마다 갱신
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [botPreset?.id]);
+
   const timerRef = useRef(null);
   const isConnected = config.apiKey && config.apiSecret;
 
@@ -684,42 +702,43 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           )}
           {cryptoPositions.length === 0 && <div style={{ fontSize: "11px", color: C.text3, textAlign: "center", padding: "8px" }}>보유 크립토 없음</div>}
 
-          {/* ═══ 봇 성과 지표 ═══ */}
+          {/* ═══ 봇 독립 성과 지표 (KV 기반) ═══ */}
           {(() => {
-            const eq = parseFloat(alpacaAccount.equity || 0);
-            const lastEq = parseFloat(alpacaAccount.last_equity || eq);
+            const snap = botPerf?.snapshot || {};
+            const perf = botPerf?.perf || {};
+            const unrealizedPL = snap.unrealizedPL || 0;
+            const dd = snap.dd || 0;
+            const mdd = snap.mdd || 0;
+            const marketValue = snap.marketValue || 0;
             const initCapital = botAllocation || 100000;
-            const ratio = (botAllocation && eq > 0) ? (botAllocation / eq) : 1;
-            const adjEq = botAllocation || eq;
-
-            // 오늘 수익
-            const todayPL = (eq - lastEq) * ratio;
-            const todayPLPct = lastEq > 0 ? ((eq - lastEq) / lastEq) * 100 : 0;
-            // 누적 수익
-            const totalPL = adjEq - initCapital;
-            const totalPLPct = initCapital > 0 ? ((adjEq - initCapital) / initCapital) * 100 : 0;
-            // 포지션 기반 미실현 P&L
-            const unrealizedPL = cryptoPositions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
-            // Drawdown (현재 자산 vs 초기자본 고점 — 간이 계산)
-            const peakEquity = Math.max(initCapital, adjEq);
-            const dd = peakEquity > 0 ? ((peakEquity - adjEq) / peakEquity) * 100 : 0;
-            // 투자 비중
-            const invested = cryptoPositions.reduce((s, p) => s + parseFloat(p.market_value || 0), 0);
-            const investedPct = adjEq > 0 ? (invested / adjEq) * 100 : 0;
+            const invested = marketValue;
+            const investedPct = initCapital > 0 ? (invested / initCapital) * 100 : 0;
+            const tradeCount = perf.tradeCount || 0;
+            const totalSold = perf.totalSellRevenue || 0;
+            const totalBought = perf.totalBuyCost || 0;
+            const realizedPL = totalSold - totalBought + unrealizedPL;
+            const realizedPLPct = initCapital > 0 ? (realizedPL / initCapital) * 100 : 0;
 
             const fmtUSD = (v) => `${v >= 0 ? "+" : ""}$${Math.abs(v).toFixed(2)}`;
             const fmtPct = (v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
             const metrics = [
-              { label: "오늘 수익", value: fmtUSD(todayPL), sub: fmtPct(todayPLPct), color: todayPL >= 0 ? C.green : C.red },
-              { label: "누적 수익", value: fmtUSD(totalPL), sub: fmtPct(totalPLPct), color: totalPL >= 0 ? C.green : C.red },
+              { label: "총 거래", value: `${tradeCount}회`, color: C.text1 },
+              { label: "누적 수익", value: fmtUSD(realizedPL), sub: fmtPct(realizedPLPct), color: realizedPL >= 0 ? C.green : C.red },
               { label: "미실현 P&L", value: fmtUSD(unrealizedPL), color: unrealizedPL >= 0 ? C.green : C.red },
               { label: "Drawdown", value: `-${dd.toFixed(2)}%`, color: dd > 5 ? C.red : dd > 2 ? C.yellow : C.green },
-              { label: "투자 비중", value: `${investedPct.toFixed(1)}%`, color: investedPct > 70 ? C.yellow : C.blue },
-              { label: "포지션 수", value: `${cryptoPositions.length}개`, color: C.text1 },
+              { label: "MDD", value: `-${mdd.toFixed(2)}%`, color: mdd > 10 ? C.red : mdd > 5 ? C.yellow : C.green },
+              { label: "포지션 수", value: `${snap.positionCount || 0}개`, color: C.text1 },
             ];
             return (
               <div style={{ marginTop: "12px", borderTop: `1px solid ${C.border}40`, paddingTop: "12px" }}>
-                <div style={{ fontSize: "11px", fontWeight: 700, color: C.text3, marginBottom: "8px" }}>봇 성과</div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: C.text3 }}>봇 독립 성과</span>
+                  {snap.lastUpdated && (
+                    <span style={{ fontSize: "9px", color: C.text3 }}>
+                      {new Date(snap.lastUpdated).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })} 갱신
+                    </span>
+                  )}
+                </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
                   {metrics.map((m, i) => (
                     <div key={i} style={{ background: C.card2, borderRadius: "8px", padding: "8px", textAlign: "center" }}>
@@ -729,6 +748,23 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                     </div>
                   ))}
                 </div>
+                {/* 최근 거래 내역 */}
+                {perf.trades && perf.trades.length > 0 && (
+                  <div style={{ marginTop: "8px" }}>
+                    <div style={{ fontSize: "10px", fontWeight: 700, color: C.text3, marginBottom: "4px" }}>최근 거래</div>
+                    {perf.trades.slice(0, 5).map((t, i) => (
+                      <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+                        padding: "4px 6px", borderRadius: "4px", background: i % 2 === 0 ? C.card2 : "transparent", fontSize: "10px" }}>
+                        <span style={{ color: t.type === "BUY" ? C.green : C.red, fontWeight: 700, minWidth: "32px" }}>{t.type}</span>
+                        <span style={{ color: C.text2, flex: 1, marginLeft: "6px" }}>{t.asset}</span>
+                        <span style={{ color: C.text1, fontWeight: 600 }}>${(t.amount || 0).toFixed(0)}</span>
+                        <span style={{ color: C.text3, marginLeft: "6px", fontSize: "9px" }}>
+                          {t.time ? new Date(t.time).toLocaleDateString("ko-KR", { month: "short", day: "numeric" }) : ""}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -780,9 +816,9 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                 {alpacaConnected && (
                   <div style={{ display: "flex", gap: "4px" }}>
                     <button onClick={() => submitCryptoOrder(a.sym, "buy", "100", `수동 매수 ${a.name}`)} disabled={orderLoading}
-                      style={{ padding: "4px 8px", borderRadius: "4px", fontSize: "9px", fontWeight: 700, background: C.greenBg, color: C.green, border: "none", cursor: "pointer", opacity: orderLoading ? 0.5 : 1 }}>매수</button>
+                      style={{ padding: "4px 8px", borderRadius: "4px", fontSize: "9px", fontWeight: 700, background: C.greenBg, color: C.green, border: "none", cursor: "pointer", opacity: orderLoading ? 0.5 : 1, whiteSpace: "nowrap", flexShrink: 0 }}>매수</button>
                     <button onClick={() => submitCryptoOrder(a.sym, "sell", "100", `수동 매도 ${a.name}`)} disabled={orderLoading}
-                      style={{ padding: "4px 8px", borderRadius: "4px", fontSize: "9px", fontWeight: 700, background: C.redBg, color: C.red, border: "none", cursor: "pointer", opacity: orderLoading ? 0.5 : 1 }}>매도</button>
+                      style={{ padding: "4px 8px", borderRadius: "4px", fontSize: "9px", fontWeight: 700, background: C.redBg, color: C.red, border: "none", cursor: "pointer", opacity: orderLoading ? 0.5 : 1, whiteSpace: "nowrap", flexShrink: 0 }}>매도</button>
                   </div>
                 )}
               </div>
@@ -1028,7 +1064,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                         {badge(t.type === "BUY" ? "매수" : "매도", t.type === "BUY" ? C.greenBg : C.redBg, t.type === "BUY" ? C.green : C.red)}
                         <span style={{ color: C.text2, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.reason}</span>
                         <span style={{ fontWeight: 700, color: C.text1 }}>${t.price?.toFixed(0)}</span>
-                        {t.pnlPct != null && <span style={{ fontWeight: 700, color: t.pnlPct >= 0 ? C.green : C.red, minWidth: "42px", textAlign: "right" }}>{t.pnlPct >= 0 ? "+" : ""}{t.pnlPct.toFixed(1)}%</span>}
+                        {t.pnlPct != null && <span style={{ fontWeight: 700, color: t.pnlPct >= 0 ? C.green : C.red, minWidth: "42px", textAlign: "right", flexShrink: 0 }}>{t.pnlPct >= 0 ? "+" : ""}{t.pnlPct.toFixed(1)}%</span>}
                       </div>
                     ))}
                   </div>

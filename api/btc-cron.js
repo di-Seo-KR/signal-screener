@@ -27,6 +27,24 @@ const BINANCE_SYMBOLS = {
 const MAX_POSITION_PER_ASSET = 0.30;
 const MAX_TOTAL_CRYPTO_EXPOSURE = 0.80;
 
+// ── 봇별 자산 매핑 (AutoTrading.jsx의 CRYPTO_BOTS와 동기화) ──
+const BOT_ASSET_MAP = {
+  "btc-alpha": ["BTC/USD"],
+  "highcap-momentum": ["BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD", "ADA/USD", "AVAX/USD"],
+  "defi-infra": ["LINK/USD", "UNI/USD", "AAVE/USD", "DOT/USD"],
+  "meme-trend": ["DOGE/USD", "SHIB/USD", "PEPE/USD"],
+  "l2-emerging": ["ARB/USD", "OP/USD", "MATIC/USD"],
+  "crypto-diversity": CRYPTO_ASSETS, // 전체
+  "crypto-swing": CRYPTO_ASSETS, // 전체
+};
+
+// 자산 → 해당 자산을 다루는 봇 목록
+function getBotsForAsset(asset) {
+  return Object.entries(BOT_ASSET_MAP)
+    .filter(([, assets]) => assets.includes(asset))
+    .map(([botId]) => botId);
+}
+
 export default async function handler(req, res) {
   const startTime = Date.now();
   const log = [];
@@ -384,6 +402,69 @@ export default async function handler(req, res) {
       if (!latestSignal || (latestSignal.type === "BUY" && tradeAmount <= 10)) {
         assetResults.push({ asset, ok: true, action: "skip", signal: latestSignal });
       }
+    }
+
+    // ── 봇별 성과 KV 저장 ──
+    try {
+      const kvModule = await import("@vercel/kv");
+      const kv = kvModule.kv;
+      const executedTrades = assetResults.filter(r => r.type === "BUY" || r.type === "SELL");
+
+      if (executedTrades.length > 0) {
+        // 각 거래를 봇별로 분류하여 기록
+        for (const trade of executedTrades) {
+          const bots = getBotsForAsset(trade.asset);
+          for (const botId of bots) {
+            const key = `di:bot:${botId}:perf`;
+            const existing = (await kv.get(key)) || {
+              botId, trades: [], realizedPL: 0, totalBuyCost: 0, totalSellRevenue: 0,
+              tradeCount: 0, winCount: 0, peakValue: 0, mdd: 0, lastUpdated: null,
+            };
+            // 거래 기록 추가 (최근 200건 유지)
+            existing.trades = [
+              { time: new Date().toISOString(), asset: trade.asset, type: trade.type,
+                amount: trade.amount, signal: trade.signal?.reason?.slice(0, 60),
+                score: trade.signal?.score, confidence: trade.signal?.confidence },
+              ...(existing.trades || []),
+            ].slice(0, 200);
+            existing.tradeCount = (existing.tradeCount || 0) + 1;
+            if (trade.type === "BUY") {
+              existing.totalBuyCost = (existing.totalBuyCost || 0) + (trade.amount || 0);
+            } else {
+              existing.totalSellRevenue = (existing.totalSellRevenue || 0) + (trade.amount || 0);
+            }
+            existing.lastUpdated = new Date().toISOString();
+            await kv.set(key, existing);
+          }
+        }
+        addLog(`📊 봇별 성과 KV 저장: ${executedTrades.length}건 분배`);
+      }
+
+      // 봇별 포지션 스냅샷 (현재 포지션 기준 미실현 P&L)
+      for (const [botId, assets] of Object.entries(BOT_ASSET_MAP)) {
+        const botPositions = assets
+          .map(a => positionMap[a])
+          .filter(Boolean);
+        const botUnrealizedPL = botPositions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
+        const botMarketValue = botPositions.reduce((s, p) => s + parseFloat(p.market_value || 0), 0);
+        const snapKey = `di:bot:${botId}:snapshot`;
+        const prevSnap = (await kv.get(snapKey)) || { peakValue: botMarketValue, mdd: 0, history: [] };
+        const peakValue = Math.max(prevSnap.peakValue || 0, botMarketValue);
+        const dd = peakValue > 0 ? ((peakValue - botMarketValue) / peakValue) * 100 : 0;
+        const mdd = Math.max(prevSnap.mdd || 0, dd);
+        // 에쿼티 히스토리 (최근 500개 — 15분 간격이면 ~5일)
+        const history = [
+          ...(prevSnap.history || []),
+          { time: new Date().toISOString(), value: botMarketValue, unrealizedPL: botUnrealizedPL, positions: botPositions.length },
+        ].slice(-500);
+        await kv.set(snapKey, {
+          botId, marketValue: botMarketValue, unrealizedPL: botUnrealizedPL,
+          positionCount: botPositions.length, peakValue, dd, mdd, history, lastUpdated: new Date().toISOString(),
+        });
+      }
+      addLog(`📸 봇별 포지션 스냅샷 저장 완료`);
+    } catch (e) {
+      addLog(`⚠️ 봇별 성과 KV 저장 실패: ${e.message}`);
     }
 
     // ── 텔레그램 알림 ──

@@ -961,10 +961,10 @@ function OrderModal({ symbol: initSymbol, side, reason, config, onClose, onOrder
       justifyContent: "center", background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
         background: C.card, border: `1px solid ${C.border}`, borderRadius: "20px",
-        padding: "24px", width: "100%", maxWidth: "400px", margin: "16px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        padding: "24px", width: "100%", maxWidth: "min(90vw, 400px)", margin: "16px", boxSizing: "border-box" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", minWidth: 0 }}>
           <div style={{ fontWeight: 800, fontSize: "17px" }}>{side === "buy" ? "매수" : "매도"} 주문</div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: C.text3, fontSize: "20px", cursor: "pointer" }}>×</button>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: C.text3, fontSize: "20px", cursor: "pointer", padding: "4px 8px", minHeight: "32px", minWidth: "32px", flexShrink: 0 }}>×</button>
         </div>
         {initSymbol ? (
           <div style={{ background: C.card2, borderRadius: "10px", padding: "12px", marginBottom: "12px",

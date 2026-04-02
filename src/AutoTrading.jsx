@@ -388,7 +388,7 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
           >
             <style>{`.bot-carousel::-webkit-scrollbar { display: none; }`}</style>
             {bots.map((bot) => (
-              <div key={bot.id} style={{ minWidth: "280px", maxWidth: "300px", scrollSnapAlign: "start", flex: "0 0 auto" }}>
+              <div key={bot.id} style={{ minWidth: "min(280px, 85vw)", maxWidth: "300px", scrollSnapAlign: "start", flex: "0 0 auto" }}>
                 <BotCard bot={bot} onActivate={onActivate} theme={theme} />
               </div>
             ))}
@@ -690,6 +690,22 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
   const activeBotScrollRef = useRef(null);
   const [activeBotIdx, setActiveBotIdx] = useState(0);
 
+  // ── 봇별 독립 성과 데이터 (KV) ──
+  const [allBotPerf, setAllBotPerf] = useState({});
+  useEffect(() => {
+    let cancelled = false;
+    const fetchAll = async () => {
+      try {
+        const res = await fetch("/api/bot-performance?all=1");
+        const data = await res.json();
+        if (!cancelled && data.ok) setAllBotPerf(data.bots || {});
+      } catch { /* 실패해도 기존 fallback */ }
+    };
+    fetchAll();
+    const interval = setInterval(fetchAll, 60000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
+
   if (!activeBots || activeBots.length === 0) return null;
 
   // 실제 데이터 기반 지표 계산
@@ -954,10 +970,10 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
             <div key={ab.botId} style={{
               background: c.card, border: `1px solid ${c.border}`, borderRadius: isMobile ? "12px" : "14px", padding: isMobile ? "14px 12px" : "20px",
               display: "flex", flexDirection: "column", gap: isMobile ? "10px" : "14px",
-              ...(isMobile && activeBots.length > 1 ? { minWidth: "85%", maxWidth: "85%", scrollSnapAlign: "start", flexShrink: 0 } : {}),
+              ...(isMobile && activeBots.length > 1 ? { minWidth: "min(85%, calc(100vw - 48px))", maxWidth: "85%", scrollSnapAlign: "start", flexShrink: 0 } : {}),
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "10px" : "12px" }}>
-                <span style={{ fontSize: isMobile ? "24px" : "28px" }}>{bot.icon}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "10px" : "12px", minWidth: 0 }}>
+                <span style={{ fontSize: isMobile ? "24px" : "28px", flexShrink: 0 }}>{bot.icon}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: isMobile ? "13px" : "15px", color: c.text1, wordBreak: "break-word" }}>{bot.name}</div>
                   <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3 }}>
@@ -1047,13 +1063,47 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
                 )}
               </div>
 
+              {/* 봇별 독립 성과 (KV 기반) */}
+              {(() => {
+                const bp = allBotPerf[ab.botId];
+                const kvTrades = bp?.perf?.tradeCount || 0;
+                const kvUnrealized = bp?.snapshot?.unrealizedPL || 0;
+                const kvDD = bp?.snapshot?.dd || 0;
+                const kvMDD = bp?.snapshot?.mdd || 0;
+                const kvPositions = bp?.snapshot?.positionCount || 0;
+                return bp ? (
+                  <div style={{
+                    display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "4px",
+                    background: `${c.blue}06`, borderRadius: "8px", padding: isMobile ? "8px 6px" : "10px",
+                    border: `1px solid ${c.blue}15`,
+                  }}>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: "9px", color: c.text3 }}>거래</div>
+                      <div style={{ fontSize: "12px", fontWeight: 800, color: c.text1 }}>{kvTrades}회</div>
+                    </div>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: "9px", color: c.text3 }}>미실현</div>
+                      <div style={{ fontSize: "12px", fontWeight: 800, color: kvUnrealized >= 0 ? c.green : c.red }}>
+                        {kvUnrealized >= 0 ? "+" : ""}${Math.abs(kvUnrealized).toFixed(0)}
+                      </div>
+                    </div>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontSize: "9px", color: c.text3 }}>DD / MDD</div>
+                      <div style={{ fontSize: "11px", fontWeight: 700, color: kvMDD > 10 ? c.red : kvMDD > 5 ? c.yellow : c.green }}>
+                        {kvDD.toFixed(1)}% / {kvMDD.toFixed(1)}%
+                      </div>
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+
               <div style={{
                 display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: isMobile ? "6px" : "8px",
                 background: c.card2, borderRadius: "10px", padding: isMobile ? "10px 8px" : "12px",
               }}>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3, marginBottom: "2px" }}>거래 횟수</div>
-                  <div style={{ fontSize: isMobile ? "13px" : "16px", fontWeight: 800, color: c.text1 }}>{botTrades || ab.trades || 0}</div>
+                  <div style={{ fontSize: isMobile ? "13px" : "16px", fontWeight: 800, color: c.text1 }}>{(allBotPerf[ab.botId]?.perf?.tradeCount) || botTrades || ab.trades || 0}</div>
                 </div>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3, marginBottom: "2px" }}>투입 금액</div>
@@ -1071,17 +1121,18 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: isMobile ? "6px" : "8px" }}>
+              <div style={{ display: "flex", gap: isMobile ? "6px" : "8px", minWidth: 0 }}>
                 <button onClick={() => onSelectBot(bot)} style={{
-                  flex: 1, padding: isMobile ? "12px 8px" : "10px", borderRadius: isMobile ? "8px" : "8px", fontSize: isMobile ? "12px" : "13px", fontWeight: 600,
+                  flex: 1, minWidth: 0, padding: isMobile ? "12px 8px" : "10px", borderRadius: "8px", fontSize: isMobile ? "12px" : "13px", fontWeight: 600,
                   background: c.blue, color: "#fff", border: "none", cursor: "pointer", minHeight: "44px",
+                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                 }}>상세 보기</button>
                 <button onClick={() => onAddFund(ab.botId)} style={{
-                  padding: isMobile ? "12px 12px" : "10px 16px", borderRadius: "8px", fontSize: isMobile ? "12px" : "13px", fontWeight: 600,
+                  flexShrink: 0, padding: isMobile ? "12px 10px" : "10px 16px", borderRadius: "8px", fontSize: isMobile ? "12px" : "13px", fontWeight: 600,
                   background: `${c.green}15`, color: c.green, border: `1px solid ${c.green}30`, cursor: "pointer", minHeight: "44px",
                 }}>+ 추가</button>
                 <button onClick={() => onStopBot(ab.botId)} style={{
-                  padding: isMobile ? "12px 12px" : "10px 16px", borderRadius: "8px", fontSize: isMobile ? "12px" : "13px", fontWeight: 600,
+                  flexShrink: 0, padding: isMobile ? "12px 10px" : "10px 16px", borderRadius: "8px", fontSize: isMobile ? "12px" : "13px", fontWeight: 600,
                   background: `${c.red}15`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer", minHeight: "44px",
                 }}>중지</button>
               </div>
@@ -1436,7 +1487,7 @@ export default function AutoTrading({ theme = "dark", user }) {
           }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <h3 style={{ margin: 0, fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: c.text1 }}>Alpaca API 설정</h3>
-              <button onClick={() => setShowAlpacaSetup(false)} style={{ background: "none", border: "none", color: c.text3, fontSize: "18px", cursor: "pointer" }}>✕</button>
+              <button onClick={() => setShowAlpacaSetup(false)} style={{ background: "none", border: "none", color: c.text3, fontSize: "18px", cursor: "pointer", padding: "4px 8px", minHeight: "32px", minWidth: "32px", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "10px" : "12px" }}>
               <div>
