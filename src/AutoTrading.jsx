@@ -687,6 +687,8 @@ function useAlpacaRealData(userId) {
 function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, theme, userId, isMobile }) {
   const c = colors[theme];
   const { account, equityHistory, tradeLog, loading } = useAlpacaRealData(userId);
+  const activeBotScrollRef = useRef(null);
+  const [activeBotIdx, setActiveBotIdx] = useState(0);
 
   if (!activeBots || activeBots.length === 0) return null;
 
@@ -815,8 +817,20 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
         </div>
       )}
 
-      {/* 활성 봇 목록 */}
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(340px, 1fr))", gap: isMobile ? "12px" : "16px" }}>
+      {/* 활성 봇 목록 (모바일: 수평 스와이프 캐러셀) */}
+      <div
+        ref={activeBotScrollRef}
+        onScroll={isMobile && activeBots.length > 1 ? () => {
+          const el = activeBotScrollRef.current;
+          if (el) { const idx = Math.round(el.scrollLeft / (el.offsetWidth * 0.85)); setActiveBotIdx(Math.min(idx, activeBots.length - 1)); }
+        } : undefined}
+        style={isMobile && activeBots.length > 1 ? {
+          display: "flex", gap: "12px", overflowX: "auto", scrollSnapType: "x mandatory",
+          WebkitOverflowScrolling: "touch", msOverflowStyle: "none", scrollbarWidth: "none",
+          paddingBottom: "8px",
+        } : {
+          display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(340px, 1fr))", gap: isMobile ? "12px" : "16px",
+        }}>
         {activeBots.map(ab => {
           const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
           const elapsed = Date.now() - (ab.startedAt || Date.now());
@@ -940,6 +954,7 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
             <div key={ab.botId} style={{
               background: c.card, border: `1px solid ${c.border}`, borderRadius: isMobile ? "12px" : "14px", padding: isMobile ? "14px 12px" : "20px",
               display: "flex", flexDirection: "column", gap: isMobile ? "10px" : "14px",
+              ...(isMobile && activeBots.length > 1 ? { minWidth: "85%", maxWidth: "85%", scrollSnapAlign: "start", flexShrink: 0 } : {}),
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "10px" : "12px" }}>
                 <span style={{ fontSize: isMobile ? "24px" : "28px" }}>{bot.icon}</span>
@@ -1074,6 +1089,18 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
           );
         })}
       </div>
+      {/* 모바일 캐러셀 페이지 인디케이터 */}
+      {isMobile && activeBots.length > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: "6px", marginTop: "8px" }}>
+          {activeBots.map((_, i) => (
+            <div key={i} style={{
+              width: activeBotIdx === i ? "16px" : "6px", height: "6px", borderRadius: "3px",
+              background: activeBotIdx === i ? c.blue : `${c.text3}40`,
+              transition: "all 0.2s",
+            }} />
+          ))}
+        </div>
+      )}
       <style>{`@keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
     </div>
   );
@@ -1212,6 +1239,7 @@ export default function AutoTrading({ theme = "dark", user }) {
   // 금액 추가 모달 상태
   const [addFundBotId, setAddFundBotId] = useState(null);
   const [addFundInput, setAddFundInput] = useState("");
+  const [stopBotConfirm, setStopBotConfirm] = useState(null); // { botId, botName, icon }
 
   const handleActivateBot = useCallback((bot) => {
     if (!user) {
@@ -1275,10 +1303,31 @@ export default function AutoTrading({ theme = "dark", user }) {
   }, [addFundBotId, addFundInput, showToast]);
 
   const handleStopBot = useCallback((botId) => {
-    setActiveBots(prev => prev.filter(ab => ab.botId !== botId));
+    const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === botId);
+    setStopBotConfirm({ botId, botName: bot?.name || "봇", icon: bot?.icon || "🤖" });
+  }, []);
+
+  const confirmStopBot = useCallback(async () => {
+    if (!stopBotConfirm) return;
+    const { botId } = stopBotConfirm;
+    // 1. 로컬 상태에서 제거
+    setActiveBots(prev => {
+      const updated = prev.filter(ab => ab.botId !== botId);
+      // 2. localStorage 즉시 동기화
+      if (storageKey) try { localStorage.setItem(storageKey, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+    // 3. Supabase 즉시 동기화 (지연 없이)
+    if (user) {
+      try {
+        const currentBots = activeBots.filter(ab => ab.botId !== botId);
+        await supabase.auth.updateUser({ data: { active_bots: currentBots } });
+      } catch (e) { console.warn("봇 삭제 Supabase 동기화 실패:", e); }
+    }
     if (activeBot?.id === botId) setActiveBot(null);
-    showToast("success", "봇 운영을 중지했습니다.");
-  }, [activeBot, showToast]);
+    setStopBotConfirm(null);
+    showToast("success", `${stopBotConfirm.botName} 봇이 완전히 삭제되었습니다.`);
+  }, [stopBotConfirm, activeBot, activeBots, user, storageKey, showToast]);
 
   const handleBackToCatalog = useCallback(() => {
     setActiveBot(null);
@@ -1587,6 +1636,52 @@ export default function AutoTrading({ theme = "dark", user }) {
             </div>
           );
         })()}
+
+        {/* 봇 중지 확인 모달 */}
+        {stopBotConfirm && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 9999,
+          }} onClick={() => setStopBotConfirm(null)}>
+            <div style={{
+              background: c.card, borderRadius: isMobile ? "14px" : "16px", padding: isMobile ? "24px 20px" : "32px",
+              width: isMobile ? "min(90vw, 100%)" : "min(400px, 90vw)",
+              border: `1px solid ${c.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+              textAlign: "center",
+            }} onClick={e => e.stopPropagation()}>
+              <div style={{ fontSize: "48px", marginBottom: "12px" }}>{stopBotConfirm.icon}</div>
+              <h3 style={{ margin: "0 0 8px", color: c.text1, fontSize: isMobile ? "17px" : "19px", fontWeight: 800 }}>
+                봇을 중지하시겠습니까?
+              </h3>
+              <p style={{ margin: "0 0 8px", color: c.text2, fontSize: isMobile ? "13px" : "14px", lineHeight: 1.5 }}>
+                <strong style={{ color: c.text1 }}>{stopBotConfirm.botName}</strong>
+              </p>
+              <div style={{
+                background: `${c.red}08`, border: `1px solid ${c.red}20`, borderRadius: "10px",
+                padding: "12px 14px", marginBottom: "20px", textAlign: "left",
+              }}>
+                <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.red, fontWeight: 600, marginBottom: "6px" }}>주의사항</div>
+                <ul style={{ margin: 0, paddingLeft: "16px", fontSize: isMobile ? "11px" : "12px", color: c.text2, lineHeight: 1.7 }}>
+                  <li>봇 운영이 즉시 중단됩니다</li>
+                  <li>보유 포지션은 Alpaca 계좌에 그대로 유지됩니다</li>
+                  <li>투입 금액 설정 및 운영 기록이 삭제됩니다</li>
+                  <li>같은 봇을 다시 시작하면 새로 설정해야 합니다</li>
+                </ul>
+              </div>
+              <div style={{ display: "flex", gap: "10px" }}>
+                <button onClick={() => setStopBotConfirm(null)} style={{
+                  flex: 1, padding: isMobile ? "14px" : "12px", borderRadius: "10px", fontSize: isMobile ? "14px" : "14px", fontWeight: 600,
+                  background: c.card2, color: c.text2, border: `1px solid ${c.border}`, cursor: "pointer", minHeight: "48px",
+                }}>취소</button>
+                <button onClick={confirmStopBot} style={{
+                  flex: 1, padding: isMobile ? "14px" : "12px", borderRadius: "10px", fontSize: isMobile ? "14px" : "14px", fontWeight: 700,
+                  background: c.red, color: "#fff", border: "none", cursor: "pointer", minHeight: "48px",
+                }}>봇 중지 및 삭제</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* 잔고 카드는 상단 연동 배너에 통합됨 */}
 
