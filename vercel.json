@@ -34,7 +34,7 @@
     },
     {
       "path": "/api/btc-cron",
-      "schedule": "0 * * * *"
+      "schedule": "*/15 * * * *"
     },
     {
       "path": "/api/stock-cron",

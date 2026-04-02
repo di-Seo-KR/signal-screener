@@ -1786,9 +1786,40 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
             ))}
           </div>
 
-          <div style={{ marginTop: "16px", fontSize: "11px", color: C.text3, display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          {/* ═══ 봇 성과 지표 (3×2 그리드) ═══ */}
+          {(() => {
+            const initCapital = botAllocation || 100000;
+            const unrealizedPL = filteredPositions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
+            const peakEq = Math.max(initCapital, equity);
+            const dd = peakEq > 0 ? ((peakEq - equity) / peakEq) * 100 : 0;
+            const invested = filteredPositions.reduce((s, p) => s + parseFloat(p.market_value || 0), 0);
+            const investedPct = equity > 0 ? (invested / equity) * 100 : 0;
+            const perfMetrics = [
+              { label: "오늘 수익", value: fmtUSD(dayPL), sub: fmtPct(dayPLPct), color: dayPL >= 0 ? C.green : C.red },
+              { label: "누적 수익", value: fmtUSD(totalPL), sub: fmtPct(totalPLPct), color: totalPL >= 0 ? C.green : C.red },
+              { label: "미실현 P&L", value: fmtUSD(positionPL), color: positionPL >= 0 ? C.green : C.red },
+              { label: "Drawdown", value: `-${dd.toFixed(2)}%`, sub: `한도 ${tradeSettings.maxDrawdownPct}%`, color: dd > 5 ? C.red : dd > 2 ? C.yellow : C.green },
+              { label: "투자 비중", value: `${investedPct.toFixed(1)}%`, color: investedPct > 70 ? C.yellow : C.blue },
+              { label: "포지션 수", value: `${filteredPositions.length}개`, color: C.text1 },
+            ];
+            return (
+              <div style={{ marginTop: "16px", borderTop: `1px solid ${C.border}40`, paddingTop: "14px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: C.text3, marginBottom: "8px" }}>봇 성과</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                  {perfMetrics.map((m, i) => (
+                    <div key={i} style={{ background: C.card2, borderRadius: "8px", padding: "10px", textAlign: "center" }}>
+                      <div style={{ fontSize: "9px", color: C.text3, marginBottom: "3px", fontWeight: 600 }}>{m.label}</div>
+                      <div style={{ fontSize: "13px", fontWeight: 800, color: m.color }}>{m.value}</div>
+                      {m.sub && <div style={{ fontSize: "9px", color: m.color, marginTop: "2px" }}>{m.sub}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+
+          <div style={{ marginTop: "14px", fontSize: "11px", color: C.text3, display: "flex", gap: "8px", flexWrap: "wrap" }}>
             <span>{loading ? "갱신 중..." : "30초 자동 갱신"}</span>
-            <span>DD: {fmt(rm.drawdown)}%/{tradeSettings.maxDrawdownPct}%</span>
             {lastScanTime && <span>스캔 {lastScanTime.toLocaleTimeString("ko-KR")}</span>}
           </div>
 

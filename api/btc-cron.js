@@ -33,7 +33,7 @@ export default async function handler(req, res) {
   const addLog = (msg) => { log.push(`[${new Date().toISOString()}] ${msg}`); console.log(msg); };
 
   try {
-    addLog("🚀 크립토 자동매매 Cron 시작 (1h 간격)");
+    addLog("🚀 크립토 자동매매 Cron 시작 (15분 간격)");
 
     // ── KV에서 market-monitor 레짐 데이터 로드 ──
     let marketRegime = null;
@@ -125,6 +125,7 @@ export default async function handler(req, res) {
       // 인증 불필요, Yahoo Finance보다 안정적이고 빠름
       const binDaily = `https://api.binance.com/api/v3/klines?symbol=${binSymbol}&interval=1d&limit=365`;
       const bin4h = `https://api.binance.com/api/v3/klines?symbol=${binSymbol}&interval=4h&limit=500`;
+      const bin1h = `https://api.binance.com/api/v3/klines?symbol=${binSymbol}&interval=1h&limit=500`;
 
       let candles = [];
       try {
@@ -169,7 +170,24 @@ export default async function handler(req, res) {
         }
       } catch { /* 4h 실패해도 일봉으로 계속 */ }
 
-      addLog(`✅ ${asset}: 일봉 ${candles.length}개 + 4h ${candles4h.length}개 (최신: $${candles[candles.length - 1]?.close?.toFixed(0)})`);
+      // 1시간봉 로드 (단기 시그널용 — 15분 크론에 최적)
+      let candles1h = [];
+      try {
+        const res1h = await fetch(bin1h);
+        if (res1h.ok) {
+          const raw1h = await res1h.json();
+          candles1h = raw1h.map(k => ({
+            time: Math.floor(k[0] / 1000),
+            open: parseFloat(k[1]),
+            high: parseFloat(k[2]),
+            low: parseFloat(k[3]),
+            close: parseFloat(k[4]),
+            volume: parseFloat(k[5]),
+          })).filter(c => c.close > 0 && c.high > 0 && c.low > 0);
+        }
+      } catch { /* 1h 실패해도 상위 타임프레임으로 계속 */ }
+
+      addLog(`✅ ${asset}: 일봉 ${candles.length}개 + 4h ${candles4h.length}개 + 1h ${candles1h.length}개 (최신: $${candles[candles.length - 1]?.close?.toFixed(0)})`);
 
       // 지표 계산
       const closes = candles.map(c => c.close);
@@ -238,8 +256,40 @@ export default async function handler(req, res) {
         }
       }
 
+      // 일봉+4시간봉 모두 시그널 없으면 1시간봉으로 재시도 (15분 크론 최적화)
+      if (!latestSignal && candles1h.length >= 61) {
+        addLog(`🔄 ${asset} 일봉+4h 시그널 없음 → 1시간봉 분석...`);
+        const c1h = candles1h;
+        const closes1h = c1h.map(c => c.close);
+        const highs1h = c1h.map(c => c.high);
+        const lows1h = c1h.map(c => c.low);
+        const volumes1h = c1h.map(c => c.volume || 0);
+        const rsi1h = calcRSI(closes1h, 14);
+        const bb1h = calcBB(closes1h, 20, 2.0);
+        const ema21_1h = calcEMA(closes1h, 21);
+        const ema55_1h = calcEMA(closes1h, 55);
+        const ema200_1h = closes1h.length > 200 ? calcEMA(closes1h, 200) : [];
+        const macd1h = calcMACD(closes1h);
+        const adx1h = calcADX(highs1h, lows1h, closes1h, 14);
+        const atr1h = calcATR(highs1h, lows1h, closes1h, 14);
+        const stoch1h = calcStochastic(highs1h, lows1h, closes1h, 14, 3);
+        const obv1h = calcOBV(closes1h, volumes1h);
+        const obvEma1h = calcEMA(obv1h, 20);
+        const volSMA1h = calcSMA(volumes1h, 20);
+        latestSignal = analyzeLatest(c1h, closes1h, highs1h, lows1h, volumes1h, {
+          rsi: rsi1h, bb: bb1h, ema21: ema21_1h, ema55: ema55_1h, ema200: ema200_1h,
+          macdLine: macd1h.macdLine, macdSig: macd1h.signal, histogram: macd1h.histogram,
+          adx: adx1h, atr: atr1h, stoch: stoch1h, obv: obv1h, obvEma: obvEma1h, volSMA: volSMA1h, weeklyTrendUp,
+        }, fngValue, marketRegime, assetAlerts);
+        if (latestSignal) {
+          latestSignal.reason = `[1h] ${latestSignal.reason}`;
+          // 1시간봉 시그널은 포지션 크기 30%로 축소 (단기 트레이드)
+          latestSignal.positionSize = (latestSignal.positionSize || 0.5) * 0.3;
+        }
+      }
+
       if (!latestSignal) {
-        addLog(`⏸️ ${asset} 시그널 없음 (일봉+4시간봉 모두)`);
+        addLog(`⏸️ ${asset} 시그널 없음 (일봉+4h+1h 모두)`);
         assetResults.push({ asset, ok: true, action: "wait", signal: null });
         continue;
       }
