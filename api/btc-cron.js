@@ -274,9 +274,11 @@ export default async function handler(req, res) {
         }
       }
 
-      // 일봉+4시간봉 모두 시그널 없으면 1시간봉으로 재시도 (15분 크론 최적화)
-      if (!latestSignal && candles1h.length >= 61) {
-        addLog(`🔄 ${asset} 일봉+4h 시그널 없음 → 1시간봉 분석...`);
+      // 일봉+4시간봉 모두 시그널 없으면 1시간봉으로 재시도 (유동성 시간대만)
+      const currentHourUTC = new Date().getUTCHours();
+      const isLiquidHours = currentHourUTC >= 8 || currentHourUTC < 2; // 아시안 저유동성 02-08 UTC 스킵
+      if (!latestSignal && candles1h.length >= 61 && isLiquidHours) {
+        addLog(`🔄 ${asset} 일봉+4h 시그널 없음 → 1시간봉 분석 (UTC${currentHourUTC}시)...`);
         const c1h = candles1h;
         const closes1h = c1h.map(c => c.close);
         const highs1h = c1h.map(c => c.high);
@@ -323,13 +325,29 @@ export default async function handler(req, res) {
       const maxAssetValue = equity * MAX_POSITION_PER_ASSET;
       let tradeAmount = 0;
 
-      // Trailing stop-loss 확인: 포지션이 있으면 -5% 체크
+      // 동적 손절 + 이익 실현 (레짐별 맞춤)
       let shouldSellForStopLoss = false;
+      let shouldTakeProfit = false;
       if (pos && pos.unrealized_pl != null) {
         const plPct = (parseFloat(pos.unrealized_pl) / parseFloat(pos.cost_basis || 1)) * 100;
-        if (plPct <= -5) {
+        // 레짐별 손절: 평균회귀 -2.5%, 추세추종 -5%
+        const stopLevel = marketRegime === "MEAN_REVERT" ? -2.5 : -5;
+        if (plPct <= stopLevel) {
           shouldSellForStopLoss = true;
-          addLog(`🛑 ${asset} 손절: P&L ${plPct.toFixed(1)}%`);
+          addLog(`🛑 ${asset} 손절(${marketRegime === "MEAN_REVERT" ? "MR" : "TR"}): P&L ${plPct.toFixed(1)}% ≤ ${stopLevel}%`);
+        }
+        // 이익 실현: +5% 이상이면서 SELL 시그널이면 익절
+        if (plPct >= 5 && latestSignal && latestSignal.type === "SELL") {
+          shouldTakeProfit = true;
+          addLog(`💰 ${asset} 익절: P&L +${plPct.toFixed(1)}% + SELL 시그널`);
+        }
+        // 장기 보유 손실: 14일 이상 보유 중 마이너스면 청산
+        if (pos.updated_at) {
+          const holdDays = (Date.now() - new Date(pos.updated_at).getTime()) / (1000 * 86400);
+          if (holdDays > 14 && plPct < -1) {
+            shouldSellForStopLoss = true;
+            addLog(`⏰ ${asset} 장기손실 청산: ${holdDays.toFixed(0)}일 보유, P&L ${plPct.toFixed(1)}%`);
+          }
         }
       }
 
@@ -372,7 +390,7 @@ export default async function handler(req, res) {
       }
 
       // SELL 주문 실행
-      if ((latestSignal.type === "SELL" || shouldSellForStopLoss) && pos) {
+      if ((latestSignal.type === "SELL" || shouldSellForStopLoss || shouldTakeProfit) && pos) {
         const sellAmount = parseFloat(pos.market_value || 0);
         if (sellAmount > 10) {
           addLog(`🔴 ${asset} 매도: $${sellAmount.toFixed(0)}`);
@@ -684,12 +702,12 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
       sellScore += 3; reasons.push("데드크로스!");
     }
 
-    // ── RSI 모멘텀 (크립토에서는 continuation 지표) ──
-    // RSI > 60 = 상승 모멘텀 지속, RSI > 70 = 강한 상승 추세
-    if (rsi[L] > 70) { buyScore += 2; reasons.push(`RSI${rsi[L].toFixed(0)} 강세모멘텀`); }
-    else if (rsi[L] > 55) { buyScore += 1; reasons.push(`RSI${rsi[L].toFixed(0)} 상승`); }
-    else if (rsi[L] < 30) { sellScore += 2; reasons.push(`RSI${rsi[L].toFixed(0)} 약세모멘텀`); }
-    else if (rsi[L] < 45) { sellScore += 1; reasons.push(`RSI${rsi[L].toFixed(0)} 하락`); }
+    // ── RSI 모멘텀 (MACD/EMA 확인 필수) ──
+    // RSI > 70 단독은 위험 → MACD+EMA 동시 확인 시에만 강세 신호
+    if (rsi[L] > 70 && macdLine[L] > macdSig[L] && ema21[L] > ema55[L]) { buyScore += 2; reasons.push(`RSI${rsi[L].toFixed(0)} 강세(확인됨)`); }
+    else if (rsi[L] > 55 && macdLine[L] > macdSig[L]) { buyScore += 1; reasons.push(`RSI${rsi[L].toFixed(0)} 상승`); }
+    else if (rsi[L] < 30 && macdLine[L] < macdSig[L]) { sellScore += 2; reasons.push(`RSI${rsi[L].toFixed(0)} 약세(확인됨)`); }
+    else if (rsi[L] < 45 && macdLine[L] < macdSig[L]) { sellScore += 1; reasons.push(`RSI${rsi[L].toFixed(0)} 하락`); }
 
     // ── MACD 모멘텀 확인 ──
     if (macdLine[L] > macdSig[L]) { buyScore += 1; reasons.push("MACD↑"); }
@@ -718,9 +736,13 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
   // ─ 스토캐스틱 %K/%D 크로스 보조
   // ═══════════════════════════════════════════════════════
   if (regime === "MEAN_REVERT") {
-    // ── RSI 역추세 (핵심) ──
-    if (rsi[L] < 30) { buyScore += 3; reasons.push(`RSI${rsi[L].toFixed(0)} 과매도`); }
-    else if (rsi[L] < 40 && rsi[L] > rsi[L - 1]) { buyScore += 2; reasons.push(`RSI${rsi[L].toFixed(0)} 반등`); }
+    // ── RSI 역추세 (BB 확인 강화) ──
+    const bbLower = bb[L] ? bb[L].lower : null;
+    const rsiOversold = rsi[L] < 30;
+    const bbTouched = bbLower && price <= bbLower * 1.02;
+    const priceBouncing = price > closes[L - 2];
+    if (rsiOversold && (bbTouched || priceBouncing)) { buyScore += 3; reasons.push(`RSI${rsi[L].toFixed(0)} 과매도(BB확인)`); }
+    else if (rsi[L] < 40 && rsi[L] > rsi[L - 1] && priceBouncing) { buyScore += 2; reasons.push(`RSI${rsi[L].toFixed(0)} 반등`); }
     else if (rsi[L] < 45) { buyScore += 1; reasons.push(`RSI${rsi[L].toFixed(0)} 매수권`); }
 
     if (rsi[L] > 70) { sellScore += 3; reasons.push(`RSI${rsi[L].toFixed(0)} 과매수`); }
@@ -767,10 +789,11 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
 
   // ── 효율성 비율 급변 (추세 탄생/소멸) ──
   const prevER = (er[er.length - 2] + er[er.length - 3] + er[er.length - 4]) / 3 || 0;
-  if (curER > 0.5 && prevER < 0.3) {
-    // 추세 탄생: 효율성 급등
-    if (price > closes[L - 5]) { buyScore += 2; reasons.push(`ER탄생${curER.toFixed(2)}↑`); }
-    else { sellScore += 2; reasons.push(`ER탄생${curER.toFixed(2)}↓`); }
+  const erAcceleration = curER - prevER;
+  if (erAcceleration > 0.15) {
+    // 추세 가속: ER 급등 (임계값 완화 0.2→0.15)
+    if (price > closes[L - 5]) { buyScore += 2; reasons.push(`ER가속${curER.toFixed(2)}↑`); }
+    else { sellScore += 2; reasons.push(`ER가속${curER.toFixed(2)}↓`); }
   }
 
   // ── 변동성 군집 돌파 (ATR 폭발) ──
@@ -1076,15 +1099,18 @@ function detectCandlePattern(candles, i) {
 }
 
 function detectBullishDivergence(closes, rsi, i, lookback = 10) {
+  // 강세 다이버전스: 가격은 더 낮은 저점, RSI는 더 높은 저점
   if (i < lookback + 2) return false;
-  let priceLow = Infinity, priceLowIdx = i;
-  let prevLow = Infinity, prevLowIdx = i;
-  for (let j = 1; j <= lookback; j++) {
-    if (closes[i - j] < priceLow) { prevLow = priceLow; prevLowIdx = priceLowIdx; priceLow = closes[i - j]; priceLowIdx = i - j; }
-    else if (closes[i - j] < prevLow) { prevLow = closes[i - j]; prevLowIdx = i - j; }
+  // 최근 lookback 내 가장 낮은 2개 저점 찾기
+  let low1 = { price: Infinity, idx: i }, low2 = { price: Infinity, idx: i };
+  for (let j = 2; j <= lookback; j++) {
+    const p = closes[i - j];
+    if (p < low1.price) { low2 = { ...low1 }; low1 = { price: p, idx: i - j }; }
+    else if (p < low2.price) { low2 = { price: p, idx: i - j }; }
   }
-  if (closes[i] <= priceLow && rsi[i] != null && rsi[priceLowIdx] != null) {
-    return rsi[i] > rsi[priceLowIdx] + 3;
+  // 현재 가격이 이전 저점보다 낮거나 같은데, RSI는 더 높은 경우 = 강세 다이버전스
+  if (closes[i] <= low1.price * 1.01 && rsi[i] != null && rsi[low1.idx] != null) {
+    return rsi[i] > rsi[low1.idx] + 5; // RSI 5pt 이상 차이 필요
   }
   return false;
 }

@@ -4106,7 +4106,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             if (navigator.share) {
               navigator.share({ title: `${asset.name} AI 투자 진단`, text: shareText, url: "https://zepta.vercel.app" }).catch(() => {});
             } else {
-              navigator.clipboard.writeText(shareText).then(() => alert("진단 결과가 복사되었습니다! 커뮤니티에 공유해보세요.")).catch(() => {});
+              navigator.clipboard.writeText(shareText).then(() => showToast("진단 결과가 복사되었습니다!", "success")).catch(() => {});
             }
           }} style={{
             width: "100%", padding: "10px 0", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
@@ -4162,6 +4162,14 @@ function AppInner() {
   const ctaCountRef = useRef(0); // 쿠팡/구글 번갈아 표시
   C = themeMode === "dark" ? DARK : LIGHT;
 
+  // ── 토스트 알림 시스템 ──
+  const [toasts, setToasts] = useState([]);
+  const showToast = useCallback((msg, type = "info") => {
+    const id = Date.now() + Math.random();
+    setToasts(prev => [...prev.slice(-4), { id, msg, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000);
+  }, []);
+
   // ── 로그인 필요 탭 정의 ──
   const LOGIN_REQUIRED_TABS = ["alerts"];
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -4190,14 +4198,23 @@ function AppInner() {
     });
   }, []);
 
-  const [tab, setTab] = useState(() => {
+  const validTabs = ["home","auto-trading","portfolio","screener","alerts","news","quant-portfolio","quant-port","risk-map","sector-flow","backtest","sentiment","strategy","anomaly","quant-report","econ-calendar","profile"];
+  const [tab, setTabRaw] = useState(() => {
     try {
+      // 1순위: URL ?tab= 파라미터
       const p = new URLSearchParams(window.location.search);
       const t = p.get("tab");
-      if (t && ["auto-trading","portfolio","screener","alerts","news","quant-portfolio","sector-flow","backtest","sentiment"].includes(t)) return t;
+      if (t && validTabs.includes(t)) return t;
+      // 2순위: sessionStorage (새로고침 시 복원)
+      const saved = sessionStorage.getItem("zepta_tab");
+      if (saved && validTabs.includes(saved)) return saved;
     } catch {}
     return "home";
   });
+  const setTab = useCallback((newTab) => {
+    setTabRaw(newTab);
+    try { sessionStorage.setItem("zepta_tab", newTab); } catch {}
+  }, []);
 
   // ── GNB 카테고리 상태 ──
   const gnbCategoryMap = {
@@ -7465,7 +7482,7 @@ function AppInner() {
                     const top5 = dailyPicks.slice(0, 5).map((p, i) => `${i + 1}. ${p.name} (${p.symbol}) ${p.change >= 0 ? "+" : ""}${p.change}%`).join("\n");
                     const txt = `[Zepta AI 오늘의 추천]\n\n${top5}\n\nAI 퀀트 33개 전략이 실시간으로 찾아낸 종목입니다\n👉 https://zepta.vercel.app`;
                     if (navigator.share) navigator.share({ title: "Zepta AI 오늘의 추천", text: txt, url: "https://zepta.vercel.app" }).catch(() => {});
-                    else navigator.clipboard.writeText(txt).then(() => alert("추천 종목이 복사되었습니다!")).catch(() => {});
+                    else navigator.clipboard.writeText(txt).then(() => showToast("추천 종목이 복사되었습니다!", "success")).catch(() => {});
                   }} style={{
                     width: "100%", padding: "8px 0", marginTop: "8px", borderRadius: "10px",
                     fontSize: "12px", fontWeight: 600, color: C.text3, background: "transparent",
@@ -9339,7 +9356,7 @@ function AppInner() {
                       if (navigator.share) {
                         navigator.share({ title: "Zepta AI 시장 리포트", text: shareText, url: "https://zepta.vercel.app" }).catch(() => {});
                       } else {
-                        navigator.clipboard.writeText(shareText).then(() => alert("리포트가 복사되었습니다!")).catch(() => {});
+                        navigator.clipboard.writeText(shareText).then(() => showToast("리포트가 복사되었습니다!", "success")).catch(() => {});
                       }
                     }} style={{
                       background: "none", border: `1px solid ${C.border}${C.isDark ? '40' : '60'}`, borderRadius: "8px",
@@ -10784,7 +10801,7 @@ function AppInner() {
                 const name = user?.user_metadata?.display_name || "투자자";
                 const txt = `[Zepta AI 투자 성적표]\n\n${name}님의 투자 현황\n관심종목 ${watchlist.length}개 | AI 봇 ${bots}개 운영 | ${days}일째 투자 중\n\n33개 AI 퀀트 전략으로 매일 시그널 받고 있어요\n무료로 시작하기 👉 https://zepta.vercel.app`;
                 if (navigator.share) navigator.share({ title: "Zepta AI 투자 성적표", text: txt, url: "https://zepta.vercel.app" }).catch(() => {});
-                else navigator.clipboard.writeText(txt).then(() => alert("성적표가 복사되었습니다!")).catch(() => {});
+                else navigator.clipboard.writeText(txt).then(() => showToast("성적표가 복사되었습니다!", "success")).catch(() => {});
               }} style={{
                 padding: "10px 28px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
                 background: C.blue, color: "#fff", border: "none", cursor: "pointer",
@@ -10803,14 +10820,14 @@ function AppInner() {
                   <button onClick={() => {
                     const txt = "나 요즘 이거 쓰는데 AI가 매수 타점 잡아줘서 꽤 괜찮아. 무료인데 한번 써봐 👉 https://zepta.vercel.app";
                     if (navigator.share) navigator.share({ title: "Zepta - AI 퀀트 투자", text: txt, url: "https://zepta.vercel.app" }).catch(() => {});
-                    else navigator.clipboard.writeText(txt).then(() => alert("초대 링크가 복사되었습니다!")).catch(() => {});
+                    else navigator.clipboard.writeText(txt).then(() => showToast("초대 링크가 복사되었습니다!", "success")).catch(() => {});
                   }} style={{
                     flex: 1, padding: "10px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
                     background: C.blue, color: "#fff", border: "none", cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
                   }}>📱 카톡으로 공유</button>
                   <button onClick={() => {
-                    navigator.clipboard.writeText("https://zepta.vercel.app").then(() => alert("링크가 복사되었습니다!")).catch(() => {});
+                    navigator.clipboard.writeText("https://zepta.vercel.app").then(() => showToast("링크가 복사되었습니다!", "success")).catch(() => {});
                   }} style={{
                     flex: 1, padding: "10px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
                     background: C.card2, color: C.text2, border: `1px solid ${C.border}${C.isDark ? '30' : '50'}`, cursor: "pointer",
@@ -11148,6 +11165,21 @@ function AppInner() {
 
       {/* ── CTA 광고 (구글 애드센스 인터스티셜) ── */}
       {showGoogleCTA && <GoogleAdInterstitial onClose={() => setShowGoogleCTA(false)} />}
+
+      {/* ── 토스트 알림 ── */}
+      {toasts.length > 0 && (
+        <div style={{ position: "fixed", top: "env(safe-area-inset-top, 16px)", left: "50%", transform: "translateX(-50%)",
+          zIndex: 99999, display: "flex", flexDirection: "column", gap: "8px", pointerEvents: "none", padding: "16px" }}>
+          {toasts.map(t => (
+            <div key={t.id} style={{
+              background: t.type === "error" ? "#DC2626" : t.type === "success" ? "#16A34A" : "#3B8BFF",
+              color: "#fff", padding: "12px 20px", borderRadius: "12px", fontSize: "13px", fontWeight: 600,
+              boxShadow: "0 8px 24px rgba(0,0,0,0.3)", pointerEvents: "auto", maxWidth: "min(360px, 90vw)",
+              textAlign: "center", animation: "fadeInDown 0.3s ease",
+            }}>{t.msg}</div>
+          ))}
+        </div>
+      )}
 
     </div>
   );
