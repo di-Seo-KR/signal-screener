@@ -5,9 +5,25 @@
 
 export const config = { maxDuration: 120 };
 
-const CRYPTO_ASSETS = ["BTC/USD", "ETH/USD", "SOL/USD", "AVAX/USD", "LINK/USD", "DOGE/USD"];
-// Binance 심볼 매핑 (공개 API, 인증 불필요, Yahoo보다 안정적)
-const BINANCE_SYMBOLS = { "BTC/USD": "BTCUSDT", "ETH/USD": "ETHUSDT", "SOL/USD": "SOLUSDT", "AVAX/USD": "AVAXUSDT", "LINK/USD": "LINKUSDT", "DOGE/USD": "DOGEUSDT" };
+// 코인 유니버스: 하이캡 + 미드캡 + DeFi + 밈 (Binance 상장 기준)
+const CRYPTO_ASSETS = [
+  // 하이캡 (Top 10)
+  "BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD", "ADA/USD", "AVAX/USD",
+  // DeFi / 인프라
+  "LINK/USD", "UNI/USD", "AAVE/USD", "DOT/USD",
+  // 밈 / 트렌드
+  "DOGE/USD", "SHIB/USD", "PEPE/USD",
+  // Layer2 / 신흥
+  "ARB/USD", "OP/USD", "MATIC/USD",
+];
+const BINANCE_SYMBOLS = {
+  "BTC/USD": "BTCUSDT", "ETH/USD": "ETHUSDT", "SOL/USD": "SOLUSDT",
+  "XRP/USD": "XRPUSDT", "ADA/USD": "ADAUSDT", "AVAX/USD": "AVAXUSDT",
+  "LINK/USD": "LINKUSDT", "UNI/USD": "UNIUSDT", "AAVE/USD": "AAVEUSDT",
+  "DOT/USD": "DOTUSDT", "DOGE/USD": "DOGEUSDT", "SHIB/USD": "SHIBUSDT",
+  "PEPE/USD": "PEPEUSDT", "ARB/USD": "ARBUSDT", "OP/USD": "OPUSDT",
+  "MATIC/USD": "MATICUSDT",
+};
 const MAX_POSITION_PER_ASSET = 0.30;
 const MAX_TOTAL_CRYPTO_EXPOSURE = 0.80;
 

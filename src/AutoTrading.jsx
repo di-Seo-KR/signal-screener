@@ -263,28 +263,68 @@ const CRYPTO_BOTS = [
     expectedReturn: "20-60%+",
     description: "10팩터 멀티스코어 + Fear&Greed 적응형 BTC 전문 트레이딩",
     tags: ["멀티팩터", "변동성적응", "24/7"],
-    stats: {
-      winRate: "60%",
-      sharpeRatio: "1.6",
-      mdd: "28%",
-    },
+    stats: { winRate: "60%", sharpeRatio: "1.6", mdd: "28%" },
     details: "기술적 지표 10개를 통합한 멀티팩터 모델과 공포-탐욕 지수를 결합하여 BTC 변동성을 포착합니다.",
   },
   {
-    id: "crypto-diversity",
-    name: "크립토 다이버시티",
-    icon: "🌈",
+    id: "highcap-momentum",
+    name: "하이캡 모멘텀",
+    icon: "🏛️",
+    risk: "중간",
+    riskColor: "green",
+    expectedReturn: "15-35%",
+    description: "BTC·ETH·SOL·XRP·ADA·AVAX — 시총 상위 추세추종 전략",
+    tags: ["Top6", "추세추종", "레짐적응"],
+    stats: { winRate: "63%", sharpeRatio: "1.8", mdd: "20%" },
+    details: "시가총액 상위 6개 코인에 집중하여 ADX 추세장에서 모멘텀을 추종합니다. 횡보 시 자동 포지션 축소.",
+  },
+  {
+    id: "defi-infra",
+    name: "DeFi 인프라봇",
+    icon: "🔗",
     risk: "공격",
     riskColor: "orange",
-    expectedReturn: "15-40%",
-    description: "6대 크립토 분산투자 · 엔트로피 레짐 + 정보흐름 중기 전략",
-    tags: ["분산투자", "리밸런싱", "6자산"],
-    stats: {
-      winRate: "61%",
-      sharpeRatio: "1.7",
-      mdd: "25%",
-    },
-    details: "BTC(35%), ETH(25%), SOL(15%), AVAX(10%), LINK(8%), DOGE(7%) 분산투자로 리스크를 관리합니다.",
+    expectedReturn: "20-50%",
+    description: "LINK·UNI·AAVE·DOT — DeFi/인프라 섹터 집중 알파 전략",
+    tags: ["DeFi", "인프라", "섹터집중"],
+    stats: { winRate: "58%", sharpeRatio: "1.5", mdd: "32%" },
+    details: "DeFi 프로토콜과 블록체인 인프라 토큰에 집중합니다. 온체인 메트릭과 기술적 분석을 결합한 섹터 알파.",
+  },
+  {
+    id: "meme-trend",
+    name: "밈코인 트렌드봇",
+    icon: "🐕",
+    risk: "매우높음",
+    riskColor: "red",
+    expectedReturn: "30-100%+",
+    description: "DOGE·SHIB·PEPE — 밈코인 변동성 극대화 단기매매",
+    tags: ["밈코인", "고변동성", "단기매매"],
+    stats: { winRate: "51%", sharpeRatio: "1.2", mdd: "50%" },
+    details: "밈코인 특유의 높은 변동성을 활용합니다. 소셜 모멘텀 + 기술적 분석으로 급등 구간을 포착합니다.",
+  },
+  {
+    id: "l2-emerging",
+    name: "L2 이머징봇",
+    icon: "🚀",
+    risk: "공격",
+    riskColor: "orange",
+    expectedReturn: "25-60%",
+    description: "ARB·OP·MATIC — Layer2 신흥 프로젝트 성장 전략",
+    tags: ["Layer2", "이머징", "성장투자"],
+    stats: { winRate: "56%", sharpeRatio: "1.4", mdd: "35%" },
+    details: "이더리움 L2 생태계의 핵심 토큰에 투자합니다. 기술 채택률과 TVL 성장을 반영한 중기 전략.",
+  },
+  {
+    id: "crypto-diversity",
+    name: "크립토 올웨더",
+    icon: "🌈",
+    risk: "중간",
+    riskColor: "green",
+    expectedReturn: "15-30%",
+    description: "16개 자산 분산투자 · 레짐 적응형 리밸런싱 · 올웨더 전략",
+    tags: ["분산투자", "리밸런싱", "16자산"],
+    stats: { winRate: "61%", sharpeRatio: "1.7", mdd: "22%" },
+    details: "하이캡부터 밈코인까지 16개 자산에 분산투자합니다. 시장 레짐에 따라 자동 리밸런싱합니다.",
   },
   {
     id: "crypto-swing",
@@ -293,14 +333,10 @@ const CRYPTO_BOTS = [
     risk: "매우높음",
     riskColor: "red",
     expectedReturn: "30-80%+",
-    description: "단기 스윙 트레이딩 · 변동성 극대화 구간 집중 · 고위험고수익",
-    tags: ["스윙트레이딩", "고변동성", "단기매매"],
-    stats: {
-      winRate: "52%",
-      sharpeRatio: "1.3",
-      mdd: "45%",
-    },
-    details: "고변동성 구간을 감지하여 단기 스윙 거래로 수익을 극대화합니다. 매우 높은 위험도를 감수합니다.",
+    description: "전 코인 단기 스윙 · 변동성 극대화 구간 집중 · 고위험고수익",
+    tags: ["스윙트레이딩", "전종목", "고빈도"],
+    stats: { winRate: "52%", sharpeRatio: "1.3", mdd: "45%" },
+    details: "16개 코인 전체를 대상으로 고변동성 구간을 감지하여 단기 스윙 거래합니다.",
   },
 ];
 
@@ -313,6 +349,84 @@ function getRiskColor(riskColor, theme) {
     red: c.red,
   };
   return mapping[riskColor] || c.text1;
+}
+
+// ── 봇 섹션: 모바일=수평 스와이프 캐러셀, PC=그리드 ──
+function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, description }) {
+  const c = colors[theme];
+  const scrollRef = useRef(null);
+  const [scrollIdx, setScrollIdx] = useState(0);
+
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    const el = scrollRef.current;
+    const cardW = el.firstChild?.offsetWidth || 280;
+    const gap = 12;
+    const idx = Math.round(el.scrollLeft / (cardW + gap));
+    setScrollIdx(idx);
+  };
+
+  return (
+    <div style={{ marginBottom: "60px" }}>
+      <h2 style={{ color: c.text1, fontSize: isMobile ? "20px" : "24px", fontWeight: "600", marginBottom: "4px" }}>
+        {title}
+      </h2>
+      {subtitle && <p style={{ margin: "0 0 20px", color: c.text3, fontSize: "13px" }}>{subtitle}</p>}
+      {!subtitle && <div style={{ marginBottom: "20px" }} />}
+
+      {/* 모바일: 수평 스와이프 캐러셀 */}
+      {isMobile ? (
+        <>
+          <div
+            ref={scrollRef}
+            onScroll={handleScroll}
+            style={{
+              display: "flex", gap: "12px", overflowX: "auto", scrollSnapType: "x mandatory",
+              WebkitOverflowScrolling: "touch", paddingBottom: "8px",
+              scrollbarWidth: "none", msOverflowStyle: "none",
+            }}
+          >
+            <style>{`.bot-carousel::-webkit-scrollbar { display: none; }`}</style>
+            {bots.map((bot) => (
+              <div key={bot.id} style={{ minWidth: "280px", maxWidth: "300px", scrollSnapAlign: "start", flex: "0 0 auto" }}>
+                <BotCard bot={bot} onActivate={onActivate} theme={theme} />
+              </div>
+            ))}
+          </div>
+          {/* 페이지 인디케이터 */}
+          <div style={{ display: "flex", justifyContent: "center", gap: "6px", marginTop: "12px" }}>
+            {bots.map((_, i) => (
+              <div key={i} style={{
+                width: scrollIdx === i ? "16px" : "6px", height: "6px",
+                borderRadius: "3px", transition: "all 0.3s",
+                background: scrollIdx === i ? c.blue : `${c.text3}40`,
+              }} />
+            ))}
+          </div>
+        </>
+      ) : (
+        /* PC: 기존 그리드 */
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+          gap: "24px",
+        }}>
+          {bots.map((bot) => (
+            <BotCard key={bot.id} bot={bot} onActivate={onActivate} theme={theme} />
+          ))}
+        </div>
+      )}
+
+      {description && (
+        <div style={{
+          marginTop: "24px", backgroundColor: c.card2, border: `1px solid ${c.border}`,
+          borderRadius: "8px", padding: "16px", color: c.text2, fontSize: "13px", lineHeight: "1.6",
+        }}>
+          <strong style={{ color: c.text1 }}>작동 방식:</strong> {description}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function BotCard({ bot, onActivate, theme }) {
@@ -488,75 +602,25 @@ function BotCatalog({ onActivate, theme, isMobile }) {
       </div>
 
       {/* Stock Bots Section */}
-      <div style={{ marginBottom: "80px" }}>
-        <h2 style={{ color: c.text1, fontSize: isMobile ? "20px" : "24px", fontWeight: "600", marginBottom: isMobile ? "20px" : "32px" }}>
-          📊 주식 자동매매 봇
-        </h2>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(320px, 1fr))",
-            gap: isMobile ? "16px" : "24px",
-            marginBottom: "40px",
-          }}
-        >
-          {STOCK_BOTS.map((bot) => (
-            <BotCard key={bot.id} bot={bot} onActivate={onActivate} theme={theme} />
-          ))}
-        </div>
-        <div
-          style={{
-            backgroundColor: c.card2,
-            border: `1px solid ${c.border}`,
-            borderRadius: "8px",
-            padding: "20px",
-            color: c.text2,
-            fontSize: "14px",
-            lineHeight: "1.6",
-          }}
-        >
-          <strong style={{ color: c.text1 }}>주식 자동매매 작동 방식:</strong>
-          <br />각 봇은 개별 설정된 전략으로 한국 주식시장을 모니터링합니다. 매일 장 개시 전 포트폴리오를 리밸런싱하고,
-          실시간 신호에 따라 자동으로 매매를 실행합니다. 모든 거래는 과거 데이터로 백테스트되었으며, 위험도별로
-          포지션 사이징이 최적화되어 있습니다.
-        </div>
-      </div>
+      <BotSection
+        title="📊 주식 자동매매 봇"
+        bots={STOCK_BOTS}
+        onActivate={onActivate}
+        theme={theme}
+        isMobile={isMobile}
+        description="각 봇은 개별 설정된 전략으로 한국 주식시장을 모니터링합니다. 매일 장 개시 전 포트폴리오를 리밸런싱하고, 실시간 신호에 따라 자동으로 매매를 실행합니다."
+      />
 
       {/* Crypto Bots Section */}
-      <div>
-        <h2 style={{ color: c.text1, fontSize: isMobile ? "20px" : "24px", fontWeight: "600", marginBottom: isMobile ? "20px" : "32px" }}>
-          💰 크립토 자동매매 봇
-        </h2>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(320px, 1fr))",
-            gap: isMobile ? "16px" : "24px",
-            marginBottom: "40px",
-          }}
-        >
-          {CRYPTO_BOTS.map((bot) => (
-            <BotCard key={bot.id} bot={bot} onActivate={onActivate} theme={theme} />
-          ))}
-        </div>
-        <div
-          style={{
-            backgroundColor: c.card2,
-            border: `1px solid ${c.border}`,
-            borderRadius: "8px",
-            padding: "20px",
-            color: c.text2,
-            fontSize: "14px",
-            lineHeight: "1.6",
-          }}
-        >
-          <strong style={{ color: c.text1 }}>크립토 자동매매 작동 방식:</strong>
-          <br />
-          암호화폐 시장의 24/7 변동성을 포착하여 자동으로 거래합니다. 멀티팩터 모델과 공포-탐욕 지수를 활용하여
-          최적의 진입점을 감지하고, 리스크 관리 규칙에 따라 포지션을 관리합니다. 실시간 시장 데이터로 끊임없이
-          신호를 업데이트합니다.
-        </div>
-      </div>
+      <BotSection
+        title="💰 크립토 자동매매 봇"
+        subtitle="16개 코인 · Binance 실시간 데이터 · 24/7 운영"
+        bots={CRYPTO_BOTS}
+        onActivate={onActivate}
+        theme={theme}
+        isMobile={isMobile}
+        description="16개 코인(BTC, ETH, SOL, XRP, ADA, AVAX, LINK, UNI, AAVE, DOT, DOGE, SHIB, PEPE, ARB, OP, MATIC)을 Binance 실시간 데이터로 분석합니다. ADX 기반 레짐 판별로 추세장/횡보장 전략을 자동 스위칭합니다."
+      />
     </div>
   );
 }

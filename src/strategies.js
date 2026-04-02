@@ -1,6 +1,10 @@
 // ════════════════════════════════════════════════════════════════════
-// Zepta 퀀트 엔진 v4.1 — 오전 전략 파라미터 최적화 (2026-04-02)
-// 33개 매매전략 + 백테스팅 엔진 + 시장진단 + 전략추천
+// Zepta 퀀트 엔진 v4.2 — 하위전략 3차 안전필터 강화 (2026-04-02)
+// 41개 매매전략 + 백테스팅 엔진 + 시장진단 + 전략추천
+// v4.2: 4/2 일일 개선 — 백테스트 하위전략 안전필터 3차 강화
+//   - OBV 추세추종: RSI>72 과매수 억제 + ADX≥15 추세필터 + MA200 하락추세 매수억제 + OBV 3봉 기울기 확인
+//   - 갭 앤 고: RSI>70 과매수 억제 + 연속양봉 과열 차단 + 중복진입 방지 + ATR 트레일링 스탑
+//   - 삼중 이평선: ADX 상승확인 + RSI 기울기 반등 확인 + MA200 장기추세필터(95% 이하 차단)
 // v4.1: 4/2 오전 전략 업데이트 (VIX 25.25 고변동 + BTC Fear 8 극공포 반영)
 //   - RSI 반전: 기본 임계값 26/74→25/75 (고변동장 과매도 진입 깊게)
 //   - RSI 반전: 하락추세 진입 RSI 기준 20→18 (패닉 매도 반전 포착)
@@ -777,7 +781,7 @@ export const strategyBBSqueeze = {
 export const strategyTripleMA = {
   id: "triple_ma_atr",
   name: "삼중 이평선 + ATR 정지",
-  desc: "EMA(5) > EMA(20) > EMA(60) 정배열 매수. v3.8: ADX 추세강도 필터 + 이격도 과열 억제 + RSI 확인.",
+  desc: "EMA(5) > EMA(20) > EMA(60) 정배열 매수. v4.2: MA200 추세필터 + 정배열 2봉 연속확인 + RSI 기울기 반등 + ADX 상승 확인.",
   category: "추세추종",
   risk: "중",
   icon: "🎿",
@@ -805,12 +809,20 @@ export const strategyTripleMA = {
         // v3.8: ADX 추세강도 필터 — ADX < 18이면 약한 추세, 정배열이어도 매수 보류
         const adxVal = adx[i] || 0;
         if (adxVal < 18) continue;
+        // v4.2: ADX 상승 확인 — ADX가 하락 중이면 추세 약화, 진입 보류
+        if (i >= 2 && adx[i - 1] != null && adx[i - 2] != null && adx[i] < adx[i - 2]) continue;
         // v3.8: 이격도 과열 억제 — 이격 > 8%면 이미 과열, 추격매수 방지
         if (gap > 8) continue;
         // v3.8: RSI 확인 — 과매수(>75) 상태에서 정배열 전환은 고점 신호
         const rsiVal = rsi[i] || 50;
         if (rsiVal > 75) continue;
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `삼중 이평선 정배열 (이격 ${gap.toFixed(1)}% · ADX ${adxVal.toFixed(0)} · RSI ${rsiVal.toFixed(0)})` });
+        // v4.2: RSI 기울기 반등 확인 — RSI가 하락 중이면 모멘텀 약화
+        if (i >= 2 && rsi[i - 1] != null && rsi[i - 2] != null && rsiVal < rsi[i - 2]) continue;
+        // v4.2: MA200 추세필터 — 장기 하락추세에서 정배열은 베어마켓 랠리일 가능성
+        const ma200 = calcSMA(closes.slice(0, i + 1), Math.min(200, i + 1));
+        const ma200Val = ma200[ma200.length - 1];
+        if (ma200Val != null && closes[i] < ma200Val * 0.95) continue;
+        signals.push({ index: i, type: "BUY", price: closes[i], reason: `삼중 이평선 정배열 (이격 ${gap.toFixed(1)}% · ADX ${adxVal.toFixed(0)}↑ · RSI ${rsiVal.toFixed(0)})` });
       }
       // ATR 후행 정지
       const trailingStop = emaM[i] - atrMult * atr[i];
@@ -1008,7 +1020,7 @@ export const strategyIchimoku = {
 export const strategyGapAndGo = {
   id: "gap_and_go",
   name: "갭 앤 고",
-  desc: "전일 대비 2% 이상 갭 상승 후 3봉 이내 매수 → 5봉 보유 후 매도. 단기 모멘텀 전략. v3.4: ATR기반 동적 갭임계값 + 2x 거래량 확인 + 동적홀드.",
+  desc: "전일 대비 갭 상승 후 매수 → 동적 보유 후 매도. v4.2: RSI 과매수 억제 + 전일 캔들 양봉 확인 + ATR 트레일링 스탑 + 연속갭 중복진입 방지.",
   category: "모멘텀",
   risk: "높음",
   icon: "🎯",
@@ -1020,6 +1032,8 @@ export const strategyGapAndGo = {
     const lows = candles.map(c => c.low);
     const closes = candles.map(c => c.close);
     const atr = calcATR(highs, lows, closes);
+    const rsi = calcRSI(closes, 14);
+    let lastBuyIdx = -999; // v4.2: 연속갭 중복진입 방지
     for (let i = 1; i < candles.length; i++) {
       const gap = ((candles[i].open - candles[i - 1].close) / candles[i - 1].close) * 100;
       // v3.4: ATR 기반 동적 갭 임계값 (ATR이 클수록 갭 임계값도 높음)
@@ -1032,12 +1046,30 @@ export const strategyGapAndGo = {
         const avgVol = candles.slice(Math.max(0, i - 20), i).reduce((a, c) => a + (c.volume || 0), 0) / Math.min(i, 20);
         const vol = candles[i].volume || 0;
         if (vol < avgVol * 2) continue;
-        signals.push({ index: i, type: "BUY", price: candles[i].close, reason: `갭 +${gap.toFixed(1)}% + 거래량 ${(vol/avgVol).toFixed(1)}x` });
+        // v4.2: RSI 과매수 억제 — 이미 과매수(>70) 상태에서 갭매수는 고점잡기
+        const rsiVal = rsi[i] || 50;
+        if (rsiVal > 70) continue;
+        // v4.2: 전일 캔들이 음봉(하락)일 때만 갭업이 의미 있음 (반전 갭)
+        // 연속 양봉 + 갭은 과열, 전일 음봉/보합 후 갭이 더 신뢰성 높음
+        if (i >= 2 && candles[i - 1].close > candles[i - 2].close * 1.02 && candles[i - 2].close > candles[i - 3]?.close * 1.02) continue;
+        // v4.2: 연속갭 중복진입 방지 (이전 매수 후 5봉 이내 재진입 금지)
+        if (i - lastBuyIdx < holdBars + 2) continue;
+        lastBuyIdx = i;
+        signals.push({ index: i, type: "BUY", price: candles[i].close, reason: `갭 +${gap.toFixed(1)}% + 거래량 ${(vol/avgVol).toFixed(1)}x (RSI ${rsiVal.toFixed(0)})` });
         // v3.4: 갭 크기에 따른 동적 홀드 기간 (갭이 클수록 길게)
         const gapRatio = gap / dynamicGapThreshold;
         const dynamicHold = Math.ceil(holdBars * Math.min(gapRatio, 2.5));
-        const sellIdx = Math.min(i + dynamicHold, candles.length - 1);
-        signals.push({ index: sellIdx, type: "SELL", price: candles[sellIdx].close, reason: `${dynamicHold}봉 보유 후 매도 (갭기반)` });
+        // v4.2: ATR 트레일링 스탑 — 보유 중 1.5xATR 이탈 시 조기 매도
+        let sellIdx = Math.min(i + dynamicHold, candles.length - 1);
+        const entryPrice = candles[i].close;
+        for (let j = i + 1; j <= sellIdx; j++) {
+          const curAtr = atr[j] || atrVal;
+          if (candles[j].close < entryPrice - 1.5 * curAtr) {
+            sellIdx = j;
+            break;
+          }
+        }
+        signals.push({ index: sellIdx, type: "SELL", price: candles[sellIdx].close, reason: `${sellIdx - i}봉 보유 후 매도 (갭기반 · ATR스탑)` });
       }
     }
     return signals;
@@ -1080,7 +1112,7 @@ export const strategySwingATR = {
 export const strategyOBV = {
   id: "obv_trend",
   name: "OBV 추세 추종",
-  desc: "OBV가 20일 이동평균을 상향돌파하면 매수. 거래량 기반 스마트머니 움직임 추적.",
+  desc: "OBV가 20일 이동평균을 상향돌파하면 매수. v4.2: RSI 과매수 억제 + MA200 추세필터 + ADX 최소 15 + OBV 기울기 확인.",
   category: "추세추종",
   risk: "낮음",
   icon: "📈",
@@ -1088,6 +1120,11 @@ export const strategyOBV = {
   generate(candles, params = {}) {
     const { obvMAPeriod = 20 } = { ...this.params, ...params };
     const closes = candles.map(c => c.close);
+    const highs = candles.map(c => c.high);
+    const lows = candles.map(c => c.low);
+    const rsi = calcRSI(closes, 14);
+    const adx = calcADX(highs, lows, closes, 14);
+    const ma200 = calcSMA(closes, Math.min(200, Math.floor(closes.length * 0.8)));
     const obvArr = [0];
     for (let i = 1; i < closes.length; i++) {
       if (closes[i] > closes[i - 1]) obvArr.push(obvArr[i - 1] + (candles[i].volume || 0));
@@ -1101,9 +1138,20 @@ export const strategyOBV = {
     const signals = [];
     for (let i = obvMAPeriod + 1; i < candles.length; i++) {
       if (obvSMA[i] == null || obvSMA[i - 1] == null) continue;
-      if (obvArr[i] > obvSMA[i] && obvArr[i - 1] <= obvSMA[i - 1])
-        signals.push({ index: i, type: "BUY", price: closes[i], reason: `OBV > OBV-MA${obvMAPeriod} 골든크로스` });
-      else if (obvArr[i] < obvSMA[i] && obvArr[i - 1] >= obvSMA[i - 1])
+      if (obvArr[i] > obvSMA[i] && obvArr[i - 1] <= obvSMA[i - 1]) {
+        // v4.2: RSI 과매수(>72) 상태에서 OBV 돌파는 고점 잡기 위험
+        const rsiVal = rsi[i] || 50;
+        if (rsiVal > 72) continue;
+        // v4.2: ADX 최소 15 — 비추세장에서 OBV 크로스는 노이즈
+        const adxVal = adx[i] || 0;
+        if (adxVal < 15) continue;
+        // v4.2: MA200 하락추세 시 매수 억제 (역추세 진입 방지)
+        const ma200Val = ma200[i];
+        if (ma200Val != null && closes[i] < ma200Val * 0.97) continue;
+        // v4.2: OBV 기울기 확인 — 최근 3봉 OBV 상승 확인
+        if (i >= 3 && obvArr[i] <= obvArr[i - 3]) continue;
+        signals.push({ index: i, type: "BUY", price: closes[i], reason: `OBV > OBV-MA${obvMAPeriod} 골든크로스 (RSI ${rsiVal.toFixed(0)} · ADX ${adxVal.toFixed(0)})` });
+      } else if (obvArr[i] < obvSMA[i] && obvArr[i - 1] >= obvSMA[i - 1])
         signals.push({ index: i, type: "SELL", price: closes[i], reason: `OBV < OBV-MA${obvMAPeriod} 데드크로스` });
     }
     return signals;
