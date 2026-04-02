@@ -1,7 +1,0 @@
-pending
-reason: Chrome MCP 도구 전체 타임아웃 (브라우저 미응답)
-created: 2026-03-16T16:03:00+09:00
-attempts: 5 (navigate x3, javascript_tool x2 — 모두 60s 타임아웃)
-action_needed: 브라우저 재시작 후 수동 발송 또는 다음 스케줄에서 재시도
-alert_file: telegram-pending-2026-03-16-alert-1603.txt
-signal: BTC $74,300 40일 신고가, $73K-$75K 저항대 진입, 숏스퀴즈 $113M

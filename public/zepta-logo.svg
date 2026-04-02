@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Dark blue arrow gradient (left/back arrow) -->
+    <linearGradient id="arrowDark" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a5bb5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2d7be0;stop-opacity:1" />
+    </linearGradient>
+    <!-- Teal arrow gradient (right/up arrow) -->
+    <linearGradient id="arrowTeal" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#2d7be0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4dd8c0;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Transparent background - no rect -->
+
+  <!-- Z-Arrow Mark: two interlocking arrows forming Z -->
+  <g transform="translate(96, 56)">
+    <!-- Back arrow (dark blue): horizontal left + diagonal down-right forming top of Z -->
+    <!-- Arrow shaft: goes right, turns diagonal down-left -->
+    <path d="
+      M 60 60
+      L 220 60
+      L 60 220
+      L 220 220
+    " stroke="url(#arrowDark)" stroke-width="48" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+    <!-- Left arrowhead -->
+    <polygon points="20,60 80,20 80,100" fill="url(#arrowDark)"/>
+
+    <!-- Up-right arrow (teal): from center going up-right -->
+    <path d="
+      M 120 220
+      L 280 60
+    " stroke="url(#arrowTeal)" stroke-width="48" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+    <!-- Right arrowhead pointing up-right -->
+    <polygon points="300,30 310,100 240,40" fill="url(#arrowTeal)"/>
+
+    <!-- Right arrow (teal): horizontal right from bottom -->
+    <path d="
+      M 120 220
+      L 300 220
+    " stroke="url(#arrowTeal)" stroke-width="44" stroke-linecap="round" fill="none"/>
+
+    <!-- Right arrowhead -->
+    <polygon points="320,220 270,185 270,255" fill="url(#arrowTeal)"/>
+  </g>
+
+  <!-- "zepta" text -->
+  <text x="256" y="468" text-anchor="middle" font-family="'Helvetica Neue', 'SF Pro Display', Arial, sans-serif" font-size="72" font-weight="700" letter-spacing="4" fill="#1a2744">zepta</text>
+</svg>
