@@ -1085,6 +1085,63 @@ function runDiagnosis(candles) {
     else trendScore = Math.max(0, trendScore - 2);
   }
 
+  // ── MACD 히스토그램 다이버전스 (가격 vs 히스토그램 괴리) ──
+  if (histogram && n >= 20) {
+    // 가격 신저가 vs 히스토그램 higher low → 강세 다이버전스
+    const priceLow5 = Math.min(...closes.slice(-5));
+    const priceLow15 = Math.min(...closes.slice(-15, -5));
+    const histLow5 = Math.min(...histogram.slice(-5).filter(h => h != null));
+    const histLow15 = Math.min(...histogram.slice(-15, -5).filter(h => h != null));
+    if (priceLow5 < priceLow15 && histLow5 > histLow15 && histLow5 < 0) {
+      momScore = Math.min(100, momScore + 5);
+      signals.push({ type: "bullish", name: "MACD 히스토그램 강세 다이버전스", detail: "가격 신저가 vs 히스토그램 상승 — 매도 압력 소진, 반등 임박" });
+    }
+    // 가격 신고가 vs 히스토그램 lower high → 약세 다이버전스
+    const priceHigh5 = Math.max(...closes.slice(-5));
+    const priceHigh15 = Math.max(...closes.slice(-15, -5));
+    const histHigh5 = Math.max(...histogram.slice(-5).filter(h => h != null));
+    const histHigh15 = Math.max(...histogram.slice(-15, -5).filter(h => h != null));
+    if (priceHigh5 > priceHigh15 && histHigh5 < histHigh15 && histHigh5 > 0) {
+      momScore = Math.max(0, momScore - 5);
+      signals.push({ type: "bearish", name: "MACD 히스토그램 약세 다이버전스", detail: "가격 신고가 vs 히스토그램 하락 — 매수 모멘텀 약화, 조정 가능" });
+    }
+  }
+
+  // ── RSI·Stoch·MACD 트리플 컨버전스 (3지표 동시 방향 일치) ──
+  if (rsi != null && stochK != null && macdVal != null && sigVal != null) {
+    const rsiBull = rsi > 50 && (rsiArr[n - 2] != null && rsi > rsiArr[n - 2]);
+    const stochBull = stochK > stochD && stochK > 20;
+    const macdBull = macdVal > sigVal && histVal > 0;
+    const rsiBear = rsi < 50 && (rsiArr[n - 2] != null && rsi < rsiArr[n - 2]);
+    const stochBear = stochK < stochD && stochK < 80;
+    const macdBear = macdVal < sigVal && histVal < 0;
+    if (rsiBull && stochBull && macdBull) {
+      momScore = Math.min(100, momScore + 6);
+      signals.push({ type: "bullish", name: "모멘텀 트리플 컨버전스 ↑", detail: "RSI·Stoch·MACD 3지표 동시 상승 — 매우 강한 매수 모멘텀" });
+    } else if (rsiBear && stochBear && macdBear) {
+      momScore = Math.max(0, momScore - 6);
+      signals.push({ type: "bearish", name: "모멘텀 트리플 컨버전스 ↓", detail: "RSI·Stoch·MACD 3지표 동시 하락 — 매우 강한 매도 모멘텀" });
+    }
+  }
+
+  // ── ATR 퍼센타일 기반 변동성 레짐 판단 ──
+  if (n >= 60 && atrArr) {
+    const atrHistory = atrArr.slice(-60).filter(v => v != null && v > 0);
+    if (atrHistory.length >= 30) {
+      const sorted = [...atrHistory].sort((a, b) => a - b);
+      const currentATR = atrArr[n - 1];
+      const rank = sorted.findIndex(v => v >= currentATR);
+      const percentile = (rank / sorted.length) * 100;
+      if (percentile >= 90) {
+        volScore = Math.max(0, volScore - 5);
+        signals.push({ type: "neutral", name: `ATR 상위 ${(100 - percentile).toFixed(0)}% (극단 변동성)`, detail: "60일 내 최고 수준 변동성 — 리스크 관리 강화 필요" });
+      } else if (percentile <= 10) {
+        volScore = Math.min(100, volScore + 5);
+        signals.push({ type: "neutral", name: `ATR 하위 ${percentile.toFixed(0)}% (극저 변동성)`, detail: "60일 내 최저 수준 변동성 — 폭발적 움직임 임박 가능" });
+      }
+    }
+  }
+
   // ── 변동성 수축→확장 전환 감지 (Squeeze Momentum) ──
   if (bb && n >= 30) {
     const bbWidths = [];
@@ -1164,6 +1221,22 @@ function runDiagnosis(candles) {
     return { level: "낮음", icon: "🟢", detail: "안정적 구간" };
   })();
 
+  // ── 신호 일치도 (Signal Consensus) — 카테고리 간 방향성 합의 ──
+  const signalConsensus = (() => {
+    const catScores = [trendScore, momScore, volScore, supScore, posScore, patternScore];
+    const bullish = catScores.filter(s => s >= 60).length;
+    const bearish = catScores.filter(s => s <= 40).length;
+    const neutral = catScores.filter(s => s > 40 && s < 60).length;
+    // 방향 일치도 (0~100): 모든 카테고리가 같은 방향이면 100
+    const maxDirection = Math.max(bullish, bearish);
+    const consensus = Math.round((maxDirection / catScores.length) * 100);
+    // 점수 분산 (낮을수록 일치)
+    const mean = catScores.reduce((a, b) => a + b, 0) / catScores.length;
+    const variance = Math.sqrt(catScores.reduce((s, v) => s + (v - mean) ** 2, 0) / catScores.length);
+    const label = consensus >= 83 ? "매우 강함" : consensus >= 67 ? "강함" : consensus >= 50 ? "보통" : "약함 (혼재)";
+    return { consensus, bullish, bearish, neutral, variance: variance.toFixed(1), label };
+  })();
+
   return {
     score: totalScore,
     verdict,
@@ -1191,6 +1264,7 @@ function runDiagnosis(candles) {
     riskReward,
     riskLevel,
     trendConfidence,
+    signalConsensus,
   };
 }
 

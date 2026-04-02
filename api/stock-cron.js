@@ -885,9 +885,13 @@ export default async function handler(req, res) {
       const avgBuyScore = signals.reduce((s, x) => s + x.buyScore, 0) / signals.length;
       const avgSellScore = signals.reduce((s, x) => s + x.sellScore, 0) / signals.length;
       const overallBias = avgBuyScore > avgSellScore ? '매수 우위' : avgBuyScore < avgSellScore ? '매도 우위' : '중립';
+      const biasStrength = Math.abs(avgBuyScore - avgSellScore);
+      const biasIcon = biasStrength > 3 ? '🔥' : biasStrength > 1.5 ? '💡' : '➖';
       report += `\n📐 *리스크 관리*\n`;
       report += `  포지션: ${positions.length}/${WATCHLIST.length} (${(positions.length / WATCHLIST.length * 100).toFixed(0)}% 배분)\n`;
-      report += `  시그널 편향: ${overallBias} (Buy ${avgBuyScore.toFixed(1)} / Sell ${avgSellScore.toFixed(1)})\n`;
+      report += `  시그널 편향: ${biasIcon} ${overallBias} (Buy ${avgBuyScore.toFixed(1)} / Sell ${avgSellScore.toFixed(1)})`;
+      if (biasStrength > 3) report += ` — 강한 방향성`;
+      report += `\n`;
       // ATR 기반 포트폴리오 변동성 근사
       const avgATR = signals.filter(s => s.lastATR && s.lastClose > 0)
         .reduce((sum, s) => sum + (s.lastATR / s.lastClose * 100), 0);
@@ -896,6 +900,20 @@ export default async function handler(req, res) {
         const portfolioVol = (avgATR / atrCount).toFixed(1);
         const volLabel = portfolioVol > 3 ? '🔴 고변동' : portfolioVol > 2 ? '🟡 보통' : '🟢 안정';
         report += `  변동성: ATR ${portfolioVol}% ${volLabel}\n`;
+      }
+      // 포트폴리오 집중도 & 분산 경고
+      if (positions.length > 0) {
+        const posValues = positions.map(p => parseFloat(p.market_value) || 0);
+        const maxPosValue = Math.max(...posValues);
+        const maxPosPct = startEquity > 0 ? (maxPosValue / startEquity * 100) : 0;
+        if (maxPosPct > 25) {
+          const maxPosSymbol = positions[posValues.indexOf(maxPosValue)]?.symbol || '?';
+          report += `  ⚠️ 집중 위험: ${maxPosSymbol} ${maxPosPct.toFixed(0)}% 비중 — 분산 권장\n`;
+        }
+        // 평균 보유 기간 근사 (수익률 분포로 추정)
+        const positivePnl = positions.filter(p => parseFloat(p.unrealized_pl) > 0).length;
+        const winRate = positions.length > 0 ? (positivePnl / positions.length * 100) : 0;
+        report += `  승률: ${winRate.toFixed(0)}% (${positivePnl}/${positions.length} 수익중)\n`;
       }
     }
 
@@ -915,14 +933,29 @@ export default async function handler(req, res) {
       report += `\n✋ 체결 주문 없음\n`;
     }
 
+    // 마켓 레짐 정보 표시
+    if (marketRegime) {
+      report += `\n🧭 *마켓 레짐*\n`;
+      report += `  상태: ${marketRegime.regime || '미정'}`;
+      if (marketRegime.avgHurst != null) {
+        const hurstLabel = marketRegime.avgHurst > 0.6 ? '추세 지속' : marketRegime.avgHurst < 0.4 ? '평균 회귀' : '랜덤워크';
+        report += ` | Hurst ${marketRegime.avgHurst.toFixed(2)} (${hurstLabel})`;
+      }
+      report += `\n`;
+    }
+
     // 다음 주요 이벤트 힌트
     const dayOfWeek = now.getUTCDay();
     if (dayOfWeek === 5) report += `\n📅 주말 포지션 유의 — 월요일 갭 리스크\n`;
     if (dayOfWeek === 1) report += `\n📅 주초 모멘텀 확인 구간\n`;
+    if (dayOfWeek >= 2 && dayOfWeek <= 4) {
+      const nextClose = dayOfWeek === 4 ? '내일 금요일 주말 앞두고 리스크 체크' : '';
+      if (nextClose) report += `\n📅 ${nextClose}\n`;
+    }
 
     const elapsed = ((Date.now() - now.getTime()) / 1000).toFixed(1);
     report += `\n━━━━━━━━━━━━━━━━━━\n`;
-    report += `🤖 DI금융 Stock Auto v4 | ${elapsed}s`;
+    report += `🤖 DI금융 Stock Auto v4.1 | ${elapsed}s`;
 
     await sendTelegramReport('Stock Auto-Trading', report);
 

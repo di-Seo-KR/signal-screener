@@ -1,5 +1,6 @@
-// Zepta v11.2 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 스크리너 프리셋
+// Zepta v11.3 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 스크리너 프리셋
 // Features: 스크리닝, 캔들차트, 33개 전략(BTC 알파 포함), 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
+// v11.3: 퀀트 엔진 v4.1 고변동장 전략 최적화 + 투자진단 v2.2 하락추세 감지 강화
 // v11.2: 퀀트 엔진 v3.9 하위전략 2차 안전필터 + 모바일 터치 UX 개선
 // v11.1: 다중 타임프레임 RSI 스크리닝 조건 + 퀀트 엔진 v3.8 하위전략 안전필터
 // v11.0: 토스증권 벤치마킹 기반 대개편 — 스크리너 프리셋, 글로벌 검색, 위험종목 필터, 실시간 티커
@@ -1672,7 +1673,7 @@ function SearchBar({ onSelect, placeholder = "종목 검색 (예: AAPL, 삼성�
 }
 
 // ════════════════════════════════════════════════════════════════════
-// ── 퀵 투자진단 v2.1 (카드용 — API 호출 없이 기존 데이터로 즉시 계산, v4.0 최적화) ──
+// ── 퀵 투자진단 v2.2 (카드용 — API 호출 없이 기존 데이터로 즉시 계산, v4.1 최적화) ──
 function quickDiagnosis(asset) {
   const signals = [];
   let trendScore = 50, momScore = 50, supScore = 50, posScore = 50;
@@ -1684,8 +1685,9 @@ function quickDiagnosis(asset) {
     else if (asset.ma200Dist > 3) trendScore += 8;
     else if (asset.ma200Dist > 0) trendScore += 4;
     else if (asset.ma200Dist > -5) trendScore -= 4;
-    else if (asset.ma200Dist > -15) { trendScore -= 10; signals.push({ type: "bearish", name: `200일선 아래 ${asset.ma200Dist.toFixed(0)}%` }); }
-    else { trendScore -= 15; signals.push({ type: "bearish", name: `200일선 크게 하회 (${asset.ma200Dist.toFixed(0)}%)` }); }
+    else if (asset.ma200Dist > -10) { trendScore -= 8; signals.push({ type: "bearish", name: `200일선 아래 ${asset.ma200Dist.toFixed(0)}%` }); } // v4.1: -15→-10 세분화 (고변동 조기 감지)
+    else if (asset.ma200Dist > -15) { trendScore -= 12; signals.push({ type: "bearish", name: `200일선 크게 하회 ${asset.ma200Dist.toFixed(0)}%` }); } // v4.1: 추가 구간
+    else { trendScore -= 15; signals.push({ type: "bearish", name: `200일선 극단 하회 (${asset.ma200Dist.toFixed(0)}%)` }); }
   }
   // MA 배열 상태
   const ma50 = asset.fiftyDayAvg || asset.ma50;
@@ -1693,25 +1695,25 @@ function quickDiagnosis(asset) {
   if (ma50 && ma200) {
     if (ma50 > ma200 && asset.price > ma50) { trendScore += 10; signals.push({ type: "bullish", name: "정배열 + 가격 위" }); }
     else if (ma50 > ma200) { trendScore += 5; signals.push({ type: "bullish", name: "골든크로스 구간" }); }
-    else if (ma50 < ma200 && asset.price < ma50) { trendScore -= 8; signals.push({ type: "bearish", name: "역배열 + 가격 아래" }); }
-    else if (ma50 < ma200) { trendScore -= 4; signals.push({ type: "bearish", name: "데드크로스 구간" }); }
+    else if (ma50 < ma200 && asset.price < ma50) { trendScore -= 10; signals.push({ type: "bearish", name: "역배열 + 가격 아래" }); } // v4.1: -8→-10 하락추세 가중
+    else if (ma50 < ma200) { trendScore -= 5; signals.push({ type: "bearish", name: "데드크로스 구간" }); } // v4.1: -4→-5
   }
   // 단기 추세
   if (asset.weekChange > 8) trendScore += 6;
   else if (asset.weekChange > 3) trendScore += 3;
-  else if (asset.weekChange < -8) trendScore -= 6;
-  else if (asset.weekChange < -3) trendScore -= 3;
+  else if (asset.weekChange < -8) trendScore -= 8; // v4.1: -6→-8 급락 가중
+  else if (asset.weekChange < -3) trendScore -= 4; // v4.1: -3→-4
   trendScore = Math.max(0, Math.min(100, trendScore));
 
-  // ── 모멘텀: RSI 연속 그라데이션 (v4.0 최적화) + 스토캐스틱 + W%R ──
-  // v4.0: 5단계 변동성 레짐 기반 RSI 임계값 동적 조정 + RSI 변화율 반영
+  // ── 모멘텀: RSI 연속 그라데이션 (v4.1 최적화) + 스토캐스틱 + W%R ──
+  // v4.1: 5단계 변동성 레짐 기반 RSI 임계값 동적 조정 + 극단변동/고변동 임계값 미세조정
   const isExtremeVol = asset.atr14Pct != null && asset.atr14Pct > 4.5; // 극단 변동성 (위기 상황)
   const isHighVol = asset.atr14Pct != null && asset.atr14Pct > 3;
   const isMedVol = asset.atr14Pct != null && asset.atr14Pct >= 2 && asset.atr14Pct <= 3;
   const isLowVol = asset.atr14Pct != null && asset.atr14Pct < 1.2 && asset.atr14Pct >= 0.8;
-  const isUltraLowVol = asset.atr14Pct != null && asset.atr14Pct < 0.8; // v4.0: 초저변동성 (횡보장)
-  const rsiOB = isExtremeVol ? 78 : isHighVol ? 75 : isMedVol ? 72 : isUltraLowVol ? 68 : isLowVol ? 70 : 73; // v4.0: 5단계 레짐
-  const rsiOS = isExtremeVol ? 20 : isHighVol ? 25 : isMedVol ? 28 : isUltraLowVol ? 32 : isLowVol ? 30 : 27; // v4.0: 극단변동 OS 22→20, 초저변동 32
+  const isUltraLowVol = asset.atr14Pct != null && asset.atr14Pct < 0.8;
+  const rsiOB = isExtremeVol ? 80 : isHighVol ? 76 : isMedVol ? 72 : isUltraLowVol ? 68 : isLowVol ? 70 : 73; // v4.1: 극단 78→80, 고변동 75→76
+  const rsiOS = isExtremeVol ? 18 : isHighVol ? 23 : isMedVol ? 28 : isUltraLowVol ? 32 : isLowVol ? 30 : 27; // v4.1: 극단 20→18, 고변동 25→23 (패닉 반전 포착)
   if (asset.rsi != null) {
     if (asset.rsi >= 80) { momScore -= 18; signals.push({ type: "bearish", name: `RSI 극단 과매수 (${asset.rsi})` }); }
     else if (asset.rsi >= rsiOB) { momScore -= 12; signals.push({ type: "bearish", name: `RSI 과매수 (${asset.rsi}${isHighVol ? " · 고변동" : ""})` }); }
@@ -6290,6 +6292,59 @@ function AppInner() {
               score += 8; reasons.push("3팩터 프리미엄 (밸류+퀄리티+모멘텀)");
             } else if (isValue && isQuality) {
               score += 4; reasons.push("밸류+퀄리티 복합");
+            }
+
+            // 35) 이익 품질 복합 점수 (Earnings Quality Composite)
+            // 높은 그로스마진 + 높은 이익률 + 이익 가속 = 최고 품질 이익
+            if (grossMargin != null && margin != null && fpe != null && per != null && per > 0) {
+              const earningsQuality = (grossMargin > 0.50 ? 1 : 0) + (margin > 0.15 ? 1 : 0) + (fpe < per ? 1 : 0) + (roe != null && roe > 0.15 ? 1 : 0);
+              if (earningsQuality >= 4 && per < 25) {
+                score += 7; reasons.push("이익 품질 최상위 (고마진+이익가속+고ROE)");
+              } else if (earningsQuality >= 3 && per < 20) {
+                score += 4; reasons.push("이익 품질 우수");
+              }
+            }
+
+            // 36) NCAV 프록시 — 청산가치 대비 할인 (넷넷 전략)
+            // PBR < 0.7 + 저부채 = 순유동자산가치 이하 근사
+            if (pbr != null && pbr < 0.7 && debtEquity != null && debtEquity < 80 && margin != null && margin > 0) {
+              score += 8; reasons.push(`NCAV 프록시 (PBR ${pbr.toFixed(2)} + 저부채 + 흑자) — 청산가치 할인`);
+            } else if (pbr != null && pbr < 0.5 && margin != null && margin > -0.05) {
+              score += 5; reasons.push(`초저PBR 심화 (${pbr.toFixed(2)}) — 자산가치 대비 극단 할인`);
+            }
+
+            // 37) 단기 가격 반전 감지 — 급락 후 반등 초기 (기술적 바닥 확인)
+            if (q.fiftyDayAvg && q.twoHundredDayAvg && q.price && low52 && high52) {
+              const drawdown52 = high52 > 0 ? (q.price - high52) / high52 : 0;
+              const reboundFromLow = low52 > 0 ? (q.price - low52) / low52 : 0;
+              // 52주 고점 대비 -25% 이상 하락했으나, 저점에서 +10% 이상 반등 중
+              if (drawdown52 < -0.25 && reboundFromLow > 0.10 && q.price > q.fiftyDayAvg) {
+                score += 6; reasons.push(`기술적 바닥 반등 (저점+${(reboundFromLow * 100).toFixed(0)}%, 50일선↑)`);
+              }
+            }
+
+            // 38) EV/Sales 프록시 — 매출 대비 기업가치 (성장주 밸류에이션 보완)
+            if (q.enterpriseToRevenue != null && q.enterpriseToRevenue > 0) {
+              if (q.enterpriseToRevenue < 1.5 && margin != null && margin > 0.05) {
+                score += 6; reasons.push(`EV/Sales ${q.enterpriseToRevenue.toFixed(1)} 초저평가`);
+              } else if (q.enterpriseToRevenue < 3 && revGrowth != null && revGrowth > 0.10) {
+                score += 3; reasons.push(`EV/Sales ${q.enterpriseToRevenue.toFixed(1)} 양호`);
+              } else if (q.enterpriseToRevenue > 15 && revGrowth != null && revGrowth < 0.20) {
+                score -= 5; reasons.push(`EV/Sales ${q.enterpriseToRevenue.toFixed(1)} 과다`);
+              }
+            }
+
+            // 39) 밸류 트랩 최종 방어 — 다중 적신호 동시 감지 시 강력 감점
+            const trapSignals = [
+              per != null && per < 8 && margin != null && margin < 0,
+              debtEquity != null && debtEquity > 250,
+              revGrowth != null && revGrowth < -0.20,
+              roe != null && roe < -0.10,
+            ].filter(Boolean).length;
+            if (trapSignals >= 3) {
+              score -= 15; reasons.push("다중 밸류 트랩 경고 (3+ 위험 신호 동시 감지)");
+            } else if (trapSignals >= 2 && per != null && per < 10) {
+              score -= 8; reasons.push("밸류 트랩 복합 주의 (2+ 위험 신호)");
             }
 
             score = Math.max(0, Math.min(100, score));

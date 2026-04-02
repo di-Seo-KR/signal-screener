@@ -331,23 +331,38 @@ export default async function handler(req, res) {
       msg += `${i + 1}. ${s.name}: Sharpe ${s.avgSharpe.toFixed(2)} | 수익 ${s.avgReturn.toFixed(1)}% | 승률 ${s.avgWinRate.toFixed(0)}%\n`;
     });
 
-    // 실전 시그널 (강화)
+    // 실전 시그널 (강화 v2 — 리스크 조정 신뢰도 + 타이밍)
     if (actionable.length > 0) {
       msg += `\n🎯 실전 시그널 (최근 3봉, Sharpe>0.5)\n`;
       msg += `━━━━━━━━━━━━━━━━━━━━\n`;
       actionable.slice(0, 5).forEach(r => {
         const icon = r.lastSignal.type === "BUY" ? "🟢 매수" : "🔴 매도";
         const conf = r.sharpe >= 1.5 ? "⭐⭐⭐" : r.sharpe >= 1.0 ? "⭐⭐" : "⭐";
-        msg += `${icon} ${r.name} @ $${r.lastSignal.price?.toFixed(2)} ${conf}\n`;
-        msg += `   ${r.strat} | Sharpe ${r.sharpe?.toFixed(2)} | MDD ${r.mdd?.toFixed(1)}%\n`;
+        const ageLabel = r.lastSignal.age === 0 ? "오늘" : r.lastSignal.age === 1 ? "어제" : `${r.lastSignal.age}일전`;
+        const rr = r.pf != null && r.pf > 0 ? `PF ${r.pf.toFixed(1)}` : "";
+        msg += `${icon} ${r.name} @ $${r.lastSignal.price?.toFixed(2)} ${conf} (${ageLabel})\n`;
+        msg += `   ${r.strat} | Sharpe ${r.sharpe?.toFixed(2)} | MDD ${r.mdd?.toFixed(1)}% | 승률 ${r.winRate?.toFixed(0)}%`;
+        if (rr) msg += ` | ${rr}`;
+        msg += `\n`;
       });
+      // 시그널 요약 한줄
+      const buyCount = actionable.filter(r => r.lastSignal.type === "BUY").length;
+      const sellCount = actionable.filter(r => r.lastSignal.type === "SELL").length;
+      msg += `   → 매수 ${buyCount}건 / 매도 ${sellCount}건\n`;
+    } else {
+      msg += `\n🎯 실전 시그널: 조건 충족 종목 없음 (관망)\n`;
     }
 
-    // 종목별 최적 (간소화)
+    // 종목별 최적 (개선 — 성과 지표 포함)
     msg += `\n📋 종목별 베스트\n`;
-    Object.values(bestBySymbol).sort((a, b) => (b.sharpe || 0) - (a.sharpe || 0)).forEach(r => {
-      msg += `${r.name}: ${r.strat} (S${(r.sharpe || 0).toFixed(1)})\n`;
+    const bestEntries = Object.values(bestBySymbol).sort((a, b) => (b.sharpe || 0) - (a.sharpe || 0));
+    bestEntries.forEach(r => {
+      const tier = (r.sharpe || 0) >= 1.5 ? "🥇" : (r.sharpe || 0) >= 1.0 ? "🥈" : (r.sharpe || 0) >= 0.5 ? "🥉" : "  ";
+      msg += `${tier} ${r.name}: ${r.strat} (S${(r.sharpe || 0).toFixed(1)} R${(r.ret || 0).toFixed(0)}%)\n`;
     });
+    // 전략 다양성 요약
+    const uniqueStrats = new Set(bestEntries.map(r => r.strat));
+    msg += `   전략 다양성: ${uniqueStrats.size}개 전략 사용\n`;
 
     msg += `\n━━━━━━━━━━━━━━━━━━━━\n`;
     msg += `⏱️ ${dur}s | 내일: ${BATCHES[(dayOfWeek + 1) % 7].name}`;
