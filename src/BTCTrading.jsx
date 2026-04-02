@@ -683,6 +683,55 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
             </div>
           )}
           {cryptoPositions.length === 0 && <div style={{ fontSize: "11px", color: C.text3, textAlign: "center", padding: "8px" }}>보유 크립토 없음</div>}
+
+          {/* ═══ 봇 성과 지표 ═══ */}
+          {(() => {
+            const eq = parseFloat(alpacaAccount.equity || 0);
+            const lastEq = parseFloat(alpacaAccount.last_equity || eq);
+            const initCapital = botAllocation || 100000;
+            const ratio = (botAllocation && eq > 0) ? (botAllocation / eq) : 1;
+            const adjEq = botAllocation || eq;
+
+            // 오늘 수익
+            const todayPL = (eq - lastEq) * ratio;
+            const todayPLPct = lastEq > 0 ? ((eq - lastEq) / lastEq) * 100 : 0;
+            // 누적 수익
+            const totalPL = adjEq - initCapital;
+            const totalPLPct = initCapital > 0 ? ((adjEq - initCapital) / initCapital) * 100 : 0;
+            // 포지션 기반 미실현 P&L
+            const unrealizedPL = cryptoPositions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
+            // Drawdown (현재 자산 vs 초기자본 고점 — 간이 계산)
+            const peakEquity = Math.max(initCapital, adjEq);
+            const dd = peakEquity > 0 ? ((peakEquity - adjEq) / peakEquity) * 100 : 0;
+            // 투자 비중
+            const invested = cryptoPositions.reduce((s, p) => s + parseFloat(p.market_value || 0), 0);
+            const investedPct = adjEq > 0 ? (invested / adjEq) * 100 : 0;
+
+            const fmtUSD = (v) => `${v >= 0 ? "+" : ""}$${Math.abs(v).toFixed(2)}`;
+            const fmtPct = (v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}%`;
+            const metrics = [
+              { label: "오늘 수익", value: fmtUSD(todayPL), sub: fmtPct(todayPLPct), color: todayPL >= 0 ? C.green : C.red },
+              { label: "누적 수익", value: fmtUSD(totalPL), sub: fmtPct(totalPLPct), color: totalPL >= 0 ? C.green : C.red },
+              { label: "미실현 P&L", value: fmtUSD(unrealizedPL), color: unrealizedPL >= 0 ? C.green : C.red },
+              { label: "Drawdown", value: `-${dd.toFixed(2)}%`, color: dd > 5 ? C.red : dd > 2 ? C.yellow : C.green },
+              { label: "투자 비중", value: `${investedPct.toFixed(1)}%`, color: investedPct > 70 ? C.yellow : C.blue },
+              { label: "포지션 수", value: `${cryptoPositions.length}개`, color: C.text1 },
+            ];
+            return (
+              <div style={{ marginTop: "12px", borderTop: `1px solid ${C.border}40`, paddingTop: "12px" }}>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: C.text3, marginBottom: "8px" }}>봇 성과</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
+                  {metrics.map((m, i) => (
+                    <div key={i} style={{ background: C.card2, borderRadius: "8px", padding: "8px", textAlign: "center" }}>
+                      <div style={{ fontSize: "9px", color: C.text3, marginBottom: "2px", fontWeight: 600 }}>{m.label}</div>
+                      <div style={{ fontSize: "12px", fontWeight: 800, color: m.color }}>{m.value}</div>
+                      {m.sub && <div style={{ fontSize: "9px", color: m.color, marginTop: "1px" }}>{m.sub}</div>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 

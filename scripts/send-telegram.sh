@@ -3,7 +3,7 @@
 # 사용법: ./scripts/send-telegram.sh [파일경로]
 # 파일경로 생략 시 quant-reports/telegram-pending-*.txt 전체 발송
 
-SEND_URL="https://signal-screener.vercel.app/api/telegram-send"
+SEND_URL="https://zepta.vercel.app/api/telegram-send"
 REPORT_DIR="$(dirname "$0")/../quant-reports"
 
 send_file() {

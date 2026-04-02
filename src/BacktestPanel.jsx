@@ -1,4 +1,4 @@
-// Zepta — 백테스트 패널 v4.0
+// Zepta — 백테스트 패널 v4.1 (Omega/Tail Ratio 추가)
 // 전략 선택 → 데이터 로드 → 백테스트 실행 → 성과 시각화
 // v3.5: MAE/MFE + Expectancy + Recovery Factor + 평균 보유기간 표시
 import { useState, useCallback, useRef, useEffect } from "react";
@@ -427,6 +427,12 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
               <MetricCard label="UPI" value={result.upiRatio ?? "—"}
                 color={result.upiRatio >= 1 ? C.green : result.upiRatio >= 0 ? C.yellow : C.red}
                 sub="초과수익/Ulcer Index" />
+              <MetricCard label="Omega" value={result.omegaRatio ?? "—"}
+                color={(result.omegaRatio || 0) >= 2 ? C.green : (result.omegaRatio || 0) >= 1 ? C.yellow : C.red}
+                sub="이익/손실 비율 (≥2 양호)" />
+              <MetricCard label="Tail Ratio" value={result.tailRatio ?? "—"}
+                color={(result.tailRatio || 0) >= 1 ? C.green : (result.tailRatio || 0) >= 0.5 ? C.yellow : C.red}
+                sub="꼬리위험 (≥1 좋음)" />
             </div>
 
             {/* 자산 곡선 */}

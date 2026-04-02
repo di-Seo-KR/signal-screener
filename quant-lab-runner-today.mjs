@@ -107,7 +107,7 @@ function runStrategyBacktest(strategy, candles, ticker) {
 // ── 텔레그램 전송 (Vercel 프록시) ──────────────────────────
 async function sendTelegram(text) {
   try {
-    const res = await fetch('https://signal-screener.vercel.app/api/telegram-send', {
+    const res = await fetch('https://zepta.vercel.app/api/telegram-send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text }),

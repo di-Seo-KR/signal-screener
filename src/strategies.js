@@ -1,6 +1,14 @@
 // ════════════════════════════════════════════════════════════════════
-// Zepta 퀀트 엔진 v4.0 — 오전 전략 파라미터 최적화 (2026-03-31)
+// Zepta 퀀트 엔진 v4.1 — 오전 전략 파라미터 최적화 (2026-04-02)
 // 33개 매매전략 + 백테스팅 엔진 + 시장진단 + 전략추천
+// v4.1: 4/2 오전 전략 업데이트 (VIX 25.25 고변동 + BTC Fear 8 극공포 반영)
+//   - RSI 반전: 기본 임계값 26/74→25/75 (고변동장 과매도 진입 깊게)
+//   - RSI 반전: 하락추세 진입 RSI 기준 20→18 (패닉 매도 반전 포착)
+//   - BTC 알파: 패닉 RSI 18→20 (극공포 F&G 8 반영, 과격한 진입 완화)
+//   - BTC 알파: 저변동 RSI 임계값 32/68→30/70 (레인지 확대)
+//   - 볼린저밴드: 스퀴즈 비율 0.5→0.45 (수축 구간 더 엄격 억제)
+//   - 백테스트 엔진: Omega Ratio + Tail Ratio 메트릭 추가
+//   - 백테스트 엔진: 연속 손실 포지션 축소 3회→2회 (고변동 리스크 관리 강화)
 // v4.0: 3/31 오전 전략 업데이트
 //   - RSI 반전: 기본 임계값 27/73→26/74 + 거래량 확인 0.7→0.65 완화
 //   - BTC 알파: 패닉 RSI 15→18 (극단 진입 방지) + 거래량 서지 1.8→1.6
@@ -259,13 +267,13 @@ function detectBearishDivergence(closes, rsi, index, lookback = 10) {
 export const strategyRSI = {
   id: "rsi_reversal",
   name: "RSI 반전 전략",
-  desc: "RSI(14) 과매도/과매수 진입. v3.6: 변동성 레짐 기반 적응형 임계값(저변동 30/70, 고변동 25/75) + RSI 3봉 기울기 반전 확인.",
+  desc: "RSI(14) 과매도/과매수 진입. v4.1: 고변동장 최적화 임계값(25/75) + 패닉 매도 반전 포착(하락추세 RSI 18) + 변동성 레짐 적응형.",
   category: "평균회귀",
   risk: "중",
   icon: "📉",
-  params: { period: 14, buyThreshold: 26, sellThreshold: 74 }, // v4.0: 27/73→26/74 시그널 품질 향상
+  params: { period: 14, buyThreshold: 25, sellThreshold: 75 }, // v4.1: 26/74→25/75 고변동장 과매도 진입 확대
   generate(candles, params = {}) {
-    const { period = 14, buyThreshold = 26, sellThreshold = 74 } = { ...this.params, ...params };
+    const { period = 14, buyThreshold = 25, sellThreshold = 75 } = { ...this.params, ...params };
     const closes = candles.map(c => c.close);
     const highs = candles.map(c => c.high);
     const lows = candles.map(c => c.low);
@@ -295,10 +303,10 @@ export const strategyRSI = {
       if (rsi[i] <= adjBuy && rsi[i - 1] > adjBuy) {
         if (!isVolumeConfirmed(candles, i, 20, 0.65)) continue; // v4.0: 0.7→0.65 완화 (더 많은 시그널 포착)
         const trend = getTrendDirection(closes, i);
-        if (trend === "down" && rsi[i] > 20) continue;
+        if (trend === "down" && rsi[i] > 18) continue; // v4.1: 20→18 패닉 매도 반전 포착 (VIX 25+ 환경)
         // v3.5: 연속 하락봉 후 반전봉 확인
         const prevBearish = (i >= 2 && candles[i-1].close < candles[i-1].open) || (i >= 3 && candles[i-2].close < candles[i-2].open);
-        if (!prevBearish && rsi[i] > 22) continue;
+        if (!prevBearish && rsi[i] > 20) continue; // v4.1: 22→20 반전봉 확인 기준 완화
         // v3.6: RSI 3봉 기울기 반전 확인 — RSI가 최근 저점에서 상승 전환 중인지 확인
         const rsiSlope = i >= 3 && rsi[i-2] != null ? (rsi[i] - rsi[i-2]) : 0;
         const rsiTurning = rsiSlope > -2; // 급락 중이면 아직 반전 아님
@@ -350,8 +358,8 @@ export const strategyBB = {
       const bwRatio = avgBW > 0 ? (bb[i].bw / avgBW) : 1;
       if (closes[i] <= bb[i].lower && closes[i - 1] > bb[i - 1].lower) {
         if (!isVolumeConfirmed(candles, i, 20, 0.8)) continue;
-        // v3.6: 밴드폭 극단 수축 시 역추세 신호 억제 — 스퀴즈 구간에서는 돌파 전략이 유리
-        if (bwRatio < 0.5) continue; // 극단적 수축 시 평균회귀 부적합
+        // v4.1: 밴드폭 극단 수축 시 역추세 신호 억제 — 스퀴즈 구간 더 엄격 억제 (0.5→0.45)
+        if (bwRatio < 0.45) continue; // v4.1: 고변동장 스퀴즈 구간 더 넓게 차단
         const rsiOversold = rsi14[i] != null && rsi14[i] < 35;
         const div = detectBullishDivergence(closes, rsi14, i);
         // v3.9: 종가 이탈 기준을 ATR 비례로 조정 (고변동: 완화, 저변동: 엄격)
@@ -366,7 +374,7 @@ export const strategyBB = {
         signals.push({ index: i, type: "BUY", price: closes[i],
           reason: `BB 하단 (%B=${pctB.toFixed(2)})${rsiOversold ? ` + RSI${rsi14[i].toFixed(0)}` : ""}${div ? " + 강세다이버전스" : ""}${bwRatio < 0.8 ? " · 밴드수축" : ""}${trendTag}` });
       } else if (closes[i] >= bb[i].upper && closes[i - 1] < bb[i - 1].upper) {
-        if (bwRatio < 0.5) continue; // v3.6: 스퀴즈 구간 보호
+        if (bwRatio < 0.45) continue; // v4.1: 0.5→0.45 스퀴즈 구간 보호 강화 (매도측도 동일)
         const div = detectBearishDivergence(closes, rsi14, i);
         signals.push({ index: i, type: "SELL", price: closes[i],
           reason: `BB 상단 (%B=${pctB.toFixed(2)})${div ? " + 약세다이버전스" : ""}${bwRatio < 0.8 ? " · 밴드수축" : ""}` });
@@ -1856,11 +1864,11 @@ export const strategyBTCAlpha = {
     // 패닉 레짐(ATR% > 6): RSI < 15 = 극단적 매수신호
     function getAdaptiveRSI(i) {
       const atrPct = atr[i] && closes[i] > 0 ? (atr[i] / closes[i]) * 100 : 2;
-      if (atrPct > 6) return { buy: 18, sell: 82, isPanic: true };  // v4.0: 패닉 15→18 (너무 극단적 진입 방지)
-      if (atrPct > 5) return { buy: 20, sell: 80 };                  // 초고변동
+      if (atrPct > 6) return { buy: 20, sell: 82, isPanic: true };  // v4.1: 패닉 18→20 (F&G 8 극공포 — 조기 진입 완화)
+      if (atrPct > 5) return { buy: 22, sell: 80 };                  // v4.1: 초고변동 20→22 (극단 방지)
       if (atrPct > 3) return { buy: 25, sell: 75 };                  // 고변동
       if (atrPct > 1.5) return { buy: 28, sell: 72 };                // 보통
-      return { buy: 32, sell: 68 };                                  // 저변동
+      return { buy: 30, sell: 70 };                                  // v4.1: 저변동 32/68→30/70 (레인지 확대)
     }
 
     // ── 변동성 레짐별 동적 거래량 임계값 ──
@@ -2982,7 +2990,7 @@ export const ALL_STRATEGIES = [
 // 슬리피지, 수수료, 포지션 사이징, 손절/익절, 봉별 자산추적
 // ════════════════════════════════════════════════════════════════════
 
-// v3.7: 변동성 적응 슬리피지 + 낙폭 서킷브레이커 + CAGR
+// v4.1: Omega/Tail Ratio + 연속손실 2회 축소 + 변동성 적응 슬리피지 + 낙폭 서킷브레이커 + CAGR
 export function runBacktest(candles, signals, options = {}) {
   const {
     initialCapital = 10000,
@@ -3147,8 +3155,8 @@ export function runBacktest(candles, signals, options = {}) {
       if (sig.type === "BUY" && position === 0 && lastAction !== "BUY" && circuitScale > 0) {
         const adaptiveSlip = getAdaptiveSlippage(i);
         const buyPrice = sig.price * (1 + adaptiveSlip);
-        // v4.0: 리스크 적응 포지션 사이징 — 연속 손실 + 서킷스케일 + 변동성 적응
-        const riskFactor = (riskAdaptive && consecLosses >= 3) ? 0.5 : 1.0;
+        // v4.1: 리스크 적응 포지션 사이징 — 연속 손실 2회로 강화 (고변동 리스크 관리) + 서킷스케일 + 변동성 적응
+        const riskFactor = (riskAdaptive && consecLosses >= 2) ? 0.5 : 1.0; // v4.1: 3→2 고변동장 조기 리스크 축소
         const volFactor = getVolSizingFactor(i);
         const investAmount = capital * positionSize * riskFactor * circuitScale * volFactor;
         const comm = investAmount * commission;
@@ -3379,6 +3387,27 @@ export function runBacktest(candles, signals, options = {}) {
       }
       const ui = Math.sqrt(sumSqDD / equity.length);
       return ui > 0 ? +((totalReturn - bhReturn) / ui).toFixed(2) : 0;
+    })(),
+    // v4.1: Omega Ratio — 임계수익률(0%) 대비 이익영역 합 / 손실영역 합 (높을수록 좋음)
+    omegaRatio: (() => {
+      if (returns.length < 2) return 0;
+      const threshold = 0; // 임계 수익률 0%
+      let gains = 0, losses = 0;
+      for (const r of returns) {
+        if (r > threshold) gains += (r - threshold);
+        else losses += (threshold - r);
+      }
+      return losses > 0 ? +(gains / losses).toFixed(2) : (gains > 0 ? 99.99 : 0);
+    })(),
+    // v4.1: Tail Ratio — 95th percentile 이익 / 5th percentile 손실 (꼬리 위험 측정)
+    tailRatio: (() => {
+      if (returns.length < 10) return 0;
+      const sorted = [...returns].sort((a, b) => a - b);
+      const p5Idx = Math.floor(returns.length * 0.05);
+      const p95Idx = Math.floor(returns.length * 0.95);
+      const p5 = Math.abs(sorted[p5Idx]);
+      const p95 = Math.abs(sorted[p95Idx]);
+      return p5 > 0 ? +(p95 / p5).toFixed(2) : (p95 > 0 ? 99.99 : 0);
     })(),
     trades,
     equity,
