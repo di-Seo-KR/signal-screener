@@ -5519,6 +5519,12 @@ function AppInner() {
     };
   }, [tab]);
 
+  // 경제 캘린더 탭 진입 시에도 데이터 로드
+  useEffect(() => {
+    if (tab !== "econ-calendar") return;
+    if (econEvents.length === 0) fetchEconCalendar();
+  }, [tab]);
+
   // ── 전략 매매 알림 생성 함수 ──────────────────────────────────
   // 스크리닝 결과에서 전략 포트폴리오 종목의 시그널을 찾아 알림 생성
   const STRATEGY_PORTFOLIO_SYMBOLS = useMemo(() => {

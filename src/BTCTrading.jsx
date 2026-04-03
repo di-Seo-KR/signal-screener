@@ -33,14 +33,48 @@ const LIGHT_C = {
 
 // 지원 크립토 자산
 // KV 가상 포트폴리오에서 Binance USDT 쌍으로 거래됨
-const BTC_ASSETS = [
-  { sym: "BTC-USD", name: "Bitcoin", icon: "₿", weight: 0.35 },
-  { sym: "ETH-USD", name: "Ethereum", icon: "Ξ", weight: 0.25 },
-  { sym: "SOL-USD", name: "Solana", icon: "◎", weight: 0.15 },
-  { sym: "AVAX-USD", name: "Avalanche", icon: "🔺", weight: 0.10 },
-  { sym: "LINK-USD", name: "Chainlink", icon: "⬡", weight: 0.08 },
-  { sym: "DOGE-USD", name: "Dogecoin", icon: "🐕", weight: 0.07 },
-];
+// 전체 크립토 자산 목록 (아이콘/이름 매핑)
+const ALL_CRYPTO = {
+  "BTC/USD": { sym: "BTC-USD", name: "Bitcoin", icon: "₿" },
+  "ETH/USD": { sym: "ETH-USD", name: "Ethereum", icon: "Ξ" },
+  "SOL/USD": { sym: "SOL-USD", name: "Solana", icon: "◎" },
+  "XRP/USD": { sym: "XRP-USD", name: "XRP", icon: "✕" },
+  "ADA/USD": { sym: "ADA-USD", name: "Cardano", icon: "◆" },
+  "AVAX/USD": { sym: "AVAX-USD", name: "Avalanche", icon: "🔺" },
+  "LINK/USD": { sym: "LINK-USD", name: "Chainlink", icon: "⬡" },
+  "UNI/USD": { sym: "UNI-USD", name: "Uniswap", icon: "🦄" },
+  "AAVE/USD": { sym: "AAVE-USD", name: "Aave", icon: "👻" },
+  "DOT/USD": { sym: "DOT-USD", name: "Polkadot", icon: "●" },
+  "DOGE/USD": { sym: "DOGE-USD", name: "Dogecoin", icon: "🐕" },
+  "SHIB/USD": { sym: "SHIB-USD", name: "Shiba Inu", icon: "🐶" },
+  "PEPE/USD": { sym: "PEPE-USD", name: "Pepe", icon: "🐸" },
+  "ARB/USD": { sym: "ARB-USD", name: "Arbitrum", icon: "🔵" },
+  "OP/USD": { sym: "OP-USD", name: "Optimism", icon: "🔴" },
+  "MATIC/USD": { sym: "MATIC-USD", name: "Polygon", icon: "💜" },
+};
+
+// 봇별 매매 대상 자산 (btc-cron.js BOT_ASSET_MAP과 동기화)
+const BOT_ASSET_MAP = {
+  "btc-alpha": ["BTC/USD"],
+  "highcap-momentum": ["BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD", "ADA/USD", "AVAX/USD"],
+  "defi-infra": ["LINK/USD", "UNI/USD", "AAVE/USD", "DOT/USD"],
+  "meme-trend": ["DOGE/USD", "SHIB/USD", "PEPE/USD"],
+  "l2-emerging": ["ARB/USD", "OP/USD", "MATIC/USD"],
+  "crypto-diversity": Object.keys(ALL_CRYPTO),
+  "crypto-swing": Object.keys(ALL_CRYPTO),
+};
+
+// 기본 폴백 (봇 미지정 시)
+const DEFAULT_ASSETS = ["BTC/USD", "ETH/USD", "SOL/USD", "AVAX/USD", "LINK/USD", "DOGE/USD"];
+
+// 봇 ID에 맞는 자산 목록 반환
+function getBotAssets(botId) {
+  const assetKeys = BOT_ASSET_MAP[botId] || DEFAULT_ASSETS;
+  return assetKeys.map(k => ALL_CRYPTO[k]).filter(Boolean);
+}
+
+// 하위 호환용 (기존 코드에서 BTC_ASSETS 참조하는 부분)
+const BTC_ASSETS = Object.values(ALL_CRYPTO).slice(0, 6);
 
 const BTC_STRATEGY = ALL_STRATEGIES.find(s => s.id === "btc_alpha");
 
@@ -289,7 +323,8 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
       const geckoData = await fetchCryptoPrices();
       if (geckoData) {
         const pm = {};
-        for (const a of BTC_ASSETS) {
+        const allAssets = Object.values(ALL_CRYPTO);
+        for (const a of allAssets) {
           const g = GECKO[a.sym];
           if (geckoData[g]) pm[a.sym] = {
             price: geckoData[g].usd, change24h: geckoData[g].usd_24h_change,
@@ -300,7 +335,8 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
       }
 
       // ── 멀티 타임프레임 캔들 병렬 로딩 (전체 자산 동적) ──
-      const assetSyms = BTC_ASSETS.map(a => a.sym);
+      const botAssets = getBotAssets(botPreset?.id);
+      const assetSyms = botAssets.map(a => a.sym);
       const candlePromises = [];
       for (const sym of assetSyms) {
         candlePromises.push(fetchCandles(sym, "1y"));       // 일봉
@@ -483,10 +519,13 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   useEffect(() => { save("di_btc_tab", subTab); }, [subTab]);
 
   // ── Equity 계산 ──
-  const equity = parseFloat(virtualPortfolio?.equity || 0);
-  const cash = parseFloat(virtualPortfolio?.cash || 0);
-  const dayPL = parseFloat(virtualPortfolio?.dayPL || 0);
-  const dayPLPct = parseFloat(virtualPortfolio?.dayPLPct || 0);
+  const fullEquity = parseFloat(virtualPortfolio?.equity || 0);
+  const fullCash = parseFloat(virtualPortfolio?.cash || 0);
+  const hasPortfolioData = fullEquity > 0 || fullCash > 0;
+  const equity = botAllocation ? botAllocation : fullEquity;
+  const cash = (botAllocation && !hasPortfolioData) ? botAllocation : fullCash;
+  const dayPL = (botAllocation && !hasPortfolioData) ? 0 : parseFloat(virtualPortfolio?.dayPL || 0);
+  const dayPLPct = (botAllocation && !hasPortfolioData) ? 0 : parseFloat(virtualPortfolio?.dayPLPct || 0);
   const fmtUSD2 = (v) => `$${Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
   // ── 봇 성과 파생 ──
@@ -658,7 +697,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
             <div style={card}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>실시간 크립토</span>
+                  <span style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>모니터링 종목</span>
                   {botPreset && (
                     <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "8px",
                       background: `${C.blue}20`, color: C.blue, fontWeight: 600 }}>{botPreset.name}</span>
@@ -667,21 +706,18 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                 {lastUpdate && <span style={{ fontSize: "10px", color: C.text3 }}>{lastUpdate.toLocaleTimeString("ko-KR")}</span>}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                {BTC_ASSETS.map(a => {
+                {getBotAssets(botPreset?.id).map(a => {
                   const p = prices[a.sym];
                   const isUp = p && p.change24h >= 0;
                   return (
                     <div key={a.sym} style={{
                       display: "flex", alignItems: "center", padding: "10px 14px", borderRadius: "10px",
                       background: C.card2, gap: "10px",
-                      border: a.sym === "BTC-USD" ? `1px solid ${C.orange}25` : `1px solid transparent`,
+                      border: `1px solid transparent`,
                     }}>
                       <span style={{ fontSize: "18px", width: "24px", textAlign: "center" }}>{a.icon}</span>
                       <div style={{ flex: 1 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                          <span style={{ fontSize: "12px", fontWeight: 700, color: C.text1 }}>{a.name}</span>
-                          {badge(`${(a.weight * 100).toFixed(0)}%`, C.purpleBg, C.purple)}
-                        </div>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: C.text1 }}>{a.name}</span>
                         {p?.volume24h && <div style={{ fontSize: "10px", color: C.text3 }}>Vol ${(p.volume24h / 1e9).toFixed(1)}B</div>}
                       </div>
                       <div style={{ textAlign: "right" }}>
@@ -705,7 +741,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                   {cryptoPositions.map((p, i) => {
                     const pnl = parseFloat(p.unrealizedPL || 0);
                     const pnlPct = parseFloat(p.unrealizedPLPct || 0);
-                    const assetIcon = BTC_ASSETS.find(a => p.symbol && a.sym.includes(p.symbol.split("USDT")[0]))?.icon || "₿";
+                    const assetIcon = Object.values(ALL_CRYPTO).find(a => p.symbol && a.sym.includes(p.symbol.split("USDT")[0]))?.icon || "₿";
                     return (
                       <div key={i} style={{
                         display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px",
@@ -831,20 +867,17 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
 
             {/* 목표 할당 */}
             <div style={card}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>목표 할당</div>
-              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                {BTC_ASSETS.map(a => (
-                  <div key={a.sym} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ fontSize: "12px", fontWeight: 600, color: C.text1, minWidth: "50px" }}>{a.name}</span>
-                    <div style={{ flex: 1, height: "20px", borderRadius: "4px", background: C.card2, overflow: "hidden" }}>
-                      <div style={{
-                        height: "100%", width: `${a.weight * 100}%`,
-                        background: a.sym === "BTC-USD" ? C.orange : a.sym === "ETH-USD" ? C.purple : a.sym === "SOL-USD" ? C.blue : a.sym === "BNB-USD" ? C.yellow : C.green,
-                        transition: "width .3s",
-                      }} />
-                    </div>
-                    <span style={{ fontSize: "11px", fontWeight: 700, color: C.text2, minWidth: "35px", textAlign: "right" }}>{(a.weight * 100).toFixed(0)}%</span>
-                  </div>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>매매 대상 자산</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {getBotAssets(botPreset?.id).map(a => (
+                  <span key={a.sym} style={{
+                    fontSize: "11px", padding: "5px 12px", borderRadius: "8px",
+                    background: C.card2, border: `1px solid ${C.border}`,
+                    color: C.text1, fontWeight: 600,
+                    display: "flex", alignItems: "center", gap: "4px",
+                  }}>
+                    <span>{a.icon}</span> {a.name}
+                  </span>
                 ))}
               </div>
             </div>

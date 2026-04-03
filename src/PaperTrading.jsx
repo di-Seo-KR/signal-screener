@@ -851,8 +851,8 @@ function fmt(n, dec = 2) {
   if (n == null || isNaN(n)) return "—";
   return Number(n).toLocaleString("en-US", { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
-function fmtUSD(n) { return n == null ? "—" : `$${fmt(n)}`; }
-function fmtPct(n) { return n == null ? "—" : `${Number(n) >= 0 ? "+" : ""}${fmt(n)}%`; }
+function fmtUSD(n) { return (n == null || isNaN(n)) ? "—" : `$${fmt(n)}`; }
+function fmtPct(n) { return (n == null || isNaN(n)) ? "—" : `${Number(n) >= 0 ? "+" : ""}${fmt(n)}%`; }
 
 // ══════════════════════════════════════════════════════════════
 // 설정 패널 (가상매매 - 자동 연결)
@@ -1626,15 +1626,21 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
   const fullCash = parseFloat(account?.cash || 0);
   const fullBuyingPower = parseFloat(account?.cash || 0);
   // 봇 배분 비율: botAllocation이 있으면 해당 봇에 배분된 비율만큼만 표시
+  // fullEquity=0 (계좌 미연결/가상 포트폴리오 미생성)이고 botAllocation이 있으면 → 배분금액을 현금으로 표시
+  const hasAccountData = fullEquity > 0 || fullCash > 0;
   const allocRatio = (botAllocation && fullEquity > 0) ? (botAllocation / fullEquity) : 1;
   const equity = botAllocation ? botAllocation : fullEquity;
-  const cash = Math.round(fullCash * allocRatio * 100) / 100;
-  const buyingPower = botAllocation
-    ? Math.min(Math.round(fullBuyingPower * allocRatio * 100) / 100, botAllocation)
-    : fullBuyingPower;
+  const cash = (botAllocation && !hasAccountData)
+    ? botAllocation  // 계좌 데이터 없으면 배분금액 전체가 현금
+    : Math.round(fullCash * allocRatio * 100) / 100;
+  const buyingPower = (botAllocation && !hasAccountData)
+    ? botAllocation  // 계좌 데이터 없으면 배분금액 전체가 가용원금
+    : botAllocation
+      ? Math.min(Math.round(fullBuyingPower * allocRatio * 100) / 100, botAllocation)
+      : fullBuyingPower;
   const fullDayPL = parseFloat(account?.equity) - parseFloat(account?.last_equity || account?.equity);
-  const dayPL = Math.round(fullDayPL * allocRatio * 100) / 100;
-  const dayPLPct = parseFloat(account?.last_equity) ? (fullDayPL / parseFloat(account.last_equity) * 100) : 0;
+  const dayPL = (botAllocation && !hasAccountData) ? 0 : Math.round(fullDayPL * allocRatio * 100) / 100;
+  const dayPLPct = (botAllocation && !hasAccountData) ? 0 : (parseFloat(account?.last_equity) ? (fullDayPL / parseFloat(account.last_equity) * 100) : 0);
   const totalPL = equity - (botAllocation || 100000);
   const totalPLPct = botAllocation ? (totalPL / botAllocation * 100) : ((equity - 100000) / 100000 * 100);
   const positionPL = filteredPositions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
