@@ -4201,11 +4201,14 @@ function AppInner() {
   const validTabs = ["home","auto-trading","portfolio","screener","alerts","news","quant-portfolio","quant-port","risk-map","sector-flow","backtest","sentiment","strategy","anomaly","quant-report","econ-calendar","profile"];
   const [tab, setTabRaw] = useState(() => {
     try {
-      // 1순위: URL ?tab= 파라미터
+      // 1순위: URL pathname (/screener, /auto-trading 등)
+      const path = window.location.pathname.replace(/^\//, "").replace(/\/$/, "");
+      if (path && validTabs.includes(path)) return path;
+      // 2순위: URL ?tab= 파라미터 (레거시 호환)
       const p = new URLSearchParams(window.location.search);
       const t = p.get("tab");
       if (t && validTabs.includes(t)) return t;
-      // 2순위: sessionStorage (새로고침 시 복원)
+      // 3순위: sessionStorage (새로고침 시 복원)
       const saved = sessionStorage.getItem("zepta_tab");
       if (saved && validTabs.includes(saved)) return saved;
     } catch {}
@@ -4213,7 +4216,25 @@ function AppInner() {
   });
   const setTab = useCallback((newTab) => {
     setTabRaw(newTab);
-    try { sessionStorage.setItem("zepta_tab", newTab); } catch {}
+    try {
+      sessionStorage.setItem("zepta_tab", newTab);
+      // URL을 경로 기반으로 업데이트 (페이지 리로드 없이)
+      const newPath = newTab === "home" ? "/" : `/${newTab}`;
+      if (window.location.pathname !== newPath) {
+        window.history.pushState({ tab: newTab }, "", newPath);
+      }
+    } catch {}
+  }, []);
+
+  // ── 브라우저 뒤로가기/앞으로가기 지원 ──
+  useEffect(() => {
+    const onPopState = () => {
+      const path = window.location.pathname.replace(/^\//, "").replace(/\/$/, "");
+      if (path && validTabs.includes(path)) { setTabRaw(path); try { sessionStorage.setItem("zepta_tab", path); } catch {} }
+      else { setTabRaw("home"); }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   // ── GNB 카테고리 상태 ──

@@ -3,7 +3,8 @@
     { "source": "/api/yahoo-ohlc", "destination": "/api/yahoo?_mode=ohlc" },
     { "source": "/api/yahoo-batch", "destination": "/api/yahoo?_mode=batch" },
     { "source": "/api/yahoo-quote", "destination": "/api/yahoo?_mode=quote" },
-    { "source": "/api/(.*)", "destination": "/api/$1" }
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon).*)", "destination": "/index.html" }
   ],
   "headers": [
     {

@@ -641,8 +641,8 @@ function useVirtualPortfolio(userId) {
       .then(r => r.json())
       .then(data => {
         if (data?.ok) {
-          setCryptoPortfolio(data.cryptoPortfolio || null);
-          setStockPortfolio(data.stockPortfolio || null);
+          setCryptoPortfolio(data.crypto || null);
+          setStockPortfolio(data.stock || null);
         }
         setLoading(false);
       })
@@ -914,7 +914,7 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
               }}>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3, marginBottom: "2px" }}>거래 횟수</div>
-                  <div style={{ fontSize: isMobile ? "13px" : "16px", fontWeight: 800, color: c.text1 }}>{(allBotPerf[ab.botId]?.perf?.tradeCount) || botTrades || ab.trades || 0}</div>
+                  <div style={{ fontSize: isMobile ? "13px" : "16px", fontWeight: 800, color: c.text1 }}>{(allBotPerf[ab.botId]?.perf?.tradeCount) || ab.trades || 0}</div>
                 </div>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3, marginBottom: "2px" }}>투입 금액</div>
