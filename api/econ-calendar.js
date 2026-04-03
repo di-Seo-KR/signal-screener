@@ -99,7 +99,7 @@ export default async function handler(req, res) {
   };
 
   // ── 1차: Finnhub 경제 캘린더 ──
-  const finnhubKey = process.env.FINNHUB_API_KEY;
+  const finnhubKey = process.env.FINNHUB_API_KEY || "d77tjo9r01qsamsi55ugd77tjo9r01qsamsi55v0";
   if (finnhubKey && finnhubKey !== "demo") {
     try {
       const finnhubUrl = `https://finnhub.io/api/v1/calendar/economic?from=${fmtDate(from)}&to=${fmtDate(to)}&token=${finnhubKey}`;
