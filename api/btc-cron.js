@@ -520,6 +520,15 @@ export default async function handler(req, res) {
 
     // ── 가상 포트폴리오 KV 저장 ──
     await kv.set(PORTFOLIO_KEY, portfolio);
+    // 일간 P&L용: 하루 첫 실행 시 prevEquity 저장 (한국 시간 기준 날짜 체크)
+    const nowKST = new Date(Date.now() + 9 * 3600000);
+    const todayKST = nowKST.toISOString().slice(0, 10);
+    const prevEquityDate = await kv.get("di:virtual:crypto-prev-equity-date");
+    if (prevEquityDate !== todayKST) {
+      await kv.set("di:virtual:crypto-prev-equity", equity);
+      await kv.set("di:virtual:crypto-prev-equity-date", todayKST);
+      addLog(`📊 일간 기준 equity 갱신: $${equity.toFixed(0)} (${todayKST})`);
+    }
     addLog(`💾 포트폴리오 저장: 현금 $${portfolio.cash.toFixed(0)}, 포지션 ${Object.keys(portfolio.positions).length}종목`);
 
     // ── 봇별 성과 KV 저장 ──

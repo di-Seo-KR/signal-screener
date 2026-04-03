@@ -497,7 +497,15 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
     })), [signals, btcCandles]);
   const latestSignal = signals.length > 0 ? signals[signals.length - 1] : null;
   const latestDate = latestSignal?.time ? new Date(latestSignal.time * 1000) : (latestSignal && btcCandles[latestSignal.index]?.time ? new Date(btcCandles[latestSignal.index].time * 1000) : null);
-  const cryptoPositions = virtualPortfolio?.positions || [];
+  // 봇별 자산 필터링 — 해당 봇이 담당하는 자산만 표시
+  const botAssets = getBotAssets(botPreset?.id);
+  const cryptoPositions = (virtualPortfolio?.positions || []).filter(p => {
+    if (!botAssets || botAssets.length === 0) return true; // 전체 봇이면 필터 안 함
+    return botAssets.some(a => {
+      const sym = a.replace("/USD", ""); // "BTC/USD" → "BTC"
+      return p.symbol && (p.symbol === a || p.symbol.startsWith(sym));
+    });
+  });
 
   // ═══ RENDER ═══
   const fmtNum = (n) => typeof n === "number" ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : n;
@@ -541,11 +549,12 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   const dd = snap.dd || 0;
   const mdd = snap.mdd || 0;
   const tradeCount = perf.tradeCount || 0;
-  const totalSold = perf.totalSellRevenue || 0;
-  const totalBought = perf.totalBuyCost || 0;
-  const realizedPL = totalSold - totalBought + unrealizedPL;
+  // 실현 손익: 매도한 종목에서만 발생 (매도 수익 - 매도 대상의 매수 비용)
+  const closedPL = perf.realizedPL || 0; // btc-cron에서 매도 시 계산된 실현 손익
+  // 총 손익 = 실현 손익 + 미실현 손익
+  const totalPL = closedPL + unrealizedPL;
   const initCapital = botAllocation || 100000;
-  const realizedPLPct = initCapital > 0 ? (realizedPL / initCapital) * 100 : 0;
+  const totalPLPct = initCapital > 0 ? (totalPL / initCapital) * 100 : 0;
 
   return (
     <div className="tab-content" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "240px 1fr", gap: "0", minHeight: "100vh" }}>
@@ -663,7 +672,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
             {[
               { label: "총 거래", value: `${tradeCount}회`, color: C.text1 },
-              { label: "누적 수익", value: `${realizedPL >= 0 ? "+" : ""}$${Math.abs(realizedPL).toFixed(0)}`, color: realizedPL >= 0 ? C.green : C.red },
+              { label: "누적 수익", value: `${totalPL >= 0 ? "+" : ""}$${Math.abs(totalPL).toFixed(0)}`, color: totalPL >= 0 ? C.green : C.red },
               { label: "미실현 P&L", value: `${unrealizedPL >= 0 ? "+" : ""}$${Math.abs(unrealizedPL).toFixed(0)}`, color: unrealizedPL >= 0 ? C.green : C.red },
               { label: "Drawdown", value: `-${dd.toFixed(2)}%`, color: dd > 5 ? C.red : dd > 2 ? C.yellow : C.green },
               { label: "MDD", value: `-${mdd.toFixed(2)}%`, color: mdd > 10 ? C.red : mdd > 5 ? C.yellow : C.green },
