@@ -1,13 +1,12 @@
 // Stock Auto-Trading Cron Engine for Vercel
 // 장중 30분 간격 실행: 실시간 시장 감시 + 알파 전략 기반 자동매매
-// market-monitor가 KV에 쌓은 레짐 데이터를 참조하여 적응형 매매
-// Paper-trades 10 high-liquidity US stocks via Alpaca
+// KV 가상 포트폴리오 매매 (Alpaca 불필요)
+// Yahoo Finance 가격 기반 가상매매
 
 export const config = { maxDuration: 120 };
 
 import fetch from 'node-fetch';
 
-const ALPACA_BASE = 'https://paper-api.alpaca.markets';
 const YAHOO_FINANCE_URL = 'https://query1.finance.yahoo.com/v8/finance/chart';
 
 const WATCHLIST = ['AAPL', 'MSFT', 'NVDA', 'GOOG', 'AMZN', 'META', 'TSLA', 'AMD', 'AVGO', 'CRM'];
@@ -586,54 +585,9 @@ function analyzeLatest(symbol, data, marketRegime = null, stockAlerts = []) {
   };
 }
 
-// ==================== ALPACA INTEGRATION ====================
-
-async function alpacaRequest(endpoint, method = 'GET', body = null) {
-  const headers = {
-    'APCA-API-KEY-ID': process.env.ALPACA_API_KEY,
-    'APCA-API-SECRET-KEY': process.env.ALPACA_SECRET_KEY,
-    'Content-Type': 'application/json'
-  };
-
-  const config = { method, headers };
-  if (body) config.body = JSON.stringify(body);
-
-  const res = await fetch(`${ALPACA_BASE}${endpoint}`, config);
-  const json = await res.json();
-
-  if (!res.ok) {
-    console.error(`Alpaca error on ${endpoint}:`, json);
-    throw new Error(`Alpaca API error: ${json.message || 'Unknown'}`);
-  }
-
-  return json;
-}
-
-async function getAccount() {
-  return alpacaRequest('/v2/account');
-}
-
-async function getPositions() {
-  return alpacaRequest('/v2/positions');
-}
-
-async function getOrders() {
-  return alpacaRequest('/v2/orders?status=open');
-}
-
-async function placeOrder(symbol, qty, side, orderType = 'market') {
-  return alpacaRequest('/v2/orders', 'POST', {
-    symbol,
-    qty,
-    side,
-    type: orderType,
-    time_in_force: 'day'
-  });
-}
-
-async function closePosition(symbol) {
-  return alpacaRequest(`/v2/positions/${symbol}`, 'DELETE');
-}
+// ==================== KV VIRTUAL PORTFOLIO ====================
+const STOCK_PORTFOLIO_KEY = "di:virtual:stock-portfolio";
+const STOCK_INITIAL_CASH = 100000; // $100,000 가상 자금
 
 // ==================== TELEGRAM REPORTING ====================
 
@@ -669,27 +623,39 @@ export default async function handler(req, res) {
 
     console.log('Starting stock auto-trading cron (30min interval)...');
 
-    // ── KV에서 market-monitor 레짐 데이터 로드 ──
+    // ── KV 연결 + 가상 포트폴리오 로드 ──
+    let kvModule, kv;
     let marketRegime = null;
     let monitorAlerts = [];
     try {
-      const kvModule = await import("@vercel/kv");
-      const kv = kvModule.kv;
+      kvModule = await import("@vercel/kv");
+      kv = kvModule.kv;
       marketRegime = await kv.get("di:market:regime");
       monitorAlerts = (await kv.get("di:market:alerts")) || [];
       if (marketRegime) {
         console.log(`📡 마켓 모니터 레짐: ${marketRegime.regime} (H=${marketRegime.avgHurst?.toFixed(2)})`);
       }
     } catch {
-      console.log("⚠️ KV 미연결 — 기본 모드");
+      console.log("❌ KV 연결 실패 — 매매 불가");
+      return res.status(200).json({ ok: false, error: "KV connection failed" });
     }
 
-    const account = await getAccount();
-    const positions = await getPositions();
-    const startEquity = parseFloat(account.equity);
-    const startCash = parseFloat(account.cash);
+    let portfolio = await kv.get(STOCK_PORTFOLIO_KEY);
+    if (!portfolio) {
+      portfolio = {
+        cash: STOCK_INITIAL_CASH,
+        initialCash: STOCK_INITIAL_CASH,
+        positions: {}, // { "AAPL": { qty: 10, avgPrice: 180.5, entryTime: "..." } }
+        totalTrades: 0,
+        createdAt: new Date().toISOString(),
+      };
+      await kv.set(STOCK_PORTFOLIO_KEY, portfolio);
+      console.log(`🆕 주식 가상 포트폴리오 생성: $${STOCK_INITIAL_CASH.toLocaleString()}`);
+    }
 
-    console.log(`Account: $${startEquity.toFixed(2)} equity, $${startCash.toFixed(2)} cash`);
+    // ── 포지션 가치 계산용 — 현재가 필요 ──
+    const positions = []; // 텔레그램 리포트용 포지션 배열
+    let totalMarketValue = 0;
 
     const signals = [];
     const orders = [];
@@ -709,81 +675,84 @@ export default async function handler(req, res) {
 
       signals.push(analysis);
 
-      const existingPos = positions.find(p => p.symbol === symbol);
+      const existingPos = portfolio.positions[symbol];
+      const currentPrice = analysis.lastClose;
 
-      // BUY signal
+      // 기존 포지션 정보를 positions 배열에 추가 (텔레그램 리포트용)
+      if (existingPos && existingPos.qty > 0) {
+        const mv = existingPos.qty * currentPrice;
+        const costBasis = existingPos.qty * existingPos.avgPrice;
+        totalMarketValue += mv;
+        positions.push({
+          symbol,
+          qty: existingPos.qty,
+          avg_entry_price: existingPos.avgPrice,
+          current_price: currentPrice,
+          market_value: mv,
+          cost_basis: costBasis,
+          unrealized_pl: mv - costBasis,
+          unrealized_plpc: costBasis > 0 ? (mv - costBasis) / costBasis : 0,
+        });
+      }
+
+      // BUY signal — 가상매매
       if (analysis.buySignal && !existingPos) {
+        const startEquity = portfolio.cash + totalMarketValue;
         const maxEquity = startEquity * MAX_EQUITY_PER_STOCK;
-        const currentStockExposure = positions.reduce((sum, p) => sum + (parseFloat(p.market_value) || 0), 0);
         const totalAllowed = startEquity * MAX_TOTAL_STOCK_EXPOSURE;
 
-        if (currentStockExposure + maxEquity <= totalAllowed) {
-          const qty = Math.floor(maxEquity / analysis.lastClose);
+        if (totalMarketValue + maxEquity <= totalAllowed && portfolio.cash >= maxEquity) {
+          const qty = Math.floor(maxEquity / currentPrice);
           if (qty > 0) {
-            try {
-              const order = await placeOrder(symbol, qty, 'buy');
-              orders.push({
-                symbol,
-                side: 'BUY',
-                qty,
-                price: analysis.lastClose,
-                status: 'placed'
-              });
-              totalTradeValue += qty * analysis.lastClose;
-              console.log(`BUY ${qty} ${symbol} @ $${analysis.lastClose.toFixed(2)}`);
-            } catch (error) {
-              console.error(`Buy order failed for ${symbol}:`, error.message);
-            }
+            const tradeAmount = qty * currentPrice;
+            portfolio.positions[symbol] = { qty, avgPrice: currentPrice, entryTime: new Date().toISOString() };
+            portfolio.cash -= tradeAmount;
+            portfolio.totalTrades = (portfolio.totalTrades || 0) + 1;
+            totalMarketValue += tradeAmount;
+            orders.push({ symbol, side: 'BUY', qty, price: currentPrice, status: 'filled' });
+            totalTradeValue += tradeAmount;
+            console.log(`🟢 BUY ${qty} ${symbol} @ $${currentPrice.toFixed(2)} ($${tradeAmount.toFixed(0)})`);
           }
         }
       }
 
-      // SELL signal
-      if (analysis.sellSignal && existingPos) {
-        try {
-          await closePosition(symbol);
-          orders.push({
-            symbol,
-            side: 'SELL',
-            qty: existingPos.qty,
-            price: analysis.lastClose,
-            status: 'closed'
-          });
-          console.log(`SELL ${existingPos.qty} ${symbol} @ $${analysis.lastClose.toFixed(2)}`);
-        } catch (error) {
-          console.error(`Sell order failed for ${symbol}:`, error.message);
-        }
+      // SELL signal — 가상매매
+      if (analysis.sellSignal && existingPos && existingPos.qty > 0) {
+        const sellValue = existingPos.qty * currentPrice;
+        const costBasis = existingPos.qty * existingPos.avgPrice;
+        const realizedPL = sellValue - costBasis;
+        portfolio.cash += sellValue;
+        delete portfolio.positions[symbol];
+        portfolio.totalTrades = (portfolio.totalTrades || 0) + 1;
+        orders.push({ symbol, side: 'SELL', qty: existingPos.qty, price: currentPrice, status: 'filled', pnl: realizedPL });
+        console.log(`🔴 SELL ${existingPos.qty} ${symbol} @ $${currentPrice.toFixed(2)} (P&L: ${realizedPL >= 0 ? '+' : ''}$${realizedPL.toFixed(2)})`);
       }
 
-      // Trailing stop-loss
-      if (existingPos) {
-        const entryPrice = parseFloat(existingPos.avg_entry_price);
-        const currentPrice = analysis.lastClose;
+      // Trailing stop-loss — 가상매매
+      if (existingPos && existingPos.qty > 0 && !analysis.sellSignal) {
+        const entryPrice = existingPos.avgPrice;
         const pnlPercent = (currentPrice - entryPrice) / entryPrice;
 
         if (pnlPercent < TRAILING_STOP_LOSS) {
-          try {
-            await closePosition(symbol);
-            orders.push({
-              symbol,
-              side: 'SELL (SL)',
-              qty: existingPos.qty,
-              price: currentPrice,
-              reason: `Trailing SL: ${(pnlPercent * 100).toFixed(2)}%`
-            });
-            console.log(`SELL ${existingPos.qty} ${symbol} (trailing SL) @ $${currentPrice.toFixed(2)}`);
-          } catch (error) {
-            console.error(`Stop-loss sell failed for ${symbol}:`, error.message);
-          }
+          const sellValue = existingPos.qty * currentPrice;
+          const realizedPL = sellValue - (existingPos.qty * entryPrice);
+          portfolio.cash += sellValue;
+          delete portfolio.positions[symbol];
+          portfolio.totalTrades = (portfolio.totalTrades || 0) + 1;
+          orders.push({ symbol, side: 'SELL (SL)', qty: existingPos.qty, price: currentPrice, reason: `Trailing SL: ${(pnlPercent * 100).toFixed(2)}%`, pnl: realizedPL });
+          console.log(`🛑 SELL ${existingPos.qty} ${symbol} (SL ${(pnlPercent * 100).toFixed(1)}%) @ $${currentPrice.toFixed(2)}`);
         }
       }
     }
 
+    // ── 가상 포트폴리오 KV 저장 ──
+    await kv.set(STOCK_PORTFOLIO_KEY, portfolio);
+    const startEquity = portfolio.cash + totalMarketValue;
+    const startCash = portfolio.cash;
+    console.log(`💾 주식 포트폴리오 저장: 현금 $${startCash.toFixed(0)}, 포지션 ${Object.keys(portfolio.positions).length}종목, 총자산 $${startEquity.toFixed(0)}`);
+
     // ── 주식 봇별 성과 KV 저장 ──
     try {
-      const kvModule = await import("@vercel/kv");
-      const kv = kvModule.kv;
-
       // 주식 봇 ID 목록 (AutoTrading.jsx의 STOCK_BOTS와 동기화)
       const STOCK_BOT_IDS = ["us-stable", "us-balanced", "us-aggressive", "us-trend", "us-meanrev"];
 
@@ -841,10 +810,14 @@ export default async function handler(req, res) {
     const cashPct = startEquity > 0 ? ((startCash / startEquity) * 100).toFixed(1) : '0.0';
     const investedPct = (100 - parseFloat(cashPct)).toFixed(1);
 
-    // 일간 P&L 계산 (이전 자산 대비)
-    const dayPnL = parseFloat(account.equity) - parseFloat(account.last_equity || account.equity);
-    const dayPnLPct = parseFloat(account.last_equity) > 0 ? (dayPnL / parseFloat(account.last_equity) * 100) : 0;
+    // 일간 P&L 계산 (이전 자산 대비 — KV에서 이전 equity 로드)
+    const prevEquityKey = "di:virtual:stock-prev-equity";
+    const prevEquity = (await kv.get(prevEquityKey)) || startEquity;
+    const dayPnL = startEquity - prevEquity;
+    const dayPnLPct = prevEquity > 0 ? (dayPnL / prevEquity * 100) : 0;
     const dayPnLIcon = dayPnL >= 0 ? '📈' : '📉';
+    // 현재 equity를 다음 실행용으로 저장
+    await kv.set(prevEquityKey, startEquity);
 
     let report = `📊 *DI금융 주식 자동매매 리포트*\n`;
     report += `━━━━━━━━━━━━━━━━━━\n`;
