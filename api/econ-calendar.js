@@ -286,8 +286,8 @@ function getCuratedEvents2026() {
     { date: "2026-03-28", event: "PCE Price Index (YoY)", actual: 2.5, estimate: 2.5, previous: 2.5, impact: "High", unit: "%", type: "PCE" },
 
     // ── April 2026 ──
-    { date: "2026-04-03", event: "Nonfarm Payrolls", actual: null, estimate: 170, previous: 151, impact: "High", unit: "K", type: "NFP" },
-    { date: "2026-04-03", event: "Unemployment Rate", actual: null, estimate: 4.1, previous: 4.1, impact: "High", unit: "%", type: "NFP" },
+    { date: "2026-04-03", event: "Nonfarm Payrolls", actual: 178, estimate: 170, previous: 151, impact: "High", unit: "K", type: "NFP" },
+    { date: "2026-04-03", event: "Unemployment Rate", actual: 4.3, estimate: 4.1, previous: 4.1, impact: "High", unit: "%", type: "NFP" },
     { date: "2026-04-10", event: "CPI (YoY)", actual: null, estimate: 2.8, previous: 2.4, impact: "High", unit: "%", type: "CPI" },
     { date: "2026-04-10", event: "Core CPI (YoY)", actual: null, estimate: 2.6, previous: 2.5, impact: "High", unit: "%", type: "CPI" },
     { date: "2026-04-16", event: "Retail Sales (MoM)", actual: null, estimate: 0.3, previous: 0.2, impact: "High", unit: "%", type: "경제지표" },
