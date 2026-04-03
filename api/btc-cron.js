@@ -37,6 +37,9 @@ const CC_SYMBOLS = {
   "MATIC/USD": "MATIC",
 };
 
+// 딜레이 헬퍼 (CryptoCompare rate limit 우회)
+const delay = (ms) => new Promise(r => setTimeout(r, ms));
+
 // CryptoCompare OHLCV 캔들 로드 헬퍼 (미국 접근 가능)
 async function fetchCCKlines(symbol, interval, limit) {
   // interval: "1d" → histoday, "4h" → histohour (aggregate=4), "1h" → histohour
@@ -258,80 +261,45 @@ export default async function handler(req, res) {
 
     for (const asset of CRYPTO_ASSETS) {
       addLog(`\n📊 ${asset} 스캔 중...`);
-      const binSymbol = BINANCE_SYMBOLS[asset];
       const ccSymbol = CC_SYMBOLS[asset];
 
-      // ── 캔들 데이터 로드 (Binance → CryptoCompare 폴백) ──
+      // ── 캔들 데이터 로드 (CryptoCompare — Binance/Bybit 미국 차단) ──
       let candles = [];
       let candleSource = "none";
 
-      // 일봉: Binance 시도
-      try {
-        const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${binSymbol}&interval=1d&limit=365`, { signal: AbortSignal.timeout(5000) });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const raw = await res.json();
-        if (!Array.isArray(raw)) throw new Error("Not array");
-        candles = raw.map(k => ({
-          time: Math.floor(k[0] / 1000),
-          open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]),
-          close: parseFloat(k[4]), volume: parseFloat(k[5]),
-        })).filter(c => c.close > 0 && c.high > 0 && c.low > 0);
-        if (candles.length > 50) candleSource = "binance";
-      } catch { /* Binance 실패 → CryptoCompare */ }
-
-      // CryptoCompare 폴백 (일봉)
-      if (candles.length < 100 && ccSymbol) {
+      // 일봉: CryptoCompare (rate limit 우회 딜레이 포함)
+      if (ccSymbol) {
         try {
           candles = await fetchCCKlines(ccSymbol, "1d", 365);
           if (candles.length > 50) candleSource = "cryptocompare";
         } catch (e) {
-          addLog(`⚠️ ${asset} CryptoCompare 일봉도 실패: ${e.message}`);
+          addLog(`⚠️ ${asset} CryptoCompare 일봉 실패: ${e.message}`);
         }
       }
 
       if (candles.length < 100) {
         addLog(`❌ ${asset} 캔들 부족 (${candles.length}개 < 100개) — 스킵`);
         assetResults.push({ asset, ok: false, error: "Insufficient candle data" });
+        await delay(1500); // rate limit 방지 (실패 후 길게 대기)
         continue;
       }
 
-      // 4시간봉 로드 (Binance → CryptoCompare 폴백)
+      // 4시간봉 로드 (CryptoCompare)
       let candles4h = [];
-      try {
-        const res4h = await fetch(`https://api.binance.com/api/v3/klines?symbol=${binSymbol}&interval=4h&limit=500`, { signal: AbortSignal.timeout(5000) });
-        if (res4h.ok) {
-          const raw4h = await res4h.json();
-          if (Array.isArray(raw4h)) {
-            candles4h = raw4h.map(k => ({
-              time: Math.floor(k[0] / 1000),
-              open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]),
-              close: parseFloat(k[4]), volume: parseFloat(k[5]),
-            })).filter(c => c.close > 0 && c.high > 0 && c.low > 0);
-          }
-        }
-      } catch { /* Binance 4h 실패 */ }
-      if (candles4h.length < 50 && ccSymbol) {
+      await delay(700); // rate limit 방지
+      if (ccSymbol) {
         try { candles4h = await fetchCCKlines(ccSymbol, "4h", 500); } catch { /* skip */ }
       }
 
-      // 1시간봉 로드 (Binance → CryptoCompare 폴백)
+      // 1시간봉 로드 (CryptoCompare)
       let candles1h = [];
-      try {
-        const res1h = await fetch(`https://api.binance.com/api/v3/klines?symbol=${binSymbol}&interval=1h&limit=500`, { signal: AbortSignal.timeout(5000) });
-        if (res1h.ok) {
-          const raw1h = await res1h.json();
-          if (Array.isArray(raw1h)) {
-            candles1h = raw1h.map(k => ({
-              time: Math.floor(k[0] / 1000),
-              open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]),
-              close: parseFloat(k[4]), volume: parseFloat(k[5]),
-            })).filter(c => c.close > 0 && c.high > 0 && c.low > 0);
-          }
-        }
-      } catch { /* Binance 1h 실패 */ }
-      if (candles1h.length < 50 && ccSymbol) {
+      await delay(700); // rate limit 방지
+      if (ccSymbol) {
         try { candles1h = await fetchCCKlines(ccSymbol, "1h", 500); } catch { /* skip */ }
       }
+
+      // 다음 자산 전 rate limit 방지 딜레이
+      await delay(500);
 
       addLog(`✅ ${asset} [${candleSource}]: 일봉 ${candles.length}개 + 4h ${candles4h.length}개 + 1h ${candles1h.length}개 (최신: $${candles[candles.length - 1]?.close?.toFixed(0)})`);
 
