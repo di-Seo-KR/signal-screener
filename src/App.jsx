@@ -10753,13 +10753,7 @@ function AppInner() {
                     return `${JSON.parse(localStorage.getItem(k) || "[]").length}개`;
                   } catch { return "0개"; }
                 })(), action: () => setTab("auto-trading") },
-                { label: "알파카 연동", value: (() => {
-                  try {
-                    const prefix = `di_${user.id.slice(0, 8)}_`;
-                    const cfg = JSON.parse(localStorage.getItem(`${prefix}alpaca_config`) || "null");
-                    return cfg?.apiKey ? "연결됨" : "미연결";
-                  } catch { return "미연결"; }
-                })() },
+                { label: "가상 포트폴리오", value: "운영중", action: () => setTab("auto-trading") },
               ].map((item, i) => (
                 <div key={i} onClick={item.action} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",

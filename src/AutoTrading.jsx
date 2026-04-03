@@ -625,11 +625,10 @@ function BotCatalog({ onActivate, theme, isMobile }) {
   );
 }
 
-// ── 알파카 페이퍼트레이딩 실제 데이터 로드 ──
-function useAlpacaRealData(userId) {
-  const [account, setAccount] = useState(null);
-  const [equityHistory, setEquityHistory] = useState([]); // [{timestamp, equity}]
-  const [tradeLog, setTradeLog] = useState([]);
+// ── KV 가상 포트폴리오 데이터 로드 (주식 + 크립토 통합) ──
+function useVirtualPortfolio(userId) {
+  const [cryptoPortfolio, setCryptoPortfolio] = useState(null);
+  const [stockPortfolio, setStockPortfolio] = useState(null);
   const [loading, setLoading] = useState(false);
   const fetched = useRef(false);
 
@@ -637,56 +636,26 @@ function useAlpacaRealData(userId) {
     if (!userId || fetched.current) return;
     fetched.current = true;
 
-    // 1) localStorage에서 알파카 config 가져오기
-    const prefix = `di_${userId.slice(0, 8)}_`;
-    let config;
-    try { config = JSON.parse(localStorage.getItem(`${prefix}alpaca_config`) || "null"); } catch {}
-    if (!config?.apiKey || !config?.apiSecret) return;
-
-    // 2) localStorage에서 trade log 가져오기 (주식 + 크립토)
-    try {
-      const stockLog = JSON.parse(localStorage.getItem(`${prefix}trade_log_v3`) || "[]");
-      const cryptoLog = JSON.parse(localStorage.getItem(`${prefix}trade_log_v2`) || "[]");
-      setTradeLog([...stockLog, ...cryptoLog].sort((a, b) => new Date(b.time || 0) - new Date(a.time || 0)));
-    } catch {}
-
-    // 3) 알파카 API에서 계좌 + 포트폴리오 히스토리 가져오기
-    const headers = {
-      "Content-Type": "application/json",
-      "x-alpaca-key": config.apiKey,
-      "x-alpaca-secret": config.apiSecret,
-      "x-alpaca-paper": String(config.isPaper !== false),
-    };
-
     setLoading(true);
-
-    Promise.allSettled([
-      fetch("/api/alpaca?action=account", { headers }).then(r => r.json()),
-      fetch("/api/alpaca?action=portfolio_history&period=1M&timeframe=1D", { headers }).then(r => r.json()),
-    ]).then(([accRes, histRes]) => {
-      if (accRes.status === "fulfilled" && accRes.value?.equity) {
-        setAccount(accRes.value);
-      }
-      if (histRes.status === "fulfilled" && histRes.value?.equity && histRes.value?.timestamp) {
-        const hist = histRes.value.timestamp.map((ts, i) => ({
-          timestamp: ts * 1000,
-          equity: histRes.value.equity[i],
-          profitLoss: histRes.value.profit_loss?.[i] || 0,
-          profitLossPct: histRes.value.profit_loss_pct?.[i] || 0,
-        }));
-        setEquityHistory(hist);
-      }
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    fetch(`/api/virtual-portfolio?type=all`)
+      .then(r => r.json())
+      .then(data => {
+        if (data?.ok) {
+          setCryptoPortfolio(data.cryptoPortfolio || null);
+          setStockPortfolio(data.stockPortfolio || null);
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, [userId]);
 
-  return { account, equityHistory, tradeLog, loading };
+  return { cryptoPortfolio, stockPortfolio, loading };
 }
 
-// ── 운영 중 봇 대시보드 (실제 알파카 데이터 기반) ──
+// ── 운영 중 봇 대시보드 (KV 가상 포트폴리오 데이터 기반) ──
 function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, theme, userId, isMobile }) {
   const c = colors[theme];
-  const { account, equityHistory, tradeLog, loading } = useAlpacaRealData(userId);
+  const { cryptoPortfolio, stockPortfolio, loading } = useVirtualPortfolio(userId);
   const activeBotScrollRef = useRef(null);
   const [activeBotIdx, setActiveBotIdx] = useState(0);
 
@@ -708,63 +677,20 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
 
   if (!activeBots || activeBots.length === 0) return null;
 
-  // 실제 데이터 기반 지표 계산
-  const totalTrades = tradeLog.length;
-  const filledTrades = tradeLog.filter(t => t.status === "filled" || t.status === "accepted" || t.type);
-  const winTrades = tradeLog.filter(t => (t.pnl != null && parseFloat(t.pnl) > 0));
-  const realWinRate = filledTrades.length > 0 ? (winTrades.length / filledTrades.length * 100) : null;
-
-  // 에쿼티 커브 → 차트 데이터 (100 기준 정규화)
-  const equityChartData = useMemo(() => {
-    if (equityHistory.length >= 2) {
-      const base = equityHistory[0].equity;
-      return equityHistory.map(h => (h.equity / base) * 100);
-    }
-    // 알파카 히스토리가 없으면 trade log에서 누적 P&L 커브 생성
-    if (tradeLog.length > 0) {
-      const sorted = [...tradeLog].filter(t => t.time && t.pnl != null).sort((a, b) => new Date(a.time) - new Date(b.time));
-      if (sorted.length >= 2) {
-        let cum = 100;
-        const curve = [100];
-        for (const t of sorted) {
-          cum += parseFloat(t.pnl || 0) * 0.01; // 정규화
-          curve.push(cum);
-        }
-        return curve;
-      }
-    }
-    return null; // 데이터 없음
-  }, [equityHistory, tradeLog]);
-
-  // 현재 수익률 (NaN 방지)
-  const currentReturn = (() => {
-    if (account) {
-      const eq = parseFloat(account.equity);
-      const lastEq = parseFloat(account.last_equity || account.equity);
-      if (!lastEq || !isFinite(lastEq)) return null;
-      const ret = ((eq - lastEq) / lastEq * 100);
-      return isFinite(ret) ? ret : null;
-    }
-    if (equityHistory.length >= 2) {
-      const first = equityHistory[0].equity;
-      const last = equityHistory[equityHistory.length - 1].equity;
-      if (!first || !isFinite(first)) return null;
-      const ret = ((last - first) / first * 100);
-      return isFinite(ret) ? ret : null;
-    }
-    return null;
+  // 통합 포트폴리오 지표 계산 (주식 + 크립토)
+  const totalTrades = (stockPortfolio?.totalTrades || 0) + (cryptoPortfolio?.totalTrades || 0);
+  const totalPLPct = (() => {
+    const stockPL = stockPortfolio?.totalPLPct || 0;
+    const cryptoPL = cryptoPortfolio?.totalPLPct || 0;
+    const stockEquity = stockPortfolio?.totalMarketValue || 0;
+    const cryptoEquity = cryptoPortfolio?.totalMarketValue || 0;
+    const totalEquity = stockEquity + cryptoEquity;
+    if (totalEquity === 0) return 0;
+    return ((stockPL * stockEquity + cryptoPL * cryptoEquity) / totalEquity);
   })();
-
-  const totalEquity = account ? parseFloat(account.equity) : null;
-  const totalPL = account ? (parseFloat(account.equity) - (parseFloat(account.last_equity) || parseFloat(account.equity))) : null;
-
-  // 날짜 라벨 생성
-  const dateLabels = useMemo(() => {
-    if (equityHistory.length < 2) return [];
-    const step = Math.max(1, Math.floor(equityHistory.length / 5));
-    return equityHistory.filter((_, i) => i % step === 0 || i === equityHistory.length - 1)
-      .map(h => new Date(h.timestamp).toLocaleDateString("ko-KR", { month: "short", day: "numeric" }));
-  }, [equityHistory]);
+  const totalEquity = (stockPortfolio?.totalMarketValue || 0) + (cryptoPortfolio?.totalMarketValue || 0);
+  const totalPL = (stockPortfolio?.totalPL || 0) + (cryptoPortfolio?.totalPL || 0);
+  const dayPL = (stockPortfolio?.dayPL || 0) + (cryptoPortfolio?.dayPL || 0);
 
   return (
     <div style={{ marginBottom: "32px" }}>
@@ -779,22 +705,22 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
         </div>
       </div>
 
-      {/* 종합 계좌 요약 (알파카 실데이터) */}
-      {account && (
+      {/* 종합 포트폴리오 요약 (KV 가상 포트폴리오) */}
+      {(stockPortfolio || cryptoPortfolio) && (
         <div style={{
           background: `linear-gradient(135deg, ${c.card} 0%, ${totalPL >= 0 ? c.green : c.red}10 100%)`,
           border: `1px solid ${c.border}`, borderRadius: "16px", padding: isMobile ? "16px 12px" : "20px", marginBottom: "16px",
         }}>
-          <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "8px" }}>알파카 페이퍼트레이딩 계좌</div>
+          <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "8px" }}>DI 가상 포트폴리오</div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: isMobile ? "10px" : "12px" }}>
             <div>
               <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3 }}>총 자산</div>
-              <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 800, color: c.text1 }}>${totalEquity?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+              <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 800, color: c.text1 }}>${totalEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
             </div>
             <div>
               <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3 }}>오늘 P&L</div>
-              <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 800, color: totalPL >= 0 ? c.green : c.red }}>
-                {totalPL >= 0 ? "+" : ""}${totalPL?.toFixed(2)}
+              <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 800, color: dayPL >= 0 ? c.green : c.red }}>
+                {dayPL >= 0 ? "+" : ""}${dayPL.toFixed(2)}
               </div>
             </div>
             <div>
@@ -802,34 +728,12 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
               <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 800, color: c.text1 }}>{totalTrades}건</div>
             </div>
             <div>
-              <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3 }}>실제 승률</div>
-              <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 800, color: realWinRate != null && realWinRate >= 50 ? c.green : c.red }}>
-                {realWinRate != null ? `${realWinRate.toFixed(1)}%` : "—"}
+              <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3 }}>누적 수익률</div>
+              <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 800, color: totalPLPct >= 0 ? c.green : c.red }}>
+                {totalPLPct >= 0 ? "+" : ""}{totalPLPct.toFixed(2)}%
               </div>
             </div>
           </div>
-
-          {/* 실제 에쿼티 커브 */}
-          {equityChartData && equityChartData.length >= 2 && (
-            <div style={{ marginTop: "16px", background: c.card2, borderRadius: "10px", padding: isMobile ? "10px 8px" : "12px 14px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                <span style={{ fontSize: "11px", fontWeight: 700, color: c.text3 }}>
-                  {equityHistory.length >= 2 ? "실제 에쿼티 커브 (1개월)" : "누적 P&L 커브"}
-                </span>
-                {currentReturn != null && (
-                  <span style={{ fontSize: "13px", fontWeight: 800, color: currentReturn >= 0 ? c.green : c.red }}>
-                    {currentReturn >= 0 ? "+" : ""}{currentReturn.toFixed(2)}%
-                  </span>
-                )}
-              </div>
-              <MiniEquityChart data={equityChartData} color={currentReturn >= 0 ? c.green : c.red} theme={theme} />
-              {dateLabels.length > 0 && (
-                <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px" }}>
-                  {dateLabels.map((l, i) => <span key={i} style={{ fontSize: "9px", color: c.text3 }}>{l}</span>)}
-                </div>
-              )}
-            </div>
-          )}
         </div>
       )}
 
@@ -854,58 +758,12 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
           const hours = Math.floor((elapsed % 86400000) / 3600000);
           const isStock = STOCK_BOTS.some(b => b.id === ab.botId);
 
-          // 해당 봇의 실제 거래 로그 필터링 (개선된 로직)
-          const botTradeLog = tradeLog.filter(t => {
-            if (isStock) {
-              // 주식: "/" 없고, BTC/ETH/SOL/BNB/XRP 포함 안 함
-              const isCrypto = t.symbol?.includes("/") ||
-                             t.symbol?.includes("BTC") ||
-                             t.symbol?.includes("ETH") ||
-                             t.symbol?.includes("SOL") ||
-                             t.symbol?.includes("BNB") ||
-                             t.symbol?.includes("XRP");
-              return !isCrypto;
-            }
-            // 크립토: BTC/USD, ETH/USD, SOL/USD 등 또는 BTC, ETH 등이름 포함
-            return t.symbol?.includes("/") ||
-                   t.symbol?.includes("BTC") ||
-                   t.symbol?.includes("ETH") ||
-                   t.symbol?.includes("SOL") ||
-                   t.symbol?.includes("BNB") ||
-                   t.symbol?.includes("XRP");
-          });
-          const botTrades = botTradeLog.length;
-
-          // 봇별 실제 누적 P&L 차트 데이터 생성
-          // 봇 배분 비율 계산 (전체 배분 대비 이 봇의 비중)
-          const totalAllocated = activeBots.reduce((s, b) => s + (b.allocation || 0), 0);
-          const botAllocRatio = (ab.allocation && totalAllocated > 0) ? (ab.allocation / totalAllocated) : (1 / activeBots.length);
-          // 봇 시작 시간 이후의 데이터만 사용
-          const botStartTime = ab.startedAt || Date.now();
+          // 봇별 실제 누적 P&L 차트 데이터 생성 (KV bot performance 기반)
+          const botPerf = allBotPerf[ab.botId];
           const botPnlCurve = (() => {
-            // 1순위: 실제 trade log에서 P&L 커브 (봇 시작 이후만)
-            const withPnl = botTradeLog
-              .filter(t => t.time && t.pnl != null && new Date(t.time).getTime() >= botStartTime)
-              .sort((a, b) => new Date(a.time) - new Date(b.time));
-            if (withPnl.length >= 2) {
-              let cum = 0;
-              const curve = [0];
-              for (const t of withPnl) {
-                cum += parseFloat(t.pnl || 0);
-                curve.push(cum);
-              }
-              const initEquity = ab.allocation || 10000;
-              return { data: curve.map(v => 100 + (v / initEquity) * 100), source: "trade_log" };
-            }
-            // 2순위: 알파카 포트폴리오 히스토리 (봇 시작 이후만, 배분 비율 적용)
-            if (equityHistory.length >= 2 && activeBots.length > 0) {
-              const filtered = equityHistory.filter(h => new Date(h.timestamp).getTime() >= botStartTime);
-              if (filtered.length >= 2) {
-                const base = filtered[0].equity;
-                // 크립토/주식 봇 구분: 크립토는 배분 비율을 더 신중하게 적용
-                const adjustedRatio = isStock ? botAllocRatio : Math.min(botAllocRatio, 0.3); // 크립토는 최대 30% 가중
-                return { data: filtered.map(h => 100 + ((h.equity - base) * adjustedRatio / base) * 100), source: "alpaca" };
-              }
+            // KV bot performance 데이터에서 봇별 P&L 커브 가져오기
+            if (botPerf?.equityCurve && botPerf.equityCurve.length >= 2) {
+              return { data: botPerf.equityCurve, source: "kv_bot_perf" };
             }
             // 데이터 없음 — 봇 시작 직후라 아직 데이터 수집 중
             return { data: [], source: "none", collecting: true };
@@ -914,57 +772,10 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
           const pnlData = botPnlCurve?.data || [];
           const pnlSource = botPnlCurve?.source || "none";
 
-          const botReturn = pnlData.length >= 2 && pnlData[0] !== 0
-            ? ((pnlData[pnlData.length - 1] - pnlData[0]) / Math.abs(pnlData[0]) * 100)
-            : pnlData.length >= 2 && ab.allocation
-              ? ((pnlData[pnlData.length - 1] - pnlData[0]) / ab.allocation * 100)
-              : null;
-          const safeBotReturn = (botReturn != null && isFinite(botReturn)) ? botReturn : null;
+          // KV bot performance 데이터 활용
+          const botPnlPct = botPerf?.totalPLPct ?? null;
+          const safeBotReturn = botPerf?.totalReturn ?? null;
           const botIsPositive = safeBotReturn != null ? safeBotReturn >= 0 : true;
-
-          // 봇 P&L 퍼센트 계산 (봇 시작 이후, 배분 금액 기준)
-          const botPnlPct = (() => {
-            const alloc = ab.allocation || 0;
-            if (!alloc) return null;
-            // trade log 기반
-            const withPnl = botTradeLog.filter(t => t.pnl != null && t.time && new Date(t.time).getTime() >= botStartTime);
-            if (withPnl.length > 0) {
-              const totalPnl = withPnl.reduce((s, t) => s + parseFloat(t.pnl || 0), 0);
-              const pct = (totalPnl / alloc) * 100;
-              return isFinite(pct) ? pct : null;
-            }
-            // 에쿼티 히스토리 기반 (봇 시작 이후)
-            if (equityHistory.length >= 2) {
-              const filtered = equityHistory.filter(h => new Date(h.timestamp).getTime() >= botStartTime);
-              if (filtered.length >= 2) {
-                const base = filtered[0].equity;
-                const last = filtered[filtered.length - 1].equity;
-                const pct = ((last - base) * botAllocRatio / alloc) * 100;
-                return isFinite(pct) ? pct : null;
-              }
-            }
-            return null;
-          })();
-
-          // 봇 P&L 날짜 라벨
-          const botDateLabels = (() => {
-            const withTime = botTradeLog.filter(t => t.time).sort((a, b) => new Date(a.time) - new Date(b.time));
-            if (withTime.length >= 2) {
-              const first = new Date(withTime[0].time);
-              const last = new Date(withTime[withTime.length - 1].time);
-              return [
-                first.toLocaleDateString("ko-KR", { month: "short", day: "numeric" }),
-                last.toLocaleDateString("ko-KR", { month: "short", day: "numeric" }),
-              ];
-            }
-            if (equityHistory.length >= 2) {
-              return [
-                new Date(equityHistory[0].timestamp).toLocaleDateString("ko-KR", { month: "short", day: "numeric" }),
-                new Date(equityHistory[equityHistory.length - 1].timestamp).toLocaleDateString("ko-KR", { month: "short", day: "numeric" }),
-              ];
-            }
-            return [];
-          })();
 
           return (
             <div key={ab.botId} style={{
@@ -990,7 +801,7 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
               <div style={{ background: c.card2, borderRadius: "10px", padding: isMobile ? "10px 8px" : "12px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px", flexWrap: "wrap", gap: "8px" }}>
                   <span style={{ fontSize: isMobile ? "10px" : "11px", fontWeight: 700, color: c.text3 }}>
-                    {pnlSource === "trade_log" ? "실제 P&L" : pnlSource === "alpaca" ? "계좌 P&L" : "수익률 차트"}
+                    {pnlSource === "trade_log" ? "실제 P&L" : pnlSource === "kv_bot_perf" ? "봇 성과" : "수익률 차트"}
                   </span>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     {botPnlPct != null && (
@@ -1162,10 +973,6 @@ export default function AutoTrading({ theme = "dark", user }) {
   const { showToast } = useAuth();
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
   const [activeBot, setActiveBot] = useState(null);
-  const [showAlpacaSetup, setShowAlpacaSetup] = useState(false);
-  const [alpacaKey, setAlpacaKey] = useState("");
-  const [alpacaSecret, setAlpacaSecret] = useState("");
-  const [alpacaPaper, setAlpacaPaper] = useState(true);
   const [pendingBot, setPendingBot] = useState(null);
 
   // 모바일 반응형 감지
@@ -1177,34 +984,6 @@ export default function AutoTrading({ theme = "dark", user }) {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // 알파카 설정 로드
-  const alpacaPrefix = user ? `di_${user.id.slice(0, 8)}_` : "";
-  const [alpacaConnected, setAlpacaConnected] = useState(() => {
-    if (!user) return false;
-    try {
-      const cfg = JSON.parse(localStorage.getItem(`${alpacaPrefix}alpaca_config`) || "null");
-      return !!(cfg?.apiKey && cfg?.apiSecret);
-    } catch { return false; }
-  });
-
-  const handleSaveAlpaca = useCallback(() => {
-    if (!user || !alpacaKey.trim() || !alpacaSecret.trim()) {
-      showToast("error", "API Key와 Secret Key를 모두 입력해주세요.");
-      return;
-    }
-    try {
-      localStorage.setItem(`${alpacaPrefix}alpaca_config`, JSON.stringify({
-        apiKey: alpacaKey.trim(),
-        apiSecret: alpacaSecret.trim(),
-        isPaper: alpacaPaper,
-      }));
-      setAlpacaConnected(true);
-      setShowAlpacaSetup(false);
-      showToast("success", "알파카 API가 연결되었습니다! 새로고침하면 실제 데이터가 표시됩니다.");
-    } catch (e) {
-      showToast("error", "저장 실패: " + e.message);
-    }
-  }, [user, alpacaKey, alpacaSecret, alpacaPaper, alpacaPrefix, showToast]);
 
   // 운영 중인 봇 목록 (Supabase user_metadata + localStorage 캐시)
   const storageKey = user ? `zepta_${user.id.slice(0,8)}_active_bots` : null;
@@ -1264,25 +1043,6 @@ export default function AutoTrading({ theme = "dark", user }) {
     }, 1000);
   }, [activeBots, user, storageKey]);
 
-  // 알파카 계좌 잔고 로드 (봇 배분 기준)
-  const [alpacaEquity, setAlpacaEquity] = useState(null);
-  useEffect(() => {
-    if (!user || !alpacaConnected) return;
-    const prefix = `di_${user.id.slice(0, 8)}_`;
-    let cfg;
-    try { cfg = JSON.parse(localStorage.getItem(`${prefix}alpaca_config`) || "null"); } catch {}
-    if (!cfg?.apiKey) return;
-    fetch("/api/alpaca?action=account", {
-      headers: {
-        "Content-Type": "application/json",
-        "x-alpaca-key": cfg.apiKey,
-        "x-alpaca-secret": cfg.apiSecret,
-        "x-alpaca-paper": String(cfg.isPaper !== false),
-      },
-    }).then(r => r.json()).then(data => {
-      if (data?.equity) setAlpacaEquity(parseFloat(data.equity));
-    }).catch(() => {});
-  }, [user, alpacaConnected]);
 
   // 수동 배분 모달 상태
   const [allocationInput, setAllocationInput] = useState("");
@@ -1304,11 +1064,9 @@ export default function AutoTrading({ theme = "dark", user }) {
     }
     // 수동 배분 모달 표시
     setPendingBot(bot);
-    // 기본값: 잔고에서 기존 봇 배분액 차감한 잔여 금액
-    const allocatedTotal = activeBots.reduce((sum, ab) => sum + (ab.allocation || 0), 0);
-    const remaining = alpacaEquity ? Math.max(0, Math.floor(alpacaEquity - allocatedTotal)) : 1000;
-    setAllocationInput(String(remaining));
-  }, [user, showToast, activeBots, alpacaEquity]);
+    // 기본값: 1000 USD
+    setAllocationInput("1000");
+  }, [user, showToast, activeBots]);
 
   const handleConfirmAllocation = useCallback(() => {
     if (!pendingBot) return;
@@ -1394,133 +1152,6 @@ export default function AutoTrading({ theme = "dark", user }) {
       }}
     >
       <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
-        {/* 알파카 API 연동 배너 */}
-        {user && !alpacaConnected && (
-          <div style={{
-            background: `linear-gradient(135deg, ${c.card} 0%, ${c.blue}08 100%)`,
-            border: `1px solid ${c.blue}30`, borderRadius: "14px", padding: "16px 20px", marginBottom: "20px",
-            display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: "12px",
-          }}>
-            <div>
-              <div style={{ fontSize: "14px", fontWeight: 700, color: c.text1, marginBottom: "4px" }}>🔗 알파카 페이퍼트레이딩 연동</div>
-              <div style={{ fontSize: "12px", color: c.text3 }}>실제 수익률 데이터를 확인하려면 Alpaca API 키를 연결하세요</div>
-            </div>
-            <button onClick={() => setShowAlpacaSetup(true)} style={{
-              padding: "8px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
-              background: c.blue, color: "#fff", border: "none", cursor: "pointer",
-            }}>API 키 설정</button>
-          </div>
-        )}
-        {user && alpacaConnected && !showAlpacaSetup && (() => {
-          const used = activeBots.reduce((s, ab) => s + (ab.allocation || 0), 0);
-          const left = alpacaEquity != null ? Math.max(0, alpacaEquity - used) : null;
-          return (
-            <div style={{
-              background: `linear-gradient(135deg, ${c.card} 0%, ${c.blue}0A 50%, ${c.green}08 100%)`,
-              border: `1px solid ${c.border}`,
-              borderRadius: "16px", padding: "24px", marginBottom: "20px",
-            }}>
-              {/* 상단: 연동 상태 + 재설정 */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: c.green, boxShadow: `0 0 8px ${c.green}80` }} />
-                  <span style={{ fontSize: "13px", fontWeight: 700, color: c.text1 }}>Alpaca Paper Trading</span>
-                  <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "10px", background: `${c.green}15`, color: c.green, fontWeight: 600 }}>연동됨</span>
-                </div>
-                <button onClick={() => setShowAlpacaSetup(true)} style={{
-                  fontSize: "11px", color: c.text3, background: c.card2, border: `1px solid ${c.border}`, borderRadius: "6px",
-                  padding: "4px 10px", cursor: "pointer",
-                }}>재설정</button>
-              </div>
-
-              {/* 수치 카드 그리드 */}
-              {alpacaEquity != null && (
-                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : (activeBots.length > 0 ? "1fr 1fr 1fr" : "1fr"), gap: isMobile ? "10px" : "12px" }}>
-                  {/* 총 자산 */}
-                  <div style={{
-                    background: c.card, borderRadius: isMobile ? "10px" : "12px", padding: isMobile ? "12px 14px" : "16px 20px",
-                    border: `1px solid ${c.border}`,
-                  }}>
-                    <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3, marginBottom: "6px", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>총 자산</div>
-                    <div style={{ fontSize: isMobile ? "22px" : "28px", fontWeight: 800, color: c.text1, letterSpacing: "-1px" }}>
-                      ${alpacaEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                    </div>
-                  </div>
-                  {/* 배분 완료 */}
-                  {activeBots.length > 0 && (
-                    <div style={{
-                      background: c.card, borderRadius: isMobile ? "10px" : "12px", padding: isMobile ? "12px 14px" : "16px 20px",
-                      border: `1px solid ${c.border}`,
-                    }}>
-                      <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3, marginBottom: "6px", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>봇 배분</div>
-                      <div style={{ fontSize: isMobile ? "22px" : "28px", fontWeight: 800, color: c.orange || c.yellow, letterSpacing: "-1px" }}>
-                        ${used.toLocaleString()}
-                      </div>
-                      <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3, marginTop: "4px" }}>{activeBots.length}개 봇 운영 중</div>
-                    </div>
-                  )}
-                  {/* 잔여 */}
-                  {activeBots.length > 0 && left != null && (
-                    <div style={{
-                      background: c.card, borderRadius: isMobile ? "10px" : "12px", padding: isMobile ? "12px 14px" : "16px 20px",
-                      border: `1px solid ${left > 0 ? c.border : c.red + "30"}`,
-                    }}>
-                      <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3, marginBottom: "6px", fontWeight: 600, letterSpacing: "0.5px", textTransform: "uppercase" }}>잔여 금액</div>
-                      <div style={{ fontSize: isMobile ? "22px" : "28px", fontWeight: 800, color: left > 0 ? c.green : c.red, letterSpacing: "-1px" }}>
-                        ${left.toLocaleString()}
-                      </div>
-                      <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3, marginTop: "4px" }}>
-                        {alpacaEquity > 0 ? `${((left / alpacaEquity) * 100).toFixed(1)}% 가용` : ""}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })()}
-        {/* 알파카 API 키 설정 폼 */}
-        {showAlpacaSetup && (
-          <div style={{
-            background: c.card, border: `1px solid ${c.border}`, borderRadius: isMobile ? "12px" : "16px",
-            padding: isMobile ? "16px 12px" : "24px", marginBottom: "20px",
-          }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <h3 style={{ margin: 0, fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: c.text1 }}>Alpaca API 설정</h3>
-              <button onClick={() => setShowAlpacaSetup(false)} style={{ background: "none", border: "none", color: c.text3, fontSize: "18px", cursor: "pointer", padding: "4px 8px", minHeight: "32px", minWidth: "32px", display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "10px" : "12px" }}>
-              <div>
-                <label style={{ fontSize: isMobile ? "11px" : "12px", fontWeight: 600, color: c.text2, marginBottom: "4px", display: "block" }}>API Key</label>
-                <input value={alpacaKey} onChange={e => setAlpacaKey(e.target.value)} placeholder="PKXXXXXXXXXXXXXXXXXX"
-                  style={{ width: "100%", padding: isMobile ? "12px" : "10px 12px", borderRadius: "8px", border: `1px solid ${c.border}`, background: c.card2, color: c.text1, fontSize: isMobile ? "14px" : "13px", boxSizing: "border-box", outline: "none", minHeight: "44px" }}
-                  onFocus={e => e.target.style.borderColor = c.blue} onBlur={e => e.target.style.borderColor = c.border}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: isMobile ? "11px" : "12px", fontWeight: 600, color: c.text2, marginBottom: "4px", display: "block" }}>Secret Key</label>
-                <input value={alpacaSecret} onChange={e => setAlpacaSecret(e.target.value)} type="password" placeholder="••••••••••••••••••"
-                  style={{ width: "100%", padding: isMobile ? "12px" : "10px 12px", borderRadius: "8px", border: `1px solid ${c.border}`, background: c.card2, color: c.text1, fontSize: isMobile ? "14px" : "13px", boxSizing: "border-box", outline: "none", minHeight: "44px" }}
-                  onFocus={e => e.target.style.borderColor = c.blue} onBlur={e => e.target.style.borderColor = c.border}
-                />
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "6px" : "8px" }}>
-                <input type="checkbox" checked={alpacaPaper} onChange={e => setAlpacaPaper(e.target.checked)} id="alpaca-paper" />
-                <label htmlFor="alpaca-paper" style={{ fontSize: isMobile ? "11px" : "12px", color: c.text2 }}>페이퍼 트레이딩 (테스트 환경)</label>
-              </div>
-              <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3, lineHeight: 1.5 }}>
-                API 키는 브라우저 로컬 스토리지에만 저장되며, 서버로 전송되지 않습니다.
-                <br />
-                <a href="https://app.alpaca.markets/paper/dashboard/overview" target="_blank" rel="noopener noreferrer" style={{ color: c.blue }}>Alpaca 대시보드에서 API 키 발급 →</a>
-              </div>
-              <button onClick={handleSaveAlpaca} style={{
-                padding: isMobile ? "14px 12px" : "12px", borderRadius: "10px", fontSize: isMobile ? "13px" : "14px", fontWeight: 700,
-                background: c.blue, color: "#fff", border: "none", cursor: "pointer", minHeight: "44px", width: "100%",
-              }}>저장</button>
-            </div>
-          </div>
-        )}
-
         {/* 수동 배분 모달 */}
         {pendingBot && (
           <div style={{
@@ -1539,21 +1170,16 @@ export default function AutoTrading({ theme = "dark", user }) {
                   <span style={{ fontSize: isMobile ? "11px" : "12px", color: c.text2 }}>투입 금액을 설정해주세요</span>
                 </div>
               </div>
-              {alpacaEquity != null && (() => {
+              {(() => {
                 const used = activeBots.reduce((s, ab) => s + (ab.allocation || 0), 0);
-                const left = Math.max(0, alpacaEquity - used);
-                return (
+                return used > 0 ? (
                   <div style={{
                     padding: isMobile ? "10px" : "8px 12px", background: `${c.blue}08`, borderRadius: "8px",
                     border: `1px solid ${c.blue}15`, marginBottom: "16px", fontSize: isMobile ? "11px" : "12px", color: c.text2,
                   }}>
-                    계좌 잔고: <strong style={{ color: c.text1 }}>${alpacaEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
-                    {used > 0 && <>
-                      {" · "}배분 완료: <strong style={{ color: c.orange || c.yellow }}>${used.toLocaleString()}</strong>
-                      {" · "}잔여: <strong style={{ color: left > 0 ? c.green : c.red }}>${left.toLocaleString()}</strong>
-                    </>}
+                    배분 완료: <strong style={{ color: c.orange || c.yellow }}>${used.toLocaleString()}</strong>
                   </div>
-                );
+                ) : null;
               })()}
               <div style={{ marginBottom: "20px" }}>
                 <label style={{ fontSize: isMobile ? "12px" : "13px", color: c.text2, display: "block", marginBottom: "6px" }}>투입 금액 (USD)</label>
@@ -1591,7 +1217,6 @@ export default function AutoTrading({ theme = "dark", user }) {
           if (!targetBot || !botDef) return null;
           const currentAlloc = targetBot.allocation || 0;
           const used = activeBots.reduce((s, ab) => s + (ab.allocation || 0), 0);
-          const left = alpacaEquity != null ? Math.max(0, alpacaEquity - used) : null;
           const quickAmounts = [500, 1000, 2000, 5000];
           return (
             <div style={{
@@ -1621,18 +1246,6 @@ export default function AutoTrading({ theme = "dark", user }) {
                     <span>현재 투입 금액</span>
                     <strong style={{ color: c.text1 }}>${currentAlloc.toLocaleString()}</strong>
                   </div>
-                  {alpacaEquity != null && (
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span>계좌 잔고</span>
-                      <strong style={{ color: c.text1 }}>${alpacaEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
-                    </div>
-                  )}
-                  {left != null && (
-                    <div style={{ display: "flex", justifyContent: "space-between" }}>
-                      <span>잔여 가용</span>
-                      <strong style={{ color: left > 0 ? c.green : c.red }}>${left.toLocaleString()}</strong>
-                    </div>
-                  )}
                 </div>
 
                 {/* 빠른 금액 선택 */}
@@ -1715,7 +1328,7 @@ export default function AutoTrading({ theme = "dark", user }) {
                 <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.red, fontWeight: 600, marginBottom: "6px" }}>주의사항</div>
                 <ul style={{ margin: 0, paddingLeft: "16px", fontSize: isMobile ? "11px" : "12px", color: c.text2, lineHeight: 1.7 }}>
                   <li>봇 운영이 즉시 중단됩니다</li>
-                  <li>보유 포지션은 Alpaca 계좌에 그대로 유지됩니다</li>
+                  <li>보유 포지션은 가상 포트폴리오에 그대로 유지됩니다</li>
                   <li>투입 금액 설정 및 운영 기록이 삭제됩니다</li>
                   <li>같은 봇을 다시 시작하면 새로 설정해야 합니다</li>
                 </ul>

@@ -1,7 +1,7 @@
 // ════════════════════════════════════════════════════════════════════
 // Zepta — ₿ 비트코인 전용 자동매매 시스템 v2.0
-// BTC 알파 v2 멀티팩터 전략 + Alpaca Paper Trading 크립토 연동
-// CoinGecko 실시간 + Yahoo Finance 캔들 + Alpaca 크립토 주문
+// BTC 알파 v2 멀티팩터 전략 + KV 가상 포트폴리오 자동매매
+// CoinGecko 실시간 + Yahoo Finance 캔들 + Binance 데이터
 // ════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ALL_STRATEGIES, runBacktest, diagnoseMarket, strategyHurst, strategyVolCluster, strategyEfficiency, strategyMomDecay, strategyInfoFlow, strategyFundingRate, strategyMicrostructure, strategyEntropy } from "./strategies.js";
@@ -31,15 +31,15 @@ const LIGHT_C = {
   isDark: false,
 };
 
-// Alpaca 지원 크립토만 포함 (BNB, XRP는 Alpaca 미지원)
-// 지원 코인: BTC, ETH, SOL, AVAX, DOGE, LINK, DOT, UNI, AAVE, LTC 등
+// 지원 크립토 자산
+// KV 가상 포트폴리오에서 Binance USDT 쌍으로 거래됨
 const BTC_ASSETS = [
-  { sym: "BTC-USD", alpaca: "BTC/USD", name: "Bitcoin", icon: "₿", weight: 0.35 },
-  { sym: "ETH-USD", alpaca: "ETH/USD", name: "Ethereum", icon: "Ξ", weight: 0.25 },
-  { sym: "SOL-USD", alpaca: "SOL/USD", name: "Solana", icon: "◎", weight: 0.15 },
-  { sym: "AVAX-USD", alpaca: "AVAX/USD", name: "Avalanche", icon: "🔺", weight: 0.10 },
-  { sym: "LINK-USD", alpaca: "LINK/USD", name: "Chainlink", icon: "⬡", weight: 0.08 },
-  { sym: "DOGE-USD", alpaca: "DOGE/USD", name: "Dogecoin", icon: "🐕", weight: 0.07 },
+  { sym: "BTC-USD", name: "Bitcoin", icon: "₿", weight: 0.35 },
+  { sym: "ETH-USD", name: "Ethereum", icon: "Ξ", weight: 0.25 },
+  { sym: "SOL-USD", name: "Solana", icon: "◎", weight: 0.15 },
+  { sym: "AVAX-USD", name: "Avalanche", icon: "🔺", weight: 0.10 },
+  { sym: "LINK-USD", name: "Chainlink", icon: "⬡", weight: 0.08 },
+  { sym: "DOGE-USD", name: "Dogecoin", icon: "🐕", weight: 0.07 },
 ];
 
 const BTC_STRATEGY = ALL_STRATEGIES.find(s => s.id === "btc_alpha");
@@ -47,29 +47,23 @@ const BTC_STRATEGY = ALL_STRATEGIES.find(s => s.id === "btc_alpha");
 // ── Storage (유저별 키 분리) ──
 function makeBtcKeys(userId) {
   const p = userId ? `di_${userId.slice(0, 8)}_btc_` : "di_btc_";
-  return { config: `${p}alpaca_config`, log: `${p}trade_log_v2`, settings: `${p}settings_v2` };
+  return { log: `${p}trade_log_v2`, settings: `${p}settings_v2` };
 }
 let KEYS = makeBtcKeys(null);
 function load(k, fb) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch { return fb; } }
 function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 
-// ── Alpaca API ──
-async function alpacaAPI(action, config, params = {}) {
-  const { apiKey, apiSecret, isPaper = true } = config;
-  if (!apiKey || !apiSecret) throw new Error("API 키 미설정");
-  const isPost = ["submit_order"].includes(action);
-  const queryParams = isPost ? `action=${action}` : new URLSearchParams({ action, ...params }).toString();
-  const ctrl = new AbortController();
-  const tmr = setTimeout(() => ctrl.abort(), 15000);
-  const res = await fetch(`/api/alpaca?${queryParams}`, {
-    method: isPost ? "POST" : "GET",
-    headers: { "Content-Type": "application/json", "x-alpaca-key": apiKey, "x-alpaca-secret": apiSecret, "x-alpaca-paper": String(isPaper) },
-    body: isPost ? JSON.stringify(params) : undefined,
-    signal: ctrl.signal,
-  }).finally(() => clearTimeout(tmr));
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || data.error || `API ${res.status}`);
-  return data;
+// ── Virtual Portfolio API ──
+async function fetchVirtualPortfolio() {
+  try {
+    const res = await fetch(`/api/virtual-portfolio?type=crypto`);
+    if (!res.ok) throw new Error(`API ${res.status}`);
+    const data = await res.json();
+    return data.ok ? data.crypto : null;
+  } catch (e) {
+    console.error("Virtual portfolio fetch failed:", e);
+    return null;
+  }
 }
 
 // ── Yahoo candles ──
@@ -179,10 +173,8 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
 
   const C = theme === "dark" ? DARK_C : LIGHT_C;
 
-  // ── Config State ──
-  const [config, setConfig] = useState(load(KEYS.config, { apiKey: "", apiSecret: "", isPaper: true }));
-  const [showConfig, setShowConfig] = useState(false);
-  const [configInput, setConfigInput] = useState({ apiKey: config.apiKey, apiSecret: config.apiSecret });
+  // ── Settings State ──
+  const [showSettings, setShowSettings] = useState(false);
 
   // ── Trading State ──
   const [prices, setPrices] = useState({});
@@ -253,13 +245,9 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   const [lastAutoDecisions, setLastAutoDecisions] = useState([]);
   const [tradeCooldowns, setTradeCooldowns] = useState({});
 
-  // ── Alpaca State ──
-  const [alpacaConnected, setAlpacaConnected] = useState(false);
-  const [alpacaAccount, setAlpacaAccount] = useState(null);
-  const [alpacaPositions, setAlpacaPositions] = useState([]);
-  const [alpacaOrders, setAlpacaOrders] = useState([]);
-  const [alpacaError, setAlpacaError] = useState(null);
-  const [orderLoading, setOrderLoading] = useState(false);
+  // ── Virtual Portfolio State ──
+  const [virtualPortfolio, setVirtualPortfolio] = useState(null);
+  const [portfolioLoading, setPortfolioLoading] = useState(false);
 
   // ── 봇별 독립 성과 (KV 데이터) ──
   const [botPerf, setBotPerf] = useState(null); // { perf, snapshot }
@@ -280,57 +268,19 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   }, [botPreset?.id]);
 
   const timerRef = useRef(null);
-  const isConnected = config.apiKey && config.apiSecret;
 
-  // ── Alpaca 연결 테스트 ──
-  const connectAlpaca = useCallback(async () => {
-    if (!isConnected) return;
+  // ── Virtual Portfolio 페치 ──
+  const fetchPortfolio = useCallback(async () => {
+    setPortfolioLoading(true);
     try {
-      setAlpacaError(null);
-      const acc = await alpacaAPI("account", config);
-      setAlpacaAccount(acc);
-      setAlpacaConnected(true);
-      const pos = await alpacaAPI("positions", config);
-      setAlpacaPositions(Array.isArray(pos) ? pos : []);
-      const ord = await alpacaAPI("orders", config, { status: "open", limit: "20" });
-      setAlpacaOrders(Array.isArray(ord) ? ord : []);
+      const portfolio = await fetchVirtualPortfolio();
+      setVirtualPortfolio(portfolio);
     } catch (e) {
-      setAlpacaError(e.message);
-      setAlpacaConnected(false);
-    }
-  }, [config, isConnected]);
-
-  // ── 크립토 주문 실행 ──
-  const submitCryptoOrder = useCallback(async (symbol, side, notional, reason) => {
-    if (!isConnected || !alpacaConnected) return;
-    setOrderLoading(true);
-    try {
-      const alpacaSym = BTC_ASSETS.find(a => a.sym === symbol)?.alpaca || symbol.replace("-USD", "/USD");
-      const order = await alpacaAPI("submit_order", config, {
-        symbol: alpacaSym,
-        notional: String(notional),
-        side,
-        type: "market",
-        time_in_force: "gtc", // crypto는 GTC
-      });
-      const logEntry = {
-        time: new Date().toISOString(), type: side.toUpperCase(), symbol, price: null,
-        reason, orderId: order.id, status: "submitted", auto: autoMode,
-        notional: +notional,
-      };
-      const newLog = [logEntry, ...tradeLog].slice(0, 100);
-      setTradeLog(newLog);
-      save(KEYS.log, newLog);
-      // Refresh positions
-      setTimeout(() => connectAlpaca(), 2000);
-      return order;
-    } catch (e) {
-      setAlpacaError(`주문 실패: ${e.message}`);
-      return null;
+      console.error("Failed to fetch virtual portfolio:", e);
     } finally {
-      setOrderLoading(false);
+      setPortfolioLoading(false);
     }
-  }, [config, isConnected, alpacaConnected, autoMode, tradeLog, connectAlpaca]);
+  }, []);
 
   // ── 데이터 로딩 ──
   const loadData = useCallback(async () => {
@@ -444,110 +394,62 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
     setLoading(false);
   }, [riskLevel]);
 
-  useEffect(() => { loadData(); }, [loadData]);
-  useEffect(() => { if (isConnected) connectAlpaca(); }, [connectAlpaca, isConnected]);
+  // ── 초기 데이터 로딩 및 가상 포트폴리오 페치 ──
   useEffect(() => {
-    // 크립토 24/7 — 90초 간격 갱신 (5분봉 스캘핑 대응)
-    timerRef.current = setInterval(() => { loadData(); if (isConnected) connectAlpaca(); }, 90 * 1000);
-    return () => clearInterval(timerRef.current);
-  }, [loadData, connectAlpaca, isConnected]);
+    loadData();
+    fetchPortfolio();
+  }, [loadData, fetchPortfolio]);
 
-  // ── Auto mode 시그널 처리 (멀티애셋 + 리스크 관리 v4) ──
+  // ── 주기적 갱신: 가격 + 시그널 (90초), 포트폴리오 (90초) ──
   useEffect(() => {
-    if (!autoMode || !alpacaConnected || !alpacaAccount || signals.length === 0) return;
+    timerRef.current = setInterval(() => {
+      loadData();
+      fetchPortfolio();
+    }, 90 * 1000);
+    return () => clearInterval(timerRef.current);
+  }, [loadData, fetchPortfolio]);
+
+  // ── Auto mode 시그널 표시 (실제 거래는 cron job이 처리) ──
+  useEffect(() => {
+    if (!autoMode || signals.length === 0) return;
 
     const now = Date.now();
     const decisions = [];
 
-    // 변동성 레짐
+    // 변동성 레짐 계산 (표시 목적)
     const btcPriceHistory = btcCandles.slice(-30).map(c => c.close).filter(c => c != null);
     const annualizedVol = riskManager.calculateVolatility(btcPriceHistory);
     const regime = riskManager.getVolatilityRegime(annualizedVol);
 
-    // 최근 시그널 — 타임프레임별 유효기간 필터
+    // 최근 시그널 평가 (표시용만, 실제 거래는 cron이 처리)
     const nowSec = now / 1000;
     const recentSignals = signals.filter(sig => {
       if (!sig.time) return false;
       const ageSec = nowSec - sig.time;
-      if (sig.tf === "5m") return ageSec < 30 * 60;     // 5분봉: 30분 이내
-      if (sig.tf === "4h") return ageSec < 12 * 3600;   // 4시간봉: 12시간 이내
-      return ageSec < 2 * 86400;                         // 일봉: 2일 이내
-    }).slice(-15);  // 최대 15개까지 평가
+      if (sig.tf === "5m") return ageSec < 30 * 60;
+      if (sig.tf === "4h") return ageSec < 12 * 3600;
+      return ageSec < 2 * 86400;
+    }).slice(-15);
 
     for (const sig of recentSignals) {
       const asset = sig.asset || "BTC-USD";
       if (!sig.time) continue;
-      // 프리셋 자산 필터: 이 봇이 다루는 자산만 거래
       if (!presetConfig.assets.includes(asset)) continue;
 
-      // 쿨다운 체크: 5m→15분, 4h→2시간, 1d→4시간 (프리셋별 배수 적용)
+      // 표시용 의사결정 로직 (cron이 실제 거래 실행)
       const baseCooldown = sig.tf === "5m" ? 15 * 60 * 1000 : sig.tf === "4h" ? 2 * 3600 * 1000 : 4 * 3600 * 1000;
       const cooldownMs = baseCooldown * (presetConfig.cooldownMult || 1);
       const lastTradeSym = tradeCooldowns[asset];
       if (lastTradeSym && now - lastTradeSym < cooldownMs) {
-        decisions.push({ symbol: asset, action: "skip", reason: "4h 쿨다운 중" });
+        decisions.push({ symbol: asset, action: "skip", reason: "cooldown" });
         continue;
       }
 
-      // 중복 체크: 동일 인덱스+자산 시그널만 스킵
-      const sigKey = `${asset}_${sig.type}_${sig.index}`;
-      const alreadyDone = tradeLog.some(l => l.auto && l._sigKey === sigKey);
-      if (alreadyDone) continue;
-
-      // Fear & Greed (BTC 기준 — 크립토 시장 전체 대표)
-      const btcChange = prices["BTC-USD"]?.change24h || 0;
-      let fearGreedMult = 1.0;
-      if (Math.abs(btcChange) > 8) fearGreedMult = 0.3;
-      else if (Math.abs(btcChange) > 5) fearGreedMult = 0.5;
-
-      // 포지션 사이징 (등급 + 변동성 + 자산 가중치 + 타임프레임 반영)
-      const equity = parseFloat(alpacaAccount.equity || 0);
-      const assetInfo = BTC_ASSETS.find(a => a.sym === asset);
-      const assetWeight = assetInfo?.weight || 0.1;
-      const gradeBonus = sig.confidence === "A" ? 1.2 : sig.confidence === "B" ? 1.0 : 0.8;
-      const baseSize = (sig.positionSize || 0.5) * gradeBonus;
-      const riskMult = { low: 0.5, medium: 0.7, high: 1.0 }[riskLevel] || 0.7;
-      // 타임프레임별 사이징: 5분봉은 스캘핑(작게), 4시간은 중간, 일봉은 풀
-      const tfMult = sig.tf === "5m" ? 0.15 : sig.tf === "4h" ? 0.5 : 1.0;
-
-      const maxDD = portfolioMetrics.drawdown || 0;
-      const adjustedSize = riskManager.adjustPositionSize(baseSize, regime, maxDD);
-      // 자산별 가중치 + 프리셋 배수 적용
-      const presetMult = presetConfig.positionMult || 1.0;
-      const tradeAmount = Math.min(equity * adjustedSize * riskMult * fearGreedMult * assetWeight * tfMult * presetMult, equity * 0.35);
-
-      if (sig.type === "BUY" && tradeAmount > 10) {
-        submitCryptoOrder(asset, "buy", tradeAmount.toFixed(2), `[${asset}] ${sig.reason}`);
-        setTradeCooldowns(prev => ({ ...prev, [asset]: now }));
-        const newLog = [{ ...tradeLog[0], _sigKey: sigKey }, ...tradeLog.slice(1)];
-        decisions.push({ symbol: asset, action: "BUY", amount: tradeAmount.toFixed(0), reason: sig.reason });
-        break;
-      } else if (sig.type === "SELL") {
-        const alpacaSym = assetInfo?.alpaca || asset.replace("-USD", "/USD");
-        const pos = alpacaPositions.find(p => p.symbol === alpacaSym || p.symbol === alpacaSym.replace("/", ""));
-        if (pos) {
-          const sellAmount = Math.min(parseFloat(pos.market_value || 0), tradeAmount);
-          if (sellAmount > 10) {
-            submitCryptoOrder(asset, "sell", sellAmount.toFixed(2), `[${asset}] ${sig.reason}`);
-            setTradeCooldowns(prev => ({ ...prev, [asset]: now }));
-            const newLog = [{ ...tradeLog[0], _sigKey: sigKey }, ...tradeLog.slice(1)];
-            decisions.push({ symbol: "BTC-USD", action: "SELL", amount: sellAmount.toFixed(0), reason: sig.reason });
-            break;
-          }
-        }
-      }
+      decisions.push({ symbol: asset, action: sig.type, reason: sig.reason, confidence: sig.confidence });
     }
 
     setLastAutoDecisions(decisions.slice(-5));
-  }, [autoMode, alpacaConnected, signals, alpacaAccount, riskLevel, alpacaPositions, btcCandles, tradeLog, prices, portfolioMetrics, submitCryptoOrder, riskManager]);
-
-  // ── Config 저장 ──
-  const saveConfig = () => {
-    const newConfig = { apiKey: configInput.apiKey.trim(), apiSecret: configInput.apiSecret.trim(), isPaper: true };
-    setConfig(newConfig);
-    save(KEYS.config, newConfig);
-    setShowConfig(false);
-  };
+  }, [autoMode, signals, riskLevel, btcCandles, riskManager, presetConfig, tradeCooldowns]);
 
   // ── Settings 저장 ──
   useEffect(() => { save(KEYS.settings, { enabled: autoMode, riskLevel }); }, [autoMode, riskLevel]);
@@ -559,7 +461,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
     })), [signals, btcCandles]);
   const latestSignal = signals.length > 0 ? signals[signals.length - 1] : null;
   const latestDate = latestSignal?.time ? new Date(latestSignal.time * 1000) : (latestSignal && btcCandles[latestSignal.index]?.time ? new Date(btcCandles[latestSignal.index].time * 1000) : null);
-  const cryptoPositions = alpacaPositions.filter(p => p.symbol?.includes("/") || p.asset_class === "crypto");
+  const cryptoPositions = virtualPortfolio?.positions || [];
 
   // ═══ RENDER ═══
   const fmtNum = (n) => typeof n === "number" ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : n;
@@ -587,18 +489,17 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
               <span style={{ fontSize: "26px" }}>₿</span>
               <span style={{ fontSize: "20px", fontWeight: 800, color: C.text1 }}>BTC 자동매매</span>
               {badge("알파 v2", C.orangeBg, C.orange)}
-              {alpacaConnected && badge("Alpaca 연결됨", C.greenBg, C.green)}
-              {isConnected && !alpacaConnected && badge("연결 실패", C.redBg, C.red)}
+              {autoMode && badge("자동매매 ON", C.greenBg, C.green)}
             </div>
             <div style={{ fontSize: "12px", color: C.text3 }}>
-              10팩터 멀티스코어링 · 다중 타임프레임 · 변동성 적응형 · Alpaca 크립토 매매
+              10팩터 멀티스코어링 · 다중 타임프레임 · 변동성 적응형 · KV 자동매매
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <button onClick={() => setShowConfig(!showConfig)} style={{
+            <button onClick={() => setShowSettings(!showSettings)} style={{
               padding: "7px 12px", borderRadius: "8px", fontSize: "11px", fontWeight: 700,
               background: C.card2, color: C.text2, border: `1px solid ${C.border}`, cursor: "pointer",
-            }}>{isConnected ? "⚙️ 설정" : "🔗 Alpaca 연결"}</button>
+            }}>⚙️ 설정</button>
             <div onClick={() => setAutoMode(!autoMode)} style={{
               width: "48px", height: "26px", borderRadius: "13px", cursor: "pointer",
               background: autoMode ? C.green : C.card2, border: `1px solid ${autoMode ? C.green : C.border}`,
@@ -616,83 +517,76 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           </div>
         </div>
 
-        {/* Alpaca 설정 패널 */}
-        {showConfig && (
+        {/* 설정 패널 */}
+        {showSettings && (
           <div style={{ marginTop: "16px", padding: "16px", borderRadius: "12px", background: C.card2, border: `1px solid ${C.border}` }}>
-            <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>Alpaca Paper Trading 연결</div>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>자동매매 설정</div>
             <div style={{ fontSize: "11px", color: C.text3, marginBottom: "12px" }}>
-              Alpaca에서 크립토 Paper Trading API 키를 발급받아 입력하세요. 크립토 거래는 24/7 가능합니다.
+              자동매매는 KV 가상 포트폴리오에서 진행됩니다. 리스크 레벨을 선택하세요.
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-              <input placeholder="API Key" value={configInput.apiKey}
-                onChange={e => setConfigInput(p => ({ ...p, apiKey: e.target.value }))}
-                style={{ padding: "8px 12px", borderRadius: "8px", background: C.bg, border: `1px solid ${C.border}`, color: C.text1, fontSize: "12px", fontFamily: "monospace" }} />
-              <input placeholder="API Secret" type="password" value={configInput.apiSecret}
-                onChange={e => setConfigInput(p => ({ ...p, apiSecret: e.target.value }))}
-                style={{ padding: "8px 12px", borderRadius: "8px", background: C.bg, border: `1px solid ${C.border}`, color: C.text1, fontSize: "12px", fontFamily: "monospace" }} />
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button onClick={saveConfig} style={{
+            <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+              {["low", "medium", "high"].map(r => (
+                <button key={r} onClick={() => setRiskLevel(r)} style={{
                   flex: 1, padding: "8px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
-                  background: C.blue, color: "#fff", border: "none", cursor: "pointer",
-                }}>연결 저장</button>
-                <button onClick={() => setShowConfig(false)} style={{
-                  padding: "8px 16px", borderRadius: "8px", fontSize: "12px",
-                  background: C.card2, color: C.text3, border: `1px solid ${C.border}`, cursor: "pointer",
-                }}>취소</button>
-              </div>
+                  background: riskLevel === r ? (r === "low" ? C.greenBg : r === "high" ? C.redBg : C.yellowBg) : C.bg,
+                  color: riskLevel === r ? (r === "low" ? C.green : r === "high" ? C.red : C.yellow) : C.text2,
+                  border: `1px solid ${riskLevel === r ? (r === "low" ? C.green : r === "high" ? C.red : C.yellow) : C.border}`,
+                  cursor: "pointer",
+                }}>
+                  {r === "low" ? "🛡️ 보수" : r === "high" ? "⚡ 공격" : "⚖️ 중립"}
+                </button>
+              ))}
             </div>
-            {alpacaError && <div style={{ marginTop: "8px", fontSize: "11px", color: C.red }}>{alpacaError}</div>}
+            <button onClick={() => setShowSettings(false)} style={{
+              width: "100%", padding: "8px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
+              background: C.blue, color: "#fff", border: "none", cursor: "pointer",
+            }}>닫기</button>
           </div>
         )}
       </div>
 
-      {/* ═══ Alpaca 계좌 + 포지션 (연결 시) ═══ */}
-      {alpacaConnected && alpacaAccount && (
+      {/* ═══ DI 가상 포트폴리오 ═══ */}
+      {virtualPortfolio && (
         <div style={card}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-            <span style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>Alpaca 크립토 계좌</span>
-            {badge("Paper Trading", C.yellowBg, C.yellow)}
+            <span style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>DI 가상 포트폴리오</span>
+            {badge("KV 자동매매", C.purpleBg, C.purple)}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>
             {(() => {
-              const fullEq = parseFloat(alpacaAccount.equity || 0);
-              const fullBp = parseFloat(alpacaAccount.cash || 0);
-              const fullLastEq = parseFloat(alpacaAccount.last_equity || alpacaAccount.equity || 0);
-              const ratio = (botAllocation && fullEq > 0) ? (botAllocation / fullEq) : 1;
-              const dispEq = botAllocation || fullEq;
-              const dispBp = botAllocation
-                ? Math.min(Math.round(fullBp * ratio), botAllocation)
-                : Math.round(fullBp);
-              const fullPL = fullEq - fullLastEq;
-              const dispPL = (fullPL * ratio).toFixed(2);
+              const equity = parseFloat(virtualPortfolio.equity || 0);
+              const cash = parseFloat(virtualPortfolio.cash || 0);
+              const dayPL = parseFloat(virtualPortfolio.dayPL || 0);
+              const dayPLPct = parseFloat(virtualPortfolio.dayPLPct || 0);
               return <>
-                {stat("봇 자산", `$${dispEq.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, C.text1)}
-                {stat("현금", `$${dispBp.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, C.green)}
-                {stat("총 P&L", `$${dispPL}`, parseFloat(dispPL) >= 0 ? C.green : C.red, "오늘")}
+                {stat("자산 총액", `$${equity.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, C.text1)}
+                {stat("현금", `$${cash.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, C.green)}
+                {stat("오늘 P&L", `$${dayPL.toFixed(2)}`, dayPL >= 0 ? C.green : C.red, `${dayPLPct >= 0 ? "+" : ""}${dayPLPct.toFixed(2)}%`)}
               </>;
             })()}
           </div>
           {/* 크립토 포지션 */}
-          {cryptoPositions.length > 0 && (
+          {cryptoPositions && cryptoPositions.length > 0 && (
             <div>
               <div style={{ fontSize: "11px", fontWeight: 700, color: C.text3, marginBottom: "6px" }}>보유 크립토</div>
               {cryptoPositions.map((p, i) => {
-                const pnl = parseFloat(p.unrealized_pl || 0);
-                const pnlPct = parseFloat(p.unrealized_plpc || 0) * 100;
+                const pnl = parseFloat(p.unrealizedPL || 0);
+                const pnlPct = parseFloat(p.unrealizedPLPct || 0);
+                const assetIcon = BTC_ASSETS.find(a => p.symbol && a.sym.includes(p.symbol.split("USDT")[0]))?.icon || "₿";
                 return (
                   <div key={i} style={{
                     display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px",
                     borderRadius: "8px", background: C.card2, marginBottom: "4px",
                   }}>
-                    <span style={{ fontSize: "16px" }}>₿</span>
+                    <span style={{ fontSize: "16px" }}>{assetIcon}</span>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: "12px", fontWeight: 700, color: C.text1 }}>{p.symbol}</div>
-                      <div style={{ fontSize: "10px", color: C.text3 }}>수량: {parseFloat(p.qty).toFixed(6)}</div>
+                      <div style={{ fontSize: "12px", fontWeight: 700, color: C.text1 }}>{p.symbol || "Unknown"}</div>
+                      <div style={{ fontSize: "10px", color: C.text3 }}>수량: {parseFloat(p.qty || 0).toFixed(6)}</div>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: "12px", fontWeight: 700, color: C.text1 }}>${parseFloat(p.market_value || 0).toFixed(2)}</div>
+                      <div style={{ fontSize: "12px", fontWeight: 700, color: C.text1 }}>${parseFloat(p.marketValue || 0).toFixed(2)}</div>
                       <div style={{ fontSize: "11px", fontWeight: 700, color: pnl >= 0 ? C.green : C.red }}>
-                        {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(1)}%)
+                        {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)
                       </div>
                     </div>
                   </div>
@@ -700,7 +594,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
               })}
             </div>
           )}
-          {cryptoPositions.length === 0 && <div style={{ fontSize: "11px", color: C.text3, textAlign: "center", padding: "8px" }}>보유 크립토 없음</div>}
+          {(!cryptoPositions || cryptoPositions.length === 0) && <div style={{ fontSize: "11px", color: C.text3, textAlign: "center", padding: "8px" }}>보유 크립토 없음</div>}
 
           {/* ═══ 봇 독립 성과 지표 (KV 기반) ═══ */}
           {(() => {
@@ -812,15 +706,6 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                   <div style={{ fontSize: "13px", fontWeight: 800, color: C.text1 }}>{p ? `$${p.price?.toLocaleString()}` : "..."}</div>
                   {p && <div style={{ fontSize: "10px", fontWeight: 700, color: isUp ? C.green : C.red }}>{isUp ? "+" : ""}{p.change24h?.toFixed(2)}%</div>}
                 </div>
-                {/* 수동 매수/매도 */}
-                {alpacaConnected && (
-                  <div style={{ display: "flex", gap: "4px" }}>
-                    <button onClick={() => submitCryptoOrder(a.sym, "buy", "100", `수동 매수 ${a.name}`)} disabled={orderLoading}
-                      style={{ padding: "4px 8px", borderRadius: "4px", fontSize: "9px", fontWeight: 700, background: C.greenBg, color: C.green, border: "none", cursor: "pointer", opacity: orderLoading ? 0.5 : 1, whiteSpace: "nowrap", flexShrink: 0 }}>매수</button>
-                    <button onClick={() => submitCryptoOrder(a.sym, "sell", "100", `수동 매도 ${a.name}`)} disabled={orderLoading}
-                      style={{ padding: "4px 8px", borderRadius: "4px", fontSize: "9px", fontWeight: 700, background: C.redBg, color: C.red, border: "none", cursor: "pointer", opacity: orderLoading ? 0.5 : 1, whiteSpace: "nowrap", flexShrink: 0 }}>매도</button>
-                  </div>
-                )}
               </div>
             );
           })}
@@ -1160,7 +1045,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
             <div>
               <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>매매 기록</div>
-              <div style={{ fontSize: "11px", color: C.text3 }}>{alpacaConnected ? "Alpaca 실제 주문" : "시뮬레이션"} 히스토리</div>
+              <div style={{ fontSize: "11px", color: C.text3 }}>KV 자동매매 히스토리</div>
             </div>
             {tradeLog.length > 0 && (
               <button onClick={() => { setTradeLog([]); save(KEYS.log, []); }} style={{
@@ -1174,7 +1059,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
               <div style={{ fontSize: "24px", marginBottom: "8px" }}>₿</div>
               <div style={{ fontSize: "12px", fontWeight: 600 }}>매매 기록 없음</div>
               <div style={{ fontSize: "11px", marginTop: "4px" }}>
-                {alpacaConnected ? "자동매매를 켜면 시그널 발생 시 Alpaca로 주문합니다" : "Alpaca를 연결하면 실제 Paper Trading이 가능합니다"}
+                자동매매를 켜면 시그널 발생 시 KV 포트폴리오에 자동 주문됩니다
               </div>
             </div>
           ) : (
@@ -1197,7 +1082,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
       )}
 
       <div style={{ textAlign: "center", padding: "12px", fontSize: "10px", color: C.text3, lineHeight: 1.5 }}>
-        ₿ BTC 알파 v2 · 10팩터 멀티스코어링 · Alpaca Paper Trading 연동<br/>
+        ₿ BTC 알파 v2 · 10팩터 멀티스코어링 · Binance 데이터 · KV 가상매매<br/>
         투자 판단은 본인의 책임입니다 · 시뮬레이션 결과가 미래 수익을 보장하지 않습니다
       </div>
     </div>

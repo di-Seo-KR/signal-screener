@@ -1,329 +1,276 @@
 // Portfolio Rebalancing Cron - Runs weekdays at 14:00 UTC (10:00 ET)
-// Manages position weights, stop-losses, and profit-taking
+// KV 가상 포트폴리오 기반 리밸런싱
+// 주식 + 크립토 포지션 비중 관리, 손절, 익절
 
-const ALPACA_BASE = 'https://paper-api.alpaca.markets';
 const MAX_STOCK_WEIGHT = 0.20; // 20% max per stock
 const MAX_CRYPTO_WEIGHT = 0.30; // 30% max per crypto
 const STOP_LOSS_THRESHOLD = -0.08; // -8% unrealized loss
 const PROFIT_TAKE_THRESHOLD = 0.25; // +25% unrealized gain
 
+const STOCK_PORTFOLIO_KEY = "di:virtual:stock-portfolio";
+const CRYPTO_PORTFOLIO_KEY = "di:virtual:portfolio";
+
 export default async function handler(req, res) {
-  // Verify cron secret
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {
-    const alpacaKey = process.env.ALPACA_API_KEY;
-    const alpacaSecret = process.env.ALPACA_SECRET_KEY;
+    const kvModule = await import("@vercel/kv");
+    const kv = kvModule.kv;
 
-    if (!alpacaKey || !alpacaSecret) {
-      throw new Error('Missing Alpaca credentials');
+    // Load both portfolios
+    const stockPortfolio = await kv.get(STOCK_PORTFOLIO_KEY);
+    const cryptoPortfolio = await kv.get(CRYPTO_PORTFOLIO_KEY);
+
+    const allActions = [];
+    const allResults = [];
+    let totalEquity = 0;
+    let totalCash = 0;
+    const allPositionWeights = [];
+
+    // ── Stock Portfolio Rebalancing ──
+    if (stockPortfolio && Object.keys(stockPortfolio.positions || {}).length > 0) {
+      // Fetch current stock prices from Yahoo Finance
+      const symbols = Object.keys(stockPortfolio.positions);
+      const currentPrices = {};
+      for (const sym of symbols) {
+        try {
+          const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${sym}?interval=1d&range=1d`);
+          const d = await r.json();
+          const meta = d?.chart?.result?.[0]?.meta;
+          if (meta?.regularMarketPrice) currentPrices[sym] = meta.regularMarketPrice;
+        } catch {}
+      }
+
+      let stockMarketValue = 0;
+      const stockPositions = [];
+      for (const [symbol, pos] of Object.entries(stockPortfolio.positions)) {
+        const currentPrice = currentPrices[symbol] || pos.avgPrice;
+        const mv = pos.qty * currentPrice;
+        const costBasis = pos.qty * pos.avgPrice;
+        stockMarketValue += mv;
+        stockPositions.push({
+          symbol, qty: pos.qty, currentPrice, marketValue: mv, costBasis,
+          unrealizedPL: mv - costBasis,
+          unrealizedPLPct: costBasis > 0 ? (mv - costBasis) / costBasis : 0,
+          assetClass: 'stock',
+        });
+      }
+
+      const stockEquity = stockPortfolio.cash + stockMarketValue;
+      totalEquity += stockEquity;
+      totalCash += stockPortfolio.cash;
+
+      // Identify actions for stocks
+      for (const pos of stockPositions) {
+        const weight = stockEquity > 0 ? pos.marketValue / stockEquity : 0;
+        allPositionWeights.push({ ...pos, weight });
+
+        // Overweight
+        if (weight > MAX_STOCK_WEIGHT) {
+          const excessValue = pos.marketValue - (MAX_STOCK_WEIGHT * stockEquity);
+          const sellQty = Math.floor(excessValue / pos.currentPrice);
+          if (sellQty > 0) {
+            allActions.push({ type: 'sell_overweight', symbol: pos.symbol, qty: sellQty, portfolio: 'stock',
+              reason: `Overweight (${(weight * 100).toFixed(1)}% > ${(MAX_STOCK_WEIGHT * 100).toFixed(1)}%)`,
+              currentWeight: weight, targetWeight: MAX_STOCK_WEIGHT });
+          }
+        }
+
+        // Stop-loss
+        if (pos.unrealizedPLPct < STOP_LOSS_THRESHOLD) {
+          allActions.push({ type: 'stop_loss', symbol: pos.symbol, qty: pos.qty, portfolio: 'stock',
+            reason: `Stop-loss (${(pos.unrealizedPLPct * 100).toFixed(2)}% loss)`,
+            unrealizedLoss: pos.unrealizedPL, unrealizedLossPct: pos.unrealizedPLPct });
+        }
+
+        // Profit-take (trim half)
+        if (pos.unrealizedPLPct > PROFIT_TAKE_THRESHOLD) {
+          const trimQty = Math.floor(pos.qty / 2);
+          if (trimQty > 0) {
+            allActions.push({ type: 'profit_take', symbol: pos.symbol, qty: trimQty, portfolio: 'stock',
+              reason: `Profit-taking (${(pos.unrealizedPLPct * 100).toFixed(2)}% gain)`,
+              unrealizedGain: pos.unrealizedPL, unrealizedGainPct: pos.unrealizedPLPct });
+          }
+        }
+      }
+
+      // Execute stock rebalancing
+      for (const action of allActions.filter(a => a.portfolio === 'stock')) {
+        try {
+          const pos = stockPortfolio.positions[action.symbol];
+          if (!pos) { allResults.push({ success: false, ...action, error: 'Position not found' }); continue; }
+
+          const price = currentPrices[action.symbol] || pos.avgPrice;
+          const sellValue = action.qty * price;
+
+          if (action.qty >= pos.qty) {
+            // Full close
+            stockPortfolio.cash += pos.qty * price;
+            delete stockPortfolio.positions[action.symbol];
+          } else {
+            // Partial sell
+            stockPortfolio.cash += sellValue;
+            pos.qty -= action.qty;
+          }
+          stockPortfolio.totalTrades = (stockPortfolio.totalTrades || 0) + 1;
+          allResults.push({ success: true, ...action, price, value: sellValue });
+        } catch (e) {
+          allResults.push({ success: false, ...action, error: e.message });
+        }
+      }
+
+      await kv.set(STOCK_PORTFOLIO_KEY, stockPortfolio);
     }
 
-    // Step 1: Fetch account info
-    const accountResp = await fetchAlpaca('/v2/account', { alpacaKey, alpacaSecret });
-    const equity = parseFloat(accountResp.equity);
-    const cash = parseFloat(accountResp.cash);
+    // ── Crypto Portfolio Rebalancing ──
+    if (cryptoPortfolio && Object.keys(cryptoPortfolio.positions || {}).length > 0) {
+      let prices = {};
+      try {
+        const tickerRes = await fetch("https://api.binance.com/api/v3/ticker/price");
+        const tickers = await tickerRes.json();
+        for (const t of tickers) prices[t.symbol] = parseFloat(t.price);
+      } catch {}
 
-    // Step 2: Fetch all positions
-    const positionsResp = await fetchAlpaca('/v2/positions', { alpacaKey, alpacaSecret });
-    const positions = Array.isArray(positionsResp) ? positionsResp : [];
+      let cryptoMarketValue = 0;
+      const cryptoPositions = [];
+      for (const [asset, pos] of Object.entries(cryptoPortfolio.positions)) {
+        const binanceSym = asset.replace("-USD", "USDT").replace("/USD", "USDT").replace("/", "");
+        const currentPrice = prices[binanceSym] || prices[asset] || pos.avgPrice;
+        const mv = pos.qty * currentPrice;
+        const costBasis = pos.qty * pos.avgPrice;
+        cryptoMarketValue += mv;
+        cryptoPositions.push({
+          symbol: asset, qty: pos.qty, currentPrice, marketValue: mv, costBasis,
+          unrealizedPL: mv - costBasis,
+          unrealizedPLPct: costBasis > 0 ? (mv - costBasis) / costBasis : 0,
+          assetClass: 'crypto',
+        });
+      }
 
-    // Calculate position weights and identify actions
-    const positionWeights = positions.map(pos => ({
-      symbol: pos.symbol,
-      qty: parseFloat(pos.qty),
-      current_price: parseFloat(pos.current_price),
-      market_value: parseFloat(pos.market_value),
-      cost_basis: parseFloat(pos.cost_basis),
-      unrealized_pl: parseFloat(pos.unrealized_pl),
-      unrealized_plpc: parseFloat(pos.unrealized_plpc),
-      weight: parseFloat(pos.market_value) / equity,
-      asset_class: pos.asset_class || 'us_equity',
-    }));
+      const cryptoEquity = cryptoPortfolio.cash + cryptoMarketValue;
+      totalEquity += cryptoEquity;
+      totalCash += cryptoPortfolio.cash;
 
-    // Step 3-5: Identify rebalancing actions
-    const actions = identifyRebalancingActions(positionWeights, equity);
+      const cryptoActions = [];
+      for (const pos of cryptoPositions) {
+        const weight = cryptoEquity > 0 ? pos.marketValue / cryptoEquity : 0;
+        allPositionWeights.push({ ...pos, weight });
 
-    // Step 6: Execute rebalancing orders
-    const executionResults = await executeRebalancingOrders(
-      actions,
-      { alpacaKey, alpacaSecret }
-    );
+        if (weight > MAX_CRYPTO_WEIGHT) {
+          const excessValue = pos.marketValue - (MAX_CRYPTO_WEIGHT * cryptoEquity);
+          const sellQty = excessValue / pos.currentPrice;
+          if (sellQty > 0.0001) {
+            cryptoActions.push({ type: 'sell_overweight', symbol: pos.symbol, qty: sellQty, portfolio: 'crypto',
+              reason: `Overweight (${(weight * 100).toFixed(1)}% > ${(MAX_CRYPTO_WEIGHT * 100).toFixed(1)}%)`,
+              currentWeight: weight, targetWeight: MAX_CRYPTO_WEIGHT });
+          }
+        }
 
-    // Step 7: Send Telegram notification
-    const summary = formatRebalancingSummary(
-      positionWeights,
-      actions,
-      executionResults,
-      equity,
-      cash
-    );
+        if (pos.unrealizedPLPct < STOP_LOSS_THRESHOLD) {
+          cryptoActions.push({ type: 'stop_loss', symbol: pos.symbol, qty: pos.qty, portfolio: 'crypto',
+            reason: `Stop-loss (${(pos.unrealizedPLPct * 100).toFixed(2)}% loss)` });
+        }
 
+        if (pos.unrealizedPLPct > PROFIT_TAKE_THRESHOLD) {
+          const trimQty = pos.qty / 2;
+          if (trimQty > 0.0001) {
+            cryptoActions.push({ type: 'profit_take', symbol: pos.symbol, qty: trimQty, portfolio: 'crypto',
+              reason: `Profit-taking (${(pos.unrealizedPLPct * 100).toFixed(2)}% gain)` });
+          }
+        }
+      }
+
+      for (const action of cryptoActions) {
+        try {
+          const pos = cryptoPortfolio.positions[action.symbol];
+          if (!pos) { allResults.push({ success: false, ...action, error: 'Position not found' }); continue; }
+
+          const binanceSym = action.symbol.replace("-USD", "USDT").replace("/USD", "USDT").replace("/", "");
+          const price = prices[binanceSym] || prices[action.symbol] || pos.avgPrice;
+          const sellValue = action.qty * price;
+
+          if (action.qty >= pos.qty) {
+            cryptoPortfolio.cash += pos.qty * price;
+            delete cryptoPortfolio.positions[action.symbol];
+          } else {
+            cryptoPortfolio.cash += sellValue;
+            pos.qty -= action.qty;
+          }
+          cryptoPortfolio.totalTrades = (cryptoPortfolio.totalTrades || 0) + 1;
+          allResults.push({ success: true, ...action, price, value: sellValue });
+        } catch (e) {
+          allResults.push({ success: false, ...action, error: e.message });
+        }
+      }
+
+      allActions.push(...cryptoActions);
+      await kv.set(CRYPTO_PORTFOLIO_KEY, cryptoPortfolio);
+    }
+
+    // Telegram report
+    const summary = formatRebalancingSummary(allPositionWeights, allActions, allResults, totalEquity, totalCash);
     await sendTelegramMessage(summary);
 
     return res.status(200).json({
       success: true,
       timestamp: new Date().toISOString(),
-      portfolio_equity: equity,
-      total_positions: positions.length,
-      actions_identified: actions.length,
-      actions_executed: executionResults.filter(r => r.success).length,
+      portfolio_equity: totalEquity,
+      total_positions: allPositionWeights.length,
+      actions_identified: allActions.length,
+      actions_executed: allResults.filter(r => r.success).length,
     });
   } catch (error) {
     console.error('Portfolio rebalance error:', error);
-
-    // Send error notification
-    await sendTelegramMessage(
-      `❌ Portfolio Rebalance Error\n\n${error.message}`
-    ).catch(() => {});
-
-    return res.status(500).json({
-      error: error.message || 'Rebalancing failed',
-      timestamp: new Date().toISOString(),
-    });
+    await sendTelegramMessage(`❌ Portfolio Rebalance Error\n\n${error.message}`).catch(() => {});
+    return res.status(500).json({ error: error.message || 'Rebalancing failed', timestamp: new Date().toISOString() });
   }
 }
 
-/**
- * Identify positions that need rebalancing
- */
-function identifyRebalancingActions(positionWeights, equity) {
-  const actions = [];
-
-  for (const pos of positionWeights) {
-    const isCrypto = pos.asset_class === 'crypto';
-    const maxWeight = isCrypto ? MAX_CRYPTO_WEIGHT : MAX_STOCK_WEIGHT;
-
-    // Rule 1: Overweight positions
-    if (pos.weight > maxWeight) {
-      const excessValue = pos.market_value - (maxWeight * equity);
-      const sellQty = Math.floor(excessValue / pos.current_price);
-
-      if (sellQty > 0) {
-        actions.push({
-          type: 'sell_overweight',
-          symbol: pos.symbol,
-          qty: sellQty,
-          reason: `Overweight (${(pos.weight * 100).toFixed(1)}% > ${(maxWeight * 100).toFixed(1)}%)`,
-          current_weight: pos.weight,
-          target_weight: maxWeight,
-        });
-      }
-    }
-
-    // Rule 2: Stop-loss positions (large unrealized losses)
-    if (pos.unrealized_plpc < STOP_LOSS_THRESHOLD) {
-      actions.push({
-        type: 'stop_loss',
-        symbol: pos.symbol,
-        qty: pos.qty,
-        reason: `Stop-loss triggered (${(pos.unrealized_plpc * 100).toFixed(2)}% loss)`,
-        unrealized_loss: pos.unrealized_pl,
-        unrealized_loss_pct: pos.unrealized_plpc,
-      });
-    }
-
-    // Rule 3: Profit-taking (large unrealized gains - trim to half)
-    if (pos.unrealized_plpc > PROFIT_TAKE_THRESHOLD) {
-      const trimQty = Math.floor(pos.qty / 2);
-
-      if (trimQty > 0) {
-        actions.push({
-          type: 'profit_take',
-          symbol: pos.symbol,
-          qty: trimQty,
-          reason: `Profit-taking (${(pos.unrealized_plpc * 100).toFixed(2)}% gain)`,
-          unrealized_gain: pos.unrealized_pl,
-          unrealized_gain_pct: pos.unrealized_plpc,
-        });
-      }
-    }
-  }
-
-  return actions;
-}
-
-/**
- * Execute rebalancing orders
- */
-async function executeRebalancingOrders(actions, credentials) {
-  const results = [];
-
-  for (const action of actions) {
-    try {
-      const orderPayload = {
-        symbol: action.symbol,
-        qty: action.qty,
-        side: 'sell',
-        type: 'market',
-        time_in_force: 'day',
-      };
-
-      // Add stop price for stop-loss orders
-      if (action.type === 'stop_loss') {
-        // Stop at 2% below current price to ensure execution
-        const stopPriceResp = await fetchAlpaca(
-          `/v2/positions/${action.symbol}`,
-          credentials
-        );
-        const currentPrice = parseFloat(stopPriceResp.current_price);
-        orderPayload.order_class = 'simple';
-      }
-
-      const orderResp = await fetchAlpaca(
-        '/v2/orders',
-        credentials,
-        'POST',
-        orderPayload
-      );
-
-      results.push({
-        success: true,
-        action: action.type,
-        symbol: action.symbol,
-        qty: action.qty,
-        order_id: orderResp.id,
-        status: orderResp.status,
-      });
-    } catch (error) {
-      results.push({
-        success: false,
-        action: action.type,
-        symbol: action.symbol,
-        qty: action.qty,
-        error: error.message,
-      });
-    }
-  }
-
-  return results;
-}
-
-/**
- * Format rebalancing summary for Telegram
- */
 function formatRebalancingSummary(positions, actions, results, equity, cash) {
-  let message = '📊 *Portfolio Rebalance Report*\n\n';
-  message += `⏰ ${new Date().toISOString()}\n`;
-  message += `💼 Equity: $${equity.toFixed(2)}\n`;
-  message += `💵 Cash: $${cash.toFixed(2)}\n\n`;
+  let msg = '📊 *DI 포트폴리오 리밸런스 리포트*\n\n';
+  msg += `⏰ ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}\n`;
+  msg += `💼 총 자산: $${equity.toFixed(2)}\n`;
+  msg += `💵 현금: $${cash.toFixed(2)}\n\n`;
 
-  // Top holdings
-  message += '📈 *Top Holdings:*\n';
-  const topHoldings = positions
-    .sort((a, b) => b.market_value - a.market_value)
-    .slice(0, 5);
-
-  for (const pos of topHoldings) {
-    const weight = (pos.weight * 100).toFixed(1);
-    const pl = pos.unrealized_pl > 0 ? '📈' : '📉';
-    const plPct = (pos.unrealized_plpc * 100).toFixed(2);
-    message += `${pl} ${pos.symbol}: ${weight}% ($${pos.market_value.toFixed(2)}) [${plPct}%]\n`;
+  const topHoldings = positions.sort((a, b) => b.marketValue - a.marketValue).slice(0, 5);
+  if (topHoldings.length > 0) {
+    msg += '📈 *상위 보유:*\n';
+    for (const pos of topHoldings) {
+      const icon = pos.unrealizedPL > 0 ? '📈' : '📉';
+      msg += `${icon} ${pos.symbol}: ${(pos.weight * 100).toFixed(1)}% ($${pos.marketValue.toFixed(0)}) [${(pos.unrealizedPLPct * 100).toFixed(1)}%]\n`;
+    }
   }
 
-  // Actions taken
   if (actions.length > 0) {
-    message += '\n🔄 *Rebalancing Actions:*\n';
-
-    const sellOverweight = actions.filter(a => a.type === 'sell_overweight');
-    const stopLosses = actions.filter(a => a.type === 'stop_loss');
-    const profitTakes = actions.filter(a => a.type === 'profit_take');
-
-    if (sellOverweight.length > 0) {
-      message += '\n*Overweight Reductions:*\n';
-      for (const action of sellOverweight) {
-        message += `  🔻 ${action.symbol}: Sell ${action.qty} shares (${(action.current_weight * 100).toFixed(1)}% → ${(action.target_weight * 100).toFixed(1)}%)\n`;
-      }
+    msg += '\n🔄 *리밸런싱 액션:*\n';
+    for (const a of actions) {
+      const icon = a.type === 'stop_loss' ? '❌' : a.type === 'profit_take' ? '✅' : '🔻';
+      msg += `${icon} ${a.symbol}: ${a.reason}\n`;
     }
-
-    if (stopLosses.length > 0) {
-      message += '\n*Stop-Loss Executions:*\n';
-      for (const action of stopLosses) {
-        message += `  ❌ ${action.symbol}: Sell ${action.qty} shares (${(action.unrealized_loss_pct * 100).toFixed(2)}% loss)\n`;
-      }
-    }
-
-    if (profitTakes.length > 0) {
-      message += '\n*Profit Taking:*\n';
-      for (const action of profitTakes) {
-        message += `  ✅ ${action.symbol}: Trim ${action.qty} shares (${(action.unrealized_gain_pct * 100).toFixed(2)}% gain)\n`;
-      }
-    }
-
-    // Execution summary
-    message += '\n*Execution Summary:*\n';
-    const successful = results.filter(r => r.success).length;
-    const failed = results.filter(r => !r.success).length;
-    message += `✓ ${successful} successful | ✗ ${failed} failed\n`;
+    const ok = results.filter(r => r.success).length;
+    const fail = results.filter(r => !r.success).length;
+    msg += `\n실행: ✓ ${ok}건 성공 | ✗ ${fail}건 실패\n`;
   } else {
-    message += '\n✓ *Portfolio Balanced* - No rebalancing needed\n';
+    msg += '\n✓ *포트폴리오 균형* — 리밸런싱 불필요\n';
   }
 
-  return message;
+  return msg;
 }
 
-/**
- * Fetch from Alpaca API
- */
-async function fetchAlpaca(
-  endpoint,
-  { alpacaKey, alpacaSecret },
-  method = 'GET',
-  body = null
-) {
-  const url = ALPACA_BASE + endpoint;
-  const options = {
-    method,
-    headers: {
-      'APCA-API-KEY-ID': alpacaKey,
-      'APCA-API-SECRET-KEY': alpacaSecret,
-      'Content-Type': 'application/json',
-    },
-  };
-
-  if (body) {
-    options.body = JSON.stringify(body);
-  }
-
-  const response = await fetch(url, options);
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Alpaca API error (${response.status}): ${errorText}`);
-  }
-
-  return response.json();
-}
-
-/**
- * Send Telegram message
- */
 async function sendTelegramMessage(message) {
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!botToken || !chatId) return;
 
-  if (!botToken || !chatId) {
-    console.warn('Telegram credentials missing, skipping notification');
-    return;
+  try {
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'Markdown' }),
+    });
+  } catch (e) {
+    console.error('Telegram send error:', e.message);
   }
-
-  const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: message,
-      parse_mode: 'Markdown',
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Telegram API error: ${response.statusText}`);
-  }
-
-  return response.json();
 }

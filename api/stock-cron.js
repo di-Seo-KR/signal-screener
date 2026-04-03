@@ -1,6 +1,6 @@
 // Stock Auto-Trading Cron Engine for Vercel
 // 장중 30분 간격 실행: 실시간 시장 감시 + 알파 전략 기반 자동매매
-// KV 가상 포트폴리오 매매 (Alpaca 불필요)
+// KV 가상 포트폴리오 매매
 // Yahoo Finance 가격 기반 가상매매
 
 export const config = { maxDuration: 120 };

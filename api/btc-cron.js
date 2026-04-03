@@ -1,6 +1,6 @@
 // Vercel Cron — 멀티 자산 암호화폐 자동매매 서버사이드 엔진
 // 15분마다 실행: Binance 캔들 → 전략 시그널 → KV 가상 포트폴리오 매매
-// Alpaca 불필요 — 자체 가상매매 엔진 (Binance 실시간 가격 기반)
+// 자체 가상매매 엔진 (Binance 실시간 가격 기반)
 // 환경변수: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (선택)
 
 export const config = { maxDuration: 120 };

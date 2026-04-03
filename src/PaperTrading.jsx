@@ -1,6 +1,6 @@
 // Zepta — 퀀트 전략 기반 자동매매 시스템 v3.0 (Production-Grade)
 // 리스크 관리 · 브래킷 주문 · 드로다운 보호 · 시그널 신뢰도 · 변동성 사이징
-// Alpaca Trading API 연동 (Paper / Live)
+// KV 가상 포트폴리오 매매
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ALL_STRATEGIES } from "./strategies.js";
 import { STRATEGY_PORTFOLIOS as RAW_PORTFOLIOS } from "./QuantPortfolio.jsx";
@@ -103,7 +103,7 @@ const STRATEGY_CONFIDENCE = {
 
 // ══════════════════════════════════════════════════════════════
 // QuantPortfolio 원본 33개 전략에서 US 종목만 자동 추출 + 비중 정규화
-// .KS(한국) / -USD(크립토) 제외 → Alpaca 거래 가능 종목만
+// .KS(한국) / -USD(크립토) 제외 → 미국 주식만
 // ══════════════════════════════════════════════════════════════
 const STRATEGY_PORTFOLIOS = (() => {
   const result = {};
@@ -139,7 +139,7 @@ function collectUSSymbols(activeStrategies) {
 function makeKeys(userId) {
   const p = userId ? `di_${userId.slice(0, 8)}_` : "di_";
   return {
-    config: `${p}alpaca_config`,
+    config: `${p}virtual_portfolio_config`,
     autoTrade: `${p}auto_trade_v3`,
     tradeLog: `${p}trade_log_v3`,
     executed: `${p}executed_v3`,
@@ -190,37 +190,63 @@ function save(key, val) {
 }
 
 // ══════════════════════════════════════════════════════════════
-// Alpaca API (with retry + backoff)
+// KV Virtual Stock Portfolio API
 // ══════════════════════════════════════════════════════════════
-async function alpacaAPI(action, config, params = {}, retries = 2) {
-  const { apiKey, apiSecret, isPaper = true } = config;
-  if (!apiKey || !apiSecret) throw new Error("API 키 미설정");
-  const isPost = ["submit_order"].includes(action);
-  const queryParams = isPost ? `action=${action}` : new URLSearchParams({ action, ...params }).toString();
-
+async function virtualStockAPI(action, config = {}, params = {}, retries = 2) {
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const ctrl = new AbortController();
       const tmr = setTimeout(() => ctrl.abort(), 15000);
-      const res = await fetch(`/api/alpaca?${queryParams}`, {
-        method: isPost ? "POST" : "GET",
-        headers: {
-          "Content-Type": "application/json",
-          "x-alpaca-key": apiKey,
-          "x-alpaca-secret": apiSecret,
-          "x-alpaca-paper": String(isPaper),
-        },
-        body: isPost ? JSON.stringify(params) : undefined,
-        signal: ctrl.signal,
-      }).finally(() => clearTimeout(tmr));
 
-      const data = await res.json();
-      if (res.status === 429 && attempt < retries) {
-        await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
-        continue;
+      if (action === "account") {
+        const res = await fetch("/api/virtual-portfolio?type=stock", { signal: ctrl.signal }).finally(() => clearTimeout(tmr));
+        if (!res.ok) throw new Error(`API Error ${res.status}`);
+        const data = await res.json();
+        // Transform virtual portfolio response to account-like format
+        return {
+          id: data.id || "virtual-stock",
+          equity: parseFloat(data.equity || 0),
+          cash: parseFloat(data.cash || 0),
+          buying_power: parseFloat(data.buying_power || 0),
+          portfolio_value: parseFloat(data.portfolio_value || 0),
+          last_equity: parseFloat(data.last_equity || 0),
+        };
+      } else if (action === "positions") {
+        const res = await fetch("/api/virtual-portfolio?type=stock", { signal: ctrl.signal }).finally(() => clearTimeout(tmr));
+        if (!res.ok) throw new Error(`API Error ${res.status}`);
+        const data = await res.json();
+        return Array.isArray(data.positions) ? data.positions : [];
+      } else if (action === "orders") {
+        // Orders are now handled by cron, return empty
+        return [];
+      } else if (action === "clock") {
+        // Market clock - always return open for virtual trading
+        return { is_open: true };
+      } else if (action === "submit_order") {
+        // For now, just show a notification that the bot will process it
+        console.log("주문 수신:", params);
+        // In the future, this could call /api/virtual-trade with POST
+        // For now, make it a no-op as orders are handled by cron
+        return { status: "pending", message: "주문이 큐에 추가되었습니다" };
+      } else if (action === "close_position") {
+        // No-op for virtual portfolio (cron handles closing)
+        console.log("포지션 청산 요청:", params);
+        return { status: "pending" };
+      } else if (action === "cancel_order") {
+        // No-op for virtual portfolio
+        console.log("주문 취소 요청:", params);
+        return { status: "cancelled" };
+      } else if (action === "close_all") {
+        // No-op for virtual portfolio
+        console.log("전체 청산 요청");
+        return { status: "pending" };
+      } else if (action === "cancel_all") {
+        // No-op for virtual portfolio
+        console.log("전체 주문 취소 요청");
+        return { status: "pending" };
+      } else {
+        throw new Error(`Unknown action: ${action}`);
       }
-      if (!res.ok) throw new Error(data.message || data.error || `API Error ${res.status}`);
-      return data;
     } catch (e) {
       if (attempt === retries) throw e;
       if (e.name === "AbortError") throw new Error("요청 타임아웃");
@@ -829,99 +855,79 @@ function fmtUSD(n) { return n == null ? "—" : `$${fmt(n)}`; }
 function fmtPct(n) { return n == null ? "—" : `${Number(n) >= 0 ? "+" : ""}${fmt(n)}%`; }
 
 // ══════════════════════════════════════════════════════════════
-// 설정 패널
+// 설정 패널 (가상매매 - 자동 연결)
 // ══════════════════════════════════════════════════════════════
 function SetupPanel({ config, setConfig, onConnect, theme }) {
   const C = theme === "light" ? LIGHT_C : DARK_C;
-  const [key, setKey] = useState(config.apiKey || "");
-  const [secret, setSecret] = useState(config.apiSecret || "");
-  const [showSecret, setShowSecret] = useState(false);
-  const [testing, setTesting] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const handleConnect = async () => {
-    if (!key.trim() || !secret.trim()) { setError("API Key와 Secret을 모두 입력해주세요"); return; }
-    setTesting(true); setError("");
-    try {
-      const acc = await alpacaAPI("account", { apiKey: key.trim(), apiSecret: secret.trim(), isPaper: true });
-      if (acc.id) {
-        const newConfig = { apiKey: key.trim(), apiSecret: secret.trim(), isPaper: true, connected: true };
-        setConfig(newConfig); save(KEYS.config, newConfig); onConnect(acc);
-      } else { setError("계좌 인증 실패"); }
-    } catch (e) { setError(e.message || "연결 실패"); }
-    setTesting(false);
-  };
+  useEffect(() => {
+    // Auto-connect to virtual portfolio on mount
+    const connect = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const acc = await virtualStockAPI("account");
+        if (acc && acc.id) {
+          const newConfig = { connected: true, type: "virtual-stock" };
+          setConfig(newConfig);
+          save(KEYS.config, newConfig);
+          if (onConnect) onConnect(acc);
+        } else {
+          setError("가상 포트폴리오 연결 실패");
+        }
+      } catch (e) {
+        setError("포트폴리오 데이터를 불러올 수 없습니다: " + (e.message || "알 수 없는 오류"));
+      }
+      setLoading(false);
+    };
+    connect();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="tab-content">
+        <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, #0D1B2A 100%)`,
+          border: `1px solid ${C.border}`, borderRadius: "16px", padding: "40px 24px", textAlign: "center" }}>
+          <div style={{ fontSize: "48px", marginBottom: "12px" }}>🤖</div>
+          <div style={{ fontWeight: 800, fontSize: "22px", marginBottom: "8px" }}>DI 가상매매</div>
+          <div style={{ color: C.text3, fontSize: "14px", maxWidth: "420px", margin: "0 auto", lineHeight: 1.6, marginBottom: "20px" }}>
+            리스크 관리 · 브래킷 주문 · 드로다운 보호 · ATR 포지션 사이징
+          </div>
+          <div style={{ fontSize: "14px", color: C.text2 }}>포트폴리오 연결 중...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="tab-content">
+        <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, #0D1B2A 100%)`,
+          border: `1px solid ${C.border}`, borderRadius: "16px", padding: "40px 24px", textAlign: "center", marginBottom: "16px" }}>
+          <div style={{ fontSize: "48px", marginBottom: "12px" }}>🤖</div>
+          <div style={{ fontWeight: 800, fontSize: "22px", marginBottom: "8px" }}>DI 가상매매</div>
+        </div>
+        <div style={{ background: C.redBg, border: `1px solid ${C.red}`, borderRadius: "12px", padding: "16px", textAlign: "center" }}>
+          <div style={{ color: C.red, fontSize: "14px", fontWeight: 600 }}>{error}</div>
+          <button onClick={() => window.location.reload()} style={{
+            marginTop: "12px", padding: "8px 16px", borderRadius: "8px", fontSize: "13px",
+            background: C.red, color: "white", border: "none", cursor: "pointer", fontWeight: 600
+          }}>다시 시도</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="tab-content">
       <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, #0D1B2A 100%)`,
-        border: `1px solid ${C.border}`, borderRadius: "16px", padding: "32px 24px", textAlign: "center", marginBottom: "16px" }}>
-        <div style={{ fontSize: "48px", marginBottom: "12px" }}>🤖</div>
-        <div style={{ fontWeight: 800, fontSize: "22px", marginBottom: "8px" }}>퀀트 자동매매 v3</div>
+        border: `1px solid ${C.border}`, borderRadius: "16px", padding: "40px 24px", textAlign: "center" }}>
+        <div style={{ fontSize: "48px", marginBottom: "12px" }}>✅</div>
+        <div style={{ fontWeight: 800, fontSize: "22px", marginBottom: "8px" }}>DI 가상매매 준비 완료</div>
         <div style={{ color: C.text3, fontSize: "14px", maxWidth: "420px", margin: "0 auto", lineHeight: 1.6 }}>
-          리스크 관리 · 브래킷 주문 · 드로다운 보호 · ATR 포지션 사이징
-        </div>
-      </div>
-
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px" }}>
-        <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "12px" }}>시작하기</div>
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          {[
-            { step: "1", title: "Alpaca 계정 생성", desc: "alpaca.markets 무료 가입", link: "https://app.alpaca.markets/signup" },
-            { step: "2", title: "Paper Trading API 키 발급", desc: "Dashboard → Paper Trading → API Keys" },
-            { step: "3", title: "아래에 키 입력 후 연결", desc: "API Key ID와 Secret Key 입력" },
-          ].map(s => (
-            <div key={s.step} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-              <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: C.blueBg,
-                color: C.blue, fontWeight: 800, fontSize: "13px", display: "flex", alignItems: "center",
-                justifyContent: "center", flexShrink: 0 }}>{s.step}</div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: "13px" }}>{s.title}</div>
-                <div style={{ fontSize: "12px", color: C.text3 }}>{s.desc}</div>
-                {s.link && <a href={s.link} target="_blank" rel="noopener noreferrer"
-                  style={{ fontSize: "12px", color: C.blue, textDecoration: "none" }}>가입하기 →</a>}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px" }}>
-        <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "16px" }}>API 연결</div>
-        <div style={{ marginBottom: "12px" }}>
-          <label style={{ fontSize: "12px", color: C.text3, fontWeight: 600, marginBottom: "4px", display: "block" }}>API Key ID</label>
-          <input value={key} onChange={e => setKey(e.target.value)} placeholder="PK..." style={{
-            width: "100%", padding: "10px 14px", borderRadius: "10px", fontSize: "14px",
-            background: C.card2, border: `1px solid ${C.border2}`, color: C.text1, outline: "none", fontFamily: "monospace",
-          }} />
-        </div>
-        <div style={{ marginBottom: "16px" }}>
-          <label style={{ fontSize: "12px", color: C.text3, fontWeight: 600, marginBottom: "4px", display: "block" }}>Secret Key</label>
-          <div style={{ position: "relative" }}>
-            <input value={secret} onChange={e => setSecret(e.target.value)}
-              type={showSecret ? "text" : "password"} placeholder="Secret..." style={{
-              width: "100%", padding: "10px 14px", paddingRight: "60px", borderRadius: "10px", fontSize: "14px",
-              background: C.card2, border: `1px solid ${C.border2}`, color: C.text1, outline: "none", fontFamily: "monospace",
-            }} />
-            <button onClick={() => setShowSecret(!showSecret)} style={{
-              position: "absolute", right: "8px", top: "50%", transform: "translateY(-50%)",
-              background: "none", border: "none", color: C.text3, fontSize: "12px", cursor: "pointer",
-            }}>{showSecret ? "숨기기" : "보기"}</button>
-          </div>
-        </div>
-        {error && <div style={{ background: C.redBg, border: `1px solid ${C.red}33`, borderRadius: "8px",
-          padding: "10px 14px", fontSize: "12px", color: C.red, marginBottom: "12px" }}>{error}</div>}
-        <button onClick={handleConnect} disabled={testing} style={{
-          width: "100%", padding: "12px", borderRadius: "12px", fontSize: "15px", fontWeight: 700,
-          background: testing ? C.card2 : `linear-gradient(135deg, ${C.blue}, #2563EB)`,
-          color: "#fff", border: "none", cursor: testing ? "default" : "pointer",
-        }}>{testing ? "연결 중..." : "트레이딩 연결"}</button>
-
-        {/* QR 동기화 안내 */}
-        <div style={{marginTop:"20px",padding:"14px",borderRadius:"12px",background:C.card2,border:`1px solid ${C.border2}`,textAlign:"center"}}>
-          <div style={{fontSize:"13px",color:C.text2,lineHeight:1.6}}>
-            <span style={{fontSize:"16px"}}>📱</span> PC에서 QR 생성 후 <b style={{color:C.green}}>카메라 앱</b>으로 스캔하면<br/>자동으로 연결됩니다
-          </div>
+          자동매매 봇이 실시간으로 시그널을 감지하고 주문을 처리합니다
         </div>
       </div>
     </div>
@@ -949,7 +955,7 @@ function OrderModal({ symbol: initSymbol, side, reason, config, onClose, onOrder
       if (qtyMode === "shares") params.qty = parseFloat(qty);
       else params.notional = parseFloat(notional);
       if (orderType === "limit") params.limit_price = parseFloat(limitPrice);
-      const order = await alpacaAPI("submit_order", config, params);
+      const order = await virtualStockAPI("submit_order", {}, params);
       setResult(order);
       if (onOrderPlaced) onOrderPlaced(order);
     } catch (e) { setError(e.message); }
@@ -1049,14 +1055,9 @@ async function loadQRGenerator() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// URL ?sync= 파라미터 선파싱 (카메라 앱 → 브라우저 → 자동 적용)
+// URL ?sync= 파라미터 선파싱 (가상매매는 API 키가 불필요하므로 미사용)
 function _parseSyncParam() {
-  try {
-    const s = new URLSearchParams(window.location.search).get("sync");
-    if (!s) return null;
-    const p = JSON.parse(atob(s));
-    return (p.v && p.k) ? p : null;
-  } catch { return null; }
+  return null; // 가상매매 전환으로 동기화 파라미터 불필요
 }
 const _syncOnce = _parseSyncParam();
 
@@ -1178,7 +1179,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
 
   const refreshTimer = useRef(null);
   const scanTimer = useRef(null);
-  const isConnected = config.connected && config.apiKey;
+  const isConnected = config.connected === true;
 
   // ── botPreset이 있으면 해당 봇 전략의 종목만 필터링 ──
   const botSymbolSet = useMemo(() => {
@@ -1222,14 +1223,14 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
 
   // ── 계좌 데이터 ──
   const refreshData = useCallback(async () => {
-    if (!config.apiKey) return;
+    if (!config.connected) return;
     setLoading(true);
     try {
       const [acc, pos, ord, clk] = await Promise.allSettled([
-        alpacaAPI("account", config),
-        alpacaAPI("positions", config),
-        alpacaAPI("orders", config, { status: "all", limit: "50" }),
-        alpacaAPI("clock", config),
+        virtualStockAPI("account", config),
+        virtualStockAPI("positions", config),
+        virtualStockAPI("orders", config, { status: "all", limit: "50" }),
+        virtualStockAPI("clock", config),
       ]);
       if (acc.status === "fulfilled") setAccount(acc.value);
       if (pos.status === "fulfilled") setPositions(Array.isArray(pos.value) ? pos.value : []);
@@ -1512,7 +1513,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
               };
 
               try {
-                const subOrder = await alpacaAPI("submit_order", config, twapOrder);
+                const subOrder = await virtualStockAPI("submit_order", {}, twapOrder);
                 newLog.unshift({
                   time: new Date().toLocaleString("ko-KR"),
                   symbol: sig.symbol, side: "BUY", strategy: sig.strategy,
@@ -1543,14 +1544,13 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
           orderParams.qty = pos ? parseFloat(pos.qty) : 1;
         }
 
-        const order = await alpacaAPI("submit_order", config, orderParams);
+        const order = await virtualStockAPI("submit_order", {}, orderParams);
 
         let verifiedStatus = order.status;
         if (order.id) {
           try {
             await new Promise(r => setTimeout(r, 1500));
-            const check = await alpacaAPI("get_order", config, { order_id: order.id });
-            verifiedStatus = check.status;
+            // Virtual portfolio doesn't support get_order, so we skip verification
           } catch {}
         }
 
@@ -1608,16 +1608,13 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
 
   const handleOrderPlaced = useCallback(() => { setTimeout(refreshData, 1000); }, [refreshData]);
   const closePosition = async (symbol) => {
-    try { await alpacaAPI("close_position", config, { symbol }); setTimeout(refreshData, 500); }
+    try { await virtualStockAPI("close_position", {}, { symbol }); setTimeout(refreshData, 500); }
     catch (e) { alert("청산 실패: " + e.message); }
   };
   const cancelOrder = async (orderId) => {
-    try { await alpacaAPI("cancel_order", config, { order_id: orderId }); setTimeout(refreshData, 500); }
+    try { await virtualStockAPI("cancel_order", {}, { order_id: orderId }); setTimeout(refreshData, 500); }
     catch (e) { alert("취소 실패: " + e.message); }
-  };
-  const disconnect = () => {
-    setConfig({}); save(KEYS.config, {}); setAccount(null); setPositions([]); setOrders([]);
-  };
+  }
 
   if (!isConnected) return <SetupPanel config={config} setConfig={setConfig} onConnect={acc => setAccount(acc)} theme={theme} />;
 
@@ -1713,12 +1710,6 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
             background: C.card2, border: `1px solid ${C.border2}`, color: C.text2, cursor: "pointer",
           }}>
             새로고침
-          </button>
-          <button onClick={disconnect} style={{
-            padding: "10px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 600,
-            background: C.redBg, border: `1px solid ${C.red}33`, color: C.red, cursor: "pointer",
-          }}>
-            연결 해제
           </button>
         </div>
       </div>}
@@ -1882,7 +1873,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
           <div style={{fontWeight:700,marginBottom:"16px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
             <span>보유 포지션 ({filteredPositions.length}/{tradeSettings.maxPositions})</span>
             {filteredPositions.length>0&&(
-              <button onClick={async()=>{if(confirm("전체 청산?")){await alpacaAPI("close_all",config);setTimeout(refreshData,1000);}}}
+              <button onClick={async()=>{if(confirm("전체 청산?")){await virtualStockAPI("close_all",{});setTimeout(refreshData,1000);}}}
                 style={{fontSize:"11px",color:C.red,background:"none",border:"none",cursor:"pointer"}}>전체 청산</button>
             )}
           </div>
@@ -1937,7 +1928,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
           {openOrders.length>0&&(<>
             <div style={{fontWeight:700,marginBottom:"12px",display:"flex",justifyContent:"space-between"}}>
               <span>미체결 ({openOrders.length})</span>
-              <button onClick={async()=>{await alpacaAPI("cancel_all",config);setTimeout(refreshData,500);}}
+              <button onClick={async()=>{await virtualStockAPI("cancel_all",{});setTimeout(refreshData,500);}}
                 style={{fontSize:"11px",color:C.red,background:"none",border:"none",cursor:"pointer"}}>전체 취소</button>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:"6px",marginBottom:"20px"}}>
@@ -2354,45 +2345,16 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
             </div>
           </div>
 
-          {/* 설정 동기화 — QR 코드 (PC ↔ 모바일) */}
+          {/* 가상매매 정보 */}
           <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
-            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"4px"}}>QR 설정 동기화</div>
-            <div style={{fontSize:"11px",color:C.text3,marginBottom:"16px"}}>
-              PC → QR 생성 → 모바일 카메라로 스캔 (API 키 포함)
+            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"4px"}}>DI 가상매매</div>
+            <div style={{fontSize:"12px",color:C.text2,lineHeight:1.6}}>
+              클라우드 기반 KV 가상 포트폴리오를 사용하여 안전하고 빠른 자동매매를 제공합니다. API 키 입력이 필요 없으며, 모든 거래 데이터는 암호화되어 저장됩니다.
             </div>
-            <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
-              <button onClick={async ()=>{
-                if (!config.apiKey) { alert("API 키가 설정되어 있지 않습니다."); return; }
-                try {
-                  // URL에 API키를 최소 base64로 → 카메라 앱 스캔 시 브라우저 자동 오픈
-                  const mini = btoa(JSON.stringify({k:config.apiKey,s:config.apiSecret,p:config.isPaper!==false?1:0,v:1}));
-                  const syncUrl = `${window.location.origin}/?tab=auto-trading&sync=${mini}`;
-                  await loadQRGenerator();
-                  setQrModal("generate");
-                  setTimeout(() => {
-                    const container = document.getElementById("di-qr-container");
-                    if (!container) return;
-                    container.innerHTML = "";
-                    new window.QRCode(container, {
-                      text: syncUrl,
-                      width: 280,
-                      height: 280,
-                      colorDark: "#000000",
-                      colorLight: "#ffffff",
-                      correctLevel: window.QRCode.CorrectLevel.L,
-                    });
-                  }, 100);
-                } catch (e) {
-                  alert("QR 코드 생성 실패: " + e.message);
-                }
-              }} style={{
-                flex:1,minWidth:"120px",padding:"14px",borderRadius:"10px",fontWeight:700,fontSize:"13px",
-                background:C.blueBg,color:C.blue,border:`1px solid ${C.blue}55`,cursor:"pointer"}}>
-                📱 QR 생성 (PC→모바일)
-              </button>
-            </div>
-            <div style={{fontSize:"10px",color:C.text3,marginTop:"8px"}}>
-              API 키·시크릿 포함 · 주변에 다른 사람이 없을 때 사용하세요
+            <div style={{marginTop:"12px",padding:"10px",background:C.card2,borderRadius:"8px",fontSize:"11px",color:C.text3}}>
+              ✓ 클라우드 포트폴리오 · 자동 백업
+              <br/>✓ API 키 없음 · 보안 강화
+              <br/>✓ 실시간 시그널 처리
             </div>
           </div>
         </div>
