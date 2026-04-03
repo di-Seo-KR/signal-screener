@@ -1,7 +1,7 @@
 // Vercel Cron — 멀티 자산 암호화폐 자동매매 서버사이드 엔진
-// 1시간마다 실행: BTC, ETH, SOL 캔들 데이터 → 전략 시그널 생성 → Alpaca 주문
-// market-monitor가 KV에 쌓은 레짐 데이터를 참조하여 적응형 매매
-// 환경변수: ALPACA_API_KEY, ALPACA_SECRET_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+// 15분마다 실행: Binance 캔들 → 전략 시그널 → KV 가상 포트폴리오 매매
+// Alpaca 불필요 — 자체 가상매매 엔진 (Binance 실시간 가격 기반)
+// 환경변수: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (선택)
 
 export const config = { maxDuration: 120 };
 
@@ -72,46 +72,78 @@ export default async function handler(req, res) {
     }
 
     // ── 환경변수 확인 ──
-    const ALPACA_KEY = process.env.ALPACA_API_KEY;
-    const ALPACA_SECRET = process.env.ALPACA_SECRET_KEY;
     const TG_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
     const TG_CHAT = process.env.TELEGRAM_CHAT_ID;
 
-    if (!ALPACA_KEY || !ALPACA_SECRET) {
-      addLog("❌ ALPACA_API_KEY 또는 ALPACA_SECRET_KEY 환경변수 없음");
-      return res.status(200).json({ ok: false, error: "Missing Alpaca credentials", log });
+    // ── KV 가상 포트폴리오 로드 ──
+    addLog("💰 가상 포트폴리오 로드...");
+    let kvModule, kv;
+    try {
+      kvModule = await import("@vercel/kv");
+      kv = kvModule.kv;
+    } catch {
+      addLog("❌ KV 연결 실패 — 매매 불가");
+      return res.status(200).json({ ok: false, error: "KV connection failed", log });
     }
 
-    // ── Alpaca 계좌 확인 ──
-    addLog("💰 Alpaca 계좌 조회...");
-    const alpacaBase = "https://paper-api.alpaca.markets";
-    const alpacaHeaders = {
-      "APCA-API-KEY-ID": ALPACA_KEY,
-      "APCA-API-SECRET-KEY": ALPACA_SECRET,
-      "Content-Type": "application/json",
-    };
-
-    const accRes = await fetch(`${alpacaBase}/v2/account`, { headers: alpacaHeaders });
-    const account = await accRes.json();
-    if (!accRes.ok) {
-      addLog(`❌ Alpaca 계좌 오류: ${JSON.stringify(account)}`);
-      return res.status(200).json({ ok: false, error: "Alpaca account error", log });
+    const PORTFOLIO_KEY = "di:virtual:portfolio";
+    const INITIAL_CASH = 100000; // 가상 초기 자금 $100,000
+    let portfolio = await kv.get(PORTFOLIO_KEY);
+    if (!portfolio) {
+      portfolio = {
+        cash: INITIAL_CASH,
+        initialCash: INITIAL_CASH,
+        positions: {}, // { "BTC/USD": { qty: 0.5, avgPrice: 60000, entryTime: "..." } }
+        totalTrades: 0,
+        createdAt: new Date().toISOString(),
+      };
+      await kv.set(PORTFOLIO_KEY, portfolio);
+      addLog(`🆕 가상 포트폴리오 생성: $${INITIAL_CASH.toLocaleString()}`);
     }
 
-    const equity = parseFloat(account.equity || 0);
-    const cash = parseFloat(account.cash || 0);
-    addLog(`✅ 계좌: $${equity.toFixed(0)} (현금: $${cash.toFixed(0)})`);
-
-    // ── 포지션 확인 ──
-    const posRes = await fetch(`${alpacaBase}/v2/positions`, { headers: alpacaHeaders });
-    const positions = await posRes.json();
-    const positionMap = {};
-    if (Array.isArray(positions)) {
+    // ── Binance 실시간 가격 조회 (전 종목 한번에) ──
+    const priceMap = {};
+    try {
+      const tickerRes = await fetch("https://api.binance.com/api/v3/ticker/price");
+      const tickers = await tickerRes.json();
       for (const asset of CRYPTO_ASSETS) {
-        const pos = positions.find(p => p.symbol === asset);
-        if (pos) positionMap[asset] = pos;
+        const binSym = BINANCE_SYMBOLS[asset];
+        const ticker = tickers.find(t => t.symbol === binSym);
+        if (ticker) priceMap[asset] = parseFloat(ticker.price);
       }
+      addLog(`📡 실시간 가격: ${Object.keys(priceMap).length}종목 로드`);
+    } catch (e) {
+      addLog(`❌ Binance 가격 오류: ${e.message}`);
+      return res.status(200).json({ ok: false, error: "Binance price fetch failed", log });
     }
+
+    // ── 포트폴리오 가치 계산 ──
+    let totalMarketValue = 0;
+    const positionMap = {};
+    for (const [asset, pos] of Object.entries(portfolio.positions || {})) {
+      const currentPrice = priceMap[asset];
+      if (!currentPrice || !pos.qty || pos.qty <= 0) continue;
+      const marketValue = pos.qty * currentPrice;
+      const costBasis = pos.qty * pos.avgPrice;
+      const unrealizedPL = marketValue - costBasis;
+      const unrealizedPLPct = costBasis > 0 ? (unrealizedPL / costBasis) * 100 : 0;
+      totalMarketValue += marketValue;
+      positionMap[asset] = {
+        symbol: asset,
+        qty: pos.qty,
+        avg_entry_price: pos.avgPrice,
+        current_price: currentPrice,
+        market_value: marketValue,
+        cost_basis: costBasis,
+        unrealized_pl: unrealizedPL,
+        unrealized_plpc: unrealizedPLPct / 100,
+        updated_at: pos.entryTime,
+      };
+    }
+    const equity = portfolio.cash + totalMarketValue;
+    const cash = portfolio.cash;
+    addLog(`✅ 가상 계좌: $${equity.toFixed(0)} (현금: $${cash.toFixed(0)}, 포지션: $${totalMarketValue.toFixed(0)})`);
+    addLog(`📊 보유 포지션: ${Object.keys(positionMap).length}종목`);
 
     // ── Fear & Greed Index 페치 ──
     let fngData = null;
@@ -351,69 +383,58 @@ export default async function handler(req, res) {
         }
       }
 
-      // BUY 주문 실행 (현금 기준 — 레버리지 미사용)
+      // ── 가상매매: BUY 실행 ──
+      const currentPrice = priceMap[asset];
+      if (!currentPrice) {
+        addLog(`⚠️ ${asset} 가격 없음 — 스킵`);
+        assetResults.push({ asset, ok: false, error: "No price data" });
+        continue;
+      }
+
       if (latestSignal.type === "BUY" && !shouldSellForStopLoss) {
-        const availableCash = cash - totalCryptoExposure;
-        const maxCashPerAsset = cash * MAX_POSITION_PER_ASSET;
+        const availableCash = portfolio.cash - totalCryptoExposure;
+        const maxCashPerAsset = equity * MAX_POSITION_PER_ASSET;
         if (pos) {
-          const addAmount = cash * positionSize * 0.25;
+          const addAmount = equity * positionSize * 0.25;
           if (currentExposure + addAmount <= maxCashPerAsset && addAmount <= availableCash) {
             tradeAmount = Math.min(addAmount, maxCashPerAsset - currentExposure, availableCash);
           }
         } else {
-          tradeAmount = Math.min(cash * positionSize * 0.25, maxCashPerAsset, availableCash);
+          tradeAmount = Math.min(equity * positionSize * 0.25, maxCashPerAsset, availableCash);
         }
 
-        if (latestSignal.type === "BUY" && tradeAmount > 10) {
-          addLog(`🟢 ${asset} 매수: $${tradeAmount.toFixed(0)}`);
-          const orderRes = await fetch(`${alpacaBase}/v2/orders`, {
-            method: "POST",
-            headers: alpacaHeaders,
-            body: JSON.stringify({
-              symbol: asset,
-              notional: tradeAmount.toFixed(2),
-              side: "buy",
-              type: "market",
-              time_in_force: "gtc",
-            }),
-          });
-          const orderResult = await orderRes.json();
-          if (orderRes.ok) {
-            addLog(`✅ ${asset} 매수 완료: ${orderResult.id}`);
-            assetResults.push({ asset, ok: true, type: "BUY", signal: latestSignal, order: orderResult.id, amount: tradeAmount });
-            totalCryptoExposure += tradeAmount;
+        if (tradeAmount > 10) {
+          const buyQty = tradeAmount / currentPrice;
+          const existing = portfolio.positions[asset];
+          if (existing && existing.qty > 0) {
+            // 평균단가 재계산
+            const totalQty = existing.qty + buyQty;
+            const totalCost = (existing.qty * existing.avgPrice) + tradeAmount;
+            portfolio.positions[asset] = { qty: totalQty, avgPrice: totalCost / totalQty, entryTime: existing.entryTime };
           } else {
-            addLog(`❌ ${asset} 매수 실패: ${JSON.stringify(orderResult)}`);
-            assetResults.push({ asset, ok: false, error: `Buy failed: ${orderResult.code}` });
+            portfolio.positions[asset] = { qty: buyQty, avgPrice: currentPrice, entryTime: new Date().toISOString() };
           }
+          portfolio.cash -= tradeAmount;
+          portfolio.totalTrades = (portfolio.totalTrades || 0) + 1;
+          totalCryptoExposure += tradeAmount;
+          addLog(`🟢 ${asset} 매수: $${tradeAmount.toFixed(0)} (${buyQty.toFixed(6)}개 @ $${currentPrice.toFixed(2)})`);
+          assetResults.push({ asset, ok: true, type: "BUY", signal: latestSignal, amount: tradeAmount, price: currentPrice, qty: buyQty });
         }
       }
 
-      // SELL 주문 실행
+      // ── 가상매매: SELL 실행 ──
       if ((latestSignal.type === "SELL" || shouldSellForStopLoss || shouldTakeProfit) && pos) {
-        const sellAmount = parseFloat(pos.market_value || 0);
-        if (sellAmount > 10) {
-          addLog(`🔴 ${asset} 매도: $${sellAmount.toFixed(0)}`);
-          const orderRes = await fetch(`${alpacaBase}/v2/orders`, {
-            method: "POST",
-            headers: alpacaHeaders,
-            body: JSON.stringify({
-              symbol: asset,
-              notional: sellAmount.toFixed(2),
-              side: "sell",
-              type: "market",
-              time_in_force: "gtc",
-            }),
-          });
-          const orderResult = await orderRes.json();
-          if (orderRes.ok) {
-            addLog(`✅ ${asset} 매도 완료: ${orderResult.id}`);
-            assetResults.push({ asset, ok: true, type: "SELL", signal: latestSignal, order: orderResult.id, amount: sellAmount });
-            totalCryptoExposure -= sellAmount;
-          } else {
-            addLog(`❌ ${asset} 매도 실패: ${JSON.stringify(orderResult)}`);
-            assetResults.push({ asset, ok: false, error: `Sell failed: ${orderResult.code}` });
-          }
+        const sellQty = portfolio.positions[asset]?.qty || 0;
+        const sellValue = sellQty * currentPrice;
+        if (sellValue > 10) {
+          const costBasis = sellQty * (portfolio.positions[asset]?.avgPrice || currentPrice);
+          const realizedPL = sellValue - costBasis;
+          portfolio.cash += sellValue;
+          delete portfolio.positions[asset];
+          portfolio.totalTrades = (portfolio.totalTrades || 0) + 1;
+          totalCryptoExposure -= sellValue;
+          addLog(`🔴 ${asset} 매도: $${sellValue.toFixed(0)} (P&L: ${realizedPL >= 0 ? "+" : ""}$${realizedPL.toFixed(2)})`);
+          assetResults.push({ asset, ok: true, type: "SELL", signal: latestSignal, amount: sellValue, price: currentPrice, pnl: realizedPL });
         }
       }
 
@@ -422,10 +443,12 @@ export default async function handler(req, res) {
       }
     }
 
+    // ── 가상 포트폴리오 KV 저장 ──
+    await kv.set(PORTFOLIO_KEY, portfolio);
+    addLog(`💾 포트폴리오 저장: 현금 $${portfolio.cash.toFixed(0)}, 포지션 ${Object.keys(portfolio.positions).length}종목`);
+
     // ── 봇별 성과 KV 저장 ──
     try {
-      const kvModule = await import("@vercel/kv");
-      const kv = kvModule.kv;
       const executedTrades = assetResults.filter(r => r.type === "BUY" || r.type === "SELL");
 
       if (executedTrades.length > 0) {
@@ -495,6 +518,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       results: assetResults,
+      portfolio: { equity: equity.toFixed(0), cash: portfolio.cash.toFixed(0), positions: Object.keys(portfolio.positions).length, totalTrades: portfolio.totalTrades },
       duration: `${duration}s`,
       log,
     });
