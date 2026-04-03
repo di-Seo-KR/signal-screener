@@ -2142,59 +2142,38 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
             </div>
           </div>
 
-          {/* 투자 성향 프리셋 */}
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
-            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"4px"}}>투자 성향</div>
-            <div style={{fontSize:"11px",color:C.text3,marginBottom:"14px"}}>성향을 선택하면 모든 설정이 자동으로 최적화됩니다</div>
-            <div style={{display:"flex",gap:"8px"}}>
-              {[
-                { id:"conservative", label:"안정형", icon:"🛡️", color:C.blue, bg:C.blueBg,
-                  desc:"대형 우량주·저위험·검증 전략만",
-                  s:{allocationPct:3,maxPositions:10,maxDrawdownPct:5,maxDailyLossPct:2,maxSectorPct:25,maxSinglePct:5,
-                    stopLossATR:1.5,takeProfitATR:2.5,useBracketOrders:true,minConfidence:0.7,cooldownHours:48,orderType:"market",
-                    strategies:Object.keys(STRATEGY_PORTFOLIOS).filter(n=>{
-                      const cat = STRATEGY_CATEGORY_MAP[n] || "복합";
-                      const conf = STRATEGY_CONFIDENCE[n] || 0.5;
-                      // 안정형: 복합·평균회귀 전략 + 신뢰도 0.65 이상
-                      return conf >= 0.65 && (cat === "복합" || cat === "평균회귀");
-                    })}},
-                { id:"balanced", label:"균형형", icon:"⚖️", color:C.green, bg:C.greenBg,
-                  desc:"분산 투자·추세+회귀 혼합",
-                  s:{allocationPct:5,maxPositions:20,maxDrawdownPct:10,maxDailyLossPct:3,maxSectorPct:35,maxSinglePct:8,
-                    stopLossATR:2,takeProfitATR:3,useBracketOrders:true,minConfidence:0.5,cooldownHours:24,orderType:"market",
-                    strategies:Object.keys(STRATEGY_PORTFOLIOS).filter(n=>{
-                      const cat = STRATEGY_CATEGORY_MAP[n] || "복합";
-                      const conf = STRATEGY_CONFIDENCE[n] || 0.5;
-                      // 균형형: 추세추종 제외, 복합·평균회귀·모멘텀·패턴 + 신뢰도 0.5 이상
-                      return conf >= 0.5 && cat !== "추세추종";
-                    })}},
-                { id:"aggressive", label:"공격형", icon:"🔥", color:C.orange, bg:C.orangeBg,
-                  desc:"고변동 종목·추세+모멘텀 집중",
-                  s:{allocationPct:8,maxPositions:30,maxDrawdownPct:15,maxDailyLossPct:5,maxSectorPct:45,maxSinglePct:12,
-                    stopLossATR:2.5,takeProfitATR:4,useBracketOrders:true,minConfidence:0.4,cooldownHours:12,orderType:"market",
-                    strategies:Object.keys(STRATEGY_PORTFOLIOS).filter(n=>{
-                      const cat = STRATEGY_CATEGORY_MAP[n] || "복합";
-                      // 공격형: 추세추종·모멘텀·알파 전략 위주 (평균회귀 제외)
-                      return cat === "추세추종" || cat === "모멘텀" || cat === "복합";
-                    })}},
-              ].map(p=>{
-                // 현재 설정이 이 프리셋과 일치하는지 체크
-                const match = tradeSettings.allocationPct===p.s.allocationPct
-                  && tradeSettings.minConfidence===p.s.minConfidence
-                  && tradeSettings.maxDrawdownPct===p.s.maxDrawdownPct;
-                return (
-                  <button key={p.id} onClick={()=>setTradeSettings(prev=>({...prev,...p.s}))} style={{
-                    flex:1,padding:"14px 8px",borderRadius:"12px",border:`2px solid ${match?p.color:C.border2}`,
-                    background:match?p.bg:"transparent",cursor:"pointer",textAlign:"center",transition:"all 0.2s",
-                  }}>
-                    <div style={{fontSize:"24px",marginBottom:"4px"}}>{p.icon}</div>
-                    <div style={{fontWeight:700,fontSize:"13px",color:match?p.color:C.text1}}>{p.label}</div>
-                    <div style={{fontSize:"10px",color:C.text3,marginTop:"2px"}}>{p.desc}</div>
-                  </button>
-                );
-              })}
+          {/* 봇 전략 정보 카드 */}
+          {botPreset && (
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"12px"}}>
+                <span style={{fontSize:"28px"}}>{botPreset.icon}</span>
+                <div>
+                  <div style={{fontWeight:700,fontSize:"15px",color:C.text1}}>{botPreset.name}</div>
+                  <div style={{fontSize:"11px",color:C.text3}}>{botPreset.description}</div>
+                </div>
+              </div>
+              <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"12px"}}>
+                {(botPreset.tags||[]).map(tag=>(
+                  <span key={tag} style={{fontSize:"11px",padding:"3px 10px",borderRadius:"12px",
+                    background:C.card2,border:`1px solid ${C.border}`,color:C.text2}}>{tag}</span>
+                ))}
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",background:C.card2,borderRadius:"10px",padding:"12px",textAlign:"center"}}>
+                <div>
+                  <div style={{fontSize:"10px",color:C.text3}}>승률</div>
+                  <div style={{fontSize:"14px",fontWeight:700,color:C.green}}>{botPreset.stats?.winRate||"—"}</div>
+                </div>
+                <div>
+                  <div style={{fontSize:"10px",color:C.text3}}>샤프비율</div>
+                  <div style={{fontSize:"14px",fontWeight:700,color:C.blue}}>{botPreset.stats?.sharpeRatio||"—"}</div>
+                </div>
+                <div>
+                  <div style={{fontSize:"10px",color:C.text3}}>최대낙폭</div>
+                  <div style={{fontSize:"14px",fontWeight:700,color:C.red}}>{botPreset.stats?.mdd||"—"}</div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* 매매 설정 (상세) */}
           <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>

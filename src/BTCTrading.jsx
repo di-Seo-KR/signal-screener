@@ -517,26 +517,39 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           </div>
         </div>
 
-        {/* 설정 패널 */}
-        {showSettings && (
+        {/* 봇 전략 정보 패널 */}
+        {showSettings && botPreset && (
           <div style={{ marginTop: "16px", padding: "16px", borderRadius: "12px", background: C.card2, border: `1px solid ${C.border}` }}>
-            <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>자동매매 설정</div>
-            <div style={{ fontSize: "11px", color: C.text3, marginBottom: "12px" }}>
-              자동매매는 KV 가상 포트폴리오에서 진행됩니다. 리스크 레벨을 선택하세요.
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+              <span style={{ fontSize: "24px" }}>{botPreset.icon}</span>
+              <div>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>{botPreset.name}</div>
+                <div style={{ fontSize: "11px", color: C.text3 }}>{botPreset.description}</div>
+              </div>
             </div>
-            <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-              {["low", "medium", "high"].map(r => (
-                <button key={r} onClick={() => setRiskLevel(r)} style={{
-                  flex: 1, padding: "8px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
-                  background: riskLevel === r ? (r === "low" ? C.greenBg : r === "high" ? C.redBg : C.yellowBg) : C.bg,
-                  color: riskLevel === r ? (r === "low" ? C.green : r === "high" ? C.red : C.yellow) : C.text2,
-                  border: `1px solid ${riskLevel === r ? (r === "low" ? C.green : r === "high" ? C.red : C.yellow) : C.border}`,
-                  cursor: "pointer",
-                }}>
-                  {r === "low" ? "🛡️ 보수" : r === "high" ? "⚡ 공격" : "⚖️ 중립"}
-                </button>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "12px" }}>
+              {(botPreset.tags || []).map(tag => (
+                <span key={tag} style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "10px",
+                  background: C.bg, border: `1px solid ${C.border}`, color: C.text2 }}>{tag}</span>
               ))}
             </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", background: C.bg, borderRadius: "8px", padding: "10px", textAlign: "center", marginBottom: "12px" }}>
+              <div>
+                <div style={{ fontSize: "9px", color: C.text3 }}>승률</div>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: C.green }}>{botPreset.stats?.winRate || "—"}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: "9px", color: C.text3 }}>샤프비율</div>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: C.blue }}>{botPreset.stats?.sharpeRatio || "—"}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: "9px", color: C.text3 }}>최대낙폭</div>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: C.red }}>{botPreset.stats?.mdd || "—"}</div>
+              </div>
+            </div>
+            {botPreset.details && (
+              <div style={{ fontSize: "11px", color: C.text3, lineHeight: 1.5, marginBottom: "12px" }}>{botPreset.details}</div>
+            )}
             <button onClick={() => setShowSettings(false)} style={{
               width: "100%", padding: "8px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
               background: C.blue, color: "#fff", border: "none", cursor: "pointer",
@@ -670,17 +683,10 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <span style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>실시간 크립토</span>
-            {/* 리스크 레벨 */}
-            <div style={{ display: "flex", gap: "4px" }}>
-              {["low", "medium", "high"].map(r => (
-                <button key={r} onClick={() => setRiskLevel(r)} style={{
-                  padding: "2px 8px", borderRadius: "4px", fontSize: "9px", fontWeight: 700,
-                  background: riskLevel === r ? (r === "low" ? C.greenBg : r === "high" ? C.redBg : C.yellowBg) : C.card2,
-                  color: riskLevel === r ? (r === "low" ? C.green : r === "high" ? C.red : C.yellow) : C.text3,
-                  border: "none", cursor: "pointer",
-                }}>{r === "low" ? "보수" : r === "high" ? "공격" : "중립"}</button>
-              ))}
-            </div>
+            {botPreset && (
+              <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "8px",
+                background: `${C.blue}20`, color: C.blue, fontWeight: 600 }}>{botPreset.name}</span>
+            )}
           </div>
           {lastUpdate && <span style={{ fontSize: "10px", color: C.text3 }}>{lastUpdate.toLocaleTimeString("ko-KR")}</span>}
         </div>

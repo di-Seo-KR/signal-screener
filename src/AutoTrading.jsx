@@ -578,6 +578,144 @@ function BotCard({ bot, onActivate, theme }) {
   );
 }
 
+function BotRecommender({ onActivate, theme, isMobile }) {
+  const c = colors[theme];
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [result, setResult] = useState(null);
+
+  const questions = [
+    { key: "market", q: "어떤 시장에 관심이 있으신가요?", options: [
+      { value: "stock", label: "🏦 주식", desc: "미국 대형 우량주 (AAPL, NVDA, TSLA 등)" },
+      { value: "crypto", label: "₿ 크립토", desc: "BTC, ETH, SOL 등 암호화폐" },
+      { value: "both", label: "📊 둘 다", desc: "주식과 크립토 동시 운영" },
+    ]},
+    { key: "risk", q: "투자 성향은 어떻게 되시나요?", options: [
+      { value: "low", label: "🛡️ 안정 추구", desc: "낮은 변동성, 꾸준한 수익" },
+      { value: "mid", label: "⚖️ 균형 투자", desc: "적당한 리스크, 적당한 수익" },
+      { value: "high", label: "🔥 공격 투자", desc: "높은 변동성 감수, 높은 수익 추구" },
+    ]},
+    { key: "style", q: "선호하는 전략 스타일은?", options: [
+      { value: "trend", label: "📈 추세추종", desc: "상승장에서 타고 가는 전략" },
+      { value: "mean", label: "🔄 평균회귀", desc: "과매도 매수, 과매수 매도" },
+      { value: "ensemble", label: "🎯 앙상블", desc: "여러 전략의 합의 기반" },
+      { value: "any", label: "🤖 AI 추천", desc: "자동으로 최적 매칭" },
+    ]},
+  ];
+
+  const recommend = (ans) => {
+    const recs = [];
+    const allBots = [...STOCK_BOTS.map(b => ({...b, type: "stock"})), ...CRYPTO_BOTS.map(b => ({...b, type: "crypto"}))];
+    for (const bot of allBots) {
+      let score = 0;
+      // 시장 매칭
+      if (ans.market === "both" || (ans.market === "stock" && bot.type === "stock") || (ans.market === "crypto" && bot.type === "crypto")) score += 3;
+      else continue;
+      // 리스크 매칭
+      if (ans.risk === "low" && (bot.riskColor === "blue")) score += 3;
+      else if (ans.risk === "low" && (bot.riskColor === "green")) score += 2;
+      else if (ans.risk === "mid" && (bot.riskColor === "green")) score += 3;
+      else if (ans.risk === "mid" && (bot.riskColor === "blue" || bot.riskColor === "orange")) score += 1;
+      else if (ans.risk === "high" && (bot.riskColor === "orange" || bot.riskColor === "red")) score += 3;
+      else if (ans.risk === "high" && bot.riskColor === "green") score += 1;
+      // 스타일 매칭
+      if (ans.style === "any") score += 2;
+      else if (ans.style === "trend" && bot.tags?.some(t => t.includes("추세"))) score += 2;
+      else if (ans.style === "mean" && bot.tags?.some(t => t.includes("평균회귀") || t.includes("오실레이터"))) score += 2;
+      else if (ans.style === "ensemble" && bot.tags?.some(t => t.includes("앙상블") || t.includes("다전략"))) score += 2;
+      recs.push({ ...bot, score });
+    }
+    return recs.sort((a, b) => b.score - a.score).slice(0, 3);
+  };
+
+  const selectAnswer = (key, value) => {
+    const newAnswers = { ...answers, [key]: value };
+    setAnswers(newAnswers);
+    if (step < questions.length - 1) {
+      setStep(step + 1);
+    } else {
+      setResult(recommend(newAnswers));
+    }
+  };
+
+  if (result) {
+    return (
+      <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px", padding: isMobile ? "20px" : "32px", marginBottom: "40px" }}>
+        <div style={{ textAlign: "center", marginBottom: "24px" }}>
+          <div style={{ fontSize: "28px", marginBottom: "8px" }}>🎯</div>
+          <h3 style={{ margin: "0 0 8px", color: c.text1, fontSize: "18px" }}>추천 봇</h3>
+          <p style={{ margin: 0, color: c.text3, fontSize: "13px" }}>투자 성향에 맞는 봇을 찾았습니다</p>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "16px" }}>
+          {result.map((bot, i) => (
+            <div key={bot.id} onClick={() => onActivate(bot)} style={{
+              display: "flex", alignItems: "center", gap: "12px", padding: "16px", borderRadius: "12px",
+              background: i === 0 ? `${c.blue}10` : c.card2, border: `1px solid ${i === 0 ? c.blue : c.border}`,
+              cursor: "pointer", transition: "all 0.2s",
+            }}>
+              <span style={{ fontSize: "28px" }}>{bot.icon}</span>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span style={{ fontWeight: 700, fontSize: "14px", color: c.text1 }}>{bot.name}</span>
+                  {i === 0 && <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "8px", background: `${c.green}20`, color: c.green, fontWeight: 700 }}>BEST</span>}
+                  <span style={{ fontSize: "10px", padding: "2px 8px", borderRadius: "8px", background: `${getRiskColor(bot.riskColor, theme)}20`, color: getRiskColor(bot.riskColor, theme) }}>{bot.risk}</span>
+                </div>
+                <div style={{ fontSize: "11px", color: c.text3, marginTop: "2px" }}>{bot.description}</div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "12px", color: c.green, fontWeight: 600 }}>{bot.expectedReturn}</div>
+                <div style={{ fontSize: "10px", color: c.text3 }}>예상수익</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <button onClick={() => { setResult(null); setStep(0); setAnswers({}); }} style={{
+          width: "100%", padding: "10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+          background: "transparent", color: c.text3, border: `1px solid ${c.border}`, cursor: "pointer",
+        }}>다시 선택하기</button>
+      </div>
+    );
+  }
+
+  const q = questions[step];
+  return (
+    <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px", padding: isMobile ? "20px" : "32px", marginBottom: "40px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
+        <h3 style={{ margin: 0, color: c.text1, fontSize: "16px" }}>🤖 나에게 맞는 봇 찾기</h3>
+        <span style={{ fontSize: "12px", color: c.text3 }}>{step + 1} / {questions.length}</span>
+      </div>
+      <div style={{ display: "flex", gap: "4px", marginBottom: "20px" }}>
+        {questions.map((_, i) => (
+          <div key={i} style={{ flex: 1, height: "3px", borderRadius: "2px", background: i <= step ? c.blue : c.border }} />
+        ))}
+      </div>
+      <p style={{ margin: "0 0 16px", color: c.text2, fontSize: "15px", fontWeight: 600 }}>{q.q}</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+        {q.options.map(opt => (
+          <button key={opt.value} onClick={() => selectAnswer(q.key, opt.value)} style={{
+            display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", borderRadius: "12px",
+            background: answers[q.key] === opt.value ? `${c.blue}10` : "transparent",
+            border: `1px solid ${answers[q.key] === opt.value ? c.blue : c.border}`,
+            cursor: "pointer", textAlign: "left", transition: "all 0.2s",
+          }}>
+            <span style={{ fontSize: "20px" }}>{opt.label.split(" ")[0]}</span>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: "13px", color: c.text1 }}>{opt.label.split(" ").slice(1).join(" ")}</div>
+              <div style={{ fontSize: "11px", color: c.text3 }}>{opt.desc}</div>
+            </div>
+          </button>
+        ))}
+      </div>
+      {step > 0 && (
+        <button onClick={() => setStep(step - 1)} style={{
+          marginTop: "12px", padding: "8px", fontSize: "12px", color: c.text3, background: "transparent",
+          border: "none", cursor: "pointer",
+        }}>← 이전</button>
+      )}
+    </div>
+  );
+}
+
 function BotCatalog({ onActivate, theme, isMobile }) {
   const c = colors[theme];
 
@@ -588,17 +726,22 @@ function BotCatalog({ onActivate, theme, isMobile }) {
         style={{
           background: `linear-gradient(135deg, ${c.blue}15 0%, ${c.purple}10 100%)`,
           borderBottom: `1px solid ${c.border}`,
-          padding: "60px 40px",
-          marginBottom: "60px",
+          padding: isMobile ? "40px 20px" : "60px 40px",
+          marginBottom: "40px",
           textAlign: "center",
         }}
       >
-        <h1 style={{ margin: "0 0 16px 0", color: c.text1, fontSize: "40px", fontWeight: "700" }}>
+        <h1 style={{ margin: "0 0 16px 0", color: c.text1, fontSize: isMobile ? "28px" : "40px", fontWeight: "700" }}>
           AI 퀀트 전략
         </h1>
-        <p style={{ margin: "0", color: c.text2, fontSize: "18px", maxWidth: "600px", marginLeft: "auto", marginRight: "auto" }}>
+        <p style={{ margin: "0", color: c.text2, fontSize: isMobile ? "14px" : "18px", maxWidth: "600px", marginLeft: "auto", marginRight: "auto" }}>
           AI 기반 퀀트 봇이 24/7 시장을 분석하고 최적의 매매 시그널을 생성합니다
         </p>
+      </div>
+
+      {/* 봇 추천 플로우 */}
+      <div style={{ maxWidth: "700px", margin: "0 auto", padding: isMobile ? "0 16px" : "0 40px" }}>
+        <BotRecommender onActivate={onActivate} theme={theme} isMobile={isMobile} />
       </div>
 
       {/* Stock Bots Section */}
