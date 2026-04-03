@@ -831,7 +831,9 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
     if (totalEquity === 0) return 0;
     return ((stockPL * stockEquity + cryptoPL * cryptoEquity) / totalEquity);
   })();
-  const totalEquity = (stockPortfolio?.totalMarketValue || 0) + (cryptoPortfolio?.totalMarketValue || 0);
+  // 봇별 배분 금액 합계를 총 자산으로 표시
+  const totalAllocated = activeBots.reduce((sum, ab) => sum + (ab.allocation || 0), 0);
+  const totalEquity = totalAllocated || ((stockPortfolio?.equity || 0) + (cryptoPortfolio?.equity || 0));
   const totalPL = (stockPortfolio?.totalPL || 0) + (cryptoPortfolio?.totalPL || 0);
   const dayPL = (stockPortfolio?.dayPL || 0) + (cryptoPortfolio?.dayPL || 0);
 
@@ -849,7 +851,7 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
       </div>
 
       {/* 종합 포트폴리오 요약 (KV 가상 포트폴리오) */}
-      {(stockPortfolio || cryptoPortfolio) && (
+      {(activeBots.length > 0) && (
         <div style={{
           background: `linear-gradient(135deg, ${c.card} 0%, ${totalPL >= 0 ? c.green : c.red}10 100%)`,
           border: `1px solid ${c.border}`, borderRadius: "16px", padding: isMobile ? "16px 12px" : "20px", marginBottom: "16px",
@@ -857,7 +859,7 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
           <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "8px" }}>가상매매 포트폴리오</div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: isMobile ? "10px" : "12px" }}>
             <div>
-              <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3 }}>총 자산</div>
+              <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3 }}>총 배분 금액</div>
               <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 800, color: c.text1 }}>${totalEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
             </div>
             <div>

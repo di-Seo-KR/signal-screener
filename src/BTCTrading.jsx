@@ -569,7 +569,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           border: `1px solid ${C.border}`, borderRadius: "16px", padding: "28px 32px",
         }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-            <div style={{ fontSize: "13px", color: C.text3, fontWeight: 500 }}>총 자산</div>
+            <div style={{ fontSize: "13px", color: C.text3, fontWeight: 500 }}>배분 금액</div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               {badge("알파 v2", C.orangeBg, C.orange)}
               {autoMode && badge("자동매매 ON", C.greenBg, C.green)}
@@ -591,7 +591,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
             fontWeight: 800, fontSize: "42px", color: C.text1, lineHeight: 1, marginBottom: "12px",
             letterSpacing: "-1px",
           }}>
-            {fmtUSD2(equity)}
+            {fmtUSD2(initCapital)}
           </div>
           <div style={{
             display: "flex", alignItems: "baseline", gap: "12px", fontSize: "13px", fontWeight: 600,

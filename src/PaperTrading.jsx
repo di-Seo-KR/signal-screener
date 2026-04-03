@@ -1744,7 +1744,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
           background: `linear-gradient(135deg, ${C.card} 0%, #0D1B2A 100%)`,
           border: `1px solid ${C.border}`, borderRadius: "16px", padding: "28px 32px",
         }}>
-          <div style={{ fontSize: "13px", color: C.text3, fontWeight: 500, marginBottom: "8px" }}>총 자산</div>
+          <div style={{ fontSize: "13px", color: C.text3, fontWeight: 500, marginBottom: "8px" }}>배분 금액</div>
           <div style={{
             fontWeight: 800, fontSize: "42px", color: C.text1, lineHeight: 1, marginBottom: "12px",
             letterSpacing: "-1px",
