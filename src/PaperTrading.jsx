@@ -1151,7 +1151,8 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
 
   // 리스크 알림 상태
   const [riskAlerts, setRiskAlerts] = useState([]);
-  const [tradingHalted, setTradingHalted] = useState(() => load("di_trading_halted", false));
+  // 가상매매 전환: 기존 halted 상태 초기화 (이전 Alpaca 연동 시 halt된 값이 남아있을 수 있음)
+  const [tradingHalted, setTradingHalted] = useState(false);
 
   // ── botPreset이 있으면 프리셋 설정 자동 적용, 없으면 localStorage 기본값 ──
   const presetOverride = botPreset?.id ? getBotPresetSettings(botPreset.id) : null;
@@ -1319,6 +1320,9 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
   // ── 리스크 체크 (계좌 갱신 시마다) ──
   useEffect(() => {
     if (!account || !isConnected) return;
+    // 가상매매: equity가 0이거나 아직 로딩 안 됐으면 리스크 체크 스킵
+    const eq = parseFloat(account?.equity || 0);
+    if (eq <= 0) return;
     const rm = new RiskManager(tradeSettings, account, positions);
     const alerts = [];
 
