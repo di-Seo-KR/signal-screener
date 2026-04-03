@@ -756,23 +756,37 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                   {cryptoPositions.map((p, i) => {
                     const pnl = parseFloat(p.unrealizedPL || 0);
                     const pnlPct = parseFloat(p.unrealizedPLPct || 0);
-                    const assetIcon = Object.values(ALL_CRYPTO).find(a => p.symbol && a.sym.includes(p.symbol.split("USDT")[0]))?.icon || "₿";
+                    const avgPrice = parseFloat(p.avgPrice || p.avg_entry_price || 0);
+                    const curPrice = parseFloat(p.currentPrice || p.current_price || 0);
+                    const qty = parseFloat(p.qty || 0);
+                    const assetIcon = Object.values(ALL_CRYPTO).find(a => p.symbol && a.sym.includes(p.symbol.split("USDT")[0]))?.icon
+                      || Object.values(ALL_CRYPTO).find(a => p.symbol && p.symbol.includes(a.sym?.replace("USDT", "")))?.icon || "₿";
+                    const assetName = Object.values(ALL_CRYPTO).find(a => p.symbol && (a.sym.includes(p.symbol.split("USDT")[0]) || p.symbol.includes(a.sym?.replace("USDT", ""))))?.name || p.symbol;
                     return (
                       <div key={i} style={{
-                        display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px",
-                        borderRadius: "10px", background: C.card2, border: `1px solid ${C.border}`,
+                        padding: "12px 14px", borderRadius: "10px", background: C.card2,
+                        border: `1px solid ${C.border}`, borderLeft: `3px solid ${pnl >= 0 ? C.green : C.red}`,
                       }}>
-                        <span style={{ fontSize: "18px" }}>{assetIcon}</span>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>{p.symbol || "Unknown"}</div>
-                          <div style={{ fontSize: "10px", color: C.text3 }}>수량: {parseFloat(p.qty || 0).toFixed(6)}</div>
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>${parseFloat(p.marketValue || 0).toFixed(2)}</div>
-                          <div style={{ fontSize: "11px", fontWeight: 700, color: pnl >= 0 ? C.green : C.red }}>
-                            {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                          <span style={{ fontSize: "18px" }}>{assetIcon}</span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>{p.symbol || "Unknown"}</div>
+                            <div style={{ fontSize: "10px", color: C.text3 }}>
+                              수량: {qty < 1 ? qty.toFixed(6) : qty.toFixed(2)} · 매수가: ${avgPrice < 1 ? avgPrice.toFixed(6) : avgPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>${parseFloat(p.marketValue || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
+                            <div style={{ fontSize: "11px", fontWeight: 700, color: pnl >= 0 ? C.green : C.red }}>
+                              {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)
+                            </div>
                           </div>
                         </div>
+                        {curPrice > 0 && avgPrice > 0 && (
+                          <div style={{ display: "flex", gap: "12px", marginTop: "6px", paddingLeft: "28px" }}>
+                            <span style={{ fontSize: "9px", color: C.text3 }}>현재가: ${curPrice < 1 ? curPrice.toFixed(6) : curPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

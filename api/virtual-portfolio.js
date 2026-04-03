@@ -13,23 +13,32 @@ export default async function handler(req, res) {
     if (type === "crypto" || type === "all") {
       const cryptoPortfolio = await kv.get("di:virtual:portfolio");
       if (cryptoPortfolio) {
-        // 현재 가격 조회 (Binance)
+        // 현재 가격 조회 (CoinGecko — Binance 미국 차단)
         let prices = {};
+        const cgIds = {
+          "BTC/USD": "bitcoin", "ETH/USD": "ethereum", "SOL/USD": "solana",
+          "XRP/USD": "ripple", "ADA/USD": "cardano", "AVAX/USD": "avalanche-2",
+          "LINK/USD": "chainlink", "UNI/USD": "uniswap", "AAVE/USD": "aave",
+          "DOT/USD": "polkadot", "DOGE/USD": "dogecoin", "SHIB/USD": "shiba-inu",
+          "PEPE/USD": "pepe", "ARB/USD": "arbitrum", "OP/USD": "optimism",
+          "MATIC/USD": "matic-network",
+        };
         try {
-          const tickerRes = await fetch("https://api.binance.com/api/v3/ticker/price");
-          const tickers = await tickerRes.json();
-          for (const t of tickers) {
-            prices[t.symbol] = parseFloat(t.price);
+          const ids = Object.values(cgIds).join(",");
+          const cgRes = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`, { signal: AbortSignal.timeout(8000) });
+          if (cgRes.ok) {
+            const cgData = await cgRes.json();
+            for (const [asset, cgId] of Object.entries(cgIds)) {
+              if (cgData[cgId]?.usd) prices[asset] = cgData[cgId].usd;
+            }
           }
-        } catch {}
+        } catch { /* CoinGecko 실패 시 매수가로 폴백 */ }
 
         // 포지션 시가평가
         let totalMarketValue = 0;
         const positions = [];
         for (const [asset, pos] of Object.entries(cryptoPortfolio.positions || {})) {
-          // asset: "BTCUSDT" or "BTC-USD" → binance symbol
-          const binanceSym = asset.replace("-USD", "USDT").replace("/USD", "USDT").replace("/", "");
-          const currentPrice = prices[binanceSym] || prices[asset] || pos.avgPrice;
+          const currentPrice = prices[asset] || pos.avgPrice;
           const mv = pos.qty * currentPrice;
           const costBasis = pos.qty * pos.avgPrice;
           totalMarketValue += mv;
