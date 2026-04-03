@@ -101,21 +101,76 @@ export default async function handler(req, res) {
       addLog(`🆕 가상 포트폴리오 생성: $${INITIAL_CASH.toLocaleString()}`);
     }
 
-    // ── Binance 실시간 가격 조회 (전 종목 한번에) ──
+    // ── 실시간 가격 조회 (Binance → CoinGecko 폴백) ──
     const priceMap = {};
+    let priceSource = "none";
+
+    // 1차: Binance
     try {
-      const tickerRes = await fetch("https://api.binance.com/api/v3/ticker/price");
+      const tickerRes = await fetch("https://api.binance.com/api/v3/ticker/price", { signal: AbortSignal.timeout(5000) });
       const tickers = await tickerRes.json();
-      for (const asset of CRYPTO_ASSETS) {
-        const binSym = BINANCE_SYMBOLS[asset];
-        const ticker = tickers.find(t => t.symbol === binSym);
-        if (ticker) priceMap[asset] = parseFloat(ticker.price);
+      if (Array.isArray(tickers)) {
+        for (const asset of CRYPTO_ASSETS) {
+          const binSym = BINANCE_SYMBOLS[asset];
+          const ticker = tickers.find(t => t.symbol === binSym);
+          if (ticker) priceMap[asset] = parseFloat(ticker.price);
+        }
+        if (Object.keys(priceMap).length > 0) priceSource = "binance";
+        addLog(`📡 Binance 가격: ${Object.keys(priceMap).length}종목 로드`);
+      } else {
+        addLog(`⚠️ Binance 응답이 배열 아님: ${JSON.stringify(tickers).slice(0, 100)}`);
       }
-      addLog(`📡 실시간 가격: ${Object.keys(priceMap).length}종목 로드`);
     } catch (e) {
-      addLog(`❌ Binance 가격 오류: ${e.message}`);
-      return res.status(200).json({ ok: false, error: "Binance price fetch failed", log });
+      addLog(`⚠️ Binance 가격 실패: ${e.message}`);
     }
+
+    // 2차: CoinGecko 폴백 (Binance 실패 시)
+    if (Object.keys(priceMap).length < 5) {
+      try {
+        const geckoIds = {
+          "BTC/USD": "bitcoin", "ETH/USD": "ethereum", "SOL/USD": "solana",
+          "XRP/USD": "ripple", "ADA/USD": "cardano", "AVAX/USD": "avalanche-2",
+          "LINK/USD": "chainlink", "UNI/USD": "uniswap", "AAVE/USD": "aave",
+          "DOT/USD": "polkadot", "DOGE/USD": "dogecoin", "SHIB/USD": "shiba-inu",
+          "PEPE/USD": "pepe", "ARB/USD": "arbitrum", "OP/USD": "optimism",
+          "MATIC/USD": "matic-network",
+        };
+        const ids = Object.values(geckoIds).join(",");
+        const geckoRes = await fetch(
+          `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`,
+          { signal: AbortSignal.timeout(8000) }
+        );
+        const geckoData = await geckoRes.json();
+        for (const [asset, geckoId] of Object.entries(geckoIds)) {
+          if (geckoData[geckoId]?.usd) priceMap[asset] = geckoData[geckoId].usd;
+        }
+        if (Object.keys(priceMap).length > 0) priceSource = "coingecko";
+        addLog(`📡 CoinGecko 폴백: ${Object.keys(priceMap).length}종목 로드`);
+      } catch (e) {
+        addLog(`⚠️ CoinGecko도 실패: ${e.message}`);
+      }
+    }
+
+    // 3차: Binance 개별 조회 폴백 (여전히 부족하면)
+    if (Object.keys(priceMap).length < 5) {
+      addLog(`🔄 개별 Binance 가격 조회 시도...`);
+      for (const asset of CRYPTO_ASSETS) {
+        if (priceMap[asset]) continue;
+        try {
+          const binSym = BINANCE_SYMBOLS[asset];
+          const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${binSym}`, { signal: AbortSignal.timeout(3000) });
+          const d = await r.json();
+          if (d.price) { priceMap[asset] = parseFloat(d.price); priceSource = "binance-individual"; }
+        } catch { /* skip */ }
+      }
+      addLog(`📡 개별 조회 후: ${Object.keys(priceMap).length}종목`);
+    }
+
+    if (Object.keys(priceMap).length === 0) {
+      addLog(`❌ 모든 가격 소스 실패 — 매매 불가`);
+      return res.status(200).json({ ok: false, error: "All price sources failed", log });
+    }
+    addLog(`✅ 가격 소스: ${priceSource} (${Object.keys(priceMap).length}종목)`);
 
     // ── 포트폴리오 가치 계산 ──
     let totalMarketValue = 0;

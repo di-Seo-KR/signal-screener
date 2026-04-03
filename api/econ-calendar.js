@@ -172,65 +172,83 @@ export default async function handler(req, res) {
   }
 
   // ── 3차: FRED API (실제 발표 수치 보완) ──
-  // 주요 지표의 actual 값만 FRED에서 가져와서 KV에 저장
+  // FRED에서 최신 actual 값을 가져와 KV에 저장 → curated 이벤트에 병합
   const fredKey = process.env.FRED_API_KEY;
-  if (fredKey) {
+  const curated = getCuratedEvents2026();
+
+  if (fredKey && kv) {
     try {
-      // FRED series IDs for major indicators
       const fredSeries = [
-        { id: "CPIAUCSL", event: "CPI", yoy: true },
-        { id: "CPILFESL", event: "Core CPI", yoy: true },
-        { id: "PAYEMS", event: "Nonfarm Payrolls", diff: true, unit: "K" },
-        { id: "UNRATE", event: "Unemployment Rate" },
-        { id: "A191RL1Q225SBEA", event: "GDP Growth Rate" },
-        { id: "PCEPI", event: "PCE Price Index", yoy: true },
-        { id: "RSAFS", event: "Retail Sales", mom: true },
+        { id: "CPIAUCSL", eventMatch: "CPI (YoY)", yoy: true },
+        { id: "CPILFESL", eventMatch: "Core CPI (YoY)", yoy: true },
+        { id: "PAYEMS", eventMatch: "Nonfarm Payrolls", diff: true },
+        { id: "UNRATE", eventMatch: "Unemployment Rate", direct: true },
+        { id: "A191RL1Q225SBEA", eventMatch: "GDP Growth Rate", direct: true },
+        { id: "PCEPI", eventMatch: "PCE Price Index (YoY)", yoy: true },
+        { id: "RSAFS", eventMatch: "Retail Sales (MoM)", mom: true },
       ];
+
+      let kvUpdated = false;
+      const todayStr = fmtDate(now);
 
       for (const series of fredSeries) {
         try {
-          const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${series.id}&sort_order=desc&limit=3&api_key=${fredKey}&file_type=json`;
+          const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${series.id}&sort_order=desc&limit=14&api_key=${fredKey}&file_type=json`;
           const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
-          if (resp.ok) {
-            const json = await resp.json();
-            const obs = json?.observations;
-            if (obs && obs.length >= 2) {
-              const latest = parseFloat(obs[0].value);
-              const prev = parseFloat(obs[1].value);
-              if (!isNaN(latest)) {
-                let actual = latest;
-                if (series.yoy && obs.length >= 2) {
-                  // YoY 계산은 12개월 전 데이터 필요 — 여기선 최신 값만 저장
-                  actual = latest;
-                }
-                if (series.diff) {
-                  actual = (latest - prev); // 차이 (Payrolls)
-                  if (series.unit === "K") actual = actual; // 이미 K 단위
-                }
-                if (series.mom && !isNaN(prev) && prev > 0) {
-                  actual = ((latest - prev) / prev * 100);
-                }
-                // obs[0].date로 가장 가까운 이벤트에 매칭
-                const releaseDate = obs[0].date;
-                if (releaseDate) {
-                  // 근접 날짜의 이벤트에 actual 저장
-                  const matchKey = Object.keys(kvActuals).find(k =>
-                    k.includes(series.event) && k.startsWith(releaseDate.slice(0, 7))
-                  );
-                  if (!matchKey) {
-                    // 새로운 데이터 포인트 — 큐레이션 이벤트와 매칭 시도
-                  }
-                }
-              }
+          if (!resp.ok) continue;
+          const json = await resp.json();
+          const obs = json?.observations?.filter(o => o.value !== ".");
+          if (!obs || obs.length < 2) continue;
+
+          const latest = parseFloat(obs[0].value);
+          const prev = parseFloat(obs[1].value);
+          if (isNaN(latest) || isNaN(prev)) continue;
+
+          // 실제 값 계산
+          let actual;
+          if (series.direct) {
+            actual = latest;
+          } else if (series.diff) {
+            actual = latest - prev; // Payrolls: 단위 K (FRED는 이미 K 단위)
+          } else if (series.yoy) {
+            // YoY: 12개월 전 데이터와 비교
+            const obs12 = obs.length >= 13 ? parseFloat(obs[12].value) : null;
+            if (obs12 && !isNaN(obs12) && obs12 > 0) {
+              actual = ((latest - obs12) / obs12) * 100;
+              actual = Math.round(actual * 10) / 10;
+            } else {
+              actual = latest; // YoY 계산 불가 시 원시값
+            }
+          } else if (series.mom) {
+            actual = prev > 0 ? Math.round(((latest - prev) / prev) * 1000) / 10 : 0;
+          }
+
+          if (actual == null || isNaN(actual)) continue;
+
+          // curated 이벤트에서 actual이 null인 가장 최근 과거 이벤트와 매칭
+          const matchingEvents = curated.filter(e =>
+            e.event === series.eventMatch && e.actual == null && e.date <= todayStr
+          );
+
+          if (matchingEvents.length > 0) {
+            // 가장 최근 이벤트 매칭
+            const target = matchingEvents[matchingEvents.length - 1];
+            const kvKey = `${target.date}::${target.event}`;
+            if (kvActuals[kvKey] == null) {
+              kvActuals[kvKey] = actual;
+              kvUpdated = true;
             }
           }
         } catch { /* 개별 FRED 시리즈 실패 무시 */ }
+      }
+
+      if (kvUpdated) {
+        try { await kv.set("di:econ:actuals", kvActuals); } catch {}
       }
     } catch { /* FRED 전체 실패 무시 */ }
   }
 
   // ── 4차: 큐레이션 폴백 + KV actual 병합 ──
-  const curated = getCuratedEvents2026();
   const merged = mergeKVActuals(curated);
   return res.status(200).json({ events: merged, source: "curated", updatedAt: now.toISOString() });
 }
