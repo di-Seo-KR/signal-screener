@@ -27,33 +27,39 @@ const BINANCE_SYMBOLS = {
 const MAX_POSITION_PER_ASSET = 0.30;
 const MAX_TOTAL_CRYPTO_EXPOSURE = 0.80;
 
-// Bybit 심볼 매핑 (Binance 폴백용)
-const BYBIT_SYMBOLS = {
-  "BTC/USD": "BTCUSDT", "ETH/USD": "ETHUSDT", "SOL/USD": "SOLUSDT",
-  "XRP/USD": "XRPUSDT", "ADA/USD": "ADAUSDT", "AVAX/USD": "AVAXUSDT",
-  "LINK/USD": "LINKUSDT", "UNI/USD": "UNIUSDT", "AAVE/USD": "AAVEUSDT",
-  "DOT/USD": "DOTUSDT", "DOGE/USD": "DOGEUSDT", "SHIB/USD": "SHIBUSDT",
-  "PEPE/USD": "PEPEUSDT", "ARB/USD": "ARBUSDT", "OP/USD": "OPUSDT",
-  "MATIC/USD": "MATICUSDT",
+// CryptoCompare 심볼 매핑 (Binance/Bybit 미국 차단 우회)
+const CC_SYMBOLS = {
+  "BTC/USD": "BTC", "ETH/USD": "ETH", "SOL/USD": "SOL",
+  "XRP/USD": "XRP", "ADA/USD": "ADA", "AVAX/USD": "AVAX",
+  "LINK/USD": "LINK", "UNI/USD": "UNI", "AAVE/USD": "AAVE",
+  "DOT/USD": "DOT", "DOGE/USD": "DOGE", "SHIB/USD": "SHIB",
+  "PEPE/USD": "PEPE", "ARB/USD": "ARB", "OP/USD": "OP",
+  "MATIC/USD": "MATIC",
 };
 
-// Bybit kline 캔들 로드 헬퍼
-async function fetchBybitKlines(symbol, interval, limit) {
-  // Bybit interval: "D" (일봉), "240" (4시간), "60" (1시간)
-  const bybitInterval = interval === "1d" ? "D" : interval === "4h" ? "240" : "60";
-  const url = `https://api.bybit.com/v5/market/kline?category=spot&symbol=${symbol}&interval=${bybitInterval}&limit=${limit}`;
-  const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
-  if (!resp.ok) throw new Error(`Bybit HTTP ${resp.status}`);
+// CryptoCompare OHLCV 캔들 로드 헬퍼 (미국 접근 가능)
+async function fetchCCKlines(symbol, interval, limit) {
+  // interval: "1d" → histoday, "4h" → histohour (aggregate=4), "1h" → histohour
+  let url;
+  if (interval === "1d") {
+    url = `https://min-api.cryptocompare.com/data/v2/histoday?fsym=${symbol}&tsym=USD&limit=${Math.min(limit, 2000)}`;
+  } else if (interval === "4h") {
+    // CryptoCompare histohour → 4시간 단위로 리샘플링
+    url = `https://min-api.cryptocompare.com/data/v2/histohour?fsym=${symbol}&tsym=USD&limit=${Math.min(limit * 4, 2000)}&aggregate=4`;
+  } else {
+    url = `https://min-api.cryptocompare.com/data/v2/histohour?fsym=${symbol}&tsym=USD&limit=${Math.min(limit, 2000)}`;
+  }
+  const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  if (!resp.ok) throw new Error(`CC HTTP ${resp.status}`);
   const json = await resp.json();
-  if (json.retCode !== 0 || !json.result?.list) throw new Error(json.retMsg || "No data");
-  // Bybit returns [startTime, open, high, low, close, volume, turnover] — 최신순이므로 reverse
-  return json.result.list.reverse().map(k => ({
-    time: Math.floor(parseInt(k[0]) / 1000),
-    open: parseFloat(k[1]),
-    high: parseFloat(k[2]),
-    low: parseFloat(k[3]),
-    close: parseFloat(k[4]),
-    volume: parseFloat(k[5]),
+  if (json.Response !== "Success" || !json.Data?.Data) throw new Error(json.Message || "No data");
+  return json.Data.Data.map(k => ({
+    time: k.time,
+    open: k.open,
+    high: k.high,
+    low: k.low,
+    close: k.close,
+    volume: k.volumefrom || 0,
   })).filter(c => c.close > 0 && c.high > 0 && c.low > 0);
 }
 
@@ -253,9 +259,9 @@ export default async function handler(req, res) {
     for (const asset of CRYPTO_ASSETS) {
       addLog(`\n📊 ${asset} 스캔 중...`);
       const binSymbol = BINANCE_SYMBOLS[asset];
-      const bybitSymbol = BYBIT_SYMBOLS[asset];
+      const ccSymbol = CC_SYMBOLS[asset];
 
-      // ── 캔들 데이터 로드 (Binance → Bybit 폴백) ──
+      // ── 캔들 데이터 로드 (Binance → CryptoCompare 폴백) ──
       let candles = [];
       let candleSource = "none";
 
@@ -271,15 +277,15 @@ export default async function handler(req, res) {
           close: parseFloat(k[4]), volume: parseFloat(k[5]),
         })).filter(c => c.close > 0 && c.high > 0 && c.low > 0);
         if (candles.length > 50) candleSource = "binance";
-      } catch { /* Binance 실패 → Bybit */ }
+      } catch { /* Binance 실패 → CryptoCompare */ }
 
-      // Bybit 폴백 (일봉)
-      if (candles.length < 100 && bybitSymbol) {
+      // CryptoCompare 폴백 (일봉)
+      if (candles.length < 100 && ccSymbol) {
         try {
-          candles = await fetchBybitKlines(bybitSymbol, "1d", 365);
-          if (candles.length > 50) candleSource = "bybit";
+          candles = await fetchCCKlines(ccSymbol, "1d", 365);
+          if (candles.length > 50) candleSource = "cryptocompare";
         } catch (e) {
-          addLog(`⚠️ ${asset} Bybit 일봉도 실패: ${e.message}`);
+          addLog(`⚠️ ${asset} CryptoCompare 일봉도 실패: ${e.message}`);
         }
       }
 
@@ -289,7 +295,7 @@ export default async function handler(req, res) {
         continue;
       }
 
-      // 4시간봉 로드 (Binance → Bybit 폴백)
+      // 4시간봉 로드 (Binance → CryptoCompare 폴백)
       let candles4h = [];
       try {
         const res4h = await fetch(`https://api.binance.com/api/v3/klines?symbol=${binSymbol}&interval=4h&limit=500`, { signal: AbortSignal.timeout(5000) });
@@ -304,11 +310,11 @@ export default async function handler(req, res) {
           }
         }
       } catch { /* Binance 4h 실패 */ }
-      if (candles4h.length < 50 && bybitSymbol) {
-        try { candles4h = await fetchBybitKlines(bybitSymbol, "4h", 500); } catch { /* skip */ }
+      if (candles4h.length < 50 && ccSymbol) {
+        try { candles4h = await fetchCCKlines(ccSymbol, "4h", 500); } catch { /* skip */ }
       }
 
-      // 1시간봉 로드 (Binance → Bybit 폴백)
+      // 1시간봉 로드 (Binance → CryptoCompare 폴백)
       let candles1h = [];
       try {
         const res1h = await fetch(`https://api.binance.com/api/v3/klines?symbol=${binSymbol}&interval=1h&limit=500`, { signal: AbortSignal.timeout(5000) });
@@ -323,8 +329,8 @@ export default async function handler(req, res) {
           }
         }
       } catch { /* Binance 1h 실패 */ }
-      if (candles1h.length < 50 && bybitSymbol) {
-        try { candles1h = await fetchBybitKlines(bybitSymbol, "1h", 500); } catch { /* skip */ }
+      if (candles1h.length < 50 && ccSymbol) {
+        try { candles1h = await fetchCCKlines(ccSymbol, "1h", 500); } catch { /* skip */ }
       }
 
       addLog(`✅ ${asset} [${candleSource}]: 일봉 ${candles.length}개 + 4h ${candles4h.length}개 + 1h ${candles1h.length}개 (최신: $${candles[candles.length - 1]?.close?.toFixed(0)})`);
