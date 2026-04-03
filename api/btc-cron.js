@@ -27,6 +27,36 @@ const BINANCE_SYMBOLS = {
 const MAX_POSITION_PER_ASSET = 0.30;
 const MAX_TOTAL_CRYPTO_EXPOSURE = 0.80;
 
+// Bybit 심볼 매핑 (Binance 폴백용)
+const BYBIT_SYMBOLS = {
+  "BTC/USD": "BTCUSDT", "ETH/USD": "ETHUSDT", "SOL/USD": "SOLUSDT",
+  "XRP/USD": "XRPUSDT", "ADA/USD": "ADAUSDT", "AVAX/USD": "AVAXUSDT",
+  "LINK/USD": "LINKUSDT", "UNI/USD": "UNIUSDT", "AAVE/USD": "AAVEUSDT",
+  "DOT/USD": "DOTUSDT", "DOGE/USD": "DOGEUSDT", "SHIB/USD": "SHIBUSDT",
+  "PEPE/USD": "PEPEUSDT", "ARB/USD": "ARBUSDT", "OP/USD": "OPUSDT",
+  "MATIC/USD": "MATICUSDT",
+};
+
+// Bybit kline 캔들 로드 헬퍼
+async function fetchBybitKlines(symbol, interval, limit) {
+  // Bybit interval: "D" (일봉), "240" (4시간), "60" (1시간)
+  const bybitInterval = interval === "1d" ? "D" : interval === "4h" ? "240" : "60";
+  const url = `https://api.bybit.com/v5/market/kline?category=spot&symbol=${symbol}&interval=${bybitInterval}&limit=${limit}`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!resp.ok) throw new Error(`Bybit HTTP ${resp.status}`);
+  const json = await resp.json();
+  if (json.retCode !== 0 || !json.result?.list) throw new Error(json.retMsg || "No data");
+  // Bybit returns [startTime, open, high, low, close, volume, turnover] — 최신순이므로 reverse
+  return json.result.list.reverse().map(k => ({
+    time: Math.floor(parseInt(k[0]) / 1000),
+    open: parseFloat(k[1]),
+    high: parseFloat(k[2]),
+    low: parseFloat(k[3]),
+    close: parseFloat(k[4]),
+    volume: parseFloat(k[5]),
+  })).filter(c => c.close > 0 && c.high > 0 && c.low > 0);
+}
+
 // ── 봇별 자산 매핑 (AutoTrading.jsx의 CRYPTO_BOTS와 동기화) ──
 const BOT_ASSET_MAP = {
   "btc-alpha": ["BTC/USD"],
@@ -223,75 +253,81 @@ export default async function handler(req, res) {
     for (const asset of CRYPTO_ASSETS) {
       addLog(`\n📊 ${asset} 스캔 중...`);
       const binSymbol = BINANCE_SYMBOLS[asset];
+      const bybitSymbol = BYBIT_SYMBOLS[asset];
 
-      // ── Binance 공개 API로 캔들 데이터 로드 ──
-      // 일봉 365개 (1년) + 4시간봉 500개 (~83일)
-      // 인증 불필요, Yahoo Finance보다 안정적이고 빠름
-      const binDaily = `https://api.binance.com/api/v3/klines?symbol=${binSymbol}&interval=1d&limit=365`;
-      const bin4h = `https://api.binance.com/api/v3/klines?symbol=${binSymbol}&interval=4h&limit=500`;
-      const bin1h = `https://api.binance.com/api/v3/klines?symbol=${binSymbol}&interval=1h&limit=500`;
-
+      // ── 캔들 데이터 로드 (Binance → Bybit 폴백) ──
       let candles = [];
+      let candleSource = "none";
+
+      // 일봉: Binance 시도
       try {
-        const res = await fetch(binDaily);
+        const res = await fetch(`https://api.binance.com/api/v3/klines?symbol=${binSymbol}&interval=1d&limit=365`, { signal: AbortSignal.timeout(5000) });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const raw = await res.json();
-        // Binance klines: [openTime, open, high, low, close, volume, closeTime, ...]
+        if (!Array.isArray(raw)) throw new Error("Not array");
         candles = raw.map(k => ({
           time: Math.floor(k[0] / 1000),
-          open: parseFloat(k[1]),
-          high: parseFloat(k[2]),
-          low: parseFloat(k[3]),
-          close: parseFloat(k[4]),
-          volume: parseFloat(k[5]),
+          open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]),
+          close: parseFloat(k[4]), volume: parseFloat(k[5]),
         })).filter(c => c.close > 0 && c.high > 0 && c.low > 0);
-      } catch (e) {
-        addLog(`❌ ${asset} Binance 일봉 오류: ${e.message}`);
-        assetResults.push({ asset, ok: false, error: "Binance daily fetch failed" });
-        continue;
+        if (candles.length > 50) candleSource = "binance";
+      } catch { /* Binance 실패 → Bybit */ }
+
+      // Bybit 폴백 (일봉)
+      if (candles.length < 100 && bybitSymbol) {
+        try {
+          candles = await fetchBybitKlines(bybitSymbol, "1d", 365);
+          if (candles.length > 50) candleSource = "bybit";
+        } catch (e) {
+          addLog(`⚠️ ${asset} Bybit 일봉도 실패: ${e.message}`);
+        }
       }
 
       if (candles.length < 100) {
-        addLog(`❌ ${asset} 캔들 부족 (${candles.length}개 < 100개)`);
+        addLog(`❌ ${asset} 캔들 부족 (${candles.length}개 < 100개) — 스킵`);
         assetResults.push({ asset, ok: false, error: "Insufficient candle data" });
         continue;
       }
 
-      // 4시간봉 로드
+      // 4시간봉 로드 (Binance → Bybit 폴백)
       let candles4h = [];
       try {
-        const res4h = await fetch(bin4h);
+        const res4h = await fetch(`https://api.binance.com/api/v3/klines?symbol=${binSymbol}&interval=4h&limit=500`, { signal: AbortSignal.timeout(5000) });
         if (res4h.ok) {
           const raw4h = await res4h.json();
-          candles4h = raw4h.map(k => ({
-            time: Math.floor(k[0] / 1000),
-            open: parseFloat(k[1]),
-            high: parseFloat(k[2]),
-            low: parseFloat(k[3]),
-            close: parseFloat(k[4]),
-            volume: parseFloat(k[5]),
-          })).filter(c => c.close > 0 && c.high > 0 && c.low > 0);
+          if (Array.isArray(raw4h)) {
+            candles4h = raw4h.map(k => ({
+              time: Math.floor(k[0] / 1000),
+              open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]),
+              close: parseFloat(k[4]), volume: parseFloat(k[5]),
+            })).filter(c => c.close > 0 && c.high > 0 && c.low > 0);
+          }
         }
-      } catch { /* 4h 실패해도 일봉으로 계속 */ }
+      } catch { /* Binance 4h 실패 */ }
+      if (candles4h.length < 50 && bybitSymbol) {
+        try { candles4h = await fetchBybitKlines(bybitSymbol, "4h", 500); } catch { /* skip */ }
+      }
 
-      // 1시간봉 로드 (단기 시그널용 — 15분 크론에 최적)
+      // 1시간봉 로드 (Binance → Bybit 폴백)
       let candles1h = [];
       try {
-        const res1h = await fetch(bin1h);
+        const res1h = await fetch(`https://api.binance.com/api/v3/klines?symbol=${binSymbol}&interval=1h&limit=500`, { signal: AbortSignal.timeout(5000) });
         if (res1h.ok) {
           const raw1h = await res1h.json();
-          candles1h = raw1h.map(k => ({
-            time: Math.floor(k[0] / 1000),
-            open: parseFloat(k[1]),
-            high: parseFloat(k[2]),
-            low: parseFloat(k[3]),
-            close: parseFloat(k[4]),
-            volume: parseFloat(k[5]),
-          })).filter(c => c.close > 0 && c.high > 0 && c.low > 0);
+          if (Array.isArray(raw1h)) {
+            candles1h = raw1h.map(k => ({
+              time: Math.floor(k[0] / 1000),
+              open: parseFloat(k[1]), high: parseFloat(k[2]), low: parseFloat(k[3]),
+              close: parseFloat(k[4]), volume: parseFloat(k[5]),
+            })).filter(c => c.close > 0 && c.high > 0 && c.low > 0);
+          }
         }
-      } catch { /* 1h 실패해도 상위 타임프레임으로 계속 */ }
+      } catch { /* Binance 1h 실패 */ }
+      if (candles1h.length < 50 && bybitSymbol) {
+        try { candles1h = await fetchBybitKlines(bybitSymbol, "1h", 500); } catch { /* skip */ }
+      }
 
-      addLog(`✅ ${asset}: 일봉 ${candles.length}개 + 4h ${candles4h.length}개 + 1h ${candles1h.length}개 (최신: $${candles[candles.length - 1]?.close?.toFixed(0)})`);
+      addLog(`✅ ${asset} [${candleSource}]: 일봉 ${candles.length}개 + 4h ${candles4h.length}개 + 1h ${candles1h.length}개 (최신: $${candles[candles.length - 1]?.close?.toFixed(0)})`);
 
       // 지표 계산
       const closes = candles.map(c => c.close);
