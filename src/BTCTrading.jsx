@@ -545,11 +545,11 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
         )}
       </div>
 
-      {/* ═══ DI 가상 포트폴리오 ═══ */}
+      {/* ═══ 가상매매 포트폴리오 ═══ */}
       {virtualPortfolio && (
         <div style={card}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-            <span style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>DI 가상 포트폴리오</span>
+            <span style={{ fontSize: "13px", fontWeight: 700, color: C.text1 }}>가상매매 포트폴리오</span>
             {badge("KV 자동매매", C.purpleBg, C.purple)}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "12px" }}>

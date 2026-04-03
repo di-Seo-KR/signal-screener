@@ -711,7 +711,7 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
           background: `linear-gradient(135deg, ${c.card} 0%, ${totalPL >= 0 ? c.green : c.red}10 100%)`,
           border: `1px solid ${c.border}`, borderRadius: "16px", padding: isMobile ? "16px 12px" : "20px", marginBottom: "16px",
         }}>
-          <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "8px" }}>DI 가상 포트폴리오</div>
+          <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "8px" }}>가상매매 포트폴리오</div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: isMobile ? "10px" : "12px" }}>
             <div>
               <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3 }}>총 자산</div>

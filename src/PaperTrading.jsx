@@ -891,7 +891,7 @@ function SetupPanel({ config, setConfig, onConnect, theme }) {
         <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, #0D1B2A 100%)`,
           border: `1px solid ${C.border}`, borderRadius: "16px", padding: "40px 24px", textAlign: "center" }}>
           <div style={{ fontSize: "48px", marginBottom: "12px" }}>🤖</div>
-          <div style={{ fontWeight: 800, fontSize: "22px", marginBottom: "8px" }}>DI 가상매매</div>
+          <div style={{ fontWeight: 800, fontSize: "22px", marginBottom: "8px" }}>가상매매</div>
           <div style={{ color: C.text3, fontSize: "14px", maxWidth: "420px", margin: "0 auto", lineHeight: 1.6, marginBottom: "20px" }}>
             리스크 관리 · 브래킷 주문 · 드로다운 보호 · ATR 포지션 사이징
           </div>
@@ -907,7 +907,7 @@ function SetupPanel({ config, setConfig, onConnect, theme }) {
         <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, #0D1B2A 100%)`,
           border: `1px solid ${C.border}`, borderRadius: "16px", padding: "40px 24px", textAlign: "center", marginBottom: "16px" }}>
           <div style={{ fontSize: "48px", marginBottom: "12px" }}>🤖</div>
-          <div style={{ fontWeight: 800, fontSize: "22px", marginBottom: "8px" }}>DI 가상매매</div>
+          <div style={{ fontWeight: 800, fontSize: "22px", marginBottom: "8px" }}>가상매매</div>
         </div>
         <div style={{ background: C.redBg, border: `1px solid ${C.red}`, borderRadius: "12px", padding: "16px", textAlign: "center" }}>
           <div style={{ color: C.red, fontSize: "14px", fontWeight: 600 }}>{error}</div>
@@ -925,7 +925,7 @@ function SetupPanel({ config, setConfig, onConnect, theme }) {
       <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, #0D1B2A 100%)`,
         border: `1px solid ${C.border}`, borderRadius: "16px", padding: "40px 24px", textAlign: "center" }}>
         <div style={{ fontSize: "48px", marginBottom: "12px" }}>✅</div>
-        <div style={{ fontWeight: 800, fontSize: "22px", marginBottom: "8px" }}>DI 가상매매 준비 완료</div>
+        <div style={{ fontWeight: 800, fontSize: "22px", marginBottom: "8px" }}>가상매매 준비 완료</div>
         <div style={{ color: C.text3, fontSize: "14px", maxWidth: "420px", margin: "0 auto", lineHeight: 1.6 }}>
           자동매매 봇이 실시간으로 시그널을 감지하고 주문을 처리합니다
         </div>
@@ -2347,7 +2347,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
 
           {/* 가상매매 정보 */}
           <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
-            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"4px"}}>DI 가상매매</div>
+            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"4px"}}>가상매매</div>
             <div style={{fontSize:"12px",color:C.text2,lineHeight:1.6}}>
               클라우드 기반 KV 가상 포트폴리오를 사용하여 안전하고 빠른 자동매매를 제공합니다. API 키 입력이 필요 없으며, 모든 거래 데이터는 암호화되어 저장됩니다.
             </div>

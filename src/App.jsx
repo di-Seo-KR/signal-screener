@@ -10753,7 +10753,7 @@ function AppInner() {
                     return `${JSON.parse(localStorage.getItem(k) || "[]").length}개`;
                   } catch { return "0개"; }
                 })(), action: () => setTab("auto-trading") },
-                { label: "가상 포트폴리오", value: "운영중", action: () => setTab("auto-trading") },
+                { label: "가상매매", value: "운영중", action: () => setTab("auto-trading") },
               ].map((item, i) => (
                 <div key={i} onClick={item.action} style={{
                   display: "flex", justifyContent: "space-between", alignItems: "center",
