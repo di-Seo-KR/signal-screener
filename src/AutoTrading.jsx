@@ -1262,24 +1262,26 @@ export default function AutoTrading({ theme = "dark", user }) {
   const confirmStopBot = useCallback(async () => {
     if (!stopBotConfirm) return;
     const { botId } = stopBotConfirm;
-    // 1. 로컬 상태에서 제거
+    // 1. 로컬 상태에서 제거 + 즉시 동기화 (stale closure 방지: setter 내에서 최신 상태 사용)
+    let updatedBots = [];
     setActiveBots(prev => {
-      const updated = prev.filter(ab => ab.botId !== botId);
+      updatedBots = prev.filter(ab => ab.botId !== botId);
       // 2. localStorage 즉시 동기화
-      if (storageKey) try { localStorage.setItem(storageKey, JSON.stringify(updated)); } catch {}
-      return updated;
+      if (storageKey) try { localStorage.setItem(storageKey, JSON.stringify(updatedBots)); } catch {}
+      return updatedBots;
     });
-    // 3. Supabase 즉시 동기화 (지연 없이)
+    // 3. Supabase 즉시 동기화 — updatedBots 사용 (stale activeBots 대신)
     if (user) {
       try {
-        const currentBots = activeBots.filter(ab => ab.botId !== botId);
-        await supabase.auth.updateUser({ data: { active_bots: currentBots } });
+        // 디바운스 타이머 취소 (이전 저장이 삭제 전 데이터를 덮어쓰는 것 방지)
+        if (saveBotsTimeout.current) { clearTimeout(saveBotsTimeout.current); saveBotsTimeout.current = null; }
+        await supabase.auth.updateUser({ data: { active_bots: updatedBots } });
       } catch (e) { console.warn("봇 삭제 Supabase 동기화 실패:", e); }
     }
     if (activeBot?.id === botId) setActiveBot(null);
     setStopBotConfirm(null);
     showToast("success", `${stopBotConfirm.botName} 봇이 완전히 삭제되었습니다.`);
-  }, [stopBotConfirm, activeBot, activeBots, user, storageKey, showToast]);
+  }, [stopBotConfirm, activeBot, user, storageKey, showToast]);
 
   const handleBackToCatalog = useCallback(() => {
     setActiveBot(null);

@@ -1655,12 +1655,8 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
       }}>
         {[
           { id: "dashboard", label: "포지션", count: filteredPositions.length },
-          { id: "orders", label: "주문내역", count: orders.filter(o=>["new","partially_filled","accepted","pending_new"].includes(o.status)).length },
           { id: "signals", label: "시그널", count: detectedSignals.length },
-          { id: "auto", label: "자동매매", count: null },
-          { id: "perf", label: "성과분석", count: null },
-          { id: "risk", label: "리스크", count: riskAlerts.length },
-          { id: "log", label: "로그", count: tradeLog.length },
+          { id: "market", label: "시장진단", count: null },
         ].map(({ id, label, count }) => (
           <button
             key={id}
@@ -1926,55 +1922,82 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
         </div>
       </>)}
 
-      {/* ── 주문 ── */}
-      {activeTab==="orders"&&(
-        <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
-          {openOrders.length>0&&(<>
-            <div style={{fontWeight:700,marginBottom:"12px",display:"flex",justifyContent:"space-between"}}>
-              <span>미체결 ({openOrders.length})</span>
-              <button onClick={async()=>{await virtualStockAPI("cancel_all",{});setTimeout(refreshData,500);}}
-                style={{fontSize:"11px",color:C.red,background:"none",border:"none",cursor:"pointer"}}>전체 취소</button>
-            </div>
-            <div style={{display:"flex",flexDirection:"column",gap:"6px",marginBottom:"20px"}}>
-              {openOrders.map((o,i)=>(
-                <div key={i} style={{background:C.card2,borderRadius:"10px",padding:"12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div>
-                    <div style={{display:"flex",alignItems:"center",gap:"6px",marginBottom:"2px"}}>
-                      <span style={{padding:"2px 6px",borderRadius:"4px",fontSize:"10px",fontWeight:700,
-                        background:o.side==="buy"?C.redBg:C.blueBg,color:o.side==="buy"?C.red:C.blue}}>
-                        {o.side==="buy"?"매수":"매도"}</span>
-                      <span style={{fontWeight:700}}>{o.symbol}</span>
-                      <span style={{fontSize:"11px",color:C.text3}}>{o.qty||o.notional}{o.qty?"주":"$"}</span>
+      {/* ── 시장진단 ── */}
+      {activeTab==="market"&&(
+        <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
+          {/* 마켓 레짐 */}
+          {detectedSignals._regime && (()=>{
+            const r = detectedSignals._regime;
+            const regimeInfo = {
+              trending: { icon: "📈", label: "추세장", color: C.green, desc: "모멘텀·추세추종 전략 유리" },
+              "mean-reverting": { icon: "↔️", label: "박스권", color: C.yellow, desc: "평균회귀·오실레이터 전략 유리" },
+              volatile: { icon: "⚡", label: "고변동", color: C.red, desc: "리스크 축소, 방어적 운용" },
+              unknown: { icon: "❓", label: "분석중", color: C.text3, desc: "데이터 수집 중" },
+            }[r.regime] || { icon: "❓", label: "분석중", color: C.text3, desc: "" };
+            return (
+              <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
+                <div style={{display:"flex",alignItems:"center",gap:"12px",marginBottom:"16px"}}>
+                  <div style={{fontSize:"32px"}}>{regimeInfo.icon}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:700,fontSize:"15px",display:"flex",alignItems:"center",gap:"8px"}}>
+                      마켓 레짐: <span style={{color:regimeInfo.color}}>{regimeInfo.label}</span>
+                      {r.trendDir && <span style={{fontSize:"11px",color:r.trendDir==="bull"?C.green:C.red,fontWeight:600}}>
+                        {r.trendDir==="bull"?"BULL":"BEAR"}
+                      </span>}
                     </div>
-                    <div style={{fontSize:"11px",color:C.text3}}>
-                      {o.type==="limit"?`지정가 $${o.limit_price}`:o.type==="stop"?`스탑 $${o.stop_price}`:"시장가"} · {o.status}
-                      {o.order_class==="bracket"&&" · 브래킷"}
+                    <div style={{fontSize:"12px",color:C.text3,marginTop:"4px"}}>{regimeInfo.desc}</div>
+                  </div>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px"}}>
+                  {r.annualizedVol!=null && (
+                    <div style={{background:C.card2,borderRadius:"10px",padding:"10px",textAlign:"center"}}>
+                      <div style={{fontSize:"10px",color:C.text3,marginBottom:"2px"}}>연환산 변동성</div>
+                      <div style={{fontSize:"15px",fontWeight:800,color:r.annualizedVol>30?C.red:r.annualizedVol>15?C.yellow:C.green}}>{r.annualizedVol.toFixed(1)}%</div>
                     </div>
-                  </div>
-                  <button onClick={()=>cancelOrder(o.id)} style={{
-                    padding:"4px 8px",borderRadius:"6px",fontSize:"10px",
-                    background:C.redBg,color:C.red,border:"none",cursor:"pointer"}}>취소</button>
+                  )}
+                  {r.adxProxy!=null && (
+                    <div style={{background:C.card2,borderRadius:"10px",padding:"10px",textAlign:"center"}}>
+                      <div style={{fontSize:"10px",color:C.text3,marginBottom:"2px"}}>추세 강도</div>
+                      <div style={{fontSize:"15px",fontWeight:800,color:r.adxProxy>25?C.green:C.yellow}}>{r.adxProxy.toFixed(0)}</div>
+                    </div>
+                  )}
+                  {r.strength!=null && (
+                    <div style={{background:C.card2,borderRadius:"10px",padding:"10px",textAlign:"center"}}>
+                      <div style={{fontSize:"10px",color:C.text3,marginBottom:"2px"}}>레짐 신뢰도</div>
+                      <div style={{fontSize:"15px",fontWeight:800,color:C.blue}}>{(r.strength*100).toFixed(0)}%</div>
+                    </div>
+                  )}
                 </div>
-              ))}
+              </div>
+            );
+          })()}
+
+          {/* 리스크 알림 */}
+          {riskAlerts.length > 0 && (
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
+              <div style={{fontWeight:700,fontSize:"14px",marginBottom:"12px"}}>리스크 알림 ({riskAlerts.length})</div>
+              <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
+                {riskAlerts.map((a,i) => (
+                  <div key={i} style={{
+                    background: a.level==="critical"?C.redBg:a.level==="warning"?C.yellowBg:C.blueBg,
+                    border:`1px solid ${a.level==="critical"?C.red:a.level==="warning"?C.yellow:C.blue}33`,
+                    borderRadius:"10px",padding:"10px 14px",fontSize:"12px",
+                    color: a.level==="critical"?C.red:a.level==="warning"?C.yellow:C.blue,
+                    display:"flex",alignItems:"center",gap:"8px",
+                  }}>
+                    <span style={{fontSize:"14px"}}>{a.level==="critical"?"🚨":a.level==="warning"?"⚠️":"ℹ️"}</span>
+                    {a.msg}
+                  </div>
+                ))}
+              </div>
             </div>
-          </>)}
-          <div style={{fontWeight:700,marginBottom:"12px"}}>체결 ({filledOrders.length})</div>
-          {filledOrders.length===0?(
-            <div style={{textAlign:"center",padding:"30px 0",color:C.text3}}>체결 내역 없음</div>
-          ):(
-            <div style={{display:"flex",flexDirection:"column",gap:"4px",maxHeight:"400px",overflow:"auto"}}>
-              {filledOrders.map((o,i)=>(
-                <div key={i} style={{background:C.card2,borderRadius:"8px",padding:"10px 12px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
-                    <span style={{padding:"2px 6px",borderRadius:"4px",fontSize:"10px",fontWeight:700,
-                      background:o.side==="buy"?C.redBg:C.blueBg,color:o.side==="buy"?C.red:C.blue}}>
-                      {o.side==="buy"?"매수":"매도"}</span>
-                    <span style={{fontWeight:600,fontSize:"13px"}}>{o.symbol}</span>
-                    <span style={{fontSize:"11px",color:C.text3}}>{o.filled_qty}주 @ ${fmt(parseFloat(o.filled_avg_price||0))}</span>
-                  </div>
-                  <span style={{fontSize:"10px",color:C.text3}}>{new Date(o.filled_at||o.created_at).toLocaleDateString("ko-KR")}</span>
-                </div>
-              ))}
+          )}
+
+          {/* 데이터 없을 때 */}
+          {!detectedSignals._regime && riskAlerts.length === 0 && (
+            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"40px",textAlign:"center"}}>
+              <div style={{fontSize:"24px",marginBottom:"8px"}}>📊</div>
+              <div style={{fontSize:"13px",fontWeight:600,color:C.text2}}>시그널 스캔을 실행하면 시장 진단 정보가 표시됩니다</div>
             </div>
           )}
         </div>
@@ -2097,651 +2120,6 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
         </div>
       )}
 
-      {/* ── 자동매매 설정 ── */}
-      {activeTab==="auto"&&(
-        <div>
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}}>
-              <div>
-                <div style={{fontWeight:700,fontSize:"15px"}}>퀀트 자동매매</div>
-                <div style={{fontSize:"12px",color:C.text3,marginTop:"2px"}}>
-                  리스크 관리 적용 · 브래킷 주문 · ATR 사이징
-                </div>
-              </div>
-              <button onClick={()=>{setAutoTradeEnabled(!autoTradeEnabled);setTradingHalted(false);}} style={{
-                width:"52px",height:"28px",borderRadius:"14px",border:"none",cursor:"pointer",
-                background:autoTradeEnabled?C.green:C.border2,position:"relative",transition:"background 0.2s"}}>
-                <div style={{width:"22px",height:"22px",borderRadius:"50%",background:"#fff",
-                  position:"absolute",top:"3px",left:autoTradeEnabled?"27px":"3px",transition:"left 0.2s"}} />
-              </button>
-            </div>
-            {autoTradeEnabled&&!tradingHalted&&(
-              <div style={{background:C.greenBg,border:`1px solid ${C.green}33`,borderRadius:"10px",
-                padding:"12px",fontSize:"12px",color:C.green,marginBottom:"12px"}}>
-                자동매매 활성. 스탑로스 {tradeSettings.stopLossATR}×ATR / 익절 {tradeSettings.takeProfitATR}×ATR / 1건당 {tradeSettings.allocationPct}%
-              </div>
-            )}
-            {tradingHalted&&(
-              <div style={{background:C.redBg,border:`1px solid ${C.red}33`,borderRadius:"10px",
-                padding:"12px",fontSize:"12px",color:C.red,marginBottom:"12px"}}>
-                리스크 한도 초과로 자동매매가 중단되었습니다. 토글을 다시 켜서 재개할 수 있습니다.
-              </div>
-            )}
-
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px",background:C.card2,borderRadius:"10px"}}>
-              <div>
-                <div style={{fontSize:"13px",fontWeight:600}}>자동 스캔 (5분)</div>
-                <div style={{fontSize:"11px",color:C.text3}}>시장 데이터 자동 수집 + 시그널 감지</div>
-              </div>
-              <button onClick={()=>setAutoScanEnabled(!autoScanEnabled)} style={{
-                width:"44px",height:"24px",borderRadius:"12px",border:"none",cursor:"pointer",
-                background:autoScanEnabled?C.blue:C.border2,position:"relative",transition:"background 0.2s"}}>
-                <div style={{width:"18px",height:"18px",borderRadius:"50%",background:"#fff",
-                  position:"absolute",top:"3px",left:autoScanEnabled?"23px":"3px",transition:"left 0.2s"}} />
-              </button>
-            </div>
-          </div>
-
-          {/* 봇 전략 정보 카드 */}
-          {botPreset && (
-            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
-              <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"12px"}}>
-                <span style={{fontSize:"28px"}}>{botPreset.icon}</span>
-                <div>
-                  <div style={{fontWeight:700,fontSize:"15px",color:C.text1}}>{botPreset.name}</div>
-                  <div style={{fontSize:"11px",color:C.text3}}>{botPreset.description}</div>
-                </div>
-              </div>
-              <div style={{display:"flex",gap:"6px",flexWrap:"wrap",marginBottom:"12px"}}>
-                {(botPreset.tags||[]).map(tag=>(
-                  <span key={tag} style={{fontSize:"11px",padding:"3px 10px",borderRadius:"12px",
-                    background:C.card2,border:`1px solid ${C.border}`,color:C.text2}}>{tag}</span>
-                ))}
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px",background:C.card2,borderRadius:"10px",padding:"12px",textAlign:"center"}}>
-                <div>
-                  <div style={{fontSize:"10px",color:C.text3}}>승률</div>
-                  <div style={{fontSize:"14px",fontWeight:700,color:C.green}}>{botPreset.stats?.winRate||"—"}</div>
-                </div>
-                <div>
-                  <div style={{fontSize:"10px",color:C.text3}}>샤프비율</div>
-                  <div style={{fontSize:"14px",fontWeight:700,color:C.blue}}>{botPreset.stats?.sharpeRatio||"—"}</div>
-                </div>
-                <div>
-                  <div style={{fontSize:"10px",color:C.text3}}>최대낙폭</div>
-                  <div style={{fontSize:"14px",fontWeight:700,color:C.red}}>{botPreset.stats?.mdd||"—"}</div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 매매 설정 (상세) */}
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
-            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"16px"}}>포지션 사이징 (상세)</div>
-            <div style={{display:"flex",flexDirection:"column",gap:"14px"}}>
-
-              <div>
-                <label style={{fontSize:"12px",color:C.text3,fontWeight:600,display:"block",marginBottom:"6px"}}>1건당 투자 비율</label>
-                <div style={{display:"flex",gap:"4px"}}>
-                  {[2,3,5,8,12].map(pct=>(
-                    <button key={pct} onClick={()=>setTradeSettings(p=>({...p,allocationPct:pct}))} style={{
-                      flex:1,padding:"8px",borderRadius:"8px",fontSize:"12px",fontWeight:600,
-                      background:tradeSettings.allocationPct===pct?C.blueBg:"transparent",
-                      color:tradeSettings.allocationPct===pct?C.blue:C.text3,
-                      border:`1px solid ${tradeSettings.allocationPct===pct?C.blue:C.border2}`,cursor:"pointer"}}>{pct}%</button>
-                  ))}
-                </div>
-                <div style={{fontSize:"11px",color:C.text3,marginTop:"4px"}}>
-                  기준 약 {fmtUSD(equity*tradeSettings.allocationPct/100)} · ATR 변동성으로 자동 조정
-                </div>
-              </div>
-
-              <div>
-                <label style={{fontSize:"12px",color:C.text3,fontWeight:600,display:"block",marginBottom:"6px"}}>스탑로스 (ATR 배수)</label>
-                <div style={{display:"flex",gap:"4px"}}>
-                  {[1.5,2,2.5,3].map(n=>(
-                    <button key={n} onClick={()=>setTradeSettings(p=>({...p,stopLossATR:n}))} style={{
-                      flex:1,padding:"8px",borderRadius:"8px",fontSize:"12px",fontWeight:600,
-                      background:tradeSettings.stopLossATR===n?C.redBg:"transparent",
-                      color:tradeSettings.stopLossATR===n?C.red:C.text3,
-                      border:`1px solid ${tradeSettings.stopLossATR===n?C.red:C.border2}`,cursor:"pointer"}}>{n}×</button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label style={{fontSize:"12px",color:C.text3,fontWeight:600,display:"block",marginBottom:"6px"}}>익절 (ATR 배수)</label>
-                <div style={{display:"flex",gap:"4px"}}>
-                  {[2,3,4,5].map(n=>(
-                    <button key={n} onClick={()=>setTradeSettings(p=>({...p,takeProfitATR:n}))} style={{
-                      flex:1,padding:"8px",borderRadius:"8px",fontSize:"12px",fontWeight:600,
-                      background:tradeSettings.takeProfitATR===n?C.greenBg:"transparent",
-                      color:tradeSettings.takeProfitATR===n?C.green:C.text3,
-                      border:`1px solid ${tradeSettings.takeProfitATR===n?C.green:C.border2}`,cursor:"pointer"}}>{n}×</button>
-                  ))}
-                </div>
-                <div style={{fontSize:"11px",color:C.text3,marginTop:"4px"}}>
-                  R:R 비율 = 1:{fmt(tradeSettings.takeProfitATR/tradeSettings.stopLossATR,1)}
-                </div>
-              </div>
-
-              <div>
-                <label style={{fontSize:"12px",color:C.text3,fontWeight:600,display:"block",marginBottom:"6px"}}>최소 신뢰도</label>
-                <div style={{display:"flex",gap:"4px"}}>
-                  {[0.3,0.4,0.5,0.6,0.7].map(n=>(
-                    <button key={n} onClick={()=>setTradeSettings(p=>({...p,minConfidence:n}))} style={{
-                      flex:1,padding:"8px",borderRadius:"8px",fontSize:"12px",fontWeight:600,
-                      background:tradeSettings.minConfidence===n?C.purpleBg:"transparent",
-                      color:tradeSettings.minConfidence===n?C.purple:C.text3,
-                      border:`1px solid ${tradeSettings.minConfidence===n?C.purple:C.border2}`,cursor:"pointer"}}>{n*100}%</button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label style={{fontSize:"12px",color:C.text3,fontWeight:600,display:"block",marginBottom:"6px"}}>종목 쿨다운 (시간)</label>
-                <div style={{display:"flex",gap:"4px"}}>
-                  {[6,12,24,48].map(n=>(
-                    <button key={n} onClick={()=>setTradeSettings(p=>({...p,cooldownHours:n}))} style={{
-                      flex:1,padding:"8px",borderRadius:"8px",fontSize:"12px",fontWeight:600,
-                      background:tradeSettings.cooldownHours===n?C.blueBg:"transparent",
-                      color:tradeSettings.cooldownHours===n?C.blue:C.text3,
-                      border:`1px solid ${tradeSettings.cooldownHours===n?C.blue:C.border2}`,cursor:"pointer"}}>{n}h</button>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px",background:C.card2,borderRadius:"10px"}}>
-                <div>
-                  <div style={{fontSize:"13px",fontWeight:600}}>브래킷 주문</div>
-                  <div style={{fontSize:"11px",color:C.text3}}>진입 시 자동 스탑로스 + 익절 주문</div>
-                </div>
-                <button onClick={()=>setTradeSettings(p=>({...p,useBracketOrders:!p.useBracketOrders}))} style={{
-                  width:"44px",height:"24px",borderRadius:"12px",border:"none",cursor:"pointer",
-                  background:tradeSettings.useBracketOrders?C.green:C.border2,position:"relative",transition:"background 0.2s"}}>
-                  <div style={{width:"18px",height:"18px",borderRadius:"50%",background:"#fff",
-                    position:"absolute",top:"3px",left:tradeSettings.useBracketOrders?"23px":"3px",transition:"left 0.2s"}} />
-                </button>
-              </div>
-
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px",background:C.card2,borderRadius:"10px"}}>
-                <div>
-                  <div style={{fontSize:"13px",fontWeight:600}}>트레일링 스탑</div>
-                  <div style={{fontSize:"11px",color:C.text3}}>이익 구간에서 자동 스탑로스 추적</div>
-                </div>
-                <button onClick={()=>setTradeSettings(p=>({...p,trailingStop:!p.trailingStop}))} style={{
-                  width:"44px",height:"24px",borderRadius:"12px",border:"none",cursor:"pointer",
-                  background:tradeSettings.trailingStop?C.green:C.border2,position:"relative",transition:"background 0.2s"}}>
-                  <div style={{width:"18px",height:"18px",borderRadius:"50%",background:"#fff",
-                    position:"absolute",top:"3px",left:tradeSettings.trailingStop?"23px":"3px",transition:"left 0.2s"}} />
-                </button>
-              </div>
-              {tradeSettings.trailingStop && (
-                <div>
-                  <label style={{fontSize:"12px",color:C.text3,fontWeight:600,display:"block",marginBottom:"6px"}}>트레일링 간격 (%)</label>
-                  <div style={{display:"flex",gap:"4px"}}>
-                    {[1,2,3,5].map(n=>(
-                      <button key={n} onClick={()=>setTradeSettings(p=>({...p,trailPercent:n}))} style={{
-                        flex:1,padding:"8px",borderRadius:"8px",fontSize:"12px",fontWeight:600,
-                        background:(tradeSettings.trailPercent||2)===n?C.greenBg:"transparent",
-                        color:(tradeSettings.trailPercent||2)===n?C.green:C.text3,
-                        border:`1px solid ${(tradeSettings.trailPercent||2)===n?C.green:C.border2}`,cursor:"pointer"}}>{n}%</button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* 전략 선택 */}
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"16px"}}>
-              <div>
-                <div style={{fontWeight:700,fontSize:"15px"}}>활성 전략</div>
-                <div style={{fontSize:"12px",color:C.text3,marginTop:"2px"}}>
-                  {tradeSettings.strategies.length}/{Object.keys(STRATEGY_PORTFOLIOS).length}개 전략
-                </div>
-              </div>
-              <button onClick={()=>{
-                const all=Object.keys(STRATEGY_PORTFOLIOS);
-                setTradeSettings(p=>({...p,strategies:p.strategies.length===all.length?[]:all}));
-              }} style={{fontSize:"11px",color:C.blue,background:"none",border:"none",cursor:"pointer"}}>
-                {tradeSettings.strategies.length===Object.keys(STRATEGY_PORTFOLIOS).length?"전체 해제":"전체 선택"}
-              </button>
-            </div>
-            <div style={{display:"flex",flexWrap:"wrap",gap:"6px"}}>
-              {Object.keys(STRATEGY_PORTFOLIOS).map(name=>{
-                const strat=STRATEGY_MAP[name];
-                const active=tradeSettings.strategies.includes(name);
-                const conf=STRATEGY_CONFIDENCE[name]||0.5;
-                return (
-                  <button key={name} onClick={()=>{
-                    setTradeSettings(p=>({...p,strategies:active?p.strategies.filter(s=>s!==name):[...p.strategies,name]}));
-                  }} style={{
-                    padding:"6px 10px",borderRadius:"8px",fontSize:"11px",fontWeight:600,
-                    background:active?C.purpleBg:"transparent",color:active?C.purple:C.text3,
-                    border:`1px solid ${active?C.purple+"55":C.border2}`,cursor:"pointer"}}>
-                    {strat?.icon||"📊"} {name} <span style={{fontSize:"9px",opacity:0.7}}>{(conf*100).toFixed(0)}%</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 가상매매 정보 */}
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
-            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"4px"}}>가상매매</div>
-            <div style={{fontSize:"12px",color:C.text2,lineHeight:1.6}}>
-              클라우드 기반 KV 가상 포트폴리오를 사용하여 안전하고 빠른 자동매매를 제공합니다. API 키 입력이 필요 없으며, 모든 거래 데이터는 암호화되어 저장됩니다.
-            </div>
-            <div style={{marginTop:"12px",padding:"10px",background:C.card2,borderRadius:"8px",fontSize:"11px",color:C.text3}}>
-              ✓ 클라우드 포트폴리오 · 자동 백업
-              <br/>✓ API 키 없음 · 보안 강화
-              <br/>✓ 실시간 시그널 처리
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── 성과 분석 (v3.2 — Risk-Adjusted Metrics) ── */}
-      {activeTab==="perf"&&(()=>{
-        const perf = loadStrategyPerformance();
-        const stratStats = Object.entries(perf).map(([name, s]) => {
-          const total = (s.wins||0) + (s.losses||0);
-          const winRate = total > 0 ? s.wins / total * 100 : 0;
-          const expectancy = total > 0 ? (s.avgWin * s.wins - s.avgLoss * s.losses) / total : 0;
-          // Sharpe-유사 메트릭: 기대값 / 표준편차
-          const variance = Math.sqrt((s.avgWin - expectancy) ** 2 * s.wins + (s.avgLoss - expectancy) ** 2 * s.losses) / (total || 1);
-          const sharpeProxy = variance > 0 ? expectancy / variance : 0;
-          return { name, ...s, total, winRate, expectancy, sharpeProxy };
-        }).filter(s => s.total >= 1).sort((a,b) => b.sharpeProxy - a.sharpeProxy); // Sharpe-like 순위
-
-        const totalTrades = stratStats.reduce((s,x) => s+x.total, 0);
-        const totalWins = stratStats.reduce((s,x) => s+(x.wins||0), 0);
-        const totalLosses = stratStats.reduce((s,x) => s+(x.losses||0), 0);
-        const avgWinRate = totalTrades > 0 ? totalWins/totalTrades*100 : 0;
-
-        // 로그 기반 최근 성과
-        const recentLogs = tradeLog.filter(l => !l.error).slice(0, 100);
-        const successRate = recentLogs.length > 0 ? recentLogs.filter(l => l.status === "filled" || l.status === "accepted").length / recentLogs.length * 100 : 0;
-
-        // 연승/연패 추적
-        let maxWinStreak = 0, maxLossStreak = 0, currentStreak = 0, streakType = null;
-        for (const log of recentLogs) {
-          const isWin = log.status === "filled" || log.status === "accepted";
-          if (isWin) {
-            if (streakType === "win") currentStreak++;
-            else { currentStreak = 1; streakType = "win"; }
-            maxWinStreak = Math.max(maxWinStreak, currentStreak);
-          } else {
-            if (streakType === "loss") currentStreak++;
-            else { currentStreak = 1; streakType = "loss"; }
-            maxLossStreak = Math.max(maxLossStreak, currentStreak);
-          }
-        }
-
-        // 최고 거래 / 최악 거래 (PL 기반)
-        const tradePLs = recentLogs.filter(l => l.pnl != null).map(l => parseFloat(l.pnl || 0));
-        const bestTrade = tradePLs.length > 0 ? Math.max(...tradePLs) : 0;
-        const worstTrade = tradePLs.length > 0 ? Math.min(...tradePLs) : 0;
-
-        // 월별 P&L (간단한 그리드)
-        const monthlyPL = {};
-        for (const log of tradeLog) {
-          if (!log.time || !log.pnl) continue;
-          const date = new Date(log.time);
-          const month = date.toLocaleString("ko-KR", { year: "numeric", month: "2-digit" });
-          monthlyPL[month] = (monthlyPL[month] || 0) + parseFloat(log.pnl);
-        }
-
-        // 전략 상관관계 (간단한 근사)
-        const strategyCorrelation = {};
-        for (let i = 0; i < stratStats.length; i++) {
-          for (let j = i + 1; j < stratStats.length; j++) {
-            const s1 = stratStats[i];
-            const s2 = stratStats[j];
-            // 승률 차이로 상관관계 근사 (낮을수록 다양성 높음)
-            const correlation = Math.abs(s1.winRate - s2.winRate) / 100;
-            strategyCorrelation[`${s1.name} ↔ ${s2.name}`] = correlation;
-          }
-        }
-
-        return (
-          <div>
-            {/* 요약 대시보드 — Enhanced Metrics */}
-            <div style={{background:`linear-gradient(135deg,${C.card} 0%,#0D1B2A 100%)`,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
-              <div style={{fontWeight:700,fontSize:"15px",marginBottom:"16px"}}>📊 성과 분석 (Risk-Adjusted)</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:"8px"}}>
-                {[
-                  {label:"총 거래",value:totalTrades+"건",color:C.text1},
-                  {label:"전략 승률",value:fmt(avgWinRate,1)+"%",color:avgWinRate>=50?C.green:C.red},
-                  {label:"Sharpe순위",value:stratStats.length>0?fmt(stratStats[0].sharpeProxy,2):"—",color:C.blue},
-                  {label:"포트폴리오 VaR",value:"$"+fmt(rm.calcVaR(0.95), 0),color:C.yellow},
-                  {label:"최대 DD",value:fmt(rm.drawdown,1)+"%",color:rm.drawdown>5?C.red:C.green},
-                  {label:"주문 성공",value:fmt(successRate,0)+"%",color:successRate>=70?C.green:C.yellow},
-                  {label:"연승 기록",value:maxWinStreak+"회",color:C.green},
-                  {label:"연패 기록",value:maxLossStreak+"회",color:C.red},
-                  {label:"최고 거래",value:fmtUSD(bestTrade),color:bestTrade>=0?C.green:C.red},
-                  {label:"최악 거래",value:fmtUSD(worstTrade),color:worstTrade>=0?C.green:C.red},
-                  {label:"포트폴리오 베타",value:fmt(rm.calcPortfolioBeta(),2),color:C.purple},
-                  {label:"포트폴리오 Heat",value:fmt(rm.calcPortfolioHeat(),1)+"%",color:rm.calcPortfolioHeat()>50?C.red:C.green},
-                ].map((m,i)=>(
-                  <div key={i} style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
-                    <div style={{fontSize:"10px",color:C.text3,marginBottom:"3px"}}>{m.label}</div>
-                    <div style={{fontWeight:800,fontSize:"14px",color:m.color}}>{m.value}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 전략별 성과 (Risk-Adjusted Ranking) */}
-            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
-              <div style={{fontWeight:700,fontSize:"15px",marginBottom:"16px"}}>전략별 성과 (Sharpe로 순위)</div>
-              {stratStats.length===0?(
-                <div style={{textAlign:"center",padding:"40px 0",color:C.text3}}>
-                  <div style={{fontSize:"36px",marginBottom:"8px"}}>📈</div>
-                  아직 충분한 거래 데이터가 없습니다<br/>자동매매를 시작하면 전략별 성과가 기록됩니다
-                </div>
-              ):(
-                <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
-                  {stratStats.map((s,i)=>{
-                    const barColor = s.sharpeProxy>=0.5?C.green:s.sharpeProxy>=0.2?C.yellow:C.red;
-                    return (
-                      <div key={i} style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
-                        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
-                          <span style={{fontWeight:600,fontSize:"13px"}}>{i+1}. {s.name}</span>
-                          <span style={{fontSize:"12px",fontWeight:700,color:barColor}}>Sharpe {fmt(s.sharpeProxy,2)}</span>
-                        </div>
-                        <div style={{height:"6px",background:C.border,borderRadius:"3px",overflow:"hidden",marginBottom:"6px"}}>
-                          <div style={{height:"100%",width:`${Math.min(100, (s.sharpeProxy+1)*50)}%`,background:barColor,borderRadius:"3px"}} />
-                        </div>
-                        <div style={{display:"flex",gap:"12px",fontSize:"11px",color:C.text3,flexWrap:"wrap"}}>
-                          <span>{s.wins}승 {s.losses}패</span>
-                          <span>승률 {fmt(s.winRate,1)}%</span>
-                          <span>평균이익 {fmt(s.avgWin*100,1)}%</span>
-                          <span>평균손실 {fmt(s.avgLoss*100,1)}%</span>
-                          <span style={{color:s.expectancy>0?C.green:C.red}}>기대값 {fmt(s.expectancy*100,2)}%</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* 월별 P&L */}
-            {Object.keys(monthlyPL).length > 0 && (
-              <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
-                <div style={{fontWeight:700,fontSize:"15px",marginBottom:"16px"}}>월별 P&L</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(80px,1fr))",gap:"8px"}}>
-                  {Object.entries(monthlyPL).sort().reverse().map(([month, pl], i) => (
-                    <div key={i} style={{background:C.card2,borderRadius:"10px",padding:"12px",textAlign:"center"}}>
-                      <div style={{fontSize:"11px",color:C.text3,marginBottom:"3px"}}>{month}</div>
-                      <div style={{fontWeight:800,fontSize:"14px",color:pl>=0?C.green:C.red}}>{fmtUSD(pl)}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 전략 상관관계 (간단한 색상 코드) */}
-            {Object.keys(strategyCorrelation).length > 0 && (
-              <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
-                <div style={{fontWeight:700,fontSize:"15px",marginBottom:"16px"}}>전략 다양성 (상관관계)</div>
-                <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
-                  {Object.entries(strategyCorrelation).slice(0, 6).map(([pair, corr], i) => (
-                    <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                      <span style={{fontSize:"12px",color:C.text2}}>{pair}</span>
-                      <div style={{display:"flex",alignItems:"center",gap:"8px"}}>
-                        <div style={{width:"60px",height:"6px",background:C.border,borderRadius:"3px"}}>
-                          <div style={{height:"100%",width:`${corr*100}%`,background:corr<0.3?C.green:corr<0.6?C.yellow:C.red,borderRadius:"3px"}} />
-                        </div>
-                        <span style={{fontSize:"11px",color:C.text3,width:"30px"}}>{fmt(corr,2)}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* ── 리스크 대시보드 (v3.2 — Advanced Risk Metrics) ── */}
-      {activeTab==="risk"&&(
-        <div>
-          {/* 메인 리스크 게이지 */}
-          <div style={{background:`linear-gradient(135deg,${C.card} 0%,#0D1B2A 100%)`,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
-            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"16px"}}>⚠️ 리스크 대시보드</div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:"8px",marginBottom:"16px"}}>
-              {/* 드로다운 게이지 */}
-              <div style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
-                <div style={{fontSize:"10px",color:C.text3}}>드로다운</div>
-                <div style={{fontWeight:800,fontSize:"18px",color:rm.drawdown>tradeSettings.maxDrawdownPct*0.7?C.red:C.green}}>
-                  {fmt(rm.drawdown)}%
-                </div>
-                <div style={{fontSize:"10px",color:C.text3}}>한도 {tradeSettings.maxDrawdownPct}%</div>
-                <div style={{height:"4px",background:C.border,borderRadius:"2px",marginTop:"6px"}}>
-                  <div style={{height:"100%",width:`${Math.min(100,rm.drawdown/tradeSettings.maxDrawdownPct*100)}%`,
-                    background:rm.drawdown>tradeSettings.maxDrawdownPct*0.7?C.red:C.green,borderRadius:"2px"}} />
-                </div>
-              </div>
-
-              {/* 일일 P&L */}
-              <div style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
-                <div style={{fontSize:"10px",color:C.text3}}>일일 P&L</div>
-                <div style={{fontWeight:800,fontSize:"18px",color:dayPLPct>=0?C.green:C.red}}>{fmtPct(dayPLPct)}</div>
-                <div style={{fontSize:"10px",color:C.text3}}>한도 -{tradeSettings.maxDailyLossPct}%</div>
-              </div>
-
-              {/* 포트폴리오 VaR (95% 신뢰도) */}
-              <div style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
-                <div style={{fontSize:"10px",color:C.text3}}>포트폴리오 VaR (95%)</div>
-                <div style={{fontWeight:800,fontSize:"18px",color:C.orange}}>
-                  {fmtUSD(rm.calcVaR(0.95))}
-                </div>
-                <div style={{fontSize:"9px",color:C.text3}}>최대 예상 손실</div>
-              </div>
-
-              {/* 포트폴리오 Heat */}
-              <div style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
-                <div style={{fontSize:"10px",color:C.text3}}>포트폴리오 Heat</div>
-                <div style={{fontWeight:800,fontSize:"18px",color:rm.calcPortfolioHeat()>50?C.red:C.green}}>
-                  {fmt(rm.calcPortfolioHeat(),1)}%
-                </div>
-                <div style={{fontSize:"10px",color:C.text3}}>배포된 리스크</div>
-                <div style={{height:"4px",background:C.border,borderRadius:"2px",marginTop:"6px"}}>
-                  <div style={{height:"100%",width:`${Math.min(100,rm.calcPortfolioHeat())}%`,
-                    background:rm.calcPortfolioHeat()>50?C.red:C.yellow,borderRadius:"2px"}} />
-                </div>
-              </div>
-
-              {/* 포트폴리오 베타 */}
-              <div style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
-                <div style={{fontSize:"10px",color:C.text3}}>포트폴리오 베타</div>
-                <div style={{fontWeight:800,fontSize:"18px",color:C.purple}}>
-                  {fmt(rm.calcPortfolioBeta(),2)}x
-                </div>
-                <div style={{fontSize:"9px",color:C.text3}}>{rm.calcPortfolioBeta()>1.1?"공격적":"방어적"}</div>
-              </div>
-
-              {/* 리스크 스코어 (0-100) */}
-              {(() => {
-                const ddPart = (rm.drawdown * 3);
-                const heatPart = (rm.calcPortfolioHeat() * 0.3);
-                const betaPart = (Math.max(0, rm.calcPortfolioBeta() - 1) * 20);
-                const riskScore = Math.min(100, Math.max(0, Math.round(ddPart + heatPart + betaPart + 20)));
-                const riskColor = riskScore > 70 ? C.red : riskScore > 40 ? C.yellow : C.green;
-                return (
-                  <div style={{background:C.card2,borderRadius:"10px",padding:"12px"}}>
-                    <div style={{fontSize:"10px",color:C.text3}}>종합 리스크 스코어</div>
-                    <div style={{fontWeight:800,fontSize:"18px",color:riskColor}}>{riskScore}</div>
-                    <div style={{fontSize:"9px",color:C.text3}}>0(안전) ~ 100(위험)</div>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* 리스크 한도 설정 */}
-            <div style={{display:"flex",flexDirection:"column",gap:"12px"}}>
-              <div>
-                <label style={{fontSize:"12px",color:C.text3,fontWeight:600,display:"block",marginBottom:"6px"}}>최대 드로다운 (%)</label>
-                <div style={{display:"flex",gap:"4px"}}>
-                  {[5,8,10,15,20].map(n=>(
-                    <button key={n} onClick={()=>setTradeSettings(p=>({...p,maxDrawdownPct:n}))} style={{
-                      flex:1,padding:"8px",borderRadius:"8px",fontSize:"12px",fontWeight:600,
-                      background:tradeSettings.maxDrawdownPct===n?C.redBg:"transparent",
-                      color:tradeSettings.maxDrawdownPct===n?C.red:C.text3,
-                      border:`1px solid ${tradeSettings.maxDrawdownPct===n?C.red:C.border2}`,cursor:"pointer"}}>{n}%</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label style={{fontSize:"12px",color:C.text3,fontWeight:600,display:"block",marginBottom:"6px"}}>일일 손실 한도 (%)</label>
-                <div style={{display:"flex",gap:"4px"}}>
-                  {[2,3,5,7].map(n=>(
-                    <button key={n} onClick={()=>setTradeSettings(p=>({...p,maxDailyLossPct:n}))} style={{
-                      flex:1,padding:"8px",borderRadius:"8px",fontSize:"12px",fontWeight:600,
-                      background:tradeSettings.maxDailyLossPct===n?C.redBg:"transparent",
-                      color:tradeSettings.maxDailyLossPct===n?C.red:C.text3,
-                      border:`1px solid ${tradeSettings.maxDailyLossPct===n?C.red:C.border2}`,cursor:"pointer"}}>{n}%</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label style={{fontSize:"12px",color:C.text3,fontWeight:600,display:"block",marginBottom:"6px"}}>섹터 집중도 한도 (%)</label>
-                <div style={{display:"flex",gap:"4px"}}>
-                  {[25,30,35,40,50].map(n=>(
-                    <button key={n} onClick={()=>setTradeSettings(p=>({...p,maxSectorPct:n}))} style={{
-                      flex:1,padding:"8px",borderRadius:"8px",fontSize:"12px",fontWeight:600,
-                      background:tradeSettings.maxSectorPct===n?C.orangeBg:"transparent",
-                      color:tradeSettings.maxSectorPct===n?C.orange:C.text3,
-                      border:`1px solid ${tradeSettings.maxSectorPct===n?C.orange:C.border2}`,cursor:"pointer"}}>{n}%</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label style={{fontSize:"12px",color:C.text3,fontWeight:600,display:"block",marginBottom:"6px"}}>개별 종목 한도 (%)</label>
-                <div style={{display:"flex",gap:"4px"}}>
-                  {[3,5,7,10].map(n=>(
-                    <button key={n} onClick={()=>setTradeSettings(p=>({...p,maxSinglePct:n}))} style={{
-                      flex:1,padding:"8px",borderRadius:"8px",fontSize:"12px",fontWeight:600,
-                      background:tradeSettings.maxSinglePct===n?C.orangeBg:"transparent",
-                      color:tradeSettings.maxSinglePct===n?C.orange:C.text3,
-                      border:`1px solid ${tradeSettings.maxSinglePct===n?C.orange:C.border2}`,cursor:"pointer"}}>{n}%</button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <label style={{fontSize:"12px",color:C.text3,fontWeight:600,display:"block",marginBottom:"6px"}}>최대 포지션 수</label>
-                <div style={{display:"flex",gap:"4px"}}>
-                  {[10,15,20,30].map(n=>(
-                    <button key={n} onClick={()=>setTradeSettings(p=>({...p,maxPositions:n}))} style={{
-                      flex:1,padding:"8px",borderRadius:"8px",fontSize:"12px",fontWeight:600,
-                      background:tradeSettings.maxPositions===n?C.blueBg:"transparent",
-                      color:tradeSettings.maxPositions===n?C.blue:C.text3,
-                      border:`1px solid ${tradeSettings.maxPositions===n?C.blue:C.border2}`,cursor:"pointer"}}>{n}개</button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 섹터 분포 및 상관관계 위험 */}
-          <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
-            <div style={{fontWeight:700,fontSize:"15px",marginBottom:"12px"}}>🗂️ 섹터 분포</div>
-            {filteredPositions.length===0?(
-              <div style={{textAlign:"center",padding:"20px 0",color:C.text3}}>포지션 없음</div>
-            ):(
-              <div style={{display:"flex",flexDirection:"column",gap:"6px"}}>
-                {Object.entries(rm.getSectorExposure()).sort((a,b)=>b[1]-a[1]).map(([sec,pct])=>(
-                  <div key={sec}>
-                    <div style={{display:"flex",justifyContent:"space-between",fontSize:"12px",marginBottom:"2px"}}>
-                      <span style={{fontWeight:600}}>{sec}</span>
-                      <span style={{color:pct>(tradeSettings.maxSectorPct||35)&&sec!=="ETF"?C.red:C.text2}}>{fmt(pct,1)}%</span>
-                    </div>
-                    <div style={{height:"6px",background:C.card2,borderRadius:"3px"}}>
-                      <div style={{height:"100%",width:`${Math.min(100,pct)}%`,borderRadius:"3px",
-                        background:pct>(tradeSettings.maxSectorPct||35)&&sec!=="ETF"?C.red:C.blue}} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* 상관관계 위험 히트맵 (색상 코드) */}
-          {filteredPositions.length > 1 && (
-            <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
-              <div style={{fontWeight:700,fontSize:"15px",marginBottom:"12px"}}>🔥 상관관계 위험 (섹터 중복)</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:"8px"}}>
-                {Object.entries(rm.getSectorExposure()).sort((a,b)=>b[1]-a[1]).map(([sec,pct])=>{
-                  // 같은 섹터의 포지션 개수로 상관위험 평가
-                  const sectorCount = filteredPositions.filter(p => (SECTOR_MAP[p.symbol] || "Other") === sec).length;
-                  const riskLevel = sectorCount > 3 ? "high" : sectorCount > 1 ? "medium" : "low";
-                  const riskColor = riskLevel === "high" ? C.red : riskLevel === "medium" ? C.yellow : C.green;
-                  return (
-                    <div key={sec} style={{background:C.card2,borderRadius:"10px",padding:"12px",textAlign:"center"}}>
-                      <div style={{fontSize:"11px",color:C.text3,marginBottom:"4px"}}>{sec}</div>
-                      <div style={{fontWeight:800,fontSize:"14px",color:riskColor}}>{sectorCount}개</div>
-                      <div style={{fontSize:"9px",color:C.text3,marginTop:"4px"}}>
-                        {riskLevel==="high"?"⚠️ 위험":riskLevel==="medium"?"⚡ 주의":"✓ 안전"}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── 로그 ── */}
-      {activeTab==="log"&&(
-        <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px"}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
-            <span style={{fontWeight:700}}>실행 로그 ({tradeLog.length})</span>
-            {tradeLog.length>0&&(
-              <button onClick={()=>setTradeLog([])} style={{fontSize:"11px",color:C.red,background:"none",border:"none",cursor:"pointer"}}>전체 삭제</button>
-            )}
-          </div>
-          {tradeLog.length===0?(
-            <div style={{textAlign:"center",padding:"30px 0",color:C.text3}}>실행 기록 없음</div>
-          ):(
-            <div style={{display:"flex",flexDirection:"column",gap:"4px",maxHeight:"500px",overflow:"auto"}}>
-              {tradeLog.map((log,i)=>(
-                <div key={i} style={{background:C.card2,borderRadius:"8px",padding:"10px 12px",
-                  borderLeft:`3px solid ${log.error?C.red:C.green}`}}>
-                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:"2px"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap"}}>
-                      <span style={{padding:"2px 6px",borderRadius:"4px",fontSize:"10px",fontWeight:700,
-                        background:log.side==="BUY"?C.redBg:log.side==="SELL"?C.blueBg:C.yellowBg,
-                        color:log.side==="BUY"?C.red:log.side==="SELL"?C.blue:C.yellow}}>
-                        {log.side==="BUY"?"매수":log.side==="SELL"?"매도":log.side}</span>
-                      <span style={{fontWeight:700,fontSize:"13px"}}>{log.symbol}</span>
-                      {log.amount&&<span style={{fontSize:"10px",color:C.text2}}>{log.amount}</span>}
-                      {log.confidence!=null&&(
-                        <span style={{fontSize:"9px",color:C.purple}}>{(log.confidence*100).toFixed(0)}%</span>
-                      )}
-                      {log.strategy&&<span style={{fontSize:"10px",color:C.purple}}>{log.strategy}</span>}
-                    </div>
-                    <span style={{fontSize:"10px",color:C.text3}}>{log.time}</span>
-                  </div>
-                  {log.reason&&<div style={{fontSize:"10px",color:C.text3,marginBottom:"2px"}}>{log.reason}</div>}
-                  {log.stopLoss&&(
-                    <div style={{fontSize:"10px",color:C.text3}}>SL: {log.stopLoss} · TP: {log.takeProfit}</div>
-                  )}
-                  {log.error?(
-                    <div style={{fontSize:"11px",color:C.red}}>{log.error}</div>
-                  ):(
-                    <div style={{fontSize:"11px",color:C.green}}>{log.status} · {log.orderId?.slice(0,12)}...</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
       </div>{/* end main content */}
 
       {/* ── QR 모달 (생성 / 스캔) ── */}
@@ -2790,10 +2168,8 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
         }}>
           {[
             { id: "dashboard", label: "포지션", count: filteredPositions.length },
-            { id: "orders", label: "주문", count: orders.filter(o=>["new","partially_filled","accepted","pending_new"].includes(o.status)).length },
             { id: "signals", label: "시그널", count: detectedSignals.length },
-            { id: "auto", label: "자동", count: null },
-            { id: "perf", label: "성과", count: null },
+            { id: "market", label: "시장진단", count: null },
           ].map(({ id, label, count }) => (
             <button
               key={id}

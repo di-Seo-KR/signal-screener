@@ -164,7 +164,6 @@ export default async function handler(req, res) {
 
     // ── 멀티 자산 스캔 및 주문 실행 ──
     const assetResults = [];
-    let totalCryptoExposure = 0;
 
     for (const asset of CRYPTO_ASSETS) {
       addLog(`\n📊 ${asset} 스캔 중...`);
@@ -392,15 +391,28 @@ export default async function handler(req, res) {
       }
 
       if (latestSignal.type === "BUY" && !shouldSellForStopLoss) {
-        const availableCash = portfolio.cash - totalCryptoExposure;
+        // portfolio.cash는 매수 시 즉시 차감되므로 그대로 사용 (이중 차감 방지)
+        const availableCash = portfolio.cash;
+        // 총 크립토 익스포저 체크 (전체 포지션 가치 / 자산 기준)
+        const currentTotalExposure = Object.entries(portfolio.positions).reduce((sum, [a, p]) => {
+          const px = priceMap[a];
+          return sum + (px && p.qty > 0 ? p.qty * px : 0);
+        }, 0);
+        const maxTotalExposure = equity * MAX_TOTAL_CRYPTO_EXPOSURE;
         const maxCashPerAsset = equity * MAX_POSITION_PER_ASSET;
-        if (pos) {
-          const addAmount = equity * positionSize * 0.25;
-          if (currentExposure + addAmount <= maxCashPerAsset && addAmount <= availableCash) {
-            tradeAmount = Math.min(addAmount, maxCashPerAsset - currentExposure, availableCash);
+
+        if (currentTotalExposure < maxTotalExposure) {
+          const remainingExposure = maxTotalExposure - currentTotalExposure;
+          if (pos) {
+            const addAmount = equity * positionSize * 0.25;
+            if (currentExposure + addAmount <= maxCashPerAsset && addAmount <= availableCash) {
+              tradeAmount = Math.min(addAmount, maxCashPerAsset - currentExposure, availableCash, remainingExposure);
+            }
+          } else {
+            tradeAmount = Math.min(equity * positionSize * 0.25, maxCashPerAsset, availableCash, remainingExposure);
           }
         } else {
-          tradeAmount = Math.min(equity * positionSize * 0.25, maxCashPerAsset, availableCash);
+          addLog(`⚠️ ${asset} 총 크립토 익스포저 한도 도달 (${(currentTotalExposure/equity*100).toFixed(1)}% ≥ ${MAX_TOTAL_CRYPTO_EXPOSURE*100}%) — 매수 스킵`);
         }
 
         if (tradeAmount > 10) {
@@ -416,7 +428,6 @@ export default async function handler(req, res) {
           }
           portfolio.cash -= tradeAmount;
           portfolio.totalTrades = (portfolio.totalTrades || 0) + 1;
-          totalCryptoExposure += tradeAmount;
           addLog(`🟢 ${asset} 매수: $${tradeAmount.toFixed(0)} (${buyQty.toFixed(6)}개 @ $${currentPrice.toFixed(2)})`);
           assetResults.push({ asset, ok: true, type: "BUY", signal: latestSignal, amount: tradeAmount, price: currentPrice, qty: buyQty });
         }
@@ -432,7 +443,6 @@ export default async function handler(req, res) {
           portfolio.cash += sellValue;
           delete portfolio.positions[asset];
           portfolio.totalTrades = (portfolio.totalTrades || 0) + 1;
-          totalCryptoExposure -= sellValue;
           addLog(`🔴 ${asset} 매도: $${sellValue.toFixed(0)} (P&L: ${realizedPL >= 0 ? "+" : ""}$${realizedPL.toFixed(2)})`);
           assetResults.push({ asset, ok: true, type: "SELL", signal: latestSignal, amount: sellValue, price: currentPrice, pnl: realizedPL });
         }
