@@ -498,12 +498,12 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   const latestSignal = signals.length > 0 ? signals[signals.length - 1] : null;
   const latestDate = latestSignal?.time ? new Date(latestSignal.time * 1000) : (latestSignal && btcCandles[latestSignal.index]?.time ? new Date(btcCandles[latestSignal.index].time * 1000) : null);
   // 봇별 자산 필터링 — 해당 봇이 담당하는 자산만 표시
-  const botAssets = getBotAssets(botPreset?.id);
+  const botAssetKeys = BOT_ASSET_MAP[botPreset?.id] || null;
   const cryptoPositions = (virtualPortfolio?.positions || []).filter(p => {
-    if (!botAssets || botAssets.length === 0) return true; // 전체 봇이면 필터 안 함
-    return botAssets.some(a => {
-      const sym = a.replace("/USD", ""); // "BTC/USD" → "BTC"
-      return p.symbol && (p.symbol === a || p.symbol.startsWith(sym));
+    if (!botAssetKeys) return true; // 매핑 없으면 전체 표시
+    return botAssetKeys.some(key => {
+      const sym = key.replace("/USD", ""); // "BTC/USD" → "BTC"
+      return p.symbol && (p.symbol === key || p.symbol.startsWith(sym));
     });
   });
 
