@@ -540,8 +540,14 @@ export default async function handler(req, res) {
       }
 
       // ── 가상매매: SELL 실행 ──
-      // 매도는 활성 봇 자산이 아니더라도, 기존 포지션이 있으면 청산 허용 (손절/익절)
-      if ((latestSignal.type === "SELL" || shouldSellForStopLoss || shouldTakeProfit) && pos && (activeAssets.has(asset) || shouldSellForStopLoss || shouldTakeProfit)) {
+      // 매도 허용 조건:
+      // 1. 활성 봇 자산: SELL 시그널, 손절, 익절 모두 허용
+      // 2. 비활성/고아 포지션: 포지션이 있으면 무조건 청산 (봇 삭제 후 남은 포지션 정리)
+      const isOrphanPosition = pos && !activeAssets.has(asset);
+      if (isOrphanPosition) {
+        addLog(`🧹 ${asset} 고아 포지션 감지 — 자동 청산 진행`);
+      }
+      if (((latestSignal.type === "SELL" || shouldSellForStopLoss || shouldTakeProfit) && pos && activeAssets.has(asset)) || isOrphanPosition) {
         const sellQty = portfolio.positions[asset]?.qty || 0;
         const sellValue = sellQty * currentPrice;
         if (sellValue > 10) {

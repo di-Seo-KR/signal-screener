@@ -844,12 +844,19 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                 ${((cryptoPortfolio?.equity || 0) + (stockPortfolio?.equity || 0) || 100000).toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </div>
             </div>
-            <div>
-              <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "6px" }}>투입 가능 금액</div>
-              <div style={{ fontSize: isMobile ? "18px" : "24px", fontWeight: 800, color: c.green }}>
-                $100,000
-              </div>
-            </div>
+            {(() => {
+              const totalEquity = (cryptoPortfolio?.equity || 0) + (stockPortfolio?.equity || 0) || 100000;
+              const totalAllocated = activeBots.reduce((s, ab) => s + (ab.allocation || 0), 0);
+              const available = Math.max(0, totalEquity - totalAllocated);
+              return (
+                <div>
+                  <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "6px" }}>투입 가능 금액</div>
+                  <div style={{ fontSize: isMobile ? "18px" : "24px", fontWeight: 800, color: c.green }}>
+                    ${available.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+              );
+            })()}
             {hasPausedBots && (
               <div>
                 <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "6px" }}>일시정지된 봇</div>
@@ -921,12 +928,19 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                 ${((cryptoPortfolio?.equity || 0) + (stockPortfolio?.equity || 0) || 100000).toLocaleString(undefined, { maximumFractionDigits: 0 })}
               </div>
             </div>
-            <div>
-              <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "6px" }}>투입 가능 금액</div>
-              <div style={{ fontSize: isMobile ? "18px" : "24px", fontWeight: 800, color: c.green }}>
-                $100,000
-              </div>
-            </div>
+            {(() => {
+              const totalEquity = (cryptoPortfolio?.equity || 0) + (stockPortfolio?.equity || 0) || 100000;
+              const totalAllocated = activeBots.reduce((s, ab) => s + (ab.allocation || 0), 0);
+              const available = Math.max(0, totalEquity - totalAllocated);
+              return (
+                <div>
+                  <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "6px" }}>투입 가능 금액</div>
+                  <div style={{ fontSize: isMobile ? "18px" : "24px", fontWeight: 800, color: c.green }}>
+                    ${available.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                  </div>
+                </div>
+              );
+            })()}
             <div>
               <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "6px" }}>일시정지된 봇</div>
               <div style={{ fontSize: isMobile ? "18px" : "24px", fontWeight: 800, color: c.yellow }}>

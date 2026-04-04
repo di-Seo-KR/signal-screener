@@ -114,13 +114,37 @@ export default function DevDashboard({ theme = "dark" }) {
               마지막 조회: {lastFetched?.toLocaleTimeString() || "—"} · 응답: {data.responseTime}
             </div>
           </div>
-          <div style={{ display: "flex", gap: "8px" }}>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             <button onClick={fetchData} disabled={loading} style={{
               padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
               background: c.blue, color: "#fff", border: "none", cursor: "pointer",
               opacity: loading ? 0.5 : 1,
             }}>
               {loading ? "로딩..." : "새로고침"}
+            </button>
+            <button onClick={async () => {
+              if (!confirm("포트폴리오를 $100,000으로 초기화합니다. 모든 포지션이 삭제됩니다.")) return;
+              const r = await fetch("/api/dev-status?action=reset-portfolio", { method: "POST" });
+              const d = await r.json();
+              alert(d.message || d.error);
+              fetchData();
+            }} style={{
+              padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
+              background: c.red, color: "#fff", border: "none", cursor: "pointer",
+            }}>
+              포트폴리오 초기화
+            </button>
+            <button onClick={async () => {
+              if (!confirm("모든 봇의 성과 데이터(거래기록, DD/MDD)를 초기화합니다.")) return;
+              const r = await fetch("/api/dev-status?action=reset-bots", { method: "POST" });
+              const d = await r.json();
+              alert(d.message || d.error);
+              fetchData();
+            }} style={{
+              padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
+              background: c.orange, color: "#fff", border: "none", cursor: "pointer",
+            }}>
+              봇 성과 초기화
             </button>
             <button onClick={() => setAutoRefresh(!autoRefresh)} style={{
               padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,

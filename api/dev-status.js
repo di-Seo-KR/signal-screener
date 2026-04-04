@@ -1,8 +1,48 @@
 // Vercel Serverless — 개발/QA용 시스템 상태 진단 API
-// GET /api/dev-status → KV 데이터, 봇 상태, 포트폴리오, cron 이력 전체 조회
-// 프로덕션에서도 접근 가능 (관리자 전용 페이지에서 사용)
+// GET  /api/dev-status          → KV 데이터 전체 진단
+// POST /api/dev-status?action=reset-portfolio → 포트폴리오 초기화
+// POST /api/dev-status?action=reset-bots      → 봇 성과 데이터 초기화
 
 export default async function handler(req, res) {
+  // POST 액션 처리
+  if (req.method === "POST") {
+    const { action } = req.query;
+    try {
+      const kvModule = await import("@vercel/kv");
+      const kv = kvModule.kv;
+
+      if (action === "reset-portfolio") {
+        const INITIAL_CASH = 100000;
+        await kv.set("di:virtual:portfolio", {
+          cash: INITIAL_CASH,
+          initialCash: INITIAL_CASH,
+          positions: {},
+          totalTrades: 0,
+          createdAt: new Date().toISOString(),
+        });
+        await kv.set("di:active-bots", []);
+        return res.status(200).json({ ok: true, message: "포트폴리오 초기화 완료 ($100,000)" });
+      }
+
+      if (action === "reset-bots") {
+        const botIds = [
+          "btc-alpha", "highcap-momentum", "defi-infra",
+          "meme-trend", "l2-emerging", "crypto-diversity", "crypto-swing",
+          "us-stable", "us-balanced", "us-aggressive", "us-trend", "us-meanrev",
+        ];
+        for (const id of botIds) {
+          await kv.del(`di:bot:${id}:perf`);
+          await kv.del(`di:bot:${id}:snapshot`);
+        }
+        return res.status(200).json({ ok: true, message: `${botIds.length}개 봇 성과 데이터 초기화 완료` });
+      }
+
+      return res.status(400).json({ ok: false, error: `Unknown action: ${action}` });
+    } catch (e) {
+      return res.status(500).json({ ok: false, error: e.message });
+    }
+  }
+
   const startTime = Date.now();
   const status = {
     timestamp: new Date().toISOString(),
