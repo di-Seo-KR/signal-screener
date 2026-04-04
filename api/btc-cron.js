@@ -599,6 +599,11 @@ export default async function handler(req, res) {
               existing.totalBuyCost = (existing.totalBuyCost || 0) + (trade.amount || 0);
             } else {
               existing.totalSellRevenue = (existing.totalSellRevenue || 0) + (trade.amount || 0);
+              // 실현 손익 누적 (매도 시 계산된 P&L)
+              if (trade.pnl != null) {
+                existing.realizedPL = (existing.realizedPL || 0) + trade.pnl;
+                if (trade.pnl > 0) existing.winCount = (existing.winCount || 0) + 1;
+              }
             }
             existing.lastUpdated = new Date().toISOString();
             await kv.set(key, existing);
@@ -607,26 +612,45 @@ export default async function handler(req, res) {
         addLog(`📊 봇별 성과 KV 저장: ${executedTrades.length}건 분배`);
       }
 
-      // 봇별 포지션 스냅샷 (현재 포지션 기준 미실현 P&L)
+      // 봇별 포지션 스냅샷 (배분금액 기준 에쿼티로 DD/MDD 계산)
+      const activeBotsList = (await kv.get("di:active-bots")) || [];
       for (const [botId, assets] of Object.entries(BOT_ASSET_MAP)) {
         const botPositions = assets
           .map(a => positionMap[a])
           .filter(Boolean);
         const botUnrealizedPL = botPositions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
         const botMarketValue = botPositions.reduce((s, p) => s + parseFloat(p.market_value || 0), 0);
+        const botCostBasis = botPositions.reduce((s, p) => s + parseFloat(p.cost_basis || 0), 0);
+
+        // 봇 배분금액 조회 (활성 봇 목록에서)
+        const activeBotInfo = activeBotsList.find(ab => ab.botId === botId);
+        const botAllocation = activeBotInfo?.allocation || 0;
+
+        // 봇 에쿼티 = 배분금액 + 미실현 손익 + 실현 손익
+        // (배분금액이 없으면 포지션 시가 사용)
+        const perfKey = `di:bot:${botId}:perf`;
+        const perfData = (await kv.get(perfKey)) || {};
+        const realizedPL = perfData.realizedPL || 0;
+        const botEquity = botAllocation > 0
+          ? botAllocation + botUnrealizedPL + realizedPL
+          : botMarketValue;
+
         const snapKey = `di:bot:${botId}:snapshot`;
-        const prevSnap = (await kv.get(snapKey)) || { peakValue: botMarketValue, mdd: 0, history: [] };
-        const peakValue = Math.max(prevSnap.peakValue || 0, botMarketValue);
-        const dd = peakValue > 0 ? ((peakValue - botMarketValue) / peakValue) * 100 : 0;
+        const prevSnap = (await kv.get(snapKey)) || { peakEquity: botEquity, mdd: 0, history: [] };
+        // 에쿼티 기준 peak/DD/MDD (배분금액 대비)
+        const peakEquity = Math.max(prevSnap.peakEquity || prevSnap.peakValue || botEquity, botEquity);
+        const dd = peakEquity > 0 ? ((peakEquity - botEquity) / peakEquity) * 100 : 0;
         const mdd = Math.max(prevSnap.mdd || 0, dd);
         // 에쿼티 히스토리 (최근 500개 — 15분 간격이면 ~5일)
         const history = [
           ...(prevSnap.history || []),
-          { time: new Date().toISOString(), value: botMarketValue, unrealizedPL: botUnrealizedPL, positions: botPositions.length },
+          { time: new Date().toISOString(), equity: botEquity, value: botMarketValue, unrealizedPL: botUnrealizedPL, positions: botPositions.length },
         ].slice(-500);
         await kv.set(snapKey, {
           botId, marketValue: botMarketValue, unrealizedPL: botUnrealizedPL,
-          positionCount: botPositions.length, peakValue, dd, mdd, history, lastUpdated: new Date().toISOString(),
+          positionCount: botPositions.length, peakEquity, dd, mdd,
+          botAllocation, botEquity, realizedPL,
+          history, lastUpdated: new Date().toISOString(),
         });
       }
       addLog(`📸 봇별 포지션 스냅샷 저장 완료`);
