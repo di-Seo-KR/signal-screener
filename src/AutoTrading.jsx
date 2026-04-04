@@ -796,7 +796,7 @@ function useVirtualPortfolio(userId) {
 }
 
 // ── 운영 중 봇 대시보드 (KV 가상 포트폴리오 데이터 기반) ──
-function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, theme, userId, isMobile }) {
+function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, onAddFund, onUpdateBotStatus, theme, userId, isMobile }) {
   const c = colors[theme];
   const { cryptoPortfolio, stockPortfolio, loading } = useVirtualPortfolio(userId);
   const activeBotScrollRef = useRef(null);
@@ -818,7 +818,194 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
     return () => { cancelled = true; clearInterval(interval); };
   }, []);
 
-  if (!activeBots || activeBots.length === 0) return null;
+  // 활성 봇이 없을 때 계좌 현황 표시
+  const hasActiveBots = activeBots && activeBots.some(ab => ab.status !== "paused");
+  const hasPausedBots = activeBots && activeBots.some(ab => ab.status === "paused");
+
+  if (!activeBots || activeBots.length === 0) {
+    // 활성 봇이 완전히 없으면 계좌 현황 카드 표시
+    return (
+      <div style={{ marginBottom: "32px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <h2 style={{ margin: 0, color: c.text1, fontSize: "20px", fontWeight: 700 }}>계좌 현황</h2>
+          </div>
+        </div>
+
+        {/* 계좌 현황 카드 */}
+        <div style={{
+          background: `linear-gradient(135deg, ${c.card} 0%, ${c.card2} 100%)`,
+          border: `1px solid ${c.border}`, borderRadius: "16px", padding: isMobile ? "20px 16px" : "24px", marginBottom: "16px",
+        }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr", gap: isMobile ? "16px" : "20px" }}>
+            <div>
+              <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "6px" }}>가상 포트폴리오 잔고</div>
+              <div style={{ fontSize: isMobile ? "18px" : "24px", fontWeight: 800, color: c.text1 }}>
+                ${((cryptoPortfolio?.equity || 0) + (stockPortfolio?.equity || 0) || 100000).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "6px" }}>투입 가능 금액</div>
+              <div style={{ fontSize: isMobile ? "18px" : "24px", fontWeight: 800, color: c.green }}>
+                $100,000
+              </div>
+            </div>
+            {hasPausedBots && (
+              <div>
+                <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "6px" }}>일시정지된 봇</div>
+                <div style={{ fontSize: isMobile ? "18px" : "24px", fontWeight: 800, color: c.yellow }}>
+                  {activeBots.filter(ab => ab.status === "paused").length}개
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 정지된 봇 히스토리 */}
+        {stoppedBots && stoppedBots.length > 0 && (
+          <div>
+            <div style={{ fontSize: "14px", fontWeight: 600, color: c.text1, marginBottom: "12px" }}>운영 기록</div>
+            <div style={{
+              display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))", gap: isMobile ? "10px" : "12px",
+            }}>
+              {stoppedBots.slice(0, 5).map((sb, idx) => {
+                const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === sb.botId);
+                const duration = Math.floor((sb.stoppedAt - sb.startedAt) / (1000 * 60 * 60 * 24));
+                return (
+                  <div key={idx} style={{
+                    background: c.card2, border: `1px solid ${c.border}`, borderRadius: "10px",
+                    padding: isMobile ? "12px" : "14px", fontSize: isMobile ? "11px" : "12px",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                      <span style={{ fontSize: "20px" }}>{bot?.icon || "🤖"}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, color: c.text1 }}>{sb.botName}</div>
+                        <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3 }}>{duration}일 운영</div>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: isMobile ? "10px" : "11px" }}>
+                      <span style={{ color: c.text3 }}>거래: {sb.trades}</span>
+                      <span style={{ color: sb.realizedPL >= 0 ? c.green : c.red, fontWeight: 600 }}>
+                        {sb.realizedPL >= 0 ? "+" : ""}{sb.realizedPL.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (!hasActiveBots && hasPausedBots) {
+    // 활성 봇은 없고 일시정지된 봇만 있을 때
+    return (
+      <div style={{ marginBottom: "32px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <h2 style={{ margin: 0, color: c.text1, fontSize: "20px", fontWeight: 700 }}>계좌 현황</h2>
+          </div>
+        </div>
+
+        {/* 계좌 현황 카드 */}
+        <div style={{
+          background: `linear-gradient(135deg, ${c.card} 0%, ${c.card2} 100%)`,
+          border: `1px solid ${c.border}`, borderRadius: "16px", padding: isMobile ? "20px 16px" : "24px", marginBottom: "16px",
+        }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr", gap: isMobile ? "16px" : "20px" }}>
+            <div>
+              <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "6px" }}>가상 포트폴리오 잔고</div>
+              <div style={{ fontSize: isMobile ? "18px" : "24px", fontWeight: 800, color: c.text1 }}>
+                ${((cryptoPortfolio?.equity || 0) + (stockPortfolio?.equity || 0) || 100000).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "6px" }}>투입 가능 금액</div>
+              <div style={{ fontSize: isMobile ? "18px" : "24px", fontWeight: 800, color: c.green }}>
+                $100,000
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text3, marginBottom: "6px" }}>일시정지된 봇</div>
+              <div style={{ fontSize: isMobile ? "18px" : "24px", fontWeight: 800, color: c.yellow }}>
+                {activeBots.filter(ab => ab.status === "paused").length}개
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 일시정지된 봇 목록 */}
+        <div style={{ fontSize: "14px", fontWeight: 600, color: c.text1, marginBottom: "12px" }}>일시정지된 봇</div>
+        <div style={{
+          display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(340px, 1fr))", gap: isMobile ? "12px" : "16px",
+        }}>
+          {activeBots.filter(ab => ab.status === "paused").map(ab => {
+            const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
+            return (
+              <div key={ab.botId} style={{
+                background: c.card, border: `1px solid ${c.border}`, borderRadius: isMobile ? "12px" : "14px", padding: isMobile ? "14px 12px" : "20px",
+                display: "flex", flexDirection: "column", gap: isMobile ? "10px" : "14px",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "10px" : "12px", minWidth: 0 }}>
+                  <span style={{ fontSize: isMobile ? "24px" : "28px", flexShrink: 0 }}>{bot.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: isMobile ? "13px" : "15px", color: c.text1 }}>{bot.name}</div>
+                    <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3 }}>일시정지 상태</div>
+                  </div>
+                  <div style={{
+                    padding: "4px 10px", borderRadius: "12px", fontSize: "11px", fontWeight: 700,
+                    background: `${c.yellow}20`, color: c.yellow, flexShrink: 0,
+                  }}>일시정지</div>
+                </div>
+
+                <div style={{
+                  display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr 1fr", gap: isMobile ? "6px" : "8px",
+                  background: c.card2, borderRadius: "10px", padding: isMobile ? "10px 8px" : "12px",
+                }}>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3, marginBottom: "2px" }}>거래 횟수</div>
+                    <div style={{ fontSize: isMobile ? "13px" : "16px", fontWeight: 800, color: c.text1 }}>{ab.trades || 0}</div>
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: isMobile ? "9px" : "10px", color: c.text3, marginBottom: "2px" }}>투입 금액</div>
+                    <div style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 700, color: c.blue }}>
+                      ${ab.allocation ? ab.allocation.toLocaleString() : "—"}
+                    </div>
+                  </div>
+                  {!isMobile && (
+                    <>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>위험도</div>
+                        <div style={{ fontSize: "14px", fontWeight: 700, color: getRiskColor(bot.riskColor || "blue", theme) }}>{bot.risk || "—"}</div>
+                      </div>
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontSize: "10px", color: c.text3, marginBottom: "2px" }}>예상 수익</div>
+                        <div style={{ fontSize: "14px", fontWeight: 700, color: c.green }}>{bot.expectedReturn || "—"}</div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div style={{ display: "flex", gap: isMobile ? "6px" : "8px", minWidth: 0 }}>
+                  <button onClick={() => onUpdateBotStatus(ab.botId, "active")} style={{
+                    flex: 1, minWidth: 0, padding: isMobile ? "12px 8px" : "10px", borderRadius: "8px", fontSize: isMobile ? "12px" : "13px", fontWeight: 600,
+                    background: c.green, color: "#fff", border: "none", cursor: "pointer", minHeight: "44px",
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                  }}>재시작</button>
+                  <button onClick={() => onStopBot(ab.botId)} style={{
+                    flexShrink: 0, padding: isMobile ? "12px 10px" : "10px 16px", borderRadius: "8px", fontSize: isMobile ? "12px" : "13px", fontWeight: 600,
+                    background: `${c.red}15`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer", minHeight: "44px",
+                  }}>삭제</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
 
   // 통합 포트폴리오 지표 계산 (주식 + 크립토)
   const totalTrades = (stockPortfolio?.totalTrades || 0) + (cryptoPortfolio?.totalTrades || 0);
@@ -885,18 +1072,18 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
       {/* 활성 봇 목록 (모바일: 수평 스와이프 캐러셀) */}
       <div
         ref={activeBotScrollRef}
-        onScroll={isMobile && activeBots.length > 1 ? () => {
+        onScroll={isMobile && hasActiveBots ? () => {
           const el = activeBotScrollRef.current;
           if (el) { const idx = Math.round(el.scrollLeft / (el.offsetWidth * 0.85)); setActiveBotIdx(Math.min(idx, activeBots.length - 1)); }
         } : undefined}
-        style={isMobile && activeBots.length > 1 ? {
+        style={isMobile && hasActiveBots ? {
           display: "flex", gap: "12px", overflowX: "auto", scrollSnapType: "x mandatory",
           WebkitOverflowScrolling: "touch", msOverflowStyle: "none", scrollbarWidth: "none",
           paddingBottom: "8px",
         } : {
           display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(340px, 1fr))", gap: isMobile ? "12px" : "16px",
         }}>
-        {activeBots.map(ab => {
+        {activeBots.filter(ab => ab.status !== "paused").map(ab => {
           const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
           const elapsed = Date.now() - (ab.startedAt || Date.now());
           const days = Math.floor(elapsed / 86400000);
@@ -993,11 +1180,6 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
                       </svg>
                     );
                   })()}
-                  {botDateLabels.length >= 2 && (
-                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: "3px" }}>
-                      {botDateLabels.map((l, i) => <span key={i} style={{ fontSize: "9px", color: c.text3 }}>{l}</span>)}
-                    </div>
-                  )}
                   </>
                 ) : (
                   /* 데이터 없는 빈 차트 UI */
@@ -1097,9 +1279,9 @@ function ActiveBotsDashboard({ activeBots, onSelectBot, onStopBot, onAddFund, th
         })}
       </div>
       {/* 모바일 캐러셀 페이지 인디케이터 */}
-      {isMobile && activeBots.length > 1 && (
+      {isMobile && hasActiveBots && activeBots.filter(ab => ab.status !== "paused").length > 1 && (
         <div style={{ display: "flex", justifyContent: "center", gap: "6px", marginTop: "8px" }}>
-          {activeBots.map((_, i) => (
+          {activeBots.filter(ab => ab.status !== "paused").map((_, i) => (
             <div key={i} style={{
               width: activeBotIdx === i ? "16px" : "6px", height: "6px", borderRadius: "3px",
               background: activeBotIdx === i ? c.blue : `${c.text3}40`,
@@ -1132,10 +1314,16 @@ export default function AutoTrading({ theme = "dark", user }) {
 
   // 운영 중인 봇 목록 (Supabase user_metadata + localStorage 캐시)
   const storageKey = user ? `zepta_${user.id.slice(0,8)}_active_bots` : null;
+  const stoppedBotsStorageKey = user ? `zepta_${user.id.slice(0,8)}_stopped_bots` : null;
   const [activeBots, setActiveBots] = useState(() => {
     // localStorage에서 캐시된 값으로 빠른 초기 렌더
     if (!storageKey) return [];
     try { return JSON.parse(localStorage.getItem(storageKey) || "[]"); } catch { return []; }
+  });
+  const [stoppedBots, setStoppedBots] = useState(() => {
+    // localStorage에서 캐시된 정지된 봇 목록
+    if (!stoppedBotsStorageKey) return [];
+    try { return JSON.parse(localStorage.getItem(stoppedBotsStorageKey) || "[]"); } catch { return []; }
   });
   const botsLoaded = useRef(false);
   const botsSaving = useRef(false);
@@ -1148,9 +1336,14 @@ export default function AutoTrading({ theme = "dark", user }) {
         // Supabase에서 최신 user 정보를 명시적으로 가져옴 (캐시 방지)
         const { data } = await supabase.auth.getUser();
         const remoteBots = data?.user?.user_metadata?.active_bots;
+        const remoteStoppedBots = data?.user?.user_metadata?.stopped_bots;
         const localBots = (() => {
           if (!storageKey) return [];
           try { return JSON.parse(localStorage.getItem(storageKey) || "[]"); } catch { return []; }
+        })();
+        const localStoppedBots = (() => {
+          if (!stoppedBotsStorageKey) return [];
+          try { return JSON.parse(localStorage.getItem(stoppedBotsStorageKey) || "[]"); } catch { return []; }
         })();
 
         // 병합 전략: 더 많은 데이터를 가진 쪽 우선 (빈 배열로 덮어쓰기 방지)
@@ -1163,12 +1356,21 @@ export default function AutoTrading({ theme = "dark", user }) {
           setActiveBots(localBots);
           await supabase.auth.updateUser({ data: { active_bots: localBots } });
         }
+
+        // 정지된 봇 목록 로드
+        if (Array.isArray(remoteStoppedBots) && remoteStoppedBots.length > 0) {
+          setStoppedBots(remoteStoppedBots);
+          if (stoppedBotsStorageKey) try { localStorage.setItem(stoppedBotsStorageKey, JSON.stringify(remoteStoppedBots)); } catch {}
+        } else if (localStoppedBots.length > 0) {
+          setStoppedBots(localStoppedBots);
+          await supabase.auth.updateUser({ data: { stopped_bots: localStoppedBots } });
+        }
       } catch (e) {
         console.warn("[Zepta] 봇 목록 로드 실패:", e);
       }
       botsLoaded.current = true;
     })();
-  }, [user, storageKey]);
+  }, [user, storageKey, stoppedBotsStorageKey]);
 
   // activeBots 변경 시 → Supabase + localStorage 동시 저장 (로드 완료 후에만)
   const saveBotsTimeout = useRef(null);
@@ -1184,17 +1386,36 @@ export default function AutoTrading({ theme = "dark", user }) {
       try {
         await supabase.auth.updateUser({ data: { active_bots: activeBots } });
       } catch (e) { console.warn("[Zepta] 봇 Supabase 동기화 실패:", e); }
-      // KV에도 동기화 (btc-cron이 활성 봇 확인용)
+      // KV에도 동기화 (btc-cron이 활성 봇 확인용) - paused 상태가 아닌 봇만 전달
       try {
+        const activeForCron = activeBots.filter(ab => ab.status !== "paused");
         await fetch("/api/sync-active-bots", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ activeBots }),
+          body: JSON.stringify({ activeBots: activeForCron }),
         });
       } catch (e) { console.warn("[Zepta] 봇 KV 동기화 실패:", e); }
       botsSaving.current = false;
     }, 1000);
   }, [activeBots, user, storageKey]);
+
+  // stoppedBots 변경 시 → Supabase + localStorage 동시 저장
+  const saveStoppedBotsTimeout = useRef(null);
+  useEffect(() => {
+    if (!user || !botsLoaded.current) return;
+    // localStorage 즉시 저장
+    if (stoppedBotsStorageKey) try { localStorage.setItem(stoppedBotsStorageKey, JSON.stringify(stoppedBots)); } catch {}
+    // Supabase는 디바운스 (1초 — 빈번한 쓰기 방지)
+    if (saveStoppedBotsTimeout.current) clearTimeout(saveStoppedBotsTimeout.current);
+    saveStoppedBotsTimeout.current = setTimeout(async () => {
+      if (botsSaving.current) return;
+      botsSaving.current = true;
+      try {
+        await supabase.auth.updateUser({ data: { stopped_bots: stoppedBots } });
+      } catch (e) { console.warn("[Zepta] 정지봇 Supabase 동기화 실패:", e); }
+      botsSaving.current = false;
+    }, 1000);
+  }, [stoppedBots, user, stoppedBotsStorageKey]);
 
 
   // 수동 배분 모달 상태
@@ -1266,32 +1487,105 @@ export default function AutoTrading({ theme = "dark", user }) {
 
   const handleStopBot = useCallback((botId) => {
     const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === botId);
-    setStopBotConfirm({ botId, botName: bot?.name || "봇", icon: bot?.icon || "🤖" });
-  }, []);
+    const activeBot = activeBots.find(ab => ab.botId === botId);
+    // 일시정지된 봇이면 완전 삭제 모드, 활성 봇이면 일시정지 모드
+    const isPaused = activeBot?.status === "paused";
+    setStopBotConfirm({
+      botId,
+      botName: bot?.name || "봇",
+      icon: bot?.icon || "🤖",
+      positionCount: 0,
+      mode: isPaused ? "delete" : "pause"
+    });
+  }, [activeBots]);
 
-  const confirmStopBot = useCallback(async () => {
+  const confirmPauseBot = useCallback(async () => {
     if (!stopBotConfirm) return;
     const { botId } = stopBotConfirm;
-    // 1. 로컬 상태에서 제거 + 즉시 동기화 (stale closure 방지: setter 내에서 최신 상태 사용)
+    // 봇을 "paused" 상태로 변경
     let updatedBots = [];
     setActiveBots(prev => {
-      updatedBots = prev.filter(ab => ab.botId !== botId);
-      // 2. localStorage 즉시 동기화
+      updatedBots = prev.map(ab =>
+        ab.botId === botId ? { ...ab, status: "paused" } : ab
+      );
       if (storageKey) try { localStorage.setItem(storageKey, JSON.stringify(updatedBots)); } catch {}
       return updatedBots;
     });
-    // 3. Supabase 즉시 동기화 — updatedBots 사용 (stale activeBots 대신)
     if (user) {
       try {
-        // 디바운스 타이머 취소 (이전 저장이 삭제 전 데이터를 덮어쓰는 것 방지)
+        if (saveBotsTimeout.current) { clearTimeout(saveBotsTimeout.current); saveBotsTimeout.current = null; }
+        await supabase.auth.updateUser({ data: { active_bots: updatedBots } });
+      } catch (e) { console.warn("봇 일시정지 Supabase 동기화 실패:", e); }
+    }
+    setStopBotConfirm(null);
+    const botName = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === botId)?.name || "봇";
+    showToast("success", `${botName}을(를) 자동매매 중단했습니다.`);
+  }, [stopBotConfirm, user, storageKey, showToast]);
+
+  const confirmDeleteBot = useCallback(async () => {
+    if (!stopBotConfirm) return;
+    const { botId } = stopBotConfirm;
+    const botToDelete = activeBots.find(ab => ab.botId === botId);
+
+    if (!botToDelete) return;
+
+    // 정지된 봇 목록에 추가
+    const deletedBotRecord = {
+      botId: botId,
+      botName: stopBotConfirm.botName,
+      allocation: botToDelete.allocation || 0,
+      startedAt: botToDelete.startedAt,
+      stoppedAt: Date.now(),
+      trades: botToDelete.trades || 0,
+      realizedPL: botToDelete.realizedPL || 0,
+    };
+
+    let updatedBots = [];
+    setActiveBots(prev => {
+      updatedBots = prev.filter(ab => ab.botId !== botId);
+      if (storageKey) try { localStorage.setItem(storageKey, JSON.stringify(updatedBots)); } catch {}
+      return updatedBots;
+    });
+
+    // 정지된 봇 히스토리에 추가
+    setStoppedBots(prev => {
+      const updated = [deletedBotRecord, ...prev];
+      if (stoppedBotsStorageKey) try { localStorage.setItem(stoppedBotsStorageKey, JSON.stringify(updated)); } catch {}
+      return updated;
+    });
+
+    if (user) {
+      try {
         if (saveBotsTimeout.current) { clearTimeout(saveBotsTimeout.current); saveBotsTimeout.current = null; }
         await supabase.auth.updateUser({ data: { active_bots: updatedBots } });
       } catch (e) { console.warn("봇 삭제 Supabase 동기화 실패:", e); }
     }
+
     if (activeBot?.id === botId) setActiveBot(null);
     setStopBotConfirm(null);
     showToast("success", `${stopBotConfirm.botName} 봇이 완전히 삭제되었습니다.`);
-  }, [stopBotConfirm, activeBot, user, storageKey, showToast]);
+  }, [stopBotConfirm, activeBot, activeBots, user, storageKey, stoppedBotsStorageKey, showToast]);
+
+  const handleUpdateBotStatus = useCallback((botId, newStatus) => {
+    let updatedBots = [];
+    setActiveBots(prev => {
+      updatedBots = prev.map(ab =>
+        ab.botId === botId ? { ...ab, status: newStatus } : ab
+      );
+      if (storageKey) try { localStorage.setItem(storageKey, JSON.stringify(updatedBots)); } catch {}
+      return updatedBots;
+    });
+    if (user) {
+      try {
+        if (saveBotsTimeout.current) { clearTimeout(saveBotsTimeout.current); saveBotsTimeout.current = null; }
+        supabase.auth.updateUser({ data: { active_bots: updatedBots } });
+      } catch (e) { console.warn("봇 상태 Supabase 동기화 실패:", e); }
+    }
+    const botName = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === botId)?.name || "봇";
+    if (newStatus === "active") {
+      showToast("success", `${botName}을(를) 재시작했습니다.`);
+    }
+  }, [user, storageKey, showToast]);
 
   const handleBackToCatalog = useCallback(() => {
     setActiveBot(null);
@@ -1456,7 +1750,7 @@ export default function AutoTrading({ theme = "dark", user }) {
           );
         })()}
 
-        {/* 봇 중지 확인 모달 */}
+        {/* 봇 중지 / 삭제 확인 모달 */}
         {stopBotConfirm && (
           <div style={{
             position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
@@ -1465,39 +1759,82 @@ export default function AutoTrading({ theme = "dark", user }) {
           }} onClick={() => setStopBotConfirm(null)}>
             <div style={{
               background: c.card, borderRadius: isMobile ? "14px" : "16px", padding: isMobile ? "24px 20px" : "32px",
-              width: isMobile ? "min(90vw, 100%)" : "min(400px, 90vw)",
+              width: isMobile ? "min(90vw, 100%)" : "min(420px, 90vw)",
               border: `1px solid ${c.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
               textAlign: "center",
             }} onClick={e => e.stopPropagation()}>
               <div style={{ fontSize: "48px", marginBottom: "12px" }}>{stopBotConfirm.icon}</div>
-              <h3 style={{ margin: "0 0 8px", color: c.text1, fontSize: isMobile ? "17px" : "19px", fontWeight: 800 }}>
-                봇을 중지하시겠습니까?
-              </h3>
-              <p style={{ margin: "0 0 8px", color: c.text2, fontSize: isMobile ? "13px" : "14px", lineHeight: 1.5 }}>
-                <strong style={{ color: c.text1 }}>{stopBotConfirm.botName}</strong>
-              </p>
-              <div style={{
-                background: `${c.red}08`, border: `1px solid ${c.red}20`, borderRadius: "10px",
-                padding: "12px 14px", marginBottom: "20px", textAlign: "left",
-              }}>
-                <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.red, fontWeight: 600, marginBottom: "6px" }}>주의사항</div>
-                <ul style={{ margin: 0, paddingLeft: "16px", fontSize: isMobile ? "11px" : "12px", color: c.text2, lineHeight: 1.7 }}>
-                  <li>봇 운영이 즉시 중단됩니다</li>
-                  <li>보유 포지션은 가상 포트폴리오에 그대로 유지됩니다</li>
-                  <li>투입 금액 설정 및 운영 기록이 삭제됩니다</li>
-                  <li>같은 봇을 다시 시작하면 새로 설정해야 합니다</li>
-                </ul>
-              </div>
-              <div style={{ display: "flex", gap: "10px" }}>
-                <button onClick={() => setStopBotConfirm(null)} style={{
-                  flex: 1, padding: isMobile ? "14px" : "12px", borderRadius: "10px", fontSize: isMobile ? "14px" : "14px", fontWeight: 600,
-                  background: c.card2, color: c.text2, border: `1px solid ${c.border}`, cursor: "pointer", minHeight: "48px",
-                }}>취소</button>
-                <button onClick={confirmStopBot} style={{
-                  flex: 1, padding: isMobile ? "14px" : "12px", borderRadius: "10px", fontSize: isMobile ? "14px" : "14px", fontWeight: 700,
-                  background: c.red, color: "#fff", border: "none", cursor: "pointer", minHeight: "48px",
-                }}>봇 중지 및 삭제</button>
-              </div>
+              {stopBotConfirm.mode === "pause" ? (
+                <>
+                  <h3 style={{ margin: "0 0 8px", color: c.text1, fontSize: isMobile ? "17px" : "19px", fontWeight: 800 }}>
+                    자동매매 중단
+                  </h3>
+                  <p style={{ margin: "0 0 20px", color: c.text2, fontSize: isMobile ? "13px" : "14px", lineHeight: 1.5 }}>
+                    <strong style={{ color: c.text1 }}>{stopBotConfirm.botName}</strong>
+                  </p>
+
+                  {/* 일시정지 단계 설명 */}
+                  <div style={{
+                    background: `${c.blue}08`, border: `1px solid ${c.blue}20`, borderRadius: "10px",
+                    padding: isMobile ? "12px 14px" : "14px 16px", marginBottom: "20px", textAlign: "left",
+                  }}>
+                    <div style={{ fontSize: isMobile ? "12px" : "13px", color: c.blue, fontWeight: 600, marginBottom: "8px" }}>다음 단계 진행</div>
+                    <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.text2, lineHeight: 1.6 }}>
+                      <div style={{ marginBottom: "6px" }}>
+                        <strong>1단계: 자동매매 중단</strong><br/>
+                        새로운 매매를 중지합니다. 봇이 목록에 표시되며 재시작 가능합니다.
+                      </div>
+                      <div>
+                        <strong>2단계: 봇 삭제</strong><br/>
+                        일시정지된 봇을 목록에서 완전히 제거합니다.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "10px", flexDirection: isMobile ? "column" : "row" }}>
+                    <button onClick={() => setStopBotConfirm(null)} style={{
+                      flex: 1, padding: isMobile ? "14px" : "12px", borderRadius: "10px", fontSize: isMobile ? "14px" : "14px", fontWeight: 600,
+                      background: c.card2, color: c.text2, border: `1px solid ${c.border}`, cursor: "pointer", minHeight: "48px",
+                    }}>취소</button>
+                    <button onClick={confirmPauseBot} style={{
+                      flex: 1, padding: isMobile ? "14px" : "12px", borderRadius: "10px", fontSize: isMobile ? "14px" : "14px", fontWeight: 700,
+                      background: c.yellow, color: "#000", border: "none", cursor: "pointer", minHeight: "48px",
+                    }}>자동매매만 중단</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h3 style={{ margin: "0 0 8px", color: c.text1, fontSize: isMobile ? "17px" : "19px", fontWeight: 800 }}>
+                    봇을 삭제하시겠습니까?
+                  </h3>
+                  <p style={{ margin: "0 0 20px", color: c.text2, fontSize: isMobile ? "13px" : "14px", lineHeight: 1.5 }}>
+                    <strong style={{ color: c.text1 }}>{stopBotConfirm.botName}</strong>
+                  </p>
+
+                  <div style={{
+                    background: `${c.red}08`, border: `1px solid ${c.red}20`, borderRadius: "10px",
+                    padding: isMobile ? "12px 14px" : "14px 16px", marginBottom: "20px", textAlign: "left",
+                  }}>
+                    <div style={{ fontSize: isMobile ? "11px" : "12px", color: c.red, fontWeight: 600, marginBottom: "6px" }}>주의사항</div>
+                    <ul style={{ margin: 0, paddingLeft: "16px", fontSize: isMobile ? "11px" : "12px", color: c.text2, lineHeight: 1.6 }}>
+                      <li>봇이 목록에서 완전히 제거됩니다</li>
+                      <li>운영 기록은 보관됩니다</li>
+                      <li>이 작업은 취소할 수 없습니다</li>
+                    </ul>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "10px", flexDirection: isMobile ? "column" : "row" }}>
+                    <button onClick={() => setStopBotConfirm(null)} style={{
+                      flex: 1, padding: isMobile ? "14px" : "12px", borderRadius: "10px", fontSize: isMobile ? "14px" : "14px", fontWeight: 600,
+                      background: c.card2, color: c.text2, border: `1px solid ${c.border}`, cursor: "pointer", minHeight: "48px",
+                    }}>취소</button>
+                    <button onClick={confirmDeleteBot} style={{
+                      flex: 1, padding: isMobile ? "14px" : "12px", borderRadius: "10px", fontSize: isMobile ? "14px" : "14px", fontWeight: 700,
+                      background: c.red, color: "#fff", border: "none", cursor: "pointer", minHeight: "48px",
+                    }}>봇 완전 삭제</button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -1505,12 +1842,14 @@ export default function AutoTrading({ theme = "dark", user }) {
         {/* 잔고 카드는 상단 연동 배너에 통합됨 */}
 
         {/* 운영 중인 봇 대시보드 (활성 봇이 있을 때만 표시) */}
-        {!activeBot && activeBots.length > 0 && (
+        {!activeBot && (
           <ActiveBotsDashboard
             activeBots={activeBots}
+            stoppedBots={stoppedBots}
             onSelectBot={(bot) => setActiveBot(bot)}
             onStopBot={handleStopBot}
             onAddFund={handleAddFund}
+            onUpdateBotStatus={handleUpdateBotStatus}
             theme={theme}
             userId={user?.id}
             isMobile={isMobile}

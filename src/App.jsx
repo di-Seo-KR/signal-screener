@@ -50,6 +50,7 @@ import BacktestPanel from "./BacktestPanel.jsx";
 import QuantPortfolio from "./QuantPortfolio.jsx";
 import RiskHeatmap from "./RiskHeatmap.jsx";
 import AutoTrading from "./AutoTrading.jsx";
+import DevDashboard from "./DevDashboard.jsx";
 import { ALL_STRATEGIES } from "./strategies.js";
 
 // ════════════════════════════════════════════════════════════════════
@@ -4198,7 +4199,7 @@ function AppInner() {
     });
   }, []);
 
-  const validTabs = ["home","auto-trading","portfolio","screener","alerts","news","quant-portfolio","quant-port","risk-map","sector-flow","backtest","sentiment","strategy","anomaly","quant-report","econ-calendar","profile"];
+  const validTabs = ["home","auto-trading","portfolio","screener","alerts","news","quant-portfolio","quant-port","risk-map","sector-flow","backtest","sentiment","strategy","anomaly","quant-report","econ-calendar","profile","dev"];
   const [tab, setTabRaw] = useState(() => {
     try {
       // 1순위: URL pathname (/screener, /auto-trading 등)
@@ -10709,6 +10710,13 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "auto-trading" && (
           <AutoTrading theme={themeMode} user={user} />
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 개발/QA 대시보드 (zepta.vercel.app/dev)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "dev" && (
+          <DevDashboard theme={themeMode} />
         )}
 
         {/* 종목 상세 팝업 */}
