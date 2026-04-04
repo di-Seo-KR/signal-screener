@@ -140,17 +140,26 @@ export default async function handler(req, res) {
       addLog(`🆕 가상 포트폴리오 생성: $${INITIAL_CASH.toLocaleString()}`);
     }
 
-    // ── 활성 봇 확인 → 매매 대상 자산 필터링 ──
+    // ── 활성 봇 확인 → 매매 대상 자산 필터링 + 자산별 배분금액 한도 ──
     let activeAssets = new Set(CRYPTO_ASSETS); // 기본: 전체
+    const assetAllocationMap = {}; // { "BTC/USD": 총 배분금액 }  — 봇별 배분금액 합산
     try {
       const activeBots = await kv.get("di:active-bots");
       if (Array.isArray(activeBots) && activeBots.length > 0) {
         activeAssets = new Set();
         for (const ab of activeBots) {
           const botAssets = BOT_ASSET_MAP[ab.botId];
-          if (botAssets) botAssets.forEach(a => activeAssets.add(a));
+          const allocation = ab.allocation || 0;
+          if (botAssets && allocation > 0) {
+            const perAsset = allocation / botAssets.length; // 봇 배분금액을 자산 수로 균등 분배
+            botAssets.forEach(a => {
+              activeAssets.add(a);
+              assetAllocationMap[a] = (assetAllocationMap[a] || 0) + perAsset;
+            });
+          }
         }
-        addLog(`🤖 활성 봇 ${activeBots.length}개 → 매매 대상: ${activeAssets.size}종목 [${[...activeAssets].join(", ")}]`);
+        const totalAlloc = activeBots.reduce((s, ab) => s + (ab.allocation || 0), 0);
+        addLog(`🤖 활성 봇 ${activeBots.length}개 → 매매 대상: ${activeAssets.size}종목, 총 배분: $${totalAlloc.toLocaleString()}`);
       } else {
         // 활성 봇 정보가 없으면 매매 안 함 (봇 미생성 상태)
         activeAssets = new Set();
@@ -491,15 +500,22 @@ export default async function handler(req, res) {
         const maxTotalExposure = equity * MAX_TOTAL_CRYPTO_EXPOSURE;
         const maxCashPerAsset = equity * MAX_POSITION_PER_ASSET;
 
-        if (currentTotalExposure < maxTotalExposure) {
+        // ── 봇 배분금액 한도 체크 ──
+        const assetAllocLimit = assetAllocationMap[asset] || 0;
+        const currentExposureForAlloc = pos ? (pos.qty * currentPrice) : 0;
+        const remainingAlloc = Math.max(0, assetAllocLimit - currentExposureForAlloc);
+
+        if (assetAllocLimit > 0 && remainingAlloc <= 10) {
+          addLog(`⚠️ ${asset} 배분한도 도달 ($${currentExposureForAlloc.toFixed(0)}/$${assetAllocLimit.toFixed(0)}) — 매수 스킵`);
+        } else if (currentTotalExposure < maxTotalExposure) {
           const remainingExposure = maxTotalExposure - currentTotalExposure;
           if (pos) {
             const addAmount = equity * positionSize * 0.25;
             if (currentExposure + addAmount <= maxCashPerAsset && addAmount <= availableCash) {
-              tradeAmount = Math.min(addAmount, maxCashPerAsset - currentExposure, availableCash, remainingExposure);
+              tradeAmount = Math.min(addAmount, maxCashPerAsset - currentExposure, availableCash, remainingExposure, remainingAlloc > 0 ? remainingAlloc : Infinity);
             }
           } else {
-            tradeAmount = Math.min(equity * positionSize * 0.25, maxCashPerAsset, availableCash, remainingExposure);
+            tradeAmount = Math.min(equity * positionSize * 0.25, maxCashPerAsset, availableCash, remainingExposure, remainingAlloc > 0 ? remainingAlloc : Infinity);
           }
         } else {
           addLog(`⚠️ ${asset} 총 크립토 익스포저 한도 도달 (${(currentTotalExposure/equity*100).toFixed(1)}% ≥ ${MAX_TOTAL_CRYPTO_EXPOSURE*100}%) — 매수 스킵`);
