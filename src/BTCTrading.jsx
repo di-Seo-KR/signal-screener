@@ -546,8 +546,11 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   const snap = botPerf?.snapshot || {};
   const perf = botPerf?.perf || {};
   const unrealizedPL = snap.unrealizedPL || 0;
-  const dd = snap.dd || 0;
-  const mdd = snap.mdd || 0;
+  // DD/MDD: 배분금액 기준 에쿼티 대비 (100%는 비정상 데이터 → 0으로 처리)
+  const rawDD = snap.dd || 0;
+  const rawMDD = snap.mdd || 0;
+  const dd = rawDD >= 99.9 ? 0 : rawDD;
+  const mdd = rawMDD >= 99.9 ? 0 : rawMDD;
   const tradeCount = perf.tradeCount || 0;
   // 실현 손익: 매도한 종목에서만 발생 (매도 수익 - 매도 대상의 매수 비용)
   const closedPL = perf.realizedPL || 0; // btc-cron에서 매도 시 계산된 실현 손익

@@ -630,28 +630,31 @@ export default async function handler(req, res) {
         addLog(`📊 봇별 성과 KV 저장: ${executedTrades.length}건 분배`);
       }
 
-      // 봇별 포지션 스냅샷 (배분금액 기준 에쿼티로 DD/MDD 계산)
+      // 봇별 포지션 스냅샷 (활성 봇만 — 비활성 봇은 스냅샷 갱신하지 않음)
       const activeBotsList = (await kv.get("di:active-bots")) || [];
-      for (const [botId, assets] of Object.entries(BOT_ASSET_MAP)) {
+      for (const ab of activeBotsList) {
+        const botId = ab.botId;
+        const assets = BOT_ASSET_MAP[botId];
+        if (!assets) continue; // 알 수 없는 봇 ID 스킵
+
         const botPositions = assets
           .map(a => positionMap[a])
           .filter(Boolean);
         const botUnrealizedPL = botPositions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
         const botMarketValue = botPositions.reduce((s, p) => s + parseFloat(p.market_value || 0), 0);
-        const botCostBasis = botPositions.reduce((s, p) => s + parseFloat(p.cost_basis || 0), 0);
 
-        // 봇 배분금액 조회 (활성 봇 목록에서)
-        const activeBotInfo = activeBotsList.find(ab => ab.botId === botId);
-        const botAllocation = activeBotInfo?.allocation || 0;
+        const botAllocation = ab.allocation || 0;
 
         // 봇 에쿼티 = 배분금액 + 미실현 손익 + 실현 손익
-        // (배분금액이 없으면 포지션 시가 사용)
         const perfKey = `di:bot:${botId}:perf`;
         const perfData = (await kv.get(perfKey)) || {};
         const realizedPL = perfData.realizedPL || 0;
         const botEquity = botAllocation > 0
           ? botAllocation + botUnrealizedPL + realizedPL
           : botMarketValue;
+
+        // botEquity가 0 이하이면 DD 계산 스킵 (아직 매매 전이거나 데이터 이상)
+        if (botEquity <= 0) continue;
 
         const snapKey = `di:bot:${botId}:snapshot`;
         const prevSnap = (await kv.get(snapKey)) || { peakEquity: botEquity, mdd: 0, history: [] };
