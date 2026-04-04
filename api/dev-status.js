@@ -28,7 +28,7 @@ export default async function handler(req, res) {
         const botIds = [
           "btc-alpha", "highcap-momentum", "defi-infra",
           "meme-trend", "l2-emerging", "crypto-diversity", "crypto-swing",
-          "us-stable", "us-balanced", "us-aggressive", "us-trend", "us-meanrev",
+          "stable-quant", "balanced-quant", "aggressive-quant", "trend-follow", "mean-reversion", "ensemble-signal",
         ];
         for (const id of botIds) {
           await kv.del(`di:bot:${id}:perf`);

@@ -539,7 +539,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   const fullDayPL = parseFloat(virtualPortfolio?.dayPL || 0);
   const dayPL = botAllocation ? Math.round(fullDayPL * allocRatio * 100) / 100 : fullDayPL;
   const fullDayPLPct = parseFloat(virtualPortfolio?.dayPLPct || 0);
-  const dayPLPct = botAllocation ? fullDayPLPct : fullDayPLPct;
+  const dayPLPct = botAllocation ? Math.round(fullDayPLPct * allocRatio * 100) / 100 : fullDayPLPct;
   const fmtUSD2 = (v) => `$${Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
   // ── 봇 성과 파생 ──

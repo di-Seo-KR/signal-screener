@@ -640,6 +640,23 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: false, error: "KV connection failed" });
     }
 
+    // ── 활성 봇 확인 → 주식 봇만 필터링 ──
+    const STOCK_BOT_IDS = ["stable-quant", "balanced-quant", "aggressive-quant", "trend-follow", "mean-reversion", "ensemble-signal"];
+    let activeStockBots = [];
+    let totalStockAllocation = 0;
+    try {
+      const allActiveBots = (await kv.get("di:active-bots")) || [];
+      activeStockBots = allActiveBots.filter(ab => STOCK_BOT_IDS.includes(ab.botId) && ab.status !== "paused");
+      totalStockAllocation = activeStockBots.reduce((s, ab) => s + (ab.allocation || 0), 0);
+      if (activeStockBots.length > 0) {
+        console.log(`🤖 활성 주식 봇 ${activeStockBots.length}개, 총 배분: $${totalStockAllocation.toLocaleString()}`);
+      } else {
+        console.log(`⏸️ 활성 주식 봇 없음 — 시그널 스캔만 수행 (매매 건너뜀)`);
+      }
+    } catch (e) {
+      console.log(`⚠️ 활성 봇 조회 실패: ${e.message}`);
+    }
+
     let portfolio = await kv.get(STOCK_PORTFOLIO_KEY);
     if (!portfolio) {
       portfolio = {
@@ -695,13 +712,15 @@ export default async function handler(req, res) {
         });
       }
 
-      // BUY signal — 가상매매
-      if (analysis.buySignal && !existingPos) {
+      // BUY signal — 가상매매 (활성 주식 봇이 있을 때만)
+      if (analysis.buySignal && !existingPos && activeStockBots.length > 0) {
         const startEquity = portfolio.cash + totalMarketValue;
-        const maxEquity = startEquity * MAX_EQUITY_PER_STOCK;
+        // 배분금액 기준으로 매수 한도 계산 (전체 equity 대신)
+        const perStockAlloc = totalStockAllocation / WATCHLIST.length;
+        const maxEquity = Math.min(perStockAlloc, startEquity * MAX_EQUITY_PER_STOCK);
         const totalAllowed = startEquity * MAX_TOTAL_STOCK_EXPOSURE;
 
-        if (totalMarketValue + maxEquity <= totalAllowed && portfolio.cash >= maxEquity) {
+        if (totalMarketValue + maxEquity <= totalAllowed && portfolio.cash >= maxEquity && maxEquity > 10) {
           const qty = Math.floor(maxEquity / currentPrice);
           if (qty > 0) {
             const tradeAmount = qty * currentPrice;
@@ -714,6 +733,8 @@ export default async function handler(req, res) {
             console.log(`🟢 BUY ${qty} ${symbol} @ $${currentPrice.toFixed(2)} ($${tradeAmount.toFixed(0)})`);
           }
         }
+      } else if (analysis.buySignal && !existingPos && activeStockBots.length === 0) {
+        console.log(`⏭️ ${symbol} 매수 스킵 — 활성 주식 봇 없음`);
       }
 
       // SELL signal — 가상매매
@@ -751,13 +772,12 @@ export default async function handler(req, res) {
     const startCash = portfolio.cash;
     console.log(`💾 주식 포트폴리오 저장: 현금 $${startCash.toFixed(0)}, 포지션 ${Object.keys(portfolio.positions).length}종목, 총자산 $${startEquity.toFixed(0)}`);
 
-    // ── 주식 봇별 성과 KV 저장 ──
+    // ── 주식 봇별 성과 KV 저장 (활성 봇만) ──
     try {
-      // 주식 봇 ID 목록 (AutoTrading.jsx의 STOCK_BOTS와 동기화)
-      const STOCK_BOT_IDS = ["us-stable", "us-balanced", "us-aggressive", "us-trend", "us-meanrev"];
+      const activeBotIds = activeStockBots.map(ab => ab.botId);
 
-      if (orders.length > 0) {
-        for (const botId of STOCK_BOT_IDS) {
+      if (orders.length > 0 && activeBotIds.length > 0) {
+        for (const botId of activeBotIds) {
           const key = `di:bot:${botId}:perf`;
           const existing = (await kv.get(key)) || {
             botId, trades: [], realizedPL: 0, totalBuyCost: 0, totalSellRevenue: 0,
@@ -774,29 +794,42 @@ export default async function handler(req, res) {
               existing.totalBuyCost = (existing.totalBuyCost || 0) + (order.qty * order.price);
             } else {
               existing.totalSellRevenue = (existing.totalSellRevenue || 0) + (order.qty * order.price);
+              if (order.pnl != null) {
+                existing.realizedPL = (existing.realizedPL || 0) + order.pnl;
+                if (order.pnl > 0) existing.winCount = (existing.winCount || 0) + 1;
+              }
             }
           }
           existing.lastUpdated = new Date().toISOString();
           await kv.set(key, existing);
         }
-        console.log(`📊 주식 봇별 성과 KV 저장: ${orders.length}건`);
+        console.log(`📊 주식 봇별 성과 KV 저장: ${orders.length}건 → ${activeBotIds.length}개 봇`);
       }
 
-      // 주식 봇별 포지션 스냅샷
-      for (const botId of STOCK_BOT_IDS) {
+      // 주식 봇별 포지션 스냅샷 (활성 봇만)
+      for (const ab of activeStockBots) {
+        const botId = ab.botId;
+        const botAllocation = ab.allocation || 0;
         const totalMV = positions.reduce((s, p) => s + (parseFloat(p.market_value) || 0), 0);
         const totalUnrealized = positions.reduce((s, p) => s + (parseFloat(p.unrealized_pl) || 0), 0);
+        // 봇 에쿼티 = 배분금액 + 미실현 손익 + 실현 손익
+        const perfKey = `di:bot:${botId}:perf`;
+        const perfData = (await kv.get(perfKey)) || {};
+        const realizedPL = perfData.realizedPL || 0;
+        const botEquity = botAllocation > 0 ? botAllocation + totalUnrealized + realizedPL : totalMV;
         const snapKey = `di:bot:${botId}:snapshot`;
-        const prevSnap = (await kv.get(snapKey)) || { peakValue: totalMV, mdd: 0, history: [] };
-        const peakValue = Math.max(prevSnap.peakValue || 0, totalMV);
-        const dd = peakValue > 0 ? ((peakValue - totalMV) / peakValue) * 100 : 0;
+        const prevSnap = (await kv.get(snapKey)) || { peakEquity: botEquity, mdd: 0, history: [] };
+        const peakEquity = Math.max(prevSnap.peakEquity || prevSnap.peakValue || botEquity, botEquity);
+        const dd = peakEquity > 0 ? ((peakEquity - botEquity) / peakEquity) * 100 : 0;
         const mdd = Math.max(prevSnap.mdd || 0, dd);
         const history = [...(prevSnap.history || []),
-          { time: new Date().toISOString(), value: totalMV, unrealizedPL: totalUnrealized, positions: positions.length },
+          { time: new Date().toISOString(), equity: botEquity, value: totalMV, unrealizedPL: totalUnrealized, positions: positions.length },
         ].slice(-500);
         await kv.set(snapKey, {
           botId, marketValue: totalMV, unrealizedPL: totalUnrealized,
-          positionCount: positions.length, peakValue, dd, mdd, history, lastUpdated: new Date().toISOString(),
+          positionCount: positions.length, peakEquity, dd, mdd,
+          botAllocation, botEquity, realizedPL,
+          history, lastUpdated: new Date().toISOString(),
         });
       }
       console.log(`📸 주식 봇별 포지션 스냅샷 저장 완료`);

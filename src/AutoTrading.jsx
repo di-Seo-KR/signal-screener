@@ -868,40 +868,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
           </div>
         </div>
 
-        {/* 정지된 봇 히스토리 */}
-        {stoppedBots && stoppedBots.length > 0 && (
-          <div>
-            <div style={{ fontSize: "14px", fontWeight: 600, color: c.text1, marginBottom: "12px" }}>운영 기록</div>
-            <div style={{
-              display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))", gap: isMobile ? "10px" : "12px",
-            }}>
-              {stoppedBots.slice(0, 5).map((sb, idx) => {
-                const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === sb.botId);
-                const duration = Math.floor((sb.stoppedAt - sb.startedAt) / (1000 * 60 * 60 * 24));
-                return (
-                  <div key={idx} style={{
-                    background: c.card2, border: `1px solid ${c.border}`, borderRadius: "10px",
-                    padding: isMobile ? "12px" : "14px", fontSize: isMobile ? "11px" : "12px",
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                      <span style={{ fontSize: "20px" }}>{bot?.icon || "🤖"}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, color: c.text1 }}>{sb.botName}</div>
-                        <div style={{ fontSize: isMobile ? "10px" : "11px", color: c.text3 }}>{duration}일 운영</div>
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: isMobile ? "10px" : "11px" }}>
-                      <span style={{ color: c.text3 }}>거래: {sb.trades}</span>
-                      <span style={{ color: sb.realizedPL >= 0 ? c.green : c.red, fontWeight: 600 }}>
-                        {sb.realizedPL >= 0 ? "+" : ""}{sb.realizedPL.toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {/* 운영 기록은 프로필/설정 페이지에서 표시 (메인 페이지에서 제거) */}
       </div>
     );
   }

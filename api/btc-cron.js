@@ -286,6 +286,12 @@ export default async function handler(req, res) {
       addLog(`⚠️ FNG API 오류: ${e.message} (기본값 사용)`);
     }
 
+    // ── equity 유효성 검증 ──
+    if (!isFinite(equity) || equity <= 0) {
+      addLog(`❌ equity 비정상 ($${equity}) — 매매 중단`);
+      return res.status(200).json({ ok: false, error: "Invalid equity", log });
+    }
+
     // ── 멀티 자산 스캔 및 주문 실행 ──
     const assetResults = [];
 
@@ -362,6 +368,7 @@ export default async function handler(req, res) {
 
       // 최근 시그널 분석 (market-monitor 레짐 연동)
       // monitorAlerts에서 현재 자산 관련 알림 추출
+      const binSymbol = BINANCE_SYMBOLS[asset] || asset;
       const assetAlerts = monitorAlerts.filter(a => a.ticker === binSymbol || a.ticker === asset);
       let latestSignal = analyzeLatest(candles, closes, highs, lows, volumes, {
         rsi, bb, ema21, ema55, ema200, macdLine, macdSig, histogram,
@@ -505,17 +512,21 @@ export default async function handler(req, res) {
         const currentExposureForAlloc = pos ? (pos.qty * currentPrice) : 0;
         const remainingAlloc = Math.max(0, assetAllocLimit - currentExposureForAlloc);
 
-        if (assetAllocLimit > 0 && remainingAlloc <= 10) {
+        if (assetAllocLimit <= 0) {
+          addLog(`⚠️ ${asset} 배분금액 없음 — 매수 스킵`);
+        } else if (remainingAlloc <= 10) {
           addLog(`⚠️ ${asset} 배분한도 도달 ($${currentExposureForAlloc.toFixed(0)}/$${assetAllocLimit.toFixed(0)}) — 매수 스킵`);
         } else if (currentTotalExposure < maxTotalExposure) {
           const remainingExposure = maxTotalExposure - currentTotalExposure;
+          // 매수금액을 봇 배분한도 기준으로 산출 (전체 equity 아닌 자산별 배분금액의 25%)
+          const baseAmount = Math.min(assetAllocLimit * positionSize * 0.25, maxCashPerAsset);
           if (pos) {
-            const addAmount = equity * positionSize * 0.25;
+            const addAmount = baseAmount;
             if (currentExposure + addAmount <= maxCashPerAsset && addAmount <= availableCash) {
-              tradeAmount = Math.min(addAmount, maxCashPerAsset - currentExposure, availableCash, remainingExposure, remainingAlloc > 0 ? remainingAlloc : Infinity);
+              tradeAmount = Math.min(addAmount, maxCashPerAsset - currentExposure, availableCash, remainingExposure, remainingAlloc);
             }
           } else {
-            tradeAmount = Math.min(equity * positionSize * 0.25, maxCashPerAsset, availableCash, remainingExposure, remainingAlloc > 0 ? remainingAlloc : Infinity);
+            tradeAmount = Math.min(baseAmount, maxCashPerAsset, availableCash, remainingExposure, remainingAlloc);
           }
         } else {
           addLog(`⚠️ ${asset} 총 크립토 익스포저 한도 도달 (${(currentTotalExposure/equity*100).toFixed(1)}% ≥ ${MAX_TOTAL_CRYPTO_EXPOSURE*100}%) — 매수 스킵`);
@@ -525,10 +536,11 @@ export default async function handler(req, res) {
           const buyQty = tradeAmount / currentPrice;
           const existing = portfolio.positions[asset];
           if (existing && existing.qty > 0) {
-            // 평균단가 재계산
+            // 평균단가 재계산 (NaN 방지)
             const totalQty = existing.qty + buyQty;
             const totalCost = (existing.qty * existing.avgPrice) + tradeAmount;
-            portfolio.positions[asset] = { qty: totalQty, avgPrice: totalCost / totalQty, entryTime: existing.entryTime };
+            const newAvgPrice = totalQty > 0 ? totalCost / totalQty : currentPrice;
+            portfolio.positions[asset] = { qty: totalQty, avgPrice: isFinite(newAvgPrice) ? newAvgPrice : currentPrice, entryTime: existing.entryTime };
           } else {
             portfolio.positions[asset] = { qty: buyQty, avgPrice: currentPrice, entryTime: new Date().toISOString() };
           }
