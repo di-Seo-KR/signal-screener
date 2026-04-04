@@ -1307,14 +1307,16 @@ export default function AutoTrading({ theme = "dark", user }) {
     try { return JSON.parse(localStorage.getItem(stoppedBotsStorageKey) || "[]"); } catch { return []; }
   });
   const botsLoaded = useRef(false);
-  const botsSaving = useRef(false);
+  const activeBotsSaving = useRef(false);
+  const stoppedBotsSaving = useRef(false);
 
-  // Supabase에서 봇 목록 로드 (기기간 동기화 — race condition 방지)
+  // Supabase에서 봇 목록 로드 (기기간 동기화 — 항상 서버 우선)
   useEffect(() => {
     if (!user || botsLoaded.current) return;
     (async () => {
       try {
-        // Supabase에서 최신 user 정보를 명시적으로 가져옴 (캐시 방지)
+        // 세션 강제 새로고침 → 다른 기기에서 변경한 user_metadata 반영
+        await supabase.auth.refreshSession();
         const { data } = await supabase.auth.getUser();
         const remoteBots = data?.user?.user_metadata?.active_bots;
         const remoteStoppedBots = data?.user?.user_metadata?.stopped_bots;
@@ -1327,19 +1329,19 @@ export default function AutoTrading({ theme = "dark", user }) {
           try { return JSON.parse(localStorage.getItem(stoppedBotsStorageKey) || "[]"); } catch { return []; }
         })();
 
-        // 병합 전략: 더 많은 데이터를 가진 쪽 우선 (빈 배열로 덮어쓰기 방지)
-        if (Array.isArray(remoteBots) && remoteBots.length > 0) {
-          // 리모트에 데이터가 있으면 리모트 우선
+        // 병합 전략: 서버(Supabase) 우선 — 서버가 진실의 원천(source of truth)
+        if (Array.isArray(remoteBots)) {
+          // 리모트 데이터가 배열이면 (빈 배열이라도) 서버 우선 사용
           setActiveBots(remoteBots);
           if (storageKey) try { localStorage.setItem(storageKey, JSON.stringify(remoteBots)); } catch {}
         } else if (localBots.length > 0) {
-          // 리모트는 비어있는데 로컬에 데이터가 있으면 로컬 유지 + 리모트에 복원
+          // 리모트에 아예 데이터가 없는 경우에만 로컬 → 서버 복원
           setActiveBots(localBots);
           await supabase.auth.updateUser({ data: { active_bots: localBots } });
         }
 
-        // 정지된 봇 목록 로드
-        if (Array.isArray(remoteStoppedBots) && remoteStoppedBots.length > 0) {
+        // 정지된 봇 목록 로드 (동일 전략)
+        if (Array.isArray(remoteStoppedBots)) {
           setStoppedBots(remoteStoppedBots);
           if (stoppedBotsStorageKey) try { localStorage.setItem(stoppedBotsStorageKey, JSON.stringify(remoteStoppedBots)); } catch {}
         } else if (localStoppedBots.length > 0) {
@@ -1353,17 +1355,16 @@ export default function AutoTrading({ theme = "dark", user }) {
     })();
   }, [user, storageKey, stoppedBotsStorageKey]);
 
-  // activeBots 변경 시 → Supabase + localStorage 동시 저장 (로드 완료 후에만)
+  // activeBots 변경 시 → Supabase + localStorage + KV 동시 저장 (로드 완료 후에만)
   const saveBotsTimeout = useRef(null);
   useEffect(() => {
     if (!user || !botsLoaded.current) return;
     // localStorage 즉시 저장
     if (storageKey) try { localStorage.setItem(storageKey, JSON.stringify(activeBots)); } catch {}
-    // Supabase는 디바운스 (1초 — 빈번한 쓰기 방지)
+    // Supabase는 디바운스 (500ms)
     if (saveBotsTimeout.current) clearTimeout(saveBotsTimeout.current);
     saveBotsTimeout.current = setTimeout(async () => {
-      if (botsSaving.current) return;
-      botsSaving.current = true;
+      activeBotsSaving.current = true;
       try {
         await supabase.auth.updateUser({ data: { active_bots: activeBots } });
       } catch (e) { console.warn("[Zepta] 봇 Supabase 동기화 실패:", e); }
@@ -1376,8 +1377,9 @@ export default function AutoTrading({ theme = "dark", user }) {
           body: JSON.stringify({ activeBots: activeForCron }),
         });
       } catch (e) { console.warn("[Zepta] 봇 KV 동기화 실패:", e); }
-      botsSaving.current = false;
-    }, 1000);
+      activeBotsSaving.current = false;
+    }, 500);
+    return () => { if (saveBotsTimeout.current) clearTimeout(saveBotsTimeout.current); };
   }, [activeBots, user, storageKey]);
 
   // stoppedBots 변경 시 → Supabase + localStorage 동시 저장
@@ -1386,16 +1388,16 @@ export default function AutoTrading({ theme = "dark", user }) {
     if (!user || !botsLoaded.current) return;
     // localStorage 즉시 저장
     if (stoppedBotsStorageKey) try { localStorage.setItem(stoppedBotsStorageKey, JSON.stringify(stoppedBots)); } catch {}
-    // Supabase는 디바운스 (1초 — 빈번한 쓰기 방지)
+    // Supabase는 디바운스 (500ms)
     if (saveStoppedBotsTimeout.current) clearTimeout(saveStoppedBotsTimeout.current);
     saveStoppedBotsTimeout.current = setTimeout(async () => {
-      if (botsSaving.current) return;
-      botsSaving.current = true;
+      stoppedBotsSaving.current = true;
       try {
         await supabase.auth.updateUser({ data: { stopped_bots: stoppedBots } });
       } catch (e) { console.warn("[Zepta] 정지봇 Supabase 동기화 실패:", e); }
-      botsSaving.current = false;
-    }, 1000);
+      stoppedBotsSaving.current = false;
+    }, 500);
+    return () => { if (saveStoppedBotsTimeout.current) clearTimeout(saveStoppedBotsTimeout.current); };
   }, [stoppedBots, user, stoppedBotsStorageKey]);
 
 
