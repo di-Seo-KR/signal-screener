@@ -1183,7 +1183,15 @@ export default function AutoTrading({ theme = "dark", user }) {
       botsSaving.current = true;
       try {
         await supabase.auth.updateUser({ data: { active_bots: activeBots } });
-      } catch (e) { console.warn("[Zepta] 봇 동기화 실패:", e); }
+      } catch (e) { console.warn("[Zepta] 봇 Supabase 동기화 실패:", e); }
+      // KV에도 동기화 (btc-cron이 활성 봇 확인용)
+      try {
+        await fetch("/api/sync-active-bots", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ activeBots }),
+        });
+      } catch (e) { console.warn("[Zepta] 봇 KV 동기화 실패:", e); }
       botsSaving.current = false;
     }, 1000);
   }, [activeBots, user, storageKey]);

@@ -140,6 +140,27 @@ export default async function handler(req, res) {
       addLog(`🆕 가상 포트폴리오 생성: $${INITIAL_CASH.toLocaleString()}`);
     }
 
+    // ── 활성 봇 확인 → 매매 대상 자산 필터링 ──
+    let activeAssets = new Set(CRYPTO_ASSETS); // 기본: 전체
+    try {
+      const activeBots = await kv.get("di:active-bots");
+      if (Array.isArray(activeBots) && activeBots.length > 0) {
+        activeAssets = new Set();
+        for (const ab of activeBots) {
+          const botAssets = BOT_ASSET_MAP[ab.botId];
+          if (botAssets) botAssets.forEach(a => activeAssets.add(a));
+        }
+        addLog(`🤖 활성 봇 ${activeBots.length}개 → 매매 대상: ${activeAssets.size}종목 [${[...activeAssets].join(", ")}]`);
+      } else {
+        // 활성 봇 정보가 없으면 매매 안 함 (봇 미생성 상태)
+        activeAssets = new Set();
+        addLog(`⏸️ 활성 봇 없음 — 시그널 스캔만 수행 (매매 건너뜀)`);
+      }
+    } catch (e) {
+      addLog(`⚠️ 활성 봇 조회 실패: ${e.message} — 전체 자산 스캔`);
+      activeAssets = new Set(CRYPTO_ASSETS);
+    }
+
     // ── 실시간 가격 조회 (Binance → CoinGecko 폴백) ──
     const priceMap = {};
     let priceSource = "none";
@@ -455,7 +476,11 @@ export default async function handler(req, res) {
         continue;
       }
 
-      if (latestSignal.type === "BUY" && !shouldSellForStopLoss) {
+      if (latestSignal.type === "BUY" && !shouldSellForStopLoss && !activeAssets.has(asset)) {
+        addLog(`⏭️ ${asset} 매수 스킵 — 비활성 봇 자산`);
+      }
+
+      if (latestSignal.type === "BUY" && !shouldSellForStopLoss && activeAssets.has(asset)) {
         // portfolio.cash는 매수 시 즉시 차감되므로 그대로 사용 (이중 차감 방지)
         const availableCash = portfolio.cash;
         // 총 크립토 익스포저 체크 (전체 포지션 가치 / 자산 기준)
@@ -499,7 +524,8 @@ export default async function handler(req, res) {
       }
 
       // ── 가상매매: SELL 실행 ──
-      if ((latestSignal.type === "SELL" || shouldSellForStopLoss || shouldTakeProfit) && pos) {
+      // 매도는 활성 봇 자산이 아니더라도, 기존 포지션이 있으면 청산 허용 (손절/익절)
+      if ((latestSignal.type === "SELL" || shouldSellForStopLoss || shouldTakeProfit) && pos && (activeAssets.has(asset) || shouldSellForStopLoss || shouldTakeProfit)) {
         const sellQty = portfolio.positions[asset]?.qty || 0;
         const sellValue = sellQty * currentPrice;
         if (sellValue > 10) {
