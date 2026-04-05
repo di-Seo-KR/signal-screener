@@ -537,12 +537,17 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   const fullEquity = parseFloat(virtualPortfolio?.equity || 0);
   const fullCash = parseFloat(virtualPortfolio?.cash || 0);
   const hasPortfolioData = fullEquity > 0 || fullCash > 0;
-  // 봇 배분 비율: 전체 포트폴리오 대비 이 봇에 할당된 비율
-  const allocRatio = (botAllocation && fullEquity > 0) ? (botAllocation / fullEquity) : 1;
   const equity = botAllocation ? botAllocation : fullEquity;
+  // 봇별 현금 = 배분금액 - 해당 봇의 실제 투자금(포지션 시장가치 합계)
+  const botMarketValue = (() => {
+    if (!botAllocation) return 0;
+    // cryptoPositions: 이 봇에 속하는 실제 포지션 목록
+    return (cryptoPositions || []).reduce((sum, p) => sum + Math.abs(parseFloat(p.marketValue || p.market_value || 0)), 0);
+  })();
   const cash = botAllocation
-    ? (hasPortfolioData ? Math.round(fullCash * allocRatio) : botAllocation)
+    ? Math.max(0, botAllocation - botMarketValue)
     : fullCash;
+  const allocRatio = (botAllocation && fullEquity > 0) ? (botAllocation / fullEquity) : 1;
   const fullDayPL = parseFloat(virtualPortfolio?.dayPL || 0);
   const dayPL = botAllocation ? Math.round(fullDayPL * allocRatio * 100) / 100 : fullDayPL;
   const fullDayPLPct = parseFloat(virtualPortfolio?.dayPLPct || 0);
