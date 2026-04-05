@@ -25,16 +25,16 @@ class ErrorBoundary extends Component {
         }}>
           <div style={{ fontSize: "48px", marginBottom: "16px" }}>⚠️</div>
           <h2 style={{ fontWeight: 800, fontSize: "20px", marginBottom: "8px" }}>앱 오류가 발생했습니다</h2>
-          <p style={{ color: "#6B7D8E", fontSize: isMobile ? "16px" : "18px", marginBottom: "20px", maxWidth: "360px" }}>
+          <p style={{ color: "#6B7D8E", fontSize: "16px", marginBottom: "20px", maxWidth: "360px" }}>
             일시적인 오류입니다. 새로고침하면 정상 작동합니다.
           </p>
           <button onClick={() => window.location.reload()} style={{
-            padding: "12px 28px", borderRadius: "12px", fontSize: isMobile ? "16px" : "18px", fontWeight: 700,
+            padding: "12px 28px", borderRadius: "12px", fontSize: "16px", fontWeight: 700,
             background: "#3182F6", color: "#fff", border: "none", cursor: "pointer",
           }}>새로고침</button>
-          <details style={{ marginTop: "16px", fontSize: isMobile ? "14px" : "16px", color: "#6B7D8E", maxWidth: "360px" }}>
+          <details style={{ marginTop: "16px", fontSize: "14px", color: "#6B7D8E", maxWidth: "360px" }}>
             <summary style={{ cursor: "pointer" }}>오류 상세</summary>
-            <pre style={{ textAlign: "left", fontSize: isMobile ? "13px" : "15px", whiteSpace: "pre-wrap", wordBreak: "break-all", marginTop: "8px" }}>
+            <pre style={{ textAlign: "left", fontSize: "13px", whiteSpace: "pre-wrap", wordBreak: "break-all", marginTop: "8px" }}>
               {this.state.error?.message}
             </pre>
           </details>
@@ -1469,7 +1469,7 @@ function PullToRefresh({ onRefresh, children }) {
           }}>
             {refreshing ? "⏳" : pullDistance >= THRESHOLD ? "↻" : "↓"}
           </div>
-          <span style={{ marginLeft: "8px", fontSize: isMobile ? "15px" : "17px", color: C.text3, fontWeight: 600 }}>
+          <span style={{ marginLeft: "8px", fontSize: "17px", color: C.text3, fontWeight: 600 }}>
             {refreshing ? "새로고침 중..." : pullDistance >= THRESHOLD ? "놓으면 새로고침" : "아래로 당기기"}
           </span>
         </div>
@@ -1523,7 +1523,7 @@ function SignalTag({ triggerKey, asset }) {
   }
   return (
     <span title={meta.desc} style={{
-      padding: "2px 7px", borderRadius: "6px", fontSize: isMobile ? "13px" : "15px", fontWeight: 700,
+      padding: "2px 7px", borderRadius: "6px", fontSize: "15px", fontWeight: 700,
       background: `${color}22`, color, border: `1px solid ${color}44`, whiteSpace: "nowrap",
       cursor: "help",
     }}>{icon} {label}</span>
@@ -1593,7 +1593,7 @@ function SearchBar({ onSelect, placeholder = "종목 검색 (예: AAPL, 삼성�
   return (
     <div style={{ position: "relative", width: compact ? "auto" : "100%" }}>
       <div style={{ position: "relative" }}>
-        {!compact && <span style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", fontSize: isMobile ? "16px" : "18px", color: C.text3, pointerEvents: "none" }}>🔍</span>}
+        {!compact && <span style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)", fontSize: "18px", color: C.text3, pointerEvents: "none" }}>🔍</span>}
         <input
           ref={inputRef}
           value={query}
@@ -1617,7 +1617,7 @@ function SearchBar({ onSelect, placeholder = "종목 검색 (예: AAPL, 삼성�
         {query && (
           <button onClick={() => { setQuery(""); inputRef.current?.focus(); }} style={{
             position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)",
-            background: "none", border: "none", color: C.text3, fontSize: isMobile ? "16px" : "18px", cursor: "pointer", padding: "4px",
+            background: "none", border: "none", color: C.text3, fontSize: "18px", cursor: "pointer", padding: "4px",
           }}>✕</button>
         )}
       </div>
@@ -1645,20 +1645,20 @@ function SearchBar({ onSelect, placeholder = "종목 검색 (예: AAPL, 삼성�
                   width: "36px", height: "36px", borderRadius: "10px", flexShrink: 0,
                   background: asset.market === "us" ? "#1A2C4F" : asset.market === "kr" ? "#1A2A1E" : "#1E1A2A",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontWeight: 800, fontSize: isMobile ? "12px" : "14px",
+                  fontWeight: 800, fontSize: "14px",
                   color: asset.market === "us" ? C.blue : asset.market === "kr" ? C.green : C.purple,
                 }}>
                   {asset.symbol.length <= 5 ? asset.symbol : asset.symbol.slice(0, 5)}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: isMobile ? "16px" : "18px", color: C.text1 }}>{asset.name}</div>
-                  <div style={{ fontSize: isMobile ? "14px" : "16px", color: C.text3 }}>
+                  <div style={{ fontWeight: 600, fontSize: "18px", color: C.text1 }}>{asset.name}</div>
+                  <div style={{ fontSize: "16px", color: C.text3 }}>
                     {flag} {asset.symbol}{asset.market === "kr" ? ".KS" : ""}
                     {asset.koName ? ` · ${asset.koName}` : ""}
                   </div>
                 </div>
                 <div style={{
-                  padding: "3px 8px", borderRadius: "6px", fontSize: isMobile ? "13px" : "15px", fontWeight: 600,
+                  padding: "3px 8px", borderRadius: "6px", fontSize: "15px", fontWeight: 600,
                   background: asset.market === "us" ? `${C.blue}18` : asset.market === "kr" ? `${C.green}18` : `${C.purple}18`,
                   color: asset.market === "us" ? C.blue : asset.market === "kr" ? C.green : C.purple,
                 }}>
@@ -2572,17 +2572,17 @@ function AssetCard({ asset, onChart }) {
         <div style={{
           width: "42px", height: "42px", borderRadius: "12px", background: mcBg, flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontWeight: 800, fontSize: isMobile ? "13px" : "15px", color: mcColor, letterSpacing: "-0.5px",
+          fontWeight: 800, fontSize: "15px", color: mcColor, letterSpacing: "-0.5px",
         }}>
           {asset.symbol.length <= 4 ? asset.symbol : asset.symbol.slice(0, 4)}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-            <span style={{ fontWeight: 700, fontSize: isMobile ? "15px" : "17px", color: C.text1 }}>{asset.name}</span>
-            <span style={{ fontSize: isMobile ? "14px" : "16px", color: C.text3 }}>{asset.symbol}</span>
+            <span style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>{asset.name}</span>
+            <span style={{ fontSize: "16px", color: C.text3 }}>{asset.symbol}</span>
             {diag && (
               <span style={{
-                fontSize: isMobile ? "13px" : "15px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", marginLeft: "auto",
+                fontSize: "15px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", marginLeft: "auto",
                 background: diag.score >= 68 ? `${C.green}20` : diag.score >= 42 ? `${C.yellow}20` : `${C.red}20`,
                 color: diag.score >= 68 ? C.green : diag.score >= 42 ? C.yellow : C.red,
               }}>{diag.score}점 {diag.opinion}</span>
@@ -2594,29 +2594,29 @@ function AssetCard({ asset, onChart }) {
             {(() => {
               const bd = [asset.macdDivType === "bullish", asset.rsiDivType === "bullish", asset.obvDivType === "bullish"].filter(Boolean).length;
               const sd = [asset.macdDivType === "bearish", asset.rsiDivType === "bearish", asset.obvDivType === "bearish"].filter(Boolean).length;
-              if (bd >= 2) return <span style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 800, padding: "2px 7px", borderRadius: "5px", background: `${C.green}28`, color: C.green, border: `1px solid ${C.green}44` }}>{bd === 3 ? "⚡3중 강세" : "복합 강세"}</span>;
-              if (sd >= 2) return <span style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 800, padding: "2px 7px", borderRadius: "5px", background: `${C.red}28`, color: C.red, border: `1px solid ${C.red}44` }}>{sd === 3 ? "⚡3중 약세" : "복합 약세"}</span>;
+              if (bd >= 2) return <span style={{ fontSize: "14px", fontWeight: 800, padding: "2px 7px", borderRadius: "5px", background: `${C.green}28`, color: C.green, border: `1px solid ${C.green}44` }}>{bd === 3 ? "⚡3중 강세" : "복합 강세"}</span>;
+              if (sd >= 2) return <span style={{ fontSize: "14px", fontWeight: 800, padding: "2px 7px", borderRadius: "5px", background: `${C.red}28`, color: C.red, border: `1px solid ${C.red}44` }}>{sd === 3 ? "⚡3중 약세" : "복합 약세"}</span>;
               return null;
             })()}
           </div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: isMobile ? "16px" : "18px", color: C.text1 }}>{fmtPrice(asset.price, asset.market)}</div>
-          <div style={{ fontSize: isMobile ? "15px" : "17px", fontWeight: 600, color: isPos ? C.green : C.red }}>
+          <div style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{fmtPrice(asset.price, asset.market)}</div>
+          <div style={{ fontSize: "17px", fontWeight: 600, color: isPos ? C.green : C.red }}>
             {isPos ? "▲" : "▼"} {Math.abs(asset.weekChange)}%
           </div>
           {/* 수급 미니 인디케이터 (CMF/MFI) */}
           <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end", marginTop: "3px" }}>
             {asset.cmf != null && (Math.abs(asset.cmf) > 0.05) && (
               <span title={`CMF: ${asset.cmf > 0 ? "+" : ""}${asset.cmf.toFixed(3)}`} style={{
-                fontSize: isMobile ? "12px" : "14px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px",
+                fontSize: "14px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px",
                 background: asset.cmf > 0.1 ? `${C.green}22` : asset.cmf < -0.1 ? `${C.red}22` : `${C.yellow}18`,
                 color: asset.cmf > 0.1 ? C.green : asset.cmf < -0.1 ? C.red : C.yellow,
               }}>{asset.cmf > 0 ? "매집" : "분산"}</span>
             )}
             {asset.mfi != null && (asset.mfi < 25 || asset.mfi > 75) && (
               <span title={`MFI: ${asset.mfi}`} style={{
-                fontSize: isMobile ? "12px" : "14px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px",
+                fontSize: "14px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px",
                 background: asset.mfi < 20 ? `${C.purple}22` : asset.mfi < 25 ? `${C.green}18` : asset.mfi > 80 ? `${C.red}22` : `${C.yellow}18`,
                 color: asset.mfi < 20 ? C.purple : asset.mfi < 25 ? C.green : asset.mfi > 80 ? C.red : C.yellow,
               }}>{asset.mfi < 25 ? "수급▲" : "수급▼"}</span>
@@ -2650,13 +2650,13 @@ function AssetCard({ asset, onChart }) {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
-                    <span style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: C.text3 }}>🩺 투자진단</span>
+                    <span style={{ fontSize: "16px", fontWeight: 700, color: C.text3 }}>🩺 투자진단</span>
                     <span style={{
-                      fontSize: isMobile ? "14px" : "16px", fontWeight: 700,
+                      fontSize: "16px", fontWeight: 700,
                       color: diag.score >= 70 ? C.green : diag.score >= 40 ? C.yellow : C.red,
                     }}>{diag.verdict}</span>
                     <span style={{
-                      fontSize: isMobile ? "13px" : "15px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px",
+                      fontSize: "15px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px",
                       background: diag.opinionColor === "green" ? `${C.green}18` : diag.opinionColor === "red" ? `${C.red}18` : `${C.yellow}18`,
                       color: diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow,
                     }}>{diag.opinion}</span>
@@ -2665,7 +2665,7 @@ function AssetCard({ asset, onChart }) {
                   <div style={{ display: "grid", gridTemplateColumns: diag.categories.length > 5 ? "1fr 1fr 1fr" : "1fr 1fr", gap: "4px" }}>
                     {diag.categories.map(cat => (
                       <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, width: "36px" }}>{cat.name}</span>
+                        <span style={{ fontSize: "14px", color: C.text3, width: "36px" }}>{cat.name}</span>
                         <div style={{ flex: 1, height: "4px", background: C.border, borderRadius: "2px", overflow: "hidden" }}>
                           <div style={{
                             height: "100%", borderRadius: "2px",
@@ -2674,7 +2674,7 @@ function AssetCard({ asset, onChart }) {
                             transition: "width 0.4s ease",
                           }} />
                         </div>
-                        <span style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 700, color: C.text3, width: "18px", textAlign: "right" }}>{cat.score}</span>
+                        <span style={{ fontSize: "14px", fontWeight: 700, color: C.text3, width: "18px", textAlign: "right" }}>{cat.score}</span>
                       </div>
                     ))}
                   </div>
@@ -2685,7 +2685,7 @@ function AssetCard({ asset, onChart }) {
                 <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
                   {diag.signals.slice(0, 5).map((sig, i) => (
                     <span key={i} style={{
-                      fontSize: isMobile ? "12px" : "14px", fontWeight: 600, padding: "3px 7px", borderRadius: "5px",
+                      fontSize: "14px", fontWeight: 600, padding: "3px 7px", borderRadius: "5px",
                       background: sig.type === "bullish" ? `${C.green}18` : sig.type === "bearish" ? `${C.red}18` : `${C.yellow}18`,
                       color: sig.type === "bullish" ? C.green : sig.type === "bearish" ? C.red : C.yellow,
                     }}>{sig.type === "bullish" ? "▲" : sig.type === "bearish" ? "▼" : "●"} {sig.name}</span>
@@ -2701,10 +2701,10 @@ function AssetCard({ asset, onChart }) {
               background: C.bg, borderRadius: "10px", border: `1px solid ${C.border}`,
               alignItems: "center", flexWrap: "wrap",
             }}>
-              <span style={{ fontSize: isMobile ? "13px" : "15px", fontWeight: 700, color: C.text3, whiteSpace: "nowrap" }}>💧 수급</span>
+              <span style={{ fontSize: "15px", fontWeight: 700, color: C.text3, whiteSpace: "nowrap" }}>💧 수급</span>
               {asset.cmf != null && (
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: "1 1 120px", minWidth: "120px" }}>
-                  <span style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, width: "26px" }}>CMF</span>
+                  <span style={{ fontSize: "14px", color: C.text3, width: "26px" }}>CMF</span>
                   <div style={{ flex: 1, height: "6px", background: C.border, borderRadius: "3px", overflow: "hidden", position: "relative" }}>
                     <div style={{ position: "absolute", left: "50%", top: 0, width: "1px", height: "100%", background: C.text3 + "44" }} />
                     <div style={{
@@ -2715,14 +2715,14 @@ function AssetCard({ asset, onChart }) {
                       transition: "all 0.4s ease",
                     }} />
                   </div>
-                  <span style={{ fontSize: isMobile ? "13px" : "15px", fontWeight: 700, color: asset.cmf > 0.1 ? C.green : asset.cmf < -0.1 ? C.red : C.text2, width: "40px", textAlign: "right" }}>
+                  <span style={{ fontSize: "15px", fontWeight: 700, color: asset.cmf > 0.1 ? C.green : asset.cmf < -0.1 ? C.red : C.text2, width: "40px", textAlign: "right" }}>
                     {asset.cmf > 0 ? "+" : ""}{asset.cmf.toFixed(3)}
                   </span>
                 </div>
               )}
               {asset.mfi != null && (
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: "1 1 120px", minWidth: "120px" }}>
-                  <span style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, width: "26px" }}>MFI</span>
+                  <span style={{ fontSize: "14px", color: C.text3, width: "26px" }}>MFI</span>
                   <div style={{ flex: 1, height: "6px", background: C.border, borderRadius: "3px", overflow: "hidden" }}>
                     <div style={{
                       height: "100%", borderRadius: "3px",
@@ -2731,7 +2731,7 @@ function AssetCard({ asset, onChart }) {
                       transition: "width 0.4s ease",
                     }} />
                   </div>
-                  <span style={{ fontSize: isMobile ? "13px" : "15px", fontWeight: 700, color: asset.mfi < 20 ? C.purple : asset.mfi > 80 ? C.red : C.text2, width: "28px", textAlign: "right" }}>
+                  <span style={{ fontSize: "15px", fontWeight: 700, color: asset.mfi < 20 ? C.purple : asset.mfi > 80 ? C.red : C.text2, width: "28px", textAlign: "right" }}>
                     {asset.mfi}
                   </span>
                 </div>
@@ -2739,35 +2739,35 @@ function AssetCard({ asset, onChart }) {
               {/* 다이버전스 방향 뱃지 */}
               {asset.macdDivType && (
                 <span style={{
-                  fontSize: isMobile ? "12px" : "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                  fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
                   background: asset.macdDivType === "bullish" ? `${C.green}22` : `${C.red}22`,
                   color: asset.macdDivType === "bullish" ? C.green : C.red,
                 }}>{asset.macdDivType === "bullish" ? "📈 MACD 상승전환" : "📉 MACD 하락전환"}</span>
               )}
               {asset.rsiDivType && (
                 <span style={{
-                  fontSize: isMobile ? "12px" : "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                  fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
                   background: asset.rsiDivType === "bullish" ? `${C.green}22` : `${C.red}22`,
                   color: asset.rsiDivType === "bullish" ? C.green : C.red,
                 }}>{asset.rsiDivType === "bullish" ? "📈 RSI 상승전환" : "📉 RSI 하락전환"}</span>
               )}
               {asset.obvDivType && (
                 <span style={{
-                  fontSize: isMobile ? "12px" : "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                  fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
                   background: asset.obvDivType === "bullish" ? `${C.green}22` : `${C.red}22`,
                   color: asset.obvDivType === "bullish" ? C.green : C.red,
                 }}>{asset.obvDivType === "bullish" ? "📊 OBV 매집" : "📊 OBV 분산"}</span>
               )}
               {asset.adx != null && asset.adx >= 25 && (
                 <span style={{
-                  fontSize: isMobile ? "12px" : "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                  fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
                   background: asset.plusDI > asset.minusDI ? `${C.green}22` : `${C.red}22`,
                   color: asset.plusDI > asset.minusDI ? C.green : C.red,
                 }}>{asset.plusDI > asset.minusDI ? "🔼" : "🔽"} ADX {asset.adx} ({asset.plusDI > asset.minusDI ? "매수세" : "매도세"})</span>
               )}
               {asset.bbSqueeze && (
                 <span style={{
-                  fontSize: isMobile ? "12px" : "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                  fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
                   background: `${C.yellow}22`, color: C.yellow,
                 }}>⚡ TTM Squeeze ON</span>
               )}
@@ -2795,15 +2795,15 @@ function AssetCard({ asset, onChart }) {
                 sub: asset.bbSqueeze ? "변동성 폭발 임박" : "정상 상태" },
             ].map(({ label, value, color, sub }) => (
               <div key={label} style={{ background: C.bg, borderRadius: "10px", padding: "10px 12px" }}>
-                <div style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, marginBottom: "4px" }}>{label}</div>
-                <div style={{ fontWeight: 700, fontSize: isMobile ? "16px" : "18px", color: color || C.text1 }}>{value}</div>
-                {sub && <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginTop: "2px" }}>{sub}</div>}
+                <div style={{ fontSize: "15px", color: C.text3, marginBottom: "4px" }}>{label}</div>
+                <div style={{ fontWeight: 700, fontSize: "18px", color: color || C.text1 }}>{value}</div>
+                {sub && <div style={{ fontSize: "14px", color: C.text3, marginTop: "2px" }}>{sub}</div>}
               </div>
             ))}
           </div>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             <button onClick={(e) => { e.stopPropagation(); onChart(); }} style={{
-              padding: "10px 20px", borderRadius: "10px", fontSize: isMobile ? "15px" : "17px", fontWeight: 600, minHeight: "44px",
+              padding: "10px 20px", borderRadius: "10px", fontSize: "17px", fontWeight: 600, minHeight: "44px",
               background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}44`, cursor: "pointer",
               transition: "background 0.15s ease",
             }}>📈 차트 보기</button>
@@ -2812,7 +2812,7 @@ function AssetCard({ asset, onChart }) {
                 : `https://finance.yahoo.com/quote/${asset.symbolRaw || asset.symbol}`}
               target="_blank" rel="noopener" onClick={e => e.stopPropagation()}
               style={{
-                padding: "10px 20px", borderRadius: "10px", fontSize: isMobile ? "15px" : "17px", fontWeight: 600, minHeight: "44px",
+                padding: "10px 20px", borderRadius: "10px", fontSize: "17px", fontWeight: 600, minHeight: "44px",
                 background: C.card, color: C.text3, border: `1px solid ${C.border2}`, textDecoration: "none",
                 display: "inline-flex", alignItems: "center",
               }}>🔗 상세 정보</a>
@@ -3238,21 +3238,21 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             <div style={{
               width: "44px", height: "44px", borderRadius: "12px", background: mcBg,
               display: "flex", alignItems: "center", justifyContent: "center",
-              fontWeight: 800, fontSize: isMobile ? "14px" : "16px", color: mcColor, flexShrink: 0,
+              fontWeight: 800, fontSize: "16px", color: mcColor, flexShrink: 0,
             }}>
               {asset.symbol.replace(".KS","").slice(0, 4)}
             </div>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ fontWeight: 700, fontSize: isMobile ? "15px" : "17px", color: C.text1 }}>{asset.name}</span>
-                <span style={{ fontSize: isMobile ? "14px" : "16px" }}>{flag}</span>
+                <span style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>{asset.name}</span>
+                <span style={{ fontSize: "16px" }}>{flag}</span>
               </div>
-              <div style={{ fontSize: isMobile ? "14px" : "16px", color: C.text3 }}>{asset.symbol.replace(".KS","")}</div>
+              <div style={{ fontSize: "16px", color: C.text3 }}>{asset.symbol.replace(".KS","")}</div>
             </div>
           </div>
           <button onClick={onClose} style={{
             width: "32px", height: "32px", borderRadius: "50%", border: "none",
-            background: C.card2, color: C.text3, fontSize: isMobile ? "16px" : "18px", cursor: "pointer",
+            background: C.card2, color: C.text3, fontSize: "18px", cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>✕</button>
         </div>
@@ -3265,14 +3265,14 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             </div>
             {(change != null || techData?.weekChange != null) && (
               <span style={{
-                fontSize: isMobile ? "15px" : "17px", fontWeight: 600,
+                fontSize: "17px", fontWeight: 600,
                 color: (techData?.weekChange ?? change ?? 0) >= 0 ? C.green : C.red,
               }}>
                 {(techData?.weekChange ?? change ?? 0) >= 0 ? "▲" : "▼"} {Math.abs(techData?.weekChange ?? change ?? 0).toFixed(2)}%
               </span>
             )}
             {ext && (ext.price) && (
-              <div style={{ marginTop: "6px", fontSize: isMobile ? "14px" : "16px", color: C.text3, display: "flex", alignItems: "center", gap: "6px" }}>
+              <div style={{ marginTop: "6px", fontSize: "16px", color: C.text3, display: "flex", alignItems: "center", gap: "6px" }}>
                 <span style={{ background: C.card2, padding: "2px 6px", borderRadius: "4px" }}>
                   {ext.isPreMarket ? "프리" : "애프터"} ${Number(ext.price).toFixed(2)}
                   {ext.change != null && (
@@ -3294,7 +3294,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               border: `1px solid ${C.border}`,
             }}>
               <div style={{ fontSize: "20px", marginBottom: "8px", animation: "spin 1s linear infinite" }}>⏳</div>
-              <div style={{ fontSize: isMobile ? "14px" : "16px", color: C.text3 }}>기술적 지표 분석 중...</div>
+              <div style={{ fontSize: "16px", color: C.text3 }}>기술적 지표 분석 중...</div>
             </div>
           ) : (
             <div style={{
@@ -3318,9 +3318,9 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                    <span style={{ fontSize: isMobile ? "15px" : "17px", fontWeight: 700, color: C.text3 }}>🩺 투자진단</span>
+                    <span style={{ fontSize: "17px", fontWeight: 700, color: C.text3 }}>🩺 투자진단</span>
                     <span style={{
-                      fontSize: isMobile ? "16px" : "18px", fontWeight: 800,
+                      fontSize: "18px", fontWeight: 800,
                       color: diag.score >= 70 ? C.green : diag.score >= 40 ? C.yellow : C.red,
                     }}>{diag.verdict}</span>
                   </div>
@@ -3331,17 +3331,17 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                     background: diag.opinionColor === "green" ? `${C.green}12` : diag.opinionColor === "red" ? `${C.red}12` : `${C.yellow}12`,
                   }}>
                     <span style={{
-                      fontSize: isMobile ? "15px" : "17px", fontWeight: 800,
+                      fontSize: "17px", fontWeight: 800,
                       color: diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow,
                     }}>
                       {diag.opinion === "매수" ? "🟢" : diag.opinion === "매도" ? "🔴" : diag.opinion === "중립" ? "🟡" : diag.opinionColor === "green" ? "🟢" : "🔴"} {diag.opinion}
                     </span>
-                    <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3 }}>{diag.rationale}</span>
+                    <span style={{ fontSize: "15px", color: C.text3 }}>{diag.rationale}</span>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: diag.categories.length > 5 ? "1fr 1fr 1fr" : "1fr 1fr", gap: "5px" }}>
                     {diag.categories.map(cat => (
                       <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, width: "36px" }}>{cat.name}</span>
+                        <span style={{ fontSize: "15px", color: C.text3, width: "36px" }}>{cat.name}</span>
                         <div style={{ flex: 1, height: "5px", background: C.border, borderRadius: "3px", overflow: "hidden" }}>
                           <div style={{
                             height: "100%", borderRadius: "3px",
@@ -3350,7 +3350,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                             transition: "width 0.4s ease",
                           }} />
                         </div>
-                        <span style={{ fontSize: isMobile ? "13px" : "15px", fontWeight: 700, color: C.text3, width: "20px", textAlign: "right" }}>{cat.score}</span>
+                        <span style={{ fontSize: "15px", fontWeight: 700, color: C.text3, width: "20px", textAlign: "right" }}>{cat.score}</span>
                       </div>
                     ))}
                   </div>
@@ -3360,7 +3360,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
                   {diag.signals.map((sig, i) => (
                     <span key={i} style={{
-                      fontSize: isMobile ? "13px" : "15px", fontWeight: 600, padding: "4px 8px", borderRadius: "6px",
+                      fontSize: "15px", fontWeight: 600, padding: "4px 8px", borderRadius: "6px",
                       background: sig.type === "bullish" ? `${C.green}18` : sig.type === "bearish" ? `${C.red}18` : `${C.yellow}18`,
                       color: sig.type === "bullish" ? C.green : sig.type === "bearish" ? C.red : C.yellow,
                     }}>{sig.type === "bullish" ? "▲" : sig.type === "bearish" ? "▼" : "●"} {sig.name}</span>
@@ -3372,8 +3372,8 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               {buyLevels.levels.length > 0 && (
                 <div style={{ marginTop: "12px", padding: "14px", borderRadius: "14px", background: `${C.blueBg}60`, border: `1px solid ${C.blue}20` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                    <span style={{ fontSize: isMobile ? "15px" : "17px", fontWeight: 700, color: C.text1 }}>🎯 매수 추천가</span>
-                    <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3 }}>{buyLevels.summary}</span>
+                    <span style={{ fontSize: "17px", fontWeight: 700, color: C.text1 }}>🎯 매수 추천가</span>
+                    <span style={{ fontSize: "15px", color: C.text3 }}>{buyLevels.summary}</span>
                   </div>
                   <div style={{ display: "flex", gap: "8px" }}>
                     {buyLevels.levels.map((lv, li) => {
@@ -3385,17 +3385,17 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                           background: `${lvColors[li]}12`, textAlign: "center",
                           border: `1px solid ${lvColors[li]}20`,
                         }}>
-                          <div style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: lvColors[li], marginBottom: "4px" }}>{lvIcons[li]} {lv.label}</div>
-                          <div style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 800, color: C.text1 }}>
+                          <div style={{ fontSize: "16px", fontWeight: 700, color: lvColors[li], marginBottom: "4px" }}>{lvIcons[li]} {lv.label}</div>
+                          <div style={{ fontSize: "18px", fontWeight: 800, color: C.text1 }}>
                             {asset.market === "kr" ? `₩${Math.round(lv.price).toLocaleString()}` : `$${lv.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
                           </div>
-                          <div style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: C.red, marginTop: "2px" }}>-{lv.discount}%</div>
-                          <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginTop: "4px", lineHeight: 1.3 }}>{lv.rationale}</div>
+                          <div style={{ fontSize: "16px", fontWeight: 700, color: C.red, marginTop: "2px" }}>-{lv.discount}%</div>
+                          <div style={{ fontSize: "14px", color: C.text3, marginTop: "4px", lineHeight: 1.3 }}>{lv.rationale}</div>
                           <div style={{ marginTop: "4px" }}>
                             <div style={{ height: "3px", borderRadius: "2px", background: `${C.border}40`, overflow: "hidden" }}>
                               <div style={{ height: "100%", width: `${lv.confidence}%`, background: lvColors[li], borderRadius: "2px" }} />
                             </div>
-                            <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginTop: "2px" }}>신뢰도 {lv.confidence}%</div>
+                            <div style={{ fontSize: "14px", color: C.text3, marginTop: "2px" }}>신뢰도 {lv.confidence}%</div>
                           </div>
                         </div>
                       );
@@ -3432,8 +3432,8 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           <div style={{ padding: "0 20px 12px" }}>
             {/* ── 섹션 헤더 ── */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-              <span style={{ fontSize: isMobile ? "15px" : "17px", fontWeight: 800, color: C.text1 }}>기업 정보</span>
-              <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, background: C.card2, padding: "2px 8px", borderRadius: "4px" }}>
+              <span style={{ fontSize: "17px", fontWeight: 800, color: C.text1 }}>기업 정보</span>
+              <span style={{ fontSize: "15px", color: C.text3, background: C.card2, padding: "2px 8px", borderRadius: "4px" }}>
                 {fd?.fiscal_date || (fd ? "Financial Datasets" : "Yahoo Finance")}
               </span>
             </div>
@@ -3447,7 +3447,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             {/* ── 1. 실적 요약 (Financial Datasets만) ── */}
             {fd && fd.revenue != null && (
               <div style={{ background: C.card, borderRadius: "14px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>실적 요약</div>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>실적 요약</div>
                 {/* 매출/영업이익/순이익 */}
                 <div style={{ display: "flex", gap: "0", marginBottom: "12px" }}>
                   {[
@@ -3459,12 +3459,12 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                       flex: 1, textAlign: "center", position: "relative",
                       ...(idx < 2 ? { borderRight: `1px solid ${C.border}` } : {}),
                     }}>
-                      <div style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, marginBottom: "4px" }}>{item.label}</div>
-                      <div style={{ fontSize: isMobile ? "15px" : "17px", fontWeight: 800, color: item.value > 0 ? C.text1 : item.value < 0 ? C.red : C.text3 }}>
+                      <div style={{ fontSize: "15px", color: C.text3, marginBottom: "4px" }}>{item.label}</div>
+                      <div style={{ fontSize: "17px", fontWeight: 800, color: item.value > 0 ? C.text1 : item.value < 0 ? C.red : C.text3 }}>
                         {fmtMoney(item.value)}
                       </div>
                       {item.growth != null && (
-                        <div style={{ fontSize: isMobile ? "13px" : "15px", fontWeight: 700, color: growthColor(item.growth), marginTop: "2px" }}>
+                        <div style={{ fontSize: "15px", fontWeight: 700, color: growthColor(item.growth), marginTop: "2px" }}>
                           YoY {fmtGrowth(item.growth)}
                         </div>
                       )}
@@ -3481,14 +3481,14 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                       { label: "순이익률", value: fd.netMargin, color: fd.netMargin >= 0 ? C.purple : C.red },
                     ].filter(m => m.value != null).map(m => (
                       <div key={m.label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, width: "64px", flexShrink: 0 }}>{m.label}</span>
+                        <span style={{ fontSize: "15px", color: C.text3, width: "64px", flexShrink: 0 }}>{m.label}</span>
                         <div style={{ flex: 1, height: "6px", background: `${C.border}60`, borderRadius: "3px", overflow: "hidden" }}>
                           <div style={{
                             height: "100%", borderRadius: "3px", transition: "width 0.5s ease",
                             width: `${Math.min(Math.max(m.value, 0), 100)}%`, background: m.color,
                           }} />
                         </div>
-                        <span style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: m.value >= 0 ? C.text1 : C.red, width: "36px", textAlign: "right" }}>
+                        <span style={{ fontSize: "16px", fontWeight: 700, color: m.value >= 0 ? C.text1 : C.red, width: "36px", textAlign: "right" }}>
                           {m.value}%
                         </span>
                       </div>
@@ -3508,8 +3508,8 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                         flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "8px",
                         background: g.value > 0 ? `${C.green}10` : g.value < 0 ? `${C.red}10` : C.card2,
                       }}>
-                        <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3 }}>{g.label}</div>
-                        <div style={{ fontSize: isMobile ? "15px" : "17px", fontWeight: 800, color: growthColor(g.value) }}>{fmtGrowth(g.value)}</div>
+                        <div style={{ fontSize: "14px", color: C.text3 }}>{g.label}</div>
+                        <div style={{ fontSize: "17px", fontWeight: 800, color: growthColor(g.value) }}>{fmtGrowth(g.value)}</div>
                       </div>
                     ))}
                   </div>
@@ -3523,7 +3523,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                   const maxNI = Math.max(...qr.filter(q => q.netIncome).map(q => Math.abs(q.netIncome)), 1);
                   return (
                     <div style={{ marginTop: "12px" }}>
-                      <div style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, marginBottom: "8px" }}>분기별 추이</div>
+                      <div style={{ fontSize: "15px", color: C.text3, marginBottom: "8px" }}>분기별 추이</div>
                       <div style={{ display: "flex", gap: "6px", alignItems: "flex-end", height: "60px" }}>
                         {qr.map((q, i) => {
                           const revPct = maxRev > 0 ? Math.abs(q.revenue) / maxRev : 0;
@@ -3544,10 +3544,10 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                                   }} />
                                 )}
                               </div>
-                              <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginTop: "4px", lineHeight: 1.2 }}>
+                              <div style={{ fontSize: "14px", color: C.text3, marginTop: "4px", lineHeight: 1.2 }}>
                                 {(q.period || "").slice(2, 4)}/{(q.period || "").slice(5, 7)}
                               </div>
-                              <div style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 700, color: growthColor(growth), marginTop: "1px" }}>
+                              <div style={{ fontSize: "14px", fontWeight: 700, color: growthColor(growth), marginTop: "1px" }}>
                                 {i > 0 ? `${growth > 0 ? "+" : ""}${growth.toFixed(0)}%` : ""}
                               </div>
                             </div>
@@ -3567,7 +3567,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             {/* ── 2. 밸류에이션 ── */}
             {(per != null || pbr != null || psr != null || evEbitda != null) && (
               <div style={{ background: C.card, borderRadius: "14px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>밸류에이션</div>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>밸류에이션</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0" }}>
                   {[
                     { label: "PER", value: per, desc: per ? (per < 15 ? "저평가" : per < 25 ? "적정" : per < 40 ? "고평가" : "매우 고평가") : null,
@@ -3582,12 +3582,12 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                       borderBottom: idx < 2 ? `1px solid ${C.border}40` : "none",
                       borderRight: idx % 2 === 0 ? `1px solid ${C.border}40` : "none",
                     }}>
-                      <div style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, marginBottom: "2px" }}>{item.label}</div>
+                      <div style={{ fontSize: "15px", color: C.text3, marginBottom: "2px" }}>{item.label}</div>
                       <div style={{ display: "flex", alignItems: "baseline", gap: "4px" }}>
-                        <span style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 800, color: item.color }}>
+                        <span style={{ fontSize: "18px", fontWeight: 800, color: item.color }}>
                           {typeof item.value === "number" ? item.value.toFixed(1) : item.value}
                         </span>
-                        {item.desc && <span style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 600, color: item.color, opacity: 0.8 }}>{item.desc}</span>}
+                        {item.desc && <span style={{ fontSize: "14px", fontWeight: 600, color: item.color, opacity: 0.8 }}>{item.desc}</span>}
                       </div>
                     </div>
                   ))}
@@ -3601,8 +3601,8 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                     { label: "베타", value: beta, fmt: v => v.toFixed(2) },
                   ].filter(v => v.value != null).map(item => (
                     <div key={item.label} style={{ flex: 1, textAlign: "center" }}>
-                      <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3 }}>{item.label}</div>
-                      <div style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: C.text1 }}>{item.fmt(item.value)}</div>
+                      <div style={{ fontSize: "14px", color: C.text3 }}>{item.label}</div>
+                      <div style={{ fontSize: "16px", fontWeight: 700, color: C.text1 }}>{item.fmt(item.value)}</div>
                     </div>
                   ))}
                 </div>
@@ -3612,7 +3612,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             {/* ── 3. 수익성 & 재무 건전성 ── */}
             {(roe != null || roa != null || dte != null || cr != null) && (
               <div style={{ background: C.card, borderRadius: "14px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>수익성 & 재무건전성</div>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>수익성 & 재무건전성</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   {[
                     { label: "ROE", value: roe, scale: 100, suffix: "%", good: v => v > 15, bad: v => v < 0, barMax: 40, barColor: C.green },
@@ -3627,11 +3627,11 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                       : (m.good(displayVal) ? C.green : m.bad(displayVal) ? C.red : m.barColor);
                     return (
                       <div key={m.label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: isMobile ? "14px" : "16px", color: C.text3, width: "52px", flexShrink: 0 }}>{m.label}</span>
+                        <span style={{ fontSize: "16px", color: C.text3, width: "52px", flexShrink: 0 }}>{m.label}</span>
                         <div style={{ flex: 1, height: "8px", background: `${C.border}40`, borderRadius: "4px", overflow: "hidden" }}>
                           <div style={{ height: "100%", borderRadius: "4px", width: `${barPct}%`, background: color, transition: "width 0.5s ease" }} />
                         </div>
-                        <span style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 800, color, width: "48px", textAlign: "right" }}>
+                        <span style={{ fontSize: "16px", fontWeight: 800, color, width: "48px", textAlign: "right" }}>
                           {displayVal.toFixed(1)}{m.suffix}
                         </span>
                       </div>
@@ -3665,21 +3665,21 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               return (
               <div style={{ background: C.card, borderRadius: "14px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                  <span style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: C.text3 }}>애널리스트 컨센서스</span>
-                  {cnt > 0 && <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, background: C.card2, padding: "2px 6px", borderRadius: "4px" }}>{cnt}명</span>}
+                  <span style={{ fontSize: "16px", fontWeight: 700, color: C.text3 }}>애널리스트 컨센서스</span>
+                  {cnt > 0 && <span style={{ fontSize: "15px", color: C.text3, background: C.card2, padding: "2px 6px", borderRadius: "4px" }}>{cnt}명</span>}
                 </div>
 
                 {/* 투자의견 배지 */}
                 {rec && (
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
                     <span style={{
-                      fontSize: isMobile ? "15px" : "17px", fontWeight: 800, padding: "4px 12px", borderRadius: "8px",
+                      fontSize: "17px", fontWeight: 800, padding: "4px 12px", borderRadius: "8px",
                       background: `${recColors[rec] || C.yellow}18`, color: recColors[rec] || C.yellow,
                     }}>
                       {recLabels[rec] || rec}
                     </span>
                     {recScore && (
-                      <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3 }}>
+                      <span style={{ fontSize: "15px", color: C.text3 }}>
                         점수 {recScore.toFixed(1)}/5
                       </span>
                     )}
@@ -3698,12 +3698,12 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                         flex: 1, textAlign: "center",
                         ...(idx < 2 ? { borderRight: `1px solid ${C.border}40` } : {}),
                       }}>
-                        <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3 }}>{item.label}</div>
+                        <div style={{ fontSize: "14px", color: C.text3 }}>{item.label}</div>
                         <div style={{ fontSize: item.main ? "17px" : "13px", fontWeight: 800, color: item.main ? (upside > 0 ? C.green : C.red) : C.text2 }}>
                           ${item.value.toFixed(2)}
                         </div>
                         {item.main && upside != null && (
-                          <div style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: upside > 0 ? C.green : C.red, marginTop: "1px" }}>
+                          <div style={{ fontSize: "16px", fontWeight: 700, color: upside > 0 ? C.green : C.red, marginTop: "1px" }}>
                             {upside > 0 ? "▲" : "▼"} {Math.abs(upside)}%
                           </div>
                         )}
@@ -3732,7 +3732,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                       position: "absolute", top: "6px", left: `${Math.min(Math.max(curPct, 2), 98)}%`, transform: "translateX(-50%)",
                       display: "flex", flexDirection: "column", alignItems: "center",
                     }}>
-                      <div style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 700, color: C.text2, whiteSpace: "nowrap" }}>현재</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700, color: C.text2, whiteSpace: "nowrap" }}>현재</div>
                       <div style={{ width: "3px", height: "16px", background: C.text1, borderRadius: "2px" }} />
                     </div>
                     {/* 목표가 마커 */}
@@ -3741,7 +3741,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                         position: "absolute", top: "6px", left: `${Math.min(Math.max(tgtPct, 2), 98)}%`, transform: "translateX(-50%)",
                         display: "flex", flexDirection: "column", alignItems: "center",
                       }}>
-                        <div style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 700, color: C.blue, whiteSpace: "nowrap" }}>목표</div>
+                        <div style={{ fontSize: "14px", fontWeight: 700, color: C.blue, whiteSpace: "nowrap" }}>목표</div>
                         <div style={{ width: "3px", height: "16px", background: C.blue, borderRadius: "2px" }} />
                       </div>
                     )}
@@ -3751,8 +3751,8 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 {/* Financial Datasets 추가 정보 */}
                 {fd?.estRevenue && (
                   <div style={{ display: "flex", gap: "12px", paddingTop: "8px", borderTop: `1px solid ${C.border}40` }}>
-                    {fd.estRevenue && <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3 }}>예상매출 <span style={{ fontWeight: 700, color: C.text1 }}>{fmtMoney(fd.estRevenue)}</span></span>}
-                    {fd.estEps && <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3 }}>예상EPS <span style={{ fontWeight: 700, color: C.text1 }}>${fd.estEps.toFixed(2)}</span></span>}
+                    {fd.estRevenue && <span style={{ fontSize: "15px", color: C.text3 }}>예상매출 <span style={{ fontWeight: 700, color: C.text1 }}>{fmtMoney(fd.estRevenue)}</span></span>}
+                    {fd.estEps && <span style={{ fontSize: "15px", color: C.text3 }}>예상EPS <span style={{ fontWeight: 700, color: C.text1 }}>${fd.estEps.toFixed(2)}</span></span>}
                   </div>
                 )}
               </div>
@@ -3767,23 +3767,23 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               const models = techData.models || [];
               return (
               <div style={{ background: C.card, borderRadius: "14px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>적정주가 분석</div>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>적정주가 분석</div>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px" }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3 }}>종합 적정주가</div>
+                    <div style={{ fontSize: "15px", color: C.text3 }}>종합 적정주가</div>
                     <div style={{ fontSize: "20px", fontWeight: 800, color: C.text1 }}>${fv.toFixed(2)}</div>
                   </div>
                   <div style={{
                     padding: "6px 14px", borderRadius: "10px", textAlign: "center",
                     background: fp > 10 ? `${C.red}15` : fp > 5 ? `${C.yellow}15` : fp < -10 ? `${C.green}15` : fp < -5 ? `${C.green}10` : `${C.text3}10`,
                   }}>
-                    <div style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3 }}>현재가 괴리</div>
+                    <div style={{ fontSize: "15px", color: C.text3 }}>현재가 괴리</div>
                     <div style={{
-                      fontSize: isMobile ? "16px" : "18px", fontWeight: 800,
+                      fontSize: "18px", fontWeight: 800,
                       color: fp > 5 ? C.red : fp < -5 ? C.green : C.yellow,
                     }}>{fp > 0 ? "+" : ""}{fp}%</div>
                     <div style={{
-                      fontSize: isMobile ? "12px" : "14px", fontWeight: 700,
+                      fontSize: "14px", fontWeight: 700,
                       color: fp > 5 ? C.red : fp < -5 ? C.green : C.yellow,
                     }}>
                       {fp > 15 ? "매우 고평가" : fp > 10 ? "고평가" : fp > 5 ? "약간 고평가" : fp < -15 ? "매우 저평가" : fp < -10 ? "저평가" : fp < -5 ? "약간 저평가" : "적정 범위"}
@@ -3796,7 +3796,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                     {models.map(m => {
                       const diff = curP ? ((curP - m.value) / m.value * 100) : 0;
                       return (
-                        <div key={m.name} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: isMobile ? "13px" : "15px" }}>
+                        <div key={m.name} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "15px" }}>
                           <span style={{ width: "14px" }}>{m.icon}</span>
                           <span style={{ color: C.text3, flex: 1 }}>{m.name}</span>
                           <span style={{ fontWeight: 700, color: C.text1 }}>${m.value.toFixed(2)}</span>
@@ -3814,7 +3814,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             })()}
 
             {/* 데이터 출처 */}
-            <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, textAlign: "right", opacity: 0.5, marginTop: "2px" }}>
+            <div style={{ fontSize: "14px", color: C.text3, textAlign: "right", opacity: 0.5, marginTop: "2px" }}>
               via {fd ? "Financial Datasets API" : "Yahoo Finance"}
               {techData?.earningsDate && ` · 다음 실적 ${new Date(techData.earningsDate * 1000).toLocaleDateString("ko-KR")}`}
             </div>
@@ -3850,19 +3850,19 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: C.text3 }}>🎯 퀀트 전략</span>
+                    <span style={{ fontSize: "16px", fontWeight: 700, color: C.text3 }}>🎯 퀀트 전략</span>
                     <span style={{
-                      fontSize: isMobile ? "13px" : "15px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px",
+                      fontSize: "15px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px",
                       background: diag.opinionColor === "green" ? `${C.green}18` : diag.opinionColor === "red" ? `${C.red}18` : `${C.yellow}18`,
                       color: diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow,
                     }}>{diag.opinion}</span>
                   </div>
-                  {freshMin != null && <span style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3 }}>{freshMin < 1 ? "방금" : `${freshMin}분 전`} 분석</span>}
+                  {freshMin != null && <span style={{ fontSize: "14px", color: C.text3 }}>{freshMin < 1 ? "방금" : `${freshMin}분 전`} 분석</span>}
                 </div>
 
                 {/* 전략 요약 */}
                 <div style={{
-                  fontSize: isMobile ? "14px" : "16px", color: C.text2, lineHeight: 1.7, marginBottom: "14px",
+                  fontSize: "16px", color: C.text2, lineHeight: 1.7, marginBottom: "14px",
                   padding: "10px 12px", borderRadius: "10px", background: C.card,
                   borderLeft: `3px solid ${diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow}`,
                 }}>
@@ -3878,40 +3878,40 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 {/* 목표가 + 손절가 (근거 표시) */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "8px" }}>
                   <div style={{ background: C.card, borderRadius: "8px", padding: "10px" }}>
-                    <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginBottom: "3px" }}>목표가</div>
-                    <div style={{ fontSize: isMobile ? "15px" : "17px", fontWeight: 800, color: C.green }}>{fmtP(targetPrice || techData.analystTarget)}</div>
-                    {upside && <div style={{ fontSize: isMobile ? "13px" : "15px", color: C.green, marginTop: "2px" }}>+{upside}%</div>}
-                    {lv?.targetSources && <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginTop: "4px", lineHeight: 1.4 }}>{lv.targetSources.slice(0, 3).join(" · ")}</div>}
+                    <div style={{ fontSize: "14px", color: C.text3, marginBottom: "3px" }}>목표가</div>
+                    <div style={{ fontSize: "17px", fontWeight: 800, color: C.green }}>{fmtP(targetPrice || techData.analystTarget)}</div>
+                    {upside && <div style={{ fontSize: "15px", color: C.green, marginTop: "2px" }}>+{upside}%</div>}
+                    {lv?.targetSources && <div style={{ fontSize: "14px", color: C.text3, marginTop: "4px", lineHeight: 1.4 }}>{lv.targetSources.slice(0, 3).join(" · ")}</div>}
                   </div>
                   <div style={{ background: C.card, borderRadius: "8px", padding: "10px" }}>
-                    <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginBottom: "3px" }}>손절가</div>
-                    <div style={{ fontSize: isMobile ? "15px" : "17px", fontWeight: 800, color: C.red }}>{fmtP(stopLoss)}</div>
-                    {downside > 0 && <div style={{ fontSize: isMobile ? "13px" : "15px", color: C.red, marginTop: "2px" }}>-{downside}%</div>}
-                    {lv?.stopSources && <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginTop: "4px", lineHeight: 1.4 }}>{lv.stopSources.slice(0, 3).join(" · ")}</div>}
+                    <div style={{ fontSize: "14px", color: C.text3, marginBottom: "3px" }}>손절가</div>
+                    <div style={{ fontSize: "17px", fontWeight: 800, color: C.red }}>{fmtP(stopLoss)}</div>
+                    {downside > 0 && <div style={{ fontSize: "15px", color: C.red, marginTop: "2px" }}>-{downside}%</div>}
+                    {lv?.stopSources && <div style={{ fontSize: "14px", color: C.text3, marginTop: "4px", lineHeight: 1.4 }}>{lv.stopSources.slice(0, 3).join(" · ")}</div>}
                   </div>
                 </div>
 
                 {/* 지지선 + 저항선 (다중 레벨, 근거 표시) */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "10px" }}>
                   <div style={{ background: C.card, borderRadius: "8px", padding: "10px" }}>
-                    <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginBottom: "5px" }}>지지선</div>
+                    <div style={{ fontSize: "14px", color: C.text3, marginBottom: "5px" }}>지지선</div>
                     {sup1 ? (
                       <>
-                        <div style={{ fontSize: isMobile ? "15px" : "17px", fontWeight: 700, color: C.blue }}>{fmtP(sup1.price)}</div>
-                        <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginTop: "2px" }}>{sup1.sources.slice(0, 2).join(" · ")} <span style={{ color: C.blue }}>×{sup1.weight.toFixed(0)}</span></div>
-                        {sup2 && <div style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, marginTop: "4px" }}>2차: {fmtP(sup2.price)} <span style={{ fontSize: isMobile ? "12px" : "14px" }}>({sup2.sources[0]})</span></div>}
+                        <div style={{ fontSize: "17px", fontWeight: 700, color: C.blue }}>{fmtP(sup1.price)}</div>
+                        <div style={{ fontSize: "14px", color: C.text3, marginTop: "2px" }}>{sup1.sources.slice(0, 2).join(" · ")} <span style={{ color: C.blue }}>×{sup1.weight.toFixed(0)}</span></div>
+                        {sup2 && <div style={{ fontSize: "15px", color: C.text3, marginTop: "4px" }}>2차: {fmtP(sup2.price)} <span style={{ fontSize: "14px" }}>({sup2.sources[0]})</span></div>}
                       </>
-                    ) : <div style={{ fontSize: isMobile ? "14px" : "16px", color: C.text3 }}>—</div>}
+                    ) : <div style={{ fontSize: "16px", color: C.text3 }}>—</div>}
                   </div>
                   <div style={{ background: C.card, borderRadius: "8px", padding: "10px" }}>
-                    <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginBottom: "5px" }}>저항선</div>
+                    <div style={{ fontSize: "14px", color: C.text3, marginBottom: "5px" }}>저항선</div>
                     {res1 ? (
                       <>
-                        <div style={{ fontSize: isMobile ? "15px" : "17px", fontWeight: 700, color: C.purple }}>{fmtP(res1.price)}</div>
-                        <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginTop: "2px" }}>{res1.sources.slice(0, 2).join(" · ")} <span style={{ color: C.purple }}>×{res1.weight.toFixed(0)}</span></div>
-                        {res2 && <div style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, marginTop: "4px" }}>2차: {fmtP(res2.price)} <span style={{ fontSize: isMobile ? "12px" : "14px" }}>({res2.sources[0]})</span></div>}
+                        <div style={{ fontSize: "17px", fontWeight: 700, color: C.purple }}>{fmtP(res1.price)}</div>
+                        <div style={{ fontSize: "14px", color: C.text3, marginTop: "2px" }}>{res1.sources.slice(0, 2).join(" · ")} <span style={{ color: C.purple }}>×{res1.weight.toFixed(0)}</span></div>
+                        {res2 && <div style={{ fontSize: "15px", color: C.text3, marginTop: "4px" }}>2차: {fmtP(res2.price)} <span style={{ fontSize: "14px" }}>({res2.sources[0]})</span></div>}
                       </>
-                    ) : <div style={{ fontSize: isMobile ? "14px" : "16px", color: C.text3 }}>—</div>}
+                    ) : <div style={{ fontSize: "16px", color: C.text3 }}>—</div>}
                   </div>
                 </div>
 
@@ -3919,17 +3919,17 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 <div style={{ display: "flex", gap: "6px" }}>
                   {riskReward && (
                     <div style={{ flex: 1, padding: "8px 10px", borderRadius: "8px", background: riskReward >= 2 ? `${C.green}12` : riskReward >= 1 ? `${C.yellow}12` : `${C.red}12`, textAlign: "center" }}>
-                      <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3 }}>R:R</div>
-                      <div style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 800, color: riskReward >= 2 ? C.green : riskReward >= 1 ? C.yellow : C.red }}>1:{riskReward}</div>
+                      <div style={{ fontSize: "14px", color: C.text3 }}>R:R</div>
+                      <div style={{ fontSize: "18px", fontWeight: 800, color: riskReward >= 2 ? C.green : riskReward >= 1 ? C.yellow : C.red }}>1:{riskReward}</div>
                     </div>
                   )}
                   <div style={{ flex: 1, padding: "8px 10px", borderRadius: "8px", background: C.card, textAlign: "center" }}>
-                    <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3 }}>진입</div>
-                    <div style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: C.text1, marginTop: "2px" }}>{isBullish ? "분할매수" : isBearish ? "관망" : "확인 후"}</div>
+                    <div style={{ fontSize: "14px", color: C.text3 }}>진입</div>
+                    <div style={{ fontSize: "16px", fontWeight: 700, color: C.text1, marginTop: "2px" }}>{isBullish ? "분할매수" : isBearish ? "관망" : "확인 후"}</div>
                   </div>
                   <div style={{ flex: 1, padding: "8px 10px", borderRadius: "8px", background: C.card, textAlign: "center" }}>
-                    <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3 }}>포지션</div>
-                    <div style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: C.text1, marginTop: "2px" }}>{diag.score >= 70 ? "비중확대" : diag.score >= 55 ? "소량매수" : diag.score >= 40 ? "비중유지" : "비중축소"}</div>
+                    <div style={{ fontSize: "14px", color: C.text3 }}>포지션</div>
+                    <div style={{ fontSize: "16px", fontWeight: 700, color: C.text1, marginTop: "2px" }}>{diag.score >= 70 ? "비중확대" : diag.score >= 55 ? "소량매수" : diag.score >= 40 ? "비중유지" : "비중축소"}</div>
                   </div>
                 </div>
               </div>
@@ -3940,8 +3940,8 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               <div style={{ padding: "0 20px 12px" }}>
                 <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-                    <span style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: C.text3 }}>📊 퀀트 전략 백테스트 (1년)</span>
-                    <span style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3 }}>상위 {bt.length}개</span>
+                    <span style={{ fontSize: "16px", fontWeight: 700, color: C.text3 }}>📊 퀀트 전략 백테스트 (1년)</span>
+                    <span style={{ fontSize: "14px", color: C.text3 }}>상위 {bt.length}개</span>
                   </div>
                   {bt.map((s, i) => {
                     const isTop = i === 0;
@@ -3954,26 +3954,26 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                       }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <span style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: isTop ? C.blue : C.text1 }}>
+                            <span style={{ fontSize: "16px", fontWeight: 700, color: isTop ? C.blue : C.text1 }}>
                               {isTop ? "🏆" : `${i + 1}.`} {s.name}
                             </span>
                           </div>
-                          <span style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 800, color: retColor }}>
+                          <span style={{ fontSize: "18px", fontWeight: 800, color: retColor }}>
                             {s.totalReturn >= 0 ? "+" : ""}{s.totalReturn}%
                           </span>
                         </div>
-                        <div style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, marginBottom: "6px" }}>{s.desc}</div>
+                        <div style={{ fontSize: "15px", color: C.text3, marginBottom: "6px" }}>{s.desc}</div>
                         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                          <span style={{ fontSize: isMobile ? "13px" : "15px", padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
+                          <span style={{ fontSize: "15px", padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
                             샤프 <span style={{ fontWeight: 700, color: s.sharpe >= 1 ? C.green : s.sharpe >= 0 ? C.yellow : C.red }}>{s.sharpe}</span>
                           </span>
-                          <span style={{ fontSize: isMobile ? "13px" : "15px", padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
+                          <span style={{ fontSize: "15px", padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
                             승률 <span style={{ fontWeight: 700, color: s.winRate >= 60 ? C.green : s.winRate >= 40 ? C.yellow : C.red }}>{s.winRate}%</span>
                           </span>
-                          <span style={{ fontSize: isMobile ? "13px" : "15px", padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
+                          <span style={{ fontSize: "15px", padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
                             MDD <span style={{ fontWeight: 700, color: s.maxDD <= 10 ? C.green : s.maxDD <= 20 ? C.yellow : C.red }}>-{s.maxDD}%</span>
                           </span>
-                          <span style={{ fontSize: isMobile ? "13px" : "15px", padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
+                          <span style={{ fontSize: "15px", padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
                             {s.trades}회
                           </span>
                         </div>
@@ -3993,7 +3993,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
         {techData && (
           <div style={{ padding: "0 20px 16px" }}>
             <div style={{ background: C.card, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
-              <div style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>기술적 지표</div>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>기술적 지표</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
                 {[
                   { label: "RSI(14)", value: techData.rsi, color: techData.rsi <= 30 ? C.purple : techData.rsi >= 70 ? C.red : C.text2 },
@@ -4007,9 +4007,9 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                   { label: "ADX", value: enriched.adx != null ? `${enriched.adx}` : "—", color: enriched.adx != null ? (enriched.adx >= 25 ? (enriched.plusDI > enriched.minusDI ? C.green : C.red) : C.text3) : C.text2, sub: enriched.adx != null ? (enriched.adx >= 25 ? (enriched.plusDI > enriched.minusDI ? "+DI 우세" : "-DI 우세") : "추세 약함") : null },
                 ].map(({ label, value, color, sub }) => (
                   <div key={label} style={{ background: C.card2, borderRadius: "10px", padding: "8px 10px", textAlign: "center" }}>
-                    <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginBottom: "3px" }}>{label}</div>
-                    <div style={{ fontWeight: 700, fontSize: isMobile ? "15px" : "17px", color: color || C.text1 }}>{value}</div>
-                    {sub && <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginTop: "2px" }}>{sub}</div>}
+                    <div style={{ fontSize: "14px", color: C.text3, marginBottom: "3px" }}>{label}</div>
+                    <div style={{ fontWeight: 700, fontSize: "17px", color: color || C.text1 }}>{value}</div>
+                    {sub && <div style={{ fontSize: "14px", color: C.text3, marginTop: "2px" }}>{sub}</div>}
                   </div>
                 ))}
               </div>
@@ -4017,15 +4017,15 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               {(enriched.cmf != null || enriched.mfi != null) && (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${C.border}40` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ fontSize: isMobile ? "13px" : "15px", fontWeight: 700, color: C.text3 }}>수급 흐름</span>
+                    <span style={{ fontSize: "15px", fontWeight: 700, color: C.text3 }}>수급 흐름</span>
                     {enriched.macdDivType && (
-                      <span style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                      <span style={{ fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
                         background: enriched.macdDivType === "bullish" ? `${C.green}18` : `${C.red}18`,
                         color: enriched.macdDivType === "bullish" ? C.green : C.red,
                       }}>{enriched.macdDivType === "bullish" ? "MACD ↑" : "MACD ↓"}</span>
                     )}
                     {enriched.obvDivType && (
-                      <span style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                      <span style={{ fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
                         background: enriched.obvDivType === "bullish" ? `${C.green}18` : `${C.red}18`,
                         color: enriched.obvDivType === "bullish" ? C.green : C.red,
                       }}>{enriched.obvDivType === "bullish" ? "OBV ↑" : "OBV ↓"}</span>
@@ -4033,7 +4033,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                   </div>
                   {enriched.cmf != null && (
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, width: "30px", flexShrink: 0 }}>CMF</span>
+                      <span style={{ fontSize: "15px", color: C.text3, width: "30px", flexShrink: 0 }}>CMF</span>
                       <div style={{ flex: 1, height: "6px", background: `${C.border}40`, borderRadius: "3px", overflow: "hidden", position: "relative" }}>
                         <div style={{ position: "absolute", left: "50%", top: 0, width: "1px", height: "100%", background: C.text3 + "44" }} />
                         <div style={{
@@ -4043,14 +4043,14 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                           width: `${Math.min(Math.abs(enriched.cmf) * 100, 50)}%`,
                         }} />
                       </div>
-                      <span style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: enriched.cmf > 0.1 ? C.green : enriched.cmf < -0.1 ? C.red : C.text2, width: "42px", textAlign: "right" }}>
+                      <span style={{ fontSize: "16px", fontWeight: 700, color: enriched.cmf > 0.1 ? C.green : enriched.cmf < -0.1 ? C.red : C.text2, width: "42px", textAlign: "right" }}>
                         {enriched.cmf > 0 ? "+" : ""}{enriched.cmf.toFixed(3)}
                       </span>
                     </div>
                   )}
                   {enriched.mfi != null && (
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, width: "30px", flexShrink: 0 }}>MFI</span>
+                      <span style={{ fontSize: "15px", color: C.text3, width: "30px", flexShrink: 0 }}>MFI</span>
                       <div style={{ flex: 1, height: "6px", background: `${C.border}40`, borderRadius: "3px", overflow: "hidden" }}>
                         <div style={{
                           height: "100%", borderRadius: "3px",
@@ -4058,7 +4058,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                           background: enriched.mfi < 20 ? C.purple : enriched.mfi > 80 ? C.red : enriched.mfi < 30 ? C.green : enriched.mfi > 70 ? C.yellow : C.blue,
                         }} />
                       </div>
-                      <span style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: enriched.mfi < 20 ? C.purple : enriched.mfi > 80 ? C.red : C.text2, width: "24px", textAlign: "right" }}>
+                      <span style={{ fontSize: "16px", fontWeight: 700, color: enriched.mfi < 20 ? C.purple : enriched.mfi > 80 ? C.red : C.text2, width: "24px", textAlign: "right" }}>
                         {Math.round(enriched.mfi)}
                       </span>
                     </div>
@@ -4067,7 +4067,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               )}
               {/* 실적 발표일 */}
               {techData.earningsDate && (
-                <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: `1px solid ${C.border}40`, fontSize: isMobile ? "13px" : "15px", color: C.text3, textAlign: "center" }}>
+                <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: `1px solid ${C.border}40`, fontSize: "15px", color: C.text3, textAlign: "center" }}>
                   📅 다음 실적 발표 <span style={{ fontWeight: 700, color: C.text2 }}>{new Date(techData.earningsDate * 1000).toLocaleDateString("ko-KR", { year: "numeric", month: "short", day: "numeric" })}</span>
                 </div>
               )}
@@ -4083,7 +4083,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
           }}>{isWatched ? "⭐" : "☆"}</button>
           <button onClick={() => { onChart(); onClose(); }} style={{
-            flex: 1, padding: "12px 0", borderRadius: "12px", fontSize: isMobile ? "16px" : "18px", fontWeight: 700,
+            flex: 1, padding: "12px 0", borderRadius: "12px", fontSize: "18px", fontWeight: 700,
             background: C.blue, color: "#fff", border: "none", cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
           }}>📈 차트 보기</button>
@@ -4092,7 +4092,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               : `https://finance.yahoo.com/quote/${asset.symbolRaw || asset.symbol}`}
             target="_blank" rel="noopener"
             style={{
-              flex: 1, padding: "12px 0", borderRadius: "12px", fontSize: isMobile ? "16px" : "18px", fontWeight: 700,
+              flex: 1, padding: "12px 0", borderRadius: "12px", fontSize: "18px", fontWeight: 700,
               background: C.card2, color: C.text2, border: `1px solid ${C.border2}`,
               textDecoration: "none", textAlign: "center",
               display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
@@ -4110,7 +4110,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               navigator.clipboard.writeText(shareText).then(() => showToast("진단 결과가 복사되었습니다!", "success")).catch(() => {});
             }
           }} style={{
-            width: "100%", padding: "10px 0", borderRadius: "10px", fontSize: isMobile ? "15px" : "17px", fontWeight: 600,
+            width: "100%", padding: "10px 0", borderRadius: "10px", fontSize: "17px", fontWeight: 600,
             background: "transparent", color: C.text3, border: `1px solid ${C.border}${C.isDark ? '30' : '50'}`,
             cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
             transition: "all .15s",
