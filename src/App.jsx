@@ -11102,25 +11102,25 @@ function AppInner() {
               { label: "문의하기", tab: "contact" },
             ].map((item, i) => (
               <span key={item.tab} style={{ display: "flex", alignItems: "center" }}>
-                {i > 0 && <span style={{ margin: "0 10px", color: C.text3, opacity: 0.3 }}>|</span>}
+                {i > 0 && <span style={{ margin: "0 10px", color: C.text2, opacity: 0.25 }}>|</span>}
                 <span
                   onClick={() => setTab(item.tab)}
                   style={{
-                    fontSize: "12px", color: C.text3, cursor: "pointer",
+                    fontSize: "12px", color: C.text2, cursor: "pointer",
                     fontWeight: item.bold ? 700 : 400,
                   }}
                   onMouseEnter={e => { e.target.style.color = C.text1; }}
-                  onMouseLeave={e => { e.target.style.color = C.text3; }}
+                  onMouseLeave={e => { e.target.style.color = C.text2; }}
                 >{item.label}</span>
               </span>
             ))}
           </div>
 
           {/* 중단: 사업자 정보 */}
-          <div style={{ fontSize: "11px", color: C.text3, lineHeight: 1.8, marginBottom: "16px", opacity: 0.7 }}>
+          <div style={{ fontSize: "11px", color: C.text2, lineHeight: 1.8, marginBottom: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
-              <img src="/zepta-icon-192.png" alt="Zepta" width="18" height="18" style={{ flexShrink: 0, opacity: 0.6 }} />
-              <span style={{ fontWeight: 600, fontSize: "12px" }}>Zepta</span>
+              <img src="/zepta-icon-192.png" alt="Zepta" width="18" height="18" style={{ flexShrink: 0 }} />
+              <span style={{ fontWeight: 600, fontSize: "12px", color: C.text1 }}>Zepta</span>
             </div>
             <span>대표: 서동인</span>
             <span style={{ margin: "0 8px", opacity: 0.3 }}>·</span>
@@ -11128,7 +11128,7 @@ function AppInner() {
           </div>
 
           {/* 하단: 면책 + 저작권 */}
-          <div style={{ fontSize: "11px", color: C.text3, lineHeight: 1.7, opacity: 0.5 }}>
+          <div style={{ fontSize: "11px", color: C.text3, lineHeight: 1.7 }}>
             <p style={{ margin: "0 0 6px" }}>
               Zepta에서 제공하는 투자 정보는 고객의 투자 판단을 위한 단순 참고용이며, 투자 제안 및 권유, 종목 추천을 위해 작성된 것이 아닙니다.
             </p>
