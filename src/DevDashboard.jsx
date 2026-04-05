@@ -13,7 +13,7 @@ function StatusBadge({ ok, label }) {
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: "5px",
-      padding: "3px 10px", borderRadius: "12px", fontSize: "11px", fontWeight: 700,
+      padding: "3px 10px", borderRadius: "12px", fontSize: "14px", fontWeight: 700,
       background: ok ? "#22c55e20" : "#ef444420",
       color: ok ? "#22c55e" : "#ef4444",
     }}>
@@ -36,10 +36,10 @@ function Section({ title, badge, children, defaultOpen = true }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <span style={{ fontSize: "14px", fontWeight: 700, color: c.text1 }}>{title}</span>
+          <span style={{ fontSize: "16px", fontWeight: 700, color: c.text1 }}>{title}</span>
           {badge}
         </div>
-        <span style={{ color: c.text3, fontSize: "12px" }}>{open ? "▼" : "▶"}</span>
+        <span style={{ color: c.text3, fontSize: "14px" }}>{open ? "▼" : "▶"}</span>
       </div>
       {open && <div style={{ padding: "14px 18px" }}>{children}</div>}
     </div>
@@ -50,8 +50,8 @@ function KVValue({ label, value, color }) {
   const c = colors.dark;
   return (
     <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${c.border}22` }}>
-      <span style={{ fontSize: "12px", color: c.text2 }}>{label}</span>
-      <span style={{ fontSize: "12px", fontWeight: 600, color: color || c.text1, fontFamily: "monospace" }}>
+      <span style={{ fontSize: "14px", color: c.text2 }}>{label}</span>
+      <span style={{ fontSize: "14px", fontWeight: 600, color: color || c.text1, fontFamily: "monospace" }}>
         {typeof value === "number" ? value.toLocaleString(undefined, { maximumFractionDigits: 2 }) : String(value ?? "—")}
       </span>
     </div>
@@ -88,7 +88,7 @@ export default function DevDashboard({ theme = "dark" }) {
 
   if (!data) return (
     <div style={{ background: c.bg, color: c.text1, minHeight: "100vh", padding: "40px 20px", textAlign: "center" }}>
-      <div style={{ fontSize: "14px", color: c.text2 }}>시스템 상태 로딩 중...</div>
+      <div style={{ fontSize: "16px", color: c.text2 }}>시스템 상태 로딩 중...</div>
     </div>
   );
 
@@ -110,13 +110,13 @@ export default function DevDashboard({ theme = "dark" }) {
             <h1 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: c.text1 }}>
               Zepta Dev/QA Dashboard
             </h1>
-            <div style={{ fontSize: "11px", color: c.text3, marginTop: "4px" }}>
+            <div style={{ fontSize: "14px", color: c.text3, marginTop: "4px" }}>
               마지막 조회: {lastFetched?.toLocaleTimeString() || "—"} · 응답: {data.responseTime}
             </div>
           </div>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             <button onClick={fetchData} disabled={loading} style={{
-              padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
+              padding: "8px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: 700,
               background: c.blue, color: "#fff", border: "none", cursor: "pointer",
               opacity: loading ? 0.5 : 1,
             }}>
@@ -129,7 +129,7 @@ export default function DevDashboard({ theme = "dark" }) {
               alert(d.message || d.error);
               fetchData();
             }} style={{
-              padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
+              padding: "8px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: 700,
               background: c.red, color: "#fff", border: "none", cursor: "pointer",
             }}>
               포트폴리오 초기화
@@ -141,13 +141,13 @@ export default function DevDashboard({ theme = "dark" }) {
               alert(d.message || d.error);
               fetchData();
             }} style={{
-              padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
+              padding: "8px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: 700,
               background: c.orange, color: "#fff", border: "none", cursor: "pointer",
             }}>
               봇 성과 초기화
             </button>
             <button onClick={() => setAutoRefresh(!autoRefresh)} style={{
-              padding: "8px 16px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
+              padding: "8px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: 700,
               background: autoRefresh ? c.green : c.card2, color: autoRefresh ? "#fff" : c.text2,
               border: `1px solid ${autoRefresh ? c.green : c.border}`, cursor: "pointer",
             }}>
@@ -162,9 +162,9 @@ export default function DevDashboard({ theme = "dark" }) {
             background: `${c.red}10`, border: `1px solid ${c.red}30`, borderRadius: "10px",
             padding: "12px 16px", marginBottom: "12px",
           }}>
-            <div style={{ fontSize: "12px", fontWeight: 700, color: c.red, marginBottom: "6px" }}>오류 {errors.length}건</div>
+            <div style={{ fontSize: "14px", fontWeight: 700, color: c.red, marginBottom: "6px" }}>오류 {errors.length}건</div>
             {errors.map((e, i) => (
-              <div key={i} style={{ fontSize: "11px", color: c.red, fontFamily: "monospace", padding: "2px 0" }}>{e}</div>
+              <div key={i} style={{ fontSize: "14px", color: c.red, fontFamily: "monospace", padding: "2px 0" }}>{e}</div>
             ))}
           </div>
         )}
@@ -185,7 +185,7 @@ export default function DevDashboard({ theme = "dark" }) {
               background: c.card, border: `1px solid ${c.border}`, borderRadius: "10px",
               padding: "12px", textAlign: "center",
             }}>
-              <div style={{ fontSize: "10px", color: c.text3, marginBottom: "6px" }}>{s.label}</div>
+              <div style={{ fontSize: "13px", color: c.text3, marginBottom: "6px" }}>{s.label}</div>
               <StatusBadge ok={s.ok} label={s.ok ? "OK" : "FAIL"} />
             </div>
           ))}
@@ -207,9 +207,9 @@ export default function DevDashboard({ theme = "dark" }) {
 
               {ph.positions?.length > 0 && (
                 <div style={{ marginTop: "12px" }}>
-                  <div style={{ fontSize: "12px", fontWeight: 700, color: c.text1, marginBottom: "8px" }}>보유 포지션 ({ph.positions.length})</div>
+                  <div style={{ fontSize: "14px", fontWeight: 700, color: c.text1, marginBottom: "8px" }}>보유 포지션 ({ph.positions.length})</div>
                   <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
                       <thead>
                         <tr style={{ borderBottom: `1px solid ${c.border}` }}>
                           {["자산", "수량", "평균가", "원가", "진입일"].map(h => (
@@ -234,7 +234,7 @@ export default function DevDashboard({ theme = "dark" }) {
               )}
             </>
           ) : (
-            <div style={{ fontSize: "12px", color: c.text3 }}>포트폴리오 데이터 없음</div>
+            <div style={{ fontSize: "14px", color: c.text3 }}>포트폴리오 데이터 없음</div>
           )}
         </Section>
 
@@ -249,21 +249,21 @@ export default function DevDashboard({ theme = "dark" }) {
               border: `1px solid ${c.border}`,
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span style={{ fontSize: "13px", fontWeight: 700, color: c.text1 }}>{ab.botId}</span>
+                <span style={{ fontSize: "15px", fontWeight: 700, color: c.text1 }}>{ab.botId}</span>
                 <span style={{
-                  fontSize: "10px", padding: "2px 8px", borderRadius: "8px",
+                  fontSize: "13px", padding: "2px 8px", borderRadius: "8px",
                   background: ab.status === "paused" ? `${c.yellow}20` : `${c.green}20`,
                   color: ab.status === "paused" ? c.yellow : c.green,
                   fontWeight: 700,
                 }}>{ab.status === "paused" ? "일시정지" : "활성"}</span>
               </div>
-              <div style={{ display: "flex", gap: "16px", marginTop: "6px", fontSize: "11px", color: c.text2 }}>
+              <div style={{ display: "flex", gap: "16px", marginTop: "6px", fontSize: "14px", color: c.text2 }}>
                 <span>배분: ${(ab.allocation || 0).toLocaleString()}</span>
                 <span>시작: {ab.startedAt ? new Date(ab.startedAt).toLocaleDateString() : "—"}</span>
               </div>
             </div>
           )) : (
-            <div style={{ fontSize: "12px", color: c.text3 }}>활성 봇 없음 (KV에 di:active-bots 데이터 없음)</div>
+            <div style={{ fontSize: "14px", color: c.text3 }}>활성 봇 없음 (KV에 di:active-bots 데이터 없음)</div>
           )}
         </Section>
 
@@ -274,8 +274,8 @@ export default function DevDashboard({ theme = "dark" }) {
               background: c.card2, borderRadius: "8px", padding: "10px 14px", marginBottom: "6px",
               border: `1px solid ${c.border}`,
             }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: c.blue, marginBottom: "6px" }}>{id}</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "4px", fontSize: "11px" }}>
+              <div style={{ fontSize: "15px", fontWeight: 700, color: c.blue, marginBottom: "6px" }}>{id}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "4px", fontSize: "14px" }}>
                 <KVValue label="거래 수" value={perf.tradeCount} />
                 <KVValue label="실현 P&L" value={`$${perf.realizedPL?.toFixed(2)}`} color={perf.realizedPL >= 0 ? c.green : c.red} />
                 <KVValue label="승 횟수" value={perf.winCount} />
@@ -284,7 +284,7 @@ export default function DevDashboard({ theme = "dark" }) {
                 <KVValue label="갱신" value={perf.lastUpdated?.slice(11, 19) || "—"} />
               </div>
               {perf.recentTrades?.length > 0 && (
-                <div style={{ marginTop: "8px", fontSize: "10px", color: c.text3 }}>
+                <div style={{ marginTop: "8px", fontSize: "13px", color: c.text3 }}>
                   <div style={{ fontWeight: 600, marginBottom: "4px" }}>최근 거래:</div>
                   {perf.recentTrades.map((t, i) => (
                     <div key={i} style={{ padding: "2px 0", fontFamily: "monospace" }}>
@@ -296,7 +296,7 @@ export default function DevDashboard({ theme = "dark" }) {
               )}
             </div>
           )) : (
-            <div style={{ fontSize: "12px", color: c.text3 }}>봇 성과 데이터 없음</div>
+            <div style={{ fontSize: "14px", color: c.text3 }}>봇 성과 데이터 없음</div>
           )}
         </Section>
 
@@ -307,8 +307,8 @@ export default function DevDashboard({ theme = "dark" }) {
               background: c.card2, borderRadius: "8px", padding: "10px 14px", marginBottom: "6px",
               border: `1px solid ${c.border}`,
             }}>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: c.purple, marginBottom: "6px" }}>{id}</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px", fontSize: "11px" }}>
+              <div style={{ fontSize: "15px", fontWeight: 700, color: c.purple, marginBottom: "6px" }}>{id}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px", fontSize: "14px" }}>
                 <KVValue label="시장 가치" value={`$${(snap.marketValue || 0).toFixed(0)}`} />
                 <KVValue label="미실현 P&L" value={`$${(snap.unrealizedPL || 0).toFixed(2)}`} color={(snap.unrealizedPL || 0) >= 0 ? c.green : c.red} />
                 <KVValue label="DD" value={`${(snap.dd || 0).toFixed(2)}%`} color={(snap.dd || 0) > 5 ? c.red : c.green} />
@@ -322,7 +322,7 @@ export default function DevDashboard({ theme = "dark" }) {
               </div>
             </div>
           )) : (
-            <div style={{ fontSize: "12px", color: c.text3 }}>스냅샷 데이터 없음</div>
+            <div style={{ fontSize: "14px", color: c.text3 }}>스냅샷 데이터 없음</div>
           )}
         </Section>
 
@@ -346,7 +346,7 @@ export default function DevDashboard({ theme = "dark" }) {
               <KVValue label="갱신" value={data.marketRegime.updatedAt || "—"} />
             </>
           ) : (
-            <div style={{ fontSize: "12px", color: c.text3 }}>레짐 데이터 없음</div>
+            <div style={{ fontSize: "14px", color: c.text3 }}>레짐 데이터 없음</div>
           )}
         </Section>
 
@@ -359,7 +359,7 @@ export default function DevDashboard({ theme = "dark" }) {
         {/* Raw JSON */}
         <Section title="Raw JSON 데이터" defaultOpen={false}>
           <pre style={{
-            fontSize: "10px", color: c.text2, background: c.bg, padding: "12px",
+            fontSize: "13px", color: c.text2, background: c.bg, padding: "12px",
             borderRadius: "8px", overflow: "auto", maxHeight: "400px", fontFamily: "monospace",
             whiteSpace: "pre-wrap", wordBreak: "break-all",
           }}>

@@ -81,46 +81,46 @@ export default function StrategyPanel({ onRunBacktest }) {
     <div>
       {/* 시장 진단 */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px" }}>
-        <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "14px" }}>🔬 시장 진단</div>
+        <div style={{ fontWeight: 700, fontSize: "17px", marginBottom: "14px" }}>🔬 시장 진단</div>
         <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginBottom: "14px" }}>
           <select value={selectedSymbol} onChange={e => setSelectedSymbol(e.target.value)} style={{
-            padding: "8px 12px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+            padding: "8px 12px", borderRadius: "10px", fontSize: "15px", fontWeight: 600,
             background: C.card2, color: C.text1, border: `1px solid ${C.border2}`,
             outline: "none", cursor: "pointer",
           }}>
             {symbols.map(s => <option key={s.value} value={s.value}>{s.label} ({s.value})</option>)}
           </select>
           <button onClick={runDiagnosis} disabled={loading} style={{
-            padding: "8px 20px", borderRadius: "10px", fontSize: "13px", fontWeight: 700,
+            padding: "8px 20px", borderRadius: "10px", fontSize: "15px", fontWeight: 700,
             background: loading ? C.card2 : C.blue, color: loading ? C.text3 : "#fff", border: "none", cursor: "pointer",
           }}>
             {loading ? "분석 중..." : "🔍 진단 실행"}
           </button>
         </div>
 
-        {error && <div style={{ color: C.red, fontSize: "13px", marginBottom: "10px" }}>⚠️ {error}</div>}
+        {error && <div style={{ color: C.red, fontSize: "15px", marginBottom: "10px" }}>⚠️ {error}</div>}
 
         {diagnosis && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "10px" }}>
             <div style={{ background: regimeStyle.bg, borderRadius: "12px", padding: "14px", textAlign: "center" }}>
               <div style={{ fontSize: "24px", marginBottom: "4px" }}>{regimeStyle.icon}</div>
-              <div style={{ fontSize: "11px", color: C.text3, marginBottom: "4px" }}>시장 국면</div>
-              <div style={{ fontSize: "15px", fontWeight: 700, color: regimeStyle.color }}>{diagnosis.regime}</div>
+              <div style={{ fontSize: "14px", color: C.text3, marginBottom: "4px" }}>시장 국면</div>
+              <div style={{ fontSize: "17px", fontWeight: 700, color: regimeStyle.color }}>{diagnosis.regime}</div>
             </div>
             <div style={{ background: C.card2, borderRadius: "12px", padding: "14px", textAlign: "center" }}>
               <div style={{ fontSize: "24px", marginBottom: "4px" }}>{diagnosis.trend === "상승" ? "📈" : diagnosis.trend === "하락" ? "📉" : "➡️"}</div>
-              <div style={{ fontSize: "11px", color: C.text3, marginBottom: "4px" }}>추세</div>
-              <div style={{ fontSize: "15px", fontWeight: 700, color: C.text1 }}>{diagnosis.trend}</div>
+              <div style={{ fontSize: "14px", color: C.text3, marginBottom: "4px" }}>추세</div>
+              <div style={{ fontSize: "17px", fontWeight: 700, color: C.text1 }}>{diagnosis.trend}</div>
             </div>
             <div style={{ background: C.card2, borderRadius: "12px", padding: "14px", textAlign: "center" }}>
               <div style={{ fontSize: "24px", marginBottom: "4px" }}>📊</div>
-              <div style={{ fontSize: "11px", color: C.text3, marginBottom: "4px" }}>변동성</div>
-              <div style={{ fontSize: "15px", fontWeight: 700, color: C.text1 }}>{diagnosis.volatility} ({diagnosis.atrPct}%)</div>
+              <div style={{ fontSize: "14px", color: C.text3, marginBottom: "4px" }}>변동성</div>
+              <div style={{ fontSize: "17px", fontWeight: 700, color: C.text1 }}>{diagnosis.volatility} ({diagnosis.atrPct}%)</div>
             </div>
             <div style={{ background: C.card2, borderRadius: "12px", padding: "14px", textAlign: "center" }}>
               <div style={{ fontSize: "24px", marginBottom: "4px" }}>{diagnosis.momentum === "과매수" ? "🔴" : diagnosis.momentum === "과매도" ? "🟢" : "⚪"}</div>
-              <div style={{ fontSize: "11px", color: C.text3, marginBottom: "4px" }}>모멘텀</div>
-              <div style={{ fontSize: "15px", fontWeight: 700, color: C.text1 }}>{diagnosis.momentum} {diagnosis.rsi != null ? `(RSI ${diagnosis.rsi})` : ""}</div>
+              <div style={{ fontSize: "14px", color: C.text3, marginBottom: "4px" }}>모멘텀</div>
+              <div style={{ fontSize: "17px", fontWeight: 700, color: C.text1 }}>{diagnosis.momentum} {diagnosis.rsi != null ? `(RSI ${diagnosis.rsi})` : ""}</div>
             </div>
           </div>
         )}
@@ -129,7 +129,7 @@ export default function StrategyPanel({ onRunBacktest }) {
       {/* 추천 전략 */}
       {recs.length > 0 && (
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px" }}>
-          <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "14px" }}>🎯 추천 전략 (시장 진단 기반)</div>
+          <div style={{ fontWeight: 700, fontSize: "17px", marginBottom: "14px" }}>🎯 추천 전략 (시장 진단 기반)</div>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {recs.map((rec, idx) => {
               const s = rec.strategy;
@@ -143,9 +143,9 @@ export default function StrategyPanel({ onRunBacktest }) {
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <span style={{ fontSize: "18px" }}>{s.icon}</span>
-                      <span style={{ fontWeight: 700, fontSize: "14px", color: C.text1 }}>{s.name}</span>
+                      <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>{s.name}</span>
                       <span style={{
-                        padding: "2px 7px", borderRadius: "6px", fontSize: "10px", fontWeight: 700,
+                        padding: "2px 7px", borderRadius: "6px", fontSize: "13px", fontWeight: 700,
                         background: `${catColor}22`, color: catColor,
                       }}>{s.category}</span>
                     </div>
@@ -153,24 +153,24 @@ export default function StrategyPanel({ onRunBacktest }) {
                       <div style={{
                         width: "28px", height: "28px", borderRadius: "50%",
                         background: `${C.blue}22`, display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: "12px", fontWeight: 800, color: C.blue,
+                        fontSize: "14px", fontWeight: 800, color: C.blue,
                       }}>{rec.score}</div>
                     </div>
                   </div>
-                  <div style={{ fontSize: "12px", color: C.text2, marginBottom: "4px" }}>{rec.reason}</div>
+                  <div style={{ fontSize: "14px", color: C.text2, marginBottom: "4px" }}>{rec.reason}</div>
                   {expandedStrategy === s.id && (
                     <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${C.border}` }}>
-                      <div style={{ fontSize: "12px", color: C.text2, marginBottom: "8px", lineHeight: 1.6 }}>{s.desc}</div>
+                      <div style={{ fontSize: "14px", color: C.text2, marginBottom: "8px", lineHeight: 1.6 }}>{s.desc}</div>
                       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
-                        <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "10px", background: C.card, color: C.text3, border: `1px solid ${C.border}` }}>
+                        <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "13px", background: C.card, color: C.text3, border: `1px solid ${C.border}` }}>
                           위험도: {s.risk}
                         </span>
-                        <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "10px", background: `${CAT_COLORS[s.category] || C.blue}15`, color: CAT_COLORS[s.category] || C.blue, fontWeight: 600 }}>
+                        <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "13px", background: `${CAT_COLORS[s.category] || C.blue}15`, color: CAT_COLORS[s.category] || C.blue, fontWeight: 600 }}>
                           {s.category}
                         </span>
                         {onRunBacktest && (
                           <button onClick={(e) => { e.stopPropagation(); onRunBacktest(s, selectedSymbol); }} style={{
-                            padding: "6px 14px", borderRadius: "8px", fontSize: "11px", fontWeight: 700,
+                            padding: "6px 14px", borderRadius: "8px", fontSize: "14px", fontWeight: 700,
                             background: `linear-gradient(135deg, ${C.blue}, ${C.blueL})`, color: "#fff",
                             border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px",
                             boxShadow: `0 2px 8px ${C.blue}40`,
@@ -188,7 +188,7 @@ export default function StrategyPanel({ onRunBacktest }) {
 
       {/* 전체 전략 목록 */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px" }}>
-        <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "14px" }}>📋 전체 전략 목록 ({ALL_STRATEGIES.length}개)</div>
+        <div style={{ fontWeight: 700, fontSize: "17px", marginBottom: "14px" }}>📋 전체 전략 목록 ({ALL_STRATEGIES.length}개)</div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(240px, 100%), 1fr))", gap: "10px" }}>
           {ALL_STRATEGIES.map(s => {
             const catColor = CAT_COLORS[s.category] || C.blue;
@@ -197,22 +197,22 @@ export default function StrategyPanel({ onRunBacktest }) {
                 background: C.card2, borderRadius: "12px", padding: "14px", border: `1px solid ${C.border2}`,
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                  <span style={{ fontSize: "16px" }}>{s.icon}</span>
-                  <span style={{ fontWeight: 700, fontSize: "13px", color: C.text1, flex: 1 }}>{s.name}</span>
+                  <span style={{ fontSize: "18px" }}>{s.icon}</span>
+                  <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1, flex: 1 }}>{s.name}</span>
                   <span style={{
-                    padding: "2px 6px", borderRadius: "4px", fontSize: "10px", fontWeight: 600,
+                    padding: "2px 6px", borderRadius: "4px", fontSize: "13px", fontWeight: 600,
                     background: `${catColor}22`, color: catColor, flexShrink: 0,
                   }}>{s.category}</span>
                 </div>
-                <div style={{ fontSize: "11px", color: C.text2, marginBottom: "8px", lineHeight: 1.5 }}>{s.desc}</div>
+                <div style={{ fontSize: "14px", color: C.text2, marginBottom: "8px", lineHeight: 1.5 }}>{s.desc}</div>
                 <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", alignItems: "center" }}>
                   <span style={{
-                    padding: "2px 6px", borderRadius: "4px", fontSize: "10px",
+                    padding: "2px 6px", borderRadius: "4px", fontSize: "13px",
                     background: C.card, color: C.text3,
                   }}>위험도: {s.risk}</span>
                   {onRunBacktest && (
                     <button onClick={() => onRunBacktest(s, selectedSymbol)} style={{
-                      padding: "4px 10px", borderRadius: "6px", fontSize: "10px", fontWeight: 700,
+                      padding: "4px 10px", borderRadius: "6px", fontSize: "13px", fontWeight: 700,
                       background: `linear-gradient(135deg, ${C.blue}, ${C.blueL})`, color: "#fff",
                       border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "3px",
                       boxShadow: `0 1px 4px ${C.blue}30`,

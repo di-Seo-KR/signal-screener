@@ -105,11 +105,11 @@ export default function AuthPage({ theme = "dark", embedded = false, onClose }) 
     },
     logoVer: {
       display: "inline-block", marginLeft: "8px",
-      fontSize: "11px", fontWeight: 700, color: C.blue,
+      fontSize: "14px", fontWeight: 700, color: C.blue,
       background: C.blueBg, padding: "2px 8px", borderRadius: "6px",
     },
     logoSub: {
-      fontSize: "13px", color: C.text3, marginTop: "6px",
+      fontSize: "15px", color: C.text3, marginTop: "6px",
     },
     card: {
       background: C.card, borderRadius: "16px", border: `1px solid ${C.border}`,
@@ -121,19 +121,19 @@ export default function AuthPage({ theme = "dark", embedded = false, onClose }) 
     },
     tab: (active) => ({
       flex: 1, textAlign: "center", padding: "10px", borderRadius: "8px",
-      fontSize: "14px", fontWeight: 600, cursor: "pointer", border: "none",
+      fontSize: "16px", fontWeight: 600, cursor: "pointer", border: "none",
       transition: "all 0.2s",
       background: active ? C.blue : "transparent",
       color: active ? "#fff" : C.text3,
     }),
     label: {
-      display: "block", fontSize: "13px", fontWeight: 600,
+      display: "block", fontSize: "15px", fontWeight: 600,
       color: C.text2, marginBottom: "6px",
     },
     input: {
       width: "100%", padding: "12px 14px", borderRadius: "10px",
       border: `1px solid ${C.border}`, background: C.card2,
-      color: C.text1, fontSize: "14px", outline: "none",
+      color: C.text1, fontSize: "16px", outline: "none",
       transition: "border-color 0.2s", boxSizing: "border-box",
     },
     inputGroup: {
@@ -141,13 +141,13 @@ export default function AuthPage({ theme = "dark", embedded = false, onClose }) 
     },
     btn: {
       width: "100%", padding: "14px", borderRadius: "12px",
-      fontSize: "15px", fontWeight: 700, border: "none", cursor: "pointer",
+      fontSize: "17px", fontWeight: 700, border: "none", cursor: "pointer",
       background: C.blue, color: "#fff", transition: "all 0.2s",
       opacity: loading ? 0.6 : 1, marginTop: "8px",
     },
     divider: {
       display: "flex", alignItems: "center", gap: "12px",
-      margin: "20px 0", color: C.text3, fontSize: "12px",
+      margin: "20px 0", color: C.text3, fontSize: "14px",
     },
     divLine: {
       flex: 1, height: "1px", background: C.border,
@@ -157,18 +157,18 @@ export default function AuthPage({ theme = "dark", embedded = false, onClose }) 
     },
     error: {
       background: C.redBg, color: C.red, padding: "10px 14px", borderRadius: "10px",
-      fontSize: "13px", marginBottom: "16px", textAlign: "center",
+      fontSize: "15px", marginBottom: "16px", textAlign: "center",
     },
     success: {
       background: C.greenBg, color: C.green, padding: "10px 14px", borderRadius: "10px",
-      fontSize: "13px", marginBottom: "16px", textAlign: "center",
+      fontSize: "15px", marginBottom: "16px", textAlign: "center",
     },
     link: {
-      color: C.blue, cursor: "pointer", fontSize: "13px", fontWeight: 600,
+      color: C.blue, cursor: "pointer", fontSize: "15px", fontWeight: 600,
       background: "none", border: "none", padding: 0,
     },
     footer: {
-      textAlign: "center", marginTop: "20px", fontSize: "13px", color: C.text3,
+      textAlign: "center", marginTop: "20px", fontSize: "15px", color: C.text3,
     },
   };
 
@@ -191,13 +191,13 @@ export default function AuthPage({ theme = "dark", embedded = false, onClose }) 
           {mode === "reset" && (
             <div style={{ marginBottom: "20px" }}>
               <button onClick={() => { setMode("login"); setError(""); setSuccess(""); }}
-                style={{ ...S.link, fontSize: "13px", display: "flex", alignItems: "center", gap: "4px" }}>
+                style={{ ...S.link, fontSize: "15px", display: "flex", alignItems: "center", gap: "4px" }}>
                 ← 로그인으로 돌아가기
               </button>
               <h3 style={{ color: C.text1, fontSize: "18px", fontWeight: 700, margin: "12px 0 4px" }}>
                 비밀번호 재설정
               </h3>
-              <p style={{ color: C.text3, fontSize: "13px", margin: 0 }}>
+              <p style={{ color: C.text3, fontSize: "15px", margin: 0 }}>
                 가입한 이메일을 입력하면 재설정 링크를 보내드립니다.
               </p>
             </div>
@@ -229,7 +229,7 @@ export default function AuthPage({ theme = "dark", embedded = false, onClose }) 
                 onBlur={e => e.target.style.borderColor = email && !validateEmail(email) ? C.red : C.border}
               />
               {email && !validateEmail(email) && (
-                <div style={{ color: C.red, fontSize: "12px", marginTop: "4px", fontWeight: 500 }}>
+                <div style={{ color: C.red, fontSize: "14px", marginTop: "4px", fontWeight: 500 }}>
                   유효한 이메일 형식을 입력해주세요
                 </div>
               )}
@@ -270,7 +270,7 @@ export default function AuthPage({ theme = "dark", embedded = false, onClose }) 
               </div>
               <button onClick={() => handleOAuth("google")} disabled={loading} style={{
                 width: "100%", display: "flex", alignItems: "center", justifyContent: "center",
-                gap: "10px", padding: "13px", borderRadius: "12px", fontSize: "14px",
+                gap: "10px", padding: "13px", borderRadius: "12px", fontSize: "16px",
                 fontWeight: 600, border: `1px solid ${C.border}`, cursor: loading ? "default" : "pointer",
                 background: C.isDark ? "#fff" : "#fff", color: "#333", transition: "all 0.2s",
               }}>

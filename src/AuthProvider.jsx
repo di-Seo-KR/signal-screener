@@ -24,7 +24,7 @@ function AuthToast({ toast, onClose }) {
       background: isError ? "#2C1520" : "#0B2E1E",
       border: `1px solid ${isError ? "#FF4D5E" : "#00D47E"}`,
       color: isError ? "#FF8A95" : "#6EE7A8",
-      fontSize: "14px", fontWeight: 600,
+      fontSize: "16px", fontWeight: 600,
       boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
       display: "flex", alignItems: "center", gap: "12px",
       animation: "slideDown 0.3s ease-out",

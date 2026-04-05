@@ -18,9 +18,9 @@ const C = {
 function MetricCard({ label, value, color, sub }) {
   return (
     <div style={{ background: C.card2, borderRadius: "10px", padding: "12px", textAlign: "center", minWidth: "100px" }}>
-      <div style={{ fontSize: "11px", color: C.text3, marginBottom: "4px" }}>{label}</div>
+      <div style={{ fontSize: "14px", color: C.text3, marginBottom: "4px" }}>{label}</div>
       <div style={{ fontSize: "18px", fontWeight: 800, color: color || C.text1 }}>{value}</div>
-      {sub && <div style={{ fontSize: "10px", color: C.text3, marginTop: "2px" }}>{sub}</div>}
+      {sub && <div style={{ fontSize: "13px", color: C.text3, marginTop: "2px" }}>{sub}</div>}
     </div>
   );
 }
@@ -253,24 +253,24 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
     <div>
       {/* 설정 패널 */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px" }}>
-        <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "14px" }}>📊 백테스트 실행</div>
+        <div style={{ fontWeight: 700, fontSize: "17px", marginBottom: "14px" }}>📊 백테스트 실행</div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "10px", marginBottom: "14px" }}>
           <div>
-            <label style={{ fontSize: "11px", color: C.text3, display: "block", marginBottom: "4px" }}>전략</label>
+            <label style={{ fontSize: "14px", color: C.text3, display: "block", marginBottom: "4px" }}>전략</label>
             <select value={strategyId} onChange={e => setStrategyId(e.target.value)} style={{
-              width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "13px",
+              width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "15px",
               background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none",
             }}>
               {ALL_STRATEGIES.map(s => <option key={s.id} value={s.id}>{s.icon} {s.name}</option>)}
             </select>
           </div>
           <div>
-            <label style={{ fontSize: "11px", color: C.text3, display: "block", marginBottom: "4px" }}>종목 심볼</label>
+            <label style={{ fontSize: "14px", color: C.text3, display: "block", marginBottom: "4px" }}>종목 심볼</label>
             <input value={symbol} onChange={e => setSymbol(e.target.value.toUpperCase())} placeholder="SPY, AAPL, 005930.KS..."
               list="bt-symbol-list"
               style={{
-                width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "13px",
+                width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "15px",
                 background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none",
                 boxSizing: "border-box",
               }}
@@ -280,11 +280,11 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
             </datalist>
           </div>
           <div>
-            <label style={{ fontSize: "11px", color: C.text3, display: "block", marginBottom: "4px" }}>타임프레임</label>
+            <label style={{ fontSize: "14px", color: C.text3, display: "block", marginBottom: "4px" }}>타임프레임</label>
             <div style={{ display: "flex", gap: "4px" }}>
               {[{ v: "1d", l: "일봉" }, { v: "1wk", l: "주봉" }].map(t => (
                 <button key={t.v} onClick={() => setTimeframe(t.v)} style={{
-                  flex: 1, padding: "8px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+                  flex: 1, padding: "8px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
                   background: timeframe === t.v ? C.blueBg : C.card2, color: timeframe === t.v ? C.blue : C.text3,
                   border: `1px solid ${timeframe === t.v ? C.blue : C.border2}`, cursor: "pointer",
                 }}>{t.l}</button>
@@ -292,11 +292,11 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
             </div>
           </div>
           <div>
-            <label style={{ fontSize: "11px", color: C.text3, display: "block", marginBottom: "4px" }}>기간</label>
+            <label style={{ fontSize: "14px", color: C.text3, display: "block", marginBottom: "4px" }}>기간</label>
             <div style={{ display: "flex", gap: "4px" }}>
               {[{ v: "6mo", l: "6개월" }, { v: "1y", l: "1년" }, { v: "2y", l: "2년" }, { v: "5y", l: "5년" }].map(r => (
                 <button key={r.v} onClick={() => setRange(r.v)} style={{
-                  flex: 1, padding: "8px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+                  flex: 1, padding: "8px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
                   background: range === r.v ? C.blueBg : C.card2, color: range === r.v ? C.blue : C.text3,
                   border: `1px solid ${range === r.v ? C.blue : C.border2}`, cursor: "pointer",
                 }}>{r.l}</button>
@@ -307,49 +307,49 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "10px", marginBottom: "14px" }}>
           <div>
-            <label style={{ fontSize: "11px", color: C.text3, display: "block", marginBottom: "4px" }}>초기 자본 ($)</label>
+            <label style={{ fontSize: "14px", color: C.text3, display: "block", marginBottom: "4px" }}>초기 자본 ($)</label>
             <input type="number" value={capital} onChange={e => setCapital(+e.target.value || 10000)} style={{
-              width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "13px",
+              width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "15px",
               background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none", boxSizing: "border-box",
             }} />
           </div>
           <div>
-            <label style={{ fontSize: "11px", color: C.text3, display: "block", marginBottom: "4px" }}>손절 (%, 선택)</label>
+            <label style={{ fontSize: "14px", color: C.text3, display: "block", marginBottom: "4px" }}>손절 (%, 선택)</label>
             <input type="number" value={stopLoss} onChange={e => setStopLoss(e.target.value)} placeholder="예: 5" style={{
-              width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "13px",
+              width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "15px",
               background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none", boxSizing: "border-box",
             }} />
           </div>
           <div>
-            <label style={{ fontSize: "11px", color: C.text3, display: "block", marginBottom: "4px" }}>익절 (%, 선택)</label>
+            <label style={{ fontSize: "14px", color: C.text3, display: "block", marginBottom: "4px" }}>익절 (%, 선택)</label>
             <input type="number" value={takeProfit} onChange={e => setTakeProfit(e.target.value)} placeholder="예: 10" style={{
-              width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "13px",
+              width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "15px",
               background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none", boxSizing: "border-box",
             }} />
           </div>
           <div>
-            <label style={{ fontSize: "11px", color: C.text3, display: "block", marginBottom: "4px" }}>트레일링 스톱 (%, 선택)</label>
+            <label style={{ fontSize: "14px", color: C.text3, display: "block", marginBottom: "4px" }}>트레일링 스톱 (%, 선택)</label>
             <input type="number" value={trailingStop} onChange={e => setTrailingStop(e.target.value)} placeholder="예: 8" style={{
-              width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "13px",
+              width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "15px",
               background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none", boxSizing: "border-box",
             }} />
           </div>
           <div>
-            <label style={{ fontSize: "11px", color: C.text3, display: "block", marginBottom: "4px" }}>낙폭 제한 (%, 선택)</label>
+            <label style={{ fontSize: "14px", color: C.text3, display: "block", marginBottom: "4px" }}>낙폭 제한 (%, 선택)</label>
             <input type="number" value={maxDDLimit} onChange={e => setMaxDDLimit(e.target.value)} placeholder="예: 15" style={{
-              width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "13px",
+              width: "100%", padding: "8px 10px", borderRadius: "8px", fontSize: "15px",
               background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none", boxSizing: "border-box",
             }} />
           </div>
         </div>
 
         <button onClick={execute} disabled={loading} style={{
-          padding: "11px 28px", borderRadius: "12px", fontSize: "14px", fontWeight: 700,
+          padding: "11px 28px", borderRadius: "12px", fontSize: "16px", fontWeight: 700,
           background: loading ? C.card2 : C.blue, color: loading ? C.text3 : "#fff", border: "none", cursor: "pointer",
         }}>
           {loading ? "⏳ 백테스트 실행 중..." : `🚀 ${strategy?.name || "전략"} 백테스트 실행`}
         </button>
-        {error && <div style={{ color: C.red, fontSize: "13px", marginTop: "10px" }}>⚠️ {error}</div>}
+        {error && <div style={{ color: C.red, fontSize: "15px", marginTop: "10px" }}>⚠️ {error}</div>}
       </div>
 
       {/* 결과 */}
@@ -358,11 +358,11 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
           {/* 성과 요약 */}
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-              <div style={{ fontWeight: 700, fontSize: "15px" }}>
+              <div style={{ fontWeight: 700, fontSize: "17px" }}>
                 {result.strategyIcon} {result.strategyName} — {result.symbol}
               </div>
               <span style={{
-                padding: "4px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
+                padding: "4px 10px", borderRadius: "8px", fontSize: "14px", fontWeight: 700,
                 background: result.totalReturn >= 0 ? C.greenBg : C.redBg,
                 color: result.totalReturn >= 0 ? C.green : C.red,
               }}>
@@ -437,7 +437,7 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
 
             {/* 자산 곡선 */}
             <div style={{ marginBottom: "10px" }}>
-              <div style={{ fontSize: "12px", color: C.text3, marginBottom: "6px" }}>자산 곡선 (Equity Curve)</div>
+              <div style={{ fontSize: "14px", color: C.text3, marginBottom: "6px" }}>자산 곡선 (Equity Curve)</div>
               <EquityChart equity={result.equity} buyHoldReturn={result.buyHoldReturn} initialCapital={result.initialCapital} />
             </div>
           </div>
@@ -447,16 +447,16 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
             <div onClick={() => setShowTrades(!showTrades)} style={{
               display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer",
             }}>
-              <div style={{ fontWeight: 700, fontSize: "15px" }}>📜 거래 내역 ({result.trades.length}건)</div>
+              <div style={{ fontWeight: 700, fontSize: "17px" }}>📜 거래 내역 ({result.trades.length}건)</div>
               <span style={{ color: C.text3, fontSize: "18px" }}>{showTrades ? "▲" : "▼"}</span>
             </div>
             {showTrades && (
               <div style={{ marginTop: "12px", maxHeight: "400px", overflow: "auto" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "14px" }}>
                   <thead>
                     <tr style={{ borderBottom: `1px solid ${C.border2}` }}>
                       {["타입", "날짜", "가격", "수량", "수익", "사유"].map(h => (
-                        <th key={h} style={{ padding: "8px 6px", textAlign: "left", color: C.text3, fontWeight: 600, fontSize: "11px" }}>{h}</th>
+                        <th key={h} style={{ padding: "8px 6px", textAlign: "left", color: C.text3, fontWeight: 600, fontSize: "14px" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>

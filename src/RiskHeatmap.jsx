@@ -208,7 +208,7 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", marginBottom: "16px" }}>
           <div>
             <div style={{ fontWeight: 800, fontSize: "18px", marginBottom: "2px" }}>리스크 컨트롤 타워</div>
-            <div style={{ color: C.text3, fontSize: "12px" }}>
+            <div style={{ color: C.text3, fontSize: "14px" }}>
               {new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })} 기준
             </div>
           </div>
@@ -222,7 +222,7 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
               <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
                 fontWeight: 800, fontSize: "20px", color: ov.color }}>{overall.score}</div>
             </div>
-            <div style={{ fontSize: "10px", fontWeight: 700, color: ov.color, marginTop: "2px",
+            <div style={{ fontSize: "13px", fontWeight: 700, color: ov.color, marginTop: "2px",
               padding: "1px 8px", borderRadius: "4px", background: ov.glow }}>{ov.label}</div>
           </div>
         </div>
@@ -237,7 +237,7 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
                 textAlign: "center", border: `1px solid ${cnt > 0 ? sev.color + "30" : C.border}`,
               }}>
                 <div style={{ fontSize: "20px", fontWeight: 800, color: cnt > 0 ? sev.color : C.text3 }}>{cnt}</div>
-                <div style={{ fontSize: "9px", color: cnt > 0 ? sev.color : C.text3, fontWeight: 700 }}>{sev.label}</div>
+                <div style={{ fontSize: "12px", color: cnt > 0 ? sev.color : C.text3, fontWeight: 700 }}>{sev.label}</div>
               </div>
             );
           })}
@@ -248,7 +248,7 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
       <div style={{ display: "flex", gap: "4px", marginBottom: "12px" }}>
         {[["dashboard", "대시보드"], ["matrix", "리스크 매트릭스"], ["history", "트렌드"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} style={{
-            padding: "7px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+            padding: "7px 14px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
             background: tab === id ? C.blueBg : "transparent", color: tab === id ? C.blue : C.text3,
             border: `1px solid ${tab === id ? C.blue : C.border2}`, cursor: "pointer",
           }}>{label}</button>
@@ -274,15 +274,15 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
-                      <span style={{ fontWeight: 700, fontSize: "14px" }}>{risk.name}</span>
-                      <span style={{ fontSize: "9px", fontWeight: 800, color: sev.color,
+                      <span style={{ fontWeight: 700, fontSize: "16px" }}>{risk.name}</span>
+                      <span style={{ fontSize: "12px", fontWeight: 800, color: sev.color,
                         padding: "1px 6px", borderRadius: "4px", background: sev.glow }}>{sev.label}</span>
-                      <span style={{ fontSize: "10px", color: risk.trend === "악화" ? C.red : risk.trend === "개선" ? C.green : C.text3,
+                      <span style={{ fontSize: "13px", color: risk.trend === "악화" ? C.red : risk.trend === "개선" ? C.green : C.text3,
                         fontWeight: 600 }}>
                         {risk.trend === "악화" ? "↗ 악화" : risk.trend === "개선" ? "↘ 개선" : "→ 보합"}
                       </span>
                     </div>
-                    <div style={{ fontSize: "12px", color: C.text3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: "14px", color: C.text3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {risk.headline}
                     </div>
                   </div>
@@ -298,17 +298,17 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "12px" }}>
                       {risk.keyMetrics.map((m, j) => (
                         <div key={j} style={{ background: C.card2, borderRadius: "10px", padding: "10px", textAlign: "center" }}>
-                          <div style={{ fontSize: "10px", color: C.text3, marginBottom: "4px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                          <div style={{ fontSize: "13px", color: C.text3, marginBottom: "4px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
                             <StatusDot status={m.status} /> {m.label}
                           </div>
-                          <div style={{ fontWeight: 700, fontSize: "14px",
+                          <div style={{ fontWeight: 700, fontSize: "16px",
                             color: m.status === "danger" ? C.red : m.status === "warn" ? C.yellow : C.text1 }}>{m.value}</div>
                         </div>
                       ))}
                     </div>
                     {/* 포트폴리오 영향 */}
                     <div style={{ background: C.card2, borderRadius: "10px", padding: "10px 12px",
-                      fontSize: "12px", color: C.text2, display: "flex", alignItems: "center", gap: "6px" }}>
+                      fontSize: "14px", color: C.text2, display: "flex", alignItems: "center", gap: "6px" }}>
                       <span style={{ color: C.yellow }}>💡</span> <b>포트폴리오 영향:</b> {risk.impact}
                     </div>
                     {/* 리스크 바 */}
@@ -349,13 +349,13 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
                       <span style={{ fontSize: "18px" }}>{risk.icon}</span>
                       <span style={{ fontWeight: 800, fontSize: "24px", color: sev.color, opacity }}>{risk.score}</span>
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: "13px", marginBottom: "2px" }}>{risk.name}</div>
-                    <div style={{ fontSize: "10px", color: C.text3, marginBottom: "6px",
+                    <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "2px" }}>{risk.name}</div>
+                    <div style={{ fontSize: "13px", color: C.text3, marginBottom: "6px",
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{risk.headline}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span style={{ fontSize: "9px", fontWeight: 700, padding: "1px 6px", borderRadius: "4px",
+                      <span style={{ fontSize: "12px", fontWeight: 700, padding: "1px 6px", borderRadius: "4px",
                         background: sev.glow, color: sev.color }}>{sev.label}</span>
-                      <span style={{ fontSize: "9px", color: risk.trend === "악화" ? C.red : risk.trend === "개선" ? C.green : C.text3 }}>
+                      <span style={{ fontSize: "12px", color: risk.trend === "악화" ? C.red : risk.trend === "개선" ? C.green : C.text3 }}>
                         {risk.trend === "악화" ? "▲" : risk.trend === "개선" ? "▼" : "−"}
                       </span>
                     </div>
@@ -364,7 +364,7 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
                   {expandedCP === risk.id && (
                     <div style={{ position: "relative", marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${C.border}` }}>
                       {risk.keyMetrics.map((m, j) => (
-                        <div key={j} style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", padding: "3px 0" }}>
+                        <div key={j} style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", padding: "3px 0" }}>
                           <span style={{ color: C.text3, display: "flex", alignItems: "center", gap: "4px" }}>
                             <StatusDot status={m.status} /> {m.label}
                           </span>
@@ -381,7 +381,7 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
           {/* 범례 */}
           <div style={{ display: "flex", gap: "12px", justifyContent: "center", padding: "8px" }}>
             {Object.entries(SEV).map(([key, sev]) => (
-              <div key={key} style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", color: C.text3 }}>
+              <div key={key} style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "13px", color: C.text3 }}>
                 <span style={{ width: "8px", height: "8px", borderRadius: "2px", background: sev.color }} />
                 {sev.label}
               </div>
@@ -394,19 +394,19 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
       {tab === "history" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "16px" }}>
-            <div style={{ fontWeight: 700, fontSize: "14px", marginBottom: "12px" }}>📊 7일 리스크 트렌드</div>
+            <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "12px" }}>📊 7일 리스크 트렌드</div>
             {risks.map(risk => {
               const sev = SEV[risk.severity];
               return (
                 <div key={risk.id} style={{ display: "flex", alignItems: "center", gap: "12px",
                   padding: "8px 0", borderBottom: `1px solid ${C.border}` }}>
-                  <span style={{ fontSize: "16px", width: "28px", textAlign: "center" }}>{risk.icon}</span>
-                  <span style={{ fontWeight: 600, fontSize: "13px", width: "60px" }}>{risk.name}</span>
+                  <span style={{ fontSize: "18px", width: "28px", textAlign: "center" }}>{risk.icon}</span>
+                  <span style={{ fontWeight: 600, fontSize: "15px", width: "60px" }}>{risk.name}</span>
                   <div style={{ flex: 1 }}>
                     <Sparkline score={risk.score} trend={risk.trend} width={100} height={24} />
                   </div>
-                  <span style={{ fontWeight: 700, fontSize: "14px", color: sev.color, width: "32px", textAlign: "right" }}>{risk.score}</span>
-                  <span style={{ fontSize: "9px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px",
+                  <span style={{ fontWeight: 700, fontSize: "16px", color: sev.color, width: "32px", textAlign: "right" }}>{risk.score}</span>
+                  <span style={{ fontSize: "12px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px",
                     background: sev.glow, color: sev.color, minWidth: "52px", textAlign: "center" }}>{sev.label}</span>
                 </div>
               );
@@ -415,14 +415,14 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
 
           {/* 종합 인사이트 */}
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "16px" }}>
-            <div style={{ fontWeight: 700, fontSize: "14px", marginBottom: "10px" }}>💡 리스크 인사이트</div>
+            <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "10px" }}>💡 리스크 인사이트</div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {[
                 { icon: "🔴", text: `${risks.filter(r => r.trend === "악화").length}개 CP 악화 추세 — 포지션 축소 권장` },
                 { icon: "🟢", text: `${risks.filter(r => r.trend === "개선").length}개 CP 개선 중 — 선별적 진입 가능` },
                 { icon: "⚠️", text: `종합 리스크 ${overall.score}점 — ${overall.score > 65 ? "방어적 운용 권장" : overall.score > 40 ? "중립 유지" : "공격적 운용 가능"}` },
               ].map((item, i) => (
-                <div key={i} style={{ display: "flex", gap: "8px", alignItems: "flex-start", fontSize: "13px", color: C.text2 }}>
+                <div key={i} style={{ display: "flex", gap: "8px", alignItems: "flex-start", fontSize: "15px", color: C.text2 }}>
                   <span>{item.icon}</span> {item.text}
                 </div>
               ))}
@@ -433,7 +433,7 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
 
       {/* 면책 */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px",
-        fontSize: "10px", color: C.text3, lineHeight: "1.5", marginTop: "12px" }}>
+        fontSize: "13px", color: C.text3, lineHeight: "1.5", marginTop: "12px" }}>
         ⚠️ 리스크 점수는 VIX, 공포·탐욕 지수, 달러 인덱스 등 공개 시장 데이터를 기반으로 자동 산출됩니다.
         투자 판단의 근거가 아닌 참고 자료로만 활용하시기 바랍니다.
       </div>
