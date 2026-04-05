@@ -1082,7 +1082,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
 
                 {/* 미니 ROI 차트 */}
                 {!isMobile && (
-                  <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ flex: 1, minWidth: 0, height: "72px" }}>
                     {pnlData.length >= 2 ? (() => {
                       const w = 300, h = 64;
                       const min = Math.min(...pnlData) * 0.998;
@@ -1095,7 +1095,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                       const clr = botIsPositive ? c.green : c.red;
                       const gradId = `mini-${ab.botId.replace(/[^a-z0-9]/gi, "")}`;
                       return (
-                        <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ borderRadius: "6px" }}>
+                        <svg width="100%" height="64" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" style={{ borderRadius: "6px", display: "block" }}>
                           <defs>
                             <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                               <stop offset="0%" stopColor={clr} stopOpacity="0.2" />
