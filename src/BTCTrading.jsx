@@ -533,43 +533,37 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   // ── 탭 퍼시스턴스 ──
   useEffect(() => { save("di_btc_tab", subTab); }, [subTab]);
 
-  // ── Equity 계산 ──
+  // ── Equity / 손익 계산 (실제 포지션 기준으로 통일) ──
   const fullEquity = parseFloat(virtualPortfolio?.equity || 0);
   const fullCash = parseFloat(virtualPortfolio?.cash || 0);
-  const hasPortfolioData = fullEquity > 0 || fullCash > 0;
   const equity = botAllocation ? botAllocation : fullEquity;
-  // 봇별 현금 = 배분금액 - 해당 봇의 실제 투자금(포지션 시장가치 합계)
-  const botMarketValue = (() => {
-    if (!botAllocation) return 0;
-    // cryptoPositions: 이 봇에 속하는 실제 포지션 목록
-    return (cryptoPositions || []).reduce((sum, p) => sum + Math.abs(parseFloat(p.marketValue || p.market_value || 0)), 0);
-  })();
-  const cash = botAllocation
-    ? Math.max(0, botAllocation - botMarketValue)
-    : fullCash;
-  const allocRatio = (botAllocation && fullEquity > 0) ? (botAllocation / fullEquity) : 1;
-  const fullDayPL = parseFloat(virtualPortfolio?.dayPL || 0);
-  const dayPL = botAllocation ? Math.round(fullDayPL * allocRatio * 100) / 100 : fullDayPL;
-  const fullDayPLPct = parseFloat(virtualPortfolio?.dayPLPct || 0);
-  const dayPLPct = botAllocation ? Math.round(fullDayPLPct * allocRatio * 100) / 100 : fullDayPLPct;
+  // 봇별 실제 포지션에서 시장가치와 미실현 손익 직접 계산
+  const botMarketValue = (cryptoPositions || []).reduce((sum, p) => sum + Math.abs(parseFloat(p.marketValue || p.market_value || 0)), 0);
+  const botUnrealizedPL = (cryptoPositions || []).reduce((sum, p) => sum + parseFloat(p.unrealizedPL || p.unrealized_pl || 0), 0);
+  // 봇별 현금 = 배분금액 - 투자금
+  const cash = botAllocation ? Math.max(0, botAllocation - botMarketValue) : fullCash;
   const fmtUSD2 = (v) => `$${Math.abs(v).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
   // ── 봇 성과 파생 ──
   const snap = botPerf?.snapshot || {};
   const perf = botPerf?.perf || {};
-  const unrealizedPL = snap.unrealizedPL || 0;
-  // DD/MDD: 배분금액 기준 에쿼티 대비 (100%는 비정상 데이터 → 0으로 처리)
+  // 미실현 손익: 실제 포지션 > KV 스냅샷 순으로 우선 사용
+  const unrealizedPL = botUnrealizedPL !== 0 ? botUnrealizedPL : (snap.unrealizedPL || 0);
+  // DD/MDD
   const rawDD = snap.dd || 0;
   const rawMDD = snap.mdd || 0;
   const dd = rawDD >= 99.9 ? 0 : rawDD;
   const mdd = rawMDD >= 99.9 ? 0 : rawMDD;
   const tradeCount = perf.tradeCount || 0;
-  // 실현 손익: 매도한 종목에서만 발생 (매도 수익 - 매도 대상의 매수 비용)
-  const closedPL = perf.realizedPL || 0; // btc-cron에서 매도 시 계산된 실현 손익
+  // 실현 손익: 매도한 종목에서만 발생
+  const closedPL = perf.realizedPL || 0;
   // 총 손익 = 실현 손익 + 미실현 손익
   const totalPL = closedPL + unrealizedPL;
   const initCapital = botAllocation || 100000;
   const totalPLPct = initCapital > 0 ? (totalPL / initCapital) * 100 : 0;
+  // 일일 손익도 실제 포지션 기반 (미실현 손익을 dayPL로 표시)
+  const dayPL = unrealizedPL;
+  const dayPLPct = initCapital > 0 ? (unrealizedPL / initCapital) * 100 : 0;
 
   return (
     <div className="tab-content" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "240px 1fr", gap: "0", minHeight: "100vh" }}>
