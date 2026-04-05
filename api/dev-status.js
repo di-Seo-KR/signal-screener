@@ -4,9 +4,9 @@
 // POST /api/dev-status?action=reset-bots      → 봇 성과 데이터 초기화
 
 export default async function handler(req, res) {
-  // POST 액션 처리
-  if (req.method === "POST") {
-    const { action } = req.query;
+  // POST 또는 GET 액션 처리 (GET도 허용 — Vercel 도구 제한 대응)
+  const { action } = req.query;
+  if (action && (req.method === "POST" || req.method === "GET")) {
     try {
       const kvModule = await import("@vercel/kv");
       const kv = kvModule.kv;
