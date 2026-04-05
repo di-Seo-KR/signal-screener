@@ -1163,13 +1163,13 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           const showKvTrades = botPreset && kvTrades2.length > 0;
           const displayTrades = showKvTrades
             ? kvTrades2.slice(-30).reverse().map(t => ({
-                type: t.side || t.action || "BUY",
+                type: t.type || t.side || t.action || "BUY",
                 asset: t.asset || t.symbol || "",
                 price: t.price || 0,
                 qty: t.qty || 0,
                 amount: t.amount || (t.price * (t.qty || 0)),
                 date: t.time ? new Date(t.time) : null,
-                reason: t.reason || (t.side === "SELL" ? "매도 시그널" : "매수 시그널"),
+                reason: t.signal || t.reason || ((t.type || t.side) === "SELL" ? "매도 시그널" : "매수 시그널"),
                 pnl: t.pnl || null,
               }))
             : recentSignals;
@@ -1186,7 +1186,9 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
               </div>
               {displayTrades.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "40px", color: C.text3 }}>
-                  {showKvTrades ? "거래 내역 없음" : "시그널 없음"}
+                  {snap.positionCount > 0
+                    ? "기존 포지션 연동 중 — 다음 크론 실행 시 거래 기록이 생성됩니다"
+                    : (showKvTrades ? "거래 내역 없음" : "시그널 없음")}
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>

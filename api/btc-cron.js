@@ -637,6 +637,32 @@ export default async function handler(req, res) {
         const assets = BOT_ASSET_MAP[botId];
         if (!assets) continue; // 알 수 없는 봇 ID 스킵
 
+        // ── 기존 포지션 백필: 포지션 있는데 거래 기록이 0이면 초기 진입으로 기록 ──
+        const botPositionsForBackfill = assets.map(a => positionMap[a]).filter(Boolean);
+        if (botPositionsForBackfill.length > 0) {
+          const perfKeyBf = `di:bot:${botId}:perf`;
+          const perfBf = (await kv.get(perfKeyBf)) || { botId, trades: [], tradeCount: 0, realizedPL: 0, totalBuyCost: 0, totalSellRevenue: 0, winCount: 0 };
+          if ((perfBf.tradeCount || 0) === 0 && (!perfBf.trades || perfBf.trades.length === 0)) {
+            // 기존 포지션을 초기 진입 기록으로 백필
+            const backfillTrades = botPositionsForBackfill.map(p => ({
+              time: p.updated_at || new Date().toISOString(),
+              asset: p.symbol,
+              type: "BUY",
+              amount: parseFloat(p.market_value || 0),
+              price: parseFloat(p.avg_entry_price || p.current_price || 0),
+              signal: "기존 포지션 연동",
+              score: null,
+              confidence: null,
+            }));
+            perfBf.trades = backfillTrades;
+            perfBf.tradeCount = backfillTrades.length;
+            perfBf.totalBuyCost = backfillTrades.reduce((s, t) => s + (t.amount || 0), 0);
+            perfBf.lastUpdated = new Date().toISOString();
+            await kv.set(perfKeyBf, perfBf);
+            addLog(`🔄 ${botId}: 기존 포지션 ${backfillTrades.length}건 거래 기록 백필`);
+          }
+        }
+
         const botPositions = assets
           .map(a => positionMap[a])
           .filter(Boolean);
