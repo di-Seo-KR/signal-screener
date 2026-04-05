@@ -734,25 +734,44 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           const kvDD2 = rawDD2 >= 99.9 ? 0 : rawDD2;
           const kvMDD2 = rawMDD2 >= 99.9 ? 0 : rawMDD2;
           const botAssets = getBotAssets(botPreset?.id);
-          // 실제 포지션 데이터 기반 자산 배분 (positionDetails가 있으면 사용, 없으면 균등)
+          // 실제 진입 포지션 기반 자산 배분 (positionDetails + 현금 비중 포함)
           const posDetails = snap.positionDetails || [];
-          // 자산명 매핑: "BTC-USD" → "Bitcoin" 등
+          // 자산명 매핑: "BTC/USD" → "Bitcoin" 등
           const assetNameMap = {};
           botAssets.forEach(a => {
             const sym = (a.sym || "").replace("USDT", "").replace("-USD", "");
             assetNameMap[sym] = a.name;
             assetNameMap[sym.toUpperCase()] = a.name;
             assetNameMap[a.sym || ""] = a.name;
+            // "BTC/USD" 형태도 매핑
+            const slashKey = (a.sym || "").replace("-USD", "/USD");
+            assetNameMap[slashKey] = a.name;
           });
           const getAssetLabel = (raw) => {
-            const clean = (raw || "").replace("-USD", "").replace("USDT", "").replace("/USD", "");
+            if (!raw) return "Unknown";
+            // 직접 매핑 먼저 시도
+            if (assetNameMap[raw]) return assetNameMap[raw];
+            const clean = raw.replace("-USD", "").replace("USDT", "").replace("/USD", "");
             return assetNameMap[clean] || assetNameMap[clean.toUpperCase()] || clean || "Unknown";
           };
-          const assetData = posDetails.length > 0
+          // 실제 포지션 자산 데이터 (시장가치 기준)
+          const posAssetData = posDetails.length > 0
             ? posDetails.map(p => ({ name: getAssetLabel(p.asset), value: Math.abs(p.marketValue || 0) })).filter(a => a.value > 0)
-            : botAssets.map(a => ({ name: a.name, value: 1 }));
-          // 포지션 없으면 "현금" 표시
-          const finalAssetData = assetData.length > 0 ? assetData : [{ name: "현금 (대기)", value: 1 }];
+            : [];
+          // 총 투자금 대비 현금(미투자) 비중 계산
+          const totalInvested = posAssetData.reduce((s, a) => s + a.value, 0);
+          const botAlloc = snap.botAllocation || 0;
+          const cashRemaining = botAlloc > 0 ? Math.max(0, botAlloc - totalInvested) : 0;
+          // 포지션이 있으면 자산+현금, 없으면 "전액 현금 (대기)"
+          let finalAssetData;
+          if (posAssetData.length > 0) {
+            finalAssetData = [...posAssetData];
+            if (cashRemaining > totalInvested * 0.01) {
+              finalAssetData.push({ name: "현금", value: cashRemaining });
+            }
+          } else {
+            finalAssetData = [{ name: "현금 (대기)", value: 1 }];
+          }
           const chartColors = [C.blue, "#FCD535", "#85C4FF", C.purple, C.orange, C.green, C.red, "#FF69B4", "#00CED1", "#FF6347"];
           const eqCurve = bp?.equityCurve || [];
           const pnlCurveData = bp?.pnlCurve || [];
@@ -981,19 +1000,27 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                                 const y1 = cy2 + r2 * Math.sin(start);
                                 const x2 = cx2 + r2 * Math.cos(end);
                                 const y2 = cy2 + r2 * Math.sin(end);
+                                const isCash = (d.name || "").includes("현금");
+                                const arcColor = isCash ? `${C.text3}50` : chartColors[i % chartColors.length];
                                 return <path key={i} d={`M ${x1} ${y1} A ${r2} ${r2} 0 ${la} 1 ${x2} ${y2}`}
-                                  fill="none" stroke={chartColors[i % chartColors.length]} strokeWidth={sw} />;
+                                  fill="none" stroke={arcColor} strokeWidth={sw} />;
                               })}
                             </svg>
                           );
                         })()}
-                        <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                           {finalAssetData.slice(0, 8).map((a, i) => {
-                            const pct = (a.value / finalAssetData.reduce((s, d) => s + d.value, 0) * 100).toFixed(1);
+                            const total = finalAssetData.reduce((s, d) => s + d.value, 0);
+                            const pct = (a.value / total * 100).toFixed(1);
+                            const isCash = a.name.includes("현금");
+                            const barColor = isCash ? `${C.text3}60` : chartColors[i % chartColors.length];
                             return (
                               <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                <div style={{ width: "14px", height: "4px", borderRadius: "2px", background: chartColors[i % chartColors.length] }} />
-                                <span style={{ fontSize: "14px", fontWeight: 600, color: C.text1 }}>{a.name} {pct}%</span>
+                                <div style={{ width: "14px", height: "4px", borderRadius: "2px", background: barColor }} />
+                                <span style={{ fontSize: "14px", fontWeight: 600, color: isCash ? C.text3 : C.text1 }}>{a.name}</span>
+                                <span style={{ fontSize: "13px", color: C.text3, marginLeft: "auto" }}>
+                                  {a.value >= 1 ? `$${a.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : ""} {pct}%
+                                </span>
                               </div>
                             );
                           })}
