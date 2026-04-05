@@ -2556,7 +2556,7 @@ function calcAdvancedLevels(closes, highs, lows, volumes, techData, fairValue, a
 // ════════════════════════════════════════════════════════════════════
 // 서브 컴포넌트: AssetCard
 // ════════════════════════════════════════════════════════════════════
-function AssetCard({ asset, onChart }) {
+function AssetCard({ asset, onChart, isMobile = false }) {
   const [expanded, setExpanded] = useState(false);
   const isPos = asset.weekChange >= 0;
   const mcBg = asset.market === "us" ? "#1A2C4F" : asset.market === "kr" ? "#1A2A1E" : "#1E1A2A";
@@ -2568,21 +2568,21 @@ function AssetCard({ asset, onChart }) {
   return (
     <div className="asset-card" style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", overflow: "hidden", transition: "border-color 0.2s ease, box-shadow 0.2s ease" }}>
       <div onClick={() => setExpanded(!expanded)}
-        style={{ display: "flex", alignItems: "center", padding: "14px 18px", cursor: "pointer", gap: "12px" }}>
+        style={{ display: "flex", alignItems: "center", padding: isMobile ? "10px 12px" : "14px 18px", cursor: "pointer", gap: isMobile ? "8px" : "12px" }}>
         <div style={{
-          width: "42px", height: "42px", borderRadius: "12px", background: mcBg, flexShrink: 0,
+          width: isMobile ? "36px" : "42px", height: isMobile ? "36px" : "42px", borderRadius: "12px", background: mcBg, flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontWeight: 800, fontSize: "15px", color: mcColor, letterSpacing: "-0.5px",
+          fontWeight: 800, fontSize: isMobile ? "12px" : "15px", color: mcColor, letterSpacing: "-0.5px",
         }}>
           {asset.symbol.length <= 4 ? asset.symbol : asset.symbol.slice(0, 4)}
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-            <span style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>{asset.name}</span>
-            <span style={{ fontSize: "16px", color: C.text3 }}>{asset.symbol}</span>
+        <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "4px" : "8px", marginBottom: "4px", flexWrap: "nowrap" }}>
+            <span style={{ fontWeight: 700, fontSize: isMobile ? "14px" : "17px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: isMobile ? "80px" : "none" }}>{asset.name}</span>
+            {!isMobile && <span style={{ fontSize: "16px", color: C.text3 }}>{asset.symbol}</span>}
             {diag && (
               <span style={{
-                fontSize: "15px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", marginLeft: "auto",
+                fontSize: isMobile ? "12px" : "15px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", marginLeft: "auto", whiteSpace: "nowrap", flexShrink: 0,
                 background: diag.score >= 68 ? `${C.green}20` : diag.score >= 42 ? `${C.yellow}20` : `${C.red}20`,
                 color: diag.score >= 68 ? C.green : diag.score >= 42 ? C.yellow : C.red,
               }}>{diag.score}점 {diag.opinion}</span>
@@ -2601,8 +2601,8 @@ function AssetCard({ asset, onChart }) {
           </div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{fmtPrice(asset.price, asset.market)}</div>
-          <div style={{ fontSize: "17px", fontWeight: 600, color: isPos ? C.green : C.red }}>
+          <div style={{ fontWeight: 700, fontSize: isMobile ? "15px" : "18px", color: C.text1 }}>{fmtPrice(asset.price, asset.market)}</div>
+          <div style={{ fontSize: isMobile ? "14px" : "17px", fontWeight: 600, color: isPos ? C.green : C.red }}>
             {isPos ? "▲" : "▼"} {Math.abs(asset.weekChange)}%
           </div>
           {/* 수급 미니 인디케이터 (CMF/MFI) */}
@@ -8604,7 +8604,7 @@ function AppInner() {
 
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {filtered.map((asset, i) => (
-                <AssetCard key={`${asset.symbol}-${i}`} asset={asset} onChart={() => setChartAsset(asset)} />
+                <AssetCard key={`${asset.symbol}-${i}`} asset={asset} onChart={() => setChartAsset(asset)} isMobile={isMobile} />
               ))}
             </div>
 

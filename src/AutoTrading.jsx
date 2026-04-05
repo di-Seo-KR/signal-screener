@@ -991,8 +991,8 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
 
             {/* 핵심 지표 그리드 */}
             <div style={{
-              display: "grid", gridTemplateColumns: "repeat(3, 1fr) repeat(3, 1fr)",
-              gap: "12px", marginBottom: "4px",
+              display: "grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(6, 1fr)",
+              gap: isMobile ? "8px" : "12px", marginBottom: "4px",
             }}>
               {[
                 { label: "미실현 손익", value: `${grandUnrealized >= 0 ? "+" : ""}$${grandUnrealized.toFixed(2)}`, color: grandUnrealized >= 0 ? c.green : c.red },
@@ -1002,9 +1002,9 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                 { label: "활성 봇", value: `${runningBots.length}개`, color: c.blue },
                 { label: "총 승/패", value: `${grandWins}/${grandTrades - grandWins}`, color: c.text1 },
               ].map((m, i) => (
-                <div key={i} style={{ padding: "10px 12px", borderRadius: "10px", background: c.card2 }}>
-                  <div style={{ fontSize: "14px", color: c.text3, marginBottom: "4px" }}>{m.label}</div>
-                  <div style={{ fontSize: "18px", fontWeight: 700, color: m.color }}>{m.value}</div>
+                <div key={i} style={{ padding: isMobile ? "8px 6px" : "10px 12px", borderRadius: "10px", background: c.card2, textAlign: "center" }}>
+                  <div style={{ fontSize: isMobile ? "11px" : "14px", color: c.text3, marginBottom: "4px", whiteSpace: "nowrap" }}>{m.label}</div>
+                  <div style={{ fontSize: isMobile ? "15px" : "18px", fontWeight: 700, color: m.color, whiteSpace: "nowrap" }}>{m.value}</div>
                 </div>
               ))}
             </div>
