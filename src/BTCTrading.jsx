@@ -755,12 +755,20 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
             return assetNameMap[clean] || assetNameMap[clean.toUpperCase()] || clean || "Unknown";
           };
           // 실제 포지션 자산 데이터 (시장가치 기준)
-          const posAssetData = posDetails.length > 0
+          // 1순위: KV 스냅샷의 positionDetails, 2순위: virtualPortfolio 실시간 데이터
+          let posAssetData = posDetails.length > 0
             ? posDetails.map(p => ({ name: getAssetLabel(p.asset), value: Math.abs(p.marketValue || 0) })).filter(a => a.value > 0)
             : [];
+          // positionDetails가 비어있으면 virtualPortfolio(실시간)에서 폴백
+          if (posAssetData.length === 0 && cryptoPositions && cryptoPositions.length > 0) {
+            posAssetData = cryptoPositions.map(p => ({
+              name: getAssetLabel(p.symbol || ""),
+              value: Math.abs(parseFloat(p.marketValue || p.market_value || 0)),
+            })).filter(a => a.value > 0);
+          }
           // 총 투자금 대비 현금(미투자) 비중 계산
           const totalInvested = posAssetData.reduce((s, a) => s + a.value, 0);
-          const botAlloc = snap.botAllocation || 0;
+          const botAlloc = snap.botAllocation || botAllocation || 0;
           const cashRemaining = botAlloc > 0 ? Math.max(0, botAlloc - totalInvested) : 0;
           // 포지션이 있으면 자산+현금, 없으면 "전액 현금 (대기)"
           let finalAssetData;
