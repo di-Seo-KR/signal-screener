@@ -828,6 +828,167 @@ function DonutChart({ data, size = 140, theme }) {
   );
 }
 
+// ── 활성 봇 모바일 캐러셀 (수평 스와이프) ──
+function ActiveBotCarousel({ activeBots, allBotPerf, onSelectBot, onStopBot, onAddFund, theme, cardStyle }) {
+  const c = colors[theme];
+  const scrollRef = useRef(null);
+  const [scrollIdx, setScrollIdx] = useState(0);
+  const runningBots = activeBots.filter(ab => ab.status !== "paused");
+
+  const handleScroll = () => {
+    if (!scrollRef.current) return;
+    const el = scrollRef.current;
+    const cardW = el.firstChild?.offsetWidth || 260;
+    const idx = Math.round(el.scrollLeft / (cardW + 12));
+    setScrollIdx(idx);
+  };
+
+  if (runningBots.length === 0) return null;
+
+  return (
+    <>
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="bot-carousel"
+        style={{
+          display: "flex", gap: "12px", overflowX: "auto", scrollSnapType: "x mandatory",
+          WebkitOverflowScrolling: "touch", paddingBottom: "8px",
+          scrollbarWidth: "none", msOverflowStyle: "none",
+        }}
+      >
+        <style>{`.bot-carousel::-webkit-scrollbar { display: none; }`}</style>
+        {runningBots.map(ab => {
+          const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
+          const elapsed = Date.now() - (ab.startedAt || Date.now());
+          const days = Math.floor(elapsed / 86400000);
+          const hours = Math.floor((elapsed % 86400000) / 3600000);
+          const isStock = STOCK_BOTS.some(b => b.id === ab.botId);
+          const bp = allBotPerf[ab.botId];
+          const kvTrades = bp?.perf?.tradeCount || 0;
+          const kvWinCount = bp?.perf?.winCount || 0;
+          const kvUnrealized = bp?.snapshot?.unrealizedPL || 0;
+          const realizedPL = bp?.perf?.realizedPL || 0;
+          const totalPL = kvUnrealized + realizedPL;
+          const allocation = ab.allocation || 0;
+          const roiPct = allocation > 0 ? (totalPL / allocation) * 100 : 0;
+          const rawMDD = bp?.snapshot?.mdd || 0;
+          const kvMDD = rawMDD >= 99.9 ? 0 : rawMDD;
+          const pnlData = bp?.equityCurve && bp.equityCurve.length >= 2 ? bp.equityCurve : [];
+          const botIsPositive = roiPct >= 0;
+
+          return (
+            <div key={ab.botId} style={{
+              ...cardStyle, minWidth: "min(300px, 85vw)", maxWidth: "320px", scrollSnapAlign: "start", flex: "0 0 auto",
+              display: "flex", flexDirection: "column", gap: "10px", cursor: "pointer",
+            }} onClick={() => onSelectBot(bot)}>
+              {/* 봇 헤더 */}
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                <span style={{
+                  fontSize: "22px", width: "36px", height: "36px",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: `${c.blue}10`, borderRadius: "10px", flexShrink: 0,
+                }}>{bot.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontWeight: 700, fontSize: "15px", color: c.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bot.name}</span>
+                    <span style={{
+                      padding: "1px 6px", borderRadius: "4px", fontSize: "11px", fontWeight: 600,
+                      background: `${getRiskColor(bot.riskColor, theme)}15`,
+                      color: getRiskColor(bot.riskColor, theme), flexShrink: 0,
+                    }}>{bot.risk}</span>
+                  </div>
+                  <div style={{ fontSize: "12px", color: c.text3, marginTop: "1px" }}>
+                    {days > 0 ? `${days}일 ` : ""}{hours}시간 · {isStock ? "주식" : "크립토"} · {kvTrades}회
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: "17px", fontWeight: 800, color: botIsPositive ? c.green : c.red }}>
+                    {roiPct >= 0 ? "+" : ""}{roiPct.toFixed(2)}%
+                  </div>
+                  <div style={{ fontSize: "12px", color: totalPL >= 0 ? c.green : c.red, fontWeight: 600 }}>
+                    {totalPL >= 0 ? "+" : ""}${totalPL.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+
+              {/* 미니 ROI 차트 */}
+              <div style={{ height: "50px" }}>
+                {pnlData.length >= 2 ? (() => {
+                  const w = 300, h = 46;
+                  const min = Math.min(...pnlData) * 0.998;
+                  const max = Math.max(...pnlData) * 1.002;
+                  const rng = max - min || 1;
+                  const xStep = w / (pnlData.length - 1);
+                  const pts = pnlData.map((v, i) => `${(i * xStep).toFixed(1)},${(h - ((v - min) / rng) * (h - 4) - 2).toFixed(1)}`);
+                  const linePath = `M${pts.join(" L")}`;
+                  const areaPath = `${linePath} L${w},${h} L0,${h} Z`;
+                  const clr = botIsPositive ? c.green : c.red;
+                  const gradId = `mc-${ab.botId.replace(/[^a-z0-9]/gi, "")}`;
+                  return (
+                    <svg width="100%" height="46" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" style={{ borderRadius: "6px", display: "block" }}>
+                      <defs><linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={clr} stopOpacity="0.18" /><stop offset="100%" stopColor={clr} stopOpacity="0.01" /></linearGradient></defs>
+                      <path d={areaPath} fill={`url(#${gradId})`} />
+                      <path d={linePath} fill="none" stroke={clr} strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  );
+                })() : (
+                  <div style={{ height: "46px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px", background: `${c.text3}06` }}>
+                    <span style={{ fontSize: "12px", color: c.text3 }}>데이터 수집 중...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* 미니 지표 */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "4px" }}>
+                {[
+                  { label: "투입", value: `$${allocation >= 1000 ? (allocation/1000).toFixed(1)+"k" : allocation.toLocaleString()}` },
+                  { label: "MDD", value: kvMDD > 0 ? `${kvMDD.toFixed(1)}%` : "--" },
+                  { label: "승률", value: kvTrades > 0 ? `${(kvWinCount/kvTrades*100).toFixed(0)}%` : "--" },
+                  { label: "승/패", value: `${kvWinCount}/${kvTrades - kvWinCount}` },
+                ].map((m, i) => (
+                  <div key={i} style={{ padding: "4px 4px", borderRadius: "5px", background: c.card2, textAlign: "center" }}>
+                    <div style={{ fontSize: "10px", color: c.text3 }}>{m.label}</div>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: c.text1 }}>{m.value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 액션 버튼 */}
+              <div style={{ display: "flex", gap: "6px" }}>
+                <button onClick={(e) => { e.stopPropagation(); onSelectBot(bot); }} style={{
+                  flex: 2, padding: "7px", borderRadius: "7px", fontSize: "13px", fontWeight: 700,
+                  background: c.blue, color: "#fff", border: "none", cursor: "pointer",
+                }}>상세 보기</button>
+                <button onClick={(e) => { e.stopPropagation(); onAddFund(ab.botId); }} style={{
+                  flex: 1, padding: "7px", borderRadius: "7px", fontSize: "13px", fontWeight: 600,
+                  background: `${c.green}12`, color: c.green, border: `1px solid ${c.green}30`, cursor: "pointer",
+                }}>+ 추가</button>
+                <button onClick={(e) => { e.stopPropagation(); onStopBot(ab.botId); }} style={{
+                  padding: "7px 8px", borderRadius: "7px", fontSize: "13px", fontWeight: 600,
+                  background: `${c.red}12`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer",
+                }}>중지</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {/* 페이지 인디케이터 */}
+      {runningBots.length > 1 && (
+        <div style={{ display: "flex", justifyContent: "center", gap: "6px", marginTop: "10px", marginBottom: "8px" }}>
+          {runningBots.map((_, i) => (
+            <div key={i} style={{
+              width: scrollIdx === i ? "16px" : "6px", height: "6px",
+              borderRadius: "3px", transition: "all 0.3s",
+              background: scrollIdx === i ? c.blue : `${c.text3}40`,
+            }} />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── 운영 중 봇 대시보드 (바이낸스 카피트레이딩 스타일) ──
 function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, onAddFund, onUpdateBotStatus, theme, userId, isMobile }) {
   const c = colors[theme];
@@ -1013,7 +1174,10 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
       })()}
 
       {/* ── 봇별 요약 리스트 ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+      {isMobile ? (
+        <ActiveBotCarousel activeBots={activeBots} allBotPerf={allBotPerf} onSelectBot={onSelectBot} onStopBot={onStopBot} onAddFund={onAddFund} theme={theme} cardStyle={cardStyle} />
+      ) : null}
+      <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
         {activeBots.filter(ab => ab.status !== "paused").map(ab => {
           const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
           const elapsed = Date.now() - (ab.startedAt || Date.now());
