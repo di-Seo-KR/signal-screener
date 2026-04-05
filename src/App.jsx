@@ -4199,7 +4199,7 @@ function AppInner() {
     });
   }, []);
 
-  const validTabs = ["home","auto-trading","portfolio","screener","alerts","news","quant-portfolio","quant-port","risk-map","sector-flow","backtest","sentiment","strategy","anomaly","quant-report","econ-calendar","profile","dev"];
+  const validTabs = ["home","auto-trading","portfolio","screener","alerts","news","quant-portfolio","quant-port","risk-map","sector-flow","backtest","sentiment","strategy","anomaly","quant-report","econ-calendar","profile","dev","about","privacy","terms","contact"];
   const [tab, setTabRaw] = useState(() => {
     try {
       // 1순위: URL pathname (/screener, /auto-trading 등)
@@ -10895,6 +10895,195 @@ function AppInner() {
           </div>
         )}
 
+        {/* ═══════════════════════════════════════════════════════════
+            정적 콘텐츠 페이지 (AdSense 승인용)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "about" && (
+          <div className="tab-content" style={{ maxWidth: "800px", margin: "0 auto", padding: "32px 20px", lineHeight: 1.8, color: C.text2 }}>
+            <h1 style={{ fontSize: "28px", fontWeight: 800, color: C.text1, marginBottom: "24px" }}>Zepta 소개</h1>
+            <section style={{ marginBottom: "32px" }}>
+              <h2 style={{ fontSize: "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>서비스 개요</h2>
+              <p style={{ fontSize: "15px", marginBottom: "16px" }}>
+                Zepta는 개인 투자자를 위한 종합 투자 정보 플랫폼입니다. 미국 주식과 글로벌 암호화폐 시장을 아우르는 실시간 데이터 분석, AI 기반 퀀트 전략, 자동매매 시스템을 제공하여 데이터 기반의 합리적인 투자 의사결정을 지원합니다.
+              </p>
+              <p style={{ fontSize: "15px", marginBottom: "16px" }}>
+                기존 금융 서비스의 복잡하고 전문가 중심적인 인터페이스에서 벗어나, 투자 초보자부터 전문 트레이더까지 누구나 쉽게 사용할 수 있는 직관적인 경험을 제공하는 것이 Zepta의 핵심 가치입니다.
+              </p>
+            </section>
+            <section style={{ marginBottom: "32px" }}>
+              <h2 style={{ fontSize: "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>주요 기능</h2>
+              <p style={{ fontSize: "15px", marginBottom: "12px" }}>
+                <strong style={{ color: C.text1 }}>실시간 시장 모니터링</strong> — S&P 500, 나스닥, 다우존스 등 주요 지수와 개별 종목의 실시간 시세를 한눈에 확인할 수 있습니다. 글로벌 암호화폐 시장의 가격 변동도 실시간으로 추적합니다.
+              </p>
+              <p style={{ fontSize: "15px", marginBottom: "12px" }}>
+                <strong style={{ color: C.text1 }}>AI 퀀트 자동매매</strong> — 멀티팩터 시그널 분석(RSI, MACD, 볼린저밴드, Hurst 지수, 효율성 비율 등)을 기반으로 매수/매도 시점을 자동으로 판단합니다. 사용자는 투자 성향에 맞는 봇을 선택하여 자동매매를 운영할 수 있습니다.
+              </p>
+              <p style={{ fontSize: "15px", marginBottom: "12px" }}>
+                <strong style={{ color: C.text1 }}>종목 스크리너</strong> — 기술적 분석 지표와 펀더멘털 데이터를 조합하여 투자 기회를 탐색합니다. 섹터별 자금 흐름, 이상 탐지, 시장 심리 분석 등 다양한 관점에서 시장을 분석할 수 있습니다.
+              </p>
+              <p style={{ fontSize: "15px", marginBottom: "12px" }}>
+                <strong style={{ color: C.text1 }}>포트폴리오 관리</strong> — 보유 자산의 수익률, 배분 비율, 리스크 지표(DD, MDD, VaR)를 실시간으로 모니터링하여 체계적인 자산 관리를 지원합니다.
+              </p>
+              <p style={{ fontSize: "15px", marginBottom: "12px" }}>
+                <strong style={{ color: C.text1 }}>경제 캘린더 및 뉴스</strong> — FOMC, CPI, 고용지표 등 주요 경제 이벤트 일정과 실시간 금융 뉴스를 통해 시장에 영향을 미치는 정보를 빠르게 파악할 수 있습니다.
+              </p>
+            </section>
+            <section style={{ marginBottom: "32px" }}>
+              <h2 style={{ fontSize: "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>운영 정보</h2>
+              <p style={{ fontSize: "15px", marginBottom: "8px" }}>운영자: 서동인</p>
+              <p style={{ fontSize: "15px", marginBottom: "8px" }}>이메일: donginseo0421@gmail.com</p>
+              <p style={{ fontSize: "15px", marginBottom: "8px" }}>서비스 URL: zepta.vercel.app</p>
+            </section>
+            <section>
+              <h2 style={{ fontSize: "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>면책 조항</h2>
+              <p style={{ fontSize: "15px" }}>
+                Zepta에서 제공하는 모든 정보와 분석은 투자 참고 자료로만 활용되어야 하며, 특정 금융 상품의 매수 또는 매도를 권유하지 않습니다. 모든 투자의 판단과 책임은 이용자 본인에게 있으며, Zepta는 투자 결과에 대한 법적 책임을 지지 않습니다. 자동매매 기능은 가상매매(시뮬레이션)로 운영되며, 실제 자금이 거래되지 않습니다.
+              </p>
+            </section>
+          </div>
+        )}
+
+        {tab === "privacy" && (
+          <div className="tab-content" style={{ maxWidth: "800px", margin: "0 auto", padding: "32px 20px", lineHeight: 1.8, color: C.text2 }}>
+            <h1 style={{ fontSize: "28px", fontWeight: 800, color: C.text1, marginBottom: "8px" }}>개인정보처리방침</h1>
+            <p style={{ fontSize: "13px", color: C.text3, marginBottom: "24px" }}>시행일: 2025년 1월 1일 · 최종 수정: 2026년 4월 5일</p>
+
+            <section style={{ marginBottom: "28px" }}>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>1. 수집하는 개인정보 항목</h2>
+              <p style={{ fontSize: "14px", marginBottom: "8px" }}>Zepta는 서비스 제공을 위해 다음과 같은 개인정보를 수집합니다.</p>
+              <p style={{ fontSize: "14px", marginBottom: "4px" }}>필수 항목: 이메일 주소 (회원가입 및 로그인 시)</p>
+              <p style={{ fontSize: "14px", marginBottom: "4px" }}>선택 항목: 프로필 이름, 프로필 이미지 (소셜 로그인 시 제공되는 경우)</p>
+              <p style={{ fontSize: "14px" }}>자동 수집 항목: 서비스 이용 기록, 접속 로그, 기기 정보, 브라우저 유형</p>
+            </section>
+
+            <section style={{ marginBottom: "28px" }}>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>2. 개인정보의 수집 및 이용 목적</h2>
+              <p style={{ fontSize: "14px", marginBottom: "4px" }}>회원 관리: 회원 식별, 인증, 계정 관리</p>
+              <p style={{ fontSize: "14px", marginBottom: "4px" }}>서비스 제공: 관심 종목 저장, 자동매매 봇 설정 저장, 포트폴리오 데이터 관리</p>
+              <p style={{ fontSize: "14px", marginBottom: "4px" }}>서비스 개선: 이용 통계 분석, 서비스 품질 향상, 오류 탐지 및 수정</p>
+              <p style={{ fontSize: "14px" }}>광고 게재: Google AdSense를 통한 맞춤형 광고 제공 (사용자의 광고 설정에 따라 조정 가능)</p>
+            </section>
+
+            <section style={{ marginBottom: "28px" }}>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>3. 개인정보의 보유 및 이용 기간</h2>
+              <p style={{ fontSize: "14px" }}>
+                회원 탈퇴 시 즉시 파기합니다. 단, 관련 법령에 따라 보존이 필요한 경우 해당 기간 동안 보관합니다. 전자상거래법에 따른 계약 또는 청약철회 등에 관한 기록은 5년, 소비자 불만 또는 분쟁 처리에 관한 기록은 3년, 접속 기록은 통신비밀보호법에 따라 3개월간 보관합니다.
+              </p>
+            </section>
+
+            <section style={{ marginBottom: "28px" }}>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>4. 개인정보의 제3자 제공</h2>
+              <p style={{ fontSize: "14px" }}>
+                Zepta는 이용자의 개인정보를 원칙적으로 제3자에게 제공하지 않습니다. 다만, 이용자의 사전 동의가 있는 경우와 법령에 의해 요구되는 경우에는 예외로 합니다.
+              </p>
+            </section>
+
+            <section style={{ marginBottom: "28px" }}>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>5. 쿠키 및 광고 관련 안내</h2>
+              <p style={{ fontSize: "14px", marginBottom: "8px" }}>
+                Zepta는 Google AdSense를 통해 광고를 게재하며, Google은 쿠키를 사용하여 이용자의 관심사에 기반한 광고를 제공할 수 있습니다. 이용자는 Google 광고 설정(ads.google.com/settings)에서 맞춤 광고를 비활성화하거나, aboutads.info를 방문하여 제3자 광고 쿠키를 거부할 수 있습니다.
+              </p>
+              <p style={{ fontSize: "14px" }}>
+                쿠키는 브라우저 설정을 통해 거부할 수 있으며, 쿠키 저장을 거부할 경우 일부 서비스 이용에 어려움이 있을 수 있습니다.
+              </p>
+            </section>
+
+            <section style={{ marginBottom: "28px" }}>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>6. 개인정보의 안전성 확보 조치</h2>
+              <p style={{ fontSize: "14px" }}>
+                Zepta는 개인정보의 안전성 확보를 위해 HTTPS 암호화 통신, Supabase 인증 시스템 활용, 비밀번호 암호화 저장, 접근 권한 관리 등의 기술적·관리적 조치를 시행하고 있습니다.
+              </p>
+            </section>
+
+            <section>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>7. 개인정보 보호 책임자</h2>
+              <p style={{ fontSize: "14px", marginBottom: "4px" }}>이름: 서동인</p>
+              <p style={{ fontSize: "14px", marginBottom: "4px" }}>이메일: donginseo0421@gmail.com</p>
+              <p style={{ fontSize: "14px" }}>개인정보 관련 문의는 위 이메일로 연락 부탁드립니다.</p>
+            </section>
+          </div>
+        )}
+
+        {tab === "terms" && (
+          <div className="tab-content" style={{ maxWidth: "800px", margin: "0 auto", padding: "32px 20px", lineHeight: 1.8, color: C.text2 }}>
+            <h1 style={{ fontSize: "28px", fontWeight: 800, color: C.text1, marginBottom: "8px" }}>이용약관</h1>
+            <p style={{ fontSize: "13px", color: C.text3, marginBottom: "24px" }}>시행일: 2025년 1월 1일 · 최종 수정: 2026년 4월 5일</p>
+
+            <section style={{ marginBottom: "28px" }}>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제1조 (목적)</h2>
+              <p style={{ fontSize: "14px" }}>
+                본 약관은 Zepta(이하 "서비스")가 제공하는 투자 정보 서비스의 이용 조건 및 절차, 이용자와 서비스 간의 권리·의무·책임 사항을 규정함을 목적으로 합니다.
+              </p>
+            </section>
+
+            <section style={{ marginBottom: "28px" }}>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제2조 (서비스의 내용)</h2>
+              <p style={{ fontSize: "14px" }}>
+                서비스는 다음과 같은 기능을 제공합니다: 실시간 시장 데이터 조회 및 분석, AI 기반 자동매매 시뮬레이션(가상매매), 종목 스크리닝 및 기술적 분석, 포트폴리오 관리 도구, 경제 캘린더 및 뉴스 제공. 서비스는 투자 참고 자료를 제공하는 것이며, 투자 자문 서비스가 아닙니다.
+              </p>
+            </section>
+
+            <section style={{ marginBottom: "28px" }}>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제3조 (이용자의 의무)</h2>
+              <p style={{ fontSize: "14px" }}>
+                이용자는 본 약관 및 관련 법령을 준수해야 합니다. 서비스의 정상적인 운영을 방해하는 행위, 타인의 개인정보를 부정하게 수집하는 행위, 서비스를 이용하여 불법 행위를 하는 행위는 금지됩니다. 이용자는 자신의 계정 정보를 관리할 책임이 있으며, 계정의 무단 사용을 발견한 경우 즉시 서비스에 알려야 합니다.
+              </p>
+            </section>
+
+            <section style={{ marginBottom: "28px" }}>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제4조 (투자 관련 면책)</h2>
+              <p style={{ fontSize: "14px" }}>
+                서비스에서 제공하는 정보, 분석, 시그널, 자동매매 결과는 투자 참고 자료일 뿐이며, 특정 금융 상품의 매수 또는 매도를 권유하거나 보장하지 않습니다. 모든 투자 의사결정의 최종 판단과 그에 따른 책임은 이용자 본인에게 있습니다. 서비스는 시장 데이터의 정확성, 완전성, 적시성을 보장하지 않으며, 데이터 오류나 지연으로 인한 손실에 대해 책임을 지지 않습니다. 자동매매 기능은 가상매매(시뮬레이션)로 운영되며, 실제 자금 거래가 이루어지지 않습니다.
+              </p>
+            </section>
+
+            <section style={{ marginBottom: "28px" }}>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제5조 (서비스의 변경 및 중단)</h2>
+              <p style={{ fontSize: "14px" }}>
+                서비스는 운영상 필요한 경우 서비스의 전부 또는 일부를 변경하거나 중단할 수 있습니다. 서비스 변경 또는 중단 시 가능한 범위에서 사전에 공지합니다. 천재지변, 시스템 장애 등 불가항력적 사유로 서비스가 중단되는 경우 별도의 통보 없이 서비스가 중단될 수 있으며, 이에 대한 책임을 지지 않습니다.
+              </p>
+            </section>
+
+            <section style={{ marginBottom: "28px" }}>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제6조 (지적재산권)</h2>
+              <p style={{ fontSize: "14px" }}>
+                서비스에서 제공하는 콘텐츠(텍스트, 이미지, UI 디자인, 분석 알고리즘 등)에 대한 저작권 및 지적재산권은 서비스에 귀속됩니다. 이용자는 서비스의 콘텐츠를 개인적 용도로만 사용할 수 있으며, 무단 복제, 배포, 상업적 이용은 금지됩니다.
+              </p>
+            </section>
+
+            <section>
+              <h2 style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제7조 (분쟁 해결)</h2>
+              <p style={{ fontSize: "14px" }}>
+                본 약관과 관련된 분쟁은 대한민국 법률에 따라 해석되며, 분쟁 발생 시 서울중앙지방법원을 관할 법원으로 합니다. 서비스 이용에 대한 문의사항은 donginseo0421@gmail.com으로 연락 부탁드립니다.
+              </p>
+            </section>
+          </div>
+        )}
+
+        {tab === "contact" && (
+          <div className="tab-content" style={{ maxWidth: "800px", margin: "0 auto", padding: "32px 20px", lineHeight: 1.8, color: C.text2 }}>
+            <h1 style={{ fontSize: "28px", fontWeight: 800, color: C.text1, marginBottom: "24px" }}>문의하기</h1>
+            <section style={{ marginBottom: "32px" }}>
+              <p style={{ fontSize: "15px", marginBottom: "16px" }}>
+                Zepta 서비스에 대한 문의, 건의, 불편 사항은 아래 연락처로 연락해 주세요. 최대한 빠르게 답변 드리겠습니다.
+              </p>
+              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "24px", marginBottom: "24px" }}>
+                <p style={{ fontSize: "15px", marginBottom: "12px" }}><strong style={{ color: C.text1 }}>이메일</strong>: donginseo0421@gmail.com</p>
+                <p style={{ fontSize: "15px", marginBottom: "12px" }}><strong style={{ color: C.text1 }}>운영자</strong>: 서동인</p>
+                <p style={{ fontSize: "15px" }}><strong style={{ color: C.text1 }}>응답 시간</strong>: 보통 1~2 영업일 이내</p>
+              </div>
+            </section>
+            <section style={{ marginBottom: "32px" }}>
+              <h2 style={{ fontSize: "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>문의 유형별 안내</h2>
+              <p style={{ fontSize: "14px", marginBottom: "8px" }}><strong style={{ color: C.text1 }}>서비스 이용 관련</strong>: 기능 사용법, 계정 문제, 데이터 관련 문의</p>
+              <p style={{ fontSize: "14px", marginBottom: "8px" }}><strong style={{ color: C.text1 }}>버그 리포트</strong>: 서비스 오류나 비정상 동작 신고</p>
+              <p style={{ fontSize: "14px", marginBottom: "8px" }}><strong style={{ color: C.text1 }}>기능 제안</strong>: 새로운 기능이나 개선 사항 제안</p>
+              <p style={{ fontSize: "14px", marginBottom: "8px" }}><strong style={{ color: C.text1 }}>광고 및 제휴</strong>: 광고 게재, 비즈니스 제휴 관련 문의</p>
+              <p style={{ fontSize: "14px" }}><strong style={{ color: C.text1 }}>개인정보 관련</strong>: 개인정보 열람, 수정, 삭제 요청</p>
+            </section>
+          </div>
+        )}
+
         {/* 차트 모달 */}
         {chartAsset && <ChartModal asset={chartAsset} onClose={() => setChartAsset(null)} krwRate={krwRate} theme={themeMode} />}
 
@@ -10902,18 +11091,31 @@ function AppInner() {
         <footer style={{
           maxWidth: "1400px", margin: "40px auto 0", padding: "24px 24px calc(24px + env(safe-area-inset-bottom, 0px))",
           borderTop: `1px solid ${C.border}${C.isDark ? '30' : '50'}`,
-          display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "12px",
+          display: "flex", flexDirection: "column", gap: "16px",
         }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ fontSize: "16px" }}>📡</span>
-            <span style={{ fontWeight: 700, fontSize: "13px", color: C.text2 }}>Zepta</span>
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "16px" }}>📡</span>
+              <span style={{ fontWeight: 700, fontSize: "13px", color: C.text2 }}>Zepta</span>
+            </div>
+            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+              <span onClick={() => setTab("about")} style={{ fontSize: "12px", color: C.text3, cursor: "pointer", textDecoration: "underline" }}>서비스 소개</span>
+              <span onClick={() => setTab("privacy")} style={{ fontSize: "12px", color: C.text3, cursor: "pointer", textDecoration: "underline" }}>개인정보처리방침</span>
+              <span onClick={() => setTab("terms")} style={{ fontSize: "12px", color: C.text3, cursor: "pointer", textDecoration: "underline" }}>이용약관</span>
+              <span onClick={() => setTab("contact")} style={{ fontSize: "12px", color: C.text3, cursor: "pointer", textDecoration: "underline" }}>문의하기</span>
+            </div>
           </div>
-          <div style={{ fontSize: "11px", color: C.text3, display: "flex", gap: "16px", flexWrap: "wrap" }}>
-            <span>투자의 판단과 책임은 본인에게 있습니다</span>
-            <span>문의: donginseo0421@gmail.com</span>
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
+            <div style={{ fontSize: "11px", color: C.text3, display: "flex", gap: "16px", flexWrap: "wrap" }}>
+              <span>투자의 판단과 책임은 본인에게 있습니다</span>
+              <span>문의: donginseo0421@gmail.com</span>
+            </div>
+            <div style={{ fontSize: "10px", color: C.text3 }}>
+              쿠팡 파트너스 활동의 일환으로 수수료를 제공받을 수 있습니다
+            </div>
           </div>
-          <div style={{ fontSize: "10px", color: C.text3 }}>
-            쿠팡 파트너스 활동의 일환으로 수수료를 제공받을 수 있습니다
+          <div style={{ fontSize: "10px", color: C.text3, textAlign: "center" }}>
+            © 2025-2026 Zepta. All rights reserved.
           </div>
         </footer>
       </main>

@@ -1329,19 +1329,29 @@ export default function AutoTrading({ theme = "dark", user }) {
           try { return JSON.parse(localStorage.getItem(stoppedBotsStorageKey) || "[]"); } catch { return []; }
         })();
 
-        // 병합 전략: 서버(Supabase) 우선 — 서버가 진실의 원천(source of truth)
-        if (Array.isArray(remoteBots)) {
-          // 리모트 데이터가 배열이면 (빈 배열이라도) 서버 우선 사용
+        // 병합 전략: 서버 우선, 단 서버가 비어있고 로컬에 데이터가 있으면 로컬 복원
+        // (이전 저장 버그로 서버에 빈 배열이 남아있을 수 있으므로 안전 장치)
+        if (Array.isArray(remoteBots) && remoteBots.length > 0) {
+          // 서버에 봇 데이터가 있으면 서버 우선 (refreshSession으로 최신 보장)
           setActiveBots(remoteBots);
           if (storageKey) try { localStorage.setItem(storageKey, JSON.stringify(remoteBots)); } catch {}
         } else if (localBots.length > 0) {
-          // 리모트에 아예 데이터가 없는 경우에만 로컬 → 서버 복원
+          // 서버 비어있지만 로컬에 데이터 있음 → 로컬 유지 + 서버 복원
           setActiveBots(localBots);
           await supabase.auth.updateUser({ data: { active_bots: localBots } });
+          // KV에도 즉시 동기화
+          try {
+            const activeForCron = localBots.filter(ab => ab.status !== "paused");
+            await fetch("/api/sync-active-bots", {
+              method: "POST", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ activeBots: activeForCron }),
+            });
+          } catch {}
         }
+        // else: 둘 다 비어있으면 기본값 [] 유지
 
         // 정지된 봇 목록 로드 (동일 전략)
-        if (Array.isArray(remoteStoppedBots)) {
+        if (Array.isArray(remoteStoppedBots) && remoteStoppedBots.length > 0) {
           setStoppedBots(remoteStoppedBots);
           if (stoppedBotsStorageKey) try { localStorage.setItem(stoppedBotsStorageKey, JSON.stringify(remoteStoppedBots)); } catch {}
         } else if (localStoppedBots.length > 0) {
