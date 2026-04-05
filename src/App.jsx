@@ -11094,8 +11094,8 @@ function AppInner() {
           display: "flex", flexDirection: "column", gap: "16px",
         }}>
           <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <span style={{ fontSize: "16px" }}>📡</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <img src="/zepta-icon-192.png" alt="Zepta" width="24" height="24" style={{ flexShrink: 0 }} />
               <span style={{ fontWeight: 700, fontSize: "13px", color: C.text2 }}>Zepta</span>
             </div>
             <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
@@ -11109,9 +11109,6 @@ function AppInner() {
             <div style={{ fontSize: "11px", color: C.text3, display: "flex", gap: "16px", flexWrap: "wrap" }}>
               <span>투자의 판단과 책임은 본인에게 있습니다</span>
               <span>문의: donginseo0421@gmail.com</span>
-            </div>
-            <div style={{ fontSize: "10px", color: C.text3 }}>
-              쿠팡 파트너스 활동의 일환으로 수수료를 제공받을 수 있습니다
             </div>
           </div>
           <div style={{ fontSize: "10px", color: C.text3, textAlign: "center" }}>
