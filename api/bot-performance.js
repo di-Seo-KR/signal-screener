@@ -32,9 +32,13 @@ export default async function handler(req, res) {
           const equityCurve = hist.length >= 2
             ? hist.map(h => alloc > 0 ? ((h.equity || alloc) / alloc) * 100 : 100)
             : [];
+          // pnlCurve 추출 (달러 기준 손익)
+          const pnlCurve = hist.length >= 2
+            ? hist.map(h => alloc > 0 ? (h.equity || alloc) - alloc : 0)
+            : [];
           // snapshot에서 큰 history 배열 제외 (응답 크기 절감)
           const snapClean = snapshot ? { ...snapshot, history: undefined, historyLength: hist.length } : null;
-          results[id] = { perf: perf || null, snapshot: snapClean, equityCurve };
+          results[id] = { perf: perf || null, snapshot: snapClean, equityCurve, pnlCurve };
         }
       }
       return res.status(200).json({ ok: true, bots: results });
@@ -51,6 +55,9 @@ export default async function handler(req, res) {
       const equityCurve = hist.length >= 2
         ? hist.map(h => alloc > 0 ? ((h.equity || alloc) / alloc) * 100 : 100)
         : [];
+      const pnlCurve = hist.length >= 2
+        ? hist.map(h => alloc > 0 ? (h.equity || alloc) - alloc : 0)
+        : [];
       const snapClean = snapshot ? { ...snapshot, history: undefined, historyLength: hist.length } : null;
       return res.status(200).json({
         ok: true,
@@ -58,6 +65,7 @@ export default async function handler(req, res) {
         perf: perf || { botId, trades: [], tradeCount: 0, realizedPL: 0 },
         snapshot: snapClean || { botId, marketValue: 0, unrealizedPL: 0, positionCount: 0, dd: 0, mdd: 0 },
         equityCurve,
+        pnlCurve,
       });
     }
 

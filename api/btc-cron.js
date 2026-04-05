@@ -667,10 +667,19 @@ export default async function handler(req, res) {
           ...(prevSnap.history || []),
           { time: new Date().toISOString(), equity: botEquity, value: botMarketValue, unrealizedPL: botUnrealizedPL, positions: botPositions.length },
         ].slice(-500);
+        // 개별 포지션 상세 (자산 배분 차트용)
+        const positionDetails = botPositions.map(p => ({
+          asset: p.asset,
+          qty: p.qty,
+          avgPrice: p.avgPrice,
+          marketValue: parseFloat(p.market_value || 0),
+          unrealizedPL: parseFloat(p.unrealized_pl || 0),
+        }));
         await kv.set(snapKey, {
           botId, marketValue: botMarketValue, unrealizedPL: botUnrealizedPL,
           positionCount: botPositions.length, peakEquity, dd, mdd,
           botAllocation, botEquity, realizedPL,
+          positionDetails,
           history, lastUpdated: new Date().toISOString(),
         });
       }

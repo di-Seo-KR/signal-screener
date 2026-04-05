@@ -1005,7 +1005,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
       })()}
 
       {/* ── 봇별 요약 리스트 ── */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "12px" }}>
         {activeBots.filter(ab => ab.status !== "paused").map(ab => {
           const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
           const elapsed = Date.now() - (ab.startedAt || Date.now());
@@ -1028,105 +1028,97 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
 
           return (
             <div key={ab.botId} style={{
-              ...cardStyle, display: "flex", flexDirection: "column", gap: isMobile ? "12px" : "14px",
-            }}>
+              ...cardStyle, display: "flex", flexDirection: "column", gap: "10px", cursor: "pointer",
+            }} onClick={() => onSelectBot(bot)}>
               {/* 봇 헤더 */}
-              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <span style={{
-                  fontSize: "28px", width: "44px", height: "44px",
+                  fontSize: "22px", width: "36px", height: "36px",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  background: `${c.blue}10`, borderRadius: "12px", flexShrink: 0,
+                  background: `${c.blue}10`, borderRadius: "10px", flexShrink: 0,
                 }}>{bot.icon}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                    <span style={{ fontWeight: 700, fontSize: isMobile ? "15px" : "16px", color: c.text1 }}>{bot.name}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontWeight: 700, fontSize: "14px", color: c.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bot.name}</span>
                     <span style={{
-                      padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 600,
+                      padding: "1px 6px", borderRadius: "4px", fontSize: "9px", fontWeight: 600,
                       background: `${getRiskColor(bot.riskColor, theme)}15`,
-                      color: getRiskColor(bot.riskColor, theme),
+                      color: getRiskColor(bot.riskColor, theme), flexShrink: 0,
                     }}>{bot.risk}</span>
                   </div>
-                  <div style={{ fontSize: "11px", color: c.text3, marginTop: "2px" }}>
-                    {days > 0 ? `${days}일 ` : ""}{hours}시간 운영 · {isStock ? "주식" : "크립토"} · {kvTrades}회 거래
+                  <div style={{ fontSize: "10px", color: c.text3, marginTop: "1px" }}>
+                    {days > 0 ? `${days}일 ` : ""}{hours}시간 · {isStock ? "주식" : "크립토"} · {kvTrades}회
                   </div>
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 800, color: botIsPositive ? c.green : c.red }}>
+                  <div style={{ fontSize: "16px", fontWeight: 800, color: botIsPositive ? c.green : c.red }}>
                     {roiPct >= 0 ? "+" : ""}{roiPct.toFixed(2)}%
                   </div>
-                  <div style={{ fontSize: "11px", color: totalPL >= 0 ? c.green : c.red, fontWeight: 600 }}>
+                  <div style={{ fontSize: "10px", color: totalPL >= 0 ? c.green : c.red, fontWeight: 600 }}>
                     {totalPL >= 0 ? "+" : ""}${totalPL.toFixed(2)}
                   </div>
                 </div>
               </div>
 
-              {/* 미니 지표 + 차트 */}
-              <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                {/* 미니 지표 */}
-                <div style={{
-                  display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px",
-                  flex: isMobile ? "1" : "0 0 200px",
-                }}>
-                  {[
-                    { label: "투입", value: `$${allocation.toLocaleString()}`, color: c.text1 },
-                    { label: "MDD", value: kvMDD > 0 ? `${kvMDD.toFixed(1)}%` : "--", color: kvMDD > 10 ? c.red : kvMDD > 5 ? c.yellow : c.green },
-                    { label: "승률", value: kvTrades > 0 ? `${(kvWinCount/kvTrades*100).toFixed(0)}%` : "--", color: c.text1 },
-                    { label: "승/패", value: `${kvWinCount}/${kvTrades - kvWinCount}`, color: c.text1 },
-                  ].map((m, i) => (
-                    <div key={i} style={{ padding: "6px 8px", borderRadius: "6px", background: c.card2 }}>
-                      <div style={{ fontSize: "9px", color: c.text3 }}>{m.label}</div>
-                      <div style={{ fontSize: "12px", fontWeight: 700, color: m.color }}>{m.value}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* 미니 ROI 차트 */}
-                {!isMobile && (
-                  <div style={{ flex: 1, minWidth: 0, height: "72px" }}>
-                    {pnlData.length >= 2 ? (() => {
-                      const w = 300, h = 64;
-                      const min = Math.min(...pnlData) * 0.998;
-                      const max = Math.max(...pnlData) * 1.002;
-                      const rng = max - min || 1;
-                      const xStep = w / (pnlData.length - 1);
-                      const pts = pnlData.map((v, i) => `${(i * xStep).toFixed(1)},${(h - ((v - min) / rng) * (h - 6) - 3).toFixed(1)}`);
-                      const linePath = `M${pts.join(" L")}`;
-                      const areaPath = `${linePath} L${w},${h} L0,${h} Z`;
-                      const clr = botIsPositive ? c.green : c.red;
-                      const gradId = `mini-${ab.botId.replace(/[^a-z0-9]/gi, "")}`;
-                      return (
-                        <svg width="100%" height="64" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" style={{ borderRadius: "6px", display: "block" }}>
-                          <defs>
-                            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor={clr} stopOpacity="0.2" />
-                              <stop offset="100%" stopColor={clr} stopOpacity="0.01" />
-                            </linearGradient>
-                          </defs>
-                          <path d={areaPath} fill={`url(#${gradId})`} />
-                          <path d={linePath} fill="none" stroke={clr} strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
-                      );
-                    })() : (
-                      <div style={{ height: "64px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px", background: `${c.text3}06` }}>
-                        <span style={{ fontSize: "11px", color: c.text3 }}>데이터 수집 중...</span>
-                      </div>
-                    )}
+              {/* 미니 ROI 차트 */}
+              <div style={{ height: "56px" }}>
+                {pnlData.length >= 2 ? (() => {
+                  const w = 300, h = 50;
+                  const min = Math.min(...pnlData) * 0.998;
+                  const max = Math.max(...pnlData) * 1.002;
+                  const rng = max - min || 1;
+                  const xStep = w / (pnlData.length - 1);
+                  const pts = pnlData.map((v, i) => `${(i * xStep).toFixed(1)},${(h - ((v - min) / rng) * (h - 4) - 2).toFixed(1)}`);
+                  const linePath = `M${pts.join(" L")}`;
+                  const areaPath = `${linePath} L${w},${h} L0,${h} Z`;
+                  const clr = botIsPositive ? c.green : c.red;
+                  const gradId = `mini-${ab.botId.replace(/[^a-z0-9]/gi, "")}`;
+                  return (
+                    <svg width="100%" height="50" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" style={{ borderRadius: "6px", display: "block" }}>
+                      <defs>
+                        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor={clr} stopOpacity="0.18" />
+                          <stop offset="100%" stopColor={clr} stopOpacity="0.01" />
+                        </linearGradient>
+                      </defs>
+                      <path d={areaPath} fill={`url(#${gradId})`} />
+                      <path d={linePath} fill="none" stroke={clr} strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  );
+                })() : (
+                  <div style={{ height: "50px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px", background: `${c.text3}06` }}>
+                    <span style={{ fontSize: "10px", color: c.text3 }}>데이터 수집 중...</span>
                   </div>
                 )}
               </div>
 
+              {/* 미니 지표 */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "4px" }}>
+                {[
+                  { label: "투입", value: `$${allocation >= 1000 ? (allocation/1000).toFixed(1)+"k" : allocation.toLocaleString()}`, color: c.text1 },
+                  { label: "MDD", value: kvMDD > 0 ? `${kvMDD.toFixed(1)}%` : "--", color: kvMDD > 10 ? c.red : kvMDD > 5 ? c.yellow : c.green },
+                  { label: "승률", value: kvTrades > 0 ? `${(kvWinCount/kvTrades*100).toFixed(0)}%` : "--", color: c.text1 },
+                  { label: "승/패", value: `${kvWinCount}/${kvTrades - kvWinCount}`, color: c.text1 },
+                ].map((m, i) => (
+                  <div key={i} style={{ padding: "4px 6px", borderRadius: "5px", background: c.card2, textAlign: "center" }}>
+                    <div style={{ fontSize: "8px", color: c.text3 }}>{m.label}</div>
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: m.color }}>{m.value}</div>
+                  </div>
+                ))}
+              </div>
+
               {/* 액션 버튼 */}
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button onClick={() => onSelectBot(bot)} style={{
-                  flex: 2, padding: "10px", borderRadius: "8px", fontSize: "13px", fontWeight: 700,
+              <div style={{ display: "flex", gap: "6px" }}>
+                <button onClick={(e) => { e.stopPropagation(); onSelectBot(bot); }} style={{
+                  flex: 2, padding: "8px", borderRadius: "7px", fontSize: "12px", fontWeight: 700,
                   background: c.blue, color: "#fff", border: "none", cursor: "pointer",
                 }}>상세 보기</button>
-                <button onClick={() => onAddFund(ab.botId)} style={{
-                  flex: 1, padding: "10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+                <button onClick={(e) => { e.stopPropagation(); onAddFund(ab.botId); }} style={{
+                  flex: 1, padding: "8px", borderRadius: "7px", fontSize: "11px", fontWeight: 600,
                   background: `${c.green}12`, color: c.green, border: `1px solid ${c.green}30`, cursor: "pointer",
                 }}>+ 추가</button>
-                <button onClick={() => onStopBot(ab.botId)} style={{
-                  padding: "10px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+                <button onClick={(e) => { e.stopPropagation(); onStopBot(ab.botId); }} style={{
+                  padding: "8px 10px", borderRadius: "7px", fontSize: "11px", fontWeight: 600,
                   background: `${c.red}12`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer",
                 }}>중지</button>
               </div>
@@ -1340,6 +1332,13 @@ export default function AutoTrading({ theme = "dark", user }) {
       showToast("error", "투입 금액을 올바르게 입력해주세요.");
       return;
     }
+    // 봇 생성 시 이전 KV 데이터 초기화 (이전 거래 기록 제거)
+    try {
+      fetch("/api/reset-bot", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ botId: pendingBot.id }),
+      });
+    } catch {}
     setActiveBots(prev => [...prev, {
       botId: pendingBot.id,
       startedAt: Date.now(),
@@ -1451,6 +1450,14 @@ export default function AutoTrading({ theme = "dark", user }) {
         await supabase.auth.updateUser({ data: { active_bots: updatedBots } });
       } catch (e) { console.warn("봇 삭제 Supabase 동기화 실패:", e); }
     }
+
+    // 봇 삭제 시 KV 데이터 초기화
+    try {
+      fetch("/api/reset-bot", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ botId }),
+      });
+    } catch {}
 
     if (activeBot?.id === botId) setActiveBot(null);
     setStopBotConfirm(null);

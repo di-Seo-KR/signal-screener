@@ -272,6 +272,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   const [tradeLog, setTradeLog] = useState(load(KEYS.log, []));
   const [btcCandles, setBtcCandles] = useState([]);
   const [subTab, setSubTab] = useState(() => botPreset ? "dashboard" : load("di_btc_tab", "overview"));
+  const [detailChartTab, setDetailChartTab] = useState("roi"); // "roi" or "pnl"
   const [lastUpdate, setLastUpdate] = useState(null);
   const [riskManager] = useState(new CryptoRiskManager());
   const [volatilityRegime, setVolatilityRegime] = useState("normal");
@@ -293,7 +294,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
       try {
         const res = await fetch(`/api/bot-performance?botId=${bid}`);
         const data = await res.json();
-        if (!cancelled && data.ok) setBotPerf({ perf: data.perf, snapshot: data.snapshot, equityCurve: data.equityCurve || [] });
+        if (!cancelled && data.ok) setBotPerf({ perf: data.perf, snapshot: data.snapshot, equityCurve: data.equityCurve || [], pnlCurve: data.pnlCurve || [] });
       } catch { /* 실패해도 기존 데이터로 폴백 */ }
     };
     fetchBotPerf();
@@ -727,10 +728,18 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           const kvDD2 = rawDD2 >= 99.9 ? 0 : rawDD2;
           const kvMDD2 = rawMDD2 >= 99.9 ? 0 : rawMDD2;
           const botAssets = getBotAssets(botPreset?.id);
-          const assetData = botAssets.map(a => ({ name: a.name, value: 1 }));
+          // 실제 포지션 데이터 기반 자산 배분 (positionDetails가 있으면 사용, 없으면 균등)
+          const posDetails = snap.positionDetails || [];
+          const assetData = posDetails.length > 0
+            ? posDetails.map(p => ({ name: (p.asset || "").replace("-USD", "").replace("USDT", ""), value: Math.abs(p.marketValue || 0) })).filter(a => a.value > 0)
+            : botAssets.map(a => ({ name: a.name, value: 1 }));
+          // 포지션 없으면 "현금" 표시
+          const finalAssetData = assetData.length > 0 ? assetData : [{ name: "현금 (대기)", value: 1 }];
           const chartColors = [C.blue, "#FCD535", "#85C4FF", C.purple, C.orange, C.green, C.red, "#FF69B4", "#00CED1", "#FF6347"];
           const eqCurve = bp?.equityCurve || [];
-          const curvePositive = eqCurve.length >= 2 ? eqCurve[eqCurve.length - 1] >= eqCurve[0] : true;
+          const pnlCurveData = bp?.pnlCurve || [];
+          const activeCurve = detailChartTab === "pnl" ? pnlCurveData : eqCurve;
+          const curvePositive = activeCurve.length >= 2 ? activeCurve[activeCurve.length - 1] >= activeCurve[0] : true;
           const elapsed = Date.now() - (botPreset?._startedAt || Date.now());
           const runDays = Math.floor(elapsed / 86400000);
           const runHours = Math.floor((elapsed % 86400000) / 3600000);
@@ -785,20 +794,32 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                   {/* ROI 차트 카드 */}
                   <div style={{ ...card, padding: isMobile ? "16px" : "24px", flex: 1 }}>
                     <div style={{ display: "flex", gap: "16px", marginBottom: "16px" }}>
-                      <span style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>ROI</span>
-                      <span style={{ fontWeight: 500, fontSize: "17px", color: C.text3 }}>PnL</span>
+                      <span onClick={() => setDetailChartTab("roi")} style={{
+                        fontWeight: 700, fontSize: "17px", cursor: "pointer",
+                        color: detailChartTab === "roi" ? C.text1 : C.text3,
+                        borderBottom: detailChartTab === "roi" ? `2px solid ${C.blue}` : "2px solid transparent",
+                        paddingBottom: "4px",
+                      }}>ROI</span>
+                      <span onClick={() => setDetailChartTab("pnl")} style={{
+                        fontWeight: 700, fontSize: "17px", cursor: "pointer",
+                        color: detailChartTab === "pnl" ? C.text1 : C.text3,
+                        borderBottom: detailChartTab === "pnl" ? `2px solid ${C.blue}` : "2px solid transparent",
+                        paddingBottom: "4px",
+                      }}>PnL</span>
                     </div>
-                    {eqCurve.length >= 2 ? (() => {
+                    {activeCurve.length >= 2 ? (() => {
                       const w = isMobile ? 320 : 600, h = isMobile ? 160 : 220;
-                      const min = Math.min(...eqCurve) * 0.998;
-                      const max = Math.max(...eqCurve) * 1.002;
+                      const min = Math.min(...activeCurve) * 0.998;
+                      const max = Math.max(...activeCurve) * 1.002;
                       const rng = max - min || 1;
-                      const xStep = w / (eqCurve.length - 1);
-                      const pts = eqCurve.map((v, i) => `${(i * xStep).toFixed(1)},${(h - ((v - min) / rng) * (h - 12) - 6).toFixed(1)}`);
+                      const xStep = w / (activeCurve.length - 1);
+                      const pts = activeCurve.map((v, i) => `${(i * xStep).toFixed(1)},${(h - ((v - min) / rng) * (h - 12) - 6).toFixed(1)}`);
                       const linePath = `M${pts.join(" L")}`;
                       const areaPath = `${linePath} L${w},${h} L0,${h} Z`;
                       const clr = curvePositive ? C.green : C.red;
-                      const baseY = h - ((100 - min) / rng) * (h - 12) - 6;
+                      // ROI 모드: 100% 기준선, PnL 모드: 0 기준선
+                      const baseVal = detailChartTab === "pnl" ? 0 : 100;
+                      const baseY = h - ((baseVal - min) / rng) * (h - 12) - 6;
                       return (
                         <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ borderRadius: "8px", overflow: "hidden" }}>
                           <defs>
@@ -813,7 +834,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                           <line x1="0" y1={baseY} x2={w} y2={baseY} stroke={C.text3} strokeWidth="0.8" strokeDasharray="4,4" opacity="0.3" />
                           <path d={areaPath} fill="url(#roi-detail-grad)" />
                           <path d={linePath} fill="none" stroke={clr} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                          <circle cx={((eqCurve.length - 1) * xStep).toFixed(1)} cy={pts[pts.length - 1].split(",")[1]} r="5" fill={C.card} stroke={clr} strokeWidth="2.5" />
+                          <circle cx={((activeCurve.length - 1) * xStep).toFixed(1)} cy={pts[pts.length - 1].split(",")[1]} r="5" fill={C.card} stroke={clr} strokeWidth="2.5" />
                         </svg>
                       );
                     })() : (
@@ -860,12 +881,12 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                         {(() => {
                           const sz = isMobile ? 120 : 140;
                           const cx2 = sz / 2, cy2 = sz / 2, r2 = sz * 0.38, sw = sz * 0.15;
-                          const total = assetData.reduce((s, d) => s + d.value, 0);
+                          const total = finalAssetData.reduce((s, d) => s + d.value, 0);
                           let cum = -Math.PI / 2;
                           return (
                             <svg width={sz} height={sz} viewBox={`0 0 ${sz} ${sz}`}>
                               <circle cx={cx2} cy={cy2} r={r2} fill="none" stroke={`${C.text3}15`} strokeWidth={sw} />
-                              {assetData.map((d, i) => {
+                              {finalAssetData.map((d, i) => {
                                 const pct = d.value / total;
                                 const angle = pct * 2 * Math.PI;
                                 const start = cum;
@@ -883,8 +904,8 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                           );
                         })()}
                         <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-                          {assetData.slice(0, 8).map((a, i) => {
-                            const pct = (a.value / assetData.reduce((s, d) => s + d.value, 0) * 100).toFixed(1);
+                          {finalAssetData.slice(0, 8).map((a, i) => {
+                            const pct = (a.value / finalAssetData.reduce((s, d) => s + d.value, 0) * 100).toFixed(1);
                             return (
                               <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                                 <div style={{ width: "14px", height: "4px", borderRadius: "2px", background: chartColors[i % chartColors.length] }} />
@@ -892,7 +913,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                               </div>
                             );
                           })}
-                          {assetData.length > 8 && <span style={{ fontSize: "10px", color: C.text3 }}>외 {assetData.length - 8}개</span>}
+                          {finalAssetData.length > 8 && <span style={{ fontSize: "10px", color: C.text3 }}>외 {finalAssetData.length - 8}개</span>}
                         </div>
                       </div>
                     </div>
