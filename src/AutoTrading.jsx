@@ -961,17 +961,21 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
           grandRealized += bp?.perf?.realizedPL || 0;
         });
         grandTotalPL = grandUnrealized + grandRealized;
+        const currentAUM = totalAllocated + grandTotalPL; // 현재 AUM = 투입 + 총수익
         const grandROI = totalAllocated > 0 ? (grandTotalPL / totalAllocated) * 100 : 0;
         const grandWinRate = grandTrades > 0 ? (grandWins / grandTrades) * 100 : 0;
 
         return (
           <div style={{ ...cardStyle, marginBottom: "20px" }}>
-            {/* 상단: 총 자산 + ROI */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
+            {/* 상단: 총 AUM + ROI */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
               <div>
-                <div style={{ fontSize: "14px", color: c.text3, marginBottom: "4px" }}>총 투입 금액</div>
+                <div style={{ fontSize: "14px", color: c.text3, marginBottom: "4px" }}>현재 AUM</div>
                 <div style={{ fontSize: isMobile ? "28px" : "36px", fontWeight: 800, color: c.text1, letterSpacing: "-1px" }}>
-                  ${totalAllocated.toLocaleString()}
+                  ${currentAUM.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </div>
+                <div style={{ fontSize: "14px", color: c.text3, marginTop: "2px" }}>
+                  투입: ${totalAllocated.toLocaleString()}
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
@@ -979,20 +983,24 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                 <div style={{ fontSize: isMobile ? "24px" : "32px", fontWeight: 800, color: grandROI >= 0 ? c.green : c.red }}>
                   {grandROI >= 0 ? "+" : ""}{grandROI.toFixed(2)}%
                 </div>
+                <div style={{ fontSize: "14px", fontWeight: 600, color: grandTotalPL >= 0 ? c.green : c.red, marginTop: "2px" }}>
+                  {grandTotalPL >= 0 ? "+" : ""}${grandTotalPL.toFixed(2)}
+                </div>
               </div>
             </div>
 
             {/* 핵심 지표 그리드 */}
             <div style={{
-              display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(5, 1fr)",
+              display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr) repeat(3, 1fr)",
               gap: "12px", marginBottom: "4px",
             }}>
               {[
-                { label: "총 수익 (PnL)", value: `${grandTotalPL >= 0 ? "+" : ""}$${grandTotalPL.toFixed(2)}`, color: grandTotalPL >= 0 ? c.green : c.red },
                 { label: "미실현 손익", value: `${grandUnrealized >= 0 ? "+" : ""}$${grandUnrealized.toFixed(2)}`, color: grandUnrealized >= 0 ? c.green : c.red },
                 { label: "실현 손익", value: `${grandRealized >= 0 ? "+" : ""}$${grandRealized.toFixed(2)}`, color: grandRealized >= 0 ? c.green : c.red },
                 { label: "승률", value: grandTrades > 0 ? `${grandWinRate.toFixed(1)}%` : "--", color: grandWinRate >= 50 ? c.green : c.text1 },
                 { label: "총 거래", value: `${grandTrades}회`, color: c.text1 },
+                { label: "활성 봇", value: `${runningBots.length}개`, color: c.blue },
+                { label: "총 승/패", value: `${grandWins}/${grandTrades - grandWins}`, color: c.text1 },
               ].map((m, i) => (
                 <div key={i} style={{ padding: "10px 12px", borderRadius: "10px", background: c.card2 }}>
                   <div style={{ fontSize: "14px", color: c.text3, marginBottom: "4px" }}>{m.label}</div>

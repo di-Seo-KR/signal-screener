@@ -273,6 +273,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   const [btcCandles, setBtcCandles] = useState([]);
   const [subTab, setSubTab] = useState(() => botPreset ? "dashboard" : load("di_btc_tab", "overview"));
   const [detailChartTab, setDetailChartTab] = useState("roi"); // "roi" or "pnl"
+  const [chartHover, setChartHover] = useState(null); // { idx, x, y }
   const [lastUpdate, setLastUpdate] = useState(null);
   const [riskManager] = useState(new CryptoRiskManager());
   const [volatilityRegime, setVolatilityRegime] = useState("normal");
@@ -422,7 +423,12 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           const var95 = riskManager.estimateVaR(returns, 0.95);
           const equity = bt.finalEquity;
           const maxDD = ((bt.maxDrawdown / 100) * 10000) / equity;
-          setPortfolioMetrics({ heat: 45, var: var95, drawdown: maxDD });
+          // 포트폴리오 Heat: 포지션 비율 기반 (미실현 손익 기준 리스크)
+          const snapData = botPerf?.snapshot || {};
+          const pCnt = snapData.positionCount || 0;
+          const botAssetCnt = getBotAssets(botPreset?.id)?.length || 6;
+          const posRatio = Math.min(pCnt / botAssetCnt, 1) * 100; // 포지션 점유율
+          setPortfolioMetrics({ heat: posRatio, var: var95, drawdown: maxDD });
         }
         setMarketDiag(diagnoseMarket(candles));
       }
@@ -739,6 +745,18 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           const eqCurve = bp?.equityCurve || [];
           const pnlCurveData = bp?.pnlCurve || [];
           const activeCurve = detailChartTab === "pnl" ? pnlCurveData : eqCurve;
+          // Sharpe Ratio 실제 계산 (일간 수익률 기반, 연환산)
+          const calcSharpe = (() => {
+            if (eqCurve.length < 3) return null;
+            const returns = [];
+            for (let i = 1; i < eqCurve.length; i++) {
+              returns.push((eqCurve[i] - eqCurve[i - 1]) / eqCurve[i - 1]);
+            }
+            const avgR = returns.reduce((s, r) => s + r, 0) / returns.length;
+            const stdR = Math.sqrt(returns.reduce((s, r) => s + (r - avgR) ** 2, 0) / returns.length);
+            if (stdR === 0) return avgR > 0 ? 99 : 0;
+            return (avgR / stdR) * Math.sqrt(252); // 연환산
+          })();
           const curvePositive = activeCurve.length >= 2 ? activeCurve[activeCurve.length - 1] >= activeCurve[0] : true;
           const elapsed = Date.now() - (botPreset?._startedAt || Date.now());
           const runDays = Math.floor(elapsed / 86400000);
@@ -770,7 +788,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                   </div>
 
                   {[
-                    { label: "Sharpe Ratio", value: botPreset?.stats?.sharpeRatio || "--" },
+                    { label: "Sharpe Ratio", value: calcSharpe !== null ? calcSharpe.toFixed(2) : "--", color: calcSharpe > 1 ? C.green : calcSharpe > 0 ? C.text1 : C.red },
                     { label: "MDD", value: kvMDD2 > 0 ? `${kvMDD2.toFixed(2)}%` : "--", color: kvMDD2 > 10 ? C.red : kvMDD2 > 5 ? C.yellow : C.text1 },
                     { label: "Win Rate", value: kvTrades > 0 ? `${kvWinRate.toFixed(1)}%` : "--", color: kvWinRate >= 50 ? C.green : C.red },
                     { label: "미실현 손익", value: `${kvUnrealized >= 0 ? "+" : ""}$${kvUnrealized.toFixed(2)}`, color: kvUnrealized >= 0 ? C.green : C.red },
@@ -808,34 +826,88 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                       }}>PnL</span>
                     </div>
                     {activeCurve.length >= 2 ? (() => {
-                      const w = isMobile ? 320 : 600, h = isMobile ? 160 : 220;
+                      const yAxisW = 52; // Y축 라벨 너비
+                      const cw = isMobile ? 300 : 560, ch = isMobile ? 160 : 220;
+                      const totalW = cw + yAxisW;
                       const min = Math.min(...activeCurve) * 0.998;
                       const max = Math.max(...activeCurve) * 1.002;
                       const rng = max - min || 1;
-                      const xStep = w / (activeCurve.length - 1);
-                      const pts = activeCurve.map((v, i) => `${(i * xStep).toFixed(1)},${(h - ((v - min) / rng) * (h - 12) - 6).toFixed(1)}`);
+                      const xStep = cw / (activeCurve.length - 1);
+                      const toY = (v) => ch - ((v - min) / rng) * (ch - 12) - 6;
+                      const pts = activeCurve.map((v, i) => `${(yAxisW + i * xStep).toFixed(1)},${toY(v).toFixed(1)}`);
                       const linePath = `M${pts.join(" L")}`;
-                      const areaPath = `${linePath} L${w},${h} L0,${h} Z`;
+                      const areaPath = `${linePath} L${yAxisW + cw},${ch} L${yAxisW},${ch} Z`;
                       const clr = curvePositive ? C.green : C.red;
-                      // ROI 모드: 100% 기준선, PnL 모드: 0 기준선
                       const baseVal = detailChartTab === "pnl" ? 0 : 100;
-                      const baseY = h - ((baseVal - min) / rng) * (h - 12) - 6;
+                      const baseY = toY(baseVal);
+                      const isPnl = detailChartTab === "pnl";
+                      // Y축 라벨 값 (5단계)
+                      const ySteps = [0, 0.25, 0.5, 0.75, 1].map(f => {
+                        const val = min + rng * (1 - f);
+                        return { y: 6 + f * (ch - 12), label: isPnl ? `$${val.toFixed(0)}` : `${val.toFixed(1)}%` };
+                      });
                       return (
-                        <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ borderRadius: "8px", overflow: "hidden" }}>
-                          <defs>
-                            <linearGradient id="roi-detail-grad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor={clr} stopOpacity="0.15" />
-                              <stop offset="100%" stopColor={clr} stopOpacity="0.01" />
-                            </linearGradient>
-                          </defs>
-                          {[0.25, 0.5, 0.75].map(f => (
-                            <line key={f} x1="0" y1={h * f} x2={w} y2={h * f} stroke={C.text3} strokeWidth="0.5" strokeDasharray="3,3" opacity="0.15" />
-                          ))}
-                          <line x1="0" y1={baseY} x2={w} y2={baseY} stroke={C.text3} strokeWidth="0.8" strokeDasharray="4,4" opacity="0.3" />
-                          <path d={areaPath} fill="url(#roi-detail-grad)" />
-                          <path d={linePath} fill="none" stroke={clr} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                          <circle cx={((activeCurve.length - 1) * xStep).toFixed(1)} cy={pts[pts.length - 1].split(",")[1]} r="5" fill={C.card} stroke={clr} strokeWidth="2.5" />
-                        </svg>
+                        <div style={{ position: "relative" }}
+                          onMouseMove={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const mx = ((e.clientX - rect.left) / rect.width) * totalW - yAxisW;
+                            const idx = Math.round(mx / xStep);
+                            if (idx >= 0 && idx < activeCurve.length) {
+                              setChartHover({ idx, x: e.clientX - rect.left, y: e.clientY - rect.top });
+                            }
+                          }}
+                          onMouseLeave={() => setChartHover(null)}
+                        >
+                          <svg width="100%" viewBox={`0 0 ${totalW} ${ch}`} preserveAspectRatio="none" style={{ borderRadius: "8px", overflow: "visible", display: "block" }}>
+                            <defs>
+                              <linearGradient id="roi-detail-grad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor={clr} stopOpacity="0.15" />
+                                <stop offset="100%" stopColor={clr} stopOpacity="0.01" />
+                              </linearGradient>
+                            </defs>
+                            {/* Y축 라벨 */}
+                            {ySteps.map((ys, i) => (
+                              <g key={i}>
+                                <text x={yAxisW - 6} y={ys.y + 3} textAnchor="end" fill={C.text3} fontSize="10" fontFamily="inherit">{ys.label}</text>
+                                <line x1={yAxisW} y1={ys.y} x2={totalW} y2={ys.y} stroke={C.text3} strokeWidth="0.5" strokeDasharray="3,3" opacity="0.15" />
+                              </g>
+                            ))}
+                            {/* 기준선 */}
+                            {baseY > 0 && baseY < ch && (
+                              <line x1={yAxisW} y1={baseY} x2={totalW} y2={baseY} stroke={C.text3} strokeWidth="0.8" strokeDasharray="4,4" opacity="0.35" />
+                            )}
+                            {/* 면적 + 라인 */}
+                            <path d={areaPath} fill="url(#roi-detail-grad)" />
+                            <path d={linePath} fill="none" stroke={clr} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                            {/* 끝점 */}
+                            <circle cx={(yAxisW + (activeCurve.length - 1) * xStep).toFixed(1)} cy={toY(activeCurve[activeCurve.length - 1]).toFixed(1)} r="5" fill={C.card} stroke={clr} strokeWidth="2.5" />
+                            {/* 호버 수직선 + 포인트 */}
+                            {chartHover && chartHover.idx < activeCurve.length && (() => {
+                              const hx = yAxisW + chartHover.idx * xStep;
+                              const hy = toY(activeCurve[chartHover.idx]);
+                              return (
+                                <g>
+                                  <line x1={hx} y1={0} x2={hx} y2={ch} stroke={C.text2} strokeWidth="1" strokeDasharray="3,2" opacity="0.5" />
+                                  <circle cx={hx} cy={hy} r="4" fill={clr} stroke={C.card} strokeWidth="2" />
+                                </g>
+                              );
+                            })()}
+                          </svg>
+                          {/* 호버 툴팁 */}
+                          {chartHover && chartHover.idx < activeCurve.length && (
+                            <div style={{
+                              position: "absolute", left: Math.min(chartHover.x + 12, 400), top: chartHover.y - 40,
+                              background: C.card2, border: `1px solid ${C.border}`, borderRadius: "8px",
+                              padding: "6px 12px", pointerEvents: "none", zIndex: 10, whiteSpace: "nowrap",
+                              boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
+                            }}>
+                              <div style={{ fontSize: "13px", fontWeight: 700, color: clr }}>
+                                {isPnl ? `$${activeCurve[chartHover.idx].toFixed(2)}` : `${activeCurve[chartHover.idx].toFixed(2)}%`}
+                              </div>
+                              <div style={{ fontSize: "11px", color: C.text3 }}>#{chartHover.idx + 1}</div>
+                            </div>
+                          )}
+                        </div>
                       );
                     })() : (
                       <div style={{
@@ -1046,39 +1118,77 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
         )}
 
         {/* ═══ 시그널 ═══ */}
-        {subTab === "signals" && (
-          <div style={card}>
-            <div style={{ fontSize: "15px", fontWeight: 700, color: C.text1, marginBottom: "4px" }}>매매 시그널 히스토리</div>
-            <div style={{ fontSize: "14px", color: C.text3, marginBottom: "12px" }}>BTC 알파 v2 · 멀티 타임프레임 · 최근 30건</div>
-            {recentSignals.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "40px", color: C.text3 }}>시그널 없음</div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
-                {recentSignals.map((s, i) => (
-                  <div key={i} style={{
-                    display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px",
-                    borderRadius: "10px", background: C.card2, borderLeft: `3px solid ${s.type === "BUY" ? C.green : C.red}`,
-                  }}>
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
-                      {badge(s.type === "BUY" ? "매수" : "매도", s.type === "BUY" ? C.greenBg : C.redBg, s.type === "BUY" ? C.green : C.red)}
-                      {s.confidence && badge(s.confidence, C.blueBg, C.blue)}
-                      {s.tf && badge(s.tf, C.purpleBg, C.purple)}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: "14px", color: C.text2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {s.asset && <span style={{ fontWeight: 700 }}>[{s.asset.replace("-USD","")}] </span>}{s.reason}
-                      </div>
-                    </div>
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: "14px", fontWeight: 700, color: C.text1 }}>${s.price?.toLocaleString(undefined, { maximumFractionDigits: s.price > 100 ? 0 : 2 })}</div>
-                      {s.date && <div style={{ fontSize: "12px", color: C.text3 }}>{s.date.toLocaleDateString("ko-KR", { month: "short", day: "numeric" })} {s.tf !== "1d" ? s.date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" }) : ""}</div>}
-                    </div>
-                  </div>
-                ))}
+        {subTab === "signals" && (() => {
+          // 봇 상세 모드: KV 실제 거래 데이터 우선, 없으면 프론트엔드 시그널
+          const kvTrades2 = botPerf?.perf?.trades || [];
+          const showKvTrades = botPreset && kvTrades2.length > 0;
+          const displayTrades = showKvTrades
+            ? kvTrades2.slice(-30).reverse().map(t => ({
+                type: t.side || t.action || "BUY",
+                asset: t.asset || t.symbol || "",
+                price: t.price || 0,
+                qty: t.qty || 0,
+                amount: t.amount || (t.price * (t.qty || 0)),
+                date: t.time ? new Date(t.time) : null,
+                reason: t.reason || (t.side === "SELL" ? "매도 시그널" : "매수 시그널"),
+                pnl: t.pnl || null,
+              }))
+            : recentSignals;
+          return (
+            <div style={card}>
+              <div style={{ fontSize: "15px", fontWeight: 700, color: C.text1, marginBottom: "4px" }}>
+                {showKvTrades ? "실제 거래 내역" : "매매 시그널 히스토리"}
               </div>
-            )}
-          </div>
-        )}
+              <div style={{ fontSize: "14px", color: C.text3, marginBottom: "12px" }}>
+                {showKvTrades
+                  ? `${botPreset?.name || "봇"} · 최근 ${Math.min(kvTrades2.length, 30)}건`
+                  : "BTC 알파 v2 · 멀티 타임프레임 · 최근 30건"
+                }
+              </div>
+              {displayTrades.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "40px", color: C.text3 }}>
+                  {showKvTrades ? "거래 내역 없음" : "시그널 없음"}
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                  {displayTrades.map((s, i) => {
+                    const isBuy = (s.type || "").toUpperCase().includes("BUY");
+                    return (
+                      <div key={i} style={{
+                        display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px",
+                        borderRadius: "10px", background: C.card2, borderLeft: `3px solid ${isBuy ? C.green : C.red}`,
+                      }}>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "2px" }}>
+                          {badge(isBuy ? "매수" : "매도", isBuy ? C.greenBg : C.redBg, isBuy ? C.green : C.red)}
+                          {showKvTrades && s.amount > 0 && badge(`$${s.amount.toFixed(0)}`, C.blueBg, C.blue)}
+                          {!showKvTrades && s.confidence && badge(s.confidence, C.blueBg, C.blue)}
+                          {!showKvTrades && s.tf && badge(s.tf, C.purpleBg, C.purple)}
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "14px", color: C.text2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {s.asset && <span style={{ fontWeight: 700 }}>[{(s.asset || "").replace("-USD","").replace("USDT","")}] </span>}
+                            {s.reason}
+                          </div>
+                          {showKvTrades && s.pnl != null && (
+                            <div style={{ fontSize: "13px", fontWeight: 600, color: s.pnl >= 0 ? C.green : C.red, marginTop: "2px" }}>
+                              PnL: {s.pnl >= 0 ? "+" : ""}${s.pnl.toFixed(2)}
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div style={{ fontSize: "14px", fontWeight: 700, color: C.text1 }}>
+                            ${s.price?.toLocaleString(undefined, { maximumFractionDigits: s.price > 100 ? 0 : 2 })}
+                          </div>
+                          {s.date && <div style={{ fontSize: "12px", color: C.text3 }}>{s.date.toLocaleDateString("ko-KR", { month: "short", day: "numeric" })} {s.date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}</div>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ═══ 시장진단 ═══ */}
         {subTab === "market" && (
