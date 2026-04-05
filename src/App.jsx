@@ -11087,32 +11087,52 @@ function AppInner() {
         {/* 차트 모달 */}
         {chartAsset && <ChartModal asset={chartAsset} onClose={() => setChartAsset(null)} krwRate={krwRate} theme={themeMode} />}
 
-        {/* ═══ 풋터 ═══ */}
+        {/* ═══ 풋터 (토스 스타일) ═══ */}
         <footer style={{
-          maxWidth: "1400px", margin: "40px auto 0", padding: "24px 24px calc(24px + env(safe-area-inset-bottom, 0px))",
-          borderTop: `1px solid ${C.border}${C.isDark ? '30' : '50'}`,
-          display: "flex", flexDirection: "column", gap: "16px",
+          maxWidth: "1400px", margin: "60px auto 0",
+          padding: "32px 24px calc(40px + env(safe-area-inset-bottom, 0px))",
+          borderTop: `1px solid ${C.border}${C.isDark ? '20' : '40'}`,
         }}>
-          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "12px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <img src="/zepta-icon-192.png" alt="Zepta" width="24" height="24" style={{ flexShrink: 0 }} />
-              <span style={{ fontWeight: 700, fontSize: "13px", color: C.text2 }}>Zepta</span>
-            </div>
-            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-              <span onClick={() => setTab("about")} style={{ fontSize: "12px", color: C.text3, cursor: "pointer", textDecoration: "underline" }}>서비스 소개</span>
-              <span onClick={() => setTab("privacy")} style={{ fontSize: "12px", color: C.text3, cursor: "pointer", textDecoration: "underline" }}>개인정보처리방침</span>
-              <span onClick={() => setTab("terms")} style={{ fontSize: "12px", color: C.text3, cursor: "pointer", textDecoration: "underline" }}>이용약관</span>
-              <span onClick={() => setTab("contact")} style={{ fontSize: "12px", color: C.text3, cursor: "pointer", textDecoration: "underline" }}>문의하기</span>
-            </div>
+          {/* 상단: 네비게이션 링크 */}
+          <div style={{ display: "flex", alignItems: "center", gap: "0", flexWrap: "wrap", marginBottom: "20px" }}>
+            {[
+              { label: "개인정보 처리방침", tab: "privacy", bold: true },
+              { label: "이용약관", tab: "terms" },
+              { label: "서비스 소개", tab: "about" },
+              { label: "문의하기", tab: "contact" },
+            ].map((item, i) => (
+              <span key={item.tab} style={{ display: "flex", alignItems: "center" }}>
+                {i > 0 && <span style={{ margin: "0 10px", color: C.text3, opacity: 0.3 }}>|</span>}
+                <span
+                  onClick={() => setTab(item.tab)}
+                  style={{
+                    fontSize: "12px", color: C.text3, cursor: "pointer",
+                    fontWeight: item.bold ? 700 : 400,
+                  }}
+                  onMouseEnter={e => { e.target.style.color = C.text1; }}
+                  onMouseLeave={e => { e.target.style.color = C.text3; }}
+                >{item.label}</span>
+              </span>
+            ))}
           </div>
-          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "8px" }}>
-            <div style={{ fontSize: "11px", color: C.text3, display: "flex", gap: "16px", flexWrap: "wrap" }}>
-              <span>투자의 판단과 책임은 본인에게 있습니다</span>
-              <span>문의: donginseo0421@gmail.com</span>
+
+          {/* 중단: 사업자 정보 */}
+          <div style={{ fontSize: "11px", color: C.text3, lineHeight: 1.8, marginBottom: "16px", opacity: 0.7 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+              <img src="/zepta-icon-192.png" alt="Zepta" width="18" height="18" style={{ flexShrink: 0, opacity: 0.6 }} />
+              <span style={{ fontWeight: 600, fontSize: "12px" }}>Zepta</span>
             </div>
+            <span>대표: 서동인</span>
+            <span style={{ margin: "0 8px", opacity: 0.3 }}>·</span>
+            <span>문의: donginseo0421@gmail.com</span>
           </div>
-          <div style={{ fontSize: "10px", color: C.text3, textAlign: "center" }}>
-            © 2025-2026 Zepta. All rights reserved.
+
+          {/* 하단: 면책 + 저작권 */}
+          <div style={{ fontSize: "11px", color: C.text3, lineHeight: 1.7, opacity: 0.5 }}>
+            <p style={{ margin: "0 0 6px" }}>
+              Zepta에서 제공하는 투자 정보는 고객의 투자 판단을 위한 단순 참고용이며, 투자 제안 및 권유, 종목 추천을 위해 작성된 것이 아닙니다.
+            </p>
+            <p style={{ margin: 0 }}>© 2025-2026 Zepta. All rights reserved.</p>
           </div>
         </footer>
       </main>
