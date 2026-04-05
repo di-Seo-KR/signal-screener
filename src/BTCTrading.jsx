@@ -271,7 +271,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   const [riskLevel, setRiskLevel] = useState(presetConfig.riskLevel || load(KEYS.settings, { enabled: false, riskLevel: "medium" }).riskLevel);
   const [tradeLog, setTradeLog] = useState(load(KEYS.log, []));
   const [btcCandles, setBtcCandles] = useState([]);
-  const [subTab, setSubTab] = useState(() => load("di_btc_tab", "overview"));
+  const [subTab, setSubTab] = useState(() => botPreset ? "dashboard" : load("di_btc_tab", "overview"));
   const [lastUpdate, setLastUpdate] = useState(null);
   const [riskManager] = useState(new CryptoRiskManager());
   const [volatilityRegime, setVolatilityRegime] = useState("normal");
@@ -293,7 +293,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
       try {
         const res = await fetch(`/api/bot-performance?botId=${bid}`);
         const data = await res.json();
-        if (!cancelled && data.ok) setBotPerf({ perf: data.perf, snapshot: data.snapshot });
+        if (!cancelled && data.ok) setBotPerf({ perf: data.perf, snapshot: data.snapshot, equityCurve: data.equityCurve || [] });
       } catch { /* 실패해도 기존 데이터로 폴백 */ }
     };
     fetchBotPerf();
@@ -569,6 +569,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
         display: "flex", flexDirection: "column", gap: "0", position: "sticky", top: "0", maxHeight: "100vh", overflowY: "auto",
       }}>
         {[
+          { id: "dashboard", label: "대시보드", count: null },
           { id: "overview", label: "포지션", count: cryptoPositions.length },
           { id: "signals", label: "시그널", count: recentSignals.length },
           { id: "market", label: "시장진단", count: null },
@@ -693,6 +694,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
         {isMobile && (
           <div style={{ display: "flex", gap: "6px", overflowX: "auto", paddingBottom: "4px" }}>
             {[
+              { id: "dashboard", label: "대시보드" },
               { id: "overview", label: "포지션" },
               { id: "signals", label: "시그널" },
               { id: "market", label: "시장진단" },
@@ -707,6 +709,199 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
             ))}
           </div>
         )}
+
+        {/* ═══ 대시보드 (바이낸스 카피트레이딩 스타일) ═══ */}
+        {subTab === "dashboard" && (() => {
+          const bp = botPerf || {};
+          const snap = bp.snapshot || {};
+          const perf2 = bp.perf || {};
+          const kvTrades = perf2.tradeCount || 0;
+          const kvWinCount = perf2.winCount || 0;
+          const kvUnrealized = snap.unrealizedPL || 0;
+          const kvRealized = perf2.realizedPL || 0;
+          const kvTotalPL = kvUnrealized + kvRealized;
+          const kvROI = initCapital > 0 ? (kvTotalPL / initCapital) * 100 : 0;
+          const kvWinRate = kvTrades > 0 ? (kvWinCount / kvTrades) * 100 : 0;
+          const rawDD2 = snap.dd || 0;
+          const rawMDD2 = snap.mdd || 0;
+          const kvDD2 = rawDD2 >= 99.9 ? 0 : rawDD2;
+          const kvMDD2 = rawMDD2 >= 99.9 ? 0 : rawMDD2;
+          const botAssets = getBotAssets(botPreset?.id);
+          const assetData = botAssets.map(a => ({ name: a.name, value: 1 }));
+          const chartColors = [C.blue, "#FCD535", "#85C4FF", C.purple, C.orange, C.green, C.red, "#FF69B4", "#00CED1", "#FF6347"];
+          const eqCurve = bp?.equityCurve || [];
+          const curvePositive = eqCurve.length >= 2 ? eqCurve[eqCurve.length - 1] >= eqCurve[0] : true;
+          const elapsed = Date.now() - (botPreset?._startedAt || Date.now());
+          const runDays = Math.floor(elapsed / 86400000);
+          const runHours = Math.floor((elapsed % 86400000) / 3600000);
+
+          return (
+            <>
+              {/* 바이낸스 스타일 2열 그리드 */}
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "1fr 2fr",
+                gap: isMobile ? "12px" : "16px",
+              }}>
+                {/* ── Performance 카드 (좌측) ── */}
+                <div style={{ ...card, padding: isMobile ? "16px" : "24px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "17px", color: C.text1, marginBottom: "16px" }}>Performance</div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                    <span style={{ fontSize: "13px", color: C.text3 }}>ROI</span>
+                    <span style={{ fontSize: "13px", color: C.text3 }}>PnL</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}>
+                    <span style={{ fontSize: "22px", fontWeight: 700, color: kvROI >= 0 ? C.green : C.red }}>
+                      {kvROI >= 0 ? "+" : ""}{kvROI.toFixed(2)}%
+                    </span>
+                    <span style={{ fontSize: "22px", fontWeight: 700, color: kvTotalPL >= 0 ? C.green : C.red }}>
+                      {kvTotalPL >= 0 ? "+" : ""}{kvTotalPL.toFixed(2)}
+                    </span>
+                  </div>
+
+                  {[
+                    { label: "Sharpe Ratio", value: botPreset?.stats?.sharpeRatio || "--" },
+                    { label: "MDD", value: kvMDD2 > 0 ? `${kvMDD2.toFixed(2)}%` : "--", color: kvMDD2 > 10 ? C.red : kvMDD2 > 5 ? C.yellow : C.text1 },
+                    { label: "Win Rate", value: kvTrades > 0 ? `${kvWinRate.toFixed(1)}%` : "--", color: kvWinRate >= 50 ? C.green : C.red },
+                    { label: "미실현 손익", value: `${kvUnrealized >= 0 ? "+" : ""}$${kvUnrealized.toFixed(2)}`, color: kvUnrealized >= 0 ? C.green : C.red },
+                    { label: "실현 손익", value: `${kvRealized >= 0 ? "+" : ""}$${kvRealized.toFixed(2)}`, color: kvRealized >= 0 ? C.green : C.red },
+                    { label: "승리 포지션", value: `${kvWinCount}` },
+                    { label: "총 포지션", value: `${kvTrades}` },
+                  ].map((row, i) => (
+                    <div key={i} style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "9px 0", borderTop: i === 0 ? `1px solid ${C.border}` : "none",
+                      borderBottom: `1px solid ${C.border}20`,
+                    }}>
+                      <span style={{ fontSize: "13px", color: C.text3 }}>{row.label}</span>
+                      <span style={{ fontSize: "14px", fontWeight: 600, color: row.color || C.text1 }}>{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ── 우측: ROI 차트 + 하단 그리드 ── */}
+                <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "12px" : "16px" }}>
+                  {/* ROI 차트 카드 */}
+                  <div style={{ ...card, padding: isMobile ? "16px" : "24px", flex: 1 }}>
+                    <div style={{ display: "flex", gap: "16px", marginBottom: "16px" }}>
+                      <span style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>ROI</span>
+                      <span style={{ fontWeight: 500, fontSize: "17px", color: C.text3 }}>PnL</span>
+                    </div>
+                    {eqCurve.length >= 2 ? (() => {
+                      const w = isMobile ? 320 : 600, h = isMobile ? 160 : 220;
+                      const min = Math.min(...eqCurve) * 0.998;
+                      const max = Math.max(...eqCurve) * 1.002;
+                      const rng = max - min || 1;
+                      const xStep = w / (eqCurve.length - 1);
+                      const pts = eqCurve.map((v, i) => `${(i * xStep).toFixed(1)},${(h - ((v - min) / rng) * (h - 12) - 6).toFixed(1)}`);
+                      const linePath = `M${pts.join(" L")}`;
+                      const areaPath = `${linePath} L${w},${h} L0,${h} Z`;
+                      const clr = curvePositive ? C.green : C.red;
+                      const baseY = h - ((100 - min) / rng) * (h - 12) - 6;
+                      return (
+                        <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ borderRadius: "8px", overflow: "hidden" }}>
+                          <defs>
+                            <linearGradient id="roi-detail-grad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={clr} stopOpacity="0.15" />
+                              <stop offset="100%" stopColor={clr} stopOpacity="0.01" />
+                            </linearGradient>
+                          </defs>
+                          {[0.25, 0.5, 0.75].map(f => (
+                            <line key={f} x1="0" y1={h * f} x2={w} y2={h * f} stroke={C.text3} strokeWidth="0.5" strokeDasharray="3,3" opacity="0.15" />
+                          ))}
+                          <line x1="0" y1={baseY} x2={w} y2={baseY} stroke={C.text3} strokeWidth="0.8" strokeDasharray="4,4" opacity="0.3" />
+                          <path d={areaPath} fill="url(#roi-detail-grad)" />
+                          <path d={linePath} fill="none" stroke={clr} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                          <circle cx={((eqCurve.length - 1) * xStep).toFixed(1)} cy={pts[pts.length - 1].split(",")[1]} r="5" fill={C.card} stroke={clr} strokeWidth="2.5" />
+                        </svg>
+                      );
+                    })() : (
+                      <div style={{
+                        height: isMobile ? "160px" : "220px", display: "flex", flexDirection: "column",
+                        alignItems: "center", justifyContent: "center", borderRadius: "8px",
+                        background: `${C.text3}06`, border: `1px dashed ${C.text3}20`,
+                      }}>
+                        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ opacity: 0.3, marginBottom: "8px" }}>
+                          <path d="M6 36 L14 28 L22 32 L30 18 L38 22 L42 12" stroke={C.text3} strokeWidth="2" strokeLinecap="round" fill="none" />
+                        </svg>
+                        <span style={{ fontSize: "13px", color: C.text3 }}>거래 데이터 수집 중입니다...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 하단: 봇 개요 + 자산 배분 */}
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "12px" : "16px" }}>
+                    {/* 봇 개요 */}
+                    <div style={{ ...card, padding: isMobile ? "16px" : "24px" }}>
+                      <div style={{ fontWeight: 700, fontSize: "17px", color: C.text1, marginBottom: "16px" }}>봇 개요</div>
+                      {[
+                        { label: "투입 금액 (AUM)", value: `$${(botAllocation || 0).toLocaleString()}` },
+                        { label: "예상 수익률", value: botPreset?.expectedReturn || "--" },
+                        { label: "운영 기간", value: `${runDays}일 ${runHours}시간` },
+                        { label: "거래 자산 수", value: `${botAssets.length}개` },
+                        { label: "Drawdown", value: kvDD2 > 0 ? `${kvDD2.toFixed(2)}%` : "--" },
+                      ].map((row, i) => (
+                        <div key={i} style={{
+                          display: "flex", justifyContent: "space-between", alignItems: "center",
+                          padding: "9px 0", borderBottom: `1px solid ${C.border}20`,
+                        }}>
+                          <span style={{ fontSize: "13px", color: C.text3 }}>{row.label}</span>
+                          <span style={{ fontSize: "14px", fontWeight: 600, color: C.text1 }}>{row.value}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 자산 배분 (도넛) */}
+                    <div style={{ ...card, padding: isMobile ? "16px" : "24px" }}>
+                      <div style={{ fontWeight: 700, fontSize: "17px", color: C.text1, marginBottom: "16px" }}>자산 배분</div>
+                      <div style={{ display: "flex", gap: "20px", alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+                        {/* SVG 도넛 */}
+                        {(() => {
+                          const sz = isMobile ? 120 : 140;
+                          const cx2 = sz / 2, cy2 = sz / 2, r2 = sz * 0.38, sw = sz * 0.15;
+                          const total = assetData.reduce((s, d) => s + d.value, 0);
+                          let cum = -Math.PI / 2;
+                          return (
+                            <svg width={sz} height={sz} viewBox={`0 0 ${sz} ${sz}`}>
+                              <circle cx={cx2} cy={cy2} r={r2} fill="none" stroke={`${C.text3}15`} strokeWidth={sw} />
+                              {assetData.map((d, i) => {
+                                const pct = d.value / total;
+                                const angle = pct * 2 * Math.PI;
+                                const start = cum;
+                                cum += angle;
+                                const end = cum - 0.001;
+                                const la = angle > Math.PI ? 1 : 0;
+                                const x1 = cx2 + r2 * Math.cos(start);
+                                const y1 = cy2 + r2 * Math.sin(start);
+                                const x2 = cx2 + r2 * Math.cos(end);
+                                const y2 = cy2 + r2 * Math.sin(end);
+                                return <path key={i} d={`M ${x1} ${y1} A ${r2} ${r2} 0 ${la} 1 ${x2} ${y2}`}
+                                  fill="none" stroke={chartColors[i % chartColors.length]} strokeWidth={sw} />;
+                              })}
+                            </svg>
+                          );
+                        })()}
+                        <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
+                          {assetData.slice(0, 8).map((a, i) => {
+                            const pct = (a.value / assetData.reduce((s, d) => s + d.value, 0) * 100).toFixed(1);
+                            return (
+                              <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                                <div style={{ width: "14px", height: "4px", borderRadius: "2px", background: chartColors[i % chartColors.length] }} />
+                                <span style={{ fontSize: "11px", fontWeight: 600, color: C.text1 }}>{a.name} {pct}%</span>
+                              </div>
+                            );
+                          })}
+                          {assetData.length > 8 && <span style={{ fontSize: "10px", color: C.text3 }}>외 {assetData.length - 8}개</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </>
+          );
+        })()}
 
         {/* ═══ 포지션 (overview) ═══ */}
         {subTab === "overview" && (

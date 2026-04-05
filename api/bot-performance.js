@@ -26,7 +26,15 @@ export default async function handler(req, res) {
           kv.get(`di:bot:${id}:snapshot`),
         ]);
         if (perf || snapshot) {
-          results[id] = { perf: perf || null, snapshot: snapshot || null };
+          // equityCurve 추출 (배분 대비 % 로 정규화)
+          const hist = snapshot?.history || [];
+          const alloc = snapshot?.botAllocation || 0;
+          const equityCurve = hist.length >= 2
+            ? hist.map(h => alloc > 0 ? ((h.equity || alloc) / alloc) * 100 : 100)
+            : [];
+          // snapshot에서 큰 history 배열 제외 (응답 크기 절감)
+          const snapClean = snapshot ? { ...snapshot, history: undefined, historyLength: hist.length } : null;
+          results[id] = { perf: perf || null, snapshot: snapClean, equityCurve };
         }
       }
       return res.status(200).json({ ok: true, bots: results });
@@ -38,11 +46,18 @@ export default async function handler(req, res) {
         kv.get(`di:bot:${botId}:perf`),
         kv.get(`di:bot:${botId}:snapshot`),
       ]);
+      const hist = snapshot?.history || [];
+      const alloc = snapshot?.botAllocation || 0;
+      const equityCurve = hist.length >= 2
+        ? hist.map(h => alloc > 0 ? ((h.equity || alloc) / alloc) * 100 : 100)
+        : [];
+      const snapClean = snapshot ? { ...snapshot, history: undefined, historyLength: hist.length } : null;
       return res.status(200).json({
         ok: true,
         botId,
         perf: perf || { botId, trades: [], tradeCount: 0, realizedPL: 0 },
-        snapshot: snapshot || { botId, marketValue: 0, unrealizedPL: 0, positionCount: 0, dd: 0, mdd: 0, history: [] },
+        snapshot: snapClean || { botId, marketValue: 0, unrealizedPL: 0, positionCount: 0, dd: 0, mdd: 0 },
+        equityCurve,
       });
     }
 

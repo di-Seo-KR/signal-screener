@@ -949,306 +949,191 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
         {loading && <span style={{ fontSize: "11px", color: c.text3 }}>로딩 중...</span>}
       </div>
 
-      {/* 봇별 바이낸스 스타일 대시보드 */}
-      {activeBots.filter(ab => ab.status !== "paused").map(ab => {
-        const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
-        const elapsed = Date.now() - (ab.startedAt || Date.now());
-        const days = Math.floor(elapsed / 86400000);
-        const hours = Math.floor((elapsed % 86400000) / 3600000);
-        const isStock = STOCK_BOTS.some(b => b.id === ab.botId);
-        const bp = allBotPerf[ab.botId];
-
-        // 성과 데이터
-        const kvTrades = bp?.perf?.tradeCount || 0;
-        const kvWinCount = bp?.perf?.winCount || 0;
-        const rawDD = bp?.snapshot?.dd || 0;
-        const rawMDD = bp?.snapshot?.mdd || 0;
-        const kvDD = rawDD >= 99.9 ? 0 : rawDD;
-        const kvMDD = rawMDD >= 99.9 ? 0 : rawMDD;
-        const kvUnrealized = bp?.snapshot?.unrealizedPL || 0;
-        const realizedPL = bp?.perf?.realizedPL || 0;
-        const totalPL = kvUnrealized + realizedPL;
-        const allocation = ab.allocation || 0;
-        const roiPct = allocation > 0 ? (totalPL / allocation) * 100 : 0;
-        const winRate = kvTrades > 0 ? (kvWinCount / kvTrades) * 100 : 0;
-        const botPnlPct = bp?.totalPLPct ?? null;
-        const safeBotReturn = bp?.totalReturn ?? null;
-
-        // 차트 데이터
-        const pnlData = bp?.equityCurve && bp.equityCurve.length >= 2 ? bp.equityCurve : [];
-        const botIsPositive = (safeBotReturn != null ? safeBotReturn >= 0 : roiPct >= 0);
-
-        // 자산 배분 데이터
-        const botAssets = BOT_ASSET_MAP[ab.botId] || [];
-        const assetData = botAssets.map(asset => ({
-          name: asset.replace("/USD", ""),
-          value: 1, // 균등 배분 가정
-        }));
+      {/* ── 통합 포트폴리오 요약 카드 ── */}
+      {(() => {
+        const runningBots = activeBots.filter(ab => ab.status !== "paused");
+        let grandTotalPL = 0, grandUnrealized = 0, grandRealized = 0, grandTrades = 0, grandWins = 0;
+        runningBots.forEach(ab => {
+          const bp = allBotPerf[ab.botId];
+          grandTrades += bp?.perf?.tradeCount || 0;
+          grandWins += bp?.perf?.winCount || 0;
+          grandUnrealized += bp?.snapshot?.unrealizedPL || 0;
+          grandRealized += bp?.perf?.realizedPL || 0;
+        });
+        grandTotalPL = grandUnrealized + grandRealized;
+        const grandROI = totalAllocated > 0 ? (grandTotalPL / totalAllocated) * 100 : 0;
+        const grandWinRate = grandTrades > 0 ? (grandWins / grandTrades) * 100 : 0;
 
         return (
-          <div key={ab.botId} style={{ marginBottom: "24px" }}>
-            {/* ── 봇 헤더 (바이낸스 트레이더 프로필 스타일) ── */}
-            <div style={{
-              ...cardStyle, marginBottom: "1px", borderBottomLeftRadius: 0, borderBottomRightRadius: 0,
-              display: "flex", alignItems: "center", gap: isMobile ? "12px" : "16px",
-              flexWrap: "wrap",
-            }}>
-              <span style={{
-                fontSize: isMobile ? "32px" : "40px",
-                width: isMobile ? "48px" : "56px", height: isMobile ? "48px" : "56px",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                background: `${c.blue}10`, borderRadius: "50%", flexShrink: 0,
-              }}>{bot.icon}</span>
-              <div style={{ flex: 1, minWidth: isMobile ? "120px" : "200px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  <span style={{ fontWeight: 700, fontSize: isMobile ? "16px" : "20px", color: c.text1 }}>{bot.name}</span>
-                  <span style={{
-                    padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: 600,
-                    background: `${getRiskColor(bot.riskColor, theme)}15`,
-                    color: getRiskColor(bot.riskColor, theme),
-                  }}>위험도: {bot.risk}</span>
-                  {!isStock && <span style={{
-                    padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: 600,
-                    background: `${c.text3}15`, color: c.text2,
-                  }}>24/7 자동매매</span>}
-                </div>
-                <div style={{ fontSize: isMobile ? "12px" : "13px", color: c.text2, marginTop: "4px" }}>
-                  {bot.description}
+          <div style={{ ...cardStyle, marginBottom: "20px" }}>
+            {/* 상단: 총 자산 + ROI */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
+              <div>
+                <div style={{ fontSize: "12px", color: c.text3, marginBottom: "4px" }}>총 투입 금액</div>
+                <div style={{ fontSize: isMobile ? "28px" : "36px", fontWeight: 800, color: c.text1, letterSpacing: "-1px" }}>
+                  ${totalAllocated.toLocaleString()}
                 </div>
               </div>
-              <div style={{
-                display: "flex", gap: isMobile ? "12px" : "20px",
-                flexWrap: "wrap", alignItems: "center",
-                ...(isMobile ? { width: "100%", justifyContent: "space-around", marginTop: "8px" } : {}),
-              }}>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "11px", color: c.text3 }}>운영 기간</div>
-                  <div style={{ fontSize: isMobile ? "13px" : "14px", fontWeight: 700, color: c.text1 }}>{days > 0 ? `${days}일` : `${hours}시간`}</div>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "11px", color: c.text3 }}>총 거래</div>
-                  <div style={{ fontSize: isMobile ? "13px" : "14px", fontWeight: 700, color: c.text1 }}>{kvTrades}회</div>
-                </div>
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: "11px", color: c.text3 }}>상태</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "4px", justifyContent: "center" }}>
-                    <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: c.green }} />
-                    <span style={{ fontSize: isMobile ? "13px" : "14px", fontWeight: 700, color: c.green }}>운영 중</span>
-                  </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "12px", color: c.text3, marginBottom: "4px" }}>총 수익률 (ROI)</div>
+                <div style={{ fontSize: isMobile ? "24px" : "32px", fontWeight: 800, color: grandROI >= 0 ? c.green : c.red }}>
+                  {grandROI >= 0 ? "+" : ""}{grandROI.toFixed(2)}%
                 </div>
               </div>
             </div>
 
-            {/* ── 바이낸스 카피트레이딩 그리드 (Performance / ROI Chart / Overview / Assets) ── */}
+            {/* 핵심 지표 그리드 */}
             <div style={{
-              display: "grid",
-              gridTemplateColumns: isMobile ? "1fr" : "1fr 2fr",
-              gap: "1px",
+              display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(5, 1fr)",
+              gap: "12px", marginBottom: "4px",
             }}>
-              {/* Performance 카드 (바이낸스 좌측) */}
-              <div style={{
-                ...cardStyle,
-                borderRadius: 0,
-                ...(isMobile ? {} : { borderBottomLeftRadius: "16px" }),
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                  <span style={{ fontWeight: 700, fontSize: isMobile ? "15px" : "17px", color: c.text1 }}>Performance</span>
+              {[
+                { label: "총 수익 (PnL)", value: `${grandTotalPL >= 0 ? "+" : ""}$${grandTotalPL.toFixed(2)}`, color: grandTotalPL >= 0 ? c.green : c.red },
+                { label: "미실현 손익", value: `${grandUnrealized >= 0 ? "+" : ""}$${grandUnrealized.toFixed(2)}`, color: grandUnrealized >= 0 ? c.green : c.red },
+                { label: "실현 손익", value: `${grandRealized >= 0 ? "+" : ""}$${grandRealized.toFixed(2)}`, color: grandRealized >= 0 ? c.green : c.red },
+                { label: "승률", value: grandTrades > 0 ? `${grandWinRate.toFixed(1)}%` : "--", color: grandWinRate >= 50 ? c.green : c.text1 },
+                { label: "총 거래", value: `${grandTrades}회`, color: c.text1 },
+              ].map((m, i) => (
+                <div key={i} style={{ padding: "10px 12px", borderRadius: "10px", background: c.card2 }}>
+                  <div style={{ fontSize: "11px", color: c.text3, marginBottom: "4px" }}>{m.label}</div>
+                  <div style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 700, color: m.color }}>{m.value}</div>
                 </div>
-
-                {/* ROI / PnL 메인 */}
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-                  <span style={{ fontSize: "13px", color: c.text3 }}>ROI</span>
-                  <span style={{ fontSize: "13px", color: c.text3 }}>PnL</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px" }}>
-                  <span style={{
-                    fontSize: isMobile ? "18px" : "20px", fontWeight: 700,
-                    color: roiPct >= 0 ? c.green : c.red,
-                  }}>
-                    {roiPct >= 0 ? "+" : ""}{roiPct.toFixed(2)}%
-                  </span>
-                  <span style={{
-                    fontSize: isMobile ? "18px" : "20px", fontWeight: 700,
-                    color: totalPL >= 0 ? c.green : c.red,
-                  }}>
-                    {totalPL >= 0 ? "+" : ""}{totalPL.toFixed(2)}
-                  </span>
-                </div>
-
-                {/* 세부 지표 목록 (바이낸스 스타일) */}
-                {[
-                  { label: "Sharpe Ratio", value: bot.stats?.sharpeRatio || "--" },
-                  { label: "MDD", value: kvMDD > 0 ? `${kvMDD.toFixed(2)}%` : "--", color: kvMDD > 10 ? c.red : kvMDD > 5 ? c.yellow : c.text1 },
-                  { label: "Win Rate", value: kvTrades > 0 ? `${winRate.toFixed(1)}%` : "--", color: winRate >= 50 ? c.green : c.red },
-                  { label: "미실현 손익", value: `${kvUnrealized >= 0 ? "+" : ""}$${kvUnrealized.toFixed(2)}`, color: kvUnrealized >= 0 ? c.green : c.red },
-                  { label: "실현 손익", value: `${realizedPL >= 0 ? "+" : ""}$${realizedPL.toFixed(2)}`, color: realizedPL >= 0 ? c.green : c.red },
-                  { label: "승리 포지션", value: `${kvWinCount}` },
-                  { label: "총 포지션", value: `${kvTrades}` },
-                ].map((row, i) => (
-                  <div key={i} style={{
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "8px 0", borderTop: i === 0 ? `1px solid ${c.border}` : "none",
-                    borderBottom: `1px solid ${c.border}20`,
-                  }}>
-                    <span style={{ fontSize: "13px", color: c.text3 }}>{row.label}</span>
-                    <span style={{ fontSize: "14px", fontWeight: 600, color: row.color || c.text1 }}>{row.value}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* ROI 차트 + 봇 개요 + 자산 배분 (바이낸스 우측) */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "1px" }}>
-                {/* ROI 차트 카드 */}
-                <div style={{
-                  ...cardStyle,
-                  borderRadius: 0,
-                  ...(isMobile ? {} : { borderTopRightRadius: 0 }),
-                  flex: 1,
-                }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-                    <div style={{ display: "flex", gap: "16px" }}>
-                      <span style={{ fontWeight: 700, fontSize: isMobile ? "15px" : "17px", color: c.text1 }}>ROI</span>
-                      <span style={{ fontWeight: 500, fontSize: isMobile ? "15px" : "17px", color: c.text3, cursor: "default" }}>PnL</span>
-                    </div>
-                  </div>
-
-                  {pnlData.length >= 2 ? (() => {
-                    const w = isMobile ? 320 : 600, h = isMobile ? 140 : 200;
-                    const min = Math.min(...pnlData) * 0.998;
-                    const max = Math.max(...pnlData) * 1.002;
-                    const rng = max - min || 1;
-                    const xStep = w / (pnlData.length - 1);
-                    const pts = pnlData.map((v, i) => `${(i * xStep).toFixed(1)},${(h - ((v - min) / rng) * (h - 12) - 6).toFixed(1)}`);
-                    const linePath = `M${pts.join(" L")}`;
-                    const areaPath = `${linePath} L${w},${h} L0,${h} Z`;
-                    const clr = botIsPositive ? c.green : c.red;
-                    const baseY = h - ((100 - min) / rng) * (h - 12) - 6;
-                    const gradId = `roi-chart-${ab.botId.replace(/[^a-z0-9]/gi, "")}`;
-
-                    // y축 라벨
-                    const yMin = ((min - 100) / 100 * 100);
-                    const yMax = ((max - 100) / 100 * 100);
-                    const yMid = (yMin + yMax) / 2;
-
-                    return (
-                      <div style={{ position: "relative" }}>
-                        <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ borderRadius: "8px", overflow: "hidden" }}>
-                          <defs>
-                            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor={clr} stopOpacity="0.15" />
-                              <stop offset="100%" stopColor={clr} stopOpacity="0.01" />
-                            </linearGradient>
-                          </defs>
-                          {/* 수평 그리드 라인 */}
-                          {[0.25, 0.5, 0.75].map(frac => (
-                            <line key={frac} x1="0" y1={h * frac} x2={w} y2={h * frac}
-                              stroke={c.text3} strokeWidth="0.5" strokeDasharray="3,3" opacity="0.15" />
-                          ))}
-                          <line x1="0" y1={baseY} x2={w} y2={baseY} stroke={c.text3} strokeWidth="0.8" strokeDasharray="4,4" opacity="0.3" />
-                          <path d={areaPath} fill={`url(#${gradId})`} />
-                          <path d={linePath} fill="none" stroke={clr} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          <circle cx={((pnlData.length - 1) * xStep).toFixed(1)} cy={pts[pts.length - 1].split(",")[1]} r="4" fill={c.card} stroke={clr} strokeWidth="2" />
-                        </svg>
-                      </div>
-                    );
-                  })() : (
-                    <div style={{
-                      height: isMobile ? "140px" : "200px", display: "flex", flexDirection: "column",
-                      alignItems: "center", justifyContent: "center", borderRadius: "8px",
-                      background: `${c.text3}06`, border: `1px dashed ${c.text3}20`,
-                    }}>
-                      <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ opacity: 0.3, marginBottom: "8px" }}>
-                        <path d="M6 36 L14 28 L22 32 L30 18 L38 22 L42 12" stroke={c.text3} strokeWidth="2" strokeLinecap="round" fill="none" />
-                      </svg>
-                      <span style={{ fontSize: "12px", color: c.text3 }}>거래 데이터 수집 중입니다...</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* 하단: 봇 개요 + 자산 배분 (가로 2분할) */}
-                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "1px" }}>
-                  {/* 봇 개요 카드 */}
-                  <div style={{
-                    ...cardStyle,
-                    borderRadius: 0,
-                    ...(isMobile ? {} : {}),
-                  }}>
-                    <div style={{ fontWeight: 700, fontSize: isMobile ? "15px" : "17px", color: c.text1, marginBottom: "16px" }}>봇 개요</div>
-                    {[
-                      { label: "투입 금액 (AUM)", value: `$${allocation.toLocaleString()}` },
-                      { label: "예상 수익률", value: bot.expectedReturn || "--" },
-                      { label: "운영 기간", value: `${days}일 ${hours}시간` },
-                      { label: "거래 자산 수", value: `${botAssets.length}개` },
-                    ].map((row, i) => (
-                      <div key={i} style={{
-                        display: "flex", justifyContent: "space-between", alignItems: "center",
-                        padding: "8px 0", borderBottom: `1px solid ${c.border}20`,
-                      }}>
-                        <span style={{ fontSize: "13px", color: c.text3 }}>{row.label}</span>
-                        <span style={{ fontSize: "14px", fontWeight: 600, color: c.text1 }}>{row.value}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* 자산 배분 카드 (도넛 차트) */}
-                  <div style={{
-                    ...cardStyle,
-                    borderRadius: 0,
-                    ...(isMobile ? { borderBottomLeftRadius: "16px", borderBottomRightRadius: "16px" } : { borderBottomRightRadius: "16px" }),
-                  }}>
-                    <div style={{ fontWeight: 700, fontSize: isMobile ? "15px" : "17px", color: c.text1, marginBottom: "16px" }}>자산 배분</div>
-                    <div style={{ display: "flex", gap: isMobile ? "16px" : "24px", alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
-                      <DonutChart data={assetData} size={isMobile ? 120 : 140} theme={theme} />
-                      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                        {assetData.slice(0, 6).map((asset, i) => {
-                          const chartColors = [c.blue, "#FCD535", "#85C4FF", c.purple, c.orange, c.green, c.red];
-                          const pct = (asset.value / assetData.reduce((s, d) => s + d.value, 0) * 100).toFixed(1);
-                          return (
-                            <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                              <div style={{
-                                width: "16px", height: "4px", borderRadius: "2px",
-                                background: chartColors[i % chartColors.length],
-                              }} />
-                              <span style={{ fontSize: isMobile ? "11px" : "12px", fontWeight: 600, color: c.text1 }}>
-                                {asset.name} {pct}%
-                              </span>
-                            </div>
-                          );
-                        })}
-                        {assetData.length > 6 && (
-                          <span style={{ fontSize: "11px", color: c.text3 }}>외 {assetData.length - 6}개 자산</span>
-                        )}
-                      </div>
-                    </div>
-                    <div style={{ marginTop: "12px", fontSize: "11px", color: c.text3 }}>
-                      *1~2시간 주기로 갱신됩니다.
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* 액션 버튼 */}
-            <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
-              <button onClick={() => onSelectBot(bot)} style={{
-                flex: 2, padding: isMobile ? "14px" : "12px 20px", borderRadius: "10px",
-                fontSize: isMobile ? "14px" : "15px", fontWeight: 700,
-                background: c.blue, color: "#fff", border: "none", cursor: "pointer",
-              }}>상세 보기</button>
-              <button onClick={() => onAddFund(ab.botId)} style={{
-                flex: 1, padding: isMobile ? "14px" : "12px 16px", borderRadius: "10px",
-                fontSize: isMobile ? "13px" : "14px", fontWeight: 600,
-                background: `${c.green}12`, color: c.green, border: `1px solid ${c.green}30`, cursor: "pointer",
-              }}>+ 추가 투입</button>
-              <button onClick={() => onStopBot(ab.botId)} style={{
-                padding: isMobile ? "14px 16px" : "12px 16px", borderRadius: "10px",
-                fontSize: isMobile ? "13px" : "14px", fontWeight: 600,
-                background: `${c.red}12`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer",
-              }}>중지</button>
+              ))}
             </div>
           </div>
         );
-      })}
+      })()}
+
+      {/* ── 봇별 요약 리스트 ── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        {activeBots.filter(ab => ab.status !== "paused").map(ab => {
+          const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
+          const elapsed = Date.now() - (ab.startedAt || Date.now());
+          const days = Math.floor(elapsed / 86400000);
+          const hours = Math.floor((elapsed % 86400000) / 3600000);
+          const isStock = STOCK_BOTS.some(b => b.id === ab.botId);
+          const bp = allBotPerf[ab.botId];
+          const kvTrades = bp?.perf?.tradeCount || 0;
+          const kvWinCount = bp?.perf?.winCount || 0;
+          const kvUnrealized = bp?.snapshot?.unrealizedPL || 0;
+          const realizedPL = bp?.perf?.realizedPL || 0;
+          const totalPL = kvUnrealized + realizedPL;
+          const allocation = ab.allocation || 0;
+          const roiPct = allocation > 0 ? (totalPL / allocation) * 100 : 0;
+          const rawDD = bp?.snapshot?.dd || 0;
+          const rawMDD = bp?.snapshot?.mdd || 0;
+          const kvMDD = rawMDD >= 99.9 ? 0 : rawMDD;
+          const pnlData = bp?.equityCurve && bp.equityCurve.length >= 2 ? bp.equityCurve : [];
+          const botIsPositive = roiPct >= 0;
+
+          return (
+            <div key={ab.botId} style={{
+              ...cardStyle, display: "flex", flexDirection: "column", gap: isMobile ? "12px" : "14px",
+            }}>
+              {/* 봇 헤더 */}
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <span style={{
+                  fontSize: "28px", width: "44px", height: "44px",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  background: `${c.blue}10`, borderRadius: "12px", flexShrink: 0,
+                }}>{bot.icon}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                    <span style={{ fontWeight: 700, fontSize: isMobile ? "15px" : "16px", color: c.text1 }}>{bot.name}</span>
+                    <span style={{
+                      padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: 600,
+                      background: `${getRiskColor(bot.riskColor, theme)}15`,
+                      color: getRiskColor(bot.riskColor, theme),
+                    }}>{bot.risk}</span>
+                  </div>
+                  <div style={{ fontSize: "11px", color: c.text3, marginTop: "2px" }}>
+                    {days > 0 ? `${days}일 ` : ""}{hours}시간 운영 · {isStock ? "주식" : "크립토"} · {kvTrades}회 거래
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <div style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 800, color: botIsPositive ? c.green : c.red }}>
+                    {roiPct >= 0 ? "+" : ""}{roiPct.toFixed(2)}%
+                  </div>
+                  <div style={{ fontSize: "11px", color: totalPL >= 0 ? c.green : c.red, fontWeight: 600 }}>
+                    {totalPL >= 0 ? "+" : ""}${totalPL.toFixed(2)}
+                  </div>
+                </div>
+              </div>
+
+              {/* 미니 지표 + 차트 */}
+              <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                {/* 미니 지표 */}
+                <div style={{
+                  display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px",
+                  flex: isMobile ? "1" : "0 0 200px",
+                }}>
+                  {[
+                    { label: "투입", value: `$${allocation.toLocaleString()}`, color: c.text1 },
+                    { label: "MDD", value: kvMDD > 0 ? `${kvMDD.toFixed(1)}%` : "--", color: kvMDD > 10 ? c.red : kvMDD > 5 ? c.yellow : c.green },
+                    { label: "승률", value: kvTrades > 0 ? `${(kvWinCount/kvTrades*100).toFixed(0)}%` : "--", color: c.text1 },
+                    { label: "승/패", value: `${kvWinCount}/${kvTrades - kvWinCount}`, color: c.text1 },
+                  ].map((m, i) => (
+                    <div key={i} style={{ padding: "6px 8px", borderRadius: "6px", background: c.card2 }}>
+                      <div style={{ fontSize: "9px", color: c.text3 }}>{m.label}</div>
+                      <div style={{ fontSize: "12px", fontWeight: 700, color: m.color }}>{m.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 미니 ROI 차트 */}
+                {!isMobile && (
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {pnlData.length >= 2 ? (() => {
+                      const w = 300, h = 64;
+                      const min = Math.min(...pnlData) * 0.998;
+                      const max = Math.max(...pnlData) * 1.002;
+                      const rng = max - min || 1;
+                      const xStep = w / (pnlData.length - 1);
+                      const pts = pnlData.map((v, i) => `${(i * xStep).toFixed(1)},${(h - ((v - min) / rng) * (h - 6) - 3).toFixed(1)}`);
+                      const linePath = `M${pts.join(" L")}`;
+                      const areaPath = `${linePath} L${w},${h} L0,${h} Z`;
+                      const clr = botIsPositive ? c.green : c.red;
+                      const gradId = `mini-${ab.botId.replace(/[^a-z0-9]/gi, "")}`;
+                      return (
+                        <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ borderRadius: "6px" }}>
+                          <defs>
+                            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={clr} stopOpacity="0.2" />
+                              <stop offset="100%" stopColor={clr} stopOpacity="0.01" />
+                            </linearGradient>
+                          </defs>
+                          <path d={areaPath} fill={`url(#${gradId})`} />
+                          <path d={linePath} fill="none" stroke={clr} strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                      );
+                    })() : (
+                      <div style={{ height: "64px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px", background: `${c.text3}06` }}>
+                        <span style={{ fontSize: "11px", color: c.text3 }}>데이터 수집 중...</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* 액션 버튼 */}
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button onClick={() => onSelectBot(bot)} style={{
+                  flex: 2, padding: "10px", borderRadius: "8px", fontSize: "13px", fontWeight: 700,
+                  background: c.blue, color: "#fff", border: "none", cursor: "pointer",
+                }}>상세 보기</button>
+                <button onClick={() => onAddFund(ab.botId)} style={{
+                  flex: 1, padding: "10px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+                  background: `${c.green}12`, color: c.green, border: `1px solid ${c.green}30`, cursor: "pointer",
+                }}>+ 추가</button>
+                <button onClick={() => onStopBot(ab.botId)} style={{
+                  padding: "10px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 600,
+                  background: `${c.red}12`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer",
+                }}>중지</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       {/* 일시정지된 봇 */}
       {hasPausedBots && (
