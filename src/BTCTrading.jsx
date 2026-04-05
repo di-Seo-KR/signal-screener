@@ -572,7 +572,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   const totalPLPct = initCapital > 0 ? (totalPL / initCapital) * 100 : 0;
 
   return (
-    <div className="tab-content" style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: "0", minHeight: "100vh" }}>
+    <div className="tab-content" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "240px 1fr", gap: "0", minHeight: "100vh" }}>
       {/* ═══════════════════════════════════════════════════════════
           LEFT SIDEBAR — hidden on mobile
       ═══════════════════════════════════════════════════════════ */}
@@ -631,12 +631,12 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
       {/* ═══════════════════════════════════════════════════════════
           MAIN CONTENT
       ═══════════════════════════════════════════════════════════ */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "20px", padding: "20px", paddingBottom: "20px", overflowY: "auto" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "14px" : "20px", padding: isMobile ? "12px" : "20px", paddingBottom: "20px", overflowY: "auto" }}>
 
         {/* ── 큰 잔액 표시 (토스 스타일) ── */}
         <div style={{
           background: `linear-gradient(135deg, ${C.card} 0%, ${C.isDark ? "#1A0E00" : "#FFF8F0"} 100%)`,
-          border: `1px solid ${C.border}`, borderRadius: "16px", padding: "28px 32px",
+          border: `1px solid ${C.border}`, borderRadius: "16px", padding: isMobile ? "18px 16px" : "28px 32px",
         }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
             <div style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, fontWeight: 500, whiteSpace: "nowrap", flexShrink: 0 }}>배분 금액</div>
