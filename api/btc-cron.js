@@ -659,19 +659,31 @@ export default async function handler(req, res) {
         const snapKey = `di:bot:${botId}:snapshot`;
         const prevSnap = (await kv.get(snapKey)) || { peakEquity: botEquity, mdd: 0, history: [] };
         // 에쿼티 기준 peak/DD/MDD (배분금액 대비)
-        const peakEquity = Math.max(prevSnap.peakEquity || prevSnap.peakValue || botEquity, botEquity);
+        // peakEquity도 합리적 범위 내에서만 사용 (손상 데이터 방어)
+        const prevPeak = prevSnap.peakEquity || prevSnap.peakValue || botEquity;
+        const safePrevPeak = (prevPeak > 0 && prevPeak <= maxEq) ? prevPeak : botEquity;
+        const peakEquity = Math.max(safePrevPeak, botEquity);
         const dd = peakEquity > 0 ? ((peakEquity - botEquity) / peakEquity) * 100 : 0;
-        const mdd = Math.max(prevSnap.mdd || 0, dd);
+        // MDD도 비정상(99% 이상)이면 리셋
+        const prevMDD = (prevSnap.mdd || 0) >= 90 ? 0 : (prevSnap.mdd || 0);
+        const mdd = Math.max(prevMDD, dd);
         // 에쿼티 히스토리 (최근 500개 — 15분 간격이면 ~5일)
+        // 구버전에서 전체 포트폴리오 에쿼티가 저장된 손상 항목 자동 정리
+        const maxEq = botAllocation * 3;
+        const minEq = botAllocation * 0.1;
+        const cleanedPrevHistory = (prevSnap.history || []).filter(h => {
+          const eq = h.equity;
+          return eq != null && eq > 0 && eq >= minEq && eq <= maxEq;
+        });
         const history = [
-          ...(prevSnap.history || []),
+          ...cleanedPrevHistory,
           { time: new Date().toISOString(), equity: botEquity, value: botMarketValue, unrealizedPL: botUnrealizedPL, positions: botPositions.length },
         ].slice(-500);
         // 개별 포지션 상세 (자산 배분 차트용)
         const positionDetails = botPositions.map(p => ({
-          asset: p.asset,
-          qty: p.qty,
-          avgPrice: p.avgPrice,
+          asset: p.symbol || p.asset || "",
+          qty: p.qty || 0,
+          avgPrice: p.avg_entry_price || p.avgPrice || 0,
           marketValue: parseFloat(p.market_value || 0),
           unrealizedPL: parseFloat(p.unrealized_pl || 0),
         }));

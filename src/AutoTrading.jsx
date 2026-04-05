@@ -102,7 +102,7 @@ function MiniEquityChart({ data, color, width = 280, height = 80, theme }) {
   return (
     <div style={{ position: "relative" }}>
       <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: "4px" }}>
-        <span style={{ fontSize: "15px", fontWeight: 800, color: isPositive ? c.green : c.red }}>
+        <span style={{ fontSize: isMobile ? "13px" : "15px", fontWeight: 800, color: isPositive ? c.green : c.red }}>
           {isPositive ? "+" : ""}{totalReturn}%
         </span>
       </div>
@@ -371,7 +371,7 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
       <h2 style={{ color: c.text1, fontSize: isMobile ? "20px" : "26px", fontWeight: "600", marginBottom: "4px" }}>
         {title}
       </h2>
-      {subtitle && <p style={{ margin: "0 0 20px", color: c.text3, fontSize: "15px" }}>{subtitle}</p>}
+      {subtitle && <p style={{ margin: "0 0 20px", color: c.text3, fontSize: isMobile ? "13px" : "15px" }}>{subtitle}</p>}
       {!subtitle && <div style={{ marginBottom: "20px" }} />}
 
       {/* 모바일: 수평 스와이프 캐러셀 */}
@@ -420,7 +420,7 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
       {description && (
         <div style={{
           marginTop: "24px", backgroundColor: c.card2, border: `1px solid ${c.border}`,
-          borderRadius: "8px", padding: "16px", color: c.text2, fontSize: "15px", lineHeight: "1.6",
+          borderRadius: "8px", padding: "16px", color: c.text2, fontSize: isMobile ? "13px" : "15px", lineHeight: "1.6",
         }}>
           <strong style={{ color: c.text1 }}>작동 방식:</strong> {description}
         </div>
@@ -460,7 +460,7 @@ function BotCard({ bot, onActivate, theme }) {
       <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
         <span style={{ fontSize: "28px" }}>{bot.icon}</span>
         <div style={{ flex: 1 }}>
-          <h3 style={{ margin: "0 0 4px 0", color: c.text1, fontSize: "18px", fontWeight: "600" }}>
+          <h3 style={{ margin: "0 0 4px 0", color: c.text1, fontSize: isMobile ? "16px" : "18px", fontWeight: "600" }}>
             {bot.name}
           </h3>
         </div>
@@ -474,20 +474,20 @@ function BotCard({ bot, onActivate, theme }) {
             color: bot.riskColor === "red" ? "#fff" : "#000",
             padding: "4px 12px",
             borderRadius: "20px",
-            fontSize: "14px",
+            fontSize: isMobile ? "12px" : "14px",
             fontWeight: "600",
             opacity: 0.8,
           }}
         >
           위험도: {bot.risk}
         </div>
-        <div style={{ color: c.green, fontSize: "16px", fontWeight: "600" }}>
+        <div style={{ color: c.green, fontSize: isMobile ? "14px" : "16px", fontWeight: "600" }}>
           예상수익: {bot.expectedReturn}
         </div>
       </div>
 
       {/* Description */}
-      <p style={{ margin: "0", color: c.text2, fontSize: "15px", lineHeight: "1.5" }}>
+      <p style={{ margin: "0", color: c.text2, fontSize: isMobile ? "13px" : "15px", lineHeight: "1.5" }}>
         {bot.description}
       </p>
 
@@ -501,7 +501,7 @@ function BotCard({ bot, onActivate, theme }) {
               color: c.text2,
               padding: "4px 10px",
               borderRadius: "16px",
-              fontSize: "14px",
+              fontSize: isMobile ? "12px" : "14px",
               border: `1px solid ${c.border}`,
             }}
           >
@@ -516,7 +516,7 @@ function BotCard({ bot, onActivate, theme }) {
           backgroundColor: c.card2,
           padding: "12px",
           borderRadius: "8px",
-          fontSize: "14px",
+          fontSize: isMobile ? "12px" : "14px",
           color: c.text2,
           display: "grid",
           gridTemplateColumns: "1fr 1fr 1fr",
@@ -525,15 +525,15 @@ function BotCard({ bot, onActivate, theme }) {
         }}
       >
         <div>
-          <div style={{ color: c.text3, fontSize: "14px" }}>승률</div>
+          <div style={{ color: c.text3, fontSize: isMobile ? "12px" : "14px" }}>승률</div>
           <div style={{ color: c.green, fontWeight: "600" }}>{bot.stats.winRate}</div>
         </div>
         <div>
-          <div style={{ color: c.text3, fontSize: "14px" }}>샤프비율</div>
+          <div style={{ color: c.text3, fontSize: isMobile ? "12px" : "14px" }}>샤프비율</div>
           <div style={{ color: c.blue, fontWeight: "600" }}>{bot.stats.sharpeRatio}</div>
         </div>
         <div>
-          <div style={{ color: c.text3, fontSize: "14px" }}>최대낙폭</div>
+          <div style={{ color: c.text3, fontSize: isMobile ? "12px" : "14px" }}>최대낙폭</div>
           <div style={{ color: c.red, fontWeight: "600" }}>{bot.stats.mdd}</div>
         </div>
       </div>
@@ -557,7 +557,7 @@ function BotCard({ bot, onActivate, theme }) {
           border: "none",
           borderRadius: "8px",
           padding: "12px 16px",
-          fontSize: "16px",
+          fontSize: isMobile ? "14px" : "16px",
           fontWeight: "600",
           cursor: "pointer",
           transition: "all 0.2s ease",
@@ -643,8 +643,8 @@ function BotRecommender({ onActivate, theme, isMobile }) {
       <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px", padding: isMobile ? "20px" : "32px", marginBottom: "40px" }}>
         <div style={{ textAlign: "center", marginBottom: "24px" }}>
           <div style={{ fontSize: "28px", marginBottom: "8px" }}>🎯</div>
-          <h3 style={{ margin: "0 0 8px", color: c.text1, fontSize: "18px" }}>추천 봇</h3>
-          <p style={{ margin: 0, color: c.text3, fontSize: "15px" }}>투자 성향에 맞는 봇을 찾았습니다</p>
+          <h3 style={{ margin: "0 0 8px", color: c.text1, fontSize: isMobile ? "16px" : "18px" }}>추천 봇</h3>
+          <p style={{ margin: 0, color: c.text3, fontSize: isMobile ? "13px" : "15px" }}>투자 성향에 맞는 봇을 찾았습니다</p>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "16px" }}>
           {result.map((bot, i) => (
@@ -656,21 +656,21 @@ function BotRecommender({ onActivate, theme, isMobile }) {
               <span style={{ fontSize: "28px" }}>{bot.icon}</span>
               <div style={{ flex: 1 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ fontWeight: 700, fontSize: "16px", color: c.text1 }}>{bot.name}</span>
+                  <span style={{ fontWeight: 700, fontSize: isMobile ? "14px" : "16px", color: c.text1 }}>{bot.name}</span>
                   {i === 0 && <span style={{ fontSize: "13px", padding: "2px 8px", borderRadius: "8px", background: `${c.green}20`, color: c.green, fontWeight: 700 }}>BEST</span>}
                   <span style={{ fontSize: "13px", padding: "2px 8px", borderRadius: "8px", background: `${getRiskColor(bot.riskColor, theme)}20`, color: getRiskColor(bot.riskColor, theme) }}>{bot.risk}</span>
                 </div>
-                <div style={{ fontSize: "14px", color: c.text3, marginTop: "2px" }}>{bot.description}</div>
+                <div style={{ fontSize: isMobile ? "12px" : "14px", color: c.text3, marginTop: "2px" }}>{bot.description}</div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "14px", color: c.green, fontWeight: 600 }}>{bot.expectedReturn}</div>
+                <div style={{ fontSize: isMobile ? "12px" : "14px", color: c.green, fontWeight: 600 }}>{bot.expectedReturn}</div>
                 <div style={{ fontSize: "13px", color: c.text3 }}>예상수익</div>
               </div>
             </div>
           ))}
         </div>
         <button onClick={() => { setResult(null); setStep(0); setAnswers({}); }} style={{
-          width: "100%", padding: "10px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
+          width: "100%", padding: "10px", borderRadius: "8px", fontSize: isMobile ? "12px" : "14px", fontWeight: 600,
           background: "transparent", color: c.text3, border: `1px solid ${c.border}`, cursor: "pointer",
         }}>다시 선택하기</button>
       </div>
@@ -681,15 +681,15 @@ function BotRecommender({ onActivate, theme, isMobile }) {
   return (
     <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px", padding: isMobile ? "20px" : "32px", marginBottom: "40px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-        <h3 style={{ margin: 0, color: c.text1, fontSize: "18px" }}>🤖 나에게 맞는 봇 찾기</h3>
-        <span style={{ fontSize: "14px", color: c.text3 }}>{step + 1} / {questions.length}</span>
+        <h3 style={{ margin: 0, color: c.text1, fontSize: isMobile ? "16px" : "18px" }}>🤖 나에게 맞는 봇 찾기</h3>
+        <span style={{ fontSize: isMobile ? "12px" : "14px", color: c.text3 }}>{step + 1} / {questions.length}</span>
       </div>
       <div style={{ display: "flex", gap: "4px", marginBottom: "20px" }}>
         {questions.map((_, i) => (
           <div key={i} style={{ flex: 1, height: "3px", borderRadius: "2px", background: i <= step ? c.blue : c.border }} />
         ))}
       </div>
-      <p style={{ margin: "0 0 16px", color: c.text2, fontSize: "17px", fontWeight: 600 }}>{q.q}</p>
+      <p style={{ margin: "0 0 16px", color: c.text2, fontSize: isMobile ? "15px" : "17px", fontWeight: 600 }}>{q.q}</p>
       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
         {q.options.map(opt => (
           <button key={opt.value} onClick={() => selectAnswer(q.key, opt.value)} style={{
@@ -700,15 +700,15 @@ function BotRecommender({ onActivate, theme, isMobile }) {
           }}>
             <span style={{ fontSize: "20px" }}>{opt.label.split(" ")[0]}</span>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "15px", color: c.text1 }}>{opt.label.split(" ").slice(1).join(" ")}</div>
-              <div style={{ fontSize: "14px", color: c.text3 }}>{opt.desc}</div>
+              <div style={{ fontWeight: 600, fontSize: isMobile ? "13px" : "15px", color: c.text1 }}>{opt.label.split(" ").slice(1).join(" ")}</div>
+              <div style={{ fontSize: isMobile ? "12px" : "14px", color: c.text3 }}>{opt.desc}</div>
             </div>
           </button>
         ))}
       </div>
       {step > 0 && (
         <button onClick={() => setStep(step - 1)} style={{
-          marginTop: "12px", padding: "8px", fontSize: "14px", color: c.text3, background: "transparent",
+          marginTop: "12px", padding: "8px", fontSize: isMobile ? "12px" : "14px", color: c.text3, background: "transparent",
           border: "none", cursor: "pointer",
         }}>← 이전</button>
       )}
@@ -882,16 +882,16 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
         <div style={{ ...cardStyle, marginBottom: "16px" }}>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "1fr 1fr 1fr", gap: "16px" }}>
             <div>
-              <div style={{ fontSize: "14px", color: c.text3, marginBottom: "6px" }}>가상 포트폴리오 잔고</div>
+              <div style={{ fontSize: isMobile ? "12px" : "14px", color: c.text3, marginBottom: "6px" }}>가상 포트폴리오 잔고</div>
               <div style={{ fontSize: isMobile ? "18px" : "26px", fontWeight: 800, color: c.text1 }}>${totalEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
             </div>
             <div>
-              <div style={{ fontSize: "14px", color: c.text3, marginBottom: "6px" }}>투입 가능 금액</div>
+              <div style={{ fontSize: isMobile ? "12px" : "14px", color: c.text3, marginBottom: "6px" }}>투입 가능 금액</div>
               <div style={{ fontSize: isMobile ? "18px" : "26px", fontWeight: 800, color: c.green }}>${available.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
             </div>
             {hasPausedBots && (
               <div>
-                <div style={{ fontSize: "14px", color: c.text3, marginBottom: "6px" }}>일시정지된 봇</div>
+                <div style={{ fontSize: isMobile ? "12px" : "14px", color: c.text3, marginBottom: "6px" }}>일시정지된 봇</div>
                 <div style={{ fontSize: isMobile ? "18px" : "26px", fontWeight: 800, color: c.yellow }}>{activeBots.filter(ab => ab.status === "paused").length}개</div>
               </div>
             )}
@@ -900,7 +900,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
         {/* 일시정지된 봇 목록 */}
         {hasPausedBots && (
           <>
-            <div style={{ fontSize: "16px", fontWeight: 600, color: c.text1, marginBottom: "12px" }}>일시정지된 봇</div>
+            <div style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 600, color: c.text1, marginBottom: "12px" }}>일시정지된 봇</div>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(340px, 1fr))", gap: "12px" }}>
               {activeBots.filter(ab => ab.status === "paused").map(ab => {
                 const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
@@ -909,18 +909,18 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                     <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                       <span style={{ fontSize: "24px" }}>{bot.icon}</span>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, fontSize: "16px", color: c.text1 }}>{bot.name}</div>
-                        <div style={{ fontSize: "14px", color: c.text3 }}>일시정지 상태</div>
+                        <div style={{ fontWeight: 700, fontSize: isMobile ? "14px" : "16px", color: c.text1 }}>{bot.name}</div>
+                        <div style={{ fontSize: isMobile ? "12px" : "14px", color: c.text3 }}>일시정지 상태</div>
                       </div>
-                      <span style={{ padding: "4px 10px", borderRadius: "12px", fontSize: "14px", fontWeight: 700, background: `${c.yellow}20`, color: c.yellow }}>일시정지</span>
+                      <span style={{ padding: "4px 10px", borderRadius: "12px", fontSize: isMobile ? "12px" : "14px", fontWeight: 700, background: `${c.yellow}20`, color: c.yellow }}>일시정지</span>
                     </div>
                     <div style={{ display: "flex", gap: "8px" }}>
                       <button onClick={() => onUpdateBotStatus(ab.botId, "active")} style={{
-                        flex: 1, padding: "12px", borderRadius: "8px", fontSize: "15px", fontWeight: 600,
+                        flex: 1, padding: "12px", borderRadius: "8px", fontSize: isMobile ? "13px" : "15px", fontWeight: 600,
                         background: c.green, color: "#fff", border: "none", cursor: "pointer",
                       }}>재시작</button>
                       <button onClick={() => onStopBot(ab.botId)} style={{
-                        padding: "12px 16px", borderRadius: "8px", fontSize: "15px", fontWeight: 600,
+                        padding: "12px 16px", borderRadius: "8px", fontSize: isMobile ? "13px" : "15px", fontWeight: 600,
                         background: `${c.red}15`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer",
                       }}>삭제</button>
                     </div>
@@ -943,10 +943,10 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
       <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
         <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: c.green, animation: "livePulse 1.5s ease-in-out infinite" }} />
         <h2 style={{ margin: 0, color: c.text1, fontSize: isMobile ? "18px" : "24px", fontWeight: 700 }}>운영 현황</h2>
-        <span style={{ fontSize: "14px", padding: "3px 10px", borderRadius: "12px", background: `${c.green}20`, color: c.green, fontWeight: 700 }}>
+        <span style={{ fontSize: isMobile ? "12px" : "14px", padding: "3px 10px", borderRadius: "12px", background: `${c.green}20`, color: c.green, fontWeight: 700 }}>
           {activeBots.filter(ab => ab.status !== "paused").length}개 활성
         </span>
-        {loading && <span style={{ fontSize: "14px", color: c.text3 }}>로딩 중...</span>}
+        {loading && <span style={{ fontSize: isMobile ? "12px" : "14px", color: c.text3 }}>로딩 중...</span>}
       </div>
 
       {/* ── 통합 포트폴리오 요약 카드 ── */}
@@ -970,20 +970,20 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
             {/* 상단: 총 AUM + ROI */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
               <div>
-                <div style={{ fontSize: "14px", color: c.text3, marginBottom: "4px" }}>현재 AUM</div>
+                <div style={{ fontSize: isMobile ? "12px" : "14px", color: c.text3, marginBottom: "4px" }}>현재 AUM</div>
                 <div style={{ fontSize: isMobile ? "28px" : "36px", fontWeight: 800, color: c.text1, letterSpacing: "-1px" }}>
                   ${currentAUM.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </div>
-                <div style={{ fontSize: "14px", color: c.text3, marginTop: "2px" }}>
+                <div style={{ fontSize: isMobile ? "12px" : "14px", color: c.text3, marginTop: "2px" }}>
                   투입: ${totalAllocated.toLocaleString()}
                 </div>
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "14px", color: c.text3, marginBottom: "4px" }}>총 수익률 (ROI)</div>
+                <div style={{ fontSize: isMobile ? "12px" : "14px", color: c.text3, marginBottom: "4px" }}>총 수익률 (ROI)</div>
                 <div style={{ fontSize: isMobile ? "24px" : "32px", fontWeight: 800, color: grandROI >= 0 ? c.green : c.red }}>
                   {grandROI >= 0 ? "+" : ""}{grandROI.toFixed(2)}%
                 </div>
-                <div style={{ fontSize: "14px", fontWeight: 600, color: grandTotalPL >= 0 ? c.green : c.red, marginTop: "2px" }}>
+                <div style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 600, color: grandTotalPL >= 0 ? c.green : c.red, marginTop: "2px" }}>
                   {grandTotalPL >= 0 ? "+" : ""}${grandTotalPL.toFixed(2)}
                 </div>
               </div>
@@ -1003,7 +1003,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                 { label: "총 승/패", value: `${grandWins}/${grandTrades - grandWins}`, color: c.text1 },
               ].map((m, i) => (
                 <div key={i} style={{ padding: "10px 12px", borderRadius: "10px", background: c.card2 }}>
-                  <div style={{ fontSize: "14px", color: c.text3, marginBottom: "4px" }}>{m.label}</div>
+                  <div style={{ fontSize: isMobile ? "12px" : "14px", color: c.text3, marginBottom: "4px" }}>{m.label}</div>
                   <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 700, color: m.color }}>{m.value}</div>
                 </div>
               ))}
@@ -1047,7 +1047,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                 }}>{bot.icon}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ fontWeight: 700, fontSize: "16px", color: c.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bot.name}</span>
+                    <span style={{ fontWeight: 700, fontSize: isMobile ? "14px" : "16px", color: c.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bot.name}</span>
                     <span style={{
                       padding: "1px 6px", borderRadius: "4px", fontSize: "12px", fontWeight: 600,
                       background: `${getRiskColor(bot.riskColor, theme)}15`,
@@ -1059,7 +1059,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                   </div>
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: "18px", fontWeight: 800, color: botIsPositive ? c.green : c.red }}>
+                  <div style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 800, color: botIsPositive ? c.green : c.red }}>
                     {roiPct >= 0 ? "+" : ""}{roiPct.toFixed(2)}%
                   </div>
                   <div style={{ fontSize: "13px", color: totalPL >= 0 ? c.green : c.red, fontWeight: 600 }}>
@@ -1110,7 +1110,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                 ].map((m, i) => (
                   <div key={i} style={{ padding: "4px 6px", borderRadius: "5px", background: c.card2, textAlign: "center" }}>
                     <div style={{ fontSize: "11px", color: c.text3 }}>{m.label}</div>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: m.color }}>{m.value}</div>
+                    <div style={{ fontSize: isMobile ? "12px" : "14px", fontWeight: 700, color: m.color }}>{m.value}</div>
                   </div>
                 ))}
               </div>
@@ -1118,15 +1118,15 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
               {/* 액션 버튼 */}
               <div style={{ display: "flex", gap: "6px" }}>
                 <button onClick={(e) => { e.stopPropagation(); onSelectBot(bot); }} style={{
-                  flex: 2, padding: "8px", borderRadius: "7px", fontSize: "14px", fontWeight: 700,
+                  flex: 2, padding: "8px", borderRadius: "7px", fontSize: isMobile ? "12px" : "14px", fontWeight: 700,
                   background: c.blue, color: "#fff", border: "none", cursor: "pointer",
                 }}>상세 보기</button>
                 <button onClick={(e) => { e.stopPropagation(); onAddFund(ab.botId); }} style={{
-                  flex: 1, padding: "8px", borderRadius: "7px", fontSize: "14px", fontWeight: 600,
+                  flex: 1, padding: "8px", borderRadius: "7px", fontSize: isMobile ? "12px" : "14px", fontWeight: 600,
                   background: `${c.green}12`, color: c.green, border: `1px solid ${c.green}30`, cursor: "pointer",
                 }}>+ 추가</button>
                 <button onClick={(e) => { e.stopPropagation(); onStopBot(ab.botId); }} style={{
-                  padding: "8px 10px", borderRadius: "7px", fontSize: "14px", fontWeight: 600,
+                  padding: "8px 10px", borderRadius: "7px", fontSize: isMobile ? "12px" : "14px", fontWeight: 600,
                   background: `${c.red}12`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer",
                 }}>중지</button>
               </div>
@@ -1138,7 +1138,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
       {/* 일시정지된 봇 */}
       {hasPausedBots && (
         <div style={{ marginTop: "24px" }}>
-          <div style={{ fontSize: "16px", fontWeight: 600, color: c.text1, marginBottom: "12px" }}>일시정지된 봇</div>
+          <div style={{ fontSize: isMobile ? "14px" : "16px", fontWeight: 600, color: c.text1, marginBottom: "12px" }}>일시정지된 봇</div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(340px, 1fr))", gap: "12px" }}>
             {activeBots.filter(ab => ab.status === "paused").map(ab => {
               const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
@@ -1147,18 +1147,18 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     <span style={{ fontSize: "24px" }}>{bot.icon}</span>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: "16px", color: c.text1 }}>{bot.name}</div>
-                      <div style={{ fontSize: "14px", color: c.text3 }}>일시정지 상태</div>
+                      <div style={{ fontWeight: 700, fontSize: isMobile ? "14px" : "16px", color: c.text1 }}>{bot.name}</div>
+                      <div style={{ fontSize: isMobile ? "12px" : "14px", color: c.text3 }}>일시정지 상태</div>
                     </div>
-                    <span style={{ padding: "4px 10px", borderRadius: "12px", fontSize: "14px", fontWeight: 700, background: `${c.yellow}20`, color: c.yellow }}>일시정지</span>
+                    <span style={{ padding: "4px 10px", borderRadius: "12px", fontSize: isMobile ? "12px" : "14px", fontWeight: 700, background: `${c.yellow}20`, color: c.yellow }}>일시정지</span>
                   </div>
                   <div style={{ display: "flex", gap: "8px" }}>
                     <button onClick={() => onUpdateBotStatus(ab.botId, "active")} style={{
-                      flex: 1, padding: "12px", borderRadius: "8px", fontSize: "15px", fontWeight: 600,
+                      flex: 1, padding: "12px", borderRadius: "8px", fontSize: isMobile ? "13px" : "15px", fontWeight: 600,
                       background: c.green, color: "#fff", border: "none", cursor: "pointer",
                     }}>재시작</button>
                     <button onClick={() => onStopBot(ab.botId)} style={{
-                      padding: "12px 16px", borderRadius: "8px", fontSize: "15px", fontWeight: 600,
+                      padding: "12px 16px", borderRadius: "8px", fontSize: isMobile ? "13px" : "15px", fontWeight: 600,
                       background: `${c.red}15`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer",
                     }}>삭제</button>
                   </div>
@@ -1772,7 +1772,7 @@ export default function AutoTrading({ theme = "dark", user }) {
                 border: `1px solid ${c.blue}`,
                 borderRadius: "8px",
                 padding: "10px 16px",
-                fontSize: "16px",
+                fontSize: isMobile ? "14px" : "16px",
                 fontWeight: "600",
                 cursor: "pointer",
                 marginBottom: "24px",
@@ -1813,7 +1813,7 @@ export default function AutoTrading({ theme = "dark", user }) {
                 >
                   {activeBot.name}
                 </h2>
-                <p style={{ margin: "0", color: c.text2, fontSize: "16px" }}>
+                <p style={{ margin: "0", color: c.text2, fontSize: isMobile ? "14px" : "16px" }}>
                   {activeBot.description}
                 </p>
               </div>
