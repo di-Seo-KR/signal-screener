@@ -29,6 +29,24 @@ import crypto from "node:crypto";
 
 const app = Fastify({ logger: { level: process.env.LOG_LEVEL || "info" } });
 
+// === 커스텀 JSON 파서: rawBody 보존 ===
+// Fastify의 기본 JSON 파서는 body를 객체로 변환만 하는데, HMAC 검증 시
+// JSON.stringify(req.body)로 재직렬화하면 원본 바이트와 달라질 수 있어 서명이 깨진다.
+// 따라서 원본 문자열(rawBody)을 보존하고, preHandler에서 이를 사용해 HMAC을 검증한다.
+app.addContentTypeParser("application/json", { parseAs: "string" }, function (req, body, done) {
+  req.rawBody = body || "";
+  if (!body) {
+    done(null, {});
+    return;
+  }
+  try {
+    done(null, JSON.parse(body));
+  } catch (err) {
+    err.statusCode = 400;
+    done(err, undefined);
+  }
+});
+
 const BINANCE_FAPI = process.env.BINANCE_FAPI_BASE || "https://fapi.binance.com";
 const BINANCE_FAPI_TESTNET = "https://testnet.binancefuture.com";
 const SHARED = process.env.PROXY_SHARED_SECRET || "";
@@ -74,13 +92,29 @@ app.addHook("preHandler", async (req, reply) => {
     return reply.code(401).send({ ok: false, error: "Stale or invalid timestamp" });
   }
 
-  const bodyStr = req.body ? JSON.stringify(req.body) : "";
+  // HMAC은 반드시 원본 raw body 문자열에 대해 계산해야 한다.
+  // req.body를 JSON.stringify로 재직렬화하면 파싱/재직렬화 과정에서
+  // 원본과 바이트 단위로 다를 수 있어 서명이 깨진다.
+  const bodyStr = req.rawBody || "";
   const expected = signInternal(ts, req.method, req.url, bodyStr);
 
   // timing-safe compare
-  const a = Buffer.from(sig, "hex");
-  const b = Buffer.from(expected, "hex");
-  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+  let a, b;
+  try {
+    a = Buffer.from(sig, "hex");
+    b = Buffer.from(expected, "hex");
+  } catch {
+    return reply.code(401).send({ ok: false, error: "Invalid signature format" });
+  }
+  if (a.length === 0 || a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    req.log.warn({
+      msg: "HMAC mismatch",
+      ts,
+      method: req.method,
+      url: req.url,
+      bodyLen: bodyStr.length,
+      sigLen: sig.length,
+    });
     return reply.code(401).send({ ok: false, error: "Invalid signature" });
   }
 });
