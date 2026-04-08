@@ -51,6 +51,7 @@ import QuantPortfolio from "./QuantPortfolio.jsx";
 import RiskHeatmap from "./RiskHeatmap.jsx";
 import AutoTrading from "./AutoTrading.jsx";
 import DevDashboard from "./DevDashboard.jsx";
+import RealTrading from "./RealTrading.jsx";
 import { ALL_STRATEGIES } from "./strategies.js";
 
 // ════════════════════════════════════════════════════════════════════
@@ -4199,7 +4200,7 @@ function AppInner() {
     });
   }, []);
 
-  const validTabs = ["home","auto-trading","portfolio","screener","alerts","news","quant-portfolio","quant-port","risk-map","sector-flow","backtest","sentiment","strategy","anomaly","quant-report","econ-calendar","profile","dev","about","privacy","terms","contact"];
+  const validTabs = ["home","auto-trading","real-trading","portfolio","screener","alerts","news","quant-portfolio","quant-port","risk-map","sector-flow","backtest","sentiment","strategy","anomaly","quant-report","econ-calendar","profile","dev","about","privacy","terms","contact"];
   const [tab, setTabRaw] = useState(() => {
     try {
       // 1순위: URL pathname (/screener, /auto-trading 등)
@@ -4250,6 +4251,7 @@ function AppInner() {
     "risk-map": "management",
     "portfolio": "management",
     "auto-trading": "ai-quant",
+    "real-trading": "ai-quant",
     "news": "info",
     "sentiment": "info",
     "alerts": "info",
@@ -7033,6 +7035,7 @@ function AppInner() {
                   {[
                     { id: "profile", label: "회원정보", icon: "👤" },
                     { id: "auto-trading", label: "봇 운영현황", icon: "🤖" },
+                    { id: "real-trading", label: "실전매매", icon: "🔴" },
                     { id: "portfolio", label: "포트폴리오", icon: "💼" },
                   ].map(item => (
                     <button key={item.id} onClick={() => { setTab(item.id); setUserDropOpen(false); }} style={{
@@ -7163,6 +7166,7 @@ function AppInner() {
             { section: "메인", items: [
               { id: "home", label: "홈 대시보드", icon: "🏠" },
               { id: "auto-trading", label: "AI 퀀트 전략", icon: "🤖" },
+              { id: "real-trading", label: "실전매매 관제", icon: "🔴" },
             ]},
             { section: "분석", items: [
               { id: "screener", label: "종목 탐색", icon: "🔍" },
@@ -10721,6 +10725,13 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "auto-trading" && (
           <AutoTrading theme={themeMode} user={user} />
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 실전매매 (Phase 1 — 단일 사용자 Binance Futures)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "real-trading" && (
+          <RealTrading theme={themeMode} />
         )}
 
         {/* ═══════════════════════════════════════════════════════════
