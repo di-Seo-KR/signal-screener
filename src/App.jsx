@@ -4156,8 +4156,12 @@ const SCREENER_PRESETS = [
 // ════════════════════════════════════════════════════════════════════
 // 메인 앱
 // ════════════════════════════════════════════════════════════════════
+// 소유자 전용 기능 게이트 (실전매매 탭) — 이 이메일로 로그인한 사용자에게만 노출
+const OWNER_EMAIL = "donginseo0421@gmail.com";
+
 function AppInner() {
   const { user, loading: authLoading, signOut } = useAuth();
+  const isOwner = (user?.email || "").toLowerCase() === OWNER_EMAIL;
   const [themeMode, setThemeMode] = useState(loadTheme);
   const [showCoupangCTA, setShowCoupangCTA] = useState(false);
   const [showGoogleCTA, setShowGoogleCTA] = useState(false);
@@ -7035,7 +7039,7 @@ function AppInner() {
                   {[
                     { id: "profile", label: "회원정보", icon: "👤" },
                     { id: "auto-trading", label: "봇 운영현황", icon: "🤖" },
-                    { id: "real-trading", label: "실전매매", icon: "🔴" },
+                    ...(isOwner ? [{ id: "real-trading", label: "실전매매", icon: "🔴" }] : []),
                     { id: "portfolio", label: "포트폴리오", icon: "💼" },
                   ].map(item => (
                     <button key={item.id} onClick={() => { setTab(item.id); setUserDropOpen(false); }} style={{
@@ -7166,7 +7170,7 @@ function AppInner() {
             { section: "메인", items: [
               { id: "home", label: "홈 대시보드", icon: "🏠" },
               { id: "auto-trading", label: "AI 퀀트 전략", icon: "🤖" },
-              { id: "real-trading", label: "실전매매 관제", icon: "🔴" },
+              ...(isOwner ? [{ id: "real-trading", label: "실전매매 관제", icon: "🔴" }] : []),
             ]},
             { section: "분석", items: [
               { id: "screener", label: "종목 탐색", icon: "🔍" },
@@ -10730,8 +10734,16 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 실전매매 (Phase 1 — 단일 사용자 Binance Futures)
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "real-trading" && (
+        {tab === "real-trading" && isOwner && (
           <RealTrading theme={themeMode} />
+        )}
+        {tab === "real-trading" && !isOwner && (
+          <div style={{ maxWidth: 720, margin: "80px auto", padding: "40px 24px", textAlign: "center", color: C.text2 }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: C.text, marginBottom: 8 }}>접근 권한이 없는 페이지입니다</div>
+            <div style={{ fontSize: 15, color: C.text3, marginBottom: 24 }}>요청하신 페이지는 존재하지 않거나 접근할 수 없습니다.</div>
+            <button onClick={() => setTab("home")} style={{ padding: "10px 20px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontWeight: 700, cursor: "pointer" }}>홈으로</button>
+          </div>
         )}
 
         {/* ═══════════════════════════════════════════════════════════
