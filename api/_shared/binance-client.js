@@ -232,3 +232,61 @@ export function cancelAllOpenOrders({ apiKey, apiSecret, symbol, testnet = false
     params: { symbol }, testnet,
   });
 }
+
+/** 오픈 주문 목록 — GET /fapi/v1/openOrders */
+export function getOpenOrders({ apiKey, apiSecret, symbol, testnet = false }) {
+  return binanceSignedRequest({
+    apiKey, apiSecret, method: "GET", path: "/fapi/v1/openOrders",
+    params: symbol ? { symbol } : {}, testnet,
+  });
+}
+
+/** 단일 주문 취소 — DELETE /fapi/v1/order */
+export function cancelOrder({ apiKey, apiSecret, symbol, orderId, origClientOrderId, testnet = false }) {
+  const params = { symbol };
+  if (orderId) params.orderId = orderId;
+  if (origClientOrderId) params.origClientOrderId = origClientOrderId;
+  return binanceSignedRequest({
+    apiKey, apiSecret, method: "DELETE", path: "/fapi/v1/order",
+    params, testnet,
+  });
+}
+
+/**
+ * STOP_MARKET / TAKE_PROFIT_MARKET 주문 (reduceOnly).
+ * Bracket(SL/TP) 용.
+ *
+ * @param {object} opts
+ * @param {"STOP_MARKET"|"TAKE_PROFIT_MARKET"} opts.type
+ * @param {"BUY"|"SELL"} opts.side  (LONG 포지션의 SL/TP 는 SELL, SHORT 의 경우 BUY)
+ * @param {number} opts.stopPrice
+ * @param {number} [opts.quantity]  없으면 closePosition=true 로 전량 청산
+ * @param {boolean} [opts.closePosition=false]
+ * @param {string} [opts.workingType="MARK_PRICE"]
+ * @param {string} [opts.clientOrderId]
+ */
+export function placeStopOrder({
+  apiKey, apiSecret, symbol, type, side, stopPrice,
+  quantity, closePosition = false, workingType = "MARK_PRICE",
+  clientOrderId, testnet = false,
+}) {
+  const params = {
+    symbol,
+    side,
+    type,
+    stopPrice,
+    workingType,
+    newOrderRespType: "RESULT",
+  };
+  if (closePosition) {
+    params.closePosition = "true";
+  } else {
+    params.quantity = quantity;
+    params.reduceOnly = "true";
+  }
+  if (clientOrderId) params.newClientOrderId = clientOrderId;
+  return binanceSignedRequest({
+    apiKey, apiSecret, method: "POST", path: "/fapi/v1/order",
+    params, testnet,
+  });
+}
