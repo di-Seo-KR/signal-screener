@@ -21,7 +21,7 @@ import { loadUserCredentials, respondError } from "../_shared/binance-auth.js";
 import { extractSignal, pickBestSignal, PHASE1_ALLOWED_SYMBOLS } from "../_shared/signal-extractor.js";
 import { planTrade, RISK_CONFIG } from "../_shared/risk-manager.js";
 import { preTradeCheck } from "../_shared/circuit-breaker.js";
-import { getExchangeInfo, getTickerPrice, getAccountInfo } from "../_shared/binance-client.js";
+import { getExchangeInfo, getTickerPrice, getAccountInfo, getKlines } from "../_shared/binance-client.js";
 import { executeOrderPlan } from "../binance/order.js";
 
 export const config = { maxDuration: 60 };
@@ -103,12 +103,38 @@ async function pullRecentSignals(userId) {
 }
 
 /**
- * 가격 히스토리로부터 간단한 ATR(14) 근사.
- * 프록시 경유로 klines 를 받아오지 않도록, ticker/price 만 쓰고
- * ATR 은 보수적으로 "가격의 1.5%" 고정값으로 가정한다 (Phase 1 안전 기본값).
- *
- * Phase 2 에서 실제 ATR 로 교체.
+ * 실제 ATR(14) 계산. 프록시 경유 klines.
+ * klines 포맷: [openTime, open, high, low, close, volume, closeTime, ...]
  */
+async function computeAtr(symbol, interval = "4h", period = 14) {
+  try {
+    const kl = await getKlines({ symbol, interval, limit: period + 30 });
+    if (!Array.isArray(kl) || kl.length < period + 1) return null;
+    const highs = kl.map((k) => parseFloat(k[2]));
+    const lows = kl.map((k) => parseFloat(k[3]));
+    const closes = kl.map((k) => parseFloat(k[4]));
+    const trs = [];
+    for (let i = 1; i < kl.length; i++) {
+      const tr = Math.max(
+        highs[i] - lows[i],
+        Math.abs(highs[i] - closes[i - 1]),
+        Math.abs(lows[i] - closes[i - 1])
+      );
+      trs.push(tr);
+    }
+    // Wilder's smoothing
+    let atr = trs.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    for (let i = period; i < trs.length; i++) {
+      atr = (atr * (period - 1) + trs[i]) / period;
+    }
+    return atr;
+  } catch (e) {
+    console.warn("[engine] ATR compute failed:", e?.message);
+    return null;
+  }
+}
+
+// 가격의 1.5% — ATR 가져오기 실패 시 fallback
 function defaultAtrApprox(price) {
   return price * 0.015;
 }
@@ -176,11 +202,17 @@ async function runOnce({ userId, forceDryRun }) {
   }
   S(`picked: ${best.symbol} ${best.side} conf=${best.confidence} fam=${best.strategyFamily}`);
 
-  // 7) 현재가 + ATR(근사)
+  // 7) 현재가 + ATR(14, 4h) (실패 시 1.5% 근사)
   const tick = await getTickerPrice({ symbol: best.symbol });
   const price = parseFloat(tick.price);
-  const atr = defaultAtrApprox(price);
-  S(`price=${price} atr≈${atr.toFixed(4)}`);
+  const klInterval = best.timeframe === "1h" ? "1h" : best.timeframe === "1d" ? "1d" : "4h";
+  let atr = await computeAtr(best.symbol, klInterval, 14);
+  if (!atr || atr <= 0) {
+    atr = defaultAtrApprox(price);
+    S(`price=${price} atr≈${atr.toFixed(4)} (fallback 1.5%)`);
+  } else {
+    S(`price=${price} atr(${klInterval},14)=${atr.toFixed(4)}`);
+  }
 
   // 8) 심볼 필터 + 리스크 플랜
   const filter = await symFilter(best.symbol);

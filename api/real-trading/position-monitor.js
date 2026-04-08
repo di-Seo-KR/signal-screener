@@ -16,6 +16,7 @@ import {
   getPositionRisk,
   getOpenOrders,
   cancelAllOpenOrders,
+  getUserTrades,
 } from "../_shared/binance-client.js";
 import { recordTradeResult } from "../_shared/circuit-breaker.js";
 
@@ -56,19 +57,32 @@ async function checkUser(userId) {
     }
   }
 
-  // 2) realizedPnL 추정 — orders 로그에서 마지막 entry 와 현재 시점 사이 손익 찾기
+  // 2) realizedPnL 계산 — userTrades 에서 최근 청산 트레이드의 realizedPnl 합산
   if (report.closed.length) {
-    const ordersLog = (await kv.get(`di:real:user:${userId}:orders`)) || [];
+    const lookbackMs = 10 * 60 * 1000; // 최근 10분
+    const startTime = Date.now() - lookbackMs;
     for (const sym of report.closed) {
-      const lastEntry = ordersLog.find((o) => o.symbol === sym && !o.reduceOnly);
-      if (lastEntry) {
-        // 간단 근사: 실제 realizedPnL 은 Binance userTrades endpoint 에서 가져와야 정확.
-        // Phase 1 에서는 기록만 하고, 0 으로 간주해 recordTradeResult 는 패스.
-        // (breaker 는 equity 기준으로 daily/weekly 손익을 별도 체크하므로 안전)
+      try {
+        const trades = await getUserTrades({ ...creds, symbol: sym, startTime, limit: 50 });
+        const realized = (trades || []).reduce((s, t) => s + parseFloat(t.realizedPnl || 0), 0);
+        if (Number.isFinite(realized) && realized !== 0) {
+          await recordTradeResult(userId, realized);
+          // 청산 로그에 반영
+          const logKey = `di:real:user:${userId}:engine-log`;
+          const log = (await kv.get(logKey)) || [];
+          log.unshift({
+            time: new Date().toISOString(),
+            event: "position_closed",
+            symbol: sym,
+            realizedPnL: Number(realized.toFixed(4)),
+          });
+          await kv.set(logKey, log.slice(0, 200));
+          report.closed = report.closed.map((c) => (c === sym ? { sym, realizedPnL: realized } : c));
+        }
+      } catch (e) {
+        console.warn(`[monitor] userTrades ${sym} failed:`, e?.message);
       }
     }
-    // 안전: 연속손실 트리거는 equity 기반으로 추후 갱신.
-    await recordTradeResult(userId, 0);
   }
 
   // 3) 현재 포지션 저장 (다음 틱 비교용)

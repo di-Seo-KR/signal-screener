@@ -370,6 +370,24 @@ export default async function handler(req, res) {
     await sendTG(TG_TOKEN, TG_CHAT, msg);
     L(`📨 리포트 전송 완료`);
 
+    // ── 영구 아카이브 (di:quant:latest) — 실전매매 엔진이 참조 ──
+    try {
+      const kvModule = await import("@vercel/kv");
+      const kv = kvModule.kv;
+      await kv.set("di:quant:latest", {
+        batch: { day: dayOfWeek, name: batch.name },
+        topSharpe: topSharpe.slice(0, 10),
+        topReturn: topReturn.slice(0, 10),
+        stratRank,
+        bestBySymbol,
+        actionable: actionable.slice(0, 10),
+        duration: `${dur}s`,
+        savedAt: new Date().toISOString(),
+      });
+    } catch (e) {
+      L(`⚠️ di:quant:latest 저장 실패: ${e.message}`);
+    }
+
     return res.status(200).json({
       ok: true,
       batch: { day: dayOfWeek, name: batch.name },

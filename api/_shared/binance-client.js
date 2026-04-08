@@ -193,6 +193,40 @@ export async function getTickerPrice({ symbol, testnet = false }) {
   return await resp.json();
 }
 
+/**
+ * 캔들 데이터 — GET /fapi/v1/klines (무서명, 프록시 필수)
+ * @param {object} opts
+ * @param {string} opts.symbol
+ * @param {string} [opts.interval="4h"]
+ * @param {number} [opts.limit=100]
+ */
+export async function getKlines({ symbol, interval = "4h", limit = 100, testnet = false }) {
+  if (isProxyMode()) {
+    return await viaProxy({
+      method: "GET",
+      path: "/fapi/v1/klines",
+      params: { symbol, interval, limit },
+      testnet,
+      signed: false,
+    });
+  }
+  const base = testnet ? BINANCE_FAPI_TESTNET : BINANCE_FAPI;
+  const url = `${base}/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
+  if (!resp.ok) throw new Error(`klines ${resp.status}`);
+  return await resp.json();
+}
+
+/** 최근 체결 내역 — GET /fapi/v1/userTrades */
+export function getUserTrades({ apiKey, apiSecret, symbol, startTime, limit = 50, testnet = false }) {
+  const params = { symbol, limit };
+  if (startTime) params.startTime = startTime;
+  return binanceSignedRequest({
+    apiKey, apiSecret, method: "GET", path: "/fapi/v1/userTrades",
+    params, testnet,
+  });
+}
+
 /** 레버리지 변경 — POST /fapi/v1/leverage */
 export function changeLeverage({ apiKey, apiSecret, symbol, leverage, testnet = false }) {
   return binanceSignedRequest({
