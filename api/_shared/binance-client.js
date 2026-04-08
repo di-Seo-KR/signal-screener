@@ -1,16 +1,26 @@
 // 바이낸스 Futures(USDⓈ-M) REST API 클라이언트
-// Base: https://fapi.binance.com (운영) / https://testnet.binancefuture.com (테스트넷)
 //
-// 모든 "SIGNED" 요청은 HMAC-SHA256 (secretKey) 서명이 필요함.
+// 두 가지 모드 지원:
+//   1) DIRECT 모드 — Vercel에서 바이낸스로 직접 HTTP 호출
+//      (IP 화이트리스트 불가라 Futures trading 불가능 — 무서명 호출용)
+//   2) PROXY 모드 — Fly.io 고정 IP 프록시 경유
+//      환경변수 BINANCE_PROXY_URL, BINANCE_PROXY_SECRET 설정되면 자동으로 프록시 모드
 //
 // 사용 예:
-//   import { binanceSignedRequest, getAccountInfo } from "../_shared/binance-client.js";
+//   import { getAccountInfo } from "../_shared/binance-client.js";
 //   const acct = await getAccountInfo({ apiKey, apiSecret });
 
 import crypto from "node:crypto";
 
 export const BINANCE_FAPI = process.env.BINANCE_FAPI_BASE || "https://fapi.binance.com";
 export const BINANCE_FAPI_TESTNET = "https://testnet.binancefuture.com";
+
+const PROXY_URL = process.env.BINANCE_PROXY_URL || "";       // 예: https://zepta-binance-proxy.fly.dev
+const PROXY_SECRET = process.env.BINANCE_PROXY_SECRET || ""; // Fly.io와 공유하는 HMAC 키
+
+export function isProxyMode() {
+  return !!(PROXY_URL && PROXY_SECRET);
+}
 
 function sign(queryString, apiSecret) {
   return crypto.createHmac("sha256", apiSecret).update(queryString).digest("hex");
@@ -20,6 +30,61 @@ function buildQuery(params) {
   // undefined/null 제거
   const entries = Object.entries(params || {}).filter(([, v]) => v !== undefined && v !== null && v !== "");
   return entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
+}
+
+// 프록시 내부 인증 서명 (Fly.io server.js의 signInternal과 동일 규칙)
+function signProxyInternal(timestamp, method, path, bodyStr) {
+  return crypto
+    .createHmac("sha256", PROXY_SECRET)
+    .update(`${timestamp}\n${method}\n${path}\n${bodyStr || ""}`)
+    .digest("hex");
+}
+
+// 프록시 경유 요청
+async function viaProxy({ apiKey, apiSecret, method, path, params, testnet, signed = true }) {
+  const proxyPath = "/binance/request";
+  const body = { apiKey, apiSecret, method, path, params, testnet, signed };
+  const bodyStr = JSON.stringify(body);
+  const timestamp = Date.now().toString();
+  const sig = signProxyInternal(timestamp, "POST", proxyPath, bodyStr);
+
+  const resp = await fetch(`${PROXY_URL}${proxyPath}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Proxy-Timestamp": timestamp,
+      "X-Proxy-Signature": sig,
+    },
+    body: bodyStr,
+    signal: AbortSignal.timeout(15000),
+  });
+
+  const text = await resp.text();
+  let wrapped;
+  try { wrapped = JSON.parse(text); } catch { wrapped = { ok: false, raw: text }; }
+
+  // 프록시 자체 오류
+  if (!resp.ok && resp.status !== 400 && resp.status !== 401 && resp.status !== 500) {
+    const e = new Error(`Proxy ${resp.status}: ${wrapped?.error || text}`);
+    e.status = resp.status;
+    throw e;
+  }
+
+  // 프록시는 {ok, status, data} 로 래핑해서 반환
+  if (wrapped.ok === false && wrapped.data && typeof wrapped.data === "object") {
+    const e = new Error(`Binance ${wrapped.status}: ${wrapped.data?.msg || "error"}`);
+    e.status = wrapped.status;
+    e.code = wrapped.data?.code;
+    e.data = wrapped.data;
+    throw e;
+  }
+  if (wrapped.ok === false) {
+    const e = new Error(wrapped?.error || "Proxy error");
+    e.status = wrapped.status || 500;
+    throw e;
+  }
+
+  return wrapped.data;
 }
 
 /**
@@ -35,6 +100,13 @@ function buildQuery(params) {
  */
 export async function binanceSignedRequest({ apiKey, apiSecret, method, path, params = {}, testnet = false, recvWindow = 5000 }) {
   if (!apiKey || !apiSecret) throw new Error("binanceSignedRequest: apiKey/apiSecret required");
+
+  // === 프록시 모드: Fly.io 경유 ===
+  if (isProxyMode()) {
+    return await viaProxy({ apiKey, apiSecret, method, path, params, testnet, signed: true });
+  }
+
+  // === 다이렉트 모드 (IP 화이트리스트 없는 환경, 무서명 endpoint나 testnet 용) ===
   const base = testnet ? BINANCE_FAPI_TESTNET : BINANCE_FAPI;
 
   const timestamp = Date.now();

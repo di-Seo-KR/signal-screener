@@ -1,0 +1,153 @@
+// Zepta Binance Proxy — Fly.io 고정 IP 서버
+// 역할: Vercel(zepta) ↔ Binance Futures 중계
+//
+// 환경변수:
+//   PROXY_SHARED_SECRET  Vercel과 공유하는 내부 인증 토큰 (HMAC-SHA256 서명 검증용)
+//   BINANCE_FAPI_BASE    (선택) 기본 https://fapi.binance.com
+//   PORT                 (Fly.io 자동 주입, 기본 8080)
+//
+// 인증:
+//   모든 요청에 다음 헤더 필수
+//     X-Proxy-Timestamp: 밀리초
+//     X-Proxy-Signature: hex(HMAC-SHA256(PROXY_SHARED_SECRET, timestamp + "\n" + method + "\n" + path + "\n" + body))
+//   timestamp는 현재 시각 기준 ±60초 범위여야 함 (리플레이 방지)
+//
+// 엔드포인트:
+//   GET  /health                      Fly.io 헬스체크 (무인증)
+//   GET  /ip                          현재 outbound IP 확인 (무인증, 화이트리스트 등록용)
+//   POST /binance/request             범용 프록시. body: { apiKey, apiSecret, method, path, params, testnet }
+//
+//   (편의 래퍼 — 선택적, 내부에서 /binance/request 호출)
+//   POST /binance/order               주문
+//   GET  /binance/account             계정 조회
+//   GET  /binance/positions           포지션 조회
+//
+// 주의: API key/secret은 이 서버에 저장되지 않음. 매 요청마다 Vercel에서 암호화 해제된 상태로 넘어옴.
+
+import Fastify from "fastify";
+import crypto from "node:crypto";
+
+const app = Fastify({ logger: { level: process.env.LOG_LEVEL || "info" } });
+
+const BINANCE_FAPI = process.env.BINANCE_FAPI_BASE || "https://fapi.binance.com";
+const BINANCE_FAPI_TESTNET = "https://testnet.binancefuture.com";
+const SHARED = process.env.PROXY_SHARED_SECRET || "";
+const MAX_CLOCK_SKEW_MS = 60 * 1000;
+
+if (!SHARED) {
+  console.warn("[WARN] PROXY_SHARED_SECRET is empty — all authenticated requests will be rejected.");
+}
+
+// === 유틸 ===
+function signInternal(timestamp, method, path, bodyStr) {
+  return crypto
+    .createHmac("sha256", SHARED)
+    .update(`${timestamp}\n${method}\n${path}\n${bodyStr || ""}`)
+    .digest("hex");
+}
+
+function signBinance(queryString, apiSecret) {
+  return crypto.createHmac("sha256", apiSecret).update(queryString).digest("hex");
+}
+
+function buildQuery(params) {
+  const entries = Object.entries(params || {}).filter(([, v]) => v !== undefined && v !== null && v !== "");
+  return entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
+}
+
+// === 인증 미들웨어 (hook) ===
+app.addHook("preHandler", async (req, reply) => {
+  // 헬스체크 / IP 조회는 무인증
+  if (req.url === "/health" || req.url === "/ip") return;
+
+  if (!SHARED) {
+    return reply.code(503).send({ ok: false, error: "Proxy not configured (missing PROXY_SHARED_SECRET)" });
+  }
+
+  const ts = req.headers["x-proxy-timestamp"];
+  const sig = req.headers["x-proxy-signature"];
+  if (!ts || !sig) {
+    return reply.code(401).send({ ok: false, error: "Missing proxy auth headers" });
+  }
+  const tsNum = parseInt(ts, 10);
+  if (!Number.isFinite(tsNum) || Math.abs(Date.now() - tsNum) > MAX_CLOCK_SKEW_MS) {
+    return reply.code(401).send({ ok: false, error: "Stale or invalid timestamp" });
+  }
+
+  const bodyStr = req.body ? JSON.stringify(req.body) : "";
+  const expected = signInternal(ts, req.method, req.url, bodyStr);
+
+  // timing-safe compare
+  const a = Buffer.from(sig, "hex");
+  const b = Buffer.from(expected, "hex");
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return reply.code(401).send({ ok: false, error: "Invalid signature" });
+  }
+});
+
+// === 헬스체크 ===
+app.get("/health", async () => ({ ok: true, service: "zepta-binance-proxy", ts: Date.now() }));
+
+// === outbound IP 확인 (바이낸스 화이트리스트 등록용) ===
+app.get("/ip", async () => {
+  try {
+    const r = await fetch("https://api.ipify.org?format=json", { signal: AbortSignal.timeout(5000) });
+    const d = await r.json();
+    return { ok: true, ip: d.ip };
+  } catch (e) {
+    return { ok: false, error: e?.message || String(e) };
+  }
+});
+
+// === 범용 바이낸스 프록시 ===
+app.post("/binance/request", async (req, reply) => {
+  const { apiKey, apiSecret, method = "GET", path, params = {}, testnet = false, signed = true, recvWindow = 5000 } = req.body || {};
+
+  if (!path || typeof path !== "string" || !path.startsWith("/")) {
+    return reply.code(400).send({ ok: false, error: "path required (must start with /)" });
+  }
+  if (signed && (!apiKey || !apiSecret)) {
+    return reply.code(400).send({ ok: false, error: "apiKey/apiSecret required for signed request" });
+  }
+
+  const base = testnet ? BINANCE_FAPI_TESTNET : BINANCE_FAPI;
+
+  let url = `${base}${path}`;
+  const init = { method, headers: {} };
+
+  if (signed) {
+    const timestamp = Date.now();
+    const all = { ...params, recvWindow, timestamp };
+    const qs = buildQuery(all);
+    const signature = signBinance(qs, apiSecret);
+    url += `?${qs}&signature=${signature}`;
+    init.headers["X-MBX-APIKEY"] = apiKey;
+  } else {
+    const qs = buildQuery(params);
+    if (qs) url += `?${qs}`;
+  }
+
+  try {
+    const resp = await fetch(url, { ...init, signal: AbortSignal.timeout(10000) });
+    const text = await resp.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = { raw: text }; }
+    return reply.code(resp.status).send({
+      ok: resp.ok,
+      status: resp.status,
+      data,
+    });
+  } catch (e) {
+    return reply.code(502).send({ ok: false, error: "Binance upstream error", detail: e?.message || String(e) });
+  }
+});
+
+// === start ===
+const port = parseInt(process.env.PORT || "8080", 10);
+app
+  .listen({ port, host: "0.0.0.0" })
+  .then(() => console.log(`[binance-proxy] listening on :${port}`))
+  .catch(err => {
+    console.error(err);
+    process.exit(1);
+  });
