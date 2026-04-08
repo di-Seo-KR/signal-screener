@@ -48,6 +48,18 @@
     {
       "path": "/api/portfolio-rebalance",
       "schedule": "0 14,17,20 * * 1-5"
+    },
+    {
+      "path": "/api/strategy-snapshot",
+      "schedule": "15 6 * * *"
+    },
+    {
+      "path": "/api/real-trading/engine",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/real-trading/position-monitor",
+      "schedule": "*/3 * * * *"
     }
   ]
 }
