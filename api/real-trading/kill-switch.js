@@ -75,6 +75,22 @@ export default async function handler(req, res) {
         const state = await resetBreaker(userId);
         return res.status(200).json({ ok: true, breaker: state });
       }
+      if (action === "enable-phase1") {
+        await kv.set(`di:real:user:${userId}:phase1_enabled`, true);
+        const list = (await kv.get("di:real:phase1-users")) || [];
+        if (!list.includes(userId)) list.push(userId);
+        await kv.set("di:real:phase1-users", list);
+        return res.status(200).json({ ok: true, phase1Enabled: true, enrolled: true });
+      }
+      if (action === "disable-phase1") {
+        await kv.set(`di:real:user:${userId}:phase1_enabled`, false);
+        const list = (await kv.get("di:real:phase1-users")) || [];
+        const next = list.filter((u) => u !== userId);
+        await kv.set("di:real:phase1-users", next);
+        // 안전을 위해 killswitch 도 같이 ON
+        await setKillSwitch(userId, true);
+        return res.status(200).json({ ok: true, phase1Enabled: false, killswitchOn: true });
+      }
       return res.status(400).json({ error: `unknown action: ${action}` });
     }
 
