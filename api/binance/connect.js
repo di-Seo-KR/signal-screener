@@ -58,17 +58,19 @@ export default async function handler(req, res) {
 
     // === 2) 권한 체크 ===
     // canTrade: 선물 매매 허용 여부
-    // canWithdraw: 출금 권한 (반드시 false 여야 함 — 보안 정책)
+    //
+    // NOTE: /fapi/v2/account 의 canWithdraw 필드는 "계정 자체의 출금 가능 여부"를
+    // 뜻하며 API 키 단위 권한이 아니다. 즉 계정이 정상이면 거의 항상 true다.
+    // API 키 레벨에서 Enable Withdrawals가 꺼져있는지 확인하려면
+    // /sapi/v1/account/apiRestrictions 를 호출해야 하는데, 이는 spot API(sapi)라
+    // 현재 프록시 구조(fapi 전용)에서는 바로 쓸 수 없다.
+    // TODO: 프록시에 sapi 지원 추가 후 apiRestrictions.enableWithdrawals 체크로 교체.
+    // 당분간은 유저가 바이낸스 UI에서 직접 "Enable Withdrawals" 체크를 끄는 것을
+    // 문서/UI로 강제한다.
     if (account.canTrade !== true) {
       return res.status(400).json({
         error: "이 API 키는 Futures 매매 권한이 없습니다.",
         hint: "바이낸스에서 API 키 편집 > 'Enable Futures' 체크 후 다시 시도하세요.",
-      });
-    }
-    if (account.canWithdraw === true) {
-      return res.status(400).json({
-        error: "출금 권한이 켜진 API 키는 사용할 수 없습니다.",
-        hint: "보안을 위해 반드시 출금 권한(Enable Withdrawals)을 꺼주세요.",
       });
     }
 
