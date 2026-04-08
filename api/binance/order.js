@@ -30,6 +30,7 @@ import {
   getExchangeInfo,
   getTickerPrice,
   placeOrder,
+  placeStopOrder,
 } from "../_shared/binance-client.js";
 
 // 심볼 정보 캐시 (Lambda warm 동안 유지)
@@ -64,6 +65,145 @@ function floorToStep(qty, step) {
 function roundPrecision(x, p) {
   const f = Math.pow(10, p || 0);
   return Math.floor(x * f) / f;
+}
+
+/**
+ * 재사용 가능한 내부 함수: (dry)실제 진입+옵션으로 SL/TP 까지 한 번에 태운다.
+ * 실전매매 엔진(api/real-trading/engine.js, api/binance/bracket-order.js)이 이걸 호출한다.
+ *
+ * @param {object} opts
+ * @param {string} opts.userId
+ * @param {string} opts.symbol
+ * @param {"LONG"|"SHORT"} opts.side
+ * @param {number} opts.usdt            증거금 USDT (레버리지 곱하기 전)
+ * @param {number} [opts.leverage=10]
+ * @param {"ISOLATED"|"CROSSED"} [opts.marginType="ISOLATED"]
+ * @param {boolean} [opts.dryRun=true]  ★ 기본값 true (안전 기본값)
+ * @param {number} [opts.stopLossPrice]
+ * @param {number} [opts.takeProfitPrice]
+ * @param {string} [opts.clientOrderId]
+ * @returns {Promise<object>}
+ */
+export async function executeOrderPlan(opts) {
+  const {
+    userId, symbol, side, usdt,
+    leverage = 10, marginType = "ISOLATED",
+    dryRun = true, stopLossPrice, takeProfitPrice, clientOrderId,
+  } = opts;
+
+  if (!userId) throw Object.assign(new Error("userId required"), { code: "BAD_REQUEST" });
+  if (!["LONG", "SHORT"].includes(side)) throw Object.assign(new Error("side must be LONG/SHORT"), { code: "BAD_REQUEST" });
+  if (!(usdt > 0)) throw Object.assign(new Error("usdt > 0 required"), { code: "BAD_REQUEST" });
+
+  const { apiKey, apiSecret, testnet } = await loadUserCredentials(userId);
+  const filter = await getSymbolFilter(symbol, testnet);
+  const tick = await getTickerPrice({ symbol, testnet });
+  const price = parseFloat(tick.price);
+  if (!(price > 0)) throw new Error(`price fetch failed: ${symbol}`);
+
+  const notional = usdt * leverage;
+  const rawQty = notional / price;
+  const stepped = floorToStep(rawQty, filter.stepSize);
+  const qty = roundPrecision(stepped, filter.quantityPrecision);
+
+  if (qty < filter.minQty) throw new Error(`qty ${qty} < minQty ${filter.minQty}`);
+  if (qty * price < filter.minNotional) throw new Error(`notional ${(qty * price).toFixed(2)} < minNotional ${filter.minNotional}`);
+
+  if (dryRun) {
+    return {
+      ok: true, dryRun: true, symbol, side, leverage, marginType,
+      price, notional, qty, estimatedMargin: usdt,
+      stopLossPrice: stopLossPrice ?? null,
+      takeProfitPrice: takeProfitPrice ?? null,
+    };
+  }
+
+  // === 실제 주문 path ===
+  try {
+    await changeMarginType({ apiKey, apiSecret, symbol, marginType, testnet });
+  } catch (e) {
+    if (e?.data?.code !== -4046) console.warn(`[executeOrderPlan] marginType:`, e?.data?.msg || e?.message);
+  }
+  try {
+    await changeLeverage({ apiKey, apiSecret, symbol, leverage, testnet });
+  } catch (e) {
+    throw Object.assign(new Error(`레버리지 ${leverage}x 설정 실패: ${e?.data?.msg || e?.message}`), { code: "LEVERAGE_FAIL" });
+  }
+
+  const entrySide = side === "LONG" ? "BUY" : "SELL";
+  const entryParams = {
+    symbol, side: entrySide, type: "MARKET", quantity: qty,
+    newOrderRespType: "RESULT",
+  };
+  if (clientOrderId) entryParams.newClientOrderId = clientOrderId;
+  const entryResp = await placeOrder({ apiKey, apiSecret, params: entryParams, testnet });
+
+  // === SL/TP 예약 (Option A — 서버 장애에도 생존) ===
+  const bracketResults = { sl: null, tp: null };
+  const closeSide = side === "LONG" ? "SELL" : "BUY";
+  if (stopLossPrice && Number.isFinite(stopLossPrice)) {
+    try {
+      const slResp = await placeStopOrder({
+        apiKey, apiSecret, symbol, type: "STOP_MARKET", side: closeSide,
+        stopPrice: stopLossPrice, closePosition: true, testnet,
+        clientOrderId: clientOrderId ? `${clientOrderId}-SL` : undefined,
+      });
+      bracketResults.sl = { orderId: slResp.orderId, stopPrice: stopLossPrice };
+    } catch (e) {
+      bracketResults.sl = { error: e?.data?.msg || e?.message };
+    }
+  }
+  if (takeProfitPrice && Number.isFinite(takeProfitPrice)) {
+    try {
+      const tpResp = await placeStopOrder({
+        apiKey, apiSecret, symbol, type: "TAKE_PROFIT_MARKET", side: closeSide,
+        stopPrice: takeProfitPrice, closePosition: true, testnet,
+        clientOrderId: clientOrderId ? `${clientOrderId}-TP` : undefined,
+      });
+      bracketResults.tp = { orderId: tpResp.orderId, stopPrice: takeProfitPrice };
+    } catch (e) {
+      bracketResults.tp = { error: e?.data?.msg || e?.message };
+    }
+  }
+
+  // 로그
+  try {
+    const kvModule = await import("@vercel/kv");
+    const kv = kvModule.kv;
+    const logKey = `di:real:user:${userId}:orders`;
+    const existing = (await kv.get(logKey)) || [];
+    existing.unshift({
+      time: new Date().toISOString(),
+      symbol, side, qty, leverage, marginType, price,
+      orderId: entryResp.orderId,
+      clientOrderId: entryResp.clientOrderId,
+      executedQty: parseFloat(entryResp.executedQty || 0),
+      avgPrice: parseFloat(entryResp.avgPrice || 0),
+      status: entryResp.status,
+      bracket: bracketResults,
+      bracketMode: !!(stopLossPrice || takeProfitPrice),
+    });
+    await kv.set(logKey, existing.slice(0, 500));
+  } catch (e) {
+    console.warn("[executeOrderPlan] log 실패:", e?.message);
+  }
+
+  return {
+    ok: true,
+    symbol, side, leverage, marginType,
+    orderId: entryResp.orderId,
+    clientOrderId: entryResp.clientOrderId,
+    type: entryResp.type,
+    status: entryResp.status,
+    executedQty: parseFloat(entryResp.executedQty || 0),
+    avgPrice: parseFloat(entryResp.avgPrice || 0),
+    cumQuote: parseFloat(entryResp.cumQuote || 0),
+    qtyRequested: qty,
+    priceAtRequest: price,
+    notional,
+    bracket: bracketResults,
+    raw: entryResp,
+  };
 }
 
 export default async function handler(req, res) {
