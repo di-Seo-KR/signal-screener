@@ -33,6 +33,9 @@ const app = Fastify({ logger: { level: process.env.LOG_LEVEL || "info" } });
 // Fastify의 기본 JSON 파서는 body를 객체로 변환만 하는데, HMAC 검증 시
 // JSON.stringify(req.body)로 재직렬화하면 원본 바이트와 달라질 수 있어 서명이 깨진다.
 // 따라서 원본 문자열(rawBody)을 보존하고, preHandler에서 이를 사용해 HMAC을 검증한다.
+//
+// Fastify 4는 기본 JSON 파서가 이미 등록돼 있으므로 먼저 제거한 뒤 교체해야 한다.
+app.removeContentTypeParser("application/json");
 app.addContentTypeParser("application/json", { parseAs: "string" }, function (req, body, done) {
   req.rawBody = body || "";
   if (!body) {
@@ -107,20 +110,31 @@ app.addHook("preHandler", async (req, reply) => {
     return reply.code(401).send({ ok: false, error: "Invalid signature format" });
   }
   if (a.length === 0 || a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    // 디버깅용: 원본 바이트를 그대로 출력하면 안 되지만 (apiKey/Secret 노출 위험)
+    // 대신 길이와 SHA256 체크섬만 로그로 남겨 외부와 비교 가능하게 한다.
+    const bodyHash = crypto.createHash("sha256").update(bodyStr).digest("hex").slice(0, 16);
+    const firstBytes = bodyStr.slice(0, 30).replace(/"[^"]{20,}"/g, '"***"');
     req.log.warn({
       msg: "HMAC mismatch",
+      version: BUILD_VERSION,
       ts,
       method: req.method,
       url: req.url,
       bodyLen: bodyStr.length,
+      bodyHash,
+      bodyPreview: firstBytes,
       sigLen: sig.length,
+      expectedPrefix: expected.slice(0, 16),
+      receivedPrefix: sig.toString().slice(0, 16),
+      hasRawBody: typeof req.rawBody === "string",
     });
     return reply.code(401).send({ ok: false, error: "Invalid signature" });
   }
 });
 
 // === 헬스체크 ===
-app.get("/health", async () => ({ ok: true, service: "zepta-binance-proxy", ts: Date.now() }));
+const BUILD_VERSION = "2026-04-08-rawbody-fix-2";
+app.get("/health", async () => ({ ok: true, service: "zepta-binance-proxy", version: BUILD_VERSION, ts: Date.now() }));
 
 // === outbound IP 확인 (바이낸스 화이트리스트 등록용) ===
 app.get("/ip", async () => {
