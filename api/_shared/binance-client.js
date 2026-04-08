@@ -154,16 +154,38 @@ export function getAccountInfo({ apiKey, apiSecret, testnet = false }) {
  *  Futures 전용 권한은 /fapi/v2/account 의 canTrade/canDeposit/canWithdraw 로 확인.
  */
 
-/** 심볼 거래소 정보 — GET /fapi/v1/exchangeInfo (무서명) */
+/** 심볼 거래소 정보 — GET /fapi/v1/exchangeInfo (무서명)
+ *  프록시 모드면 프록시 경유 (바이낸스가 Vercel 미국 IP를 451 차단하므로 필수).
+ */
 export async function getExchangeInfo({ testnet = false } = {}) {
+  if (isProxyMode()) {
+    return await viaProxy({
+      method: "GET",
+      path: "/fapi/v1/exchangeInfo",
+      params: {},
+      testnet,
+      signed: false,
+    });
+  }
   const base = testnet ? BINANCE_FAPI_TESTNET : BINANCE_FAPI;
   const resp = await fetch(`${base}/fapi/v1/exchangeInfo`, { signal: AbortSignal.timeout(10000) });
   if (!resp.ok) throw new Error(`exchangeInfo ${resp.status}`);
   return await resp.json();
 }
 
-/** 현재가 — GET /fapi/v1/ticker/price (무서명) */
+/** 현재가 — GET /fapi/v1/ticker/price (무서명)
+ *  프록시 모드면 프록시 경유.
+ */
 export async function getTickerPrice({ symbol, testnet = false }) {
+  if (isProxyMode()) {
+    return await viaProxy({
+      method: "GET",
+      path: "/fapi/v1/ticker/price",
+      params: symbol ? { symbol } : {},
+      testnet,
+      signed: false,
+    });
+  }
   const base = testnet ? BINANCE_FAPI_TESTNET : BINANCE_FAPI;
   const url = symbol ? `${base}/fapi/v1/ticker/price?symbol=${symbol}` : `${base}/fapi/v1/ticker/price`;
   const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
