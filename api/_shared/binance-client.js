@@ -1,0 +1,140 @@
+// 바이낸스 Futures(USDⓈ-M) REST API 클라이언트
+// Base: https://fapi.binance.com (운영) / https://testnet.binancefuture.com (테스트넷)
+//
+// 모든 "SIGNED" 요청은 HMAC-SHA256 (secretKey) 서명이 필요함.
+//
+// 사용 예:
+//   import { binanceSignedRequest, getAccountInfo } from "../_shared/binance-client.js";
+//   const acct = await getAccountInfo({ apiKey, apiSecret });
+
+import crypto from "node:crypto";
+
+export const BINANCE_FAPI = process.env.BINANCE_FAPI_BASE || "https://fapi.binance.com";
+export const BINANCE_FAPI_TESTNET = "https://testnet.binancefuture.com";
+
+function sign(queryString, apiSecret) {
+  return crypto.createHmac("sha256", apiSecret).update(queryString).digest("hex");
+}
+
+function buildQuery(params) {
+  // undefined/null 제거
+  const entries = Object.entries(params || {}).filter(([, v]) => v !== undefined && v !== null && v !== "");
+  return entries.map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
+}
+
+/**
+ * 서명된 요청.
+ * @param {object} opts
+ * @param {string} opts.apiKey
+ * @param {string} opts.apiSecret
+ * @param {"GET"|"POST"|"DELETE"|"PUT"} opts.method
+ * @param {string} opts.path  예: "/fapi/v2/account"
+ * @param {object} [opts.params]
+ * @param {boolean} [opts.testnet]
+ * @param {number} [opts.recvWindow] 기본 5000
+ */
+export async function binanceSignedRequest({ apiKey, apiSecret, method, path, params = {}, testnet = false, recvWindow = 5000 }) {
+  if (!apiKey || !apiSecret) throw new Error("binanceSignedRequest: apiKey/apiSecret required");
+  const base = testnet ? BINANCE_FAPI_TESTNET : BINANCE_FAPI;
+
+  const timestamp = Date.now();
+  const allParams = { ...params, recvWindow, timestamp };
+  const qs = buildQuery(allParams);
+  const signature = sign(qs, apiSecret);
+  const full = `${qs}&signature=${signature}`;
+
+  let url = `${base}${path}`;
+  const init = {
+    method,
+    headers: { "X-MBX-APIKEY": apiKey },
+  };
+
+  if (method === "GET" || method === "DELETE") {
+    url += `?${full}`;
+  } else {
+    // POST/PUT — Binance는 body 대신 query에 실어도 받음 (일관성을 위해 query 사용)
+    url += `?${full}`;
+  }
+
+  const resp = await fetch(url, { ...init, signal: AbortSignal.timeout(10000) });
+  const text = await resp.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = { raw: text }; }
+
+  if (!resp.ok) {
+    const err = new Error(`Binance ${resp.status}: ${data?.msg || text}`);
+    err.status = resp.status;
+    err.code = data?.code;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+
+// === 고수준 헬퍼 ===
+
+/** 계정 정보 (잔고, 포지션, 권한) — GET /fapi/v2/account */
+export function getAccountInfo({ apiKey, apiSecret, testnet = false }) {
+  return binanceSignedRequest({ apiKey, apiSecret, method: "GET", path: "/fapi/v2/account", testnet });
+}
+
+/** API 키 권한 — GET /sapi/v1/account/apiRestrictions (현물 base, 사용 X)
+ *  Futures 전용 권한은 /fapi/v2/account 의 canTrade/canDeposit/canWithdraw 로 확인.
+ */
+
+/** 심볼 거래소 정보 — GET /fapi/v1/exchangeInfo (무서명) */
+export async function getExchangeInfo({ testnet = false } = {}) {
+  const base = testnet ? BINANCE_FAPI_TESTNET : BINANCE_FAPI;
+  const resp = await fetch(`${base}/fapi/v1/exchangeInfo`, { signal: AbortSignal.timeout(10000) });
+  if (!resp.ok) throw new Error(`exchangeInfo ${resp.status}`);
+  return await resp.json();
+}
+
+/** 현재가 — GET /fapi/v1/ticker/price (무서명) */
+export async function getTickerPrice({ symbol, testnet = false }) {
+  const base = testnet ? BINANCE_FAPI_TESTNET : BINANCE_FAPI;
+  const url = symbol ? `${base}/fapi/v1/ticker/price?symbol=${symbol}` : `${base}/fapi/v1/ticker/price`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!resp.ok) throw new Error(`ticker/price ${resp.status}`);
+  return await resp.json();
+}
+
+/** 레버리지 변경 — POST /fapi/v1/leverage */
+export function changeLeverage({ apiKey, apiSecret, symbol, leverage, testnet = false }) {
+  return binanceSignedRequest({
+    apiKey, apiSecret, method: "POST", path: "/fapi/v1/leverage",
+    params: { symbol, leverage }, testnet,
+  });
+}
+
+/** 마진 타입 변경 — POST /fapi/v1/marginType (ISOLATED | CROSSED) */
+export function changeMarginType({ apiKey, apiSecret, symbol, marginType, testnet = false }) {
+  return binanceSignedRequest({
+    apiKey, apiSecret, method: "POST", path: "/fapi/v1/marginType",
+    params: { symbol, marginType }, testnet,
+  });
+}
+
+/** 주문 — POST /fapi/v1/order */
+export function placeOrder({ apiKey, apiSecret, params, testnet = false }) {
+  return binanceSignedRequest({
+    apiKey, apiSecret, method: "POST", path: "/fapi/v1/order",
+    params, testnet,
+  });
+}
+
+/** 포지션 리스크 — GET /fapi/v2/positionRisk */
+export function getPositionRisk({ apiKey, apiSecret, symbol, testnet = false }) {
+  return binanceSignedRequest({
+    apiKey, apiSecret, method: "GET", path: "/fapi/v2/positionRisk",
+    params: symbol ? { symbol } : {}, testnet,
+  });
+}
+
+/** 모든 오픈 주문 취소 — DELETE /fapi/v1/allOpenOrders */
+export function cancelAllOpenOrders({ apiKey, apiSecret, symbol, testnet = false }) {
+  return binanceSignedRequest({
+    apiKey, apiSecret, method: "DELETE", path: "/fapi/v1/allOpenOrders",
+    params: { symbol }, testnet,
+  });
+}
