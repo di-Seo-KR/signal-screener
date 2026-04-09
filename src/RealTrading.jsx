@@ -28,6 +28,14 @@ const fmtUsd = (v, digits = 2) => {
   return (n < 0 ? "-$" : "$") + Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits });
 };
 const fmtPct = (v, d = 2) => (v == null || !isFinite(v)) ? "—" : (v >= 0 ? "+" : "") + Number(v).toFixed(d) + "%";
+// float 연산 부작용(3.9000000000000004) 제거용 qty 포맷터
+const fmtQty = (v) => {
+  if (v == null || !isFinite(v)) return "—";
+  const n = Number(v);
+  // 6자리에서 반올림 후 불필요한 0 제거 → "3.9", "0.001234"
+  const r = Math.round(n * 1e6) / 1e6;
+  return r.toString();
+};
 const fmtTime = (t) => t ? new Date(t).toLocaleTimeString("ko-KR", { hour12: false }) : "—";
 const fmtDT = (t) => t ? new Date(t).toLocaleString("ko-KR", { hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
 
@@ -123,7 +131,7 @@ function RealTradingInner() {
       const r = await jpost("/api/real-trading/engine", { userId, dryRun: true, probe });
       if (r?.ran) {
         toast.push(
-          `${r.signal?.symbol || ""} ${r.signal?.side || ""} · plan qty ${r.plan?.qty} @ ${r.plan?.leverage}×`,
+          `${r.signal?.symbol || ""} ${r.signal?.side || ""} · plan qty ${fmtQty(r.plan?.qty)} @ ${r.plan?.leverage}×${r.plan?.bumpedToMin ? " · ⚠ bumped" : ""}`,
           { tone: "green", title: "✓ 모의 실행 완료", duration: 5000 }
         );
       } else {
@@ -619,7 +627,7 @@ function RealTradingInner() {
               </div>
               {e.plan && (
                 <div style={{ color: "var(--z-text-2)", fontSize: 11, fontFamily: "var(--z-font-mono)" }}>
-                  qty {e.plan.qty} · {e.plan.leverage}× · SL {fmtUsd(e.plan.slPrice)} · TP {fmtUsd(e.plan.tpPrice)}
+                  qty {fmtQty(e.plan.qty)} · {e.plan.leverage}× · SL {fmtUsd(e.plan.slPrice)} · TP {fmtUsd(e.plan.tpPrice)}{e.plan.bumpedToMin ? " · bumped" : ""}
                   {e.plan.effectiveRR && <> · RR {e.plan.effectiveRR.toFixed(2)}</>}
                 </div>
               )}

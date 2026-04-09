@@ -93,38 +93,46 @@
   --z-nav-w-collapsed: 68px;
   --z-header-h: 60px;
   --z-mobile-tab-h: 60px;
-  --background:        oklch(1 0 0);
-  --foreground:        oklch(0.145 0 0);
-  --card:        oklch(1 0 0);
-  --card-foreground:        oklch(0.145 0 0);
-  --popover:        oklch(1 0 0);
-  --popover-foreground:        oklch(0.145 0 0);
-  --primary:        oklch(0.205 0 0);
-  --primary-foreground:        oklch(0.985 0 0);
-  --secondary:        oklch(0.97 0 0);
-  --secondary-foreground:        oklch(0.205 0 0);
-  --muted:        oklch(0.97 0 0);
-  --muted-foreground:        oklch(0.556 0 0);
-  --accent:        oklch(0.97 0 0);
-  --accent-foreground:        oklch(0.205 0 0);
-  --destructive:        oklch(0.577 0.245 27.325);
-  --border:        oklch(0.922 0 0);
-  --input:        oklch(0.922 0 0);
-  --ring:        oklch(0.708 0 0);
-  --chart-1:        oklch(0.87 0 0);
-  --chart-2:        oklch(0.556 0 0);
-  --chart-3:        oklch(0.439 0 0);
-  --chart-4:        oklch(0.371 0 0);
-  --chart-5:        oklch(0.269 0 0);
-  --radius:        0.625rem;
-  --sidebar:        oklch(0.985 0 0);
-  --sidebar-foreground:        oklch(0.145 0 0);
-  --sidebar-primary:        oklch(0.205 0 0);
-  --sidebar-primary-foreground:        oklch(0.985 0 0);
-  --sidebar-accent:        oklch(0.97 0 0);
-  --sidebar-accent-foreground:        oklch(0.205 0 0);
-  --sidebar-border:        oklch(0.922 0 0);
-  --sidebar-ring:        oklch(0.708 0 0);
+
+  /* ══════════════════════════════════════════════════════════════════
+     Shadcn ↔ Zepta Bridge Layer
+     모든 Shadcn CSS variable 은 Zepta --z-* 토큰을 참조한다.
+     이렇게 하면 Shadcn 컴포넌트가 자동으로 Zepta 색상을 쓰고,
+     [data-theme] 전환 시에도 함께 업데이트됨.
+     ══════════════════════════════════════════════════════════════════ */
+  --background:           var(--z-bg);
+  --foreground:           var(--z-text);
+  --card:                 var(--z-card);
+  --card-foreground:      var(--z-text);
+  --popover:              var(--z-card-hi);
+  --popover-foreground:   var(--z-text);
+  --primary:              var(--z-blue);
+  --primary-foreground:   #ffffff;
+  --secondary:            var(--z-card-2);
+  --secondary-foreground: var(--z-text);
+  --muted:                var(--z-card-2);
+  --muted-foreground:     var(--z-text-3);
+  --accent:               var(--z-card-hi);
+  --accent-foreground:    var(--z-text);
+  --destructive:          var(--z-red);
+  --destructive-foreground: #ffffff;
+  --border:               var(--z-border);
+  --input:                var(--z-border);
+  --ring:                 var(--z-blue);
+  --chart-1:              var(--z-blue);
+  --chart-2:              var(--z-green);
+  --chart-3:              var(--z-purple);
+  --chart-4:              var(--z-yellow);
+  --chart-5:              var(--z-cyan);
+  --radius:               0.625rem;
+  --sidebar:              var(--z-bg-elev);
+  --sidebar-foreground:   var(--z-text);
+  --sidebar-primary:      var(--z-blue);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent:       var(--z-card-hi);
+  --sidebar-accent-foreground:  var(--z-text);
+  --sidebar-border:       var(--z-border);
+  --sidebar-ring:         var(--z-blue);
 }
 
 /* ── Light 테마 ── */
@@ -322,38 +330,16 @@ a:focus-visible,
   --radius-4xl:        calc(var(--radius) * 2.6);
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   .dark class — 빈 블록
+   Shadcn 의 `dark:` utility variant 와 @custom-variant 가 동작하려면
+   html 에 .dark 클래스가 필요한데 (theme.jsx 가 토글함), 실제 색상은
+   위의 bridge 레이어가 --z-* 참조로 이미 해결함.
+   여기선 Shadcn dark:* 가 요구하는 일부 투명도 오버라이드만 정의.
+   ══════════════════════════════════════════════════════════════════ */
 .dark {
-  --background:        oklch(0.145 0 0);
-  --foreground:        oklch(0.985 0 0);
-  --card:        oklch(0.205 0 0);
-  --card-foreground:        oklch(0.985 0 0);
-  --popover:        oklch(0.205 0 0);
-  --popover-foreground:        oklch(0.985 0 0);
-  --primary:        oklch(0.922 0 0);
-  --primary-foreground:        oklch(0.205 0 0);
-  --secondary:        oklch(0.269 0 0);
-  --secondary-foreground:        oklch(0.985 0 0);
-  --muted:        oklch(0.269 0 0);
-  --muted-foreground:        oklch(0.708 0 0);
-  --accent:        oklch(0.269 0 0);
-  --accent-foreground:        oklch(0.985 0 0);
-  --destructive:        oklch(0.704 0.191 22.216);
-  --border:        oklch(1 0 0 / 10%);
-  --input:        oklch(1 0 0 / 15%);
-  --ring:        oklch(0.556 0 0);
-  --chart-1:        oklch(0.87 0 0);
-  --chart-2:        oklch(0.556 0 0);
-  --chart-3:        oklch(0.439 0 0);
-  --chart-4:        oklch(0.371 0 0);
-  --chart-5:        oklch(0.269 0 0);
-  --sidebar:        oklch(0.205 0 0);
-  --sidebar-foreground:        oklch(0.985 0 0);
-  --sidebar-primary:        oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground:        oklch(0.985 0 0);
-  --sidebar-accent:        oklch(0.269 0 0);
-  --sidebar-accent-foreground:        oklch(0.985 0 0);
-  --sidebar-border:        oklch(1 0 0 / 10%);
-  --sidebar-ring:        oklch(0.556 0 0);
+  /* dark 모드에서 input/border 가 살짝 밝아보이게 */
+  --input:  var(--z-border-2);
 }
 
 @layer base {

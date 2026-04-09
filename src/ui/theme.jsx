@@ -23,6 +23,9 @@ export function ThemeProvider({ children, defaultTheme }) {
   useEffect(() => {
     const el = document.documentElement;
     el.setAttribute("data-theme", theme);
+    // Shadcn 은 `.dark` class 기반이라 같이 토글해서 dark:* utility 도 활성화
+    if (theme === "dark") el.classList.add("dark");
+    else el.classList.remove("dark");
     try { localStorage.setItem(STORAGE_KEY, theme); } catch {}
   }, [theme]);
 
