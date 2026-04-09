@@ -198,23 +198,34 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     S("dry-run: phase1 check skipped");
   }
 
-  // 2) 크레덴셜
-  let creds;
+  // 2) 크레덴셜 — dry run 은 creds 없어도 파이프라인 전체가 돌아가야 함
+  let creds = null;
   try {
     creds = await loadUserCredentials(userId);
+    S(`credentials loaded`);
   } catch (e) {
-    S(`credentials error: ${e.message}`);
-    return { ok: false, userId, ran: false, error: e.message, steps };
+    if (forceDryRun) {
+      S(`dry-run: credentials unavailable (${e.message}) — continuing with fallback equity`);
+    } else {
+      S(`credentials error: ${e.message}`);
+      return { ok: false, userId, ran: false, reason: `credentials: ${e.message}`, error: e.message, steps };
+    }
   }
 
-  // 3) 에쿼티
-  const equity = await getEquityUsdt(creds);
-  S(`equity=$${equity.toFixed(2)}`);
+  // 3) 에쿼티 — creds 있으면 진짜 조회, 없으면 $100 fallback (dry run)
+  let equity = 0;
+  if (creds) {
+    equity = await getEquityUsdt(creds);
+    S(`equity=$${equity.toFixed(2)}`);
+  } else {
+    S(`dry-run: skipping equity fetch (no creds)`);
+  }
   if (equity < 20 && !forceDryRun) {
     S("equity < $20 — skip");
     return { ok: true, userId, ran: false, reason: "insufficient equity", equity, steps };
   }
   const effectiveEquity = equity > 0 ? equity : (forceDryRun ? 100 : 0); // dry run fallback $100 simulation
+  if (forceDryRun && equity <= 0) S(`dry-run: using $${effectiveEquity} fallback equity`);
 
   // 4) 서킷브레이커 — dry run 은 조회만 하고 차단은 안 함
   if (!forceDryRun) {
