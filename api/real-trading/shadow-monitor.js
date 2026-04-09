@@ -204,7 +204,10 @@ export default async function handler(req, res) {
     }
     const kv = await getKv();
     // shadow 모드는 phase1 enroll 없어도 돈다 — 별도 리스트
+    // GLOBAL_PROBE_USER 를 항상 포함시켜 대표님 조작 없이도 자동 평가
+    const GLOBAL_PROBE_USER = "__zepta_global_probe__";
     const users = (await kv.get("di:real:shadow-users")) || (await kv.get("di:real:phase1-users")) || [];
+    if (!users.includes(GLOBAL_PROBE_USER)) users.unshift(GLOBAL_PROBE_USER);
     const results = [];
     for (const uid of users.slice(0, 20)) {
       try { results.push(await monitorUser(uid)); }

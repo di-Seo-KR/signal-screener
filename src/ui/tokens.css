@@ -272,11 +272,95 @@ a:focus-visible,
 .z-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .z-btn:not(:disabled):active { transform: translateY(1px); }
 
-/* ── 미디어 쿼리 ── */
+/* ══════════════════════════════════════════════════════════════════
+   Global Polish Layer — 레거시 inline-style 페이지에도 Shadcn 톤 강제
+   div+button 들이 raw inline style 로만 그려져 있어도 이 룰들이
+   자동으로 둥근 모서리, ring, hover lift, focus glow 를 부여한다.
+   대상: card-class 또는 background+padding 을 가진 컨테이너, button.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* 모든 button 의 베이스 인터랙션 — 호버/포커스 트랜지션 + 포커스 글로우 */
+button:not(.no-z-polish) {
+  transition: transform var(--z-dur-fast) var(--z-ease),
+              box-shadow var(--z-dur-fast) var(--z-ease),
+              filter var(--z-dur-fast) var(--z-ease),
+              background-color var(--z-dur-fast) var(--z-ease) !important;
+  font-family: var(--z-font-sans);
+}
+button:not(:disabled):not(.no-z-polish):hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+button:not(:disabled):not(.no-z-polish):active {
+  transform: translateY(0);
+  filter: brightness(0.96);
+}
+button:not(.no-z-polish):focus-visible {
+  outline: none;
+  box-shadow: var(--z-sh-glow-blue);
+}
+
+/* 카드 클래스 polish — asset-card / *-card / .card 등 */
+[class*="card"]:not(button):not(.no-z-polish),
+.card-like {
+  border-radius: var(--z-r-lg) !important;
+  transition: transform var(--z-dur) var(--z-ease),
+              box-shadow var(--z-dur) var(--z-ease),
+              border-color var(--z-dur) var(--z-ease) !important;
+}
+[class*="card"]:not(button):not(.no-z-polish):hover {
+  transform: translateY(-1px);
+  box-shadow: var(--z-sh-lg);
+}
+
+/* 입력 폼 polish */
+input:not([type="checkbox"]):not([type="radio"]):not(.no-z-polish),
+select:not(.no-z-polish),
+textarea:not(.no-z-polish) {
+  font-family: var(--z-font-sans);
+  transition: border-color var(--z-dur-fast) var(--z-ease),
+              box-shadow var(--z-dur-fast) var(--z-ease) !important;
+}
+input:not(.no-z-polish):focus,
+select:not(.no-z-polish):focus,
+textarea:not(.no-z-polish):focus {
+  outline: none;
+  box-shadow: var(--z-sh-glow-blue);
+}
+
+/* 글로벌 fade-in — 페이지 진입 시 부드러운 등장 */
+main, [class*="panel"], [class*="dashboard"] {
+  animation: z-fade-in var(--z-dur-slow) var(--z-ease);
+}
+
+/* ── 미디어 쿼리 / 모바일 ── */
 @media (max-width: 768px) {
   :root {
     --z-header-h: 56px;
+    --z-r-lg: 12px;
+    --z-r-xl: 14px;
   }
+  /* 모바일에선 hover lift 효과 끔 — 터치 디바이스에 부적합 */
+  button:not(:disabled):not(.no-z-polish):hover,
+  [class*="card"]:not(button):not(.no-z-polish):hover {
+    transform: none;
+  }
+  /* 모바일 가독성 — 본문 최소 14px 강제 (iOS 줌 방지에 16px 권장이지만 dense UI 우선) */
+  body { font-size: 14px; }
+  /* 카드 패딩 자동 축소 */
+  [class*="card"]:not(button) {
+    /* padding 은 인라인 스타일이 우선이므로 강제 못 함 — 권장값만 제공 */
+  }
+  /* 가로 스크롤 방지 안전망 */
+  html, body { overflow-x: hidden; }
+  /* 표 모바일 가독성 */
+  table { font-size: 13px; }
+}
+
+@media (max-width: 480px) {
+  /* 작은 핸드폰 — 더 컴팩트 */
+  body { font-size: 13px; }
+  table { font-size: 12px; }
 }
 
 /* ── Reduce motion ── */

@@ -23,6 +23,7 @@
 
 import { loadUserCredentials, respondError } from "../_shared/binance-auth.js";
 import { extractSignal, pickBestSignal, rankSignals } from "../_shared/signal-extractor.js";
+import { loadFamilyWeightsRobust, applyWeightsToRanking } from "../_shared/strategy-weights.js";
 import { planTrade, RISK_CONFIG } from "../_shared/risk-manager.js";
 import { preTradeCheck } from "../_shared/circuit-breaker.js";
 import { getSymbolFilter, isSymbolAffordable } from "../_shared/exchange-info.js";
@@ -30,6 +31,9 @@ import { getTickerPrice, getAccountInfo, getKlines } from "../_shared/binance-cl
 import { executeOrderPlan } from "../binance/order.js";
 
 export const config = { maxDuration: 60 };
+
+// 글로벌 probe 유저 — KV 등록 없이도 cron 이 항상 dry-run+shadow 로 실행
+export const GLOBAL_PROBE_USER = "__zepta_global_probe__";
 
 async function getKv() {
   const mod = await import("@vercel/kv");
@@ -269,9 +273,23 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     .map((r) => extractSignal(r, { strict: !forceDryRun }))
     .filter(Boolean);
   S(`canonical=${canonical.length}`);
-  const ranked = rankSignals(canonical);
+  let ranked = rankSignals(canonical);
   if (!ranked.length) {
     return { ok: true, userId, ran: false, reason: "no valid canonical signal", diag, steps };
+  }
+  // family 가중치 적용 — shadow ledger 성과 기반 자동 튜닝
+  try {
+    const kvForWeights = await getKv();
+    const weights = await loadFamilyWeightsRobust(kvForWeights, userId);
+    if (weights && Object.keys(weights).length > 0) {
+      const before = ranked[0]?.symbol;
+      ranked = applyWeightsToRanking(ranked, weights);
+      const after = ranked[0]?.symbol;
+      const wstr = Object.entries(weights).map(([k, v]) => `${k}=${v.toFixed(2)}`).join(",");
+      S(`family weights applied: ${wstr}${before !== after ? ` (rerank: ${before}→${after})` : ""}`);
+    }
+  } catch (e) {
+    S(`family weights skipped: ${e?.message}`);
   }
 
   // 7-9) ★ ranked 시그널 순회 — 1순위가 affordability/risk reject 되어도
@@ -420,6 +438,8 @@ export default async function handler(req, res) {
     }
 
     // GET: cron — phase1 유저는 live, shadow-only 유저는 shadow 모드로 순회
+    // + GLOBAL_PROBE_USER 는 KV 등록 없이도 항상 shadow 로 강제 실행
+    //   (대표님이 dry-run 버튼을 매일 누르지 않아도 shadow-ledger 가 자동 누적됨)
     const kv = await getKv();
     const phase1Users = (await kv.get("di:real:phase1-users")) || [];
     const shadowUsers = (await kv.get("di:real:shadow-users")) || [];
@@ -431,14 +451,33 @@ export default async function handler(req, res) {
         results.push({ userId: uid, ok: false, error: e?.message });
       }
     }
+    // 글로벌 probe — 등록 안 된 상태에서도 항상 1회 자동 dry-run+shadow
+    try {
+      results.push(await runOnce({
+        userId: GLOBAL_PROBE_USER,
+        forceDryRun: true,
+        shadow: true,
+        probe: true,
+      }));
+    } catch (e) {
+      results.push({ userId: GLOBAL_PROBE_USER, ok: false, error: e?.message });
+    }
     for (const uid of shadowUsers.slice(0, 20)) {
       if (phase1Users.includes(uid)) continue;
+      if (uid === GLOBAL_PROBE_USER) continue;
       try {
         results.push(await runOnce({ userId: uid, forceDryRun: true, shadow: true }));
       } catch (e) {
         results.push({ userId: uid, ok: false, error: e?.message });
       }
     }
+    // probe 유저를 shadow-users 에 멱등 등록 → shadow-monitor 도 자동 순회
+    try {
+      const cur = (await kv.get("di:real:shadow-users")) || [];
+      if (!cur.includes(GLOBAL_PROBE_USER)) {
+        await kv.set("di:real:shadow-users", [GLOBAL_PROBE_USER, ...cur]);
+      }
+    } catch {}
     return res.status(200).json({ ok: true, count: results.length, results });
   } catch (err) {
     return respondError(res, err);
