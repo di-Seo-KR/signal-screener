@@ -105,11 +105,43 @@ function hash(str) {
  * @param {boolean} [opts.strict] Phase1 allowed symbol 만 허용
  * @returns {null | object} canonical signal
  */
+/**
+ * 봇이 저장하는 다양한 asset 포맷을 짧은 티커(BTC, ETH, ...)로 정규화.
+ * 지원 포맷:
+ *   "BTC"        → "BTC"
+ *   "BTC/USD"    → "BTC"   (btc-cron.js CRYPTO_ASSETS 포맷)
+ *   "BTC/USDT"   → "BTC"
+ *   "BTCUSDT"    → "BTC"   (바이낸스 full symbol)
+ *   "BTC-USD"    → "BTC"
+ *   "btc"        → "BTC"
+ */
+export function normalizeAssetKey(asset) {
+  if (!asset) return null;
+  let a = String(asset).toUpperCase().trim();
+  // slash / dash quote 구분자 제거 (BTC/USD, BTC-USD)
+  if (a.includes("/")) a = a.split("/")[0];
+  if (a.includes("-")) a = a.split("-")[0];
+  // 이미 짧은 티커면 바로 리턴
+  if (ASSET_TO_SYMBOL[a]) return a;
+  // full symbol (BTCUSDT, ETHUSDT) 인 경우 USDT/USD 접미어 제거
+  if (a.endsWith("USDT")) {
+    const s = a.slice(0, -4);
+    if (ASSET_TO_SYMBOL[s]) return s;
+  }
+  if (a.endsWith("USD")) {
+    const s = a.slice(0, -3);
+    if (ASSET_TO_SYMBOL[s]) return s;
+  }
+  return null;
+}
+
 export function extractSignal({ asset, signal, source, stratName }, opts = {}) {
   if (!signal || !signal.type) return null;
   if (!asset) return null;
 
-  const symbol = ASSET_TO_SYMBOL[asset.toUpperCase()];
+  const key = normalizeAssetKey(asset);
+  if (!key) return null;
+  const symbol = ASSET_TO_SYMBOL[key];
   if (!symbol) return null;
   if (opts.strict !== false && !PHASE1_ALLOWED_SYMBOLS.has(symbol)) return null;
 
@@ -134,7 +166,7 @@ export function extractSignal({ asset, signal, source, stratName }, opts = {}) {
   return {
     id,
     source: source || "unknown",
-    asset: asset.toUpperCase(),
+    asset: key,
     symbol,
     side,
     confidence: Number(conf.toFixed(3)),
@@ -161,4 +193,4 @@ export function pickBestSignal(signals) {
   })[0];
 }
 
-export default { extractSignal, pickBestSignal, ASSET_TO_SYMBOL, PHASE1_ALLOWED_SYMBOLS, classifyStrategyFamily };
+export default { extractSignal, pickBestSignal, normalizeAssetKey, ASSET_TO_SYMBOL, PHASE1_ALLOWED_SYMBOLS, classifyStrategyFamily };
