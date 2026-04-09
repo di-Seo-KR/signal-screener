@@ -254,11 +254,38 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
 
   // 10) quantity
   const rawQty = notional / price;
-  const qty = roundDownStep(rawQty, filter.stepSize || 0);
+  let qty = roundDownStep(rawQty, filter.stepSize || 0);
   if (qty < (filter.minQty || 0)) {
-    return { ok: false, reason: `qty ${qty} < minQty ${filter.minQty}`, log };
+    // minQty 미달도 stepSize 한 단위로 보정 시도
+    if ((filter.minQty || 0) > 0) {
+      qty = filter.minQty;
+      push(`qty bumped to minQty ${qty}`);
+    } else {
+      return { ok: false, reason: `qty ${qty} < minQty ${filter.minQty}`, log };
+    }
   }
-  const finalNotional = qty * price;
+  let finalNotional = qty * price;
+  // ★ stepSize 양자화로 인해 minNotional 을 못 채우면 한 step 위로 올림
+  //   (BTC: 0.00145 BTC → 0.001 BTC = $72 < minN $100 케이스 구제)
+  if (finalNotional < minN && (filter.stepSize || 0) > 0) {
+    const bumpedQty = qty + filter.stepSize;
+    const bumpedNotional = bumpedQty * price;
+    const bumpedLossUsd = bumpedNotional * effLossPct;
+    const stepBumpCap = (cfg.minNotionalBumpCap || 1.5);
+    const riskRatio2 = riskAmount > 0 ? bumpedLossUsd / riskAmount : Infinity;
+    if (riskRatio2 <= stepBumpCap) {
+      push(`stepSize bump: qty ${qty} → ${bumpedQty} ($${finalNotional.toFixed(2)} → $${bumpedNotional.toFixed(2)}, risk ${riskRatio2.toFixed(2)}x ≤ ${stepBumpCap}x)`);
+      qty = bumpedQty;
+      finalNotional = bumpedNotional;
+      bumped = true;
+    } else {
+      return {
+        ok: false,
+        reason: `finalNotional ${finalNotional.toFixed(2)} < minNotional ${minN}; step-bump risk ${riskRatio2.toFixed(2)}x > cap ${stepBumpCap}x`,
+        log,
+      };
+    }
+  }
   if (finalNotional < minN) {
     return { ok: false, reason: `finalNotional ${finalNotional.toFixed(2)} < minNotional ${minN}`, log };
   }
