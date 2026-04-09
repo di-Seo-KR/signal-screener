@@ -1,0 +1,241 @@
+/* ══════════════════════════════════════════════════════════════════
+   Zepta Design Tokens — v1
+   의존성 제로 · CSS 변수 기반 · data-theme 전환
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 타이포그래피 ── */
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css");
+@import url("https://cdn.jsdelivr.net/npm/jetbrains-mono@1/css/jetbrains-mono.min.css");
+
+:root {
+  /* ── 색상 (Dark default — Zepta 네이비 베이스) ── */
+  --z-bg:        #070B14;
+  --z-bg-elev:   #0C1321;
+  --z-card:      #101828;
+  --z-card-2:    #161F33;
+  --z-card-hi:   #1B2740;
+  --z-border:    #1E2A42;
+  --z-border-2:  #2A3A58;
+  --z-border-hi: #3B4D6D;
+
+  --z-text:      #F1F5FB;
+  --z-text-2:    #9AA7BD;
+  --z-text-3:    #64728C;
+  --z-text-4:    #3F4C66;
+
+  --z-blue:      #3B82F6;
+  --z-blue-hi:   #60A5FA;
+  --z-blue-bg:   rgba(59, 130, 246, 0.12);
+
+  --z-green:     #10D884;
+  --z-green-hi:  #34E89A;
+  --z-green-bg:  rgba(16, 216, 132, 0.10);
+
+  --z-red:       #FF4D64;
+  --z-red-hi:    #FF6B7E;
+  --z-red-bg:    rgba(255, 77, 100, 0.10);
+
+  --z-yellow:    #FFB020;
+  --z-yellow-hi: #FFC55A;
+  --z-yellow-bg: rgba(255, 176, 32, 0.10);
+
+  --z-purple:    #9B6FFF;
+  --z-purple-hi: #B793FF;
+  --z-purple-bg: rgba(155, 111, 255, 0.10);
+
+  --z-cyan:      #22D3EE;
+  --z-cyan-bg:   rgba(34, 211, 238, 0.10);
+
+  /* ── 시맨틱 ── */
+  --z-success: var(--z-green);
+  --z-danger:  var(--z-red);
+  --z-warn:    var(--z-yellow);
+  --z-info:    var(--z-blue);
+
+  /* ── Radius ── */
+  --z-r-xs: 6px;
+  --z-r-sm: 8px;
+  --z-r-md: 10px;
+  --z-r-lg: 14px;
+  --z-r-xl: 18px;
+  --z-r-2xl: 24px;
+  --z-r-full: 9999px;
+
+  /* ── Shadow ── */
+  --z-sh-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --z-sh:    0 4px 12px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --z-sh-lg: 0 12px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
+  --z-sh-glow-blue:  0 0 0 3px rgba(59, 130, 246, 0.22);
+  --z-sh-glow-red:   0 0 0 3px rgba(255, 77, 100, 0.22);
+  --z-sh-glow-green: 0 0 0 3px rgba(16, 216, 132, 0.22);
+
+  /* ── 타이포 ── */
+  --z-font-sans: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
+                 "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --z-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* ── Motion ── */
+  --z-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --z-dur-fast: 120ms;
+  --z-dur: 180ms;
+  --z-dur-slow: 260ms;
+
+  /* ── 레이아웃 ── */
+  --z-content-max: 1280px;
+  --z-nav-w: 240px;
+  --z-nav-w-collapsed: 68px;
+  --z-header-h: 60px;
+  --z-mobile-tab-h: 60px;
+}
+
+/* ── Light 테마 ── */
+[data-theme="light"] {
+  --z-bg:        #F6F8FC;
+  --z-bg-elev:   #FFFFFF;
+  --z-card:      #FFFFFF;
+  --z-card-2:    #F1F4F9;
+  --z-card-hi:   #E7ECF4;
+  --z-border:    #E2E6EF;
+  --z-border-2:  #D0D6E1;
+  --z-border-hi: #B7C0CE;
+
+  --z-text:      #0A1224;
+  --z-text-2:    #4C5870;
+  --z-text-3:    #7D889D;
+  --z-text-4:    #B7C0CE;
+
+  --z-blue:      #2563EB;
+  --z-blue-hi:   #3B82F6;
+  --z-blue-bg:   rgba(37, 99, 235, 0.10);
+
+  --z-green:     #059B64;
+  --z-green-hi:  #10B77B;
+  --z-green-bg:  rgba(5, 155, 100, 0.10);
+
+  --z-red:       #E11D48;
+  --z-red-hi:    #F43F5E;
+  --z-red-bg:    rgba(225, 29, 72, 0.08);
+
+  --z-yellow:    #D08300;
+  --z-yellow-hi: #F0A020;
+  --z-yellow-bg: rgba(208, 131, 0, 0.10);
+
+  --z-purple:    #7C3AED;
+  --z-purple-bg: rgba(124, 58, 237, 0.08);
+
+  --z-sh-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --z-sh:    0 2px 10px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --z-sh-lg: 0 12px 32px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+/* ── 전역 리셋/베이스 ── */
+html, body, #root {
+  background: var(--z-bg);
+  color: var(--z-text);
+  font-family: var(--z-font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "cv11", "ss01", "ss03";
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-variant-numeric: tabular-nums;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--z-blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: none;
+  box-shadow: var(--z-sh-glow-blue);
+}
+
+::selection { background: var(--z-blue); color: #fff; }
+
+/* ── 스크롤바 ── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--z-border-2);
+  border-radius: 6px;
+  border: 2px solid var(--z-bg);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--z-border-hi); }
+
+/* ── 유틸리티 ── */
+.z-mono { font-family: var(--z-font-mono); font-feature-settings: "zero"; }
+.z-num  { font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+
+/* ── 애니메이션 ── */
+@keyframes z-fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes z-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+@keyframes z-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.z-anim-in { animation: z-fade-in var(--z-dur) var(--z-ease); }
+.z-pulse   { animation: z-pulse 2s var(--z-ease) infinite; }
+
+/* ── 스켈레톤 ── */
+.z-skel {
+  background: linear-gradient(90deg,
+    var(--z-card-2) 0%, var(--z-card-hi) 50%, var(--z-card-2) 100%);
+  background-size: 800px 100%;
+  animation: z-shimmer 1.4s linear infinite;
+  border-radius: var(--z-r-sm);
+}
+
+/* ── 버튼 ripple/hover 베이스 ── */
+.z-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: inherit;
+  font-weight: 600;
+  border-radius: var(--z-r-sm);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background var(--z-dur-fast) var(--z-ease),
+              border-color var(--z-dur-fast) var(--z-ease),
+              color var(--z-dur-fast) var(--z-ease),
+              transform var(--z-dur-fast) var(--z-ease),
+              box-shadow var(--z-dur-fast) var(--z-ease);
+  user-select: none;
+  white-space: nowrap;
+}
+.z-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.z-btn:not(:disabled):active { transform: translateY(1px); }
+
+/* ── 미디어 쿼리 ── */
+@media (max-width: 768px) {
+  :root {
+    --z-header-h: 56px;
+  }
+}
+
+/* ── Reduce motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
