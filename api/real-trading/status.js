@@ -34,12 +34,16 @@ export default async function handler(req, res) {
     if (!userId) return res.status(400).json({ error: "userId required" });
 
     const kv = await getKv();
-    const [killed, phase1, breaker, engineLog, orders] = await Promise.all([
+    const [killed, phase1, shadowEnrolled, breaker, engineLog, orders, shadowSummary, shadowLedger, reconcileLog] = await Promise.all([
       isKillSwitchEnabled(userId),
       kv.get(`di:real:user:${userId}:phase1_enabled`),
+      kv.get(`di:real:user:${userId}:shadow_enabled`),
       getBreakerState(userId),
       kv.get(`di:real:user:${userId}:engine-log`),
       kv.get(`di:real:user:${userId}:orders`),
+      kv.get(`di:real:user:${userId}:shadow-summary`),
+      kv.get(`di:real:user:${userId}:shadow-ledger`),
+      kv.get(`di:real:user:${userId}:reconcile-log`),
     ]);
 
     let equity = null;
@@ -69,14 +73,21 @@ export default async function handler(req, res) {
       ok: true,
       userId,
       phase1Enabled: !!phase1,
+      shadowEnabled: !!shadowEnrolled,
       killswitchOn: killed,
       halted: !!breaker?.halted,
       haltedReason: breaker?.haltedReason || null,
       equity,
       openPositions,
-      recentEngineLog: (engineLog || []).slice(0, 10),
+      recentEngineLog: (engineLog || []).slice(0, 20),
       recentOrders: (orders || []).slice(0, 10),
       breaker,
+      shadow: {
+        summary: shadowSummary || null,
+        openCount: (shadowLedger || []).filter((e) => e.status === "OPEN").length,
+        recent: (shadowLedger || []).slice(0, 20),
+      },
+      reconcile: (reconcileLog || []).slice(0, 5),
       updatedAt: new Date().toISOString(),
     });
   } catch (err) {

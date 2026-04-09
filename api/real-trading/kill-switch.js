@@ -82,6 +82,24 @@ export default async function handler(req, res) {
         await kv.set("di:real:phase1-users", list);
         return res.status(200).json({ ok: true, phase1Enabled: true, enrolled: true });
       }
+      if (action === "enable-shadow") {
+        await kv.set(`di:real:user:${userId}:shadow_enabled`, true);
+        const list = (await kv.get("di:real:shadow-users")) || [];
+        if (!list.includes(userId)) list.push(userId);
+        await kv.set("di:real:shadow-users", list);
+        return res.status(200).json({ ok: true, shadowEnabled: true });
+      }
+      if (action === "disable-shadow") {
+        await kv.set(`di:real:user:${userId}:shadow_enabled`, false);
+        const list = (await kv.get("di:real:shadow-users")) || [];
+        await kv.set("di:real:shadow-users", list.filter((u) => u !== userId));
+        return res.status(200).json({ ok: true, shadowEnabled: false });
+      }
+      if (action === "reset-shadow") {
+        await kv.set(`di:real:user:${userId}:shadow-ledger`, []);
+        await kv.set(`di:real:user:${userId}:shadow-summary`, { wins: 0, losses: 0, netPnL: 0, trades: 0, totalRR: 0, updatedAt: new Date().toISOString() });
+        return res.status(200).json({ ok: true, reset: true });
+      }
       if (action === "disable-phase1") {
         await kv.set(`di:real:user:${userId}:phase1_enabled`, false);
         const list = (await kv.get("di:real:phase1-users")) || [];

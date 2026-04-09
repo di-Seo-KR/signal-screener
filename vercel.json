@@ -60,6 +60,14 @@
     {
       "path": "/api/real-trading/position-monitor",
       "schedule": "*/3 * * * *"
+    },
+    {
+      "path": "/api/real-trading/shadow-monitor",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/real-trading/reconcile",
+      "schedule": "0 21 * * *"
     }
   ]
 }
