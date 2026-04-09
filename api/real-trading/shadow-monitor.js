@@ -44,6 +44,7 @@ async function monitorUser(userId) {
   const kv = await getKv();
   const ledgerKey = `di:real:user:${userId}:shadow-ledger`;
   const summaryKey = `di:real:user:${userId}:shadow-summary`;
+  const equityKey = `di:real:user:${userId}:shadow-equity`;
   const ledger = (await kv.get(ledgerKey)) || [];
   if (!ledger.length) return { userId, scanned: 0, closed: 0 };
 
@@ -64,6 +65,14 @@ async function monitorUser(userId) {
     const tp = e.plan.tpPrice;
     const entry = e.entryPrice;
     const hit = side === "LONG" ? hitLong(entry, mark, sl, tp) : hitShort(entry, mark, sl, tp);
+
+    // ── MFE / MAE 트래킹 (best/worst 가격) ──
+    e.mfePrice = side === "LONG"
+      ? Math.max(e.mfePrice || mark, mark)
+      : Math.min(e.mfePrice || mark, mark);
+    e.maePrice = side === "LONG"
+      ? Math.min(e.maePrice || mark, mark)
+      : Math.max(e.maePrice || mark, mark);
 
     const openedAt = new Date(e.openedAt || now).getTime();
     const tooOld = now - openedAt > (e.plan.maxHoldMs || 48 * 60 * 60 * 1000);
@@ -92,6 +101,7 @@ async function monitorUser(userId) {
       const costPct = ((e.feeBps || 8) + (e.slippageBps || 5)) / 10000;
       const netPct = close.grossPct - costPct;
       const netPnL = (e.plan.notional || 0) * netPct;
+      const holdMs = now - openedAt;
       e.status = "CLOSED";
       e.closedAt = new Date(now).toISOString();
       e.closeReason = close.closeReason;
@@ -99,27 +109,88 @@ async function monitorUser(userId) {
       e.grossPct = close.grossPct;
       e.netPct = netPct;
       e.netPnL = netPnL;
+      e.holdMs = holdMs;
+      // R 단위 결과
+      const riskAmt = e.plan?.riskAmount || 0;
+      e.rMultiple = riskAmt > 0 ? netPnL / riskAmt : 0;
+      // MFE/MAE 를 R 로 변환
+      if (riskAmt > 0 && e.plan?.notional) {
+        const mfePct = side === "LONG"
+          ? ((e.mfePrice || entry) - entry) / entry
+          : (entry - (e.mfePrice || entry)) / entry;
+        const maePct = side === "LONG"
+          ? ((e.maePrice || entry) - entry) / entry
+          : (entry - (e.maePrice || entry)) / entry;
+        e.mfeR = (mfePct * e.plan.notional) / riskAmt;
+        e.maeR = (maePct * e.plan.notional) / riskAmt;
+      }
       closed.push(e);
     }
   }
 
   if (closed.length) {
     await kv.set(ledgerKey, ledger.slice(0, 500));
-    // summary 업데이트
-    const sum = (await kv.get(summaryKey)) || { wins: 0, losses: 0, netPnL: 0, trades: 0, totalRR: 0 };
+    // ── 풍부한 summary 업데이트 ──
+    const sum = (await kv.get(summaryKey)) || {
+      wins: 0, losses: 0, netPnL: 0, trades: 0, totalRR: 0,
+      bestR: 0, worstR: 0, totalHoldMs: 0,
+      byFamily: {}, byCloseReason: { TP: 0, SL: 0, TIME: 0 },
+      grossWin: 0, grossLoss: 0,
+    };
+    // 신규 필드 backfill
+    sum.byFamily = sum.byFamily || {};
+    sum.byCloseReason = sum.byCloseReason || { TP: 0, SL: 0, TIME: 0 };
+    sum.totalHoldMs = sum.totalHoldMs || 0;
+    sum.bestR = sum.bestR || 0;
+    sum.worstR = sum.worstR || 0;
+    sum.grossWin = sum.grossWin || 0;
+    sum.grossLoss = sum.grossLoss || 0;
+
     for (const c of closed) {
       sum.trades += 1;
       sum.netPnL += c.netPnL || 0;
-      if ((c.netPnL || 0) > 0) sum.wins += 1;
-      else sum.losses += 1;
-      const riskAmt = c.plan?.riskAmount || 0;
-      if (riskAmt > 0) sum.totalRR += (c.netPnL || 0) / riskAmt;
+      sum.totalHoldMs += c.holdMs || 0;
+      if ((c.netPnL || 0) > 0) {
+        sum.wins += 1;
+        sum.grossWin += c.netPnL || 0;
+      } else {
+        sum.losses += 1;
+        sum.grossLoss += Math.abs(c.netPnL || 0);
+      }
+      if ((c.rMultiple || 0) > sum.bestR) sum.bestR = c.rMultiple;
+      if ((c.rMultiple || 0) < sum.worstR) sum.worstR = c.rMultiple;
+      sum.totalRR += c.rMultiple || 0;
+      sum.byCloseReason[c.closeReason] = (sum.byCloseReason[c.closeReason] || 0) + 1;
+      const fam = c.plan?.strategyFamily || "unknown";
+      sum.byFamily[fam] = sum.byFamily[fam] || { trades: 0, wins: 0, netPnL: 0 };
+      sum.byFamily[fam].trades += 1;
+      sum.byFamily[fam].netPnL += c.netPnL || 0;
+      if ((c.netPnL || 0) > 0) sum.byFamily[fam].wins += 1;
     }
+    sum.profitFactor = sum.grossLoss > 0 ? sum.grossWin / sum.grossLoss : null;
+    sum.avgHoldHours = sum.trades > 0 ? sum.totalHoldMs / sum.trades / 3600000 : 0;
+    sum.avgR = sum.trades > 0 ? sum.totalRR / sum.trades : 0;
+    sum.winRate = sum.trades > 0 ? sum.wins / sum.trades : 0;
     sum.updatedAt = new Date().toISOString();
     await kv.set(summaryKey, sum);
+
+    // ── equity curve append ──
+    const curve = (await kv.get(equityKey)) || [];
+    curve.push({
+      t: now,
+      cum: sum.netPnL,
+      trades: sum.trades,
+    });
+    // 최근 1000 포인트만
+    await kv.set(equityKey, curve.slice(-1000));
   }
 
-  return { userId, scanned: ledger.length, closed: closed.length };
+  return {
+    userId,
+    scanned: ledger.length,
+    closed: closed.length,
+    closedReasons: closed.map((c) => c.closeReason),
+  };
 }
 
 export default async function handler(req, res) {

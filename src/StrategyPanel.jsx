@@ -3,15 +3,18 @@
 import { useState, useCallback } from "react";
 import { ALL_STRATEGIES, diagnoseMarket, recommendStrategies } from "./strategies.js";
 
+// ── Zepta 토큰 기반 (theme-responsive) ──
+// 모든 색상은 src/ui/tokens.css 의 --z-* CSS 변수를 참조한다.
+// data-theme=light 전환 시 자동으로 라이트 팔레트로 바뀜.
 const C = {
-  bg: "#070C14", card: "#0F1825", card2: "#141E2E",
-  border: "#1A2535", border2: "#243044",
-  blue: "#3182F6", blueL: "#5AA3FF", blueBg: "#1A2C4F",
-  red: "#F04452", redBg: "#2A1520",
-  green: "#05C072", greenBg: "#0A2A1A",
-  yellow: "#FFB400", yellowBg: "#2A2000",
-  purple: "#8B5CF6", purpleBg: "#1E1535",
-  text1: "#F2F4F7", text2: "#A0AEBF", text3: "#5A6880",
+  bg: "var(--z-bg)", card: "var(--z-card)", card2: "var(--z-card-2)",
+  border: "var(--z-border)", border2: "var(--z-border-2)",
+  blue: "var(--z-blue)", blueL: "var(--z-blue-hi)", blueBg: "var(--z-blue-bg)",
+  red: "var(--z-red)", redBg: "var(--z-red-bg)",
+  green: "var(--z-green)", greenBg: "var(--z-green-bg)",
+  yellow: "var(--z-yellow)", yellowBg: "var(--z-yellow-bg)",
+  purple: "var(--z-purple)", purpleBg: "var(--z-purple-bg)",
+  text1: "var(--z-text)", text2: "var(--z-text-2)", text3: "var(--z-text-3)",
 };
 
 const REGIME_COLORS = {
@@ -27,6 +30,13 @@ const REGIME_COLORS = {
 
 const CAT_COLORS = {
   "추세추종": C.blue, "평균회귀": C.purple, "모멘텀": C.yellow, "변동성": C.red,
+};
+// 카테고리별 배경 (var() 와 alpha hex 를 합칠 수 없어 별도 매핑)
+const CAT_BG = {
+  "추세추종": "var(--z-blue-bg)",
+  "평균회귀": "var(--z-purple-bg)",
+  "모멘텀":   "var(--z-yellow-bg)",
+  "변동성":   "var(--z-red-bg)",
 };
 
 export default function StrategyPanel({ onRunBacktest }) {
@@ -146,13 +156,13 @@ export default function StrategyPanel({ onRunBacktest }) {
                       <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>{s.name}</span>
                       <span style={{
                         padding: "2px 7px", borderRadius: "6px", fontSize: "13px", fontWeight: 700,
-                        background: `${catColor}22`, color: catColor,
+                        background: CAT_BG[s.category] || C.blueBg, color: catColor,
                       }}>{s.category}</span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <div style={{
                         width: "28px", height: "28px", borderRadius: "50%",
-                        background: `${C.blue}22`, display: "flex", alignItems: "center", justifyContent: "center",
+                        background: C.blueBg, display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: "14px", fontWeight: 800, color: C.blue,
                       }}>{rec.score}</div>
                     </div>
@@ -165,15 +175,15 @@ export default function StrategyPanel({ onRunBacktest }) {
                         <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "13px", background: C.card, color: C.text3, border: `1px solid ${C.border}` }}>
                           위험도: {s.risk}
                         </span>
-                        <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "13px", background: `${CAT_COLORS[s.category] || C.blue}15`, color: CAT_COLORS[s.category] || C.blue, fontWeight: 600 }}>
+                        <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "13px", background: CAT_BG[s.category] || C.blueBg, color: CAT_COLORS[s.category] || C.blue, fontWeight: 600 }}>
                           {s.category}
                         </span>
                         {onRunBacktest && (
                           <button onClick={(e) => { e.stopPropagation(); onRunBacktest(s, selectedSymbol); }} style={{
                             padding: "6px 14px", borderRadius: "8px", fontSize: "14px", fontWeight: 700,
-                            background: `linear-gradient(135deg, ${C.blue}, ${C.blueL})`, color: "#fff",
+                            background: `linear-gradient(135deg, var(--z-blue), var(--z-blue-hi))`, color: "#fff",
                             border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: "4px",
-                            boxShadow: `0 2px 8px ${C.blue}40`,
+                            boxShadow: `var(--z-sh)`,
                           }}>📊 백테스트 실행</button>
                         )}
                       </div>
@@ -201,7 +211,7 @@ export default function StrategyPanel({ onRunBacktest }) {
                   <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1, flex: 1 }}>{s.name}</span>
                   <span style={{
                     padding: "2px 6px", borderRadius: "4px", fontSize: "13px", fontWeight: 600,
-                    background: `${catColor}22`, color: catColor, flexShrink: 0,
+                    background: CAT_BG[s.category] || C.blueBg, color: catColor, flexShrink: 0,
                   }}>{s.category}</span>
                 </div>
                 <div style={{ fontSize: "14px", color: C.text2, marginBottom: "8px", lineHeight: 1.5 }}>{s.desc}</div>
@@ -213,9 +223,9 @@ export default function StrategyPanel({ onRunBacktest }) {
                   {onRunBacktest && (
                     <button onClick={() => onRunBacktest(s, selectedSymbol)} style={{
                       padding: "4px 10px", borderRadius: "6px", fontSize: "13px", fontWeight: 700,
-                      background: `linear-gradient(135deg, ${C.blue}, ${C.blueL})`, color: "#fff",
+                      background: `linear-gradient(135deg, var(--z-blue), var(--z-blue-hi))`, color: "#fff",
                       border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "3px",
-                      boxShadow: `0 1px 4px ${C.blue}30`,
+                      boxShadow: `var(--z-sh-sm)`,
                     }}>📊 백테스트</button>
                   )}
                 </div>

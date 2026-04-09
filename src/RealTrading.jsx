@@ -678,11 +678,59 @@ function RealTradingInner() {
             <Stat compact label="누적 netPnL"
               value={fmtUsd(shadow.summary.netPnL)}
               tone={(shadow.summary.netPnL || 0) >= 0 ? "success" : "danger"} />
-            <Stat compact label="평균 RR"
+            <Stat compact label="평균 R"
               value={shadow.summary.trades > 0
-                ? ((shadow.summary.totalRR || 0) / shadow.summary.trades).toFixed(2) + "R" : "—"} />
+                ? (shadow.summary.avgR != null
+                    ? shadow.summary.avgR.toFixed(2) + "R"
+                    : ((shadow.summary.totalRR || 0) / shadow.summary.trades).toFixed(2) + "R")
+                : "—"} />
             <Stat compact label="오픈 중" value={shadow.openCount || 0} />
+            {shadow.summary.profitFactor != null && (
+              <Stat compact label="Profit Factor"
+                value={shadow.summary.profitFactor != null && isFinite(shadow.summary.profitFactor)
+                  ? shadow.summary.profitFactor.toFixed(2) : "—"}
+                tone={(shadow.summary.profitFactor || 0) >= 1.5 ? "success" : (shadow.summary.profitFactor || 0) >= 1 ? "warn" : "danger"} />
+            )}
+            {shadow.summary.bestR != null && (
+              <Stat compact label="Best / Worst"
+                value={`${(shadow.summary.bestR || 0).toFixed(1)} / ${(shadow.summary.worstR || 0).toFixed(1)}R`} />
+            )}
+            {shadow.summary.avgHoldHours != null && (
+              <Stat compact label="평균 보유" value={`${(shadow.summary.avgHoldHours || 0).toFixed(1)}h`} />
+            )}
           </div>
+          {shadow.summary.byCloseReason && (
+            <div style={{
+              marginBottom: 12, padding: 10,
+              background: "var(--z-card-2)", borderRadius: "var(--z-r-sm)",
+              border: `1px solid var(--z-border)`,
+              display: "flex", gap: 14, flexWrap: "wrap", fontSize: 11,
+            }}>
+              <span style={{ color: "var(--z-text-3)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>청산 사유</span>
+              <span><Badge tone="green" size="sm">TP</Badge> {shadow.summary.byCloseReason.TP || 0}</span>
+              <span><Badge tone="red" size="sm">SL</Badge> {shadow.summary.byCloseReason.SL || 0}</span>
+              <span><Badge tone="yellow" size="sm">TIME</Badge> {shadow.summary.byCloseReason.TIME || 0}</span>
+            </div>
+          )}
+          {shadow.summary.byFamily && Object.keys(shadow.summary.byFamily).length > 0 && (
+            <div style={{
+              marginBottom: 12, padding: 10,
+              background: "var(--z-card-2)", borderRadius: "var(--z-r-sm)",
+              border: `1px solid var(--z-border)`,
+            }}>
+              <div style={{ fontSize: 10, color: "var(--z-text-3)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>전략 family 별</div>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 11 }}>
+                {Object.entries(shadow.summary.byFamily).map(([fam, st]) => (
+                  <div key={fam} style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                    <Badge tone="blue" size="sm">{fam}</Badge>
+                    <span style={{ fontFamily: "var(--z-font-mono)", color: (st.netPnL || 0) >= 0 ? "var(--z-green-hi)" : "var(--z-red-hi)" }}>
+                      {fmtUsd(st.netPnL)} · {st.wins}/{st.trades}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       ) : (
         <EmptyState

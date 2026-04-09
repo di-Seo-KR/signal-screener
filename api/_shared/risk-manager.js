@@ -86,6 +86,36 @@ export const RISK_CONFIG = {
 
   // 시간 손절 (engine 외부에서 참조)
   maxHoldMs: 48 * 60 * 60 * 1000,
+
+  // ── 시간 손절 단계화 ──
+  // 일정 시간이 지났는데 +수익이 충분히 나지 않은 포지션은 조기 청산.
+  // softTimeStop: 보유 시간 (ms), minProfitR: 그 시점에 최소로 떠 있어야 할 R 배수
+  // 만족 못하면 포지션 청산. maxHoldMs 보다 짧은 단계.
+  timeStops: [
+    { afterMs: 6  * 60 * 60 * 1000, minProfitR: 0.0  }, // 6h: 본전 미만이면 컷
+    { afterMs: 12 * 60 * 60 * 1000, minProfitR: 0.5  }, // 12h: +0.5R 미만이면 컷
+    { afterMs: 24 * 60 * 60 * 1000, minProfitR: 1.0  }, // 24h: +1.0R 미만이면 컷
+  ],
+
+  // ── 트레일링 스탑 ──
+  // 포지션이 +activationR 이상으로 가면, 그때부터 SL 을 trailDistanceR 만큼
+  // 떨어진 위치로 끌어올린다. (=Binance SL 주문을 cancel & re-create)
+  // 한 번 올린 SL 은 절대 내리지 않음 (one-way ratchet).
+  trailingStop: {
+    enabled: true,
+    activationR: 1.0,    // +1R 도달 시 활성화
+    trailDistanceR: 0.5, // 최고점에서 0.5R 만큼 양보 (=lock 0.5R 이상)
+    breakEvenAtR: 0.7,   // +0.7R 시 일단 breakeven 으로 SL 이동
+  },
+
+  // ── 부분 익절 (Partial TP) ──
+  // 활성화 시 진입가에서 +tp1R 도달하면 포지션의 tp1FractionPct 를 시장가 청산하고
+  // 잔여분의 SL 을 breakeven 으로 이동.
+  partialTP: {
+    enabled: false,      // Phase 1 default OFF — bracket atomic 보존 우선
+    tp1R: 1.5,
+    tp1FractionPct: 0.5,
+  },
 };
 
 function roundDownStep(x, step) { if (!step || step <= 0) return x; return Math.floor(x / step) * step; }
@@ -287,4 +317,141 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
   return { ok: true, plan };
 }
 
-export default { planTrade, pickLeverage, stopDistancePct, approxLiquidationPct, inSameCorrelationGroup, RISK_CONFIG };
+// ──────────────────────────────────────────────────────────────────
+// Position-monitor 헬퍼들
+// 모두 순수 함수 — KV/Binance 호출 없음. 호출 측에서 결과만 받아 행동.
+// ──────────────────────────────────────────────────────────────────
+
+/**
+ * 현재 시점에 시간손절을 발동해야 하는지 판단.
+ * @param {object} args
+ * @param {number} args.openedAt        포지션 진입 timestamp(ms)
+ * @param {number} args.entryPrice
+ * @param {number} args.markPrice
+ * @param {string} args.side            "LONG" | "SHORT"
+ * @param {number} args.slPct           plan.slPct (양수)
+ * @param {number} [args.now=Date.now()]
+ * @param {object} [args.cfg=RISK_CONFIG]
+ * @returns {{ shouldClose: boolean, reason?: string, currentR?: number }}
+ */
+export function evaluateTimeStop({ openedAt, entryPrice, markPrice, side, slPct, now = Date.now(), cfg = RISK_CONFIG }) {
+  if (!openedAt || !entryPrice || !markPrice || !slPct) return { shouldClose: false };
+  const heldMs = now - openedAt;
+  if (heldMs < 0) return { shouldClose: false };
+
+  // 현재 R-multiple = (이익 %) / (slPct)
+  const moveFrac = side === "LONG"
+    ? (markPrice - entryPrice) / entryPrice
+    : (entryPrice - markPrice) / entryPrice;
+  const currentR = moveFrac / slPct;
+
+  // 절대 한계
+  if (heldMs >= (cfg.maxHoldMs || Infinity)) {
+    return { shouldClose: true, reason: `maxHold ${(heldMs / 3600000).toFixed(1)}h reached`, currentR };
+  }
+
+  const stops = cfg.timeStops || [];
+  // 가장 strict 한 (가장 늦은) 적용 가능 단계 선택
+  let triggered = null;
+  for (const t of stops) {
+    if (heldMs >= t.afterMs && currentR < t.minProfitR) {
+      if (!triggered || t.afterMs > triggered.afterMs) triggered = t;
+    }
+  }
+  if (triggered) {
+    return {
+      shouldClose: true,
+      reason: `timeStop ${(triggered.afterMs / 3600000).toFixed(0)}h, R=${currentR.toFixed(2)} < ${triggered.minProfitR}`,
+      currentR,
+    };
+  }
+  return { shouldClose: false, currentR };
+}
+
+/**
+ * 트레일링 스탑 신규 SL 가격 계산.
+ * 호출측은 이 결과 newSlPrice 가 기존 SL 보다 유리하면 cancel & re-create.
+ * @param {object} args
+ * @param {number} args.entryPrice
+ * @param {number} args.markPrice            현재가 (또는 highWater 갱신 후의 best price)
+ * @param {string} args.side                 "LONG" | "SHORT"
+ * @param {number} args.slPct                초기 SL 거리 (양수)
+ * @param {number} args.currentSlPrice
+ * @param {number} [args.highWater]          이번 포지션의 최고/최저 mark (없으면 markPrice 사용)
+ * @param {object} [args.cfg=RISK_CONFIG]
+ * @returns {{ shouldUpdate: boolean, newSlPrice?: number, reason?: string, currentR?: number }}
+ */
+export function evaluateTrailingStop({ entryPrice, markPrice, side, slPct, currentSlPrice, highWater, cfg = RISK_CONFIG }) {
+  const ts = cfg.trailingStop || {};
+  if (!ts.enabled) return { shouldUpdate: false };
+  if (!entryPrice || !markPrice || !slPct) return { shouldUpdate: false };
+
+  const ref = highWater ?? markPrice;
+  const moveFrac = side === "LONG"
+    ? (ref - entryPrice) / entryPrice
+    : (entryPrice - ref) / entryPrice;
+  const currentR = moveFrac / slPct;
+
+  // breakeven 단계
+  if (currentR >= (ts.breakEvenAtR ?? 0.7) && currentR < (ts.activationR ?? 1.0)) {
+    const beSL = entryPrice;
+    const isImproved = side === "LONG"
+      ? beSL > (currentSlPrice || -Infinity)
+      : beSL < (currentSlPrice || Infinity);
+    if (isImproved) {
+      return { shouldUpdate: true, newSlPrice: beSL, reason: `breakeven @${currentR.toFixed(2)}R`, currentR };
+    }
+  }
+
+  // 트레일링 활성화
+  if (currentR >= (ts.activationR ?? 1.0)) {
+    const trailFrac = (ts.trailDistanceR ?? 0.5) * slPct;
+    const newSL = side === "LONG"
+      ? ref * (1 - trailFrac)
+      : ref * (1 + trailFrac);
+    const isImproved = side === "LONG"
+      ? newSL > (currentSlPrice || -Infinity)
+      : newSL < (currentSlPrice || Infinity);
+    if (isImproved) {
+      return { shouldUpdate: true, newSlPrice: newSL, reason: `trail @${currentR.toFixed(2)}R`, currentR };
+    }
+  }
+  return { shouldUpdate: false, currentR };
+}
+
+/**
+ * 부분 익절 (TP1) 발동 여부.
+ * @returns {{ shouldPartialClose: boolean, fractionPct?: number, reason?: string, currentR?: number }}
+ */
+export function evaluatePartialTP({ entryPrice, markPrice, side, slPct, cfg = RISK_CONFIG }) {
+  const p = cfg.partialTP || {};
+  if (!p.enabled) return { shouldPartialClose: false };
+  if (!entryPrice || !markPrice || !slPct) return { shouldPartialClose: false };
+
+  const moveFrac = side === "LONG"
+    ? (markPrice - entryPrice) / entryPrice
+    : (entryPrice - markPrice) / entryPrice;
+  const currentR = moveFrac / slPct;
+
+  if (currentR >= (p.tp1R ?? 1.5)) {
+    return {
+      shouldPartialClose: true,
+      fractionPct: p.tp1FractionPct ?? 0.5,
+      reason: `TP1 @${currentR.toFixed(2)}R`,
+      currentR,
+    };
+  }
+  return { shouldPartialClose: false, currentR };
+}
+
+export default {
+  planTrade,
+  pickLeverage,
+  stopDistancePct,
+  approxLiquidationPct,
+  inSameCorrelationGroup,
+  evaluateTimeStop,
+  evaluateTrailingStop,
+  evaluatePartialTP,
+  RISK_CONFIG,
+};

@@ -1,5 +1,9 @@
 // ══════════════════════════════════════════════════════════════════
-// Zepta UI Primitives — 의존성 제로 · CSS 변수 기반
+// Zepta UI Primitives — Shadcn aesthetic, --z-* token backed
+// • 모든 색/간격은 tokens.css 의 --z-* (또는 Shadcn bridge 변수) 사용
+// • Shadcn UI 와 시각적 일관 (ring-1 카드, focus-visible blue glow,
+//   rounded-xl, font-medium 등) 을 inline style 로 재현
+// • API 는 RealTrading.jsx 가 그대로 쓸 수 있도록 변경 없음
 // 사용: import { Button, Card, Badge, Stat, Tabs, ... } from "./ui/primitives";
 // ══════════════════════════════════════════════════════════════════
 import React, { useEffect, useState, useCallback, useRef, createContext, useContext } from "react";
@@ -29,6 +33,7 @@ export function Button({
   onClick, children, style, title, type = "button", ...rest
 }) {
   const [hover, setHover] = useState(false);
+  const [focus, setFocus] = useState(false);
   const v = BTN_VARIANTS[variant] || BTN_VARIANTS.default;
   const s = BTN_SIZES[size] || BTN_SIZES.md;
   return (
@@ -39,6 +44,8 @@ export function Button({
       disabled={disabled || loading}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      onFocus={(e) => { setFocus(true); rest.onFocus?.(e); }}
+      onBlur={(e) => { setFocus(false); rest.onBlur?.(e); }}
       title={title}
       style={{
         background: hover && !disabled ? v.hover : v.bg,
@@ -49,6 +56,8 @@ export function Button({
         minHeight: s.h,
         width: fullWidth ? "100%" : undefined,
         textDecoration: variant === "link" ? "underline" : "none",
+        borderRadius: "var(--z-r-md)",
+        boxShadow: focus && !disabled ? "var(--z-sh-glow-blue)" : undefined,
         ...style,
       }}
       {...rest}
@@ -77,15 +86,19 @@ export function Card({ children, title, subtitle, actions, icon, tone, pad = 18,
   const toneBorder = tone
     ? { danger: "var(--z-red)", warn: "var(--z-yellow)", success: "var(--z-green)", info: "var(--z-blue)" }[tone]
     : "var(--z-border)";
+  // Shadcn Card 와 동일한 ring-1 ring-foreground/10 효과를 inset shadow 로 재현
+  const ringShadow = tone
+    ? `inset 0 0 0 1px ${toneBorder}66`
+    : `inset 0 0 0 1px color-mix(in oklab, var(--z-text) 10%, transparent)`;
   return (
     <section
       onClick={onClick}
       style={{
         background: "var(--z-card)",
-        border: noBorder ? "none" : `1px solid ${toneBorder}${tone ? "55" : ""}`,
-        borderRadius: "var(--z-r-lg)",
-        boxShadow: "var(--z-sh-sm)",
-        transition: "border-color var(--z-dur) var(--z-ease), transform var(--z-dur) var(--z-ease)",
+        border: noBorder ? "none" : "1px solid transparent",
+        borderRadius: "var(--z-r-xl)",
+        boxShadow: noBorder ? "var(--z-sh-sm)" : `${ringShadow}, var(--z-sh-sm)`,
+        transition: "border-color var(--z-dur) var(--z-ease), transform var(--z-dur) var(--z-ease), box-shadow var(--z-dur) var(--z-ease)",
         cursor: onClick ? "pointer" : "default",
         ...style,
       }}

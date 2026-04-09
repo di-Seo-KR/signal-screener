@@ -355,6 +355,33 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     }
   }
 
+  // 11a) live 진입 성공이면 plan 을 KV 에 저장 — position-monitor 가
+  // trailing stop / time stop 평가에 사용. dry/shadow 는 저장 안 함.
+  if (!dryRun && !shadow && result?.ok && !result?.error) {
+    try {
+      const kv = await getKv();
+      const planKey = `di:real:user:${userId}:plan:${plan.plan.symbol}`;
+      await kv.set(planKey, {
+        symbol: plan.plan.symbol,
+        side: plan.plan.side,
+        entryPrice: plan.plan.entryPrice,
+        slPrice: plan.plan.slPrice,
+        tpPrice: plan.plan.tpPrice,
+        slPct: plan.plan.slPct,
+        tpPct: plan.plan.tpPct,
+        leverage: plan.plan.leverage,
+        qty: plan.plan.qty,
+        openedAt: Date.now(),
+        currentSlPrice: plan.plan.slPrice,
+        highWater: plan.plan.entryPrice,
+        strategyFamily: plan.plan.strategyFamily,
+      });
+      S(`plan persisted to ${planKey}`);
+    } catch (e) {
+      S(`plan persist failed: ${e.message}`);
+    }
+  }
+
   // 11) engine-log
   await appendLog(userId, `di:real:user:${userId}:engine-log`, {
     time: startedAt,
