@@ -76,6 +76,14 @@ export const RISK_CONFIG = {
   minNotionalSafety: 1.05,
   absoluteMaxNotional: 500,
 
+  // ★ 작은 계정 구제: notional 이 minNotional×safety 미만일 때
+  //   qty 를 bump 하되, 그 결과의 실효 손실(effLossPct × notional) 이
+  //   원래 riskAmount 의 minNotionalBumpCap 배수 이내면 허용.
+  //   초과하면 기존대로 reject.
+  //   Phase 1 ($100 계정) 에서 XRP/DOGE 같은 저가 알트 시그널이 전부
+  //   reject 되는 문제를 해결하면서 리스크 상한은 유지.
+  minNotionalBumpCap: 1.5,
+
   // 시간 손절 (engine 외부에서 참조)
   maxHoldMs: 48 * 60 * 60 * 1000,
 };
@@ -192,14 +200,26 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
   notional = notional * sizeHint;
   push(`sizeHint=${sizeHint} → notional=$${notional.toFixed(2)}`);
 
-  // 9) minNotional
+  // 9) minNotional — 작은 계정 bump-to-min 로직
   const minN = filter.minNotional || 0;
-  if (notional < minN * (cfg.minNotionalSafety || 1.05)) {
-    return {
-      ok: false,
-      reason: `notional $${notional.toFixed(2)} < minNotional×safety $${(minN * (cfg.minNotionalSafety || 1.05)).toFixed(2)}`,
-      log,
-    };
+  const minNSafe = minN * (cfg.minNotionalSafety || 1.05);
+  let bumped = false;
+  if (notional < minNSafe) {
+    // bump 후 실효 손실이 원래 riskAmount 의 bumpCap 배수 이내면 허용
+    const bumpCap = cfg.minNotionalBumpCap || 1.5;
+    const bumpedLoss = minNSafe * effLossPct;
+    const riskRatio = bumpedLoss / riskAmount;
+    if (riskRatio <= bumpCap) {
+      push(`bump-to-min: $${notional.toFixed(2)} → $${minNSafe.toFixed(2)} (risk ${riskRatio.toFixed(2)}x ≤ cap ${bumpCap}x)`);
+      notional = minNSafe;
+      bumped = true;
+    } else {
+      return {
+        ok: false,
+        reason: `notional $${notional.toFixed(2)} < minNotional×safety $${minNSafe.toFixed(2)}; bump risk ${riskRatio.toFixed(2)}x > cap ${bumpCap}x`,
+        log,
+      };
+    }
   }
 
   // 10) quantity
@@ -261,6 +281,7 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
     liqPct,
     safeSL,
     maxHoldMs: cfg.maxHoldMs,
+    bumpedToMin: bumped,
     log,
   };
   return { ok: true, plan };
