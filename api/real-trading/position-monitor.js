@@ -33,14 +33,18 @@ async function checkUser(userId) {
 
   const kv = await getKv();
   const lastPosKey = `di:real:user:${userId}:last-positions`;
-  const lastPos = (await kv.get(lastPosKey)) || [];
+  const lastPosRaw = (await kv.get(lastPosKey)) || {};
+  // 레거시 array 형태 호환
+  const lastPos = Array.isArray(lastPosRaw)
+    ? Object.fromEntries(lastPosRaw.map((p) => [p.symbol, p]))
+    : lastPosRaw;
 
   const report = { userId, positions: nonZero.length, closed: [], orphansCleaned: [] };
 
   // 1) 고아 SL/TP 정리 — 포지션 없는 심볼에 남은 reduce-only 주문 취소
   const symbolsWithPos = new Set(nonZero.map((p) => p.symbol));
   // 직전에 포지션이 있었지만 지금은 없는 것 = 최근 청산된 심볼
-  const lastSymbols = new Set((lastPos || []).map((p) => p.symbol));
+  const lastSymbols = new Set(Object.keys(lastPos));
   for (const sym of lastSymbols) {
     if (!symbolsWithPos.has(sym)) {
       // 고아 주문 확인 후 취소
@@ -85,17 +89,19 @@ async function checkUser(userId) {
     }
   }
 
-  // 3) 현재 포지션 저장 (다음 틱 비교용)
-  await kv.set(
-    lastPosKey,
-    nonZero.map((p) => ({
+  // 3) 현재 포지션 저장 (symbol → info 맵 형태, reconcile.js 와 공유)
+  const nextMap = {};
+  for (const p of nonZero) {
+    nextMap[p.symbol] = {
       symbol: p.symbol,
       positionAmt: parseFloat(p.positionAmt),
       entryPrice: parseFloat(p.entryPrice),
       markPrice: parseFloat(p.markPrice),
       unRealizedProfit: parseFloat(p.unRealizedProfit),
-    }))
-  );
+      leverage: parseInt(p.leverage || "0", 10),
+    };
+  }
+  await kv.set(lastPosKey, nextMap);
 
   return report;
 }

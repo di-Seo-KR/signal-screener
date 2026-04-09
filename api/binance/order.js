@@ -138,32 +138,71 @@ export async function executeOrderPlan(opts) {
   if (clientOrderId) entryParams.newClientOrderId = clientOrderId;
   const entryResp = await placeOrder({ apiKey, apiSecret, params: entryParams, testnet });
 
-  // === SL/TP 예약 (Option A — 서버 장애에도 생존) ===
+  // === SL/TP 예약 (원자성 강화: retry + fallback close) ===
+  // ★ Critical #1 ★
+  //   진입은 체결됐는데 bracket 이 안 걸리면 "벌거벗은 포지션" 이 남아서 재앙.
+  //   전략: SL 을 반드시 먼저 3회 재시도 → 실패 시 즉시 시장가로 포지션 강제 청산.
+  //   SL 성공 후 TP 는 best-effort (TP 실패는 손실 무제한이 아니므로 close 까진 안 함).
   const bracketResults = { sl: null, tp: null };
   const closeSide = side === "LONG" ? "SELL" : "BUY";
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  async function tryStopOrder(params, label, attempts = 3) {
+    let lastErr;
+    for (let i = 0; i < attempts; i++) {
+      try {
+        const r = await placeStopOrder(params);
+        return { ok: true, orderId: r.orderId, attempts: i + 1 };
+      } catch (e) {
+        lastErr = e;
+        const msg = e?.data?.msg || e?.message || String(e);
+        console.warn(`[executeOrderPlan] ${label} attempt ${i + 1} failed: ${msg}`);
+        if (i < attempts - 1) await sleep(300 * (i + 1));
+      }
+    }
+    return { ok: false, error: lastErr?.data?.msg || lastErr?.message || "unknown" };
+  }
+
+  let bracketRescue = null;
   if (stopLossPrice && Number.isFinite(stopLossPrice)) {
-    try {
-      const slResp = await placeStopOrder({
-        apiKey, apiSecret, symbol, type: "STOP_MARKET", side: closeSide,
-        stopPrice: stopLossPrice, closePosition: true, testnet,
-        clientOrderId: clientOrderId ? `${clientOrderId}-SL` : undefined,
-      });
-      bracketResults.sl = { orderId: slResp.orderId, stopPrice: stopLossPrice };
-    } catch (e) {
-      bracketResults.sl = { error: e?.data?.msg || e?.message };
+    const slRes = await tryStopOrder({
+      apiKey, apiSecret, symbol, type: "STOP_MARKET", side: closeSide,
+      stopPrice: stopLossPrice, closePosition: true, testnet,
+      clientOrderId: clientOrderId ? `${clientOrderId}-SL` : undefined,
+    }, "SL");
+    bracketResults.sl = slRes;
+
+    if (!slRes.ok) {
+      // ★ Rescue: SL 예약 실패 → 즉시 포지션 시장가 청산
+      console.error(`[executeOrderPlan] CRITICAL SL attach failed → force close position`);
+      try {
+        const rescueResp = await placeOrder({
+          apiKey, apiSecret, testnet,
+          params: {
+            symbol,
+            side: closeSide,
+            type: "MARKET",
+            quantity: qty,
+            reduceOnly: "true",
+            newOrderRespType: "RESULT",
+            newClientOrderId: clientOrderId ? `${clientOrderId}-RESCUE` : undefined,
+          },
+        });
+        bracketRescue = { ok: true, orderId: rescueResp.orderId, reason: "SL attach failed, force-closed" };
+      } catch (e) {
+        bracketRescue = { ok: false, error: e?.data?.msg || e?.message, critical: true };
+      }
     }
   }
-  if (takeProfitPrice && Number.isFinite(takeProfitPrice)) {
-    try {
-      const tpResp = await placeStopOrder({
-        apiKey, apiSecret, symbol, type: "TAKE_PROFIT_MARKET", side: closeSide,
-        stopPrice: takeProfitPrice, closePosition: true, testnet,
-        clientOrderId: clientOrderId ? `${clientOrderId}-TP` : undefined,
-      });
-      bracketResults.tp = { orderId: tpResp.orderId, stopPrice: takeProfitPrice };
-    } catch (e) {
-      bracketResults.tp = { error: e?.data?.msg || e?.message };
-    }
+
+  // TP 는 SL 이 있는 상태에서만, 실패해도 RESCUE 안 함 (SL 이 이미 하방을 지킴)
+  if (takeProfitPrice && Number.isFinite(takeProfitPrice) && bracketResults.sl?.ok) {
+    const tpRes = await tryStopOrder({
+      apiKey, apiSecret, symbol, type: "TAKE_PROFIT_MARKET", side: closeSide,
+      stopPrice: takeProfitPrice, closePosition: true, testnet,
+      clientOrderId: clientOrderId ? `${clientOrderId}-TP` : undefined,
+    }, "TP");
+    bracketResults.tp = tpRes;
   }
 
   // 로그
@@ -181,6 +220,7 @@ export async function executeOrderPlan(opts) {
       avgPrice: parseFloat(entryResp.avgPrice || 0),
       status: entryResp.status,
       bracket: bracketResults,
+      bracketRescue,
       bracketMode: !!(stopLossPrice || takeProfitPrice),
     });
     await kv.set(logKey, existing.slice(0, 500));
@@ -202,6 +242,7 @@ export async function executeOrderPlan(opts) {
     priceAtRequest: price,
     notional,
     bracket: bracketResults,
+    bracketRescue,
     raw: entryResp,
   };
 }

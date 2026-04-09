@@ -1,47 +1,64 @@
 // api/_shared/risk-manager.js
 //
-// $100 수준의 소자본 실전매매를 위한 리스크 매니저.
+// Phase 1 실전매매 리스크 매니저 (Option A — 절대수익형 posture).
 //
-// 책임:
-//  1. 현재 에쿼티 + 신호 기반으로 "한 번의 트레이드에 얼마를 걸까" 결정
-//  2. 전략 family 기반 ATR 배수로 SL/TP 거리 계산
-//  3. Binance minNotional / stepSize 제약을 만족하는 수량 계산
-//  4. 동적 레버리지 2x ~ 10x (신호 confidence + family 에 따라)
-//  5. 모든 결정을 log 로 남겨 디버그 가능하게 함
+// 이 모듈의 직무:
+//  1) 에쿼티 + 신호 → 한 번에 얼마를 걸지 결정 (Fractional Kelly)
+//  2) ATR 기반 SL 거리 + 전략 family 별 R:R 매칭
+//  3) Binance minNotional / stepSize 제약 반영
+//  4) 동적 레버리지 2x~5x (Option A 보수화)
+//  5) ★ 수수료(왕복 0.08%) + 예상 슬리피지(왕복 0.05%) 를 리스크에 반영
+//  6) ★ 청산가격과 SL 거리 안전 버퍼 검증 (liquidation-before-SL 사고 방지)
+//  7) 모든 판단을 log 배열에 남김
 //
-// 이 파일은 외부(Binance REST) 를 직접 호출하지 않는다.
-// 엔진이 먼저 exchangeInfo, ticker 등을 조회해 filter/price 를 넘겨준다.
+// 외부(Binance REST) 직접 호출 없음. 엔진이 필터·가격·ATR 을 넘겨준다.
 
-// ── 기본 설정 (Phase 1) ──
+// ── Option A: 절대수익형 기본 설정 ──
 export const RISK_CONFIG = {
-  // 계정 에쿼티 대비 단일 트레이드의 "리스크 한도" (SL 까지 맞았을 때 잃는 금액 비율)
-  // Fractional Kelly 1/4 ~ 1/5 수준. $100 기준 1회 -$1.5 ~ -$2 손실.
-  riskPerTradePct: 0.015, // 1.5%
+  // Fractional Kelly ~ 1/8. $100 기준 1회 -$0.8 손실 목표.
+  // (수수료·슬리피지 흡수 후에도 실질 risk 가 의도와 맞도록 축소)
+  riskPerTradePct: 0.008, // 0.8%
 
-  // 최대 증거금 비중 (에쿼티 대비) — 레버리지 쓰더라도 마진 콜 여유 확보
-  maxMarginPct: 0.40, // 한 포지션에 에쿼티의 40% 까지만 증거금으로
+  // 한 포지션 최대 증거금 비중
+  maxMarginPct: 0.35,
 
-  // 전략 family 별 ATR 배수 (SL 거리)
+  // 동시 보유 포지션 상한 (상관 위험 관리)
+  maxConcurrentPositions: 2,
+
+  // 심볼 간 상관 그룹 — 같은 그룹에서 동시 2개 금지
+  correlationGroups: [
+    ["BTCUSDT", "ETHUSDT", "BNBUSDT"],              // 메가캡
+    ["SOLUSDT", "AVAXUSDT", "ADAUSDT", "DOTUSDT"],  // L1
+    ["DOGEUSDT", "XRPUSDT"],                        // 레거시 밈/페이먼트
+    ["MATICUSDT", "LINKUSDT"],                      // 인프라
+  ],
+
+  // 전략 family 별 ATR × 배수 (SL 거리)
   atrMultSL: {
     trend: 2.5,
     "mean-revert": 1.5,
     breakout: 1.2,
     unknown: 2.0,
   },
-  // TP = SL * RR
+  // TP = SL × rewardToRisk (수수료 차감 전 raw RR)
   rewardToRisk: {
-    trend: 2.5,
-    "mean-revert": 1.5,
-    breakout: 2.0,
+    trend: 3.0,          // 절대수익형: 승률 희생하고 기대값 키움
+    "mean-revert": 1.8,
+    breakout: 2.5,
     unknown: 2.0,
   },
 
-  // 레버리지 범위
-  minLeverage: 2,
-  maxLeverage: 10,
+  // 수수료 + 슬리피지 가정 (왕복 기준, 명목가 대비)
+  // Binance USDⓈ-M Futures taker 0.04% × 2 = 0.08%.
+  // 슬리피지 0.025% × 2 = 0.05%. 합 0.13%.
+  roundTripFeePct: 0.0008,       // 0.08% taker
+  roundTripSlippagePct: 0.0005,  // 0.05% slippage
+  // TP·SL 가격이 커버해야 할 "고정비용 거리" = 0.13% + 약간의 버퍼
+  minNetRR: 1.8,                 // 비용 차감 후 실질 RR 하한
 
-  // confidence 0.5 → minLeverage, 1.0 → maxLeverage (선형)
-  // family 가 trend 면 +1, breakout 이면 +0, mean-revert 면 -1 조정
+  // 레버리지 — Option A 는 2~5x (청산 사고 위험 축소)
+  minLeverage: 2,
+  maxLeverage: 5,
   leverageBias: {
     trend: 1,
     breakout: 0,
@@ -49,57 +66,53 @@ export const RISK_CONFIG = {
     unknown: 0,
   },
 
-  // 최소 주문가능 여유 (minNotional 의 몇 배 이상이어야 실행)
-  minNotionalSafety: 1.05,
+  // 청산거리 안전 버퍼
+  //  SL 거리 ≤ 청산거리 × liqSafetyRatio 강제.
+  //  Isolated 기준 청산거리 ≈ (1 / leverage) × (1 - maintMargin).
+  //  Binance 유지증거금 ~0.4~1.0% 가정 → 단순화: 1/lev × 0.9
+  liqSafetyRatio: 0.7,
 
-  // Phase 1 에서는 작은 자본 보호용으로 단일 포지션 "절대 상한"
-  absoluteMaxNotional: 500, // $500 — 레버리지 반영 후에도 이 이상 금지
+  // minNotional 여유
+  minNotionalSafety: 1.05,
+  absoluteMaxNotional: 500,
+
+  // 시간 손절 (engine 외부에서 참조)
+  maxHoldMs: 48 * 60 * 60 * 1000,
 };
 
-function roundDownStep(x, step) {
-  if (!step || step <= 0) return x;
-  return Math.floor(x / step) * step;
-}
+function roundDownStep(x, step) { if (!step || step <= 0) return x; return Math.floor(x / step) * step; }
+function round(x, decimals)     { const f = Math.pow(10, decimals || 0); return Math.round(x * f) / f; }
+function clamp(x, lo, hi)       { return Math.max(lo, Math.min(hi, x)); }
 
-function round(x, decimals) {
-  const f = Math.pow(10, decimals || 0);
-  return Math.round(x * f) / f;
-}
-
-function clamp(x, lo, hi) {
-  return Math.max(lo, Math.min(hi, x));
-}
-
-/**
- * 동적 레버리지.
- * confidence: 0~1, family: trend/mean-revert/breakout/unknown
- */
 export function pickLeverage(confidence, family, cfg = RISK_CONFIG) {
   const base = cfg.minLeverage + (cfg.maxLeverage - cfg.minLeverage) * clamp((confidence - 0.5) / 0.5, 0, 1);
   const bias = cfg.leverageBias[family] || 0;
   return Math.round(clamp(base + bias, cfg.minLeverage, cfg.maxLeverage));
 }
 
-/**
- * ATR 기반 stop 거리(퍼센트). atr 는 price 와 같은 단위.
- */
 export function stopDistancePct({ price, atr, family, cfg = RISK_CONFIG }) {
   if (!atr || !price || atr <= 0 || price <= 0) return null;
   const mult = cfg.atrMultSL[family] || cfg.atrMultSL.unknown;
-  return (atr * mult) / price; // ratio (e.g., 0.02 = 2%)
+  return (atr * mult) / price;
+}
+
+/** Isolated 포지션의 대략적 청산거리 비율 (보수적 가정). */
+export function approxLiquidationPct(leverage) {
+  if (!leverage || leverage <= 1) return 0.99;
+  return (1 / leverage) * 0.9; // 유지증거금 ~10% 흡수
+}
+
+/** 상관 그룹에서 이미 오픈된 심볼과 같은 그룹인지 */
+export function inSameCorrelationGroup(symbol, openSymbols, cfg = RISK_CONFIG) {
+  const groups = cfg.correlationGroups || [];
+  for (const g of groups) {
+    if (g.includes(symbol) && openSymbols.some((s) => g.includes(s) && s !== symbol)) return true;
+  }
+  return false;
 }
 
 /**
- * 핵심 함수: 신호 + 계정 상태 → 실제 주문 파라미터.
- *
- * @param {object} args
- * @param {object} args.signal        canonical signal (signal-extractor 출력)
- * @param {number} args.equity        현재 가용 USDT (Binance futures wallet)
- * @param {number} args.price         현재가
- * @param {number} args.atr           최근 ATR (price 단위)
- * @param {object} args.filter        binance symbol filter (stepSize, minQty, minNotional, ...)
- * @param {object} [args.cfg]         RISK_CONFIG override
- * @returns {{ ok: boolean, reason?: string, plan?: object }}
+ * 핵심: 신호 + 계정 상태 → 실제 주문 파라미터.
  */
 export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFIG }) {
   const log = [];
@@ -112,23 +125,29 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
   if (!(price > 0)) return { ok: false, reason: "price invalid", log };
   if (!filter) return { ok: false, reason: "symbol filter missing", log };
 
-  // 1) ATR → stop 거리
+  // 1) ATR → raw stop 거리
   const stopDistPct = stopDistancePct({ price, atr, family: signal.strategyFamily, cfg });
   if (!stopDistPct || stopDistPct <= 0) {
     return { ok: false, reason: "ATR 없음 또는 stop 거리 산출 불가", log };
   }
-  push(`stopDistPct=${(stopDistPct * 100).toFixed(2)}%`);
+  push(`rawStopDistPct=${(stopDistPct * 100).toFixed(3)}%`);
 
-  // 2) 리스크 금액 = 에쿼티 × riskPerTradePct
+  // 2) 비용 거리 (수수료 + 슬리피지, 왕복)
+  const costPct = (cfg.roundTripFeePct || 0) + (cfg.roundTripSlippagePct || 0);
+  push(`costPct=${(costPct * 100).toFixed(3)}% (fee+slip roundtrip)`);
+  if (stopDistPct <= costPct * 1.5) {
+    return { ok: false, reason: `stopDist ${(stopDistPct * 100).toFixed(2)}% too tight vs costs ${(costPct * 100).toFixed(2)}%`, log };
+  }
+
+  // 3) 리스크 금액 (SL 까지 맞았을 때 잃는 순손실 한도)
   const riskAmount = equity * cfg.riskPerTradePct;
-  push(`riskAmount=$${riskAmount.toFixed(2)} (${cfg.riskPerTradePct * 100}% of $${equity.toFixed(2)})`);
+  push(`riskAmount=$${riskAmount.toFixed(3)} (${(cfg.riskPerTradePct * 100).toFixed(2)}% of $${equity.toFixed(2)})`);
 
-  // 3) 리스크 금액 / stop 거리 = 명목가 (notional)
-  //    포지션이 stopDistPct 만큼 움직이면 riskAmount 를 잃는다.
-  let notional = riskAmount / stopDistPct;
-  push(`rawNotional=$${notional.toFixed(2)}`);
+  // 4) 효과적 loss 거리 = stopDist + cost (수수료 내기 위해 실제로는 더 많이 움직여야 같은 손실)
+  const effLossPct = stopDistPct + costPct;
+  let notional = riskAmount / effLossPct;
+  push(`effLossPct=${(effLossPct * 100).toFixed(3)}% → rawNotional=$${notional.toFixed(2)}`);
 
-  // 4) 절대 상한
   if (notional > cfg.absoluteMaxNotional) {
     notional = cfg.absoluteMaxNotional;
     push(`capped by absoluteMaxNotional=$${cfg.absoluteMaxNotional}`);
@@ -138,30 +157,52 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
   const leverage = pickLeverage(signal.confidence, signal.strategyFamily, cfg);
   push(`leverage=${leverage}x (conf=${signal.confidence}, fam=${signal.strategyFamily})`);
 
-  // 6) 필요한 증거금 = notional / leverage
-  const margin = notional / leverage;
+  // 6) ★ liquidation 버퍼 검증 — SL 이 청산보다 먼저 와야 함
+  const liqPct = approxLiquidationPct(leverage);
+  const safeSL = liqPct * (cfg.liqSafetyRatio || 0.7);
+  if (stopDistPct > safeSL) {
+    push(`SL ${(stopDistPct * 100).toFixed(2)}% > safe ${(safeSL * 100).toFixed(2)}% — leverage 낮춰야 함`);
+    // 자동 조정: 필요한 최소 레버리지 계산
+    const needLev = Math.ceil(1 / (stopDistPct / (cfg.liqSafetyRatio || 0.7) / 0.9));
+    const adjLev = clamp(needLev, cfg.minLeverage, cfg.maxLeverage);
+    if (adjLev >= leverage) {
+      return { ok: false, reason: `SL ${(stopDistPct * 100).toFixed(2)}% 가 최대 레버리지에서도 청산거리 초과 — 거부`, log };
+    }
+    push(`auto-adjust leverage → ${adjLev}x`);
+  }
+  const finalLev = (() => {
+    if (stopDistPct > safeSL) {
+      // reconcile 이 위에서 이미 return 했으면 여긴 안 옴
+      const needLev = Math.ceil(1 / (stopDistPct / (cfg.liqSafetyRatio || 0.7) / 0.9));
+      return clamp(needLev, cfg.minLeverage, cfg.maxLeverage);
+    }
+    return leverage;
+  })();
+
+  // 7) 증거금 상한
+  const margin0 = notional / finalLev;
   const maxMargin = equity * cfg.maxMarginPct;
-  if (margin > maxMargin) {
-    notional = maxMargin * leverage;
-    push(`margin capped: margin=$${margin.toFixed(2)} > max=$${maxMargin.toFixed(2)} → notional=$${notional.toFixed(2)}`);
+  if (margin0 > maxMargin) {
+    notional = maxMargin * finalLev;
+    push(`margin capped: margin=$${margin0.toFixed(2)} > max=$${maxMargin.toFixed(2)} → notional=$${notional.toFixed(2)}`);
   }
 
-  // 7) sizeHint 반영 (약한 신호는 더 작게)
+  // 8) sizeHint
   const sizeHint = clamp(signal.sizeHint ?? 0.5, 0.1, 1.0);
   notional = notional * sizeHint;
   push(`sizeHint=${sizeHint} → notional=$${notional.toFixed(2)}`);
 
-  // 8) minNotional 체크
+  // 9) minNotional
   const minN = filter.minNotional || 0;
-  if (notional < minN * cfg.minNotionalSafety) {
+  if (notional < minN * (cfg.minNotionalSafety || 1.05)) {
     return {
       ok: false,
-      reason: `notional $${notional.toFixed(2)} < minNotional×safety $${(minN * cfg.minNotionalSafety).toFixed(2)}`,
+      reason: `notional $${notional.toFixed(2)} < minNotional×safety $${(minN * (cfg.minNotionalSafety || 1.05)).toFixed(2)}`,
       log,
     };
   }
 
-  // 9) quantity 계산 + stepSize 반올림
+  // 10) quantity
   const rawQty = notional / price;
   const qty = roundDownStep(rawQty, filter.stepSize || 0);
   if (qty < (filter.minQty || 0)) {
@@ -172,15 +213,23 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
     return { ok: false, reason: `finalNotional ${finalNotional.toFixed(2)} < minNotional ${minN}`, log };
   }
 
-  // 10) SL/TP 가격 (price 단위)
+  // 11) SL / TP 가격 — TP 는 "비용 차감 후 순 RR" 기준으로 역산
   const slPct = stopDistPct;
-  const rr = cfg.rewardToRisk[signal.strategyFamily] || cfg.rewardToRisk.unknown;
-  const tpPct = slPct * rr;
+  const rawRR = cfg.rewardToRisk[signal.strategyFamily] || cfg.rewardToRisk.unknown;
+  // 순 RR: (tpPct - costPct) / (slPct + costPct) ≥ minNetRR 가 되도록 tpPct 강제
+  const requiredTpPct = Math.max(
+    slPct * rawRR,
+    (cfg.minNetRR || 1.8) * (slPct + costPct) + costPct,
+  );
+  const tpPct = requiredTpPct;
+  const netRR = (tpPct - costPct) / (slPct + costPct);
+  push(`rawRR=${rawRR} tpPct=${(tpPct * 100).toFixed(3)}% netRR=${netRR.toFixed(2)}`);
+  if (netRR < (cfg.minNetRR || 1.8)) {
+    return { ok: false, reason: `net RR ${netRR.toFixed(2)} < min ${cfg.minNetRR}`, log };
+  }
 
-  const slPrice =
-    signal.side === "LONG" ? price * (1 - slPct) : price * (1 + slPct);
-  const tpPrice =
-    signal.side === "LONG" ? price * (1 + tpPct) : price * (1 - tpPct);
+  const slPrice = signal.side === "LONG" ? price * (1 - slPct) : price * (1 + slPct);
+  const tpPrice = signal.side === "LONG" ? price * (1 + tpPct) : price * (1 - tpPct);
 
   const tickSize = filter.tickSize || 0;
   const pricePrecision = filter.pricePrecision || 2;
@@ -195,21 +244,26 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
     qty,
     entryPrice: price,
     notional: finalNotional,
-    marginRequired: finalNotional / leverage,
-    leverage,
+    marginRequired: finalNotional / finalLev,
+    leverage: finalLev,
     slPrice: roundPrice(slPrice),
     tpPrice: roundPrice(tpPrice),
     slPct,
     tpPct,
+    costPct,
+    effectiveRR: netRR,
     riskAmount,
-    expectedWin: (finalNotional * tpPct),
-    expectedLoss: (finalNotional * slPct),
+    expectedNetWin: finalNotional * (tpPct - costPct),
+    expectedNetLoss: finalNotional * (slPct + costPct),
     strategyFamily: signal.strategyFamily,
     confidence: signal.confidence,
     sizeHint,
+    liqPct,
+    safeSL,
+    maxHoldMs: cfg.maxHoldMs,
     log,
   };
   return { ok: true, plan };
 }
 
-export default { planTrade, pickLeverage, stopDistancePct, RISK_CONFIG };
+export default { planTrade, pickLeverage, stopDistancePct, approxLiquidationPct, inSameCorrelationGroup, RISK_CONFIG };

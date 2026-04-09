@@ -43,11 +43,17 @@ export async function getBreakerState(userId) {
 }
 
 export async function isKillSwitchEnabled(userId) {
-  const kv = await getKv();
-  // 기본값 true = 거래 금지. 유저가 명시적으로 false 로 바꿔야 실거래 가능.
-  const v = await kv.get(`di:real:user:${userId}:killswitch`);
-  if (v === null || v === undefined) return true; // default ON (disabled)
-  return !!v;
+  // ★ Fail-closed: KV 에러/타임아웃/미설정 전부 "차단(ON)" 으로 해석.
+  //   이 함수의 기본 원칙은 "조금이라도 의심스러우면 돈을 막는다".
+  try {
+    const kv = await getKv();
+    const v = await kv.get(`di:real:user:${userId}:killswitch`);
+    if (v === null || v === undefined) return true; // default ON (disabled)
+    return !!v;
+  } catch (e) {
+    console.error("[killswitch] KV read failed → fail-closed ON:", e?.message);
+    return true;
+  }
 }
 
 export async function setKillSwitch(userId, disabled) {
@@ -63,16 +69,23 @@ export async function setKillSwitch(userId, disabled) {
  * @returns {Promise<{ allowed: boolean, reason?: string, state: object }>}
  */
 export async function preTradeCheck(userId, currentEquity) {
-  const kv = await getKv();
-
-  // 1) 킬스위치
+  // 1) 킬스위치 (fail-closed)
   const killed = await isKillSwitchEnabled(userId);
   if (killed) {
     return { allowed: false, reason: "killswitch is ON (default)", state: {} };
   }
 
+  // ★ KV read 실패는 fail-closed
+  let kv, state;
+  try {
+    kv = await getKv();
+    state = (await kv.get(`di:real:user:${userId}:breaker`)) || {};
+  } catch (e) {
+    console.error("[breaker] KV read failed → fail-closed:", e?.message);
+    return { allowed: false, reason: "breaker KV read failed (fail-closed)", state: {} };
+  }
+
   const key = `di:real:user:${userId}:breaker`;
-  const state = (await kv.get(key)) || {};
   const now = Date.now();
 
   // 2) cooldown 중인지
