@@ -209,12 +209,12 @@ export default function RealTrading({ theme = "dark" }) {
   const halt = () => sendAction("halt", { reason: "manual" });
   const resume = () => sendAction("resume");
 
-  const runDryRun = async () => {
+  const runDryRun = async (probe = false) => {
     if (!userId) return;
     setBusy(true);
     try {
-      const r = await jpost("/api/real-trading/engine", { userId, dryRun: true });
-      showToast(r?.ran ? `모의 실행 완료 (${r.signal?.symbol || "no-signal"})` : `모의 실행: ${r?.reason || "no action"}`, "success");
+      const r = await jpost("/api/real-trading/engine", { userId, dryRun: true, probe });
+      showToast(r?.ran ? `모의 실행 완료 (${r.signal?.symbol || "no-signal"})` : `모의 실행: ${r?.reason || "no action"}`, r?.ran ? "success" : "info");
       await refresh();
     } catch (e) {
       showToast(e?.message || String(e), "error");
@@ -222,6 +222,20 @@ export default function RealTrading({ theme = "dark" }) {
       setBusy(false);
     }
   };
+
+  const enableShadow = () => setConfirmAction({
+    title: "Shadow 모드 시작",
+    desc: "실제 주문 없이 시그널 파이프라인 → 플랜 → 가상 진입/청산까지 전체 워크플로를 기록합니다.\n실거래와 병행 가능하며, 리스크 제로입니다.",
+    variant: "primary",
+    onConfirm: () => sendAction("enable-shadow"),
+  });
+  const disableShadow = () => sendAction("disable-shadow");
+  const resetShadow = () => setConfirmAction({
+    title: "Shadow 기록 초기화",
+    desc: "누적된 Shadow 원장과 요약 통계를 모두 초기화합니다. 되돌릴 수 없습니다.",
+    variant: "danger",
+    onConfirm: () => sendAction("reset-shadow"),
+  });
 
   const emergencyStop = () => setConfirmAction({
     title: "⚠️ 긴급 정지 — 모든 포지션 청산",
@@ -250,6 +264,7 @@ export default function RealTrading({ theme = "dark" }) {
   }
 
   const phase1On = !!status?.phase1Enabled;
+  const shadowOn = !!status?.shadowEnabled;
   const killOnVal = !!status?.killswitchOn;
   const halted = !!status?.halted;
   const equity = status?.equity;
@@ -257,6 +272,8 @@ export default function RealTrading({ theme = "dark" }) {
   const engineLog = status?.recentEngineLog || [];
   const orders = status?.recentOrders || [];
   const breaker = status?.breaker || {};
+  const shadow = status?.shadow || { summary: null, openCount: 0, recent: [] };
+  const reconcile = status?.reconcile || [];
 
   // 실제 거래 활성 여부 = phase1 ON + killswitch OFF + not halted
   const trulyLive = phase1On && !killOnVal && !halted;
@@ -336,7 +353,13 @@ export default function RealTrading({ theme = "dark" }) {
               ? <Btn c={c} onClick={resume} disabled={busy} variant="success">브레이커 재개</Btn>
               : <Btn c={c} onClick={halt} disabled={busy} variant="ghost">일시 정지</Btn>}
 
-            <Btn c={c} onClick={runDryRun} disabled={busy} variant="ghost">🧪 모의실행 (dry-run)</Btn>
+            <Btn c={c} onClick={() => runDryRun(false)} disabled={busy} variant="ghost">🧪 모의실행</Btn>
+            <Btn c={c} onClick={() => runDryRun(true)} disabled={busy} variant="ghost">🧪+probe</Btn>
+
+            {!shadowOn
+              ? <Btn c={c} onClick={enableShadow} disabled={busy} variant="primary">👻 Shadow 시작</Btn>
+              : <Btn c={c} onClick={disableShadow} disabled={busy} variant="ghost">👻 Shadow 중지</Btn>}
+            <Btn c={c} onClick={resetShadow} disabled={busy} variant="ghost" size="sm">Shadow 리셋</Btn>
 
             <div style={{ marginLeft: "auto" }}>
               <Btn c={c} onClick={emergencyStop} disabled={busy || positions.length === 0} variant="danger">
@@ -455,6 +478,14 @@ export default function RealTrading({ theme = "dark" }) {
                   {e.result?.orderId && (
                     <div style={{ color: c.text3, fontSize: 11 }}>orderId: {e.result.orderId}</div>
                   )}
+                  {e.result?.bracketRescue && (
+                    <div style={{ color: c.red, fontSize: 11, fontWeight: 700, marginTop: 2 }}>
+                      ⚠️ Bracket 실패 → 강제 청산 실행됨 ({e.result.bracketRescue.reason || "SL attach failed"})
+                    </div>
+                  )}
+                  {e.mode && (
+                    <div style={{ color: c.text3, fontSize: 10, marginTop: 2 }}>mode: {e.mode}</div>
+                  )}
                 </div>
               ))}
             </div>
@@ -499,34 +530,123 @@ export default function RealTrading({ theme = "dark" }) {
           )}
         </Card>
 
+        {/* ── Shadow 모드 패널 ── */}
+        <Card c={c} title={`👻 Shadow 모드 ${shadowOn ? "(활성)" : "(비활성)"}`}>
+          {shadow.summary ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, fontSize: 12, marginBottom: 10 }}>
+              <Stat c={c} label="총 트레이드" val={String(shadow.summary.trades || 0)} />
+              <Stat c={c} label="승 / 패" val={`${shadow.summary.wins || 0} / ${shadow.summary.losses || 0}`} />
+              <Stat c={c} label="승률" val={
+                (shadow.summary.trades > 0
+                  ? ((shadow.summary.wins || 0) / shadow.summary.trades * 100).toFixed(1) + "%"
+                  : "-")
+              } />
+              <Stat c={c} label="누적 netPnL" val={fmtUsd(shadow.summary.netPnL)}
+                color={(shadow.summary.netPnL || 0) >= 0 ? c.green : c.red} />
+              <Stat c={c} label="평균 RR" val={
+                (shadow.summary.trades > 0
+                  ? ((shadow.summary.totalRR || 0) / shadow.summary.trades).toFixed(2) + "R"
+                  : "-")
+              } />
+              <Stat c={c} label="오픈 중" val={String(shadow.openCount || 0)} />
+            </div>
+          ) : (
+            <div style={{ color: c.text3, fontSize: 12, padding: "8px 0" }}>
+              Shadow 기록 없음 — "Shadow 시작" 버튼으로 활성화하거나 "모의실행+probe" 로 테스트 진입을 만들어 보세요.
+            </div>
+          )}
+          {shadow.recent?.length > 0 && (
+            <div style={{ marginTop: 8, maxHeight: 260, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+              {shadow.recent.map((s, i) => (
+                <div key={s.id || i} style={{
+                  padding: 8, background: c.card2, borderRadius: 8, border: `1px solid ${c.border}`,
+                  fontSize: 11, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center",
+                }}>
+                  <span style={{ color: c.text3 }}>{new Date(s.openedAt).toLocaleString()}</span>
+                  <Pill color={s.status === "OPEN" ? c.blue : c.purple} bg={c.card}>{s.status}</Pill>
+                  <Pill color={c.text1} bg={c.card}>{s.signal?.symbol} {s.signal?.side}</Pill>
+                  {s.entryPrice && <span style={{ color: c.text3 }}>E {fmtUsd(s.entryPrice)}</span>}
+                  {s.exitPrice && <span style={{ color: c.text3 }}>X {fmtUsd(s.exitPrice)}</span>}
+                  {s.netPnL != null && (
+                    <span style={{ color: s.netPnL >= 0 ? c.green : c.red, fontWeight: 700 }}>
+                      {fmtUsd(s.netPnL)}
+                    </span>
+                  )}
+                  {s.closeReason && <span style={{ color: c.text3 }}>· {s.closeReason}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ marginTop: 10, fontSize: 11, color: c.text3, lineHeight: 1.6 }}>
+            Shadow 모드는 실제 주문 없이 파이프라인 전체를 기록합니다. 수수료(8bps) + 슬리피지(5bps) 비용이 반영된 netPnL 로 집계됩니다.
+          </div>
+        </Card>
+
+        {/* ── Reconcile 로그 ── */}
+        {reconcile.length > 0 && (
+          <Card c={c} title="🔄 일일 Reconcile (Binance = 진실)">
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              {reconcile.map((r, i) => (
+                <div key={i} style={{
+                  padding: 10, background: c.card2, borderRadius: 8,
+                  border: `1px solid ${c.border}`, fontSize: 12,
+                }}>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    <span style={{ color: c.text3 }}>{new Date(r.time).toLocaleString()}</span>
+                    <Pill color={(r.drift && (r.drift.missing?.length || r.drift.extra?.length || r.drift.mismatch?.length)) ? c.yellow : c.green}
+                      bg={c.card}>
+                      {(r.drift && (r.drift.missing?.length || r.drift.extra?.length || r.drift.mismatch?.length)) ? "DRIFT" : "OK"}
+                    </Pill>
+                    {r.realizedToday != null && (
+                      <span style={{ color: r.realizedToday >= 0 ? c.green : c.red, fontWeight: 700 }}>
+                        Today {fmtUsd(r.realizedToday)}
+                      </span>
+                    )}
+                  </div>
+                  {r.drift && (
+                    <div style={{ color: c.text2, fontSize: 11, marginTop: 4 }}>
+                      missing {r.drift.missing?.length || 0} · extra {r.drift.extra?.length || 0} · mismatch {r.drift.mismatch?.length || 0}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+
         {/* ── 리스크 설정 요약 (읽기 전용) ── */}
-        <Card c={c} title="⚙️ 리스크 설정 (Phase 1 프리셋)">
+        <Card c={c} title="⚙️ 리스크 설정 (Option A — 절대수익형)">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, fontSize: 12 }}>
-            <Stat c={c} label="트레이드당 리스크" val="1.5% of equity (≈$1.5)" />
-            <Stat c={c} label="최대 증거금 비율" val="40% of equity" />
-            <Stat c={c} label="레버리지 범위" val="2x ~ 10x (동적)" />
-            <Stat c={c} label="SL / TP 방식" val="ATR(14) 기반 + Binance 예약" />
-            <Stat c={c} label="허용 심볼" val="ETH, SOL, BNB, XRP, ADA, AVAX, LINK, MATIC, DOGE" />
-            <Stat c={c} label="제외 심볼" val="BTCUSDT ($100 minNotional)" />
+            <Stat c={c} label="트레이드당 리스크" val="0.8% of equity (≈$0.8)" />
+            <Stat c={c} label="최대 증거금 비율" val="35% of equity" />
+            <Stat c={c} label="레버리지 범위" val="2x ~ 5x (동적)" />
+            <Stat c={c} label="동시 포지션 한도" val="최대 2개 (상관군 분리)" />
+            <Stat c={c} label="SL / TP 방식" val="ATR(14) · 수수료+슬리피지 반영" />
+            <Stat c={c} label="최소 net RR" val="1.8R (비용 차감 후)" />
+            <Stat c={c} label="심볼 선택" val="exchangeInfo 동적 필터 + 상관군" />
+            <Stat c={c} label="최대 보유 시간" val="48시간" />
             <Stat c={c} label="일 손실 한도" val="-4%" color={c.red} />
             <Stat c={c} label="주 손실 한도" val="-8%" color={c.red} />
             <Stat c={c} label="MDD 한도" val="-15%" color={c.red} />
+            <Stat c={c} label="청산 안전버퍼" val="0.7 × liqDist" />
             <Stat c={c} label="연속손실 쿨다운" val="5회 → 24h" />
+            <Stat c={c} label="비용 가정" val="0.08% 수수료 + 0.05% 슬리피지" />
           </div>
           <div style={{ marginTop: 12, fontSize: 11, color: c.text3, lineHeight: 1.6 }}>
-            이 값들은 <code>api/_shared/risk-manager.js::RISK_CONFIG</code> 에서 관리됩니다. 변경 후 배포가 필요합니다.
+            Option A 절대수익형 프리셋 — Killswitch 기본 fail-closed, Bracket 주문 실패 시 자동 강제청산, 일일 Reconcile 포함.
+            이 값들은 <code>api/_shared/risk-manager.js::RISK_CONFIG</code> 에서 관리됩니다.
           </div>
         </Card>
 
         {/* ── 도움말 ── */}
-        <Card c={c} title="📘 안전 활성화 순서">
+        <Card c={c} title="📘 안전 활성화 순서 (권장)">
           <ol style={{ margin: 0, paddingLeft: 20, color: c.text2, fontSize: 12, lineHeight: 1.8 }}>
-            <li><b>Phase 1 등록</b> — 엔진이 이 계정을 순회 대상에 포함 (여전히 killswitch 로 잠금).</li>
-            <li><b>모의실행 (dry-run)</b> 버튼으로 전체 파이프라인이 정상 작동하는지 확인.</li>
-            <li>엔진 로그에 dry-run 결과가 찍히고 "signal → plan → result" 가 에러 없이 나오면 다음 단계.</li>
-            <li><b>Killswitch 해제</b> — 이 시점부터 5분 내 실거래 발생 가능.</li>
-            <li>오픈 포지션 / 엔진 로그 / 브레이커 상태를 주기적으로 확인.</li>
-            <li>문제 발생 시 <b>긴급 정지</b> → <b>Phase 1 해제</b> 순서로 차단.</li>
+            <li><b>모의실행+probe</b> 로 전체 파이프라인(signal → plan → bracket) 이 에러 없이 돌아가는지 확인.</li>
+            <li><b>Shadow 시작</b> — 실거래 없이 2~4주 가상 트레이드 축적, 요약 통계(승률·netPnL·평균 RR) 관찰.</li>
+            <li>Shadow 결과가 기대치(양의 netPnL, RR≥1.5) 충족 시 <b>Phase 1 등록</b>.</li>
+            <li><b>Killswitch 해제</b> — 이 시점부터 5분 내 실거래 발생 가능 (소액부터).</li>
+            <li>오픈 포지션 / 엔진 로그 / Reconcile / 브레이커 상태 주기 확인.</li>
+            <li>문제 발생 시 <b>긴급 정지</b> → <b>Phase 1 해제</b>.</li>
           </ol>
         </Card>
       </div>
