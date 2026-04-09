@@ -184,13 +184,21 @@ export function extractSignal({ asset, signal, source, stratName }, opts = {}) {
  * 기준: confidence 우선 → score → sizeHint
  */
 export function pickBestSignal(signals) {
+  const ranked = rankSignals(signals);
+  return ranked[0] || null;
+}
+
+/**
+ * confidence/score/sizeHint 기준으로 모든 valid 시그널을 순위화.
+ * engine 이 1순위 reject 시 차순위로 fallback 할 수 있도록 사용.
+ */
+export function rankSignals(signals) {
   const valid = (signals || []).filter(Boolean);
-  if (!valid.length) return null;
   return valid.sort((a, b) => {
     if (b.confidence !== a.confidence) return b.confidence - a.confidence;
     if (b.score !== a.score) return b.score - a.score;
     return (b.sizeHint || 0) - (a.sizeHint || 0);
-  })[0];
+  });
 }
 
-export default { extractSignal, pickBestSignal, normalizeAssetKey, ASSET_TO_SYMBOL, PHASE1_ALLOWED_SYMBOLS, classifyStrategyFamily };
+export default { extractSignal, pickBestSignal, rankSignals, normalizeAssetKey, ASSET_TO_SYMBOL, PHASE1_ALLOWED_SYMBOLS, classifyStrategyFamily };

@@ -4,20 +4,21 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { ALL_STRATEGIES } from "./strategies.js";
 
+// Zepta tokens.css 와 동기화 (dark)
 const C = {
-  bg: "#070C14", card: "#0F1825", card2: "#141E2E",
-  border: "#1A2535", border2: "#243044",
-  blue: "#3182F6", blueL: "#5AA3FF", blueBg: "#1A2C4F",
-  red: "#F04452", redBg: "#2A1520",
-  green: "#05C072", greenBg: "#0A2A1A",
-  yellow: "#FFB400", yellowBg: "#2A2000",
-  purple: "#8B5CF6", purpleBg: "#1E1535",
+  bg: "#070B14", card: "#101828", card2: "#161F33",
+  border: "#1E2A42", border2: "#2A3A58",
+  blue: "#3B82F6", blueL: "#60A5FA", blueBg: "#0F1F3D",
+  red: "#FF4D64", redBg: "#2C1520",
+  green: "#10D884", greenBg: "#0B2E1E",
+  yellow: "#FFB020", yellowBg: "#2B2100",
+  purple: "#9B6FFF", purpleBg: "#201840",
   orange: "#FF6B2C",
-  text1: "#F2F4F7", text2: "#A0AEBF", text3: "#5A6880",
+  text1: "#F1F5FB", text2: "#9AA7BD", text3: "#64728C",
 };
 
 const CAT_COLORS = {
-  "추세추종": "#3182F6", "평균회귀": "#8B5CF6", "모멘텀": "#FFB400", "변동성": "#F04452",
+  "추세추종": "#3B82F6", "평균회귀": "#9B6FFF", "모멘텀": "#FFB020", "변동성": "#FF4D64",
 };
 
 // ══════════════════════════════════════════════════════════════

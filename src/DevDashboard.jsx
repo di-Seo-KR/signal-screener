@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
 
+// Zepta tokens.css 와 동기화
 const colors = {
   dark: {
-    bg: "#0a0e17", card: "#141924", card2: "#1a2235", border: "#1f2a3d",
-    text1: "#e8ecf4", text2: "#8892a6", text3: "#5a6478",
-    green: "#22c55e", red: "#ef4444", yellow: "#f59e0b", blue: "#3b82f6",
-    orange: "#f97316", purple: "#a855f7",
+    bg: "#070B14", card: "#101828", card2: "#161F33", border: "#1E2A42",
+    text1: "#F1F5FB", text2: "#9AA7BD", text3: "#64728C",
+    green: "#10D884", red: "#FF4D64", yellow: "#FFB020", blue: "#3B82F6",
+    orange: "#FF6B2C", purple: "#9B6FFF",
   },
 };
 

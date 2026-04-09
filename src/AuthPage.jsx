@@ -5,22 +5,23 @@
 import { useState, useCallback } from "react";
 import { useAuth } from "./AuthProvider.jsx";
 
+// Zepta tokens.css 와 동기화
 const DARK = {
-  bg: "#0B0F19", card: "#131B2E", card2: "#1A2438",
-  border: "#1F2E42", border2: "#2A3F58",
-  blue: "#3B8BFF", blueL: "#64ABFF", blueBg: "#182D54",
-  red: "#FF4D5E", redBg: "#2C1520",
-  green: "#00D47E", greenBg: "#0B2E1E",
-  text1: "#F0F2F7", text2: "#94A3B8", text3: "#64748B",
+  bg: "#070B14", card: "#101828", card2: "#161F33",
+  border: "#1E2A42", border2: "#2A3A58",
+  blue: "#3B82F6", blueL: "#60A5FA", blueBg: "#0F1F3D",
+  red: "#FF4D64", redBg: "#2C1520",
+  green: "#10D884", greenBg: "#0B2E1E",
+  text1: "#F1F5FB", text2: "#9AA7BD", text3: "#64728C",
   isDark: true,
 };
 const LIGHT = {
-  bg: "#F8F9FB", card: "#FFFFFF", card2: "#F1F3F6",
-  border: "#E2E5EA", border2: "#D1D5DC",
-  blue: "#2563EB", blueL: "#3B82F6", blueBg: "#DBEAFE",
-  red: "#DC2626", redBg: "#FEF2F2",
-  green: "#16A34A", greenBg: "#F0FDF4",
-  text1: "#0F172A", text2: "#475569", text3: "#94A3B8",
+  bg: "#F6F8FC", card: "#FFFFFF", card2: "#F1F4F9",
+  border: "#E2E6EF", border2: "#D0D6E1",
+  blue: "#2563EB", blueL: "#3B82F6", blueBg: "#E8F1FE",
+  red: "#E11D48", redBg: "#FFF0F1",
+  green: "#059B64", greenBg: "#EDFBF2",
+  text1: "#0A1224", text2: "#4C5870", text3: "#7D889D",
   isDark: false,
 };
 

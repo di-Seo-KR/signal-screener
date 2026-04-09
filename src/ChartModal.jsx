@@ -152,19 +152,20 @@ function aggregateCandles(candles, factor) {
 }
 
 // ── colors — dark / light
+// Zepta tokens.css 와 동기화
 const CC_DARK = {
-  bg: "#0A0E17", card: "#111927", card2: "#1A2332",
-  border: "#1E2D3D", border2: "#283B50",
-  blue: "#3182F6", green: "#05C072", red: "#F04452", yellow: "#FFB400",
-  text1: "#F7F8FA", text2: "#B0BEC5", text3: "#6B7D8E",
-  gridColor: "#1c2128", crossColor: "#3d4f63", labelBg: "#1f6feb", chartText: "#8b949e",
+  bg: "#070B14", card: "#101828", card2: "#161F33",
+  border: "#1E2A42", border2: "#2A3A58",
+  blue: "#3B82F6", green: "#10D884", red: "#FF4D64", yellow: "#FFB020",
+  text1: "#F1F5FB", text2: "#9AA7BD", text3: "#64728C",
+  gridColor: "#1E2A42", crossColor: "#3B4D6D", labelBg: "#3B82F6", chartText: "#9AA7BD",
 };
 const CC_LIGHT = {
-  bg: "#F5F6F8", card: "#FFFFFF", card2: "#F0F2F5",
-  border: "#E0E3E8", border2: "#D0D4DB",
-  blue: "#2563EB", green: "#16A34A", red: "#DC2626", yellow: "#D97706",
-  text1: "#111827", text2: "#4B5563", text3: "#9CA3AF",
-  gridColor: "#E5E7EB", crossColor: "#9CA3AF", labelBg: "#2563EB", chartText: "#6B7280",
+  bg: "#F6F8FC", card: "#FFFFFF", card2: "#F1F4F9",
+  border: "#E2E6EF", border2: "#D0D6E1",
+  blue: "#2563EB", green: "#059B64", red: "#E11D48", yellow: "#D08300",
+  text1: "#0A1224", text2: "#4C5870", text3: "#7D889D",
+  gridColor: "#E2E6EF", crossColor: "#B7C0CE", labelBg: "#2563EB", chartText: "#7D889D",
 };
 
 // Chart options (theme-aware)

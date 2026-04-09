@@ -2,23 +2,24 @@
 // 8-Point CP 시스템 + 시장 데이터 동적 연동 + 트렌드 히스토리 + 포트폴리오 영향도
 import { useState, useMemo } from "react";
 
+// Zepta tokens.css 와 동기화 (dark)
 const C = {
-  bg: "#070C14", card: "#0F1825", card2: "#141E2E",
-  border: "#1A2535", border2: "#243044",
-  blue: "#3182F6", blueBg: "#1A2C4F",
-  red: "#F04452", redBg: "#2A1520",
-  green: "#05C072", greenBg: "#0A2A1A",
-  yellow: "#FFB400", yellowBg: "#2A2000",
-  purple: "#8B5CF6",
+  bg: "#070B14", card: "#101828", card2: "#161F33",
+  border: "#1E2A42", border2: "#2A3A58",
+  blue: "#3B82F6", blueBg: "#0F1F3D",
+  red: "#FF4D64", redBg: "#2C1520",
+  green: "#10D884", greenBg: "#0B2E1E",
+  yellow: "#FFB020", yellowBg: "#2B2100",
+  purple: "#9B6FFF",
   orange: "#FF6B2C",
-  text1: "#F2F4F7", text2: "#A0AEBF", text3: "#5A6880",
+  text1: "#F1F5FB", text2: "#9AA7BD", text3: "#64728C",
 };
 
 const SEV = {
-  CRITICAL: { label: "CRITICAL", color: "#F04452", glow: "#F0445233" },
+  CRITICAL: { label: "CRITICAL", color: "#FF4D64", glow: "#FF4D6433" },
   HIGH:     { label: "HIGH",     color: "#FF6B2C", glow: "#FF6B2C33" },
-  MODERATE: { label: "MODERATE", color: "#FFB400", glow: "#FFB40033" },
-  LOW:      { label: "LOW",      color: "#05C072", glow: "#05C07233" },
+  MODERATE: { label: "MODERATE", color: "#FFB020", glow: "#FFB02033" },
+  LOW:      { label: "LOW",      color: "#10D884", glow: "#10D88433" },
 };
 
 // ── 8-Point CP 리스크 평가 (시장 데이터 기반 동적 산출) ──

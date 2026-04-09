@@ -22,7 +22,7 @@
 // cron 기본 동작 (GET): phase1_enabled 유저 순회, 실전 집행.
 
 import { loadUserCredentials, respondError } from "../_shared/binance-auth.js";
-import { extractSignal, pickBestSignal } from "../_shared/signal-extractor.js";
+import { extractSignal, pickBestSignal, rankSignals } from "../_shared/signal-extractor.js";
 import { planTrade, RISK_CONFIG } from "../_shared/risk-manager.js";
 import { preTradeCheck } from "../_shared/circuit-breaker.js";
 import { getSymbolFilter, isSymbolAffordable } from "../_shared/exchange-info.js";
@@ -220,11 +220,13 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   } else {
     S(`dry-run: skipping equity fetch (no creds)`);
   }
-  if (equity < 20 && !forceDryRun) {
-    S("equity < $20 — skip");
-    return { ok: true, userId, ran: false, reason: "insufficient equity", equity, steps };
+  // Phase 1 최저 원금 = $200 (BTCUSDT minNotional $100 거래 가능 + 안전 마진)
+  if (equity < 200 && !forceDryRun) {
+    S(`equity < $200 — skip (Phase 1 minimum)`);
+    return { ok: true, userId, ran: false, reason: "insufficient equity (min $200)", equity, steps };
   }
-  const effectiveEquity = equity > 0 ? equity : (forceDryRun ? 100 : 0); // dry run fallback $100 simulation
+  // dry run fallback: $1000 — 모든 메이저 알트 + BTC 거래 시뮬 가능
+  const effectiveEquity = equity > 0 ? equity : (forceDryRun ? 1000 : 0);
   if (forceDryRun && equity <= 0) S(`dry-run: using $${effectiveEquity} fallback equity`);
 
   // 4) 서킷브레이커 — dry run 은 조회만 하고 차단은 안 함
@@ -267,52 +269,52 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     .map((r) => extractSignal(r, { strict: !forceDryRun }))
     .filter(Boolean);
   S(`canonical=${canonical.length}`);
-  const best = pickBestSignal(canonical);
-  if (!best) {
+  const ranked = rankSignals(canonical);
+  if (!ranked.length) {
     return { ok: true, userId, ran: false, reason: "no valid canonical signal", diag, steps };
   }
-  S(`picked: ${best.symbol} ${best.side} conf=${best.confidence} fam=${best.strategyFamily}`);
 
-  // 7) 가격 + ATR
-  let price, atr;
-  try {
-    const tick = await getTickerPrice({ symbol: best.symbol });
-    price = parseFloat(tick.price);
-  } catch (e) {
-    S(`price fetch failed: ${e.message}`);
-    return { ok: false, userId, ran: false, error: e.message, steps };
-  }
-  const klInterval = best.timeframe === "1h" ? "1h" : best.timeframe === "1d" ? "1d" : "4h";
-  atr = await computeAtr(best.symbol, klInterval, 14);
-  if (!atr || atr <= 0) {
-    atr = defaultAtrApprox(price);
-    S(`price=${price} atr≈${atr.toFixed(4)} (fallback 1.5%)`);
-  } else {
-    S(`price=${price} atr(${klInterval},14)=${atr.toFixed(4)}`);
-  }
+  // 7-9) ★ ranked 시그널 순회 — 1순위가 affordability/risk reject 되어도
+  // 차순위로 fallback. 첫 번째로 plan.ok 가 나오는 시그널을 채택.
+  let best = null, price = null, atr = null, filter = null, plan = null;
+  const tried = [];
+  for (const cand of ranked.slice(0, 6)) {  // 최대 6개 시도
+    S(`try: ${cand.symbol} ${cand.side} conf=${cand.confidence} fam=${cand.strategyFamily}`);
+    try {
+      const tick = await getTickerPrice({ symbol: cand.symbol });
+      const pr = parseFloat(tick.price);
+      const klInterval = cand.timeframe === "1h" ? "1h" : cand.timeframe === "1d" ? "1d" : "4h";
+      let a = await computeAtr(cand.symbol, klInterval, 14);
+      if (!a || a <= 0) a = defaultAtrApprox(pr);
 
-  // 8) 심볼 필터 (동적 exchangeInfo)
-  let filter;
-  try {
-    filter = await getSymbolFilter(best.symbol);
-  } catch (e) {
-    S(`symFilter failed: ${e.message}`);
-    return { ok: false, userId, ran: false, error: e.message, steps };
+      const f = await getSymbolFilter(cand.symbol);
+      if (!isSymbolAffordable({ equity: effectiveEquity, filter: f, cfg: RISK_CONFIG })) {
+        S(`  ↳ unaffordable (minNotional=${f.minNotional}, equity=${effectiveEquity})`);
+        tried.push({ symbol: cand.symbol, reason: "unaffordable" });
+        continue;
+      }
+      const p = planTrade({ signal: cand, equity: effectiveEquity, price: pr, atr: a, filter: f, cfg: RISK_CONFIG });
+      if (!p.ok) {
+        S(`  ↳ risk reject: ${p.reason}`);
+        tried.push({ symbol: cand.symbol, reason: p.reason });
+        continue;
+      }
+      // 채택!
+      best = cand; price = pr; atr = a; filter = f; plan = p;
+      S(`✓ picked: ${cand.symbol} ${cand.side} (after ${tried.length} reject${tried.length === 1 ? "" : "s"})`);
+      break;
+    } catch (e) {
+      S(`  ↳ error: ${e.message}`);
+      tried.push({ symbol: cand.symbol, reason: e.message });
+      continue;
+    }
   }
-
-  // minNotional 감당 가능 여부 체크 (Critical #5)
-  if (!isSymbolAffordable({ equity: effectiveEquity, filter, cfg: RISK_CONFIG })) {
-    S(`symbol ${best.symbol} unaffordable (minNotional=${filter.minNotional} vs equity=${effectiveEquity})`);
-    return { ok: true, userId, ran: false, reason: "symbol unaffordable at current equity", steps };
-  }
-
-  // 9) 리스크 플랜 (수수료+슬리피지 반영됨)
-  const plan = planTrade({
-    signal: best, equity: effectiveEquity, price, atr, filter, cfg: RISK_CONFIG,
-  });
-  if (!plan.ok) {
-    S(`risk reject: ${plan.reason}`);
-    return { ok: true, userId, ran: false, reason: plan.reason, rejected: true, steps, riskLog: plan.log };
+  if (!best || !plan) {
+    return {
+      ok: true, userId, ran: false,
+      reason: `all ${tried.length} signals rejected`,
+      rejected: true, tried, steps,
+    };
   }
   S(`plan: qty=${plan.plan.qty} notional=$${plan.plan.notional.toFixed(2)} lev=${plan.plan.leverage}x margin=$${plan.plan.marginRequired.toFixed(2)}`);
   S(`SL=${plan.plan.slPrice} TP=${plan.plan.tpPrice} effRR=${plan.plan.effectiveRR?.toFixed(2) || "?"}`);

@@ -1344,43 +1344,44 @@ function fmtPrice(price, market) {
 // 색상 팔레트 — 다크 / 라이트 테마
 // ════════════════════════════════════════════════════════════════════
 const THEME_KEY = "ss_theme";
+// Zepta 토큰(tokens.css)과 hex 값을 1:1 동기화. 두 시스템이 시각적으로 일치하도록 유지.
+// 알파 hex 합성(`${C.blue}22`)을 위해 var()가 아닌 hex 를 그대로 둠.
 const DARK = {
-  bg: "#0B0F19", card: "#131B2E", card2: "#1A2438",
-  border: "#1F2E42", border2: "#2A3F58",
-  blue: "#3B8BFF", blueL: "#64ABFF", blueBg: "#182D54",
-  red: "#FF4D5E", redBg: "#2C1520",
-  green: "#00D47E", greenBg: "#0B2E1E",
-  yellow: "#FFC233", yellowBg: "#2B2100",
+  bg: "#070B14", card: "#101828", card2: "#161F33",
+  border: "#1E2A42", border2: "#2A3A58",
+  blue: "#3B82F6", blueL: "#60A5FA", blueBg: "#0F1F3D",
+  red: "#FF4D64", redBg: "#2C1520",
+  green: "#10D884", greenBg: "#0B2E1E",
+  yellow: "#FFB020", yellowBg: "#2B2100",
   purple: "#9B6FFF", purpleBg: "#201840",
   orange: "#FF6B2C",
-  text1: "#F0F2F7", text2: "#94A3B8", text3: "#64748B",
+  text1: "#F1F5FB", text2: "#9AA7BD", text3: "#64728C",
   isDark: true,
 };
 const LIGHT = {
-  // 따뜻한 웜그레이 기반 — 눈 피로 최소화 (토스/카카오뱅크 참조)
-  bg: "#F2F3F6",       // 따뜻한 라이트그레이 (순백 X)
-  card: "#FAFBFC",     // 거의 흰색이지만 약간 웜톤
-  card2: "#ECEEF3",    // 카드 내부 구분용
-  border: "#DCDFE6",   // 부드러운 경계
-  border2: "#C5C9D2",  // 강한 경계
-  blue: "#3182F6",     // 토스 블루 — 선명하지만 눈 안 아픔
-  blueL: "#4C9AFF",
+  // 토스/카카오뱅크 라이트모드 톤 — Zepta light 토큰과 동기화
+  bg: "#F6F8FC",
+  card: "#FFFFFF",
+  card2: "#F1F4F9",
+  border: "#E2E6EF",
+  border2: "#D0D6E1",
+  blue: "#2563EB",
+  blueL: "#3B82F6",
   blueBg: "#E8F1FE",
-  red: "#F04452",      // 부드러운 레드
+  red: "#E11D48",
   redBg: "#FFF0F1",
-  green: "#1DAA5A",    // 부드러운 그린
+  green: "#059B64",
   greenBg: "#EDFBF2",
-  yellow: "#CC7B1A",   // 따뜻한 앰버
+  yellow: "#D08300",
   yellowBg: "#FFF9EC",
-  purple: "#6E56CF",   // 부드러운 퍼플
+  purple: "#7C3AED",
   purpleBg: "#F0EDFF",
   orange: "#E8590C",
-  text1: "#191F28",    // 거의 블랙 (순검정 X — 눈 피로 방지)
-  text2: "#4E5968",    // 중간 그레이 — 가독성 ↑
-  text3: "#8B95A1",    // 연한 그레이 — 캡션/보조
+  text1: "#0A1224",
+  text2: "#4C5870",
+  text3: "#7D889D",
   isDark: false,
-  // 라이트모드 전용: 카드 그림자 (border 대신 shadow로 깊이감)
-  cardShadow: "0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.03)",
+  cardShadow: "0 2px 10px rgba(15,23,42,0.08), 0 1px 2px rgba(15,23,42,0.04)",
 };
 function loadTheme() { try { return localStorage.getItem(THEME_KEY) || "dark"; } catch { return "dark"; } }
 // C will be set dynamically in App component and passed through context
