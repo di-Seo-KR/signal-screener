@@ -622,7 +622,21 @@
       "checkTomorrow": "Check back tomorrow for results",
       "bullish": "Bullish",
       "bearishPred": "Bearish",
-      "kosdaqLabel": "KOSDAQ"
+      "kosdaqLabel": "KOSDAQ",
+      "dowLabel": "Dow Jones",
+      "usdkrwLabel": "USD/KRW",
+      "dailyQuiz": "Daily Quiz",
+      "quizCorrect": "Correct!",
+      "quizWrong": "Not quite!",
+      "correctAnswer": "Answer",
+      "quizTomorrow": "A new quiz awaits tomorrow",
+      "investBadges": "Investment Badges",
+      "badgeStreak3": "3-Day Streak",
+      "badgeStreak7": "7-Day Streak",
+      "badgePredictor": "5 Predictions",
+      "badgeScholar": "Quiz Master",
+      "badgeAnalyst": "Analyst",
+      "badgeChampion": "Champion"
     },
     "screener": {
       "title": "Stock Screener",

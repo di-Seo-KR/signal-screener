@@ -622,7 +622,21 @@
       "checkTomorrow": "내일 결과를 확인하세요",
       "bullish": "상승",
       "bearishPred": "하락",
-      "kosdaqLabel": "코스닥"
+      "kosdaqLabel": "코스닥",
+      "dowLabel": "다우존스",
+      "usdkrwLabel": "원/달러",
+      "dailyQuiz": "오늘의 퀴즈",
+      "quizCorrect": "정답입니다!",
+      "quizWrong": "아쉽네요!",
+      "correctAnswer": "정답",
+      "quizTomorrow": "내일 새로운 퀴즈가 준비됩니다",
+      "investBadges": "투자 뱃지",
+      "badgeStreak3": "3일 연속",
+      "badgeStreak7": "7일 연속",
+      "badgePredictor": "예측 5회",
+      "badgeScholar": "퀴즈 마스터",
+      "badgeAnalyst": "분석가",
+      "badgeChampion": "챔피언"
     },
     "screener": {
       "title": "주식 골라보기",
