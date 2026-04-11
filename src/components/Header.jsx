@@ -178,10 +178,10 @@ export default memo(function Header({
   /* ── 아바타 ── */
   const Avatar = ({ size = 28 }) => {
     const url = user?.user_metadata?.avatar_url;
-    const initial = (user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase();
+    const initial = (user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase();
     return (
       <div className={cn(
-        "flex items-center justify-center rounded-full bg-primary/10 text-primary font-bold shrink-0",
+        "flex items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/70 text-white font-bold shrink-0 ring-2 ring-primary/20 transition-all",
       )} style={{ width: size, height: size, fontSize: size * 0.55 }}>
         {url
           ? <img src={url} alt="" className="rounded-full object-cover" style={{ width: size, height: size }} />
@@ -191,7 +191,7 @@ export default memo(function Header({
     );
   };
 
-  const displayName = user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User";
+  const displayName = user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User";
 
   return (
     <>
@@ -300,7 +300,7 @@ export default memo(function Header({
           </div>
 
           {/* ── 중앙: 데스크탑 GNB ── */}
-          <nav className="hidden lg:flex items-center gap-1.5 flex-1 ml-6">
+          <nav className="hidden lg:flex items-center gap-1 flex-1 justify-center">
             {NAV_CATEGORIES.map((cat) => {
               const isActive = activeCategory === cat.catId;
 
@@ -372,89 +372,91 @@ export default memo(function Header({
             })}
           </nav>
 
-          {/* ── 우측: 검색 + 사용자 ── */}
-          <div className="flex items-center gap-1.5">
-            {/* 검색 */}
-            <Button variant="outline" size="default"
-              onClick={() => setGlobalSearchOpen(true)}
-              className="gap-1.5 text-muted-foreground hidden sm:inline-flex"
-            >
-              <Search className="size-4" />
-              <span className="text-sm">{t("common.search")}</span>
-              <kbd className="ml-1 rounded bg-muted px-1 py-0.5 text-[10px] font-mono">/</kbd>
-            </Button>
+          {/* ── 우측: 검색 + 언어 + 사용자 ── */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* 검색 — 미니멀 아이콘 버튼 (데스크탑에서는 확장형) */}
             <Button variant="ghost" size="icon-sm"
               onClick={() => setGlobalSearchOpen(true)}
-              className="sm:hidden text-muted-foreground"
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              title="Search (⌘K)"
             >
-              <Search className="size-4" />
+              <Search className="size-5" />
             </Button>
 
-            {/* 언어 토글 — GNB 직접 노출 (모바일+데스크탑) */}
+            {/* 검색 확장형 — 데스크탑만 */}
+            <Button variant="outline" size="default"
+              onClick={() => setGlobalSearchOpen(true)}
+              className="gap-2 text-muted-foreground hidden sm:inline-flex px-3 py-1.5 h-9"
+            >
+              <span className="text-sm font-medium">{t("common.search")}</span>
+              <kbd className="rounded px-1.5 py-0.5 text-[10px] font-mono bg-muted text-muted-foreground">/</kbd>
+            </Button>
+
+            {/* 언어 토글 — 모던 피루 스타일 */}
             <button
               onClick={() => setLang(lang === "ko" ? "en" : "ko")}
-              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-bold rounded-full border border-border/50 hover:bg-muted/50 transition-colors text-muted-foreground"
+              className="inline-flex items-center px-3 py-1.5 h-9 text-xs font-semibold rounded-full bg-muted/50 hover:bg-muted border border-border/40 transition-all duration-200 text-muted-foreground hover:text-foreground"
+              title={lang === "ko" ? "Switch to English" : "한국어로 전환"}
             >
-              🌐 {lang === "ko" ? "EN" : "KR"}
+              {lang === "ko" ? "EN" : "KR"}
             </button>
 
             {/* 데스크탑: 사용자 드롭다운 */}
             {user ? (
               <CssDropdown
                 align="end"
-                className="min-w-[200px]"
+                className="min-w-[220px]"
                 trigger={({ open, toggle }) => (
                   <Button variant="ghost" size="default" onClick={toggle}
-                    className="hidden lg:inline-flex gap-2 pl-1.5 pr-2.5">
-                    <Avatar size={30} />
-                    <span className="max-w-[100px] truncate text-sm text-muted-foreground">{displayName}</span>
-                    <ChevronDown className={cn("size-3.5 opacity-50 transition-transform", open && "rotate-180")} />
+                    className="hidden lg:inline-flex gap-2.5 pl-1 pr-3 h-9 hover:bg-muted/50"
+                  >
+                    <Avatar size={32} />
+                    <span className="max-w-[110px] truncate text-sm font-medium text-foreground">{displayName}</span>
                   </Button>
                 )}
               >
                 {(close) => (
                   <>
-                    <div className="px-2 py-1.5">
+                    <div className="px-3 py-2.5 border-b border-border/20">
                       <div className="font-semibold text-sm text-foreground">{displayName}</div>
-                      <div className="text-xs text-muted-foreground">{user?.email}</div>
+                      <div className="text-xs text-muted-foreground mt-0.5 truncate">{user?.email}</div>
                     </div>
-                    <Separator className="my-1" />
                     <CssDropdownItem onClick={() => { navigate("profile"); close(); }}>
-                      <User className="size-4" />{t("header.profile")}
+                      <User className="size-4" /><span>{t("header.profile")}</span>
                     </CssDropdownItem>
                     <CssDropdownItem onClick={() => { navigate("auto-trading"); close(); }}>
-                      <Bot className="size-4" />{t("header.botStatus")}
+                      <Bot className="size-4" /><span>{t("header.botStatus")}</span>
                     </CssDropdownItem>
                     {isOwner && (
                       <CssDropdownItem onClick={() => { navigate("real-trading"); close(); }}>
-                        <Activity className="size-4" />{t("header.liveTrading")}
+                        <Activity className="size-4" /><span>{t("header.liveTrading")}</span>
                       </CssDropdownItem>
                     )}
                     <CssDropdownItem onClick={() => { navigate("portfolio"); close(); }}>
-                      <Briefcase className="size-4" />{t("nav.portfolio")}
+                      <Briefcase className="size-4" /><span>{t("nav.portfolio")}</span>
                     </CssDropdownItem>
-                    <Separator className="my-1" />
+                    <div className="border-t border-border/20 my-1" />
                     <CssDropdownItem onClick={() => { toggleTheme(); close(); }}>
                       {themeMode === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
-                      {themeMode === "dark" ? t("header.lightMode") : t("header.darkMode")}
+                      <span>{themeMode === "dark" ? t("header.lightMode") : t("header.darkMode")}</span>
                     </CssDropdownItem>
-                    <Separator className="my-1" />
+                    <div className="border-t border-border/20 my-1" />
                     <CssDropdownItem variant="destructive" onClick={() => {
                       if (confirm(t("header.logout") + "?")) { signOut(); close(); }
                     }}>
-                      <LogOut className="size-4" />{t("header.logout")}
+                      <LogOut className="size-4" /><span>{t("header.logout")}</span>
                     </CssDropdownItem>
                   </>
                 )}
               </CssDropdown>
             ) : (
               <>
-                <Button size="default" onClick={() => setShowAuthModal(true)} className="hidden lg:inline-flex text-sm">
+                <Button size="default" onClick={() => setShowAuthModal(true)} className="hidden lg:inline-flex text-sm h-9">
                   {t("header.login")}
                 </Button>
                 <Button variant="ghost" size="icon-sm" onClick={toggleTheme}
-                  className="hidden lg:inline-flex text-muted-foreground">
-                  {themeMode === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                  className="hidden lg:inline-flex text-muted-foreground hover:text-foreground">
+                  {themeMode === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
                 </Button>
               </>
             )}

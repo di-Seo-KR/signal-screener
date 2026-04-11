@@ -11,6 +11,142 @@ import AuthPage from "./AuthPage.jsx";
 import { CoupangOfficialBanner, CoupangSearchWidget, CoupangInterstitial, GoogleAd, GoogleAdInterstitial } from "./AdBanner.jsx";
 import Header from "./components/Header.jsx";
 import PortfolioTab from "./components/PortfolioTab.jsx";
+import { supabase } from "./supabaseClient.js";
+
+// ════════════════════════════════════════════════════════════════════
+// 닉네임 생성 및 관리 유틸
+// ════════════════════════════════════════════════════════════════════
+const generateRandomNickname = () => {
+  const adjectives = ["용감한", "똑똑한", "빠른", "현명한", "대담한", "차분한", "활발한", "침착한", "꼼꼼한", "의리있는", "따뜻한", "신뢰할수있는"];
+  const animals = ["호랑이", "독수리", "고래", "사자", "여우", "늑대", "매", "곰", "상어", "팬더", "치타", "원수"];
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const animal = animals[Math.floor(Math.random() * animals.length)];
+  return `${adj}${animal}${Math.floor(Math.random() * 100)}`;
+};
+
+/* ── 닉네임 에디터 컴포넌트 ── */
+function NicknameEditor({ user, supabase, onUpdate }) {
+  const [editing, setEditing] = useState(false);
+  const [nickname, setNickname] = useState(user?.user_metadata?.nickname || "");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleGenerateRandom = async () => {
+    const newNickname = generateRandomNickname();
+    setNickname(newNickname);
+    await handleSave(newNickname);
+  };
+
+  const handleSave = async (nickValue = nickname) => {
+    if (!nickValue.trim()) {
+      setError("닉네임을 입력해주세요");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const { error: err } = await supabase.auth.updateUser({
+        data: { nickname: nickValue }
+      });
+      if (err) throw err;
+      setEditing(false);
+      if (onUpdate) onUpdate();
+    } catch (err) {
+      setError(err?.message || "저장 실패");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancel = () => {
+    setNickname(user?.user_metadata?.nickname || "");
+    setEditing(false);
+    setError(null);
+  };
+
+  const isDirty = nickname !== (user?.user_metadata?.nickname || "");
+
+  const C = {
+    card: "var(--color-card, #1a1f2e)",
+    border: "var(--color-border, #2a3f5f)",
+    blue: "var(--color-blue, #3182f6)",
+    text1: "var(--color-text1, #f7f8fa)",
+    text3: "var(--color-text3, #6b7d8e)",
+  };
+
+  return (
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden" }}>
+      <div className="px-5 py-3.5 text-sm font-bold text-muted-foreground uppercase tracking-wider">닉네임</div>
+      {!editing ? (
+        <div className="flex justify-between items-center px-5 py-3.5 border-t" style={{ borderTopColor: `${C.border}20` }}>
+          <span className="text-base font-semibold text-foreground">{user?.user_metadata?.nickname || "미설정"}</span>
+          <button
+            onClick={() => setEditing(true)}
+            style={{
+              padding: "6px 14px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
+              background: C.blue, color: "#fff", border: "none", cursor: "pointer",
+            }}
+          >
+            편집
+          </button>
+        </div>
+      ) : (
+        <div className="px-5 py-4 border-t" style={{ borderTopColor: `${C.border}20` }}>
+          <div className="flex gap-2 mb-3">
+            <input
+              type="text"
+              value={nickname}
+              onChange={(e) => { setNickname(e.target.value); setError(null); }}
+              placeholder="닉네임 입력"
+              style={{
+                flex: 1, padding: "8px 12px", borderRadius: "8px",
+                border: `1px solid ${C.border}40`, background: "transparent",
+                color: C.text1, fontSize: "14px",
+              }}
+            />
+            <button
+              onClick={handleGenerateRandom}
+              disabled={loading}
+              style={{
+                padding: "8px 12px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                background: "transparent", color: C.blue, border: `1px solid ${C.blue}40`,
+                cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1,
+              }}
+            >
+              🎲 생성
+            </button>
+          </div>
+          {error && <div style={{ fontSize: "13px", color: "#ef4444", marginBottom: "10px" }}>{error}</div>}
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleSave()}
+              disabled={loading || !isDirty}
+              style={{
+                flex: 1, padding: "8px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
+                background: isDirty && !loading ? C.blue : `${C.blue}40`, color: "#fff",
+                border: "none", cursor: isDirty && !loading ? "pointer" : "not-allowed",
+                opacity: isDirty && !loading ? 1 : 0.5,
+              }}
+            >
+              {loading ? "저장중..." : "저장"}
+            </button>
+            <button
+              onClick={handleCancel}
+              disabled={loading}
+              style={{
+                flex: 1, padding: "8px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
+                background: "transparent", color: C.text3, border: `1px solid ${C.border}40`,
+                cursor: "pointer",
+              }}
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ════════════════════════════════════════════════════════════════════
 // ErrorBoundary — 런타임 에러 시 앱 전체 크래시 방지
@@ -10203,17 +10339,20 @@ function AppInner() {
               <div style={{
                 background: `linear-gradient(135deg, ${C.blue}, ${C.purple || "#a855f7"})`,
                 boxShadow: `0 4px 20px ${C.blue}40`,
-              }} className="w-[72px] h-[72px] rounded-full flex items-center justify-center mx-auto mb-4 text-[28px] font-black text-white">
+              }} className="w-[72px] h-[72px] rounded-full flex items-center justify-center mx-auto mb-4 text-[28px] font-black text-white ring-2 ring-primary/20">
                 {(user?.user_metadata?.avatar_url)
                   ? <img src={user.user_metadata.avatar_url} alt="" className="w-[72px] h-[72px] rounded-full object-cover" />
-                  : (user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()
+                  : (user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()
                 }
               </div>
               <h2 className="m-0 mb-1 text-xl font-black text-foreground">
-                {user?.user_metadata?.display_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User"}
+                {user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User"}
               </h2>
               <div className="text-base text-muted-foreground">{user?.email || ""}</div>
             </div>
+
+            {/* 닉네임 설정 */}
+            <NicknameEditor user={user} supabase={supabase} onUpdate={() => {}} />
 
             {/* 계정 정보 */}
             <div style={{ background: C.card, border: `1px solid ${C.border}` }} className="rounded-[16px] overflow-hidden">
