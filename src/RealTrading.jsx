@@ -83,6 +83,12 @@ function RealTradingInner() {
   const [confirm, setConfirm] = useState(null);
   const timerRef = useRef(null);
   const [lastRefresh, setLastRefresh] = useState(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const h = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
 
   useEffect(() => {
     try { localStorage.setItem("zepta:rt:density", density); } catch {}
@@ -863,7 +869,7 @@ function RealTradingInner() {
         </div>
 
         {section === "dashboard" && (
-          <div style={{ display: "grid", gap: 14, gridTemplateColumns: density === "pro" ? "minmax(0, 2fr) minmax(0, 1fr)" : "1fr" }}>
+          <div style={{ display: "grid", gap: 14, gridTemplateColumns: (density === "pro" && !isMobile) ? "minmax(0, 2fr) minmax(0, 1fr)" : "1fr" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {positionsCard}
               {engineLogCard}
