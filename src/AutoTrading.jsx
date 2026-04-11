@@ -408,7 +408,7 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
       ) : (
         /* PC: 기존 그리드 */
         <div className="grid gap-4" style={{
-          gridTemplateColumns: "repeat(auto-fill, minmax(min(340px, 100%), 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))",
         }}>
           {bots.map((bot) => (
             <BotCard key={bot.id} bot={bot} onActivate={onActivate} theme={theme} />
@@ -688,7 +688,7 @@ function BotCatalog({ onActivate, theme, isMobile }) {
     <div className="pb-6 px-1">
       {/* Hero Section */}
       <div
-        className="mb-6 text-center rounded-2xl"
+        className="mb-6 text-center rounded-2xl max-w-3xl mx-auto"
         style={{
           background: `linear-gradient(135deg, ${c.blue}12 0%, ${c.purple}08 100%)`,
           border: `1px solid ${c.border}`,
@@ -1023,7 +1023,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
         {hasPausedBots && (
           <>
             <div className="text-base font-semibold mb-3" style={{ color: c.text1 }}>일시정지된 봇</div>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(340px, 100%), 1fr))" }}>
+            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))" }}>
               {activeBots.filter(ab => ab.status === "paused").map(ab => {
                 const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
                 return (
@@ -1139,7 +1139,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
       {isMobile ? (
         <ActiveBotCarousel activeBots={activeBots} allBotPerf={allBotPerf} onSelectBot={onSelectBot} onStopBot={onStopBot} onAddFund={onAddFund} theme={theme} cardStyle={cardStyle} />
       ) : null}
-      <div className={isMobile ? "hidden" : "grid gap-3"} style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(420px, 100%), 1fr))" }}>
+      <div className={isMobile ? "hidden" : "grid gap-3"} style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(420px, 100%), 1fr))" }}>
         {activeBots.filter(ab => ab.status !== "paused").map(ab => {
           const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
           const elapsed = Date.now() - (ab.startedAt || Date.now());
@@ -1161,7 +1161,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
           const botIsPositive = roiPct >= 0;
 
           return (
-            <div key={ab.botId} className="flex flex-col gap-2.5 cursor-pointer" style={cardStyle} onClick={() => onSelectBot(bot)}>
+            <div key={ab.botId} className="flex flex-col gap-2.5 cursor-pointer" style={{ ...cardStyle, maxWidth: "700px" }} onClick={() => onSelectBot(bot)}>
               {/* 봇 헤더 */}
               <div className="flex items-center gap-2.5">
                 <span className="text-[22px] w-9 h-9 flex items-center justify-center flex-shrink-0 rounded-[10px]" style={{
@@ -1262,7 +1262,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
       {hasPausedBots && (
         <div className="mt-6">
           <div className="text-base font-semibold mb-3" style={{ color: c.text1 }}>일시정지된 봇</div>
-          <div className="gap-3" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(340px, 100%), 1fr))" }}>
+          <div className="gap-3" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))" }}>
             {activeBots.filter(ab => ab.status === "paused").map(ab => {
               const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
               return (

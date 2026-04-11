@@ -6979,7 +6979,7 @@ function AppInner() {
                           <div key={idx.symbol} onClick={() => {
                             if (!idx.symbol.includes("=X")) setChartAsset({ symbol: idx.symbol, name: idx.name, market: "us", symbolRaw: idx.symbol });
                           }} style={{
-                            minWidth: "105px", padding: "12px 14px", borderRadius: "12px", flexShrink: 0,
+                            minWidth: "100px", padding: "10px 12px", borderRadius: "12px", flexShrink: 0,
                             background: C.isDark ? `${C.card2}80` : C.card2, cursor: idx.symbol.includes("=X") ? "default" : "pointer",
                             transition: "transform .15s",
                           }}
@@ -8001,7 +8001,7 @@ function AppInner() {
                 <div style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>주식 골라보기</div>
                 <span style={{ fontSize: "14px", color: C.text3 }}>프리셋 선택 또는 직접 조건 설정</span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "10px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "10px" }}>
                 {SCREENER_PRESETS.map(preset => {
                   const isActive = activePreset === preset.id;
                   const presetColor = preset.color === "green" ? C.green : preset.color === "blue" ? C.blue : preset.color === "red" ? C.red : preset.color === "yellow" ? C.yellow : C.purple;
@@ -8018,7 +8018,7 @@ function AppInner() {
                         setMode(preset.mode);
                       }
                     }} style={{
-                      padding: "14px 16px", borderRadius: "14px", textAlign: "left", cursor: "pointer",
+                      padding: "12px 14px", borderRadius: "14px", textAlign: "left", cursor: "pointer",
                       background: isActive ? presetBg : C.card,
                       border: `1px solid ${isActive ? `${presetColor}40` : `${C.border}20`}`,
                       transition: "all 0.2s ease", position: "relative", overflow: "hidden",
@@ -8830,7 +8830,7 @@ function AppInner() {
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <div className="text-2xl font-black mb-1.5" style={{ color: mktColor }}>{mktVerdict}</div>
+                    <div className="text-xl font-black mb-1.5" style={{ color: mktColor }}>{mktVerdict}</div>
                     <div className="text-base" style={{ color: C.text2, lineHeight: 1.6 }}>
                       {mktScore >= 60
                         ? `매수 우위 장세입니다. 상승 종목 ${upCount}개, 추천 매수 ${buyPicks}개가 감지되었습니다.`
@@ -8856,8 +8856,8 @@ function AppInner() {
                   ].filter(Boolean).map(idx => (
                     <div key={idx.name} className="rounded-[10px] p-2.5 text-center" style={{ background: C.bg }}>
                       <div className="text-sm mb-1" style={{ color: C.text3 }}>{idx.name}</div>
-                      <div className="text-lg font-bold" style={{ color: C.text1 }}>{typeof idx.value === "number" ? idx.value.toLocaleString(undefined, { maximumFractionDigits: 0 }) : idx.value}</div>
-                      <div className="text-base font-semibold" style={{ color: idx.change >= 0 ? C.green : C.red }}>
+                      <div className="text-base font-bold" style={{ color: C.text1 }}>{typeof idx.value === "number" ? idx.value.toLocaleString(undefined, { maximumFractionDigits: 0 }) : idx.value}</div>
+                      <div className="text-sm font-semibold" style={{ color: idx.change >= 0 ? C.green : C.red }}>
                         {idx.change >= 0 ? "+" : ""}{idx.change}%
                       </div>
                     </div>
@@ -9629,7 +9629,7 @@ function AppInner() {
             <div style={{ background: C.card, border: `1px solid ${C.border}20` }} className="rounded-[18px] p-6 mb-3">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <div className="font-black text-lg">🚨 전략 매매 알림</div>
+                  <div className="font-bold text-lg">🚨 전략 매매 알림</div>
                   <div className="text-base text-muted-foreground mt-0.5">
                     33개 퀀트 전략의 generate() 함수로 실제 매매 시그널을 감지합니다
                   </div>
@@ -9638,7 +9638,7 @@ function AppInner() {
                   <button onClick={() => {
                     if (!confirm("매매 알림을 전부 삭제하시겠습니까?")) return;
                     setTradeAlerts([]); setAlertBadge(0);
-                  }} className="px-3 py-1.5 rounded-lg text-base font-semibold cursor-pointer" style={{
+                  }} className="px-3 py-1.5 rounded-lg text-sm font-semibold cursor-pointer" style={{
                     background: C.card2, color: C.text3, border: `1px solid ${C.border2}`,
                   }}>전체 삭제</button>
                 )}
