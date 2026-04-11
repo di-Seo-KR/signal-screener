@@ -8793,7 +8793,7 @@ function AppInner() {
           const topPicks = dailyPicks.filter(p => p.score >= 6).slice(0, 5);
 
           return (
-            <div className="tab-content flex flex-col gap-3">
+            <div className="tab-content flex flex-col gap-3 max-w-[1200px] mx-auto">
               {/* 헤더 */}
               <div className="rounded-[18px] p-[22px_24px]" style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})` }}>
                 <div className="flex items-center justify-between mb-1">
@@ -9272,7 +9272,7 @@ function AppInner() {
                 {[1,2,3,4].map(i => <div key={i} className="skeleton rounded-[14px]" style={{ height: "100px" }} />)}
               </div>
             ) : sortedNews.length === 0 ? (
-              <div style={{ background: C.card, border: `1px solid ${C.border}20` }} className="rounded-[18px] p-12 text-center">
+              <div style={{ background: C.card, border: `1px solid ${C.border}20`, textAlign: "center" }} className="rounded-[18px] p-12">
                 <div style={{ background: C.blueBg }} className="w-14 h-14 rounded-[16px] flex items-center justify-center mx-auto mb-3.5 text-2xl">📰</div>
                 <div className="font-bold text-lg mb-1.5 text-foreground" style={{color: C.text1}}>뉴스를 불러오는 중</div>
                 <div className="text-base" style={{ color: C.text3 }}>새로고침을 눌러 최신 뉴스를 확인하세요</div>
@@ -9503,7 +9503,7 @@ function AppInner() {
 
                   {/* 주차별 이벤트 그룹 */}
                   {weekGroups.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "60px 0", color: C.text3 }}>
+                    <div style={{ textAlign: "center", padding: "60px 24px", color: C.text3 }}>
                       <div style={{ fontSize: "32px", marginBottom: "12px" }}>📅</div>
                       <div style={{ fontSize: "18px" }}>해당 필터에 맞는 이벤트가 없습니다</div>
                     </div>
@@ -9794,7 +9794,7 @@ function AppInner() {
 
               {/* 알림 피드 */}
               {tradeAlerts.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "40px 0", color: C.text3 }}>
+                <div style={{ textAlign: "center", padding: "40px 24px", color: C.text3 }}>
                   <div style={{ fontSize: "40px", marginBottom: "12px" }}>🔕</div>
                   <div style={{ fontSize: "18px", fontWeight: 600, marginBottom: "4px" }}>아직 전략 매매 알림이 없습니다</div>
                   <div style={{ fontSize: "16px" }}>스크리너를 실행하면 33개 퀀트 전략이 실제 generate() 시그널을 감지합니다</div>
@@ -9990,7 +9990,7 @@ function AppInner() {
             </div>
 
             {sentimentLoading && (
-              <div style={{textAlign:"center",padding:"60px 0",color:C.text3}}>
+              <div style={{textAlign:"center",padding:"60px 24px",color:C.text3}}>
                 <div style={{fontSize:"40px",marginBottom:"12px",animation:"pulse 1.5s infinite"}}>💬</div>
                 <div>소셜 데이터 수집 중...</div>
               </div>
@@ -9999,7 +9999,7 @@ function AppInner() {
             {!sentimentLoading && sentimentData && (<>
               {/* 종합 센티먼트 게이지 */}
               {sentimentData.sentiment && (
-                <div style={{background:C.card,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:"24px",marginBottom:"12px",textAlign:"center"}}>
+                <div style={{background:C.card,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:"24px",marginBottom:"12px",textAlign:"center",maxWidth:"800px",margin:"0 auto 12px"}}>
                   <div style={{fontSize:"16px",color:C.text3,marginBottom:"8px",fontWeight:600}}>
                     {sentimentData.symbol} 종합 센티먼트
                   </div>
@@ -10027,6 +10027,7 @@ function AppInner() {
               )}
 
               {/* 소스별 상세 */}
+              <div style={{maxWidth:"800px",margin:"0 auto"}}>
               {sentimentData.sources?.map((src,i)=>(
                 <div key={i} style={{background:C.card,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:"22px 24px",marginBottom:"12px"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
@@ -10064,10 +10065,11 @@ function AppInner() {
                   ))}
                 </div>
               ))}
+              </div>
 
               {/* 트렌딩 심볼 */}
               {sentimentData.trending?.length > 0 && (
-                <div style={{background:C.card,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:"22px 24px"}}>
+                <div style={{background:C.card,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:"22px 24px",maxWidth:"800px",margin:"0 auto"}}>
                   <div style={{fontWeight:700,fontSize:"17px",marginBottom:"12px"}}>트렌딩 심볼</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
                     {sentimentData.trending.map((t,i)=>(
@@ -10086,7 +10088,7 @@ function AppInner() {
 
               {/* 데이터 없는 경우 */}
               {(!sentimentData.sources || sentimentData.sources.length === 0) && !sentimentData.sentiment && (
-                <div style={{textAlign:"center",padding:"40px 0",color:C.text3}}>
+                <div style={{textAlign:"center",padding:"40px 24px",color:C.text3}}>
                   <div style={{fontSize:"40px",marginBottom:"8px"}}>📭</div>
                   <div>'{sentimentData.symbol}'에 대한 센티먼트 데이터가 없습니다</div>
                   <div style={{fontSize:"16px",marginTop:"4px"}}>다른 심볼을 검색해보세요</div>
@@ -10096,7 +10098,7 @@ function AppInner() {
 
             {/* 초기 상태 */}
             {!sentimentLoading && !sentimentData && (
-              <div style={{textAlign:"center",padding:"60px 0",color:C.text3}}>
+              <div style={{textAlign:"center",padding:"60px 24px",color:C.text3}}>
                 <div style={{fontSize:"48px",marginBottom:"12px"}}>💬</div>
                 <div style={{fontWeight:600,fontSize:"17px",marginBottom:"4px"}}>소셜 센티먼트 분석</div>
                 <div style={{fontSize:"16px"}}>심볼을 입력하고 "분석" 버튼을 클릭하세요</div>
@@ -10122,9 +10124,9 @@ function AppInner() {
         {tab === "real-trading" && !isOwner && (
           <div style={{ maxWidth: 720, margin: "80px auto", padding: "40px 24px", textAlign: "center", color: C.text2 }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: C.text, marginBottom: 8 }}>접근 권한이 없는 페이지입니다</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: C.text1, marginBottom: 8 }}>접근 권한이 없는 페이지입니다</div>
             <div style={{ fontSize: 15, color: C.text3, marginBottom: 24 }}>요청하신 페이지는 존재하지 않거나 접근할 수 없습니다.</div>
-            <button onClick={() => setTab("home")} style={{ padding: "10px 20px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text, fontWeight: 700, cursor: "pointer" }}>홈으로</button>
+            <button onClick={() => setTab("home")} style={{ padding: "10px 20px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text1, fontWeight: 700, cursor: "pointer" }}>홈으로</button>
           </div>
         )}
 

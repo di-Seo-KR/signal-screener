@@ -409,6 +409,7 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
         /* PC: 기존 그리드 */
         <div className="grid gap-4" style={{
           gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))",
+          justifyContent: "start",
         }}>
           {bots.map((bot) => (
             <BotCard key={bot.id} bot={bot} onActivate={onActivate} theme={theme} />
@@ -1023,7 +1024,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
         {hasPausedBots && (
           <>
             <div className="text-base font-semibold mb-3" style={{ color: c.text1 }}>일시정지된 봇</div>
-            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))" }}>
+            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))", justifyContent: "start" }}>
               {activeBots.filter(ab => ab.status === "paused").map(ab => {
                 const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
                 return (
@@ -1139,7 +1140,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
       {isMobile ? (
         <ActiveBotCarousel activeBots={activeBots} allBotPerf={allBotPerf} onSelectBot={onSelectBot} onStopBot={onStopBot} onAddFund={onAddFund} theme={theme} cardStyle={cardStyle} />
       ) : null}
-      <div className={isMobile ? "hidden" : "grid gap-4"} style={{ gridTemplateColumns: activeBots.filter(ab => ab.status !== "paused").length === 1 ? "1fr" : "repeat(auto-fit, minmax(min(420px, 100%), 1fr))" }}>
+      <div className={isMobile ? "hidden" : "grid gap-4"} style={{ gridTemplateColumns: activeBots.filter(ab => ab.status !== "paused").length === 1 ? "1fr" : "repeat(auto-fit, minmax(min(420px, 100%), 1fr))", justifyContent: "start" }}>
         {activeBots.filter(ab => ab.status !== "paused").map(ab => {
           const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
           const elapsed = Date.now() - (ab.startedAt || Date.now());
@@ -1262,7 +1263,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
       {hasPausedBots && (
         <div className="mt-6">
           <div className="text-base font-semibold mb-3" style={{ color: c.text1 }}>일시정지된 봇</div>
-          <div className="gap-3" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))" }}>
+          <div className="gap-3" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))", justifyContent: "start" }}>
             {activeBots.filter(ab => ab.status === "paused").map(ab => {
               const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
               return (
