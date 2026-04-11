@@ -270,7 +270,7 @@ function RealTradingInner() {
   const kpiBar = (
     <div style={{
       display: "grid", gap: 10, marginBottom: 14,
-      gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+      gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(160px, 1fr))",
     }}>
       <Stat
         label="에쿼티"
@@ -551,7 +551,7 @@ function RealTradingInner() {
   const breakerCard = (
     <Card title="서킷브레이커" icon={<Shield size={16} />}
       subtitle="일 -4% · 주 -8% · MDD -15% · 5연속손실 → 24h 쿨다운">
-      <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))" }}>
+      <div style={{ display: "grid", gap: 10, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(220px, 1fr))" }}>
         <div>
           <Progress
             label={`일 손실 ${fmtPct(dayLossPct)}`}
@@ -581,7 +581,7 @@ function RealTradingInner() {
           />
         </div>
       </div>
-      <div style={{ marginTop: 14, display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", fontSize: 12 }}>
+      <div style={{ marginTop: 14, display: "grid", gap: 8, gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(160px, 1fr))", fontSize: 12 }}>
         <KV label="일 시작 에쿼티" value={fmtUsd(breaker.dayStartEquity)} />
         <KV label="주 시작 에쿼티" value={fmtUsd(breaker.weekStartEquity)} />
         <KV label="최고 에쿼티" value={fmtUsd(breaker.equityHigh)} />
@@ -677,7 +677,7 @@ function RealTradingInner() {
     >
       {shadow.summary ? (
         <>
-          <div style={{ display: "grid", gap: 10, gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", marginBottom: 12 }}>
+          <div style={{ display: "grid", gap: 10, gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(120px, 1fr))", marginBottom: 12 }}>
             <Stat compact label="총 트레이드" value={shadow.summary.trades || 0} />
             <Stat compact label="승 / 패" value={`${shadow.summary.wins || 0} / ${shadow.summary.losses || 0}`} />
             <Stat compact label="승률"
@@ -815,7 +815,7 @@ function RealTradingInner() {
   const riskPresetCard = (
     <Card title="리스크 프리셋 · Option A 절대수익형" icon={<Shield size={16} />}
       subtitle="api/_shared/risk-manager.js::RISK_CONFIG">
-      <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
+      <div style={{ display: "grid", gap: 8, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(200px, 1fr))" }}>
         <KV label="트레이드당 리스크" value="0.8% equity" />
         <KV label="최대 증거금 비율" value="35%" />
         <KV label="레버리지 범위" value="2× ~ 5×" />

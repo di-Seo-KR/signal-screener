@@ -1114,12 +1114,20 @@ function getBotPresetSettings(presetId) {
   }
 }
 
-export default function PaperTrading({ strategyAlerts = [], theme = "dark", user, botPreset, botAllocation, isMobile = false }) {
+export default function PaperTrading({ strategyAlerts = [], theme = "dark", user, botPreset, botAllocation, isMobileParam = false }) {
   // 유저별 localStorage 키 분리
   const userId = user?.id || null;
   KEYS = makeKeys(userId);
 
   const C = theme === "light" ? LIGHT_C : DARK_C;
+
+  // ── Mobile responsive hook ──
+  const [isMobile, setIsMobile] = useState(isMobileParam !== false ? isMobileParam : window.innerWidth < 768);
+  useEffect(() => {
+    const h = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
   const [config, setConfig] = useState(() => {
     const saved = load(KEYS.config, {});
     if (_syncOnce?.k) {
@@ -1769,7 +1777,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
             </span>
           </div>
 
-          <div style={{ marginTop: "20px", display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "12px" }}>
+          <div style={{ marginTop: "20px", display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: "12px" }}>
             {[
               { label: "현금", value: fmtUSD(cash), color: C.blue },
               { label: "가용현금", value: fmtUSD(buyingPower), color: C.blueL },
@@ -1803,7 +1811,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
             return (
               <div style={{ marginTop: "16px", borderTop: `1px solid ${C.border}40`, paddingTop: "14px" }}>
                 <div style={{ fontSize: "14px", fontWeight: 700, color: C.text3, marginBottom: "8px" }}>봇 성과</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3, 1fr)", gap: "8px" }}>
                   {perfMetrics.map((m, i) => (
                     <div key={i} style={{ background: C.card2, borderRadius: "8px", padding: "10px", textAlign: "center" }}>
                       <div style={{ fontSize: "12px", color: C.text3, marginBottom: "3px", fontWeight: 600 }}>{m.label}</div>

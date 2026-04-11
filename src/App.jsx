@@ -3998,7 +3998,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           <div style={{ padding: "0 20px 16px" }}>
             <div style={{ background: C.card, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
               <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>기술적 지표</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "6px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: "6px" }}>
                 {[
                   { label: "RSI(14)", value: techData.rsi, color: techData.rsi <= 30 ? C.purple : techData.rsi >= 70 ? C.red : C.text2 },
                   { label: "200일선 괴리", value: techData.ma200Dist != null ? `${techData.ma200Dist > 0 ? "+" : ""}${techData.ma200Dist}%` : "—", color: techData.ma200Dist > 10 ? C.red : techData.ma200Dist < -10 ? C.green : C.text2 },
@@ -7688,7 +7688,7 @@ function AppInner() {
 
                   {/* 테이블 헤더 */}
                   <div style={{
-                    display: "grid", gridTemplateColumns: "90px 1fr 48px 48px 48px",
+                    display: "grid", gridTemplateColumns: isMobile ? "60px 1fr 50px" : "90px 1fr 48px 48px 48px",
                     gap: "4px", padding: "6px 6px", marginBottom: "2px",
                     fontSize: mf(10), fontWeight: 700, color: C.text3, letterSpacing: "0.02em",
                     borderBottom: `1px solid ${C.border}20`,
@@ -7728,7 +7728,7 @@ function AppInner() {
 
                         return (
                           <div key={`${evt.event}-${y}${m}${d}-${i}`} style={{
-                            display: "grid", gridTemplateColumns: "90px 1fr 48px 48px 48px",
+                            display: "grid", gridTemplateColumns: isMobile ? "60px 1fr 50px" : "90px 1fr 48px 48px 48px",
                             gap: "4px", alignItems: "center",
                             padding: "9px 8px",
                             opacity: isPast ? 0.65 : 1,
@@ -7960,7 +7960,7 @@ function AppInner() {
                       }}>{l}</button>
                     ))}
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: "4px", maxHeight: "280px", overflow: "auto" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(150px, 1fr))", gap: "4px", maxHeight: "280px", overflow: "auto" }}>
                     {ALL_ASSETS.filter(a => filterMarket === "all" || a.market === filterMarket).map((asset, i) => {
                       const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
                       return (
@@ -8001,7 +8001,7 @@ function AppInner() {
                 <div style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>주식 골라보기</div>
                 <span style={{ fontSize: "14px", color: C.text3 }}>프리셋 선택 또는 직접 조건 설정</span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "10px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(180px, 1fr))", gap: "10px" }}>
                 {SCREENER_PRESETS.map(preset => {
                   const isActive = activePreset === preset.id;
                   const presetColor = preset.color === "green" ? C.green : preset.color === "blue" ? C.blue : preset.color === "red" ? C.red : preset.color === "yellow" ? C.yellow : C.purple;
@@ -8485,7 +8485,7 @@ function AppInner() {
               </div>
 
               {/* 통계 요약 3칸 */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: "10px" }}>
                 {[
                   { label: "급등", value: anomalies.filter(a => a.anomalyType === "surge").length, icon: "🚀", color: C.green },
                   { label: "급락", value: anomalies.filter(a => a.anomalyType === "crash").length, icon: "💥", color: C.red },
@@ -8612,7 +8612,7 @@ function AppInner() {
 
                         {/* 지표 그리드 */}
                         <div style={{
-                          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))",
+                          display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(100px, 1fr))",
                           gap: "8px", padding: "12px", background: `${C.card2}80`,
                           borderRadius: "12px",
                         }}>
@@ -8845,7 +8845,7 @@ function AppInner() {
               {/* 주요 지수 현황 */}
               <div className="rounded-[18px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                 <div className="font-bold text-lg mb-3.5" style={{ color: C.text1 }}>주요 지수</div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className={isMobile ? "grid grid-cols-2 gap-2" : "grid grid-cols-3 gap-2"}>
                   {[
                     sp && { name: "S&P 500", value: sp.price, change: sp.change },
                     nq && { name: "나스닥", value: nq.price, change: nq.change },
@@ -8919,7 +8919,7 @@ function AppInner() {
               {/* 시장별 현황 */}
               <div className="rounded-[18px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                 <div className="font-bold text-lg mb-3.5" style={{ color: C.text1 }}>시장별 현황</div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className={isMobile ? "grid grid-cols-1 gap-2" : "grid grid-cols-3 gap-2"}>
                   {[
                     { name: "🇺🇸 미국", total: usStocks.length, up: usUp, color: C.blue },
                     { name: "🇰🇷 한국", total: krStocks.length, up: krUp, color: C.green },
@@ -8965,7 +8965,7 @@ function AppInner() {
                 return (
                   <div className="rounded-[18px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                     <div className="font-bold text-lg mb-3.5" style={{ color: C.text1 }}>섹터 퍼포먼스</div>
-                    <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))" }}>
+                    <div className="grid gap-1.5" style={{ gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(140px, 1fr))" }}>
                       {sectorData.map(s => {
                         const intensity = Math.min(Math.abs(s.avgChange) / maxAbs, 1);
                         const bgColor = s.avgChange >= 0
@@ -10647,7 +10647,7 @@ function AppInner() {
       {aiChatOpen && (
         <div style={{
           position: "fixed", bottom: "90px", right: "28px",
-          width: "400px", maxHeight: "540px",
+          width: isMobile ? "calc(100vw - 56px)" : "400px", maxHeight: isMobile ? "calc(100vh - 200px)" : "540px",
           background: C.card, borderRadius: "20px", border: `1px solid ${C.border}`,
           boxShadow: `0 12px 48px ${C.isDark ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.15)"}`,
           zIndex: 9999, display: "flex", flexDirection: "column", overflow: "hidden",

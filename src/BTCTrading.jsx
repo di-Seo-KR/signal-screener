@@ -201,12 +201,20 @@ class CryptoRiskManager {
   }
 }
 
-export default function BTCTrading({ theme = "dark", user, botPreset, botAllocation, isMobile = false }) {
+export default function BTCTrading({ theme = "dark", user, botPreset, botAllocation, isMobileParam = false }) {
   // 유저별 localStorage 키 분리
   const userId = user?.id || null;
   KEYS = makeBtcKeys(userId);
 
   const C = theme === "dark" ? DARK_C : LIGHT_C;
+
+  // ── Mobile responsive hook ──
+  const [isMobile, setIsMobile] = useState(isMobileParam !== false ? isMobileParam : window.innerWidth < 768);
+  useEffect(() => {
+    const h = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
 
   // ── Settings State ──
   const [showSettings, setShowSettings] = useState(false);
@@ -668,7 +676,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           </div>
 
           {/* 자산 구성 */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
             <div style={{ padding: isMobile ? "8px 10px" : "10px 14px", borderRadius: "10px", background: C.card2, border: `1px solid ${C.border}` }}>
               <div style={{ fontSize: isMobile ? "12px" : "13px", color: C.text3, marginBottom: "2px" }}>현금</div>
               <div style={{ fontSize: isMobile ? "15px" : "17px", fontWeight: 700, color: C.text1 }}>{fmtUSD2(cash)}</div>
@@ -679,8 +687,8 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
             </div>
           </div>
 
-          {/* 봇 성과 요약 (3x2 grid) */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: isMobile ? "4px" : "6px" }}>
+          {/* 봇 성과 요약 (3x2 grid on desktop, 2x3 on mobile) */}
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3, 1fr)", gap: isMobile ? "4px" : "6px" }}>
             {[
               { label: "총 거래", value: `${tradeCount}회`, color: C.text1 },
               { label: "누적 수익", value: `${totalPL >= 0 ? "+" : ""}$${Math.abs(totalPL).toFixed(0)}`, color: totalPL >= 0 ? C.green : C.red },
