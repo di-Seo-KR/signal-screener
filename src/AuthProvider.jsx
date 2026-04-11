@@ -171,7 +171,13 @@ export default function AuthProvider({ children }) {
         }
         if (mounted) {
           setSession(existingSession);
-          setUser(existingSession?.user ?? null);
+          // getUser()로 서버에서 최신 user_metadata 가져오기 (닉네임 등 동기화)
+          if (existingSession?.user) {
+            const { data: { user: freshUser } } = await supabase.auth.getUser();
+            setUser(freshUser ?? existingSession.user);
+          } else {
+            setUser(null);
+          }
         }
       } catch (err) {
         console.error("[Zepta Auth] Init error:", err);
@@ -282,6 +288,20 @@ export default function AuthProvider({ children }) {
     return { error };
   };
 
+  // ── 유저 정보 새로고침 (서버에서 최신 user_metadata 가져오기) ──
+  const refreshUser = useCallback(async () => {
+    try {
+      const { data: { user: freshUser }, error } = await supabase.auth.getUser();
+      if (error) {
+        console.error("[Zepta Auth] refreshUser error:", error.message);
+        return;
+      }
+      if (freshUser) setUser(freshUser);
+    } catch (err) {
+      console.error("[Zepta Auth] refreshUser exception:", err);
+    }
+  }, []);
+
   // ── 비밀번호 재설정 ──
   const resetPassword = async (email) => {
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -302,6 +322,7 @@ export default function AuthProvider({ children }) {
     signInWithOAuth,
     signOut,
     resetPassword,
+    refreshUser,
     showToast,
   };
 

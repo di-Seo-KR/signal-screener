@@ -4301,7 +4301,7 @@ const OWNER_EMAIL = "donginseo0421@gmail.com";
 
 function AppInner() {
   const { t } = useLanguage();
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading, signOut, refreshUser } = useAuth();
   const isOwner = (user?.email || "").toLowerCase() === OWNER_EMAIL;
   const [themeMode, setThemeMode] = useState(loadTheme);
   const [showCoupangCTA, setShowCoupangCTA] = useState(false);
@@ -10352,7 +10352,7 @@ function AppInner() {
             </div>
 
             {/* 닉네임 설정 */}
-            <NicknameEditor user={user} supabase={supabase} onUpdate={() => {}} />
+            <NicknameEditor user={user} supabase={supabase} onUpdate={refreshUser} />
 
             {/* 계정 정보 */}
             <div style={{ background: C.card, border: `1px solid ${C.border}` }} className="rounded-[16px] overflow-hidden">
