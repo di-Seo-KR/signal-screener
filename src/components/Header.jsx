@@ -10,6 +10,7 @@
  */
 import { useState, useRef, useCallback, useEffect, memo } from "react";
 import { cn } from "@/lib/utils";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { Button } from "@/components/ui/button";
 import {
   Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle,
@@ -164,6 +165,7 @@ export default memo(function Header({
   alertBadge = 0, anomalyCount = 0, requireLogin,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { lang, setLang } = useLanguage();
   const activeCategory = gnbCategoryMap[tab] || "home";
 
   const navigate = useCallback((tabId) => {
@@ -270,6 +272,10 @@ export default memo(function Header({
                     <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={toggleTheme}>
                       {themeMode === "dark" ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
                       {themeMode === "dark" ? "라이트" : "다크"}
+                    </Button>
+                    <Button variant="outline" size="sm" className="flex-1 gap-1.5"
+                      onClick={() => setLang(lang === "ko" ? "en" : "ko")}>
+                      <span className="text-xs font-semibold">{lang === "ko" ? "EN" : "KR"}</span>
                     </Button>
                     {user && (
                       <>
@@ -425,6 +431,10 @@ export default memo(function Header({
                     <CssDropdownItem onClick={() => { toggleTheme(); close(); }}>
                       {themeMode === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
                       {themeMode === "dark" ? "라이트 모드" : "다크 모드"}
+                    </CssDropdownItem>
+                    <CssDropdownItem onClick={() => { setLang(lang === "ko" ? "en" : "ko"); close(); }}>
+                      <span className="text-xs font-semibold">{lang === "ko" ? "KR" : "EN"}</span>
+                      {lang === "ko" ? "English" : "한국어"}
                     </CssDropdownItem>
                     <Separator className="my-1" />
                     <CssDropdownItem variant="destructive" onClick={() => {

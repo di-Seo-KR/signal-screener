@@ -6,6 +6,7 @@
 // v11.0: 토스증권 벤치마킹 기반 대개편 — 스크리너 프리셋, 글로벌 검색, 위험종목 필터, 실시간 티커
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
+import { LanguageProvider } from "./i18n/LanguageContext.jsx";
 import AuthPage from "./AuthPage.jsx";
 import { CoupangOfficialBanner, CoupangSearchWidget, CoupangInterstitial, GoogleAd, GoogleAdInterstitial } from "./AdBanner.jsx";
 import Header from "./components/Header.jsx";
@@ -10241,7 +10242,7 @@ function AppInner() {
                     return `${JSON.parse(localStorage.getItem(k) || "[]").length}개`;
                   } catch { return "0개"; }
                 })(), action: () => setTab("auto-trading") },
-                { label: "가상매매", value: "운영중", action: () => setTab("auto-trading") },
+                { label: "실전매매", value: "운영중", action: () => setTab("auto-trading") },
               ].map((item, i) => (
                 <div key={i} onClick={item.action} className="flex justify-between items-center px-5 py-3.5 border-t" style={{
                   borderTopColor: `${C.border}20`,
@@ -10389,7 +10390,7 @@ function AppInner() {
             <section>
               <h2 style={{ fontSize: "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>면책 조항</h2>
               <p style={{ fontSize: "17px" }}>
-                Zepta에서 제공하는 모든 정보와 분석은 투자 참고 자료로만 활용되어야 하며, 특정 금융 상품의 매수 또는 매도를 권유하지 않습니다. 모든 투자의 판단과 책임은 이용자 본인에게 있으며, Zepta는 투자 결과에 대한 법적 책임을 지지 않습니다. 자동매매 기능은 가상매매(시뮬레이션)로 운영되며, 실제 자금이 거래되지 않습니다.
+                Zepta에서 제공하는 모든 정보와 분석은 투자 참고 자료로만 활용되어야 하며, 특정 금융 상품의 매수 또는 매도를 권유하지 않습니다. 모든 투자의 판단과 책임은 이용자 본인에게 있으며, Zepta는 투자 결과에 대한 법적 책임을 지지 않습니다. 자동매매 기능을 통해 실제 자금이 거래됩니다. 투자 손실 위험이 있으므로 신중히 이용해주세요.
               </p>
             </section>
           </div>
@@ -10471,7 +10472,7 @@ function AppInner() {
             <section style={{ marginBottom: "28px" }}>
               <h2 style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제2조 (서비스의 내용)</h2>
               <p style={{ fontSize: "18px" }}>
-                서비스는 다음과 같은 기능을 제공합니다: 실시간 시장 데이터 조회 및 분석, AI 기반 자동매매 시뮬레이션(가상매매), 종목 스크리닝 및 기술적 분석, 포트폴리오 관리 도구, 경제 캘린더 및 뉴스 제공. 서비스는 투자 참고 자료를 제공하는 것이며, 투자 자문 서비스가 아닙니다.
+                서비스는 다음과 같은 기능을 제공합니다: 실시간 시장 데이터 조회 및 분석, AI 기반 자동매매(실거래), 종목 스크리닝 및 기술적 분석, 포트폴리오 관리 도구, 경제 캘린더 및 뉴스 제공. 서비스는 투자 참고 자료를 제공하는 것이며, 투자 자문 서비스가 아닙니다.
               </p>
             </section>
 
@@ -10485,7 +10486,7 @@ function AppInner() {
             <section style={{ marginBottom: "28px" }}>
               <h2 style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제4조 (투자 관련 면책)</h2>
               <p style={{ fontSize: "18px" }}>
-                서비스에서 제공하는 정보, 분석, 시그널, 자동매매 결과는 투자 참고 자료일 뿐이며, 특정 금융 상품의 매수 또는 매도를 권유하거나 보장하지 않습니다. 모든 투자 의사결정의 최종 판단과 그에 따른 책임은 이용자 본인에게 있습니다. 서비스는 시장 데이터의 정확성, 완전성, 적시성을 보장하지 않으며, 데이터 오류나 지연으로 인한 손실에 대해 책임을 지지 않습니다. 자동매매 기능은 가상매매(시뮬레이션)로 운영되며, 실제 자금 거래가 이루어지지 않습니다.
+                서비스에서 제공하는 정보, 분석, 시그널, 자동매매 결과는 투자 참고 자료일 뿐이며, 특정 금융 상품의 매수 또는 매도를 권유하거나 보장하지 않습니다. 모든 투자 의사결정의 최종 판단과 그에 따른 책임은 이용자 본인에게 있습니다. 서비스는 시장 데이터의 정확성, 완전성, 적시성을 보장하지 않으며, 데이터 오류나 지연으로 인한 손실에 대해 책임을 지지 않습니다. 자동매매 기능을 통해 실제 자금이 거래되며, 거래 손실에 대한 모든 책임은 이용자에게 있습니다.
               </p>
             </section>
 
@@ -10904,9 +10905,11 @@ function AppInner() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <AppInner />
-      </AuthProvider>
+      <LanguageProvider>
+        <AuthProvider>
+          <AppInner />
+        </AuthProvider>
+      </LanguageProvider>
     </ErrorBoundary>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import PaperTrading from "./PaperTrading.jsx";
+import PaperTrading from "./PaperTrading.jsx"; // Hidden — kept for legacy, not used in UI
 import BTCTrading from "./BTCTrading.jsx";
+import RealTrading from "./RealTrading.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { supabase } from "./supabaseClient.js";
 
@@ -1443,6 +1444,9 @@ export default function AutoTrading({ theme = "dark", user }) {
   const [addFundInput, setAddFundInput] = useState("");
   const [stopBotConfirm, setStopBotConfirm] = useState(null); // { botId, botName, icon }
 
+  // 실전매매 확인 다이얼로그
+  const [confirmRealTrading, setConfirmRealTrading] = useState(null); // { bot, isStockBot }
+
   const handleActivateBot = useCallback((bot) => {
     if (!user) {
       showToast("error", "로그인이 필요합니다. 먼저 로그인해주세요.");
@@ -1453,11 +1457,19 @@ export default function AutoTrading({ theme = "dark", user }) {
       setActiveBot(bot);
       return;
     }
-    // 수동 배분 모달 표시
-    setPendingBot(bot);
-    // 기본값: 1000 USD
-    setAllocationInput("1000");
+    // 실전매매 확인 다이얼로그 표시
+    const isStockBot = STOCK_BOTS.some((b) => b.id === bot.id);
+    setConfirmRealTrading({ bot, isStockBot });
   }, [user, showToast, activeBots]);
+
+  const handleConfirmRealTradingStart = useCallback(() => {
+    if (!confirmRealTrading) return;
+    const { bot } = confirmRealTrading;
+    // 실전매매 확인 후 배분 모달로 진행
+    setPendingBot(bot);
+    setAllocationInput("1000");
+    setConfirmRealTrading(null);
+  }, [confirmRealTrading]);
 
   const handleConfirmAllocation = useCallback(() => {
     if (!pendingBot) return;
@@ -1480,7 +1492,7 @@ export default function AutoTrading({ theme = "dark", user }) {
       allocation: amount,
     }]);
     setActiveBot(pendingBot);
-    showToast("success", `${pendingBot.name} 운영 시작 — $${amount.toLocaleString()} 투입`);
+    showToast("success", `${pendingBot.name} 실전매매 시작 — $${amount.toLocaleString()} 투입`);
     setPendingBot(null);
     setAllocationInput("");
   }, [pendingBot, allocationInput, showToast]);
@@ -1924,12 +1936,12 @@ export default function AutoTrading({ theme = "dark", user }) {
               </div>
             </div>
 
-            {/* Trading Panel — 봇 배분 금액 전달 */}
+            {/* Trading Panel — 실전매매 (Binance 실거래) */}
             {(() => {
               const ab = activeBots.find(b => b.botId === activeBot.id);
               const alloc = ab?.allocation || null;
               return STOCK_BOTS.some((b) => b.id === activeBot.id) ? (
-                <PaperTrading theme={theme} user={user} botPreset={activeBot} botAllocation={alloc} isMobile={isMobile} />
+                <RealTrading theme={theme} user={user} botPreset={activeBot} botAllocation={alloc} isMobile={isMobile} />
               ) : (
                 <BTCTrading theme={theme} user={user} botPreset={activeBot} botAllocation={alloc} isMobile={isMobile} />
               );
@@ -1937,6 +1949,66 @@ export default function AutoTrading({ theme = "dark", user }) {
           </div>
         ) : (
           <BotCatalog onActivate={handleActivateBot} theme={theme} isMobile={isMobile} />
+        )}
+
+        {/* ── 실전매매 확인 다이얼로그 ── */}
+        {confirmRealTrading && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center",
+            justifyContent: "center", zIndex: 9999, padding: "16px",
+          }}>
+            <div style={{
+              background: colors[theme].card, borderRadius: "16px", padding: "32px 24px",
+              maxWidth: "400px", boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+              border: `1px solid ${colors[theme].border}`,
+            }}>
+              <div style={{ fontSize: "32px", marginBottom: "16px", textAlign: "center" }}>
+                ⚠️
+              </div>
+              <h3 style={{
+                fontSize: "20px", fontWeight: 700, color: colors[theme].text1,
+                marginBottom: "12px", textAlign: "center",
+              }}>
+                실전 매매를 시작합니다
+              </h3>
+              <p style={{
+                fontSize: "15px", color: colors[theme].text2, marginBottom: "20px",
+                textAlign: "center", lineHeight: "1.6",
+              }}>
+                실제 자금이 사용됩니다.<br />
+                {confirmRealTrading.bot.name}으로<br />Binance 실거래를 시작하시겠습니까?
+              </p>
+              <div style={{ display: "flex", gap: "12px" }}>
+                <button
+                  onClick={() => setConfirmRealTrading(null)}
+                  style={{
+                    flex: 1, padding: "12px 16px", borderRadius: "8px",
+                    fontSize: "15px", fontWeight: 700, border: `1px solid ${colors[theme].border}`,
+                    background: colors[theme].card2, color: colors[theme].text1, cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => { e.target.style.background = colors[theme].border; }}
+                  onMouseLeave={(e) => { e.target.style.background = colors[theme].card2; }}
+                >
+                  취소
+                </button>
+                <button
+                  onClick={handleConfirmRealTradingStart}
+                  style={{
+                    flex: 1, padding: "12px 16px", borderRadius: "8px",
+                    fontSize: "15px", fontWeight: 700, border: "none",
+                    background: colors[theme].green, color: "#fff", cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => { e.target.style.opacity = "0.85"; }}
+                  onMouseLeave={(e) => { e.target.style.opacity = "1"; }}
+                >
+                  시작
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
