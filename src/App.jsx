@@ -6904,7 +6904,7 @@ function AppInner() {
         else if (tab === "news") await fetchNews();
         else window.location.reload();
       }}>
-      <main className="mx-auto max-w-[1400px] px-4 py-4 pb-8 sm:px-6 sm:py-6 sm:pb-10">
+      <main className="px-4 py-4 pb-8 sm:px-6 sm:py-6 sm:pb-10" style={{ maxWidth: "1400px", margin: "0 auto" }}>
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 홈 (토스 스타일 — 깔끔하고 정보 밀도 최적화)
@@ -8793,7 +8793,7 @@ function AppInner() {
           const topPicks = dailyPicks.filter(p => p.score >= 6).slice(0, 5);
 
           return (
-            <div className="tab-content flex flex-col gap-3 max-w-[1200px] mx-auto">
+            <div className="tab-content flex flex-col gap-3" style={{ maxWidth: "1200px", margin: "0 auto" }}>
               {/* 헤더 */}
               <div className="rounded-[18px] p-[22px_24px]" style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})` }}>
                 <div className="flex items-center justify-between mb-1">
@@ -10154,7 +10154,7 @@ function AppInner() {
             TAB: 프로필 / 회원정보
         ═══════════════════════════════════════════════════════════ */}
         {tab === "profile" && user && (
-          <div className="tab-content max-w-[720px] mx-auto flex flex-col gap-4">
+          <div className="tab-content flex flex-col gap-4" style={{ maxWidth: "720px", margin: "0 auto" }}>
             {/* 프로필 헤더 */}
             <div className="text-center py-8 px-5">
               <div style={{

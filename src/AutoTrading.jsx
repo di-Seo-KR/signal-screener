@@ -689,8 +689,10 @@ function BotCatalog({ onActivate, theme, isMobile }) {
     <div className="pb-6 px-1">
       {/* Hero Section */}
       <div
-        className="mb-6 text-center rounded-2xl max-w-3xl mx-auto"
+        className="mb-6 text-center rounded-2xl"
         style={{
+          maxWidth: "768px",
+          margin: "0 auto",
           background: `linear-gradient(135deg, ${c.blue}12 0%, ${c.purple}08 100%)`,
           border: `1px solid ${c.border}`,
           padding: isMobile ? "28px 20px" : "36px 32px",
@@ -705,7 +707,7 @@ function BotCatalog({ onActivate, theme, isMobile }) {
       </div>
 
       {/* 봇 추천 플로우 */}
-      <div className="max-w-xl mx-auto px-4 sm:px-6">
+      <div className="px-4 sm:px-6" style={{ maxWidth: "576px", margin: "0 auto" }}>
         <BotRecommender onActivate={onActivate} theme={theme} isMobile={isMobile} />
       </div>
 
