@@ -200,7 +200,7 @@ export default memo(function Header({
         <div className="mx-auto flex h-12 max-w-[1400px] items-center justify-between gap-3 px-4 sm:h-14 lg:h-16 sm:px-6">
 
           {/* ── 좌측: 로고 + 모바일 메뉴 ── */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 lg:ml-2">
             {/* 모바일 햄버거 */}
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
