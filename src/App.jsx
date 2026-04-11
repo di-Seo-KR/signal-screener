@@ -6910,7 +6910,7 @@ function AppInner() {
             TAB: 홈 (토스 스타일 — 깔끔하고 정보 밀도 최적화)
         ═══════════════════════════════════════════════════════════ */}
         {tab === "home" && (
-          <div className="tab-content" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          <div className="tab-content">
             {/* 2컬럼 그리드 (데스크톱) / 1컬럼 (모바일) */}
             <div className="home-grid">
             <div className="home-left" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -10152,7 +10152,7 @@ function AppInner() {
             TAB: 프로필 / 회원정보
         ═══════════════════════════════════════════════════════════ */}
         {tab === "profile" && user && (
-          <div className="tab-content max-w-[640px] mx-auto flex flex-col gap-5">
+          <div className="tab-content max-w-[720px] mx-auto flex flex-col gap-4">
             {/* 프로필 헤더 */}
             <div className="text-center py-8 px-5">
               <div style={{
@@ -10181,7 +10181,7 @@ function AppInner() {
                 { label: "사용자 ID", value: user?.id ? user.id.slice(0, 8) + "..." : "—" },
               ].map((item, i) => (
                 <div key={i} className="flex justify-between items-center px-5 py-3.5 border-t" style={{borderTopColor: `${C.border}20`}}>
-                  <span className="text-lg text-card">{item.label}</span>
+                  <span className="text-lg text-muted-foreground">{item.label}</span>
                   <span className="text-lg font-semibold text-foreground text-right max-w-[60%] overflow-hidden text-ellipsis whitespace-nowrap">{item.value}</span>
                 </div>
               ))}
@@ -10204,7 +10204,7 @@ function AppInner() {
                   borderTopColor: `${C.border}20`,
                   cursor: item.action ? "pointer" : "default",
                 }}>
-                  <span className="text-lg text-card">{item.label}</span>
+                  <span className="text-lg text-muted-foreground">{item.label}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-lg font-semibold text-foreground">{item.value}</span>
                     {item.action && <span className="text-base text-muted-foreground">›</span>}
@@ -10217,20 +10217,20 @@ function AppInner() {
             <div style={{ background: `linear-gradient(135deg, ${C.card}, ${C.blueBg})`, border: `1px solid ${C.blue}20`, borderRadius: "16px", padding: "20px", textAlign: "center" }}>
               <div style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>내 투자 성적표</div>
               <div style={{ fontSize: "16px", color: C.text3, marginBottom: "16px" }}>AI가 분석한 나의 투자 현황을 공유해보세요</div>
-              <div style={{ display: "flex", justifyContent: "center", gap: "20px", marginBottom: "16px" }}>
-                <div>
-                  <div style={{ fontSize: "24px", fontWeight: 800, color: C.blue }}>{watchlist.length}</div>
-                  <div style={{ fontSize: "16px", color: C.text3 }}>관심종목</div>
+              <div className="flex justify-center gap-6 sm:gap-8 mb-4">
+                <div className="text-center">
+                  <div className="text-2xl font-extrabold" style={{ color: C.blue }}>{watchlist.length}</div>
+                  <div className="text-base text-muted-foreground">관심종목</div>
                 </div>
-                <div style={{ width: "1px", background: `${C.border}40` }} />
-                <div>
-                  <div style={{ fontSize: "24px", fontWeight: 800, color: C.purple || "#a855f7" }}>{(() => { try { return JSON.parse(localStorage.getItem(`zepta_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })()}</div>
-                  <div style={{ fontSize: "16px", color: C.text3 }}>운영봇</div>
+                <div className="w-px self-stretch" style={{ background: `${C.border}40` }} />
+                <div className="text-center">
+                  <div className="text-2xl font-extrabold" style={{ color: C.purple || "#a855f7" }}>{(() => { try { return JSON.parse(localStorage.getItem(`zepta_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })()}</div>
+                  <div className="text-base text-muted-foreground">운영봇</div>
                 </div>
-                <div style={{ width: "1px", background: `${C.border}40` }} />
-                <div>
-                  <div style={{ fontSize: "24px", fontWeight: 800, color: C.green }}>{(() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })()}</div>
-                  <div style={{ fontSize: "16px", color: C.text3 }}>투자일</div>
+                <div className="w-px self-stretch" style={{ background: `${C.border}40` }} />
+                <div className="text-center">
+                  <div className="text-2xl font-extrabold" style={{ color: C.green }}>{(() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })()}</div>
+                  <div className="text-base text-muted-foreground">투자일</div>
                 </div>
               </div>
               <button onClick={() => {

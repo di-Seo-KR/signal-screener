@@ -368,7 +368,7 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
   };
 
   return (
-    <div className="mb-60">
+    <div className="mb-10">
       <h2 className="text-2xl font-semibold mb-1" style={{ color: c.text1 }}>
         {title}
       </h2>
@@ -685,26 +685,26 @@ function BotCatalog({ onActivate, theme, isMobile }) {
   const c = colors[theme];
 
   return (
-    <div className="pb-10">
+    <div className="pb-6">
       {/* Hero Section */}
       <div
-        className="pb-10 mb-10 text-center"
+        className="mb-6 text-center"
         style={{
           background: `linear-gradient(135deg, ${c.blue}15 0%, ${c.purple}10 100%)`,
           borderBottom: `1px solid ${c.border}`,
-          padding: "60px 40px",
+          padding: isMobile ? "36px 20px" : "48px 40px",
         }}
       >
-        <h1 className="mb-4 text-5xl font-bold" style={{ margin: "0 0 16px 0", color: c.text1 }}>
+        <h1 className="mb-3 text-3xl sm:text-4xl font-bold" style={{ margin: "0 0 12px 0", color: c.text1 }}>
           AI 퀀트 전략
         </h1>
-        <p className="text-xl mx-auto" style={{ margin: "0", color: c.text2, maxWidth: "600px" }}>
+        <p className="text-lg sm:text-xl mx-auto" style={{ margin: "0", color: c.text2, maxWidth: "600px" }}>
           AI 기반 퀀트 봇이 24/7 시장을 분석하고 최적의 매매 시그널을 생성합니다
         </p>
       </div>
 
       {/* 봇 추천 플로우 */}
-      <div className="max-w-xl mx-auto px-10">
+      <div className="max-w-xl mx-auto px-4 sm:px-10">
         <BotRecommender onActivate={onActivate} theme={theme} isMobile={isMobile} />
       </div>
 
