@@ -6,7 +6,7 @@
 // v11.0: 토스증권 벤치마킹 기반 대개편 — 스크리너 프리셋, 글로벌 검색, 위험종목 필터, 실시간 티커
 import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
-import { LanguageProvider } from "./i18n/LanguageContext.jsx";
+import { LanguageProvider, useLanguage } from "./i18n/LanguageContext.jsx";
 import AuthPage from "./AuthPage.jsx";
 import { CoupangOfficialBanner, CoupangSearchWidget, CoupangInterstitial, GoogleAd, GoogleAdInterstitial } from "./AdBanner.jsx";
 import Header from "./components/Header.jsx";
@@ -1172,17 +1172,17 @@ function analyzeAsset(weeklyCloses, dailyCloses, weeklyVolumes, weeklyHighs, wee
 // 조건 메타데이터
 // ════════════════════════════════════════════════════════════════════
 const CONDITION_META = {
-  // 모멘텀 & 추세
+  // {t("tabs.screener.momentum")}
   rsi_extreme:     { label: "RSI 극단값",        icon: "⚡", desc: "RSI ≤ 25 또는 ≥ 75 — 극단적 과매수/과매도" },
   macd_divergence: { label: "MACD 다이버전스",    icon: "🔀", desc: "가격과 MACD 방향 불일치 — 추세 반전 선행지표" },
   ma_ribbon:       { label: "이평선 정배열/역배열", icon: "📐", desc: "MA20>MA50>MA200 정배열 또는 역배열 — 추세 강도 확인" },
   adx_trend:       { label: "ADX 강한 추세",      icon: "💪", desc: "ADX ≥ 25 + DI 방향 — 추세 존재 및 방향 확인" },
-  // 변동성 & 가격 구조
+  // {t("tabs.screener.volatility")}
   bb_squeeze:      { label: "TTM 스퀴즈",         icon: "🔥", desc: "BB가 Keltner Channel 내부 수축 (TTM Squeeze) — 대규모 변동 폭발 임박" },
   atr_breakout:    { label: "ATR 돌파",           icon: "🚀", desc: "당일 변동폭이 ATR(14) 2배 초과 — 폭발적 움직임" },
   price_channel:   { label: "채널 돌파",          icon: "📊", desc: "52주 고가/저가 채널 돌파 — 신고가 또는 지지선 이탈" },
   gap_signal:      { label: "갭 시그널",          icon: "⬆️", desc: "전주 대비 ±3% 이상 갭 — 수급 불균형" },
-  // 수급 & 거래량
+  // {t("tabs.screener.volume")}
   volume_climax:   { label: "거래량 클라이맥스",   icon: "🌊", desc: "거래량 20주 평균 3배 이상 — 세력 매집/투매 신호" },
   obv_divergence:  { label: "OBV 다이버전스",     icon: "📈", desc: "OBV와 가격 방향 불일치 — 스마트머니 움직임 포착" },
   volume_dry:      { label: "거래량 고갈",         icon: "🏜️", desc: "거래량 20주 평균 30% 이하 — 바닥 형성 가능" },
@@ -1217,7 +1217,7 @@ function analyzeSentiment(title) {
   if (!title) return "neutral";
   const t = ` ${title.toLowerCase()} `;
 
-  // ── 강한 긍정 (가중치 2) ──
+  // ── 강한 {t("sentiment.bullish")} (가중치 2) ──
   const strongPos = ["surge","soar","record high","all-time high","skyrocket","boom","breakout",
     "급등","폭등","신고가","사상최고","돌파","대박","호실적","깜짝실적","어닝서프라이즈"];
   // ── 긍정 (가중치 1) ──
@@ -1225,7 +1225,7 @@ function analyzeSentiment(title) {
     "upgrade","buy","strong","positive","recover","rebound","advance","climb","up ",
     "상승","호재","성장","흑자","매수","상향","강세","반등","회복","호조","개선",
     "수혜","낙관","기대","확대","증가","호황","상승세","매출증가","이익증가"];
-  // ── 강한 부정 (가중치 2) ──
+  // ── 강한 {t("sentiment.bearish")} (가중치 2) ──
   const strongNeg = ["crash","plunge","collapse","bankruptcy","default","crisis",
     "폭락","급락","파산","디폴트","위기","붕괴","대폭락","폭발적하락","서킷브레이커"];
   // ── 부정 (가중치 1) ──
@@ -1247,7 +1247,7 @@ function analyzeSentiment(title) {
   const hasNegator = negators.some(n => t.includes(n));
   if (hasNegator && score !== 0) score = -score * 0.5;
 
-  // "low risk" → 중립 보정, "high risk" → 부정 보정
+  // "low risk" → {t("sentiment.neutral")} 보정, "high risk" → 부정 보정
   if (t.includes("low risk")) score += 1;
   if (t.includes("high risk")) score -= 1;
   // "cut rates" (금리인하) → 긍정 보정
@@ -4164,6 +4164,7 @@ const SCREENER_PRESETS = [
 const OWNER_EMAIL = "donginseo0421@gmail.com";
 
 function AppInner() {
+  const { t } = useLanguage();
   const { user, loading: authLoading, signOut } = useAuth();
   const isOwner = (user?.email || "").toLowerCase() === OWNER_EMAIL;
   const [themeMode, setThemeMode] = useState(loadTheme);
@@ -4820,7 +4821,7 @@ function AppInner() {
             }
           });
 
-          reply += `현재 구성: ${portfolio.length}개 종목\n`;
+          reply += `현재 구성: ${portfolio.length}{t("tabs.home.items")}\n`;
           Object.entries(sectorConc).forEach(([sector, count]) => {
             const pct = (count / portfolio.length * 100).toFixed(0);
             reply += `  ${sector}: ${count}개 (${pct}%)\n`;
@@ -6943,18 +6944,18 @@ function AppInner() {
                   }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
                       <div style={{ fontSize: "15px", color: C.text3, fontWeight: 500 }}>
-                        {greeting} 마켓 브리핑
+                        {greeting} {t("tabs.home.marketBriefing")}
                         {marketIndices.length > 0 && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.green, display: "inline-block", marginLeft: "6px", animation: "livePulse 1.5s ease-in-out infinite" }} />}
                         {!marketLoading && marketIndices.length > 0 && <span style={{ fontSize: "13px", color: C.text3, marginLeft: "6px" }}>LIVE</span>}
                       </div>
                       <button onClick={fetchMarketOverview} disabled={marketLoading} style={{
                         background: "none", border: "none", fontSize: "16px", color: C.text3, cursor: "pointer", padding: "4px 8px",
-                      }}>{marketLoading ? "..." : "새로고침"}</button>
+                      }}>{marketLoading ? "..." : t("tabs.home.refresh")}</button>
                     </div>
                     {main && (
                       <div style={{ fontSize: "16px", fontWeight: 700, color: C.text1, lineHeight: 1.5, marginBottom: "10px" }}>
                         {mainName} <span style={{ color: trendColor }}>{main.change >= 0 ? "+" : ""}{main.change}% {trend}</span>
-                        {ks && <span style={{ color: C.text2, fontSize: "15px" }}> · 코스피 {ks.change >= 0 ? "+" : ""}{ks.change}%</span>}
+                        {ks && <span style={{ color: C.text2, fontSize: "15px" }}> · t("tabs.home.kospi") {ks.change >= 0 ? "+" : ""}{ks.change}%</span>}
                       </div>
                     )}
                     {/* 등락 비율 바 */}
@@ -7002,7 +7003,7 @@ function AppInner() {
                             background: `linear-gradient(135deg, ${fgColor}18, ${fgColor}08)`,
                             border: `1px solid ${fgColor}30`,
                           }}>
-                            <div style={{ fontSize: "13px", color: C.text3, marginBottom: "4px", fontWeight: 500 }}>투자심리</div>
+                            <div style={{ fontSize: "13px", color: C.text3, marginBottom: "4px", fontWeight: 500 }}>{t("tabs.home.investmentPsychology")}</div>
                             <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
                               <span style={{ fontWeight: 800, fontSize: "20px", color: fgColor }}>{fgVal}</span>
                               <span style={{ fontSize: "14px", fontWeight: 700, color: fgColor }}>{fgLabel}</span>
@@ -7029,7 +7030,7 @@ function AppInner() {
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
                   <span style={{ fontSize: "18px" }}>⚡</span>
-                  <span style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>이상 탐지</span>
+                  <span style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>{t("tabs.home.anomalyDetection")}</span>
                   <span style={{
                     fontSize: "16px", padding: "2px 8px", borderRadius: "10px", fontWeight: 700,
                     background: C.redBg, color: C.red,
@@ -7059,7 +7060,7 @@ function AppInner() {
                         {a.change >= 0 ? "+" : ""}{a.change}%
                       </div>
                       {a.severity === "high" && (
-                        <div style={{ fontSize: "15px", color: C.red, fontWeight: 600 }}>심각</div>
+                        <div style={{ fontSize: "15px", color: C.red, fontWeight: 600 }}>{t("tabs.home.severe")}</div>
                       )}
                     </div>
                   </div>
@@ -7078,9 +7079,9 @@ function AppInner() {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <span style={{ fontSize: "18px" }}>📊</span>
-                    <span style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>내 포트폴리오</span>
+                    <span style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>{t("tabs.home.myPortfolio")}</span>
                   </div>
-                  <span style={{ fontSize: "16px", color: C.text3 }}>{portfolio.length}개 종목 →</span>
+                  <span style={{ fontSize: "16px", color: C.text3 }}>{portfolio.length}{t("tabs.home.items")} →</span>
                 </div>
                 <div style={{ display: "flex", alignItems: "baseline", gap: "12px", marginBottom: "12px" }}>
                   <span style={{ fontWeight: 800, fontSize: "24px", color: C.text1 }}>
@@ -7615,7 +7616,7 @@ function AppInner() {
                 onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
                 onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                    <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>내 포트폴리오</span>
+                    <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{t("tabs.home.myPortfolio")}</span>
                     <span style={{ fontSize: "17px", color: C.text3 }}>{portfolio.length}개 →</span>
                   </div>
                   {totalValue > 0 ? (
@@ -7999,8 +8000,8 @@ function AppInner() {
             {/* ── 스크리너 프리셋 (토스 스타일) ── */}
             <div style={{ marginBottom: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                <div style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>주식 골라보기</div>
-                <span style={{ fontSize: "14px", color: C.text3 }}>프리셋 선택 또는 직접 조건 설정</span>
+                <div style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>{t("tabs.screener.title")}</div>
+                <span style={{ fontSize: "14px", color: C.text3 }}>{t("tabs.screener.subtitle")}</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(180px, 1fr))", gap: "10px" }}>
                 {SCREENER_PRESETS.map(preset => {
@@ -8029,7 +8030,7 @@ function AppInner() {
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
                         <span style={{ fontSize: "17px" }}>{preset.icon}</span>
                         <span style={{ fontWeight: 700, fontSize: "15px", color: isActive ? presetColor : C.text1 }}>{preset.name}</span>
-                        {preset.popular && <span style={{ fontSize: "12px", padding: "2px 6px", borderRadius: "4px", background: `${C.red}20`, color: C.red, fontWeight: 700 }}>인기</span>}
+                        {preset.popular && <span style={{ fontSize: "12px", padding: "2px 6px", borderRadius: "4px", background: `${C.red}20`, color: C.red, fontWeight: 700 }}>{t("tabs.screener.popular")}</span>}
                       </div>
                       <div style={{ fontSize: "13px", color: isActive ? presetColor : C.text3, lineHeight: 1.4 }}>{preset.desc}</div>
                       {isActive && <div style={{ position: "absolute", top: "8px", right: "8px", width: "20px", height: "20px", borderRadius: "50%", background: presetColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#fff" }}>✓</div>}
@@ -8062,7 +8063,7 @@ function AppInner() {
                   {lastScan && !scanning && (
                     <span style={{ fontSize: "16px", color: C.text3 }}>마지막: {lastScan.toLocaleTimeString("ko-KR")}</span>
                   )}
-                  <span style={{ fontSize: "16px", color: C.text3 }}>{conditions.length}개 조건 적용됨</span>
+                  <span style={{ fontSize: "16px", color: C.text3 }}>{conditions.length}{t("tabs.screener.conditionsAppliedCount")}</span>
                 </div>
               )}
             </div>
@@ -8075,9 +8076,9 @@ function AppInner() {
                 fontWeight: 700, fontSize: "18px", color: C.text1,
                 display: "flex", alignItems: "center", gap: "8px", listStyle: "none",
               }}>
-                <span>⚙️ 직접 조건 설정</span>
+                <span>⚙️ {t("tabs.screener.customSettings")}</span>
                 <span style={{ fontSize: "16px", color: C.text3, fontWeight: 500, marginLeft: "auto" }}>
-                  {conditions.length > 0 ? `${conditions.length}개 선택됨` : "조건을 직접 선택하세요"}
+                  {conditions.length > 0 ? `${conditions.length}${t("tabs.screener.conditionsApplied")}` : t("tabs.screener.selectConditions")}
                 </span>
               </summary>
             <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "0 0 18px 18px", padding: "22px 24px", marginTop: "-1px" }}>
@@ -8094,8 +8095,8 @@ function AppInner() {
                 </div>
               </div>
 
-              {/* 모멘텀 & 추세 */}
-              <div style={{ fontSize: "15px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>모멘텀 & 추세</div>
+              {/* {t("tabs.screener.momentum")} */}
+              <div style={{ fontSize: "15px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>{t("tabs.screener.momentum")}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", marginBottom: "14px" }}>
                 {["rsi_extreme","macd_divergence","rsi_divergence","mtf_rsi_oversold","mtf_rsi_overbought","ma_ribbon","adx_trend","adx_bullish","adx_bearish"].map(key => {
                   const meta = CONDITION_META[key];
@@ -8111,8 +8112,8 @@ function AppInner() {
                 })}
               </div>
 
-              {/* 변동성 & 가격 구조 */}
-              <div style={{ fontSize: "15px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>변동성 & 가격 구조</div>
+              {/* {t("tabs.screener.volatility")} */}
+              <div style={{ fontSize: "15px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>{t("tabs.screener.volatility")}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", marginBottom: "14px" }}>
                 {["bb_squeeze","atr_breakout","price_channel","gap_signal"].map(key => {
                   const meta = CONDITION_META[key];
@@ -8128,8 +8129,8 @@ function AppInner() {
                 })}
               </div>
 
-              {/* 수급 & 거래량 */}
-              <div style={{ fontSize: "15px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>수급 & 거래량</div>
+              {/* {t("tabs.screener.volume")} */}
+              <div style={{ fontSize: "15px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>{t("tabs.screener.volume")}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", marginBottom: "14px" }}>
                 {["volume_climax","obv_divergence","volume_dry","cmf_accumulation","cmf_distribution","mfi_oversold","mfi_overbought"].map(key => {
                   const meta = CONDITION_META[key];
@@ -8471,7 +8472,7 @@ function AppInner() {
                   display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px"
                 }}>⚡</div>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 800, color: C.text1 }}>이상 탐지</h2>
+                  <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 800, color: C.text1 }}>{t("tabs.home.anomalyDetection")}</h2>
                   <div style={{ fontSize: "16px", color: C.text3, marginTop: "2px" }}>
                     통계적 이상치 기반 실시간 시장 모니터링
                   </div>
@@ -9207,8 +9208,8 @@ function AppInner() {
             <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, ${C.isDark ? "#0D1B2A" : "#E3F2FD"} 100%)`, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "22px 24px", marginBottom: "12px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap", marginBottom: "14px" }}>
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: "17px", color: C.text1, marginBottom: "3px" }}>마켓 뉴스</div>
-                  <div style={{ fontSize: "14px", color: C.text3 }}>실시간 글로벌 투자 뉴스 · AI 센티먼트 분석</div>
+                  <div style={{ fontWeight: 800, fontSize: "17px", color: C.text1, marginBottom: "3px" }}>{t("tabs.news.title")}</div>
+                  <div style={{ fontSize: "14px", color: C.text3 }}>{t("tabs.news.subtitle")}</div>
                 </div>
                 <button onClick={fetchNews} disabled={newsLoading} style={{
                   padding: "8px 16px", borderRadius: "10px", fontSize: "14px", fontWeight: 700,
@@ -10004,7 +10005,7 @@ function AppInner() {
             <div style={{background:`linear-gradient(135deg, ${C.card} 0%, ${C.isDark ? "#0D1B2A" : "#EDE7F6"} 100%)`,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:"22px 24px",marginBottom:"12px"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"12px"}}>
                 <div>
-                  <div style={{fontWeight:800,fontSize:"17px",marginBottom:"4px",color:C.text1}}>소셜 센티먼트 분석</div>
+                  <div style={{fontWeight:800,fontSize:"17px",marginBottom:"4px",color:C.text1}}>{t("sentiment.title")}</div>
                   <div style={{fontSize:"14px",color:C.text3}}>StockTwits · Reddit(WSB) 기반 실시간 투자 심리</div>
                 </div>
                 <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
@@ -10216,7 +10217,7 @@ function AppInner() {
 
             {/* 계정 정보 */}
             <div style={{ background: C.card, border: `1px solid ${C.border}` }} className="rounded-[16px] overflow-hidden">
-              <div className="px-5 py-3.5 text-sm font-bold text-muted-foreground uppercase tracking-wider">계정 정보</div>
+              <div className="px-5 py-3.5 text-sm font-bold text-muted-foreground uppercase tracking-wider">{t("profile.accountInfo")}</div>
               {[
                 { label: "이메일", value: user?.email || "—" },
                 { label: "로그인 방식", value: user?.app_metadata?.provider === "google" ? "Google 로그인" : user?.app_metadata?.provider || "이메일" },
@@ -10233,7 +10234,7 @@ function AppInner() {
 
             {/* 투자 설정 현황 */}
             <div style={{ background: C.card, border: `1px solid ${C.border}` }} className="rounded-[16px] overflow-hidden">
-              <div className="px-5 py-3.5 text-sm font-bold text-muted-foreground uppercase tracking-wider">투자 설정</div>
+              <div className="px-5 py-3.5 text-sm font-bold text-muted-foreground uppercase tracking-wider">{t("profile.investmentSettings")}</div>
               {[
                 { label: "관심 종목", value: `${watchlist.length}개`, action: () => setTab("screener") },
                 { label: "운영 중 봇", value: (() => {
@@ -10321,7 +10322,7 @@ function AppInner() {
 
             {/* 앱 설정 */}
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden" }}>
-              <div style={{ padding: "14px 20px", fontSize: "16px", fontWeight: 700, color: C.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>앱 설정</div>
+              <div style={{ padding: "14px 20px", fontSize: "16px", fontWeight: 700, color: C.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("profile.appSettings")}</div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderTop: `1px solid ${C.border}20` }}>
                 <span style={{ fontSize: "18px", color: C.text2 }}>테마</span>
                 <button onClick={toggleTheme} style={{
