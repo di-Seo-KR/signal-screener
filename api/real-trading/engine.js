@@ -381,6 +381,11 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     try {
       const kv = await getKv();
       const planKey = `di:real:user:${userId}:plan:${plan.plan.symbol}`;
+      // ★ 같은 심볼에 기존 plan 이 있으면 덮어쓰지 않음 (포지션 추적 보호)
+      const existingPlan = await kv.get(planKey);
+      if (existingPlan && existingPlan.openedAt) {
+        S(`plan already exists for ${plan.plan.symbol} (opened ${new Date(existingPlan.openedAt).toISOString()}) — skip overwrite`);
+      } else {
       await kv.set(planKey, {
         symbol: plan.plan.symbol,
         side: plan.plan.side,
@@ -397,6 +402,7 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
         strategyFamily: plan.plan.strategyFamily,
       });
       S(`plan persisted to ${planKey}`);
+      } // end else (no existing plan)
     } catch (e) {
       S(`plan persist failed: ${e.message}`);
     }

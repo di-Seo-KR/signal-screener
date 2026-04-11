@@ -74,7 +74,7 @@ export default async function handler(req, res) {
         side: isLong ? "SELL" : "BUY",
         type: "MARKET",
         quantity: qty,
-        reduceOnly: "true",
+        reduceOnly: true,
         newOrderRespType: "RESULT",
       },
     });

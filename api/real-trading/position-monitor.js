@@ -186,39 +186,53 @@ async function checkUser(userId) {
         if (tick > 0) newSL = Math.round(newSL / tick) * tick;
         newSL = Number(newSL.toFixed(pricePrec));
 
-        // 기존 SL 주문(STOP_MARKET, reduceOnly) 찾기
-        const opens = await getOpenOrders({ ...creds, symbol: sym });
-        const oldSlOrders = (opens || []).filter((o) =>
-          (o.type === "STOP_MARKET" || o.type === "STOP") && (o.reduceOnly || o.closePosition)
-        );
-        for (const o of oldSlOrders) {
-          await cancelOrder({ ...creds, symbol: sym, orderId: o.orderId });
-        }
-        // 새 SL placement
+        // ★ CRITICAL SAFETY: 새 SL 을 먼저 배치하고, 성공 후 기존 SL 을 취소.
+        // 이렇게 하면 새 SL 배치 실패 시에도 기존 SL 이 유지되어
+        // 포지션이 SL 보호 없이 방치되는 갭을 완전히 제거한다.
         const closeQty = Math.abs(parseFloat(p.positionAmt));
-        await placeStopOrder({
+        const newSlClientId = `trail-${Date.now()}-${sym}`;
+        const newSlResult = await placeStopOrder({
           ...creds,
           symbol: sym,
           type: "STOP_MARKET",
           side: side === "LONG" ? "SELL" : "BUY",
           stopPrice: newSL,
           quantity: closeQty,
-          clientOrderId: `trail-${Date.now()}-${sym}`,
+          closePosition: true,
+          reduceOnly: true,
+          clientOrderId: newSlClientId,
         });
-        plan.currentSlPrice = newSL;
-        await kv.set(planKey, plan);
-        report.trailed.push({ sym, newSL, reason: trail.reason, currentR: trail.currentR });
+        // 새 SL 배치 성공 확인 후에만 기존 SL 취소
+        if (!newSlResult || newSlResult?.code) {
+          // 새 SL 실패 → 기존 SL 유지, 이번 사이클 skip
+          report.trailed.push({ sym, error: `new SL placement failed: ${newSlResult?.msg || "unknown"}`, kept_old_sl: true });
+        } else {
+          // 새 SL 성공 → 이전 SL 주문들 취소 (새 것 제외)
+          const opens = await getOpenOrders({ ...creds, symbol: sym });
+          const oldSlOrders = (opens || []).filter((o) =>
+            (o.type === "STOP_MARKET" || o.type === "STOP")
+            && (o.reduceOnly || o.closePosition === "true" || o.closePosition === true)
+            && o.clientOrderId !== newSlClientId
+          );
+          for (const o of oldSlOrders) {
+            try { await cancelOrder({ ...creds, symbol: sym, orderId: o.orderId }); }
+            catch (ce) { console.warn(`[trail] old SL cancel failed: ${o.orderId}`, ce?.message); }
+          }
+          plan.currentSlPrice = newSL;
+          await kv.set(planKey, plan);
+          report.trailed.push({ sym, newSL, reason: trail.reason, currentR: trail.currentR });
 
-        const logKey = `di:real:user:${userId}:engine-log`;
-        const log = (await kv.get(logKey)) || [];
-        log.unshift({
-          time: new Date().toISOString(),
-          event: "trailing_stop",
-          symbol: sym,
-          newSL,
-          reason: trail.reason,
-        });
-        await kv.set(logKey, log.slice(0, 200));
+          const logKey = `di:real:user:${userId}:engine-log`;
+          const log = (await kv.get(logKey)) || [];
+          log.unshift({
+            time: new Date().toISOString(),
+            event: "trailing_stop",
+            symbol: sym,
+            newSL,
+            reason: trail.reason,
+          });
+          await kv.set(logKey, log.slice(0, 200));
+        } // end if newSlResult ok
       } catch (e) {
         report.trailed.push({ sym, error: e?.message });
       }

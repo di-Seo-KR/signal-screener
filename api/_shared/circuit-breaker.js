@@ -158,24 +158,31 @@ export async function preTradeCheck(userId, currentEquity) {
  * @param {number} realizedPnL  (USDT, 손익 금액)
  */
 export async function recordTradeResult(userId, realizedPnL) {
-  const kv = await getKv();
-  const key = `di:real:user:${userId}:breaker`;
-  const state = (await kv.get(key)) || {};
-  const now = Date.now();
+  try {
+    const kv = await getKv();
+    const key = `di:real:user:${userId}:breaker`;
+    const state = (await kv.get(key)) || {};
+    const now = Date.now();
 
-  if (realizedPnL < 0) {
-    state.consecLosses = (state.consecLosses || 0) + 1;
-    state.lastLossAt = now;
-    if (state.consecLosses >= BREAKER_LIMITS.consecLossThreshold) {
-      state.cooldownUntil = now + BREAKER_LIMITS.cooldownMs;
+    if (realizedPnL < 0) {
+      state.consecLosses = (state.consecLosses || 0) + 1;
+      state.lastLossAt = now;
+      if (state.consecLosses >= BREAKER_LIMITS.consecLossThreshold) {
+        state.cooldownUntil = now + BREAKER_LIMITS.cooldownMs;
+        state.consecLosses = 0;
+      }
+    } else if (realizedPnL > 0) {
       state.consecLosses = 0;
     }
-  } else if (realizedPnL > 0) {
-    state.consecLosses = 0;
-  }
 
-  await kv.set(key, state);
-  return state;
+    await kv.set(key, state);
+    return state;
+  } catch (e) {
+    // ★ KV 장애 시에도 크래시하지 않고 안전하게 실패.
+    // 연속손실 카운터가 갱신 안 되더라도 거래 자체는 이미 종료된 상태.
+    console.error(`[circuit-breaker] recordTradeResult failed for ${userId}:`, e?.message);
+    return null;
+  }
 }
 
 /**

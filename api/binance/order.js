@@ -183,7 +183,7 @@ export async function executeOrderPlan(opts) {
             side: closeSide,
             type: "MARKET",
             quantity: qty,
-            reduceOnly: "true",
+            reduceOnly: true,
             newOrderRespType: "RESULT",
             newClientOrderId: clientOrderId ? `${clientOrderId}-RESCUE` : undefined,
           },

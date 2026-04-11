@@ -313,10 +313,10 @@ export function placeStopOrder({
     newOrderRespType: "RESULT",
   };
   if (closePosition) {
-    params.closePosition = "true";
+    params.closePosition = true;
   } else {
     params.quantity = quantity;
-    params.reduceOnly = "true";
+    params.reduceOnly = true;
   }
   if (clientOrderId) params.newClientOrderId = clientOrderId;
   return binanceSignedRequest({

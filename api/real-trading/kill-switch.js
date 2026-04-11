@@ -25,10 +25,19 @@ async function getKv() {
   return (await import("@vercel/kv")).kv;
 }
 
+// ★ POST 변경 작업은 CRON_SECRET 또는 TRADING_ADMIN_SECRET 인증 필수
+// GET 조회는 userId 만으로 허용 (대시보드 표시용, 민감 정보 미노출)
+function verifyAdminAuth(req) {
+  const secret = process.env.TRADING_ADMIN_SECRET || process.env.CRON_SECRET;
+  if (!secret) return true; // 시크릿 미설정 시 개발 환경으로 간주
+  const auth = req.headers?.authorization || "";
+  return auth === `Bearer ${secret}`;
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") return res.status(200).end();
 
   try {
@@ -51,6 +60,10 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
+      // ★ 인증 검증 — 제3자가 킬스위치/phase1 을 조작하는 것을 차단
+      if (!verifyAdminAuth(req)) {
+        return res.status(401).json({ error: "Unauthorized: Bearer token required" });
+      }
       const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
       const { userId, action, reason } = body;
       if (!userId || !action) return res.status(400).json({ error: "userId, action required" });
