@@ -7600,7 +7600,7 @@ function AppInner() {
                 <div style={{
                   background: `linear-gradient(135deg, ${C.card} 0%, ${C.purple}08 100%)`,
                   borderRadius: "18px", padding: "18px", border: `1px solid ${C.purple}15`,
-                  position: "relative", overflow: "hidden",
+                  position: "relative", overflow: "hidden", flexShrink: 0,
                 }}>
                   <div style={{ position: "absolute", top: "-30px", right: "-20px", width: "100px", height: "100px",
                     borderRadius: "50%", background: `${C.purple}06`, filter: "blur(30px)", pointerEvents: "none" }} />
@@ -7724,7 +7724,7 @@ function AppInner() {
                 <div style={{
                   background: `linear-gradient(135deg, ${C.card} 0%, ${C.blue}08 100%)`,
                   borderRadius: "18px", padding: "18px", border: `1px solid ${C.blue}15`,
-                  position: "relative", overflow: "hidden",
+                  position: "relative", overflow: "hidden", flexShrink: 0,
                 }}>
                   <div style={{ position: "absolute", top: "-20px", left: "-15px", width: "80px", height: "80px",
                     borderRadius: "50%", background: `${C.blue}06`, filter: "blur(25px)", pointerEvents: "none" }} />
