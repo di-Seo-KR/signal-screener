@@ -372,8 +372,8 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
       <h2 className="text-2xl font-semibold mb-1" style={{ color: c.text1 }}>
         {title}
       </h2>
-      {subtitle && <p className="text-[15px] mb-5" style={{ margin: "0 0 20px", color: c.text3 }}>{subtitle}</p>}
-      {!subtitle && <div className="mb-5" />}
+      {subtitle && <p className="text-[15px] mb-4" style={{ margin: "0 0 16px", color: c.text3 }}>{subtitle}</p>}
+      {!subtitle && <div className="mb-4" />}
 
       {/* 모바일: 수평 스와이프 캐러셀 */}
       {isMobile ? (
@@ -407,8 +407,8 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
         </>
       ) : (
         /* PC: 기존 그리드 */
-        <div className="grid gap-6" style={{
-          gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+        <div className="grid gap-4" style={{
+          gridTemplateColumns: "repeat(auto-fill, minmax(min(340px, 100%), 1fr))",
         }}>
           {bots.map((bot) => (
             <BotCard key={bot.id} bot={bot} onActivate={onActivate} theme={theme} />
@@ -432,7 +432,7 @@ function BotCard({ bot, onActivate, theme }) {
 
   return (
     <div
-      className="flex flex-col gap-4 p-6 rounded-xl cursor-pointer transition-all duration-300"
+      className="flex flex-col gap-3.5 p-5 rounded-xl cursor-pointer transition-all duration-300"
       style={{
         backgroundColor: c.card,
         border: `1px solid ${c.border}`,
@@ -609,8 +609,8 @@ function BotRecommender({ onActivate, theme, isMobile }) {
 
   if (result) {
     return (
-      <div className="rounded-2xl p-8 mb-10" style={{ background: c.card, border: `1px solid ${c.border}` }}>
-        <div className="text-center mb-6">
+      <div className="rounded-2xl p-6 sm:p-8 mb-8" style={{ background: c.card, border: `1px solid ${c.border}` }}>
+        <div className="text-center mb-5">
           <div className="text-[28px] mb-2">🎯</div>
           <h3 className="m-0 mb-2 text-lg" style={{ color: c.text1 }}>추천 봇</h3>
           <p className="m-0 text-[15px]" style={{ color: c.text3 }}>투자 성향에 맞는 봇을 찾았습니다</p>
@@ -647,8 +647,8 @@ function BotRecommender({ onActivate, theme, isMobile }) {
 
   const q = questions[step];
   return (
-    <div className="rounded-2xl p-8 mb-10" style={{ background: c.card, border: `1px solid ${c.border}` }}>
-      <div className="flex justify-between items-center mb-5">
+    <div className="rounded-2xl p-6 sm:p-8 mb-8" style={{ background: c.card, border: `1px solid ${c.border}` }}>
+      <div className="flex justify-between items-center mb-4">
         <h3 className="m-0 text-lg" style={{ color: c.text1 }}>🤖 나에게 맞는 봇 찾기</h3>
         <span className="text-sm" style={{ color: c.text3 }}>{step + 1} / {questions.length}</span>
       </div>
@@ -685,26 +685,26 @@ function BotCatalog({ onActivate, theme, isMobile }) {
   const c = colors[theme];
 
   return (
-    <div className="pb-6">
+    <div className="pb-6 px-1">
       {/* Hero Section */}
       <div
-        className="mb-6 text-center"
+        className="mb-6 text-center rounded-2xl"
         style={{
-          background: `linear-gradient(135deg, ${c.blue}15 0%, ${c.purple}10 100%)`,
-          borderBottom: `1px solid ${c.border}`,
-          padding: isMobile ? "36px 20px" : "48px 40px",
+          background: `linear-gradient(135deg, ${c.blue}12 0%, ${c.purple}08 100%)`,
+          border: `1px solid ${c.border}`,
+          padding: isMobile ? "28px 20px" : "36px 32px",
         }}
       >
-        <h1 className="mb-3 text-3xl sm:text-4xl font-bold" style={{ margin: "0 0 12px 0", color: c.text1 }}>
+        <h1 className="mb-2 text-2xl sm:text-3xl font-bold" style={{ margin: "0 0 8px 0", color: c.text1 }}>
           AI 퀀트 전략
         </h1>
-        <p className="text-lg sm:text-xl mx-auto" style={{ margin: "0", color: c.text2, maxWidth: "600px" }}>
+        <p className="text-base sm:text-lg mx-auto" style={{ margin: "0", color: c.text2, maxWidth: "520px" }}>
           AI 기반 퀀트 봇이 24/7 시장을 분석하고 최적의 매매 시그널을 생성합니다
         </p>
       </div>
 
       {/* 봇 추천 플로우 */}
-      <div className="max-w-xl mx-auto px-4 sm:px-10">
+      <div className="max-w-xl mx-auto px-4 sm:px-6">
         <BotRecommender onActivate={onActivate} theme={theme} isMobile={isMobile} />
       </div>
 
@@ -1004,17 +1004,17 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
         <div className="mb-4" style={cardStyle}>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <div className="text-sm mb-1.5" style={{ color: c.text3 }}>가상 포트폴리오 잔고</div>
-              <div className="text-[26px] font-extrabold" style={{ color: c.text1 }}>${totalEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+              <div className="text-xs mb-1" style={{ color: c.text3 }}>가상 포트폴리오 잔고</div>
+              <div className="text-2xl font-extrabold" style={{ color: c.text1 }}>${totalEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
             </div>
             <div>
-              <div className="text-sm mb-1.5" style={{ color: c.text3 }}>투입 가능 금액</div>
-              <div className="text-[26px] font-extrabold" style={{ color: c.green }}>${available.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+              <div className="text-xs mb-1" style={{ color: c.text3 }}>투입 가능 금액</div>
+              <div className="text-2xl font-extrabold" style={{ color: c.green }}>${available.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
             </div>
             {hasPausedBots && (
               <div>
-                <div className="text-sm mb-1.5" style={{ color: c.text3 }}>일시정지된 봇</div>
-                <div className="text-[26px] font-extrabold" style={{ color: c.yellow }}>{activeBots.filter(ab => ab.status === "paused").length}개</div>
+                <div className="text-xs mb-1" style={{ color: c.text3 }}>일시정지된 봇</div>
+                <div className="text-2xl font-extrabold" style={{ color: c.yellow }}>{activeBots.filter(ab => ab.status === "paused").length}개</div>
               </div>
             )}
           </div>
@@ -1092,20 +1092,20 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
             {/* 상단: 총 AUM + ROI */}
             <div className="flex justify-between items-start mb-4 flex-wrap gap-3">
               <div>
-                <div className="text-sm mb-1" style={{ color: c.text3 }}>현재 AUM</div>
-                <div className="text-[36px] font-extrabold" style={{ color: c.text1, letterSpacing: "-1px" }}>
+                <div className="text-xs mb-1" style={{ color: c.text3 }}>현재 AUM</div>
+                <div className="font-extrabold" style={{ color: c.text1, letterSpacing: "-0.5px", fontSize: isMobile ? "26px" : "32px" }}>
                   ${currentAUM.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </div>
-                <div className="text-sm mt-0.5" style={{ color: c.text3 }}>
+                <div className="text-xs mt-0.5" style={{ color: c.text3 }}>
                   투입: ${totalAllocated.toLocaleString()}
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-sm mb-1" style={{ color: c.text3 }}>총 수익률 (ROI)</div>
-                <div className="text-[32px] font-extrabold" style={{ color: grandROI >= 0 ? c.green : c.red }}>
+                <div className="text-xs mb-1" style={{ color: c.text3 }}>총 수익률 (ROI)</div>
+                <div className="font-extrabold" style={{ color: grandROI >= 0 ? c.green : c.red, fontSize: isMobile ? "24px" : "28px" }}>
                   {grandROI >= 0 ? "+" : ""}{grandROI.toFixed(2)}%
                 </div>
-                <div className="text-sm font-semibold mt-0.5" style={{ color: grandTotalPL >= 0 ? c.green : c.red }}>
+                <div className="text-xs font-semibold mt-0.5" style={{ color: grandTotalPL >= 0 ? c.green : c.red }}>
                   {grandTotalPL >= 0 ? "+" : ""}${grandTotalPL.toFixed(2)}
                 </div>
               </div>
@@ -1114,8 +1114,8 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
             {/* 핵심 지표 그리드 */}
             <div className="mb-1" style={{
               display: "grid",
-              gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(6, 1fr)",
-              gap: isMobile ? "8px" : "12px",
+              gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(6, 1fr)",
+              gap: isMobile ? "6px" : "10px",
             }}>
               {[
                 { label: "미실현 손익", value: `${grandUnrealized >= 0 ? "+" : ""}$${grandUnrealized.toFixed(2)}`, color: grandUnrealized >= 0 ? c.green : c.red },
@@ -1126,8 +1126,8 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                 { label: "총 승/패", value: `${grandWins}/${grandTrades - grandWins}`, color: c.text1 },
               ].map((m, i) => (
                 <div key={i} className="rounded-[10px] text-center" style={{ padding: isMobile ? "8px 6px" : "10px 12px", background: c.card2 }}>
-                  <div className="mb-1 whitespace-nowrap" style={{ fontSize: isMobile ? "11px" : "14px", color: c.text3 }}>{m.label}</div>
-                  <div className="font-bold whitespace-nowrap" style={{ fontSize: isMobile ? "15px" : "18px", color: m.color }}>{m.value}</div>
+                  <div className="mb-0.5 whitespace-nowrap" style={{ fontSize: isMobile ? "11px" : "13px", color: c.text3 }}>{m.label}</div>
+                  <div className="font-bold whitespace-nowrap" style={{ fontSize: isMobile ? "14px" : "16px", color: m.color }}>{m.value}</div>
                 </div>
               ))}
             </div>
@@ -1139,7 +1139,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
       {isMobile ? (
         <ActiveBotCarousel activeBots={activeBots} allBotPerf={allBotPerf} onSelectBot={onSelectBot} onStopBot={onStopBot} onAddFund={onAddFund} theme={theme} cardStyle={cardStyle} />
       ) : null}
-      <div className={isMobile ? "hidden" : "grid gap-3 grid-cols-1 md:grid-cols-2"}>
+      <div className={isMobile ? "hidden" : "grid gap-3"} style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(420px, 100%), 1fr))" }}>
         {activeBots.filter(ab => ab.status !== "paused").map(ab => {
           const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
           const elapsed = Date.now() - (ab.startedAt || Date.now());
@@ -1626,7 +1626,7 @@ export default function AutoTrading({ theme = "dark", user }) {
         backgroundColor: c.bg,
         color: c.text1,
         minHeight: "100vh",
-        padding: "40px 20px",
+        padding: isMobile ? "24px 16px" : "32px 24px",
       }}
     >
       <div style={{ maxWidth: "1400px", margin: "0 auto" }}>

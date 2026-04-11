@@ -6941,19 +6941,19 @@ function AppInner() {
                     padding: "22px 24px 18px",
                   }}>
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                      <div style={{ fontSize: "17px", color: C.text3, fontWeight: 500 }}>
+                      <div style={{ fontSize: "15px", color: C.text3, fontWeight: 500 }}>
                         {greeting} 마켓 브리핑
                         {marketIndices.length > 0 && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.green, display: "inline-block", marginLeft: "6px", animation: "livePulse 1.5s ease-in-out infinite" }} />}
-                        {!marketLoading && marketIndices.length > 0 && <span style={{ fontSize: "15px", color: C.text3, marginLeft: "6px" }}>LIVE</span>}
+                        {!marketLoading && marketIndices.length > 0 && <span style={{ fontSize: "13px", color: C.text3, marginLeft: "6px" }}>LIVE</span>}
                       </div>
                       <button onClick={fetchMarketOverview} disabled={marketLoading} style={{
                         background: "none", border: "none", fontSize: "16px", color: C.text3, cursor: "pointer", padding: "4px 8px",
                       }}>{marketLoading ? "..." : "새로고침"}</button>
                     </div>
                     {main && (
-                      <div style={{ fontSize: "18px", fontWeight: 700, color: C.text1, lineHeight: 1.5, marginBottom: "12px" }}>
+                      <div style={{ fontSize: "16px", fontWeight: 700, color: C.text1, lineHeight: 1.5, marginBottom: "10px" }}>
                         {mainName} <span style={{ color: trendColor }}>{main.change >= 0 ? "+" : ""}{main.change}% {trend}</span>
-                        {ks && <span style={{ color: C.text2, fontSize: "18px" }}> · 코스피 {ks.change >= 0 ? "+" : ""}{ks.change}%</span>}
+                        {ks && <span style={{ color: C.text2, fontSize: "15px" }}> · 코스피 {ks.change >= 0 ? "+" : ""}{ks.change}%</span>}
                       </div>
                     )}
                     {/* 등락 비율 바 */}
@@ -6985,11 +6985,11 @@ function AppInner() {
                           }}
                           onMouseEnter={e => { if (!idx.symbol.includes("=X")) e.currentTarget.style.transform = "scale(1.03)"; }}
                           onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
-                            <div style={{ fontSize: "16px", color: C.text3, marginBottom: "5px", whiteSpace: "nowrap", fontWeight: 500 }}>{idx.flag} {idx.name}</div>
-                            <div style={{ fontWeight: 700, fontSize: "18px", color: C.text1, marginBottom: "2px" }}>
+                            <div style={{ fontSize: "13px", color: C.text3, marginBottom: "4px", whiteSpace: "nowrap", fontWeight: 500 }}>{idx.flag} {idx.name}</div>
+                            <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "2px" }}>
                               {idx.name.includes("환율") ? `₩${Math.round(idx.price).toLocaleString()}` : idx.price.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                             </div>
-                            <div style={{ fontSize: "16px", fontWeight: 600, color: idx.change >= 0 ? C.green : C.red }}>
+                            <div style={{ fontSize: "14px", fontWeight: 600, color: idx.change >= 0 ? C.green : C.red }}>
                               {idx.change >= 0 ? "+" : ""}{idx.change}%
                             </div>
                           </div>
@@ -7001,10 +7001,10 @@ function AppInner() {
                             background: `linear-gradient(135deg, ${fgColor}18, ${fgColor}08)`,
                             border: `1px solid ${fgColor}30`,
                           }}>
-                            <div style={{ fontSize: "16px", color: C.text3, marginBottom: "5px", fontWeight: 500 }}>투자심리</div>
+                            <div style={{ fontSize: "13px", color: C.text3, marginBottom: "4px", fontWeight: 500 }}>투자심리</div>
                             <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-                              <span style={{ fontWeight: 800, fontSize: "22px", color: fgColor }}>{fgVal}</span>
-                              <span style={{ fontSize: "16px", fontWeight: 700, color: fgColor }}>{fgLabel}</span>
+                              <span style={{ fontWeight: 800, fontSize: "20px", color: fgColor }}>{fgVal}</span>
+                              <span style={{ fontSize: "14px", fontWeight: 700, color: fgColor }}>{fgLabel}</span>
                             </div>
                             <div style={{ marginTop: "6px", height: "4px", borderRadius: "2px", background: C.card2, overflow: "hidden" }}>
                               <div style={{ height: "100%", width: `${fgVal}%`, background: fgColor, borderRadius: "2px", transition: "width .5s ease" }} />
@@ -7998,8 +7998,8 @@ function AppInner() {
             {/* ── 스크리너 프리셋 (토스 스타일) ── */}
             <div style={{ marginBottom: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                <div style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>주식 골라보기</div>
-                <span style={{ fontSize: "16px", color: C.text3 }}>프리셋 선택 또는 직접 조건 설정</span>
+                <div style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>주식 골라보기</div>
+                <span style={{ fontSize: "14px", color: C.text3 }}>프리셋 선택 또는 직접 조건 설정</span>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "10px" }}>
                 {SCREENER_PRESETS.map(preset => {
@@ -8026,11 +8026,11 @@ function AppInner() {
                     onMouseEnter={e => { if (!isActive) { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = `${presetColor}30`; } }}
                     onMouseLeave={e => { if (!isActive) { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${C.border}20`; } }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                        <span style={{ fontSize: "18px" }}>{preset.icon}</span>
-                        <span style={{ fontWeight: 700, fontSize: "18px", color: isActive ? presetColor : C.text1 }}>{preset.name}</span>
-                        {preset.popular && <span style={{ fontSize: "14px", padding: "2px 6px", borderRadius: "4px", background: `${C.red}20`, color: C.red, fontWeight: 700 }}>인기</span>}
+                        <span style={{ fontSize: "17px" }}>{preset.icon}</span>
+                        <span style={{ fontWeight: 700, fontSize: "15px", color: isActive ? presetColor : C.text1 }}>{preset.name}</span>
+                        {preset.popular && <span style={{ fontSize: "12px", padding: "2px 6px", borderRadius: "4px", background: `${C.red}20`, color: C.red, fontWeight: 700 }}>인기</span>}
                       </div>
-                      <div style={{ fontSize: "16px", color: isActive ? presetColor : C.text3, lineHeight: 1.4 }}>{preset.desc}</div>
+                      <div style={{ fontSize: "13px", color: isActive ? presetColor : C.text3, lineHeight: 1.4 }}>{preset.desc}</div>
                       {isActive && <div style={{ position: "absolute", top: "8px", right: "8px", width: "20px", height: "20px", borderRadius: "50%", background: presetColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#fff" }}>✓</div>}
                     </button>
                   );
@@ -8041,7 +8041,7 @@ function AppInner() {
               {activePreset && (
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "12px", flexWrap: "wrap" }}>
                   <button onClick={runScan} disabled={scanning || conditions.length === 0} style={{
-                    padding: "10px 20px", borderRadius: "10px", fontSize: "17px", fontWeight: 700,
+                    padding: "10px 20px", borderRadius: "10px", fontSize: "15px", fontWeight: 700,
                     background: scanning ? C.card2 : C.blue, color: scanning ? C.text3 : "#fff",
                     border: "none", cursor: scanning ? "not-allowed" : "pointer", minWidth: "100px",
                   }}>
@@ -9206,11 +9206,11 @@ function AppInner() {
             <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, ${C.isDark ? "#0D1B2A" : "#E3F2FD"} 100%)`, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "22px 24px", marginBottom: "12px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap", marginBottom: "14px" }}>
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: "18px", color: C.text1, marginBottom: "3px" }}>마켓 뉴스</div>
-                  <div style={{ fontSize: "16px", color: C.text3 }}>실시간 글로벌 투자 뉴스 · AI 센티먼트 분석</div>
+                  <div style={{ fontWeight: 800, fontSize: "17px", color: C.text1, marginBottom: "3px" }}>마켓 뉴스</div>
+                  <div style={{ fontSize: "14px", color: C.text3 }}>실시간 글로벌 투자 뉴스 · AI 센티먼트 분석</div>
                 </div>
                 <button onClick={fetchNews} disabled={newsLoading} style={{
-                  padding: "8px 16px", borderRadius: "10px", fontSize: "16px", fontWeight: 700,
+                  padding: "8px 16px", borderRadius: "10px", fontSize: "14px", fontWeight: 700,
                   background: newsLoading ? C.card2 : C.blue, color: newsLoading ? C.text3 : "#fff",
                   border: "none", cursor: newsLoading ? "default" : "pointer",
                 }}>{newsLoading ? "로딩 중..." : "새로고침"}</button>
@@ -9227,7 +9227,7 @@ function AppInner() {
                       <div style={{ width: `${(neuCnt / sortedNews.length) * 100}%`, background: C.text3 + "40", transition: "width .5s" }} />
                       <div style={{ width: `${(negCnt / sortedNews.length) * 100}%`, background: C.red, transition: "width .5s" }} />
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "16px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
                       <span style={{ color: C.green, fontWeight: 600 }}>긍정 {posCnt}</span>
                       <span style={{ color: C.text3 }}>중립 {neuCnt}</span>
                       <span style={{ color: C.red, fontWeight: 600 }}>부정 {negCnt}</span>
@@ -9244,7 +9244,7 @@ function AppInner() {
                   ["crypto", "₿ 크립토"],
                 ].map(([v, l]) => (
                   <button key={v} onClick={() => setNewsCat(v)} style={{
-                    padding: "5px 12px", borderRadius: "8px", fontSize: "16px", fontWeight: 600,
+                    padding: "5px 12px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
                     background: newsCat === v ? C.blueBg : "transparent",
                     color: newsCat === v ? C.blue : C.text3,
                     border: `1px solid ${newsCat === v ? C.blue + "40" : "transparent"}`,
@@ -9258,7 +9258,7 @@ function AppInner() {
                   ["negative", "부정"],
                 ].map(([v, l]) => (
                   <button key={v} onClick={() => setNewsSort(v)} style={{
-                    padding: "5px 12px", borderRadius: "8px", fontSize: "16px", fontWeight: 600,
+                    padding: "5px 12px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
                     background: newsSort === v ? (v === "positive" ? C.greenBg : v === "negative" ? C.redBg : C.blueBg) : "transparent",
                     color: newsSort === v ? (v === "positive" ? C.green : v === "negative" ? C.red : C.blue) : C.text3,
                     border: "none", cursor: "pointer", transition: "all .15s",
@@ -9275,7 +9275,7 @@ function AppInner() {
               <div style={{ background: C.card, border: `1px solid ${C.border}20` }} className="rounded-[18px] p-12 text-center">
                 <div style={{ background: C.blueBg }} className="w-14 h-14 rounded-[16px] flex items-center justify-center mx-auto mb-3.5 text-2xl">📰</div>
                 <div className="font-bold text-lg mb-1.5 text-foreground" style={{color: C.text1}}>뉴스를 불러오는 중</div>
-                <div className="text-[17px]" style={{ color: C.text3 }}>새로고침을 눌러 최신 뉴스를 확인하세요</div>
+                <div className="text-base" style={{ color: C.text3 }}>새로고침을 눌러 최신 뉴스를 확인하세요</div>
               </div>
             ) : (
               <div className="flex flex-col gap-2">
@@ -9407,7 +9407,7 @@ function AppInner() {
                     <div className="flex items-center justify-between mb-4">
                       <button onClick={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y-1); } else setCalMonth(m => m-1); }}
                         className="bg-transparent border-none text-lg cursor-pointer p-1" style={{color: C.text2}}>‹</button>
-                      <span className="font-bold text-[17px] text-foreground">{calYear}년 {monthNames[calMonth]}</span>
+                      <span className="font-bold text-base text-foreground">{calYear}년 {monthNames[calMonth]}</span>
                       <button onClick={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y+1); } else setCalMonth(m => m+1); }}
                         className="bg-transparent border-none text-lg cursor-pointer p-1" style={{color: C.text2}}>›</button>
                     </div>
@@ -9439,7 +9439,7 @@ function AppInner() {
                             }
                           }} style={{
                             textAlign: "center", padding: "6px 0", borderRadius: "8px",
-                            fontSize: "17px", fontWeight: isToday || isSelected ? 800 : 500, position: "relative",
+                            fontSize: "15px", fontWeight: isToday || isSelected ? 800 : 500, position: "relative",
                             color: isToday ? "#fff" : isSelected ? C.blue : hasEvent ? C.text1 : C.text3,
                             background: isToday ? C.blue : isSelected ? `${C.blue}20` : "transparent",
                             cursor: hasEvent ? "pointer" : "default",
@@ -9465,9 +9465,9 @@ function AppInner() {
                     }} className="rounded-[16px] p-5">
                       <div className="flex items-center gap-1.5 mb-3">
                         <span className="text-lg">✦</span>
-                        <span className="font-bold text-[17px]" style={{color: C.blue}}>이번주 AI 요약</span>
+                        <span className="font-bold text-base" style={{color: C.blue}}>이번주 AI 요약</span>
                       </div>
-                      <div className="text-[17px] text-foreground leading-relaxed"  style={{ color: C.text1 }}>
+                      <div className="text-[15px] text-foreground leading-relaxed"  style={{ color: C.text1 }}>
                         {importantThisWeek.map((evt, i) => {
                           const kd = new Date(evt.date.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
                           const dayName = ["일","월","화","수","목","금","토"][kd.getDay()];
@@ -9493,7 +9493,7 @@ function AppInner() {
                   {/* 필터 탭 */}
                   <div className="flex gap-1.5 mb-5 flex-wrap">
                     {calFilterTabs.map(ft => (
-                      <button key={ft.key} onClick={() => setEconFilter(ft.key)} className="px-4.5 py-2 rounded-[10px] text-[17px] font-semibold cursor-pointer transition-all" style={{
+                      <button key={ft.key} onClick={() => setEconFilter(ft.key)} className="px-4 py-2 rounded-[10px] text-base font-semibold cursor-pointer transition-all" style={{
                         background: econFilter === ft.key ? C.blueBg : C.card,
                         color: econFilter === ft.key ? C.blue : C.text2,
                         border: `1px solid ${econFilter === ft.key ? C.blue + "44" : C.border + "30"}`,
@@ -9514,7 +9514,7 @@ function AppInner() {
                     return (
                     <div key={gi} id={weekId} className="mb-6" style={{ scrollMarginTop: "80px" }}>
                       {/* 주차 헤더 */}
-                      <div className="text-[17px] font-bold text-foreground mb-3 px-1" style={{color: C.text1}}>
+                      <div className="text-base font-bold text-foreground mb-3 px-1" style={{color: C.text1}}>
                         {group.monthLabel} {group.weekLabel}
                       </div>
 
@@ -9561,16 +9561,16 @@ function AppInner() {
                             >
                               {/* 날짜 */}
                               <div>
-                                <span className="text-lg font-bold" style={{
+                                <span className="text-base font-bold" style={{
                                   color: isToday ? C.blue : C.text1,
                                 }}>{d}{dayName}</span>
                               </div>
 
                               {/* 이벤트명 */}
                               <div className="flex items-center gap-2 min-w-0">
-                                <span className="text-lg flex-shrink-0">{evt.icon}</span>
+                                <span className="text-base flex-shrink-0">{evt.icon}</span>
                                 <div className="min-w-0">
-                                  <div className="font-semibold text-[17px] text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
+                                  <div className="font-semibold text-[15px] text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
                                     {evt.name}
                                   </div>
                                   {evt.daysUntil >= 0 && (
@@ -9584,26 +9584,26 @@ function AppInner() {
                               {/* 발표 */}
                               <div className="text-right">
                                 {evt.actual != null ? (
-                                  <span className="text-[17px] font-bold" style={{ color: beat ? C.green : miss ? C.red : C.text1, fontVariantNumeric: "tabular-nums" }}>
+                                  <span className="text-[15px] font-bold" style={{ color: beat ? C.green : miss ? C.red : C.text1, fontVariantNumeric: "tabular-nums" }}>
                                     {evt.actual}{evt.unit}
                                   </span>
                                 ) : (
-                                  <span className="text-base text-muted-foreground" style={{fontVariantNumeric: "tabular-nums"}}>
-                                    {isPast ? "발표 대기" : `${kstHour}시 발표 예정`}
+                                  <span className="text-sm text-muted-foreground" style={{fontVariantNumeric: "tabular-nums"}}>
+                                    {isPast ? "발표 대기" : `${kstHour}시 예정`}
                                   </span>
                                 )}
                               </div>
 
                               {/* 예측 */}
                               {!isMobile && <div className="text-right">
-                                <span className="text-[17px]" style={{ color: C.text2, fontVariantNumeric: "tabular-nums" }}>
+                                <span className="text-[15px]" style={{ color: C.text2, fontVariantNumeric: "tabular-nums" }}>
                                   {evt.estimate != null ? `${evt.estimate}${evt.unit}` : "—"}
                                 </span>
                               </div>}
 
                               {/* 이전 */}
                               {!isMobile && <div className="text-right">
-                                <span className="text-[17px] text-muted-foreground" style={{fontVariantNumeric: "tabular-nums"}}>
+                                <span className="text-[15px] text-muted-foreground" style={{fontVariantNumeric: "tabular-nums"}}>
                                   {evt.previous != null ? `${evt.previous}${evt.unit}` : "—"}
                                 </span>
                               </div>}
@@ -9646,13 +9646,13 @@ function AppInner() {
 
               {/* 알림 설정 토글 */}
               <div className="flex gap-3 mb-3 flex-wrap">
-                <label className="flex items-center gap-1.5 cursor-pointer text-base text-card">
+                <label className="flex items-center gap-1.5 cursor-pointer text-sm text-muted-foreground">
                   <input type="checkbox" checked={settings.strategyAlerts !== false}
                     onChange={e => setSettings(p => ({ ...p, strategyAlerts: e.target.checked }))}
                     className="cursor-pointer" />
                   <span>전략 매매 알림 활성화</span>
                 </label>
-                <label className="flex items-center gap-1.5 cursor-pointer text-base text-card">
+                <label className="flex items-center gap-1.5 cursor-pointer text-sm text-muted-foreground">
                   <input type="checkbox" checked={settings.autoSend}
                     onChange={e => setSettings(p => ({ ...p, autoSend: e.target.checked }))}
                     className="cursor-pointer" />
@@ -9670,8 +9670,8 @@ function AppInner() {
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <span style={{ fontSize: "18px" }}>{notiPerm === "granted" ? "🔔" : notiPerm === "denied" ? "🔕" : "🔔"}</span>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: "17px" }}>브라우저 푸시 알림</div>
-                      <div style={{ fontSize: "16px", color: C.text3 }}>
+                      <div style={{ fontWeight: 700, fontSize: "15px" }}>브라우저 푸시 알림</div>
+                      <div style={{ fontSize: "14px", color: C.text3 }}>
                         {notiPerm === "granted" ? "활성화됨 — 매매 시그널 발생 시 알림이 표시됩니다"
                           : notiPerm === "denied" ? "차단됨 — 브라우저 설정에서 알림을 허용해주세요"
                           : notiPerm === "unsupported" ? "이 브라우저에서 지원되지 않습니다"
@@ -9962,16 +9962,16 @@ function AppInner() {
             <div style={{background:`linear-gradient(135deg, ${C.card} 0%, ${C.isDark ? "#0D1B2A" : "#EDE7F6"} 100%)`,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:"22px 24px",marginBottom:"12px"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"12px"}}>
                 <div>
-                  <div style={{fontWeight:800,fontSize:"18px",marginBottom:"4px",color:C.text1}}>소셜 센티먼트 분석</div>
-                  <div style={{fontSize:"16px",color:C.text3}}>StockTwits · Reddit(WSB) 기반 실시간 투자 심리</div>
+                  <div style={{fontWeight:800,fontSize:"17px",marginBottom:"4px",color:C.text1}}>소셜 센티먼트 분석</div>
+                  <div style={{fontSize:"14px",color:C.text3}}>StockTwits · Reddit(WSB) 기반 실시간 투자 심리</div>
                 </div>
                 <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
                   <input value={sentimentSymbol} onChange={e=>setSentimentSymbol(e.target.value.toUpperCase())}
                     placeholder="SPY" onKeyDown={e=>{if(e.key==="Enter")fetchSentiment(sentimentSymbol);}}
-                    style={{width:"100px",padding:"8px 12px",borderRadius:"8px",fontSize:"18px",fontWeight:700,
+                    style={{width:"100px",padding:"8px 12px",borderRadius:"8px",fontSize:"15px",fontWeight:700,
                       background:C.card2,border:`1px solid ${C.border2}`,color:C.text1,outline:"none",textAlign:"center"}} />
                   <button onClick={()=>fetchSentiment(sentimentSymbol)} disabled={sentimentLoading} style={{
-                    padding:"8px 16px",borderRadius:"8px",fontSize:"17px",fontWeight:700,
+                    padding:"8px 16px",borderRadius:"8px",fontSize:"14px",fontWeight:700,
                     background:sentimentLoading?C.card2:`linear-gradient(135deg,${C.purple},#6D28D9)`,
                     color:"#fff",border:"none",cursor:sentimentLoading?"default":"pointer",
                   }}>{sentimentLoading?"분석 중...":"분석"}</button>
@@ -9981,7 +9981,7 @@ function AppInner() {
               <div style={{display:"flex",gap:"6px",marginTop:"12px",flexWrap:"wrap"}}>
                 {["SPY","AAPL","NVDA","TSLA","MSFT","AMZN","META","AMD","GOOG","COIN"].map(s=>(
                   <button key={s} onClick={()=>{setSentimentSymbol(s);fetchSentiment(s);}} style={{
-                    padding:"4px 10px",borderRadius:"6px",fontSize:"16px",fontWeight:600,
+                    padding:"4px 10px",borderRadius:"6px",fontSize:"13px",fontWeight:600,
                     background:sentimentSymbol===s?C.blueBg:C.card2,color:sentimentSymbol===s?C.blue:C.text3,
                     border:`1px solid ${sentimentSymbol===s?C.blue+"55":C.border2}`,cursor:"pointer",
                   }}>{s}</button>
@@ -10018,7 +10018,7 @@ function AppInner() {
                     <div style={{width:`${sentimentData.sentiment.neutral}%`,background:C.text3,transition:"width 0.5s"}} />
                     <div style={{width:`${sentimentData.sentiment.bearish}%`,background:C.red,transition:"width 0.5s"}} />
                   </div>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:"16px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:"14px"}}>
                     <span style={{color:C.green,fontWeight:600}}>긍정 {sentimentData.sentiment.bullish}%</span>
                     <span style={{color:C.text3}}>중립 {sentimentData.sentiment.neutral}%</span>
                     <span style={{color:C.red,fontWeight:600}}>부정 {sentimentData.sentiment.bearish}%</span>
@@ -10030,8 +10030,8 @@ function AppInner() {
               {sentimentData.sources?.map((src,i)=>(
                 <div key={i} style={{background:C.card,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:"22px 24px",marginBottom:"12px"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
-                    <div style={{fontWeight:700,fontSize:"17px"}}>{src.name}</div>
-                    <span style={{fontSize:"16px",color:C.text3}}>{src.total}개 포스트 분석</span>
+                    <div style={{fontWeight:700,fontSize:"15px"}}>{src.name}</div>
+                    <span style={{fontSize:"14px",color:C.text3}}>{src.total}개 포스트 분석</span>
                   </div>
                   {/* 소스 센티먼트 바 */}
                   <div style={{display:"flex",gap:"8px",marginBottom:"16px"}}>
@@ -10167,12 +10167,12 @@ function AppInner() {
               <h2 className="m-0 mb-1 text-xl font-black text-foreground">
                 {user?.user_metadata?.display_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User"}
               </h2>
-              <div className="text-[17px] text-muted-foreground">{user?.email || ""}</div>
+              <div className="text-base text-muted-foreground">{user?.email || ""}</div>
             </div>
 
             {/* 계정 정보 */}
             <div style={{ background: C.card, border: `1px solid ${C.border}` }} className="rounded-[16px] overflow-hidden">
-              <div className="px-5 py-3.5 text-base font-bold text-muted-foreground uppercase tracking-wider">계정 정보</div>
+              <div className="px-5 py-3.5 text-sm font-bold text-muted-foreground uppercase tracking-wider">계정 정보</div>
               {[
                 { label: "이메일", value: user?.email || "—" },
                 { label: "로그인 방식", value: user?.app_metadata?.provider === "google" ? "Google 로그인" : user?.app_metadata?.provider || "이메일" },
@@ -10181,15 +10181,15 @@ function AppInner() {
                 { label: "사용자 ID", value: user?.id ? user.id.slice(0, 8) + "..." : "—" },
               ].map((item, i) => (
                 <div key={i} className="flex justify-between items-center px-5 py-3.5 border-t" style={{borderTopColor: `${C.border}20`}}>
-                  <span className="text-lg text-muted-foreground">{item.label}</span>
-                  <span className="text-lg font-semibold text-foreground text-right max-w-[60%] overflow-hidden text-ellipsis whitespace-nowrap">{item.value}</span>
+                  <span className="text-base text-muted-foreground">{item.label}</span>
+                  <span className="text-base font-semibold text-foreground text-right max-w-[60%] overflow-hidden text-ellipsis whitespace-nowrap">{item.value}</span>
                 </div>
               ))}
             </div>
 
             {/* 투자 설정 현황 */}
             <div style={{ background: C.card, border: `1px solid ${C.border}` }} className="rounded-[16px] overflow-hidden">
-              <div className="px-5 py-3.5 text-base font-bold text-muted-foreground uppercase tracking-wider">투자 설정</div>
+              <div className="px-5 py-3.5 text-sm font-bold text-muted-foreground uppercase tracking-wider">투자 설정</div>
               {[
                 { label: "관심 종목", value: `${watchlist.length}개`, action: () => setTab("screener") },
                 { label: "운영 중 봇", value: (() => {
@@ -10204,10 +10204,10 @@ function AppInner() {
                   borderTopColor: `${C.border}20`,
                   cursor: item.action ? "pointer" : "default",
                 }}>
-                  <span className="text-lg text-muted-foreground">{item.label}</span>
+                  <span className="text-base text-muted-foreground">{item.label}</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-lg font-semibold text-foreground">{item.value}</span>
-                    {item.action && <span className="text-base text-muted-foreground">›</span>}
+                    <span className="text-base font-semibold text-foreground">{item.value}</span>
+                    {item.action && <span className="text-sm text-muted-foreground">›</span>}
                   </div>
                 </div>
               ))}
@@ -10215,8 +10215,8 @@ function AppInner() {
 
             {/* 내 투자 성적표 공유 */}
             <div style={{ background: `linear-gradient(135deg, ${C.card}, ${C.blueBg})`, border: `1px solid ${C.blue}20`, borderRadius: "16px", padding: "20px", textAlign: "center" }}>
-              <div style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>내 투자 성적표</div>
-              <div style={{ fontSize: "16px", color: C.text3, marginBottom: "16px" }}>AI가 분석한 나의 투자 현황을 공유해보세요</div>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>내 투자 성적표</div>
+              <div style={{ fontSize: "14px", color: C.text3, marginBottom: "16px" }}>AI가 분석한 나의 투자 현황을 공유해보세요</div>
               <div className="flex justify-center gap-6 sm:gap-8 mb-4">
                 <div className="text-center">
                   <div className="text-2xl font-extrabold" style={{ color: C.blue }}>{watchlist.length}</div>
@@ -10241,7 +10241,7 @@ function AppInner() {
                 if (navigator.share) navigator.share({ title: "Zepta AI 투자 성적표", text: txt, url: "https://zepta.vercel.app" }).catch(() => {});
                 else navigator.clipboard.writeText(txt).then(() => showToast("성적표가 복사되었습니다!", "success")).catch(() => {});
               }} style={{
-                padding: "10px 28px", borderRadius: "10px", fontSize: "17px", fontWeight: 700,
+                padding: "10px 24px", borderRadius: "10px", fontSize: "15px", fontWeight: 700,
                 background: C.blue, color: "#fff", border: "none", cursor: "pointer",
                 display: "inline-flex", alignItems: "center", gap: "6px",
               }}>📤 성적표 공유하기</button>
@@ -10249,9 +10249,9 @@ function AppInner() {
 
             {/* 친구 초대 */}
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden" }}>
-              <div style={{ padding: "14px 20px", fontSize: "16px", fontWeight: 700, color: C.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>친구 초대</div>
+              <div style={{ padding: "14px 20px", fontSize: "14px", fontWeight: 700, color: C.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>친구 초대</div>
               <div style={{ padding: "16px 20px", borderTop: `1px solid ${C.border}20` }}>
-                <div style={{ fontSize: "17px", color: C.text2, lineHeight: 1.6, marginBottom: "14px" }}>
+                <div style={{ fontSize: "15px", color: C.text2, lineHeight: 1.6, marginBottom: "14px" }}>
                   투자하는 친구에게 Zepta을 공유하세요.<br/>AI 퀀트 전략을 무료로 이용할 수 있어요.
                 </div>
                 <div style={{ display: "flex", gap: "8px" }}>
@@ -10312,28 +10312,28 @@ function AppInner() {
             <h1 style={{ fontSize: "28px", fontWeight: 800, color: C.text1, marginBottom: "24px" }}>Zepta 소개</h1>
             <section style={{ marginBottom: "32px" }}>
               <h2 style={{ fontSize: "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>서비스 개요</h2>
-              <p style={{ fontSize: "17px", marginBottom: "16px" }}>
+              <p style={{ fontSize: "15px", marginBottom: "14px" }}>
                 Zepta는 개인 투자자를 위한 종합 투자 정보 플랫폼입니다. 미국 주식과 글로벌 암호화폐 시장을 아우르는 실시간 데이터 분석, AI 기반 퀀트 전략, 자동매매 시스템을 제공하여 데이터 기반의 합리적인 투자 의사결정을 지원합니다.
               </p>
-              <p style={{ fontSize: "17px", marginBottom: "16px" }}>
+              <p style={{ fontSize: "15px", marginBottom: "14px" }}>
                 기존 금융 서비스의 복잡하고 전문가 중심적인 인터페이스에서 벗어나, 투자 초보자부터 전문 트레이더까지 누구나 쉽게 사용할 수 있는 직관적인 경험을 제공하는 것이 Zepta의 핵심 가치입니다.
               </p>
             </section>
             <section style={{ marginBottom: "32px" }}>
               <h2 style={{ fontSize: "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>주요 기능</h2>
-              <p style={{ fontSize: "17px", marginBottom: "12px" }}>
+              <p style={{ fontSize: "15px", marginBottom: "10px" }}>
                 <strong style={{ color: C.text1 }}>실시간 시장 모니터링</strong> — S&P 500, 나스닥, 다우존스 등 주요 지수와 개별 종목의 실시간 시세를 한눈에 확인할 수 있습니다. 글로벌 암호화폐 시장의 가격 변동도 실시간으로 추적합니다.
               </p>
-              <p style={{ fontSize: "17px", marginBottom: "12px" }}>
+              <p style={{ fontSize: "15px", marginBottom: "10px" }}>
                 <strong style={{ color: C.text1 }}>AI 퀀트 자동매매</strong> — 멀티팩터 시그널 분석(RSI, MACD, 볼린저밴드, Hurst 지수, 효율성 비율 등)을 기반으로 매수/매도 시점을 자동으로 판단합니다. 사용자는 투자 성향에 맞는 봇을 선택하여 자동매매를 운영할 수 있습니다.
               </p>
-              <p style={{ fontSize: "17px", marginBottom: "12px" }}>
+              <p style={{ fontSize: "15px", marginBottom: "10px" }}>
                 <strong style={{ color: C.text1 }}>종목 스크리너</strong> — 기술적 분석 지표와 펀더멘털 데이터를 조합하여 투자 기회를 탐색합니다. 섹터별 자금 흐름, 이상 탐지, 시장 심리 분석 등 다양한 관점에서 시장을 분석할 수 있습니다.
               </p>
-              <p style={{ fontSize: "17px", marginBottom: "12px" }}>
+              <p style={{ fontSize: "15px", marginBottom: "10px" }}>
                 <strong style={{ color: C.text1 }}>포트폴리오 관리</strong> — 보유 자산의 수익률, 배분 비율, 리스크 지표(DD, MDD, VaR)를 실시간으로 모니터링하여 체계적인 자산 관리를 지원합니다.
               </p>
-              <p style={{ fontSize: "17px", marginBottom: "12px" }}>
+              <p style={{ fontSize: "15px", marginBottom: "10px" }}>
                 <strong style={{ color: C.text1 }}>경제 캘린더 및 뉴스</strong> — FOMC, CPI, 고용지표 등 주요 경제 이벤트 일정과 실시간 금융 뉴스를 통해 시장에 영향을 미치는 정보를 빠르게 파악할 수 있습니다.
               </p>
             </section>
@@ -10473,12 +10473,12 @@ function AppInner() {
           <div className="tab-content" style={{ maxWidth: "800px", margin: "0 auto", padding: "32px 20px", lineHeight: 1.8, color: C.text2 }}>
             <h1 style={{ fontSize: "28px", fontWeight: 800, color: C.text1, marginBottom: "24px" }}>문의하기</h1>
             <section style={{ marginBottom: "32px" }}>
-              <p style={{ fontSize: "17px", marginBottom: "16px" }}>
+              <p style={{ fontSize: "15px", marginBottom: "14px" }}>
                 Zepta 서비스에 대한 문의, 건의, 불편 사항은 아래 연락처로 연락해 주세요. 최대한 빠르게 답변 드리겠습니다.
               </p>
               <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "24px", marginBottom: "24px" }}>
-                <p style={{ fontSize: "17px", marginBottom: "12px" }}><strong style={{ color: C.text1 }}>이메일</strong>: donginseo0421@gmail.com</p>
-                <p style={{ fontSize: "17px", marginBottom: "12px" }}><strong style={{ color: C.text1 }}>운영자</strong>: 서동인</p>
+                <p style={{ fontSize: "15px", marginBottom: "10px" }}><strong style={{ color: C.text1 }}>이메일</strong>: donginseo0421@gmail.com</p>
+                <p style={{ fontSize: "15px", marginBottom: "10px" }}><strong style={{ color: C.text1 }}>운영자</strong>: 서동인</p>
                 <p style={{ fontSize: "17px" }}><strong style={{ color: C.text1 }}>응답 시간</strong>: 보통 1~2 영업일 이내</p>
               </div>
             </section>

@@ -131,9 +131,9 @@ export default memo(function PortfolioTab({
       {/* 포트폴리오 아이템 */}
       {portfolio.length === 0 ? (
         <div className="rounded-[18px] p-[40px_24px] text-center" style={{ background: C.card, border: `1px solid ${C.border}20` }}>
-          <div className="text-5xl mb-4">💼</div>
+          <div className="text-4xl mb-3">💼</div>
           <div className="font-bold text-lg mb-2" style={{ color: C.text1 }}>포트폴리오를 시작하세요</div>
-          <div className="text-lg mb-6" style={{ color: C.text3, lineHeight: 1.6 }}>
+          <div className="text-base mb-5" style={{ color: C.text3, lineHeight: 1.6 }}>
             보유 종목을 추가하면 실시간 수익률 추적,<br/>리스크 분석, 매매 시그널 알림을 받을 수 있어요
           </div>
           <div className="flex flex-col gap-2.5 max-w-80 mx-auto text-left">
@@ -143,16 +143,16 @@ export default memo(function PortfolioTab({
               { icon: "3️⃣", text: "실시간 수익률과 AI 분석을 확인하세요" },
             ].map((step, i) => (
               <div key={i} className="flex items-center gap-2.5 p-2.5 rounded-[10px]" style={{ background: C.card2 }}>
-                <span className="text-lg">{step.icon}</span>
-                <span className="text-lg" style={{ color: C.text2, fontWeight: 500 }}>{step.text}</span>
+                <span className="text-base">{step.icon}</span>
+                <span className="text-base" style={{ color: C.text2, fontWeight: 500 }}>{step.text}</span>
               </div>
             ))}
           </div>
           <div className="mt-5 flex gap-2 justify-center">
-            <button onClick={() => setTab("screener")} className="px-5 py-2.5 rounded-[10px] text-lg font-bold cursor-pointer transition-all" style={{
+            <button onClick={() => setTab("screener")} className="px-5 py-2 rounded-[10px] text-base font-bold cursor-pointer transition-all" style={{
               background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}30`,
             }}>🔍 종목 탐색하기</button>
-            <button onClick={() => setTab("quant-report")} className="px-5 py-2.5 rounded-[10px] text-lg font-bold cursor-pointer transition-all" style={{
+            <button onClick={() => setTab("quant-report")} className="px-5 py-2 rounded-[10px] text-base font-bold cursor-pointer transition-all" style={{
               background: C.card2, color: C.text2, border: `1px solid ${C.border}`,
             }}>📋 오늘의 추천 보기</button>
           </div>
@@ -231,7 +231,7 @@ export default memo(function PortfolioTab({
                       market: item.market, symbolRaw: item.symbolRaw || item.symbol,
                       ...(cryptoA ? { id: cryptoA.id } : {}),
                     });
-                  }} className="flex-1 py-2 rounded-[10px] text-lg font-semibold transition-all flex items-center justify-center gap-1.5" style={{
+                  }} className="flex-1 py-2 rounded-[10px] text-base font-semibold transition-all flex items-center justify-center gap-1.5" style={{
                     background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}33`,
                   }}>🩺 진단</button>
                   <button onClick={() => {
@@ -239,13 +239,13 @@ export default memo(function PortfolioTab({
                       ? `https://www.coingecko.com/en/coins/${item.cryptoId || item.symbol.toLowerCase()}`
                       : `https://finance.yahoo.com/quote/${item.symbolRaw || item.symbol}`;
                     window.open(sym, "_blank");
-                  }} className="flex-1 py-2 rounded-[10px] text-lg font-semibold transition-all flex items-center justify-center gap-1.5" style={{
+                  }} className="flex-1 py-2 rounded-[10px] text-base font-semibold transition-all flex items-center justify-center gap-1.5" style={{
                     background: C.card2, color: C.text2, border: `1px solid ${C.border2}`,
                   }}>🔗 상세</button>
                   <button onClick={() => {
                     if (!confirm("이 포트폴리오를 삭제하시겠습니까?")) return;
                     setPortfolio(p => p.filter((_, i) => i !== idx));
-                  }} className="px-3.5 py-2 rounded-[10px] text-lg font-semibold transition-all" style={{
+                  }} className="px-3.5 py-2 rounded-[10px] text-base font-semibold transition-all" style={{
                     background: C.redBg, color: C.red, border: `1px solid ${C.red}33`,
                   }}>삭제</button>
                 </div>
