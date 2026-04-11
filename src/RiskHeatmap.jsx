@@ -1,5 +1,5 @@
-// Zepta — 리스크 컨트롤 타워 v2.0
-// 8-Point CP 시스템 + 시장 데이터 동적 연동 + 트렌드 히스토리 + 포트폴리오 영향도
+// Zepta — 리스크 컨트롤 타워 v3.0
+// 8-Point CP 시스템 — 모든 체크포인트 실시간 시장 데이터 기반 동적 산출
 import { useState, useMemo } from "react";
 
 // Zepta tokens.css 와 동기화 (dark)
@@ -22,118 +22,158 @@ const SEV = {
   LOW:      { label: "LOW",      color: "#10D884", glow: "#10D88433" },
 };
 
-// ── 8-Point CP 리스크 평가 (시장 데이터 기반 동적 산출) ──
+// ── 8-Point CP 리스크 평가 (100% 시장 데이터 기반 동적 산출) ──
 function assessRisks(mkt) {
-  const vix = mkt.vix;
-  const sp = mkt.sp500;
-  const spChg = mkt.sp500Change;
-  const dxy = mkt.dxy;
-  const fg = mkt.fearGreed;
+  const { vix, sp500Change, dxy, fearGreed, tnx, fvx, irx, wti, gold, copper, usdkrw } = mkt;
+
+  // ── CP1: 매크로 ──
+  const cp1Sev = vix > 30 ? "CRITICAL" : vix > 25 ? "HIGH" : vix > 18 ? "MODERATE" : "LOW";
+  const cp1Score = Math.min(100, Math.round(vix * 2.5 + Math.max(0, -sp500Change * 10)));
+
+  // ── CP2: 통화정책 (국채 수익률 기반 추론) ──
+  // 13W T-Bill(IRX)은 시장이 예상하는 단기 금리 수준을 반영
+  // 10Y-IRX 스프레드로 금리 인하 기대 추론
+  const impliedRate = irx; // 13W T-Bill ≈ 시장 내재 기준금리
+  const rateCutSpread = tnx - irx; // 음수면 인하 기대, 양수면 장기 프리미엄
+  const rateCutProb = Math.max(0, Math.min(100, Math.round(50 - rateCutSpread * 30)));
+  const cp2Sev = impliedRate > 5 ? "HIGH" : impliedRate > 4 ? "MODERATE" : "LOW";
+  const cp2Score = Math.min(100, Math.round(impliedRate * 12 + Math.max(0, (impliedRate - 4) * 15)));
+
+  // ── CP3: 지정학 (유가 변동 + 금 가격 + VIX 복합) ──
+  // 유가 급등 + 금 급등 + VIX 상승 = 지정학 리스크 증가
+  const oilStress = Math.max(0, (wti - 70) * 2); // $70 기준 초과분
+  const goldSafe = Math.max(0, (gold - 2800) / 20); // $2800 기준 안전자산 수요
+  const geoScore = Math.min(100, Math.round(20 + oilStress + goldSafe + Math.max(0, vix - 18) * 2));
+  const cp3Sev = geoScore > 75 ? "CRITICAL" : geoScore > 55 ? "HIGH" : geoScore > 35 ? "MODERATE" : "LOW";
+
+  // ── CP4: 채권시장 ──
+  const yieldSpread = tnx - fvx; // 10Y-5Y 스프레드
+  const termSpread = tnx - irx; // 장단기 스프레드
+  const inverted = termSpread < 0;
+  const cp4Sev = tnx > 5 ? "CRITICAL" : tnx > 4.5 ? "HIGH" : tnx > 4 ? "MODERATE" : "LOW";
+  const cp4Score = Math.min(100, Math.round(tnx * 15 + (inverted ? 20 : 0) + Math.max(0, vix - 18) * 2));
+
+  // ── CP5: 환율 ──
+  const cp5Sev = dxy > 106 ? "HIGH" : dxy > 103 ? "MODERATE" : "LOW";
+  const cp5Score = Math.min(100, Math.round(Math.max(0, (dxy - 100) * 8)));
+  const krwStatus = usdkrw > 1400 ? "danger" : usdkrw > 1350 ? "warn" : "ok";
+
+  // ── CP6: 원자재 ──
+  // WTI, Gold, Copper 종합
+  const oilLevel = wti > 90 ? "CRITICAL" : wti > 80 ? "HIGH" : wti > 70 ? "MODERATE" : "LOW";
+  const cp6Score = Math.min(100, Math.round(
+    Math.max(0, (wti - 65) * 1.5) + Math.max(0, (gold - 2500) / 30) + Math.max(0, (copper - 4) * 10)
+  ));
+  const cp6Sev = cp6Score > 75 ? "CRITICAL" : cp6Score > 55 ? "HIGH" : cp6Score > 35 ? "MODERATE" : "LOW";
+
+  // ── CP7: 기업실적 (S&P 변동성 + 시장 심리 기반 추론) ──
+  // 실적시즌 외에는 시장 심리와 S&P 추세로 실적 기대감 추론
+  const earningsSentiment = fearGreed != null ? fearGreed : 50;
+  const cp7Score = Math.max(0, Math.min(100, Math.round(100 - earningsSentiment - Math.max(0, sp500Change * 5))));
+  const cp7Sev = cp7Score > 65 ? "HIGH" : cp7Score > 40 ? "MODERATE" : "LOW";
+
+  // ── CP8: 유동성 ──
+  // VIX + 금리 수준 + 달러 강세 복합
+  const liqStress = vix * 1.5 + Math.max(0, (impliedRate - 4) * 10) + Math.max(0, (dxy - 103) * 3);
+  const cp8Score = Math.min(100, Math.round(liqStress));
+  const cp8Sev = cp8Score > 75 ? "CRITICAL" : cp8Score > 55 ? "HIGH" : cp8Score > 35 ? "MODERATE" : "LOW";
 
   return [
     {
       id: "CP1", name: "매크로", icon: "📊",
-      severity: vix > 30 ? "CRITICAL" : vix > 25 ? "HIGH" : vix > 18 ? "MODERATE" : "LOW",
-      score: Math.min(100, Math.round(vix * 2.5 + Math.max(0, -spChg * 10))),
-      headline: `VIX ${vix.toFixed(1)} · S&P ${spChg >= 0 ? "+" : ""}${spChg.toFixed(1)}% · ${vix > 25 ? "변동성 경고" : vix > 18 ? "경계 구간" : "안정권"}`,
+      severity: cp1Sev, score: cp1Score,
+      headline: `VIX ${vix.toFixed(1)} · S&P ${sp500Change >= 0 ? "+" : ""}${sp500Change.toFixed(1)}% · ${vix > 25 ? "변동성 경고" : vix > 18 ? "경계 구간" : "안정권"}`,
       keyMetrics: [
         { label: "VIX", value: vix.toFixed(1), status: vix > 25 ? "danger" : vix > 18 ? "warn" : "ok" },
-        { label: "S&P 500", value: `${spChg >= 0 ? "+" : ""}${spChg.toFixed(1)}%`, status: spChg < -1 ? "danger" : spChg < 0 ? "warn" : "ok" },
-        { label: "공포·탐욕", value: fg != null ? `${fg}` : "N/A", status: fg < 25 ? "danger" : fg < 40 ? "warn" : "ok" },
+        { label: "S&P 500", value: `${sp500Change >= 0 ? "+" : ""}${sp500Change.toFixed(1)}%`, status: sp500Change < -1 ? "danger" : sp500Change < 0 ? "warn" : "ok" },
+        { label: "공포·탐욕", value: fearGreed != null ? `${fearGreed}` : "N/A", status: fearGreed != null ? (fearGreed < 25 ? "danger" : fearGreed < 40 ? "warn" : "ok") : "warn" },
       ],
       impact: "전 섹터 베타 조정 필요",
-      trend: vix > 25 ? "악화" : "안정",
+      trend: vix > 25 ? "악화" : sp500Change > 0.5 ? "개선" : "안정",
     },
     {
       id: "CP2", name: "통화정책", icon: "🏦",
-      severity: "HIGH",
-      score: 72,
-      headline: "Fed 금리 동결 장기화 · 인플레 재점화 리스크",
+      severity: cp2Sev, score: cp2Score,
+      headline: `내재 기준금리 ${impliedRate.toFixed(2)}% · 금리인하 확률 ${rateCutProb}% · ${impliedRate > 5 ? "긴축 지속" : impliedRate > 4 ? "고금리 유지" : "완화 전환"}`,
       keyMetrics: [
-        { label: "Fed 금리", value: "5.25-5.50%", status: "warn" },
-        { label: "인플레", value: "CPI 2.4%", status: "ok" },
-        { label: "금리인하 확률", value: "35%", status: "warn" },
+        { label: "내재금리(13W)", value: `${impliedRate.toFixed(2)}%`, status: impliedRate > 5 ? "danger" : impliedRate > 4 ? "warn" : "ok" },
+        { label: "10Y 수익률", value: `${tnx.toFixed(2)}%`, status: tnx > 4.5 ? "danger" : tnx > 4 ? "warn" : "ok" },
+        { label: "인하 확률", value: `${rateCutProb}%`, status: rateCutProb < 30 ? "warn" : rateCutProb > 60 ? "ok" : "warn" },
       ],
       impact: "금리 민감 종목(리츠, 유틸) 주의",
-      trend: "보합",
+      trend: rateCutProb > 50 ? "개선" : rateCutProb < 25 ? "악화" : "보합",
     },
     {
       id: "CP3", name: "지정학", icon: "🌍",
-      severity: "HIGH",
-      score: 68,
-      headline: "중동 긴장 지속 · 미중 반도체 규제 확대",
+      severity: cp3Sev, score: geoScore,
+      headline: `유가 $${wti.toFixed(1)} · 금 $${gold.toFixed(0)} · ${geoScore > 55 ? "긴장 고조" : geoScore > 35 ? "경계 유지" : "안정"}`,
       keyMetrics: [
-        { label: "유가 변동", value: "+2.8%", status: "warn" },
-        { label: "방산지수", value: "+1.5%", status: "ok" },
-        { label: "EM 리스크", value: "보통", status: "warn" },
+        { label: "WTI 원유", value: `$${wti.toFixed(1)}`, status: wti > 85 ? "danger" : wti > 75 ? "warn" : "ok" },
+        { label: "금(안전자산)", value: `$${gold.toFixed(0)}`, status: gold > 3200 ? "warn" : gold > 3000 ? "warn" : "ok" },
+        { label: "VIX(불안지수)", value: vix.toFixed(1), status: vix > 25 ? "danger" : vix > 18 ? "warn" : "ok" },
       ],
       impact: "에너지·방산 롱, 공급망 민감주 헤지",
-      trend: "악화",
+      trend: geoScore > 60 ? "악화" : geoScore < 30 ? "개선" : "보합",
     },
     {
       id: "CP4", name: "채권시장", icon: "📉",
-      severity: vix > 25 ? "HIGH" : "MODERATE",
-      score: Math.min(100, Math.round(40 + Math.max(0, vix - 18) * 3)),
-      headline: `10Y 국채 ${vix > 25 ? "급등 경고" : "안정"} · 스프레드 ${vix > 20 ? "확대" : "축소"} 추세`,
+      severity: cp4Sev, score: cp4Score,
+      headline: `10Y ${tnx.toFixed(2)}% · 장단기 스프레드 ${(termSpread * 100).toFixed(0)}bp · ${inverted ? "역전 경고" : termSpread < 0.5 ? "플랫닝" : "정상"}`,
       keyMetrics: [
-        { label: "10Y 수익률", value: "4.52%", status: vix > 25 ? "danger" : "warn" },
-        { label: "2Y-10Y", value: "-8bp", status: "warn" },
-        { label: "IG 스프레드", value: "95bp", status: "ok" },
+        { label: "10Y 수익률", value: `${tnx.toFixed(2)}%`, status: tnx > 4.5 ? "danger" : tnx > 4 ? "warn" : "ok" },
+        { label: "10Y-IRX", value: `${(termSpread * 100).toFixed(0)}bp`, status: inverted ? "danger" : termSpread < 0.3 ? "warn" : "ok" },
+        { label: "10Y-5Y", value: `${(yieldSpread * 100).toFixed(0)}bp`, status: Math.abs(yieldSpread) > 0.5 ? "warn" : "ok" },
       ],
       impact: "성장주 밸류에이션 하방 압력",
-      trend: vix > 25 ? "악화" : "보합",
+      trend: tnx > 4.5 ? "악화" : tnx < 3.5 ? "개선" : "보합",
     },
     {
       id: "CP5", name: "환율", icon: "💱",
-      severity: dxy > 106 ? "HIGH" : dxy > 103 ? "MODERATE" : "LOW",
-      score: Math.min(100, Math.round(Math.max(0, (dxy - 100) * 8))),
-      headline: `달러 인덱스 ${dxy.toFixed(1)} · ${dxy > 106 ? "강달러 압박" : dxy > 103 ? "달러 강세" : "중립"}`,
+      severity: cp5Sev, score: cp5Score,
+      headline: `DXY ${dxy.toFixed(1)} · USD/KRW ${usdkrw.toFixed(0)} · ${dxy > 106 ? "강달러 압박" : dxy > 103 ? "달러 강세" : "중립"}`,
       keyMetrics: [
         { label: "DXY", value: dxy.toFixed(1), status: dxy > 106 ? "danger" : dxy > 103 ? "warn" : "ok" },
-        { label: "USD/KRW", value: "1,385", status: "warn" },
+        { label: "USD/KRW", value: `₩${usdkrw.toFixed(0)}`, status: krwStatus },
         { label: "EM 통화", value: dxy > 105 ? "약세" : "보합", status: dxy > 105 ? "warn" : "ok" },
       ],
       impact: "수출주/해외매출 비중 높은 종목 영향",
-      trend: dxy > 105 ? "악화" : "안정",
+      trend: dxy > 105 ? "악화" : dxy < 101 ? "개선" : "안정",
     },
     {
       id: "CP6", name: "원자재", icon: "🛢️",
-      severity: "MODERATE",
-      score: 48,
-      headline: "WTI $72 · 금 $3,150 — 안전자산 수요 지속",
+      severity: cp6Sev, score: cp6Score,
+      headline: `WTI $${wti.toFixed(1)} · 금 $${gold.toFixed(0)} · 구리 $${copper.toFixed(2)}`,
       keyMetrics: [
-        { label: "WTI", value: "$72.3", status: "ok" },
-        { label: "금", value: "$3,150", status: "ok" },
-        { label: "구리", value: "$4.15", status: "ok" },
+        { label: "WTI", value: `$${wti.toFixed(1)}`, status: wti > 85 ? "danger" : wti > 75 ? "warn" : "ok" },
+        { label: "금", value: `$${gold.toFixed(0)}`, status: gold > 3200 ? "warn" : "ok" },
+        { label: "구리", value: `$${copper.toFixed(2)}`, status: copper > 4.5 ? "warn" : "ok" },
       ],
-      impact: "인플레 기대 안정, 에너지 섹터 중립",
-      trend: "안정",
+      impact: "인플레 기대 반영 · 에너지 섹터 연동",
+      trend: wti > 80 ? "악화" : wti < 65 ? "개선" : "안정",
     },
     {
       id: "CP7", name: "기업실적", icon: "🏢",
-      severity: "LOW",
-      score: 28,
-      headline: "실적 시즌 외 · AI 관련 가이던스 상향 유지",
+      severity: cp7Sev, score: cp7Score,
+      headline: `시장 심리 ${earningsSentiment} · S&P ${sp500Change >= 0 ? "+" : ""}${sp500Change.toFixed(1)}% · ${earningsSentiment > 60 ? "낙관" : earningsSentiment > 40 ? "중립" : "비관"}`,
       keyMetrics: [
-        { label: "S&P EPS", value: "+8.2% YoY", status: "ok" },
-        { label: "하향 비율", value: "32%", status: "ok" },
-        { label: "서프라이즈", value: "72% 상회", status: "ok" },
+        { label: "투자심리", value: `${earningsSentiment}`, status: earningsSentiment < 25 ? "danger" : earningsSentiment < 40 ? "warn" : "ok" },
+        { label: "S&P 추세", value: `${sp500Change >= 0 ? "+" : ""}${sp500Change.toFixed(1)}%`, status: sp500Change < -1 ? "danger" : sp500Change < 0 ? "warn" : "ok" },
+        { label: "시장 상태", value: earningsSentiment > 60 ? "탐욕" : earningsSentiment > 40 ? "중립" : earningsSentiment > 25 ? "공포" : "극공포", status: earningsSentiment < 25 ? "danger" : earningsSentiment < 40 ? "warn" : "ok" },
       ],
-      impact: "실적 기반 안정 — 개별 종목 선별 유리",
-      trend: "개선",
+      impact: "실적 기대감 기반 — 개별 종목 선별",
+      trend: earningsSentiment > 55 ? "개선" : earningsSentiment < 35 ? "악화" : "보합",
     },
     {
       id: "CP8", name: "유동성", icon: "💧",
-      severity: vix > 28 ? "CRITICAL" : vix > 22 ? "HIGH" : "MODERATE",
-      score: Math.min(100, Math.round(30 + Math.max(0, vix - 15) * 4)),
-      headline: `${vix > 28 ? "신용 스트레스 경고" : vix > 22 ? "유동성 긴축 신호" : "유동성 보통"}`,
+      severity: cp8Sev, score: cp8Score,
+      headline: `${cp8Sev === "CRITICAL" ? "신용 스트레스 경고" : cp8Sev === "HIGH" ? "유동성 긴축 신호" : "유동성 보통"} · VIX ${vix.toFixed(1)} · 금리 ${impliedRate.toFixed(2)}%`,
       keyMetrics: [
-        { label: "HY 스프레드", value: "380bp", status: vix > 25 ? "danger" : "warn" },
-        { label: "SOFR", value: "5.32%", status: "warn" },
-        { label: "RRP 잔액", value: "$380B", status: "ok" },
+        { label: "VIX", value: vix.toFixed(1), status: vix > 25 ? "danger" : vix > 18 ? "warn" : "ok" },
+        { label: "기준금리", value: `${impliedRate.toFixed(2)}%`, status: impliedRate > 5 ? "danger" : impliedRate > 4 ? "warn" : "ok" },
+        { label: "DXY", value: dxy.toFixed(1), status: dxy > 106 ? "danger" : dxy > 103 ? "warn" : "ok" },
       ],
       impact: "소형주·고베타 종목 유동성 리스크",
-      trend: vix > 25 ? "악화" : "보합",
+      trend: cp8Score > 65 ? "악화" : cp8Score < 30 ? "개선" : "보합",
     },
   ];
 }
@@ -169,17 +209,37 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
   const [tab, setTab] = useState("dashboard"); // "dashboard" | "matrix" | "history"
 
   const mkt = useMemo(() => {
-    const vixD = marketIndices.find(i => i.symbol === "^VIX");
-    const spD = marketIndices.find(i => i.symbol === "^GSPC");
-    const dxyD = marketIndices.find(i => i.symbol === "DX-Y.NYB");
+    const find = (sym) => marketIndices.find(i => i.symbol === sym);
+    const vixD = find("^VIX");
+    const spD = find("^GSPC");
+    const dxyD = find("DX-Y.NYB");
+    const tnxD = find("^TNX");
+    const fvxD = find("^FVX");
+    const irxD = find("^IRX");
+    const wtiD = find("CL=F");
+    const goldD = find("GC=F");
+    const copperD = find("HG=F");
+    const krwD = find("USDKRW=X");
+
     return {
       vix: vixD?.price || 22,
-      sp500: spD?.price || 5200,
-      sp500Change: spD?.change || -0.3,
+      sp500Change: spD?.change || 0,
       dxy: dxyD?.price || 104.5,
-      fearGreed: fearGreed?.stock?.value || null,
+      fearGreed: fearGreed?.stock?.value ?? null,
+      tnx: tnxD?.price || 4.3, // 10Y Treasury Yield (Yahoo: ^TNX = yield × 10이 아닌 actual %)
+      fvx: fvxD?.price || 4.1, // 5Y Treasury Yield
+      irx: irxD?.price || 4.5, // 13-Week T-Bill Rate
+      wti: wtiD?.price || 72,
+      gold: goldD?.price || 3100,
+      copper: copperD?.price || 4.2,
+      usdkrw: krwD?.price || 1380,
     };
   }, [marketIndices, fearGreed]);
+
+  // 데이터 로딩 상태 (기본값이 아닌 실제 데이터가 있는지)
+  const hasRealData = useMemo(() => {
+    return marketIndices.some(i => i.symbol === "^VIX") || marketIndices.some(i => i.symbol === "^TNX");
+  }, [marketIndices]);
 
   const risks = useMemo(() => assessRisks(mkt), [mkt]);
   const overall = useMemo(() => calcOverall(risks), [risks]);
@@ -209,8 +269,10 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", marginBottom: "16px" }}>
           <div>
             <div style={{ fontWeight: 800, fontSize: "18px", marginBottom: "2px" }}>리스크 컨트롤 타워</div>
-            <div style={{ color: C.text3, fontSize: "14px" }}>
+            <div style={{ color: C.text3, fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
               {new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })} 기준
+              {hasRealData && <span style={{ fontSize: "11px", padding: "1px 6px", borderRadius: "4px", background: C.greenBg, color: C.green, fontWeight: 600 }}>LIVE</span>}
+              {!hasRealData && <span style={{ fontSize: "11px", padding: "1px 6px", borderRadius: "4px", background: C.yellowBg, color: C.yellow, fontWeight: 600 }}>로딩중</span>}
             </div>
           </div>
           <div style={{ textAlign: "center" }}>
@@ -435,7 +497,7 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
       {/* 면책 */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px",
         fontSize: "13px", color: C.text3, lineHeight: "1.5", marginTop: "12px" }}>
-        ⚠️ 리스크 점수는 VIX, 공포·탐욕 지수, 달러 인덱스 등 공개 시장 데이터를 기반으로 자동 산출됩니다.
+        ⚠️ 리스크 점수는 VIX, 국채 수익률, 공포·탐욕 지수, 달러 인덱스, 원자재 가격 등 공개 시장 데이터를 기반으로 실시간 자동 산출됩니다.
         투자 판단의 근거가 아닌 참고 자료로만 활용하시기 바랍니다.
       </div>
     </div>

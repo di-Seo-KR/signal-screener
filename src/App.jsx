@@ -5127,6 +5127,15 @@ function AppInner() {
       { symbol: "^KS11", name: "코스피", flag: "🇰🇷" },
       { symbol: "^KQ11", name: "코스닥", flag: "🇰🇷" },
       { symbol: "USDKRW=X", name: "원/달러 환율", flag: "💱" },
+      // 리스크 컨트롤 타워용 추가 지표
+      { symbol: "^VIX", name: "VIX", flag: "📊", hidden: true },
+      { symbol: "DX-Y.NYB", name: "달러인덱스", flag: "💲", hidden: true },
+      { symbol: "^TNX", name: "10Y 국채", flag: "📉", hidden: true },
+      { symbol: "^FVX", name: "5Y 국채", flag: "📉", hidden: true },
+      { symbol: "^IRX", name: "13W T-Bill", flag: "📉", hidden: true },
+      { symbol: "CL=F", name: "WTI 원유", flag: "🛢️", hidden: true },
+      { symbol: "GC=F", name: "금", flag: "🥇", hidden: true },
+      { symbol: "HG=F", name: "구리", flag: "🔶", hidden: true },
     ];
     // 지수 병렬 fetch
     const idxSyms = indices.map(i => i.symbol).join(",");
@@ -7053,105 +7062,174 @@ function AppInner() {
             <div className="home-grid">
             <div className="home-left" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
-            {/* ── 마켓 요약 (통합 — 배너 + 인덱스 카드) ─── */}
+            {/* ── 마켓 요약 (통합 — 히어로 배너 + 인덱스 그리드) ─── */}
             {(() => {
               const sp = marketIndices.find(i => i.symbol === "^GSPC");
               const nq = marketIndices.find(i => i.symbol === "^IXIC");
               const ks = marketIndices.find(i => i.symbol === "^KS11");
               const main = sp || nq;
-              const mainName = sp ? "S&P 500" : "나스닥";
-              const trend = main?.change > 1 ? "급등" : main?.change > 0.3 ? "상승" : main?.change > -0.3 ? "보합" : main?.change > -1 ? "하락" : "급락";
+              const mainName = sp ? "S&P 500" : "NASDAQ";
+              const isUp = main?.change >= 0;
               const trendColor = main?.change > 0.3 ? C.green : main?.change > -0.3 ? C.text2 : C.red;
               const hour = new Date().getHours();
               const greeting = hour < 12 ? "오전" : hour < 18 ? "오후" : "저녁";
               const upCount = hotAssets.filter(h => h.change > 0).length;
               const dnCount = hotAssets.filter(h => h.change < 0).length;
-              const fx = marketIndices.find(i => i.symbol === "USDKRW=X");
+              const total = Math.max(upCount + dnCount, 1);
+              const upPct = Math.round((upCount / total) * 100);
               const fgVal = fearGreed.stock?.value;
               const fgColor = fgVal ? (fgVal <= 25 ? C.red : fgVal <= 40 ? "#FF8C42" : fgVal <= 60 ? C.yellow : fgVal <= 75 ? C.green : C.green) : C.text3;
-              const fgLabel = fgVal ? (fgVal <= 25 ? "극도의 공포" : fgVal <= 40 ? "공포" : fgVal <= 60 ? "중립" : fgVal <= 75 ? "탐욕" : "극도의 탐욕") : "—";
+              const fgLabel = fgVal ? (fgVal <= 25 ? t("tabs.home.extremeFear") || "극도의 공포" : fgVal <= 40 ? t("tabs.home.fear") || "공포" : fgVal <= 60 ? t("tabs.home.neutral") || "중립" : fgVal <= 75 ? t("tabs.home.greed") || "탐욕" : t("tabs.home.extremeGreed") || "극도의 탐욕") : "—";
+              const visibleIndices = marketIndices.filter(idx => !idx.hidden);
 
               return (
-                <div style={{ background: C.card, borderRadius: "20px", overflow: "hidden", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
-                  {/* 상단 배너 */}
+                <div style={{ borderRadius: "20px", overflow: "hidden", border: `1px solid ${C.border}20`, position: "relative" }}>
+                  {/* 히어로 배너 */}
                   <div style={{
-                    background: `linear-gradient(135deg, ${C.card} 0%, ${main?.change >= 0 ? C.greenBg : C.redBg} 100%)`,
-                    padding: "22px 24px 18px",
+                    background: `linear-gradient(160deg, ${C.card} 0%, ${isUp ? '#071A12' : '#1A0710'} 50%, ${C.card} 100%)`,
+                    padding: "24px 24px 20px", position: "relative", overflow: "hidden",
                   }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                      <div style={{ fontSize: "15px", color: C.text3, fontWeight: 500 }}>
-                        {greeting} {t("tabs.home.marketBriefing")}
-                        {marketIndices.length > 0 && <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.green, display: "inline-block", marginLeft: "6px", animation: "livePulse 1.5s ease-in-out infinite" }} />}
-                        {!marketLoading && marketIndices.length > 0 && <span style={{ fontSize: "13px", color: C.text3, marginLeft: "6px" }}>LIVE</span>}
+                    {/* 배경 글로우 */}
+                    <div style={{ position: "absolute", top: "-60px", right: "-30px", width: "200px", height: "200px",
+                      borderRadius: "50%", background: isUp ? `${C.green}08` : `${C.red}08`, filter: "blur(60px)", pointerEvents: "none" }} />
+                    <div style={{ position: "absolute", bottom: "-40px", left: "20%", width: "160px", height: "160px",
+                      borderRadius: "50%", background: `${C.blue}06`, filter: "blur(50px)", pointerEvents: "none" }} />
+
+                    {/* 헤더 라인 */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", position: "relative" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "15px", color: C.text3, fontWeight: 600 }}>
+                          {greeting} {t("tabs.home.marketBriefing")}
+                        </span>
+                        {marketIndices.length > 0 && (
+                          <span style={{
+                            display: "inline-flex", alignItems: "center", gap: "4px",
+                            padding: "2px 8px", borderRadius: "6px",
+                            background: `${C.green}15`, fontSize: "12px", fontWeight: 700, color: C.green,
+                          }}>
+                            <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: C.green, animation: "livePulse 1.5s ease-in-out infinite" }} />
+                            LIVE
+                          </span>
+                        )}
                       </div>
                       <button onClick={fetchMarketOverview} disabled={marketLoading} style={{
-                        background: "none", border: "none", fontSize: "16px", color: C.text3, cursor: "pointer", padding: "4px 8px",
+                        background: `${C.card2}80`, border: `1px solid ${C.border}40`, borderRadius: "8px",
+                        fontSize: "13px", color: C.text3, cursor: "pointer", padding: "4px 10px", fontWeight: 500,
+                        transition: "all .15s",
                       }}>{marketLoading ? "..." : t("tabs.home.refresh")}</button>
                     </div>
+
+                    {/* 메인 인덱스 히어로 */}
                     {main && (
-                      <div style={{ fontSize: "16px", fontWeight: 700, color: C.text1, lineHeight: 1.5, marginBottom: "10px" }}>
-                        {mainName} <span style={{ color: trendColor }}>{main.change >= 0 ? "+" : ""}{main.change}% {trend}</span>
-                        {ks && <span style={{ color: C.text2, fontSize: "15px" }}> · t("tabs.home.kospi") {ks.change >= 0 ? "+" : ""}{ks.change}%</span>}
+                      <div style={{ position: "relative", marginBottom: "16px" }}>
+                        <div style={{ display: "flex", alignItems: "flex-end", gap: "12px", marginBottom: "6px" }}>
+                          <span style={{ fontSize: "32px", fontWeight: 800, color: C.text1, letterSpacing: "-1px", lineHeight: 1 }}>
+                            {main.price?.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                          </span>
+                          <span style={{
+                            fontSize: "18px", fontWeight: 700, color: trendColor, lineHeight: 1,
+                            display: "inline-flex", alignItems: "center", gap: "4px",
+                          }}>
+                            {isUp ? "+" : ""}{main.change}%
+                            <span style={{ fontSize: "14px" }}>{isUp ? "▲" : "▼"}</span>
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                          <span style={{ fontSize: "14px", color: C.text3, fontWeight: 500 }}>{mainName}</span>
+                          {ks && (
+                            <span style={{ fontSize: "13px", color: C.text3, fontWeight: 500 }}>
+                              · {t("tabs.home.kospiLabel") || "코스피"} <span style={{ color: ks.change >= 0 ? C.green : C.red, fontWeight: 600 }}>{ks.change >= 0 ? "+" : ""}{ks.change}%</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
                     )}
-                    {/* 등락 비율 바 */}
+
+                    {/* 등락 비율 바 — 모던 스타일 */}
                     {hotAssets.length > 0 && (
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: mf(11), color: C.green, fontWeight: 600 }}>{upCount}↑</span>
-                        <div style={{ flex: 1, height: "4px", borderRadius: "2px", background: C.card2, overflow: "hidden", display: "flex" }}>
-                          <div style={{ width: `${(upCount / Math.max(upCount + dnCount, 1)) * 100}%`, background: C.green, borderRadius: "2px 0 0 2px", transition: "width .5s ease" }} />
-                          <div style={{ flex: 1, background: hotAssets.length > 0 ? C.red : C.card2, borderRadius: "0 2px 2px 0" }} />
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                          <span style={{ fontSize: "12px", fontWeight: 700, color: C.green }}>{upCount}</span>
+                          <span style={{ fontSize: "11px", color: C.text3 }}>{t("tabs.home.up") || "상승"}</span>
                         </div>
-                        <span style={{ fontSize: mf(11), color: C.red, fontWeight: 600 }}>{dnCount}↓</span>
+                        <div style={{ flex: 1, height: "6px", borderRadius: "3px", background: `${C.card2}80`, overflow: "hidden", display: "flex", position: "relative" }}>
+                          <div style={{
+                            width: `${upPct}%`, background: `linear-gradient(90deg, ${C.green}, ${C.green}CC)`,
+                            borderRadius: "3px 0 0 3px", transition: "width .6s ease",
+                            boxShadow: `0 0 8px ${C.green}40`,
+                          }} />
+                          <div style={{
+                            flex: 1, background: `linear-gradient(90deg, ${C.red}CC, ${C.red})`,
+                            borderRadius: "0 3px 3px 0",
+                            boxShadow: `0 0 8px ${C.red}40`,
+                          }} />
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                          <span style={{ fontSize: "12px", fontWeight: 700, color: C.red }}>{dnCount}</span>
+                          <span style={{ fontSize: "11px", color: C.text3 }}>{t("tabs.home.down") || "하락"}</span>
+                        </div>
                       </div>
                     )}
                   </div>
 
-                  {/* 하단 인덱스 카드 + 시그널 가로 스크롤 */}
-                  <div className="hscroll" style={{ padding: "14px 16px 16px", display: "flex", gap: "8px" }}>
+                  {/* 인덱스 카드 그리드 */}
+                  <div style={{ padding: "14px 16px 16px", background: C.card }}>
                     {marketIndices.length === 0 && marketLoading ? (
-                      [1,2,3,4].map(i => <div key={i} className="skeleton" style={{ minWidth: "110px", height: "60px", borderRadius: "12px", flexShrink: 0 }} />)
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                        {[1,2,3,4,5,6].map(i => <div key={i} className="skeleton" style={{ height: "72px", borderRadius: "12px" }} />)}
+                      </div>
                     ) : (
-                      <>
-                        {marketIndices.map(idx => (
-                          <div key={idx.symbol} onClick={() => {
-                            if (!idx.symbol.includes("=X")) setChartAsset({ symbol: idx.symbol, name: idx.name, market: "us", symbolRaw: idx.symbol });
-                          }} style={{
-                            minWidth: "100px", padding: "10px 12px", borderRadius: "12px", flexShrink: 0,
-                            background: C.isDark ? `${C.card2}80` : C.card2, cursor: idx.symbol.includes("=X") ? "default" : "pointer",
-                            transition: "transform .15s",
-                          }}
-                          onMouseEnter={e => { if (!idx.symbol.includes("=X")) e.currentTarget.style.transform = "scale(1.03)"; }}
-                          onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}>
-                            <div style={{ fontSize: "13px", color: C.text3, marginBottom: "4px", whiteSpace: "nowrap", fontWeight: 500 }}>{idx.flag} {idx.name}</div>
-                            <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "2px" }}>
-                              {idx.name.includes("환율") ? `₩${Math.round(idx.price).toLocaleString()}` : idx.price.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
+                        {visibleIndices.map(idx => {
+                          const idxUp = idx.change >= 0;
+                          const isFx = idx.symbol.includes("=X");
+                          return (
+                            <div key={idx.symbol} onClick={() => {
+                              if (!isFx) setChartAsset({ symbol: idx.symbol, name: idx.name, market: "us", symbolRaw: idx.symbol });
+                            }} style={{
+                              padding: "12px", borderRadius: "12px", cursor: isFx ? "default" : "pointer",
+                              background: `${C.card2}60`, border: `1px solid ${C.border}15`,
+                              transition: "all .2s", position: "relative", overflow: "hidden",
+                            }}
+                            onMouseEnter={e => { if (!isFx) { e.currentTarget.style.background = `${C.card2}`; e.currentTarget.style.transform = "translateY(-1px)"; } }}
+                            onMouseLeave={e => { e.currentTarget.style.background = `${C.card2}60`; e.currentTarget.style.transform = "none"; }}>
+                              {/* 미니 배경 인디케이터 */}
+                              <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: "3px",
+                                background: `linear-gradient(90deg, transparent, ${idxUp ? C.green : C.red}40, transparent)` }} />
+                              <div style={{ fontSize: "12px", color: C.text3, marginBottom: "6px", whiteSpace: "nowrap", fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis" }}>
+                                {idx.flag} {idx.name}
+                              </div>
+                              <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "3px", letterSpacing: "-0.3px" }}>
+                                {isFx ? `₩${Math.round(idx.price).toLocaleString()}` : idx.price?.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                              </div>
+                              <div style={{ fontSize: "13px", fontWeight: 600, color: idxUp ? C.green : C.red, display: "flex", alignItems: "center", gap: "2px" }}>
+                                <span style={{ fontSize: "10px" }}>{idxUp ? "▲" : "▼"}</span>
+                                {idxUp ? "+" : ""}{idx.change}%
+                              </div>
                             </div>
-                            <div style={{ fontSize: "14px", fontWeight: 600, color: idx.change >= 0 ? C.green : C.red }}>
-                              {idx.change >= 0 ? "+" : ""}{idx.change}%
-                            </div>
-                          </div>
-                        ))}
-                        {/* 투자심리 카드 (강조) */}
+                          );
+                        })}
+                        {/* 투자심리 카드 */}
                         {fgVal && (
                           <div style={{
-                            minWidth: "130px", padding: "12px 16px", borderRadius: "12px", flexShrink: 0,
-                            background: `linear-gradient(135deg, ${fgColor}18, ${fgColor}08)`,
-                            border: `1px solid ${fgColor}30`,
+                            padding: "12px", borderRadius: "12px",
+                            background: `linear-gradient(135deg, ${fgColor}12, ${fgColor}06)`,
+                            border: `1px solid ${fgColor}25`, position: "relative", overflow: "hidden",
                           }}>
-                            <div style={{ fontSize: "13px", color: C.text3, marginBottom: "4px", fontWeight: 500 }}>{t("tabs.home.investmentPsychology")}</div>
-                            <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
+                            <div style={{ position: "absolute", top: "-20px", right: "-20px", width: "60px", height: "60px",
+                              borderRadius: "50%", background: `${fgColor}08`, filter: "blur(15px)", pointerEvents: "none" }} />
+                            <div style={{ fontSize: "12px", color: C.text3, marginBottom: "6px", fontWeight: 500 }}>{t("tabs.home.investmentPsychology")}</div>
+                            <div style={{ display: "flex", alignItems: "baseline", gap: "4px", marginBottom: "6px" }}>
                               <span style={{ fontWeight: 800, fontSize: "20px", color: fgColor }}>{fgVal}</span>
-                              <span style={{ fontSize: "14px", fontWeight: 700, color: fgColor }}>{fgLabel}</span>
+                              <span style={{ fontSize: "12px", fontWeight: 700, color: fgColor }}>{fgLabel}</span>
                             </div>
-                            <div style={{ marginTop: "6px", height: "4px", borderRadius: "2px", background: C.card2, overflow: "hidden" }}>
-                              <div style={{ height: "100%", width: `${fgVal}%`, background: fgColor, borderRadius: "2px", transition: "width .5s ease" }} />
+                            <div style={{ height: "4px", borderRadius: "2px", background: `${C.card2}80`, overflow: "hidden" }}>
+                              <div style={{ height: "100%", width: `${fgVal}%`, background: `linear-gradient(90deg, ${fgColor}CC, ${fgColor})`,
+                                borderRadius: "2px", transition: "width .5s ease", boxShadow: `0 0 6px ${fgColor}40` }} />
                             </div>
                           </div>
                         )}
-                        {/* 환율 칩 (인덱스에 없을 때) */}
-                        {fx && !marketIndices.some(i => i.symbol === "USDKRW=X" && i.name !== "원/달러 환율") && null}
-                      </>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -7161,46 +7239,73 @@ function AppInner() {
             {/* ── 이상 탐지 알림 (Anomaly Detection) ─── */}
             {anomalies.length > 0 && (
               <div style={{
-                background: `linear-gradient(135deg, ${C.card} 0%, ${anomalies[0].anomalyType === "surge" ? C.greenBg : C.redBg} 100%)`,
-                borderRadius: "18px", padding: "18px 20px", border: `1px solid ${anomalies[0].anomalyType === "surge" ? C.green : C.red}22`,
+                borderRadius: "20px", overflow: "hidden", position: "relative",
+                border: `1px solid ${anomalies[0].anomalyType === "surge" ? C.green : C.red}18`,
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                  <span style={{ fontSize: "18px" }}>⚡</span>
-                  <span style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>{t("tabs.home.anomalyDetection")}</span>
-                  <span style={{
-                    fontSize: "16px", padding: "2px 8px", borderRadius: "10px", fontWeight: 700,
-                    background: C.redBg, color: C.red,
-                  }}>{anomalies.length}건</span>
-                </div>
-                {anomalies.slice(0, 3).map((a, i) => (
-                  <div key={a.symbol} onClick={() => { setSelectedAsset(a); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    padding: "10px 8px", cursor: "pointer", borderRadius: "10px", transition: "background .15s",
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = `${C.card2}60`}
-                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
-                      <div style={{
-                        width: "32px", height: "32px", borderRadius: "8px", flexShrink: 0,
-                        background: a.anomalyType === "surge" ? `${C.green}18` : `${C.red}18`,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: "18px",
-                      }}>{a.anomalyType === "surge" ? "🚀" : "💥"}</div>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 600, fontSize: "18px", color: C.text1 }}>{a.name}</div>
-                        <div style={{ fontSize: "16px", color: C.text3, marginTop: "1px" }}>{a.anomalyReasons[0]}</div>
-                      </div>
-                    </div>
-                    <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: "18px", color: a.change >= 0 ? C.green : C.red }}>
-                        {a.change >= 0 ? "+" : ""}{a.change}%
-                      </div>
-                      {a.severity === "high" && (
-                        <div style={{ fontSize: "15px", color: C.red, fontWeight: 600 }}>{t("tabs.home.severe")}</div>
-                      )}
-                    </div>
+                {/* 배경 그라데이션 */}
+                <div style={{ position: "absolute", inset: 0,
+                  background: `linear-gradient(160deg, ${C.card} 0%, ${anomalies[0].anomalyType === "surge" ? '#071A12' : '#1A0710'} 60%, ${C.card} 100%)`,
+                  pointerEvents: "none" }} />
+                <div style={{ position: "absolute", top: "-30px", right: "10%", width: "120px", height: "120px",
+                  borderRadius: "50%", background: `${C.yellow}06`, filter: "blur(40px)", pointerEvents: "none" }} />
+
+                <div style={{ position: "relative", padding: "20px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+                    <div style={{
+                      width: "32px", height: "32px", borderRadius: "10px",
+                      background: `linear-gradient(135deg, ${C.yellow}30, ${C.orange}20)`,
+                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px",
+                    }}>⚡</div>
+                    <span style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>{t("tabs.home.anomalyDetection")}</span>
+                    <span style={{
+                      fontSize: "13px", padding: "2px 10px", borderRadius: "10px", fontWeight: 700,
+                      background: `${C.red}18`, color: C.red, letterSpacing: "0.3px",
+                    }}>{anomalies.length}{t("tabs.home.count") || "건"}</span>
                   </div>
-                ))}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    {anomalies.slice(0, 3).map((a, i) => (
+                      <div key={a.symbol} onClick={() => { setSelectedAsset(a); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "12px", cursor: "pointer", borderRadius: "14px",
+                        transition: "all .2s", background: `${C.card2}30`,
+                        border: `1px solid ${C.border}10`,
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = `${C.card2}70`; e.currentTarget.style.transform = "translateX(2px)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = `${C.card2}30`; e.currentTarget.style.transform = "none"; }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: 0 }}>
+                          <div style={{
+                            width: "40px", height: "40px", borderRadius: "12px", flexShrink: 0,
+                            background: a.anomalyType === "surge"
+                              ? `linear-gradient(135deg, ${C.green}20, ${C.green}08)`
+                              : `linear-gradient(135deg, ${C.red}20, ${C.red}08)`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: "20px",
+                          }}>{a.anomalyType === "surge" ? "🚀" : "💥"}</div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "2px" }}>{a.name}</div>
+                            <div style={{ fontSize: "13px", color: C.text3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {a.anomalyReasons[0]}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
+                          <div style={{
+                            fontWeight: 800, fontSize: "18px", color: a.change >= 0 ? C.green : C.red,
+                            letterSpacing: "-0.3px",
+                          }}>
+                            {a.change >= 0 ? "+" : ""}{a.change}%
+                          </div>
+                          {a.severity === "high" && (
+                            <span style={{
+                              fontSize: "11px", color: C.red, fontWeight: 700,
+                              padding: "1px 6px", borderRadius: "4px", background: `${C.red}15`,
+                            }}>{t("tabs.home.severe")}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 
@@ -7261,69 +7366,88 @@ function AppInner() {
 
             {/* ── 오늘의 추천 ─── */}
             {dailyPicks.length > 0 && (
-              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                  <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>오늘의 추천</span>
-                  <button onClick={() => setPicksExpanded(!picksExpanded)} style={{
-                    fontSize: "17px", color: C.blue, background: "none", border: "none", cursor: "pointer", fontWeight: 600,
-                  }}>{picksExpanded ? "접기" : `더보기 (${dailyPicks.length})`}</button>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                  {dailyPicks.slice(0, picksExpanded ? 15 : 5).map((pick, i) => {
-                    const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
-                    const isPos = pick.change >= 0;
-                    return (
-                      <div key={pick.symbol} onClick={() => { setSelectedAsset(pick); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }}
-                        style={{
-                          display: "flex", alignItems: "center", justifyContent: "space-between",
-                          padding: "12px 8px", cursor: "pointer", borderRadius: "10px",
-                          transition: "background .15s",
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = C.card2 + "60"}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            width: "28px", height: "28px", borderRadius: "9px", flexShrink: 0,
-                            background: i < 3 ? `${C.blue}20` : C.card2,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: "16px", fontWeight: 800, color: i < 3 ? C.blue : C.text3,
-                          }}>{i + 1}</div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, fontSize: "18px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{flag} {pick.name}</div>
+              <div style={{
+                borderRadius: "20px", overflow: "hidden", position: "relative",
+                border: `1px solid ${C.border}15`,
+              }}>
+                <div style={{ position: "absolute", inset: 0, background: C.card, pointerEvents: "none" }} />
+                <div style={{ position: "relative", padding: "20px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span style={{ fontWeight: 800, fontSize: "18px", color: C.text1 }}>{t("tabs.home.todayPicks") || "오늘의 추천"}</span>
+                    </div>
+                    <button onClick={() => setPicksExpanded(!picksExpanded)} style={{
+                      fontSize: "14px", color: C.blue, background: `${C.blue}10`, border: `1px solid ${C.blue}25`,
+                      borderRadius: "8px", cursor: "pointer", fontWeight: 600, padding: "4px 12px",
+                      transition: "all .15s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = `${C.blue}20`}
+                    onMouseLeave={e => e.currentTarget.style.background = `${C.blue}10`}
+                    >{picksExpanded ? (t("tabs.home.collapse") || "접기") : `${t("tabs.home.seeMore") || "더보기"} (${dailyPicks.length})`}</button>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                    {dailyPicks.slice(0, picksExpanded ? 15 : 5).map((pick, i) => {
+                      const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
+                      const isPos = pick.change >= 0;
+                      const isTop3 = i < 3;
+                      return (
+                        <div key={pick.symbol} onClick={() => { setSelectedAsset(pick); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }}
+                          style={{
+                            display: "flex", alignItems: "center", justifyContent: "space-between",
+                            padding: "12px", cursor: "pointer", borderRadius: "14px",
+                            transition: "all .2s", background: isTop3 ? `${C.card2}40` : "transparent",
+                            border: `1px solid ${isTop3 ? C.border + '12' : 'transparent'}`,
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = `${C.card2}70`; e.currentTarget.style.transform = "translateX(2px)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = isTop3 ? `${C.card2}40` : "transparent"; e.currentTarget.style.transform = "none"; }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              width: "30px", height: "30px", borderRadius: "10px", flexShrink: 0,
+                              background: isTop3
+                                ? `linear-gradient(135deg, ${C.blue}30, ${C.purple}20)`
+                                : `${C.card2}80`,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: "14px", fontWeight: 800, color: isTop3 ? C.blue : C.text3,
+                            }}>{i + 1}</div>
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontWeight: 600, fontSize: "16px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{flag} {pick.name}</div>
+                            </div>
+                          </div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                            <span style={{
+                              fontSize: "12px", padding: "3px 8px", borderRadius: "6px", fontWeight: 600,
+                              background: pick.score >= 7 ? `${C.green}15` : pick.score >= 5 ? `${C.blue}15` : `${C.yellow}15`,
+                              color: pick.score >= 7 ? C.green : pick.score >= 5 ? C.blue : C.yellow,
+                              whiteSpace: "nowrap", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis",
+                            }}>{pick.reason}</span>
+                            <span style={{
+                              fontSize: "15px", fontWeight: 700, color: isPos ? C.green : C.red,
+                              minWidth: "52px", textAlign: "right", letterSpacing: "-0.3px",
+                            }}>
+                              {isPos ? "+" : ""}{pick.change}%
+                            </span>
                           </div>
                         </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0 }}>
-                          <span style={{
-                            fontSize: "16px", padding: "3px 8px", borderRadius: "6px", fontWeight: 600,
-                            background: pick.score >= 7 ? C.greenBg : pick.score >= 5 ? C.blueBg : C.yellowBg,
-                            color: pick.score >= 7 ? C.green : pick.score >= 5 ? C.blue : C.yellow,
-                            whiteSpace: "nowrap", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis",
-                          }}>{pick.reason}</span>
-                          <span style={{ fontSize: "17px", fontWeight: 600, color: isPos ? C.green : C.red, minWidth: "52px", textAlign: "right" }}>
-                            {isPos ? "+" : ""}{pick.change}%
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                {/* 오늘의 추천 공유 */}
-                {dailyPicks.length > 0 && (
+                      );
+                    })}
+                  </div>
+                  {/* 공유 버튼 */}
                   <button onClick={() => {
                     const top5 = dailyPicks.slice(0, 5).map((p, i) => `${i + 1}. ${p.name} (${p.symbol}) ${p.change >= 0 ? "+" : ""}${p.change}%`).join("\n");
-                    const txt = `[Zepta AI 오늘의 추천]\n\n${top5}\n\nAI 퀀트 33개 전략이 실시간으로 찾아낸 종목입니다\n👉 https://zepta.vercel.app`;
-                    if (navigator.share) navigator.share({ title: "Zepta AI 오늘의 추천", text: txt, url: "https://zepta.vercel.app" }).catch(() => {});
-                    else navigator.clipboard.writeText(txt).then(() => showToast("추천 종목이 복사되었습니다!", "success")).catch(() => {});
+                    const txt = `[Zepta AI ${t("tabs.home.todayPicks") || "오늘의 추천"}]\n\n${top5}\n\n${t("tabs.home.shareDesc") || "AI 퀀트 33개 전략이 실시간으로 찾아낸 종목입니다"}\n👉 https://zepta.vercel.app`;
+                    if (navigator.share) navigator.share({ title: `Zepta AI ${t("tabs.home.todayPicks") || "오늘의 추천"}`, text: txt, url: "https://zepta.vercel.app" }).catch(() => {});
+                    else navigator.clipboard.writeText(txt).then(() => showToast(t("tabs.home.copied") || "추천 종목이 복사되었습니다!", "success")).catch(() => {});
                   }} style={{
-                    width: "100%", padding: "8px 0", marginTop: "8px", borderRadius: "10px",
-                    fontSize: "16px", fontWeight: 600, color: C.text3, background: "transparent",
-                    border: `1px dashed ${C.border}${C.isDark ? '40' : '60'}`, cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
+                    width: "100%", padding: "10px 0", marginTop: "12px", borderRadius: "12px",
+                    fontSize: "14px", fontWeight: 600, color: C.text3, background: `${C.card2}40`,
+                    border: `1px solid ${C.border}20`, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
+                    transition: "all .15s",
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.color = C.blue; e.currentTarget.style.borderColor = C.blue; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = C.text3; e.currentTarget.style.borderColor = `${C.border}${C.isDark ? '40' : '60'}`; }}
-                  >📤 오늘의 추천 공유</button>
-                )}
+                  onMouseEnter={e => { e.currentTarget.style.color = C.blue; e.currentTarget.style.background = `${C.blue}10`; e.currentTarget.style.borderColor = `${C.blue}30`; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = C.text3; e.currentTarget.style.background = `${C.card2}40`; e.currentTarget.style.borderColor = `${C.border}20`; }}
+                  >📤 {t("tabs.home.shareRecommendation") || "오늘의 추천 공유"}</button>
+                </div>
               </div>
             )}
 
@@ -7342,7 +7466,7 @@ function AppInner() {
                 <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      {[["all", "전체"], ["gainers", "급등"], ["losers", "급락"]].map(([k, l]) => (
+                      {[["all", t("tabs.home.all")], ["gainers", t("tabs.home.gainers")], ["losers", t("tabs.home.losers")]].map(([k, l]) => (
                         <button key={k} onClick={() => setHotViewMode(k)} style={{
                           padding: "5px 12px", borderRadius: "8px", fontSize: "17px", fontWeight: 700,
                           background: hotViewMode === k ? (k === "gainers" ? C.greenBg : k === "losers" ? C.redBg : C.blueBg) : "transparent",
@@ -7364,11 +7488,11 @@ function AppInner() {
                             transition: "left 0.2s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
                           }} />
                         </span>
-                        위험종목 숨기기
+                        {t("tabs.home.hideRiskyAssets")}
                       </label>
                       <button onClick={() => setHotExpanded(!hotExpanded)} style={{
                         fontSize: "16px", color: C.blue, background: "none", border: "none", cursor: "pointer", fontWeight: 600,
-                      }}>{hotExpanded ? "접기" : "더보기"}</button>
+                      }}>{hotExpanded ? t("tabs.home.collapse") : t("tabs.home.seeMore")}</button>
                     </div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column" }}>
@@ -7434,10 +7558,10 @@ function AppInner() {
             <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: watchlist.length > 0 ? "14px" : "0" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>관심종목</span>
+                  <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{t("tabs.home.watchlist")}</span>
                   {watchlist.length > 0 && <span style={{ fontSize: "16px", padding: "2px 8px", borderRadius: "10px", background: C.blueBg, color: C.blue, fontWeight: 700 }}>{watchlist.length}</span>}
                 </div>
-                {user && <SearchBar compact placeholder="+ 종목 추가" onSelect={(asset) => {
+                {user && <SearchBar compact placeholder={t("tabs.home.addAssetPlaceholder")} onSelect={(asset) => {
                   if (!watchlist.some(w => w.symbol === asset.symbol)) {
                     setWatchlist(prev => [...prev, { symbol: asset.symbol, name: asset.name, market: asset.market, symbolRaw: asset.symbolRaw || asset.symbol, id: asset.id }]);
                     if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); };
@@ -7447,18 +7571,18 @@ function AppInner() {
               {!user ? (
                 <div style={{ textAlign: "center", padding: "32px 16px 20px" }}>
                   <div style={{ width: "56px", height: "56px", borderRadius: "16px", background: C.blueBg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", fontSize: "24px" }}>🔒</div>
-                  <div style={{ fontSize: "17px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>로그인하고 관심종목을 관리하세요</div>
-                  <div style={{ fontSize: "17px", color: C.text3, lineHeight: 1.6, marginBottom: "16px" }}>실시간 퀀트 진단, 매수 타점, 전략 시그널을<br />한눈에 확인할 수 있어요</div>
+                  <div style={{ fontSize: "17px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>{t("tabs.home.loginToManageWatchlist")}</div>
+                  <div style={{ fontSize: "17px", color: C.text3, lineHeight: 1.6, marginBottom: "16px" }}>{t("tabs.home.realtimeQuantDescription")}</div>
                   <button onClick={() => setShowAuth(true)} style={{
                     padding: "10px 24px", borderRadius: "10px", fontSize: "17px", fontWeight: 700,
                     background: C.blue, color: "#fff", border: "none", cursor: "pointer",
-                  }}>로그인 / 회원가입</button>
+                  }}>{t("tabs.home.loginOrSignup")}</button>
                 </div>
               ) : watchlist.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "32px 16px 20px" }}>
                   <div style={{ width: "56px", height: "56px", borderRadius: "16px", background: C.blueBg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", fontSize: "24px" }}>📌</div>
-                  <div style={{ fontSize: "17px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>관심종목을 추가해보세요</div>
-                  <div style={{ fontSize: "17px", color: C.text3, lineHeight: 1.6 }}>실시간 퀀트 진단, 매수 타점, 전략 시그널을<br />한눈에 확인할 수 있어요</div>
+                  <div style={{ fontSize: "17px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>{t("tabs.home.addWatchlistItems")}</div>
+                  <div style={{ fontSize: "17px", color: C.text3, lineHeight: 1.6 }}>{t("tabs.home.realtimeQuantDescription")}</div>
                   <div style={{ display: "flex", gap: "6px", justifyContent: "center", marginTop: "16px", flexWrap: "wrap" }}>
                     {["NVDA","AAPL","TSLA","MSFT"].map(s => {
                       const a = hotAssets.find(h => h.symbol === s);
@@ -7667,7 +7791,7 @@ function AppInner() {
               if (sellPicks > 5) mktScore -= 6; else if (sellPicks > 2) mktScore -= 3;
               mktScore = Math.max(0, Math.min(100, mktScore));
 
-              const mktVerdict = mktScore >= 70 ? "강세" : mktScore >= 55 ? "약 강세" : mktScore >= 45 ? "혼조" : mktScore >= 30 ? "약세" : "강한 약세";
+              const mktVerdict = mktScore >= 70 ? t("tabs.home.strongBullish") : mktScore >= 55 ? t("tabs.home.weakBullish") : mktScore >= 45 ? t("tabs.home.mixed") : mktScore >= 30 ? t("tabs.home.bearish") : t("tabs.home.strongBearish");
               const mktColor = mktScore >= 60 ? C.green : mktScore >= 45 ? C.yellow : C.red;
               const now = new Date();
               const reportTime = now.toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit" });
@@ -7675,8 +7799,8 @@ function AppInner() {
               return (
                 <div onClick={() => { setTab("quant-report"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`, borderRadius: "18px", padding: "20px", cursor: "pointer", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-                    <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>퀀트 리포트</span>
-                    <span style={{ fontSize: mf(11), color: C.text3 }}>{reportTime} 기준 →</span>
+                    <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{t("tabs.home.quantReport")}</span>
+                    <span style={{ fontSize: mf(11), color: C.text3 }}>{reportTime} {t("tabs.home.asOf")} →</span>
                   </div>
 
                   {/* 시장 점수 게이지 */}
@@ -7693,8 +7817,8 @@ function AppInner() {
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: "17px", fontWeight: 800, color: mktColor, marginBottom: "5px" }}>{mktVerdict}</div>
                       <div style={{ fontSize: "16px", color: C.text3, lineHeight: 1.5 }}>
-                        {sp ? `S&P ${sp.change >= 0 ? "+" : ""}${sp.change}%` : ""}{nq ? ` · 나스닥 ${nq.change >= 0 ? "+" : ""}${nq.change}%` : ""}
-                        {ks ? ` · 코스피 ${ks.change >= 0 ? "+" : ""}${ks.change}%` : ""}
+                        {sp ? `S&P ${sp.change >= 0 ? "+" : ""}${sp.change}%` : ""}{nq ? ` · ${t("tabs.home.nasdaqLabel")} ${nq.change >= 0 ? "+" : ""}${nq.change}%` : ""}
+                        {ks ? ` · ${t("tabs.home.kospiLabel")} ${ks.change >= 0 ? "+" : ""}${ks.change}%` : ""}
                       </div>
                     </div>
                   </div>
@@ -7702,20 +7826,20 @@ function AppInner() {
                   {/* 지표 그리드 */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "14px" }}>
                     <div style={{ padding: "10px 12px", borderRadius: "10px", background: `${C.green}10` }}>
-                      <div style={{ fontSize: mf(11), color: C.text3, marginBottom: "3px" }}>상승 종목</div>
+                      <div style={{ fontSize: mf(11), color: C.text3, marginBottom: "3px" }}>{t("tabs.home.risingAssets")}</div>
                       <div style={{ fontSize: "17px", fontWeight: 700, color: C.green }}>{upCount}개 <span style={{ fontSize: "16px", color: C.text3 }}>/ {hotAssets.length}</span></div>
                     </div>
                     <div style={{ padding: "10px 12px", borderRadius: "10px", background: `${C.red}10` }}>
-                      <div style={{ fontSize: mf(11), color: C.text3, marginBottom: "3px" }}>하락 종목</div>
+                      <div style={{ fontSize: mf(11), color: C.text3, marginBottom: "3px" }}>{t("tabs.home.fallingAssets")}</div>
                       <div style={{ fontSize: "17px", fontWeight: 700, color: C.red }}>{dnCount}개 <span style={{ fontSize: "16px", color: C.text3 }}>/ {hotAssets.length}</span></div>
                     </div>
                     <div style={{ padding: "10px 12px", borderRadius: "10px", background: `${C.yellow}10` }}>
-                      <div style={{ fontSize: mf(11), color: C.text3, marginBottom: "3px" }}>공포탐욕</div>
-                      <div style={{ fontSize: "17px", fontWeight: 700, color: fg ? (fg > 60 ? C.green : fg > 40 ? C.yellow : C.red) : C.text3 }}>{fg || "—"} <span style={{ fontSize: "16px", color: C.text3 }}>{fg ? (fg <= 25 ? "극도의 공포" : fg <= 40 ? "공포" : fg <= 60 ? "중립" : fg <= 75 ? "탐욕" : "극도의 탐욕") : ""}</span></div>
+                      <div style={{ fontSize: mf(11), color: C.text3, marginBottom: "3px" }}>{t("tabs.home.fearGreedLabel")}</div>
+                      <div style={{ fontSize: "17px", fontWeight: 700, color: fg ? (fg > 60 ? C.green : fg > 40 ? C.yellow : C.red) : C.text3 }}>{fg || "—"} <span style={{ fontSize: "16px", color: C.text3 }}>{fg ? (fg <= 25 ? t("tabs.home.extremeFear") : fg <= 40 ? t("tabs.home.fear") : fg <= 60 ? t("tabs.home.neutral") : fg <= 75 ? t("tabs.home.greed") : t("tabs.home.extremeGreed")) : ""}</span></div>
                     </div>
                     <div style={{ padding: "10px 12px", borderRadius: "10px", background: `${C.blue}10` }}>
-                      <div style={{ fontSize: mf(11), color: C.text3, marginBottom: "3px" }}>추천 매수</div>
-                      <div style={{ fontSize: "17px", fontWeight: 700, color: C.blue }}>{buyPicks}개 <span style={{ fontSize: "16px", color: C.text3 }}>/ {dailyPicks.length} 분석</span></div>
+                      <div style={{ fontSize: mf(11), color: C.text3, marginBottom: "3px" }}>{t("tabs.home.recommendedBuy")}</div>
+                      <div style={{ fontSize: "17px", fontWeight: 700, color: C.blue }}>{buyPicks}개 <span style={{ fontSize: "16px", color: C.text3 }}>/ {dailyPicks.length}</span></div>
                     </div>
                   </div>
 

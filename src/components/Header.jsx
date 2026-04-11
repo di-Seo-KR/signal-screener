@@ -293,7 +293,7 @@ export default memo(function Header({
             </Sheet>
 
             {/* 로고 */}
-            <div onClick={() => navigate("home")} className="flex cursor-pointer select-none items-center gap-2">
+            <div onClick={() => navigate("home")} className="flex cursor-pointer select-none items-center gap-2 lg:ml-6">
               <img src="/zepta-icon-192.png" alt="Zepta" className="size-7 sm:size-8 lg:size-9 shrink-0" />
               <span className="text-base font-extrabold tracking-tight text-foreground sm:text-lg lg:text-xl">Zepta</span>
             </div>

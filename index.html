@@ -3,19 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <title>Zepta</title>
+    <title>Zepta — AI Quant Trading Platform for Stocks & Crypto</title>
     <meta name="google-site-verification" content="JUQdy_fK50dBcXAomofWSueoAMckVnuoGcVvjswZzGk" />
     <meta name="naver-site-verification" content="8bbe0bf4333531064510f62b3c09fb9897612fd6" />
     <meta name="google-adsense-account" content="ca-pub-5897295133273451" />
     <meta name="description" content="Zepta — AI 퀀트 투자 플랫폼. 실시간 주식/코인 스크리너, 33개 알파 전략 자동매매, 포트폴리오 리밸런싱. 무료로 시작하세요." />
+    <meta name="description-en" content="Zepta - AI-powered quant trading platform with real-time stock & crypto screener, 33 alpha strategies, automated portfolio rebalancing. Get started free." />
     <meta name="keywords" content="주식, 코인, 투자, 퀀트, 자동매매, 스크리너, AI, 비트코인, 포트폴리오, 트레이딩, 투자 플랫폼, 실시간 데이터, 알파 전략, 백테스트, 리스크 관리, 이더리움, 솔라나, 미국주식, 한국주식, 퀀트 전략, 페이퍼 트레이딩" />
+    <meta name="keywords-en" content="quant trading, stock screener, crypto trading, automated trading, algorithmic trading, portfolio rebalancing, backtesting, risk management, alpha strategies, AI trading, momentum strategy, value investing, volatility clustering, trading platform, free trading tools" />
     <link rel="canonical" href="https://zepta.vercel.app/" />
     <link rel="alternate" hreflang="ko" href="https://zepta.vercel.app/" />
     <link rel="alternate" hreflang="en" href="https://zepta.vercel.app/" />
+    <link rel="alternate" hreflang="x-default" href="https://zepta.vercel.app/" />
     <!-- Robots -->
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="googlebot" content="index, follow" />
-    <!-- Open Graph / SNS 공유 -->
+    <!-- Open Graph / SNS 공유 (Korean) -->
     <meta property="og:title" content="Zepta — AI가 찾아주는 매수 타점, 33개 퀀트 전략 자동매매" />
     <meta property="og:description" content="주식/코인 실시간 스크리닝, AI 퀀트 자동매매, 포트폴리오 리밸런싱까지. 가입만 하면 무료." />
     <meta property="og:type" content="website" />
@@ -24,10 +27,16 @@
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:locale" content="ko_KR" />
+    <meta property="og:locale:alternate" content="en_US" />
     <meta property="og:site_name" content="Zepta" />
+    <!-- Open Graph / SNS 공유 (English) -->
+    <meta property="og:title:en" content="Zepta — AI-Powered Quant Trading with 33 Alpha Strategies" />
+    <meta property="og:description:en" content="Real-time stock & crypto screener, AI quant automated trading, portfolio rebalancing. Free to start." />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Zepta — AI가 찾아주는 매수 타점, 33개 퀀트 전략 자동매매" />
+    <meta name="twitter:title:en" content="Zepta — AI-Powered Quant Trading Platform" />
     <meta name="twitter:description" content="주식/코인 실시간 스크리닝, AI 퀀트 자동매매, 포트폴리오 리밸런싱까지. 가입만 하면 무료." />
+    <meta name="twitter:description:en" content="Real-time stock & crypto screener, AI quant automated trading, portfolio rebalancing. Free to start." />
     <meta name="twitter:image" content="https://zepta.vercel.app/og-image.png" />
     <!-- PWA -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -42,21 +51,25 @@
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": ["WebApplication", "FinancialService"],
+      "@type": ["SoftwareApplication", "FinancialService", "WebApplication"],
       "name": "Zepta",
-      "alternateName": "젭타",
+      "alternateName": ["젭타", "Zepta AI Trading"],
       "url": "https://zepta.vercel.app/",
-      "description": "AI 퀀트 기반 주식/코인 투자 플랫폼. 33개 알파 전략 자동매매, 실시간 스크리너, 포트폴리오 리밸런싱, 리스크 관리까지 올인원으로 제공합니다.",
-      "applicationCategory": "FinanceApplication",
+      "description": "AI-powered quant trading platform for stocks and cryptocurrencies. Features 33+ alpha strategies, real-time screeners, automated trading, portfolio rebalancing, and risk management tools. Free to start.",
+      "applicationCategory": ["FinanceApplication", "UtilityApplication"],
       "operatingSystem": "Web",
       "browserRequirements": "Requires JavaScript. Requires HTML5.",
       "softwareVersion": "4.2",
-      "offers": {
-        "@type": "Offer",
-        "price": "0",
-        "priceCurrency": "KRW",
-        "availability": "https://schema.org/InStock"
-      },
+      "releaseDate": "2025-04-12",
+      "offers": [
+        {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD",
+          "availability": "https://schema.org/InStock",
+          "name": "Free Plan"
+        }
+      ],
       "aggregateRating": {
         "@type": "AggregateRating",
         "ratingValue": "4.5",
@@ -64,13 +77,43 @@
         "bestRating": "5",
         "worstRating": "1"
       },
-      "featureList": "AI 퀀트 자동매매, 실시간 주식 스크리너, 코인 스크리너, 33개 알파 전략, 백테스트, 포트폴리오 리밸런싱, 리스크 맵, 경제 캘린더, 실시간 뉴스",
+      "featureList": [
+        "AI Quant Automated Trading",
+        "Real-time Stock Screener",
+        "Cryptocurrency Screener",
+        "33+ Alpha Strategies",
+        "Backtesting Engine",
+        "Portfolio Rebalancing",
+        "Risk Map Analysis",
+        "Economic Calendar",
+        "Real-time News Feed",
+        "Momentum Strategy",
+        "Value Investing Analysis",
+        "Volatility Clustering Detection",
+        "Hurst Exponent Analysis",
+        "Entropy Regime Detection",
+        "Funding Rate Analysis",
+        "Microstructure Analysis",
+        "Information Flow Metrics",
+        "Efficiency Ratio Calculation",
+        "Portfolio Risk Assessment",
+        "Sector Flow Analysis"
+      ],
       "screenshot": "https://zepta.vercel.app/og-image.png",
-      "inLanguage": "ko",
+      "inLanguage": ["ko", "en"],
       "creator": {
         "@type": "Organization",
         "name": "Zepta",
         "url": "https://zepta.vercel.app/"
+      },
+      "author": {
+        "@type": "Organization",
+        "name": "Zepta"
+      },
+      "isAccessibleForFree": true,
+      "maintainer": {
+        "@type": "Organization",
+        "name": "Zepta"
       }
     }
     </script>
@@ -89,10 +132,26 @@
         },
         {
           "@type": "Question",
+          "name": "Is Zepta Free?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, Zepta's core features including real-time screeners, AI quant signals, news feeds, and economic calendar are completely free. Sign up now to access premium features like automated trading and portfolio management."
+          }
+        },
+        {
+          "@type": "Question",
           "name": "AI 퀀트 자동매매는 어떻게 작동하나요?",
           "acceptedAnswer": {
             "@type": "Answer",
             "text": "Zepta은 33개 알파 전략(모멘텀, 밸류, 볼라틸리티, 허스트 지수, 엔트로피 등)을 실시간으로 분석하여 매수/매도 시그널을 생성합니다. 가상 포트폴리오 기반으로 자동매매가 24/7 운영됩니다."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How Does AI Quant Automated Trading Work?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Zepta analyzes 33+ alpha strategies (momentum, value, volatility, Hurst exponent, entropy, funding rates, microstructure, and more) in real-time to generate buy/sell signals. Automated trading runs 24/7 on your virtual portfolio with continuous monitoring and risk management."
           }
         },
         {
@@ -105,13 +164,132 @@
         },
         {
           "@type": "Question",
+          "name": "Does Zepta Support US and Korean Stocks?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, Zepta supports US stocks (NYSE, NASDAQ), Korean stocks (KOSPI, KOSDAQ), and major cryptocurrencies (BTC, ETH, SOL, and more) across global markets."
+          }
+        },
+        {
+          "@type": "Question",
           "name": "Zepta의 퀀트 전략은 어떤 것들이 있나요?",
           "acceptedAnswer": {
             "@type": "Answer",
             "text": "모멘텀 디케이, 허스트 레짐, 볼라틸리티 클러스터, 효율 비율, 정보 흐름, 펀딩 레이트, 마이크로스트럭처, 엔트로피 레짐 등 33개 이상의 전문 퀀트 전략을 제공하며, 지속적으로 리서치를 통해 고도화됩니다."
           }
+        },
+        {
+          "@type": "Question",
+          "name": "What Quant Strategies Does Zepta Offer?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Zepta provides 33+ professional quant strategies including momentum decay, Hurst regimes, volatility clustering, efficiency ratios, information flow, funding rates, microstructure analysis, entropy regimes, and more. Our strategies are continuously refined through ongoing research and backtesting."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "포트폴리오 리밸런싱은 어떻게 이루어지나요?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Zepta의 자동 리밸런싱은 목표 자산배분을 유지하면서 시장 변화에 대응합니다. AI 시그널과 리스크 평가를 바탕으로 최적의 리밸런싱 타이밍을 자동으로 결정합니다."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How Does Portfolio Rebalancing Work?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Zepta's automated rebalancing maintains your target asset allocation while responding to market changes. Using AI signals and risk assessment, the platform automatically determines optimal rebalancing timing to maximize returns and minimize risk."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "백테스트 기능은 무엇인가요?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "백테스트 기능으로 과거 데이터를 기반으로 전략의 성과를 검증할 수 있습니다. 수익률, 낙폭, 샤프 지수 등 다양한 성과 지표를 확인하고 전략 최적화에 활용할 수 있습니다."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What Is the Backtesting Feature?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The backtesting feature allows you to validate strategy performance against historical data. Analyze detailed metrics including returns, drawdowns, Sharpe ratio, win rate, and more to optimize your trading strategies before live deployment."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "실시간 스크리너의 장점은?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Zepta의 실시간 스크리너는 정의한 조건을 만족하는 종목을 자동으로 찾습니다. 수백 개 지표를 조합하여 맞춤형 필터링이 가능하고, 조건 변경 시 즉시 결과가 업데이트됩니다."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What Are the Benefits of Real-Time Screeners?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Zepta's real-time screeners automatically identify securities matching your criteria from thousands of stocks and cryptocurrencies. Combine hundreds of indicators for custom filtering, with results updating instantly as conditions change—no more manual searching required."
+          }
         }
       ]
+    }
+    </script>
+    <!-- JSON-LD Breadcrumb Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://zepta.vercel.app/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Screener",
+          "item": "https://zepta.vercel.app/screener"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Auto Trading",
+          "item": "https://zepta.vercel.app/auto-trading"
+        }
+      ]
+    }
+    </script>
+    <!-- JSON-LD WebPage Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "Zepta - AI Quant Trading Platform",
+      "description": "AI-powered quant trading platform with real-time stock & crypto screeners, 33+ alpha strategies, automated trading, and portfolio rebalancing tools.",
+      "url": "https://zepta.vercel.app/",
+      "mainEntity": {
+        "@type": "SoftwareApplication",
+        "name": "Zepta",
+        "url": "https://zepta.vercel.app/"
+      },
+      "datePublished": "2025-04-12",
+      "dateModified": "2026-04-12",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Zepta",
+        "logo": {
+          "@type": "ImageObject",
+          "url": "https://zepta.vercel.app/favicon-32.png"
+        }
+      },
+      "inLanguage": ["ko", "en"],
+      "isAccessibleForFree": true,
+      "keywords": "AI quant trading, stock screener, crypto trading, algorithmic trading, automated investing, portfolio management"
     }
     </script>
     <!-- Google Analytics (gtag.js) -->
