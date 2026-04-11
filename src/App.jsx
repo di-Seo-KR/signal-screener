@@ -4231,6 +4231,8 @@ function AppInner() {
         window.history.pushState({ tab: newTab }, "", newPath);
       }
     } catch {}
+    // 탭 전환 시 스크롤 최상단으로 이동
+    window.scrollTo({ top: 0, behavior: "instant" });
   }, []);
 
   // ── 브라우저 뒤로가기/앞으로가기 지원 ──
@@ -11134,19 +11136,32 @@ function AppInner() {
               { label: "개인정보 처리방침", tab: "privacy", bold: true },
               { label: "이용약관", tab: "terms" },
               { label: "서비스 소개", tab: "about" },
+              { label: "투자 가이드", href: "/guide" },
               { label: "문의하기", tab: "contact" },
             ].map((item, i) => (
-              <span key={item.tab} style={{ display: "flex", alignItems: "center" }}>
+              <span key={item.tab || item.href} style={{ display: "flex", alignItems: "center" }}>
                 {i > 0 && <span style={{ margin: "0 10px", color: C.text2, opacity: 0.25 }}>|</span>}
-                <span
-                  onClick={() => setTab(item.tab)}
-                  style={{
-                    fontSize: "16px", color: C.text2, cursor: "pointer",
-                    fontWeight: item.bold ? 700 : 400,
-                  }}
-                  onMouseEnter={e => { e.target.style.color = C.text1; }}
-                  onMouseLeave={e => { e.target.style.color = C.text2; }}
-                >{item.label}</span>
+                {item.href ? (
+                  <a
+                    href={item.href}
+                    style={{
+                      fontSize: "16px", color: C.text2, cursor: "pointer",
+                      fontWeight: item.bold ? 700 : 400, textDecoration: "none",
+                    }}
+                    onMouseEnter={e => { e.target.style.color = C.text1; }}
+                    onMouseLeave={e => { e.target.style.color = C.text2; }}
+                  >{item.label}</a>
+                ) : (
+                  <span
+                    onClick={() => setTab(item.tab)}
+                    style={{
+                      fontSize: "16px", color: C.text2, cursor: "pointer",
+                      fontWeight: item.bold ? 700 : 400,
+                    }}
+                    onMouseEnter={e => { e.target.style.color = C.text1; }}
+                    onMouseLeave={e => { e.target.style.color = C.text2; }}
+                  >{item.label}</span>
+                )}
               </span>
             ))}
           </div>
