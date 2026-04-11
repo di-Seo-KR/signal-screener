@@ -82,70 +82,70 @@ function CssDropdownItem({ children, onClick, className, variant }) {
   );
 }
 
-/* ── 네비게이션 데이터 정의 ── */
-const NAV_CATEGORIES = [
-  { id: "home", label: "홈", catId: "home", icon: LayoutDashboard, directTab: "home" },
-  { id: "ai-quant", label: "AI 퀀트", catId: "ai-quant", icon: Bot, directTab: "auto-trading" },
+/* ── 네비게이션 데이터 정의 (다국어 대응 — t 함수 주입) ── */
+const getNavCategories = (t) => [
+  { id: "home", label: t("nav.home"), catId: "home", icon: LayoutDashboard, directTab: "home" },
+  { id: "ai-quant", label: t("nav.aiQuant"), catId: "ai-quant", icon: Bot, directTab: "auto-trading" },
   {
-    id: "analysis", label: "분석", catId: "analysis", icon: BarChart3,
+    id: "analysis", label: t("nav.analysis"), catId: "analysis", icon: BarChart3,
     items: [
-      { id: "screener", label: "종목 탐색", icon: Search },
-      { id: "anomaly", label: "이상 탐지", icon: Zap },
-      { id: "strategy", label: "퀀트 전략", icon: Target },
-      { id: "quant-report", label: "퀀트 리포트", icon: FileText },
-      { id: "backtest", label: "백테스트", icon: LineChart },
+      { id: "screener", label: t("nav.screener"), icon: Search },
+      { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
+      { id: "strategy", label: t("nav.strategy"), icon: Target },
+      { id: "quant-report", label: t("nav.report"), icon: FileText },
+      { id: "backtest", label: t("nav.backtest"), icon: LineChart },
     ],
   },
   {
-    id: "management", label: "운용", catId: "management", icon: Briefcase,
+    id: "management", label: t("nav.management"), catId: "management", icon: Briefcase,
     items: [
-      { id: "quant-port", label: "전략 운용", icon: TrendingUp },
-      { id: "risk-map", label: "리스크맵", icon: Shield },
-      { id: "portfolio", label: "포트폴리오", icon: Briefcase },
+      { id: "quant-port", label: t("nav.trading"), icon: TrendingUp },
+      { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
+      { id: "portfolio", label: t("nav.portfolio"), icon: Briefcase },
     ],
   },
   {
-    id: "info", label: "정보", catId: "info", icon: Newspaper,
+    id: "info", label: t("nav.info"), catId: "info", icon: Newspaper,
     items: [
-      { id: "news", label: "마켓 뉴스", icon: Newspaper },
-      { id: "sentiment", label: "센티먼트", icon: MessageSquare },
-      { id: "econ-calendar", label: "경제 캘린더", icon: CalendarDays },
-      { id: "alerts", label: "알림 설정", icon: Bell, locked: true },
+      { id: "news", label: t("nav.news"), icon: Newspaper },
+      { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
+      { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
+      { id: "alerts", label: t("nav.alerts"), icon: Bell, locked: true },
     ],
   },
 ];
 
 /* 모바일 메뉴 섹션 (3열 그리드용) */
-const getMobileMenuSections = (isOwner) => [
+const getMobileMenuSections = (isOwner, t) => [
   {
-    section: "메인", items: [
-      { id: "home", label: "홈", icon: LayoutDashboard },
-      { id: "auto-trading", label: "AI 퀀트", icon: Bot },
-      ...(isOwner ? [{ id: "real-trading", label: "실전매매", icon: Activity }] : []),
+    section: t("nav.home"), items: [
+      { id: "home", label: t("nav.home"), icon: LayoutDashboard },
+      { id: "auto-trading", label: t("nav.aiQuant"), icon: Bot },
+      ...(isOwner ? [{ id: "real-trading", label: t("header.liveTrading"), icon: Activity }] : []),
     ],
   },
   {
-    section: "분석", items: [
-      { id: "screener", label: "종목 탐색", icon: Search },
-      { id: "anomaly", label: "이상 탐지", icon: Zap },
-      { id: "strategy", label: "퀀트 전략", icon: Target },
-      { id: "quant-report", label: "리포트", icon: FileText },
-      { id: "backtest", label: "백테스트", icon: LineChart },
+    section: t("nav.analysis"), items: [
+      { id: "screener", label: t("nav.screener"), icon: Search },
+      { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
+      { id: "strategy", label: t("nav.strategy"), icon: Target },
+      { id: "quant-report", label: t("nav.report"), icon: FileText },
+      { id: "backtest", label: t("nav.backtest"), icon: LineChart },
     ],
   },
   {
-    section: "운용", items: [
-      { id: "quant-port", label: "전략 운용", icon: TrendingUp },
-      { id: "risk-map", label: "리스크맵", icon: Shield },
-      { id: "portfolio", label: "포트폴리오", icon: Briefcase },
+    section: t("nav.management"), items: [
+      { id: "quant-port", label: t("nav.trading"), icon: TrendingUp },
+      { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
+      { id: "portfolio", label: t("nav.portfolio"), icon: Briefcase },
     ],
   },
   {
-    section: "정보", items: [
-      { id: "news", label: "뉴스", icon: Newspaper },
-      { id: "sentiment", label: "센티먼트", icon: MessageSquare },
-      { id: "econ-calendar", label: "경제캘린더", icon: CalendarDays },
-      { id: "alerts", label: "알림", icon: Bell, locked: true },
+    section: t("nav.info"), items: [
+      { id: "news", label: t("nav.news"), icon: Newspaper },
+      { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
+      { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
+      { id: "alerts", label: t("nav.alerts"), icon: Bell, locked: true },
     ],
   },
 ];
@@ -165,8 +165,10 @@ export default memo(function Header({
   alertBadge = 0, anomalyCount = 0, requireLogin,
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const { lang, setLang } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
   const activeCategory = gnbCategoryMap[tab] || "home";
+  const NAV_CATEGORIES = getNavCategories(t);
+  const mobileMenuSections = getMobileMenuSections(isOwner, t);
 
   const navigate = useCallback((tabId) => {
     setTab(tabId);
@@ -233,7 +235,7 @@ export default memo(function Header({
 
                 {/* 메뉴 섹션 */}
                 <div className="flex flex-col gap-1 p-3">
-                  {getMobileMenuSections(isOwner).map((group) => (
+                  {mobileMenuSections.map((group) => (
                     <div key={group.section}>
                       <p className="px-2 pt-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                         {group.section}
@@ -271,20 +273,16 @@ export default memo(function Header({
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={toggleTheme}>
                       {themeMode === "dark" ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
-                      {themeMode === "dark" ? "라이트" : "다크"}
-                    </Button>
-                    <Button variant="outline" size="sm" className="flex-1 gap-1.5"
-                      onClick={() => setLang(lang === "ko" ? "en" : "ko")}>
-                      <span className="text-xs font-semibold">{lang === "ko" ? "EN" : "KR"}</span>
+                      {themeMode === "dark" ? t("header.lightMode") : t("header.darkMode")}
                     </Button>
                     {user && (
                       <>
                         <Button variant="outline" size="sm" className="flex-1 gap-1.5 text-primary"
                           onClick={() => navigate("profile")}>
-                          <User className="size-3.5" />내 정보
+                          <User className="size-3.5" />{t("header.myInfo")}
                         </Button>
                         <Button variant="destructive" size="sm" className="flex-1 gap-1.5"
-                          onClick={() => { if (confirm("로그아웃 하시겠습니까?")) { signOut(); setMobileOpen(false); } }}>
+                          onClick={() => { if (confirm(t("header.logout") + "?")) { signOut(); setMobileOpen(false); } }}>
                           <LogOut className="size-3.5" />
                         </Button>
                       </>
@@ -382,7 +380,7 @@ export default memo(function Header({
               className="gap-1.5 text-muted-foreground hidden sm:inline-flex"
             >
               <Search className="size-4" />
-              <span className="text-sm">검색</span>
+              <span className="text-sm">{t("common.search")}</span>
               <kbd className="ml-1 rounded bg-muted px-1 py-0.5 text-[10px] font-mono">/</kbd>
             </Button>
             <Button variant="ghost" size="icon-sm"
@@ -391,6 +389,14 @@ export default memo(function Header({
             >
               <Search className="size-4" />
             </Button>
+
+            {/* 언어 토글 — GNB 직접 노출 (모바일+데스크탑) */}
+            <button
+              onClick={() => setLang(lang === "ko" ? "en" : "ko")}
+              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-bold rounded-full border border-border/50 hover:bg-muted/50 transition-colors text-muted-foreground"
+            >
+              🌐 {lang === "ko" ? "EN" : "KR"}
+            </button>
 
             {/* 데스크탑: 사용자 드롭다운 */}
             {user ? (
@@ -414,33 +420,29 @@ export default memo(function Header({
                     </div>
                     <Separator className="my-1" />
                     <CssDropdownItem onClick={() => { navigate("profile"); close(); }}>
-                      <User className="size-4" />회원정보
+                      <User className="size-4" />{t("header.profile")}
                     </CssDropdownItem>
                     <CssDropdownItem onClick={() => { navigate("auto-trading"); close(); }}>
-                      <Bot className="size-4" />봇 운영현황
+                      <Bot className="size-4" />{t("header.botStatus")}
                     </CssDropdownItem>
                     {isOwner && (
                       <CssDropdownItem onClick={() => { navigate("real-trading"); close(); }}>
-                        <Activity className="size-4" />실전매매
+                        <Activity className="size-4" />{t("header.liveTrading")}
                       </CssDropdownItem>
                     )}
                     <CssDropdownItem onClick={() => { navigate("portfolio"); close(); }}>
-                      <Briefcase className="size-4" />포트폴리오
+                      <Briefcase className="size-4" />{t("nav.portfolio")}
                     </CssDropdownItem>
                     <Separator className="my-1" />
                     <CssDropdownItem onClick={() => { toggleTheme(); close(); }}>
                       {themeMode === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
-                      {themeMode === "dark" ? "라이트 모드" : "다크 모드"}
-                    </CssDropdownItem>
-                    <CssDropdownItem onClick={() => { setLang(lang === "ko" ? "en" : "ko"); close(); }}>
-                      <span className="text-xs font-semibold">{lang === "ko" ? "KR" : "EN"}</span>
-                      {lang === "ko" ? "English" : "한국어"}
+                      {themeMode === "dark" ? t("header.lightMode") : t("header.darkMode")}
                     </CssDropdownItem>
                     <Separator className="my-1" />
                     <CssDropdownItem variant="destructive" onClick={() => {
-                      if (confirm("로그아웃 하시겠습니까?")) { signOut(); close(); }
+                      if (confirm(t("header.logout") + "?")) { signOut(); close(); }
                     }}>
-                      <LogOut className="size-4" />로그아웃
+                      <LogOut className="size-4" />{t("header.logout")}
                     </CssDropdownItem>
                   </>
                 )}
@@ -448,7 +450,7 @@ export default memo(function Header({
             ) : (
               <>
                 <Button size="default" onClick={() => setShowAuthModal(true)} className="hidden lg:inline-flex text-sm">
-                  로그인
+                  {t("header.login")}
                 </Button>
                 <Button variant="ghost" size="icon-sm" onClick={toggleTheme}
                   className="hidden lg:inline-flex text-muted-foreground">

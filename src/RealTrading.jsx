@@ -240,7 +240,7 @@ function RealTradingInner() {
           ) : (
             <Badge tone="default">STANDBY</Badge>
           )}
-          {shadowOn && <Badge tone="purple" dot>SHADOW</Badge>}
+          {/* Shadow 뱃지 숨김 */}
           {halted && <Badge tone="yellow">BREAKER</Badge>}
         </div>
         <div style={{ fontSize: 12, color: "var(--z-text-3)" }}>
@@ -249,15 +249,6 @@ function RealTradingInner() {
         </div>
       </div>
 
-      <Segmented
-        value={density}
-        onChange={setDensity}
-        items={[{ id: "simple", label: "초보자" }, { id: "pro", label: "트레이더" }]}
-      />
-      <Tooltip content={theme === "dark" ? "라이트 모드" : "다크 모드"}>
-        <Button variant="ghost" size="sm" onClick={toggleTheme}
-          leftIcon={theme === "dark" ? <Sun size={14} /> : <Moon size={14} />} />
-      </Tooltip>
       <Button variant="ghost" size="sm" onClick={refresh} leftIcon={loading ? <Spinner size={14} /> : <Refresh size={14} />}>
         새로고침
       </Button>
@@ -307,13 +298,7 @@ function RealTradingInner() {
         sub="5회 → 24h 쿨다운"
         tone={(breaker.consecLosses || 0) >= 3 ? "warn" : undefined}
       />
-      <Stat
-        label="Shadow 성과"
-        icon={<Ghost size={12} />}
-        value={shadow.summary?.trades ? fmtUsd(shadow.summary.netPnL || 0) : "—"}
-        sub={shadow.summary?.trades ? `${shadow.summary.trades}건 · ${shadow.summary.wins || 0}W ${shadow.summary.losses || 0}L` : "기록 없음"}
-        tone={(shadow.summary?.netPnL || 0) >= 0 ? "success" : "danger"}
-      />
+      {/* Shadow 성과 — 숨김 */}
     </div>
   );
 
@@ -322,63 +307,38 @@ function RealTradingInner() {
   // ═════════════════════════════════════════════════════════
   const controlPanel = (
     <Card
-      title="제어 패널"
-      subtitle="활성 조건 = Phase 1 ON + Killswitch OFF + Breaker OK"
+      title="매매 제어"
       icon={<Settings size={16} />}
-      actions={trulyLive ? <Badge tone="green" dot>활성</Badge> : <Badge tone="default">대기</Badge>}
+      actions={trulyLive ? <Badge tone="green" dot>실거래 중</Badge> : <Badge tone="default">대기</Badge>}
     >
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        {!phase1On ? (
-          <Button variant="primary" size="sm" disabled={busy}
-            leftIcon={<Play size={14} />}
-            onClick={() => setConfirm({
-              title: "Phase 1 실거래 엔진 등록",
-              desc: "이 계정을 실거래 엔진 순회 대상에 등록합니다.\n즉시 거래가 시작되지는 않습니다 — Killswitch 가 ON 이면 엔진은 스킵합니다.",
-              confirmLabel: "등록",
-              onConfirm: () => act("enable-phase1", {}, "Phase 1 등록 완료"),
-            })}>
-            Phase 1 등록
-          </Button>
-        ) : (
-          <Button variant="ghost" size="sm" disabled={busy}
-            onClick={() => setConfirm({
-              tone: "danger",
-              title: "Phase 1 전면 비활성화",
-              desc: "유저를 allowlist 에서 제거하고 Killswitch 도 자동으로 ON 됩니다.\n오픈 포지션은 청산되지 않습니다.",
-              confirmLabel: "비활성화",
-              confirmVariant: "danger",
-              onConfirm: () => act("disable-phase1", {}, "Phase 1 해제 완료"),
-            })}>
-            Phase 1 해제
-          </Button>
-        )}
-
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+        {/* 실거래 시작/정지 — 핵심 제어만 노출 */}
         {killOn ? (
           <Button variant="danger" size="sm" disabled={busy || !phase1On}
             leftIcon={<Unlock size={14} />}
             onClick={() => setConfirm({
               tone: "danger",
-              title: "Killswitch 해제 — 실거래 개시",
-              desc: "이 버튼을 누르면 다음 cron 사이클(5분)부터 실거래가 발생할 수 있습니다.\n자본·리스크 파라미터를 확인하셨나요?",
-              confirmLabel: "해제하고 실거래 시작",
+              title: "실거래 시작",
+              desc: "이 버튼을 누르면 다음 사이클(5분)부터 실거래가 발생합니다.\n자본·리스크 파라미터를 확인하셨나요?",
+              confirmLabel: "실거래 시작",
               confirmVariant: "danger",
-              onConfirm: () => act("enable", {}, "Killswitch 해제 완료"),
+              onConfirm: () => act("enable", {}, "실거래 시작 완료"),
             })}>
-            Killswitch 해제
+            실거래 시작
           </Button>
         ) : (
           <Button variant="warn" size="sm" disabled={busy}
             leftIcon={<Lock size={14} />}
-            onClick={() => act("disable", {}, "Killswitch ON")}>
-            Killswitch ON
+            onClick={() => act("disable", {}, "실거래 중지")}>
+            실거래 중지
           </Button>
         )}
 
         {halted ? (
           <Button variant="success" size="sm" disabled={busy}
             leftIcon={<Play size={14} />}
-            onClick={() => act("resume", {}, "Breaker 재개")}>
-            Breaker 재개
+            onClick={() => act("resume", {}, "재개 완료")}>
+            재개
           </Button>
         ) : (
           <Button variant="ghost" size="sm" disabled={busy}
@@ -387,38 +347,6 @@ function RealTradingInner() {
             일시 정지
           </Button>
         )}
-
-        <div style={{ width: 1, background: "var(--z-border)", margin: "0 4px" }} />
-
-        <Button variant="ghost" size="sm" disabled={busy}
-          leftIcon={<Flask size={14} />}
-          onClick={() => runDry()}>모의실행</Button>
-
-        <div style={{ width: 1, background: "var(--z-border)", margin: "0 4px" }} />
-
-        {!shadowOn ? (
-          <Button variant="subtle" size="sm" disabled={busy}
-            leftIcon={<Ghost size={14} />}
-            onClick={() => setConfirm({
-              title: "Shadow 모드 시작",
-              desc: "실제 주문 없이 전체 파이프라인을 가상 진입/청산으로 기록합니다.\n실거래와 병행 가능, 리스크 제로.",
-              confirmLabel: "시작",
-              onConfirm: () => act("enable-shadow", {}, "Shadow 모드 시작"),
-            })}>Shadow 시작</Button>
-        ) : (
-          <Button variant="ghost" size="sm" disabled={busy}
-            leftIcon={<Ghost size={14} />}
-            onClick={() => act("disable-shadow", {}, "Shadow 모드 중지")}>Shadow 중지</Button>
-        )}
-        <Button variant="ghost" size="xs" disabled={busy}
-          onClick={() => setConfirm({
-            tone: "danger",
-            title: "Shadow 기록 초기화",
-            desc: "누적된 Shadow 원장·요약 통계를 모두 지웁니다. 되돌릴 수 없습니다.",
-            confirmLabel: "초기화",
-            confirmVariant: "danger",
-            onConfirm: () => act("reset-shadow", {}, "Shadow 리셋"),
-          })}>리셋</Button>
 
         <div style={{ flex: 1 }} />
 
@@ -846,9 +774,6 @@ function RealTradingInner() {
   const tabs = [
     { id: "dashboard", label: "대시보드" },
     { id: "positions", label: `포지션 (${positions.length})` },
-    { id: "shadow",    label: "Shadow" },
-    { id: "engine",    label: "엔진 로그" },
-    { id: "config",    label: "설정" },
   ];
 
   return (
@@ -861,7 +786,6 @@ function RealTradingInner() {
       <div style={{ maxWidth: 1280, margin: "0 auto" }}>
         {header}
         {kpiBar}
-        {density === "simple" && simpleGuide}
         {controlPanel}
 
         <div style={{ margin: "18px 0 12px" }}>
@@ -869,15 +793,12 @@ function RealTradingInner() {
         </div>
 
         {section === "dashboard" && (
-          <div style={{ display: "grid", gap: 14, gridTemplateColumns: (density === "pro" && !isMobile) ? "minmax(0, 2fr) minmax(0, 1fr)" : "1fr" }}>
+          <div style={{ display: "grid", gap: 14, gridTemplateColumns: !isMobile ? "minmax(0, 2fr) minmax(0, 1fr)" : "1fr" }}>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {positionsCard}
-              {engineLogCard}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               {breakerCard}
-              {shadowCard}
-              {reconcileCard}
             </div>
           </div>
         )}
