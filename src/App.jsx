@@ -9383,9 +9383,13 @@ function AppInner() {
             return aFirst - bFirst;
           });
 
+          // 오늘 이벤트 AI 요약
+          const todayEvents = econEvents.filter(e => e.daysUntil === 0);
+          const importantToday = todayEvents.filter(e => /FOMC|CPI|NFP|GDP|PCE|ISM|PMI/i.test(e.name)).slice(0, 5);
+
           // 이번주 핵심 이벤트 AI 요약
           const thisWeekEvents = econEvents.filter(e => e.daysUntil >= 0 && e.daysUntil <= 7);
-          const importantThisWeek = thisWeekEvents.filter(e => /FOMC|CPI|NFP|GDP|PCE|ISM|PMI/i.test(e.event)).slice(0, 3);
+          const importantThisWeek = thisWeekEvents.filter(e => /FOMC|CPI|NFP|GDP|PCE|ISM|PMI/i.test(e.name)).slice(0, 3);
 
           // 이벤트가 있는 날짜 세트
           const eventDates = new Set();
@@ -9456,6 +9460,43 @@ function AppInner() {
                       })}
                     </div>
                   </div>
+
+                  {/* AI 오늘의 경제 이벤트 요약 */}
+                  {importantToday.length > 0 && (
+                    <div style={{
+                      background: `linear-gradient(135deg, ${C.red}15 0%, ${C.red}05 100%)`,
+                      border: `1px solid ${C.red}30`,
+                    }} className="rounded-[16px] p-5">
+                      <div className="flex items-center gap-1.5 mb-3">
+                        <span className="text-lg">⚡</span>
+                        <span className="font-bold text-base" style={{color: C.red}}>오늘의 경제 이벤트</span>
+                      </div>
+                      <div className="text-[14px] text-foreground leading-relaxed" style={{ color: C.text1 }}>
+                        {importantToday.map((evt, i) => {
+                          const kd = new Date(evt.date.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+                          const timeStr = `${String(kd.getHours()).padStart(2,"0")}:${String(kd.getMinutes()).padStart(2,"0")}`;
+                          const resultStr = evt.actual && evt.estimate
+                            ? (parseFloat(evt.actual) > parseFloat(evt.estimate) ? "상승 💚" : "하락 📉")
+                            : evt.status === "완료" ? "발표완료" : "예정";
+                          return (
+                            <div key={i} style={{ marginBottom: i < importantToday.length - 1 ? "10px" : 0 }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
+                                <div style={{ flex: 1 }}>
+                                  <strong>{evt.icon} {evt.name}</strong>
+                                  <div style={{ fontSize: "13px", color: C.text2, marginTop: "3px" }}>
+                                    {timeStr} {evt.importance === "high" ? "🔴 높음" : "🟡 중간"}
+                                  </div>
+                                </div>
+                                <div style={{ fontSize: "13px", fontWeight: 600, color: evt.actual && parseFloat(evt.actual) > parseFloat(evt.estimate) ? C.green : C.red }}>
+                                  {resultStr}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {/* AI 이번주 요약 */}
                   {importantThisWeek.length > 0 && (

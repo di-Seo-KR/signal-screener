@@ -368,7 +368,7 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
   };
 
   return (
-    <div className="mb-10">
+    <div>
       <h2 className="text-2xl font-semibold mb-1" style={{ color: c.text1 }}>
         {title}
       </h2>
@@ -648,7 +648,7 @@ function BotRecommender({ onActivate, theme, isMobile }) {
 
   const q = questions[step];
   return (
-    <div className="rounded-2xl p-6 sm:p-8 mb-8" style={{ background: c.card, border: `1px solid ${c.border}` }}>
+    <div className="rounded-2xl p-6 sm:p-8" style={{ background: c.card, border: `1px solid ${c.border}` }}>
       <div className="flex justify-between items-center mb-4">
         <h3 className="m-0 text-lg" style={{ color: c.text1 }}>🤖 나에게 맞는 봇 찾기</h3>
         <span className="text-sm" style={{ color: c.text3 }}>{step + 1} / {questions.length}</span>
@@ -686,10 +686,10 @@ function BotCatalog({ onActivate, theme, isMobile }) {
   const c = colors[theme];
 
   return (
-    <div className="pb-6 px-1">
+    <div className="pb-6 px-1 flex flex-col" style={{ gap: isMobile ? "28px" : "40px" }}>
       {/* Hero Section */}
       <div
-        className="mb-6 text-center rounded-2xl"
+        className="text-center rounded-2xl"
         style={{
           maxWidth: "768px",
           margin: "0 auto",
@@ -707,7 +707,7 @@ function BotCatalog({ onActivate, theme, isMobile }) {
       </div>
 
       {/* 봇 추천 플로우 */}
-      <div className="px-4 sm:px-6" style={{ maxWidth: "576px", margin: "0 auto" }}>
+      <div className="px-4 sm:px-6" style={{ maxWidth: "576px", margin: "0 auto", width: "100%" }}>
         <BotRecommender onActivate={onActivate} theme={theme} isMobile={isMobile} />
       </div>
 
@@ -1002,7 +1002,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
     const totalAllocated = activeBots ? activeBots.reduce((s, ab) => s + (ab.allocation || 0), 0) : 0;
     const available = Math.max(0, totalEquity - totalAllocated);
     return (
-      <div className="mb-8">
+      <div>
         <h2 className="m-0 mb-4 text-[22px] font-bold" style={{ color: c.text1 }}>계좌 현황</h2>
         <div className="mb-4" style={cardStyle}>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1063,7 +1063,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
   const totalAllocated = activeBots.reduce((sum, ab) => sum + (ab.allocation || 0), 0);
 
   return (
-    <div className="mb-8">
+    <div>
       {/* 헤더 */}
       <div className="flex items-center gap-2.5 mb-5">
         <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.green, animation: "livePulse 1.5s ease-in-out infinite" }} />
@@ -1632,7 +1632,7 @@ export default function AutoTrading({ theme = "dark", user }) {
         padding: isMobile ? "24px 16px" : "32px 24px",
       }}
     >
-      <div style={{ maxWidth: "1400px", margin: "0 auto" }}>
+      <div style={{ maxWidth: "1400px", margin: "0 auto", display: "flex", flexDirection: "column", gap: isMobile ? "24px" : "40px" }}>
         {/* 수동 배분 모달 */}
         {pendingBot && (
           <div style={{
