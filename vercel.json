@@ -4,7 +4,12 @@
     { "source": "/api/yahoo-batch", "destination": "/api/yahoo?_mode=batch" },
     { "source": "/api/yahoo-quote", "destination": "/api/yahoo?_mode=quote" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon).*)", "destination": "/index.html" }
+    { "source": "/about", "destination": "/about.html" },
+    { "source": "/guide", "destination": "/guide.html" },
+    { "source": "/privacy", "destination": "/privacy.html" },
+    { "source": "/terms", "destination": "/terms.html" },
+    { "source": "/contact", "destination": "/contact.html" },
+    { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon)(?!about)(?!guide)(?!privacy)(?!terms)(?!contact).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
