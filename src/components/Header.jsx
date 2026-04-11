@@ -193,7 +193,7 @@ export default memo(function Header({
     <>
       {/* ━━━ 헤더 바 ━━━ */}
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/30 bg-background">
-        <div className="mx-auto flex h-12 max-w-[1400px] items-center justify-between gap-3 px-4 sm:h-14 sm:px-6">
+        <div className="mx-auto flex h-12 max-w-[1400px] items-center justify-between gap-3 px-4 sm:h-14 lg:h-16 sm:px-6">
 
           {/* ── 좌측: 로고 + 모바일 메뉴 ── */}
           <div className="flex items-center gap-2">
@@ -290,13 +290,13 @@ export default memo(function Header({
 
             {/* 로고 */}
             <div onClick={() => navigate("home")} className="flex cursor-pointer select-none items-center gap-2">
-              <img src="/zepta-icon-192.png" alt="Zepta" className="size-7 sm:size-8 shrink-0" />
-              <span className="text-base font-extrabold tracking-tight text-foreground sm:text-lg">Zepta</span>
+              <img src="/zepta-icon-192.png" alt="Zepta" className="size-7 sm:size-8 lg:size-9 shrink-0" />
+              <span className="text-base font-extrabold tracking-tight text-foreground sm:text-lg lg:text-xl">Zepta</span>
             </div>
           </div>
 
           {/* ── 중앙: 데스크탑 GNB ── */}
-          <nav className="hidden lg:flex items-center gap-1 flex-1 ml-6">
+          <nav className="hidden lg:flex items-center gap-1.5 flex-1 ml-6">
             {NAV_CATEGORIES.map((cat) => {
               const isActive = activeCategory === cat.catId;
 
@@ -306,10 +306,10 @@ export default memo(function Header({
                   <Button
                     key={cat.id}
                     variant="ghost"
-                    size="sm"
+                    size="default"
                     onClick={() => navigate(cat.directTab)}
                     className={cn(
-                      "text-sm font-semibold px-4",
+                      "text-[15px] font-semibold px-5",
                       isActive && cat.catId === "ai-quant"
                         ? "bg-purple-500/10 text-purple-400 hover:bg-purple-500/15 hover:text-purple-300"
                         : isActive
@@ -329,17 +329,17 @@ export default memo(function Header({
                   trigger={({ open, toggle }) => (
                     <Button
                       variant="ghost"
-                      size="sm"
+                      size="default"
                       onClick={toggle}
                       className={cn(
-                        "text-sm font-semibold gap-1 px-4",
+                        "text-[15px] font-semibold gap-1.5 px-5",
                         (isActive || open)
                           ? "bg-primary/10 text-primary hover:bg-primary/15"
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
                       {cat.label}
-                      <ChevronDown className={cn("size-3.5 opacity-50 transition-transform", open && "rotate-180")} />
+                      <ChevronDown className={cn("size-4 opacity-50 transition-transform", open && "rotate-180")} />
                     </Button>
                   )}
                 >
@@ -371,12 +371,12 @@ export default memo(function Header({
           {/* ── 우측: 검색 + 사용자 ── */}
           <div className="flex items-center gap-1.5">
             {/* 검색 */}
-            <Button variant="outline" size="sm"
+            <Button variant="outline" size="default"
               onClick={() => setGlobalSearchOpen(true)}
               className="gap-1.5 text-muted-foreground hidden sm:inline-flex"
             >
-              <Search className="size-3.5" />
-              <span className="text-xs">검색</span>
+              <Search className="size-4" />
+              <span className="text-sm">검색</span>
               <kbd className="ml-1 rounded bg-muted px-1 py-0.5 text-[10px] font-mono">/</kbd>
             </Button>
             <Button variant="ghost" size="icon-sm"
@@ -392,11 +392,11 @@ export default memo(function Header({
                 align="end"
                 className="min-w-[200px]"
                 trigger={({ open, toggle }) => (
-                  <Button variant="ghost" size="sm" onClick={toggle}
-                    className="hidden lg:inline-flex gap-2 pl-1 pr-2">
-                    <Avatar size={26} />
-                    <span className="max-w-[80px] truncate text-xs text-muted-foreground">{displayName}</span>
-                    <ChevronDown className={cn("size-3 opacity-50 transition-transform", open && "rotate-180")} />
+                  <Button variant="ghost" size="default" onClick={toggle}
+                    className="hidden lg:inline-flex gap-2 pl-1.5 pr-2.5">
+                    <Avatar size={30} />
+                    <span className="max-w-[100px] truncate text-sm text-muted-foreground">{displayName}</span>
+                    <ChevronDown className={cn("size-3.5 opacity-50 transition-transform", open && "rotate-180")} />
                   </Button>
                 )}
               >
@@ -437,7 +437,7 @@ export default memo(function Header({
               </CssDropdown>
             ) : (
               <>
-                <Button size="sm" onClick={() => setShowAuthModal(true)} className="hidden lg:inline-flex">
+                <Button size="default" onClick={() => setShowAuthModal(true)} className="hidden lg:inline-flex text-sm">
                   로그인
                 </Button>
                 <Button variant="ghost" size="icon-sm" onClick={toggleTheme}
@@ -451,7 +451,7 @@ export default memo(function Header({
       </header>
 
       {/* 헤더 높이만큼 스페이서 */}
-      <div className="h-12 sm:h-14" />
+      <div className="h-12 sm:h-14 lg:h-16" />
     </>
   );
 });

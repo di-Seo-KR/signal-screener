@@ -9,6 +9,7 @@ import AuthProvider, { useAuth } from "./AuthProvider.jsx";
 import AuthPage from "./AuthPage.jsx";
 import { CoupangOfficialBanner, CoupangSearchWidget, CoupangInterstitial, GoogleAd, GoogleAdInterstitial } from "./AdBanner.jsx";
 import Header from "./components/Header.jsx";
+import PortfolioTab from "./components/PortfolioTab.jsx";
 
 // ════════════════════════════════════════════════════════════════════
 // ErrorBoundary — 런타임 에러 시 앱 전체 크래시 방지
@@ -6670,6 +6671,9 @@ function AppInner() {
           --header-h: 56px;
           --header-gap: 16px;
         }
+        @media (min-width: 1024px) {
+          :root { --header-h: 64px; --header-gap: 16px; }
+        }
         @media (max-width: 640px) {
           :root { --header-h: 48px; --header-gap: 12px; }
         }
@@ -8425,242 +8429,23 @@ function AppInner() {
             TAB: 포트폴리오
         ═══════════════════════════════════════════════════════════ */}
         {tab === "portfolio" && (
-          <div className="tab-content">
-            {/* 요약 헤더 */}
-            <div className="rounded-[18px] p-[22px_24px] mb-4" style={{
-              background: `linear-gradient(135deg, ${C.card}, #0d1f35)`,
-              border: `1px solid ${C.border}20`,
-            }}>
-              <div className={`flex justify-between items-center ${portfolio.length ? "mb-4" : ""}`}>
-                <div className="font-bold text-lg" style={{ color: C.text1 }}>💼 내 포트폴리오</div>
-                <div className="flex gap-1.5 flex-wrap">
-                  <button onClick={() => setCurrency(c => c === "USD" ? "KRW" : "USD")} className="rounded-lg px-2.5 py-1.5 text-base font-bold transition-all" style={{
-                    background: C.card2, color: C.yellow, border: `1px solid ${C.yellow}44`,
-                  }}>{currency === "USD" ? "🇺🇸 USD" : "🇰🇷 KRW"}</button>
-                  <button onClick={fetchPortfolioPrices} className="rounded-lg px-3 py-1.5 text-base font-semibold transition-all" style={{
-                    background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}44`,
-                  }}>{portfolioLoading ? "⏳ 갱신 중" : "🔄 가격 갱신"}</button>
-                  <button onClick={() => setShowAddAsset(true)} className="rounded-lg px-3.5 py-1.5 text-base font-bold transition-all" style={{
-                    background: C.blue, color: "#fff", border: "none",
-                  }}>+ 추가</button>
-                </div>
-              </div>
-              {portfolio.length > 0 && (
-                <div className="grid grid-cols-3 gap-2.5">
-                  {[
-                    { label: "총 투자금액", value: currency === "KRW" ? `₩${Math.round(pStats.invested * krwRate).toLocaleString()}` : `$${pStats.invested.toLocaleString(undefined, { maximumFractionDigits: 0 })}` },
-                    { label: "현재 평가금액", value: pStats.hasPrices ? (currency === "KRW" ? `₩${Math.round(pStats.current * krwRate).toLocaleString()}` : `$${pStats.current.toLocaleString(undefined, { maximumFractionDigits: 0 })}`) : "—" },
-                    { label: "총 손익", value: pStats.hasPrices ? `${pStats.pnl >= 0 ? "+" : ""}${currency === "KRW" ? `₩${Math.round(Math.abs(pStats.pnl) * krwRate).toLocaleString()}` : `$${pStats.pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}` : "—", color: pStats.pnl >= 0 ? C.green : C.red },
-                  ].map(({ label, value, color }) => (
-                    <div key={label} className="rounded-xl p-3.5" style={{ background: C.bg }}>
-                      <div className="text-base mb-1" style={{ color: C.text3 }}>{label}</div>
-                      <div className="font-bold text-lg" style={{ color: color || C.text1 }}>{value}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* 자산 추가 폼 */}
-            {showAddAsset && (
-              <div className="rounded-[18px] p-[22px_24px] mb-4" style={{ background: C.card, border: `1px solid ${C.border}20` }}>
-                <div className="font-bold mb-3.5 text-lg" style={{ color: C.text1 }}>📌 자산 추가</div>
-                {/* 종목 검색으로 자동 입력 */}
-                <div className="mb-3">
-                  <div className="text-base mb-1.5" style={{ color: C.text3 }}>종목 검색 (심볼 또는 이름 입력)</div>
-                  <SearchBar placeholder="종목 검색 (예: AAPL, 삼성, BTC...)" onSelect={(asset) => {
-                    const sym = asset.symbol.toUpperCase();
-                    setNewAsset(p => ({
-                      ...p,
-                      symbol: sym,
-                      name: asset.name,
-                      market: asset.market,
-                    }));
-                  }} />
-                </div>
-                <div className="grid grid-cols-2 gap-2.5 mb-3">
-                  {[
-                    { k: "symbol",   label: "심볼", ph: "AAPL, 005930..." },
-                    { k: "name",     label: "자산명", ph: "Apple, 삼성전자..." },
-                    { k: "qty",      label: "보유 수량", ph: "0.00" },
-                    { k: "avgPrice", label: "평균 매입가", ph: "0.00" },
-                  ].map(({ k, label, ph }) => (
-                    <div key={k}>
-                      <div className="text-base mb-1" style={{ color: C.text3 }}>{label}</div>
-                      <input value={newAsset[k]} onChange={e => setNewAsset(p => ({ ...p, [k]: e.target.value }))}
-                        placeholder={ph} className="w-full px-3 py-2 rounded-[10px] text-lg outline-none box-border" style={{
-                          background: C.bg, border: `1px solid ${C.border2}`, color: C.text1,
-                        }} />
-                    </div>
-                  ))}
-                </div>
-                <div className="mb-3">
-                  <div className="text-base mb-1.5" style={{ color: C.text3 }}>시장</div>
-                  <div className="flex gap-1.5">
-                    {[["us","🇺🇸 미국"], ["kr","🇰🇷 한국"], ["crypto","₿ 크립토"]].map(([v, l]) => (
-                      <button key={v} onClick={() => setNewAsset(p => ({ ...p, market: v }))} className="rounded-lg px-3.5 py-1.5 text-base font-semibold transition-all" style={{
-                        background: newAsset.market === v ? C.blueBg : C.card2,
-                        color: newAsset.market === v ? C.blue : C.text3,
-                        border: `1px solid ${newAsset.market === v ? C.blue : C.border2}`,
-                      }}>{l}</button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={() => {
-                    if (!newAsset.symbol || !newAsset.qty || !newAsset.avgPrice) return;
-                    const sym = newAsset.symbol.toUpperCase();
-                    const symbolRaw = newAsset.market === "kr" && !sym.includes(".KS") ? `${sym}.KS` : sym;
-                    const cryptoA = CRYPTO_ASSETS.find(c => c.symbol === sym || c.id === sym.toLowerCase());
-                    setPortfolio(p => [...p, {
-                      ...newAsset, symbol: sym, symbolRaw, cryptoId: cryptoA?.id || sym.toLowerCase(),
-                      qty: parseFloat(newAsset.qty), avgPrice: parseFloat(newAsset.avgPrice), addedAt: Date.now(),
-                    }]);
-                    setNewAsset({ symbol: "", name: "", market: "us", qty: "", avgPrice: "" });
-                    setShowAddAsset(false);
-                  }} className="flex-1 rounded-[10px] px-5 py-2 text-lg font-bold border-none transition-all" style={{
-                    background: C.blue, color: "#fff",
-                  }}>추가</button>
-                  <button onClick={() => setShowAddAsset(false)} className="flex-1 rounded-[10px] px-5 py-2 text-lg font-semibold transition-all" style={{
-                    background: C.card2, color: C.text3, border: `1px solid ${C.border2}`,
-                  }}>취소</button>
-                </div>
-              </div>
-            )}
-
-            {/* 포트폴리오 아이템 */}
-            {portfolio.length === 0 ? (
-              <div className="rounded-[18px] p-[40px_24px] text-center" style={{ background: C.card, border: `1px solid ${C.border}20` }}>
-                <div className="text-5xl mb-4">💼</div>
-                <div className="font-bold text-lg mb-2" style={{ color: C.text1 }}>포트폴리오를 시작하세요</div>
-                <div className="text-lg mb-6" style={{ color: C.text3, lineHeight: 1.6 }}>
-                  보유 종목을 추가하면 실시간 수익률 추적,<br/>리스크 분석, 매매 시그널 알림을 받을 수 있어요
-                </div>
-                <div className="flex flex-col gap-2.5 max-w-80 mx-auto text-left">
-                  {[
-                    { icon: "1️⃣", text: "우측 상단 '+ 추가' 버튼을 클릭하세요" },
-                    { icon: "2️⃣", text: "종목 검색 후 매입가와 수량을 입력하세요" },
-                    { icon: "3️⃣", text: "실시간 수익률과 AI 분석을 확인하세요" },
-                  ].map((step, i) => (
-                    <div key={i} className="flex items-center gap-2.5 p-2.5 rounded-[10px]" style={{ background: C.card2 }}>
-                      <span className="text-lg">{step.icon}</span>
-                      <span className="text-lg" style={{ color: C.text2, fontWeight: 500 }}>{step.text}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-5 flex gap-2 justify-center">
-                  <button onClick={() => setTab("screener")} className="px-5 py-2.5 rounded-[10px] text-lg font-bold cursor-pointer transition-all" style={{
-                    background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}30`,
-                  }}>🔍 종목 탐색하기</button>
-                  <button onClick={() => setTab("quant-report")} className="px-5 py-2.5 rounded-[10px] text-lg font-bold cursor-pointer transition-all" style={{
-                    background: C.card2, color: C.text2, border: `1px solid ${C.border}`,
-                  }}>📋 오늘의 추천 보기</button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2.5">
-                {portfolio.map((item, idx) => {
-                  const cur = portfolioPrices[item.symbol];
-                  const gain = cur ? ((cur - item.avgPrice) / item.avgPrice) * 100 : null;
-                  const gainVal = cur ? item.qty * (cur - item.avgPrice) : null;
-                  const invested = item.qty * item.avgPrice;
-                  const evalVal = cur ? item.qty * cur : null;
-                  const isPos = gainVal != null ? gainVal >= 0 : true;
-                  const mcColor = item.market === "us" ? C.blue : item.market === "kr" ? C.green : C.purple;
-                  const mcBg = item.market === "us" ? "#1A2C4F" : item.market === "kr" ? "#1A2A1E" : "#1E1A2A";
-                  const flag = item.market === "us" ? "🇺🇸" : item.market === "kr" ? "🇰🇷" : "₿";
-                  return (
-                    <div key={idx} className="rounded-[18px] overflow-hidden" style={{
-                      background: C.card, border: `1px solid ${C.border}20`,
-                    }}>
-                      <div className="flex items-center p-4 gap-3.5">
-                        {/* 심볼 아이콘 */}
-                        <div className="size-11 rounded-xl flex-shrink-0 flex items-center justify-center font-black text-sm" style={{
-                          background: mcBg, color: mcColor,
-                        }}>
-                          {item.symbol.replace(".KS","").slice(0,4)}
-                        </div>
-                        {/* 종목 정보 */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className="font-bold text-lg" style={{ color: C.text1 }}>{item.name || item.symbol}</span>
-                            <span className="text-base" style={{ color: C.text3 }}>{flag} {item.symbol}</span>
-                          </div>
-                          <div className="text-lg" style={{ color: C.text3 }}>
-                            {item.qty.toLocaleString()}주 · 평균 {toDisplay(item.avgPrice, item.market)}
-                          </div>
-                        </div>
-                        {/* 현재가 & 수익률 */}
-                        <div className="text-right flex-shrink-0">
-                          <div className="font-bold text-lg mb-0.5" style={{ color: C.text1 }}>
-                            {toDisplay(cur, item.market)}
-                          </div>
-                          {gain != null && (
-                            <div className="text-lg font-bold" style={{ color: isPos ? C.green : C.red }}>
-                              {isPos ? "+" : ""}{gain.toFixed(2)}%
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* 손익 상세 정보 */}
-                      {cur != null && (
-                        <div className="grid grid-cols-3 gap-1.5 px-4.5 pb-3 text-base">
-                          <div className="rounded-lg p-2.5" style={{ background: C.bg }}>
-                            <div className="mb-0.5" style={{ color: C.text3 }}>투자금</div>
-                            <div className="font-bold text-lg" style={{ color: C.text1 }}>
-                              {toDisplay(invested, item.market)}
-                            </div>
-                          </div>
-                          <div className="rounded-lg p-2.5" style={{ background: C.bg }}>
-                            <div className="mb-0.5" style={{ color: C.text3 }}>평가금</div>
-                            <div className="font-bold text-lg" style={{ color: C.text1 }}>
-                              {toDisplay(evalVal, item.market)}
-                            </div>
-                          </div>
-                          <div className="rounded-lg p-2.5" style={{ background: isPos ? C.greenBg : C.redBg }}>
-                            <div className="mb-0.5" style={{ color: C.text3 }}>손익</div>
-                            <div className="font-bold text-lg" style={{ color: isPos ? C.green : C.red }}>
-                              {isPos ? "+" : ""}{toDisplay(Math.abs(gainVal), item.market)}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* 하단 액션 바 */}
-                      <div className="flex gap-2 px-4.5 pb-3.5">
-                        <button onClick={() => {
-                          const cryptoA = CRYPTO_ASSETS.find(c => c.symbol === item.symbol);
-                          setSelectedAsset({
-                            symbol: item.symbol, name: item.name || item.symbol,
-                            market: item.market, symbolRaw: item.symbolRaw || item.symbol,
-                            ...(cryptoA ? { id: cryptoA.id } : {}),
-                          });
-                        }} className="flex-1 py-2 rounded-[10px] text-lg font-semibold transition-all flex items-center justify-center gap-1.5" style={{
-                          background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}33`,
-                        }}>🩺 진단</button>
-                        <button onClick={() => {
-                          const sym = item.market === "crypto"
-                            ? `https://www.coingecko.com/en/coins/${item.cryptoId || item.symbol.toLowerCase()}`
-                            : `https://finance.yahoo.com/quote/${item.symbolRaw || item.symbol}`;
-                          window.open(sym, "_blank");
-                        }} className="flex-1 py-2 rounded-[10px] text-lg font-semibold transition-all flex items-center justify-center gap-1.5" style={{
-                          background: C.card2, color: C.text2, border: `1px solid ${C.border2}`,
-                        }}>🔗 상세</button>
-                        <button onClick={() => {
-                          if (!confirm("이 포트폴리오를 삭제하시겠습니까?")) return;
-                          setPortfolio(p => p.filter((_, i) => i !== idx));
-                        }} className="px-3.5 py-2 rounded-[10px] text-lg font-semibold transition-all" style={{
-                          background: C.redBg, color: C.red, border: `1px solid ${C.red}33`,
-                        }}>삭제</button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-          </div>
+          <PortfolioTab
+            C={C}
+            portfolio={portfolio} setPortfolio={setPortfolio}
+            portfolioPrices={portfolioPrices}
+            portfolioLoading={portfolioLoading}
+            showAddAsset={showAddAsset} setShowAddAsset={setShowAddAsset}
+            newAsset={newAsset} setNewAsset={setNewAsset}
+            currency={currency} setCurrency={setCurrency}
+            krwRate={krwRate}
+            toDisplay={toDisplay}
+            pStats={pStats}
+            fetchPortfolioPrices={fetchPortfolioPrices}
+            CRYPTO_ASSETS={CRYPTO_ASSETS}
+            SearchBar={SearchBar}
+            setSelectedAsset={setSelectedAsset}
+            setTab={setTab}
+          />
         )}
 
         {/* ═══════════════════════════════════════════════════════════
@@ -8900,7 +8685,7 @@ function AppInner() {
               border: `1px solid ${C.border}20`,
             }}>
               <h3 style={{ margin: "0 0 12px", fontSize: "18px", fontWeight: 700, color: C.text1 }}>📐 탐지 기준</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {[
                   { icon: "📈", title: "가격 이상 변동", desc: "전체 평균 대비 2σ 이상 + 3% 이상 변동" },
                   { icon: "📊", title: "거래량 폭증", desc: "5일 평균 대비 3배 이상 거래량" },
@@ -9200,7 +8985,7 @@ function AppInner() {
               })()}
 
               {/* 급등/급락 TOP 5 */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <div className="rounded-[18px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div className="flex items-center gap-1 mb-2.5">
                     <span className="w-2 h-2 rounded-full" style={{ background: C.green }} />
@@ -9607,10 +9392,10 @@ function AppInner() {
 
           return (
             <div className="tab-content">
-              <div className="grid gap-5" style={{ gridTemplateColumns: "280px 1fr", alignItems: "start" }}>
+              <div className="grid gap-5 grid-cols-1 lg:grid-cols-[280px_1fr] items-start">
 
                 {/* ── 좌측: 미니 캘린더 + AI 요약 ── */}
-                <div className="flex flex-col gap-4 sticky top-20">
+                <div className="flex flex-col gap-4 lg:sticky lg:top-20">
                   {/* 미니 캘린더 */}
                   <div style={{ background: C.card, border: `1px solid ${C.border}20` }} className="rounded-[16px] p-5">
                     <div className="flex items-center justify-between mb-4">
@@ -9729,7 +9514,7 @@ function AppInner() {
 
                       {/* 테이블 헤더 */}
                       <div className="grid gap-1 py-2 px-4 text-base font-bold text-muted-foreground rounded-t-[12px] border border-b-0" style={{
-                        gridTemplateColumns: "60px 1fr 80px 80px 80px",
+                        gridTemplateColumns: isMobile ? "40px 1fr 70px" : "60px 1fr 80px 80px 80px",
                         background: C.card, borderColor: `${C.border}20`
                       }}>
                         <span></span>
@@ -9759,7 +9544,7 @@ function AppInner() {
 
                           return (
                             <div key={`${evt.event}-${i}`} className="grid items-center py-3.5 px-4 transition-colors" style={{
-                              gridTemplateColumns: "60px 1fr 80px 80px 80px",
+                              gridTemplateColumns: isMobile ? "40px 1fr 70px" : "60px 1fr 80px 80px 80px",
                               gap: "1px",
                               borderBottom: i < group.events.length - 1 ? `1px solid ${C.border}10` : "none",
                               opacity: isPast ? 0.6 : 1,
@@ -10084,7 +9869,7 @@ function AppInner() {
             {/* ── 텔레그램 설정 ── */}
             <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "22px 24px", marginBottom: "12px" }}>
               <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "16px" }}>📱 텔레그램 연동</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "12px" }}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 <div>
                   <div style={{ fontSize: "16px", color: C.text3, marginBottom: "6px", fontWeight: 600 }}>봇 토큰</div>
                   <input value={settings.botToken} onChange={e => setSettings(p => ({ ...p, botToken: e.target.value }))}
