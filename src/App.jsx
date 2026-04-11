@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, Component } from "re
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
 import AuthPage from "./AuthPage.jsx";
 import { CoupangOfficialBanner, CoupangSearchWidget, CoupangInterstitial, GoogleAd, GoogleAdInterstitial } from "./AdBanner.jsx";
+import Header from "./components/Header.jsx";
 
 // ════════════════════════════════════════════════════════════════════
 // ErrorBoundary — 런타임 에러 시 앱 전체 크래시 방지
@@ -6697,7 +6698,7 @@ function AppInner() {
           box-sizing: border-box !important;
           padding-top: 0 !important;
         }
-        main { padding-top: calc(var(--header-h) + var(--header-gap) + env(safe-area-inset-top, 0px)) !important; }
+        /* padding-top은 Header 컴포넌트 spacer div로 대체됨 */
         body { padding-bottom: env(safe-area-inset-bottom, 0px); }
         [style*="position: fixed"][style*="bottom: 0"] { padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)) !important; }
         @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
@@ -6871,389 +6872,21 @@ function AppInner() {
       {/* ── safe-area 배경 커버 (상태바 영역) ── */}
       <div className="safe-area-cover" style={{ background: C.bg }} />
 
-      {/* ── GNB 헤더 (로고 + 수평 네비게이션 + 우측 도구) ──────────────────────────────────────────────────── */}
-      <header style={{
-        position: "fixed", left: 0, right: 0, zIndex: 100,
-        background: C.bg, backdropFilter: "none", WebkitBackdropFilter: "none",
-        borderBottom: `1px solid ${C.border}${C.isDark ? '30' : '50'}`,
-        overflow: "visible",
-      }}>
-        <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 24px", display: "flex", alignItems: "center", justifyContent: "space-between", height: "var(--header-h)", gap: "16px" }}>
-
-          {/* 좌측: 로고 */}
-          <div onClick={() => setTab("home")} style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", userSelect: "none", marginRight: "16px", flexShrink: 0, title: "홈으로 이동" }}>
-            <img src="/zepta-icon-192.png" alt="Zepta" width="36" height="36" style={{ flexShrink: 0 }} />
-            <span style={{ fontSize: "18px", fontWeight: 800, color: C.text1, letterSpacing: "-0.5px" }}>Zepta</span>
-          </div>
-
-          {/* 중앙: GNB — 호버 시 LNB 드롭다운, 클릭 비활성 (홈만 클릭 이동) */}
-          <nav className="desktop-nav" style={{ display: "flex", alignItems: "center", gap: "4px", flex: 1, overflow: "visible" }}>
-            {[
-              { id: "home", label: "홈", catId: "home" },
-              { id: "ai-quant", label: "AI 퀀트", catId: "ai-quant" },
-              { id: "analysis", label: "분석", catId: "analysis", items: [
-                { id: "screener", label: "종목 탐색", icon: "🔍" },
-                { id: "anomaly", label: "이상 탐지", icon: "⚡" },
-                { id: "strategy", label: "퀀트 전략", icon: "🎯" },
-                { id: "quant-report", label: "퀀트 리포트", icon: "📋" },
-                { id: "backtest", label: "백테스트", icon: "📈" },
-              ]},
-              { id: "management", label: "운용", catId: "management", items: [
-                { id: "quant-port", label: "전략 운용", icon: "📊" },
-                { id: "risk-map", label: "리스크맵", icon: "🛡️" },
-                { id: "portfolio", label: "포트폴리오", icon: "💼" },
-              ]},
-              { id: "info", label: "정보", catId: "info", items: [
-                { id: "news", label: "마켓 뉴스", icon: "📰" },
-                { id: "sentiment", label: "센티먼트", icon: "💬" },
-                { id: "econ-calendar", label: "경제 캘린더", icon: "📅" },
-                { id: "alerts", label: "알림 설정", icon: "🔔" },
-              ]},
-            ].map(cat => (
-              <div key={cat.id} style={{ position: "relative" }}
-                onMouseEnter={() => {
-                  if (gnbHoverTimeout.current) clearTimeout(gnbHoverTimeout.current);
-                  if (cat.items) setGnbHover(cat.catId);
-                }}
-                onMouseLeave={() => {
-                  gnbHoverTimeout.current = setTimeout(() => setGnbHover(null), 150);
-                }}
-              >
-                <button
-                  onClick={() => {
-                    if (cat.catId === "home") { setTab("home"); setGnbCategory("home"); setGnbHover(null); }
-                    else if (cat.catId === "ai-quant") { setTab("auto-trading"); setGnbCategory("ai-quant"); setGnbHover(null); }
-                    else if (cat.items) { setGnbHover(gnbHover === cat.catId ? null : cat.catId); }
-                  }}
-                  style={{
-                    padding: "10px 20px", borderRadius: "10px", fontSize: "17px", fontWeight: 600,
-                    background: (gnbCategory === cat.catId || gnbHover === cat.catId) ? (cat.catId === "ai-quant" ? `${C.purple}20` : C.blueBg) : "transparent",
-                    color: (gnbCategory === cat.catId || gnbHover === cat.catId) ? (cat.catId === "ai-quant" ? C.purple : C.blue) : C.text2,
-                    border: "none", cursor: "pointer", whiteSpace: "nowrap",
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseEnter={e => {
-                    if (gnbCategory !== cat.catId && gnbHover !== cat.catId) {
-                      e.currentTarget.style.background = C.card2;
-                      e.currentTarget.style.color = C.text1;
-                    }
-                  }}
-                  onMouseLeave={e => {
-                    if (gnbCategory !== cat.catId && gnbHover !== cat.catId) {
-                      e.currentTarget.style.background = "transparent";
-                      e.currentTarget.style.color = C.text2;
-                    }
-                  }}
-                >
-                  {cat.label}
-                  {cat.items && <span style={{ fontSize: "14px", marginLeft: "3px", opacity: 0.5, transition: "transform 0.2s", display: "inline-block", transform: gnbHover === cat.catId ? "rotate(180deg)" : "none" }}>▾</span>}
-                </button>
-                {/* LNB 드롭다운 */}
-                {cat.items && gnbHover === cat.catId && (
-                  <div style={{
-                    position: "absolute", top: "calc(100% + 4px)", left: 0,
-                    background: C.card, border: `1px solid ${C.border}40`,
-                    borderRadius: "12px", padding: "8px", minWidth: "180px",
-                    boxShadow: `0 8px 32px rgba(0,0,0,0.3)`,
-                    zIndex: 9999, animation: "fadeIn 0.12s ease",
-                  }}>
-                    {cat.items.map(item => (
-                      <button key={item.id} onClick={() => {
-                        if (item.locked && requireLogin(item.id)) return;
-                        setTab(item.id); setGnbHover(null);
-                      }} style={{
-                        display: "flex", alignItems: "center", gap: "10px", width: "100%",
-                        padding: "11px 14px", borderRadius: "8px", fontSize: "18px", fontWeight: 600,
-                        background: tab === item.id ? C.blueBg : "transparent",
-                        color: tab === item.id ? C.blue : C.text2,
-                        border: "none", cursor: "pointer", whiteSpace: "nowrap",
-                        transition: "all 0.12s", textAlign: "left",
-                      }}
-                        onMouseEnter={e => { if (tab !== item.id) e.currentTarget.style.background = C.card2; }}
-                        onMouseLeave={e => { if (tab !== item.id) e.currentTarget.style.background = "transparent"; }}
-                      >
-                        <span style={{ fontSize: "18px" }}>{item.icon}</span>
-                        {item.label}
-                        {item.locked && !user && <span style={{ fontSize: "14px", opacity: 0.5 }}>🔒</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </nav>
-
-          {/* 우측: 검색 + 사용자(데스크톱) + 테마(데스크톱) + 햄버거(모바일) */}
-          <div style={{ display: "flex", alignItems: "center", gap: "6px", flexShrink: 0 }}>
-            {/* 검색 */}
-            <button className="header-search-btn" onClick={() => setGlobalSearchOpen(true)} aria-label="검색" style={{
-              display: "flex", alignItems: "center", gap: "6px",
-              padding: "7px 14px", borderRadius: "10px",
-              background: C.card2, border: `1px solid ${C.border}${C.isDark ? '30' : '50'}`,
-              fontSize: "16px", color: C.text3, cursor: "pointer",
-            }}>
-              <span>🔍</span>
-              <span className="header-search-label">검색</span>
-              <span className="header-search-label" style={{ fontSize: "15px", padding: "1px 5px", borderRadius: "3px", background: C.bg, color: C.text3 }}>/</span>
-            </button>
-
-            {/* 데스크톱: 사용자 칩 + 호버 드롭다운 (네이버 스타일) */}
-            {user ? (
-            <div className="desktop-only" style={{ position: "relative" }}
-              onMouseEnter={() => { if (userDropTimeout.current) clearTimeout(userDropTimeout.current); setUserDropOpen(true); }}
-              onMouseLeave={() => { userDropTimeout.current = setTimeout(() => setUserDropOpen(false), 200); }}
-            >
-              <button aria-label="내 계정" style={{
-                display: "flex", alignItems: "center", gap: "6px", padding: "4px 10px 4px 4px",
-                background: userDropOpen ? C.blueBg : C.card2, borderRadius: "12px",
-                border: `1px solid ${userDropOpen ? C.blue + "40" : C.border + "30"}`, cursor: "pointer",
-                transition: "all 0.15s",
-              }}>
-                <div style={{ width: "28px", height: "28px", borderRadius: "50%", background: C.blueBg,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "17px", fontWeight: 700, color: C.blue, flexShrink: 0 }}>
-                  {(user?.user_metadata?.avatar_url)
-                    ? <img src={user.user_metadata.avatar_url} alt="" style={{ width: "28px", height: "28px", borderRadius: "50%", objectFit: "cover" }} />
-                    : (user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()
-                  }
-                </div>
-                <span style={{ fontSize: "16px", color: C.text2, maxWidth: "80px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User"}
-                </span>
-                <span style={{ fontSize: "14px", opacity: 0.5, transition: "transform 0.15s", transform: userDropOpen ? "rotate(180deg)" : "none" }}>▾</span>
-              </button>
-              {/* 유저 드롭다운 LNB */}
-              {userDropOpen && (
-                <div style={{
-                  position: "absolute", top: "calc(100% + 6px)", right: 0,
-                  background: C.card, border: `1px solid ${C.border}40`,
-                  borderRadius: "14px", padding: "8px", minWidth: "200px",
-                  boxShadow: "0 8px 32px rgba(0,0,0,0.25)", zIndex: 9999,
-                  animation: "fadeIn 0.12s ease",
-                }}>
-                  {/* 유저 정보 헤더 */}
-                  <div style={{ padding: "10px 12px 12px", borderBottom: `1px solid ${C.border}20` }}>
-                    <div style={{ fontSize: "18px", fontWeight: 700, color: C.text1 }}>
-                      {user?.user_metadata?.display_name || user?.user_metadata?.full_name || user?.email?.split("@")[0]}
-                    </div>
-                    <div style={{ fontSize: "16px", color: C.text3, marginTop: "2px" }}>{user?.email}</div>
-                  </div>
-                  {/* 메뉴 항목 */}
-                  {[
-                    { id: "profile", label: "회원정보", icon: "👤" },
-                    { id: "auto-trading", label: "봇 운영현황", icon: "🤖" },
-                    ...(isOwner ? [{ id: "real-trading", label: "실전매매", icon: "🔴" }] : []),
-                    { id: "portfolio", label: "포트폴리오", icon: "💼" },
-                  ].map(item => (
-                    <button key={item.id} onClick={() => { setTab(item.id); setUserDropOpen(false); }} style={{
-                      display: "flex", alignItems: "center", gap: "10px", width: "100%",
-                      padding: "10px 12px", borderRadius: "8px", fontSize: "17px", fontWeight: 600,
-                      background: tab === item.id ? C.blueBg : "transparent",
-                      color: tab === item.id ? C.blue : C.text2,
-                      border: "none", cursor: "pointer", textAlign: "left", transition: "all 0.1s",
-                    }}
-                      onMouseEnter={e => { if (tab !== item.id) e.currentTarget.style.background = C.card2; }}
-                      onMouseLeave={e => { if (tab !== item.id) e.currentTarget.style.background = "transparent"; }}
-                    >
-                      <span style={{ fontSize: "18px" }}>{item.icon}</span>{item.label}
-                    </button>
-                  ))}
-                  <div style={{ height: "1px", background: C.border, opacity: 0.2, margin: "4px 0" }} />
-                  {/* 테마 토글 */}
-                  <button onClick={toggleTheme} style={{
-                    display: "flex", alignItems: "center", gap: "10px", width: "100%",
-                    padding: "10px 12px", borderRadius: "8px", fontSize: "17px", fontWeight: 600,
-                    background: "transparent", color: C.text2, border: "none", cursor: "pointer", textAlign: "left",
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.background = C.card2}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                  >
-                    <span style={{ fontSize: "18px" }}>{themeMode === "dark" ? "☀️" : "🌙"}</span>
-                    {themeMode === "dark" ? "라이트 모드" : "다크 모드"}
-                  </button>
-                  {/* 로그아웃 */}
-                  <button onClick={() => { if (confirm("로그아웃 하시겠습니까?")) { signOut(); setUserDropOpen(false); } }} style={{
-                    display: "flex", alignItems: "center", gap: "10px", width: "100%",
-                    padding: "10px 12px", borderRadius: "8px", fontSize: "17px", fontWeight: 600,
-                    background: "transparent", color: C.red, border: "none", cursor: "pointer", textAlign: "left",
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.background = `${C.red}10`}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                  >
-                    <span style={{ fontSize: "18px" }}>🚪</span>로그아웃
-                  </button>
-                </div>
-              )}
-            </div>
-            ) : (
-            <button className="desktop-only" onClick={() => setShowAuthModal(true)} style={{
-              padding: "8px 16px", borderRadius: "10px", fontSize: "17px", fontWeight: 700,
-              background: C.blue, color: "#fff", border: "none", cursor: "pointer",
-              display: "flex", alignItems: "center", gap: "6px", transition: "all 0.2s",
-              whiteSpace: "nowrap",
-            }}>
-              로그인
-            </button>
-            )}
-
-            {/* 데스크톱: 테마 토글 (비로그인 시에만 독립 표시. 로그인하면 드롭다운에 포함) */}
-            {!user && (
-            <button className="desktop-only header-theme-btn" onClick={toggleTheme} aria-label={themeMode === "dark" ? "라이트 모드" : "다크 모드"} style={{
-              background: C.card2, border: `1px solid ${C.border}${C.isDark ? '30' : '50'}`, borderRadius: "12px",
-              width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "18px", cursor: "pointer", color: C.text1, transition: "all 0.2s", flexShrink: 0,
-            }}>
-              {themeMode === "dark" ? "\u2600\uFE0F" : "\uD83C\uDF19"}
-            </button>
-            )}
-
-            {/* 모바일 햄버거 버튼 */}
-            <button className="mobile-menu-btn" onClick={() => setMenuOpen(!menuOpen)} aria-label="메뉴 열기" style={{
-              display: "none", alignItems: "center", justifyContent: "center",
-              background: menuOpen ? C.card2 : "none", border: "none", color: C.text1,
-              fontSize: "22px", width: "36px", height: "36px", cursor: "pointer",
-              borderRadius: "12px", position: "relative", transition: "all .2s", flexShrink: 0,
-            }}>
-              {menuOpen ? "\u2715" : "\u2630"}
-              {!menuOpen && (alertBadge > 0 || anomalies.length > 0) && (
-                <span style={{ position: "absolute", top: "4px", right: "4px", width: "8px", height: "8px", borderRadius: "50%", background: C.red }} />
-              )}
-            </button>
-          </div>
-        </div>
-        {/* 모바일 햄버거 드롭다운 (v9.1 개선) */}
-      </header>
-
-      {/* 모바일 햄버거 메뉴 — header 밖에서 렌더링 (overflow 제약 회피) */}
-      {menuOpen && (
-        <>
-        {/* 배경 오버레이 */}
-        <div onClick={() => setMenuOpen(false)} style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)",
-          backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
-          zIndex: 200, animation: "fadeIn 0.15s ease",
-        }} />
-        {/* 메뉴 패널 */}
-        <div className="mobile-menu-panel" style={{
-          position: "fixed", left: 0, right: 0, top: 0,
-          background: C.bg, overflowY: "auto",
-          padding: "calc(16px + env(safe-area-inset-top, 0px)) 16px 24px",
-          display: "flex", flexDirection: "column", gap: "10px",
-          animation: "slideDown 0.2s ease", zIndex: 201,
-          borderRadius: "0 0 20px 20px",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-          maxHeight: "80vh",
-        }}>
-          {/* 상단: 유저 영역 or 로그인 + 닫기 */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "8px" }}>
-            {user ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: C.blueBg,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "17px", fontWeight: 700, color: C.blue }}>
-                  {(user?.user_metadata?.avatar_url)
-                    ? <img src={user.user_metadata.avatar_url} alt="" style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover" }} />
-                    : (user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()
-                  }
-                </div>
-                <div>
-                  <div style={{ fontSize: "18px", fontWeight: 700, color: C.text1 }}>
-                    {user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User"}
-                  </div>
-                  <div style={{ fontSize: "16px", color: C.text3 }}>{user?.email}</div>
-                </div>
-              </div>
-            ) : (
-              <span style={{ fontSize: "17px", fontWeight: 800, color: C.blue }}>Zepta</span>
-            )}
-            <button onClick={() => setMenuOpen(false)} style={{ background: "none", border: "none", color: C.text2, fontSize: "22px", cursor: "pointer", padding: "4px", minHeight: "36px", minWidth: "36px" }}>✕</button>
-          </div>
-          {/* 섹션 구분 */}
-          {[
-            { section: "메인", items: [
-              { id: "home", label: "홈 대시보드", icon: "🏠" },
-              { id: "auto-trading", label: "AI 퀀트 전략", icon: "🤖" },
-              ...(isOwner ? [{ id: "real-trading", label: "실전매매 관제", icon: "🔴" }] : []),
-            ]},
-            { section: "분석", items: [
-              { id: "screener", label: "종목 탐색", icon: "🔍" },
-              { id: "anomaly", label: "이상 탐지", icon: "⚡" },
-              { id: "strategy", label: "퀀트 전략", icon: "🎯" },
-              { id: "quant-report", label: "퀀트 리포트", icon: "📋" },
-              { id: "backtest", label: "백테스트", icon: "📈" },
-            ]},
-            { section: "운용", items: [
-              { id: "quant-port", label: "전략 운용", icon: "📊" },
-              { id: "risk-map", label: "리스크맵", icon: "🛡️" },
-              { id: "portfolio", label: "포트폴리오", icon: "💼" },
-            ]},
-            { section: "정보", items: [
-              { id: "news", label: "마켓 뉴스", icon: "📰" },
-              { id: "sentiment", label: "센티먼트", icon: "💬" },
-              { id: "econ-calendar", label: "경제 캘린더", icon: "📅" },
-              { id: "alerts", label: "알림 설정", icon: "🔔", locked: true },
-            ]},
-          ].map(group => (
-            <div key={group.section}>
-              <div style={{ fontSize: "15px", fontWeight: 700, color: C.text3, padding: "4px 4px 6px", letterSpacing: "0.05em", textTransform: "uppercase" }}>{group.section}</div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "5px" }}>
-                {group.items.map(t => (
-                  <button key={t.id} onClick={() => { if (t.locked && requireLogin(t.id)) { setMenuOpen(false); return; } setTab(t.id); setMenuOpen(false); }} style={{
-                    padding: "10px 8px", borderRadius: "12px", fontSize: "16px", fontWeight: 600,
-                    background: tab === t.id ? C.blueBg : C.card2,
-                    color: tab === t.id ? C.blue : C.text2,
-                    border: tab === t.id ? `1px solid ${C.blue}30` : `1px solid transparent`,
-                    textAlign: "center", cursor: "pointer", display: "flex", flexDirection: "column",
-                    alignItems: "center", gap: "4px", minHeight: "auto",
-                  }}>
-                    <span style={{fontSize:"18px"}}>{t.icon}</span>
-                    <span style={{ fontSize: "16px", lineHeight: 1.2 }}>{t.label}{t.locked && !user ? " 🔒" : ""}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-          {/* 하단: 테마/로그인/로그아웃 */}
-          <div style={{ borderTop: `1px solid ${C.border}20`, paddingTop: "10px", display: "flex", gap: "8px" }}>
-            <button onClick={() => { toggleTheme(); }} style={{
-              flex: 1, padding: "10px", borderRadius: "12px", fontSize: "17px", fontWeight: 600,
-              background: C.card2, color: C.text2, border: "none", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
-            }}>
-              {themeMode === "dark" ? "☀️ 라이트" : "🌙 다크"}
-            </button>
-            {user ? (
-              <>
-              <button onClick={() => { setTab("profile"); setMenuOpen(false); }} style={{
-                flex: 1, padding: "10px", borderRadius: "12px", fontSize: "17px", fontWeight: 600,
-                background: C.blueBg, color: C.blue, border: "none", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
-              }}>
-                👤 내 정보
-              </button>
-              <button onClick={() => { if (confirm("로그아웃 하시겠습니까?")) { signOut(); setMenuOpen(false); } }} style={{
-                flex: 1, padding: "10px", borderRadius: "12px", fontSize: "17px", fontWeight: 600,
-                background: `${C.red}12`, color: C.red, border: "none", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
-              }}>
-                로그아웃
-              </button>
-              </>
-            ) : (
-              <button onClick={() => { setShowAuthModal(true); setMenuOpen(false); }} style={{
-                flex: 2, padding: "10px", borderRadius: "12px", fontSize: "17px", fontWeight: 700,
-                background: C.blue, color: "#fff", border: "none", cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
-              }}>
-                로그인
-              </button>
-            )}
-          </div>
-        </div>
-        </>
-      )}
-
-      {/* LNB는 이제 GNB 호버 드롭다운에 통합됨 */}
+      {/* ── GNB 헤더 (shadcn 기반 컴포넌트) ── */}
+      <Header
+        tab={tab}
+        setTab={setTab}
+        user={user}
+        isOwner={isOwner}
+        themeMode={themeMode}
+        toggleTheme={toggleTheme}
+        signOut={signOut}
+        setShowAuthModal={setShowAuthModal}
+        setGlobalSearchOpen={setGlobalSearchOpen}
+        alertBadge={alertBadge}
+        anomalyCount={anomalies?.length || 0}
+        requireLogin={requireLogin}
+      />
 
       <PullToRefresh onRefresh={async () => {
         if (tab === "home") await fetchMarketOverview();
@@ -7261,7 +6894,7 @@ function AppInner() {
         else if (tab === "news") await fetchNews();
         else window.location.reload();
       }}>
-      <main style={{ maxWidth: "1400px", margin: "0 auto", padding: "28px", paddingBottom: "36px" }}>
+      <main className="mx-auto max-w-[1400px] px-4 py-4 pb-8 sm:px-6 sm:py-6 sm:pb-10">
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 홈 (토스 스타일 — 깔끔하고 정보 밀도 최적화)
