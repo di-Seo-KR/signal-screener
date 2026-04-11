@@ -222,34 +222,38 @@ async function fetchFMP(from, to) {
 // ══════════════════════════════════════════════════════════════
 async function fetchBLSActuals() {
   const actuals = {};
-  const blsKey = process.env.BLS_API_KEY; // 선택사항: 없으면 v1 (하루 25회 제한)
+  const blsKey = process.env.BLS_API_KEY;
 
   // BLS 시리즈: CPI, Core CPI, 실업률, NFP
   const series = [
-    { id: "CUSR0000SA0",  match: "CPI (YoY)",          calc: "yoy" },      // All items CPI-U
-    { id: "CUSR0000SA0L1E", match: "Core CPI (YoY)",   calc: "yoy" },      // All items less food & energy
-    { id: "LNS14000000",  match: "Unemployment Rate",   calc: "direct" },   // Unemployment rate
-    { id: "CES0000000001", match: "Nonfarm Payrolls",   calc: "diff" },     // Total nonfarm employment (thousands)
+    { id: "CUSR0000SA0",    match: "CPI (YoY)",        calc: "yoy" },    // CPI-U All Items (SA)
+    { id: "CUSR0000SA0L1E", match: "Core CPI (YoY)",   calc: "yoy" },    // CPI-U Less Food & Energy (SA)
+    { id: "LNS14000000",    match: "Unemployment Rate", calc: "direct" }, // Civilian Unemployment Rate (SA)
+    { id: "CES0000000001",  match: "Nonfarm Payrolls",  calc: "diff" },   // Total Nonfarm (SA, thousands)
   ];
 
+  const now = new Date();
+  const curYear = now.getFullYear();
+
   try {
+    // BLS API v2 POST: startyear/endyear 필수, latest는 GET 전용
+    // YoY 계산을 위해 작년~올해 2년치 요청 (최소 13개월 필요)
     const body = {
       seriesid: series.map(s => s.id),
-      startyear: String(new Date().getFullYear() - 1),
-      endyear: String(new Date().getFullYear()),
-      latest: true,
+      startyear: String(curYear - 1),
+      endyear: String(curYear),
     };
 
+    // v2는 registrationkey 필요, v1은 키 없이 사용 (하루 25회)
     const url = blsKey
       ? "https://api.bls.gov/publicAPI/v2/timeseries/data/"
-      : "https://api.bls.gov/publicAPI/v1/timeseries/data/";
+      : "https://api.bls.gov/publicAPI/v2/timeseries/data/";
 
-    const headers = { "Content-Type": "application/json" };
     if (blsKey) body.registrationkey = blsKey;
 
     const resp = await fetch(url, {
       method: "POST",
-      headers,
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(10000),
     });
@@ -259,35 +263,50 @@ async function fetchBLSActuals() {
     if (json.status !== "REQUEST_SUCCEEDED") return actuals;
 
     const curatedEvents = getCuratedEvents2026();
-    const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+    const todayStr = `${curYear}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
 
     for (const seriesData of (json.Results?.series || [])) {
       const sid = seriesData.seriesID;
       const config = series.find(s => s.id === sid);
       if (!config) continue;
 
-      const data = seriesData.data || [];
-      if (data.length < 2) continue;
+      // BLS 데이터: 최신 → 오래된 순 (year desc, period desc)
+      const rawData = (seriesData.data || [])
+        .filter(d => d.period !== "M13") // M13 = annual average, 제외
+        .sort((a, b) => {
+          const ya = parseInt(a.year), yb = parseInt(b.year);
+          if (ya !== yb) return yb - ya;
+          const pa = parseInt(a.period.replace("M", "")), pb = parseInt(b.period.replace("M", ""));
+          return pb - pa;
+        });
 
-      // BLS 데이터: 최신 → 오래된 순 정렬됨
-      const latest = parseFloat(data[0]?.value);
-      const prev   = parseFloat(data[1]?.value);
-      if (isNaN(latest) || isNaN(prev)) continue;
+      if (rawData.length < 2) continue;
+
+      const latestVal = parseFloat(rawData[0]?.value);
+      const prevVal   = parseFloat(rawData[1]?.value);
+      if (isNaN(latestVal) || isNaN(prevVal)) continue;
 
       let actual;
       if (config.calc === "direct") {
-        actual = latest;
+        actual = latestVal;
       } else if (config.calc === "diff") {
-        actual = latest - prev; // NFP: 천 명 단위 변화
+        actual = latestVal - prevVal; // NFP: 월간 변동 (K단위)
       } else if (config.calc === "yoy") {
         // YoY: 12개월 전 데이터와 비교
-        const prev12 = data.length >= 13 ? parseFloat(data[12]?.value) : null;
-        if (prev12 && !isNaN(prev12) && prev12 > 0) {
-          actual = Math.round(((latest - prev12) / prev12) * 1000) / 10;
-        } else {
-          continue; // YoY 계산 불가
-        }
+        // 최신 데이터의 year/period 파악
+        const latestYear = parseInt(rawData[0].year);
+        const latestMonth = parseInt(rawData[0].period.replace("M", ""));
+        // 12개월 전 찾기
+        const targetYear = latestMonth <= 12 ? latestYear - 1 : latestYear;
+        const targetMonth = latestMonth; // 같은 월
+        const prev12Entry = rawData.find(d =>
+          parseInt(d.year) === targetYear &&
+          parseInt(d.period.replace("M", "")) === targetMonth
+        );
+        if (!prev12Entry) continue;
+        const prev12Val = parseFloat(prev12Entry.value);
+        if (isNaN(prev12Val) || prev12Val <= 0) continue;
+        actual = Math.round(((latestVal - prev12Val) / prev12Val) * 1000) / 10;
       }
 
       if (actual == null || isNaN(actual)) continue;
