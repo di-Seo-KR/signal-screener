@@ -2,18 +2,18 @@
  * Zepta GNB Header — shadcn/ui + Tailwind, 모바일 퍼스트
  *
  * 모바일: Sheet(좌측 드로어) + 하단 safe-area
- * 데스크탑: 수평 네비 + DropdownMenu 카테고리
+ * 데스크탑: 수평 네비 + CSS absolute 드롭다운 (Floating-UI 미사용)
+ *
+ * NOTE: Radix DropdownMenu의 Floating-UI Popper가 App.jsx의 빈번한
+ *       리렌더링으로 인해 위치 계산 실패 → translate(0,-200%) 고정 문제 발생.
+ *       이를 해결하기 위해 순수 CSS absolute 포지셔닝 드롭다운으로 대체.
  */
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect, memo } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
-  Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle, SheetClose,
+  Sheet, SheetTrigger, SheetContent, SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
-import {
-  DropdownMenu, DropdownMenuTrigger, DropdownMenuContent,
-  DropdownMenuItem, DropdownMenuSeparator, DropdownMenuLabel,
-} from "@/components/ui/dropdown-menu";
 import { Separator } from "@/components/ui/separator";
 import {
   Menu, X, Search, ChevronDown, Sun, Moon, LogOut, User,
@@ -21,6 +21,65 @@ import {
   CalendarDays, Bell, Zap, Target, FileText, LineChart,
   LayoutDashboard, TrendingUp, Activity,
 } from "lucide-react";
+
+/* ═══════════════════════════════════════════════════════════════
+   커스텀 드롭다운 (Floating-UI 미사용, CSS absolute 포지셔닝)
+   ═══════════════════════════════════════════════════════════════ */
+function CssDropdown({ trigger, children, align = "start", className }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    const handleKey = (e) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", handleClick);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClick);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      {trigger({ open, toggle: () => setOpen((v) => !v) })}
+      {open && (
+        <div
+          className={cn(
+            "absolute top-full mt-1 z-[999] min-w-[180px] rounded-lg bg-popover p-1 text-popover-foreground shadow-lg ring-1 ring-foreground/10",
+            "animate-in fade-in-0 zoom-in-95 duration-100",
+            align === "end" ? "right-0" : "left-0",
+            className
+          )}
+          role="menu"
+        >
+          {typeof children === "function" ? children(() => setOpen(false)) : children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* 드롭다운 메뉴 아이템 */
+function CssDropdownItem({ children, onClick, className, variant }) {
+  return (
+    <button
+      role="menuitem"
+      onClick={onClick}
+      className={cn(
+        "flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium outline-none transition-colors",
+        "hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+        variant === "destructive" && "text-destructive hover:bg-destructive/10 focus:bg-destructive/10",
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
+}
 
 /* ── 네비게이션 데이터 정의 ── */
 const NAV_CATEGORIES = [
@@ -99,7 +158,7 @@ const gnbCategoryMap = {
   news: "info", sentiment: "info", alerts: "info", "econ-calendar": "info",
 };
 
-export default function Header({
+export default memo(function Header({
   tab, setTab, user, isOwner, themeMode, toggleTheme,
   signOut, setShowAuthModal, setGlobalSearchOpen,
   alertBadge = 0, anomalyCount = 0, requireLogin,
@@ -263,49 +322,48 @@ export default function Header({
                 );
               }
 
-              /* 분석, 운용, 정보: 드롭다운 */
+              /* 분석, 운용, 정보: CSS 드롭다운 */
               return (
-                <DropdownMenu key={cat.id}>
-                  <DropdownMenuTrigger asChild>
+                <CssDropdown
+                  key={cat.id}
+                  trigger={({ open, toggle }) => (
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={toggle}
                       className={cn(
                         "text-sm font-semibold gap-1 px-4",
-                        isActive
+                        (isActive || open)
                           ? "bg-primary/10 text-primary hover:bg-primary/15"
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
                       {cat.label}
-                      <ChevronDown className="size-3.5 opacity-50" />
+                      <ChevronDown className={cn("size-3.5 opacity-50 transition-transform", open && "rotate-180")} />
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="min-w-[180px]">
-                    {cat.items.map((item) => {
-                      const Icon = item.icon;
-                      return (
-                        <DropdownMenuItem
-                          key={item.id}
-                          onClick={() => {
-                            if (item.locked && requireLogin?.(item.id)) return;
-                            navigate(item.id);
-                          }}
-                          className={cn(
-                            "gap-2.5 py-2 text-sm font-medium cursor-pointer",
-                            tab === item.id && "bg-primary/10 text-primary"
-                          )}
-                        >
-                          <Icon className="size-4" />
-                          {item.label}
-                          {item.locked && !user && (
-                            <span className="ml-auto text-xs opacity-40">🔒</span>
-                          )}
-                        </DropdownMenuItem>
-                      );
-                    })}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  )}
+                >
+                  {(close) => cat.items.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <CssDropdownItem
+                        key={item.id}
+                        onClick={() => {
+                          if (item.locked && requireLogin?.(item.id)) return;
+                          navigate(item.id);
+                          close();
+                        }}
+                        className={cn(tab === item.id && "bg-primary/10 text-primary")}
+                      >
+                        <Icon className="size-4" />
+                        {item.label}
+                        {item.locked && !user && (
+                          <span className="ml-auto text-xs opacity-40">🔒</span>
+                        )}
+                      </CssDropdownItem>
+                    );
+                  })}
+                </CssDropdown>
               );
             })}
           </nav>
@@ -330,46 +388,53 @@ export default function Header({
 
             {/* 데스크탑: 사용자 드롭다운 */}
             {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="hidden lg:inline-flex gap-2 pl-1 pr-2">
+              <CssDropdown
+                align="end"
+                className="min-w-[200px]"
+                trigger={({ open, toggle }) => (
+                  <Button variant="ghost" size="sm" onClick={toggle}
+                    className="hidden lg:inline-flex gap-2 pl-1 pr-2">
                     <Avatar size={26} />
                     <span className="max-w-[80px] truncate text-xs text-muted-foreground">{displayName}</span>
-                    <ChevronDown className="size-3 opacity-50" />
+                    <ChevronDown className={cn("size-3 opacity-50 transition-transform", open && "rotate-180")} />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-[200px]">
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="font-semibold text-foreground">{displayName}</div>
-                    <div className="text-xs text-muted-foreground">{user?.email}</div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => navigate("profile")} className="gap-2 cursor-pointer">
-                    <User className="size-4" />회원정보
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => navigate("auto-trading")} className="gap-2 cursor-pointer">
-                    <Bot className="size-4" />봇 운영현황
-                  </DropdownMenuItem>
-                  {isOwner && (
-                    <DropdownMenuItem onClick={() => navigate("real-trading")} className="gap-2 cursor-pointer">
-                      <Activity className="size-4" />실전매매
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem onClick={() => navigate("portfolio")} className="gap-2 cursor-pointer">
-                    <Briefcase className="size-4" />포트폴리오
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={toggleTheme} className="gap-2 cursor-pointer">
-                    {themeMode === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
-                    {themeMode === "dark" ? "라이트 모드" : "다크 모드"}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem variant="destructive" className="gap-2 cursor-pointer"
-                    onClick={() => { if (confirm("로그아웃 하시겠습니까?")) signOut(); }}>
-                    <LogOut className="size-4" />로그아웃
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                )}
+              >
+                {(close) => (
+                  <>
+                    <div className="px-2 py-1.5">
+                      <div className="font-semibold text-sm text-foreground">{displayName}</div>
+                      <div className="text-xs text-muted-foreground">{user?.email}</div>
+                    </div>
+                    <Separator className="my-1" />
+                    <CssDropdownItem onClick={() => { navigate("profile"); close(); }}>
+                      <User className="size-4" />회원정보
+                    </CssDropdownItem>
+                    <CssDropdownItem onClick={() => { navigate("auto-trading"); close(); }}>
+                      <Bot className="size-4" />봇 운영현황
+                    </CssDropdownItem>
+                    {isOwner && (
+                      <CssDropdownItem onClick={() => { navigate("real-trading"); close(); }}>
+                        <Activity className="size-4" />실전매매
+                      </CssDropdownItem>
+                    )}
+                    <CssDropdownItem onClick={() => { navigate("portfolio"); close(); }}>
+                      <Briefcase className="size-4" />포트폴리오
+                    </CssDropdownItem>
+                    <Separator className="my-1" />
+                    <CssDropdownItem onClick={() => { toggleTheme(); close(); }}>
+                      {themeMode === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                      {themeMode === "dark" ? "라이트 모드" : "다크 모드"}
+                    </CssDropdownItem>
+                    <Separator className="my-1" />
+                    <CssDropdownItem variant="destructive" onClick={() => {
+                      if (confirm("로그아웃 하시겠습니까?")) { signOut(); close(); }
+                    }}>
+                      <LogOut className="size-4" />로그아웃
+                    </CssDropdownItem>
+                  </>
+                )}
+              </CssDropdown>
             ) : (
               <>
                 <Button size="sm" onClick={() => setShowAuthModal(true)} className="hidden lg:inline-flex">
@@ -389,4 +454,4 @@ export default function Header({
       <div className="h-12 sm:h-14" />
     </>
   );
-}
+});
