@@ -20,6 +20,19 @@ import {
 import { useTheme } from "./ui/theme.jsx";
 
 // ═══════════════════════════════════════════════════════════════════
+// Custom Styles for RealTrading Dashboard
+// ═══════════════════════════════════════════════════════════════════
+const realtradingStyles = `
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.rt-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+`;
+
+// ═══════════════════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════════════════
 const fmtUsd = (v, digits = 2) => {
@@ -84,6 +97,18 @@ function RealTradingInner() {
   const timerRef = useRef(null);
   const [lastRefresh, setLastRefresh] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  // Inject custom styles once
+  useEffect(() => {
+    if (!document.getElementById("realtrading-styles")) {
+      const style = document.createElement("style");
+      style.id = "realtrading-styles";
+      style.textContent = realtradingStyles;
+      document.head.appendChild(style);
+      return () => style.remove();
+    }
+  }, []);
+
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", h);
@@ -216,106 +241,346 @@ function RealTradingInner() {
     ? ((equity - breaker.equityHigh) / breaker.equityHigh) * 100 : 0;
 
   // ═════════════════════════════════════════════════════════
-  // HEADER
+  // HEADER (REDESIGNED)
   // ═════════════════════════════════════════════════════════
   const header = (
     <div style={{
-      display: "flex", alignItems: "center", gap: 12, marginBottom: 14, flexWrap: "wrap",
+      background: trulyLive
+        ? "linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(234, 51, 35, 0.08) 100%)"
+        : "linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(37, 99, 235, 0.06) 100%)",
+      border: trulyLive
+        ? "1px solid rgba(239, 68, 68, 0.25)"
+        : "1px solid rgba(59, 130, 246, 0.2)",
+      borderRadius: "var(--z-r-lg)",
+      padding: "24px 20px",
+      marginBottom: 20,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      flexWrap: "wrap",
+      gap: 16,
     }}>
       <div style={{ flex: 1, minWidth: 240 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
           <div style={{
-            width: 32, height: 32, borderRadius: 10,
-            background: "linear-gradient(135deg, var(--z-red) 0%, #C8102E 100%)",
+            width: 48, height: 48, borderRadius: 14,
+            background: trulyLive
+              ? "linear-gradient(135deg, var(--z-red) 0%, #E53935 100%)"
+              : "linear-gradient(135deg, var(--z-blue) 0%, #1E40AF 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 6px 20px rgba(255, 77, 100, 0.3)",
+            boxShadow: trulyLive
+              ? "0 8px 24px rgba(239, 68, 68, 0.35), inset 0 1px 0 rgba(255,255,255,0.2)"
+              : "0 8px 24px rgba(59, 130, 246, 0.25), inset 0 1px 0 rgba(255,255,255,0.15)",
+            position: "relative",
           }}>
-            <Power size={18} color="#fff" />
+            {trulyLive && (
+              <div className="rt-pulse" style={{
+                position: "absolute", inset: 0, borderRadius: 14,
+                background: "rgba(239, 68, 68, 0.3)",
+              }} />
+            )}
+            <Power size={24} color="#fff" style={{ position: "relative", zIndex: 1 }} />
           </div>
-          <div style={{ fontSize: 20, fontWeight: 900, letterSpacing: "-0.02em" }}>
-            실전매매 관제센터
+          <div>
+            <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-0.03em", lineHeight: 1 }}>
+              실전매매 관제센터
+            </div>
+            <div style={{ fontSize: 13, color: "var(--z-text-3)", marginTop: 4 }}>
+              Zepta Investment Platform
+            </div>
           </div>
-          {trulyLive ? (
-            <Badge tone="red" dot solid>LIVE</Badge>
-          ) : (
-            <Badge tone="default">STANDBY</Badge>
-          )}
-          {/* Shadow 뱃지 숨김 */}
-          {halted && <Badge tone="yellow">BREAKER</Badge>}
         </div>
-        <div style={{ fontSize: 12, color: "var(--z-text-3)" }}>
-          Binance USDⓈ-M Futures · Option A 절대수익형 · Owner only
-          {lastRefresh && <> · 최근 {fmtTime(lastRefresh)}</>}
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+          {trulyLive ? (
+            <Badge
+              tone="red"
+              dot
+              solid
+              className="rt-pulse"
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                padding: "6px 12px",
+              }}
+            >
+              🔴 LIVE
+            </Badge>
+          ) : (
+            <Badge
+              tone="default"
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                padding: "6px 12px",
+              }}
+            >
+              ⊙ STANDBY
+            </Badge>
+          )}
+          {halted && (
+            <Badge
+              tone="yellow"
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                padding: "6px 12px",
+              }}
+            >
+              ⚡ BREAKER
+            </Badge>
+          )}
+          <div style={{ fontSize: 12, color: "var(--z-text-2)", marginLeft: 4 }}>
+            · Binance USDⓈ-M Futures
+            {lastRefresh && <> · {fmtTime(lastRefresh)}</>}
+          </div>
         </div>
       </div>
 
-      <Button variant="ghost" size="sm" onClick={refresh} leftIcon={loading ? <Spinner size={14} /> : <Refresh size={14} />}>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={refresh}
+        leftIcon={loading ? <Spinner size={14} /> : <Refresh size={14} />}
+        style={{ whiteSpace: "nowrap" }}
+      >
         새로고침
       </Button>
     </div>
   );
 
   // ═════════════════════════════════════════════════════════
-  // KPI BAR
+  // KPI BAR (REDESIGNED - HERO METRICS)
   // ═════════════════════════════════════════════════════════
   const kpiBar = (
     <div style={{
-      display: "grid", gap: 10, marginBottom: 14,
-      gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(160px, 1fr))",
+      display: "grid", gap: 12, marginBottom: 20,
+      gridTemplateColumns: isMobile
+        ? "1fr"
+        : "2fr 1fr 1fr",
     }}>
-      <Stat
-        label="에쿼티"
-        icon={<Wallet size={12} />}
-        value={loading && equity == null ? <Skeleton width={80} height={20} /> : fmtUsd(equity)}
-        sub={breaker.dayStartEquity ? `일 시작 ${fmtUsd(breaker.dayStartEquity)}` : null}
-        trend={dayLossPct || null}
-      />
-      <Stat
-        label="오픈 포지션"
-        icon={<Activity size={12} />}
-        value={positions.length}
-        sub={`상관군 분리 · 최대 2개`}
-        tone={positions.length >= 2 ? "warn" : undefined}
-      />
-      <Stat
-        label="일 손익"
-        icon={<TrendUp size={12} />}
-        value={fmtPct(dayLossPct)}
-        sub="한도 -4%"
-        tone={dayLossPct <= -3 ? "danger" : dayLossPct < 0 ? "warn" : "success"}
-      />
-      <Stat
-        label="MDD"
-        icon={<TrendDown size={12} />}
-        value={fmtPct(mddPct)}
-        sub="한도 -15%"
-        tone={mddPct <= -10 ? "danger" : undefined}
-      />
-      <Stat
-        label="연속 손실"
-        icon={<AlertIcon size={12} />}
-        value={`${breaker.consecLosses || 0} / 5`}
-        sub="5회 → 24h 쿨다운"
-        tone={(breaker.consecLosses || 0) >= 3 ? "warn" : undefined}
-      />
-      {/* Shadow 성과 — 숨김 */}
+      {/* HERO METRIC — EQUITY */}
+      <div style={{
+        background: "linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(37, 99, 235, 0.06) 100%)",
+        border: "1px solid rgba(59, 130, 246, 0.25)",
+        borderRadius: "var(--z-r-lg)",
+        padding: "20px",
+        display: "flex", flexDirection: "column", justifyContent: "center",
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+        gridRow: isMobile ? undefined : "span 2",
+      }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 12,
+            background: "linear-gradient(135deg, var(--z-blue) 0%, #1E40AF 100%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)",
+          }}>
+            <Wallet size={20} color="#fff" />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 12, color: "var(--z-text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+              현재 에쿼티
+            </div>
+            <div style={{ fontSize: 32, fontWeight: 900, marginTop: 6, lineHeight: 1, fontFamily: "var(--z-font-mono)" }}>
+              {loading && equity == null ? (
+                <Skeleton width={140} height={32} />
+              ) : (
+                fmtUsd(equity)
+              )}
+            </div>
+          </div>
+        </div>
+        <div style={{
+          display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr",
+          paddingTop: 12, borderTop: "1px solid rgba(59, 130, 246, 0.1)",
+        }}>
+          <div>
+            <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 4 }}>일 시작 가</div>
+            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)" }}>
+              {breaker.dayStartEquity ? fmtUsd(breaker.dayStartEquity) : "—"}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 4 }}>최고 수익</div>
+            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)", color: "var(--z-green-hi)" }}>
+              {breaker.equityHigh ? fmtUsd(breaker.equityHigh) : "—"}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* SECONDARY METRICS — P&L and MDD */}
+      <div style={{
+        background: dayLossPct < 0
+          ? "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)"
+          : "linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(22, 163, 74, 0.06) 100%)",
+        border: dayLossPct < 0
+          ? "1px solid rgba(239, 68, 68, 0.25)"
+          : "1px solid rgba(34, 197, 94, 0.25)",
+        borderRadius: "var(--z-r-lg)",
+        padding: "18px",
+        display: "flex", flexDirection: "column", justifyContent: "space-between",
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+      }}>
+        <div style={{ fontSize: 12, color: "var(--z-text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+          일 손익
+        </div>
+        <div style={{
+          fontSize: 28, fontWeight: 900, lineHeight: 1,
+          color: dayLossPct < 0
+            ? "var(--z-red-hi)"
+            : dayLossPct > 0
+              ? "var(--z-green-hi)"
+              : "var(--z-text)",
+          fontFamily: "var(--z-font-mono)",
+        }}>
+          {fmtPct(dayLossPct)}
+        </div>
+        <div style={{
+          marginTop: 10, fontSize: 11, color: "var(--z-text-3)",
+          padding: "8px 10px", background: "rgba(0, 0, 0, 0.15)", borderRadius: "var(--z-r-md)",
+        }}>
+          한도 <span style={{ fontWeight: 700 }}>-4%</span>
+        </div>
+      </div>
+
+      <div style={{
+        background: mddPct < -8
+          ? "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)"
+          : "linear-gradient(135deg, rgba(168, 85, 247, 0.12) 0%, rgba(147, 51, 234, 0.06) 100%)",
+        border: mddPct < -8
+          ? "1px solid rgba(239, 68, 68, 0.25)"
+          : "1px solid rgba(168, 85, 247, 0.25)",
+        borderRadius: "var(--z-r-lg)",
+        padding: "18px",
+        display: "flex", flexDirection: "column", justifyContent: "space-between",
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+      }}>
+        <div style={{ fontSize: 12, color: "var(--z-text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+          MDD
+        </div>
+        <div style={{
+          fontSize: 28, fontWeight: 900, lineHeight: 1,
+          color: mddPct < -10
+            ? "var(--z-red-hi)"
+            : mddPct < -5
+              ? "var(--z-yellow-hi)"
+              : "var(--z-purple)",
+          fontFamily: "var(--z-font-mono)",
+        }}>
+          {fmtPct(mddPct)}
+        </div>
+        <div style={{
+          marginTop: 10, fontSize: 11, color: "var(--z-text-3)",
+          padding: "8px 10px", background: "rgba(0, 0, 0, 0.15)", borderRadius: "var(--z-r-md)",
+        }}>
+          한도 <span style={{ fontWeight: 700 }}>-15%</span>
+        </div>
+      </div>
+
+      {/* SUPPORTING METRICS */}
+      <div style={{
+        background: positions.length >= 2
+          ? "linear-gradient(135deg, rgba(234, 179, 8, 0.12) 0%, rgba(202, 138, 4, 0.06) 100%)"
+          : "linear-gradient(135deg, rgba(100, 116, 139, 0.12) 0%, rgba(71, 85, 105, 0.06) 100%)",
+        border: positions.length >= 2
+          ? "1px solid rgba(234, 179, 8, 0.25)"
+          : "1px solid rgba(100, 116, 139, 0.2)",
+        borderRadius: "var(--z-r-lg)",
+        padding: "16px",
+        display: "flex", flexDirection: "column", justifyContent: "center",
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+      }}>
+        <div style={{ fontSize: 11, color: "var(--z-text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+          오픈 포지션
+        </div>
+        <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1, color: positions.length >= 2 ? "var(--z-yellow-hi)" : "var(--z-text)" }}>
+          {positions.length}
+        </div>
+        <div style={{
+          marginTop: 8, fontSize: 10, color: "var(--z-text-3)",
+          padding: "6px 8px", background: "rgba(0, 0, 0, 0.15)", borderRadius: "var(--z-r-md)",
+        }}>
+          최대 2개
+        </div>
+      </div>
+
+      <div style={{
+        background: (breaker.consecLosses || 0) >= 3
+          ? "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)"
+          : "linear-gradient(135deg, rgba(100, 116, 139, 0.12) 0%, rgba(71, 85, 105, 0.06) 100%)",
+        border: (breaker.consecLosses || 0) >= 3
+          ? "1px solid rgba(239, 68, 68, 0.25)"
+          : "1px solid rgba(100, 116, 139, 0.2)",
+        borderRadius: "var(--z-r-lg)",
+        padding: "16px",
+        display: "flex", flexDirection: "column", justifyContent: "center",
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+      }}>
+        <div style={{ fontSize: 11, color: "var(--z-text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+          연속 손실
+        </div>
+        <div style={{
+          fontSize: 24, fontWeight: 900, lineHeight: 1,
+          color: (breaker.consecLosses || 0) >= 3 ? "var(--z-red-hi)" : "var(--z-text)",
+        }}>
+          {breaker.consecLosses || 0} / 5
+        </div>
+        <div style={{
+          marginTop: 8, fontSize: 10, color: "var(--z-text-3)",
+          padding: "6px 8px", background: "rgba(0, 0, 0, 0.15)", borderRadius: "var(--z-r-md)",
+        }}>
+          쿨다운 24h
+        </div>
+      </div>
     </div>
   );
 
   // ═════════════════════════════════════════════════════════
-  // CONTROL PANEL
+  // CONTROL PANEL (REDESIGNED - PROMINENT BUTTONS)
   // ═════════════════════════════════════════════════════════
   const controlPanel = (
-    <Card
-      title="매매 제어"
-      icon={<Settings size={16} />}
-      actions={trulyLive ? <Badge tone="green" dot>실거래 중</Badge> : <Badge tone="default">대기</Badge>}
-    >
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-        {/* 실거래 시작/정지 — 핵심 제어만 노출 */}
+    <div style={{
+      background: "linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(79, 70, 229, 0.04) 100%)",
+      border: "1px solid rgba(99, 102, 241, 0.2)",
+      borderRadius: "var(--z-r-lg)",
+      padding: "20px",
+      marginBottom: 20,
+      display: "flex", flexDirection: "column", gap: 16,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Settings size={18} color="var(--z-text-2)" />
+          <div style={{ fontSize: 14, fontWeight: 700, color: "var(--z-text-2)" }}>
+            매매 제어 센터
+          </div>
+        </div>
+        {trulyLive ? (
+          <Badge tone="green" dot style={{ fontSize: 11, fontWeight: 700, padding: "6px 10px" }}>
+            ✓ 실거래 중
+          </Badge>
+        ) : (
+          <Badge tone="default" style={{ fontSize: 11, fontWeight: 700, padding: "6px 10px" }}>
+            ⊙ 대기 중
+          </Badge>
+        )}
+      </div>
+
+      <div style={{
+        display: "grid",
+        gap: 10,
+        gridTemplateColumns: isMobile
+          ? "1fr"
+          : "1fr 1fr auto 1fr",
+        alignItems: "stretch",
+      }}>
+        {/* PRIMARY ACTION: START/STOP */}
         {killOn ? (
-          <Button variant="danger" size="sm" disabled={busy || !phase1On}
-            leftIcon={<Unlock size={14} />}
+          <Button
+            variant="danger"
+            size="lg"
+            disabled={busy || !phase1On}
+            leftIcon={<Unlock size={16} />}
             onClick={() => setConfirm({
               tone: "danger",
               title: "실거래 시작",
@@ -323,61 +588,132 @@ function RealTradingInner() {
               confirmLabel: "실거래 시작",
               confirmVariant: "danger",
               onConfirm: () => act("enable", {}, "실거래 시작 완료"),
-            })}>
-            실거래 시작
+            })}
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              padding: "14px 20px",
+              background: "linear-gradient(135deg, var(--z-red) 0%, #DC2626 100%)",
+              boxShadow: "0 4px 12px rgba(239, 68, 68, 0.3)",
+              border: "1px solid rgba(239, 68, 68, 0.4)",
+            }}
+          >
+            🚀 실거래 시작
           </Button>
         ) : (
-          <Button variant="warn" size="sm" disabled={busy}
-            leftIcon={<Lock size={14} />}
-            onClick={() => act("disable", {}, "실거래 중지")}>
-            실거래 중지
+          <Button
+            variant="warn"
+            size="lg"
+            disabled={busy}
+            leftIcon={<Lock size={16} />}
+            onClick={() => act("disable", {}, "실거래 중지")}
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              padding: "14px 20px",
+              background: "linear-gradient(135deg, var(--z-yellow) 0%, #EAB308 100%)",
+              boxShadow: "0 4px 12px rgba(234, 179, 8, 0.3)",
+              border: "1px solid rgba(234, 179, 8, 0.4)",
+            }}
+          >
+            🔒 실거래 중지
           </Button>
         )}
 
+        {/* SECONDARY ACTION: PAUSE/RESUME */}
         {halted ? (
-          <Button variant="success" size="sm" disabled={busy}
-            leftIcon={<Play size={14} />}
-            onClick={() => act("resume", {}, "재개 완료")}>
-            재개
+          <Button
+            variant="success"
+            size="lg"
+            disabled={busy}
+            leftIcon={<Play size={16} />}
+            onClick={() => act("resume", {}, "재개 완료")}
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              padding: "14px 20px",
+              background: "linear-gradient(135deg, var(--z-green) 0%, #16A34A 100%)",
+              boxShadow: "0 4px 12px rgba(34, 197, 94, 0.3)",
+              border: "1px solid rgba(34, 197, 94, 0.4)",
+            }}
+          >
+            ▶ 재개
           </Button>
         ) : (
-          <Button variant="ghost" size="sm" disabled={busy}
-            leftIcon={<Pause size={14} />}
-            onClick={() => act("halt", { reason: "manual" }, "일시 정지")}>
-            일시 정지
+          <Button
+            variant="ghost"
+            size="lg"
+            disabled={busy}
+            leftIcon={<Pause size={16} />}
+            onClick={() => act("halt", { reason: "manual" }, "일시 정지")}
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              padding: "14px 20px",
+              border: "1px solid var(--z-border)",
+            }}
+          >
+            ⏸ 일시 정지
           </Button>
         )}
 
-        <div style={{ flex: 1 }} />
+        <div style={{ display: isMobile ? "none" : "flex" }} />
 
-        <Button variant="danger" size="sm"
+        {/* EMERGENCY ACTION: STOP ALL */}
+        <Button
+          variant="danger"
+          size="lg"
           disabled={busy || positions.length === 0}
-          leftIcon={<Stop size={14} />}
-          onClick={emergencyStop}>
-          긴급 정지 ({positions.length})
+          leftIcon={<Stop size={16} />}
+          onClick={emergencyStop}
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            padding: "14px 20px",
+            background: "linear-gradient(135deg, #7F1D1D 0%, #DC2626 100%)",
+            boxShadow: "0 4px 12px rgba(239, 68, 68, 0.35), inset 0 1px 0 rgba(255,255,255,0.1)",
+            border: "1px solid rgba(239, 68, 68, 0.5)",
+          }}
+        >
+          ⚠ 긴급 정지
         </Button>
       </div>
 
       {halted && (
         <div style={{
-          marginTop: 12, padding: 10, background: "var(--z-yellow-bg)",
-          border: `1px solid var(--z-yellow)55`, borderRadius: "var(--z-r-sm)",
-          color: "var(--z-yellow-hi)", fontSize: 12, display: "flex", alignItems: "center", gap: 8,
+          padding: 12,
+          background: "linear-gradient(135deg, rgba(234, 179, 8, 0.12) 0%, rgba(202, 138, 4, 0.06) 100%)",
+          border: `1px solid rgba(234, 179, 8, 0.3)`,
+          borderRadius: "var(--z-r-md)",
+          color: "var(--z-yellow-hi)",
+          fontSize: 12,
+          fontWeight: 700,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
         }}>
-          <AlertIcon size={14} />
-          서킷브레이커 발동됨 — <b>{status?.haltedReason}</b>. '재개' 버튼으로 해제.
+          <AlertIcon size={16} />
+          <span>서킷브레이커 발동 — <span style={{ fontWeight: 900 }}>{status?.haltedReason}</span></span>
         </div>
       )}
       {error && (
         <div style={{
-          marginTop: 12, padding: 10, background: "var(--z-red-bg)",
-          border: `1px solid var(--z-red)55`, borderRadius: "var(--z-r-sm)",
-          color: "var(--z-red-hi)", fontSize: 12,
+          padding: 12,
+          background: "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)",
+          border: `1px solid rgba(239, 68, 68, 0.3)`,
+          borderRadius: "var(--z-r-md)",
+          color: "var(--z-red-hi)",
+          fontSize: 12,
+          fontWeight: 700,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
         }}>
-          오류: {error}
+          <AlertIcon size={16} />
+          <span>오류: {error}</span>
         </div>
       )}
-    </Card>
+    </div>
   );
 
   // ═════════════════════════════════════════════════════════
@@ -432,11 +768,28 @@ function RealTradingInner() {
       pad={0}
     >
       {positions.length === 0 ? (
-        <EmptyState
-          icon={<Activity size={28} />}
-          title="오픈 포지션 없음"
-          description="실거래가 활성화되면 여기에 포지션이 표시됩니다."
-        />
+        <div style={{
+          padding: "40px 24px",
+          textAlign: "center",
+          background: "linear-gradient(135deg, rgba(59, 130, 246, 0.08) 0%, rgba(79, 70, 229, 0.04) 100%)",
+          borderRadius: "var(--z-r-md)",
+          margin: "16px",
+          border: "1px solid rgba(59, 130, 246, 0.15)",
+        }}>
+          <div style={{
+            width: 60, height: 60, borderRadius: 12,
+            background: "linear-gradient(135deg, var(--z-blue) 0%, #1E40AF 100%)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            margin: "0 auto 16px",
+            boxShadow: "0 4px 12px rgba(59, 130, 246, 0.25)",
+          }}>
+            <Activity size={28} color="#fff" />
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>오픈 포지션 없음</div>
+          <div style={{ fontSize: 13, color: "var(--z-text-3)", lineHeight: 1.5 }}>
+            실거래가 활성화되고 신호가 발생하면<br />여기에 포지션이 표시됩니다.
+          </div>
+        </div>
       ) : (
         <Table
           columns={[

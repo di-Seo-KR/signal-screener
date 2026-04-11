@@ -3,9 +3,10 @@
  * App.jsx에서 분리된 포트폴리오 관리 UI
  */
 import { memo } from "react";
+import { useLanguage } from "@/i18n/LanguageContext";
 
-function SearchBarWrapper({ SearchBar, onSelect }) {
-  return <SearchBar placeholder="종목 검색 (예: AAPL, 삼성, BTC...)" onSelect={onSelect} />;
+function SearchBarWrapper({ SearchBar, onSelect, placeholder }) {
+  return <SearchBar placeholder={placeholder} onSelect={onSelect} />;
 }
 
 export default memo(function PortfolioTab({
@@ -25,6 +26,7 @@ export default memo(function PortfolioTab({
   setSelectedAsset,
   setTab,
 }) {
+  const { t } = useLanguage();
   return (
     <div className="tab-content">
       {/* 요약 헤더 */}
@@ -33,25 +35,25 @@ export default memo(function PortfolioTab({
         border: `1px solid ${C.border}20`,
       }}>
         <div className={`flex justify-between items-center ${portfolio.length ? "mb-4" : ""}`}>
-          <div className="font-bold text-lg" style={{ color: C.text1 }}>💼 내 포트폴리오</div>
+          <div className="font-bold text-lg" style={{ color: C.text1 }}>{t("portfolio.myPortfolio")}</div>
           <div className="flex gap-1.5 flex-wrap">
             <button onClick={() => setCurrency(c => c === "USD" ? "KRW" : "USD")} className="rounded-lg px-2.5 py-1.5 text-base font-bold transition-all" style={{
               background: C.card2, color: C.yellow, border: `1px solid ${C.yellow}44`,
-            }}>{currency === "USD" ? "🇺🇸 USD" : "🇰🇷 KRW"}</button>
+            }}>{currency === "USD" ? t("portfolio.currencyUSD") : t("portfolio.currencyKRW")}</button>
             <button onClick={fetchPortfolioPrices} className="rounded-lg px-3 py-1.5 text-base font-semibold transition-all" style={{
               background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}44`,
-            }}>{portfolioLoading ? "⏳ 갱신 중" : "🔄 가격 갱신"}</button>
+            }}>{portfolioLoading ? t("portfolio.refreshing") : t("portfolio.refreshBtn")}</button>
             <button onClick={() => setShowAddAsset(true)} className="rounded-lg px-3.5 py-1.5 text-base font-bold transition-all" style={{
               background: C.blue, color: "#fff", border: "none",
-            }}>+ 추가</button>
+            }}>+ {t("portfolio.addBtn")}</button>
           </div>
         </div>
         {portfolio.length > 0 && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
             {[
-              { label: "총 투자금액", value: currency === "KRW" ? `₩${Math.round(pStats.invested * krwRate).toLocaleString()}` : `$${pStats.invested.toLocaleString(undefined, { maximumFractionDigits: 0 })}` },
-              { label: "현재 평가금액", value: pStats.hasPrices ? (currency === "KRW" ? `₩${Math.round(pStats.current * krwRate).toLocaleString()}` : `$${pStats.current.toLocaleString(undefined, { maximumFractionDigits: 0 })}`) : "—" },
-              { label: "총 손익", value: pStats.hasPrices ? `${pStats.pnl >= 0 ? "+" : ""}${currency === "KRW" ? `₩${Math.round(Math.abs(pStats.pnl) * krwRate).toLocaleString()}` : `$${pStats.pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}` : "—", color: pStats.pnl >= 0 ? C.green : C.red },
+              { label: t("portfolio.invested"), value: currency === "KRW" ? `₩${Math.round(pStats.invested * krwRate).toLocaleString()}` : `$${pStats.invested.toLocaleString(undefined, { maximumFractionDigits: 0 })}` },
+              { label: t("portfolio.current"), value: pStats.hasPrices ? (currency === "KRW" ? `₩${Math.round(pStats.current * krwRate).toLocaleString()}` : `$${pStats.current.toLocaleString(undefined, { maximumFractionDigits: 0 })}`) : "—" },
+              { label: t("portfolio.pnl"), value: pStats.hasPrices ? `${pStats.pnl >= 0 ? "+" : ""}${currency === "KRW" ? `₩${Math.round(Math.abs(pStats.pnl) * krwRate).toLocaleString()}` : `$${pStats.pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}` : "—", color: pStats.pnl >= 0 ? C.green : C.red },
             ].map(({ label, value, color }) => (
               <div key={label} className="rounded-xl p-3.5" style={{ background: C.bg }}>
                 <div className="text-base mb-1" style={{ color: C.text3 }}>{label}</div>
@@ -65,10 +67,10 @@ export default memo(function PortfolioTab({
       {/* 자산 추가 폼 */}
       {showAddAsset && (
         <div className="rounded-[18px] p-[22px_24px] mb-4" style={{ background: C.card, border: `1px solid ${C.border}20` }}>
-          <div className="font-bold mb-3.5 text-lg" style={{ color: C.text1 }}>📌 자산 추가</div>
+          <div className="font-bold mb-3.5 text-lg" style={{ color: C.text1 }}>📌 {t("portfolio.addAsset")}</div>
           <div className="mb-3">
-            <div className="text-base mb-1.5" style={{ color: C.text3 }}>종목 검색 (심볼 또는 이름 입력)</div>
-            <SearchBarWrapper SearchBar={SearchBar} onSelect={(asset) => {
+            <div className="text-base mb-1.5" style={{ color: C.text3 }}>{t("portfolio.searchSymbol")}</div>
+            <SearchBarWrapper SearchBar={SearchBar} placeholder={t("portfolio.symbolPlaceholder")} onSelect={(asset) => {
               const sym = asset.symbol.toUpperCase();
               setNewAsset(p => ({
                 ...p,
@@ -80,10 +82,10 @@ export default memo(function PortfolioTab({
           </div>
           <div className="grid grid-cols-2 gap-2.5 mb-3">
             {[
-              { k: "symbol",   label: "심볼", ph: "AAPL, 005930..." },
-              { k: "name",     label: "자산명", ph: "Apple, 삼성전자..." },
-              { k: "qty",      label: "보유 수량", ph: "0.00" },
-              { k: "avgPrice", label: "평균 매입가", ph: "0.00" },
+              { k: "symbol",   label: t("portfolio.symbolPlaceholder").split(",")[0], ph: t("portfolio.symbolPlaceholder") },
+              { k: "name",     label: t("portfolio.nameLabel"), ph: t("portfolio.namePlaceholder") },
+              { k: "qty",      label: t("portfolio.qtyLabel"), ph: t("portfolio.qtyPlaceholder") },
+              { k: "avgPrice", label: t("portfolio.avgPriceLabel"), ph: t("portfolio.avgPricePlaceholder") },
             ].map(({ k, label, ph }) => (
               <div key={k}>
                 <div className="text-base mb-1" style={{ color: C.text3 }}>{label}</div>
@@ -95,9 +97,9 @@ export default memo(function PortfolioTab({
             ))}
           </div>
           <div className="mb-3">
-            <div className="text-base mb-1.5" style={{ color: C.text3 }}>시장</div>
+            <div className="text-base mb-1.5" style={{ color: C.text3 }}>{t("portfolio.marketLabel")}</div>
             <div className="flex gap-1.5">
-              {[["us","🇺🇸 미국"], ["kr","🇰🇷 한국"], ["crypto","₿ 크립토"]].map(([v, l]) => (
+              {[["us",t("portfolio.marketUS")], ["kr",t("portfolio.marketKR")], ["crypto",t("portfolio.marketCrypto")]].map(([v, l]) => (
                 <button key={v} onClick={() => setNewAsset(p => ({ ...p, market: v }))} className="rounded-lg px-3.5 py-1.5 text-base font-semibold transition-all" style={{
                   background: newAsset.market === v ? C.blueBg : C.card2,
                   color: newAsset.market === v ? C.blue : C.text3,
@@ -120,10 +122,10 @@ export default memo(function PortfolioTab({
               setShowAddAsset(false);
             }} className="flex-1 rounded-[10px] px-5 py-2 text-lg font-bold border-none transition-all" style={{
               background: C.blue, color: "#fff",
-            }}>추가</button>
+            }}>{t("portfolio.addBtn")}</button>
             <button onClick={() => setShowAddAsset(false)} className="flex-1 rounded-[10px] px-5 py-2 text-lg font-semibold transition-all" style={{
               background: C.card2, color: C.text3, border: `1px solid ${C.border2}`,
-            }}>취소</button>
+            }}>{t("portfolio.cancelBtn")}</button>
           </div>
         </div>
       )}
@@ -132,15 +134,15 @@ export default memo(function PortfolioTab({
       {portfolio.length === 0 ? (
         <div className="rounded-[18px] p-[40px_24px] text-center" style={{ background: C.card, border: `1px solid ${C.border}20` }}>
           <div className="text-4xl mb-3">💼</div>
-          <div className="font-bold text-lg mb-2" style={{ color: C.text1 }}>포트폴리오를 시작하세요</div>
+          <div className="font-bold text-lg mb-2" style={{ color: C.text1 }}>{t("portfolio.startPortfolio")}</div>
           <div className="text-base mb-5" style={{ color: C.text3, lineHeight: 1.6 }}>
-            보유 종목을 추가하면 실시간 수익률 추적,<br/>리스크 분석, 매매 시그널 알림을 받을 수 있어요
+            {t("portfolio.startDesc")}
           </div>
           <div className="flex flex-col gap-2.5 max-w-80 mx-auto text-left">
             {[
-              { icon: "1️⃣", text: "우측 상단 '+ 추가' 버튼을 클릭하세요" },
-              { icon: "2️⃣", text: "종목 검색 후 매입가와 수량을 입력하세요" },
-              { icon: "3️⃣", text: "실시간 수익률과 AI 분석을 확인하세요" },
+              { icon: "1️⃣", text: t("portfolio.step1") },
+              { icon: "2️⃣", text: t("portfolio.step2") },
+              { icon: "3️⃣", text: t("portfolio.step3") },
             ].map((step, i) => (
               <div key={i} className="flex items-center gap-2.5 p-2.5 rounded-[10px]" style={{ background: C.card2 }}>
                 <span className="text-base">{step.icon}</span>
@@ -151,10 +153,10 @@ export default memo(function PortfolioTab({
           <div className="mt-5 flex gap-2 justify-center">
             <button onClick={() => setTab("screener")} className="px-5 py-2 rounded-[10px] text-base font-bold cursor-pointer transition-all" style={{
               background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}30`,
-            }}>🔍 종목 탐색하기</button>
+            }}>{t("portfolio.screener")}</button>
             <button onClick={() => setTab("quant-report")} className="px-5 py-2 rounded-[10px] text-base font-bold cursor-pointer transition-all" style={{
               background: C.card2, color: C.text2, border: `1px solid ${C.border}`,
-            }}>📋 오늘의 추천 보기</button>
+            }}>{t("portfolio.report")}</button>
           </div>
         </div>
       ) : (
@@ -185,7 +187,7 @@ export default memo(function PortfolioTab({
                       <span className="text-base" style={{ color: C.text3 }}>{flag} {item.symbol}</span>
                     </div>
                     <div className="text-lg" style={{ color: C.text3 }}>
-                      {item.qty.toLocaleString()}주 · 평균 {toDisplay(item.avgPrice, item.market)}
+                      {item.qty.toLocaleString()} {t("portfolio.shares")} · {t("portfolio.avgPrice")} {toDisplay(item.avgPrice, item.market)}
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0">
@@ -203,19 +205,19 @@ export default memo(function PortfolioTab({
                 {cur != null && (
                   <div className="grid grid-cols-3 gap-1.5 px-4.5 pb-3 text-base">
                     <div className="rounded-lg p-2.5" style={{ background: C.bg }}>
-                      <div className="mb-0.5" style={{ color: C.text3 }}>투자금</div>
+                      <div className="mb-0.5" style={{ color: C.text3 }}>{t("portfolio.investedAmount")}</div>
                       <div className="font-bold text-lg" style={{ color: C.text1 }}>
                         {toDisplay(invested, item.market)}
                       </div>
                     </div>
                     <div className="rounded-lg p-2.5" style={{ background: C.bg }}>
-                      <div className="mb-0.5" style={{ color: C.text3 }}>평가금</div>
+                      <div className="mb-0.5" style={{ color: C.text3 }}>{t("portfolio.evaluatedAmount")}</div>
                       <div className="font-bold text-lg" style={{ color: C.text1 }}>
                         {toDisplay(evalVal, item.market)}
                       </div>
                     </div>
                     <div className="rounded-lg p-2.5" style={{ background: isPos ? C.greenBg : C.redBg }}>
-                      <div className="mb-0.5" style={{ color: C.text3 }}>손익</div>
+                      <div className="mb-0.5" style={{ color: C.text3 }}>{t("portfolio.profitLoss")}</div>
                       <div className="font-bold text-lg" style={{ color: isPos ? C.green : C.red }}>
                         {isPos ? "+" : ""}{toDisplay(Math.abs(gainVal), item.market)}
                       </div>
@@ -233,7 +235,7 @@ export default memo(function PortfolioTab({
                     });
                   }} className="flex-1 py-2 rounded-[10px] text-base font-semibold transition-all flex items-center justify-center gap-1.5" style={{
                     background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}33`,
-                  }}>🩺 진단</button>
+                  }}>{t("portfolio.diagnostic")}</button>
                   <button onClick={() => {
                     const sym = item.market === "crypto"
                       ? `https://www.coingecko.com/en/coins/${item.cryptoId || item.symbol.toLowerCase()}`
@@ -241,13 +243,13 @@ export default memo(function PortfolioTab({
                     window.open(sym, "_blank");
                   }} className="flex-1 py-2 rounded-[10px] text-base font-semibold transition-all flex items-center justify-center gap-1.5" style={{
                     background: C.card2, color: C.text2, border: `1px solid ${C.border2}`,
-                  }}>🔗 상세</button>
+                  }}>{t("portfolio.detail")}</button>
                   <button onClick={() => {
-                    if (!confirm("이 포트폴리오를 삭제하시겠습니까?")) return;
+                    if (!confirm(t("portfolio.deleteConfirm"))) return;
                     setPortfolio(p => p.filter((_, i) => i !== idx));
                   }} className="px-3.5 py-2 rounded-[10px] text-base font-semibold transition-all" style={{
                     background: C.redBg, color: C.red, border: `1px solid ${C.red}33`,
-                  }}>삭제</button>
+                  }}>{t("portfolio.delete")}</button>
                 </div>
               </div>
             );

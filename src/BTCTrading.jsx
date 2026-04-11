@@ -4,6 +4,7 @@
 // CoinGecko 실시간 + Yahoo Finance 캔들 + Binance 데이터
 // ════════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useLanguage } from "./i18n/LanguageContext.jsx";
 import { ALL_STRATEGIES, runBacktest, diagnoseMarket, strategyHurst, strategyVolCluster, strategyEfficiency, strategyMomDecay, strategyInfoFlow, strategyFundingRate, strategyMicrostructure, strategyEntropy } from "./strategies.js";
 
 // Zepta tokens.css 와 동기화

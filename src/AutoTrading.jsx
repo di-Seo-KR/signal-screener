@@ -3,6 +3,7 @@ import PaperTrading from "./PaperTrading.jsx"; // Hidden — kept for legacy, no
 import BTCTrading from "./BTCTrading.jsx";
 import RealTrading from "./RealTrading.jsx";
 import { useAuth } from "./AuthProvider.jsx";
+import { useLanguage } from "./i18n/LanguageContext.jsx";
 import { supabase } from "./supabaseClient.js";
 
 // ── 에쿼티 커브 생성 (전략 파라미터 기반) ──
@@ -428,6 +429,7 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
 }
 
 function BotCard({ bot, onActivate, theme }) {
+  const { t } = useLanguage();
   const c = colors[theme];
   const equityCurve = useMemo(() => generateEquityCurve(bot, 12), [bot.id]);
   const chartColor = getRiskColor(bot.riskColor, theme);
@@ -467,10 +469,10 @@ function BotCard({ bot, onActivate, theme }) {
             color: bot.riskColor === "red" ? "#fff" : "#000",
           }}
         >
-          위험도: {bot.risk}
+          {t("autoTrading.riskLevel")}: {bot.risk}
         </div>
         <div className="text-base font-semibold" style={{ color: c.green }}>
-          예상수익: {bot.expectedReturn}
+          {t("autoTrading.expectedReturn")}: {bot.expectedReturn}
         </div>
       </div>
 
@@ -505,15 +507,15 @@ function BotCard({ bot, onActivate, theme }) {
         }}
       >
         <div>
-          <div className="text-sm" style={{ color: c.text3 }}>승률</div>
+          <div className="text-sm" style={{ color: c.text3 }}>{t("botStats.winRate")}</div>
           <div className="font-semibold" style={{ color: c.green }}>{bot.stats.winRate}</div>
         </div>
         <div>
-          <div className="text-sm" style={{ color: c.text3 }}>샤프비율</div>
+          <div className="text-sm" style={{ color: c.text3 }}>{t("botStats.sharpeRatio")}</div>
           <div className="font-semibold" style={{ color: c.blue }}>{bot.stats.sharpeRatio}</div>
         </div>
         <div>
-          <div className="text-sm" style={{ color: c.text3 }}>최대낙폭</div>
+          <div className="text-sm" style={{ color: c.text3 }}>{t("botStats.mdd")}</div>
           <div className="font-semibold" style={{ color: c.red }}>{bot.stats.mdd}</div>
         </div>
       </div>
@@ -543,13 +545,37 @@ function BotCard({ bot, onActivate, theme }) {
           e.currentTarget.style.transform = "translateY(0)";
         }}
       >
-        시작하기
+        {t("autoTrading.activate")}
       </button>
     </div>
   );
 }
 
+function HeroSection({ theme, c, isMobile }) {
+  const { t } = useLanguage();
+  return (
+    <div
+      className="text-center rounded-2xl"
+      style={{
+        maxWidth: "768px",
+        margin: "0 auto",
+        background: `linear-gradient(135deg, ${c.blue}12 0%, ${c.purple}08 100%)`,
+        border: `1px solid ${c.border}`,
+        padding: isMobile ? "28px 20px" : "36px 32px",
+      }}
+    >
+      <h1 className="mb-2 text-2xl sm:text-3xl font-bold" style={{ margin: "0 0 8px 0", color: c.text1 }}>
+        {t("autoTrading.heroTitle")}
+      </h1>
+      <p className="text-base sm:text-lg mx-auto" style={{ margin: "0", color: c.text2, maxWidth: "520px" }}>
+        {t("autoTrading.heroSubtitle")}
+      </p>
+    </div>
+  );
+}
+
 function BotRecommender({ onActivate, theme, isMobile }) {
+  const { t } = useLanguage();
   const c = colors[theme];
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({});
@@ -689,30 +715,14 @@ function BotCatalog({ onActivate, theme, isMobile }) {
   return (
     <div className="pb-6 px-1 flex flex-col" style={{ gap: isMobile ? "28px" : "40px" }}>
       {/* Hero Section */}
-      <div
-        className="text-center rounded-2xl"
-        style={{
-          maxWidth: "768px",
-          margin: "0 auto",
-          background: `linear-gradient(135deg, ${c.blue}12 0%, ${c.purple}08 100%)`,
-          border: `1px solid ${c.border}`,
-          padding: isMobile ? "28px 20px" : "36px 32px",
-        }}
-      >
-        <h1 className="mb-2 text-2xl sm:text-3xl font-bold" style={{ margin: "0 0 8px 0", color: c.text1 }}>
-          AI 퀀트 전략
-        </h1>
-        <p className="text-base sm:text-lg mx-auto" style={{ margin: "0", color: c.text2, maxWidth: "520px" }}>
-          AI 기반 퀀트 봇이 24/7 시장을 분석하고 최적의 매매 시그널을 생성합니다
-        </p>
-      </div>
+      <HeroSection theme={theme} c={c} isMobile={isMobile} />
 
       {/* 봇 추천 플로우 */}
       <div className="px-4 sm:px-6" style={{ maxWidth: "576px", margin: "0 auto", width: "100%" }}>
         <BotRecommender onActivate={onActivate} theme={theme} isMobile={isMobile} />
       </div>
 
-      {/* Stock Bots Section */}
+      {/* Stock Bots Section - Translations hardcoded for now, can be moved to translations if needed */}
       <BotSection
         title="📊 주식 자동매매 봇"
         bots={STOCK_BOTS}
