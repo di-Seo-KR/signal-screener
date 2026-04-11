@@ -1,0 +1,122 @@
+#!/usr/bin/env python3
+"""
+자율 전략 진화 시스템 오케스트레이터
+모든 에이전트의 실행 일정을 관리
+
+스케줄:
+- 07:00 KST: Researcher (신규 알파 발굴)
+- 08:00 KST: Backtester (워크포워드 검증)
+- 09:00 KST: Evolver (유전 알고리즘)
+- 10:00 KST: Evaluator (성과 평가 및 순위)
+- 11:00 KST: Deployer (프로덕션 배포)
+- 매 6시간: Risk Tuner (위험 조정)
+"""
+
+import asyncio
+import logging
+import sys
+import os
+from datetime import datetime, time
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from agents.researcher import ResearcherAgent
+from agents.backtester import BacktesterAgent
+from agents.evolver import EvolverAgent
+from agents.evaluator import EvaluatorAgent
+from agents.deployer import DeployerAgent
+from agents.risk_tuner import RiskTunerAgent
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+)
+
+
+class Orchestrator:
+    """에이전트 오케스트레이션"""
+
+    def __init__(self):
+        self.agents = {
+            'researcher': (ResearcherAgent(), time(7, 0)),
+            'backtester': (BacktesterAgent(), time(8, 0)),
+            'evolver': (EvolverAgent(), time(9, 0)),
+            'evaluator': (EvaluatorAgent(), time(10, 0)),
+            'deployer': (DeployerAgent(), time(11, 0)),
+            'risk_tuner': (RiskTunerAgent(), None),
+        }
+        self.execution_log = {}
+
+    def _seconds_until_time(self, target_time: time) -> int:
+        """주어진 시간까지 남은 초"""
+        now = datetime.now().time()
+        now_total = now.hour * 3600 + now.minute * 60 + now.second
+        target_total = target_time.hour * 3600 + target_time.minute * 60 + target_time.second
+
+        seconds = target_total - now_total
+        if seconds <= 0:
+            seconds += 86400  # 다음 날
+
+        return seconds
+
+    async def run_agent(self, agent_name: str, agent: object) -> None:
+        """단일 에이전트 실행"""
+        try:
+            logger.info(f"▶ Starting {agent_name} agent...")
+            await agent.run()
+            self.execution_log[agent_name] = {
+                'status': 'success',
+                'timestamp': datetime.now().isoformat(),
+            }
+            logger.info(f"✓ {agent_name} agent completed")
+        except Exception as e:
+            logger.error(f"✗ {agent_name} agent failed: {e}")
+            self.execution_log[agent_name] = {
+                'status': 'failed',
+                'error': str(e),
+                'timestamp': datetime.now().isoformat(),
+            }
+
+    def print_status(self) -> None:
+        """실행 상태 출력"""
+        logger.info("\n=== Execution Status ===")
+        for agent_name, log in self.execution_log.items():
+            status = "✓" if log['status'] == 'success' else "✗"
+            logger.info(f"{status} {agent_name}: {log['status']} at {log['timestamp']}")
+
+
+async def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description='DI금융 자율 전략 진화 시스템 오케스트레이터',
+    )
+    parser.add_argument(
+        '--agent',
+        type=str,
+        help='특정 에이전트만 실행',
+    )
+
+    args = parser.parse_args()
+
+    orchestrator = Orchestrator()
+
+    if args.agent:
+        agent_name = args.agent.lower()
+        if agent_name not in orchestrator.agents:
+            logger.error(f"Unknown agent: {agent_name}")
+            logger.error(f"Available: {', '.join(orchestrator.agents.keys())}")
+            sys.exit(1)
+        agent, _ = orchestrator.agents[agent_name]
+        await orchestrator.run_agent(agent_name, agent)
+    else:
+        logger.info("ORCHESTRATOR - Running all agents once")
+        for agent_name, (agent, _) in orchestrator.agents.items():
+            await orchestrator.run_agent(agent_name, agent)
+
+    orchestrator.print_status()
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
