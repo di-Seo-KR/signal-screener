@@ -1,258 +1,412 @@
-// Vercel Serverless — 경제 캘린더 API (멀티소스 + KV 캐싱 + 실시간)
+// Vercel Serverless — 경제 캘린더 API (v2: 병렬 멀티소스 + BLS 실시간 + KV 캐싱)
 // GET /api/econ-calendar
-// 1차: Finnhub (무료 키 지원)
-// 2차: FinancialModelingPrep
-// 3차: 큐레이션 폴백 + KV에 저장된 actual 값 병합
+//
+// 데이터 소스 (병렬 실행):
+//   A. Finnhub   — 전체 경제 캘린더 (actual 포함)
+//   B. FMP       — 전체 경제 캘린더 (actual 포함)
+//   C. BLS API   — CPI/고용 실시간 actual (발표 즉시 반영)
+//   D. FRED API  — 추가 actual 보완
+//
+// 전략: 모든 소스를 병렬 호출 → actual 값이 있는 소스 우선 → curated 이벤트에 병합
 // KV 키: di:econ:actuals — 발표된 수치를 영구 저장
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  // 발표 시간대(미국 8:30AM ET = 한국 21:30~22:30)에는 2분 캐시
+
+  // 발표 시간대(미국 8:30AM ET = 한국 21:30~22:30)에는 30초 캐시로 단축
   const hourKST = new Date().getUTCHours() + 9;
   const isAnnouncementWindow = (hourKST >= 21 && hourKST <= 24) || (hourKST >= 0 && hourKST <= 2);
-  const cacheSeconds = isAnnouncementWindow ? 120 : 600;
-  res.setHeader("Cache-Control", `s-maxage=${cacheSeconds}, stale-while-revalidate=${cacheSeconds * 1.5}`);
+  const cacheSeconds = isAnnouncementWindow ? 30 : 600;
+  res.setHeader("Cache-Control", `s-maxage=${cacheSeconds}, stale-while-revalidate=${Math.floor(cacheSeconds * 1.5)}`);
 
   const now = new Date();
-  const from = new Date(now);
-  from.setDate(from.getDate() - 30);
-  const to = new Date(now);
-  to.setDate(to.getDate() + 30);
-
+  const from = new Date(now); from.setDate(from.getDate() - 30);
+  const to   = new Date(now); to.setDate(to.getDate() + 30);
   const fmtDate = (d) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  const todayStr = fmtDate(now);
 
+  // ── 유틸리티 ──
   const majorKeywords = [
-    "CPI", "Consumer Price Index",
-    "Nonfarm Payrolls", "Non-Farm", "NFP",
-    "GDP", "Gross Domestic Product",
-    "PCE", "Personal Consumption",
+    "CPI", "Consumer Price Index", "Nonfarm Payrolls", "Non-Farm", "NFP",
+    "GDP", "Gross Domestic Product", "PCE", "Personal Consumption",
     "FOMC", "Fed Interest Rate", "Federal Funds Rate",
-    "Retail Sales",
-    "Unemployment Rate",
-    "PPI", "Producer Price Index",
-    "ISM Manufacturing", "ISM Services",
-    "Initial Jobless Claims", "Jobless Claims",
-    "Housing Starts", "Building Permits",
-    "Industrial Production",
-    "Consumer Confidence",
-    "Durable Goods",
+    "Retail Sales", "Unemployment Rate", "PPI", "Producer Price Index",
+    "ISM Manufacturing", "ISM Services", "Initial Jobless Claims", "Jobless Claims",
+    "Housing Starts", "Building Permits", "Industrial Production",
+    "Consumer Confidence", "Durable Goods",
   ];
-
-  const isMajorEvent = (eventName) =>
-    majorKeywords.some(kw => (eventName || "").toLowerCase().includes(kw.toLowerCase()));
-
-  const getUnit = (eventName) => {
-    const n = (eventName || "").toLowerCase();
-    if (n.includes("rate") || n.includes("yoy") || n.includes("mom") || n.includes("pce") || n.includes("cpi") || n.includes("ppi") || n.includes("gdp")) return "%";
-    if (n.includes("payrolls") || n.includes("nfp") || n.includes("claims")) return "K";
+  const isMajorEvent = (name) => majorKeywords.some(kw => (name || "").toLowerCase().includes(kw.toLowerCase()));
+  const getUnit = (n) => {
+    const l = (n || "").toLowerCase();
+    if (l.includes("rate") || l.includes("yoy") || l.includes("mom") || l.includes("pce") || l.includes("cpi") || l.includes("ppi") || l.includes("gdp")) return "%";
+    if (l.includes("payrolls") || l.includes("nfp") || l.includes("claims")) return "K";
     return "";
   };
-
-  const getType = (eventName) => {
-    const n = (eventName || "").toLowerCase();
-    if (n.includes("fomc") || n.includes("fed") || n.includes("federal funds")) return "FOMC";
-    if (n.includes("cpi") || n.includes("consumer price")) return "CPI";
-    if (n.includes("nonfarm") || n.includes("non-farm") || n.includes("nfp") || n.includes("payrolls") || n.includes("unemployment") || n.includes("jobless")) return "NFP";
-    if (n.includes("gdp")) return "GDP";
-    if (n.includes("pce")) return "PCE";
+  const getType = (n) => {
+    const l = (n || "").toLowerCase();
+    if (l.includes("fomc") || l.includes("fed") || l.includes("federal funds")) return "FOMC";
+    if (l.includes("cpi") || l.includes("consumer price")) return "CPI";
+    if (l.includes("nonfarm") || l.includes("non-farm") || l.includes("nfp") || l.includes("payrolls") || l.includes("unemployment") || l.includes("jobless")) return "NFP";
+    if (l.includes("gdp")) return "GDP";
+    if (l.includes("pce")) return "PCE";
     return "경제지표";
   };
 
-  // ── KV 연결 (actual 값 캐싱용) ──
+  // ── KV 연결 ──
   let kv = null;
-  let kvActuals = {}; // { "2026-04-03::Nonfarm Payrolls": 228 }
+  let kvActuals = {};
   try {
     const kvModule = await import("@vercel/kv");
     kv = kvModule.kv;
     kvActuals = (await kv.get("di:econ:actuals")) || {};
   } catch { /* KV 없으면 캐싱 없이 진행 */ }
 
-  // ── actual 값을 KV에 저장하는 헬퍼 ──
-  const saveActualsToKV = async (events) => {
-    if (!kv) return;
+  const saveActualsToKV = async (newActuals) => {
+    if (!kv || Object.keys(newActuals).length === 0) return;
     let updated = false;
-    for (const e of events) {
-      if (e.actual != null && e.date) {
-        const key = `${e.date}::${e.event}`;
-        if (kvActuals[key] == null || kvActuals[key] !== e.actual) {
-          kvActuals[key] = e.actual;
-          updated = true;
-        }
+    for (const [key, val] of Object.entries(newActuals)) {
+      if (val != null && kvActuals[key] == null) {
+        kvActuals[key] = val;
+        updated = true;
       }
     }
-    if (updated) {
-      try { await kv.set("di:econ:actuals", kvActuals); } catch {}
+    if (updated) { try { await kv.set("di:econ:actuals", kvActuals); } catch {} }
+  };
+
+  // ══════════════════════════════════════════════════════════════
+  // 모든 소스를 병렬로 호출
+  // ══════════════════════════════════════════════════════════════
+  const [finnhubResult, fmpResult, blsResult, fredResult] = await Promise.allSettled([
+    fetchFinnhub(fmtDate(from), fmtDate(to)),
+    fetchFMP(fmtDate(from), fmtDate(to)),
+    fetchBLSActuals(),
+    fetchFREDActuals(todayStr, getCuratedEvents2026()),
+  ]);
+
+  // ── 소스별 결과 정리 ──
+  const finnhubEvents = finnhubResult.status === "fulfilled" ? finnhubResult.value : [];
+  const fmpEvents     = fmpResult.status === "fulfilled" ? fmpResult.value : [];
+  const blsActuals    = blsResult.status === "fulfilled" ? blsResult.value : {};
+  const fredActuals   = fredResult.status === "fulfilled" ? fredResult.value : {};
+
+  // ── 풀 캘린더 소스 선택 (Finnhub > FMP > Curated) ──
+  let baseEvents;
+  let source;
+  if (finnhubEvents.length > 5) {
+    baseEvents = finnhubEvents;
+    source = "finnhub";
+  } else if (fmpEvents.length > 5) {
+    baseEvents = fmpEvents;
+    source = "fmp";
+  } else {
+    baseEvents = getCuratedEvents2026();
+    source = "curated";
+  }
+
+  // ── 모든 actual 값 통합: BLS → FRED → KV → API 소스 순으로 우선순위 ──
+  const allActuals = { ...kvActuals };
+
+  // FRED actuals 병합
+  for (const [key, val] of Object.entries(fredActuals)) {
+    if (val != null && allActuals[key] == null) allActuals[key] = val;
+  }
+
+  // BLS actuals 병합 (최우선 — 발표 즉시 반영)
+  for (const [key, val] of Object.entries(blsActuals)) {
+    if (val != null) allActuals[key] = val; // BLS는 무조건 덮어쓰기 (가장 정확)
+  }
+
+  // API 소스에서 actual 있는 것도 수집
+  const apiSourceActuals = {};
+  for (const evt of [...finnhubEvents, ...fmpEvents]) {
+    if (evt.actual != null && evt.date && evt.event) {
+      const key = `${evt.date}::${evt.event}`;
+      if (allActuals[key] == null) allActuals[key] = evt.actual;
+      apiSourceActuals[key] = evt.actual;
     }
-  };
-
-  // ── KV에서 actual 값 병합 ──
-  const mergeKVActuals = (events) => {
-    return events.map(e => {
-      if (e.actual == null && e.date) {
-        const key = `${e.date}::${e.event}`;
-        if (kvActuals[key] != null) {
-          return { ...e, actual: kvActuals[key] };
-        }
-      }
-      return e;
-    });
-  };
-
-  // ── 1차: Finnhub 경제 캘린더 ──
-  const finnhubKey = process.env.FINNHUB_API_KEY || "d77tjo9r01qsamsi55ugd77tjo9r01qsamsi55v0";
-  if (finnhubKey && finnhubKey !== "demo") {
-    try {
-      const finnhubUrl = `https://finnhub.io/api/v1/calendar/economic?from=${fmtDate(from)}&to=${fmtDate(to)}&token=${finnhubKey}`;
-      const resp = await fetch(finnhubUrl, { signal: AbortSignal.timeout(8000) });
-
-      if (resp.ok) {
-        const json = await resp.json();
-        const data = json?.economicCalendar || json?.data || [];
-
-        if (Array.isArray(data) && data.length > 5) {
-          const filtered = data
-            .filter(e => (e.country === "US" || e.country === "United States"))
-            .filter(e => isMajorEvent(e.event || e.indicator))
-            .map(e => ({
-              date: e.date || e.time?.split("T")[0],
-              event: e.event || e.indicator,
-              actual: e.actual ?? e.actualValue ?? null,
-              estimate: e.estimate ?? e.forecastValue ?? null,
-              previous: e.previous ?? e.previousValue ?? null,
-              impact: e.impact || "High",
-              country: "US",
-              unit: e.unit || getUnit(e.event || e.indicator),
-              type: getType(e.event || e.indicator),
-            }))
-            .slice(0, 80);
-
-          if (filtered.length > 0) {
-            await saveActualsToKV(filtered);
-            return res.status(200).json({ events: filtered, source: "finnhub", updatedAt: now.toISOString() });
-          }
-        }
-      }
-    } catch (_) { /* finnhub 실패 → 다음 소스 */ }
   }
 
-  // ── 2차: FinancialModelingPrep ──
-  const fmpKey = process.env.FMP_API_KEY;
-  if (fmpKey && fmpKey !== "demo") {
-    try {
-      const fmpUrl = `https://financialmodelingprep.com/api/v3/economic_calendar?from=${fmtDate(from)}&to=${fmtDate(to)}&apikey=${fmpKey}`;
-      const resp = await fetch(fmpUrl, { signal: AbortSignal.timeout(8000) });
+  // ── baseEvents에 actual 값 병합 ──
+  const finalEvents = baseEvents.map(e => {
+    if (e.actual != null) return e;
+    const key = `${e.date}::${e.event}`;
+    if (allActuals[key] != null) {
+      return { ...e, actual: allActuals[key] };
+    }
+    return e;
+  });
 
-      if (resp.ok) {
-        const data = await resp.json();
+  // ── KV에 새로운 actual 저장 ──
+  await saveActualsToKV({ ...apiSourceActuals, ...fredActuals, ...blsActuals });
 
-        if (Array.isArray(data) && data.length > 0) {
-          const filtered = data
-            .filter(e => e.country === "US")
-            .filter(e => isMajorEvent(e.event))
-            .map(e => ({
-              date: e.date,
-              event: e.event,
-              actual: e.actual ?? null,
-              estimate: e.estimate ?? null,
-              previous: e.previous ?? null,
-              impact: e.impact || "Medium",
-              country: "US",
-              unit: e.unit || getUnit(e.event),
-              type: getType(e.event),
-            }))
-            .slice(0, 80);
+  const sourceList = [
+    source,
+    finnhubEvents.length > 0 ? "finnhub" : null,
+    fmpEvents.length > 0 ? "fmp" : null,
+    Object.keys(blsActuals).length > 0 ? "bls" : null,
+    Object.keys(fredActuals).length > 0 ? "fred" : null,
+  ].filter(Boolean);
 
-          if (filtered.length > 0) {
-            await saveActualsToKV(filtered);
-            return res.status(200).json({ events: filtered, source: "fmp", updatedAt: now.toISOString() });
-          }
-        }
-      }
-    } catch (_) { /* FMP 실패 → 다음 */ }
-  }
-
-  // ── 3차: FRED API (실제 발표 수치 보완) ──
-  // FRED에서 최신 actual 값을 가져와 KV에 저장 → curated 이벤트에 병합
-  const fredKey = process.env.FRED_API_KEY;
-  const curated = getCuratedEvents2026();
-
-  if (fredKey && kv) {
-    try {
-      const fredSeries = [
-        { id: "CPIAUCSL", eventMatch: "CPI (YoY)", yoy: true },
-        { id: "CPILFESL", eventMatch: "Core CPI (YoY)", yoy: true },
-        { id: "PAYEMS", eventMatch: "Nonfarm Payrolls", diff: true },
-        { id: "UNRATE", eventMatch: "Unemployment Rate", direct: true },
-        { id: "A191RL1Q225SBEA", eventMatch: "GDP Growth Rate", direct: true },
-        { id: "PCEPI", eventMatch: "PCE Price Index (YoY)", yoy: true },
-        { id: "RSAFS", eventMatch: "Retail Sales (MoM)", mom: true },
-      ];
-
-      let kvUpdated = false;
-      const todayStr = fmtDate(now);
-
-      for (const series of fredSeries) {
-        try {
-          const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${series.id}&sort_order=desc&limit=14&api_key=${fredKey}&file_type=json`;
-          const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
-          if (!resp.ok) continue;
-          const json = await resp.json();
-          const obs = json?.observations?.filter(o => o.value !== ".");
-          if (!obs || obs.length < 2) continue;
-
-          const latest = parseFloat(obs[0].value);
-          const prev = parseFloat(obs[1].value);
-          if (isNaN(latest) || isNaN(prev)) continue;
-
-          // 실제 값 계산
-          let actual;
-          if (series.direct) {
-            actual = latest;
-          } else if (series.diff) {
-            actual = latest - prev; // Payrolls: 단위 K (FRED는 이미 K 단위)
-          } else if (series.yoy) {
-            // YoY: 12개월 전 데이터와 비교
-            const obs12 = obs.length >= 13 ? parseFloat(obs[12].value) : null;
-            if (obs12 && !isNaN(obs12) && obs12 > 0) {
-              actual = ((latest - obs12) / obs12) * 100;
-              actual = Math.round(actual * 10) / 10;
-            } else {
-              actual = latest; // YoY 계산 불가 시 원시값
-            }
-          } else if (series.mom) {
-            actual = prev > 0 ? Math.round(((latest - prev) / prev) * 1000) / 10 : 0;
-          }
-
-          if (actual == null || isNaN(actual)) continue;
-
-          // curated 이벤트에서 actual이 null인 가장 최근 과거 이벤트와 매칭
-          const matchingEvents = curated.filter(e =>
-            e.event === series.eventMatch && e.actual == null && e.date <= todayStr
-          );
-
-          if (matchingEvents.length > 0) {
-            // 가장 최근 이벤트 매칭
-            const target = matchingEvents[matchingEvents.length - 1];
-            const kvKey = `${target.date}::${target.event}`;
-            if (kvActuals[kvKey] == null) {
-              kvActuals[kvKey] = actual;
-              kvUpdated = true;
-            }
-          }
-        } catch { /* 개별 FRED 시리즈 실패 무시 */ }
-      }
-
-      if (kvUpdated) {
-        try { await kv.set("di:econ:actuals", kvActuals); } catch {}
-      }
-    } catch { /* FRED 전체 실패 무시 */ }
-  }
-
-  // ── 4차: 큐레이션 폴백 + KV actual 병합 ──
-  const merged = mergeKVActuals(curated);
-  return res.status(200).json({ events: merged, source: "curated", updatedAt: now.toISOString() });
+  return res.status(200).json({
+    events: finalEvents,
+    source: sourceList.join("+"),
+    updatedAt: now.toISOString(),
+    actualsCount: Object.keys(allActuals).length,
+  });
 }
 
+// ══════════════════════════════════════════════════════════════
+// 데이터 소스: Finnhub
+// ══════════════════════════════════════════════════════════════
+async function fetchFinnhub(from, to) {
+  const key = process.env.FINNHUB_API_KEY;
+  if (!key || key === "demo") return [];
+  try {
+    const url = `https://finnhub.io/api/v1/calendar/economic?from=${from}&to=${to}&token=${key}`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!resp.ok) return [];
+    const json = await resp.json();
+    const data = json?.economicCalendar || json?.data || [];
+    if (!Array.isArray(data) || data.length < 3) return [];
+    return data
+      .filter(e => (e.country === "US" || e.country === "United States"))
+      .filter(e => isMajorEventCheck(e.event || e.indicator))
+      .map(e => ({
+        date: e.date || e.time?.split("T")[0],
+        event: e.event || e.indicator,
+        actual: e.actual ?? e.actualValue ?? null,
+        estimate: e.estimate ?? e.forecastValue ?? null,
+        previous: e.previous ?? e.previousValue ?? null,
+        impact: e.impact || "High",
+        country: "US",
+        unit: e.unit || getUnitHelper(e.event || e.indicator),
+        type: getTypeHelper(e.event || e.indicator),
+      }))
+      .slice(0, 80);
+  } catch { return []; }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 데이터 소스: FinancialModelingPrep
+// ══════════════════════════════════════════════════════════════
+async function fetchFMP(from, to) {
+  const key = process.env.FMP_API_KEY;
+  if (!key || key === "demo") return [];
+  try {
+    const url = `https://financialmodelingprep.com/api/v3/economic_calendar?from=${from}&to=${to}&apikey=${key}`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    if (!Array.isArray(data) || data.length < 1) return [];
+    return data
+      .filter(e => e.country === "US")
+      .filter(e => isMajorEventCheck(e.event))
+      .map(e => ({
+        date: e.date,
+        event: e.event,
+        actual: e.actual ?? null,
+        estimate: e.estimate ?? null,
+        previous: e.previous ?? null,
+        impact: e.impact || "Medium",
+        country: "US",
+        unit: e.unit || getUnitHelper(e.event),
+        type: getTypeHelper(e.event),
+      }))
+      .slice(0, 80);
+  } catch { return []; }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 데이터 소스: BLS (Bureau of Labor Statistics) — 실시간 CPI/고용
+// BLS Public Data API v2: 발표 당일 8:30 AM ET 직후 반영
+// ══════════════════════════════════════════════════════════════
+async function fetchBLSActuals() {
+  const actuals = {};
+  const blsKey = process.env.BLS_API_KEY; // 선택사항: 없으면 v1 (하루 25회 제한)
+
+  // BLS 시리즈: CPI, Core CPI, 실업률, NFP
+  const series = [
+    { id: "CUSR0000SA0",  match: "CPI (YoY)",          calc: "yoy" },      // All items CPI-U
+    { id: "CUSR0000SA0L1E", match: "Core CPI (YoY)",   calc: "yoy" },      // All items less food & energy
+    { id: "LNS14000000",  match: "Unemployment Rate",   calc: "direct" },   // Unemployment rate
+    { id: "CES0000000001", match: "Nonfarm Payrolls",   calc: "diff" },     // Total nonfarm employment (thousands)
+  ];
+
+  try {
+    const body = {
+      seriesid: series.map(s => s.id),
+      startyear: String(new Date().getFullYear() - 1),
+      endyear: String(new Date().getFullYear()),
+      latest: true,
+    };
+
+    const url = blsKey
+      ? "https://api.bls.gov/publicAPI/v2/timeseries/data/"
+      : "https://api.bls.gov/publicAPI/v1/timeseries/data/";
+
+    const headers = { "Content-Type": "application/json" };
+    if (blsKey) body.registrationkey = blsKey;
+
+    const resp = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!resp.ok) return actuals;
+    const json = await resp.json();
+    if (json.status !== "REQUEST_SUCCEEDED") return actuals;
+
+    const curatedEvents = getCuratedEvents2026();
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+
+    for (const seriesData of (json.Results?.series || [])) {
+      const sid = seriesData.seriesID;
+      const config = series.find(s => s.id === sid);
+      if (!config) continue;
+
+      const data = seriesData.data || [];
+      if (data.length < 2) continue;
+
+      // BLS 데이터: 최신 → 오래된 순 정렬됨
+      const latest = parseFloat(data[0]?.value);
+      const prev   = parseFloat(data[1]?.value);
+      if (isNaN(latest) || isNaN(prev)) continue;
+
+      let actual;
+      if (config.calc === "direct") {
+        actual = latest;
+      } else if (config.calc === "diff") {
+        actual = latest - prev; // NFP: 천 명 단위 변화
+      } else if (config.calc === "yoy") {
+        // YoY: 12개월 전 데이터와 비교
+        const prev12 = data.length >= 13 ? parseFloat(data[12]?.value) : null;
+        if (prev12 && !isNaN(prev12) && prev12 > 0) {
+          actual = Math.round(((latest - prev12) / prev12) * 1000) / 10;
+        } else {
+          continue; // YoY 계산 불가
+        }
+      }
+
+      if (actual == null || isNaN(actual)) continue;
+
+      // curated 이벤트에서 actual이 null인 가장 최근 과거 이벤트와 매칭
+      const matching = curatedEvents.filter(e =>
+        e.event === config.match && e.actual == null && e.date <= todayStr
+      );
+      if (matching.length > 0) {
+        const target = matching[matching.length - 1];
+        actuals[`${target.date}::${target.event}`] = actual;
+      }
+    }
+  } catch { /* BLS 실패 무시 */ }
+
+  return actuals;
+}
+
+// ══════════════════════════════════════════════════════════════
+// 데이터 소스: FRED (Federal Reserve) — 추가 actual 보완
+// ══════════════════════════════════════════════════════════════
+async function fetchFREDActuals(todayStr, curated) {
+  const actuals = {};
+  const fredKey = process.env.FRED_API_KEY;
+  if (!fredKey) return actuals;
+
+  const fredSeries = [
+    { id: "CPIAUCSL",         eventMatch: "CPI (YoY)",                   yoy: true },
+    { id: "CPILFESL",         eventMatch: "Core CPI (YoY)",              yoy: true },
+    { id: "PAYEMS",           eventMatch: "Nonfarm Payrolls",            diff: true },
+    { id: "UNRATE",           eventMatch: "Unemployment Rate",           direct: true },
+    { id: "A191RL1Q225SBEA",  eventMatch: "GDP Growth Rate",             direct: true },
+    { id: "PCEPI",            eventMatch: "PCE Price Index (YoY)",       yoy: true },
+    { id: "RSAFS",            eventMatch: "Retail Sales (MoM)",          mom: true },
+  ];
+
+  const fetches = fredSeries.map(async (series) => {
+    try {
+      const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${series.id}&sort_order=desc&limit=14&api_key=${fredKey}&file_type=json`;
+      const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      if (!resp.ok) return;
+      const json = await resp.json();
+      const obs = json?.observations?.filter(o => o.value !== ".");
+      if (!obs || obs.length < 2) return;
+
+      const latest = parseFloat(obs[0].value);
+      const prev   = parseFloat(obs[1].value);
+      if (isNaN(latest) || isNaN(prev)) return;
+
+      let actual;
+      if (series.direct) actual = latest;
+      else if (series.diff) actual = latest - prev;
+      else if (series.yoy) {
+        const obs12 = obs.length >= 13 ? parseFloat(obs[12].value) : null;
+        if (obs12 && !isNaN(obs12) && obs12 > 0) {
+          actual = Math.round(((latest - obs12) / obs12) * 1000) / 10;
+        } else return;
+      } else if (series.mom) {
+        actual = prev > 0 ? Math.round(((latest - prev) / prev) * 1000) / 10 : 0;
+      }
+
+      if (actual == null || isNaN(actual)) return;
+
+      // GDP는 부분 매칭 (Q1 Advance, Q4 Final 등)
+      const matchingEvents = curated.filter(e =>
+        (series.id === "A191RL1Q225SBEA"
+          ? e.event.startsWith("GDP Growth Rate")
+          : e.event === series.eventMatch)
+        && e.actual == null && e.date <= todayStr
+      );
+
+      if (matchingEvents.length > 0) {
+        const target = matchingEvents[matchingEvents.length - 1];
+        actuals[`${target.date}::${target.event}`] = actual;
+      }
+    } catch { /* 개별 시리즈 실패 무시 */ }
+  });
+
+  await Promise.allSettled(fetches);
+  return actuals;
+}
+
+// ══════════════════════════════════════════════════════════════
+// 유틸리티 (모듈 레벨)
+// ══════════════════════════════════════════════════════════════
+const _majorKW = [
+  "CPI", "Consumer Price Index", "Nonfarm Payrolls", "Non-Farm", "NFP",
+  "GDP", "Gross Domestic Product", "PCE", "Personal Consumption",
+  "FOMC", "Fed Interest Rate", "Federal Funds Rate",
+  "Retail Sales", "Unemployment Rate", "PPI", "Producer Price Index",
+  "ISM Manufacturing", "ISM Services", "Initial Jobless Claims", "Jobless Claims",
+  "Housing Starts", "Building Permits", "Industrial Production",
+  "Consumer Confidence", "Durable Goods",
+];
+
+function isMajorEventCheck(name) {
+  return _majorKW.some(kw => (name || "").toLowerCase().includes(kw.toLowerCase()));
+}
+
+function getUnitHelper(n) {
+  const l = (n || "").toLowerCase();
+  if (l.includes("rate") || l.includes("yoy") || l.includes("mom") || l.includes("pce") || l.includes("cpi") || l.includes("ppi") || l.includes("gdp")) return "%";
+  if (l.includes("payrolls") || l.includes("nfp") || l.includes("claims")) return "K";
+  return "";
+}
+
+function getTypeHelper(n) {
+  const l = (n || "").toLowerCase();
+  if (l.includes("fomc") || l.includes("fed") || l.includes("federal funds")) return "FOMC";
+  if (l.includes("cpi") || l.includes("consumer price")) return "CPI";
+  if (l.includes("nonfarm") || l.includes("non-farm") || l.includes("nfp") || l.includes("payrolls") || l.includes("unemployment") || l.includes("jobless")) return "NFP";
+  if (l.includes("gdp")) return "GDP";
+  if (l.includes("pce")) return "PCE";
+  return "경제지표";
+}
+
+// ══════════════════════════════════════════════════════════════
+// 큐레이션 이벤트 (폴백 + 이벤트 일정 기준)
+// ══════════════════════════════════════════════════════════════
 function getCuratedEvents2026() {
   return [
     // ── January 2026 ──

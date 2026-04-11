@@ -5542,10 +5542,16 @@ function AppInner() {
     };
   }, [tab]);
 
-  // 경제 캘린더 탭 진입 시에도 데이터 로드
+  // 경제 캘린더 탭 진입 시 즉시 로드 + 발표 시간대 자동 갱신
   useEffect(() => {
     if (tab !== "econ-calendar") return;
-    if (econEvents.length === 0) fetchEconCalendar();
+    fetchEconCalendar();
+    // 발표 시간대(KST 21:00~02:00)에는 30초 간격, 그 외 5분 간격 자동 갱신
+    const hourKST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" })).getHours();
+    const isAnnouncementWindow = hourKST >= 21 || hourKST <= 2;
+    const interval = isAnnouncementWindow ? 30000 : 300000;
+    const iv = setInterval(fetchEconCalendar, interval);
+    return () => clearInterval(iv);
   }, [tab]);
 
   // ── 전략 매매 알림 생성 함수 ──────────────────────────────────
