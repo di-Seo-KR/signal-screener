@@ -1139,7 +1139,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
       {isMobile ? (
         <ActiveBotCarousel activeBots={activeBots} allBotPerf={allBotPerf} onSelectBot={onSelectBot} onStopBot={onStopBot} onAddFund={onAddFund} theme={theme} cardStyle={cardStyle} />
       ) : null}
-      <div className={isMobile ? "hidden" : "grid gap-3"} style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(420px, 100%), 1fr))" }}>
+      <div className={isMobile ? "hidden" : "grid gap-4"} style={{ gridTemplateColumns: activeBots.filter(ab => ab.status !== "paused").length === 1 ? "1fr" : "repeat(auto-fit, minmax(min(420px, 100%), 1fr))" }}>
         {activeBots.filter(ab => ab.status !== "paused").map(ab => {
           const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
           const elapsed = Date.now() - (ab.startedAt || Date.now());
@@ -1161,7 +1161,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
           const botIsPositive = roiPct >= 0;
 
           return (
-            <div key={ab.botId} className="flex flex-col gap-2.5 cursor-pointer" style={{ ...cardStyle, maxWidth: "700px" }} onClick={() => onSelectBot(bot)}>
+            <div key={ab.botId} className="flex flex-col gap-2.5 cursor-pointer" style={cardStyle} onClick={() => onSelectBot(bot)}>
               {/* 봇 헤더 */}
               <div className="flex items-center gap-2.5">
                 <span className="text-[22px] w-9 h-9 flex items-center justify-center flex-shrink-0 rounded-[10px]" style={{
