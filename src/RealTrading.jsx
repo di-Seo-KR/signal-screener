@@ -124,20 +124,25 @@ function RealTradingInner() {
     } finally { setBusy(false); }
   };
 
-  const runDry = async (probe = false) => {
+  const runDry = async () => {
     if (!userId) return;
     setBusy(true);
     try {
-      const r = await jpost("/api/real-trading/engine", { userId, dryRun: true, probe });
+      // ★ 모의실행은 항상 shadow+probe — shadow-ledger 에 기록 + 시그널 없으면 합성 주입
+      const r = await jpost("/api/real-trading/engine", { userId, dryRun: true, shadow: true, probe: true });
       if (r?.ran) {
+        const sym = r.signal?.symbol || "";
+        const side = r.signal?.side || "";
+        const shadow = r.shadow ? " → Shadow 기록됨" : "";
         toast.push(
-          `${r.signal?.symbol || ""} ${r.signal?.side || ""} · plan qty ${fmtQty(r.plan?.qty)} @ ${r.plan?.leverage}×${r.plan?.bumpedToMin ? " · ⚠ bumped" : ""}`,
+          `${sym} ${side} · qty ${fmtQty(r.plan?.qty)} @ ${r.plan?.leverage}×${r.plan?.bumpedToMin ? " · ⚠ bumped" : ""}${shadow}`,
           { tone: "green", title: "✓ 모의 실행 완료", duration: 5000 }
         );
       } else {
         const msg = r?.reason || r?.error || "no action";
+        const tried = r?.tried?.length ? ` (${r.tried.length}개 시그널 시도)` : "";
         const tail = r?.steps?.length ? `\n${r.steps.slice(-3).join(" · ")}` : "";
-        toast.push(msg + tail, { tone: "yellow", title: "모의 실행 결과", duration: 6000 });
+        toast.push(msg + tried + tail, { tone: "yellow", title: "모의 실행 결과", duration: 6000 });
         console.warn("[dry-run diag]", r);
       }
       await refresh();
@@ -381,10 +386,7 @@ function RealTradingInner() {
 
         <Button variant="ghost" size="sm" disabled={busy}
           leftIcon={<Flask size={14} />}
-          onClick={() => runDry(false)}>모의실행</Button>
-        <Button variant="subtle" size="sm" disabled={busy}
-          leftIcon={<Zap size={14} />}
-          onClick={() => runDry(true)}>probe</Button>
+          onClick={() => runDry()}>모의실행</Button>
 
         <div style={{ width: 1, background: "var(--z-border)", margin: "0 4px" }} />
 
@@ -450,7 +452,7 @@ function RealTradingInner() {
   const simpleGuide = (
     <Card title="6단계 안전 활성화 가이드" subtitle="순서대로 따라가면 안전하게 실거래 시작할 수 있어요" icon={<Target size={16} />}>
       {[
-        { n: 1, title: "모의실행 + probe", desc: "전체 파이프라인(시그널 → 플랜 → 브래킷 주문)이 에러 없이 돌아가는지 확인합니다.", done: engineLog.some(e => e.dryRun) },
+        { n: 1, title: "모의실행", desc: "Shadow 모드로 전체 파이프라인을 점검합니다. 시그널이 없으면 자동 합성 시그널로 테스트합니다.", done: engineLog.some(e => e.shadow || e.dryRun) },
         { n: 2, title: "Shadow 모드 시작", desc: "실거래 없이 2~4주 가상 트레이드를 축적하고 승률·netPnL·평균 RR 을 관찰합니다.", done: shadowOn },
         { n: 3, title: "Shadow 결과 검증", desc: "양의 netPnL + 평균 RR ≥ 1.5 를 확인 후 다음 단계로 진행.", done: (shadow.summary?.trades || 0) >= 10 && (shadow.summary?.netPnL || 0) > 0 },
         { n: 4, title: "Phase 1 등록", desc: "실거래 엔진 순회 대상에 이 계정을 등록합니다. Killswitch 는 여전히 ON 상태.", done: phase1On },
@@ -736,7 +738,7 @@ function RealTradingInner() {
         <EmptyState
           icon={<Ghost size={28} />}
           title="Shadow 기록 없음"
-          description={`"Shadow 시작" 버튼으로 활성화하거나, "모의실행 + probe" 로 테스트 진입을 생성해 보세요.`}
+          description={`"모의실행" 버튼을 누르거나 Shadow 모드를 시작하면 가상 매매가 기록됩니다. 5분마다 자동 수집도 됩니다.`}
         />
       )}
       {shadow.recent?.length > 0 && (
