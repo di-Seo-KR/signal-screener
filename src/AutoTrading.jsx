@@ -100,13 +100,13 @@ function MiniEquityChart({ data, color, width = 280, height = 80, theme }) {
   const isPositive = lastVal >= data[0];
 
   return (
-    <div style={{ position: "relative" }}>
-      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: "4px" }}>
-        <span style={{ fontSize: "15px", fontWeight: 800, color: isPositive ? c.green : c.red }}>
+    <div className="relative">
+      <div className="flex justify-end items-center mb-1">
+        <span className="text-[15px] font-extrabold" style={{ color: isPositive ? c.green : c.red }}>
           {isPositive ? "+" : ""}{totalReturn}%
         </span>
       </div>
-      <svg width="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" style={{ borderRadius: "6px", overflow: "hidden" }}>
+      <svg width="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="rounded overflow-hidden">
         <defs>
           <linearGradient id={`eq-grad-${color.replace("#","")}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity="0.25" />
@@ -368,12 +368,12 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
   };
 
   return (
-    <div style={{ marginBottom: "60px" }}>
-      <h2 style={{ color: c.text1, fontSize: "26px", fontWeight: "600", marginBottom: "4px" }}>
+    <div className="mb-60">
+      <h2 className="text-2xl font-semibold mb-1" style={{ color: c.text1 }}>
         {title}
       </h2>
-      {subtitle && <p style={{ margin: "0 0 20px", color: c.text3, fontSize: "15px" }}>{subtitle}</p>}
-      {!subtitle && <div style={{ marginBottom: "20px" }} />}
+      {subtitle && <p className="text-[15px] mb-5" style={{ margin: "0 0 20px", color: c.text3 }}>{subtitle}</p>}
+      {!subtitle && <div className="mb-5" />}
 
       {/* 모바일: 수평 스와이프 캐러셀 */}
       {isMobile ? (
@@ -381,25 +381,25 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
           <div
             ref={scrollRef}
             onScroll={handleScroll}
+            className="flex gap-3 overflow-x-auto pb-2"
             style={{
-              display: "flex", gap: "12px", overflowX: "auto", scrollSnapType: "x mandatory",
-              WebkitOverflowScrolling: "touch", paddingBottom: "8px",
+              scrollSnapType: "x mandatory",
+              WebkitOverflowScrolling: "touch",
               scrollbarWidth: "none", msOverflowStyle: "none",
             }}
           >
             <style>{`.bot-carousel::-webkit-scrollbar { display: none; }`}</style>
             {bots.map((bot) => (
-              <div key={bot.id} style={{ minWidth: "min(280px, 85vw)", maxWidth: "300px", scrollSnapAlign: "start", flex: "0 0 auto" }}>
+              <div key={bot.id} className="flex-shrink-0" style={{ minWidth: "min(280px, 85vw)", maxWidth: "300px", scrollSnapAlign: "start" }}>
                 <BotCard bot={bot} onActivate={onActivate} theme={theme} />
               </div>
             ))}
           </div>
           {/* 페이지 인디케이터 */}
-          <div style={{ display: "flex", justifyContent: "center", gap: "6px", marginTop: "12px" }}>
+          <div className="flex justify-center gap-1.5 mt-3">
             {bots.map((_, i) => (
-              <div key={i} style={{
+              <div key={i} className="rounded-full transition-all duration-300" style={{
                 width: scrollIdx === i ? "16px" : "6px", height: "6px",
-                borderRadius: "3px", transition: "all 0.3s",
                 background: scrollIdx === i ? c.blue : `${c.text3}40`,
               }} />
             ))}
@@ -407,10 +407,8 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
         </>
       ) : (
         /* PC: 기존 그리드 */
-        <div style={{
-          display: "grid",
+        <div className="grid gap-6" style={{
           gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-          gap: "24px",
         }}>
           {bots.map((bot) => (
             <BotCard key={bot.id} bot={bot} onActivate={onActivate} theme={theme} />
@@ -419,10 +417,7 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
       )}
 
       {description && (
-        <div style={{
-          marginTop: "24px", backgroundColor: c.card2, border: `1px solid ${c.border}`,
-          borderRadius: "8px", padding: "16px", color: c.text2, fontSize: "15px", lineHeight: "1.6",
-        }}>
+        <div className="mt-6 rounded-lg p-4 text-[15px] leading-relaxed" style={{ backgroundColor: c.card2, border: `1px solid ${c.border}`, color: c.text2 }}>
           <strong style={{ color: c.text1 }}>작동 방식:</strong> {description}
         </div>
       )}
@@ -437,16 +432,10 @@ function BotCard({ bot, onActivate, theme }) {
 
   return (
     <div
+      className="flex flex-col gap-4 p-6 rounded-xl cursor-pointer transition-all duration-300"
       style={{
         backgroundColor: c.card,
         border: `1px solid ${c.border}`,
-        borderRadius: "12px",
-        padding: "24px",
-        cursor: "pointer",
-        transition: "all 0.3s ease",
-        display: "flex",
-        flexDirection: "column",
-        gap: "16px",
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = c.blue;
@@ -458,51 +447,45 @@ function BotCard({ bot, onActivate, theme }) {
       }}
     >
       {/* Header with icon and name */}
-      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-        <span style={{ fontSize: "28px" }}>{bot.icon}</span>
-        <div style={{ flex: 1 }}>
-          <h3 style={{ margin: "0 0 4px 0", color: c.text1, fontSize: "18px", fontWeight: "600" }}>
+      <div className="flex items-center gap-3">
+        <span className="text-[28px]">{bot.icon}</span>
+        <div className="flex-1">
+          <h3 className="m-0 mb-1 text-lg font-semibold" style={{ color: c.text1 }}>
             {bot.name}
           </h3>
         </div>
       </div>
 
       {/* Risk badge and return */}
-      <div style={{ display: "flex", gap: "8px", justifyContent: "space-between" }}>
+      <div className="flex gap-2 justify-between">
         <div
+          className="px-3 py-1 rounded-full text-sm font-semibold opacity-80"
           style={{
             backgroundColor: getRiskColor(bot.riskColor, theme),
             color: bot.riskColor === "red" ? "#fff" : "#000",
-            padding: "4px 12px",
-            borderRadius: "20px",
-            fontSize: "14px",
-            fontWeight: "600",
-            opacity: 0.8,
           }}
         >
           위험도: {bot.risk}
         </div>
-        <div style={{ color: c.green, fontSize: "16px", fontWeight: "600" }}>
+        <div className="text-base font-semibold" style={{ color: c.green }}>
           예상수익: {bot.expectedReturn}
         </div>
       </div>
 
       {/* Description */}
-      <p style={{ margin: "0", color: c.text2, fontSize: "15px", lineHeight: "1.5" }}>
+      <p className="m-0 text-[15px] leading-relaxed" style={{ color: c.text2 }}>
         {bot.description}
       </p>
 
       {/* Tags */}
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+      <div className="flex gap-2 flex-wrap">
         {bot.tags.map((tag) => (
           <span
             key={tag}
+            className="px-2.5 py-1 rounded-full text-sm"
             style={{
               backgroundColor: c.card2,
               color: c.text2,
-              padding: "4px 10px",
-              borderRadius: "16px",
-              fontSize: "14px",
               border: `1px solid ${c.border}`,
             }}
           >
@@ -513,37 +496,29 @@ function BotCard({ bot, onActivate, theme }) {
 
       {/* Stats */}
       <div
+        className="grid grid-cols-3 gap-2 p-3 rounded-lg text-sm text-center"
         style={{
           backgroundColor: c.card2,
-          padding: "12px",
-          borderRadius: "8px",
-          fontSize: "14px",
           color: c.text2,
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr 1fr",
-          gap: "8px",
-          textAlign: "center",
         }}
       >
         <div>
-          <div style={{ color: c.text3, fontSize: "14px" }}>승률</div>
-          <div style={{ color: c.green, fontWeight: "600" }}>{bot.stats.winRate}</div>
+          <div className="text-sm" style={{ color: c.text3 }}>승률</div>
+          <div className="font-semibold" style={{ color: c.green }}>{bot.stats.winRate}</div>
         </div>
         <div>
-          <div style={{ color: c.text3, fontSize: "14px" }}>샤프비율</div>
-          <div style={{ color: c.blue, fontWeight: "600" }}>{bot.stats.sharpeRatio}</div>
+          <div className="text-sm" style={{ color: c.text3 }}>샤프비율</div>
+          <div className="font-semibold" style={{ color: c.blue }}>{bot.stats.sharpeRatio}</div>
         </div>
         <div>
-          <div style={{ color: c.text3, fontSize: "14px" }}>최대낙폭</div>
-          <div style={{ color: c.red, fontWeight: "600" }}>{bot.stats.mdd}</div>
+          <div className="text-sm" style={{ color: c.text3 }}>최대낙폭</div>
+          <div className="font-semibold" style={{ color: c.red }}>{bot.stats.mdd}</div>
         </div>
       </div>
 
       {/* Equity Curve Chart */}
-      <div style={{
+      <div className="p-3 rounded-lg" style={{
         backgroundColor: c.card2,
-        padding: "12px 14px",
-        borderRadius: "8px",
         border: `1px solid ${c.border}60`,
       }}>
         <MiniEquityChart data={equityCurve} color={chartColor} theme={theme} />
@@ -552,17 +527,10 @@ function BotCard({ bot, onActivate, theme }) {
       {/* Action button */}
       <button
         onClick={() => onActivate(bot)}
+        className="w-full py-3 px-4 rounded-lg text-base font-semibold text-white cursor-pointer transition-all duration-200"
         style={{
           backgroundColor: c.blue,
-          color: "#fff",
           border: "none",
-          borderRadius: "8px",
-          padding: "12px 16px",
-          fontSize: "16px",
-          fontWeight: "600",
-          cursor: "pointer",
-          transition: "all 0.2s ease",
-          width: "100%",
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.opacity = "0.9";
@@ -641,38 +609,37 @@ function BotRecommender({ onActivate, theme, isMobile }) {
 
   if (result) {
     return (
-      <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px", padding: "32px", marginBottom: "40px" }}>
-        <div style={{ textAlign: "center", marginBottom: "24px" }}>
-          <div style={{ fontSize: "28px", marginBottom: "8px" }}>🎯</div>
-          <h3 style={{ margin: "0 0 8px", color: c.text1, fontSize: "18px" }}>추천 봇</h3>
-          <p style={{ margin: 0, color: c.text3, fontSize: "15px" }}>투자 성향에 맞는 봇을 찾았습니다</p>
+      <div className="rounded-2xl p-8 mb-10" style={{ background: c.card, border: `1px solid ${c.border}` }}>
+        <div className="text-center mb-6">
+          <div className="text-[28px] mb-2">🎯</div>
+          <h3 className="m-0 mb-2 text-lg" style={{ color: c.text1 }}>추천 봇</h3>
+          <p className="m-0 text-[15px]" style={{ color: c.text3 }}>투자 성향에 맞는 봇을 찾았습니다</p>
         </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "16px" }}>
+        <div className="flex flex-col gap-3 mb-4">
           {result.map((bot, i) => (
-            <div key={bot.id} onClick={() => onActivate(bot)} style={{
-              display: "flex", alignItems: "center", gap: "12px", padding: "16px", borderRadius: "12px",
-              background: i === 0 ? `${c.blue}10` : c.card2, border: `1px solid ${i === 0 ? c.blue : c.border}`,
-              cursor: "pointer", transition: "all 0.2s",
+            <div key={bot.id} onClick={() => onActivate(bot)} className="flex items-center gap-3 p-4 rounded-xl cursor-pointer transition-all duration-200" style={{
+              background: i === 0 ? `${c.blue}10` : c.card2,
+              border: `1px solid ${i === 0 ? c.blue : c.border}`,
             }}>
-              <span style={{ fontSize: "28px" }}>{bot.icon}</span>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ fontWeight: 700, fontSize: "16px", color: c.text1 }}>{bot.name}</span>
-                  {i === 0 && <span style={{ fontSize: "13px", padding: "2px 8px", borderRadius: "8px", background: `${c.green}20`, color: c.green, fontWeight: 700 }}>BEST</span>}
-                  <span style={{ fontSize: "13px", padding: "2px 8px", borderRadius: "8px", background: `${getRiskColor(bot.riskColor, theme)}20`, color: getRiskColor(bot.riskColor, theme) }}>{bot.risk}</span>
+              <span className="text-[28px]">{bot.icon}</span>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-base" style={{ color: c.text1 }}>{bot.name}</span>
+                  {i === 0 && <span className="text-xs py-0.5 px-2 rounded-lg font-bold" style={{ background: `${c.green}20`, color: c.green }}>BEST</span>}
+                  <span className="text-xs py-0.5 px-2 rounded-lg" style={{ background: `${getRiskColor(bot.riskColor, theme)}20`, color: getRiskColor(bot.riskColor, theme) }}>{bot.risk}</span>
                 </div>
-                <div style={{ fontSize: "14px", color: c.text3, marginTop: "2px" }}>{bot.description}</div>
+                <div className="text-sm mt-0.5" style={{ color: c.text3 }}>{bot.description}</div>
               </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "14px", color: c.green, fontWeight: 600 }}>{bot.expectedReturn}</div>
-                <div style={{ fontSize: "13px", color: c.text3 }}>예상수익</div>
+              <div className="text-right">
+                <div className="text-sm font-semibold" style={{ color: c.green }}>{bot.expectedReturn}</div>
+                <div className="text-xs" style={{ color: c.text3 }}>예상수익</div>
               </div>
             </div>
           ))}
         </div>
-        <button onClick={() => { setResult(null); setStep(0); setAnswers({}); }} style={{
-          width: "100%", padding: "10px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
-          background: "transparent", color: c.text3, border: `1px solid ${c.border}`, cursor: "pointer",
+        <button onClick={() => { setResult(null); setStep(0); setAnswers({}); }} className="w-full py-2.5 rounded-lg text-sm font-semibold bg-transparent cursor-pointer" style={{
+          color: c.text3,
+          border: `1px solid ${c.border}`,
         }}>다시 선택하기</button>
       </div>
     );
@@ -680,37 +647,34 @@ function BotRecommender({ onActivate, theme, isMobile }) {
 
   const q = questions[step];
   return (
-    <div style={{ background: c.card, border: `1px solid ${c.border}`, borderRadius: "16px", padding: "32px", marginBottom: "40px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-        <h3 style={{ margin: 0, color: c.text1, fontSize: "18px" }}>🤖 나에게 맞는 봇 찾기</h3>
-        <span style={{ fontSize: "14px", color: c.text3 }}>{step + 1} / {questions.length}</span>
+    <div className="rounded-2xl p-8 mb-10" style={{ background: c.card, border: `1px solid ${c.border}` }}>
+      <div className="flex justify-between items-center mb-5">
+        <h3 className="m-0 text-lg" style={{ color: c.text1 }}>🤖 나에게 맞는 봇 찾기</h3>
+        <span className="text-sm" style={{ color: c.text3 }}>{step + 1} / {questions.length}</span>
       </div>
-      <div style={{ display: "flex", gap: "4px", marginBottom: "20px" }}>
+      <div className="flex gap-1 mb-5">
         {questions.map((_, i) => (
-          <div key={i} style={{ flex: 1, height: "3px", borderRadius: "2px", background: i <= step ? c.blue : c.border }} />
+          <div key={i} className="flex-1 h-0.5 rounded-full" style={{ background: i <= step ? c.blue : c.border }} />
         ))}
       </div>
-      <p style={{ margin: "0 0 16px", color: c.text2, fontSize: "17px", fontWeight: 600 }}>{q.q}</p>
-      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+      <p className="mb-4 text-[17px] font-semibold" style={{ margin: "0 0 16px", color: c.text2 }}>{q.q}</p>
+      <div className="flex flex-col gap-2">
         {q.options.map(opt => (
-          <button key={opt.value} onClick={() => selectAnswer(q.key, opt.value)} style={{
-            display: "flex", alignItems: "center", gap: "12px", padding: "14px 16px", borderRadius: "12px",
+          <button key={opt.value} onClick={() => selectAnswer(q.key, opt.value)} className="flex items-center gap-3 p-3.5 px-4 rounded-xl cursor-pointer text-left transition-all duration-200" style={{
             background: answers[q.key] === opt.value ? `${c.blue}10` : "transparent",
             border: `1px solid ${answers[q.key] === opt.value ? c.blue : c.border}`,
-            cursor: "pointer", textAlign: "left", transition: "all 0.2s",
           }}>
-            <span style={{ fontSize: "20px" }}>{opt.label.split(" ")[0]}</span>
+            <span className="text-[20px]">{opt.label.split(" ")[0]}</span>
             <div>
-              <div style={{ fontWeight: 600, fontSize: "15px", color: c.text1 }}>{opt.label.split(" ").slice(1).join(" ")}</div>
-              <div style={{ fontSize: "14px", color: c.text3 }}>{opt.desc}</div>
+              <div className="font-semibold text-[15px]" style={{ color: c.text1 }}>{opt.label.split(" ").slice(1).join(" ")}</div>
+              <div className="text-sm" style={{ color: c.text3 }}>{opt.desc}</div>
             </div>
           </button>
         ))}
       </div>
       {step > 0 && (
-        <button onClick={() => setStep(step - 1)} style={{
-          marginTop: "12px", padding: "8px", fontSize: "14px", color: c.text3, background: "transparent",
-          border: "none", cursor: "pointer",
+        <button onClick={() => setStep(step - 1)} className="mt-3 py-2 text-sm bg-transparent border-none cursor-pointer" style={{
+          color: c.text3,
         }}>← 이전</button>
       )}
     </div>
@@ -721,27 +685,26 @@ function BotCatalog({ onActivate, theme, isMobile }) {
   const c = colors[theme];
 
   return (
-    <div style={{ paddingBottom: "40px" }}>
+    <div className="pb-10">
       {/* Hero Section */}
       <div
+        className="pb-10 mb-10 text-center"
         style={{
           background: `linear-gradient(135deg, ${c.blue}15 0%, ${c.purple}10 100%)`,
           borderBottom: `1px solid ${c.border}`,
           padding: "60px 40px",
-          marginBottom: "40px",
-          textAlign: "center",
         }}
       >
-        <h1 style={{ margin: "0 0 16px 0", color: c.text1, fontSize: "40px", fontWeight: "700" }}>
+        <h1 className="mb-4 text-5xl font-bold" style={{ margin: "0 0 16px 0", color: c.text1 }}>
           AI 퀀트 전략
         </h1>
-        <p style={{ margin: "0", color: c.text2, fontSize: "20px", maxWidth: "600px", marginLeft: "auto", marginRight: "auto" }}>
+        <p className="text-xl mx-auto" style={{ margin: "0", color: c.text2, maxWidth: "600px" }}>
           AI 기반 퀀트 봇이 24/7 시장을 분석하고 최적의 매매 시그널을 생성합니다
         </p>
       </div>
 
       {/* 봇 추천 플로우 */}
-      <div style={{ maxWidth: "700px", margin: "0 auto", padding: "0 40px" }}>
+      <div className="max-w-xl mx-auto px-10">
         <BotRecommender onActivate={onActivate} theme={theme} isMobile={isMobile} />
       </div>
 
@@ -851,10 +814,10 @@ function ActiveBotCarousel({ activeBots, allBotPerf, onSelectBot, onStopBot, onA
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="bot-carousel"
+        className="bot-carousel flex gap-3 overflow-x-auto pb-2"
         style={{
-          display: "flex", gap: "12px", overflowX: "auto", scrollSnapType: "x mandatory",
-          WebkitOverflowScrolling: "touch", paddingBottom: "8px",
+          scrollSnapType: "x mandatory",
+          WebkitOverflowScrolling: "touch",
           scrollbarWidth: "none", msOverflowStyle: "none",
         }}
       >
@@ -879,42 +842,38 @@ function ActiveBotCarousel({ activeBots, allBotPerf, onSelectBot, onStopBot, onA
           const botIsPositive = roiPct >= 0;
 
           return (
-            <div key={ab.botId} style={{
-              ...cardStyle, minWidth: "min(300px, 85vw)", maxWidth: "320px", scrollSnapAlign: "start", flex: "0 0 auto",
-              display: "flex", flexDirection: "column", gap: "10px", cursor: "pointer",
+            <div key={ab.botId} className="flex-shrink-0 flex flex-col gap-2.5 cursor-pointer" style={{
+              ...cardStyle, minWidth: "min(300px, 85vw)", maxWidth: "320px", scrollSnapAlign: "start",
             }} onClick={() => onSelectBot(bot)}>
               {/* 봇 헤더 */}
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{
-                  fontSize: "22px", width: "36px", height: "36px",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  background: `${c.blue}10`, borderRadius: "10px", flexShrink: 0,
+              <div className="flex items-center gap-2.5">
+                <span className="text-[22px] w-9 h-9 flex items-center justify-center flex-shrink-0 rounded-[10px]" style={{
+                  background: `${c.blue}10`,
                 }}>{bot.icon}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ fontWeight: 700, fontSize: "15px", color: c.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bot.name}</span>
-                    <span style={{
-                      padding: "1px 6px", borderRadius: "4px", fontSize: "11px", fontWeight: 600,
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-[15px] overflow-hidden text-ellipsis whitespace-nowrap" style={{ color: c.text1 }}>{bot.name}</span>
+                    <span className="px-1.5 py-0.5 rounded text-xs font-semibold flex-shrink-0" style={{
                       background: `${getRiskColor(bot.riskColor, theme)}15`,
-                      color: getRiskColor(bot.riskColor, theme), flexShrink: 0,
+                      color: getRiskColor(bot.riskColor, theme),
                     }}>{bot.risk}</span>
                   </div>
-                  <div style={{ fontSize: "12px", color: c.text3, marginTop: "1px" }}>
+                  <div className="text-xs mt-0.5" style={{ color: c.text3 }}>
                     {days > 0 ? `${days}일 ` : ""}{hours}시간 · {isStock ? "주식" : "크립토"} · {kvTrades}회
                   </div>
                 </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: "17px", fontWeight: 800, color: botIsPositive ? c.green : c.red }}>
+                <div className="text-right flex-shrink-0">
+                  <div className="text-[17px] font-extrabold" style={{ color: botIsPositive ? c.green : c.red }}>
                     {roiPct >= 0 ? "+" : ""}{roiPct.toFixed(2)}%
                   </div>
-                  <div style={{ fontSize: "12px", color: totalPL >= 0 ? c.green : c.red, fontWeight: 600 }}>
+                  <div className="text-xs font-semibold" style={{ color: totalPL >= 0 ? c.green : c.red }}>
                     {totalPL >= 0 ? "+" : ""}${totalPL.toFixed(2)}
                   </div>
                 </div>
               </div>
 
               {/* 미니 ROI 차트 */}
-              <div style={{ height: "50px" }}>
+              <div className="h-[50px]">
                 {pnlData.length >= 2 ? (() => {
                   const w = 300, h = 46;
                   const min = Math.min(...pnlData) * 0.998;
@@ -927,47 +886,49 @@ function ActiveBotCarousel({ activeBots, allBotPerf, onSelectBot, onStopBot, onA
                   const clr = botIsPositive ? c.green : c.red;
                   const gradId = `mc-${ab.botId.replace(/[^a-z0-9]/gi, "")}`;
                   return (
-                    <svg width="100%" height="46" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" style={{ borderRadius: "6px", display: "block" }}>
+                    <svg width="100%" height="46" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" className="rounded block">
                       <defs><linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={clr} stopOpacity="0.18" /><stop offset="100%" stopColor={clr} stopOpacity="0.01" /></linearGradient></defs>
                       <path d={areaPath} fill={`url(#${gradId})`} />
                       <path d={linePath} fill="none" stroke={clr} strokeWidth="1.5" strokeLinecap="round" />
                     </svg>
                   );
                 })() : (
-                  <div style={{ height: "46px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px", background: `${c.text3}06` }}>
-                    <span style={{ fontSize: "12px", color: c.text3 }}>데이터 수집 중...</span>
+                  <div className="h-[46px] flex items-center justify-center rounded" style={{ background: `${c.text3}06` }}>
+                    <span className="text-xs" style={{ color: c.text3 }}>데이터 수집 중...</span>
                   </div>
                 )}
               </div>
 
               {/* 미니 지표 */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "4px" }}>
+              <div className="grid grid-cols-4 gap-1">
                 {[
                   { label: "투입", value: `$${allocation >= 1000 ? (allocation/1000).toFixed(1)+"k" : allocation.toLocaleString()}` },
                   { label: "MDD", value: kvMDD > 0 ? `${kvMDD.toFixed(1)}%` : "--" },
                   { label: "승률", value: kvTrades > 0 ? `${(kvWinCount/kvTrades*100).toFixed(0)}%` : "--" },
                   { label: "승/패", value: `${kvWinCount}/${kvTrades - kvWinCount}` },
                 ].map((m, i) => (
-                  <div key={i} style={{ padding: "4px 4px", borderRadius: "5px", background: c.card2, textAlign: "center" }}>
-                    <div style={{ fontSize: "10px", color: c.text3 }}>{m.label}</div>
-                    <div style={{ fontSize: "13px", fontWeight: 700, color: c.text1 }}>{m.value}</div>
+                  <div key={i} className="p-1 rounded text-center" style={{ background: c.card2 }}>
+                    <div className="text-[10px]" style={{ color: c.text3 }}>{m.label}</div>
+                    <div className="text-sm font-bold" style={{ color: c.text1 }}>{m.value}</div>
                   </div>
                 ))}
               </div>
 
               {/* 액션 버튼 */}
-              <div style={{ display: "flex", gap: "6px" }}>
-                <button onClick={(e) => { e.stopPropagation(); onSelectBot(bot); }} style={{
-                  flex: 2, padding: "7px", borderRadius: "7px", fontSize: "13px", fontWeight: 700,
-                  background: c.blue, color: "#fff", border: "none", cursor: "pointer",
+              <div className="flex gap-1.5">
+                <button onClick={(e) => { e.stopPropagation(); onSelectBot(bot); }} className="flex-grow px-1.75 py-1.75 rounded text-xs font-bold text-white border-none cursor-pointer" style={{
+                  flexGrow: 2,
+                  background: c.blue,
                 }}>상세 보기</button>
-                <button onClick={(e) => { e.stopPropagation(); onAddFund(ab.botId); }} style={{
-                  flex: 1, padding: "7px", borderRadius: "7px", fontSize: "13px", fontWeight: 600,
-                  background: `${c.green}12`, color: c.green, border: `1px solid ${c.green}30`, cursor: "pointer",
+                <button onClick={(e) => { e.stopPropagation(); onAddFund(ab.botId); }} className="flex-1 px-1.75 py-1.75 rounded text-xs font-semibold border cursor-pointer" style={{
+                  background: `${c.green}12`,
+                  color: c.green,
+                  border: `1px solid ${c.green}30`,
                 }}>+ 추가</button>
-                <button onClick={(e) => { e.stopPropagation(); onStopBot(ab.botId); }} style={{
-                  padding: "7px 8px", borderRadius: "7px", fontSize: "13px", fontWeight: 600,
-                  background: `${c.red}12`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer",
+                <button onClick={(e) => { e.stopPropagation(); onStopBot(ab.botId); }} className="px-2 py-1.75 rounded text-xs font-semibold border cursor-pointer" style={{
+                  background: `${c.red}12`,
+                  color: c.red,
+                  border: `1px solid ${c.red}30`,
                 }}>중지</button>
               </div>
             </div>
@@ -976,11 +937,10 @@ function ActiveBotCarousel({ activeBots, allBotPerf, onSelectBot, onStopBot, onA
       </div>
       {/* 페이지 인디케이터 */}
       {runningBots.length > 1 && (
-        <div style={{ display: "flex", justifyContent: "center", gap: "6px", marginTop: "10px", marginBottom: "8px" }}>
+        <div className="flex justify-center gap-1.5 mt-2.5 mb-2">
           {runningBots.map((_, i) => (
-            <div key={i} style={{
+            <div key={i} className="rounded-full transition-all duration-300" style={{
               width: scrollIdx === i ? "16px" : "6px", height: "6px",
-              borderRadius: "3px", transition: "all 0.3s",
               background: scrollIdx === i ? c.blue : `${c.text3}40`,
             }} />
           ))}
@@ -1039,22 +999,22 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
     const totalAllocated = activeBots ? activeBots.reduce((s, ab) => s + (ab.allocation || 0), 0) : 0;
     const available = Math.max(0, totalEquity - totalAllocated);
     return (
-      <div style={{ marginBottom: "32px" }}>
-        <h2 style={{ margin: "0 0 16px", color: c.text1, fontSize: "22px", fontWeight: 700 }}>계좌 현황</h2>
-        <div style={{ ...cardStyle, marginBottom: "16px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
+      <div className="mb-8">
+        <h2 className="m-0 mb-4 text-[22px] font-bold" style={{ color: c.text1 }}>계좌 현황</h2>
+        <div className="mb-4" style={cardStyle}>
+          <div className="grid grid-cols-3 gap-4">
             <div>
-              <div style={{ fontSize: "14px", color: c.text3, marginBottom: "6px" }}>가상 포트폴리오 잔고</div>
-              <div style={{ fontSize: "26px", fontWeight: 800, color: c.text1 }}>${totalEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+              <div className="text-sm mb-1.5" style={{ color: c.text3 }}>가상 포트폴리오 잔고</div>
+              <div className="text-[26px] font-extrabold" style={{ color: c.text1 }}>${totalEquity.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
             </div>
             <div>
-              <div style={{ fontSize: "14px", color: c.text3, marginBottom: "6px" }}>투입 가능 금액</div>
-              <div style={{ fontSize: "26px", fontWeight: 800, color: c.green }}>${available.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+              <div className="text-sm mb-1.5" style={{ color: c.text3 }}>투입 가능 금액</div>
+              <div className="text-[26px] font-extrabold" style={{ color: c.green }}>${available.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
             </div>
             {hasPausedBots && (
               <div>
-                <div style={{ fontSize: "14px", color: c.text3, marginBottom: "6px" }}>일시정지된 봇</div>
-                <div style={{ fontSize: "26px", fontWeight: 800, color: c.yellow }}>{activeBots.filter(ab => ab.status === "paused").length}개</div>
+                <div className="text-sm mb-1.5" style={{ color: c.text3 }}>일시정지된 봇</div>
+                <div className="text-[26px] font-extrabold" style={{ color: c.yellow }}>{activeBots.filter(ab => ab.status === "paused").length}개</div>
               </div>
             )}
           </div>
@@ -1062,28 +1022,28 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
         {/* 일시정지된 봇 목록 */}
         {hasPausedBots && (
           <>
-            <div style={{ fontSize: "16px", fontWeight: 600, color: c.text1, marginBottom: "12px" }}>일시정지된 봇</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "12px" }}>
+            <div className="text-base font-semibold mb-3" style={{ color: c.text1 }}>일시정지된 봇</div>
+            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))" }}>
               {activeBots.filter(ab => ab.status === "paused").map(ab => {
                 const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
                 return (
-                  <div key={ab.botId} style={{ ...cardStyle, display: "flex", flexDirection: "column", gap: "12px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                      <span style={{ fontSize: "24px" }}>{bot.icon}</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 700, fontSize: "16px", color: c.text1 }}>{bot.name}</div>
-                        <div style={{ fontSize: "14px", color: c.text3 }}>일시정지 상태</div>
+                  <div key={ab.botId} className="flex flex-col gap-3" style={{ ...cardStyle }}>
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{bot.icon}</span>
+                      <div className="flex-1">
+                        <div className="font-bold text-base" style={{ color: c.text1 }}>{bot.name}</div>
+                        <div className="text-sm" style={{ color: c.text3 }}>일시정지 상태</div>
                       </div>
-                      <span style={{ padding: "4px 10px", borderRadius: "12px", fontSize: "14px", fontWeight: 700, background: `${c.yellow}20`, color: c.yellow }}>일시정지</span>
+                      <span className="px-2.5 py-1 rounded-xl text-sm font-bold" style={{ background: `${c.yellow}20`, color: c.yellow }}>일시정지</span>
                     </div>
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <button onClick={() => onUpdateBotStatus(ab.botId, "active")} style={{
-                        flex: 1, padding: "12px", borderRadius: "8px", fontSize: "15px", fontWeight: 600,
-                        background: c.green, color: "#fff", border: "none", cursor: "pointer",
+                    <div className="flex gap-2">
+                      <button onClick={() => onUpdateBotStatus(ab.botId, "active")} className="flex-1 px-3 py-3 rounded-lg text-[15px] font-semibold text-white border-none cursor-pointer" style={{
+                        background: c.green,
                       }}>재시작</button>
-                      <button onClick={() => onStopBot(ab.botId)} style={{
-                        padding: "12px 16px", borderRadius: "8px", fontSize: "15px", fontWeight: 600,
-                        background: `${c.red}15`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer",
+                      <button onClick={() => onStopBot(ab.botId)} className="px-4 py-3 rounded-lg text-[15px] font-semibold border cursor-pointer" style={{
+                        background: `${c.red}15`,
+                        color: c.red,
+                        border: `1px solid ${c.red}30`,
                       }}>삭제</button>
                     </div>
                   </div>
@@ -1100,15 +1060,15 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
   const totalAllocated = activeBots.reduce((sum, ab) => sum + (ab.allocation || 0), 0);
 
   return (
-    <div style={{ marginBottom: "32px" }}>
+    <div className="mb-8">
       {/* 헤더 */}
-      <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
-        <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: c.green, animation: "livePulse 1.5s ease-in-out infinite" }} />
-        <h2 style={{ margin: 0, color: c.text1, fontSize: "24px", fontWeight: 700 }}>운영 현황</h2>
-        <span style={{ fontSize: "14px", padding: "3px 10px", borderRadius: "12px", background: `${c.green}20`, color: c.green, fontWeight: 700 }}>
+      <div className="flex items-center gap-2.5 mb-5">
+        <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.green, animation: "livePulse 1.5s ease-in-out infinite" }} />
+        <h2 className="m-0 text-2xl font-bold" style={{ color: c.text1 }}>운영 현황</h2>
+        <span className="px-2.5 py-0.75 rounded-xl text-sm font-bold" style={{ background: `${c.green}20`, color: c.green }}>
           {activeBots.filter(ab => ab.status !== "paused").length}개 활성
         </span>
-        {loading && <span style={{ fontSize: "14px", color: c.text3 }}>로딩 중...</span>}
+        {loading && <span className="text-sm" style={{ color: c.text3 }}>로딩 중...</span>}
       </div>
 
       {/* ── 통합 포트폴리오 요약 카드 ── */}
@@ -1128,33 +1088,34 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
         const grandWinRate = grandTrades > 0 ? (grandWins / grandTrades) * 100 : 0;
 
         return (
-          <div style={{ ...cardStyle, marginBottom: "20px" }}>
+          <div className="mb-5" style={cardStyle}>
             {/* 상단: 총 AUM + ROI */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
+            <div className="flex justify-between items-start mb-4 flex-wrap gap-3">
               <div>
-                <div style={{ fontSize: "14px", color: c.text3, marginBottom: "4px" }}>현재 AUM</div>
-                <div style={{ fontSize: "36px", fontWeight: 800, color: c.text1, letterSpacing: "-1px" }}>
+                <div className="text-sm mb-1" style={{ color: c.text3 }}>현재 AUM</div>
+                <div className="text-[36px] font-extrabold" style={{ color: c.text1, letterSpacing: "-1px" }}>
                   ${currentAUM.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </div>
-                <div style={{ fontSize: "14px", color: c.text3, marginTop: "2px" }}>
+                <div className="text-sm mt-0.5" style={{ color: c.text3 }}>
                   투입: ${totalAllocated.toLocaleString()}
                 </div>
               </div>
-              <div style={{ textAlign: "right" }}>
-                <div style={{ fontSize: "14px", color: c.text3, marginBottom: "4px" }}>총 수익률 (ROI)</div>
-                <div style={{ fontSize: "32px", fontWeight: 800, color: grandROI >= 0 ? c.green : c.red }}>
+              <div className="text-right">
+                <div className="text-sm mb-1" style={{ color: c.text3 }}>총 수익률 (ROI)</div>
+                <div className="text-[32px] font-extrabold" style={{ color: grandROI >= 0 ? c.green : c.red }}>
                   {grandROI >= 0 ? "+" : ""}{grandROI.toFixed(2)}%
                 </div>
-                <div style={{ fontSize: "14px", fontWeight: 600, color: grandTotalPL >= 0 ? c.green : c.red, marginTop: "2px" }}>
+                <div className="text-sm font-semibold mt-0.5" style={{ color: grandTotalPL >= 0 ? c.green : c.red }}>
                   {grandTotalPL >= 0 ? "+" : ""}${grandTotalPL.toFixed(2)}
                 </div>
               </div>
             </div>
 
             {/* 핵심 지표 그리드 */}
-            <div style={{
-              display: "grid", gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(6, 1fr)",
-              gap: isMobile ? "8px" : "12px", marginBottom: "4px",
+            <div className="mb-1" style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "repeat(3, 1fr)" : "repeat(6, 1fr)",
+              gap: isMobile ? "8px" : "12px",
             }}>
               {[
                 { label: "미실현 손익", value: `${grandUnrealized >= 0 ? "+" : ""}$${grandUnrealized.toFixed(2)}`, color: grandUnrealized >= 0 ? c.green : c.red },
@@ -1164,9 +1125,9 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                 { label: "활성 봇", value: `${runningBots.length}개`, color: c.blue },
                 { label: "총 승/패", value: `${grandWins}/${grandTrades - grandWins}`, color: c.text1 },
               ].map((m, i) => (
-                <div key={i} style={{ padding: isMobile ? "8px 6px" : "10px 12px", borderRadius: "10px", background: c.card2, textAlign: "center" }}>
-                  <div style={{ fontSize: isMobile ? "11px" : "14px", color: c.text3, marginBottom: "4px", whiteSpace: "nowrap" }}>{m.label}</div>
-                  <div style={{ fontSize: isMobile ? "15px" : "18px", fontWeight: 700, color: m.color, whiteSpace: "nowrap" }}>{m.value}</div>
+                <div key={i} className="rounded-[10px] text-center" style={{ padding: isMobile ? "8px 6px" : "10px 12px", background: c.card2 }}>
+                  <div className="mb-1 whitespace-nowrap" style={{ fontSize: isMobile ? "11px" : "14px", color: c.text3 }}>{m.label}</div>
+                  <div className="font-bold whitespace-nowrap" style={{ fontSize: isMobile ? "15px" : "18px", color: m.color }}>{m.value}</div>
                 </div>
               ))}
             </div>
@@ -1178,7 +1139,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
       {isMobile ? (
         <ActiveBotCarousel activeBots={activeBots} allBotPerf={allBotPerf} onSelectBot={onSelectBot} onStopBot={onStopBot} onAddFund={onAddFund} theme={theme} cardStyle={cardStyle} />
       ) : null}
-      <div style={{ display: isMobile ? "none" : "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+      <div className={isMobile ? "hidden" : "grid gap-3"} style={{ gridTemplateColumns: "1fr 1fr" }}>
         {activeBots.filter(ab => ab.status !== "paused").map(ab => {
           const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
           const elapsed = Date.now() - (ab.startedAt || Date.now());
@@ -1200,41 +1161,36 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
           const botIsPositive = roiPct >= 0;
 
           return (
-            <div key={ab.botId} style={{
-              ...cardStyle, display: "flex", flexDirection: "column", gap: "10px", cursor: "pointer",
-            }} onClick={() => onSelectBot(bot)}>
+            <div key={ab.botId} className="flex flex-col gap-2.5 cursor-pointer" style={cardStyle} onClick={() => onSelectBot(bot)}>
               {/* 봇 헤더 */}
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{
-                  fontSize: "22px", width: "36px", height: "36px",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  background: `${c.blue}10`, borderRadius: "10px", flexShrink: 0,
+              <div className="flex items-center gap-2.5">
+                <span className="text-[22px] w-9 h-9 flex items-center justify-center flex-shrink-0 rounded-[10px]" style={{
+                  background: `${c.blue}10`,
                 }}>{bot.icon}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ fontWeight: 700, fontSize: "16px", color: c.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{bot.name}</span>
-                    <span style={{
-                      padding: "1px 6px", borderRadius: "4px", fontSize: "12px", fontWeight: 600,
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-bold text-base overflow-hidden text-ellipsis whitespace-nowrap" style={{ color: c.text1 }}>{bot.name}</span>
+                    <span className="px-1.5 py-0.5 rounded text-xs font-semibold flex-shrink-0" style={{
                       background: `${getRiskColor(bot.riskColor, theme)}15`,
-                      color: getRiskColor(bot.riskColor, theme), flexShrink: 0,
+                      color: getRiskColor(bot.riskColor, theme),
                     }}>{bot.risk}</span>
                   </div>
-                  <div style={{ fontSize: "13px", color: c.text3, marginTop: "1px" }}>
+                  <div className="text-xs mt-0.5" style={{ color: c.text3 }}>
                     {days > 0 ? `${days}일 ` : ""}{hours}시간 · {isStock ? "주식" : "크립토"} · {kvTrades}회
                   </div>
                 </div>
-                <div style={{ textAlign: "right", flexShrink: 0 }}>
-                  <div style={{ fontSize: "18px", fontWeight: 800, color: botIsPositive ? c.green : c.red }}>
+                <div className="text-right flex-shrink-0">
+                  <div className="text-lg font-extrabold" style={{ color: botIsPositive ? c.green : c.red }}>
                     {roiPct >= 0 ? "+" : ""}{roiPct.toFixed(2)}%
                   </div>
-                  <div style={{ fontSize: "13px", color: totalPL >= 0 ? c.green : c.red, fontWeight: 600 }}>
+                  <div className="text-xs font-semibold" style={{ color: totalPL >= 0 ? c.green : c.red }}>
                     {totalPL >= 0 ? "+" : ""}${totalPL.toFixed(2)}
                   </div>
                 </div>
               </div>
 
               {/* 미니 ROI 차트 */}
-              <div style={{ height: "56px" }}>
+              <div className="h-[56px]">
                 {pnlData.length >= 2 ? (() => {
                   const w = 300, h = 50;
                   const min = Math.min(...pnlData) * 0.998;
@@ -1247,7 +1203,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                   const clr = botIsPositive ? c.green : c.red;
                   const gradId = `mini-${ab.botId.replace(/[^a-z0-9]/gi, "")}`;
                   return (
-                    <svg width="100%" height="50" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" style={{ borderRadius: "6px", display: "block" }}>
+                    <svg width="100%" height="50" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="xMidYMid meet" className="rounded block">
                       <defs>
                         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor={clr} stopOpacity="0.18" />
@@ -1259,40 +1215,42 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                     </svg>
                   );
                 })() : (
-                  <div style={{ height: "50px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "6px", background: `${c.text3}06` }}>
-                    <span style={{ fontSize: "13px", color: c.text3 }}>데이터 수집 중...</span>
+                  <div className="h-[50px] flex items-center justify-center rounded" style={{ background: `${c.text3}06` }}>
+                    <span className="text-xs" style={{ color: c.text3 }}>데이터 수집 중...</span>
                   </div>
                 )}
               </div>
 
               {/* 미니 지표 */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: "4px" }}>
+              <div className="grid grid-cols-4 gap-1">
                 {[
                   { label: "투입", value: `$${allocation >= 1000 ? (allocation/1000).toFixed(1)+"k" : allocation.toLocaleString()}`, color: c.text1 },
                   { label: "MDD", value: kvMDD > 0 ? `${kvMDD.toFixed(1)}%` : "--", color: kvMDD > 10 ? c.red : kvMDD > 5 ? c.yellow : c.green },
                   { label: "승률", value: kvTrades > 0 ? `${(kvWinCount/kvTrades*100).toFixed(0)}%` : "--", color: c.text1 },
                   { label: "승/패", value: `${kvWinCount}/${kvTrades - kvWinCount}`, color: c.text1 },
                 ].map((m, i) => (
-                  <div key={i} style={{ padding: "4px 6px", borderRadius: "5px", background: c.card2, textAlign: "center" }}>
-                    <div style={{ fontSize: "11px", color: c.text3 }}>{m.label}</div>
-                    <div style={{ fontSize: "14px", fontWeight: 700, color: m.color }}>{m.value}</div>
+                  <div key={i} className="p-1 rounded text-center" style={{ background: c.card2 }}>
+                    <div className="text-[11px]" style={{ color: c.text3 }}>{m.label}</div>
+                    <div className="text-sm font-bold" style={{ color: m.color }}>{m.value}</div>
                   </div>
                 ))}
               </div>
 
               {/* 액션 버튼 */}
-              <div style={{ display: "flex", gap: "6px" }}>
-                <button onClick={(e) => { e.stopPropagation(); onSelectBot(bot); }} style={{
-                  flex: 2, padding: "8px", borderRadius: "7px", fontSize: "14px", fontWeight: 700,
-                  background: c.blue, color: "#fff", border: "none", cursor: "pointer",
+              <div className="flex gap-1.5">
+                <button onClick={(e) => { e.stopPropagation(); onSelectBot(bot); }} className="text-sm font-bold text-white border-none cursor-pointer py-2 px-2 rounded-lg" style={{
+                  flexGrow: 2,
+                  background: c.blue,
                 }}>상세 보기</button>
-                <button onClick={(e) => { e.stopPropagation(); onAddFund(ab.botId); }} style={{
-                  flex: 1, padding: "8px", borderRadius: "7px", fontSize: "14px", fontWeight: 600,
-                  background: `${c.green}12`, color: c.green, border: `1px solid ${c.green}30`, cursor: "pointer",
+                <button onClick={(e) => { e.stopPropagation(); onAddFund(ab.botId); }} className="flex-1 py-2 px-2 rounded-lg text-sm font-semibold border cursor-pointer" style={{
+                  background: `${c.green}12`,
+                  color: c.green,
+                  border: `1px solid ${c.green}30`,
                 }}>+ 추가</button>
-                <button onClick={(e) => { e.stopPropagation(); onStopBot(ab.botId); }} style={{
-                  padding: "8px 10px", borderRadius: "7px", fontSize: "14px", fontWeight: 600,
-                  background: `${c.red}12`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer",
+                <button onClick={(e) => { e.stopPropagation(); onStopBot(ab.botId); }} className="py-2 px-2.5 rounded-lg text-sm font-semibold border cursor-pointer" style={{
+                  background: `${c.red}12`,
+                  color: c.red,
+                  border: `1px solid ${c.red}30`,
                 }}>중지</button>
               </div>
             </div>
@@ -1302,29 +1260,29 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
 
       {/* 일시정지된 봇 */}
       {hasPausedBots && (
-        <div style={{ marginTop: "24px" }}>
-          <div style={{ fontSize: "16px", fontWeight: 600, color: c.text1, marginBottom: "12px" }}>일시정지된 봇</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "12px" }}>
+        <div className="mt-6">
+          <div className="text-base font-semibold mb-3" style={{ color: c.text1 }}>일시정지된 봇</div>
+          <div className="gap-3" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))" }}>
             {activeBots.filter(ab => ab.status === "paused").map(ab => {
               const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
               return (
-                <div key={ab.botId} style={{ ...cardStyle, display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <span style={{ fontSize: "24px" }}>{bot.icon}</span>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700, fontSize: "16px", color: c.text1 }}>{bot.name}</div>
-                      <div style={{ fontSize: "14px", color: c.text3 }}>일시정지 상태</div>
+                <div key={ab.botId} className="flex flex-col gap-3" style={cardStyle}>
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl">{bot.icon}</span>
+                    <div className="flex-1">
+                      <div className="font-bold text-base" style={{ color: c.text1 }}>{bot.name}</div>
+                      <div className="text-sm" style={{ color: c.text3 }}>일시정지 상태</div>
                     </div>
-                    <span style={{ padding: "4px 10px", borderRadius: "12px", fontSize: "14px", fontWeight: 700, background: `${c.yellow}20`, color: c.yellow }}>일시정지</span>
+                    <span className="px-2.5 py-1 rounded-xl text-sm font-bold" style={{ background: `${c.yellow}20`, color: c.yellow }}>일시정지</span>
                   </div>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button onClick={() => onUpdateBotStatus(ab.botId, "active")} style={{
-                      flex: 1, padding: "12px", borderRadius: "8px", fontSize: "15px", fontWeight: 600,
-                      background: c.green, color: "#fff", border: "none", cursor: "pointer",
+                  <div className="flex gap-2">
+                    <button onClick={() => onUpdateBotStatus(ab.botId, "active")} className="flex-1 px-3 py-3 rounded-lg text-[15px] font-semibold text-white border-none cursor-pointer" style={{
+                      background: c.green,
                     }}>재시작</button>
-                    <button onClick={() => onStopBot(ab.botId)} style={{
-                      padding: "12px 16px", borderRadius: "8px", fontSize: "15px", fontWeight: 600,
-                      background: `${c.red}15`, color: c.red, border: `1px solid ${c.red}30`, cursor: "pointer",
+                    <button onClick={() => onStopBot(ab.botId)} className="px-4 py-3 rounded-lg text-[15px] font-semibold border cursor-pointer" style={{
+                      background: `${c.red}15`,
+                      color: c.red,
+                      border: `1px solid ${c.red}30`,
                     }}>삭제</button>
                   </div>
                 </div>
@@ -1739,80 +1697,76 @@ export default function AutoTrading({ theme = "dark", user }) {
           const used = activeBots.reduce((s, ab) => s + (ab.allocation || 0), 0);
           const quickAmounts = [500, 1000, 2000, 5000];
           return (
-            <div style={{
-              position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-              background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center",
-              zIndex: 9999,
-            }} onClick={() => { setAddFundBotId(null); setAddFundInput(""); }}>
-              <div style={{
-                background: c.card, borderRadius: "16px", padding: "28px", width: "min(420px, 90vw)",
-                border: `1px solid ${c.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+            <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50" onClick={() => { setAddFundBotId(null); setAddFundInput(""); }}>
+              <div className="w-min(420px, 90vw) rounded-2xl p-7 border" style={{
+                background: c.card,
+                border: `1px solid ${c.border}`,
+                boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
               }} onClick={e => e.stopPropagation()}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-                  <span style={{ fontSize: "32px" }}>{botDef.icon}</span>
-                  <div style={{ minWidth: 0 }}>
-                    <h3 style={{ margin: 0, color: c.text1, fontSize: "20px", wordBreak: "break-word" }}>{botDef.name}</h3>
-                    <span style={{ fontSize: "14px", color: c.text2 }}>추가 금액을 입력해주세요</span>
+                <div className="flex items-center gap-3 mb-4">
+                  <span className="text-[32px]">{botDef.icon}</span>
+                  <div className="min-w-0">
+                    <h3 className="m-0 text-xl break-words" style={{ color: c.text1 }}>{botDef.name}</h3>
+                    <span className="text-sm" style={{ color: c.text2 }}>추가 금액을 입력해주세요</span>
                   </div>
                 </div>
 
                 {/* 현재 배분 현황 */}
-                <div style={{
-                  padding: "12px 14px", background: `${c.blue}08`, borderRadius: "10px",
-                  border: `1px solid ${c.blue}15`, marginBottom: "16px", fontSize: "15px", color: c.text2,
-                  display: "flex", flexDirection: "column", gap: "6px",
+                <div className="p-3 rounded-[10px] mb-4 text-[15px] flex flex-col gap-1.5" style={{
+                  background: `${c.blue}08`,
+                  border: `1px solid ${c.blue}15`,
+                  color: c.text2,
                 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <div className="flex justify-between">
                     <span>현재 투입 금액</span>
                     <strong style={{ color: c.text1 }}>${currentAlloc.toLocaleString()}</strong>
                   </div>
                 </div>
 
                 {/* 빠른 금액 선택 */}
-                <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
+                <div className="flex gap-2 mb-3 flex-wrap">
                   {quickAmounts.map(amt => (
-                    <button key={amt} onClick={() => setAddFundInput(String(amt))} style={{
-                      flex: "1 1 auto", padding: "8px 12px", borderRadius: "8px",
-                      fontSize: "15px", fontWeight: 600, cursor: "pointer", minHeight: "40px",
+                    <button key={amt} onClick={() => setAddFundInput(String(amt))} className="flex-1 min-w-min px-3 py-2 rounded-lg text-[15px] font-semibold cursor-pointer min-h-[40px] transition-all duration-150" style={{
                       background: addFundInput === String(amt) ? `${c.green}20` : c.card2,
                       color: addFundInput === String(amt) ? c.green : c.text2,
                       border: `1px solid ${addFundInput === String(amt) ? c.green + "50" : c.border}`,
-                      transition: "all 0.15s ease",
                     }}>${amt.toLocaleString()}</button>
                   ))}
                 </div>
 
                 {/* 직접 입력 */}
-                <div style={{ marginBottom: "20px" }}>
-                  <label style={{ fontSize: "15px", color: c.text2, display: "block", marginBottom: "6px" }}>직접 입력 (USD)</label>
+                <div className="mb-5">
+                  <label className="text-[15px] block mb-1.5" style={{ color: c.text2 }}>직접 입력 (USD)</label>
                   <input
                     type="number"
                     value={addFundInput}
                     onChange={e => setAddFundInput(e.target.value)}
                     placeholder="추가할 금액 입력"
+                    className="w-full px-3 py-3 rounded-lg border box-border min-h-[44px] text-lg font-semibold"
                     style={{
-                      width: "100%", padding: "12px", borderRadius: "8px", border: `1px solid ${c.border}`,
-                      background: c.card2, color: c.text1, fontSize: "18px", fontWeight: 600, boxSizing: "border-box", minHeight: "44px",
+                      background: c.card2,
+                      color: c.text1,
+                      border: `1px solid ${c.border}`,
                     }}
                     onKeyDown={e => e.key === "Enter" && handleConfirmAddFund()}
                     autoFocus
                   />
                   {addFundInput && parseInt(addFundInput, 10) > 0 && (
-                    <div style={{ marginTop: "8px", fontSize: "14px", color: c.text2 }}>
+                    <div className="mt-2 text-sm" style={{ color: c.text2 }}>
                       추가 후 총 투입 금액: <strong style={{ color: c.green }}>${(currentAlloc + parseInt(addFundInput, 10)).toLocaleString()}</strong>
                     </div>
                   )}
                 </div>
 
                 {/* 버튼 */}
-                <div style={{ display: "flex", gap: "8px" }}>
-                  <button onClick={() => { setAddFundBotId(null); setAddFundInput(""); }} style={{
-                    flex: 1, padding: "12px", borderRadius: "8px", fontSize: "16px", fontWeight: 600,
-                    background: c.card2, color: c.text2, border: `1px solid ${c.border}`, cursor: "pointer", minHeight: "44px",
+                <div className="flex gap-2">
+                  <button onClick={() => { setAddFundBotId(null); setAddFundInput(""); }} className="flex-1 px-3 py-3 rounded-lg text-base font-semibold cursor-pointer min-h-[44px] border" style={{
+                    background: c.card2,
+                    color: c.text2,
+                    border: `1px solid ${c.border}`,
                   }}>취소</button>
-                  <button onClick={handleConfirmAddFund} style={{
-                    flex: 1, padding: "12px", borderRadius: "8px", fontSize: "16px", fontWeight: 700,
-                    background: c.green, color: "#fff", border: "none", cursor: "pointer", minHeight: "44px",
+                  <button onClick={handleConfirmAddFund} className="flex-1 px-3 py-3 rounded-lg text-base font-bold text-white border-none cursor-pointer min-h-[44px]" style={{
+                    background: c.green,
                     opacity: (!addFundInput || parseInt(addFundInput, 10) <= 0) ? 0.5 : 1,
                   }}>금액 추가</button>
                 </div>
@@ -1823,35 +1777,30 @@ export default function AutoTrading({ theme = "dark", user }) {
 
         {/* 봇 중지 / 삭제 확인 모달 */}
         {stopBotConfirm && (
-          <div style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center",
-            zIndex: 9999,
-          }} onClick={() => setStopBotConfirm(null)}>
-            <div style={{
-              background: c.card, borderRadius: "16px", padding: "32px",
-              width: "min(420px, 90vw)",
-              border: `1px solid ${c.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
-              textAlign: "center",
+          <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50" onClick={() => setStopBotConfirm(null)}>
+            <div className="w-min(420px, 90vw) rounded-2xl p-8 text-center border" style={{
+              background: c.card,
+              border: `1px solid ${c.border}`,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
             }} onClick={e => e.stopPropagation()}>
-              <div style={{ fontSize: "48px", marginBottom: "12px" }}>{stopBotConfirm.icon}</div>
+              <div className="text-[48px] mb-3">{stopBotConfirm.icon}</div>
               {stopBotConfirm.mode === "pause" ? (
                 <>
-                  <h3 style={{ margin: "0 0 8px", color: c.text1, fontSize: "21px", fontWeight: 800 }}>
+                  <h3 className="m-0 mb-2 text-2xl font-extrabold" style={{ color: c.text1 }}>
                     자동매매 중단
                   </h3>
-                  <p style={{ margin: "0 0 20px", color: c.text2, fontSize: "16px", lineHeight: 1.5 }}>
+                  <p className="m-0 mb-5 text-base leading-relaxed" style={{ color: c.text2 }}>
                     <strong style={{ color: c.text1 }}>{stopBotConfirm.botName}</strong>
                   </p>
 
                   {/* 일시정지 단계 설명 */}
-                  <div style={{
-                    background: `${c.blue}08`, border: `1px solid ${c.blue}20`, borderRadius: "10px",
-                    padding: "14px 16px", marginBottom: "20px", textAlign: "left",
+                  <div className="p-3.5 rounded-[10px] mb-5 text-left" style={{
+                    background: `${c.blue}08`,
+                    border: `1px solid ${c.blue}20`,
                   }}>
-                    <div style={{ fontSize: "15px", color: c.blue, fontWeight: 600, marginBottom: "8px" }}>다음 단계 진행</div>
-                    <div style={{ fontSize: "14px", color: c.text2, lineHeight: 1.6 }}>
-                      <div style={{ marginBottom: "6px" }}>
+                    <div className="text-[15px] font-semibold mb-2" style={{ color: c.blue }}>다음 단계 진행</div>
+                    <div className="text-sm leading-relaxed" style={{ color: c.text2 }}>
+                      <div className="mb-1.5">
                         <strong>1단계: 자동매매 중단</strong><br/>
                         새로운 매매를 중지합니다. 봇이 목록에 표시되며 재시작 가능합니다.
                       </div>
@@ -1862,46 +1811,47 @@ export default function AutoTrading({ theme = "dark", user }) {
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", gap: "10px", flexDirection: "row" }}>
-                    <button onClick={() => setStopBotConfirm(null)} style={{
-                      flex: 1, padding: "12px", borderRadius: "10px", fontSize: "16px", fontWeight: 600,
-                      background: c.card2, color: c.text2, border: `1px solid ${c.border}`, cursor: "pointer", minHeight: "48px",
+                  <div className="flex gap-2.5">
+                    <button onClick={() => setStopBotConfirm(null)} className="flex-1 px-3 py-3 rounded-[10px] text-base font-semibold border cursor-pointer min-h-[48px]" style={{
+                      background: c.card2,
+                      color: c.text2,
+                      border: `1px solid ${c.border}`,
                     }}>취소</button>
-                    <button onClick={confirmPauseBot} style={{
-                      flex: 1, padding: "12px", borderRadius: "10px", fontSize: "16px", fontWeight: 700,
-                      background: c.yellow, color: "#000", border: "none", cursor: "pointer", minHeight: "48px",
+                    <button onClick={confirmPauseBot} className="flex-1 px-3 py-3 rounded-[10px] text-base font-bold border-none cursor-pointer min-h-[48px]" style={{
+                      background: c.yellow,
+                      color: "#000",
                     }}>자동매매만 중단</button>
                   </div>
                 </>
               ) : (
                 <>
-                  <h3 style={{ margin: "0 0 8px", color: c.text1, fontSize: "21px", fontWeight: 800 }}>
+                  <h3 className="m-0 mb-2 text-2xl font-extrabold" style={{ color: c.text1 }}>
                     봇을 삭제하시겠습니까?
                   </h3>
-                  <p style={{ margin: "0 0 20px", color: c.text2, fontSize: "16px", lineHeight: 1.5 }}>
+                  <p className="m-0 mb-5 text-base leading-relaxed" style={{ color: c.text2 }}>
                     <strong style={{ color: c.text1 }}>{stopBotConfirm.botName}</strong>
                   </p>
 
-                  <div style={{
-                    background: `${c.red}08`, border: `1px solid ${c.red}20`, borderRadius: "10px",
-                    padding: "14px 16px", marginBottom: "20px", textAlign: "left",
+                  <div className="p-3.5 rounded-[10px] mb-5 text-left" style={{
+                    background: `${c.red}08`,
+                    border: `1px solid ${c.red}20`,
                   }}>
-                    <div style={{ fontSize: "14px", color: c.red, fontWeight: 600, marginBottom: "6px" }}>주의사항</div>
-                    <ul style={{ margin: 0, paddingLeft: "16px", fontSize: "14px", color: c.text2, lineHeight: 1.6 }}>
+                    <div className="text-sm font-semibold mb-1.5" style={{ color: c.red }}>주의사항</div>
+                    <ul className="m-0 pl-4 text-sm leading-relaxed list-disc" style={{ color: c.text2 }}>
                       <li>봇이 목록에서 완전히 제거됩니다</li>
                       <li>운영 기록은 보관됩니다</li>
                       <li>이 작업은 취소할 수 없습니다</li>
                     </ul>
                   </div>
 
-                  <div style={{ display: "flex", gap: "10px", flexDirection: "row" }}>
-                    <button onClick={() => setStopBotConfirm(null)} style={{
-                      flex: 1, padding: "12px", borderRadius: "10px", fontSize: "16px", fontWeight: 600,
-                      background: c.card2, color: c.text2, border: `1px solid ${c.border}`, cursor: "pointer", minHeight: "48px",
+                  <div className="flex gap-2.5">
+                    <button onClick={() => setStopBotConfirm(null)} className="flex-1 px-3 py-3 rounded-[10px] text-base font-semibold border cursor-pointer min-h-[48px]" style={{
+                      background: c.card2,
+                      color: c.text2,
+                      border: `1px solid ${c.border}`,
                     }}>취소</button>
-                    <button onClick={confirmDeleteBot} style={{
-                      flex: 1, padding: "12px", borderRadius: "10px", fontSize: "16px", fontWeight: 700,
-                      background: c.red, color: "#fff", border: "none", cursor: "pointer", minHeight: "48px",
+                    <button onClick={confirmDeleteBot} className="flex-1 px-3 py-3 rounded-[10px] text-base font-bold text-white border-none cursor-pointer min-h-[48px]" style={{
+                      background: c.red,
                     }}>봇 완전 삭제</button>
                   </div>
                 </>
@@ -1931,17 +1881,11 @@ export default function AutoTrading({ theme = "dark", user }) {
           <div>
             <button
               onClick={handleBackToCatalog}
+              className="px-4 py-2.5 rounded-lg text-base font-semibold cursor-pointer mb-6 border transition-all duration-200"
               style={{
-                backgroundColor: "transparent",
                 color: c.blue,
                 border: `1px solid ${c.blue}`,
-                borderRadius: "8px",
-                padding: "10px 16px",
-                fontSize: "16px",
-                fontWeight: "600",
-                cursor: "pointer",
-                marginBottom: "24px",
-                transition: "all 0.2s ease",
+                backgroundColor: "transparent",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = `${c.blue}15`;
@@ -1955,30 +1899,23 @@ export default function AutoTrading({ theme = "dark", user }) {
 
             {/* Bot Info Header */}
             <div
+              className="flex items-center gap-5 p-6 rounded-xl mb-6 border"
               style={{
                 backgroundColor: c.card,
                 border: `1px solid ${c.border}`,
-                borderRadius: "12px",
-                padding: "24px",
-                marginBottom: "24px",
-                display: "flex",
-                alignItems: "center",
-                gap: "20px",
               }}
             >
-              <span style={{ fontSize: "48px" }}>{activeBot.icon}</span>
-              <div style={{ flex: 1 }}>
+              <span className="text-[48px]">{activeBot.icon}</span>
+              <div className="flex-1">
                 <h2
+                  className="m-0 mb-2 text-2xl font-semibold"
                   style={{
-                    margin: "0 0 8px 0",
                     color: c.text1,
-                    fontSize: "24px",
-                    fontWeight: "600",
                   }}
                 >
                   {activeBot.name}
                 </h2>
-                <p style={{ margin: "0", color: c.text2, fontSize: "16px" }}>
+                <p className="m-0 text-base" style={{ color: c.text2 }}>
                   {activeBot.description}
                 </p>
               </div>
