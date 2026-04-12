@@ -4322,6 +4322,18 @@ function AppInner() {
   const ctaCountRef = useRef(0); // 쿠팡/구글 번갈아 표시
   C = themeMode === "dark" ? DARK : LIGHT;
 
+
+  // ── Skeleton 로딩 컴포넌트 ──
+  const Skeleton = ({ width = "100%", height = "20px" }) => (
+    <div style={{
+      width, height, borderRadius: "8px",
+      background: `linear-gradient(90deg, ${C.card2} 25%, ${C.border}20 50%, ${C.card2} 75%)`,
+      backgroundSize: "200% 100%",
+      animation: "shimmer 1.5s infinite",
+    }} />
+  );
+
+
   // ── 토스트 알림 시스템 ──
   const [toasts, setToasts] = useState([]);
   const showToast = useCallback((msg, type = "info") => {
@@ -6759,20 +6771,40 @@ function AppInner() {
     })();
   }, []);
 
-  // ── 글로벌 검색 단축키 (/ 키) ──
+  // ── 글로벌 검색 단축키 (/ 키) + 탭 단축키 (1-5) ──
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === "/" && !e.ctrlKey && !e.metaKey && !["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName)) {
+      const isInputFocused = ["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName);
+
+      // 글로벌 검색 (/)
+      if (e.key === "/" && !e.ctrlKey && !e.metaKey && !isInputFocused) {
         e.preventDefault();
         setGlobalSearchOpen(true);
       }
+      // Escape: 검색 창 닫기
       if (e.key === "Escape") {
         setGlobalSearchOpen(false);
+      }
+      // 탭 단축키 (1-5) — 입력창 포커스 시 제외
+      if (!isInputFocused) {
+        if (e.key === "1") setTab("home");
+        else if (e.key === "2") setTab("screener");
+        else if (e.key === "3") setTab("auto-trading");
+        else if (e.key === "4") setTab("portfolio");
+        else if (e.key === "5") setTab("news");
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // ── 스크롤 감지 (맨 위로 버튼) ──
+  useEffect(() => {
+    const handler = () => setShowScrollTop(window.scrollY > 300);
+    window.addEventListener("scroll", handler, { passive: true });
+    return () => window.removeEventListener("scroll", handler);
+  }, []);
+
 
   // ── 포트폴리오 동기화 ─────────────────────────────────────────
   const syncUpload = useCallback(async () => {
@@ -6879,7 +6911,20 @@ function AppInner() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text1, fontFamily: "'Pretendard', 'Apple SD Gothic Neo', system-ui, sans-serif" }}>
-      <style>{`
+      <style>
+      @keyframes shimmer {
+        0% { background-position: -1000px 0; }
+        100% { background-position: 1000px 0; }
+      }
+      @keyframes livePulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+      @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-8px); }
+      }
+{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
         @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.4} }
@@ -7482,7 +7527,27 @@ function AppInner() {
                       msOverflowStyle: "none",
                       marginBottom: "14px",
                     }} className="hscroll">
-                      {indexCards.map((item) => {
+                      {marketLoading ? (
+                        // 스켈레톤 로더 표시
+                        Array.from({ length: 6 }).map((_, i) => (
+                          <div key={`skeleton-${i}`} style={{
+                            padding: "14px 16px",
+                            borderRadius: "16px",
+                            background: C.card2,
+                            minWidth: isMobile ? "140px" : undefined,
+                            flexShrink: isMobile ? 0 : undefined,
+                          }}>
+                            <Skeleton width="80px" height="12px" />
+                            <div style={{ marginTop: "10px" }}>
+                              <Skeleton width="100%" height="24px" />
+                            </div>
+                            <div style={{ marginTop: "6px" }}>
+                              <Skeleton width="60px" height="16px" />
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        indexCards.map((item) => {
                         const isUp = item.idx?.change >= 0;
                         return (
                           <div
@@ -7543,7 +7608,8 @@ function AppInner() {
                             </div>
                           </div>
                         );
-                      })}
+                      })
+                      )}
                     </div>
 
                     {/* 마켓 한줄 요약 */}
@@ -8241,24 +8307,81 @@ function AppInner() {
                   }}>{t("tabs.home.loginOrSignup")}</button>
                 </div>
               ) : watchlist.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "32px 16px 20px" }}>
-                  <div style={{ width: "56px", height: "56px", borderRadius: "16px", background: C.blueBg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", fontSize: "24px" }}>📌</div>
-                  <div style={{ fontSize: "17px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>{t("tabs.home.addWatchlistItems")}</div>
-                  <div style={{ fontSize: "17px", color: C.text3, lineHeight: 1.6 }}>{t("tabs.home.realtimeQuantDescription")}</div>
-                  <div style={{ display: "flex", gap: "6px", justifyContent: "center", marginTop: "16px", flexWrap: "wrap" }}>
+                <div style={{
+                  textAlign: "center",
+                  padding: "48px 24px",
+                  background: `linear-gradient(135deg, ${C.blueBg}20 0%, ${C.card2}40 100%)`,
+                  borderRadius: "16px",
+                  border: `1px solid ${C.border}20`,
+                  marginBottom: "16px",
+                }}>
+                  <div style={{
+                    width: "64px",
+                    height: "64px",
+                    borderRadius: "16px",
+                    background: C.blueBg,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    margin: "0 auto 16px",
+                    fontSize: "32px",
+                    boxShadow: `0 4px 16px ${C.blue}20`,
+                  }}>
+                    📌
+                  </div>
+                  <div style={{ fontSize: "18px", fontWeight: 800, color: C.text1, marginBottom: "8px" }}>관심종목을 추가하세요</div>
+                  <div style={{ fontSize: "15px", color: C.text3, lineHeight: 1.6, marginBottom: "24px" }}>
+                    종목을 추가하면 실시간 시세, 퀀트 분석, 및 거래 신호를 한눈에 확인할 수 있습니다.
+                  </div>
+                  <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginTop: "20px", flexWrap: "wrap" }}>
                     {["NVDA","AAPL","TSLA","MSFT"].map(s => {
                       const a = hotAssets.find(h => h.symbol === s);
                       return a ? (
-                        <button key={s} onClick={() => {
-                          setWatchlist(prev => [...prev, { symbol: a.symbol, name: a.name, market: a.market, symbolRaw: a.symbolRaw || a.symbol }]);
-                          if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); };
-                        }} style={{
-                          padding: "6px 12px", borderRadius: "8px", fontSize: "16px", fontWeight: 600,
-                          background: C.card2, color: C.text2, border: `1px solid ${C.border2}`, cursor: "pointer",
-                        }}>+ {a.name}</button>
+                        <button
+                          key={s}
+                          onClick={() => {
+                            setWatchlist(prev => [...prev, { symbol: a.symbol, name: a.name, market: a.market, symbolRaw: a.symbolRaw || a.symbol }]);
+                            if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); };
+                            showToast(`${a.name} 추가됨`, "success");
+                          }}
+                          style={{
+                            padding: "8px 16px",
+                            borderRadius: "10px",
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            background: C.blue,
+                            color: "#fff",
+                            border: "none",
+                            cursor: "pointer",
+                            transition: "all .2s",
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 4px 12px ${C.blue}40`; }}
+                          onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
+                        >
+                          + {a.name}
+                        </button>
                       ) : null;
                     })}
                   </div>
+                  <button
+                    onClick={() => setTab("screener")}
+                    style={{
+                      marginTop: "16px",
+                      padding: "10px 20px",
+                      borderRadius: "10px",
+                      fontSize: "15px",
+                      fontWeight: 700,
+                      background: `${C.blue}15`,
+                      color: C.blue,
+                      border: `1.5px solid ${C.blue}30`,
+                      cursor: "pointer",
+                      transition: "all .2s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}25`; e.currentTarget.style.borderColor = C.blue; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = `${C.blue}15`; e.currentTarget.style.borderColor = `${C.blue}30`; }}
+                  >
+                    스크리너로 종목 찾기 →
+                  </button>
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column" }}>
@@ -9884,7 +10007,13 @@ function AppInner() {
                     kq && { name: "코스닥", value: kq.price, change: kq.change },
                     vix && { name: "VIX", value: vix.price, change: vix.change },
                   ].filter(Boolean).map(idx => (
-                    <div key={idx.name} className="rounded-[10px] p-2.5 text-center" style={{ background: C.bg }}>
+                    <div key={idx.name} className="rounded-[12px] p-3 text-center transition-all" style={{
+                      background: C.bg,
+                      cursor: "pointer",
+                      border: `1px solid ${idx.change >= 0 ? C.green + "30" : C.red + "30"}`,
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 4px 12px ${idx.change >= 0 ? C.green + "30" : C.red + "30"}`; }}
+                    onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}>
                       <div className="text-sm mb-1" style={{ color: C.text3 }}>{idx.name}</div>
                       <div className="text-base font-bold" style={{ color: C.text1 }}>{typeof idx.value === "number" ? idx.value.toLocaleString(undefined, { maximumFractionDigits: 0 }) : idx.value}</div>
                       <div className="text-sm font-semibold" style={{ color: idx.change >= 0 ? C.green : C.red }}>
@@ -11465,18 +11594,18 @@ function AppInner() {
               <div style={{ fontSize: "13px", color: C.text3, marginBottom: "20px" }}>AI가 분석한 나의 투자 현황을 공유해보세요</div>
               <div className="flex justify-center mb-6" style={{ gap: isMobile ? "16px" : "32px" }}>
                 <div className="text-center">
-                  <div style={{ fontSize: "28px", fontWeight: "900", color: C.blue }}>{watchlist.length}</div>
-                  <div style={{ fontSize: "13px", color: C.text3, marginTop: "4px" }}>관심종목</div>
+                  <div style={{ fontSize: "42px", fontWeight: "900", color: C.blue, textShadow: `0 0 12px ${C.blue}40`, letterSpacing: "-1px" }}>{watchlist.length}</div>
+                  <div style={{ fontSize: "14px", color: C.text3, marginTop: "6px", fontWeight: 600 }}>관심종목</div>
                 </div>
-                <div className="w-px self-stretch" style={{ background: `${C.border}40` }} />
+                <div className="w-px self-stretch" style={{ background: `linear-gradient(180deg, ${C.border}00, ${C.border}60, ${C.border}00)` }} />
                 <div className="text-center">
-                  <div style={{ fontSize: "28px", fontWeight: "900", color: C.purple }}>{(() => { try { return JSON.parse(localStorage.getItem(`zepta_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })()}</div>
-                  <div style={{ fontSize: "13px", color: C.text3, marginTop: "4px" }}>운영봇</div>
+                  <div style={{ fontSize: "42px", fontWeight: "900", color: C.purple, textShadow: `0 0 12px ${C.purple}40`, letterSpacing: "-1px" }}>{(() => { try { return JSON.parse(localStorage.getItem(`zepta_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })()}</div>
+                  <div style={{ fontSize: "14px", color: C.text3, marginTop: "6px", fontWeight: 600 }}>운영봇</div>
                 </div>
-                <div className="w-px self-stretch" style={{ background: `${C.border}40` }} />
+                <div className="w-px self-stretch" style={{ background: `linear-gradient(180deg, ${C.border}00, ${C.border}60, ${C.border}00)` }} />
                 <div className="text-center">
-                  <div style={{ fontSize: "28px", fontWeight: "900", color: C.green }}>{(() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })()}</div>
-                  <div style={{ fontSize: "13px", color: C.text3, marginTop: "4px" }}>투자일</div>
+                  <div style={{ fontSize: "42px", fontWeight: "900", color: C.green, textShadow: `0 0 12px ${C.green}40`, letterSpacing: "-1px" }}>{(() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })()}</div>
+                  <div style={{ fontSize: "14px", color: C.text3, marginTop: "6px", fontWeight: 600 }}>투자일</div>
                 </div>
               </div>
               <button onClick={() => {
@@ -11597,22 +11726,23 @@ function AppInner() {
                     background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
                     borderRadius: "16px", padding: "20px",
                     border: `1px solid ${C.border}20`,
+                    borderLeft: `4px solid ${[C.blue, C.purple, C.green, C.blue, C.purple, C.green][i]}`,
                     boxShadow: `0 2px 12px rgba(0,0,0,${C.isDark ? 0.15 : 0.08})`,
-                    transition: "all 0.3s",
+                    transition: "all 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
                   }}
                   onMouseEnter={e => {
                     if (!isMobile) {
-                      e.currentTarget.style.transform = "translateY(-4px)";
+                      e.currentTarget.style.transform = "translateY(-4px) scale(1.01)";
                       e.currentTarget.style.boxShadow = `0 8px 24px rgba(0,0,0,${C.isDark ? 0.25 : 0.12})`;
                     }
                   }}
                   onMouseLeave={e => {
                     if (!isMobile) {
-                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.transform = "translateY(0) scale(1)";
                       e.currentTarget.style.boxShadow = `0 2px 12px rgba(0,0,0,${C.isDark ? 0.15 : 0.08})`;
                     }
                   }}>
-                    <div style={{ fontSize: "32px", marginBottom: "12px" }}>{f.icon}</div>
+                    <div style={{ fontSize: "36px", marginBottom: "12px" }}>{f.icon}</div>
                     <h3 style={{ fontSize: "16px", fontWeight: 800, color: C.text1, marginBottom: "6px" }}>{f.title}</h3>
                     <p style={{ fontSize: "13px", color: C.text3, lineHeight: 1.5, margin: 0 }}>{f.desc}</p>
                   </div>
@@ -11626,46 +11756,50 @@ function AppInner() {
               padding: isMobile ? "16px" : "32px 40px",
               lineHeight: 1.7, color: C.text2
             }}>
-              <section style={{ marginBottom: "32px" }}>
+              <section style={{ marginBottom: "32px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "24px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.blue}` }}>
                 <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>서비스 개요</h2>
                 <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "14px", lineHeight: 1.7 }}>
                   Zepta는 개인 투자자를 위한 종합 투자 정보 플랫폼입니다. 미국 주식과 글로벌 암호화폐 시장을 아우르는 실시간 데이터 분석, AI 기반 퀀트 전략, 자동매매 시스템을 제공하여 데이터 기반의 합리적인 투자 의사결정을 지원합니다.
                 </p>
-                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "14px", lineHeight: 1.7 }}>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>
                   기존 금융 서비스의 복잡하고 전문가 중심적인 인터페이스에서 벗어나, 투자 초보자부터 전문 트레이더까지 누구나 쉽게 사용할 수 있는 직관적인 경험을 제공하는 것이 Zepta의 핵심 가치입니다.
                 </p>
               </section>
 
-              <section style={{ marginBottom: "32px" }}>
-                <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>주요 기능 상세</h2>
-                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}>
-                  <strong style={{ color: C.text1 }}>실시간 시장 모니터링</strong> — S&P 500, 나스닥, 다우존스 등 주요 지수와 개별 종목의 실시간 시세를 한눈에 확인할 수 있습니다. 글로벌 암호화폐 시장의 가격 변동도 실시간으로 추적합니다.
-                </p>
-                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}>
-                  <strong style={{ color: C.text1 }}>AI 퀀트 자동매매</strong> — 멀티팩터 시그널 분석(RSI, MACD, 볼린저밴드, Hurst 지수, 효율성 비율 등)을 기반으로 매수/매도 시점을 자동으로 판단합니다. 사용자는 투자 성향에 맞는 봇을 선택하여 자동매매를 운영할 수 있습니다.
-                </p>
-                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}>
-                  <strong style={{ color: C.text1 }}>종목 스크리너</strong> — 기술적 분석 지표와 펀더멘털 데이터를 조합하여 투자 기회를 탐색합니다. 섹터별 자금 흐름, 이상 탐지, 시장 심리 분석 등 다양한 관점에서 시장을 분석할 수 있습니다.
-                </p>
-                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}>
-                  <strong style={{ color: C.text1 }}>포트폴리오 관리</strong> — 보유 자산의 수익률, 배분 비율, 리스크 지표(DD, MDD, VaR)를 실시간으로 모니터링하여 체계적인 자산 관리를 지원합니다.
-                </p>
-                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}>
-                  <strong style={{ color: C.text1 }}>경제 캘린더 및 뉴스</strong> — FOMC, CPI, 고용지표 등 주요 경제 이벤트 일정과 실시간 금융 뉴스를 통해 시장에 영향을 미치는 정보를 빠르게 파악할 수 있습니다.
-                </p>
+              <section style={{ marginBottom: "32px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "24px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.purple}` }}>
+                <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "16px" }}>주요 기능 상세</h2>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>
+                    <strong style={{ color: C.text1 }}>실시간 시장 모니터링</strong> — S&P 500, 나스닥, 다우존스 등 주요 지수와 개별 종목의 실시간 시세를 한눈에 확인할 수 있습니다.
+                  </p>
+                  <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>
+                    <strong style={{ color: C.text1 }}>AI 퀀트 자동매매</strong> — 멀티팩터 시그널 분석을 기반으로 매수/매도 시점을 자동으로 판단합니다.
+                  </p>
+                  <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>
+                    <strong style={{ color: C.text1 }}>종목 스크리너</strong> — 기술적 분석 지표와 펀더멘털 데이터를 조합하여 투자 기회를 탐색합니다.
+                  </p>
+                  <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>
+                    <strong style={{ color: C.text1 }}>포트폴리오 관리</strong> — 보유 자산의 수익률, 배분 비율, 리스크 지표를 실시간으로 모니터링합니다.
+                  </p>
+                  <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>
+                    <strong style={{ color: C.text1 }}>경제 캘린더 및 뉴스</strong> — 주요 경제 이벤트 일정과 실시간 금융 뉴스를 제공합니다.
+                  </p>
+                </div>
               </section>
 
-              <section style={{ marginBottom: "32px" }}>
+              <section style={{ marginBottom: "32px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "24px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.green}` }}>
                 <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>운영 정보</h2>
-                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "8px" }}>운영자: 서동인</p>
-                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "8px" }}>이메일: donginseo0421@gmail.com</p>
-                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "8px" }}>서비스 URL: zepta.vercel.app</p>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0" }}>운영자: <strong style={{ color: C.text1 }}>서동인</strong></p>
+                  <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0" }}>이메일: <strong style={{ color: C.text1 }}>donginseo0421@gmail.com</strong></p>
+                  <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0" }}>서비스 URL: <strong style={{ color: C.text1 }}>zepta.vercel.app</strong></p>
+                </div>
               </section>
 
-              <section>
+              <section style={{ background: `linear-gradient(135deg, ${C.red}15 0%, ${C.red}08 100%)`, borderRadius: "16px", padding: "24px", border: `1px solid ${C.red}20`, borderLeft: `4px solid ${C.red}` }}>
                 <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>면책 조항</h2>
-                <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>
-                  Zepta에서 제공하는 모든 정보와 분석은 투자 참고 자료로만 활용되어야 하며, 특정 금융 상품의 매수 또는 매도를 권유하지 않습니다. 모든 투자의 판단과 책임은 이용자 본인에게 있으며, Zepta는 투자 결과에 대한 법적 책임을 지지 않습니다. 자동매매 기능을 통해 실제 자금이 거래됩니다. 투자 손실 위험이 있으므로 신중히 이용해주세요.
+                <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7, marginBottom: "0" }}>
+                  Zepta에서 제공하는 모든 정보와 분석은 투자 참고 자료로만 활용되어야 하며, 특정 금융 상품의 매수 또는 매도를 권유하지 않습니다. 모든 투자의 판단과 책임은 이용자 본인에게 있으며, Zepta는 투자 결과에 대한 법적 책임을 지지 않습니다.
                 </p>
               </section>
             </div>
@@ -11677,58 +11811,66 @@ function AppInner() {
             <h1 style={{ fontSize: isMobile ? "24px" : "28px", fontWeight: 800, color: C.text1, marginBottom: "8px" }}>개인정보처리방침</h1>
             <p style={{ fontSize: isMobile ? "14px" : "15px", color: C.text3, marginBottom: "24px" }}>시행일: 2025년 1월 1일 · 최종 수정: 2026년 4월 5일</p>
 
-            <section style={{ marginBottom: "28px" }}>
+            <section style={{ marginBottom: "28px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.blue}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>1. 수집하는 개인정보 항목</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "8px", lineHeight: 1.7 }}>Zepta는 서비스 제공을 위해 다음과 같은 개인정보를 수집합니다.</p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "4px", lineHeight: 1.7 }}>필수 항목: 이메일 주소 (회원가입 및 로그인 시)</p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "4px", lineHeight: 1.7 }}>선택 항목: 프로필 이름, 프로필 이미지 (소셜 로그인 시 제공되는 경우)</p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>자동 수집 항목: 서비스 이용 기록, 접속 로그, 기기 정보, 브라우저 유형</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>Zepta는 서비스 제공을 위해 다음과 같은 개인정보를 수집합니다.</p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>필수 항목: 이메일 주소 (회원가입 및 로그인 시)</p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>선택 항목: 프로필 이름, 프로필 이미지 (소셜 로그인 시 제공)</p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>자동 수집: 서비스 이용 기록, 접속 로그, 기기 정보</p>
+              </div>
             </section>
 
-            <section style={{ marginBottom: "28px" }}>
+            <section style={{ marginBottom: "28px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.purple}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>2. 개인정보의 수집 및 이용 목적</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "4px", lineHeight: 1.7 }}>회원 관리: 회원 식별, 인증, 계정 관리</p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "4px", lineHeight: 1.7 }}>서비스 제공: 관심 종목 저장, 자동매매 봇 설정 저장, 포트폴리오 데이터 관리</p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "4px", lineHeight: 1.7 }}>서비스 개선: 이용 통계 분석, 서비스 품질 향상, 오류 탐지 및 수정</p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>광고 게재: Google AdSense를 통한 맞춤형 광고 제공 (사용자의 광고 설정에 따라 조정 가능)</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>회원 관리: 회원 식별, 인증, 계정 관리</p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>서비스 제공: 관심 종목 저장, 자동매매 봇 설정 저장</p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>서비스 개선: 이용 통계 분석, 서비스 품질 향상</p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>광고 게재: Google AdSense를 통한 맞춤형 광고 제공</p>
+              </div>
             </section>
 
-            <section style={{ marginBottom: "28px" }}>
+            <section style={{ marginBottom: "28px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.green}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>3. 개인정보의 보유 및 이용 기간</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>
-                회원 탈퇴 시 즉시 파기합니다. 단, 관련 법령에 따라 보존이 필요한 경우 해당 기간 동안 보관합니다. 전자상거래법에 따른 계약 또는 청약철회 등에 관한 기록은 5년, 소비자 불만 또는 분쟁 처리에 관한 기록은 3년, 접속 기록은 통신비밀보호법에 따라 3개월간 보관합니다.
+              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7, marginBottom: "0" }}>
+                회원 탈퇴 시 즉시 파기합니다. 단, 관련 법령에 따라 보존이 필요한 경우 해당 기간 동안 보관합니다. 전자상거래법에 따른 계약은 5년, 소비자 불만 처리는 3년, 접속 기록은 3개월간 보관합니다.
               </p>
             </section>
 
-            <section style={{ marginBottom: "28px" }}>
+            <section style={{ marginBottom: "28px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.blue}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>4. 개인정보의 제3자 제공</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>
+              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7, marginBottom: "0" }}>
                 Zepta는 이용자의 개인정보를 원칙적으로 제3자에게 제공하지 않습니다. 다만, 이용자의 사전 동의가 있는 경우와 법령에 의해 요구되는 경우에는 예외로 합니다.
               </p>
             </section>
 
-            <section style={{ marginBottom: "28px" }}>
+            <section style={{ marginBottom: "28px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.purple}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>5. 쿠키 및 광고 관련 안내</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "8px", lineHeight: 1.7 }}>
-                Zepta는 Google AdSense를 통해 광고를 게재하며, Google은 쿠키를 사용하여 이용자의 관심사에 기반한 광고를 제공할 수 있습니다. 이용자는 Google 광고 설정(ads.google.com/settings)에서 맞춤 광고를 비활성화하거나, aboutads.info를 방문하여 제3자 광고 쿠키를 거부할 수 있습니다.
-              </p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>
-                쿠키는 브라우저 설정을 통해 거부할 수 있으며, 쿠키 저장을 거부할 경우 일부 서비스 이용에 어려움이 있을 수 있습니다.
-              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>
+                  Zepta는 Google AdSense를 통해 광고를 게재하며, Google은 쿠키를 사용하여 맞춤형 광고를 제공할 수 있습니다.
+                </p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>
+                  쿠키는 브라우저 설정을 통해 거부할 수 있으며, 쿠키 저장을 거부할 경우 일부 서비스 이용에 어려움이 있을 수 있습니다.
+                </p>
+              </div>
             </section>
 
-            <section style={{ marginBottom: "28px" }}>
+            <section style={{ marginBottom: "28px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.green}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>6. 개인정보의 안전성 확보 조치</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>
-                Zepta는 개인정보의 안전성 확보를 위해 HTTPS 암호화 통신, Supabase 인증 시스템 활용, 비밀번호 암호화 저장, 접근 권한 관리 등의 기술적·관리적 조치를 시행하고 있습니다.
+              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7, marginBottom: "0" }}>
+                Zepta는 개인정보의 안전성 확보를 위해 HTTPS 암호화 통신, Supabase 인증 시스템 활용, 비밀번호 암호화 저장, 접근 권한 관리 등의 조치를 시행하고 있습니다.
               </p>
             </section>
 
-            <section>
+            <section style={{ background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.blue}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>7. 개인정보 보호 책임자</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "4px", lineHeight: 1.7 }}>이름: 서동인</p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "4px", lineHeight: 1.7 }}>이메일: donginseo0421@gmail.com</p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>개인정보 관련 문의는 위 이메일로 연락 부탁드립니다.</p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>이름: <strong style={{ color: C.text1 }}>서동인</strong></p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>이메일: <strong style={{ color: C.text1 }}>donginseo0421@gmail.com</strong></p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>개인정보 관련 문의는 위 이메일로 연락 부탁드립니다.</p>
+              </div>
             </section>
           </div>
         )}
@@ -11738,52 +11880,52 @@ function AppInner() {
             <h1 style={{ fontSize: isMobile ? "24px" : "28px", fontWeight: 800, color: C.text1, marginBottom: "8px" }}>이용약관</h1>
             <p style={{ fontSize: isMobile ? "14px" : "15px", color: C.text3, marginBottom: "24px" }}>시행일: 2025년 1월 1일 · 최종 수정: 2026년 4월 5일</p>
 
-            <section style={{ marginBottom: "28px" }}>
+            <section style={{ marginBottom: "28px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.blue}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제1조 (목적)</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>
-                본 약관은 Zepta(이하 "서비스")가 제공하는 투자 정보 서비스의 이용 조건 및 절차, 이용자와 서비스 간의 권리·의무·책임 사항을 규정함을 목적으로 합니다.
+              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7, marginBottom: "0" }}>
+                본 약관은 Zepta가 제공하는 투자 정보 서비스의 이용 조건 및 절차, 이용자와 서비스 간의 권리·의무·책임 사항을 규정함을 목적으로 합니다.
               </p>
             </section>
 
-            <section style={{ marginBottom: "28px" }}>
+            <section style={{ marginBottom: "28px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.purple}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제2조 (서비스의 내용)</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>
-                서비스는 다음과 같은 기능을 제공합니다: 실시간 시장 데이터 조회 및 분석, AI 기반 자동매매(실거래), 종목 스크리닝 및 기술적 분석, 포트폴리오 관리 도구, 경제 캘린더 및 뉴스 제공. 서비스는 투자 참고 자료를 제공하는 것이며, 투자 자문 서비스가 아닙니다.
+              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7, marginBottom: "0" }}>
+                서비스는 실시간 시장 데이터 조회 및 분석, AI 기반 자동매매, 종목 스크리닝, 포트폴리오 관리, 경제 캘린더 및 뉴스를 제공합니다. 서비스는 투자 참고 자료를 제공하는 것이며, 투자 자문 서비스가 아닙니다.
               </p>
             </section>
 
-            <section style={{ marginBottom: "28px" }}>
+            <section style={{ marginBottom: "28px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.green}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제3조 (이용자의 의무)</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>
-                이용자는 본 약관 및 관련 법령을 준수해야 합니다. 서비스의 정상적인 운영을 방해하는 행위, 타인의 개인정보를 부정하게 수집하는 행위, 서비스를 이용하여 불법 행위를 하는 행위는 금지됩니다. 이용자는 자신의 계정 정보를 관리할 책임이 있으며, 계정의 무단 사용을 발견한 경우 즉시 서비스에 알려야 합니다.
+              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7, marginBottom: "0" }}>
+                이용자는 본 약관 및 관련 법령을 준수해야 합니다. 서비스의 정상적인 운영을 방해하는 행위, 개인정보를 부정하게 수집하는 행위, 불법 행위는 금지됩니다. 계정 무단 사용을 발견한 경우 즉시 서비스에 알려야 합니다.
               </p>
             </section>
 
-            <section style={{ marginBottom: "28px" }}>
+            <section style={{ marginBottom: "28px", background: `linear-gradient(135deg, ${C.red}15 0%, ${C.red}08 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.red}20`, borderLeft: `4px solid ${C.red}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제4조 (투자 관련 면책)</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>
-                서비스에서 제공하는 정보, 분석, 시그널, 자동매매 결과는 투자 참고 자료일 뿐이며, 특정 금융 상품의 매수 또는 매도를 권유하거나 보장하지 않습니다. 모든 투자 의사결정의 최종 판단과 그에 따른 책임은 이용자 본인에게 있습니다. 서비스는 시장 데이터의 정확성, 완전성, 적시성을 보장하지 않으며, 데이터 오류나 지연으로 인한 손실에 대해 책임을 지지 않습니다. 자동매매 기능을 통해 실제 자금이 거래되며, 거래 손실에 대한 모든 책임은 이용자에게 있습니다.
+              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7, marginBottom: "0" }}>
+                서비스의 모든 정보는 투자 참고 자료일 뿐이며, 특정 금융 상품 매수/매도를 권유하지 않습니다. 모든 투자 의사결정의 책임은 이용자에게 있습니다. 자동매매 기능을 통해 실제 자금이 거래되며, 거래 손실에 대한 모든 책임은 이용자에게 있습니다.
               </p>
             </section>
 
-            <section style={{ marginBottom: "28px" }}>
+            <section style={{ marginBottom: "28px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.blue}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제5조 (서비스의 변경 및 중단)</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>
-                서비스는 운영상 필요한 경우 서비스의 전부 또는 일부를 변경하거나 중단할 수 있습니다. 서비스 변경 또는 중단 시 가능한 범위에서 사전에 공지합니다. 천재지변, 시스템 장애 등 불가항력적 사유로 서비스가 중단되는 경우 별도의 통보 없이 서비스가 중단될 수 있으며, 이에 대한 책임을 지지 않습니다.
+              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7, marginBottom: "0" }}>
+                서비스는 운영상 필요한 경우 변경하거나 중단할 수 있습니다. 변경 또는 중단 시 가능한 범위에서 사전에 공지합니다. 불가항력적 사유로 중단되는 경우 별도의 통보 없이 중단될 수 있습니다.
               </p>
             </section>
 
-            <section style={{ marginBottom: "28px" }}>
+            <section style={{ marginBottom: "28px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.purple}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제6조 (지적재산권)</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>
-                서비스에서 제공하는 콘텐츠(텍스트, 이미지, UI 디자인, 분석 알고리즘 등)에 대한 저작권 및 지적재산권은 서비스에 귀속됩니다. 이용자는 서비스의 콘텐츠를 개인적 용도로만 사용할 수 있으며, 무단 복제, 배포, 상업적 이용은 금지됩니다.
+              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7, marginBottom: "0" }}>
+                서비스의 콘텐츠에 대한 저작권 및 지적재산권은 서비스에 귀속됩니다. 이용자는 개인적 용도로만 사용할 수 있으며, 무단 복제, 배포, 상업적 이용은 금지됩니다.
               </p>
             </section>
 
-            <section>
+            <section style={{ background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.green}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제7조 (분쟁 해결)</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>
-                본 약관과 관련된 분쟁은 대한민국 법률에 따라 해석되며, 분쟁 발생 시 서울중앙지방법원을 관할 법원으로 합니다. 서비스 이용에 대한 문의사항은 donginseo0421@gmail.com으로 연락 부탁드립니다.
+              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7, marginBottom: "0" }}>
+                본 약관과 관련된 분쟁은 대한민국 법률에 따라 해석되며, 분쟁 발생 시 서울중앙지방법원을 관할 법원으로 합니다. 문의사항은 donginseo0421@gmail.com으로 연락 부탁드립니다.
               </p>
             </section>
           </div>
@@ -11796,19 +11938,23 @@ function AppInner() {
               <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "14px", lineHeight: 1.7 }}>
                 Zepta 서비스에 대한 문의, 건의, 불편 사항은 아래 연락처로 연락해 주세요. 최대한 빠르게 답변 드리겠습니다.
               </p>
-              <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: isMobile ? "16px" : "24px", marginBottom: "24px" }}>
-                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}><strong style={{ color: C.text1 }}>이메일</strong>: donginseo0421@gmail.com</p>
-                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}><strong style={{ color: C.text1 }}>운영자</strong>: 서동인</p>
-                <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}><strong style={{ color: C.text1 }}>응답 시간</strong>: 보통 1~2 영업일 이내</p>
+              <div style={{ background: `linear-gradient(135deg, ${C.blue}15 0%, ${C.blue}08 100%)`, border: `1px solid ${C.blue}30`, borderRadius: "16px", padding: isMobile ? "16px" : "24px", marginBottom: "24px", borderLeft: `4px solid ${C.blue}` }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}><strong style={{ color: C.text1 }}>이메일</strong>: donginseo0421@gmail.com</p>
+                  <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}><strong style={{ color: C.text1 }}>운영자</strong>: 서동인</p>
+                  <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}><strong style={{ color: C.text1 }}>응답 시간</strong>: 보통 1~2 영업일 이내</p>
+                </div>
               </div>
             </section>
-            <section style={{ marginBottom: "32px" }}>
-              <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>문의 유형별 안내</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "8px", lineHeight: 1.7 }}><strong style={{ color: C.text1 }}>서비스 이용 관련</strong>: 기능 사용법, 계정 문제, 데이터 관련 문의</p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "8px", lineHeight: 1.7 }}><strong style={{ color: C.text1 }}>버그 리포트</strong>: 서비스 오류나 비정상 동작 신고</p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "8px", lineHeight: 1.7 }}><strong style={{ color: C.text1 }}>기능 제안</strong>: 새로운 기능이나 개선 사항 제안</p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "8px", lineHeight: 1.7 }}><strong style={{ color: C.text1 }}>광고 및 제휴</strong>: 광고 게재, 비즈니스 제휴 관련 문의</p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}><strong style={{ color: C.text1 }}>개인정보 관련</strong>: 개인정보 열람, 수정, 삭제 요청</p>
+            <section style={{ marginBottom: "32px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.purple}` }}>
+              <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "16px" }}>문의 유형별 안내</h2>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}><strong style={{ color: C.text1 }}>서비스 이용 관련</strong>: 기능 사용법, 계정 문제, 데이터 관련 문의</p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}><strong style={{ color: C.text1 }}>버그 리포트</strong>: 서비스 오류나 비정상 동작 신고</p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}><strong style={{ color: C.text1 }}>기능 제안</strong>: 새로운 기능이나 개선 사항 제안</p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}><strong style={{ color: C.text1 }}>광고 및 제휴</strong>: 광고 게재, 비즈니스 제휴 관련 문의</p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}><strong style={{ color: C.text1 }}>개인정보 관련</strong>: 개인정보 열람, 수정, 삭제 요청</p>
+              </div>
             </section>
           </div>
         )}
@@ -11905,6 +12051,39 @@ function AppInner() {
       </div>{/* di-main-wrap */}
 
       {/* ═══ AI 투자 어시스턴트 플로팅 채팅 ═══ */}
+
+      {/* 맨 위로 버튼 */}
+      {showScrollTop && (
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          style={{
+            position: "fixed",
+            bottom: isMobile ? "140px" : "100px",
+            right: isMobile ? "16px" : "28px",
+            width: "44px",
+            height: "44px",
+            borderRadius: "50%",
+            background: `${C.card}E0`,
+            border: `1px solid ${C.border}30`,
+            backdropFilter: "blur(8px)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: "18px",
+            color: C.text2,
+            zIndex: 9990,
+            transition: "all .2s",
+            boxShadow: `0 4px 12px ${C.bg}80`,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.background = C.blue; e.currentTarget.style.color = "#fff"; e.currentTarget.style.boxShadow = `0 6px 20px ${C.blue}40`; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.background = `${C.card}E0`; e.currentTarget.style.color = C.text2; e.currentTarget.style.boxShadow = `0 4px 12px ${C.bg}80`; }}
+          title="맨 위로"
+        >
+          ↑
+        </button>
+      )}
+
       {/* FAB 버튼 */}
       <button onClick={() => setAiChatOpen(!aiChatOpen)} style={{
         position: "fixed", bottom: "28px", right: "28px",

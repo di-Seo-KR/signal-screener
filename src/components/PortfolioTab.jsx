@@ -132,31 +132,96 @@ export default memo(function PortfolioTab({
 
       {/* 포트폴리오 아이템 */}
       {portfolio.length === 0 ? (
-        <div className="rounded-[18px] p-[40px_24px] text-center" style={{ background: C.card, border: `1px solid ${C.border}20` }}>
-          <div className="text-4xl mb-3">💼</div>
-          <div className="font-bold text-lg mb-2" style={{ color: C.text1 }}>{t("portfolio.startPortfolio")}</div>
-          <div className="text-base mb-5" style={{ color: C.text3, lineHeight: 1.6 }}>
-            {t("portfolio.startDesc")}
+        <div style={{
+          borderRadius: "20px",
+          padding: "56px 24px",
+          textAlign: "center",
+          background: `linear-gradient(135deg, ${C.blueBg}20 0%, ${C.card2}40 100%)`,
+          border: `1px solid ${C.border}20`,
+          boxShadow: `0 4px 16px ${C.blue}10`,
+        }}>
+          <div style={{ fontSize: "56px", marginBottom: "16px", animation: "float 3s ease-in-out infinite" }}>💼</div>
+          <div style={{ fontSize: "20px", fontWeight: 800, marginBottom: "8px", color: C.text1 }}>
+            {t("portfolio.startPortfolio") || "포트폴리오를 시작하세요"}
           </div>
-          <div className="flex flex-col gap-2.5 max-w-80 mx-auto text-left">
+          <div style={{ fontSize: "16px", color: C.text3, lineHeight: 1.7, marginBottom: "28px" }}>
+            {t("portfolio.startDesc") || "보유 자산을 기록하고 성과를 추적하세요"}
+          </div>
+
+          {/* 스텝 가이드 */}
+          <div style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+            maxWidth: "420px",
+            margin: "0 auto 28px",
+            textAlign: "left",
+          }}>
             {[
-              { icon: "1️⃣", text: t("portfolio.step1") },
-              { icon: "2️⃣", text: t("portfolio.step2") },
-              { icon: "3️⃣", text: t("portfolio.step3") },
+              { icon: "1️⃣", text: t("portfolio.step1") || "종목을 검색하여 추가" },
+              { icon: "2️⃣", text: t("portfolio.step2") || "매수 가격과 수량 입력" },
+              { icon: "3️⃣", text: t("portfolio.step3") || "실시간 성과 추적" },
             ].map((step, i) => (
-              <div key={i} className="flex items-center gap-2.5 p-2.5 rounded-[10px]" style={{ background: C.card2 }}>
-                <span className="text-base">{step.icon}</span>
-                <span className="text-base" style={{ color: C.text2, fontWeight: 500 }}>{step.text}</span>
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "12px 16px",
+                  borderRadius: "12px",
+                  background: `${C.blue}10`,
+                  border: `1px solid ${C.blue}20`,
+                  transition: "all .2s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}20`; e.currentTarget.style.transform = "translateX(4px)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = `${C.blue}10`; e.currentTarget.style.transform = "translateX(0)"; }}
+              >
+                <span style={{ fontSize: "18px", minWidth: "24px" }}>{step.icon}</span>
+                <span style={{ fontSize: "15px", color: C.text2, fontWeight: 500 }}>{step.text}</span>
               </div>
             ))}
           </div>
-          <div className="mt-5 flex gap-2 justify-center">
-            <button onClick={() => setTab("screener")} className="px-5 py-2 rounded-[10px] text-base font-bold cursor-pointer transition-all" style={{
-              background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}30`,
-            }}>{t("portfolio.screener")}</button>
-            <button onClick={() => setTab("quant-report")} className="px-5 py-2 rounded-[10px] text-base font-bold cursor-pointer transition-all" style={{
-              background: C.card2, color: C.text2, border: `1px solid ${C.border}`,
-            }}>{t("portfolio.report")}</button>
+
+          {/* CTA 버튼 */}
+          <div style={{ display: "flex", gap: "10px", justifyContent: "center", flexWrap: "wrap" }}>
+            <button
+              onClick={() => setTab("screener")}
+              style={{
+                padding: "10px 24px",
+                borderRadius: "12px",
+                fontSize: "15px",
+                fontWeight: 700,
+                background: C.blue,
+                color: "#fff",
+                border: "none",
+                cursor: "pointer",
+                transition: "all .2s",
+                boxShadow: `0 4px 12px ${C.blue}30`,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 6px 20px ${C.blue}40`; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 4px 12px ${C.blue}30`; }}
+            >
+              {t("portfolio.screener") || "스크리너에서 찾기"}
+            </button>
+            <button
+              onClick={() => setTab("quant-report")}
+              style={{
+                padding: "10px 24px",
+                borderRadius: "12px",
+                fontSize: "15px",
+                fontWeight: 700,
+                background: C.card2,
+                color: C.text2,
+                border: `1.5px solid ${C.border}`,
+                cursor: "pointer",
+                transition: "all .2s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}15`; e.currentTarget.style.color = C.blue; e.currentTarget.style.borderColor = C.blue; }}
+              onMouseLeave={e => { e.currentTarget.style.background = C.card2; e.currentTarget.style.color = C.text2; e.currentTarget.style.borderColor = C.border; }}
+            >
+              {t("portfolio.report") || "추천 리포트 보기"}
+            </button>
           </div>
         </div>
       ) : (
