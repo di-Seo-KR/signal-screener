@@ -7059,8 +7059,8 @@ function AppInner() {
           .tech-grid-popup { grid-template-columns: repeat(2, 1fr) !important; }
           .home-grid { gap: 16px !important; }
           .home-left { gap: 14px !important; }
-          .home-right { gap: 14px !important; order: -1 !important; }
-          /* 모바일에서 사이드바(prediction, quiz, badges)를 상단으로 이동 */
+          .home-right { gap: 14px !important; }
+          /* 모바일에서 사이드바는 메인 콘텐츠 아래에 자연 배치 */
           .ui-card { padding: 16px !important; border-radius: 14px !important; }
           .ui-card-compact { padding: 14px !important; }
           .ui-list-item { padding: 12px 8px; }
