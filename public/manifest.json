@@ -2,11 +2,17 @@
   "name": "Zepta",
   "short_name": "Zepta",
   "description": "AI 퀀트 투자 플랫폼 — 33개 전략 자동매매",
+  "id": "/",
+  "scope": "/",
   "start_url": "/",
+  "lang": "ko",
+  "dir": "ltr",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
   "background_color": "#060a12",
   "theme_color": "#060a12",
+  "categories": ["finance", "business", "productivity"],
   "icons": [
     {
       "src": "/zepta-icon-192.png",
@@ -17,6 +23,40 @@
       "src": "/zepta-icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
+    },
+    {
+      "src": "/zepta-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
-  ]
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "스크리너",
+      "short_name": "스크리너",
+      "url": "/screener",
+      "description": "실시간 주식/코인 스크리너"
+    },
+    {
+      "name": "AI 자동매매",
+      "short_name": "AI매매",
+      "url": "/auto-trading",
+      "description": "AI 퀀트 자동매매"
+    },
+    {
+      "name": "포트폴리오",
+      "short_name": "포트폴리오",
+      "url": "/portfolio",
+      "description": "포트폴리오 관리"
+    },
+    {
+      "name": "뉴스",
+      "short_name": "뉴스",
+      "url": "/news",
+      "description": "실시간 투자 뉴스"
+    }
+  ],
+  "prefer_related_applications": false
 }

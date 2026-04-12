@@ -2942,7 +2942,7 @@ function AssetCard({ asset, onChart, isMobile = false }) {
               </div>
             ))}
           </div>
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "8px", flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : "visible", paddingBottom: isMobile ? "8px" : "0" }}>
             <button onClick={(e) => { e.stopPropagation(); onChart(); }} style={{
               padding: "10px 20px", borderRadius: "10px", fontSize: "17px", fontWeight: 600, minHeight: "44px",
               background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}44`, cursor: "pointer",
@@ -4104,17 +4104,17 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                           </span>
                         </div>
                         <div style={{ fontSize: "15px", color: C.text3, marginBottom: "6px" }}>{s.desc}</div>
-                        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                          <span style={{ fontSize: "15px", padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
+                        <div style={{ display: "flex", gap: "8px", flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : "visible", paddingBottom: isMobile ? "8px" : "0" }}>
+                          <span style={{ fontSize: mf(15), padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
                             샤프 <span style={{ fontWeight: 700, color: s.sharpe >= 1 ? C.green : s.sharpe >= 0 ? C.yellow : C.red }}>{s.sharpe}</span>
                           </span>
-                          <span style={{ fontSize: "15px", padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
+                          <span style={{ fontSize: mf(15), padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
                             승률 <span style={{ fontWeight: 700, color: s.winRate >= 60 ? C.green : s.winRate >= 40 ? C.yellow : C.red }}>{s.winRate}%</span>
                           </span>
-                          <span style={{ fontSize: "15px", padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
+                          <span style={{ fontSize: mf(15), padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
                             MDD <span style={{ fontWeight: 700, color: s.maxDD <= 10 ? C.green : s.maxDD <= 20 ? C.yellow : C.red }}>-{s.maxDD}%</span>
                           </span>
-                          <span style={{ fontSize: "15px", padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
+                          <span style={{ fontSize: mf(15), padding: "2px 6px", borderRadius: "4px", background: C.card2 }}>
                             {s.trades}회
                           </span>
                         </div>
@@ -6887,7 +6887,7 @@ function AppInner() {
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: ${C.border2}; border-radius: 3px; }
         button, a { cursor: pointer; font-family: inherit; transition: all 0.15s ease; }
-        button:active { transform: scale(0.97); }
+        button:active { transform: scale(0.96); transition-duration: 0.08s; }
         button:focus-visible { outline: 2px solid ${C.blue}; outline-offset: 2px; }
         input, select { font-family: inherit; font-size: 14px; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
         input:focus { border-color: ${C.blue} !important; box-shadow: 0 0 0 3px ${C.blue}30; outline: none; }
@@ -6909,6 +6909,14 @@ function AppInner() {
         /* 가로 스크롤 영역 스크롤바 숨김 */
         .hscroll { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; -ms-overflow-style: none; }
         .hscroll::-webkit-scrollbar { display: none; }
+        /* 수평 스크롤 우측 페이드 효과 */
+        .hscroll-fade { position: relative; }
+        .hscroll-fade::after { content: ""; position: absolute; right: 0; top: 0; bottom: 0; width: 32px; background: linear-gradient(to right, transparent, ${C.bg}); pointer-events: none; z-index: 1; }
+        /* 터치 피드백 개선 — 모든 인터랙티브 요소 */
+        @media (pointer: coarse) {
+          .ui-card-compact:active { transform: scale(0.98); }
+          .ui-list-item:active { background: ${C.card2}90; transform: scale(0.99); }
+        }
         /* 좌측 네비게이션 바 (LNB) */
         .lnb-sidebar { display: flex !important; }
         .lnb-sidebar::-webkit-scrollbar { display: none; }
@@ -6939,8 +6947,8 @@ function AppInner() {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
           .lnb-sidebar { display: none !important; }
-          main { padding-left: 14px !important; padding-right: 14px !important; padding-bottom: 90px !important; font-size: 15px !important; }
-          .tab-content { font-size: 15px; padding-bottom: 80px !important; }
+          main { padding-left: 14px !important; padding-right: 14px !important; padding-bottom: 120px !important; font-size: 15px !important; }
+          .tab-content { font-size: 15px; padding-bottom: 120px !important; gap: 12px !important; }
           button { min-height: 44px; }
           select { min-height: 44px; }
           .screener-cond-btn { padding: 10px 16px !important; font-size: 13px !important; min-height: 44px !important; border-radius: 12px !important; }
@@ -6970,6 +6978,8 @@ function AppInner() {
           .asset-card .indicator-grid { gap: 6px !important; }
           /* v3.7: 수급 게이지 모바일 최소 높이 확보 */
           .asset-card div[style*="gap: 3px"] { gap: 5px !important; }
+          /* 섹션 제목 모바일 폰트 축소 */
+          .ui-section-title { font-size: 15px !important; }
         }
         /* ── 매우 작은 화면 (≤380px) — 극저해상도 최적화 ── */
         @media (max-width: 380px) {
@@ -8578,10 +8588,10 @@ function AppInner() {
             {/* ── 스크리너 프리셋 (토스 스타일) ── */}
             <div style={{ marginBottom: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                <div style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>{t("tabs.screener.title")}</div>
-                <span style={{ fontSize: "14px", color: C.text3 }}>{t("tabs.screener.subtitle")}</span>
+                <div style={{ fontWeight: 700, fontSize: mf(17), color: C.text1 }}>{t("tabs.screener.title")}</div>
+                <span style={{ fontSize: mf(14), color: C.text3 }}>{t("tabs.screener.subtitle")}</span>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(180px, 1fr))", gap: "10px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(160px, 1fr))", gap: "10px" }}>
                 {SCREENER_PRESETS.map(preset => {
                   const isActive = activePreset === preset.id;
                   const presetColor = preset.color === "green" ? C.green : preset.color === "blue" ? C.blue : preset.color === "red" ? C.red : preset.color === "yellow" ? C.yellow : C.purple;
@@ -8598,7 +8608,7 @@ function AppInner() {
                         setMode(preset.mode);
                       }
                     }} style={{
-                      padding: "12px 14px", borderRadius: "14px", textAlign: "left", cursor: "pointer",
+                      padding: isMobile ? "10px 12px" : "12px 14px", borderRadius: "14px", textAlign: "left", cursor: "pointer", minHeight: "44px", display: "flex", flexDirection: "column", justifyContent: "center",
                       background: isActive ? presetBg : C.card,
                       border: `1px solid ${isActive ? `${presetColor}40` : `${C.border}20`}`,
                       transition: "all 0.2s ease", position: "relative", overflow: "hidden",
@@ -8606,11 +8616,11 @@ function AppInner() {
                     onMouseEnter={e => { if (!isActive) { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = `${presetColor}30`; } }}
                     onMouseLeave={e => { if (!isActive) { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${C.border}20`; } }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                        <span style={{ fontSize: "17px" }}>{preset.icon}</span>
-                        <span style={{ fontWeight: 700, fontSize: "15px", color: isActive ? presetColor : C.text1 }}>{preset.name}</span>
+                        <span style={{ fontSize: mf(17) }}>{preset.icon}</span>
+                        <span style={{ fontWeight: 700, fontSize: mf(15), color: isActive ? presetColor : C.text1 }}>{preset.name}</span>
                         {preset.popular && <span style={{ fontSize: "12px", padding: "2px 6px", borderRadius: "4px", background: `${C.red}20`, color: C.red, fontWeight: 700 }}>{t("tabs.screener.popular")}</span>}
                       </div>
-                      <div style={{ fontSize: "13px", color: isActive ? presetColor : C.text3, lineHeight: 1.4 }}>{preset.desc}</div>
+                      <div style={{ fontSize: mf(13), color: isActive ? presetColor : C.text3, lineHeight: 1.4 }}>{preset.desc}</div>
                       {isActive && <div style={{ position: "absolute", top: "8px", right: "8px", width: "20px", height: "20px", borderRadius: "50%", background: presetColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#fff" }}>✓</div>}
                     </button>
                   );
@@ -8621,9 +8631,9 @@ function AppInner() {
               {activePreset && (
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "12px", flexWrap: "wrap" }}>
                   <button onClick={runScan} disabled={scanning || conditions.length === 0} style={{
-                    padding: "10px 20px", borderRadius: "10px", fontSize: "15px", fontWeight: 700,
+                    padding: isMobile ? "12px 16px" : "10px 20px", borderRadius: "10px", fontSize: mf(15), fontWeight: 700,
                     background: scanning ? C.card2 : C.blue, color: scanning ? C.text3 : "#fff",
-                    border: "none", cursor: scanning ? "not-allowed" : "pointer", minWidth: "100px",
+                    border: "none", cursor: scanning ? "not-allowed" : "pointer", minWidth: isMobile ? "100%" : "100px", minHeight: "44px",
                   }}>
                     {scanning
                       ? <span style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "center" }}>
@@ -8639,7 +8649,7 @@ function AppInner() {
                     </div>
                   )}
                   {lastScan && !scanning && (
-                    <span style={{ fontSize: "16px", color: C.text3 }}>마지막: {lastScan.toLocaleTimeString("ko-KR")}</span>
+                    <span style={{ fontSize: mf(16), color: C.text3 }}>마지막: {lastScan.toLocaleTimeString("ko-KR")}</span>
                   )}
                   <span style={{ fontSize: "16px", color: C.text3 }}>{conditions.length}{t("tabs.screener.conditionsAppliedCount")}</span>
                 </div>
@@ -8655,17 +8665,17 @@ function AppInner() {
                 display: "flex", alignItems: "center", gap: "8px", listStyle: "none",
               }}>
                 <span>⚙️ {t("tabs.screener.customSettings")}</span>
-                <span style={{ fontSize: "16px", color: C.text3, fontWeight: 500, marginLeft: "auto" }}>
+                <span style={{ fontSize: mf(16), color: C.text3, fontWeight: 500, marginLeft: "auto" }}>
                   {conditions.length > 0 ? `${conditions.length}${t("tabs.screener.conditionsApplied")}` : t("tabs.screener.selectConditions")}
                 </span>
               </summary>
             <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "0 0 18px 18px", padding: "22px 24px", marginTop: "-1px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-                <div style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>⚙️ 스크리닝 옵션</div>
+                <div style={{ fontWeight: 700, fontSize: mf(18), color: C.text1 }}>⚙️ 스크리닝 옵션</div>
                 <div style={{ display: "flex", gap: "6px" }}>
                   {["or", "and"].map(m => (
                     <button key={m} onClick={() => setMode(m)} style={{
-                      padding: "5px 12px", borderRadius: "8px", fontSize: "16px", fontWeight: 700,
+                      padding: "6px 14px", borderRadius: "8px", fontSize: mf(16), fontWeight: 700, minHeight: "36px",
                       background: mode === m ? C.blue : C.card2, color: mode === m ? "#fff" : C.text3,
                       border: `1px solid ${mode === m ? C.blue : C.border2}`,
                     }}>{m.toUpperCase()}</button>
@@ -8682,7 +8692,7 @@ function AppInner() {
                   return (
                     <button key={key} onClick={() => setConditions(p => on ? p.filter(c => c !== key) : [...p, key])}
                       title={meta?.desc} style={{
-                        padding: "6px 12px", borderRadius: "10px", fontSize: "16px", fontWeight: 600,
+                        padding: isMobile ? "10px 12px" : "8px 12px", borderRadius: "10px", fontSize: mf(13), fontWeight: 600, minHeight: "44px", display: "flex", alignItems: "center", gap: "6px",
                         background: on ? `${C.blue}22` : C.card2, color: on ? C.blue : C.text3,
                         border: `1px solid ${on ? C.blue : C.border2}`,
                       }}>{meta?.icon} {meta?.label}</button>
@@ -8699,7 +8709,7 @@ function AppInner() {
                   return (
                     <button key={key} onClick={() => setConditions(p => on ? p.filter(c => c !== key) : [...p, key])}
                       title={meta?.desc} style={{
-                        padding: "6px 12px", borderRadius: "10px", fontSize: "16px", fontWeight: 600,
+                        padding: isMobile ? "10px 12px" : "8px 12px", borderRadius: "10px", fontSize: mf(13), fontWeight: 600, minHeight: "44px", display: "flex", alignItems: "center", gap: "6px",
                         background: on ? `${C.red}22` : C.card2, color: on ? C.red : C.text3,
                         border: `1px solid ${on ? C.red : C.border2}`,
                       }}>{meta?.icon} {meta?.label}</button>
@@ -8716,7 +8726,7 @@ function AppInner() {
                   return (
                     <button key={key} onClick={() => setConditions(p => on ? p.filter(c => c !== key) : [...p, key])}
                       title={meta?.desc} style={{
-                        padding: "6px 12px", borderRadius: "10px", fontSize: "16px", fontWeight: 600,
+                        padding: isMobile ? "10px 12px" : "8px 12px", borderRadius: "10px", fontSize: mf(13), fontWeight: 600, minHeight: "44px", display: "flex", alignItems: "center", gap: "6px",
                         background: on ? `${C.yellow}22` : C.card2, color: on ? C.yellow : C.text3,
                         border: `1px solid ${on ? C.yellow : C.border2}`,
                       }}>{meta?.icon} {meta?.label}</button>
@@ -8733,7 +8743,7 @@ function AppInner() {
                   return (
                     <button key={key} onClick={() => setConditions(p => on ? p.filter(c => c !== key) : [...p, key])}
                       title={meta?.desc} style={{
-                        padding: "6px 12px", borderRadius: "10px", fontSize: "16px", fontWeight: 600,
+                        padding: isMobile ? "10px 12px" : "8px 12px", borderRadius: "10px", fontSize: mf(13), fontWeight: 600, minHeight: "44px", display: "flex", alignItems: "center", gap: "6px",
                         background: on ? `${C.green}22` : C.card2, color: on ? C.green : C.text3,
                         border: `1px solid ${on ? C.green : C.border2}`,
                       }}>{meta?.icon} {meta?.label}</button>
@@ -8751,10 +8761,10 @@ function AppInner() {
               )}
               <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
                 <button onClick={runScan} disabled={scanning || conditions.length === 0} style={{
-                  padding: "11px 24px", borderRadius: "12px", fontSize: "18px", fontWeight: 700,
+                  padding: isMobile ? "14px 16px" : "11px 24px", borderRadius: "12px", fontSize: mf(18), fontWeight: 700,
                   background: scanning ? C.card2 : conditions.length === 0 ? C.card2 : C.blue,
                   color: scanning || conditions.length === 0 ? C.text3 : "#fff", border: "none",
-                  minWidth: "120px", opacity: conditions.length === 0 ? 0.6 : 1,
+                  minWidth: isMobile ? "100%" : "120px", minHeight: "48px", opacity: conditions.length === 0 ? 0.6 : 1,
                 }}>
                   {scanning
                     ? <span style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }}>
@@ -8773,7 +8783,7 @@ function AppInner() {
                   </div>
                 )}
                 {lastScan && !scanning && (
-                  <span style={{ fontSize: "16px", color: C.text3 }}>마지막: {lastScan.toLocaleTimeString("ko-KR")}</span>
+                  <span style={{ fontSize: mf(16), color: C.text3 }}>마지막: {lastScan.toLocaleTimeString("ko-KR")}</span>
                 )}
               </div>
 
@@ -8791,19 +8801,19 @@ function AppInner() {
             {/* 결과 필터 */}
             {results.length > 0 && (
               <div style={{ display: "flex", gap: "7px", alignItems: "center", marginBottom: "12px", flexWrap: "wrap" }}>
-                <span style={{ fontSize: "17px", color: C.text2, fontWeight: 600 }}>🎯 {filtered.length}개</span>
+                <span style={{ fontSize: mf(17), color: C.text2, fontWeight: 600 }}>🎯 {filtered.length}개</span>
                 {["all","us","kr","crypto"].map(m => (
                   <button key={m} onClick={() => setFilterMarket(m)} style={{
-                    padding: "4px 10px", borderRadius: "8px", fontSize: "16px", fontWeight: 600,
+                    padding: "4px 10px", borderRadius: "8px", fontSize: mf(16), fontWeight: 600,
                     background: filterMarket === m ? C.blueBg : "transparent",
                     color: filterMarket === m ? C.blue : C.text3, border: `1px solid ${filterMarket === m ? C.blue : C.border2}`,
                   }}>{m === "all" ? "전체" : m === "us" ? "🇺🇸 미국" : m === "kr" ? "🇰🇷 한국" : "₿ 크립토"}</button>
                 ))}
                 <div style={{ marginLeft: "auto", display: "flex", gap: "5px", alignItems: "center" }}>
-                  <span style={{ fontSize: "16px", color: C.text3 }}>정렬</span>
+                  <span style={{ fontSize: mf(16), color: C.text3 }}>정렬</span>
                   {[["score","퀀트점수"], ["rsi","RSI"], ["change","변동률"], ["vol","거래량"], ["signals","시그널"]].map(([v, l]) => (
                     <button key={v} onClick={() => setSortBy(v)} style={{
-                      padding: "3px 8px", borderRadius: "6px", fontSize: "16px", fontWeight: 600,
+                      padding: "3px 8px", borderRadius: "6px", fontSize: mf(16), fontWeight: 600,
                       background: sortBy === v ? C.blueBg : "transparent", color: sortBy === v ? C.blue : C.text3,
                       border: `1px solid ${sortBy === v ? C.blue : C.border2}`,
                     }}>{l}</button>
@@ -8815,11 +8825,11 @@ function AppInner() {
             {/* 대기 상태 */}
             {!scanning && results.length === 0 && (
               <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "48px 24px", textAlign: "center" }}>
-                <div style={{ fontSize: "44px", marginBottom: "16px" }}>{lastScan ? "🔍" : "📡"}</div>
-                <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "8px", color: C.text1 }}>
+                <div style={{ fontSize: mf(44), marginBottom: "16px" }}>{lastScan ? "🔍" : "📡"}</div>
+                <div style={{ fontWeight: 700, fontSize: mf(18), marginBottom: "8px", color: C.text1 }}>
                   {lastScan ? "시그널 없음" : "스캔 대기 중"}
                 </div>
-                <div style={{ color: C.text3, fontSize: "18px", lineHeight: 1.7 }}>
+                <div style={{ color: C.text3, fontSize: mf(18), lineHeight: 1.7 }}>
                   {lastScan ? (
                     <>선택한 조건에 해당하는 종목이 없습니다<br />조건을 변경하거나 OR 모드를 사용해보세요</>
                   ) : (
@@ -8848,8 +8858,8 @@ function AppInner() {
             {!scanning && results.length > 0 && filtered.length === 0 && (
               <div style={{ background: C.card, borderRadius: "18px", padding: "32px", textAlign: "center" }}>
                 <div style={{ fontSize: "32px", marginBottom: "8px" }}>🏷️</div>
-                <div style={{ fontWeight: 600, fontSize: "18px", color: C.text2, marginBottom: "4px" }}>선택한 시장에 시그널 없음</div>
-                <div style={{ fontSize: "16px", color: C.text3 }}>다른 시장 필터를 선택해보세요 (전체 {results.length}건 발견)</div>
+                <div style={{ fontWeight: 600, fontSize: mf(18), color: C.text2, marginBottom: "4px" }}>선택한 시장에 시그널 없음</div>
+                <div style={{ fontSize: mf(16), color: C.text3 }}>다른 시장 필터를 선택해보세요 (전체 {results.length}건 발견)</div>
               </div>
             )}
 
@@ -8860,13 +8870,13 @@ function AppInner() {
             <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "22px 24px", marginTop: "20px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
                 <div>
-                  <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "3px", color: C.text1 }}>💎 저평가 종목 통합 조회</div>
-                  <div style={{ fontSize: "16px", color: C.text3 }}>PER · PBR · 배당률 · 애널리스트 목표가 · 52주 위치 종합 분석</div>
+                  <div style={{ fontWeight: 700, fontSize: mf(18), marginBottom: "3px", color: C.text1 }}>💎 저평가 종목 통합 조회</div>
+                  <div style={{ fontSize: mf(16), color: C.text3 }}>PER · PBR · 배당률 · 애널리스트 목표가 · 52주 위치 종합 분석</div>
                 </div>
                 <button onClick={runValueScan} disabled={valueScanning} style={{
-                  padding: "10px 20px", borderRadius: "12px", fontSize: "17px", fontWeight: 700,
+                  padding: isMobile ? "12px 16px" : "10px 20px", borderRadius: "12px", fontSize: mf(17), fontWeight: 700,
                   background: valueScanning ? C.card2 : C.green, color: valueScanning ? C.text3 : "#fff",
-                  border: "none", whiteSpace: "nowrap",
+                  border: "none", whiteSpace: "nowrap", minHeight: "44px",
                 }}>
                   {valueScanning
                     ? <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -8887,7 +8897,7 @@ function AppInner() {
               )}
 
               {valueLastScan && !valueScanning && (
-                <div style={{ fontSize: "16px", color: C.text3, marginBottom: "10px" }}>
+                <div style={{ fontSize: mf(16), color: C.text3, marginBottom: "10px" }}>
                   마지막 스캔: {valueLastScan.toLocaleTimeString("ko-KR")} · 전체 {valueResults.length}개 분석 · 저평가 {filteredValue.length}개 발견
                 </div>
               )}
@@ -8897,16 +8907,16 @@ function AppInner() {
                 <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "12px", flexWrap: "wrap" }}>
                   {[["all","전체"], ["us","🇺🇸 미국"], ["kr","🇰🇷 한국"]].map(([v, l]) => (
                     <button key={v} onClick={() => setValueFilter(v)} style={{
-                      padding: "4px 10px", borderRadius: "8px", fontSize: "16px", fontWeight: 600,
+                      padding: "4px 10px", borderRadius: "8px", fontSize: mf(16), fontWeight: 600,
                       background: valueFilter === v ? C.greenBg : "transparent",
                       color: valueFilter === v ? C.green : C.text3, border: `1px solid ${valueFilter === v ? C.green : C.border2}`,
                     }}>{l}</button>
                   ))}
                   <div style={{ marginLeft: "auto", display: "flex", gap: "4px", alignItems: "center" }}>
-                    <span style={{ fontSize: "16px", color: C.text3 }}>정렬</span>
+                    <span style={{ fontSize: mf(16), color: C.text3 }}>정렬</span>
                     {[["score","종합"], ["per","PER↑"], ["pbr","PBR↑"], ["div","배당↓"], ["upside","목표가↓"]].map(([v, l]) => (
                       <button key={v} onClick={() => setValueSortBy(v)} style={{
-                        padding: "3px 7px", borderRadius: "6px", fontSize: "15px", fontWeight: 600,
+                        padding: "3px 7px", borderRadius: "6px", fontSize: mf(15), fontWeight: 600,
                         background: valueSortBy === v ? C.greenBg : "transparent", color: valueSortBy === v ? C.green : C.text3,
                         border: `1px solid ${valueSortBy === v ? C.green : C.border2}`,
                       }}>{l}</button>
@@ -8923,18 +8933,18 @@ function AppInner() {
                     const scoreLabel = s.score >= 80 ? "강력 저평가" : s.score >= 70 ? "저평가" : s.score >= 60 ? "저평가 가능성" : "주의 관찰";
                     return (
                       <div key={s.symbol} onClick={() => { setSelectedAsset({ symbol: s.symbol, name: s.name }); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
-                        background: C.card2, borderRadius: "12px", padding: "12px 14px",
+                        background: C.card2, borderRadius: "12px", padding: isMobile ? "12px 12px" : "12px 14px",
                         border: `1px solid ${C.border}`, cursor: "pointer", transition: "all .15s",
                       }}>
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ fontSize: "16px", fontWeight: 700, color: C.text3, minWidth: "20px" }}>{i + 1}</span>
+                            <span style={{ fontSize: mf(16), fontWeight: 700, color: C.text3, minWidth: "20px" }}>{i + 1}</span>
                             <span style={{ fontSize: "16px" }}>{s.market === "us" ? "🇺🇸" : "🇰🇷"}</span>
-                            <span style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>{s.name}</span>
-                            <span style={{ fontSize: "16px", color: C.text3 }}>{s.symbol.replace(".KS","").replace(".KQ","")}</span>
+                            <span style={{ fontWeight: 700, fontSize: mf(17), color: C.text1 }}>{s.name}</span>
+                            <span style={{ fontSize: mf(16), color: C.text3 }}>{s.symbol.replace(".KS","").replace(".KQ","")}</span>
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                            <span style={{ fontSize: "17px", fontWeight: 700, color: C.text1 }}>
+                            <span style={{ fontSize: mf(17), fontWeight: 700, color: C.text1 }}>
                               {s.market === "kr" ? `₩${Math.round(s.price).toLocaleString()}` : `$${s.price?.toFixed(2)}`}
                             </span>
                             <span style={{
@@ -8946,34 +8956,34 @@ function AppInner() {
                         {/* 지표 행 */}
                         <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "4px" }}>
                           {s.per != null && (
-                            <span style={{ fontSize: "15px", padding: "2px 6px", borderRadius: "4px", background: s.per < 12 ? `${C.green}18` : s.per < 20 ? `${C.blue}18` : `${C.text3}18`, color: s.per < 12 ? C.green : s.per < 20 ? C.blue : C.text3 }}>
+                            <span style={{ fontSize: mf(15), padding: "2px 6px", borderRadius: "4px", background: s.per < 12 ? `${C.green}18` : s.per < 20 ? `${C.blue}18` : `${C.text3}18`, color: s.per < 12 ? C.green : s.per < 20 ? C.blue : C.text3 }}>
                               PER {s.per.toFixed(1)}
                             </span>
                           )}
                           {s.pbr != null && (
-                            <span style={{ fontSize: "15px", padding: "2px 6px", borderRadius: "4px", background: s.pbr < 1 ? `${C.green}18` : s.pbr < 2 ? `${C.blue}18` : `${C.text3}18`, color: s.pbr < 1 ? C.green : s.pbr < 2 ? C.blue : C.text3 }}>
+                            <span style={{ fontSize: mf(15), padding: "2px 6px", borderRadius: "4px", background: s.pbr < 1 ? `${C.green}18` : s.pbr < 2 ? `${C.blue}18` : `${C.text3}18`, color: s.pbr < 1 ? C.green : s.pbr < 2 ? C.blue : C.text3 }}>
                               PBR {s.pbr.toFixed(2)}
                             </span>
                           )}
                           {s.divYield > 0 && (
-                            <span style={{ fontSize: "15px", padding: "2px 6px", borderRadius: "4px", background: s.divYield > 3 ? `${C.yellow}18` : `${C.text3}18`, color: s.divYield > 3 ? C.yellow : C.text3 }}>
+                            <span style={{ fontSize: mf(15), padding: "2px 6px", borderRadius: "4px", background: s.divYield > 3 ? `${C.yellow}18` : `${C.text3}18`, color: s.divYield > 3 ? C.yellow : C.text3 }}>
                               배당 {s.divYield.toFixed(1)}%
                             </span>
                           )}
                           {s.upside != null && (
-                            <span style={{ fontSize: "15px", padding: "2px 6px", borderRadius: "4px", background: s.upside > 15 ? `${C.green}18` : s.upside > 0 ? `${C.blue}18` : `${C.red}18`, color: s.upside > 15 ? C.green : s.upside > 0 ? C.blue : C.red }}>
+                            <span style={{ fontSize: mf(15), padding: "2px 6px", borderRadius: "4px", background: s.upside > 15 ? `${C.green}18` : s.upside > 0 ? `${C.blue}18` : `${C.red}18`, color: s.upside > 15 ? C.green : s.upside > 0 ? C.blue : C.red }}>
                               목표 {s.upside > 0 ? "+" : ""}{s.upside.toFixed(0)}%
                             </span>
                           )}
                           {s.fpe != null && s.per != null && s.fpe < s.per * 0.85 && (
-                            <span style={{ fontSize: "15px", padding: "2px 6px", borderRadius: "4px", background: `${C.green}18`, color: C.green }}>
+                            <span style={{ fontSize: mf(15), padding: "2px 6px", borderRadius: "4px", background: `${C.green}18`, color: C.green }}>
                               F-PER {s.fpe.toFixed(1)}
                             </span>
                           )}
                         </div>
                         {/* 이유 */}
                         {s.reasons.length > 0 && (
-                          <div style={{ fontSize: "15px", color: C.text3, lineHeight: 1.6 }}>
+                          <div style={{ fontSize: mf(15), color: C.text3, lineHeight: 1.6 }}>
                             {s.reasons.slice(0, 3).join(" · ")}
                           </div>
                         )}
@@ -8981,7 +8991,7 @@ function AppInner() {
                     );
                   })}
                   {filteredValue.length > 50 && (
-                    <div style={{ textAlign: "center", fontSize: "16px", color: C.text3, padding: "8px" }}>
+                    <div style={{ textAlign: "center", fontSize: mf(16), color: C.text3, padding: "8px" }}>
                       상위 50개만 표시 (전체 {filteredValue.length}개)
                     </div>
                   )}
@@ -8990,19 +9000,19 @@ function AppInner() {
 
               {!valueScanning && valueResults.length === 0 && (
                 <div style={{ textAlign: "center", padding: "24px", color: C.text3 }}>
-                  <div style={{ fontSize: "36px", marginBottom: "10px" }}>💎</div>
-                  <div style={{ fontSize: "17px", lineHeight: 1.7 }}>
+                  <div style={{ fontSize: mf(36), marginBottom: "10px" }}>💎</div>
+                  <div style={{ fontSize: mf(17), lineHeight: 1.7 }}>
                     <strong style={{ color: C.green }}>저평가 스캔</strong>을 눌러 미국·한국 주식의<br />
                     밸류에이션을 종합 분석합니다
                   </div>
-                  <div style={{ fontSize: "16px", marginTop: "8px", color: C.text3 }}>
+                  <div style={{ fontSize: mf(16), marginTop: "8px", color: C.text3 }}>
                     PER · PBR · 배당수익률 · Forward PE · 애널리스트 목표가 · 52주 위치 · 200일선 괴리 기반
                   </div>
                 </div>
               )}
 
               {!valueScanning && valueResults.length > 0 && filteredValue.length === 0 && (
-                <div style={{ textAlign: "center", padding: "20px", color: C.text3, fontSize: "17px" }}>
+                <div style={{ textAlign: "center", padding: "20px", color: C.text3, fontSize: mf(17) }}>
                   선택한 시장에 저평가 기준 충족 종목 없음 — 필터를 변경해보세요
                 </div>
               )}
@@ -9042,7 +9052,7 @@ function AppInner() {
             {/* 헤더 */}
             <div style={{
               background: `linear-gradient(135deg, ${C.card} 0%, ${C.purpleBg} 100%)`,
-              borderRadius: "18px", padding: "22px 24px", border: `1px solid ${C.purple}18`,
+              borderRadius: "18px", padding: isMobile ? "18px 16px" : "22px 24px", border: `1px solid ${C.purple}18`,
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px" }}>
                 <div style={{ width: "42px", height: "42px", borderRadius: "14px",
@@ -9050,7 +9060,7 @@ function AppInner() {
                   display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px"
                 }}>⚡</div>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: "20px", fontWeight: 800, color: C.text1 }}>{t("tabs.home.anomalyDetection")}</h2>
+                  <h2 style={{ margin: 0, fontSize: isMobile ? mf(18) : "20px", fontWeight: 800, color: C.text1 }}>{t("tabs.home.anomalyDetection")}</h2>
                   <div style={{ fontSize: "16px", color: C.text3, marginTop: "2px" }}>
                     통계적 이상치 기반 실시간 시장 모니터링
                   </div>
@@ -9084,7 +9094,7 @@ function AppInner() {
             </div>
 
             {/* 필터 탭 */}
-            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: "8px", flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : "visible", paddingBottom: isMobile ? "8px" : "0" }}>
               {[
                 { key: "all", label: "전체", icon: "📊" },
                 { key: "surge", label: "급등", icon: "🚀" },
@@ -9100,7 +9110,7 @@ function AppInner() {
                     background: anomalyFilter === f.key ? C.blueBg : C.card,
                     color: anomalyFilter === f.key ? C.blue : C.text2,
                     border: `1px solid ${anomalyFilter === f.key ? C.blue : C.border}40`,
-                    cursor: "pointer", display: "flex", alignItems: "center", gap: "6px",
+                    cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", flexShrink: 0,
                   }}>
                     {f.icon} {f.label}
                     <span style={{
@@ -9136,14 +9146,14 @@ function AppInner() {
                 </div>
               );
               return (
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "8px" : "10px" }}>
                   {filtered.map((a, i) => {
                     const isSurge = a.anomalyType === "surge";
                     const accentColor = isSurge ? C.green : C.red;
                     return (
                       <div key={`${a.symbol}-${i}`} style={{
                         background: C.card, borderRadius: "16px",
-                        padding: "18px 20px", border: `1px solid ${accentColor}20`,
+                        padding: isMobile ? "14px" : "18px 20px", border: `1px solid ${accentColor}20`,
                         cursor: "pointer", transition: "all .2s",
                       }}
                       onClick={() => setChartAsset(a)}
@@ -9815,8 +9825,8 @@ function AppInner() {
                   </div>
                 );
               })()}
-              {/* 카테고리 필터 */}
-              <div style={{ display: "flex", gap: "6px", marginTop: "12px", flexWrap: "wrap" }}>
+              {/* 카테고리 필터 — 모바일에서 수평 스크롤 가능 */}
+              <div className={isMobile ? "hscroll" : ""} style={{ display: "flex", gap: "6px", marginTop: "12px", flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch" }}>
                 {[
                   ["all", "전체"],
                   ["us", "🇺🇸 미국"],
@@ -9828,10 +9838,10 @@ function AppInner() {
                     background: newsCat === v ? C.blueBg : "transparent",
                     color: newsCat === v ? C.blue : C.text3,
                     border: `1px solid ${newsCat === v ? C.blue + "40" : "transparent"}`,
-                    cursor: "pointer", transition: "all .15s",
+                    cursor: "pointer", transition: "all .15s", flexShrink: 0
                   }}>{l}</button>
                 ))}
-                <div style={{ width: "1px", background: C.border, margin: "0 4px" }} />
+                <div style={{ width: "1px", background: C.border, margin: "0 4px", flexShrink: 0 }} />
                 {[
                   ["time", "최신순"],
                   ["positive", "긍정"],
@@ -9875,7 +9885,7 @@ function AppInner() {
                   })();
                   return (<>
                     <a key={i} href={news.url || news.link || "#"} target="_blank" rel="noopener" onClick={() => { if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
-                      background: C.card, border: `1px solid ${C.border}20`, borderRadius: "14px", padding: "16px 18px",
+                      background: C.card, border: `1px solid ${C.border}20`, borderRadius: "14px", padding: isMobile ? "14px" : "16px 18px",
                       textDecoration: "none", color: "inherit", display: "block", transition: "all .2s",
                       borderLeft: `3px solid ${sentColor}60`,
                     }}
@@ -9883,9 +9893,9 @@ function AppInner() {
                     onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = "translateY(0)"; }}>
                       <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: "18px", marginBottom: "8px", color: C.text1, lineHeight: 1.5 }}>{news.title}</div>
+                          <div style={{ fontWeight: 600, fontSize: mf(16), marginBottom: "8px", color: C.text1, lineHeight: 1.5 }}>{news.title}</div>
                           {(news.desc || news.description) && (
-                            <div style={{ fontSize: "16px", color: C.text2, lineHeight: 1.6, marginBottom: "8px" }}>{(news.desc || news.description).slice(0, 150)}</div>
+                            <div style={{ fontSize: mf(16), color: C.text2, lineHeight: 1.6, marginBottom: "8px" }}>{(news.desc || news.description).slice(0, 150)}</div>
                           )}
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                             <span style={{ fontSize: "16px", fontWeight: 600, color: sentColor, display: "flex", alignItems: "center", gap: "3px" }}>
@@ -10111,10 +10121,10 @@ function AppInner() {
 
                 {/* ── 우측: 이벤트 목록 ── */}
                 <div>
-                  {/* 필터 탭 */}
-                  <div className="flex gap-1.5 mb-5 flex-wrap">
+                  {/* 필터 탭 — 모바일에서 수평 스크롤 가능 */}
+                  <div className={`flex gap-1.5 mb-5 ${isMobile ? "hscroll overflow-x-auto" : "flex-wrap"}`} style={{ WebkitOverflowScrolling: "touch" }}>
                     {calFilterTabs.map(ft => (
-                      <button key={ft.key} onClick={() => setEconFilter(ft.key)} className="px-4 py-2 rounded-[10px] text-base font-semibold cursor-pointer transition-all" style={{
+                      <button key={ft.key} onClick={() => setEconFilter(ft.key)} className="px-4 py-2 rounded-[10px] text-base font-semibold cursor-pointer transition-all flex-shrink-0" style={{
                         background: econFilter === ft.key ? C.blueBg : C.card,
                         color: econFilter === ft.key ? C.blue : C.text2,
                         border: `1px solid ${econFilter === ft.key ? C.blue + "44" : C.border + "30"}`,
@@ -10284,7 +10294,7 @@ function AppInner() {
               {/* ── 브라우저 푸시 알림 ── */}
               <div style={{
                 background: notiPerm === "granted" ? C.greenBg : C.card2,
-                borderRadius: "12px", padding: "14px", marginBottom: "12px",
+                borderRadius: "12px", padding: isMobile ? "16px" : "22px 24px", marginBottom: "12px",
                 border: `1px solid ${notiPerm === "granted" ? C.green + "30" : notiPerm === "denied" ? C.red + "30" : C.border2}`,
               }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -10312,7 +10322,7 @@ function AppInner() {
                       }
                     }} style={{
                       padding: "8px 16px", borderRadius: "8px", fontSize: "16px", fontWeight: 700, cursor: "pointer",
-                      background: C.blue, color: "#fff", border: "none", whiteSpace: "nowrap",
+                      background: C.blue, color: "#fff", border: "none", whiteSpace: "nowrap", minHeight: "44px",
                     }}>알림 허용</button>
                   )}
                   {notiPerm === "granted" && (
@@ -10442,7 +10452,7 @@ function AppInner() {
                         background: C.card2, borderRadius: "12px", padding: "14px",
                         borderLeft: `3px solid ${isBuy ? C.green : C.red}`,
                         cursor: "pointer", transition: "all .15s",
-                        opacity: alert.read ? 0.7 : 1,
+                        opacity: alert.read ? 0.7 : 1, minHeight: "44px",
                       }}
                       onMouseEnter={e => e.currentTarget.style.background = C.border}
                       onMouseLeave={e => e.currentTarget.style.background = C.card2}>
@@ -10589,7 +10599,7 @@ function AppInner() {
                 <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
                   <input value={sentimentSymbol} onChange={e=>setSentimentSymbol(e.target.value.toUpperCase())}
                     placeholder="SPY" onKeyDown={e=>{if(e.key==="Enter")fetchSentiment(sentimentSymbol);}}
-                    style={{width:"100px",padding:"8px 12px",borderRadius:"8px",fontSize:"15px",fontWeight:700,
+                    style={{width:isMobile?"80px":"100px",padding:"8px 12px",borderRadius:"8px",fontSize:"15px",fontWeight:700,
                       background:C.card2,border:`1px solid ${C.border2}`,color:C.text1,outline:"none",textAlign:"center"}} />
                   <button onClick={()=>fetchSentiment(sentimentSymbol)} disabled={sentimentLoading} style={{
                     padding:"8px 16px",borderRadius:"8px",fontSize:"14px",fontWeight:700,
@@ -10598,13 +10608,13 @@ function AppInner() {
                   }}>{sentimentLoading?"분석 중...":"분석"}</button>
                 </div>
               </div>
-              {/* 빠른 심볼 버튼 */}
-              <div style={{display:"flex",gap:"6px",marginTop:"12px",flexWrap:"wrap"}}>
+              {/* 빠른 심볼 버튼 — 모바일에서 수평 스크롤 가능 */}
+              <div className={isMobile ? "hscroll" : ""} style={{display:"flex",gap:"6px",marginTop:"12px",flexWrap:isMobile?"nowrap":"wrap",overflowX:isMobile?"auto":"visible",WebkitOverflowScrolling:"touch"}}>
                 {["SPY","AAPL","NVDA","TSLA","MSFT","AMZN","META","AMD","GOOG","COIN"].map(s=>(
                   <button key={s} onClick={()=>{setSentimentSymbol(s);fetchSentiment(s);}} style={{
                     padding:"4px 10px",borderRadius:"6px",fontSize:"13px",fontWeight:600,
                     background:sentimentSymbol===s?C.blueBg:C.card2,color:sentimentSymbol===s?C.blue:C.text3,
-                    border:`1px solid ${sentimentSymbol===s?C.blue+"55":C.border2}`,cursor:"pointer",
+                    border:`1px solid ${sentimentSymbol===s?C.blue+"55":C.border2}`,cursor:"pointer",flexShrink:0
                   }}>{s}</button>
                 ))}
               </div>
@@ -10624,7 +10634,7 @@ function AppInner() {
                   <div style={{fontSize:"16px",color:C.text3,marginBottom:"8px",fontWeight:600}}>
                     {sentimentData.symbol} 종합 센티먼트
                   </div>
-                  <div style={{fontSize:"48px",fontWeight:900,color:
+                  <div style={{fontSize:isMobile?"36px":"48px",fontWeight:900,color:
                     sentimentData.sentiment.score>=60?C.green:sentimentData.sentiment.score>=40?C.yellow:C.red,
                     letterSpacing:"-2px",marginBottom:"4px"}}>
                     {sentimentData.sentiment.score}
@@ -10650,7 +10660,7 @@ function AppInner() {
               {/* 소스별 상세 */}
               <div style={{maxWidth:"800px",margin:"0 auto"}}>
               {sentimentData.sources?.map((src,i)=>(
-                <div key={i} style={{background:C.card,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:"22px 24px",marginBottom:"12px"}}>
+                <div key={i} style={{background:C.card,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:isMobile?"14px":"22px 24px",marginBottom:"12px"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
                     <div style={{fontWeight:700,fontSize:"15px"}}>{src.name}</div>
                     <span style={{fontSize:"14px",color:C.text3}}>{src.total}개 포스트 분석</span>
@@ -10808,7 +10818,7 @@ function AppInner() {
               ].map((item, i) => (
                 <div key={i} className="flex justify-between items-center px-5 py-3.5 border-t" style={{borderTopColor: `${C.border}20`}}>
                   <span className="text-base text-muted-foreground">{item.label}</span>
-                  <span className="text-base font-semibold text-foreground text-right max-w-[60%] overflow-hidden text-ellipsis whitespace-nowrap">{item.value}</span>
+                  <span className="text-base font-semibold text-foreground text-right overflow-hidden text-ellipsis whitespace-nowrap" style={{ maxWidth: isMobile ? "50%" : "60%" }}">{item.value}</span>
                 </div>
               ))}
             </div>
@@ -10843,7 +10853,7 @@ function AppInner() {
             <div style={{ background: `linear-gradient(135deg, ${C.card}, ${C.blueBg})`, border: `1px solid ${C.blue}20`, borderRadius: "16px", padding: "20px", textAlign: "center" }}>
               <div style={{ fontSize: "16px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>내 투자 성적표</div>
               <div style={{ fontSize: "14px", color: C.text3, marginBottom: "16px" }}>AI가 분석한 나의 투자 현황을 공유해보세요</div>
-              <div className="flex justify-center gap-6 sm:gap-8 mb-4">
+              <div className="flex justify-center mb-4" style={{ gap: isMobile ? "12px" : "24px" }}>
                 <div className="text-center">
                   <div className="text-2xl font-extrabold" style={{ color: C.blue }}>{watchlist.length}</div>
                   <div className="text-base text-muted-foreground">관심종목</div>
@@ -10880,7 +10890,7 @@ function AppInner() {
                 <div style={{ fontSize: "15px", color: C.text2, lineHeight: 1.6, marginBottom: "14px" }}>
                   투자하는 친구에게 Zepta을 공유하세요.<br/>AI 퀀트 전략을 무료로 이용할 수 있어요.
                 </div>
-                <div style={{ display: "flex", gap: "8px" }}>
+                <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: "8px" }}>
                   <button onClick={() => {
                     const txt = "나 요즘 이거 쓰는데 AI가 매수 타점 잡아줘서 꽤 괜찮아. 무료인데 한번 써봐 👉 https://zepta.vercel.app";
                     if (navigator.share) navigator.share({ title: "Zepta - AI 퀀트 투자", text: txt, url: "https://zepta.vercel.app" }).catch(() => {});
@@ -10888,14 +10898,14 @@ function AppInner() {
                   }} style={{
                     flex: 1, padding: "10px", borderRadius: "10px", fontSize: "17px", fontWeight: 600,
                     background: C.blue, color: "#fff", border: "none", cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", minHeight: "44px",
                   }}>📱 카톡으로 공유</button>
                   <button onClick={() => {
                     navigator.clipboard.writeText("https://zepta.vercel.app").then(() => showToast("링크가 복사되었습니다!", "success")).catch(() => {});
                   }} style={{
                     flex: 1, padding: "10px", borderRadius: "10px", fontSize: "17px", fontWeight: 600,
                     background: C.card2, color: C.text2, border: `1px solid ${C.border}${C.isDark ? '30' : '50'}`, cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: "4px",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", minHeight: "44px",
                   }}>🔗 링크 복사</button>
                 </div>
               </div>
