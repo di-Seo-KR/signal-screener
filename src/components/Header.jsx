@@ -269,7 +269,14 @@ export default memo(function Header({
                 </div>
 
                 {/* 하단 도구 */}
-                <div className="mt-auto border-t border-border/30 p-3">
+                <div className="mt-auto border-t border-border/30 p-3 flex flex-col gap-2">
+                  {!user && (
+                    <Button size="default" className="w-full gap-2 font-bold"
+                      onClick={() => { setShowAuthModal(true); setMobileOpen(false); }}>
+                      <User className="size-4" />
+                      {t("header.login")}
+                    </Button>
+                  )}
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" className="flex-1 gap-1.5" onClick={toggleTheme}>
                       {themeMode === "dark" ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}

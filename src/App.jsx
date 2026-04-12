@@ -7240,7 +7240,7 @@ function AppInner() {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
           .lnb-sidebar { display: none !important; }
-          main { padding-left: 14px !important; padding-right: 14px !important; padding-bottom: 140px !important; font-size: 15px !important; }
+          main { padding-left: 14px !important; padding-right: 14px !important; padding-bottom: 160px !important; font-size: 15px !important; }
           .tab-content { font-size: 15px; padding-bottom: 120px !important; gap: 12px !important; }
           button { min-height: 44px; }
           select { min-height: 44px; }
@@ -12341,7 +12341,7 @@ function AppInner() {
       {/* ── 하단 실시간 티커 바 (모바일: 탭바 위, 데스크톱: 바닥) ── */}
       {marketIndices.length > 0 && (
         <div style={{
-          position: "fixed", bottom: isMobile ? "56px" : 0, left: 0, right: 0, zIndex: 90,
+          position: "fixed", bottom: isMobile ? "82px" : 0, left: 0, right: 0, zIndex: 90,
           background: `${C.bg}F0`, borderTop: `1px solid ${C.border}${C.isDark ? '30' : '50'}`,
           backdropFilter: "blur(8px)", padding: "6px 0", overflow: "hidden",
         }}>
@@ -12396,23 +12396,23 @@ function AppInner() {
         </button>
       )}
 
-      {/* ═══ 모바일 하단 탭 네비게이션 바 ═══ */}
+      {/* ═══ 모바일 하단 탭 네비게이션 바 (토스 스타일) ═══ */}
       {isMobile && (
         <nav className="mobile-bottom-nav" style={{
           position: "fixed",
           bottom: 0,
           left: 0,
           right: 0,
-          height: "56px",
-          background: `${C.bg}F5`,
-          backdropFilter: "blur(20px) saturate(180%)",
-          WebkitBackdropFilter: "blur(20px) saturate(180%)",
-          borderTop: `1px solid ${C.border}20`,
+          height: "82px",
+          background: C.isDark ? `${C.bg}F8` : `${C.bg}FA`,
+          backdropFilter: "blur(24px) saturate(180%)",
+          WebkitBackdropFilter: "blur(24px) saturate(180%)",
+          borderTop: `0.5px solid ${C.border}${C.isDark ? '25' : '40'}`,
           display: "flex",
-          alignItems: "center",
+          alignItems: "flex-start",
           justifyContent: "space-around",
+          paddingTop: "8px",
           zIndex: 10000,
-          boxShadow: `0 -2px 20px ${C.bg}60`,
         }}>
           {[
             { id: "home", icon: "🏠", label: "홈" },
@@ -12436,22 +12436,23 @@ function AppInner() {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: "2px",
-                padding: "6px 0",
+                gap: "4px",
+                padding: "4px 0",
                 background: "transparent",
                 border: "none",
                 cursor: "pointer",
                 color: isActive ? C.blue : C.text3,
-                transition: "color .2s",
+                transition: "color .15s",
                 position: "relative",
+                minHeight: "52px",
               }}>
                 {isActive && <div style={{
-                  position: "absolute", top: "-1px", left: "50%", transform: "translateX(-50%)",
-                  width: "24px", height: "3px", borderRadius: "2px",
+                  position: "absolute", top: "-8px", left: "50%", transform: "translateX(-50%)",
+                  width: "28px", height: "3px", borderRadius: "2px",
                   background: C.blue,
                 }} />}
-                <span style={{ fontSize: "20px", lineHeight: 1 }}>{item.icon}</span>
-                <span style={{ fontSize: "10px", fontWeight: isActive ? 700 : 500, lineHeight: 1 }}>{item.label}</span>
+                <span style={{ fontSize: "26px", lineHeight: 1, display: "block", height: "28px" }}>{item.icon}</span>
+                <span style={{ fontSize: "11px", fontWeight: isActive ? 700 : 500, lineHeight: 1, letterSpacing: "-0.3px" }}>{item.label}</span>
               </button>
             );
           })}
@@ -12460,7 +12461,7 @@ function AppInner() {
 
       {/* FAB 버튼 */}
       <button onClick={() => setAiChatOpen(!aiChatOpen)} style={{
-        position: "fixed", bottom: isMobile ? "84px" : "28px", right: isMobile ? "16px" : "28px",
+        position: "fixed", bottom: isMobile ? "100px" : "28px", right: isMobile ? "16px" : "28px",
         width: "56px", height: "56px", borderRadius: "16px", border: "none",
         background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`,
         color: "#fff", fontSize: "26px", cursor: "pointer",
