@@ -78,10 +78,10 @@ export default memo(function PortfolioTab({
 
       {/* 자산 추가 폼 */}
       {showAddAsset && (
-        <div className="rounded-[18px] p-[22px_24px] mb-4" style={{ background: C.card, border: `1px solid ${C.border}20` }}>
-          <div className="font-bold mb-3.5 text-lg" style={{ color: C.text1 }}>📌 {t("portfolio.addAsset")}</div>
+        <div className="rounded-[18px] mb-4" style={{ background: C.card, border: `1px solid ${C.border}20`, padding: isMobile ? "16px 12px" : "22px 24px" }}>
+          <div className="font-bold mb-3.5" style={{ color: C.text1, fontSize: isMobile ? "15px" : "18px" }}>📌 {t("portfolio.addAsset")}</div>
           <div className="mb-3">
-            <div className="text-base mb-1.5" style={{ color: C.text3 }}>{t("portfolio.searchSymbol")}</div>
+            <div style={{ color: C.text3, marginBottom: "8px", fontSize: isMobile ? "13px" : "14px" }}>{t("portfolio.searchSymbol")}</div>
             <SearchBarWrapper SearchBar={SearchBar} placeholder={t("portfolio.symbolPlaceholder")} onSelect={(asset) => {
               const sym = asset.symbol.toUpperCase();
               setNewAsset(p => ({
@@ -92,7 +92,7 @@ export default memo(function PortfolioTab({
               }));
             }} />
           </div>
-          <div className="grid grid-cols-2 gap-2.5 mb-3">
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: "10px", marginBottom: "12px" }}>
             {[
               { k: "symbol",   label: t("portfolio.symbolPlaceholder").split(",")[0], ph: t("portfolio.symbolPlaceholder") },
               { k: "name",     label: t("portfolio.nameLabel"), ph: t("portfolio.namePlaceholder") },
@@ -100,27 +100,30 @@ export default memo(function PortfolioTab({
               { k: "avgPrice", label: t("portfolio.avgPriceLabel"), ph: t("portfolio.avgPricePlaceholder") },
             ].map(({ k, label, ph }) => (
               <div key={k}>
-                <div className="text-base mb-1" style={{ color: C.text3 }}>{label}</div>
+                <div style={{ color: C.text3, marginBottom: "6px", fontSize: isMobile ? "13px" : "14px" }}>{label}</div>
                 <input value={newAsset[k]} onChange={e => setNewAsset(p => ({ ...p, [k]: e.target.value }))}
-                  placeholder={ph} className="w-full px-3 py-2 rounded-[10px] text-lg outline-none box-border" style={{
+                  placeholder={ph} className="w-full rounded-[10px] outline-none box-border" style={{
                     background: C.bg, border: `1px solid ${C.border2}`, color: C.text1,
+                    padding: "10px 12px", minHeight: "44px", fontSize: isMobile ? "14px" : "16px",
                   }} />
               </div>
             ))}
           </div>
           <div className="mb-3">
-            <div className="text-base mb-1.5" style={{ color: C.text3 }}>{t("portfolio.marketLabel")}</div>
-            <div className="flex gap-1.5">
+            <div style={{ color: C.text3, marginBottom: "10px", fontSize: isMobile ? "13px" : "14px" }}>{t("portfolio.marketLabel")}</div>
+            <div className="flex gap-1.5" style={{ flexDirection: isMobile ? "column" : "row" }}>
               {[["us",t("portfolio.marketUS")], ["kr",t("portfolio.marketKR")], ["crypto",t("portfolio.marketCrypto")]].map(([v, l]) => (
-                <button key={v} onClick={() => setNewAsset(p => ({ ...p, market: v }))} className="rounded-lg px-3.5 py-1.5 text-base font-semibold transition-all" style={{
+                <button key={v} onClick={() => setNewAsset(p => ({ ...p, market: v }))} className="rounded-lg font-semibold transition-all" style={{
                   background: newAsset.market === v ? C.blueBg : C.card2,
                   color: newAsset.market === v ? C.blue : C.text3,
                   border: `1px solid ${newAsset.market === v ? C.blue : C.border2}`,
+                  minHeight: "44px", padding: "10px 14px", flex: isMobile ? "1" : "0 0 auto", display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: isMobile ? "13px" : "14px",
                 }}>{l}</button>
               ))}
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2" style={{ flexDirection: isMobile ? "column" : "row" }}>
             <button onClick={() => {
               if (!newAsset.symbol || !newAsset.qty || !newAsset.avgPrice) return;
               const sym = newAsset.symbol.toUpperCase();
@@ -132,11 +135,15 @@ export default memo(function PortfolioTab({
               }]);
               setNewAsset({ symbol: "", name: "", market: "us", qty: "", avgPrice: "" });
               setShowAddAsset(false);
-            }} className="flex-1 rounded-[10px] px-5 py-2 text-lg font-bold border-none transition-all" style={{
+            }} className="flex-1 rounded-[10px] font-bold border-none transition-all" style={{
               background: C.blue, color: "#fff",
+              minHeight: "44px", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: isMobile ? "14px" : "16px",
             }}>{t("portfolio.addBtn")}</button>
-            <button onClick={() => setShowAddAsset(false)} className="flex-1 rounded-[10px] px-5 py-2 text-lg font-semibold transition-all" style={{
+            <button onClick={() => setShowAddAsset(false)} className="flex-1 rounded-[10px] font-semibold transition-all" style={{
               background: C.card2, color: C.text3, border: `1px solid ${C.border2}`,
+              minHeight: "44px", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: isMobile ? "14px" : "16px",
             }}>{t("portfolio.cancelBtn")}</button>
           </div>
         </div>
@@ -146,17 +153,17 @@ export default memo(function PortfolioTab({
       {portfolio.length === 0 ? (
         <div style={{
           borderRadius: "20px",
-          padding: "56px 24px",
+          padding: isMobile ? "40px 16px" : "56px 24px",
           textAlign: "center",
           background: `linear-gradient(135deg, ${C.blueBg}20 0%, ${C.card2}40 100%)`,
           border: `1px solid ${C.border}20`,
           boxShadow: `0 4px 16px ${C.blue}10`,
         }}>
-          <div style={{ fontSize: "56px", marginBottom: "16px", animation: "float 3s ease-in-out infinite" }}>💼</div>
-          <div style={{ fontSize: "20px", fontWeight: 800, marginBottom: "8px", color: C.text1 }}>
+          <div style={{ fontSize: isMobile ? "40px" : "56px", marginBottom: "16px", animation: "float 3s ease-in-out infinite" }}>💼</div>
+          <div style={{ fontSize: isMobile ? "16px" : "20px", fontWeight: 800, marginBottom: "8px", color: C.text1 }}>
             {t("portfolio.startPortfolio") || "포트폴리오를 시작하세요"}
           </div>
-          <div style={{ fontSize: "16px", color: C.text3, lineHeight: 1.7, marginBottom: "28px" }}>
+          <div style={{ fontSize: isMobile ? "13px" : "16px", color: C.text3, lineHeight: 1.7, marginBottom: "28px" }}>
             {t("portfolio.startDesc") || "보유 자산을 기록하고 성과를 추적하세요"}
           </div>
 
@@ -179,30 +186,31 @@ export default memo(function PortfolioTab({
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: "12px",
-                  padding: "12px 16px",
+                  gap: isMobile ? "10px" : "12px",
+                  padding: isMobile ? "10px 12px" : "12px 16px",
                   borderRadius: "12px",
                   background: `${C.blue}10`,
                   border: `1px solid ${C.blue}20`,
                   transition: "all .2s",
+                  minHeight: isMobile ? "44px" : "auto",
                 }}
                 onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}20`; e.currentTarget.style.transform = "translateX(4px)"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = `${C.blue}10`; e.currentTarget.style.transform = "translateX(0)"; }}
               >
-                <span style={{ fontSize: "18px", minWidth: "24px" }}>{step.icon}</span>
-                <span style={{ fontSize: "15px", color: C.text2, fontWeight: 500 }}>{step.text}</span>
+                <span style={{ fontSize: isMobile ? "16px" : "18px", minWidth: "24px" }}>{step.icon}</span>
+                <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text2, fontWeight: 500 }}>{step.text}</span>
               </div>
             ))}
           </div>
 
           {/* CTA 버튼 */}
-          <div style={{ display: "flex", gap: "10px", justifyContent: "center", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: "10px", justifyContent: "center", flexWrap: isMobile ? "wrap" : "nowrap", flexDirection: isMobile ? "column" : "row" }}>
             <button
               onClick={() => setTab("screener")}
               style={{
-                padding: "10px 24px",
+                padding: isMobile ? "10px 16px" : "10px 24px",
                 borderRadius: "12px",
-                fontSize: "15px",
+                fontSize: isMobile ? "13px" : "15px",
                 fontWeight: 700,
                 background: C.blue,
                 color: "#fff",
@@ -210,6 +218,8 @@ export default memo(function PortfolioTab({
                 cursor: "pointer",
                 transition: "all .2s",
                 boxShadow: `0 4px 12px ${C.blue}30`,
+                minHeight: isMobile ? "44px" : "auto", flex: isMobile ? "1" : "0 0 auto",
+                display: "flex", alignItems: "center", justifyContent: "center",
               }}
               onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 6px 20px ${C.blue}40`; }}
               onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 4px 12px ${C.blue}30`; }}
@@ -219,15 +229,17 @@ export default memo(function PortfolioTab({
             <button
               onClick={() => setTab("quant-report")}
               style={{
-                padding: "10px 24px",
+                padding: isMobile ? "10px 16px" : "10px 24px",
                 borderRadius: "12px",
-                fontSize: "15px",
+                fontSize: isMobile ? "13px" : "15px",
                 fontWeight: 700,
                 background: C.card2,
                 color: C.text2,
                 border: `1.5px solid ${C.border}`,
                 cursor: "pointer",
                 transition: "all .2s",
+                minHeight: isMobile ? "44px" : "auto", flex: isMobile ? "1" : "0 0 auto",
+                display: "flex", alignItems: "center", justifyContent: "center",
               }}
               onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}15`; e.currentTarget.style.color = C.blue; e.currentTarget.style.borderColor = C.blue; }}
               onMouseLeave={e => { e.currentTarget.style.background = C.card2; e.currentTarget.style.color = C.text2; e.currentTarget.style.borderColor = C.border; }}
@@ -252,27 +264,27 @@ export default memo(function PortfolioTab({
               <div key={idx} className="rounded-[18px] overflow-hidden" style={{
                 background: C.card, border: `1px solid ${C.border}20`,
               }}>
-                <div className="flex items-center p-4 gap-3.5">
+                <div className="flex items-center p-4 gap-3.5" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center" }}>
                   <div className="size-11 rounded-xl flex-shrink-0 flex items-center justify-center font-black text-sm" style={{
                     background: mcBg, color: mcColor,
                   }}>
                     {item.symbol.replace(".KS","").slice(0,4)}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="font-bold text-lg" style={{ color: C.text1 }}>{item.name || item.symbol}</span>
-                      <span className="text-base" style={{ color: C.text3 }}>{flag} {item.symbol}</span>
+                  <div className="flex-1 min-w-0" style={{ width: isMobile ? "100%" : "auto" }}>
+                    <div className="flex items-center gap-2 mb-0.5" style={{ flexWrap: "wrap" }}>
+                      <span className="font-bold" style={{ color: C.text1, fontSize: isMobile ? "14px" : "18px" }}>{item.name || item.symbol}</span>
+                      <span style={{ color: C.text3, fontSize: isMobile ? "12px" : "14px" }}>{flag} {item.symbol}</span>
                     </div>
-                    <div className="text-lg" style={{ color: C.text3 }}>
+                    <div style={{ color: C.text3, fontSize: isMobile ? "12px" : "14px" }}>
                       {item.qty.toLocaleString()} {t("portfolio.shares")} · {t("portfolio.avgPrice")} {toDisplay(item.avgPrice, item.market)}
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <div className="font-bold text-lg mb-0.5" style={{ color: C.text1 }}>
+                  <div style={{ textAlign: "right", flex: isMobile ? "1 0 100%" : "0 0 auto", width: isMobile ? "100%" : "auto", paddingTop: isMobile ? "12px" : "0", borderTop: isMobile ? `1px solid ${C.border}` : "none" }}>
+                    <div className="font-bold mb-0.5" style={{ color: C.text1, fontSize: isMobile ? "14px" : "18px" }}>
                       {toDisplay(cur, item.market)}
                     </div>
                     {gain != null && (
-                      <div className="text-lg font-bold" style={{ color: isPos ? C.green : C.red }}>
+                      <div className="font-bold" style={{ color: isPos ? C.green : C.red, fontSize: isMobile ? "14px" : "16px" }}>
                         {isPos ? "+" : ""}{gain.toFixed(2)}%
                       </div>
                     )}
@@ -280,29 +292,29 @@ export default memo(function PortfolioTab({
                 </div>
 
                 {cur != null && (
-                  <div className="grid grid-cols-3 gap-1.5 px-4.5 pb-3 text-base">
-                    <div className="rounded-lg p-2.5" style={{ background: C.bg }}>
-                      <div className="mb-0.5" style={{ color: C.text3 }}>{t("portfolio.investedAmount")}</div>
-                      <div className="font-bold text-lg" style={{ color: C.text1 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? "8px" : "6px", padding: isMobile ? "12px" : "14px 18px 12px", fontSize: isMobile ? "13px" : "14px" }}>
+                    <div className="rounded-lg" style={{ background: C.bg, padding: isMobile ? "10px 12px" : "10px" }}>
+                      <div style={{ marginBottom: "4px", color: C.text3, fontSize: isMobile ? "11px" : "12px" }}>{t("portfolio.investedAmount")}</div>
+                      <div className="font-bold" style={{ color: C.text1, fontSize: isMobile ? "13px" : "16px" }}>
                         {toDisplay(invested, item.market)}
                       </div>
                     </div>
-                    <div className="rounded-lg p-2.5" style={{ background: C.bg }}>
-                      <div className="mb-0.5" style={{ color: C.text3 }}>{t("portfolio.evaluatedAmount")}</div>
-                      <div className="font-bold text-lg" style={{ color: C.text1 }}>
+                    <div className="rounded-lg" style={{ background: C.bg, padding: isMobile ? "10px 12px" : "10px" }}>
+                      <div style={{ marginBottom: "4px", color: C.text3, fontSize: isMobile ? "11px" : "12px" }}>{t("portfolio.evaluatedAmount")}</div>
+                      <div className="font-bold" style={{ color: C.text1, fontSize: isMobile ? "13px" : "16px" }}>
                         {toDisplay(evalVal, item.market)}
                       </div>
                     </div>
-                    <div className="rounded-lg p-2.5" style={{ background: isPos ? C.greenBg : C.redBg }}>
-                      <div className="mb-0.5" style={{ color: C.text3 }}>{t("portfolio.profitLoss")}</div>
-                      <div className="font-bold text-lg" style={{ color: isPos ? C.green : C.red }}>
+                    <div className="rounded-lg" style={{ background: isPos ? C.greenBg : C.redBg, padding: isMobile ? "10px 12px" : "10px" }}>
+                      <div style={{ marginBottom: "4px", color: C.text3, fontSize: isMobile ? "11px" : "12px" }}>{t("portfolio.profitLoss")}</div>
+                      <div className="font-bold" style={{ color: isPos ? C.green : C.red, fontSize: isMobile ? "13px" : "16px" }}>
                         {isPos ? "+" : ""}{toDisplay(Math.abs(gainVal), item.market)}
                       </div>
                     </div>
                   </div>
                 )}
 
-                <div className="flex gap-2 px-4.5 pb-3.5">
+                <div className="flex gap-2" style={{ padding: isMobile ? "10px 12px" : "12px 18px 14px", flexDirection: isMobile ? "column" : "row" }}>
                   <button onClick={() => {
                     const cryptoA = CRYPTO_ASSETS.find(c => c.symbol === item.symbol);
                     setSelectedAsset({
@@ -310,22 +322,25 @@ export default memo(function PortfolioTab({
                       market: item.market, symbolRaw: item.symbolRaw || item.symbol,
                       ...(cryptoA ? { id: cryptoA.id } : {}),
                     });
-                  }} className="flex-1 py-2 rounded-[10px] text-base font-semibold transition-all flex items-center justify-center gap-1.5" style={{
+                  }} className="flex-1 rounded-[10px] font-semibold transition-all flex items-center justify-center gap-1.5" style={{
                     background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}33`,
+                    minHeight: "44px", padding: "8px 12px", fontSize: isMobile ? "13px" : "14px",
                   }}>{t("portfolio.diagnostic")}</button>
                   <button onClick={() => {
                     const sym = item.market === "crypto"
                       ? `https://www.coingecko.com/en/coins/${item.cryptoId || item.symbol.toLowerCase()}`
                       : `https://finance.yahoo.com/quote/${item.symbolRaw || item.symbol}`;
                     window.open(sym, "_blank");
-                  }} className="flex-1 py-2 rounded-[10px] text-base font-semibold transition-all flex items-center justify-center gap-1.5" style={{
+                  }} className="flex-1 rounded-[10px] font-semibold transition-all flex items-center justify-center gap-1.5" style={{
                     background: C.card2, color: C.text2, border: `1px solid ${C.border2}`,
+                    minHeight: "44px", padding: "8px 12px", fontSize: isMobile ? "13px" : "14px",
                   }}>{t("portfolio.detail")}</button>
                   <button onClick={() => {
                     if (!confirm(t("portfolio.deleteConfirm"))) return;
                     setPortfolio(p => p.filter((_, i) => i !== idx));
-                  }} className="px-3.5 py-2 rounded-[10px] text-base font-semibold transition-all" style={{
+                  }} className="rounded-[10px] font-semibold transition-all flex items-center justify-center" style={{
                     background: C.redBg, color: C.red, border: `1px solid ${C.red}33`,
+                    minHeight: "44px", padding: "8px 12px", flex: isMobile ? "0 0 auto" : "0 0 auto", fontSize: isMobile ? "13px" : "14px",
                   }}>{t("portfolio.delete")}</button>
                 </div>
               </div>
