@@ -6960,9 +6960,15 @@ function AppInner() {
           box-sizing: border-box !important;
           padding-top: 0 !important;
         }
-        /* padding-top은 Header 컴포넌트 spacer div로 대체됨 */
+        /* 메인 콘텐츠 영역: 고정 헤더 + safe-area 아래에 시작 */
+        main {
+          padding-top: calc(env(safe-area-inset-top, 0px) + var(--header-h) + var(--header-gap)) !important;
+        }
         body { padding-bottom: env(safe-area-inset-bottom, 0px); }
-        [style*="position: fixed"][style*="bottom: 0"] { padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px)) !important; }
+        /* 모바일 하단 탭바 safe-area */
+        .mobile-bottom-nav {
+          padding-bottom: env(safe-area-inset-bottom, 0px) !important;
+        }
         @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
         @keyframes slideDown { from{opacity:0;transform:translateY(-16px)} to{opacity:1;transform:translateY(0)} }
@@ -7138,7 +7144,7 @@ function AppInner() {
           .desktop-nav { display: none !important; }
           .mobile-menu-btn { display: flex !important; }
           .lnb-sidebar { display: none !important; }
-          main { padding-left: 14px !important; padding-right: 14px !important; padding-bottom: 120px !important; font-size: 15px !important; }
+          main { padding-left: 14px !important; padding-right: 14px !important; padding-bottom: 140px !important; font-size: 15px !important; }
           .tab-content { font-size: 15px; padding-bottom: 120px !important; gap: 12px !important; }
           button { min-height: 44px; }
           select { min-height: 44px; }
@@ -12014,10 +12020,10 @@ function AppInner() {
       </main>
       </PullToRefresh>
 
-      {/* ── 하단 실시간 티커 바 ── */}
+      {/* ── 하단 실시간 티커 바 (모바일: 탭바 위, 데스크톱: 바닥) ── */}
       {marketIndices.length > 0 && (
         <div style={{
-          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 90,
+          position: "fixed", bottom: isMobile ? "56px" : 0, left: 0, right: 0, zIndex: 90,
           background: `${C.bg}F0`, borderTop: `1px solid ${C.border}${C.isDark ? '30' : '50'}`,
           backdropFilter: "blur(8px)", padding: "6px 0", overflow: "hidden",
         }}>
@@ -12074,13 +12080,12 @@ function AppInner() {
 
       {/* ═══ 모바일 하단 탭 네비게이션 바 ═══ */}
       {isMobile && (
-        <nav style={{
+        <nav className="mobile-bottom-nav" style={{
           position: "fixed",
           bottom: 0,
           left: 0,
           right: 0,
           height: "56px",
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
           background: `${C.bg}F5`,
           backdropFilter: "blur(20px) saturate(180%)",
           WebkitBackdropFilter: "blur(20px) saturate(180%)",
