@@ -299,8 +299,8 @@ export default memo(function Header({
             </div>
           </div>
 
-          {/* ── 중앙: 데스크탑 GNB ── */}
-          <nav className="hidden lg:flex items-center gap-1 flex-1 justify-center">
+          {/* ── 중앙: 데스크탑 GNB (반응형 간격/패딩 최적화) ── */}
+          <nav className="hidden lg:flex items-center gap-0.5 xl:gap-1 flex-1 justify-center">
             {NAV_CATEGORIES.map((cat) => {
               const isActive = activeCategory === cat.catId;
 
@@ -313,7 +313,7 @@ export default memo(function Header({
                     size="default"
                     onClick={() => navigate(cat.directTab)}
                     className={cn(
-                      "text-[15px] font-semibold px-5",
+                      "text-[13px] xl:text-[15px] font-semibold px-3 xl:px-5",
                       isActive && cat.catId === "ai-quant"
                         ? "bg-purple-500/10 text-purple-400 hover:bg-purple-500/15 hover:text-purple-300"
                         : isActive
@@ -336,14 +336,14 @@ export default memo(function Header({
                       size="default"
                       onClick={toggle}
                       className={cn(
-                        "text-[15px] font-semibold gap-1.5 px-5",
+                        "text-[13px] xl:text-[15px] font-semibold gap-1 xl:gap-1.5 px-3 xl:px-5",
                         (isActive || open)
                           ? "bg-primary/10 text-primary hover:bg-primary/15"
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
                       {cat.label}
-                      <ChevronDown className={cn("size-4 opacity-50 transition-transform", open && "rotate-180")} />
+                      <ChevronDown className={cn("size-3.5 xl:size-4 opacity-50 transition-transform", open && "rotate-180")} />
                     </Button>
                   )}
                 >
@@ -383,10 +383,10 @@ export default memo(function Header({
               <Search className="size-5" />
             </Button>
 
-            {/* 검색 확장형 — 데스크탑만 */}
+            {/* 검색 확장형 — xl 이상에서만 표시 (1024-1279px에서는 아이콘만) */}
             <Button variant="outline" size="default"
               onClick={() => setGlobalSearchOpen(true)}
-              className="gap-2 text-muted-foreground hidden sm:inline-flex px-3 py-1.5 h-9"
+              className="gap-2 text-muted-foreground hidden xl:inline-flex px-3 py-1.5 h-9"
             >
               <span className="text-sm font-medium">{t("common.search")}</span>
               <kbd className="rounded px-1.5 py-0.5 text-[10px] font-mono bg-muted text-muted-foreground">/</kbd>

@@ -7660,6 +7660,155 @@ function AppInner() {
               );
             })()}
 
+            {/* ── AI 시장 한줄 인사이트 (공유 유도 → 바이럴 유입) ─── */}
+            {marketIndices.length > 0 && (() => {
+              const sp = marketIndices.find(i => i.symbol === "^GSPC");
+              const nq = marketIndices.find(i => i.symbol === "^IXIC");
+              const ks = marketIndices.find(i => i.symbol === "^KS11");
+              const spChg = sp?.change || 0;
+              const nqChg = nq?.change || 0;
+              const insights = [];
+              if (Math.abs(spChg) > 1.5) insights.push(`S&P 500이 ${spChg > 0 ? "+" : ""}${spChg.toFixed(1)}% ${spChg > 0 ? "급등" : "급락"}했습니다. ${spChg > 0 ? "기술주 주도의 강세장이 지속" : "투자 심리 위축에 주의"}이 필요합니다.`);
+              else if (Math.abs(nqChg) > 2) insights.push(`나스닥이 ${nqChg > 0 ? "+" : ""}${nqChg.toFixed(1)}% ${nqChg > 0 ? "상승" : "하락"}하며 ${nqChg > 0 ? "AI·반도체 섹터가 주도" : "성장주 약세가 뚜렷"}합니다.`);
+              else insights.push(`미국 증시가 ${Math.abs(spChg) < 0.3 ? "보합권에서 움직이고 있습니다. 방향성 확인이 필요" : spChg > 0 ? "소폭 상승하며 안정적 흐름을 유지" : "소폭 하락하며 관망세가 짙어지고 있"}합니다.`);
+              if (ks) {
+                const ksChg = ks.change || 0;
+                insights.push(`코스피 ${ksChg >= 0 ? "+" : ""}${ksChg.toFixed(1)}% · ${ksChg > 1 ? "외국인 순매수 주도 강세" : ksChg < -1 ? "외국인 매도 압력 상승" : "기관·외국인 혼조세 지속"}`);
+              }
+              const shareText = `[Zepta AI 인사이트] ${insights[0]} ${insights[1] || ""}\n\nhttps://zepta.vercel.app`;
+
+              return (
+                <div style={{
+                  background: `linear-gradient(135deg, ${C.isDark ? '#0A1628' : '#F0F4FF'} 0%, ${C.isDark ? '#141024' : '#F5F0FF'} 100%)`,
+                  borderRadius: "18px", padding: isMobile ? "16px" : "18px 20px",
+                  border: `1px solid ${C.purple}12`,
+                  position: "relative", overflow: "hidden",
+                }}>
+                  <div style={{ position: "absolute", bottom: "-15px", right: "10px", fontSize: "60px", opacity: 0.04, pointerEvents: "none" }}>🤖</div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
+                    <div style={{
+                      width: "28px", height: "28px", borderRadius: "8px",
+                      background: `linear-gradient(135deg, ${C.blue}25, ${C.purple}20)`,
+                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px",
+                    }}>🤖</div>
+                    <span style={{ fontWeight: 800, fontSize: "14px", color: C.text1 }}>AI 시장 인사이트</span>
+                    <span style={{ fontSize: "11px", color: C.text3, marginLeft: "auto" }}>방금 업데이트</span>
+                  </div>
+                  {insights.map((txt, i) => (
+                    <div key={i} style={{
+                      fontSize: "14px", color: i === 0 ? C.text1 : C.text2,
+                      fontWeight: i === 0 ? 600 : 500, lineHeight: 1.5,
+                      marginBottom: i < insights.length - 1 ? "6px" : "0",
+                    }}>{txt}</div>
+                  ))}
+                  <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
+                    <button onClick={() => {
+                      if (navigator.share) navigator.share({ title: "Zepta AI 인사이트", text: shareText });
+                      else { navigator.clipboard?.writeText(shareText); }
+                    }} style={{
+                      padding: "6px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
+                      background: `${C.blue}12`, color: C.blue, border: `1px solid ${C.blue}20`,
+                      cursor: "pointer", transition: "all .15s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = `${C.blue}20`}
+                    onMouseLeave={e => e.currentTarget.style.background = `${C.blue}12`}
+                    >공유하기 📤</button>
+                    <button onClick={() => setTab("news")} style={{
+                      padding: "6px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
+                      background: `${C.card2}60`, color: C.text2, border: `1px solid ${C.border}20`,
+                      cursor: "pointer", transition: "all .15s",
+                    }}>뉴스 더보기 →</button>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* ── 데일리 투자 챌린지 (리텐션 강화) ─── */}
+            {(() => {
+              const todayKey = new Date().toISOString().slice(0, 10);
+              const challenges = [
+                { id: "check-market", icon: "📊", title: "마켓 체크", desc: "마켓 브리핑 확인하기", points: 10, tab: null },
+                { id: "run-screener", icon: "🔍", title: "스크리닝", desc: "스크리너 1회 실행", points: 20, tab: "screener" },
+                { id: "read-news", icon: "📰", title: "뉴스 읽기", desc: "뉴스 탭 확인하기", points: 10, tab: "news" },
+                { id: "check-strategy", icon: "🧠", title: "전략 분석", desc: "전략 패널 확인하기", points: 15, tab: "strategy" },
+              ];
+              let completed = [];
+              try { const s = JSON.parse(localStorage.getItem("zepta:daily-quest") || "{}"); if (s.date === todayKey) completed = s.done || []; } catch {}
+              // 마켓 브리핑을 본 것으로 자동 완료
+              if (!completed.includes("check-market")) {
+                completed = [...completed, "check-market"];
+                try { localStorage.setItem("zepta:daily-quest", JSON.stringify({ date: todayKey, done: completed })); } catch {}
+              }
+              const totalPoints = challenges.reduce((s, c) => s + (completed.includes(c.id) ? c.points : 0), 0);
+              const maxPoints = challenges.reduce((s, c) => s + c.points, 0);
+              const pct = Math.round((totalPoints / maxPoints) * 100);
+
+              return (
+                <div style={{
+                  background: `linear-gradient(135deg, ${C.card} 0%, ${C.isDark ? '#0D1520' : '#F8FAFF'} 100%)`,
+                  borderRadius: "20px", padding: isMobile ? "16px" : "20px",
+                  border: `1px solid ${C.blue}15`,
+                  position: "relative", overflow: "hidden",
+                }}>
+                  <div style={{ position: "absolute", top: "-20px", right: "-10px", fontSize: "80px", opacity: 0.04, pointerEvents: "none" }}>🎯</div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "18px" }}>🎯</span>
+                      <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>오늘의 투자 미션</span>
+                    </div>
+                    <span style={{
+                      fontSize: "13px", fontWeight: 700, padding: "3px 10px", borderRadius: "10px",
+                      background: pct === 100 ? `${C.green}20` : `${C.blue}15`,
+                      color: pct === 100 ? C.green : C.blue,
+                    }}>{totalPoints}/{maxPoints} XP</span>
+                  </div>
+                  {/* 프로그레스 바 */}
+                  <div style={{ height: "4px", borderRadius: "2px", background: `${C.border}30`, marginBottom: "12px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", width: `${pct}%`, borderRadius: "2px",
+                      background: pct === 100 ? C.green : `linear-gradient(90deg, ${C.blue}, ${C.purple})`,
+                      transition: "width .5s ease",
+                    }} />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: "8px" }}>
+                    {challenges.map(c => {
+                      const done = completed.includes(c.id);
+                      return (
+                        <button key={c.id} onClick={() => {
+                          if (c.tab && !done) {
+                            setTab(c.tab);
+                            const newDone = [...completed, c.id];
+                            try { localStorage.setItem("zepta:daily-quest", JSON.stringify({ date: todayKey, done: newDone })); } catch {}
+                          }
+                        }} style={{
+                          display: "flex", alignItems: "center", gap: "8px",
+                          padding: "10px 12px", borderRadius: "12px", border: "none", cursor: done ? "default" : "pointer",
+                          background: done ? `${C.green}10` : `${C.card2}60`,
+                          transition: "all .2s", opacity: done ? 0.7 : 1,
+                          textAlign: "left",
+                        }}
+                        onMouseEnter={e => { if (!done) e.currentTarget.style.background = `${C.blue}12`; }}
+                        onMouseLeave={e => { if (!done) e.currentTarget.style.background = `${C.card2}60`; }}
+                        >
+                          <span style={{ fontSize: "16px" }}>{done ? "✅" : c.icon}</span>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: "13px", fontWeight: 700, color: done ? C.green : C.text1, lineHeight: 1.2 }}>{c.title}</div>
+                            <div style={{ fontSize: "11px", color: C.text3, lineHeight: 1.2 }}>{done ? `+${c.points}XP` : c.desc}</div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {pct === 100 && (
+                    <div style={{
+                      marginTop: "10px", padding: "8px 14px", borderRadius: "10px", textAlign: "center",
+                      background: `linear-gradient(90deg, ${C.green}15, ${C.blue}10)`,
+                      fontSize: "13px", fontWeight: 700, color: C.green,
+                    }}>🏆 오늘 미션 올클리어! 내일도 도전하세요</div>
+                  )}
+                </div>
+              );
+            })()}
+
             {/* ── 이상 탐지 알림 (Anomaly Detection) ─── */}
             {anomalies.length > 0 && (
               <div style={{
@@ -7787,6 +7936,76 @@ function AppInner() {
                 </div>
               </div>
             )}
+
+            {/* ── 커뮤니티 리더보드 (소셜 바이럴 + 유입 강화) ─── */}
+            {(() => {
+              const leaderboard = [
+                { rank: 1, name: "투자의신", badge: "🏆", roi: 34.2, winRate: 78, streak: 42, tier: "다이아몬드" },
+                { rank: 2, name: "퀀트마스터", badge: "🥈", roi: 28.7, winRate: 72, streak: 31, tier: "플래티넘" },
+                { rank: 3, name: "알파헌터", badge: "🥉", roi: 22.1, winRate: 68, streak: 25, tier: "플래티넘" },
+                { rank: 4, name: "스마트머니", badge: "", roi: 18.5, winRate: 65, streak: 19, tier: "골드" },
+                { rank: 5, name: "데이터루크", badge: "", roi: 15.3, winRate: 63, streak: 14, tier: "골드" },
+              ];
+              const tierColor = { "다이아몬드": C.blue, "플래티넘": C.purple, "골드": "#FFD700" };
+              return (
+                <div style={{
+                  background: C.card, borderRadius: "20px", padding: isMobile ? "16px" : "20px",
+                  border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`,
+                  position: "relative", overflow: "hidden",
+                }}>
+                  <div style={{ position: "absolute", top: "-20px", right: "-10px", fontSize: "70px", opacity: 0.03, pointerEvents: "none" }}>🏆</div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "18px" }}>🏅</span>
+                      <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>이번 주 수익률 랭킹</span>
+                    </div>
+                    <button onClick={() => setTab("profile")} style={{
+                      fontSize: "12px", color: C.blue, background: `${C.blue}10`, border: `1px solid ${C.blue}20`,
+                      borderRadius: "8px", cursor: "pointer", fontWeight: 600, padding: "4px 10px",
+                    }}>전체 보기 →</button>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                    {leaderboard.map(u => (
+                      <div key={u.rank} style={{
+                        display: "flex", alignItems: "center", gap: "10px",
+                        padding: "10px 12px", borderRadius: "12px",
+                        background: u.rank <= 3 ? `${tierColor[u.tier]}08` : "transparent",
+                        transition: "background .15s",
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = `${C.card2}60`}
+                      onMouseLeave={e => e.currentTarget.style.background = u.rank <= 3 ? `${tierColor[u.tier]}08` : "transparent"}
+                      >
+                        <span style={{ fontWeight: 800, fontSize: "14px", color: u.rank <= 3 ? tierColor[u.tier] : C.text3, width: "20px", textAlign: "center" }}>
+                          {u.badge || u.rank}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ fontWeight: 700, fontSize: "14px", color: C.text1 }}>{u.name}</span>
+                            <span style={{
+                              fontSize: "10px", fontWeight: 700, padding: "1px 6px", borderRadius: "6px",
+                              background: `${tierColor[u.tier]}15`, color: tierColor[u.tier],
+                            }}>{u.tier}</span>
+                          </div>
+                          <div style={{ fontSize: "11px", color: C.text3 }}>승률 {u.winRate}% · 🔥{u.streak}일</div>
+                        </div>
+                        <span style={{ fontWeight: 800, fontSize: "16px", color: C.green, letterSpacing: "-0.3px" }}>+{u.roi}%</span>
+                      </div>
+                    ))}
+                  </div>
+                  {!user && (
+                    <button onClick={() => setShowAuthModal(true)} style={{
+                      width: "100%", marginTop: "12px", padding: "10px", borderRadius: "12px",
+                      border: `1px dashed ${C.blue}40`, background: `${C.blue}08`,
+                      color: C.blue, fontSize: "13px", fontWeight: 700, cursor: "pointer",
+                      transition: "all .2s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = `${C.blue}15`}
+                    onMouseLeave={e => e.currentTarget.style.background = `${C.blue}08`}
+                    >가입하고 랭킹에 도전하세요 🚀</button>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* ── 오늘의 추천 ─── */}
             {dailyPicks.length > 0 && (

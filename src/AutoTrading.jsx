@@ -420,8 +420,8 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
         </>
       ) : (
         /* PC: 기존 그리드 */
-        <div className="grid gap-4" style={{
-          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+        <div className="grid gap-3" style={{
+          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
           justifyContent: "start",
         }}>
           {bots.map((bot) => (
@@ -775,7 +775,7 @@ function BotCatalog({ onActivate, theme, isMobile }) {
   const c = colors[theme];
 
   return (
-    <div className="pb-6 px-1 flex flex-col" style={{ gap: isMobile ? "28px" : "40px" }}>
+    <div className="pb-6 px-1 flex flex-col" style={{ gap: isMobile ? "24px" : "32px" }}>
       {/* Hero Section */}
       <HeroSection theme={theme} c={c} isMobile={isMobile} />
 
@@ -1191,9 +1191,9 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
         const grandWinRate = grandTrades > 0 ? (grandWins / grandTrades) * 100 : 0;
 
         return (
-          <div className="mb-5" style={cardStyle}>
+          <div className="mb-3" style={cardStyle}>
             {/* 상단: 총 AUM + ROI */}
-            <div className="flex justify-between items-start mb-4 flex-wrap gap-3">
+            <div className="flex justify-between items-start mb-3 flex-wrap gap-3">
               <div>
                 <div className="text-xs mb-1" style={{ color: c.text3 }}>현재 AUM</div>
                 <div className="font-extrabold" style={{ color: c.text1, letterSpacing: "-0.5px", fontSize: isMobile ? "26px" : "32px" }}>
@@ -1242,7 +1242,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
       {isMobile ? (
         <ActiveBotCarousel activeBots={activeBots} allBotPerf={allBotPerf} onSelectBot={onSelectBot} onStopBot={onStopBot} onAddFund={onAddFund} theme={theme} cardStyle={cardStyle} />
       ) : null}
-      <div className={isMobile ? "hidden" : "grid gap-4"} style={{ gridTemplateColumns: activeBots.filter(ab => ab.status !== "paused").length === 1 ? "1fr" : "repeat(auto-fit, minmax(400px, 1fr))", justifyContent: "start" }}>
+      <div className={isMobile ? "hidden" : "grid gap-4"} style={{ gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", maxWidth: activeBots.filter(ab => ab.status !== "paused").length === 1 ? "560px" : "100%", justifyContent: "start" }}>
         {activeBots.filter(ab => ab.status !== "paused").map(ab => {
           const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
           const elapsed = Date.now() - (ab.startedAt || Date.now());
@@ -1740,10 +1740,10 @@ export default function AutoTrading({ theme = "dark", user }) {
         backgroundColor: c.bg,
         color: c.text1,
         minHeight: "100vh",
-        padding: isMobile ? "24px 16px" : "32px 24px",
+        padding: isMobile ? "16px 12px" : "24px 20px",
       }}
     >
-      <div style={{ maxWidth: "1400px", margin: "0 auto", display: "flex", flexDirection: "column", gap: isMobile ? "24px" : "40px" }}>
+      <div style={{ maxWidth: "1100px", margin: "0 auto", display: "flex", flexDirection: "column", gap: isMobile ? "20px" : "32px" }}>
         {/* 수동 배분 모달 */}
         {pendingBot && (
           <div style={{
