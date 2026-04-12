@@ -7178,6 +7178,10 @@ function AppInner() {
         .di-app-body { display: flex; flex-direction: column; }
         .di-main-wrap { flex: 1; }
         .gnb-inner { margin-left: auto !important; margin-right: auto !important; }
+        /* 모바일 하단탭 존재 시 상단 햄버거 숨김 */
+        @media (max-width: 640px) {
+          .mobile-hamburger { display: none !important; }
+        }
         /* v7.5: 공통 카드 스타일 — 개선된 간격 ── */
         .ui-card {
           background: ${C.isDark
@@ -12296,6 +12300,77 @@ function AppInner() {
 
             <div style={{ textAlign: "center", padding: "8px 0 20px" }}>
               <span style={{ fontSize: "16px", color: C.text3 }}>Zepta v10.0 · donginseo0421@gmail.com</span>
+            </div>
+          </div>
+        )}
+
+        {/* ── 더보기 탭: 비로그인 상태 ── */}
+        {tab === "profile" && !user && (
+          <div className="tab-content flex flex-col gap-5" style={{ maxWidth: "480px", margin: "0 auto", padding: isMobile ? "40px 0" : "60px 0" }}>
+            {/* 로그인 유도 */}
+            <div style={{
+              background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.purpleBg} 100%)`,
+              borderRadius: "24px", padding: "40px 24px", textAlign: "center",
+              border: `1px solid ${C.blue}15`,
+            }}>
+              <div style={{
+                width: "80px", height: "80px", borderRadius: "50%",
+                background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                margin: "0 auto 20px", fontSize: "36px",
+                boxShadow: `0 0 30px ${C.blue}40`,
+              }}>👤</div>
+              <h2 style={{ fontSize: "22px", fontWeight: 900, color: C.text1, margin: "0 0 8px" }}>로그인이 필요해요</h2>
+              <p style={{ fontSize: "14px", color: C.text3, lineHeight: 1.6, margin: "0 0 24px" }}>
+                로그인하면 XP 적립, 투자 랭킹, 관심종목 동기화 등<br/>
+                모든 개인화 기능을 이용할 수 있어요
+              </p>
+              <button onClick={() => setShowAuthModal(true)} style={{
+                padding: "14px 36px", borderRadius: "14px", fontSize: "16px", fontWeight: 700,
+                background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`, color: "#fff",
+                border: "none", cursor: "pointer",
+                boxShadow: `0 4px 16px ${C.blue}40`,
+                display: "inline-flex", alignItems: "center", gap: "8px",
+              }}>로그인 / 회원가입</button>
+            </div>
+
+            {/* 앱 설정 (비로그인에서도 접근 가능) */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", fontSize: "14px", fontWeight: 700, color: C.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>설정</div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderTop: `1px solid ${C.border}20` }}>
+                <span style={{ fontSize: "15px", color: C.text2 }}>테마</span>
+                <button onClick={toggleTheme} style={{
+                  padding: "6px 14px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
+                  background: C.card2 || C.card, border: `1px solid ${C.border}30`, color: C.text1, cursor: "pointer",
+                }}>
+                  {themeMode === "dark" ? "다크 모드 🌙" : "라이트 모드 ☀️"}
+                </button>
+              </div>
+            </div>
+
+            {/* 바로가기 메뉴 */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", fontSize: "14px", fontWeight: 700, color: C.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>서비스</div>
+              {[
+                { label: "서비스 소개", tab: "about" },
+                { label: "투자 가이드", tab: "guide" },
+                { label: "개인정보 처리방침", tab: "privacy" },
+                { label: "이용약관", tab: "terms" },
+                { label: "문의하기", tab: "contact" },
+              ].map((item, i) => (
+                <div key={i} onClick={() => setTab(item.tab)} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "14px 20px", borderTop: `1px solid ${C.border}20`, cursor: "pointer",
+                }}>
+                  <span style={{ fontSize: "15px", color: C.text2 }}>{item.label}</span>
+                  <span style={{ fontSize: "14px", color: C.text3 }}>›</span>
+                </div>
+              ))}
+            </div>
+
+            {/* 푸터 정보 */}
+            <div style={{ textAlign: "center", padding: "8px 0 20px" }}>
+              <span style={{ fontSize: "13px", color: C.text3 }}>Zepta v11.3 · donginseo0421@gmail.com</span>
             </div>
           </div>
         )}

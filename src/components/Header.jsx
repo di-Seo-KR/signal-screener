@@ -204,7 +204,7 @@ export default memo(function Header({
             {/* 모바일 햄버거 */}
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon-sm" className="relative lg:hidden">
+                <Button variant="ghost" size="icon-sm" className="relative lg:hidden mobile-hamburger">
                   <Menu className="size-5" />
                   {(alertBadge > 0 || anomalyCount > 0) && (
                     <span className="absolute top-0.5 right-0.5 size-2 rounded-full bg-destructive" />
