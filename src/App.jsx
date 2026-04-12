@@ -7316,6 +7316,7 @@ function AppInner() {
           .di-main-wrap { margin-left: 0; flex: 1; width: 100%; }
           .di-main-wrap header { left: 0 !important; width: 100% !important; }
           .di-main-wrap main { max-width: 1400px !important; padding-left: 36px !important; padding-right: 36px !important; padding-bottom: 36px !important; }
+          .gnb-inner { max-width: 1400px !important; padding-left: 36px !important; padding-right: 36px !important; }
           .home-grid { display: grid !important; grid-template-columns: 1fr 400px !important; gap: 24px !important; align-items: start !important; }
           .home-right { position: sticky; top: calc(var(--header-h) + var(--header-gap) + env(safe-area-inset-top, 0px)); max-height: calc(100vh - var(--header-h) - var(--header-gap) - env(safe-area-inset-top, 0px) - 16px); overflow-y: auto; overflow-x: hidden; scroll-behavior: smooth;
             scrollbar-width: none; -ms-overflow-style: none; }
@@ -7327,6 +7328,7 @@ function AppInner() {
         /* ── 초와이드 (≥1600px) — 최대 폭 레이아웃 ── */
         @media (min-width: 1600px) {
           .di-main-wrap main { max-width: 1600px !important; padding-left: 48px !important; padding-right: 48px !important; padding-bottom: 40px !important; }
+          .gnb-inner { max-width: 1600px !important; padding-left: 48px !important; padding-right: 48px !important; }
           .home-grid { grid-template-columns: 1fr 480px !important; gap: 28px !important; }
           .ui-card { padding: 22px !important; }
           .home-left { gap: 20px !important; }

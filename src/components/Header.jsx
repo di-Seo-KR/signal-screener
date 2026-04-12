@@ -197,7 +197,7 @@ export default memo(function Header({
     <>
       {/* ━━━ 헤더 바 ━━━ */}
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/30 bg-background">
-        <div className="mx-auto flex h-12 max-w-[1400px] items-center justify-between gap-3 px-4 sm:h-14 lg:h-16 sm:px-6 lg:px-10">
+        <div className="gnb-inner mx-auto flex h-12 max-w-[1400px] items-center justify-between gap-3 px-4 sm:h-14 lg:h-16 sm:px-6">
 
           {/* ── 좌측: 로고 + 모바일 메뉴 ── */}
           <div className="flex items-center gap-2">
