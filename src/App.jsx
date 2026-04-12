@@ -6997,7 +6997,7 @@ function AppInner() {
         @media (min-width: 900px) and (max-width: 1199px) {
           main { padding-left: 28px !important; padding-right: 28px !important; padding-bottom: 32px !important; }
           .home-grid { display: grid !important; grid-template-columns: 1fr 360px !important; gap: 20px !important; align-items: start !important; }
-          .home-right { position: sticky; top: calc(var(--header-h) + var(--header-gap) + env(safe-area-inset-top, 0px)); max-height: calc(100vh - var(--header-h) - var(--header-gap) - env(safe-area-inset-top, 0px) - 16px); overflow-y: auto; overflow-x: hidden;
+          .home-right { position: sticky; top: calc(var(--header-h) + var(--header-gap) + env(safe-area-inset-top, 0px)); max-height: calc(100vh - var(--header-h) - var(--header-gap) - env(safe-area-inset-top, 0px) - 16px); overflow-y: auto; overflow-x: hidden; scroll-behavior: smooth;
             scrollbar-width: none; -ms-overflow-style: none; }
           .home-right::-webkit-scrollbar { display: none; }
           .ui-card { padding: 18px !important; }
@@ -7013,7 +7013,7 @@ function AppInner() {
           .di-main-wrap header { left: 0 !important; width: 100% !important; }
           .di-main-wrap main { max-width: 1400px !important; padding-left: 36px !important; padding-right: 36px !important; padding-bottom: 36px !important; }
           .home-grid { display: grid !important; grid-template-columns: 1fr 400px !important; gap: 24px !important; align-items: start !important; }
-          .home-right { position: sticky; top: calc(var(--header-h) + var(--header-gap) + env(safe-area-inset-top, 0px)); max-height: calc(100vh - var(--header-h) - var(--header-gap) - env(safe-area-inset-top, 0px) - 16px); overflow-y: auto; overflow-x: hidden;
+          .home-right { position: sticky; top: calc(var(--header-h) + var(--header-gap) + env(safe-area-inset-top, 0px)); max-height: calc(100vh - var(--header-h) - var(--header-gap) - env(safe-area-inset-top, 0px) - 16px); overflow-y: auto; overflow-x: hidden; scroll-behavior: smooth;
             scrollbar-width: none; -ms-overflow-style: none; }
           .home-right::-webkit-scrollbar { display: none; }
           .ui-card { padding: 20px !important; }
@@ -7032,6 +7032,28 @@ function AppInner() {
           0% { transform: translateX(0); }
           100% { transform: translateX(-50%); }
         }
+        @keyframes cardPulse {
+          0% { transform: scale(1); }
+          50% { transform: scale(1.02); }
+          100% { transform: scale(1); }
+        }
+        @keyframes badgeUnlock {
+          0% { transform: scale(0.8); opacity: 0.5; }
+          50% { transform: scale(1.1); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes shimmerNew {
+          0% { background-position: -200px 0; }
+          100% { background-position: 200px 0; }
+        }
+        .card-enter { animation: fadeInUp 0.3s ease-out; }
+        .card-pulse-hover:hover { animation: cardPulse 0.4s ease-in-out; }
+        .badge-unlock { animation: badgeUnlock 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .button-press:active { animation: cardPulse 0.2s ease-out; }
       `}</style>
 
 
@@ -7112,9 +7134,9 @@ function AppInner() {
                     padding: "6px 14px", borderRadius: "10px",
                     background: `${C.orange}15`, border: `1px solid ${C.orange}25`,
                   }}>
-                    <span style={{ fontSize: "16px" }}>🔥</span>
+                    <span style={{ fontSize: "18px", display: "inline-block" }}>🔥</span>
                     <div>
-                      <div style={{ fontSize: "16px", fontWeight: 800, color: C.orange, lineHeight: 1 }}>{streakData.count}</div>
+                      <div style={{ fontSize: "16px", fontWeight: 800, color: C.orange, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{streakData.count}</div>
                       <div style={{ fontSize: "10px", color: C.text3, fontWeight: 600 }}>{t("tabs.home.streakDays") || "일 연속"}</div>
                     </div>
                   </div>
@@ -7179,10 +7201,20 @@ function AppInner() {
                               borderRadius: "14px",
                               background: `${isUp ? C.green : C.red}06`,
                               border: `1px solid ${isUp ? C.green : C.red}12`,
-                              transition: "transform .15s, background .15s",
+                              transition: "all .2s",
                             }}
-                            onMouseEnter={(e) => item.idx && (e.currentTarget.style.transform = "scale(1.02)")}
-                            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+                            onMouseEnter={(e) => {
+                              if (item.idx) {
+                                e.currentTarget.style.transform = "translateY(-2px)";
+                                e.currentTarget.style.background = `${isUp ? C.green : C.red}10`;
+                                e.currentTarget.style.boxShadow = `0 4px 12px ${isUp ? C.green : C.red}15`;
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = "translateY(0)";
+                              e.currentTarget.style.background = `${isUp ? C.green : C.red}06`;
+                              e.currentTarget.style.boxShadow = "none";
+                            }}
                           >
                             <div style={{ fontSize: "13px", color: C.text3, fontWeight: 600, marginBottom: "6px" }}>
                               {item.flag} {item.name}
@@ -7213,7 +7245,7 @@ function AppInner() {
                     </div>
 
                     {/* 하단: 등락 바 + 투자심리 */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "14px", paddingTop: "10px", borderTop: `1px solid ${C.border}12` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "14px", paddingTop: "14px", borderTop: `1px solid ${C.border}10` }}>
                       {/* 등락 바 */}
                       <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "6px" }}>
                         <span style={{ fontSize: "13px", fontWeight: 700, color: C.green }}>{upCount}↑</span>
@@ -7452,7 +7484,9 @@ function AppInner() {
             )}
 
             {/* ── Google AdSense (Home - Responsive) ─── */}
-            <GoogleAd format="responsive" slot="home-main" style={{ margin: "20px 0" }} />
+            <div style={{ minHeight: 0, overflow: "hidden" }}>
+              <GoogleAd format="responsive" slot="home-main" style={{ margin: "20px 0" }} />
+            </div>
 
             {/* ── 주요 종목 (통합: 전체 / 급등 / 급락 탭) ─── */}
             {hotAssets.length > 0 && (() => {
@@ -7549,7 +7583,9 @@ function AppInner() {
             })()}
 
             {/* 쿠팡 파트너스 배너 — 홈 중간 */}
-            <CoupangOfficialBanner width="728" height="90" bannerId={975392} style={{ margin: "4px 0", borderRadius: "14px", overflow: "hidden" }} />
+            <div style={{ minHeight: 0, overflow: "hidden" }}>
+              <CoupangOfficialBanner width="728" height="90" bannerId={975392} style={{ margin: "4px 0", borderRadius: "14px", overflow: "hidden" }} />
+            </div>
 
             </div>{/* end home-left */}
             <div className="home-right" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -7634,7 +7670,7 @@ function AppInner() {
                       </div>
                     )}
 
-                    <div style={{ fontSize: "14px", color: C.text3, marginBottom: "10px" }}>
+                    <div style={{ fontSize: "16px", color: C.text3, marginBottom: "10px", fontWeight: 500 }}>
                       {t("tabs.home.tomorrowSP") || "내일 S&P 500은?"}
                     </div>
 
@@ -7653,23 +7689,23 @@ function AppInner() {
                     ) : (
                       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                         <button onClick={() => handlePredict("up")} style={{
-                          padding: "14px", borderRadius: "12px", cursor: "pointer", transition: "all .15s",
-                          background: `${C.green}08`, border: `1px solid ${C.green}20`,
-                          display: "flex", flexDirection: "column", alignItems: "center", gap: "4px",
+                          padding: "18px", borderRadius: "12px", cursor: "pointer", transition: "all .15s",
+                          background: `linear-gradient(135deg, ${C.green}12, ${C.green}04)`, border: `1px solid ${C.green}20`,
+                          display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = `${C.green}18`; e.currentTarget.style.transform = "scale(1.02)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = `${C.green}08`; e.currentTarget.style.transform = "none"; }}>
-                          <span style={{ fontSize: "24px" }}>📈</span>
+                        onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 20px ${C.green}20`; e.currentTarget.style.transform = "scale(1.02)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)"; e.currentTarget.style.transform = "none"; }}>
+                          <span style={{ fontSize: "32px" }}>📈</span>
                           <span style={{ fontSize: "15px", fontWeight: 700, color: C.green }}>{t("tabs.home.bullish") || "상승"}</span>
                         </button>
                         <button onClick={() => handlePredict("down")} style={{
-                          padding: "14px", borderRadius: "12px", cursor: "pointer", transition: "all .15s",
-                          background: `${C.red}08`, border: `1px solid ${C.red}20`,
-                          display: "flex", flexDirection: "column", alignItems: "center", gap: "4px",
+                          padding: "18px", borderRadius: "12px", cursor: "pointer", transition: "all .15s",
+                          background: `linear-gradient(135deg, ${C.red}12, ${C.red}04)`, border: `1px solid ${C.red}20`,
+                          display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = `${C.red}18`; e.currentTarget.style.transform = "scale(1.02)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = `${C.red}08`; e.currentTarget.style.transform = "none"; }}>
-                          <span style={{ fontSize: "24px" }}>📉</span>
+                        onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 20px ${C.red}20`; e.currentTarget.style.transform = "scale(1.02)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)"; e.currentTarget.style.transform = "none"; }}>
+                          <span style={{ fontSize: "32px" }}>📉</span>
                           <span style={{ fontSize: "15px", fontWeight: 700, color: C.red }}>{t("tabs.home.bearishPred") || "하락"}</span>
                         </button>
                       </div>
@@ -7766,14 +7802,14 @@ function AppInner() {
                       <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                         {todayQuiz.options.map((opt, idx) => (
                           <button key={idx} onClick={() => handleQuizAnswer(idx)} style={{
-                            padding: "12px 14px", borderRadius: "10px", cursor: "pointer",
+                            padding: "14px 16px", borderRadius: "10px", cursor: "pointer",
                             background: `${C.card2}40`, border: `1px solid ${C.border}20`,
-                            textAlign: "left", fontSize: "14px", fontWeight: 600, color: C.text2,
+                            textAlign: "left", fontSize: "15px", fontWeight: 600, color: C.text2,
                             transition: "all .15s", display: "flex", alignItems: "center", gap: "10px",
                           }}
-                          onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}12`; e.currentTarget.style.borderColor = `${C.blue}30`; e.currentTarget.style.color = C.text1; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = `${C.card2}40`; e.currentTarget.style.borderColor = `${C.border}20`; e.currentTarget.style.color = C.text2; }}>
-                            <span style={{ width: "24px", height: "24px", borderRadius: "50%", background: `${C.blue}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", fontWeight: 700, color: C.blue, flexShrink: 0 }}>
+                          onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}12`; e.currentTarget.style.borderColor = `${C.blue}30`; e.currentTarget.style.color = C.text1; e.currentTarget.style.borderLeft = `3px solid ${C.blue}`; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = `${C.card2}40`; e.currentTarget.style.borderColor = `${C.border}20`; e.currentTarget.style.color = C.text2; e.currentTarget.style.borderLeft = "none"; }}>
+                            <span style={{ width: "28px", height: "28px", borderRadius: "50%", background: `${C.blue}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 700, color: C.blue, flexShrink: 0 }}>
                               {String.fromCharCode(65 + idx)}
                             </span>
                             {opt}
@@ -7815,16 +7851,17 @@ function AppInner() {
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
                     {badges.map((b, i) => (
                       <div key={i} style={{
-                        padding: "10px 6px", borderRadius: "12px", textAlign: "center",
+                        padding: "12px 8px", borderRadius: "12px", textAlign: "center",
                         background: b.earned ? `${C.blue}08` : `${C.card2}30`,
                         border: `1px solid ${b.earned ? C.blue + '20' : C.border + '10'}`,
-                        opacity: b.earned ? 1 : 0.5,
+                        opacity: b.earned ? 1 : 0.6,
                         transition: "all .2s",
+                        boxShadow: b.earned ? `0 0 12px ${C.blue}20` : "none",
                       }}>
-                        <div style={{ fontSize: "22px", marginBottom: "4px", filter: b.earned ? "none" : "grayscale(1)" }}>{b.icon}</div>
-                        <div style={{ fontSize: "11px", fontWeight: 600, color: b.earned ? C.text1 : C.text3, lineHeight: 1.2 }}>{b.name}</div>
+                        <div style={{ fontSize: "28px", marginBottom: "4px", filter: b.earned ? "none" : "grayscale(1)" }}>{b.icon}</div>
+                        <div style={{ fontSize: "12px", fontWeight: 600, color: b.earned ? C.text1 : C.text3, lineHeight: 1.2 }}>{b.name}</div>
                         {!b.earned && (
-                          <div style={{ marginTop: "4px", height: "3px", borderRadius: "2px", background: C.card2, overflow: "hidden" }}>
+                          <div style={{ marginTop: "4px", height: "5px", borderRadius: "2px", background: C.card2, overflow: "hidden" }}>
                             <div style={{ width: `${(b.progress / b.target) * 100}%`, height: "100%", background: C.blue, borderRadius: "2px", transition: "width .3s" }} />
                           </div>
                         )}
