@@ -11977,400 +11977,401 @@ function AppInner() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════
-            TAB: 프로필 / 회원정보
+            TAB: 전체 (더보기) — 토스 스타일 서비스 허브
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "profile" && user && (
-          <div className="tab-content flex flex-col gap-4" style={{ maxWidth: "720px", margin: "0 auto" }}>
-            {/* ── 프로필 헤더 + XP 레벨 통합 카드 ── */}
-            {(() => {
+        {tab === "profile" && (
+          <div className="tab-content" style={{ maxWidth: "720px", margin: "0 auto" }}>
+
+            {/* ── 상단: 유저 영역 ── */}
+            {user ? (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <div style={{
+                    width: "44px", height: "44px", borderRadius: "50%",
+                    background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "18px", fontWeight: 900, color: "#fff",
+                  }}>
+                    {(user?.user_metadata?.avatar_url)
+                      ? <img src={user.user_metadata.avatar_url} alt="" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }} />
+                      : (user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()
+                    }
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "18px", fontWeight: 800, color: C.text1 }}>
+                      {user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User"}
+                    </div>
+                    <div style={{ fontSize: "12px", color: C.text3 }}>
+                      {(() => { const uid = user?.id?.slice(0,8) || "anon"; const xi = getXpInfo(readTotalXp(uid).total); return `${xi.tier.icon} ${xi.tier.name} · Lv.${xi.level}`; })()}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button onClick={() => setTab("mypage")} style={{
+                    padding: "7px 14px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                    background: C.card, border: `1px solid ${C.border}30`, color: C.text2, cursor: "pointer",
+                  }}>내 정보</button>
+                  <button onClick={toggleTheme} style={{
+                    padding: "7px 12px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                    background: C.card, border: `1px solid ${C.border}30`, color: C.text2, cursor: "pointer",
+                  }}>{themeMode === "dark" ? "🌙" : "☀️"}</button>
+                </div>
+              </div>
+            ) : (
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                marginBottom: "20px", padding: "16px", borderRadius: "16px",
+                background: `linear-gradient(135deg, ${C.blueBg}, ${C.purpleBg})`,
+                border: `1px solid ${C.blue}15`,
+              }}>
+                <div>
+                  <div style={{ fontSize: "16px", fontWeight: 800, color: C.text1, marginBottom: "4px" }}>로그인하고 시작하세요</div>
+                  <div style={{ fontSize: "12px", color: C.text3 }}>XP 적립, 랭킹, 관심종목 동기화까지</div>
+                </div>
+                <button onClick={() => setShowAuthModal(true)} style={{
+                  padding: "10px 20px", borderRadius: "12px", fontSize: "14px", fontWeight: 700,
+                  background: C.blue, color: "#fff", border: "none", cursor: "pointer",
+                  whiteSpace: "nowrap",
+                }}>로그인</button>
+              </div>
+            )}
+
+            {/* ── 서비스 그리드 (토스 스타일 아이콘 그리드) ── */}
+            <div style={{
+              background: C.card, borderRadius: "20px", padding: "20px 16px",
+              border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`,
+              marginBottom: "16px",
+            }}>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(4, 1fr)",
+                gap: "4px",
+              }}>
+                {[
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="1.8"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>, label: "스크리너", tab: "screener" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.purple} strokeWidth="1.8"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 12l3 3 5-6" strokeWidth="2"/></svg>, label: "AI매매", tab: "auto-trading" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="1.8"><path d="M3 3v18h18"/><path d="M7 16l4-6 4 3 5-7"/></svg>, label: "전략분석", tab: "strategy" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E67E22" strokeWidth="1.8"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 7h8M8 11h5M8 15h7"/></svg>, label: "뉴스", tab: "news" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.red || "#ef4444"} strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, label: "캘린더", tab: "calendar" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="1.8"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" fill="none"/></svg>, label: "포트폴리오", tab: "portfolio" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="1.8"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7L12 16.4 5.7 21l2.3-7L2 9.4h7.6z"/></svg>, label: "랭킹", action: () => { setTab("profile"); setTimeout(() => document.getElementById("ranking-section")?.scrollIntoView({ behavior: "smooth" }), 100); } },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.text3} strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>, label: "설정", tab: "settings-sub" },
+                ].map((item, i) => (
+                  <button key={i} onClick={() => item.action ? item.action() : setTab(item.tab)} style={{
+                    display: "flex", flexDirection: "column", alignItems: "center", gap: "6px",
+                    padding: "12px 4px", borderRadius: "14px", border: "none",
+                    background: "transparent", cursor: "pointer",
+                    transition: "background .15s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = `${C.border}15`}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <div style={{
+                      width: "52px", height: "52px", borderRadius: "16px",
+                      background: `${C.isDark ? '#1a2235' : '#f0f4ff'}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>{item.icon}</div>
+                    <span style={{ fontSize: "12px", fontWeight: 600, color: C.text2, lineHeight: 1.2 }}>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* ── XP 레벨 미니 카드 (로그인 시) ── */}
+            {user && (() => {
               const uid = user?.id?.slice(0, 8) || "anon";
               const xpData = readTotalXp(uid);
               const xpInfo = getXpInfo(xpData.total);
-              const displayName = user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
-
               return (
-                <div style={{
-                  background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.purpleBg} 100%)`,
-                  borderRadius: "24px", padding: isMobile ? "24px 16px" : "32px 28px",
-                  textAlign: "center", boxShadow: `0 4px 20px ${C.blue}20`,
-                  position: "relative", overflow: "hidden",
+                <div onClick={() => setTab("mypage")} style={{
+                  background: C.card, borderRadius: "16px", padding: "16px",
+                  border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`,
+                  marginBottom: "16px", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: "14px",
                 }}>
-                  {/* 배경 티어 아이콘 */}
-                  <div style={{ position: "absolute", top: "-10px", right: "-10px", fontSize: "120px", opacity: 0.06, pointerEvents: "none" }}>{xpInfo.tier.icon}</div>
-
-                  {/* 아바타 + 티어 배지 */}
-                  <div style={{ position: "relative", display: "inline-block", marginBottom: "12px" }}>
-                    <div style={{
-                      background: `linear-gradient(135deg, ${xpInfo.tier.color}, ${C.purple || "#a855f7"})`,
-                      boxShadow: `0 0 30px ${xpInfo.tier.color}50`,
-                      borderRadius: "50%", width: "80px", height: "80px",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: "32px", fontWeight: "900", color: "white",
-                      border: "3px solid rgba(255,255,255,0.4)",
-                    }}>
-                      {(user?.user_metadata?.avatar_url)
-                        ? <img src={user.user_metadata.avatar_url} alt="" style={{ width: "80px", height: "80px", borderRadius: "50%", objectFit: "cover" }} />
-                        : displayName[0].toUpperCase()
-                      }
-                    </div>
-                    {/* 티어 배지 */}
-                    <div style={{
-                      position: "absolute", bottom: "-4px", right: "-8px",
-                      background: C.card, border: `2px solid ${xpInfo.tier.color}`,
-                      borderRadius: "10px", padding: "2px 8px",
-                      fontSize: "12px", fontWeight: 800, color: xpInfo.tier.color,
-                      boxShadow: `0 2px 8px ${xpInfo.tier.color}30`,
-                    }}>{xpInfo.tier.icon} {xpInfo.tier.name}</div>
-                  </div>
-
-                  <h2 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: "900", color: C.text1 }}>{displayName}</h2>
-                  <div style={{ fontSize: "13px", color: C.text3, marginBottom: "16px" }}>{user?.email || ""}</div>
-
-                  {/* XP 레벨 카드 */}
                   <div style={{
-                    background: `${C.card}CC`, borderRadius: "16px", padding: "16px",
-                    border: `1px solid ${xpInfo.tier.color}20`,
-                    backdropFilter: "blur(10px)",
-                  }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-                        <span style={{ fontSize: "28px", fontWeight: 900, color: xpInfo.tier.color }}>Lv.{xpInfo.level}</span>
-                        <span style={{ fontSize: "13px", fontWeight: 600, color: C.text3 }}>{xpInfo.tier.name}</span>
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: "18px", fontWeight: 800, color: C.blue }}>{xpData.total.toLocaleString()} XP</div>
-                        {xpInfo.tier.next && <div style={{ fontSize: "11px", color: C.text3 }}>다음 티어: {xpInfo.tier.next}</div>}
-                      </div>
+                    width: "48px", height: "48px", borderRadius: "14px",
+                    background: `${xpInfo.tier.color}15`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "24px",
+                  }}>{xpInfo.tier.icon}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "6px" }}>
+                      <span style={{ fontSize: "16px", fontWeight: 800, color: xpInfo.tier.color }}>Lv.{xpInfo.level}</span>
+                      <span style={{ fontSize: "12px", color: C.text3 }}>{xpInfo.tier.name}</span>
+                      <span style={{ fontSize: "13px", fontWeight: 700, color: C.blue, marginLeft: "auto" }}>{xpData.total.toLocaleString()} XP</span>
                     </div>
-                    {/* 레벨 프로그레스 바 */}
-                    <div style={{ height: "6px", borderRadius: "3px", background: `${C.border}30`, overflow: "hidden", marginBottom: "6px" }}>
+                    <div style={{ height: "4px", borderRadius: "2px", background: `${C.border}30`, overflow: "hidden" }}>
                       <div style={{
                         height: "100%", width: `${Math.round(xpInfo.progress * 100)}%`,
-                        borderRadius: "3px",
+                        borderRadius: "2px",
                         background: `linear-gradient(90deg, ${xpInfo.tier.color}, ${C.blue})`,
-                        transition: "width .5s ease",
                       }} />
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: C.text3 }}>
-                      <span>{xpInfo.currentLevelXp} / {xpInfo.nextLevelXp} XP</span>
-                      <span>다음 레벨까지 {xpInfo.nextLevelXp - xpInfo.currentLevelXp} XP</span>
-                    </div>
                   </div>
-
-                  {/* XP 획득 방법 요약 */}
-                  <div style={{
-                    display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px",
-                    marginTop: "12px",
-                  }}>
-                    {[
-                      { label: "데일리 미션", value: "+55/일", icon: "🎯" },
-                      { label: "예측 적중", value: "+25/회", icon: "🎯" },
-                      { label: "연속 접속", value: "+100/7일", icon: "🔥" },
-                    ].map((item, i) => (
-                      <div key={i} style={{
-                        background: `${C.card}80`, borderRadius: "10px", padding: "8px",
-                        textAlign: "center",
-                      }}>
-                        <div style={{ fontSize: "14px", marginBottom: "2px" }}>{item.icon}</div>
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: C.green }}>{item.value}</div>
-                        <div style={{ fontSize: "10px", color: C.text3 }}>{item.label}</div>
-                      </div>
-                    ))}
-                  </div>
+                  <span style={{ fontSize: "14px", color: C.text3 }}>›</span>
                 </div>
               );
             })()}
 
-            {/* 닉네임 설정 */}
-            <NicknameEditor user={user} supabase={supabase} onUpdate={refreshUser} />
-
-            {/* ── 전체 랭킹 (XP 기준) ── */}
-            {(() => {
-              const uid = user?.id?.slice(0, 8) || "anon";
-              const myXp = readTotalXp(uid);
-              const myInfo = getXpInfo(myXp.total);
-              const myName = user?.user_metadata?.nickname || user?.user_metadata?.display_name || "나";
-              const myStats = (() => { try { return JSON.parse(localStorage.getItem("zepta:pred:stats") || '{"correct":0,"total":0}'); } catch { return { correct: 0, total: 0 }; } })();
-              const myWinRate = myStats.total > 0 ? Math.round((myStats.correct / myStats.total) * 100) : 0;
-
-              const fullLeaderboard = [
-                { name: "투자의신", xp: 4800, winRate: 78, predictions: 89, level: 28 },
-                { name: "퀀트마스터", xp: 3200, winRate: 72, predictions: 65, level: 22 },
-                { name: "알파헌터", xp: 2100, winRate: 68, predictions: 52, level: 16 },
-                { name: "스마트머니", xp: 1500, winRate: 65, predictions: 43, level: 12 },
-                { name: "데이터루크", xp: 800, winRate: 63, predictions: 31, level: 8 },
-                { name: "머니메이커", xp: 600, winRate: 60, predictions: 25, level: 7 },
-                { name: "차트읽기장인", xp: 450, winRate: 58, predictions: 20, level: 5 },
-                { name: "초보투자자", xp: 200, winRate: 55, predictions: 12, level: 3 },
-              ].map(u => ({
-                ...u, isMe: false,
-                tierInfo: [...XP_TIERS].reverse().find(t => u.level >= t.minLv) || XP_TIERS[0],
-              }));
-
-              // 내 데이터 삽입
-              if (myXp.total > 0) {
-                fullLeaderboard.push({
-                  name: myName, xp: myXp.total, winRate: myWinRate,
-                  predictions: myStats.total, level: myInfo.level,
-                  isMe: true, tierInfo: myInfo.tier,
-                });
-              }
-              fullLeaderboard.sort((a, b) => b.xp - a.xp);
-              fullLeaderboard.forEach((u, i) => { u.rank = i + 1; });
-              const badges = ["🏆", "🥈", "🥉"];
-
-              return (
-                <div id="ranking-section" style={{
-                  background: C.card, borderRadius: "20px", padding: isMobile ? "16px" : "20px",
-                  border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
-                    <span style={{ fontSize: "18px" }}>🏅</span>
-                    <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>전체 투자 랭킹</span>
-                    <span style={{ fontSize: "11px", fontWeight: 600, color: C.text3, padding: "2px 8px", borderRadius: "6px", background: `${C.border}20` }}>XP 기준</span>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                    {fullLeaderboard.map(u => (
-                      <div key={u.rank} style={{
-                        display: "flex", alignItems: "center", gap: "10px",
-                        padding: "10px 12px", borderRadius: "12px",
-                        background: u.isMe ? `${C.blue}10` : u.rank <= 3 ? `${u.tierInfo.color}08` : "transparent",
-                        border: u.isMe ? `1px solid ${C.blue}25` : "1px solid transparent",
-                      }}>
-                        <span style={{ fontWeight: 800, fontSize: "14px", color: u.rank <= 3 ? u.tierInfo.color : C.text3, width: "24px", textAlign: "center" }}>
-                          {badges[u.rank - 1] || u.rank}
-                        </span>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <span style={{ fontWeight: 700, fontSize: "14px", color: u.isMe ? C.blue : C.text1 }}>{u.name}{u.isMe ? " (나)" : ""}</span>
-                            <span style={{
-                              fontSize: "10px", fontWeight: 700, padding: "1px 6px", borderRadius: "6px",
-                              background: `${u.tierInfo.color}15`, color: u.tierInfo.color,
-                            }}>Lv.{u.level}</span>
-                          </div>
-                          <div style={{ fontSize: "11px", color: C.text3 }}>적중률 {u.winRate}% · {u.predictions}회 예측</div>
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontWeight: 800, fontSize: "14px", color: u.tierInfo.color }}>{u.xp.toLocaleString()} XP</div>
-                          <div style={{ fontSize: "10px", color: C.text3 }}>{u.tierInfo.icon} {u.tierInfo?.name || ""}</div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {myXp.total === 0 && (
-                    <div style={{
-                      marginTop: "12px", padding: "12px", borderRadius: "12px", textAlign: "center",
-                      background: `${C.blue}08`, border: `1px dashed ${C.blue}20`,
-                      fontSize: "13px", color: C.text3,
-                    }}>
-                      홈에서 데일리 미션을 완료하고 XP를 적립하면<br/>랭킹에 참여할 수 있어요!
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* 계정 정보 */}
-            <div style={{ background: C.card, border: `1px solid ${C.border}` }} className="rounded-[16px] overflow-hidden">
-              <div className="px-5 py-3.5 text-sm font-bold text-muted-foreground uppercase tracking-wider">{t("profile.accountInfo")}</div>
-              {[
-                { label: "이메일", value: user?.email || "—" },
-                { label: "로그인 방식", value: user?.app_metadata?.provider === "google" ? "Google 로그인" : user?.app_metadata?.provider || "이메일" },
-                { label: "가입일", value: user?.created_at ? new Date(user.created_at).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" }) : "—" },
-                { label: "마지막 로그인", value: user?.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—" },
-                { label: "사용자 ID", value: user?.id ? user.id.slice(0, 8) + "..." : "—" },
-              ].map((item, i) => (
-                <div key={i} className="flex justify-between items-center px-5 py-3.5 border-t" style={{borderTopColor: `${C.border}20`}}>
-                  <span className="text-base text-muted-foreground">{item.label}</span>
-                  <span className="text-base font-semibold text-foreground text-right overflow-hidden text-ellipsis whitespace-nowrap" style={{ maxWidth: isMobile ? "50%" : "60%" }}>{item.value}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* 투자 설정 현황 */}
-            <div style={{ background: C.card, border: `1px solid ${C.border}` }} className="rounded-[16px] overflow-hidden">
-              <div className="px-5 py-3.5 text-sm font-bold text-muted-foreground uppercase tracking-wider">{t("profile.investmentSettings")}</div>
-              {[
-                { label: "관심 종목", value: `${watchlist.length}개`, action: () => setTab("screener") },
-                { label: "운영 중 봇", value: (() => {
-                  try {
-                    const k = `zepta_${user.id.slice(0, 8)}_active_bots`;
-                    return `${JSON.parse(localStorage.getItem(k) || "[]").length}개`;
-                  } catch { return "0개"; }
-                })(), action: () => setTab("auto-trading") },
-                { label: "실전매매", value: "운영중", action: () => setTab("auto-trading") },
-              ].map((item, i) => (
-                <div key={i} onClick={item.action} className="flex justify-between items-center px-5 py-3.5 border-t" style={{
-                  borderTopColor: `${C.border}20`,
-                  cursor: item.action ? "pointer" : "default",
-                }}>
-                  <span className="text-base text-muted-foreground">{item.label}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-base font-semibold text-foreground">{item.value}</span>
-                    {item.action && <span className="text-sm text-muted-foreground">›</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* 내 투자 성적표 공유 (프리미엄 카드) */}
-            <div style={{ background: `linear-gradient(135deg, ${C.blue}15 0%, ${C.purple}15 100%)`, border: `2px solid ${C.blue}40`, borderRadius: "20px", padding: "28px", textAlign: "center", boxShadow: `0 8px 24px ${C.blue}20` }}>
-              <div style={{ fontSize: "18px", fontWeight: 800, color: C.text1, marginBottom: "8px" }}>내 투자 성적표</div>
-              <div style={{ fontSize: "13px", color: C.text3, marginBottom: "20px" }}>AI가 분석한 나의 투자 현황을 공유해보세요</div>
-              <div className="flex justify-center mb-6" style={{ gap: isMobile ? "16px" : "32px" }}>
-                <div className="text-center">
-                  <div style={{ fontSize: "42px", fontWeight: "900", color: C.blue, textShadow: `0 0 12px ${C.blue}40`, letterSpacing: "-1px" }}>{watchlist.length}</div>
-                  <div style={{ fontSize: "14px", color: C.text3, marginTop: "6px", fontWeight: 600 }}>관심종목</div>
-                </div>
-                <div className="w-px self-stretch" style={{ background: `linear-gradient(180deg, ${C.border}00, ${C.border}60, ${C.border}00)` }} />
-                <div className="text-center">
-                  <div style={{ fontSize: "42px", fontWeight: "900", color: C.purple, textShadow: `0 0 12px ${C.purple}40`, letterSpacing: "-1px" }}>{(() => { try { return JSON.parse(localStorage.getItem(`zepta_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })()}</div>
-                  <div style={{ fontSize: "14px", color: C.text3, marginTop: "6px", fontWeight: 600 }}>운영봇</div>
-                </div>
-                <div className="w-px self-stretch" style={{ background: `linear-gradient(180deg, ${C.border}00, ${C.border}60, ${C.border}00)` }} />
-                <div className="text-center">
-                  <div style={{ fontSize: "42px", fontWeight: "900", color: C.green, textShadow: `0 0 12px ${C.green}40`, letterSpacing: "-1px" }}>{(() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })()}</div>
-                  <div style={{ fontSize: "14px", color: C.text3, marginTop: "6px", fontWeight: 600 }}>투자일</div>
-                </div>
-              </div>
-              <button onClick={() => {
-                const days = (() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })();
-                const bots = (() => { try { return JSON.parse(localStorage.getItem(`zepta_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })();
-                const name = user?.user_metadata?.display_name || "투자자";
-                const txt = `[Zepta AI 투자 성적표]\n\n${name}님의 투자 현황\n관심종목 ${watchlist.length}개 | AI 봇 ${bots}개 운영 | ${days}일째 투자 중\n\n33개 AI 퀀트 전략으로 매일 시그널 받고 있어요\n무료로 시작하기 👉 https://zepta.vercel.app`;
-                if (navigator.share) navigator.share({ title: "Zepta AI 투자 성적표", text: txt, url: "https://zepta.vercel.app" }).catch(() => {});
-                else navigator.clipboard.writeText(txt).then(() => showToast("성적표가 복사되었습니다!", "success")).catch(() => {});
-              }} style={{
-                padding: "12px 28px", borderRadius: "12px", fontSize: "15px", fontWeight: 700,
-                background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`, color: "#fff", border: "none", cursor: "pointer",
-                display: "inline-flex", alignItems: "center", gap: "6px", boxShadow: `0 4px 12px ${C.blue}30`,
-              }}>📤 성적표 공유하기</button>
-            </div>
-
-            {/* 친구 초대 */}
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden" }}>
-              <div style={{ padding: "14px 20px", fontSize: "14px", fontWeight: 700, color: C.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>친구 초대</div>
-              <div style={{ padding: "16px 20px", borderTop: `1px solid ${C.border}20` }}>
-                <div style={{ fontSize: "15px", color: C.text2, lineHeight: 1.6, marginBottom: "14px" }}>
-                  투자하는 친구에게 Zepta을 공유하세요.<br/>AI 퀀트 전략을 무료로 이용할 수 있어요.
-                </div>
-                <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: "8px" }}>
-                  <button onClick={() => {
-                    const txt = "나 요즘 이거 쓰는데 AI가 매수 타점 잡아줘서 꽤 괜찮아. 무료인데 한번 써봐 👉 https://zepta.vercel.app";
-                    if (navigator.share) navigator.share({ title: "Zepta - AI 퀀트 투자", text: txt, url: "https://zepta.vercel.app" }).catch(() => {});
-                    else navigator.clipboard.writeText(txt).then(() => showToast("초대 링크가 복사되었습니다!", "success")).catch(() => {});
-                  }} style={{
-                    flex: 1, padding: "10px", borderRadius: "10px", fontSize: "17px", fontWeight: 600,
-                    background: C.blue, color: "#fff", border: "none", cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", minHeight: "44px",
-                  }}>📱 카톡으로 공유</button>
-                  <button onClick={() => {
-                    navigator.clipboard.writeText("https://zepta.vercel.app").then(() => showToast("링크가 복사되었습니다!", "success")).catch(() => {});
-                  }} style={{
-                    flex: 1, padding: "10px", borderRadius: "10px", fontSize: "17px", fontWeight: 600,
-                    background: C.card2, color: C.text2, border: `1px solid ${C.border}${C.isDark ? '30' : '50'}`, cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: "4px", minHeight: "44px",
-                  }}>🔗 링크 복사</button>
-                </div>
-              </div>
-            </div>
-
-            {/* 앱 설정 */}
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden" }}>
-              <div style={{ padding: "14px 20px", fontSize: "16px", fontWeight: 700, color: C.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("profile.appSettings")}</div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderTop: `1px solid ${C.border}20` }}>
-                <span style={{ fontSize: "18px", color: C.text2 }}>테마</span>
-                <button onClick={toggleTheme} style={{
-                  padding: "6px 14px", borderRadius: "8px", fontSize: "17px", fontWeight: 600,
-                  background: C.card2, border: `1px solid ${C.border}${C.isDark ? '30' : '50'}`, color: C.text1, cursor: "pointer",
-                }}>
-                  {themeMode === "dark" ? "다크 모드" : "라이트 모드"} {themeMode === "dark" ? "🌙" : "☀️"}
-                </button>
-              </div>
-            </div>
-
-            {/* 로그아웃 */}
-            <button onClick={() => { if (confirm("로그아웃 하시겠습니까?")) { signOut(); setTab("home"); } }} style={{
-              width: "100%", padding: "14px", borderRadius: "12px", fontSize: "17px", fontWeight: 700,
-              background: `${C.red}12`, color: C.red, border: `1px solid ${C.red}25`, cursor: "pointer",
-              transition: "all 0.2s",
-            }}>
-              로그아웃
-            </button>
-
-            <div style={{ textAlign: "center", padding: "8px 0 20px" }}>
-              <span style={{ fontSize: "16px", color: C.text3 }}>Zepta v10.0 · donginseo0421@gmail.com</span>
-            </div>
-          </div>
-        )}
-
-        {/* ── 더보기 탭: 비로그인 상태 ── */}
-        {tab === "profile" && !user && (
-          <div className="tab-content flex flex-col gap-5" style={{ maxWidth: "480px", margin: "0 auto", padding: isMobile ? "40px 0" : "60px 0" }}>
-            {/* 로그인 유도 */}
+            {/* ── 투자 서비스 리스트 ── */}
             <div style={{
-              background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.purpleBg} 100%)`,
-              borderRadius: "24px", padding: "40px 24px", textAlign: "center",
-              border: `1px solid ${C.blue}15`,
+              background: C.card, borderRadius: "16px", overflow: "hidden",
+              border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`,
+              marginBottom: "16px",
             }}>
-              <div style={{
-                width: "80px", height: "80px", borderRadius: "50%",
-                background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                margin: "0 auto 20px", fontSize: "36px",
-                boxShadow: `0 0 30px ${C.blue}40`,
-              }}>👤</div>
-              <h2 style={{ fontSize: "22px", fontWeight: 900, color: C.text1, margin: "0 0 8px" }}>로그인이 필요해요</h2>
-              <p style={{ fontSize: "14px", color: C.text3, lineHeight: 1.6, margin: "0 0 24px" }}>
-                로그인하면 XP 적립, 투자 랭킹, 관심종목 동기화 등<br/>
-                모든 개인화 기능을 이용할 수 있어요
-              </p>
-              <button onClick={() => setShowAuthModal(true)} style={{
-                padding: "14px 36px", borderRadius: "14px", fontSize: "16px", fontWeight: 700,
-                background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`, color: "#fff",
-                border: "none", cursor: "pointer",
-                boxShadow: `0 4px 16px ${C.blue}40`,
-                display: "inline-flex", alignItems: "center", gap: "8px",
-              }}>로그인 / 회원가입</button>
-            </div>
-
-            {/* 앱 설정 (비로그인에서도 접근 가능) */}
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden" }}>
-              <div style={{ padding: "14px 20px", fontSize: "14px", fontWeight: 700, color: C.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>설정</div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderTop: `1px solid ${C.border}20` }}>
-                <span style={{ fontSize: "15px", color: C.text2 }}>테마</span>
-                <button onClick={toggleTheme} style={{
-                  padding: "6px 14px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
-                  background: C.card2 || C.card, border: `1px solid ${C.border}30`, color: C.text1, cursor: "pointer",
-                }}>
-                  {themeMode === "dark" ? "다크 모드 🌙" : "라이트 모드 ☀️"}
-                </button>
-              </div>
-            </div>
-
-            {/* 바로가기 메뉴 */}
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden" }}>
-              <div style={{ padding: "14px 20px", fontSize: "14px", fontWeight: 700, color: C.text3, textTransform: "uppercase", letterSpacing: "0.05em" }}>서비스</div>
+              <div style={{ padding: "14px 20px", fontSize: "14px", fontWeight: 800, color: C.text1 }}>투자 서비스</div>
               {[
-                { label: "서비스 소개", tab: "about" },
-                { label: "투자 가이드", tab: "guide" },
-                { label: "개인정보 처리방침", tab: "privacy" },
-                { label: "이용약관", tab: "terms" },
-                { label: "문의하기", tab: "contact" },
+                { icon: "📊", label: "마켓 브리핑", desc: "실시간 시장 현황", tab: "home" },
+                { icon: "🎯", label: "오늘의 예측", desc: "내일 S&P 500 방향 맞추기", tab: "home" },
+                { icon: "🧠", label: "퀀트 전략", desc: "33개 AI 전략 시그널", tab: "strategy" },
+                { icon: "🤖", label: "AI 자동매매", desc: "봇 기반 퀀트 트레이딩", tab: "auto-trading" },
+                { icon: "📰", label: "투자 뉴스", desc: "실시간 글로벌 뉴스", tab: "news" },
               ].map((item, i) => (
                 <div key={i} onClick={() => setTab(item.tab)} style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  padding: "14px 20px", borderTop: `1px solid ${C.border}20`, cursor: "pointer",
-                }}>
-                  <span style={{ fontSize: "15px", color: C.text2 }}>{item.label}</span>
+                  display: "flex", alignItems: "center", gap: "14px",
+                  padding: "14px 20px", borderTop: `1px solid ${C.border}15`, cursor: "pointer",
+                  transition: "background .1s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = `${C.border}10`}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                >
+                  <span style={{ fontSize: "20px", width: "28px", textAlign: "center" }}>{item.icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: "15px", fontWeight: 700, color: C.text1 }}>{item.label}</div>
+                    <div style={{ fontSize: "12px", color: C.text3 }}>{item.desc}</div>
+                  </div>
                   <span style={{ fontSize: "14px", color: C.text3 }}>›</span>
                 </div>
               ))}
             </div>
 
-            {/* 푸터 정보 */}
-            <div style={{ textAlign: "center", padding: "8px 0 20px" }}>
-              <span style={{ fontSize: "13px", color: C.text3 }}>Zepta v11.3 · donginseo0421@gmail.com</span>
+            {/* ── 전체 랭킹 ── */}
+            <div id="ranking-section" style={{
+              background: C.card, borderRadius: "16px", overflow: "hidden",
+              border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`,
+              marginBottom: "16px", padding: isMobile ? "16px" : "20px",
+            }}>
+              {(() => {
+                const uid = user?.id?.slice(0, 8) || "anon";
+                const myXp = readTotalXp(uid);
+                const myInfo = getXpInfo(myXp.total);
+                const myName = user?.user_metadata?.nickname || user?.user_metadata?.display_name || "나";
+                const myStats = (() => { try { return JSON.parse(localStorage.getItem("zepta:pred:stats") || '{"correct":0,"total":0}'); } catch { return { correct: 0, total: 0 }; } })();
+                const myWinRate = myStats.total > 0 ? Math.round((myStats.correct / myStats.total) * 100) : 0;
+                const fullLb = [
+                  { name: "투자의신", xp: 4800, winRate: 78, predictions: 89, level: 28 },
+                  { name: "퀀트마스터", xp: 3200, winRate: 72, predictions: 65, level: 22 },
+                  { name: "알파헌터", xp: 2100, winRate: 68, predictions: 52, level: 16 },
+                  { name: "스마트머니", xp: 1500, winRate: 65, predictions: 43, level: 12 },
+                  { name: "데이터루크", xp: 800, winRate: 63, predictions: 31, level: 8 },
+                  { name: "머니메이커", xp: 600, winRate: 60, predictions: 25, level: 7 },
+                  { name: "차트읽기장인", xp: 450, winRate: 58, predictions: 20, level: 5 },
+                ].map(u => ({ ...u, isMe: false, tierInfo: [...XP_TIERS].reverse().find(t => u.level >= t.minLv) || XP_TIERS[0] }));
+                if (user && myXp.total > 0) fullLb.push({ name: myName, xp: myXp.total, winRate: myWinRate, predictions: myStats.total, level: myInfo.level, isMe: true, tierInfo: myInfo.tier });
+                fullLb.sort((a, b) => b.xp - a.xp);
+                fullLb.forEach((u, i) => { u.rank = i + 1; });
+                const badges = ["🏆", "🥈", "🥉"];
+                return (
+                  <>
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
+                      <span style={{ fontSize: "18px" }}>🏅</span>
+                      <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>투자 랭킹</span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                      {fullLb.map(u => (
+                        <div key={u.rank} style={{
+                          display: "flex", alignItems: "center", gap: "10px",
+                          padding: "10px 12px", borderRadius: "12px",
+                          background: u.isMe ? `${C.blue}10` : u.rank <= 3 ? `${u.tierInfo.color}08` : "transparent",
+                          border: u.isMe ? `1px solid ${C.blue}25` : "1px solid transparent",
+                        }}>
+                          <span style={{ fontWeight: 800, fontSize: "14px", color: u.rank <= 3 ? u.tierInfo.color : C.text3, width: "24px", textAlign: "center" }}>{badges[u.rank - 1] || u.rank}</span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <span style={{ fontWeight: 700, fontSize: "14px", color: u.isMe ? C.blue : C.text1 }}>{u.name}{u.isMe ? " (나)" : ""}</span>
+                              <span style={{ fontSize: "10px", fontWeight: 700, padding: "1px 6px", borderRadius: "6px", background: `${u.tierInfo.color}15`, color: u.tierInfo.color }}>Lv.{u.level}</span>
+                            </div>
+                            <div style={{ fontSize: "11px", color: C.text3 }}>적중률 {u.winRate}% · {u.predictions}회 예측</div>
+                          </div>
+                          <div style={{ textAlign: "right" }}>
+                            <div style={{ fontWeight: 800, fontSize: "14px", color: u.tierInfo.color }}>{u.xp.toLocaleString()} XP</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* ── 고객지원 / 정보 ── */}
+            <div style={{
+              background: C.card, borderRadius: "16px", overflow: "hidden",
+              border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`,
+              marginBottom: "16px",
+            }}>
+              <div style={{ padding: "14px 20px", fontSize: "14px", fontWeight: 800, color: C.text1 }}>고객지원</div>
+              {[
+                { icon: "📋", label: "서비스 소개", tab: "about" },
+                { icon: "📖", label: "투자 가이드", tab: "guide" },
+                { icon: "🔒", label: "개인정보 처리방침", tab: "privacy" },
+                { icon: "📄", label: "이용약관", tab: "terms" },
+                { icon: "✉️", label: "문의하기", tab: "contact" },
+              ].map((item, i) => (
+                <div key={i} onClick={() => setTab(item.tab)} style={{
+                  display: "flex", alignItems: "center", gap: "14px",
+                  padding: "14px 20px", borderTop: `1px solid ${C.border}15`, cursor: "pointer",
+                  transition: "background .1s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = `${C.border}10`}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                >
+                  <span style={{ fontSize: "16px", width: "24px", textAlign: "center" }}>{item.icon}</span>
+                  <span style={{ fontSize: "15px", fontWeight: 600, color: C.text2, flex: 1 }}>{item.label}</span>
+                  <span style={{ fontSize: "14px", color: C.text3 }}>›</span>
+                </div>
+              ))}
+            </div>
+
+            {/* ── 로그아웃 (로그인 시에만) ── */}
+            {user && (
+              <button onClick={() => { if (confirm("로그아웃 하시겠습니까?")) { signOut(); setTab("home"); } }} style={{
+                width: "100%", padding: "14px", borderRadius: "12px", fontSize: "15px", fontWeight: 700,
+                background: `${C.red}08`, color: C.red, border: `1px solid ${C.red}15`, cursor: "pointer",
+                marginBottom: "8px",
+              }}>로그아웃</button>
+            )}
+
+            {/* 푸터 */}
+            <div style={{ textAlign: "center", padding: "8px 0 24px" }}>
+              <span style={{ fontSize: "12px", color: C.text3 }}>Zepta v11.3 · donginseo0421@gmail.com</span>
+            </div>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 마이페이지 (회원정보 상세 — 더보기 > 내 정보)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "mypage" && user && (
+          <div className="tab-content flex flex-col gap-4" style={{ maxWidth: "720px", margin: "0 auto" }}>
+            {/* 뒤로가기 헤더 */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+              <button onClick={() => setTab("profile")} style={{
+                padding: "6px 10px", borderRadius: "8px", border: "none",
+                background: C.card, cursor: "pointer", fontSize: "14px", color: C.text2,
+                display: "flex", alignItems: "center", gap: "4px",
+              }}>← 전체</button>
+              <span style={{ fontSize: "18px", fontWeight: 800, color: C.text1 }}>내 정보</span>
+            </div>
+
+            {/* XP 레벨 카드 */}
+            {(() => {
+              const uid = user?.id?.slice(0, 8) || "anon";
+              const xpData = readTotalXp(uid);
+              const xpInfo = getXpInfo(xpData.total);
+              const displayName = user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User";
+              return (
+                <div style={{
+                  background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.purpleBg} 100%)`,
+                  borderRadius: "20px", padding: "24px", textAlign: "center",
+                  border: `1px solid ${C.blue}15`, position: "relative", overflow: "hidden",
+                }}>
+                  <div style={{ position: "absolute", top: "-10px", right: "-10px", fontSize: "100px", opacity: 0.05, pointerEvents: "none" }}>{xpInfo.tier.icon}</div>
+                  <div style={{ position: "relative", display: "inline-block", marginBottom: "12px" }}>
+                    <div style={{
+                      width: "72px", height: "72px", borderRadius: "50%",
+                      background: `linear-gradient(135deg, ${xpInfo.tier.color}, ${C.purple || "#a855f7"})`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "28px", fontWeight: 900, color: "#fff",
+                      border: "3px solid rgba(255,255,255,0.3)",
+                    }}>
+                      {(user?.user_metadata?.avatar_url)
+                        ? <img src={user.user_metadata.avatar_url} alt="" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover" }} />
+                        : displayName[0].toUpperCase()}
+                    </div>
+                    <div style={{ position: "absolute", bottom: "-4px", right: "-8px", background: C.card, border: `2px solid ${xpInfo.tier.color}`, borderRadius: "8px", padding: "1px 6px", fontSize: "11px", fontWeight: 800, color: xpInfo.tier.color }}>{xpInfo.tier.icon} Lv.{xpInfo.level}</div>
+                  </div>
+                  <h2 style={{ margin: "0 0 4px", fontSize: "20px", fontWeight: 900, color: C.text1 }}>{displayName}</h2>
+                  <div style={{ fontSize: "13px", color: C.text3, marginBottom: "14px" }}>{user?.email}</div>
+                  <div style={{ background: `${C.card}CC`, borderRadius: "12px", padding: "12px", textAlign: "left" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                      <span style={{ fontSize: "14px", fontWeight: 700, color: xpInfo.tier.color }}>Lv.{xpInfo.level} {xpInfo.tier.name}</span>
+                      <span style={{ fontSize: "14px", fontWeight: 700, color: C.blue }}>{xpData.total.toLocaleString()} XP</span>
+                    </div>
+                    <div style={{ height: "5px", borderRadius: "3px", background: `${C.border}30`, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${Math.round(xpInfo.progress * 100)}%`, borderRadius: "3px", background: `linear-gradient(90deg, ${xpInfo.tier.color}, ${C.blue})` }} />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "11px", color: C.text3 }}>
+                      <span>{xpInfo.currentLevelXp}/{xpInfo.nextLevelXp} XP</span>
+                      <span>다음 레벨까지 {xpInfo.nextLevelXp - xpInfo.currentLevelXp} XP</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* 닉네임 */}
+            <NicknameEditor user={user} supabase={supabase} onUpdate={refreshUser} />
+
+            {/* 계정 정보 */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}` }} className="rounded-[16px] overflow-hidden">
+              <div className="px-5 py-3.5 text-sm font-bold text-muted-foreground uppercase tracking-wider">계정 정보</div>
+              {[
+                { label: "이메일", value: user?.email || "—" },
+                { label: "로그인 방식", value: user?.app_metadata?.provider === "google" ? "Google" : user?.app_metadata?.provider || "이메일" },
+                { label: "가입일", value: user?.created_at ? new Date(user.created_at).toLocaleDateString("ko-KR") : "—" },
+              ].map((item, i) => (
+                <div key={i} className="flex justify-between items-center px-5 py-3.5 border-t" style={{ borderTopColor: `${C.border}20` }}>
+                  <span style={{ fontSize: "14px", color: C.text3 }}>{item.label}</span>
+                  <span style={{ fontSize: "14px", fontWeight: 600, color: C.text1 }}>{item.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* 투자 성적표 */}
+            <div style={{ background: `linear-gradient(135deg, ${C.blue}12, ${C.purple}12)`, borderRadius: "16px", padding: "24px", textAlign: "center", border: `1px solid ${C.blue}20` }}>
+              <div style={{ fontSize: "16px", fontWeight: 800, color: C.text1, marginBottom: "16px" }}>내 투자 성적표</div>
+              <div style={{ display: "flex", justifyContent: "center", gap: "24px", marginBottom: "16px" }}>
+                {[
+                  { val: watchlist.length, label: "관심종목", color: C.blue },
+                  { val: (() => { try { return JSON.parse(localStorage.getItem(`zepta_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })(), label: "운영봇", color: C.purple },
+                  { val: (() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })(), label: "투자일", color: C.green },
+                ].map((s, i) => (
+                  <div key={i} className="text-center">
+                    <div style={{ fontSize: "32px", fontWeight: 900, color: s.color }}>{s.val}</div>
+                    <div style={{ fontSize: "12px", color: C.text3, fontWeight: 600 }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => {
+                const days = (() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })();
+                const bots = (() => { try { return JSON.parse(localStorage.getItem(`zepta_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })();
+                const txt = `[Zepta AI 투자 성적표]\n${user?.user_metadata?.nickname || "투자자"}님 · 관심종목 ${watchlist.length}개 | 봇 ${bots}개 | ${days}일째\n무료 시작 👉 https://zepta.vercel.app`;
+                if (navigator.share) navigator.share({ title: "Zepta 성적표", text: txt }).catch(() => {});
+                else navigator.clipboard.writeText(txt).then(() => showToast("복사되었습니다!", "success")).catch(() => {});
+              }} style={{
+                padding: "10px 24px", borderRadius: "10px", fontSize: "14px", fontWeight: 700,
+                background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`, color: "#fff",
+                border: "none", cursor: "pointer",
+              }}>📤 공유하기</button>
+            </div>
+
+            {/* 친구 초대 */}
+            <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+              <div style={{ fontSize: "14px", fontWeight: 800, color: C.text1, marginBottom: "10px" }}>친구 초대</div>
+              <div style={{ fontSize: "13px", color: C.text3, marginBottom: "12px" }}>AI 퀀트 전략을 무료로 이용할 수 있어요</div>
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button onClick={() => {
+                  const txt = "AI가 매수 타점 잡아주는 투자앱이야. 무료인데 한번 써봐 👉 https://zepta.vercel.app";
+                  if (navigator.share) navigator.share({ text: txt }).catch(() => {});
+                  else navigator.clipboard.writeText(txt).then(() => showToast("복사됨!", "success")).catch(() => {});
+                }} style={{ flex: 1, padding: "10px", borderRadius: "10px", fontSize: "14px", fontWeight: 700, background: C.blue, color: "#fff", border: "none", cursor: "pointer" }}>공유하기</button>
+                <button onClick={() => navigator.clipboard.writeText("https://zepta.vercel.app").then(() => showToast("링크 복사!", "success")).catch(() => {})} style={{
+                  flex: 1, padding: "10px", borderRadius: "10px", fontSize: "14px", fontWeight: 700,
+                  background: "transparent", color: C.text2, border: `1px solid ${C.border}30`, cursor: "pointer",
+                }}>링크 복사</button>
+              </div>
             </div>
           </div>
         )}
