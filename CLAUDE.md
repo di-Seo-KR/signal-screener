@@ -97,6 +97,47 @@
 - **병렬 에이전트 활용**: 독립적 작업은 반드시 동시 투입
 - **작업 완료 후 반드시 커밋**
 
+### 플러그인·스킬·커넥터 적극 활용 — 절대 준수
+모든 작업에서 설치된 **플러그인**, **커넥터(MCP)**, **스킬**을 적극적으로 활용합니다.
+수동으로 처리하기 전에, 해당 작업을 더 잘 수행할 수 있는 스킬이나 커넥터가 있는지 먼저 확인합니다.
+
+**설치된 주요 플러그인 및 활용 시점:**
+| 플러그인/스킬 | 활용 시점 |
+|-------------|----------|
+| `engineering:code-review` | 코드 리뷰, PR 검토, 보안·성능·정확성 점검 |
+| `engineering:architecture` | 아키텍처 의사결정, ADR 작성, 기술 선택 |
+| `engineering:system-design` | 시스템 설계, API 설계, 데이터 모델링 |
+| `engineering:debug` | 구조적 디버깅 세션 |
+| `engineering:testing-strategy` | 테스트 전략 및 테스트 플랜 수립 |
+| `engineering:deploy-checklist` | 배포 전 체크리스트 검증 |
+| `design:design-critique` | UI/UX 디자인 피드백 |
+| `design:accessibility-review` | WCAG 접근성 감사 |
+| `design:design-handoff` | 개발자 핸드오프 스펙 생성 |
+| `marketing:seo-audit` | SEO 감사, 키워드 분석, 콘텐츠 갭 |
+| `marketing:campaign-plan` | 마케팅 캠페인 기획 |
+| `marketing:competitive-brief` | 경쟁사 분석 및 포지셔닝 |
+| `product-management:write-spec` | 피처 스펙/PRD 작성 |
+| `product-management:roadmap-update` | 로드맵 수립 및 우선순위 조정 |
+| `data:analyze` | 데이터 분석, 메트릭 조회 |
+| `data:build-dashboard` | 대시보드 구축 |
+
+**커스텀 프로젝트 스킬:**
+| 스킬 | 활용 시점 |
+|------|----------|
+| `context7` | 라이브러리/프레임워크 최신 문서 조회 필요 시 |
+| `security-guidance` | 보안 검증, 취약점 분석 시 |
+| `superpowers` | 시니어 엔지니어링 프로세스 적용 시 |
+| `feature-dev` | 새 피처 개발 전체 라이프사이클 관리 시 |
+
+**커넥터(MCP):**
+| 커넥터 | 활용 시점 |
+|--------|----------|
+| Supabase MCP | DB 스키마 조회, SQL 실행, 마이그레이션 |
+| Vercel MCP | 배포 상태 확인, 빌드 로그, 도메인 관리 |
+| Notion MCP | 문서 검색, 페이지 생성, 코멘트 |
+| Sentry MCP | 에러 추적, 이슈 검색, 성능 모니터링 |
+| Chrome MCP | 라이브 사이트 검증, 스크린샷, 폼 테스트 |
+
 ### Git 및 배포
 - 커밋 메시지: 한국어 존댓말, 명확한 변경 이력
 - Git push는 Mac에서 대표가 수동으로 진행 (Sandbox 제한)
