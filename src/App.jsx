@@ -10818,7 +10818,7 @@ function AppInner() {
               ].map((item, i) => (
                 <div key={i} className="flex justify-between items-center px-5 py-3.5 border-t" style={{borderTopColor: `${C.border}20`}}>
                   <span className="text-base text-muted-foreground">{item.label}</span>
-                  <span className="text-base font-semibold text-foreground text-right overflow-hidden text-ellipsis whitespace-nowrap" style={{ maxWidth: isMobile ? "50%" : "60%" }}">{item.value}</span>
+                  <span className="text-base font-semibold text-foreground text-right overflow-hidden text-ellipsis whitespace-nowrap" style={{ maxWidth: isMobile ? "50%" : "60%" }}>{item.value}</span>
                 </div>
               ))}
             </div>
