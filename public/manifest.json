@@ -1,28 +1,41 @@
 {
-  "name": "Zepta",
+  "name": "Zepta — AI 퀀트 투자 플랫폼",
   "short_name": "Zepta",
-  "description": "AI 퀀트 투자 플랫폼 — 33개 전략 자동매매",
+  "description": "AI 퀀트 투자 플랫폼 — 실시간 스크리너, 33개 자동매매 전략, 포트폴리오 관리, 리스크 분석",
   "id": "/",
   "scope": "/",
   "start_url": "/",
   "lang": "ko",
   "dir": "ltr",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "orientation": "portrait",
   "background_color": "#060a12",
   "theme_color": "#060a12",
-  "categories": ["finance", "business", "productivity"],
+  "categories": ["finance", "business", "utilities"],
   "icons": [
+    {
+      "src": "/favicon-32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
     {
       "src": "/zepta-icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/zepta-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/zepta-icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/zepta-icon-512.png",
@@ -31,31 +44,74 @@
       "purpose": "maskable"
     }
   ],
-  "screenshots": [],
+  "screenshots": [
+    {
+      "src": "/og-image.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Zepta AI 퀀트 투자 플랫폼 홈 화면"
+    },
+    {
+      "src": "/og-image.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Zepta 스크리너 모바일 화면"
+    }
+  ],
   "shortcuts": [
     {
-      "name": "스크리너",
+      "name": "주식 스크리너",
       "short_name": "스크리너",
-      "url": "/screener",
-      "description": "실시간 주식/코인 스크리너"
+      "description": "AI 기반 실시간 주식 스크리닝",
+      "url": "/screener?mode=quickstart",
+      "icons": [
+        {
+          "src": "/zepta-icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "AI 자동매매",
       "short_name": "AI매매",
+      "description": "33개 퀀트 전략 자동매매 봇",
       "url": "/auto-trading",
-      "description": "AI 퀀트 자동매매"
+      "icons": [
+        {
+          "src": "/zepta-icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "포트폴리오",
       "short_name": "포트폴리오",
+      "description": "실시간 포트폴리오 추적",
       "url": "/portfolio",
-      "description": "포트폴리오 관리"
+      "icons": [
+        {
+          "src": "/zepta-icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
-      "name": "뉴스",
+      "name": "시장 뉴스",
       "short_name": "뉴스",
+      "description": "AI 센티먼트 분석 뉴스",
       "url": "/news",
-      "description": "실시간 투자 뉴스"
+      "icons": [
+        {
+          "src": "/zepta-icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
   ],
   "prefer_related_applications": false

@@ -237,7 +237,33 @@
       ]
     }
     </script>
-    <!-- JSON-LD Breadcrumb Schema -->
+    <!-- JSON-LD Organization Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Zepta",
+      "url": "https://zepta.vercel.app/",
+      "logo": "https://zepta.vercel.app/favicon-32.png",
+      "description": "AI-powered quant trading platform with real-time stock & crypto screeners, 33+ alpha strategies, automated trading, and portfolio rebalancing tools.",
+      "sameAs": [
+        "https://twitter.com/zepta",
+        "https://www.linkedin.com/company/zepta",
+        "https://www.instagram.com/zepta"
+      ],
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "Customer Service",
+        "email": "support@zepta.vercel.app",
+        "availableLanguage": ["ko", "en"]
+      },
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "KR"
+      }
+    }
+    </script>
+    <!-- JSON-LD Breadcrumb Schema (Extended) -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -260,6 +286,36 @@
           "position": 3,
           "name": "Auto Trading",
           "item": "https://zepta.vercel.app/auto-trading"
+        },
+        {
+          "@type": "ListItem",
+          "position": 4,
+          "name": "Portfolio",
+          "item": "https://zepta.vercel.app/portfolio"
+        },
+        {
+          "@type": "ListItem",
+          "position": 5,
+          "name": "News",
+          "item": "https://zepta.vercel.app/news"
+        },
+        {
+          "@type": "ListItem",
+          "position": 6,
+          "name": "Strategy Analysis",
+          "item": "https://zepta.vercel.app/strategy"
+        },
+        {
+          "@type": "ListItem",
+          "position": 7,
+          "name": "Risk Map",
+          "item": "https://zepta.vercel.app/risk-map"
+        },
+        {
+          "@type": "ListItem",
+          "position": 8,
+          "name": "Backtest",
+          "item": "https://zepta.vercel.app/backtest"
         }
       ]
     }

@@ -2702,12 +2702,25 @@ function AssetCard({ asset, onChart, isMobile = false }) {
   const isPos = asset.weekChange >= 0;
   const mcBg = asset.market === "us" ? "#1A2C4F" : asset.market === "kr" ? "#1A2A1E" : "#1E1A2A";
   const mcColor = asset.market === "us" ? C.blue : asset.market === "kr" ? C.green : C.purple;
+  const borderColor = asset.triggers && asset.triggers.length > 0
+    ? (asset.triggers.some(t => t.includes("buy") || t.includes("bullish")) ? C.green : C.red)
+    : C.border;
 
   // 퀵 진단 (항상 계산 — 카드 미리보기 + 정렬용)
   const diag = useMemo(() => quickDiagnosis(asset), [asset]);
 
   return (
-    <div className="asset-card" style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", overflow: "hidden", transition: "border-color 0.2s ease, box-shadow 0.2s ease" }}>
+    <div className="asset-card" style={{
+      background: C.card,
+      border: `1px solid ${C.border}`,
+      borderLeft: `4px solid ${borderColor}`,
+      borderRadius: "14px",
+      overflow: "hidden",
+      transition: "all 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease",
+      cursor: "pointer"
+    }}
+    onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 8px 16px ${borderColor}25`; }}
+    onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}>
       <div onClick={() => setExpanded(!expanded)}
         style={{ display: "flex", alignItems: "center", padding: isMobile ? "10px 12px" : "14px 18px", cursor: "pointer", gap: isMobile ? "8px" : "12px" }}>
         <div style={{
@@ -4386,6 +4399,26 @@ function AppInner() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
+  // ── 탭별 SEO 메타 정보 (제목, 설명, OG 태그용) ──
+  const TAB_META = {
+    home: { title: "Zepta — AI 퀀트 투자 플랫폼", desc: "실시간 주식/코인 스크리너, 33개 알파 전략 자동매매, 백테스트, 리스크 관리" },
+    screener: { title: "주식 스크리너 | Zepta", desc: "AI 기반 주식 스크리닝 — 모멘텀, 변동성, 수급 조건으로 종목 필터링" },
+    "auto-trading": { title: "AI 자동매매 | Zepta", desc: "33개 퀀트 전략 기반 암호화폐 자동매매 봇" },
+    portfolio: { title: "포트폴리오 | Zepta", desc: "실시간 포트폴리오 추적 및 벤치마크 비교" },
+    news: { title: "마켓 뉴스 | Zepta", desc: "AI 센티먼트 분석이 포함된 실시간 글로벌 투자 뉴스" },
+    "econ-calendar": { title: "경제 캘린더 | Zepta", desc: "주요 경제 지표 발표 일정 및 영향 분석" },
+    sentiment: { title: "소셜 센티먼트 | Zepta", desc: "StockTwits · Reddit 기반 실시간 투자 심리 분석" },
+    alerts: { title: "매매 알림 | Zepta", desc: "실시간 AI 매매 신호 알림 및 텔레그램 연동" },
+    anomaly: { title: "이상 탐지 | Zepta", desc: "AI 기반 시장 이상 징후 실시간 탐지" },
+    strategy: { title: "전략 분석 | Zepta", desc: "33개 퀀트 전략 상세 분석 및 성과 비교" },
+    backtest: { title: "백테스트 | Zepta", desc: "전략별 과거 수익률 시뮬레이션" },
+    "quant-port": { title: "퀀트 포트폴리오 | Zepta", desc: "전략 기반 포트폴리오 자동 구성" },
+    "risk-map": { title: "리스크 맵 | Zepta", desc: "시장 리스크 종합 분석 히트맵" },
+    "quant-report": { title: "퀀트 리포트 | Zepta", desc: "AI 기반 실시간 시장 분석 리포트" },
+    profile: { title: "프로필 | Zepta", desc: "투자 성적표 및 계정 설정" },
+    about: { title: "서비스 소개 | Zepta", desc: "Zepta AI 퀀트 투자 플랫폼 소개" }
+  };
+
   // ── GNB 카테고리 상태 ──
   const gnbCategoryMap = {
     "home": "home",
@@ -4488,6 +4521,9 @@ function AppInner() {
     sector: false, signal: false, hotAssets: true, allAssets: false,
   });
   const toggleSection = useCallback((key) => setHomeSection(p => ({ ...p, [key]: !p[key] })), []);
+
+  // ── 스크롤 및 UX 상태 ──
+  const [showScrollTop, setShowScrollTop] = useState(false);
 
   // ── 스크리너 상태 ─────────────────────────────────────────────
   const [results, setResults]         = useState([]);
@@ -4614,19 +4650,40 @@ function AppInner() {
     }
   }, [watchlist, watchlistKey]);
 
-  // ── 탭 타이틀 실시간 업데이트 (토스증권 스타일) ──
+  // ── 탭 타이틀 및 메타태그 실시간 업데이트 (토스증권 스타일 + SEO) ──
   useEffect(() => {
-    if (tab === "home") {
-      document.title = "Zepta";
-    } else if (selectedAsset && hotAssets.length > 0) {
+    const meta = TAB_META[tab] || TAB_META.home;
+    let title = meta.title;
+
+    if (selectedAsset && hotAssets.length > 0 && tab !== "home") {
       const h = hotAssets.find(a => a.symbol === selectedAsset.symbol);
       if (h) {
         const sign = h.change >= 0 ? "+" : "";
         const price = h.market === "kr" ? `₩${h.price?.toLocaleString()}` : `$${h.price?.toLocaleString()}`;
-        document.title = `${h.name} ${price} ${sign}${h.change}% | Zepta`;
+        title = `${h.name} ${price} ${sign}${h.change}% | Zepta`;
       }
-    } else {
-      document.title = "Zepta";
+    }
+
+    // 문서 title 설정
+    document.title = title;
+
+    // description 메타태그 동적 수정
+    const descMeta = document.querySelector('meta[name="description"]');
+    if (descMeta) descMeta.setAttribute("content", meta.desc);
+
+    // og:title 동적 수정
+    const ogTitle = document.querySelector('meta[property="og:title"]');
+    if (ogTitle) ogTitle.setAttribute("content", title);
+
+    // og:description 동적 수정
+    const ogDesc = document.querySelector('meta[property="og:description"]');
+    if (ogDesc) ogDesc.setAttribute("content", meta.desc);
+
+    // canonical URL 동적 설정
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) {
+      const canonicalUrl = tab === "home" ? "https://zepta.vercel.app/" : `https://zepta.vercel.app/${tab}`;
+      canonical.setAttribute("href", canonicalUrl);
     }
   }, [marketIndices, tab, selectedAsset, hotAssets]);
 
@@ -7382,9 +7439,34 @@ function AppInner() {
                           </span>
                         )}
                       </div>
-                      <button onClick={fetchMarketOverview} disabled={marketLoading} style={{
-                        background: "none", border: "none", fontSize: "14px", color: C.text3, cursor: "pointer", fontWeight: 500, padding: "2px 6px",
-                      }}>{marketLoading ? "..." : "↻"}</button>
+                      <div style={{ display: "flex", gap: "8px" }}>
+                        <button
+                          onClick={() => {
+                            if (navigator.share) {
+                              navigator.share({
+                                title: "Zepta 마켓 브리핑",
+                                text: "실시간 글로벌 시장 현황을 확인하세요",
+                                url: window.location.href
+                              }).catch(() => {});
+                            } else {
+                              navigator.clipboard.writeText(window.location.href);
+                              showToast("링크가 복사되었습니다", "success");
+                            }
+                          }}
+                          style={{
+                            background: "none", border: "none", fontSize: "16px", color: C.text3,
+                            cursor: "pointer", fontWeight: 500, padding: "4px 8px", borderRadius: "6px",
+                            transition: "all .2s",
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}15`; e.currentTarget.style.color = C.blue; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = C.text3; }}
+                        >
+                          📤
+                        </button>
+                        <button onClick={fetchMarketOverview} disabled={marketLoading} style={{
+                          background: "none", border: "none", fontSize: "14px", color: C.text3, cursor: "pointer", fontWeight: 500, padding: "2px 6px",
+                        }}>{marketLoading ? "..." : "↻"}</button>
+                      </div>
                     </div>
 
                     {/* 3×2 그리드 (데스크톱) / 수평 스크롤 (모바일): 6개 지수 카드 */}
@@ -8881,7 +8963,7 @@ function AppInner() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
                 <div style={{ fontWeight: 700, fontSize: mf(16), color: C.text1 }}>프리셋 선택</div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(160px, 1fr))", gap: "10px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(200px, 1fr))", gap: "10px" }}>
                 {SCREENER_PRESETS.map(preset => {
                   const isActive = activePreset === preset.id;
                   const presetColor = preset.color === "green" ? C.green : preset.color === "blue" ? C.blue : preset.color === "red" ? C.red : preset.color === "yellow" ? C.yellow : C.purple;
@@ -8901,11 +8983,27 @@ function AppInner() {
                       padding: isMobile ? "10px 12px" : "12px 14px", borderRadius: "14px", textAlign: "left", cursor: "pointer", minHeight: "44px", display: "flex", flexDirection: "column", justifyContent: "center",
                       background: isActive ? presetBg : `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
                       border: `1px solid ${isActive ? `${presetColor}40` : `${C.border}20`}`,
-                      transition: "all 0.2s ease", position: "relative", overflow: "hidden",
-                      boxShadow: isActive ? `0 4px 12px ${presetColor}30` : "none",
+                      transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)", position: "relative", overflow: "hidden",
+                      boxShadow: isActive ? `0 8px 20px ${presetColor}40, inset 0 1px 0 ${presetColor}30` : "none",
                     }}
-                    onMouseEnter={e => { if (!isActive) { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = `${presetColor}30`; } }}
-                    onMouseLeave={e => { if (!isActive) { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${C.border}20`; } }}>
+                    onMouseEnter={e => {
+                      if (!isActive) {
+                        e.currentTarget.style.transform = "scale(1.02) translateY(-3px)";
+                        e.currentTarget.style.boxShadow = `0 12px 24px ${presetColor}30`;
+                        e.currentTarget.style.borderColor = `${presetColor}50`;
+                      } else {
+                        e.currentTarget.style.boxShadow = `0 12px 28px ${presetColor}50, inset 0 1px 0 ${presetColor}40`;
+                      }
+                    }}
+                    onMouseLeave={e => {
+                      if (!isActive) {
+                        e.currentTarget.style.transform = "scale(1) translateY(0)";
+                        e.currentTarget.style.boxShadow = "none";
+                        e.currentTarget.style.borderColor = `${C.border}20`;
+                      } else {
+                        e.currentTarget.style.boxShadow = `0 8px 20px ${presetColor}40, inset 0 1px 0 ${presetColor}30`;
+                      }
+                    }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
                         <span style={{ fontSize: mf(17) }}>{preset.icon}</span>
                         <span style={{ fontWeight: 700, fontSize: mf(15), color: isActive ? presetColor : C.text1 }}>{preset.name}</span>
@@ -8923,9 +9021,12 @@ function AppInner() {
                 <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "12px", flexWrap: "wrap" }}>
                   <button onClick={runScan} disabled={scanning || conditions.length === 0} style={{
                     padding: isMobile ? "12px 16px" : "10px 20px", borderRadius: "10px", fontSize: mf(15), fontWeight: 700,
-                    background: scanning ? C.card2 : C.blue, color: scanning ? C.text3 : "#fff",
+                    background: scanning ? C.card2 : `linear-gradient(135deg, ${C.blue} 0%, ${C.purple} 100%)`, color: scanning ? C.text3 : "#fff",
                     border: "none", cursor: scanning ? "not-allowed" : "pointer", minWidth: isMobile ? "100%" : "100px", minHeight: "44px",
-                  }}>
+                    transition: "all 0.3s ease", boxShadow: !scanning ? `0 4px 12px ${C.blue}40` : "none",
+                  }}
+                  onMouseEnter={e => { if (!scanning) { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 8px 20px ${C.blue}50`; } }}
+                  onMouseLeave={e => { if (!scanning) { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 4px 12px ${C.blue}40`; } }}>
                     {scanning
                       ? <span style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "center" }}>
                           <span style={{ animation: "pulse 1s infinite" }}>⏳</span> {scanProgress.done}/{scanProgress.total}
@@ -8961,8 +9062,7 @@ function AppInner() {
                 </span>
               </summary>
             <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "0 0 18px 18px", padding: "22px 24px", marginTop: "-1px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-                <div style={{ fontWeight: 700, fontSize: mf(18), color: C.text1 }}>⚙️ 스크리닝 옵션</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: "16px" }}>
                 <div style={{ display: "flex", gap: "6px" }}>
                   {["or", "and"].map(m => (
                     <button key={m} onClick={() => setMode(m)} style={{
@@ -8984,9 +9084,14 @@ function AppInner() {
                     <button key={key} onClick={() => setConditions(p => on ? p.filter(c => c !== key) : [...p, key])}
                       title={meta?.desc} style={{
                         padding: isMobile ? "10px 12px" : "8px 12px", borderRadius: "10px", fontSize: mf(13), fontWeight: 600, minHeight: "44px", display: "flex", alignItems: "center", gap: "6px",
-                        background: on ? `${C.blue}22` : C.card2, color: on ? C.blue : C.text3,
+                        background: on ? `linear-gradient(135deg, ${C.blue}40 0%, ${C.blue}20 100%)` : C.card2,
+                        color: on ? C.blue : C.text3,
                         border: `1px solid ${on ? C.blue : C.border2}`,
-                      }}>{meta?.icon} {meta?.label}</button>
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseEnter={e => { if (!on) e.currentTarget.style.borderColor = C.blue; }}
+                      onMouseLeave={e => { if (!on) e.currentTarget.style.borderColor = C.border2; }}
+                    >{meta?.icon} {meta?.label}</button>
                   );
                 })}
               </div>
@@ -9001,9 +9106,14 @@ function AppInner() {
                     <button key={key} onClick={() => setConditions(p => on ? p.filter(c => c !== key) : [...p, key])}
                       title={meta?.desc} style={{
                         padding: isMobile ? "10px 12px" : "8px 12px", borderRadius: "10px", fontSize: mf(13), fontWeight: 600, minHeight: "44px", display: "flex", alignItems: "center", gap: "6px",
-                        background: on ? `${C.red}22` : C.card2, color: on ? C.red : C.text3,
+                        background: on ? `linear-gradient(135deg, ${C.red}40 0%, ${C.red}20 100%)` : C.card2,
+                        color: on ? C.red : C.text3,
                         border: `1px solid ${on ? C.red : C.border2}`,
-                      }}>{meta?.icon} {meta?.label}</button>
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseEnter={e => { if (!on) e.currentTarget.style.borderColor = C.red; }}
+                      onMouseLeave={e => { if (!on) e.currentTarget.style.borderColor = C.border2; }}
+                    >{meta?.icon} {meta?.label}</button>
                   );
                 })}
               </div>
@@ -9014,13 +9124,19 @@ function AppInner() {
                 {["volume_climax","obv_divergence","volume_dry","cmf_accumulation","cmf_distribution","mfi_oversold","mfi_overbought"].map(key => {
                   const meta = CONDITION_META[key];
                   const on = conditions.includes(key);
+                  const volColor = on ? C.green : C.text3;
                   return (
                     <button key={key} onClick={() => setConditions(p => on ? p.filter(c => c !== key) : [...p, key])}
                       title={meta?.desc} style={{
                         padding: isMobile ? "10px 12px" : "8px 12px", borderRadius: "10px", fontSize: mf(13), fontWeight: 600, minHeight: "44px", display: "flex", alignItems: "center", gap: "6px",
-                        background: on ? `${C.yellow}22` : C.card2, color: on ? C.yellow : C.text3,
-                        border: `1px solid ${on ? C.yellow : C.border2}`,
-                      }}>{meta?.icon} {meta?.label}</button>
+                        background: on ? `linear-gradient(135deg, ${C.green}40 0%, ${C.green}20 100%)` : C.card2,
+                        color: volColor,
+                        border: `1px solid ${on ? C.green : C.border2}`,
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseEnter={e => { if (!on) e.currentTarget.style.borderColor = C.green; }}
+                      onMouseLeave={e => { if (!on) e.currentTarget.style.borderColor = C.border2; }}
+                    >{meta?.icon} {meta?.label}</button>
                   );
                 })}
               </div>
@@ -9035,9 +9151,14 @@ function AppInner() {
                     <button key={key} onClick={() => setConditions(p => on ? p.filter(c => c !== key) : [...p, key])}
                       title={meta?.desc} style={{
                         padding: isMobile ? "10px 12px" : "8px 12px", borderRadius: "10px", fontSize: mf(13), fontWeight: 600, minHeight: "44px", display: "flex", alignItems: "center", gap: "6px",
-                        background: on ? `${C.green}22` : C.card2, color: on ? C.green : C.text3,
-                        border: `1px solid ${on ? C.green : C.border2}`,
-                      }}>{meta?.icon} {meta?.label}</button>
+                        background: on ? `linear-gradient(135deg, ${C.purple}40 0%, ${C.purple}20 100%)` : C.card2,
+                        color: on ? C.purple : C.text3,
+                        border: `1px solid ${on ? C.purple : C.border2}`,
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseEnter={e => { if (!on) e.currentTarget.style.borderColor = C.purple; }}
+                      onMouseLeave={e => { if (!on) e.currentTarget.style.borderColor = C.border2; }}
+                    >{meta?.icon} {meta?.label}</button>
                   );
                 })}
               </div>
@@ -9449,12 +9570,20 @@ function AppInner() {
                         background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
                         borderRadius: "14px", borderLeft: `4px solid ${accentColor}`,
                         padding: isMobile ? "14px" : "18px 20px", border: `1px solid ${accentColor}40`,
-                        cursor: "pointer", transition: "all .2s",
+                        cursor: "pointer", transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
                         boxShadow: `0 2px 8px rgba(0,0,0,0.15)`,
                       }}
                       onClick={() => setChartAsset(a)}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = `${accentColor}50`; e.currentTarget.style.transform = "translateY(-1px)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = `${accentColor}20`; e.currentTarget.style.transform = "none"; }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.borderColor = `${accentColor}60`;
+                        e.currentTarget.style.transform = "translateY(-3px) scale(1.01)";
+                        e.currentTarget.style.boxShadow = `0 8px 20px ${accentColor}30`;
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.borderColor = `${accentColor}40`;
+                        e.currentTarget.style.transform = "translateY(0) scale(1)";
+                        e.currentTarget.style.boxShadow = `0 2px 8px rgba(0,0,0,0.15)`;
+                      }}
                       >
                         {/* 상단: 종목명 + 변동률 + 심각도 */}
                         <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
@@ -10131,10 +10260,10 @@ function AppInner() {
                 const neuCnt = sortedNews.length - posCnt - negCnt;
                 return (
                   <div>
-                    <div style={{ display: "flex", height: "6px", borderRadius: "3px", overflow: "hidden", marginBottom: "6px" }}>
-                      <div style={{ width: `${(posCnt / sortedNews.length) * 100}%`, background: C.green, transition: "width .5s" }} />
+                    <div style={{ display: "flex", height: "8px", borderRadius: "4px", overflow: "hidden", marginBottom: "8px", boxShadow: `inset 0 1px 2px rgba(0,0,0,0.1)` }}>
+                      <div style={{ width: `${(posCnt / sortedNews.length) * 100}%`, background: C.green, transition: "width .5s", boxShadow: "0 0 8px rgba(0,255,100,0.3)" }} />
                       <div style={{ width: `${(neuCnt / sortedNews.length) * 100}%`, background: C.text3 + "40", transition: "width .5s" }} />
-                      <div style={{ width: `${(negCnt / sortedNews.length) * 100}%`, background: C.red, transition: "width .5s" }} />
+                      <div style={{ width: `${(negCnt / sortedNews.length) * 100}%`, background: C.red, transition: "width .5s", boxShadow: "0 0 8px rgba(255,0,100,0.3)" }} />
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
                       <span style={{ color: C.green, fontWeight: 600 }}>긍정 {posCnt}</span>
@@ -10206,12 +10335,13 @@ function AppInner() {
                   return (<>
                     <a key={i} href={news.url || news.link || "#"} target="_blank" rel="noopener" onClick={() => { if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
                       background: C.card, border: `1px solid ${C.border}20`, borderRadius: "16px", padding: isMobile ? "14px" : "16px 18px",
-                      textDecoration: "none", color: "inherit", display: "block", transition: "all .2s",
-                      borderLeft: `3px solid ${sentColor}`,
+                      textDecoration: "none", color: "inherit", display: "block", transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+                      borderLeft: `4px solid ${sentColor}`,
                       boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+                      cursor: "pointer",
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 16px rgba(0,0,0,0.2)`; e.currentTarget.style.transform = "translateY(-2px)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 1px 2px rgba(0,0,0,0.05)"; e.currentTarget.style.transform = "translateY(0)"; }}>
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 8px 24px ${sentColor}30`; e.currentTarget.style.transform = "translateY(-3px) scale(1.01)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 1px 2px rgba(0,0,0,0.05)"; e.currentTarget.style.transform = "translateY(0) scale(1)"; }}>
                       <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 600, fontSize: mf(16), marginBottom: "8px", color: C.text1, lineHeight: 1.5 }}>{news.title}</div>
@@ -10471,11 +10601,11 @@ function AppInner() {
                   {/* 필터 탭 — 모바일에서 수평 스크롤 가능 | 극적인 디자인 강화 */}
                   <div className={`flex gap-1.5 mb-5 ${isMobile ? "hscroll overflow-x-auto" : "flex-wrap"}`} style={{ WebkitOverflowScrolling: "touch" }}>
                     {calFilterTabs.map(ft => (
-                      <button key={ft.key} onClick={() => setEconFilter(ft.key)} className="px-4 py-2 rounded-[10px] text-base font-semibold cursor-pointer transition-all flex-shrink-0" style={{
-                        background: econFilter === ft.key ? C.yellow : C.card2,
+                      <button key={ft.key} onClick={() => setEconFilter(ft.key)} className="px-4 py-2 rounded-[12px] text-base font-semibold cursor-pointer transition-all flex-shrink-0" style={{
+                        background: econFilter === ft.key ? `linear-gradient(135deg, ${C.yellow}60 0%, ${C.yellow}40 100%)` : C.card2,
                         color: econFilter === ft.key ? "#000" : C.text2,
-                        border: `1px solid ${econFilter === ft.key ? C.yellow : C.border + "20"}`,
-                        boxShadow: econFilter === ft.key ? `0 2px 12px ${C.yellow}40` : "none",
+                        border: `2px solid ${econFilter === ft.key ? C.yellow : "transparent"}`,
+                        boxShadow: econFilter === ft.key ? `0 4px 16px ${C.yellow}40` : "none",
                         fontWeight: econFilter === ft.key ? 800 : 600,
                       }}>{ft.label}</button>
                     ))}
@@ -10528,16 +10658,18 @@ function AppInner() {
                           const kstHour = String(kstDate.getHours()).padStart(2, "0");
                           const kstMin = String(kstDate.getMinutes()).padStart(2, "0");
 
+                          const importanceColor = evt.importance === "high" ? C.red : evt.importance === "medium" ? C.yellow : C.green;
                           return (
-                            <div key={`${evt.event}-${i}`} className="grid items-center py-3.5 px-4 transition-colors" style={{
+                            <div key={`${evt.event}-${i}`} className="grid items-center py-3.5 px-4 transition-all" style={{
                               gridTemplateColumns: isMobile ? "40px 1fr 70px" : "60px 1fr 80px 80px 80px",
                               gap: "1px",
                               borderBottom: i < group.events.length - 1 ? `1px solid ${C.border}10` : "none",
+                              borderLeft: `4px solid ${importanceColor}`,
                               opacity: isPast ? 0.6 : 1,
                               background: isToday ? `${C.blue}08` : "transparent",
                             }}
-                            onMouseEnter={e => { if (!isToday) e.currentTarget.style.background = `${C.card2}80`; }}
-                            onMouseLeave={e => { if (!isToday) e.currentTarget.style.background = "transparent"; }}
+                            onMouseEnter={e => { if (!isToday) { e.currentTarget.style.background = `${importanceColor}15`; e.currentTarget.style.paddingLeft = "12px"; } }}
+                            onMouseLeave={e => { if (!isToday) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.paddingLeft = "16px"; } }}
                             >
                               {/* 날짜 */}
                               <div>
@@ -10846,20 +10978,21 @@ function AppInner() {
                         background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
                         borderRadius: "14px",
                         padding: "16px",
-                        borderLeft: `3px solid ${isBuy ? C.green : C.red}`,
+                        borderLeft: `4px solid ${isBuy ? C.green : C.red}`,
                         cursor: "pointer",
-                        transition: "all .2s",
+                        transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
                         opacity: alert.read ? 0.7 : 1,
                         minHeight: "44px",
                         boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                       }}
                       onMouseEnter={e => {
-                        e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.2)";
-                        e.currentTarget.style.transform = "translateY(-2px)";
+                        const color = isBuy ? C.green : C.red;
+                        e.currentTarget.style.boxShadow = `0 8px 20px ${color}30`;
+                        e.currentTarget.style.transform = "translateY(-3px) scale(1.01)";
                       }}
                       onMouseLeave={e => {
                         e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
-                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.transform = "translateY(0) scale(1)";
                       }}>
                         {/* 상단: 전략명 + 시간 */}
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
@@ -11070,12 +11203,16 @@ function AppInner() {
                     {sentimentData.symbol} 종합 센티먼트
                   </div>
                   <div style={{
-                    fontSize:isMobile?"36px":"48px",
+                    fontSize:isMobile?"48px":"64px",
                     fontWeight:900,
-                    color: sentimentData.sentiment.score>=60?C.green:sentimentData.sentiment.score>=40?C.yellow:C.red,
+                    background: `linear-gradient(135deg, ${sentimentData.sentiment.score>=60?C.green:sentimentData.sentiment.score>=40?C.yellow:C.red}, ${sentimentData.sentiment.score>=60?C.blue:sentimentData.sentiment.score>=40?C.orange:"#FF6B6B"})`,
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
                     letterSpacing:"-2px",
                     marginBottom:"8px",
-                    textShadow: `0 0 20px ${sentimentData.sentiment.score>=60?C.green:sentimentData.sentiment.score>=40?C.yellow:C.red}40`,
+                    textShadow: `0 0 30px ${sentimentData.sentiment.score>=60?C.green:sentimentData.sentiment.score>=40?C.yellow:C.red}60`,
+                    filter: "drop-shadow(0 0 12px " + (sentimentData.sentiment.score>=60?C.green:sentimentData.sentiment.score>=40?C.yellow:C.red) + "40)",
                   }}>
                     {sentimentData.sentiment.score}
                   </div>
@@ -11084,10 +11221,10 @@ function AppInner() {
                     {sentimentData.sentiment.label}
                   </div>
                   {/* 센티먼트 바 */}
-                  <div style={{display:"flex",height:"8px",borderRadius:"4px",overflow:"hidden",marginBottom:"8px"}}>
-                    <div style={{width:`${sentimentData.sentiment.bullish}%`,background:C.green,transition:"width 0.5s"}} />
-                    <div style={{width:`${sentimentData.sentiment.neutral}%`,background:C.text3,transition:"width 0.5s"}} />
-                    <div style={{width:`${sentimentData.sentiment.bearish}%`,background:C.red,transition:"width 0.5s"}} />
+                  <div style={{display:"flex",height:"10px",borderRadius:"6px",overflow:"hidden",marginBottom:"12px",boxShadow:`inset 0 1px 2px rgba(0,0,0,0.2)`}}>
+                    <div style={{width:`${sentimentData.sentiment.bullish}%`,background:`linear-gradient(90deg, ${C.green}80 0%, ${C.green} 100%)`,transition:"width 0.5s",boxShadow:`0 0 8px ${C.green}40`}} />
+                    <div style={{width:`${sentimentData.sentiment.neutral}%`,background:C.text3+"50",transition:"width 0.5s"}} />
+                    <div style={{width:`${sentimentData.sentiment.bearish}%`,background:`linear-gradient(90deg, ${C.red} 0%, ${C.red}80 100%)`,transition:"width 0.5s",boxShadow:`0 0 8px ${C.red}40`}} />
                   </div>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:"14px"}}>
                     <span style={{color:C.green,fontWeight:600}}>긍정 {sentimentData.sentiment.bullish}%</span>
@@ -11107,15 +11244,17 @@ function AppInner() {
                   padding:isMobile?"16px":"22px 24px",
                   marginBottom:"12px",
                   boxShadow:"0 2px 12px rgba(0,0,0,0.2)",
-                  transition:"all .2s",
+                  transition:"all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.25)";
-                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.3)";
+                  e.currentTarget.style.transform = "translateY(-3px) scale(1.01)";
+                  e.currentTarget.style.borderColor = C.blue + "40";
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.2)";
-                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.transform = "translateY(0) scale(1)";
+                  e.currentTarget.style.borderColor = C.border + "20";
                 }}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
                     <div style={{fontWeight:700,fontSize:"15px"}}>{src.name}</div>
@@ -11256,11 +11395,12 @@ function AppInner() {
             <div style={{ background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.purpleBg} 100%)`, borderRadius: "24px", padding: "32px 20px", textAlign: "center", boxShadow: `0 4px 20px ${C.blue}20` }}>
               <div style={{
                 background: `linear-gradient(135deg, ${C.blue}, ${C.purple || "#a855f7"})`,
-                boxShadow: `0 0 20px ${C.blue}30`,
+                boxShadow: `0 0 40px ${C.blue}60, inset 0 0 15px rgba(255,255,255,0.15)`,
                 borderRadius: "50%", width: "96px", height: "96px",
                 display: "flex", alignItems: "center", justifyContent: "center",
                 margin: "0 auto 16px", fontSize: "36px", fontWeight: "900", color: "white",
-                border: "3px solid rgba(255,255,255,0.2)",
+                border: "4px solid rgba(255,255,255,0.4)",
+                position: "relative",
               }}>
                 {(user?.user_metadata?.avatar_url)
                   ? <img src={user.user_metadata.avatar_url} alt="" style={{ width: "96px", height: "96px", borderRadius: "50%", objectFit: "cover" }} />

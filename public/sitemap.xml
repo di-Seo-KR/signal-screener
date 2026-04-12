@@ -49,6 +49,13 @@
   </url>
 
   <url>
+    <loc>https://zepta.vercel.app/strategy</loc>
+    <lastmod>2026-04-12</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <url>
     <loc>https://zepta.vercel.app/risk-map</loc>
     <lastmod>2026-04-12</lastmod>
     <changefreq>daily</changefreq>
@@ -70,45 +77,67 @@
   </url>
 
   <url>
-    <loc>https://zepta.vercel.app/strategy</loc>
+    <loc>https://zepta.vercel.app/quant-port</loc>
     <lastmod>2026-04-12</lastmod>
-    <changefreq>weekly</changefreq>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://zepta.vercel.app/anomaly</loc>
+    <lastmod>2026-04-12</lastmod>
+    <changefreq>hourly</changefreq>
     <priority>0.75</priority>
   </url>
 
   <url>
-    <loc>https://zepta.vercel.app/quant-port</loc>
+    <loc>https://zepta.vercel.app/quant-report</loc>
     <lastmod>2026-04-12</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.75</priority>
+  </url>
+
+  <url>
+    <loc>https://zepta.vercel.app/alerts</loc>
+    <lastmod>2026-04-12</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 정보 및 참고 페이지들 -->
+  <url>
+    <loc>https://zepta.vercel.app/profile</loc>
+    <lastmod>2026-04-12</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.65</priority>
   </url>
 
   <!-- 법률 및 정보 페이지들 (낮은 우선순위) -->
   <url>
     <loc>https://zepta.vercel.app/about</loc>
     <lastmod>2026-04-12</lastmod>
-    <changefreq>weekly</changefreq>
+    <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
 
   <url>
     <loc>https://zepta.vercel.app/privacy</loc>
     <lastmod>2026-04-12</lastmod>
-    <changefreq>weekly</changefreq>
+    <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
 
   <url>
     <loc>https://zepta.vercel.app/terms</loc>
     <lastmod>2026-04-12</lastmod>
-    <changefreq>weekly</changefreq>
+    <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
 
   <url>
     <loc>https://zepta.vercel.app/contact</loc>
     <lastmod>2026-04-12</lastmod>
-    <changefreq>weekly</changefreq>
+    <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
 </urlset>
