@@ -149,6 +149,62 @@ function NicknameEditor({ user, supabase, onUpdate }) {
 }
 
 // ════════════════════════════════════════════════════════════════════
+// XP 레벨 시스템 — 누적XP, 레벨, 티어, 보상
+// ════════════════════════════════════════════════════════════════════
+const XP_TIERS = [
+  { name: "브론즈", minLv: 1, color: "#CD7F32", icon: "🥉", next: "실버" },
+  { name: "실버", minLv: 5, color: "#C0C0C0", icon: "🥈", next: "골드" },
+  { name: "골드", minLv: 10, color: "#FFD700", icon: "🏅", next: "플래티넘" },
+  { name: "플래티넘", minLv: 20, color: "#A855F7", icon: "💎", next: "다이아몬드" },
+  { name: "다이아몬드", minLv: 35, color: "#3182F6", icon: "👑", next: null },
+];
+
+// 레벨별 필요 XP (1→2: 100, 이후 레벨×80 증가)
+function xpForLevel(lv) { return lv <= 1 ? 0 : 100 + (lv - 2) * 80; }
+function totalXpForLevel(lv) { let s = 0; for (let i = 2; i <= lv; i++) s += xpForLevel(i); return s; }
+
+function getXpInfo(totalXp) {
+  let level = 1;
+  let remaining = totalXp;
+  while (remaining >= xpForLevel(level + 1)) {
+    remaining -= xpForLevel(level + 1);
+    level++;
+    if (level >= 50) break; // max level 50
+  }
+  const needed = xpForLevel(level + 1);
+  const tier = [...XP_TIERS].reverse().find(t => level >= t.minLv) || XP_TIERS[0];
+  return { level, totalXp, currentLevelXp: remaining, nextLevelXp: needed, progress: needed > 0 ? remaining / needed : 1, tier };
+}
+
+// XP 적립 이벤트별 보상 테이블
+const XP_REWARDS = {
+  daily_quest_complete: 10,     // 데일리 퀘스트 1개 완료
+  daily_all_clear: 30,          // 전 퀘스트 올클리어 보너스
+  prediction_correct: 25,       // 주가 예측 적중
+  prediction_attempt: 5,        // 예측 참여
+  screener_run: 10,             // 스크리너 실행
+  news_read: 5,                 // 뉴스 읽기
+  streak_7day: 100,             // 7일 연속 접속 보너스
+  streak_30day: 500,            // 30일 연속 접속 보너스
+  first_watchlist: 20,          // 첫 관심종목 등록
+  first_bot: 50,                // 첫 봇 활성화
+};
+
+// localStorage에서 누적 XP 읽기/쓰기
+function readTotalXp(userId) {
+  try { return JSON.parse(localStorage.getItem(`zepta:xp:${userId || "anon"}`) || '{"total":0,"history":[]}')} catch { return { total: 0, history: [] }; }
+}
+function addXp(userId, amount, reason, syncFn) {
+  const data = readTotalXp(userId);
+  data.total += amount;
+  data.history.unshift({ amount, reason, ts: Date.now() });
+  if (data.history.length > 100) data.history = data.history.slice(0, 100); // 최근 100개만
+  try { localStorage.setItem(`zepta:xp:${userId || "anon"}`, JSON.stringify(data)); } catch {}
+  if (syncFn) syncFn();
+  return data;
+}
+
+// ════════════════════════════════════════════════════════════════════
 // ErrorBoundary — 런타임 에러 시 앱 전체 크래시 방지
 // ════════════════════════════════════════════════════════════════════
 class ErrorBoundary extends Component {
@@ -4566,6 +4622,7 @@ function AppInner() {
           quiz_stats: readUserLocal("zepta:quiz:stats", { total: 0, correct: 0 }),
           pred_today: readUserLocal(`zepta:pred:${todayKey}`, null),
           quiz_today: readUserLocal(`zepta:quiz:${todayKey}`, null),
+          xp_data: readUserLocal(`zepta:xp:${user?.id?.slice(0,8) || "anon"}`, { total: 0, history: [] }),
           synced_at: new Date().toISOString(),
         };
         await supabase.auth.updateUser({ data: { user_data: payload } });
@@ -4590,6 +4647,7 @@ function AppInner() {
           if (remote.quiz_stats) writeUserLocal("zepta:quiz:stats", remote.quiz_stats);
           if (remote.pred_today) writeUserLocal(`zepta:pred:${todayKey}`, remote.pred_today);
           if (remote.quiz_today) writeUserLocal(`zepta:quiz:${todayKey}`, remote.quiz_today);
+          if (remote.xp_data) writeUserLocal(`zepta:xp:${user?.id?.slice(0,8) || "anon"}`, remote.xp_data);
           // 상태 갱신
           setPredictionState(remote.pred_today || null);
           setQuizAnswered(remote.quiz_today || null);
@@ -7822,25 +7880,40 @@ function AppInner() {
               );
             })()}
 
-            {/* ── 데일리 투자 챌린지 (리텐션 강화) ─── */}
+            {/* ── 데일리 투자 챌린지 (XP 누적 시스템 연동) ─── */}
             {(() => {
               const todayKey = new Date().toISOString().slice(0, 10);
+              const uid = user?.id?.slice(0, 8) || "anon";
               const challenges = [
-                { id: "check-market", icon: "📊", title: "마켓 체크", desc: "마켓 브리핑 확인하기", points: 10, tab: null },
+                { id: "check-market", icon: "📊", title: "마켓 체크", desc: "마켓 브리핑 확인", points: 10, tab: null },
                 { id: "run-screener", icon: "🔍", title: "스크리닝", desc: "스크리너 1회 실행", points: 20, tab: "screener" },
-                { id: "read-news", icon: "📰", title: "뉴스 읽기", desc: "뉴스 탭 확인하기", points: 10, tab: "news" },
-                { id: "check-strategy", icon: "🧠", title: "전략 분석", desc: "전략 패널 확인하기", points: 15, tab: "strategy" },
+                { id: "read-news", icon: "📰", title: "뉴스 읽기", desc: "뉴스 탭 확인", points: 10, tab: "news" },
+                { id: "check-strategy", icon: "🧠", title: "전략 분석", desc: "전략 패널 확인", points: 15, tab: "strategy" },
               ];
               let completed = [];
-              try { const s = JSON.parse(localStorage.getItem("zepta:daily-quest") || "{}"); if (s.date === todayKey) completed = s.done || []; } catch {}
-              // 마켓 브리핑을 본 것으로 자동 완료
+              let xpGrantedToday = [];
+              try {
+                const s = JSON.parse(localStorage.getItem("zepta:daily-quest") || "{}");
+                if (s.date === todayKey) { completed = s.done || []; xpGrantedToday = s.xpGranted || []; }
+              } catch {}
+
+              // 마켓 브리핑 자동 완료 + XP 적립
               if (!completed.includes("check-market")) {
                 completed = [...completed, "check-market"];
-                try { localStorage.setItem("zepta:daily-quest", JSON.stringify({ date: todayKey, done: completed })); syncUserDataToSupabase(); } catch {}
+                if (!xpGrantedToday.includes("check-market")) {
+                  addXp(uid, 10, "데일리 미션: 마켓 체크", syncUserDataToSupabase);
+                  xpGrantedToday = [...xpGrantedToday, "check-market"];
+                }
+                try { localStorage.setItem("zepta:daily-quest", JSON.stringify({ date: todayKey, done: completed, xpGranted: xpGrantedToday })); syncUserDataToSupabase(); } catch {}
               }
+
               const totalPoints = challenges.reduce((s, c) => s + (completed.includes(c.id) ? c.points : 0), 0);
               const maxPoints = challenges.reduce((s, c) => s + c.points, 0);
               const pct = Math.round((totalPoints / maxPoints) * 100);
+
+              // 누적 XP 표시
+              const xpData = readTotalXp(uid);
+              const xpInfo = getXpInfo(xpData.total);
 
               return (
                 <div style={{
@@ -7850,24 +7923,40 @@ function AppInner() {
                   position: "relative", overflow: "hidden",
                 }}>
                   <div style={{ position: "absolute", top: "-20px", right: "-10px", fontSize: "80px", opacity: 0.04, pointerEvents: "none" }}>🎯</div>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+
+                  {/* 헤더: 미션 타이틀 + XP 정보 */}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <span style={{ fontSize: "18px" }}>🎯</span>
                       <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>오늘의 투자 미션</span>
                     </div>
-                    <span style={{
-                      fontSize: "13px", fontWeight: 700, padding: "3px 10px", borderRadius: "10px",
-                      background: pct === 100 ? `${C.green}20` : `${C.blue}15`,
-                      color: pct === 100 ? C.green : C.blue,
-                    }}>{totalPoints}/{maxPoints} XP</span>
+                    <button onClick={() => setTab("profile")} style={{
+                      display: "flex", alignItems: "center", gap: "4px",
+                      fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "10px",
+                      background: `${xpInfo.tier.color}15`, color: xpInfo.tier.color,
+                      border: "none", cursor: "pointer",
+                    }}>
+                      <span>{xpInfo.tier.icon}</span>
+                      <span>Lv.{xpInfo.level}</span>
+                      <span style={{ color: C.text3, fontWeight: 500 }}>·</span>
+                      <span style={{ color: C.blue }}>{xpData.total} XP</span>
+                    </button>
                   </div>
-                  {/* 프로그레스 바 */}
-                  <div style={{ height: "4px", borderRadius: "2px", background: `${C.border}30`, marginBottom: "12px", overflow: "hidden" }}>
-                    <div style={{ height: "100%", width: `${pct}%`, borderRadius: "2px",
-                      background: pct === 100 ? C.green : `linear-gradient(90deg, ${C.blue}, ${C.purple})`,
-                      transition: "width .5s ease",
-                    }} />
+
+                  {/* 오늘 진행률 */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                    <div style={{ flex: 1, height: "4px", borderRadius: "2px", background: `${C.border}30`, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${pct}%`, borderRadius: "2px",
+                        background: pct === 100 ? C.green : `linear-gradient(90deg, ${C.blue}, ${C.purple})`,
+                        transition: "width .5s ease",
+                      }} />
+                    </div>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: pct === 100 ? C.green : C.text3, whiteSpace: "nowrap" }}>
+                      {totalPoints}/{maxPoints}
+                    </span>
                   </div>
+
+                  {/* 퀘스트 목록 */}
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: "8px" }}>
                     {challenges.map(c => {
                       const done = completed.includes(c.id);
@@ -7876,22 +7965,33 @@ function AppInner() {
                           if (c.tab && !done) {
                             setTab(c.tab);
                             const newDone = [...completed, c.id];
-                            try { localStorage.setItem("zepta:daily-quest", JSON.stringify({ date: todayKey, done: newDone })); syncUserDataToSupabase(); } catch {}
+                            const newXpGranted = [...xpGrantedToday];
+                            if (!newXpGranted.includes(c.id)) {
+                              addXp(uid, c.points, `데일리 미션: ${c.title}`, syncUserDataToSupabase);
+                              newXpGranted.push(c.id);
+                            }
+                            // 올클리어 보너스 확인
+                            const allDone = challenges.every(ch => newDone.includes(ch.id));
+                            if (allDone && !newXpGranted.includes("all-clear")) {
+                              addXp(uid, XP_REWARDS.daily_all_clear, "데일리 올클리어 보너스", syncUserDataToSupabase);
+                              newXpGranted.push("all-clear");
+                            }
+                            try { localStorage.setItem("zepta:daily-quest", JSON.stringify({ date: todayKey, done: newDone, xpGranted: newXpGranted })); syncUserDataToSupabase(); } catch {}
                           }
                         }} style={{
                           display: "flex", alignItems: "center", gap: "8px",
                           padding: "10px 12px", borderRadius: "12px", border: "none", cursor: done ? "default" : "pointer",
-                          background: done ? `${C.green}10` : `${C.card2}60`,
+                          background: done ? `${C.green}10` : `${C.card2 || C.card}60`,
                           transition: "all .2s", opacity: done ? 0.7 : 1,
                           textAlign: "left",
                         }}
                         onMouseEnter={e => { if (!done) e.currentTarget.style.background = `${C.blue}12`; }}
-                        onMouseLeave={e => { if (!done) e.currentTarget.style.background = `${C.card2}60`; }}
+                        onMouseLeave={e => { if (!done) e.currentTarget.style.background = `${C.card2 || C.card}60`; }}
                         >
                           <span style={{ fontSize: "16px" }}>{done ? "✅" : c.icon}</span>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontSize: "13px", fontWeight: 700, color: done ? C.green : C.text1, lineHeight: 1.2 }}>{c.title}</div>
-                            <div style={{ fontSize: "11px", color: C.text3, lineHeight: 1.2 }}>{done ? `+${c.points}XP` : c.desc}</div>
+                            <div style={{ fontSize: "11px", color: C.text3, lineHeight: 1.2 }}>{done ? `+${c.points}XP 획득` : c.desc}</div>
                           </div>
                         </button>
                       );
@@ -7902,7 +8002,7 @@ function AppInner() {
                       marginTop: "10px", padding: "8px 14px", borderRadius: "10px", textAlign: "center",
                       background: `linear-gradient(90deg, ${C.green}15, ${C.blue}10)`,
                       fontSize: "13px", fontWeight: 700, color: C.green,
-                    }}>🏆 오늘 미션 올클리어! 내일도 도전하세요</div>
+                    }}>🏆 올클리어! +{XP_REWARDS.daily_all_clear}XP 보너스 획득</div>
                   )}
                 </div>
               );
@@ -8036,16 +8136,47 @@ function AppInner() {
               </div>
             )}
 
-            {/* ── 커뮤니티 리더보드 (소셜 바이럴 + 유입 강화) ─── */}
+            {/* ── 커뮤니티 리더보드 (예측 통계 기반 + XP 레벨 연동) ─── */}
             {(() => {
-              const leaderboard = [
-                { rank: 1, name: "투자의신", badge: "🏆", roi: 34.2, winRate: 78, streak: 42, tier: "다이아몬드" },
-                { rank: 2, name: "퀀트마스터", badge: "🥈", roi: 28.7, winRate: 72, streak: 31, tier: "플래티넘" },
-                { rank: 3, name: "알파헌터", badge: "🥉", roi: 22.1, winRate: 68, streak: 25, tier: "플래티넘" },
-                { rank: 4, name: "스마트머니", badge: "", roi: 18.5, winRate: 65, streak: 19, tier: "골드" },
-                { rank: 5, name: "데이터루크", badge: "", roi: 15.3, winRate: 63, streak: 14, tier: "골드" },
+              // 실제 유저 데이터가 없으면 → 예측 통계 기반 시뮬레이션 랭킹 생성
+              const uid = user?.id?.slice(0, 8) || "anon";
+              const myStats = (() => { try { return JSON.parse(localStorage.getItem("zepta:pred:stats") || '{"correct":0,"total":0}'); } catch { return { correct: 0, total: 0 }; } })();
+              const myXp = readTotalXp(uid);
+              const myInfo = getXpInfo(myXp.total);
+              const myName = user?.user_metadata?.nickname || user?.user_metadata?.display_name || "나";
+              const myWinRate = myStats.total > 0 ? Math.round((myStats.correct / myStats.total) * 100) : 0;
+
+              // 시뮬레이션 랭킹 (유저들의 XP + 예측 적중률 기반)
+              const simulatedUsers = [
+                { name: "투자의신", xp: 4800, winRate: 78, predictions: 89, level: 28, tier: "플래티넘" },
+                { name: "퀀트마스터", xp: 3200, winRate: 72, predictions: 65, level: 22, tier: "플래티넘" },
+                { name: "알파헌터", xp: 2100, winRate: 68, predictions: 52, level: 16, tier: "골드" },
+                { name: "스마트머니", xp: 1500, winRate: 65, predictions: 43, level: 12, tier: "골드" },
+                { name: "데이터루크", xp: 800, winRate: 63, predictions: 31, level: 8, tier: "실버" },
               ];
-              const tierColor = { "다이아몬드": C.blue, "플래티넘": C.purple, "골드": "#FFD700" };
+
+              // 내 랭킹 위치 결정 (XP 기준)
+              let leaderboard = simulatedUsers.map(u => ({
+                ...u, isMe: false,
+                tierInfo: [...XP_TIERS].reverse().find(t => u.level >= t.minLv) || XP_TIERS[0],
+              }));
+
+              // 로그인 유저면 내 순위 삽입
+              if (user && myXp.total > 0) {
+                const myEntry = {
+                  name: myName, xp: myXp.total, winRate: myWinRate,
+                  predictions: myStats.total, level: myInfo.level, tier: myInfo.tier.name,
+                  isMe: true, tierInfo: myInfo.tier,
+                };
+                leaderboard.push(myEntry);
+                leaderboard.sort((a, b) => b.xp - a.xp);
+                leaderboard = leaderboard.slice(0, 5); // 상위 5명만
+              }
+
+              // 순위 부여
+              leaderboard.forEach((u, i) => { u.rank = i + 1; });
+              const badges = ["🏆", "🥈", "🥉"];
+
               return (
                 <div style={{
                   background: C.card, borderRadius: "20px", padding: isMobile ? "16px" : "20px",
@@ -8056,38 +8187,42 @@ function AppInner() {
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <span style={{ fontSize: "18px" }}>🏅</span>
-                      <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>이번 주 수익률 랭킹</span>
+                      <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>투자 랭킹</span>
+                      <span style={{ fontSize: "11px", fontWeight: 600, color: C.text3, padding: "2px 8px", borderRadius: "6px", background: `${C.border}20` }}>XP 기준</span>
                     </div>
-                    <button onClick={() => setTab("profile")} style={{
+                    <button onClick={() => { setTab("profile"); setTimeout(() => { try { document.getElementById("ranking-section")?.scrollIntoView({ behavior: "smooth" }); } catch {} }, 200); }} style={{
                       fontSize: "12px", color: C.blue, background: `${C.blue}10`, border: `1px solid ${C.blue}20`,
                       borderRadius: "8px", cursor: "pointer", fontWeight: 600, padding: "4px 10px",
                     }}>전체 보기 →</button>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
                     {leaderboard.map(u => (
                       <div key={u.rank} style={{
                         display: "flex", alignItems: "center", gap: "10px",
                         padding: "10px 12px", borderRadius: "12px",
-                        background: u.rank <= 3 ? `${tierColor[u.tier]}08` : "transparent",
+                        background: u.isMe ? `${C.blue}10` : u.rank <= 3 ? `${u.tierInfo.color}08` : "transparent",
+                        border: u.isMe ? `1px solid ${C.blue}25` : "1px solid transparent",
                         transition: "background .15s",
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = `${C.card2}60`}
-                      onMouseLeave={e => e.currentTarget.style.background = u.rank <= 3 ? `${tierColor[u.tier]}08` : "transparent"}
-                      >
-                        <span style={{ fontWeight: 800, fontSize: "14px", color: u.rank <= 3 ? tierColor[u.tier] : C.text3, width: "20px", textAlign: "center" }}>
-                          {u.badge || u.rank}
+                      }}>
+                        <span style={{ fontWeight: 800, fontSize: "14px", color: u.rank <= 3 ? u.tierInfo.color : C.text3, width: "20px", textAlign: "center" }}>
+                          {badges[u.rank - 1] || u.rank}
                         </span>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <span style={{ fontWeight: 700, fontSize: "14px", color: C.text1 }}>{u.name}</span>
+                            <span style={{ fontWeight: 700, fontSize: "14px", color: u.isMe ? C.blue : C.text1 }}>{u.name}{u.isMe ? " (나)" : ""}</span>
                             <span style={{
                               fontSize: "10px", fontWeight: 700, padding: "1px 6px", borderRadius: "6px",
-                              background: `${tierColor[u.tier]}15`, color: tierColor[u.tier],
-                            }}>{u.tier}</span>
+                              background: `${u.tierInfo.color}15`, color: u.tierInfo.color,
+                            }}>Lv.{u.level}</span>
                           </div>
-                          <div style={{ fontSize: "11px", color: C.text3 }}>승률 {u.winRate}% · 🔥{u.streak}일</div>
+                          <div style={{ fontSize: "11px", color: C.text3 }}>
+                            적중률 {u.winRate}% · {u.predictions}회 예측
+                          </div>
                         </div>
-                        <span style={{ fontWeight: 800, fontSize: "16px", color: C.green, letterSpacing: "-0.3px" }}>+{u.roi}%</span>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontWeight: 800, fontSize: "14px", color: u.tierInfo.color, letterSpacing: "-0.3px" }}>{u.xp.toLocaleString()} XP</div>
+                          <div style={{ fontSize: "10px", color: C.text3 }}>{u.tierInfo.icon} {u.tier}</div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -8100,7 +8235,14 @@ function AppInner() {
                     }}
                     onMouseEnter={e => e.currentTarget.style.background = `${C.blue}15`}
                     onMouseLeave={e => e.currentTarget.style.background = `${C.blue}08`}
-                    >가입하고 랭킹에 도전하세요 🚀</button>
+                    >로그인하고 랭킹에 도전하세요 →</button>
+                  )}
+                  {user && myXp.total === 0 && (
+                    <div style={{
+                      marginTop: "10px", padding: "10px 14px", borderRadius: "10px", textAlign: "center",
+                      background: `${C.blue}08`, border: `1px dashed ${C.blue}20`,
+                      fontSize: "12px", color: C.text3,
+                    }}>미션을 완료하고 XP를 적립하면 랭킹에 참여할 수 있어요</div>
                   )}
                 </div>
               );
@@ -11834,30 +11976,194 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "profile" && user && (
           <div className="tab-content flex flex-col gap-4" style={{ maxWidth: "720px", margin: "0 auto" }}>
-            {/* 프로필 헤더 */}
-            <div style={{ background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.purpleBg} 100%)`, borderRadius: "24px", padding: "32px 20px", textAlign: "center", boxShadow: `0 4px 20px ${C.blue}20` }}>
-              <div style={{
-                background: `linear-gradient(135deg, ${C.blue}, ${C.purple || "#a855f7"})`,
-                boxShadow: `0 0 40px ${C.blue}60, inset 0 0 15px rgba(255,255,255,0.15)`,
-                borderRadius: "50%", width: "96px", height: "96px",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                margin: "0 auto 16px", fontSize: "36px", fontWeight: "900", color: "white",
-                border: "4px solid rgba(255,255,255,0.4)",
-                position: "relative",
-              }}>
-                {(user?.user_metadata?.avatar_url)
-                  ? <img src={user.user_metadata.avatar_url} alt="" style={{ width: "96px", height: "96px", borderRadius: "50%", objectFit: "cover" }} />
-                  : (user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()
-                }
-              </div>
-              <h2 style={{ margin: "0 0 8px", fontSize: "24px", fontWeight: "900", color: C.text1 }}>
-                {user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User"}
-              </h2>
-              <div style={{ fontSize: "14px", color: C.text3 }}>{user?.email || ""}</div>
-            </div>
+            {/* ── 프로필 헤더 + XP 레벨 통합 카드 ── */}
+            {(() => {
+              const uid = user?.id?.slice(0, 8) || "anon";
+              const xpData = readTotalXp(uid);
+              const xpInfo = getXpInfo(xpData.total);
+              const displayName = user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User";
+
+              return (
+                <div style={{
+                  background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.purpleBg} 100%)`,
+                  borderRadius: "24px", padding: isMobile ? "24px 16px" : "32px 28px",
+                  textAlign: "center", boxShadow: `0 4px 20px ${C.blue}20`,
+                  position: "relative", overflow: "hidden",
+                }}>
+                  {/* 배경 티어 아이콘 */}
+                  <div style={{ position: "absolute", top: "-10px", right: "-10px", fontSize: "120px", opacity: 0.06, pointerEvents: "none" }}>{xpInfo.tier.icon}</div>
+
+                  {/* 아바타 + 티어 배지 */}
+                  <div style={{ position: "relative", display: "inline-block", marginBottom: "12px" }}>
+                    <div style={{
+                      background: `linear-gradient(135deg, ${xpInfo.tier.color}, ${C.purple || "#a855f7"})`,
+                      boxShadow: `0 0 30px ${xpInfo.tier.color}50`,
+                      borderRadius: "50%", width: "80px", height: "80px",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "32px", fontWeight: "900", color: "white",
+                      border: "3px solid rgba(255,255,255,0.4)",
+                    }}>
+                      {(user?.user_metadata?.avatar_url)
+                        ? <img src={user.user_metadata.avatar_url} alt="" style={{ width: "80px", height: "80px", borderRadius: "50%", objectFit: "cover" }} />
+                        : displayName[0].toUpperCase()
+                      }
+                    </div>
+                    {/* 티어 배지 */}
+                    <div style={{
+                      position: "absolute", bottom: "-4px", right: "-8px",
+                      background: C.card, border: `2px solid ${xpInfo.tier.color}`,
+                      borderRadius: "10px", padding: "2px 8px",
+                      fontSize: "12px", fontWeight: 800, color: xpInfo.tier.color,
+                      boxShadow: `0 2px 8px ${xpInfo.tier.color}30`,
+                    }}>{xpInfo.tier.icon} {xpInfo.tier.name}</div>
+                  </div>
+
+                  <h2 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: "900", color: C.text1 }}>{displayName}</h2>
+                  <div style={{ fontSize: "13px", color: C.text3, marginBottom: "16px" }}>{user?.email || ""}</div>
+
+                  {/* XP 레벨 카드 */}
+                  <div style={{
+                    background: `${C.card}CC`, borderRadius: "16px", padding: "16px",
+                    border: `1px solid ${xpInfo.tier.color}20`,
+                    backdropFilter: "blur(10px)",
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
+                        <span style={{ fontSize: "28px", fontWeight: 900, color: xpInfo.tier.color }}>Lv.{xpInfo.level}</span>
+                        <span style={{ fontSize: "13px", fontWeight: 600, color: C.text3 }}>{xpInfo.tier.name}</span>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "18px", fontWeight: 800, color: C.blue }}>{xpData.total.toLocaleString()} XP</div>
+                        {xpInfo.tier.next && <div style={{ fontSize: "11px", color: C.text3 }}>다음 티어: {xpInfo.tier.next}</div>}
+                      </div>
+                    </div>
+                    {/* 레벨 프로그레스 바 */}
+                    <div style={{ height: "6px", borderRadius: "3px", background: `${C.border}30`, overflow: "hidden", marginBottom: "6px" }}>
+                      <div style={{
+                        height: "100%", width: `${Math.round(xpInfo.progress * 100)}%`,
+                        borderRadius: "3px",
+                        background: `linear-gradient(90deg, ${xpInfo.tier.color}, ${C.blue})`,
+                        transition: "width .5s ease",
+                      }} />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: C.text3 }}>
+                      <span>{xpInfo.currentLevelXp} / {xpInfo.nextLevelXp} XP</span>
+                      <span>다음 레벨까지 {xpInfo.nextLevelXp - xpInfo.currentLevelXp} XP</span>
+                    </div>
+                  </div>
+
+                  {/* XP 획득 방법 요약 */}
+                  <div style={{
+                    display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px",
+                    marginTop: "12px",
+                  }}>
+                    {[
+                      { label: "데일리 미션", value: "+55/일", icon: "🎯" },
+                      { label: "예측 적중", value: "+25/회", icon: "🎯" },
+                      { label: "연속 접속", value: "+100/7일", icon: "🔥" },
+                    ].map((item, i) => (
+                      <div key={i} style={{
+                        background: `${C.card}80`, borderRadius: "10px", padding: "8px",
+                        textAlign: "center",
+                      }}>
+                        <div style={{ fontSize: "14px", marginBottom: "2px" }}>{item.icon}</div>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: C.green }}>{item.value}</div>
+                        <div style={{ fontSize: "10px", color: C.text3 }}>{item.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* 닉네임 설정 */}
             <NicknameEditor user={user} supabase={supabase} onUpdate={refreshUser} />
+
+            {/* ── 전체 랭킹 (XP 기준) ── */}
+            {(() => {
+              const uid = user?.id?.slice(0, 8) || "anon";
+              const myXp = readTotalXp(uid);
+              const myInfo = getXpInfo(myXp.total);
+              const myName = user?.user_metadata?.nickname || user?.user_metadata?.display_name || "나";
+              const myStats = (() => { try { return JSON.parse(localStorage.getItem("zepta:pred:stats") || '{"correct":0,"total":0}'); } catch { return { correct: 0, total: 0 }; } })();
+              const myWinRate = myStats.total > 0 ? Math.round((myStats.correct / myStats.total) * 100) : 0;
+
+              const fullLeaderboard = [
+                { name: "투자의신", xp: 4800, winRate: 78, predictions: 89, level: 28 },
+                { name: "퀀트마스터", xp: 3200, winRate: 72, predictions: 65, level: 22 },
+                { name: "알파헌터", xp: 2100, winRate: 68, predictions: 52, level: 16 },
+                { name: "스마트머니", xp: 1500, winRate: 65, predictions: 43, level: 12 },
+                { name: "데이터루크", xp: 800, winRate: 63, predictions: 31, level: 8 },
+                { name: "머니메이커", xp: 600, winRate: 60, predictions: 25, level: 7 },
+                { name: "차트읽기장인", xp: 450, winRate: 58, predictions: 20, level: 5 },
+                { name: "초보투자자", xp: 200, winRate: 55, predictions: 12, level: 3 },
+              ].map(u => ({
+                ...u, isMe: false,
+                tierInfo: [...XP_TIERS].reverse().find(t => u.level >= t.minLv) || XP_TIERS[0],
+              }));
+
+              // 내 데이터 삽입
+              if (myXp.total > 0) {
+                fullLeaderboard.push({
+                  name: myName, xp: myXp.total, winRate: myWinRate,
+                  predictions: myStats.total, level: myInfo.level,
+                  isMe: true, tierInfo: myInfo.tier,
+                });
+              }
+              fullLeaderboard.sort((a, b) => b.xp - a.xp);
+              fullLeaderboard.forEach((u, i) => { u.rank = i + 1; });
+              const badges = ["🏆", "🥈", "🥉"];
+
+              return (
+                <div id="ranking-section" style={{
+                  background: C.card, borderRadius: "20px", padding: isMobile ? "16px" : "20px",
+                  border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "14px" }}>
+                    <span style={{ fontSize: "18px" }}>🏅</span>
+                    <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>전체 투자 랭킹</span>
+                    <span style={{ fontSize: "11px", fontWeight: 600, color: C.text3, padding: "2px 8px", borderRadius: "6px", background: `${C.border}20` }}>XP 기준</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                    {fullLeaderboard.map(u => (
+                      <div key={u.rank} style={{
+                        display: "flex", alignItems: "center", gap: "10px",
+                        padding: "10px 12px", borderRadius: "12px",
+                        background: u.isMe ? `${C.blue}10` : u.rank <= 3 ? `${u.tierInfo.color}08` : "transparent",
+                        border: u.isMe ? `1px solid ${C.blue}25` : "1px solid transparent",
+                      }}>
+                        <span style={{ fontWeight: 800, fontSize: "14px", color: u.rank <= 3 ? u.tierInfo.color : C.text3, width: "24px", textAlign: "center" }}>
+                          {badges[u.rank - 1] || u.rank}
+                        </span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span style={{ fontWeight: 700, fontSize: "14px", color: u.isMe ? C.blue : C.text1 }}>{u.name}{u.isMe ? " (나)" : ""}</span>
+                            <span style={{
+                              fontSize: "10px", fontWeight: 700, padding: "1px 6px", borderRadius: "6px",
+                              background: `${u.tierInfo.color}15`, color: u.tierInfo.color,
+                            }}>Lv.{u.level}</span>
+                          </div>
+                          <div style={{ fontSize: "11px", color: C.text3 }}>적중률 {u.winRate}% · {u.predictions}회 예측</div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontWeight: 800, fontSize: "14px", color: u.tierInfo.color }}>{u.xp.toLocaleString()} XP</div>
+                          <div style={{ fontSize: "10px", color: C.text3 }}>{u.tierInfo.icon} {u.tierInfo?.name || ""}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {myXp.total === 0 && (
+                    <div style={{
+                      marginTop: "12px", padding: "12px", borderRadius: "12px", textAlign: "center",
+                      background: `${C.blue}08`, border: `1px dashed ${C.blue}20`,
+                      fontSize: "13px", color: C.text3,
+                    }}>
+                      홈에서 데일리 미션을 완료하고 XP를 적립하면<br/>랭킹에 참여할 수 있어요!
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* 계정 정보 */}
             <div style={{ background: C.card, border: `1px solid ${C.border}` }} className="rounded-[16px] overflow-hidden">
@@ -12398,7 +12704,7 @@ function AppInner() {
         </button>
       )}
 
-      {/* ═══ 모바일 하단 탭 네비게이션 바 (토스 스타일) ═══ */}
+      {/* ═══ 모바일 하단 탭 네비게이션 바 (토스 스타일 — SVG 아이콘) ═══ */}
       {isMobile && (
         <nav className="mobile-bottom-nav" style={{
           position: "fixed",
@@ -12406,22 +12712,22 @@ function AppInner() {
           left: 0,
           right: 0,
           height: "82px",
-          background: C.isDark ? `${C.bg}F8` : `${C.bg}FA`,
-          backdropFilter: "blur(24px) saturate(180%)",
-          WebkitBackdropFilter: "blur(24px) saturate(180%)",
-          borderTop: `0.5px solid ${C.border}${C.isDark ? '25' : '40'}`,
+          background: C.isDark ? `${C.bg}F2` : `${C.bg}F8`,
+          backdropFilter: "blur(20px) saturate(180%)",
+          WebkitBackdropFilter: "blur(20px) saturate(180%)",
+          borderTop: `0.5px solid ${C.border}${C.isDark ? '20' : '35'}`,
           display: "flex",
           alignItems: "flex-start",
           justifyContent: "space-around",
-          paddingTop: "8px",
+          paddingTop: "6px",
           zIndex: 10000,
         }}>
           {[
-            { id: "home", icon: "🏠", label: "홈" },
-            { id: "screener", icon: "🔍", label: "스크리너" },
-            { id: "auto-trading", icon: "🤖", label: "AI매매" },
-            { id: "portfolio", icon: "💼", label: "포트폴리오" },
-            { id: "more", icon: "☰", label: "더보기" },
+            { id: "home", label: "홈", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><path d={active ? "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10.5z" : "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-4.5v-6h-3v6H4a1 1 0 0 1-1-1V10.5z"} />{active && <rect x="9" y="14" width="6" height="7" rx="0.5" fill={C.isDark ? C.bg : "#fff"} />}</svg> },
+            { id: "screener", label: "스크리너", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1}/><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg> },
+            { id: "auto-trading", label: "AI매매", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="3" fill={active ? "currentColor" : "none"} /><path d="M8 12l3 3 5-6" stroke={active ? (C.isDark ? C.bg : "#fff") : "currentColor"} strokeWidth="2" fill="none" />{active && <circle cx="18" cy="6" r="3.5" fill={C.green} stroke="none" />}</svg> },
+            { id: "portfolio", label: "포트폴리오", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" fill="none" stroke={active ? (C.isDark ? C.bg : "#fff") : "currentColor"} strokeWidth="1.8" /></svg> },
+            { id: "more", label: "더보기", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg> },
           ].map(item => {
             const isActive = item.id === "more"
               ? !["home","screener","auto-trading","portfolio"].includes(tab)
@@ -12438,23 +12744,26 @@ function AppInner() {
                 display: "flex",
                 flexDirection: "column",
                 alignItems: "center",
-                gap: "4px",
-                padding: "4px 0",
+                gap: "2px",
+                padding: "6px 0 2px",
                 background: "transparent",
                 border: "none",
                 cursor: "pointer",
                 color: isActive ? C.blue : C.text3,
-                transition: "color .15s",
+                transition: "color .2s",
                 position: "relative",
-                minHeight: "52px",
+                WebkitTapHighlightColor: "transparent",
               }}>
-                {isActive && <div style={{
-                  position: "absolute", top: "-8px", left: "50%", transform: "translateX(-50%)",
-                  width: "28px", height: "3px", borderRadius: "2px",
-                  background: C.blue,
-                }} />}
-                <span style={{ fontSize: "26px", lineHeight: 1, display: "block", height: "28px" }}>{item.icon}</span>
-                <span style={{ fontSize: "11px", fontWeight: isActive ? 700 : 500, lineHeight: 1, letterSpacing: "-0.3px" }}>{item.label}</span>
+                <div style={{ width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  {item.icon(isActive)}
+                </div>
+                <span style={{
+                  fontSize: "10px",
+                  fontWeight: isActive ? 700 : 500,
+                  lineHeight: 1,
+                  letterSpacing: "-0.2px",
+                  marginTop: "2px",
+                }}>{item.label}</span>
               </button>
             );
           })}
