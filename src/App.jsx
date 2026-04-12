@@ -6828,6 +6828,8 @@ function AppInner() {
         @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.4} }
         @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+        @keyframes streakPulse { 0%,100%{box-shadow:0 0 12px rgba(255,107,53,0.3)} 50%{box-shadow:0 0 24px rgba(255,107,53,0.6)} }
+        @keyframes toastSlideIn { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
         /* 모바일 앱처럼 전체 화면 확대/축소 방지 */
         html, body { touch-action: manipulation; -ms-touch-action: manipulation; }
         * { -webkit-touch-callout: none; }
@@ -6925,8 +6927,106 @@ function AppInner() {
         .di-app-body { display: flex; flex-direction: column; }
         .di-main-wrap { flex: 1; }
         /* v7.5: 공통 카드 스타일 — 개선된 간격 ── */
-        .ui-card { background: ${C.card}; border-radius: 14px; padding: 20px; border: 1px solid ${C.border}20; overflow: hidden; }
+        .ui-card {
+          background: ${C.isDark
+            ? `linear-gradient(135deg, ${C.card} 0%, ${C.card}ee 50%, ${C.card2}88 100%)`
+            : C.card};
+          border-radius: 20px;
+          padding: 24px;
+          border: 1px solid ${C.isDark ? `${C.border}30` : `${C.border}60`};
+          box-shadow: ${C.isDark
+            ? `0 4px 24px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.2), inset 0 1px 0 ${C.border}15`
+            : `0 2px 12px rgba(15,23,42,0.08), 0 1px 3px rgba(15,23,42,0.04)`};
+          backdrop-filter: blur(12px);
+          -webkit-backdrop-filter: blur(12px);
+          transition: transform 0.2s ease, box-shadow 0.2s ease;
+          overflow: hidden;
+          position: relative;
+        }
+        .ui-card::before {
+          content: "";
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 1px;
+          background: linear-gradient(90deg, transparent 0%, ${C.isDark ? `${C.blue}40` : `${C.blue}20`} 50%, transparent 100%);
+        }
+        .ui-card:hover {
+          transform: translateY(-3px);
+          box-shadow: ${C.isDark
+            ? `0 12px 40px rgba(0,0,0,0.4), 0 4px 12px rgba(59,130,246,0.1)`
+            : `0 8px 30px rgba(15,23,42,0.12), 0 4px 8px rgba(15,23,42,0.06)`};
+        }
         .ui-card-compact { background: ${C.card}; border-radius: 12px; padding: 16px; border: 1px solid ${C.border}${C.isDark ? '18' : '40'}; overflow: hidden; }
+        /* 프리미엄 카드 — AI/중요 섹션용 그래디언트 */
+        .ui-card-premium {
+          background: ${C.isDark
+            ? `linear-gradient(145deg, ${C.purpleBg} 0%, ${C.card} 40%, ${C.blueBg} 100%)`
+            : `linear-gradient(145deg, #F5F0FF 0%, #FFFFFF 40%, #EBF4FF 100%)`};
+          border-radius: 20px;
+          padding: 24px;
+          border: 1px solid ${C.isDark ? `${C.purple}25` : `${C.purple}15`};
+          box-shadow: ${C.isDark
+            ? `0 4px 24px rgba(155,111,255,0.12), 0 1px 4px rgba(0,0,0,0.2)`
+            : `0 2px 12px rgba(124,58,237,0.08)`};
+          overflow: hidden;
+          position: relative;
+        }
+        .ui-card-premium::before {
+          content: "";
+          position: absolute;
+          top: 0; left: 0; right: 0;
+          height: 1px;
+          background: linear-gradient(90deg, transparent, ${C.purple}60, ${C.blue}40, transparent);
+        }
+        /* 섹션 헤더 악센트 */
+        .section-header {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          margin-bottom: 16px;
+          font-size: 18px;
+          font-weight: 800;
+          color: ${C.text1};
+          letter-spacing: -0.02em;
+        }
+        .section-header::after {
+          content: "";
+          flex: 1;
+          height: 1px;
+          background: linear-gradient(90deg, ${C.border}40, transparent);
+        }
+        /* 그래디언트 애니메이션 배경 */
+        @keyframes gradientShift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
+        }
+        .hero-gradient {
+          background: ${C.isDark
+            ? `linear-gradient(-45deg, ${C.blueBg}, ${C.purpleBg}, ${C.card}, ${C.blueBg})`
+            : `linear-gradient(-45deg, #EBF4FF, #F5F0FF, #FFFFFF, #EBF4FF)`};
+          background-size: 400% 400%;
+          animation: gradientShift 15s ease infinite;
+        }
+        /* 카드 스태거드 진입 애니메이션 */
+        @keyframes cardEnter {
+          from { opacity: 0; transform: translateY(16px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .card-stagger > * { animation: cardEnter 0.4s ease backwards; }
+        .card-stagger > *:nth-child(1) { animation-delay: 0s; }
+        .card-stagger > *:nth-child(2) { animation-delay: 0.06s; }
+        .card-stagger > *:nth-child(3) { animation-delay: 0.12s; }
+        .card-stagger > *:nth-child(4) { animation-delay: 0.18s; }
+        .card-stagger > *:nth-child(5) { animation-delay: 0.24s; }
+        .card-stagger > *:nth-child(6) { animation-delay: 0.30s; }
+        .card-stagger > *:nth-child(7) { animation-delay: 0.36s; }
+        .card-stagger > *:nth-child(8) { animation-delay: 0.42s; }
+        /* 글로우 이펙트 */
+        .glow-green { box-shadow: 0 0 12px ${C.green}40, 0 0 4px ${C.green}20; }
+        .glow-red { box-shadow: 0 0 12px ${C.red}40, 0 0 4px ${C.red}20; }
+        .glow-blue { box-shadow: 0 0 12px ${C.blue}40, 0 0 4px ${C.blue}20; }
+        .glow-purple { box-shadow: 0 0 12px ${C.purple}40, 0 0 4px ${C.purple}20; }
         .ui-divider { height: 1px; background: ${C.border}; opacity: 0.2; margin: 12px 0; }
         .ui-list-item { display: flex; align-items: center; padding: 12px 10px; cursor: pointer; border-radius: 8px; transition: background 0.15s; gap: 8px; }
         .ui-list-item:hover { background: ${C.card2}60; }
@@ -6958,7 +7058,8 @@ function AppInner() {
           .tech-grid-popup { grid-template-columns: repeat(2, 1fr) !important; }
           .home-grid { gap: 16px !important; }
           .home-left { gap: 14px !important; }
-          .home-right { gap: 14px !important; }
+          .home-right { gap: 14px !important; order: -1 !important; }
+          /* 모바일에서 사이드바(prediction, quiz, badges)를 상단으로 이동 */
           .ui-card { padding: 16px !important; border-radius: 14px !important; }
           .ui-card-compact { padding: 14px !important; }
           .ui-list-item { padding: 12px 8px; }
@@ -7104,7 +7205,7 @@ function AppInner() {
           <div className="tab-content">
             {/* 2컬럼 그리드 (데스크톱) / 1컬럼 (모바일) */}
             <div className="home-grid">
-            <div className="home-left" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div className="home-left card-stagger" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
             {/* ── 개인화 인사 + 스트릭 ─── */}
             {(() => {
@@ -7125,34 +7226,73 @@ function AppInner() {
                 } catch { return { count: 1 }; }
               })();
               return (
-                <div style={{
+                <div className="hero-gradient" style={{
                   display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "16px 20px", borderRadius: "16px",
-                  background: `linear-gradient(135deg, ${C.card} 0%, ${C.blueBg} 100%)`,
-                  border: `1px solid ${C.blue}12`,
+                  padding: "20px 24px", borderRadius: "24px",
+                  border: `1px solid ${C.blue}18`,
+                  boxShadow: `0 4px 20px rgba(0,0,0,${C.isDark ? 0.2 : 0.08}), inset 0 1px 0 ${C.blue}20`,
+                  overflow: "hidden",
+                  position: "relative",
                 }}>
                   <div>
-                    <div style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "3px" }}>
+                    <div style={{ fontSize: "19px", fontWeight: 800, color: C.text1, marginBottom: "4px", letterSpacing: "-0.5px" }}>
                       {displayName ? `${displayName}님, ${greetText}` : greetText} 👋
                     </div>
-                    <div style={{ fontSize: "14px", color: C.text3 }}>
+                    <div style={{ fontSize: "13px", color: C.text3, fontWeight: 500 }}>
                       {new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "long" })}
                     </div>
                   </div>
                   <div style={{
-                    display: "flex", alignItems: "center", gap: "6px",
-                    padding: "6px 14px", borderRadius: "10px",
-                    background: `${C.orange}15`, border: `1px solid ${C.orange}25`,
+                    display: "flex", alignItems: "center", gap: "8px",
+                    padding: "8px 16px", borderRadius: "12px",
+                    background: streakData.count > 3
+                      ? `linear-gradient(135deg, ${C.orange}30 0%, #FF6B3520 50%, ${C.red}20 100%)`
+                      : `${C.orange}20`,
+                    border: `1px solid ${streakData.count > 3 ? C.red : C.orange}35`,
+                    boxShadow: `0 0 12px ${streakData.count > 3 ? C.red : C.orange}30`,
+                    animation: streakData.count > 0 ? "streakPulse 2s ease-in-out infinite" : "none",
                   }}>
-                    <span style={{ fontSize: "18px", display: "inline-block" }}>🔥</span>
+                    <span style={{ fontSize: "20px", display: "inline-block" }}>🔥</span>
                     <div>
-                      <div style={{ fontSize: "16px", fontWeight: 800, color: C.orange, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{streakData.count}</div>
-                      <div style={{ fontSize: "10px", color: C.text3, fontWeight: 600 }}>{t("tabs.home.streakDays") || "일 연속"}</div>
+                      <div style={{ fontSize: "17px", fontWeight: 800, color: streakData.count > 3 ? C.red : C.orange, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{streakData.count}</div>
+                      <div style={{ fontSize: "11px", color: C.text3, fontWeight: 600 }}>{t("tabs.home.streakDays") || "일 연속"}</div>
                     </div>
                   </div>
                 </div>
               );
             })()}
+
+            {/* ── 모바일 빠른 접근 버튼 ─── */}
+            {isMobile && (
+              <div style={{
+                display: "flex", gap: "8px", overflowX: "auto",
+                scrollbarWidth: "none", msOverflowStyle: "none",
+                WebkitOverflowScrolling: "touch", paddingBottom: "4px",
+              }} className="hscroll">
+                {[
+                  { icon: "🔍", label: "스크리너", tab: "screener" },
+                  { icon: "🤖", label: "AI매매", tab: "auto-trading" },
+                  { icon: "📊", label: "전략분석", tab: "strategy" },
+                  { icon: "📰", label: "뉴스", tab: "news" },
+                  { icon: "📅", label: "캘린더", tab: "econ-calendar" },
+                  { icon: "🎯", label: "백테스트", tab: "backtest" },
+                ].map((item) => (
+                  <button key={item.tab} onClick={() => setTab(item.tab)} style={{
+                    display: "flex", flexDirection: "column", alignItems: "center", gap: "6px",
+                    padding: "12px 16px", borderRadius: "16px", border: "none",
+                    background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
+                    boxShadow: `0 2px 8px rgba(0,0,0,${C.isDark ? '0.3' : '0.08'})`,
+                    cursor: "pointer", flexShrink: 0, minWidth: "72px",
+                    transition: "all 0.15s ease", color: C.text1, fontWeight: 600,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 4px 16px rgba(0,0,0,${C.isDark ? '0.4' : '0.12'})`; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 2px 8px rgba(0,0,0,${C.isDark ? '0.3' : '0.08'})`; }}>
+                    <span style={{ fontSize: "22px" }}>{item.icon}</span>
+                    <span style={{ fontSize: "11px", fontWeight: 700, color: C.text2, whiteSpace: "nowrap" }}>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
             {/* ── 마켓 브리핑 (3×2 그리드 — 6개 지수 동등 표시) ─── */}
             {(() => {
@@ -7180,12 +7320,27 @@ function AppInner() {
               ];
 
               return (
-                <div style={{ background: C.card, borderRadius: "18px", overflow: "hidden", border: `1px solid ${C.border}18` }}>
-                  <div style={{ padding: "18px 20px" }}>
+                <div style={{
+                  background: C.isDark
+                    ? `linear-gradient(135deg, ${C.card} 0%, ${C.card}ee 50%, ${C.card2}88 100%)`
+                    : C.card,
+                  borderRadius: "20px", overflow: "hidden",
+                  border: `1px solid ${C.isDark ? `${C.border}30` : `${C.border}60`}`,
+                  boxShadow: `0 4px 24px rgba(0,0,0,${C.isDark ? 0.3 : 0.08}), inset 0 1px 0 ${C.border}15`,
+                  backdropFilter: "blur(12px)",
+                  WebkitBackdropFilter: "blur(12px)",
+                  position: "relative",
+                }}>
+                  {/* 상단 선 */}
+                  <div style={{
+                    position: "absolute", top: 0, left: 0, right: 0, height: "1px",
+                    background: `linear-gradient(90deg, transparent 0%, ${C.blue}40 50%, transparent 100%)`,
+                  }} />
+                  <div style={{ padding: "20px 24px" }}>
                     {/* 헤더 */}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "15px", color: C.text2, fontWeight: 600 }}>{t("tabs.home.marketBriefing")}</span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <span style={{ fontSize: "16px", color: C.text1, fontWeight: 800, letterSpacing: "-0.5px" }}>{t("tabs.home.marketBriefing")}</span>
                         {marketIndices.length > 0 && (
                           <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", padding: "2px 7px", borderRadius: "5px", background: `${C.green}12`, fontSize: "11px", fontWeight: 700, color: C.green }}>
                             <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: C.green, animation: "livePulse 1.5s ease-in-out infinite" }} /> LIVE
@@ -7197,8 +7352,19 @@ function AppInner() {
                       }}>{marketLoading ? "..." : "↻"}</button>
                     </div>
 
-                    {/* 3×2 그리드: 6개 지수 카드 */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px", marginBottom: "14px" }}>
+                    {/* 3×2 그리드 (데스크톱) / 수평 스크롤 (모바일): 6개 지수 카드 */}
+                    <div style={{
+                      display: isMobile ? "flex" : "grid",
+                      gridTemplateColumns: !isMobile ? "repeat(3, 1fr)" : undefined,
+                      gap: isMobile ? "10px" : "12px",
+                      overflowX: isMobile ? "auto" : "visible",
+                      scrollSnapType: isMobile ? "x mandatory" : "none",
+                      WebkitOverflowScrolling: "touch",
+                      paddingBottom: isMobile ? "8px" : "0",
+                      scrollbarWidth: "none",
+                      msOverflowStyle: "none",
+                      marginBottom: "14px",
+                    }} className="hscroll">
                       {indexCards.map((item) => {
                         const isUp = item.idx?.change >= 0;
                         return (
@@ -7207,34 +7373,42 @@ function AppInner() {
                             onClick={() => item.idx && setChartAsset({ symbol: item.idx.symbol, name: item.name, market: item.market, symbolRaw: item.idx.symbol })}
                             style={{
                               cursor: item.idx ? "pointer" : "default",
-                              padding: "12px 14px",
-                              borderRadius: "14px",
-                              background: `${isUp ? C.green : C.red}06`,
-                              border: `1px solid ${isUp ? C.green : C.red}12`,
-                              transition: "all .2s",
+                              padding: "14px 16px",
+                              borderRadius: "16px",
+                              background: `${isUp ? C.green : C.red}08`,
+                              borderLeft: `3px solid ${isUp ? C.green : C.red}`,
+                              border: `1px solid ${isUp ? C.green : C.red}18`,
+                              borderLeftWidth: "3px",
+                              transition: "all .2s ease",
+                              position: "relative",
+                              overflow: "hidden",
+                              minWidth: isMobile ? "140px" : undefined,
+                              flexShrink: isMobile ? 0 : undefined,
+                              scrollSnapAlign: isMobile ? "start" : undefined,
                             }}
                             onMouseEnter={(e) => {
                               if (item.idx) {
-                                e.currentTarget.style.transform = "translateY(-2px)";
-                                e.currentTarget.style.background = `${isUp ? C.green : C.red}10`;
-                                e.currentTarget.style.boxShadow = `0 4px 12px ${isUp ? C.green : C.red}15`;
+                                e.currentTarget.style.transform = "translateY(-3px)";
+                                e.currentTarget.style.background = `${isUp ? C.green : C.red}12`;
+                                e.currentTarget.style.boxShadow = `0 6px 20px ${isUp ? C.green : C.red}25, inset 0 1px 0 ${isUp ? C.green : C.red}10`;
                               }
                             }}
                             onMouseLeave={(e) => {
                               e.currentTarget.style.transform = "translateY(0)";
-                              e.currentTarget.style.background = `${isUp ? C.green : C.red}06`;
+                              e.currentTarget.style.background = `${isUp ? C.green : C.red}08`;
                               e.currentTarget.style.boxShadow = "none";
                             }}
                           >
-                            <div style={{ fontSize: "13px", color: C.text3, fontWeight: 600, marginBottom: "6px" }}>
+                            <div style={{ fontSize: "12px", color: C.text3, fontWeight: 600, marginBottom: "7px" }}>
                               {item.flag} {item.name}
                             </div>
                             <div style={{
-                              fontSize: "22px",
+                              fontSize: "28px",
                               fontWeight: 800,
                               color: C.text1,
                               letterSpacing: "-0.5px",
-                              marginBottom: "2px",
+                              marginBottom: "3px",
+                              lineHeight: 1,
                             }}>
                               {item.idx ? (
                                 item.symbol === "USDKRW=X"
@@ -7243,9 +7417,10 @@ function AppInner() {
                               ) : "—"}
                             </div>
                             <div style={{
-                              fontSize: "15px",
-                              fontWeight: 700,
+                              fontSize: "16px",
+                              fontWeight: 800,
                               color: isUp ? C.green : C.red,
+                              letterSpacing: "-0.3px",
                             }}>
                               {item.idx ? `${isUp ? "+" : ""}${item.idx.change}%` : "—"}
                             </div>
@@ -7254,22 +7429,52 @@ function AppInner() {
                       })}
                     </div>
 
+                    {/* 마켓 한줄 요약 */}
+                    {marketIndices.length > 0 && (() => {
+                      const sp = marketIndices.find(i => i.symbol === "^GSPC");
+                      const nq = marketIndices.find(i => i.symbol === "^IXIC");
+                      const spChg = sp?.change || 0;
+                      const nqChg = nq?.change || 0;
+                      const avgChg = (spChg + nqChg) / 2;
+                      const sentiment = avgChg > 0.5 ? "강세" : avgChg > 0 ? "소폭 상승" : avgChg > -0.5 ? "소폭 하락" : "약세";
+                      const emoji = avgChg > 0.5 ? "🚀" : avgChg > 0 ? "📈" : avgChg > -0.5 ? "📉" : "⚠️";
+                      return (
+                        <div style={{
+                          padding: "12px 16px", borderRadius: "12px", fontSize: "14px",
+                          background: `linear-gradient(90deg, ${avgChg >= 0 ? C.greenBg : C.redBg} 0%, transparent 100%)`,
+                          color: C.text2, fontWeight: 600,
+                          borderLeft: `3px solid ${avgChg >= 0 ? C.green : C.red}`,
+                          marginBottom: "14px",
+                        }}>
+                          {emoji} 오늘 미국 증시는 <span style={{ color: avgChg >= 0 ? C.green : C.red, fontWeight: 800 }}>{sentiment}</span> 흐름
+                          {sp && <span> · S&P 500 {spChg >= 0 ? "+" : ""}{spChg.toFixed(2)}%</span>}
+                        </div>
+                      );
+                    })()}
+
                     {/* 하단: 등락 바 + 투자심리 */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "14px", paddingTop: "14px", borderTop: `1px solid ${C.border}10` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "16px", paddingTop: "16px", borderTop: `1px solid ${C.border}15` }}>
                       {/* 등락 바 */}
-                      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ fontSize: "13px", fontWeight: 700, color: C.green }}>{upCount}↑</span>
-                        <div style={{ flex: 1, height: "5px", borderRadius: "3px", background: C.card2, overflow: "hidden", display: "flex" }}>
+                      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: C.green, minWidth: "32px" }}>{upCount}↑</span>
+                        <div style={{ flex: 1, height: "6px", borderRadius: "3px", background: C.card2, overflow: "hidden", display: "flex", boxShadow: `inset 0 1px 2px rgba(0,0,0,0.2)` }}>
                           <div style={{ width: `${upPct}%`, background: C.green, borderRadius: "3px 0 0 3px", transition: "width .5s" }} />
                           <div style={{ flex: 1, background: C.red, borderRadius: "0 3px 3px 0" }} />
                         </div>
-                        <span style={{ fontSize: "13px", fontWeight: 700, color: C.red }}>{dnCount}↓</span>
+                        <span style={{ fontSize: "12px", fontWeight: 700, color: C.red, minWidth: "32px", textAlign: "right" }}>{dnCount}↓</span>
                       </div>
-                      {/* 투자심리 배지 */}
+                      {/* 투자심리 배지 — 더 큰 숫자 + 글로우 */}
                       {fgVal && (
-                        <div style={{ display: "flex", alignItems: "center", gap: "5px", padding: "4px 10px", borderRadius: "8px", background: `${fgColor}10` }}>
-                          <span style={{ fontSize: "15px", fontWeight: 800, color: fgColor }}>{fgVal}</span>
-                          <span style={{ fontSize: "12px", fontWeight: 600, color: fgColor }}>{fgLabel}</span>
+                        <div style={{
+                          display: "flex", flexDirection: "column", alignItems: "center", gap: "2px",
+                          padding: "8px 14px", borderRadius: "12px",
+                          background: `${fgColor}15`,
+                          border: `1px solid ${fgColor}30`,
+                          boxShadow: `0 0 12px ${fgColor}25, inset 0 1px 0 ${fgColor}15`,
+                          minWidth: "80px",
+                        }}>
+                          <span style={{ fontSize: "24px", fontWeight: 900, color: fgColor, lineHeight: 1, letterSpacing: "-0.5px" }}>{fgVal}</span>
+                          <span style={{ fontSize: "11px", fontWeight: 700, color: fgColor, opacity: 0.9 }}>{fgLabel}</span>
                         </div>
                       )}
                     </div>
@@ -7408,11 +7613,9 @@ function AppInner() {
 
             {/* ── 오늘의 추천 ─── */}
             {dailyPicks.length > 0 && (
-              <div style={{
+              <div className="ui-card" style={{
                 borderRadius: "20px", overflow: "hidden", position: "relative",
-                border: `1px solid ${C.border}15`,
               }}>
-                <div style={{ position: "absolute", inset: 0, background: C.card, pointerEvents: "none" }} />
                 <div style={{ position: "relative", padding: "20px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -7427,7 +7630,17 @@ function AppInner() {
                     onMouseLeave={e => e.currentTarget.style.background = `${C.blue}10`}
                     >{picksExpanded ? (t("tabs.home.collapse") || "접기") : `${t("tabs.home.seeMore") || "더보기"} (${dailyPicks.length})`}</button>
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <div style={{
+                    display: isMobile ? "flex" : "flex",
+                    flexDirection: isMobile ? "row" : "column",
+                    gap: isMobile ? "12px" : "4px",
+                    overflowX: isMobile ? "auto" : "visible",
+                    scrollSnapType: isMobile ? "x mandatory" : "none",
+                    WebkitOverflowScrolling: "touch",
+                    paddingBottom: isMobile ? "4px" : "0",
+                    scrollbarWidth: "none",
+                    msOverflowStyle: "none",
+                  }} className={isMobile ? "hscroll" : ""}>
                     {dailyPicks.slice(0, picksExpanded ? 15 : 5).map((pick, i) => {
                       const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
                       const isPos = pick.change >= 0;
@@ -7439,6 +7652,10 @@ function AppInner() {
                             padding: "12px", cursor: "pointer", borderRadius: "14px",
                             transition: "all .2s", background: isTop3 ? `${C.card2}40` : "transparent",
                             border: `1px solid ${isTop3 ? C.border + '12' : 'transparent'}`,
+                            minWidth: isMobile ? "280px" : undefined,
+                            flexShrink: isMobile ? 0 : undefined,
+                            scrollSnapAlign: isMobile ? "start" : undefined,
+                            flexDirection: isMobile ? "column" : "row",
                           }}
                           onMouseEnter={e => { e.currentTarget.style.background = `${C.card2}70`; e.currentTarget.style.transform = "translateX(2px)"; }}
                           onMouseLeave={e => { e.currentTarget.style.background = isTop3 ? `${C.card2}40` : "transparent"; e.currentTarget.style.transform = "none"; }}>
@@ -8433,13 +8650,12 @@ function AppInner() {
             {/* ═══ 하단 전체너비 섹션 (그리드 밖) ═══ */}
 
             {/* ── AI 퀀트 전략 하이라이트 (핵심 기능 → 최상단) ─── */}
-            <div onClick={() => { setTab("auto-trading"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
-              background: `linear-gradient(135deg, ${C.card} 0%, ${C.isDark ? "#1a0a2e" : "#EDE7F6"} 100%)`,
-              borderRadius: "16px", padding: "22px 24px", cursor: "pointer", transition: "all .2s",
-              border: `1px solid ${C.purple}25`, position: "relative", overflow: "hidden",
+            <div onClick={() => { setTab("auto-trading"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} className="ui-card-premium" style={{
+              cursor: "pointer", transition: "all .2s",
+              position: "relative", overflow: "hidden",
             }}
-            onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
-            onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
+            onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = `0 12px 40px ${C.purple}25`; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = ""; }}>
               <div style={{ position: "absolute", top: "-20px", right: "-10px", fontSize: "80px", opacity: 0.06 }}>🤖</div>
               <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                 <div style={{
@@ -8585,11 +8801,16 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "screener" && (
           <div className="tab-content">
+            {/* ── 스크리너 헤더 (그래디언트 히어로 스타일) ── */}
+            <div style={{ background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.card} 100%)`, borderRadius: "24px", padding: "28px", marginBottom: "20px", boxShadow: `0 4px 16px ${C.blue}15` }}>
+              <div style={{ fontWeight: 800, fontSize: "24px", color: C.text1 }}>{t("tabs.screener.title")}</div>
+              <div style={{ fontSize: mf(14), color: C.text3, marginTop: "4px" }}>{t("tabs.screener.subtitle")}</div>
+            </div>
+
             {/* ── 스크리너 프리셋 (토스 스타일) ── */}
             <div style={{ marginBottom: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                <div style={{ fontWeight: 700, fontSize: mf(17), color: C.text1 }}>{t("tabs.screener.title")}</div>
-                <span style={{ fontSize: mf(14), color: C.text3 }}>{t("tabs.screener.subtitle")}</span>
+                <div style={{ fontWeight: 700, fontSize: mf(16), color: C.text1 }}>프리셋 선택</div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(160px, 1fr))", gap: "10px" }}>
                 {SCREENER_PRESETS.map(preset => {
@@ -8609,9 +8830,10 @@ function AppInner() {
                       }
                     }} style={{
                       padding: isMobile ? "10px 12px" : "12px 14px", borderRadius: "14px", textAlign: "left", cursor: "pointer", minHeight: "44px", display: "flex", flexDirection: "column", justifyContent: "center",
-                      background: isActive ? presetBg : C.card,
+                      background: isActive ? presetBg : `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
                       border: `1px solid ${isActive ? `${presetColor}40` : `${C.border}20`}`,
                       transition: "all 0.2s ease", position: "relative", overflow: "hidden",
+                      boxShadow: isActive ? `0 4px 12px ${presetColor}30` : "none",
                     }}
                     onMouseEnter={e => { if (!isActive) { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.borderColor = `${presetColor}30`; } }}
                     onMouseLeave={e => { if (!isActive) { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.borderColor = `${C.border}20`; } }}>
@@ -9792,12 +10014,12 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "news" && (
           <div className="tab-content">
-            {/* 뉴스 헤더 (v9.1 개선) */}
-            <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, ${C.isDark ? "#0D1B2A" : "#E3F2FD"} 100%)`, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "22px 24px", marginBottom: "12px" }}>
+            {/* 뉴스 헤더 (그래디언트 강화) */}
+            <div style={{ background: `linear-gradient(135deg, ${C.greenBg} 0%, ${C.card} 100%)`, border: `1px solid ${C.border}20`, borderRadius: "24px", padding: "28px", marginBottom: "16px", boxShadow: `0 4px 16px ${C.green}15` }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap", marginBottom: "14px" }}>
                 <div>
-                  <div style={{ fontWeight: 800, fontSize: "17px", color: C.text1, marginBottom: "3px" }}>{t("tabs.news.title")}</div>
-                  <div style={{ fontSize: "14px", color: C.text3 }}>{t("tabs.news.subtitle")}</div>
+                  <div style={{ fontWeight: 800, fontSize: "24px", color: C.text1, marginBottom: "4px" }}>{t("tabs.news.title")}</div>
+                  <div style={{ fontSize: "13px", color: C.text3 }}>{t("tabs.news.subtitle")}</div>
                 </div>
                 <button onClick={fetchNews} disabled={newsLoading} style={{
                   padding: "8px 16px", borderRadius: "10px", fontSize: "14px", fontWeight: 700,
@@ -9834,11 +10056,12 @@ function AppInner() {
                   ["crypto", "₿ 크립토"],
                 ].map(([v, l]) => (
                   <button key={v} onClick={() => setNewsCat(v)} style={{
-                    padding: "5px 12px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
-                    background: newsCat === v ? C.blueBg : "transparent",
-                    color: newsCat === v ? C.blue : C.text3,
-                    border: `1px solid ${newsCat === v ? C.blue + "40" : "transparent"}`,
-                    cursor: "pointer", transition: "all .15s", flexShrink: 0
+                    padding: "6px 14px", borderRadius: "10px", fontSize: "14px", fontWeight: 600,
+                    background: newsCat === v ? C.blue : C.card2,
+                    color: newsCat === v ? "#fff" : C.text3,
+                    border: `1px solid ${newsCat === v ? C.blue : C.border2}`,
+                    cursor: "pointer", transition: "all .15s", flexShrink: 0,
+                    boxShadow: newsCat === v ? `0 2px 12px ${C.blue}40` : "none",
                   }}>{l}</button>
                 ))}
                 <div style={{ width: "1px", background: C.border, margin: "0 4px", flexShrink: 0 }} />
@@ -9885,12 +10108,13 @@ function AppInner() {
                   })();
                   return (<>
                     <a key={i} href={news.url || news.link || "#"} target="_blank" rel="noopener" onClick={() => { if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
-                      background: C.card, border: `1px solid ${C.border}20`, borderRadius: "14px", padding: isMobile ? "14px" : "16px 18px",
+                      background: C.card, border: `1px solid ${C.border}20`, borderRadius: "16px", padding: isMobile ? "14px" : "16px 18px",
                       textDecoration: "none", color: "inherit", display: "block", transition: "all .2s",
-                      borderLeft: `3px solid ${sentColor}60`,
+                      borderLeft: `3px solid ${sentColor}`,
+                      boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = C.blue; e.currentTarget.style.transform = "translateY(-1px)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = "translateY(0)"; }}>
+                    onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 16px rgba(0,0,0,0.2)`; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 1px 2px rgba(0,0,0,0.05)"; e.currentTarget.style.transform = "translateY(0)"; }}>
                       <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 600, fontSize: mf(16), marginBottom: "8px", color: C.text1, lineHeight: 1.5 }}>{news.title}</div>
@@ -10743,7 +10967,9 @@ function AppInner() {
             TAB: AI 퀀트 전략 (주식 + 크립토 통합)
         ═══════════════════════════════════════════════════════════ */}
         {tab === "auto-trading" && (
-          <AutoTrading theme={themeMode} user={user} />
+          <div className="card-stagger">
+            <AutoTrading theme={themeMode} user={user} />
+          </div>
         )}
 
         {/* ═══════════════════════════════════════════════════════════
@@ -10787,20 +11013,24 @@ function AppInner() {
         {tab === "profile" && user && (
           <div className="tab-content flex flex-col gap-4" style={{ maxWidth: "720px", margin: "0 auto" }}>
             {/* 프로필 헤더 */}
-            <div className="text-center py-8 px-5">
+            <div style={{ background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.purpleBg} 100%)`, borderRadius: "24px", padding: "32px 20px", textAlign: "center", boxShadow: `0 4px 20px ${C.blue}20` }}>
               <div style={{
                 background: `linear-gradient(135deg, ${C.blue}, ${C.purple || "#a855f7"})`,
-                boxShadow: `0 4px 20px ${C.blue}40`,
-              }} className="w-[72px] h-[72px] rounded-full flex items-center justify-center mx-auto mb-4 text-[28px] font-black text-white ring-2 ring-primary/20">
+                boxShadow: `0 0 20px ${C.blue}30`,
+                borderRadius: "50%", width: "96px", height: "96px",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                margin: "0 auto 16px", fontSize: "36px", fontWeight: "900", color: "white",
+                border: "3px solid rgba(255,255,255,0.2)",
+              }}>
                 {(user?.user_metadata?.avatar_url)
-                  ? <img src={user.user_metadata.avatar_url} alt="" className="w-[72px] h-[72px] rounded-full object-cover" />
+                  ? <img src={user.user_metadata.avatar_url} alt="" style={{ width: "96px", height: "96px", borderRadius: "50%", objectFit: "cover" }} />
                   : (user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()
                 }
               </div>
-              <h2 className="m-0 mb-1 text-xl font-black text-foreground">
+              <h2 style={{ margin: "0 0 8px", fontSize: "24px", fontWeight: "900", color: C.text1 }}>
                 {user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "User"}
               </h2>
-              <div className="text-base text-muted-foreground">{user?.email || ""}</div>
+              <div style={{ fontSize: "14px", color: C.text3 }}>{user?.email || ""}</div>
             </div>
 
             {/* 닉네임 설정 */}
@@ -10849,24 +11079,24 @@ function AppInner() {
               ))}
             </div>
 
-            {/* 내 투자 성적표 공유 */}
-            <div style={{ background: `linear-gradient(135deg, ${C.card}, ${C.blueBg})`, border: `1px solid ${C.blue}20`, borderRadius: "16px", padding: "20px", textAlign: "center" }}>
-              <div style={{ fontSize: "16px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>내 투자 성적표</div>
-              <div style={{ fontSize: "14px", color: C.text3, marginBottom: "16px" }}>AI가 분석한 나의 투자 현황을 공유해보세요</div>
-              <div className="flex justify-center mb-4" style={{ gap: isMobile ? "12px" : "24px" }}>
+            {/* 내 투자 성적표 공유 (프리미엄 카드) */}
+            <div style={{ background: `linear-gradient(135deg, ${C.blue}15 0%, ${C.purple}15 100%)`, border: `2px solid ${C.blue}40`, borderRadius: "20px", padding: "28px", textAlign: "center", boxShadow: `0 8px 24px ${C.blue}20` }}>
+              <div style={{ fontSize: "18px", fontWeight: 800, color: C.text1, marginBottom: "8px" }}>내 투자 성적표</div>
+              <div style={{ fontSize: "13px", color: C.text3, marginBottom: "20px" }}>AI가 분석한 나의 투자 현황을 공유해보세요</div>
+              <div className="flex justify-center mb-6" style={{ gap: isMobile ? "16px" : "32px" }}>
                 <div className="text-center">
-                  <div className="text-2xl font-extrabold" style={{ color: C.blue }}>{watchlist.length}</div>
-                  <div className="text-base text-muted-foreground">관심종목</div>
+                  <div style={{ fontSize: "28px", fontWeight: "900", color: C.blue }}>{watchlist.length}</div>
+                  <div style={{ fontSize: "13px", color: C.text3, marginTop: "4px" }}>관심종목</div>
                 </div>
                 <div className="w-px self-stretch" style={{ background: `${C.border}40` }} />
                 <div className="text-center">
-                  <div className="text-2xl font-extrabold" style={{ color: C.purple || "#a855f7" }}>{(() => { try { return JSON.parse(localStorage.getItem(`zepta_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })()}</div>
-                  <div className="text-base text-muted-foreground">운영봇</div>
+                  <div style={{ fontSize: "28px", fontWeight: "900", color: C.purple }}>{(() => { try { return JSON.parse(localStorage.getItem(`zepta_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })()}</div>
+                  <div style={{ fontSize: "13px", color: C.text3, marginTop: "4px" }}>운영봇</div>
                 </div>
                 <div className="w-px self-stretch" style={{ background: `${C.border}40` }} />
                 <div className="text-center">
-                  <div className="text-2xl font-extrabold" style={{ color: C.green }}>{(() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })()}</div>
-                  <div className="text-base text-muted-foreground">투자일</div>
+                  <div style={{ fontSize: "28px", fontWeight: "900", color: C.green }}>{(() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })()}</div>
+                  <div style={{ fontSize: "13px", color: C.text3, marginTop: "4px" }}>투자일</div>
                 </div>
               </div>
               <button onClick={() => {
@@ -10877,9 +11107,9 @@ function AppInner() {
                 if (navigator.share) navigator.share({ title: "Zepta AI 투자 성적표", text: txt, url: "https://zepta.vercel.app" }).catch(() => {});
                 else navigator.clipboard.writeText(txt).then(() => showToast("성적표가 복사되었습니다!", "success")).catch(() => {});
               }} style={{
-                padding: "10px 24px", borderRadius: "10px", fontSize: "15px", fontWeight: 700,
-                background: C.blue, color: "#fff", border: "none", cursor: "pointer",
-                display: "inline-flex", alignItems: "center", gap: "6px",
+                padding: "12px 28px", borderRadius: "12px", fontSize: "15px", fontWeight: 700,
+                background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`, color: "#fff", border: "none", cursor: "pointer",
+                display: "inline-flex", alignItems: "center", gap: "6px", boxShadow: `0 4px 12px ${C.blue}30`,
               }}>📤 성적표 공유하기</button>
             </div>
 
@@ -11472,18 +11702,28 @@ function AppInner() {
       {/* ── CTA 광고 (구글 애드센스 인터스티셜) ── */}
       {showGoogleCTA && <GoogleAdInterstitial onClose={() => setShowGoogleCTA(false)} />}
 
-      {/* ── 토스트 알림 ── */}
+      {/* ── 토스트 알림 (향상된 시각) ── */}
       {toasts.length > 0 && (
         <div style={{ position: "fixed", top: "env(safe-area-inset-top, 16px)", left: "50%", transform: "translateX(-50%)",
           zIndex: 99999, display: "flex", flexDirection: "column", gap: "8px", pointerEvents: "none", padding: "16px" }}>
-          {toasts.map(t => (
-            <div key={t.id} style={{
-              background: t.type === "error" ? "#DC2626" : t.type === "success" ? "#16A34A" : "#3B8BFF",
-              color: "#fff", padding: "12px 20px", borderRadius: "12px", fontSize: "17px", fontWeight: 600,
-              boxShadow: "0 8px 24px rgba(0,0,0,0.3)", pointerEvents: "auto", maxWidth: "min(360px, 90vw)",
-              textAlign: "center", animation: "fadeInDown 0.3s ease",
-            }}>{t.msg}</div>
-          ))}
+          {toasts.map(t => {
+            const bgGradient = t.type === "error" ? `linear-gradient(135deg, #DC2626 0%, #991b1b 100%)` : t.type === "success" ? `linear-gradient(135deg, #16A34A 0%, #15803d 100%)` : `linear-gradient(135deg, #3B8BFF 0%, #1d4ed8 100%)`;
+            const shadowColor = t.type === "error" ? "rgba(220, 38, 38, 0.4)" : t.type === "success" ? "rgba(22, 163, 74, 0.4)" : "rgba(59, 139, 255, 0.4)";
+            const emoji = t.type === "error" ? "❌" : t.type === "success" ? "✅" : "ℹ️";
+            return (
+              <div key={t.id} style={{
+                background: bgGradient,
+                color: "#fff", padding: "14px 20px", borderRadius: "14px", fontSize: "15px", fontWeight: 600,
+                boxShadow: `0 8px 28px ${shadowColor}`,
+                pointerEvents: "auto", maxWidth: "min(360px, 90vw)",
+                textAlign: "center", animation: "toastSlideIn 0.35s ease-out",
+                display: "flex", alignItems: "center", gap: "10px", justifyContent: "center",
+              }}>
+                <span style={{ fontSize: "16px" }}>{emoji}</span>
+                {t.msg}
+              </div>
+            );
+          })}
         </div>
       )}
 
