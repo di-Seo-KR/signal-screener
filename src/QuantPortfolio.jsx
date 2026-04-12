@@ -821,7 +821,7 @@ function LoadingSkeleton({ progress }) {
         </div>
       </div>
       {/* 스켈레톤 카드 */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "10px", marginTop: "12px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(280px, 1fr))", gap: isMobile ? "8px" : "10px", marginTop: "12px" }}>
         {[1,2,3,4,5,6].map(i => (
           <div key={i} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px",
             padding: "16px", opacity: 0.5 }}>
@@ -835,10 +835,23 @@ function LoadingSkeleton({ progress }) {
   );
 }
 
+// 모바일 감지 훅
+function useMobile() {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const handler = (e) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isMobile;
+}
+
 // ══════════════════════════════════════════════════════════════
 // 메인 컴포넌트
 // ══════════════════════════════════════════════════════════════
 export default function QuantPortfolio({ theme = "dark" }) {
+  const isMobile = useMobile();
   const [selectedStrategy, setSelectedStrategy] = useState(null);
   const [sortBy, setSortBy] = useState("return");
   const [filterCat, setFilterCat] = useState("all");
@@ -949,7 +962,7 @@ export default function QuantPortfolio({ theme = "dark" }) {
             <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.green, display: "inline-block" }} />
             실시간 데이터 · {lastUpdate ? lastUpdate.toLocaleTimeString("ko-KR") : ""} 업데이트
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))", gap: "6px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(90px, 1fr))", gap: isMobile ? "4px" : "6px" }}>
             {[
               { label: "누적 수익률", value: `${s.cumReturn >= 0 ? "+" : ""}${s.cumReturn}%`, color: s.cumReturn >= 0 ? C.green : C.red },
               { label: "샤프 비율", value: s.sharpe, color: s.sharpe > 1 ? C.green : s.sharpe > 0 ? C.yellow : C.red },
@@ -968,12 +981,12 @@ export default function QuantPortfolio({ theme = "dark" }) {
         </div>
 
         {/* 서브탭 */}
-        <div style={{ display: "flex", gap: "4px", marginBottom: "12px" }}>
+        <div style={{ display: "flex", gap: isMobile ? "2px" : "4px", marginBottom: "12px", flexWrap: isMobile ? "wrap" : "nowrap" }}>
           {[["overview", "수익률"], ["trades", "매매기록"], ["rebalance", "리밸런싱"]].map(([id, label]) => (
             <button key={id} onClick={() => setDetailTab(id)} style={{
-              padding: "7px 14px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
+              padding: isMobile ? "6px 10px" : "7px 14px", borderRadius: "8px", fontSize: isMobile ? "13px" : "14px", fontWeight: 600,
               background: detailTab === id ? C.blueBg : "transparent", color: detailTab === id ? C.blue : C.text3,
-              border: `1px solid ${detailTab === id ? C.blue : C.border2}`, cursor: "pointer",
+              border: `1px solid ${detailTab === id ? C.blue : C.border2}`, cursor: "pointer", minHeight: isMobile ? "40px" : "auto", flex: isMobile ? "1" : "auto",
             }}>{label}</button>
           ))}
         </div>
@@ -1070,7 +1083,7 @@ export default function QuantPortfolio({ theme = "dark" }) {
               </div>
             ) : (
               <>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "16px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: isMobile ? "6px" : "8px", marginBottom: "16px" }}>
                   {[
                     { label: "매수", count: s.tradeHistory.filter(t => t.action === "매수").length, color: C.red },
                     { label: "매도", count: s.tradeHistory.filter(t => t.action === "매도").length, color: C.blue },

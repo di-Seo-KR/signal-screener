@@ -1270,8 +1270,20 @@ function runDiagnosis(candles) {
 }
 
 // ── Full-page chart component ────────────────────────────────────
+function useMobile() {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const handler = (e) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isMobile;
+}
+
 export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) {
   const CC = theme === "dark" ? CC_DARK : CC_LIGHT;
+  const isMobile = useMobile();
   const containerRef = useRef(null);
   const mainRef   = useRef(null);
   const rsiRef    = useRef(null);
@@ -1714,23 +1726,23 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
     }}>
       {/* Top bar — 모바일 잘림 방지: 2줄 레이아웃, 최소 높이 보장 */}
       <div style={{
-        display: "flex", flexDirection: "column", gap: "6px",
-        padding: "10px 12px 8px", borderBottom: `1px solid ${CC.border}`,
+        display: "flex", flexDirection: "column", gap: isMobile ? "5px" : "6px",
+        padding: isMobile ? "8px 10px 6px" : "10px 12px 8px", borderBottom: `1px solid ${CC.border}`,
         background: `${CC.bg}f5`, backdropFilter: "blur(8px)", flexShrink: 0,
       }}>
         {/* 1행: 뒤로 + 종목명 + LIVE 배지 */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0, flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "6px" : "8px", minWidth: 0, flex: 1 }}>
             <button onClick={onClose} style={{
               background: CC.card, border: `1px solid ${CC.border}`, color: CC.text2, cursor: "pointer",
-              fontSize: "15px", padding: "6px 10px", borderRadius: "8px", fontWeight: 600, flexShrink: 0,
+              fontSize: isMobile ? "14px" : "15px", padding: isMobile ? "8px 8px" : "6px 10px", borderRadius: "8px", fontWeight: 600, flexShrink: 0, minHeight: isMobile ? "40px" : "auto", minWidth: isMobile ? "40px" : "auto", display: "flex", alignItems: "center", justifyContent: "center",
             }}>←</button>
-            <span style={{ fontSize: "18px", flexShrink: 0 }}>
+            <span style={{ fontSize: isMobile ? "16px" : "18px", flexShrink: 0 }}>
               {asset.market === "us" ? "\uD83C\uDDFA\uD83C\uDDF8" : asset.market === "kr" ? "\uD83C\uDDF0\uD83C\uDDF7" : "\u20BF"}
             </span>
             <div style={{ minWidth: 0, overflow: "hidden" }}>
-              <div style={{ color: CC.text1, fontWeight: 700, fontSize: "17px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{asset.name}</div>
-              <div style={{ color: CC.text3, fontSize: "13px" }}>{asset.symbol}</div>
+              <div style={{ color: CC.text1, fontWeight: 700, fontSize: isMobile ? "15px" : "17px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{asset.name}</div>
+              <div style={{ color: CC.text3, fontSize: isMobile ? "12px" : "13px" }}>{asset.symbol}</div>
             </div>
           </div>
           {liveConnected && (
@@ -1746,30 +1758,31 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
           )}
         </div>
         {/* 2행: 가격 + 등락률 + KRW 토글 */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <span style={{ color: CC.text1, fontWeight: 700, fontSize: "18px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: isMobile ? "6px" : "12px", flexWrap: isMobile ? "wrap" : "nowrap" }}>
+          <span style={{ color: CC.text1, fontWeight: 700, fontSize: isMobile ? "16px" : "18px" }}>
             {livePrice != null
               ? (showKRW && canShowKRW
                   ? `₩${Math.round(livePrice).toLocaleString("ko-KR")}`
                   : fmtPrice(livePrice, asset.market))
               : formatPriceWithKRW(asset.price)}
           </span>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "4px" : "6px", minHeight: isMobile ? "40px" : "auto" }}>
             {liveChange != null ? (
-              <span style={{ fontSize: "15px", fontWeight: 600, color: liveChange >= 0 ? CC.green : CC.red }}>
+              <span style={{ fontSize: isMobile ? "13px" : "15px", fontWeight: 600, color: liveChange >= 0 ? CC.green : CC.red }}>
                 {liveChange >= 0 ? "\u25B2" : "\u25BC"} {Math.abs(liveChange).toFixed(2)}%
               </span>
             ) : asset.weekChange != null ? (
-              <span style={{ fontSize: "15px", fontWeight: 600, color: asset.weekChange >= 0 ? CC.green : CC.red }}>
+              <span style={{ fontSize: isMobile ? "13px" : "15px", fontWeight: 600, color: asset.weekChange >= 0 ? CC.green : CC.red }}>
                 {asset.weekChange >= 0 ? "\u25B2" : "\u25BC"} {Math.abs(asset.weekChange)}%
               </span>
             ) : null}
             {canShowKRW && (
               <button onClick={() => setShowKRW(!showKRW)} style={{
-                fontSize: "13px", padding: "3px 7px", borderRadius: "6px", cursor: "pointer",
+                fontSize: isMobile ? "11px" : "13px", padding: isMobile ? "6px 8px" : "3px 7px", borderRadius: "6px", cursor: "pointer",
                 background: showKRW ? CC.blue + "33" : "transparent",
                 color: showKRW ? CC.blue : CC.text3,
                 border: `1px solid ${showKRW ? CC.blue : CC.border}`,
+                minHeight: isMobile ? "40px" : "auto", display: "flex", alignItems: "center", justifyContent: "center",
               }}>
                 {showKRW ? "\u20A9 KRW" : "$ USD"}
               </button>
@@ -1803,16 +1816,17 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         )}
 
         {/* Timeframe buttons — 10 granularities */}
-        <div style={{ display: "flex", gap: "4px", marginBottom: "8px", flexWrap: "wrap" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(5, 1fr)" : "repeat(10, 1fr)", gap: isMobile ? "3px" : "4px", marginBottom: "8px" }}>
           {tfOrder.map(key => {
             const cfg = tfLabels[key];
             if (!cfg) return null;
             return (
               <button key={key} onClick={() => setTimeframe(key)} style={{
-                padding: "5px 10px", borderRadius: "8px", fontSize: "14px", cursor: "pointer", fontWeight: 600,
+                padding: isMobile ? "8px 4px" : "5px 10px", borderRadius: "8px", fontSize: isMobile ? "11px" : "14px", cursor: "pointer", fontWeight: 600,
                 background: timeframe === key ? CC.blue : CC.card,
                 color: timeframe === key ? "#fff" : CC.text3,
                 border: `1px solid ${timeframe === key ? CC.blue : CC.border}`,
+                minHeight: isMobile ? "40px" : "auto",
               }}>{cfg.label}</button>
             );
           })}
@@ -1821,26 +1835,27 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         {/* Log scale toggle button */}
         <div style={{ display: "flex", gap: "4px", marginBottom: "8px", flexWrap: "wrap" }}>
           <button onClick={() => setLogScale(p => !p)} style={{
-            padding: "5px 10px", borderRadius: "8px", fontSize: "14px", cursor: "pointer", fontWeight: 600,
+            padding: isMobile ? "8px 10px" : "5px 10px", borderRadius: "8px", fontSize: isMobile ? "13px" : "14px", cursor: "pointer", fontWeight: 600,
             background: logScale ? `${CC.yellow}22` : CC.card,
             color: logScale ? CC.yellow : CC.text3,
             border: `1px solid ${logScale ? CC.yellow : CC.border}`,
-            marginLeft: "4px",
+            minHeight: isMobile ? "40px" : "auto",
           }}>📐 로그</button>
         </div>
 
         {/* Indicator quick toggles + settings gear */}
-        <div style={{ display: "flex", gap: "5px", marginBottom: showSettings ? "0px" : "12px", flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: isMobile ? "3px" : "5px", marginBottom: showSettings ? "0px" : "12px", flexWrap: "wrap", alignItems: "center" }}>
           {(settings.maList || []).map((ma, idx) => (
             <button key={`ma-${idx}`} onClick={() => {
               const newList = [...settings.maList];
               newList[idx] = { ...newList[idx], enabled: !newList[idx].enabled };
               updateSettings({ ...settings, maList: newList });
             }} style={{
-              padding: "4px 9px", borderRadius: "8px", fontSize: "14px", cursor: "pointer", fontWeight: 600,
+              padding: isMobile ? "6px 8px" : "4px 9px", borderRadius: "8px", fontSize: isMobile ? "12px" : "14px", cursor: "pointer", fontWeight: 600,
               background: ma.enabled ? `${ma.color}22` : "transparent",
               color: ma.enabled ? ma.color : CC.text3,
               border: `1px solid ${ma.enabled ? `${ma.color}88` : CC.border}`,
+              minHeight: isMobile ? "40px" : "auto", display: "flex", alignItems: "center", justifyContent: "center",
             }}>
               <span style={{ display: "inline-block", width: "7px", height: "7px", borderRadius: "50%", background: ma.enabled ? ma.color : CC.text3, marginRight: "4px", verticalAlign: "middle" }} />
               MA{ma.period}

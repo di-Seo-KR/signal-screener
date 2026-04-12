@@ -1,12 +1,20 @@
 User-agent: *
 Allow: /
+Disallow: /dev
+Disallow: /api/
 Sitemap: https://zepta.vercel.app/sitemap.xml
 
 User-agent: Googlebot
 Allow: /
+Disallow: /dev
+Disallow: /api/
 
 User-agent: Bingbot
 Allow: /
+Disallow: /dev
+Disallow: /api/
 
 User-agent: Yeti
 Allow: /
+Disallow: /dev
+Disallow: /api/

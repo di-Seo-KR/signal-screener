@@ -1,6 +1,6 @@
 // Zepta — 리스크 컨트롤 타워 v3.0
 // 8-Point CP 시스템 — 모든 체크포인트 실시간 시장 데이터 기반 동적 산출
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 
 // Zepta tokens.css 와 동기화 (dark)
 const C = {
@@ -14,6 +14,18 @@ const C = {
   orange: "#FF6B2C",
   text1: "#F1F5FB", text2: "#9AA7BD", text3: "#64728C",
 };
+
+// 모바일 감지 훅
+function useMobile() {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const handler = (e) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isMobile;
+}
 
 const SEV = {
   CRITICAL: { label: "CRITICAL", color: "#FF4D64", glow: "#FF4D6433" },
@@ -205,6 +217,7 @@ function Sparkline({ score, trend, width = 64, height = 20 }) {
 }
 
 export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
+  const isMobile = useMobile();
   const [expandedCP, setExpandedCP] = useState(null);
   const [tab, setTab] = useState("dashboard"); // "dashboard" | "matrix" | "history"
 
@@ -266,18 +279,18 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
         <div style={{ position: "absolute", top: "-40px", right: "-40px", width: "160px", height: "160px",
           borderRadius: "50%", background: ov.glow, filter: "blur(60px)", pointerEvents: "none" }} />
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", position: "relative", marginBottom: "16px" }}>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: "18px", marginBottom: "2px" }}>리스크 컨트롤 타워</div>
+        <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", position: "relative", marginBottom: "16px", gap: "12px", flexWrap: isMobile ? "wrap" : "nowrap" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 800, fontSize: isMobile ? "16px" : "18px", marginBottom: "2px" }}>리스크 컨트롤 타워</div>
             <div style={{ color: C.text3, fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
               {new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })} 기준
               {hasRealData && <span style={{ fontSize: "11px", padding: "1px 6px", borderRadius: "4px", background: C.greenBg, color: C.green, fontWeight: 600 }}>LIVE</span>}
               {!hasRealData && <span style={{ fontSize: "11px", padding: "1px 6px", borderRadius: "4px", background: C.yellowBg, color: C.yellow, fontWeight: 600 }}>로딩중</span>}
             </div>
           </div>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ position: "relative", width: "72px", height: "72px" }}>
-              <svg width="72" height="72" viewBox="0 0 72 72" style={{ transform: "rotate(-90deg)" }}>
+          <div style={{ textAlign: "center", flexShrink: 0 }}>
+            <div style={{ position: "relative", width: isMobile ? "60px" : "72px", height: isMobile ? "60px" : "72px" }}>
+              <svg width={isMobile ? "60" : "72"} height={isMobile ? "60" : "72"} viewBox="0 0 72 72" style={{ transform: "rotate(-90deg)" }}>
                 <circle cx="36" cy="36" r="30" fill="none" stroke={C.card2} strokeWidth="6" />
                 <circle cx="36" cy="36" r="30" fill="none" stroke={ov.color} strokeWidth="6"
                   strokeDasharray={`${overall.score * 1.885} 188.5`} strokeLinecap="round" />
@@ -291,7 +304,7 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
         </div>
 
         {/* 카운트 바 */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: "6px" }}>
           {Object.entries(SEV).map(([key, sev]) => {
             const cnt = risks.filter(r => r.severity === key).length;
             return (
@@ -308,12 +321,12 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
       </div>
 
       {/* 서브 탭 */}
-      <div style={{ display: "flex", gap: "4px", marginBottom: "12px" }}>
-        {[["dashboard", "대시보드"], ["matrix", "리스크 매트릭스"], ["history", "트렌드"]].map(([id, label]) => (
+      <div style={{ display: "flex", gap: isMobile ? "3px" : "4px", marginBottom: "12px", flexWrap: "wrap" }}>
+        {[["dashboard", "대시보드"], ["matrix", "매트릭스"], ["history", "트렌드"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} style={{
-            padding: "7px 14px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
+            padding: isMobile ? "6px 10px" : "7px 14px", borderRadius: "8px", fontSize: isMobile ? "12px" : "14px", fontWeight: 600,
             background: tab === id ? C.blueBg : "transparent", color: tab === id ? C.blue : C.text3,
-            border: `1px solid ${tab === id ? C.blue : C.border2}`, cursor: "pointer",
+            border: `1px solid ${tab === id ? C.blue : C.border2}`, cursor: "pointer", minHeight: isMobile ? "40px" : "auto",
           }}>{label}</button>
         ))}
       </div>
@@ -330,14 +343,14 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
                 padding: "16px", cursor: "pointer", transition: "all .2s",
                 borderLeft: `3px solid ${sev.color}`,
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <div style={{ fontSize: "22px", width: "36px", height: "36px", borderRadius: "10px",
+                <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? "8px" : "12px", flexWrap: isMobile ? "wrap" : "nowrap" }}>
+                  <div style={{ fontSize: isMobile ? "18px" : "22px", width: isMobile ? "32px" : "36px", height: isMobile ? "32px" : "36px", borderRadius: "10px",
                     background: sev.glow, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     {risk.icon}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px" }}>
-                      <span style={{ fontWeight: 700, fontSize: "16px" }}>{risk.name}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px", flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: 700, fontSize: isMobile ? "14px" : "16px" }}>{risk.name}</span>
                       <span style={{ fontSize: "12px", fontWeight: 800, color: sev.color,
                         padding: "1px 6px", borderRadius: "4px", background: sev.glow }}>{sev.label}</span>
                       <span style={{ fontSize: "13px", color: risk.trend === "악화" ? C.red : risk.trend === "개선" ? C.green : C.text3,
@@ -345,12 +358,12 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
                         {risk.trend === "악화" ? "↗ 악화" : risk.trend === "개선" ? "↘ 개선" : "→ 보합"}
                       </span>
                     </div>
-                    <div style={{ fontSize: "14px", color: C.text3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {risk.headline}
                     </div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: "22px", color: sev.color }}>{risk.score}</div>
+                    <div style={{ fontWeight: 800, fontSize: isMobile ? "18px" : "22px", color: sev.color }}>{risk.score}</div>
                     <Sparkline score={risk.score} trend={risk.trend} />
                   </div>
                 </div>
@@ -358,7 +371,7 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
                 {isOpen && (
                   <div style={{ marginTop: "14px", paddingTop: "14px", borderTop: `1px solid ${C.border}` }}>
                     {/* 핵심 지표 */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px", marginBottom: "12px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: isMobile ? "6px" : "8px", marginBottom: "12px" }}>
                       {risk.keyMetrics.map((m, j) => (
                         <div key={j} style={{ background: C.card2, borderRadius: "10px", padding: "10px", textAlign: "center" }}>
                           <div style={{ fontSize: "13px", color: C.text3, marginBottom: "4px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
@@ -392,8 +405,8 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
       {/* ═══ 리스크 매트릭스 뷰 ═══ */}
       {tab === "matrix" && (
         <div>
-          {/* 2x4 히트맵 그리드 */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
+          {/* 히트맵 그리드 (모바일에서 1열, 데스크톱에서 2열) */}
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "6px" : "8px", marginBottom: "16px" }}>
             {sorted.map(risk => {
               const sev = SEV[risk.severity];
               const opacity = 0.4 + (risk.score / 100) * 0.6;

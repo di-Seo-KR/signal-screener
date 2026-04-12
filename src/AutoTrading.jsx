@@ -84,18 +84,22 @@ function generateEquityCurve(bot, months = 12) {
 }
 
 // ── SVG 미니 에쿼티 차트 ──
-function MiniEquityChart({ data, color, width = 280, height = 80, theme }) {
+// 모바일 반응형: width를 isMobile 패러미터로 동적 조정
+function MiniEquityChart({ data, color, width = 280, height = 80, theme, isMobile = false }) {
   const c = colors[theme];
   if (!data || data.length < 2) return null;
+
+  // 모바일에서는 자동으로 너비 조정 (100% 사용)
+  const chartWidth = isMobile ? 280 : width;
 
   const min = Math.min(...data) * 0.998;
   const max = Math.max(...data) * 1.002;
   const range = max - min || 1;
-  const xStep = width / (data.length - 1);
+  const xStep = chartWidth / (data.length - 1);
 
   const points = data.map((v, i) => `${(i * xStep).toFixed(1)},${(height - ((v - min) / range) * (height - 8) - 4).toFixed(1)}`);
   const linePath = `M${points.join(" L")}`;
-  const areaPath = `${linePath} L${width},${height} L0,${height} Z`;
+  const areaPath = `${linePath} L${chartWidth},${height} L0,${height} Z`;
 
   const lastVal = data[data.length - 1];
   const totalReturn = ((lastVal - data[0]) / data[0] * 100).toFixed(1);
@@ -104,11 +108,11 @@ function MiniEquityChart({ data, color, width = 280, height = 80, theme }) {
   return (
     <div className="relative">
       <div className="flex justify-end items-center mb-1">
-        <span className="text-[15px] font-extrabold" style={{ color: isPositive ? c.green : c.red }}>
+        <span className={isMobile ? "text-[13px]" : "text-[15px]"} style={{ fontWeight: 800, color: isPositive ? c.green : c.red }}>
           {isPositive ? "+" : ""}{totalReturn}%
         </span>
       </div>
-      <svg width="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="rounded overflow-hidden">
+      <svg width="100%" viewBox={`0 0 ${chartWidth} ${height}`} preserveAspectRatio="none" className="rounded overflow-hidden">
         <defs>
           <linearGradient id={`eq-grad-${color.replace("#","")}`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={color} stopOpacity="0.25" />
@@ -371,10 +375,17 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
 
   return (
     <div>
-      <h2 className="text-2xl font-semibold mb-1" style={{ color: c.text1 }}>
+      <h2 className="font-semibold mb-1" style={{
+        color: c.text1,
+        fontSize: isMobile ? "18px" : "24px",
+      }}>
         {title}
       </h2>
-      {subtitle && <p className="text-[15px] mb-4" style={{ margin: "0 0 16px", color: c.text3 }}>{subtitle}</p>}
+      {subtitle && <p className="mb-4" style={{
+        margin: "0 0 16px",
+        color: c.text3,
+        fontSize: isMobile ? "13px" : "15px",
+      }}>{subtitle}</p>}
       {!subtitle && <div className="mb-4" />}
 
       {/* 모바일: 수평 스와이프 캐러셀 */}
@@ -520,21 +531,26 @@ function BotCard({ bot, onActivate, theme }) {
         </div>
       </div>
 
-      {/* Equity Curve Chart */}
+      {/* Equity Curve Chart — 모바일 반응형 적용 */}
       <div className="p-3 rounded-lg" style={{
         backgroundColor: c.card2,
         border: `1px solid ${c.border}60`,
       }}>
-        <MiniEquityChart data={equityCurve} color={chartColor} theme={theme} />
+        <MiniEquityChart data={equityCurve} color={chartColor} theme={theme} isMobile={false} />
       </div>
 
-      {/* Action button */}
+      {/* Action button — 모바일 터치 타겟 44px 최소 높이 보장 */}
       <button
         onClick={() => onActivate(bot)}
-        className="w-full py-3 px-4 rounded-lg text-base font-semibold text-white cursor-pointer transition-all duration-200"
+        className="w-full px-4 rounded-lg text-base font-semibold text-white cursor-pointer transition-all duration-200"
         style={{
           backgroundColor: c.blue,
           border: "none",
+          padding: "12px 16px",
+          minHeight: "44px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.opacity = "0.9";
@@ -561,13 +577,22 @@ function HeroSection({ theme, c, isMobile }) {
         margin: "0 auto",
         background: `linear-gradient(135deg, ${c.blue}12 0%, ${c.purple}08 100%)`,
         border: `1px solid ${c.border}`,
-        padding: isMobile ? "28px 20px" : "36px 32px",
+        padding: isMobile ? "20px 16px" : "36px 32px",
       }}
     >
-      <h1 className="mb-2 text-2xl sm:text-3xl font-bold" style={{ margin: "0 0 8px 0", color: c.text1 }}>
+      <h1 className="mb-2 font-bold" style={{
+        margin: "0 0 8px 0",
+        color: c.text1,
+        fontSize: isMobile ? "20px" : "28px",
+      }}>
         {t("autoTrading.heroTitle")}
       </h1>
-      <p className="text-base sm:text-lg mx-auto" style={{ margin: "0", color: c.text2, maxWidth: "520px" }}>
+      <p className="mx-auto" style={{
+        margin: "0",
+        color: c.text2,
+        maxWidth: "520px",
+        fontSize: isMobile ? "14px" : "16px",
+      }}>
         {t("autoTrading.heroSubtitle")}
       </p>
     </div>
@@ -665,9 +690,15 @@ function BotRecommender({ onActivate, theme, isMobile }) {
             </div>
           ))}
         </div>
-        <button onClick={() => { setResult(null); setStep(0); setAnswers({}); }} className="w-full py-2.5 rounded-lg text-sm font-semibold bg-transparent cursor-pointer" style={{
+        <button onClick={() => { setResult(null); setStep(0); setAnswers({}); }} className="w-full rounded-lg font-semibold bg-transparent cursor-pointer" style={{
           color: c.text3,
           border: `1px solid ${c.border}`,
+          padding: isMobile ? "10px" : "10px 16px",
+          minHeight: "40px",
+          fontSize: isMobile ? "13px" : "14px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}>다시 선택하기</button>
       </div>
     );
@@ -675,34 +706,65 @@ function BotRecommender({ onActivate, theme, isMobile }) {
 
   const q = questions[step];
   return (
-    <div className="rounded-2xl p-6 sm:p-8" style={{ background: c.card, border: `1px solid ${c.border}` }}>
+    <div className="rounded-2xl" style={{
+      background: c.card,
+      border: `1px solid ${c.border}`,
+      padding: isMobile ? "16px" : "24px 32px",
+    }}>
       <div className="flex justify-between items-center mb-4">
-        <h3 className="m-0 text-lg" style={{ color: c.text1 }}>🤖 나에게 맞는 봇 찾기</h3>
-        <span className="text-sm" style={{ color: c.text3 }}>{step + 1} / {questions.length}</span>
+        <h3 className="m-0" style={{
+          color: c.text1,
+          fontSize: isMobile ? "16px" : "18px",
+          fontWeight: 600,
+        }}>🤖 나에게 맞는 봇 찾기</h3>
+        <span style={{
+          color: c.text3,
+          fontSize: isMobile ? "12px" : "14px",
+        }}>{step + 1} / {questions.length}</span>
       </div>
       <div className="flex gap-1 mb-5">
         {questions.map((_, i) => (
           <div key={i} className="flex-1 h-0.5 rounded-full" style={{ background: i <= step ? c.blue : c.border }} />
         ))}
       </div>
-      <p className="mb-4 text-[17px] font-semibold" style={{ margin: "0 0 16px", color: c.text2 }}>{q.q}</p>
+      <p className="mb-4 font-semibold" style={{
+        margin: "0 0 16px",
+        color: c.text2,
+        fontSize: isMobile ? "15px" : "17px",
+      }}>{q.q}</p>
       <div className="flex flex-col gap-2">
         {q.options.map(opt => (
-          <button key={opt.value} onClick={() => selectAnswer(q.key, opt.value)} className="flex items-center gap-3 p-3.5 px-4 rounded-xl cursor-pointer text-left transition-all duration-200" style={{
+          <button key={opt.value} onClick={() => selectAnswer(q.key, opt.value)} className="flex items-center gap-3 rounded-xl cursor-pointer text-left transition-all duration-200" style={{
             background: answers[q.key] === opt.value ? `${c.blue}10` : "transparent",
             border: `1px solid ${answers[q.key] === opt.value ? c.blue : c.border}`,
+            padding: isMobile ? "12px" : "14px 16px",
+            minHeight: "44px",
+            display: "flex",
+            alignItems: "flex-start",
           }}>
-            <span className="text-[20px]">{opt.label.split(" ")[0]}</span>
+            <span style={{ fontSize: isMobile ? "18px" : "20px", flexShrink: 0, marginTop: "2px" }}>{opt.label.split(" ")[0]}</span>
             <div>
-              <div className="font-semibold text-[15px]" style={{ color: c.text1 }}>{opt.label.split(" ").slice(1).join(" ")}</div>
-              <div className="text-sm" style={{ color: c.text3 }}>{opt.desc}</div>
+              <div className="font-semibold" style={{
+                color: c.text1,
+                fontSize: isMobile ? "13px" : "15px",
+              }}>{opt.label.split(" ").slice(1).join(" ")}</div>
+              <div style={{
+                color: c.text3,
+                fontSize: isMobile ? "12px" : "13px",
+              }}>{opt.desc}</div>
             </div>
           </button>
         ))}
       </div>
       {step > 0 && (
-        <button onClick={() => setStep(step - 1)} className="mt-3 py-2 text-sm bg-transparent border-none cursor-pointer" style={{
+        <button onClick={() => setStep(step - 1)} className="mt-3 bg-transparent border-none cursor-pointer" style={{
           color: c.text3,
+          padding: "8px 12px",
+          minHeight: "40px",
+          fontSize: isMobile ? "13px" : "14px",
+          display: "flex",
+          alignItems: "center",
+          gap: "4px",
         }}>← 이전</button>
       )}
     </div>
@@ -717,8 +779,13 @@ function BotCatalog({ onActivate, theme, isMobile }) {
       {/* Hero Section */}
       <HeroSection theme={theme} c={c} isMobile={isMobile} />
 
-      {/* 봇 추천 플로우 */}
-      <div className="px-4 sm:px-6" style={{ maxWidth: "576px", margin: "0 auto", width: "100%" }}>
+      {/* 봇 추천 플로우 — 모바일 반응형 패딩 */}
+      <div style={{
+        padding: isMobile ? "0 16px" : "0 24px",
+        maxWidth: "576px",
+        margin: "0 auto",
+        width: "100%",
+      }}>
         <BotRecommender onActivate={onActivate} theme={theme} isMobile={isMobile} />
       </div>
 
@@ -999,12 +1066,12 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
     "crypto-swing": ["BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD", "ADA/USD", "AVAX/USD", "LINK/USD", "UNI/USD", "AAVE/USD", "DOT/USD", "DOGE/USD", "SHIB/USD", "PEPE/USD", "ARB/USD", "OP/USD", "MATIC/USD"],
   };
 
-  // 공통 카드 스타일
+  // 공통 카드 스타일 — 모바일 반응형
   const cardStyle = {
     background: c.card,
     border: `1px solid ${c.border}`,
     borderRadius: "16px",
-    padding: "24px",
+    padding: isMobile ? "16px" : "24px",
   };
 
   // ── 활성 봇 없음 or 일시정지만 있을 때 ──
@@ -1014,7 +1081,10 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
     const available = Math.max(0, totalEquity - totalAllocated);
     return (
       <div>
-        <h2 className="m-0 mb-4 text-[22px] font-bold" style={{ color: c.text1 }}>계좌 현황</h2>
+        <h2 className="m-0 mb-4 font-bold" style={{
+          color: c.text1,
+          fontSize: isMobile ? "18px" : "22px",
+        }}>계좌 현황</h2>
         <div className="mb-4" style={cardStyle}>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
@@ -1051,13 +1121,25 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                       <span className="px-2.5 py-1 rounded-xl text-sm font-bold" style={{ background: `${c.yellow}20`, color: c.yellow }}>일시정지</span>
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => onUpdateBotStatus(ab.botId, "active")} className="flex-1 px-3 py-3 rounded-lg text-[15px] font-semibold text-white border-none cursor-pointer" style={{
+                      <button onClick={() => onUpdateBotStatus(ab.botId, "active")} className="flex-1 rounded-lg font-semibold text-white border-none cursor-pointer" style={{
                         background: c.green,
+                        padding: "10px 12px",
+                        minHeight: "44px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: isMobile ? "13px" : "15px",
                       }}>재시작</button>
-                      <button onClick={() => onStopBot(ab.botId)} className="px-4 py-3 rounded-lg text-[15px] font-semibold border cursor-pointer" style={{
+                      <button onClick={() => onStopBot(ab.botId)} className="rounded-lg font-semibold border cursor-pointer" style={{
                         background: `${c.red}15`,
                         color: c.red,
                         border: `1px solid ${c.red}30`,
+                        padding: "10px 12px",
+                        minHeight: "44px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: isMobile ? "13px" : "15px",
                       }}>삭제</button>
                     </div>
                   </div>
@@ -1075,14 +1157,21 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
 
   return (
     <div>
-      {/* 헤더 */}
-      <div className="flex items-center gap-2.5 mb-5">
+      {/* 헤더 — 모바일 반응형 */}
+      <div className="flex items-center gap-2.5 mb-5 flex-wrap">
         <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.green, animation: "livePulse 1.5s ease-in-out infinite" }} />
-        <h2 className="m-0 text-2xl font-bold" style={{ color: c.text1 }}>운영 현황</h2>
-        <span className="px-2.5 py-0.75 rounded-xl text-sm font-bold" style={{ background: `${c.green}20`, color: c.green }}>
+        <h2 className="m-0 font-bold" style={{
+          color: c.text1,
+          fontSize: isMobile ? "18px" : "24px",
+        }}>운영 현황</h2>
+        <span className="px-2.5 py-0.75 rounded-xl font-bold flex-shrink-0" style={{
+          background: `${c.green}20`,
+          color: c.green,
+          fontSize: isMobile ? "12px" : "14px",
+        }}>
           {activeBots.filter(ab => ab.status !== "paused").length}개 활성
         </span>
-        {loading && <span className="text-sm" style={{ color: c.text3 }}>로딩 중...</span>}
+        {loading && <span style={{ color: c.text3, fontSize: isMobile ? "12px" : "14px" }}>로딩 중...</span>}
       </div>
 
       {/* ── 통합 포트폴리오 요약 카드 ── */}
@@ -1663,7 +1752,7 @@ export default function AutoTrading({ theme = "dark", user }) {
             zIndex: 9999,
           }} onClick={() => setPendingBot(null)}>
             <div style={{
-              background: c.card, borderRadius: "16px", padding: "28px", width: "min(400px, 90vw)",
+              background: c.card, borderRadius: "16px", padding: isMobile ? "20px 16px" : "28px", width: "min(400px, 90vw)",
               border: `1px solid ${c.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
             }} onClick={e => e.stopPropagation()}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
@@ -1685,7 +1774,7 @@ export default function AutoTrading({ theme = "dark", user }) {
                 ) : null;
               })()}
               <div style={{ marginBottom: "20px" }}>
-                <label style={{ fontSize: "15px", color: c.text2, display: "block", marginBottom: "6px" }}>투입 금액 (USD)</label>
+                <label style={{ fontSize: isMobile ? "14px" : "15px", color: c.text2, display: "block", marginBottom: "6px" }}>투입 금액 (USD)</label>
                 <input
                   type="number"
                   value={allocationInput}
@@ -1693,7 +1782,7 @@ export default function AutoTrading({ theme = "dark", user }) {
                   placeholder="예: 5000"
                   style={{
                     width: "100%", padding: "12px", borderRadius: "8px", border: `1px solid ${c.border}`,
-                    background: c.card2, color: c.text1, fontSize: "18px", fontWeight: 600, boxSizing: "border-box", minHeight: "44px",
+                    background: c.card2, color: c.text1, fontSize: isMobile ? "16px" : "18px", fontWeight: 600, boxSizing: "border-box", minHeight: "44px",
                   }}
                   onKeyDown={e => e.key === "Enter" && handleConfirmAllocation()}
                   autoFocus
@@ -1701,12 +1790,14 @@ export default function AutoTrading({ theme = "dark", user }) {
               </div>
               <div style={{ display: "flex", gap: "8px" }}>
                 <button onClick={() => setPendingBot(null)} style={{
-                  flex: 1, padding: "12px", borderRadius: "8px", fontSize: "16px", fontWeight: 600,
+                  flex: 1, padding: "12px 16px", borderRadius: "8px", fontSize: isMobile ? "14px" : "16px", fontWeight: 600,
                   background: c.card2, color: c.text2, border: `1px solid ${c.border}`, cursor: "pointer", minHeight: "44px",
+                  display: "flex", alignItems: "center", justifyContent: "center",
                 }}>취소</button>
                 <button onClick={handleConfirmAllocation} style={{
-                  flex: 1, padding: "12px", borderRadius: "8px", fontSize: "16px", fontWeight: 600,
+                  flex: 1, padding: "12px 16px", borderRadius: "8px", fontSize: isMobile ? "14px" : "16px", fontWeight: 600,
                   background: c.blue, color: "#fff", border: "none", cursor: "pointer", minHeight: "44px",
+                  display: "flex", alignItems: "center", justifyContent: "center",
                 }}>운영 시작</button>
               </div>
             </div>
@@ -1748,30 +1839,40 @@ export default function AutoTrading({ theme = "dark", user }) {
                   </div>
                 </div>
 
-                {/* 빠른 금액 선택 */}
+                {/* 빠른 금액 선택 — 모바일 터치 타겟 44px 최소 높이 */}
                 <div className="flex gap-2 mb-3 flex-wrap">
                   {quickAmounts.map(amt => (
-                    <button key={amt} onClick={() => setAddFundInput(String(amt))} className="flex-1 min-w-min px-3 py-2 rounded-lg text-[15px] font-semibold cursor-pointer min-h-[40px] transition-all duration-150" style={{
+                    <button key={amt} onClick={() => setAddFundInput(String(amt))} className="flex-1 min-w-min px-3 rounded-lg font-semibold cursor-pointer transition-all duration-150" style={{
                       background: addFundInput === String(amt) ? `${c.green}20` : c.card2,
                       color: addFundInput === String(amt) ? c.green : c.text2,
                       border: `1px solid ${addFundInput === String(amt) ? c.green + "50" : c.border}`,
+                      fontSize: isMobile ? "13px" : "15px",
+                      padding: isMobile ? "10px" : "8px 12px",
+                      minHeight: "44px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                     }}>${amt.toLocaleString()}</button>
                   ))}
                 </div>
 
                 {/* 직접 입력 */}
                 <div className="mb-5">
-                  <label className="text-[15px] block mb-1.5" style={{ color: c.text2 }}>직접 입력 (USD)</label>
+                  <label className="block mb-1.5" style={{ color: c.text2, fontSize: isMobile ? "14px" : "15px" }}>직접 입력 (USD)</label>
                   <input
                     type="number"
                     value={addFundInput}
                     onChange={e => setAddFundInput(e.target.value)}
                     placeholder="추가할 금액 입력"
-                    className="w-full px-3 py-3 rounded-lg border box-border min-h-[44px] text-lg font-semibold"
+                    className="w-full px-3 rounded-lg border box-border"
                     style={{
                       background: c.card2,
                       color: c.text1,
                       border: `1px solid ${c.border}`,
+                      padding: "12px",
+                      minHeight: "44px",
+                      fontSize: isMobile ? "16px" : "18px",
+                      fontWeight: 600,
                     }}
                     onKeyDown={e => e.key === "Enter" && handleConfirmAddFund()}
                     autoFocus
@@ -1783,16 +1884,28 @@ export default function AutoTrading({ theme = "dark", user }) {
                   )}
                 </div>
 
-                {/* 버튼 */}
+                {/* 버튼 — 모바일 터치 타겟 44px */}
                 <div className="flex gap-2">
-                  <button onClick={() => { setAddFundBotId(null); setAddFundInput(""); }} className="flex-1 px-3 py-3 rounded-lg text-base font-semibold cursor-pointer min-h-[44px] border" style={{
+                  <button onClick={() => { setAddFundBotId(null); setAddFundInput(""); }} className="flex-1 rounded-lg font-semibold cursor-pointer border" style={{
                     background: c.card2,
                     color: c.text2,
                     border: `1px solid ${c.border}`,
+                    padding: "12px 16px",
+                    minHeight: "44px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: isMobile ? "14px" : "16px",
                   }}>취소</button>
-                  <button onClick={handleConfirmAddFund} className="flex-1 px-3 py-3 rounded-lg text-base font-bold text-white border-none cursor-pointer min-h-[44px]" style={{
+                  <button onClick={handleConfirmAddFund} className="flex-1 rounded-lg font-bold text-white border-none cursor-pointer" style={{
                     background: c.green,
                     opacity: (!addFundInput || parseInt(addFundInput, 10) <= 0) ? 0.5 : 1,
+                    padding: "12px 16px",
+                    minHeight: "44px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: isMobile ? "14px" : "16px",
                   }}>금액 추가</button>
                 </div>
               </div>
@@ -1802,11 +1915,14 @@ export default function AutoTrading({ theme = "dark", user }) {
 
         {/* 봇 중지 / 삭제 확인 모달 */}
         {stopBotConfirm && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50" onClick={() => setStopBotConfirm(null)}>
-            <div className="w-min(420px, 90vw) rounded-2xl p-8 text-center border" style={{
+          <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50" onClick={() => setStopBotConfirm(null)} style={{ padding: isMobile ? "16px" : "0" }}>
+            <div className="rounded-2xl text-center border" style={{
               background: c.card,
               border: `1px solid ${c.border}`,
               boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+              maxWidth: "420px",
+              width: "100%",
+              padding: isMobile ? "24px 16px" : "32px",
             }} onClick={e => e.stopPropagation()}>
               <div className="text-[48px] mb-3">{stopBotConfirm.icon}</div>
               {stopBotConfirm.mode === "pause" ? (
@@ -1837,14 +1953,26 @@ export default function AutoTrading({ theme = "dark", user }) {
                   </div>
 
                   <div className="flex gap-2.5">
-                    <button onClick={() => setStopBotConfirm(null)} className="flex-1 px-3 py-3 rounded-[10px] text-base font-semibold border cursor-pointer min-h-[48px]" style={{
+                    <button onClick={() => setStopBotConfirm(null)} className="flex-1 rounded-[10px] font-semibold border cursor-pointer" style={{
                       background: c.card2,
                       color: c.text2,
                       border: `1px solid ${c.border}`,
+                      padding: "12px 16px",
+                      minHeight: "44px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: isMobile ? "14px" : "16px",
                     }}>취소</button>
-                    <button onClick={confirmPauseBot} className="flex-1 px-3 py-3 rounded-[10px] text-base font-bold border-none cursor-pointer min-h-[48px]" style={{
+                    <button onClick={confirmPauseBot} className="flex-1 rounded-[10px] font-bold border-none cursor-pointer" style={{
                       background: c.yellow,
                       color: "#000",
+                      padding: "12px 16px",
+                      minHeight: "44px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: isMobile ? "14px" : "16px",
                     }}>자동매매만 중단</button>
                   </div>
                 </>
@@ -1870,13 +1998,25 @@ export default function AutoTrading({ theme = "dark", user }) {
                   </div>
 
                   <div className="flex gap-2.5">
-                    <button onClick={() => setStopBotConfirm(null)} className="flex-1 px-3 py-3 rounded-[10px] text-base font-semibold border cursor-pointer min-h-[48px]" style={{
+                    <button onClick={() => setStopBotConfirm(null)} className="flex-1 rounded-[10px] font-semibold border cursor-pointer" style={{
                       background: c.card2,
                       color: c.text2,
                       border: `1px solid ${c.border}`,
+                      padding: "12px 16px",
+                      minHeight: "44px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: isMobile ? "14px" : "16px",
                     }}>취소</button>
-                    <button onClick={confirmDeleteBot} className="flex-1 px-3 py-3 rounded-[10px] text-base font-bold text-white border-none cursor-pointer min-h-[48px]" style={{
+                    <button onClick={confirmDeleteBot} className="flex-1 rounded-[10px] font-bold text-white border-none cursor-pointer" style={{
                       background: c.red,
+                      padding: "12px 16px",
+                      minHeight: "44px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: isMobile ? "14px" : "16px",
                     }}>봇 완전 삭제</button>
                   </div>
                 </>
@@ -1906,11 +2046,17 @@ export default function AutoTrading({ theme = "dark", user }) {
           <div>
             <button
               onClick={handleBackToCatalog}
-              className="px-4 py-2.5 rounded-lg text-base font-semibold cursor-pointer mb-6 border transition-all duration-200"
+              className="rounded-lg font-semibold cursor-pointer mb-6 border transition-all duration-200"
               style={{
                 color: c.blue,
                 border: `1px solid ${c.blue}`,
                 backgroundColor: "transparent",
+                padding: isMobile ? "10px 12px" : "10px 16px",
+                fontSize: isMobile ? "14px" : "16px",
+                minHeight: isMobile ? "40px" : "auto",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.backgroundColor = `${c.blue}15`;
@@ -1919,28 +2065,34 @@ export default function AutoTrading({ theme = "dark", user }) {
                 e.currentTarget.style.backgroundColor = "transparent";
               }}
             >
-              ← 봇 목록으로 돌아가기
+              <span>←</span> <span>{isMobile ? "목록" : "봇 목록으로 돌아가기"}</span>
             </button>
 
-            {/* Bot Info Header */}
+            {/* Bot Info Header — 모바일 반응형 */}
             <div
-              className="flex items-center gap-5 p-6 rounded-xl mb-6 border"
+              className="flex items-start gap-3 rounded-xl mb-6 border"
               style={{
                 backgroundColor: c.card,
                 border: `1px solid ${c.border}`,
+                padding: isMobile ? "16px" : "24px",
               }}
             >
-              <span className="text-[48px]">{activeBot.icon}</span>
-              <div className="flex-1">
+              <span className={isMobile ? "text-[32px]" : "text-[48px]"} style={{ flexShrink: 0 }}>{activeBot.icon}</span>
+              <div className="flex-1 min-w-0">
                 <h2
-                  className="m-0 mb-2 text-2xl font-semibold"
+                  className="m-0 mb-2 font-semibold"
                   style={{
                     color: c.text1,
+                    fontSize: isMobile ? "18px" : "24px",
                   }}
                 >
                   {activeBot.name}
                 </h2>
-                <p className="m-0 text-base" style={{ color: c.text2 }}>
+                <p className="m-0" style={{
+                  color: c.text2,
+                  fontSize: isMobile ? "13px" : "16px",
+                  lineHeight: "1.5",
+                }}>
                   {activeBot.description}
                 </p>
               </div>
@@ -1961,29 +2113,29 @@ export default function AutoTrading({ theme = "dark", user }) {
           <BotCatalog onActivate={handleActivateBot} theme={theme} isMobile={isMobile} />
         )}
 
-        {/* ── 실전매매 확인 다이얼로그 ── */}
+        {/* ── 실전매매 확인 다이얼로그 — 모바일 반응형 ── */}
         {confirmRealTrading && (
           <div style={{
             position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
             background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center",
-            justifyContent: "center", zIndex: 9999, padding: "16px",
+            justifyContent: "center", zIndex: 9999, padding: isMobile ? "16px" : "0",
           }}>
             <div style={{
-              background: colors[theme].card, borderRadius: "16px", padding: "32px 24px",
-              maxWidth: "400px", boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+              background: colors[theme].card, borderRadius: "16px", padding: isMobile ? "24px 16px" : "32px 24px",
+              maxWidth: "400px", width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
               border: `1px solid ${colors[theme].border}`,
             }}>
               <div style={{ fontSize: "32px", marginBottom: "16px", textAlign: "center" }}>
                 ⚠️
               </div>
               <h3 style={{
-                fontSize: "20px", fontWeight: 700, color: colors[theme].text1,
+                fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: colors[theme].text1,
                 marginBottom: "12px", textAlign: "center",
               }}>
                 실전 매매를 시작합니다
               </h3>
               <p style={{
-                fontSize: "15px", color: colors[theme].text2, marginBottom: "20px",
+                fontSize: isMobile ? "14px" : "15px", color: colors[theme].text2, marginBottom: "20px",
                 textAlign: "center", lineHeight: "1.6",
               }}>
                 실제 자금이 사용됩니다.<br />
@@ -1994,9 +2146,9 @@ export default function AutoTrading({ theme = "dark", user }) {
                   onClick={() => setConfirmRealTrading(null)}
                   style={{
                     flex: 1, padding: "12px 16px", borderRadius: "8px",
-                    fontSize: "15px", fontWeight: 700, border: `1px solid ${colors[theme].border}`,
+                    fontSize: isMobile ? "14px" : "15px", fontWeight: 700, border: `1px solid ${colors[theme].border}`,
                     background: colors[theme].card2, color: colors[theme].text1, cursor: "pointer",
-                    transition: "all 0.2s",
+                    transition: "all 0.2s", minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "center",
                   }}
                   onMouseEnter={(e) => { e.target.style.background = colors[theme].border; }}
                   onMouseLeave={(e) => { e.target.style.background = colors[theme].card2; }}
@@ -2007,9 +2159,9 @@ export default function AutoTrading({ theme = "dark", user }) {
                   onClick={handleConfirmRealTradingStart}
                   style={{
                     flex: 1, padding: "12px 16px", borderRadius: "8px",
-                    fontSize: "15px", fontWeight: 700, border: "none",
+                    fontSize: isMobile ? "14px" : "15px", fontWeight: 700, border: "none",
                     background: colors[theme].green, color: "#fff", cursor: "pointer",
-                    transition: "all 0.2s",
+                    transition: "all 0.2s", minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "center",
                   }}
                   onMouseEnter={(e) => { e.target.style.opacity = "0.85"; }}
                   onMouseLeave={(e) => { e.target.style.opacity = "1"; }}

@@ -1,6 +1,6 @@
 // Zepta — 전략 추천 패널
 // 시장 진단 → 전략 추천 → 상세 전략 카드
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { ALL_STRATEGIES, diagnoseMarket, recommendStrategies } from "./strategies.js";
 
 // ── Zepta 토큰 기반 (theme-responsive) ──
@@ -16,6 +16,18 @@ const C = {
   purple: "var(--z-purple)", purpleBg: "var(--z-purple-bg)",
   text1: "var(--z-text)", text2: "var(--z-text-2)", text3: "var(--z-text-3)",
 };
+
+// 모바일 감지 훅
+function useMobile() {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const handler = (e) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+  return isMobile;
+}
 
 const REGIME_COLORS = {
   "안정적 상승": { bg: C.greenBg, color: C.green, icon: "📈" },
@@ -40,6 +52,7 @@ const CAT_BG = {
 };
 
 export default function StrategyPanel({ onRunBacktest }) {
+  const isMobile = useMobile();
   const [loading, setLoading] = useState(false);
   const [diagnosis, setDiagnosis] = useState(null);
   const [recs, setRecs] = useState([]);
@@ -92,17 +105,17 @@ export default function StrategyPanel({ onRunBacktest }) {
       {/* 시장 진단 */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px" }}>
         <div style={{ fontWeight: 700, fontSize: "17px", marginBottom: "14px" }}>🔬 시장 진단</div>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap", marginBottom: "14px" }}>
+        <div style={{ display: "flex", gap: isMobile ? "6px" : "8px", alignItems: "center", flexWrap: "wrap", marginBottom: "14px", flexDirection: isMobile ? "column" : "row" }}>
           <select value={selectedSymbol} onChange={e => setSelectedSymbol(e.target.value)} style={{
-            padding: "8px 12px", borderRadius: "10px", fontSize: "15px", fontWeight: 600,
+            padding: isMobile ? "10px 8px" : "8px 12px", borderRadius: "10px", fontSize: isMobile ? "14px" : "15px", fontWeight: 600,
             background: C.card2, color: C.text1, border: `1px solid ${C.border2}`,
-            outline: "none", cursor: "pointer",
+            outline: "none", cursor: "pointer", width: isMobile ? "100%" : "auto", minHeight: isMobile ? "44px" : "auto",
           }}>
             {symbols.map(s => <option key={s.value} value={s.value}>{s.label} ({s.value})</option>)}
           </select>
           <button onClick={runDiagnosis} disabled={loading} style={{
-            padding: "8px 20px", borderRadius: "10px", fontSize: "15px", fontWeight: 700,
-            background: loading ? C.card2 : C.blue, color: loading ? C.text3 : "#fff", border: "none", cursor: "pointer",
+            padding: isMobile ? "10px 14px" : "8px 20px", borderRadius: "10px", fontSize: isMobile ? "14px" : "15px", fontWeight: 700,
+            background: loading ? C.card2 : C.blue, color: loading ? C.text3 : "#fff", border: "none", cursor: "pointer", width: isMobile ? "100%" : "auto", minHeight: isMobile ? "44px" : "auto",
           }}>
             {loading ? "분석 중..." : "🔍 진단 실행"}
           </button>
@@ -111,7 +124,7 @@ export default function StrategyPanel({ onRunBacktest }) {
         {error && <div style={{ color: C.red, fontSize: "15px", marginBottom: "10px" }}>⚠️ {error}</div>}
 
         {diagnosis && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "10px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(140px, 1fr))", gap: isMobile ? "8px" : "10px" }}>
             <div style={{ background: regimeStyle.bg, borderRadius: "12px", padding: "14px", textAlign: "center" }}>
               <div style={{ fontSize: "24px", marginBottom: "4px" }}>{regimeStyle.icon}</div>
               <div style={{ fontSize: "14px", color: C.text3, marginBottom: "4px" }}>시장 국면</div>
@@ -199,7 +212,7 @@ export default function StrategyPanel({ onRunBacktest }) {
       {/* 전체 전략 목록 */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px" }}>
         <div style={{ fontWeight: 700, fontSize: "17px", marginBottom: "14px" }}>📋 전체 전략 목록 ({ALL_STRATEGIES.length}개)</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(240px, 100%), 1fr))", gap: "10px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(min(240px, 100%), 1fr))", gap: isMobile ? "8px" : "10px" }}>
           {ALL_STRATEGIES.map(s => {
             const catColor = CAT_COLORS[s.category] || C.blue;
             return (

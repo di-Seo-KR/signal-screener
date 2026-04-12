@@ -705,6 +705,55 @@
       "minutesAgo": "{{minutes}}분 전",
       "hoursAgo": "{{hours}}시간 전",
       "daysAgo": "{{days}}일 전"
+    },
+    "screener": {
+      "presetTitle": "프리셋 선택",
+      "customSettings": "⚙️ 스크리닝 옵션",
+      "momentum": "모멘텀",
+      "volatility": "변동성",
+      "volume": "거래량",
+      "structural": "구조적",
+      "lastScan": "마지막 스캔",
+      "conditions": "조건",
+      "scanning": "스캐닝 중...",
+      "scanComplete": "스캔 완료"
+    },
+    "sentiment": {
+      "title": "소셜 센티먼트",
+      "subtitle": "StockTwits · Reddit(WSB) 기반 실시간 투자 심리",
+      "positive": "긍정",
+      "neutral": "중립",
+      "negative": "부정",
+      "postsAnalyzed": "개 포스트 분석",
+      "overallSentiment": "종합 센티먼트"
+    },
+    "anomaly": {
+      "title": "이상 감지",
+      "subtitle": "통계적 이상치 기반 실시간 시장 모니터링",
+      "detected": "감지됨",
+      "surge": "급등",
+      "plunge": "급락",
+      "highRisk": "고위험"
+    },
+    "profile": {
+      "investReport": "내 투자 성적표",
+      "investReportDesc": "AI가 분석한 나의 투자 현황을 공유해보세요",
+      "watchlist": "관심종목",
+      "activeBots": "운영봇",
+      "tradingDays": "투자일",
+      "shareZepta": "투자하는 친구에게 Zepta을 공유하세요"
+    },
+    "alerts": {
+      "title": "🚨 전략 매매 알림",
+      "description": "AI 퀀트 전략이 매수/매도 시그널을 감지하면 실시간으로 알려드립니다"
+    },
+    "econCalendar": {
+      "economicIndicators": "경제지표",
+      "fomc": "FOMC",
+      "cpi": "CPI",
+      "nfp": "NFP",
+      "gdp": "GDP",
+      "todayEvents": "오늘의 경제 이벤트"
     }
   }
 }

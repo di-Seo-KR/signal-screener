@@ -705,6 +705,55 @@
       "minutesAgo": "{{minutes}} minutes ago",
       "hoursAgo": "{{hours}} hours ago",
       "daysAgo": "{{days}} days ago"
+    },
+    "screener": {
+      "presetTitle": "Select Preset",
+      "customSettings": "⚙️ Screening Options",
+      "momentum": "Momentum",
+      "volatility": "Volatility",
+      "volume": "Volume",
+      "structural": "Structural",
+      "lastScan": "Last Scan",
+      "conditions": "Conditions",
+      "scanning": "Scanning...",
+      "scanComplete": "Scan Complete"
+    },
+    "sentiment": {
+      "title": "Social Sentiment",
+      "subtitle": "Real-time trading sentiment from StockTwits & Reddit (WSB)",
+      "positive": "Positive",
+      "neutral": "Neutral",
+      "negative": "Negative",
+      "postsAnalyzed": "posts analyzed",
+      "overallSentiment": "Overall Sentiment"
+    },
+    "anomaly": {
+      "title": "Anomaly Detection",
+      "subtitle": "Real-time market monitoring based on statistical outliers",
+      "detected": "Detected",
+      "surge": "Surge",
+      "plunge": "Plunge",
+      "highRisk": "High Risk"
+    },
+    "profile": {
+      "investReport": "My Investment Report",
+      "investReportDesc": "Share your AI-analyzed investment status",
+      "watchlist": "Watchlist",
+      "activeBots": "Active Bots",
+      "tradingDays": "Trading Days",
+      "shareZepta": "Share Zepta with your investor friends"
+    },
+    "alerts": {
+      "title": "🚨 Strategy Trading Alerts",
+      "description": "Get real-time notifications when AI quant strategies detect buy/sell signals"
+    },
+    "econCalendar": {
+      "economicIndicators": "Economic Indicators",
+      "fomc": "FOMC",
+      "cpi": "CPI",
+      "nfp": "NFP",
+      "gdp": "GDP",
+      "todayEvents": "Today's Economic Events"
     }
   }
 }
