@@ -374,16 +374,14 @@ export default memo(function Header({
 
           {/* ── 우측: 검색 + 언어 + 사용자 ── */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* 검색 — 미니멀 아이콘 버튼 (데스크탑에서는 확장형) */}
+            {/* 검색 — 아이콘 (xl 미만) / 확장형 (xl 이상) */}
             <Button variant="ghost" size="icon-sm"
               onClick={() => setGlobalSearchOpen(true)}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="xl:hidden text-muted-foreground hover:text-foreground transition-colors"
               title="Search (⌘K)"
             >
               <Search className="size-5" />
             </Button>
-
-            {/* 검색 확장형 — xl 이상에서만 표시 (1024-1279px에서는 아이콘만) */}
             <Button variant="outline" size="default"
               onClick={() => setGlobalSearchOpen(true)}
               className="gap-2 text-muted-foreground hidden xl:inline-flex px-3 py-1.5 h-9"
@@ -464,8 +462,8 @@ export default memo(function Header({
         </div>
       </header>
 
-      {/* 헤더 높이만큼 스페이서 */}
-      <div className="h-12 sm:h-14 lg:h-16" />
+      {/* 헤더 높이 + safe-area-inset-top 스페이서 */}
+      <div style={{ height: "calc(env(safe-area-inset-top, 0px) + var(--header-h))" }} />
     </>
   );
 });

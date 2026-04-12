@@ -7056,9 +7056,9 @@ function AppInner() {
           box-sizing: border-box !important;
           padding-top: 0 !important;
         }
-        /* 메인 콘텐츠 영역: 고정 헤더 + safe-area 아래에 시작 */
+        /* 메인 콘텐츠 영역: safe-area + 간격만 (Header spacer가 이미 헤더 높이 확보) */
         main {
-          padding-top: calc(env(safe-area-inset-top, 0px) + var(--header-h) + var(--header-gap)) !important;
+          padding-top: calc(env(safe-area-inset-top, 0px) + var(--header-gap)) !important;
         }
         body { padding-bottom: env(safe-area-inset-bottom, 0px); }
         /* 모바일 하단 탭바 safe-area */

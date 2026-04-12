@@ -573,11 +573,11 @@ function HeroSection({ theme, c, isMobile }) {
     <div
       className="text-center rounded-2xl"
       style={{
-        maxWidth: "768px",
+        maxWidth: "100%",
         margin: "0 auto",
         background: `linear-gradient(135deg, ${c.blue}12 0%, ${c.purple}08 100%)`,
         border: `1px solid ${c.border}`,
-        padding: isMobile ? "20px 16px" : "36px 32px",
+        padding: isMobile ? "16px 14px" : "28px 24px",
       }}
     >
       <h1 className="mb-2 font-bold" style={{
@@ -781,8 +781,8 @@ function BotCatalog({ onActivate, theme, isMobile }) {
 
       {/* 봇 추천 플로우 — 모바일 반응형 패딩 */}
       <div style={{
-        padding: isMobile ? "0 16px" : "0 24px",
-        maxWidth: "576px",
+        padding: isMobile ? "0 8px" : "0",
+        maxWidth: "640px",
         margin: "0 auto",
         width: "100%",
       }}>
@@ -1070,8 +1070,8 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
   const cardStyle = {
     background: c.card,
     border: `1px solid ${c.border}`,
-    borderRadius: "16px",
-    padding: isMobile ? "16px" : "24px",
+    borderRadius: "14px",
+    padding: isMobile ? "14px" : "20px",
   };
 
   // ── 활성 봇 없음 or 일시정지만 있을 때 ──
@@ -1158,7 +1158,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
   return (
     <div>
       {/* 헤더 — 모바일 반응형 */}
-      <div className="flex items-center gap-2.5 mb-5 flex-wrap">
+      <div className="flex items-center gap-2.5 mb-3 flex-wrap">
         <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: c.green, animation: "livePulse 1.5s ease-in-out infinite" }} />
         <h2 className="m-0 font-bold" style={{
           color: c.text1,
@@ -1242,7 +1242,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
       {isMobile ? (
         <ActiveBotCarousel activeBots={activeBots} allBotPerf={allBotPerf} onSelectBot={onSelectBot} onStopBot={onStopBot} onAddFund={onAddFund} theme={theme} cardStyle={cardStyle} />
       ) : null}
-      <div className={isMobile ? "hidden" : "grid gap-4"} style={{ gridTemplateColumns: "repeat(auto-fit, minmax(360px, 1fr))", maxWidth: activeBots.filter(ab => ab.status !== "paused").length === 1 ? "560px" : "100%", justifyContent: "start" }}>
+      <div className={isMobile ? "hidden" : "grid gap-3"} style={{ gridTemplateColumns: activeBots.filter(ab => ab.status !== "paused").length === 1 ? "1fr 1fr" : "repeat(auto-fill, minmax(340px, 1fr))" }}>
         {activeBots.filter(ab => ab.status !== "paused").map(ab => {
           const bot = [...STOCK_BOTS, ...CRYPTO_BOTS].find(b => b.id === ab.botId) || {};
           const elapsed = Date.now() - (ab.startedAt || Date.now());
@@ -1740,10 +1740,10 @@ export default function AutoTrading({ theme = "dark", user }) {
         backgroundColor: c.bg,
         color: c.text1,
         minHeight: "100vh",
-        padding: isMobile ? "16px 12px" : "24px 20px",
+        padding: isMobile ? "12px 10px" : "16px 20px",
       }}
     >
-      <div style={{ maxWidth: "1100px", margin: "0 auto", display: "flex", flexDirection: "column", gap: isMobile ? "20px" : "32px" }}>
+      <div style={{ maxWidth: "1100px", margin: "0 auto", display: "flex", flexDirection: "column", gap: isMobile ? "16px" : "24px" }}>
         {/* 수동 배분 모달 */}
         {pendingBot && (
           <div style={{
