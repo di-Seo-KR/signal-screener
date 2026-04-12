@@ -6829,6 +6829,7 @@ function AppInner() {
         @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
         @keyframes streakPulse { 0%,100%{box-shadow:0 0 12px rgba(255,107,53,0.3)} 50%{box-shadow:0 0 24px rgba(255,107,53,0.6)} }
+        @keyframes fabPulse { 0%,100%{box-shadow:0 4px 20px rgba(59,130,246,0.4)} 50%{box-shadow:0 4px 28px rgba(59,130,246,0.7)} }
         @keyframes toastSlideIn { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
         /* 모바일 앱처럼 전체 화면 확대/축소 방지 */
         html, body { touch-action: manipulation; -ms-touch-action: manipulation; }
@@ -7261,6 +7262,40 @@ function AppInner() {
                 </div>
               );
             })()}
+
+            {/* ── 비로그인 유저 웰컴 배너 — 가입 유도 */}
+            {!user && (
+              <div style={{
+                background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.purpleBg} 50%, ${C.blueBg} 100%)`,
+                borderRadius: "20px", padding: isMobile ? "20px" : "28px 32px",
+                border: `1px solid ${C.purple}20`,
+                boxShadow: `0 4px 24px rgba(155,111,255,0.12)`,
+                position: "relative", overflow: "hidden",
+              }}>
+                <div style={{ position: "absolute", top: "-30px", right: "-20px", fontSize: "100px", opacity: 0.06 }}>🚀</div>
+                <h2 style={{ fontSize: isMobile ? "20px" : "24px", fontWeight: 900, color: C.text1, marginBottom: "8px" }}>
+                  AI가 찾아주는 최적의 매수 타점
+                </h2>
+                <p style={{ fontSize: "15px", color: C.text2, marginBottom: "16px", lineHeight: 1.5 }}>
+                  33개 퀀트 전략으로 주식·코인을 자동 분석합니다. 무료로 시작하세요.
+                </p>
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                  <button onClick={() => setShowAuthModal(true)} style={{
+                    padding: "12px 28px", borderRadius: "14px", fontSize: "15px", fontWeight: 800,
+                    background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`,
+                    color: "#fff", border: "none", cursor: "pointer",
+                    boxShadow: `0 4px 16px ${C.blue}30`,
+                    transition: "all 0.2s",
+                  }}>무료 가입하기</button>
+                  <button onClick={() => setTab("screener")} style={{
+                    padding: "12px 28px", borderRadius: "14px", fontSize: "15px", fontWeight: 700,
+                    background: `${C.card2}`, color: C.text2,
+                    border: `1px solid ${C.border}`,
+                    cursor: "pointer", transition: "all 0.2s",
+                  }}>둘러보기</button>
+                </div>
+              </div>
+            )}
 
             {/* ── 모바일 빠른 접근 버튼 ─── */}
             {isMobile && (
@@ -8793,6 +8828,40 @@ function AppInner() {
 
             {/* 쿠팡 검색 위젯 — 홈 하단 */}
             <CoupangSearchWidget style={{ margin: "12px 0" }} />
+
+            {/* ── 푸터 ── */}
+            <div style={{
+              marginTop: "32px", paddingTop: "24px",
+              borderTop: `1px solid ${C.border}20`,
+              display: "flex", flexWrap: "wrap", justifyContent: "center",
+              gap: "16px", fontSize: "13px", color: C.text3,
+            }}>
+              <span onClick={() => setTab("about")} style={{ cursor: "pointer", transition: "color .15s" }}
+                onMouseEnter={e => e.target.style.color = C.text2}
+                onMouseLeave={e => e.target.style.color = C.text3}
+              >서비스 소개</span>
+              <span>·</span>
+              <span onClick={() => setTab("privacy")} style={{ cursor: "pointer", transition: "color .15s" }}
+                onMouseEnter={e => e.target.style.color = C.text2}
+                onMouseLeave={e => e.target.style.color = C.text3}
+              >개인정보처리방침</span>
+              <span>·</span>
+              <span onClick={() => setTab("terms")} style={{ cursor: "pointer", transition: "color .15s" }}
+                onMouseEnter={e => e.target.style.color = C.text2}
+                onMouseLeave={e => e.target.style.color = C.text3}
+              >이용약관</span>
+              <span>·</span>
+              <span onClick={() => setTab("contact")} style={{ cursor: "pointer", transition: "color .15s" }}
+                onMouseEnter={e => e.target.style.color = C.text2}
+                onMouseLeave={e => e.target.style.color = C.text3}
+              >문의하기</span>
+            </div>
+            <div style={{
+              textAlign: "center", fontSize: "12px", color: C.text3,
+              paddingTop: "12px", paddingBottom: "20px", opacity: 0.6,
+            }}>
+              © 2026 Zepta. All rights reserved.
+            </div>
           </div>
         )}
 
@@ -9271,44 +9340,47 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "anomaly" && (
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            {/* 헤더 */}
+            {/* 헤더 — 긴급 이상 탐지 분위기 강화 */}
             <div style={{
-              background: `linear-gradient(135deg, ${C.card} 0%, ${C.purpleBg} 100%)`,
-              borderRadius: "18px", padding: isMobile ? "18px 16px" : "22px 24px", border: `1px solid ${C.purple}18`,
+              background: `linear-gradient(135deg, ${C.redBg} 0%, ${C.yellowBg} 50%, ${C.card} 100%)`,
+              borderRadius: "24px", padding: isMobile ? "24px 18px" : "28px 28px", border: `1px solid ${C.red}30`,
+              boxShadow: `0 4px 20px rgba(255,77,100,0.12)`,
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px" }}>
-                <div style={{ width: "42px", height: "42px", borderRadius: "14px",
-                  background: `linear-gradient(135deg, ${C.purple}, ${C.blue})`,
-                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px"
-                }}>⚡</div>
+                <div style={{ width: "48px", height: "48px", borderRadius: "14px",
+                  background: `linear-gradient(135deg, ${C.red}, ${C.yellow})`,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px"
+                }}>⚠️</div>
                 <div>
-                  <h2 style={{ margin: 0, fontSize: isMobile ? mf(18) : "20px", fontWeight: 800, color: C.text1 }}>{t("tabs.home.anomalyDetection")}</h2>
+                  <h2 style={{ margin: 0, fontSize: isMobile ? mf(20) : "24px", fontWeight: 800, color: C.text1 }}>{t("tabs.home.anomalyDetection")}</h2>
                   <div style={{ fontSize: "16px", color: C.text3, marginTop: "2px" }}>
                     통계적 이상치 기반 실시간 시장 모니터링
                   </div>
                 </div>
                 <div style={{ marginLeft: "auto", textAlign: "right" }}>
                   <div style={{
-                    fontSize: "28px", fontWeight: 800,
+                    fontSize: "32px", fontWeight: 800,
                     color: anomalies.length > 0 ? C.red : C.green,
                   }}>{anomalies.length}</div>
                   <div style={{ fontSize: "16px", color: C.text3 }}>감지됨</div>
                 </div>
               </div>
 
-              {/* 통계 요약 3칸 */}
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: "10px" }}>
+              {/* 통계 요약 3칸 — 대형화 및 색상 강화 */}
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: "12px" }}>
                 {[
                   { label: "급등", value: anomalies.filter(a => a.anomalyType === "surge").length, icon: "🚀", color: C.green },
                   { label: "급락", value: anomalies.filter(a => a.anomalyType === "crash").length, icon: "💥", color: C.red },
                   { label: "고위험", value: anomalies.filter(a => a.severity === "high").length, icon: "🔴", color: C.yellow },
                 ].map((s, i) => (
                   <div key={i} style={{
-                    background: `${C.card}90`, borderRadius: "12px", padding: "12px",
-                    textAlign: "center", border: `1px solid ${C.border}40`,
+                    background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
+                    borderRadius: "16px", padding: "14px",
+                    textAlign: "center", border: `1px solid ${C.border}60`,
+                    boxShadow: `0 2px 12px rgba(0,0,0,0.2)`,
                   }}>
-                    <div style={{ fontSize: "18px", marginBottom: "4px" }}>{s.icon}</div>
-                    <div style={{ fontSize: "20px", fontWeight: 800, color: s.color }}>{s.value}</div>
+                    <div style={{ fontSize: "22px", marginBottom: "6px" }}>{s.icon}</div>
+                    <div style={{ fontSize: "24px", fontWeight: 800, color: s.color }}>{s.value}</div>
                     <div style={{ fontSize: "16px", color: C.text3 }}>{s.label}</div>
                   </div>
                 ))}
@@ -9374,9 +9446,11 @@ function AppInner() {
                     const accentColor = isSurge ? C.green : C.red;
                     return (
                       <div key={`${a.symbol}-${i}`} style={{
-                        background: C.card, borderRadius: "16px",
-                        padding: isMobile ? "14px" : "18px 20px", border: `1px solid ${accentColor}20`,
+                        background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
+                        borderRadius: "14px", borderLeft: `4px solid ${accentColor}`,
+                        padding: isMobile ? "14px" : "18px 20px", border: `1px solid ${accentColor}40`,
                         cursor: "pointer", transition: "all .2s",
+                        boxShadow: `0 2px 8px rgba(0,0,0,0.15)`,
                       }}
                       onClick={() => setChartAsset(a)}
                       onMouseEnter={e => { e.currentTarget.style.borderColor = `${accentColor}50`; e.currentTarget.style.transform = "translateY(-1px)"; }}
@@ -9528,7 +9602,12 @@ function AppInner() {
             TAB: 전략
         ═══════════════════════════════════════════════════════════ */}
         {tab === "strategy" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div style={{
+            background: `linear-gradient(135deg, ${C.purpleBg} 0%, ${C.card} 100%)`,
+            borderRadius: "24px", padding: "24px",
+            boxShadow: `0 4px 20px rgba(155,111,255,0.08)`,
+            display: "flex", flexDirection: "column", gap: "12px"
+          }}>
             <StrategyPanel onRunBacktest={(strategy, symbol) => {
               setBtStrategy(strategy); setBtSymbol(symbol); setTab("backtest"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); };
             }} />
@@ -9539,7 +9618,12 @@ function AppInner() {
             TAB: 전략 운용 (퀀트 포트폴리오)
         ═══════════════════════════════════════════════════════════ */}
         {tab === "quant-port" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div style={{
+            background: `linear-gradient(135deg, ${C.purpleBg} 0%, ${C.blueBg} 100%)`,
+            borderRadius: "24px", padding: "24px",
+            boxShadow: `0 4px 20px rgba(155,111,255,0.08)`,
+            display: "flex", flexDirection: "column", gap: "12px"
+          }}>
             <QuantPortfolio theme={themeMode} />
           </div>
         )}
@@ -9548,7 +9632,12 @@ function AppInner() {
             TAB: 리스크 히트맵
         ═══════════════════════════════════════════════════════════ */}
         {tab === "risk-map" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <div style={{
+            background: `linear-gradient(135deg, ${C.redBg} 0%, ${C.card} 100%)`,
+            borderRadius: "24px", padding: "24px",
+            boxShadow: `0 4px 20px rgba(255,77,100,0.08)`,
+            display: "flex", flexDirection: "column", gap: "12px"
+          }}>
             <RiskHeatmap marketIndices={marketIndices} fearGreed={fearGreed} />
           </div>
         )}
@@ -10007,7 +10096,15 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 백테스트
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "backtest" && <BacktestPanel initialStrategy={btStrategy} initialSymbol={btSymbol} />}
+        {tab === "backtest" && (
+          <div style={{
+            background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.card} 100%)`,
+            borderRadius: "24px", padding: "24px",
+            boxShadow: `0 4px 20px rgba(59,130,246,0.08)`,
+          }}>
+            <BacktestPanel initialStrategy={btStrategy} initialSymbol={btSymbol} />
+          </div>
+        )}
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 뉴스
@@ -10216,12 +10313,38 @@ function AppInner() {
 
           return (
             <div className="tab-content">
+              {/* 경제 캘린더 히어로 헤더 — 극적인 그라데이션 */}
+              <div style={{
+                background: `linear-gradient(135deg, ${C.yellowBg} 0%, ${C.card} 100%)`,
+                borderRadius: "24px",
+                padding: "28px",
+                marginBottom: "20px",
+                boxShadow: `0 4px 20px rgba(255,176,32,0.08)`,
+              }}>
+                <div style={{
+                  fontWeight: 900,
+                  fontSize: "28px",
+                  color: C.text1,
+                  marginBottom: "8px",
+                }}>📅 경제 캘린더</div>
+                <div style={{
+                  fontSize: "16px",
+                  color: C.text2,
+                }}>세계 주요 경제 지표와 이벤트를 한눈에 파악하세요</div>
+              </div>
+
               <div className="grid gap-5 grid-cols-1 lg:grid-cols-[280px_1fr] items-start">
 
                 {/* ── 좌측: 미니 캘린더 + AI 요약 ── */}
                 <div className="flex flex-col gap-4 lg:sticky lg:top-20">
                   {/* 미니 캘린더 */}
-                  <div style={{ background: C.card, border: `1px solid ${C.border}20` }} className="rounded-[16px] p-5">
+                  <div style={{
+                    background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
+                    border: `1px solid ${C.border}20`,
+                    borderRadius: "16px",
+                    padding: "5",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                  }} className="rounded-[16px] p-5">
                     <div className="flex items-center justify-between mb-4">
                       <button onClick={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y-1); } else setCalMonth(m => m-1); }}
                         className="bg-transparent border-none text-lg cursor-pointer p-1" style={{color: C.text2}}>‹</button>
@@ -10345,13 +10468,15 @@ function AppInner() {
 
                 {/* ── 우측: 이벤트 목록 ── */}
                 <div>
-                  {/* 필터 탭 — 모바일에서 수평 스크롤 가능 */}
+                  {/* 필터 탭 — 모바일에서 수평 스크롤 가능 | 극적인 디자인 강화 */}
                   <div className={`flex gap-1.5 mb-5 ${isMobile ? "hscroll overflow-x-auto" : "flex-wrap"}`} style={{ WebkitOverflowScrolling: "touch" }}>
                     {calFilterTabs.map(ft => (
                       <button key={ft.key} onClick={() => setEconFilter(ft.key)} className="px-4 py-2 rounded-[10px] text-base font-semibold cursor-pointer transition-all flex-shrink-0" style={{
-                        background: econFilter === ft.key ? C.blueBg : C.card,
-                        color: econFilter === ft.key ? C.blue : C.text2,
-                        border: `1px solid ${econFilter === ft.key ? C.blue + "44" : C.border + "30"}`,
+                        background: econFilter === ft.key ? C.yellow : C.card2,
+                        color: econFilter === ft.key ? "#000" : C.text2,
+                        border: `1px solid ${econFilter === ft.key ? C.yellow : C.border + "20"}`,
+                        boxShadow: econFilter === ft.key ? `0 2px 12px ${C.yellow}40` : "none",
+                        fontWeight: econFilter === ft.key ? 800 : 600,
                       }}>{ft.label}</button>
                     ))}
                   </div>
@@ -10480,8 +10605,35 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "alerts" && (
           <div className="tab-content">
+            {/* 알림 히어로 헤더 — 극적인 그라데이션과 섀도우 */}
+            <div style={{
+              background: `linear-gradient(135deg, ${C.redBg} 0%, ${C.card} 100%)`,
+              borderRadius: "24px",
+              padding: "28px",
+              marginBottom: "20px",
+              boxShadow: `0 4px 20px rgba(255,77,100,0.08)`,
+            }}>
+              <div style={{
+                fontWeight: 900,
+                fontSize: "28px",
+                color: C.text1,
+                marginBottom: "8px",
+              }}>🚨 실시간 매매 알림</div>
+              <div style={{
+                fontSize: "16px",
+                color: C.text2,
+              }}>33개 퀀트 전략의 시그널을 실시간으로 감지합니다</div>
+            </div>
+
             {/* ── 전략 매매 알림 피드 ── */}
-            <div style={{ background: C.card, border: `1px solid ${C.border}20` }} className="rounded-[18px] p-6 mb-3">
+            <div style={{
+              background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
+              border: `1px solid ${C.border}20`,
+              borderRadius: "18px",
+              padding: "24px",
+              marginBottom: "20px",
+              boxShadow: "0 2px 12px rgba(0,0,0,0.2)",
+            }} className="rounded-[18px]">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <div className="font-bold text-lg">🚨 전략 매매 알림</div>
@@ -10545,8 +10697,26 @@ function AppInner() {
                         });
                       }
                     }} style={{
-                      padding: "8px 16px", borderRadius: "8px", fontSize: "16px", fontWeight: 700, cursor: "pointer",
-                      background: C.blue, color: "#fff", border: "none", whiteSpace: "nowrap", minHeight: "44px",
+                      padding: "10px 20px",
+                      borderRadius: "14px",
+                      fontSize: "16px",
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`,
+                      color: "#fff",
+                      border: "none",
+                      whiteSpace: "nowrap",
+                      minHeight: "44px",
+                      boxShadow: `0 4px 16px ${C.blue}30`,
+                      transition: "all .2s",
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.boxShadow = `0 6px 20px ${C.blue}40`;
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.boxShadow = `0 4px 16px ${C.blue}30`;
+                      e.currentTarget.style.transform = "translateY(0)";
                     }}>알림 허용</button>
                   )}
                   {notiPerm === "granted" && (
@@ -10673,13 +10843,24 @@ function AppInner() {
                         const asset = ALL_ASSETS.find(a => a.symbol === alert.symbol || a.symbolRaw === alert.symbolRaw);
                         if (asset) { setSelectedAsset(asset); setTab("screener"); }
                       }} style={{
-                        background: C.card2, borderRadius: "12px", padding: "14px",
+                        background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
+                        borderRadius: "14px",
+                        padding: "16px",
                         borderLeft: `3px solid ${isBuy ? C.green : C.red}`,
-                        cursor: "pointer", transition: "all .15s",
-                        opacity: alert.read ? 0.7 : 1, minHeight: "44px",
+                        cursor: "pointer",
+                        transition: "all .2s",
+                        opacity: alert.read ? 0.7 : 1,
+                        minHeight: "44px",
+                        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                       }}
-                      onMouseEnter={e => e.currentTarget.style.background = C.border}
-                      onMouseLeave={e => e.currentTarget.style.background = C.card2}>
+                      onMouseEnter={e => {
+                        e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.2)";
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.15)";
+                        e.currentTarget.style.transform = "translateY(0)";
+                      }}>
                         {/* 상단: 전략명 + 시간 */}
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
@@ -10813,8 +10994,28 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "sentiment" && (
           <div className="tab-content">
-            {/* 헤더 */}
-            <div style={{background:`linear-gradient(135deg, ${C.card} 0%, ${C.isDark ? "#0D1B2A" : "#EDE7F6"} 100%)`,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:"22px 24px",marginBottom:"12px"}}>
+            {/* 센티먼트 히어로 헤더 — 극적인 그라데이션과 섀도우 */}
+            <div style={{
+              background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.purpleBg} 100%)`,
+              borderRadius: "24px",
+              padding: "28px",
+              marginBottom: "20px",
+              boxShadow: `0 4px 20px rgba(59,130,246,0.08)`,
+            }}>
+              <div style={{
+                fontWeight: 900,
+                fontSize: "28px",
+                color: C.text1,
+                marginBottom: "8px",
+              }}>💬 소셜 센티먼트 분석</div>
+              <div style={{
+                fontSize: "16px",
+                color: C.text2,
+              }}>StockTwits · Reddit(WSB) 기반 실시간 투자 심리</div>
+            </div>
+
+            {/* 검색 헤더 */}
+            <div style={{background:`linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:"22px 24px",marginBottom:"12px",boxShadow:"0 2px 12px rgba(0,0,0,0.2)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"12px"}}>
                 <div>
                   <div style={{fontWeight:800,fontSize:"17px",marginBottom:"4px",color:C.text1}}>{t("sentiment.title")}</div>
@@ -10852,15 +11053,30 @@ function AppInner() {
             )}
 
             {!sentimentLoading && sentimentData && (<>
-              {/* 종합 센티먼트 게이지 */}
+              {/* 종합 센티먼트 게이지 — 극적인 디자인 */}
               {sentimentData.sentiment && (
-                <div style={{background:C.card,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:"24px",marginBottom:"12px",textAlign:"center",maxWidth:"800px",margin:"0 auto 12px"}}>
-                  <div style={{fontSize:"16px",color:C.text3,marginBottom:"8px",fontWeight:600}}>
+                <div style={{
+                  background:`linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
+                  border:`1px solid ${C.border}20`,
+                  borderRadius:"18px",
+                  padding:"28px",
+                  marginBottom:"12px",
+                  textAlign:"center",
+                  maxWidth:"800px",
+                  margin:"0 auto 12px",
+                  boxShadow:"0 4px 20px rgba(0,0,0,0.2)",
+                }}>
+                  <div style={{fontSize:"16px",color:C.text3,marginBottom:"12px",fontWeight:600}}>
                     {sentimentData.symbol} 종합 센티먼트
                   </div>
-                  <div style={{fontSize:isMobile?"36px":"48px",fontWeight:900,color:
-                    sentimentData.sentiment.score>=60?C.green:sentimentData.sentiment.score>=40?C.yellow:C.red,
-                    letterSpacing:"-2px",marginBottom:"4px"}}>
+                  <div style={{
+                    fontSize:isMobile?"36px":"48px",
+                    fontWeight:900,
+                    color: sentimentData.sentiment.score>=60?C.green:sentimentData.sentiment.score>=40?C.yellow:C.red,
+                    letterSpacing:"-2px",
+                    marginBottom:"8px",
+                    textShadow: `0 0 20px ${sentimentData.sentiment.score>=60?C.green:sentimentData.sentiment.score>=40?C.yellow:C.red}40`,
+                  }}>
                     {sentimentData.sentiment.score}
                   </div>
                   <div style={{fontSize:"18px",fontWeight:700,color:
@@ -10881,10 +11097,26 @@ function AppInner() {
                 </div>
               )}
 
-              {/* 소스별 상세 */}
+              {/* 소스별 상세 — 극적인 카드 디자인 */}
               <div style={{maxWidth:"800px",margin:"0 auto"}}>
               {sentimentData.sources?.map((src,i)=>(
-                <div key={i} style={{background:C.card,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:isMobile?"14px":"22px 24px",marginBottom:"12px"}}>
+                <div key={i} style={{
+                  background:`linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
+                  border:`1px solid ${C.border}20`,
+                  borderRadius:"16px",
+                  padding:isMobile?"16px":"22px 24px",
+                  marginBottom:"12px",
+                  boxShadow:"0 2px 12px rgba(0,0,0,0.2)",
+                  transition:"all .2s",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.25)";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.2)";
+                  e.currentTarget.style.transform = "translateY(0)";
+                }}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
                     <div style={{fontWeight:700,fontSize:"15px"}}>{src.name}</div>
                     <span style={{fontSize:"14px",color:C.text3}}>{src.total}개 포스트 분석</span>
@@ -10922,9 +11154,17 @@ function AppInner() {
               ))}
               </div>
 
-              {/* 트렌딩 심볼 */}
+              {/* 트렌딩 심볼 — 극적한 카드 */}
               {sentimentData.trending?.length > 0 && (
-                <div style={{background:C.card,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:"22px 24px",maxWidth:"800px",margin:"0 auto"}}>
+                <div style={{
+                  background:`linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
+                  border:`1px solid ${C.border}20`,
+                  borderRadius:"16px",
+                  padding:"22px 24px",
+                  maxWidth:"800px",
+                  margin:"0 auto",
+                  boxShadow:"0 2px 12px rgba(0,0,0,0.2)",
+                }}>
                   <div style={{fontWeight:700,fontSize:"17px",marginBottom:"12px"}}>트렌딩 심볼</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
                     {sentimentData.trending.map((t,i)=>(
@@ -11174,47 +11414,121 @@ function AppInner() {
             정적 콘텐츠 페이지 (AdSense 승인용)
         ═══════════════════════════════════════════════════════════ */}
         {tab === "about" && (
-          <div className="tab-content" style={{ maxWidth: "800px", margin: "0 auto", padding: isMobile ? "16px" : "32px 40px", lineHeight: 1.7, color: C.text2 }}>
-            <h1 style={{ fontSize: isMobile ? "24px" : "28px", fontWeight: 800, color: C.text1, marginBottom: "24px" }}>Zepta 소개</h1>
-            <section style={{ marginBottom: "32px" }}>
-              <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>서비스 개요</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "14px", lineHeight: 1.7 }}>
-                Zepta는 개인 투자자를 위한 종합 투자 정보 플랫폼입니다. 미국 주식과 글로벌 암호화폐 시장을 아우르는 실시간 데이터 분석, AI 기반 퀀트 전략, 자동매매 시스템을 제공하여 데이터 기반의 합리적인 투자 의사결정을 지원합니다.
+          <div className="tab-content">
+            {/* ── 히어로 섹션 ── */}
+            <div style={{
+              background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.purpleBg} 100%)`,
+              borderRadius: "24px", padding: isMobile ? "32px 20px" : "48px 40px",
+              marginBottom: "32px", textAlign: "center",
+              border: `1px solid ${C.purple}20`,
+              boxShadow: `0 8px 32px rgba(155,111,255,0.15)`,
+            }}>
+              <h1 style={{
+                fontSize: isMobile ? "28px" : "36px", fontWeight: 900, color: C.text1,
+                marginBottom: "12px", letterSpacing: "-1px"
+              }}>AI가 만드는 투자의 미래</h1>
+              <p style={{
+                fontSize: isMobile ? "15px" : "18px", color: C.text2,
+                marginBottom: "0", lineHeight: 1.6, maxWidth: "600px", margin: "0 auto"
+              }}>
+                33개 퀀트 전략으로 24/7 자동 분석하고, 최적의 매수 타점을 찾아줍니다.
               </p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "14px", lineHeight: 1.7 }}>
-                기존 금융 서비스의 복잡하고 전문가 중심적인 인터페이스에서 벗어나, 투자 초보자부터 전문 트레이더까지 누구나 쉽게 사용할 수 있는 직관적인 경험을 제공하는 것이 Zepta의 핵심 가치입니다.
-              </p>
-            </section>
-            <section style={{ marginBottom: "32px" }}>
-              <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>주요 기능</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}>
-                <strong style={{ color: C.text1 }}>실시간 시장 모니터링</strong> — S&P 500, 나스닥, 다우존스 등 주요 지수와 개별 종목의 실시간 시세를 한눈에 확인할 수 있습니다. 글로벌 암호화폐 시장의 가격 변동도 실시간으로 추적합니다.
-              </p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}>
-                <strong style={{ color: C.text1 }}>AI 퀀트 자동매매</strong> — 멀티팩터 시그널 분석(RSI, MACD, 볼린저밴드, Hurst 지수, 효율성 비율 등)을 기반으로 매수/매도 시점을 자동으로 판단합니다. 사용자는 투자 성향에 맞는 봇을 선택하여 자동매매를 운영할 수 있습니다.
-              </p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}>
-                <strong style={{ color: C.text1 }}>종목 스크리너</strong> — 기술적 분석 지표와 펀더멘털 데이터를 조합하여 투자 기회를 탐색합니다. 섹터별 자금 흐름, 이상 탐지, 시장 심리 분석 등 다양한 관점에서 시장을 분석할 수 있습니다.
-              </p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}>
-                <strong style={{ color: C.text1 }}>포트폴리오 관리</strong> — 보유 자산의 수익률, 배분 비율, 리스크 지표(DD, MDD, VaR)를 실시간으로 모니터링하여 체계적인 자산 관리를 지원합니다.
-              </p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}>
-                <strong style={{ color: C.text1 }}>경제 캘린더 및 뉴스</strong> — FOMC, CPI, 고용지표 등 주요 경제 이벤트 일정과 실시간 금융 뉴스를 통해 시장에 영향을 미치는 정보를 빠르게 파악할 수 있습니다.
-              </p>
-            </section>
-            <section style={{ marginBottom: "32px" }}>
-              <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>운영 정보</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "8px" }}>운영자: 서동인</p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "8px" }}>이메일: donginseo0421@gmail.com</p>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "8px" }}>서비스 URL: zepta.vercel.app</p>
-            </section>
-            <section>
-              <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>면책 조항</h2>
-              <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>
-                Zepta에서 제공하는 모든 정보와 분석은 투자 참고 자료로만 활용되어야 하며, 특정 금융 상품의 매수 또는 매도를 권유하지 않습니다. 모든 투자의 판단과 책임은 이용자 본인에게 있으며, Zepta는 투자 결과에 대한 법적 책임을 지지 않습니다. 자동매매 기능을 통해 실제 자금이 거래됩니다. 투자 손실 위험이 있으므로 신중히 이용해주세요.
-              </p>
-            </section>
+            </div>
+
+            {/* ── 핵심 기능 카드 그리드 ── */}
+            <div style={{ marginBottom: "40px" }}>
+              <h2 style={{
+                fontSize: isMobile ? "22px" : "26px", fontWeight: 800, color: C.text1,
+                marginBottom: "24px", textAlign: "center"
+              }}>Zepta의 핵심 기능</h2>
+              <div style={{
+                display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+                gap: "16px", marginBottom: "24px"
+              }}>
+                {[
+                  { icon: "🤖", title: "AI 퀀트 자동매매", desc: "33개 알파 전략으로 24/7 자동 매매" },
+                  { icon: "📊", title: "실시간 스크리너", desc: "수백 개 지표로 매수 타점 자동 탐색" },
+                  { icon: "🎯", title: "백테스트 엔진", desc: "과거 데이터로 전략 성과 검증" },
+                  { icon: "⚡", title: "이상 감지", desc: "통계적 이상치 실시간 모니터링" },
+                  { icon: "🌍", title: "글로벌 커버리지", desc: "미국·한국 주식 + 주요 암호화폐" },
+                  { icon: "🔒", title: "안전한 투자", desc: "리스크 관리 + 포트폴리오 최적화" },
+                ].map((f, i) => (
+                  <div key={i} style={{
+                    background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
+                    borderRadius: "16px", padding: "20px",
+                    border: `1px solid ${C.border}20`,
+                    boxShadow: `0 2px 12px rgba(0,0,0,${C.isDark ? 0.15 : 0.08})`,
+                    transition: "all 0.3s",
+                  }}
+                  onMouseEnter={e => {
+                    if (!isMobile) {
+                      e.currentTarget.style.transform = "translateY(-4px)";
+                      e.currentTarget.style.boxShadow = `0 8px 24px rgba(0,0,0,${C.isDark ? 0.25 : 0.12})`;
+                    }
+                  }}
+                  onMouseLeave={e => {
+                    if (!isMobile) {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = `0 2px 12px rgba(0,0,0,${C.isDark ? 0.15 : 0.08})`;
+                    }
+                  }}>
+                    <div style={{ fontSize: "32px", marginBottom: "12px" }}>{f.icon}</div>
+                    <h3 style={{ fontSize: "16px", fontWeight: 800, color: C.text1, marginBottom: "6px" }}>{f.title}</h3>
+                    <p style={{ fontSize: "13px", color: C.text3, lineHeight: 1.5, margin: 0 }}>{f.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── 서비스 개요 섹션 ── */}
+            <div style={{
+              maxWidth: "800px", margin: "0 auto",
+              padding: isMobile ? "16px" : "32px 40px",
+              lineHeight: 1.7, color: C.text2
+            }}>
+              <section style={{ marginBottom: "32px" }}>
+                <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>서비스 개요</h2>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "14px", lineHeight: 1.7 }}>
+                  Zepta는 개인 투자자를 위한 종합 투자 정보 플랫폼입니다. 미국 주식과 글로벌 암호화폐 시장을 아우르는 실시간 데이터 분석, AI 기반 퀀트 전략, 자동매매 시스템을 제공하여 데이터 기반의 합리적인 투자 의사결정을 지원합니다.
+                </p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "14px", lineHeight: 1.7 }}>
+                  기존 금융 서비스의 복잡하고 전문가 중심적인 인터페이스에서 벗어나, 투자 초보자부터 전문 트레이더까지 누구나 쉽게 사용할 수 있는 직관적인 경험을 제공하는 것이 Zepta의 핵심 가치입니다.
+                </p>
+              </section>
+
+              <section style={{ marginBottom: "32px" }}>
+                <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>주요 기능 상세</h2>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}>
+                  <strong style={{ color: C.text1 }}>실시간 시장 모니터링</strong> — S&P 500, 나스닥, 다우존스 등 주요 지수와 개별 종목의 실시간 시세를 한눈에 확인할 수 있습니다. 글로벌 암호화폐 시장의 가격 변동도 실시간으로 추적합니다.
+                </p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}>
+                  <strong style={{ color: C.text1 }}>AI 퀀트 자동매매</strong> — 멀티팩터 시그널 분석(RSI, MACD, 볼린저밴드, Hurst 지수, 효율성 비율 등)을 기반으로 매수/매도 시점을 자동으로 판단합니다. 사용자는 투자 성향에 맞는 봇을 선택하여 자동매매를 운영할 수 있습니다.
+                </p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}>
+                  <strong style={{ color: C.text1 }}>종목 스크리너</strong> — 기술적 분석 지표와 펀더멘털 데이터를 조합하여 투자 기회를 탐색합니다. 섹터별 자금 흐름, 이상 탐지, 시장 심리 분석 등 다양한 관점에서 시장을 분석할 수 있습니다.
+                </p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}>
+                  <strong style={{ color: C.text1 }}>포트폴리오 관리</strong> — 보유 자산의 수익률, 배분 비율, 리스크 지표(DD, MDD, VaR)를 실시간으로 모니터링하여 체계적인 자산 관리를 지원합니다.
+                </p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "10px", lineHeight: 1.7 }}>
+                  <strong style={{ color: C.text1 }}>경제 캘린더 및 뉴스</strong> — FOMC, CPI, 고용지표 등 주요 경제 이벤트 일정과 실시간 금융 뉴스를 통해 시장에 영향을 미치는 정보를 빠르게 파악할 수 있습니다.
+                </p>
+              </section>
+
+              <section style={{ marginBottom: "32px" }}>
+                <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>운영 정보</h2>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "8px" }}>운영자: 서동인</p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "8px" }}>이메일: donginseo0421@gmail.com</p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "8px" }}>서비스 URL: zepta.vercel.app</p>
+              </section>
+
+              <section>
+                <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>면책 조항</h2>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7 }}>
+                  Zepta에서 제공하는 모든 정보와 분석은 투자 참고 자료로만 활용되어야 하며, 특정 금융 상품의 매수 또는 매도를 권유하지 않습니다. 모든 투자의 판단과 책임은 이용자 본인에게 있으며, Zepta는 투자 결과에 대한 법적 책임을 지지 않습니다. 자동매매 기능을 통해 실제 자금이 거래됩니다. 투자 손실 위험이 있으므로 신중히 이용해주세요.
+                </p>
+              </section>
+            </div>
           </div>
         )}
 
@@ -11460,6 +11774,7 @@ function AppInner() {
         boxShadow: "0 4px 20px rgba(59,130,246,0.4)",
         zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center",
         transition: "transform .2s, box-shadow .2s",
+        animation: aiChatOpen ? "none" : "fabPulse 2s ease-in-out infinite",
       }}
       onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.boxShadow = "0 6px 28px rgba(59,130,246,0.5)"; }}
       onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(59,130,246,0.4)"; }}>
