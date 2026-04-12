@@ -12046,7 +12046,7 @@ function AppInner() {
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           style={{
             position: "fixed",
-            bottom: isMobile ? "140px" : "100px",
+            bottom: isMobile ? "100px" : "100px",
             right: isMobile ? "16px" : "28px",
             width: "44px",
             height: "44px",
@@ -12072,9 +12072,72 @@ function AppInner() {
         </button>
       )}
 
+      {/* ═══ 모바일 하단 탭 네비게이션 바 ═══ */}
+      {isMobile && (
+        <nav style={{
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: "56px",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          background: `${C.bg}F5`,
+          backdropFilter: "blur(20px) saturate(180%)",
+          WebkitBackdropFilter: "blur(20px) saturate(180%)",
+          borderTop: `1px solid ${C.border}20`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-around",
+          zIndex: 10000,
+          boxShadow: `0 -2px 20px ${C.bg}60`,
+        }}>
+          {[
+            { id: "home", icon: "🏠", label: "홈" },
+            { id: "screener", icon: "🔍", label: "스크리너" },
+            { id: "auto-trading", icon: "🤖", label: "AI매매" },
+            { id: "portfolio", icon: "💼", label: "포트폴리오" },
+            { id: "more", icon: "☰", label: "더보기" },
+          ].map(item => {
+            const isActive = item.id === "more"
+              ? !["home","screener","auto-trading","portfolio"].includes(tab)
+              : tab === item.id;
+            return (
+              <button key={item.id} onClick={() => {
+                if (item.id === "more") {
+                  setTab("profile");
+                } else {
+                  setTab(item.id);
+                }
+              }} style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                gap: "2px",
+                padding: "6px 0",
+                background: "transparent",
+                border: "none",
+                cursor: "pointer",
+                color: isActive ? C.blue : C.text3,
+                transition: "color .2s",
+                position: "relative",
+              }}>
+                {isActive && <div style={{
+                  position: "absolute", top: "-1px", left: "50%", transform: "translateX(-50%)",
+                  width: "24px", height: "3px", borderRadius: "2px",
+                  background: C.blue,
+                }} />}
+                <span style={{ fontSize: "20px", lineHeight: 1 }}>{item.icon}</span>
+                <span style={{ fontSize: "10px", fontWeight: isActive ? 700 : 500, lineHeight: 1 }}>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
+
       {/* FAB 버튼 */}
       <button onClick={() => setAiChatOpen(!aiChatOpen)} style={{
-        position: "fixed", bottom: "28px", right: "28px",
+        position: "fixed", bottom: isMobile ? "84px" : "28px", right: isMobile ? "16px" : "28px",
         width: "56px", height: "56px", borderRadius: "16px", border: "none",
         background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`,
         color: "#fff", fontSize: "26px", cursor: "pointer",

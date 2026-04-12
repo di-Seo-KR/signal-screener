@@ -2,7 +2,7 @@
  * PortfolioTab — 포트폴리오 탭 컴포넌트
  * App.jsx에서 분리된 포트폴리오 관리 UI
  */
-import { memo } from "react";
+import { memo, useState, useEffect } from "react";
 import { useLanguage } from "@/i18n/LanguageContext";
 
 function SearchBarWrapper({ SearchBar, onSelect, placeholder }) {
@@ -27,6 +27,12 @@ export default memo(function PortfolioTab({
   setTab,
 }) {
   const { t } = useLanguage();
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth <= 640);
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
   return (
     <div className="tab-content">
       {/* 요약 헤더 */}
@@ -34,30 +40,36 @@ export default memo(function PortfolioTab({
         background: `linear-gradient(135deg, ${C.card}, #0d1f35)`,
         border: `1px solid ${C.border}20`,
       }}>
-        <div className={`flex justify-between items-center ${portfolio.length ? "mb-4" : ""}`}>
-          <div className="font-bold text-lg" style={{ color: C.text1 }}>{t("portfolio.myPortfolio")}</div>
-          <div className="flex gap-1.5 flex-wrap">
-            <button onClick={() => setCurrency(c => c === "USD" ? "KRW" : "USD")} className="rounded-lg px-2.5 py-1.5 text-base font-bold transition-all" style={{
+        <div className={`flex justify-between items-center ${portfolio.length ? "mb-4" : ""}`} style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? "12px" : "0" }}>
+          <div className="font-bold" style={{ color: C.text1, fontSize: isMobile ? "16px" : "18px" }}>{t("portfolio.myPortfolio")}</div>
+          <div className="flex gap-1.5 flex-wrap" style={{ width: isMobile ? "100%" : "auto", justifyContent: isMobile ? "stretch" : "flex-start" }}>
+            <button onClick={() => setCurrency(c => c === "USD" ? "KRW" : "USD")} className="rounded-lg px-2.5 font-bold transition-all" style={{
               background: C.card2, color: C.yellow, border: `1px solid ${C.yellow}44`,
+              minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "center",
+              flex: isMobile ? "1 1 calc(33.333% - 6px)" : "0 0 auto",
             }}>{currency === "USD" ? t("portfolio.currencyUSD") : t("portfolio.currencyKRW")}</button>
-            <button onClick={fetchPortfolioPrices} className="rounded-lg px-3 py-1.5 text-base font-semibold transition-all" style={{
+            <button onClick={fetchPortfolioPrices} className="rounded-lg px-3 font-semibold transition-all" style={{
               background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}44`,
+              minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "center",
+              flex: isMobile ? "1 1 calc(33.333% - 6px)" : "0 0 auto",
             }}>{portfolioLoading ? t("portfolio.refreshing") : t("portfolio.refreshBtn")}</button>
-            <button onClick={() => setShowAddAsset(true)} className="rounded-lg px-3.5 py-1.5 text-base font-bold transition-all" style={{
+            <button onClick={() => setShowAddAsset(true)} className="rounded-lg px-3.5 font-bold transition-all" style={{
               background: C.blue, color: "#fff", border: "none",
+              minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "center",
+              flex: isMobile ? "1 1 calc(33.333% - 6px)" : "0 0 auto",
             }}>+ {t("portfolio.addBtn")}</button>
           </div>
         </div>
         {portfolio.length > 0 && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? "8px" : "10px" }}>
             {[
               { label: t("portfolio.invested"), value: currency === "KRW" ? `₩${Math.round(pStats.invested * krwRate).toLocaleString()}` : `$${pStats.invested.toLocaleString(undefined, { maximumFractionDigits: 0 })}` },
               { label: t("portfolio.current"), value: pStats.hasPrices ? (currency === "KRW" ? `₩${Math.round(pStats.current * krwRate).toLocaleString()}` : `$${pStats.current.toLocaleString(undefined, { maximumFractionDigits: 0 })}`) : "—" },
               { label: t("portfolio.pnl"), value: pStats.hasPrices ? `${pStats.pnl >= 0 ? "+" : ""}${currency === "KRW" ? `₩${Math.round(Math.abs(pStats.pnl) * krwRate).toLocaleString()}` : `$${pStats.pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}` : "—", color: pStats.pnl >= 0 ? C.green : C.red },
             ].map(({ label, value, color }) => (
-              <div key={label} className="rounded-xl p-3.5" style={{ background: C.bg }}>
-                <div className="text-base mb-1" style={{ color: C.text3 }}>{label}</div>
-                <div className="font-bold text-lg" style={{ color: color || C.text1 }}>{value}</div>
+              <div key={label} className="rounded-xl" style={{ background: C.bg, padding: isMobile ? "10px 12px" : "14px" }}>
+                <div style={{ color: C.text3, marginBottom: "4px", fontSize: isMobile ? "12px" : "14px" }}>{label}</div>
+                <div className="font-bold" style={{ color: color || C.text1, fontSize: isMobile ? "14px" : "18px" }}>{value}</div>
               </div>
             ))}
           </div>
