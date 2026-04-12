@@ -6911,25 +6911,13 @@ function AppInner() {
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text1, fontFamily: "'Pretendard', 'Apple SD Gothic Neo', system-ui, sans-serif" }}>
-      <style>
-      @keyframes shimmer {
-        0% { background-position: -1000px 0; }
-        100% { background-position: 1000px 0; }
-      }
-      @keyframes livePulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-      }
-      @keyframes float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-8px); }
-      }
-{`
+      <style>{`
+        @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+        @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+        @keyframes float { 0%,100%{transform:translateY(0px)} 50%{transform:translateY(-8px)} }
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
-        @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.4} }
         @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
         @keyframes streakPulse { 0%,100%{box-shadow:0 0 12px rgba(255,107,53,0.3)} 50%{box-shadow:0 0 24px rgba(255,107,53,0.6)} }
         @keyframes fabPulse { 0%,100%{box-shadow:0 4px 20px rgba(59,130,246,0.4)} 50%{box-shadow:0 4px 28px rgba(59,130,246,0.7)} }
         @keyframes toastSlideIn { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
