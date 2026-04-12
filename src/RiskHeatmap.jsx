@@ -324,9 +324,9 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
       <div style={{ display: "flex", gap: isMobile ? "3px" : "4px", marginBottom: "12px", flexWrap: "wrap" }}>
         {[["dashboard", "대시보드"], ["matrix", "매트릭스"], ["history", "트렌드"]].map(([id, label]) => (
           <button key={id} onClick={() => setTab(id)} style={{
-            padding: isMobile ? "6px 10px" : "7px 14px", borderRadius: "8px", fontSize: isMobile ? "12px" : "14px", fontWeight: 600,
+            padding: isMobile ? "8px 12px" : "7px 14px", borderRadius: "8px", fontSize: isMobile ? "12px" : "14px", fontWeight: 600,
             background: tab === id ? C.blueBg : "transparent", color: tab === id ? C.blue : C.text3,
-            border: `1px solid ${tab === id ? C.blue : C.border2}`, cursor: "pointer", minHeight: isMobile ? "40px" : "auto",
+            border: `1px solid ${tab === id ? C.blue : C.border2}`, cursor: "pointer", minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "center",
           }}>{label}</button>
         ))}
       </div>

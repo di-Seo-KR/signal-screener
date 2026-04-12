@@ -948,7 +948,7 @@ export default function QuantPortfolio({ theme = "dark" }) {
       <div className="tab-content">
         <button onClick={() => { setSelectedStrategy(null); setDetailTab("overview"); }} style={{
           background: C.card2, border: `1px solid ${C.border}`, borderRadius: "10px",
-          padding: "8px 16px", fontSize: "15px", fontWeight: 600, color: C.text2, cursor: "pointer", marginBottom: "16px",
+          padding: isMobile ? "10px 12px" : "8px 16px", fontSize: isMobile ? "14px" : "15px", fontWeight: 600, color: C.text2, cursor: "pointer", marginBottom: "16px", minHeight: isMobile ? "44px" : "auto", display: "flex", alignItems: "center", justifyContent: "center",
         }}>← 전체 목록</button>
 
         {/* 헤더 */}
@@ -981,12 +981,12 @@ export default function QuantPortfolio({ theme = "dark" }) {
         </div>
 
         {/* 서브탭 */}
-        <div style={{ display: "flex", gap: isMobile ? "2px" : "4px", marginBottom: "12px", flexWrap: isMobile ? "wrap" : "nowrap" }}>
+        <div style={{ display: "flex", gap: isMobile ? "3px" : "4px", marginBottom: "12px", flexWrap: isMobile ? "wrap" : "nowrap" }}>
           {[["overview", "수익률"], ["trades", "매매기록"], ["rebalance", "리밸런싱"]].map(([id, label]) => (
             <button key={id} onClick={() => setDetailTab(id)} style={{
-              padding: isMobile ? "6px 10px" : "7px 14px", borderRadius: "8px", fontSize: isMobile ? "13px" : "14px", fontWeight: 600,
+              padding: isMobile ? "8px 12px" : "7px 14px", borderRadius: "8px", fontSize: isMobile ? "12px" : "14px", fontWeight: 600,
               background: detailTab === id ? C.blueBg : "transparent", color: detailTab === id ? C.blue : C.text3,
-              border: `1px solid ${detailTab === id ? C.blue : C.border2}`, cursor: "pointer", minHeight: isMobile ? "40px" : "auto", flex: isMobile ? "1" : "auto",
+              border: `1px solid ${detailTab === id ? C.blue : C.border2}`, cursor: "pointer", minHeight: "44px", flex: isMobile ? "1" : "auto", display: "flex", alignItems: "center", justifyContent: "center",
             }}>{label}</button>
           ))}
         </div>
@@ -1212,24 +1212,24 @@ export default function QuantPortfolio({ theme = "dark" }) {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: "6px", marginBottom: "12px", flexWrap: "wrap", alignItems: "center" }}>
+      <div style={{ display: "flex", gap: isMobile ? "4px" : "6px", marginBottom: "12px", flexWrap: "wrap", alignItems: "center" }}>
         <button onClick={() => setFilterCat("all")} style={{
-          padding: "6px 12px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
+          padding: isMobile ? "8px 10px" : "6px 12px", borderRadius: "8px", fontSize: isMobile ? "13px" : "14px", fontWeight: 600,
           background: filterCat === "all" ? C.blueBg : "transparent", color: filterCat === "all" ? C.blue : C.text3,
-          border: `1px solid ${filterCat === "all" ? C.blue : C.border2}`, cursor: "pointer",
+          border: `1px solid ${filterCat === "all" ? C.blue : C.border2}`, cursor: "pointer", minHeight: isMobile ? "40px" : "auto", display: "flex", alignItems: "center", justifyContent: "center",
         }}>전체</button>
         {categories.map(cat => (
           <button key={cat} onClick={() => setFilterCat(cat)} style={{
-            padding: "6px 12px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
+            padding: isMobile ? "8px 10px" : "6px 12px", borderRadius: "8px", fontSize: isMobile ? "13px" : "14px", fontWeight: 600,
             background: filterCat === cat ? (CAT_COLORS[cat] || C.blue) + "20" : "transparent",
             color: filterCat === cat ? (CAT_COLORS[cat] || C.blue) : C.text3,
-            border: `1px solid ${filterCat === cat ? (CAT_COLORS[cat] || C.blue) : C.border2}`, cursor: "pointer",
+            border: `1px solid ${filterCat === cat ? (CAT_COLORS[cat] || C.blue) : C.border2}`, cursor: "pointer", minHeight: isMobile ? "40px" : "auto", display: "flex", alignItems: "center", justifyContent: "center",
           }}>{cat}</button>
         ))}
         <div style={{ flex: 1 }} />
         <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{
-          padding: "6px 10px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
-          background: C.card2, color: C.text2, border: `1px solid ${C.border2}`,
+          padding: isMobile ? "8px 8px" : "6px 10px", borderRadius: "8px", fontSize: isMobile ? "13px" : "14px", fontWeight: 600,
+          background: C.card2, color: C.text2, border: `1px solid ${C.border2}`, minHeight: isMobile ? "40px" : "auto",
         }}>
           <option value="return">수익률순</option>
           <option value="sharpe">샤프비율순</option>
@@ -1237,11 +1237,11 @@ export default function QuantPortfolio({ theme = "dark" }) {
         </select>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "10px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(280px, 1fr))", gap: isMobile ? "8px" : "10px" }}>
         {filteredData.map((s, i) => (
           <div key={i} onClick={() => setSelectedStrategy(s)} style={{
             background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px",
-            padding: "16px", cursor: "pointer", transition: "all 0.2s",
+            padding: isMobile ? "12px" : "16px", cursor: "pointer", transition: "all 0.2s",
           }}
           onMouseEnter={e => e.currentTarget.style.borderColor = C.blue}
           onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
