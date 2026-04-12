@@ -4534,6 +4534,77 @@ function AppInner() {
   });
   const toggleSection = useCallback((key) => setHomeSection(p => ({ ...p, [key]: !p[key] })), []);
 
+  // ═══════════════════════════════════════════════════════════════
+  // 개인화 데이터 Supabase 동기화 시스템
+  // localStorage(즉시) + Supabase user_metadata(디바운스) 이중 저장
+  // 로그인 시 서버 데이터 우선 머지, 비로그인 시 localStorage만 사용
+  // ═══════════════════════════════════════════════════════════════
+  const userDataLoaded = useRef(false);
+  const userDataSaveTimer = useRef(null);
+
+  // 개인화 데이터 localStorage 읽기 헬퍼
+  const readUserLocal = useCallback((key, fallback = null) => {
+    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; } catch { return fallback; }
+  }, []);
+
+  // 개인화 데이터 localStorage 쓰기 + Supabase 동기화 헬퍼
+  const writeUserLocal = useCallback((key, value) => {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  }, []);
+
+  // Supabase에 개인화 데이터 통합 저장 (디바운스 500ms)
+  const syncUserDataToSupabase = useCallback(() => {
+    if (!user) return;
+    if (userDataSaveTimer.current) clearTimeout(userDataSaveTimer.current);
+    userDataSaveTimer.current = setTimeout(async () => {
+      try {
+        const todayKey = new Date().toISOString().slice(0, 10);
+        const payload = {
+          streak: readUserLocal("zepta:streak", {}),
+          daily_quest: readUserLocal("zepta:daily-quest", {}),
+          pred_stats: readUserLocal("zepta:pred:stats", { total: 0, correct: 0 }),
+          quiz_stats: readUserLocal("zepta:quiz:stats", { total: 0, correct: 0 }),
+          pred_today: readUserLocal(`zepta:pred:${todayKey}`, null),
+          quiz_today: readUserLocal(`zepta:quiz:${todayKey}`, null),
+          synced_at: new Date().toISOString(),
+        };
+        await supabase.auth.updateUser({ data: { user_data: payload } });
+      } catch (e) { console.warn("[Sync] Supabase 동기화 실패:", e); }
+    }, 500);
+  }, [user, readUserLocal]);
+
+  // 로그인 시 Supabase → localStorage 동기화 (서버 우선)
+  useEffect(() => {
+    if (!user || userDataLoaded.current) return;
+    (async () => {
+      try {
+        await supabase.auth.refreshSession();
+        const { data } = await supabase.auth.getUser();
+        const remote = data?.user?.user_metadata?.user_data;
+        if (remote && typeof remote === "object") {
+          const todayKey = new Date().toISOString().slice(0, 10);
+          // 서버 데이터가 있으면 localStorage에 머지 (서버 우선)
+          if (remote.streak) writeUserLocal("zepta:streak", remote.streak);
+          if (remote.daily_quest) writeUserLocal("zepta:daily-quest", remote.daily_quest);
+          if (remote.pred_stats) writeUserLocal("zepta:pred:stats", remote.pred_stats);
+          if (remote.quiz_stats) writeUserLocal("zepta:quiz:stats", remote.quiz_stats);
+          if (remote.pred_today) writeUserLocal(`zepta:pred:${todayKey}`, remote.pred_today);
+          if (remote.quiz_today) writeUserLocal(`zepta:quiz:${todayKey}`, remote.quiz_today);
+          // 상태 갱신
+          setPredictionState(remote.pred_today || null);
+          setQuizAnswered(remote.quiz_today || null);
+        } else {
+          // 서버에 데이터가 없으면 현재 localStorage를 서버에 업로드
+          syncUserDataToSupabase();
+        }
+      } catch (e) { console.warn("[Sync] 초기 동기화 실패:", e); }
+      userDataLoaded.current = true;
+    })();
+  }, [user, writeUserLocal, syncUserDataToSupabase]);
+
+  // 유저 변경 시 플래그 리셋
+  useEffect(() => { userDataLoaded.current = false; }, [user?.id]);
+
   // ── 스크롤 및 UX 상태 ──
   const [showScrollTop, setShowScrollTop] = useState(false);
 
@@ -4639,28 +4710,53 @@ function AppInner() {
   // 전략 알림 저장 (최대 100개 유지)
   useEffect(() => { try { localStorage.setItem("di_trade_alerts", JSON.stringify(tradeAlerts.slice(0, 100))); } catch {} }, [tradeAlerts]);
 
-  // 로그인/로그아웃 시 관심종목 재로드 (저장보다 먼저 선언)
+  // 로그인/로그아웃 시 관심종목 재로드 (Supabase 서버 우선 머지)
   const watchlistLoaded = useRef(false);
   useEffect(() => {
     if (watchlistKey) {
-      try {
-        const saved = JSON.parse(localStorage.getItem(watchlistKey) || "[]");
-        setWatchlist(saved);
-      } catch { setWatchlist([]); }
+      // 1) localStorage에서 먼저 로드
+      let local = [];
+      try { local = JSON.parse(localStorage.getItem(watchlistKey) || "[]"); } catch {}
+      setWatchlist(local);
+
+      // 2) Supabase에서 관심종목 복원 (서버 우선)
+      if (user) {
+        (async () => {
+          try {
+            const { data } = await supabase.auth.getUser();
+            const remote = data?.user?.user_metadata?.watchlist;
+            if (Array.isArray(remote) && remote.length > 0) {
+              setWatchlist(remote);
+              localStorage.setItem(watchlistKey, JSON.stringify(remote));
+            } else if (local.length > 0) {
+              // 서버에 없으면 로컬을 업로드
+              await supabase.auth.updateUser({ data: { watchlist: local } });
+            }
+          } catch {}
+        })();
+      }
     } else {
       setWatchlist([]);
     }
     // 로드 직후에는 저장 방지 (빈 배열이 기존 데이터를 덮어쓰는 것 방지)
     watchlistLoaded.current = false;
-    const t = setTimeout(() => { watchlistLoaded.current = true; }, 200);
+    const t = setTimeout(() => { watchlistLoaded.current = true; }, 500);
     return () => clearTimeout(t);
-  }, [watchlistKey]);
-  // 관심종목 저장 (로그인 시에만, 로드 직후 덮어쓰기 방지)
+  }, [watchlistKey, user]);
+  // 관심종목 저장 (로그인 시에만, 로드 직후 덮어쓰기 방지) + Supabase 동기화
+  const watchlistSaveTimer = useRef(null);
   useEffect(() => {
     if (watchlistKey && watchlistLoaded.current) {
       try { localStorage.setItem(watchlistKey, JSON.stringify(watchlist)); } catch {}
+      // Supabase user_metadata에 관심종목 동기화 (디바운스)
+      if (user) {
+        if (watchlistSaveTimer.current) clearTimeout(watchlistSaveTimer.current);
+        watchlistSaveTimer.current = setTimeout(async () => {
+          try { await supabase.auth.updateUser({ data: { watchlist } }); } catch {}
+        }, 800);
+      }
     }
-  }, [watchlist, watchlistKey]);
+  }, [watchlist, watchlistKey, user]);
 
   // ── 탭 타이틀 및 메타태그 실시간 업데이트 (토스증권 스타일 + SEO) ──
   useEffect(() => {
@@ -7319,6 +7415,7 @@ function AppInner() {
                   const newStreak = stored.lastDate === yesterday ? (stored.count || 0) + 1 : 1;
                   const updated = { lastDate: todayKey, count: newStreak };
                   localStorage.setItem("zepta:streak", JSON.stringify(updated));
+                  syncUserDataToSupabase();
                   return updated;
                 } catch { return { count: 1 }; }
               })();
@@ -7737,7 +7834,7 @@ function AppInner() {
               // 마켓 브리핑을 본 것으로 자동 완료
               if (!completed.includes("check-market")) {
                 completed = [...completed, "check-market"];
-                try { localStorage.setItem("zepta:daily-quest", JSON.stringify({ date: todayKey, done: completed })); } catch {}
+                try { localStorage.setItem("zepta:daily-quest", JSON.stringify({ date: todayKey, done: completed })); syncUserDataToSupabase(); } catch {}
               }
               const totalPoints = challenges.reduce((s, c) => s + (completed.includes(c.id) ? c.points : 0), 0);
               const maxPoints = challenges.reduce((s, c) => s + c.points, 0);
@@ -7777,7 +7874,7 @@ function AppInner() {
                           if (c.tab && !done) {
                             setTab(c.tab);
                             const newDone = [...completed, c.id];
-                            try { localStorage.setItem("zepta:daily-quest", JSON.stringify({ date: todayKey, done: newDone })); } catch {}
+                            try { localStorage.setItem("zepta:daily-quest", JSON.stringify({ date: todayKey, done: newDone })); syncUserDataToSupabase(); } catch {}
                           }
                         }} style={{
                           display: "flex", alignItems: "center", gap: "8px",
@@ -8253,6 +8350,7 @@ function AppInner() {
                     localStorage.setItem(`zepta:pred:${yesterdayKey}`, JSON.stringify(yesterdayPred));
                   } catch {}
                 }
+                syncUserDataToSupabase();
               };
 
               return (
@@ -8377,6 +8475,7 @@ function AppInner() {
                   localStorage.setItem("zepta:quiz:stats", JSON.stringify(stats));
                 } catch {}
                 setQuizAnswered(result);
+                syncUserDataToSupabase();
               };
 
               return (
