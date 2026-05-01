@@ -27,6 +27,8 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { sendCards, buildCard, fmtKST } from "../_shared/telegram.js";
+import { fetchGA4DailySummary } from "../_shared/ga4.js";
+import { fetchSentryDailySummary } from "../_shared/sentry.js";
 
 const MODEL = "claude-sonnet-4-6";
 const PROBE_USER = "__zepta_global_probe__";
@@ -240,33 +242,65 @@ function buildCardsForPlan(p) {
   });
 }
 
-// ── MKT-LEAD — 시니어 그로스 마케터 (Week 2) ──
-async function runMarketingLead(client, research, latestQuant) {
+// ── MKT-LEAD — 시니어 그로스 마케터 ──
+async function runMarketingLead(client, research, latestQuant, ga4, sentry) {
   const sys = `당신은 Zepta 의 시니어 그로스 마케터(MKT-LEAD)입니다.
 - 페르소나: 8년차 그로스 마케터 + SEO 전문가. 한국 핀테크 시장(토스/뱅크샐러드/카카오페이) 잘 알고 있음.
-- 역할: 오늘 시장·퀀트 상황을 보고 Zepta 의 유입을 늘릴 콘텐츠 1건과 SEO 전략 제안.
-- 톤: 한국어 존댓말, 평어. 광고 카피 같은 톤은 자제하고 실용 중심.
-- 콘텐츠는 네이버 블로그 / 티스토리 / 트위터(X) 발행을 가정. 가장 유리한 채널 1개 선택.
+- 역할: 오늘 시장·퀀트·실유입 데이터를 종합해 Zepta 의 유입을 늘릴 콘텐츠 1건과 SEO/광고 전략 제안.
+- 데이터 우선순위:
+  1) 어제 GA4 실측 (있으면 가장 큰 가중치)
+  2) 퀀트 리서치 헤드라인 (오늘 발행 콘텐츠 후크 소재)
+  3) Sentry 사용자 영향 이슈 (있으면 "사이트 안정성 메시지"로 활용 가능)
+- 톤: 한국어 존댓말, 평어. 실용 중심. 광고 카피 톤은 자제.
+- 콘텐츠는 네이버 블로그 / 티스토리 / 트위터(X) 중 가장 유리한 채널 1개 선택.
 - 출력: JSON 만 응답.`;
 
   const today = new Date().toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
+
+  // GA4 컨텍스트 — 없으면 비워두고 LLM 이 알아서 처리
+  let ga4Block = "(GA4 미연동 — 일반 컨텍스트로 작성)";
+  if (ga4 && !ga4.error) {
+    const topPagesStr = (ga4.topPages || []).slice(0, 3).map((p) => `${p.path}(${p.pageviews}회)`).join(", ");
+    const topChStr = (ga4.topChannels || []).slice(0, 3).map((c) => `${c.channel}(${c.sessions}세션)`).join(", ");
+    ga4Block = [
+      `- 어제 사용자 ${ga4.users}명, 세션 ${ga4.sessions}건, 페이지뷰 ${ga4.pageviews}건`,
+      `- 평균 세션 ${(ga4.avgSessionDurationSec || 0).toFixed(0)}초, 이탈률 ${((ga4.bounceRate || 0) * 100).toFixed(0)}%`,
+      `- 인기 페이지: ${topPagesStr || "(없음)"}`,
+      `- 유입 채널: ${topChStr || "(없음)"}`,
+    ].join("\n");
+  }
+
+  let sentryBlock = "(Sentry 미연동)";
+  if (sentry && !sentry.error) {
+    const newCount = sentry.newIssues?.length || 0;
+    const topErr = sentry.topIssues?.[0];
+    sentryBlock = `- 어제 새 이슈 ${newCount}건${topErr ? ` · 가장 잦은 이슈: "${topErr.title}" (${topErr.count}회 / ${topErr.userCount}명 영향)` : ""}`;
+  }
+
   const user = `오늘(${today}) Zepta 마케팅 데일리 제안 작성 요청입니다.
+
+[어제 GA4 실유입 데이터]
+${ga4Block}
+
+[Sentry 사이트 안정성]
+${sentryBlock}
 
 [퀀트 리서치 헤드라인]
 ${research?.headline || "(없음)"}
 - 어제 진단: ${JSON.stringify(research?.yesterday || []).slice(0, 200)}
 - 새 알파 후보: ${research?.alpha_idea?.name || "(없음)"}
 
-[최근 자동 리서치 요약]
+[최근 자동 백테스트 요약]
 ${latestQuant ? JSON.stringify({
   batch: latestQuant.batch,
-  topSymbol: latestQuant.topSharpe?.[0],
-  topStrat: latestQuant.stratRank?.[0],
-}).slice(0, 400) : "(없음)"}
+  topSymbol: latestQuant.topSharpe?.[0]?.name,
+  topStrat: latestQuant.stratRank?.[0]?.name,
+}).slice(0, 300) : "(없음)"}
 
 다음 형식의 JSON 으로만 답변:
 {
-  "headline": "오늘의 그로스 한 줄 (예: '극공포 구간 진입 → 역발상 매수 전략 콘텐츠로 검색 유입 노리기')",
+  "headline": "오늘의 그로스 한 줄 (어제 GA4 데이터에 근거하여 — 데이터 있으면 활용)",
+  "yesterday_summary": "어제 유입 한 줄 요약 (GA4 있으면 실수치, 없으면 '데이터 미연동')",
   "content_idea": {
     "channel": "네이버블로그 | 티스토리 | 트위터",
     "title": "발행할 글 제목 (검색 타이틀로 클릭 유도)",
@@ -275,7 +309,8 @@ ${latestQuant ? JSON.stringify({
   },
   "seo_keywords": ["키워드1", "키워드2", "키워드3"],
   "social_post": "트위터/스레드용 짧은 게시물 280자 이내",
-  "ads_note": "쿠팡파트너스/AdSense 배치·문구 최적화 1건 (선택)"
+  "ads_note": "쿠팡파트너스/AdSense 배치·문구 최적화 1건 (선택)",
+  "channel_diagnosis": "GA4 데이터 있으면: 어떤 유입 채널을 강화/축소해야 할지 한 줄. 없으면 빈 문자열."
 }`;
 
   const resp = await client.messages.create({
@@ -289,6 +324,160 @@ ${latestQuant ? JSON.stringify({
   return safeJSONParse(text) || { headline: "마케팅 응답 파싱 실패", _raw: text.slice(0, 500) };
 }
 
+// ── PLAN-SVC — 시니어 서비스 기획자 (Week 3) ──
+async function runServicePlanner(client, ga4, sentry, research) {
+  const sys = `당신은 Zepta 의 시니어 서비스 기획자(PLAN-SVC)입니다.
+- 페르소나: 8년차 서비스/프로덕트 기획자. 토스, 카카오페이 수준 핀테크 UX 감각.
+- 역할: 어제의 사용자 행동 데이터(GA4)와 사이트 안정성(Sentry)을 보고 오늘 적용 가능한 화면·UX 개선 1건을 제안.
+- 출력 원칙:
+  · 이탈률·세션 시간·인기 페이지에서 단서 찾기
+  · "어떤 화면의 어떤 부분이 문제고, 어떻게 고치면 되는지" 명확하게
+  · 개발팀(DEV-IMPL)이 즉시 착수 가능한 수준의 구체성
+- 출력: JSON 만 응답.`;
+
+  let ctx = "(GA4 미연동 — 일반 기획 관점으로)";
+  if (ga4 && !ga4.error) {
+    const topPagesStr = (ga4.topPages || []).slice(0, 3).map((p) => `${p.path}(${p.pageviews}회)`).join(", ");
+    ctx = [
+      `- 어제 사용자 ${ga4.users}명, 세션 ${ga4.sessions}건`,
+      `- 평균 세션 ${(ga4.avgSessionDurationSec || 0).toFixed(0)}초, 이탈률 ${((ga4.bounceRate || 0) * 100).toFixed(0)}%`,
+      `- 인기 페이지 TOP3: ${topPagesStr}`,
+    ].join("\n");
+  }
+  const sentryCtx = sentry && !sentry.error
+    ? `Sentry 어제 새 이슈 ${(sentry.newIssues || []).length}건${sentry.topIssues?.[0] ? `, 가장 잦은 이슈 "${sentry.topIssues[0].title}" (${sentry.topIssues[0].userCount}명 영향)` : ""}`
+    : "(Sentry 미연동)";
+
+  const user = `오늘 자 서비스 기획 데일리 제안 작성 요청입니다.
+
+[어제 GA4]
+${ctx}
+
+[Sentry]
+${sentryCtx}
+
+[퀀트 리서치 헤드라인]
+${research?.headline || "(없음)"}
+
+다음 형식의 JSON 으로만 답변:
+{
+  "headline": "오늘의 화면 개선 한 줄 (예: '홈 인사 카드 아래 마켓 브리핑 위치 변경 → 첫 진입 후 5초 안에 가치 인지 향상')",
+  "diagnosis": "어제 데이터에서 발견된 핵심 문제 한 줄 (이탈률·인기 페이지·세션 시간 근거)",
+  "proposal": {
+    "screen": "어느 화면 (예: home, screener, auto-trading)",
+    "change": "구체적 변경 (예: '인사 카드 옆 우측에 1탭으로 가는 추천 종목 3개 카드 추가')",
+    "rationale": "왜 이게 효과적인지 평어 한 줄",
+    "dev_estimate": "개발 난이도 (Easy/Medium/Hard) + 예상 시간"
+  },
+  "metrics_to_watch": ["측정할 지표 1~3개"]
+}`;
+
+  const resp = await client.messages.create({
+    model: MODEL,
+    max_tokens: 1100,
+    system: sys,
+    messages: [{ role: "user", content: user }],
+  });
+  const text = resp.content?.[0]?.text || "";
+  return safeJSONParse(text) || { headline: "서비스 기획 응답 파싱 실패", _raw: text.slice(0, 500) };
+}
+
+function buildCardsForServicePlanner(s) {
+  if (!s || s._raw) {
+    return buildCard({
+      tag: "📐",
+      title: "PLAN-SVC — 오늘의 화면 개선 제안",
+      lines: ["응답 파싱 실패"],
+      footer: s?._raw || "",
+    });
+  }
+  const lines = [s.headline];
+  if (s.diagnosis) lines.push(`진단: ${s.diagnosis}`);
+  if (s.proposal) {
+    lines.push(`제안 화면: ${s.proposal.screen}`);
+    lines.push(`변경: ${s.proposal.change}`);
+    if (s.proposal.rationale) lines.push(`이유: ${s.proposal.rationale}`);
+    if (s.proposal.dev_estimate) lines.push(`난이도: ${s.proposal.dev_estimate}`);
+  }
+  if (s.metrics_to_watch?.length) lines.push(`관찰 지표: ${s.metrics_to_watch.join(", ")}`);
+  return buildCard({
+    tag: "📐",
+    title: "PLAN-SVC — 오늘의 화면 개선 제안",
+    lines,
+  });
+}
+
+// ── PLAN-BIZ — 시니어 사업 기획자 (Week 3) ──
+async function runBusinessPlanner(client, ga4, research, marketing) {
+  const sys = `당신은 Zepta 의 시니어 사업 기획자(PLAN-BIZ)입니다.
+- 페르소나: 10년차 사업 기획 / 전략 컨설턴트. 한국 핀테크 시장 깊이 이해.
+- 역할: Zepta 의 유입·수익 다각화 관점에서 오늘 추진 가능한 사업 액션 1건 제안.
+- 관점: 토스/뱅크샐러드/카카오페이/Robinhood 와의 차별화, 광고 외 수익 모델 (프리미엄, 제휴, B2B 등).
+- 출력: JSON 만 응답.`;
+
+  let ga4Ctx = "(GA4 미연동)";
+  if (ga4 && !ga4.error) {
+    ga4Ctx = `어제 사용자 ${ga4.users}명, 세션 ${ga4.sessions}건, 페이지뷰 ${ga4.pageviews}건, 이탈률 ${((ga4.bounceRate || 0) * 100).toFixed(0)}%`;
+  }
+
+  const user = `오늘 자 사업 기획 데일리 제안 작성 요청입니다.
+
+[어제 GA4 트래픽]
+${ga4Ctx}
+
+[퀀트 리서치 헤드라인]
+${research?.headline || "(없음)"}
+
+[오늘 마케팅 콘텐츠 방향]
+${marketing?.headline || "(없음)"}
+
+다음 형식의 JSON 으로만 답변:
+{
+  "headline": "오늘의 사업 액션 한 줄 (예: '쿠팡 파트너스 배치 최적화로 RPM 20% 상승 노리기' / '프리미엄 백테스트 무제한 티어 출시 검토')",
+  "competitor_radar": "한국 경쟁사(토스증권/뱅크샐러드/리더스 등) 어제~최근 변화 한 줄 (있으면)",
+  "opportunity": {
+    "type": "유입확대 | 수익다각화 | 리텐션 | 차별화",
+    "idea": "구체적 아이디어 한 문장",
+    "why_now": "왜 지금이 적기인지 한 문장",
+    "first_step": "오늘 안에 할 수 있는 첫 행동 1개 (시간 단위 작업)"
+  },
+  "risk": "주의해야 할 리스크 한 줄"
+}`;
+
+  const resp = await client.messages.create({
+    model: MODEL,
+    max_tokens: 1000,
+    system: sys,
+    messages: [{ role: "user", content: user }],
+  });
+  const text = resp.content?.[0]?.text || "";
+  return safeJSONParse(text) || { headline: "사업 기획 응답 파싱 실패", _raw: text.slice(0, 500) };
+}
+
+function buildCardsForBusinessPlanner(b) {
+  if (!b || b._raw) {
+    return buildCard({
+      tag: "💼",
+      title: "PLAN-BIZ — 오늘의 사업 액션 제안",
+      lines: ["응답 파싱 실패"],
+      footer: b?._raw || "",
+    });
+  }
+  const lines = [b.headline];
+  if (b.competitor_radar) lines.push(`경쟁사: ${b.competitor_radar}`);
+  if (b.opportunity) {
+    lines.push(`기회 [${b.opportunity.type}]: ${b.opportunity.idea}`);
+    if (b.opportunity.why_now) lines.push(`타이밍: ${b.opportunity.why_now}`);
+    if (b.opportunity.first_step) lines.push(`첫 행동: ${b.opportunity.first_step}`);
+  }
+  return buildCard({
+    tag: "💼",
+    title: "PLAN-BIZ — 오늘의 사업 액션 제안",
+    lines,
+    hint: b.risk,
+  });
+}
+
 function buildCardsForMarketing(m) {
   if (!m || m._raw) {
     return buildCard({
@@ -299,6 +488,8 @@ function buildCardsForMarketing(m) {
     });
   }
   const lines = [m.headline];
+  if (m.yesterday_summary) lines.push(`어제 요약: ${m.yesterday_summary}`);
+  if (m.channel_diagnosis) lines.push(`채널 진단: ${m.channel_diagnosis}`);
   if (m.content_idea) {
     lines.push(`콘텐츠 [${m.content_idea.channel}] "${m.content_idea.title}"`);
     if (m.content_idea.angle) lines.push(`각도: ${m.content_idea.angle}`);
@@ -327,14 +518,22 @@ export default async function handler(req, res) {
     }
 
     const kv = await getKv();
-    const [ledger, weights, summary, latestQuant] = await Promise.all([
+    const [ledger, weights, summary, latestQuant, ga4, sentry] = await Promise.all([
       readShadowLedger(kv, 7),
       readWeights(kv),
       readShadowSummary(kv),
       kv.get("di:quant:latest").catch(() => null), // quant-research 가 매일 06:00 적립
+      fetchGA4DailySummary({ daysBack: 1 }),       // null = 미연동, error = 인증 실패
+      fetchSentryDailySummary({ daysBack: 1 }),
     ]);
-    const closedCount = ledger.filter((e) => e?.status === "CLOSED").length;
+    // ledger 의 status==CLOSED 가 0 이어도 shadow-monitor 가 별도 summary 에 누적함.
+    // 표시할 "마감 카운트" 는 summary 가 우선, 없으면 ledger 폴백.
+    const closedFromSummary = Number((summary?.wins || 0) + (summary?.losses || 0)) || 0;
+    const closedFromLedger = ledger.filter((e) => e?.status === "CLOSED").length;
+    const closedCount = closedFromSummary || closedFromLedger;
     L(`shadow ledger: ${ledger.length} entries (지난 7일, 마감 ${closedCount})`);
+    L(`GA4: ${ga4 ? (ga4.error ? "error" : `${ga4.users}users/${ga4.sessions}sessions`) : "not connected"}`);
+    L(`Sentry: ${sentry ? (sentry.error ? "error" : `${(sentry.newIssues || []).length} new issues`) : "not connected"}`);
 
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -344,21 +543,29 @@ export default async function handler(req, res) {
     const research = await runQuantResearcher(client, ledger, weights, summary);
     L(`QUANT-RES done: ${research.headline?.slice(0, 60)}`);
 
-    // 3-스텝 파이프라인: RES → PLAN + MKT 병렬 (각자 RES 결과를 입력으로 받음)
-    const [plan, marketing] = await Promise.all([
+    // 2-스텝 파이프라인:
+    //   Step 1: RES 완료 (위)
+    //   Step 2: PLAN, MKT, PLAN-SVC, PLAN-BIZ 4명 병렬 — 각자 RES + GA4/Sentry 입력 받음
+    //   (PLAN-BIZ 는 MKT 의 헤드라인도 보지만 동시 실행이라 약간 약함 — 추후 3-pass 가능)
+    const [plan, marketing, servicePlan, businessPlan] = await Promise.all([
       runQuantPlanner(client, ledger, weights, research),
-      runMarketingLead(client, research, latestQuant),
+      runMarketingLead(client, research, latestQuant, ga4, sentry),
+      runServicePlanner(client, ga4, sentry, research),
+      runBusinessPlanner(client, ga4, research, { headline: "(MKT 동시 진행)" }),
     ]);
     L(`QUANT-PLAN done: ${plan.headline?.slice(0, 60)}`);
     L(`MKT-LEAD done: ${marketing.headline?.slice(0, 60)}`);
+    L(`PLAN-SVC done: ${servicePlan.headline?.slice(0, 60)}`);
+    L(`PLAN-BIZ done: ${businessPlan.headline?.slice(0, 60)}`);
 
     const header = buildCard({
       tag: "🌅",
       title: `Zepta 일일 스탠드업 — ${fmtKST().slice(0, 8)}`,
       lines: [
-        `지난 7일 shadow 거래 ${ledger.length}건 (마감 ${closedCount}) 분석 완료`,
-        `퀀트 리서치 → 운용 결정 + 그로스 제안 동시 진행`,
+        `shadow 거래 ${ledger.length}건 진행 중, 누적 마감 ${closedCount}건`,
+        `퀀트팀(RES/PLAN) + 마케팅(MKT) + 기획(SVC/BIZ) 5명 보고`,
       ],
+      footer: ga4 && !ga4.error ? `어제 GA4 사용자 ${ga4.users}명 · 세션 ${ga4.sessions}건` : undefined,
     });
 
     const cards = [
@@ -366,6 +573,8 @@ export default async function handler(req, res) {
       buildCardsForResearch(research),
       buildCardsForPlan(plan),
       buildCardsForMarketing(marketing),
+      buildCardsForServicePlanner(servicePlan),
+      buildCardsForBusinessPlanner(businessPlan),
     ];
 
     if (dryRun) {
@@ -376,6 +585,10 @@ export default async function handler(req, res) {
         research,
         plan,
         marketing,
+        servicePlan,
+        businessPlan,
+        ga4: ga4 ? { connected: !ga4.error, ...(ga4.error ? { error: ga4.error } : {}) } : { connected: false },
+        sentry: sentry ? { connected: !sentry.error } : { connected: false },
         log,
       });
     }
@@ -390,6 +603,8 @@ export default async function handler(req, res) {
       research,
       plan,
       marketing,
+      servicePlan,
+      businessPlan,
       log,
     });
   } catch (err) {

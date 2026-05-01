@@ -263,10 +263,21 @@ Zepta 의 본업은 퀀트 자동매매. 알파 리서치와 전략 운용 결�
 ```
 
 **도입 단계**:
-- **Week 1 (현재)**: QUANT-RES + QUANT-PLAN + **MKT-LEAD** (오늘의 그로스 제안)
-- **Week 2 (예정)**: GA4·Sentry 연동 강화 — MKT-LEAD 가 실제 유입 데이터 분석
-- **Week 3**: PLAN-SVC + PLAN-BIZ (사용자 행동 → 화면/사업 제안)
-- **Week 4**: DEV-IMPL + DEV-PERF (Sentry 에러 트리아지 + Lighthouse 회귀)
+- **Week 1 (가동 중)**: QUANT-RES + QUANT-PLAN + MKT-LEAD + **PLAN-SVC + PLAN-BIZ** (5명 매일 보고)
+- **Week 1.5 (가동 중)**: GA4 / Sentry 데이터 직접 연동 (env vars 설정 시 자동 활성)
+- **Week 4 (예정)**: DEV-IMPL + DEV-PERF (Sentry 에러 트리아지 + Lighthouse 회귀)
+
+**환경변수 (선택 — 미설정 시 graceful fallback)**:
+```
+GA4_PROPERTY_ID         GA4 속성 ID (숫자만)
+GA4_SA_CLIENT_EMAIL     서비스 계정 이메일
+GA4_SA_PRIVATE_KEY      서비스 계정 RSA private key (PEM)
+
+SENTRY_AUTH_TOKEN       Sentry Auth Token (Settings → Auth Tokens)
+SENTRY_ORG_SLUG         조직 slug (예: zepta)
+SENTRY_PROJECT_SLUG     프로젝트 slug
+SENTRY_REGION_URL       (선택) 자체 호스팅 baseURL
+```
 
 ---
 

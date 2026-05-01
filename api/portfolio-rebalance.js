@@ -1,6 +1,9 @@
 // Portfolio Rebalancing Cron - Runs weekdays at 14:00 UTC (10:00 ET)
 // KV 가상 포트폴리오 기반 리밸런싱
 // 주식 + 크립토 포지션 비중 관리, 손절, 익절
+// 텔레그램 알림: api/_shared/telegram.js 의 buildCard/sendCards (사용자 친화 평어)
+
+import { sendCards, buildCard, fmtKSTShort } from "./_shared/telegram.js";
 
 const MAX_STOCK_WEIGHT = 0.20; // 20% max per stock
 const MAX_CRYPTO_WEIGHT = 0.30; // 30% max per crypto
@@ -209,9 +212,9 @@ export default async function handler(req, res) {
       await kv.set(CRYPTO_PORTFOLIO_KEY, cryptoPortfolio);
     }
 
-    // Telegram report
-    const summary = formatRebalancingSummary(allPositionWeights, allActions, allResults, totalEquity, totalCash);
-    await sendTelegramMessage(summary);
+    // Telegram report (카드형, 사용자 친화)
+    const cards = buildRebalancingCards(allPositionWeights, allActions, allResults, totalEquity, totalCash);
+    await sendCards(cards);
 
     return res.status(200).json({
       success: true,
@@ -223,54 +226,59 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error('Portfolio rebalance error:', error);
-    await sendTelegramMessage(`❌ Portfolio Rebalance Error\n\n${error.message}`).catch(() => {});
+    await sendCards([buildCard({
+      tag: "❌",
+      title: "리밸런싱 중 오류 발생",
+      lines: ["자동 리밸런싱 작업이 도중에 멈췄어요. 로그 확인이 필요합니다"],
+      footer: error.message?.slice(0, 200),
+    })]).catch(() => {});
     return res.status(500).json({ error: error.message || 'Rebalancing failed', timestamp: new Date().toISOString() });
   }
 }
 
-function formatRebalancingSummary(positions, actions, results, equity, cash) {
-  let msg = '📊 *DI 포트폴리오 리밸런스 리포트*\n\n';
-  msg += `⏰ ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}\n`;
-  msg += `💼 총 자산: $${equity.toFixed(2)}\n`;
-  msg += `💵 현금: $${cash.toFixed(2)}\n\n`;
-
+// 카드형 리밸런싱 리포트 — 평어 톤
+function buildRebalancingCards(positions, actions, results, equity, cash) {
+  const cashPct = equity > 0 ? (cash / equity) * 100 : 0;
   const topHoldings = positions.sort((a, b) => b.marketValue - a.marketValue).slice(0, 5);
+
+  const headerLines = [`총 자산 $${equity.toFixed(0)} · 현금 비중 ${cashPct.toFixed(0)}%`];
   if (topHoldings.length > 0) {
-    msg += '📈 *상위 보유:*\n';
+    headerLines.push(`상위 보유 ${topHoldings.length}종목:`);
     for (const pos of topHoldings) {
-      const icon = pos.unrealizedPL > 0 ? '📈' : '📉';
-      msg += `${icon} ${pos.symbol}: ${(pos.weight * 100).toFixed(1)}% ($${pos.marketValue.toFixed(0)}) [${(pos.unrealizedPLPct * 100).toFixed(1)}%]\n`;
+      const sign = pos.unrealizedPLPct >= 0 ? "+" : "";
+      headerLines.push(`  · ${pos.symbol}: 비중 ${(pos.weight * 100).toFixed(0)}%, $${pos.marketValue.toFixed(0)} (${sign}${(pos.unrealizedPLPct * 100).toFixed(1)}%)`);
     }
   }
+  const cards = [buildCard({
+    tag: "📊",
+    title: "Zepta 포트폴리오 리밸런스",
+    lines: headerLines,
+    footer: `${fmtKSTShort()} · 자동 리밸런싱`,
+  })];
 
   if (actions.length > 0) {
-    msg += '\n🔄 *리밸런싱 액션:*\n';
-    for (const a of actions) {
-      const icon = a.type === 'stop_loss' ? '❌' : a.type === 'profit_take' ? '✅' : '🔻';
-      msg += `${icon} ${a.symbol}: ${a.reason}\n`;
-    }
-    const ok = results.filter(r => r.success).length;
-    const fail = results.filter(r => !r.success).length;
-    msg += `\n실행: ✓ ${ok}건 성공 | ✗ ${fail}건 실패\n`;
-  } else {
-    msg += '\n✓ *포트폴리오 균형* — 리밸런싱 불필요\n';
-  }
-
-  return msg;
-}
-
-async function sendTelegramMessage(message) {
-  const botToken = process.env.TELEGRAM_BOT_TOKEN;
-  const chatId = process.env.TELEGRAM_CHAT_ID;
-  if (!botToken || !chatId) return;
-
-  try {
-    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: chatId, text: message, parse_mode: 'Markdown' }),
+    const lines = actions.map((a) => {
+      const dir =
+        a.type === "stop_loss" ? "손절" :
+        a.type === "profit_take" ? "익절" :
+        "비중 조정";
+      return `${a.symbol} ${dir} — ${a.reason}`;
     });
-  } catch (e) {
-    console.error('Telegram send error:', e.message);
+    const ok = results.filter((r) => r.success).length;
+    const fail = results.filter((r) => !r.success).length;
+    cards.push(buildCard({
+      tag: "🔄",
+      title: `리밸런싱 액션 ${actions.length}건`,
+      lines,
+      hint: `실행 결과: 성공 ${ok}건${fail ? `, 실패 ${fail}건` : ""}`,
+    }));
+  } else {
+    cards.push(buildCard({
+      tag: "✓",
+      title: "포트폴리오 균형 양호",
+      lines: ["오늘은 별도 리밸런싱이 필요 없어요 — 비중·손익 모두 안정 구간"],
+    }));
   }
+
+  return cards;
 }

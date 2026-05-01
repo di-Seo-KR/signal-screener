@@ -2,10 +2,12 @@
 // 장중 30분 간격 실행: 실시간 시장 감시 + 알파 전략 기반 자동매매
 // KV 가상 포트폴리오 매매
 // Yahoo Finance 가격 기반 가상매매
+// 텔레그램 알림: api/_shared/telegram.js 의 buildCard/sendCards (사용자 친화 평어)
 
 export const config = { maxDuration: 120 };
 
 import fetch from 'node-fetch';
+import { sendCards, buildCard } from "./_shared/telegram.js";
 
 const YAHOO_FINANCE_URL = 'https://query1.finance.yahoo.com/v8/finance/chart';
 
@@ -591,25 +593,25 @@ const STOCK_INITIAL_CASH = 100000; // $100,000 가상 자금
 
 // ==================== TELEGRAM REPORTING ====================
 
+// 단일 카드로 발송 — 기존 본문 텍스트는 그대로 lines 로 분리해 표시
 async function sendTelegramReport(title, message) {
-  if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.TELEGRAM_CHAT_ID) {
-    console.log('Telegram not configured, skipping report');
-    return;
-  }
+  // Markdown 잔재 (* 강조) 제거. humanize() 가 "DI금융"→"Zepta" 자동 치환.
+  const clean = String(message || "")
+    .replace(/\*+/g, "")            // *bold* 제거
+    .replace(/^_+|_+$/gm, "")        // 양끝 _ 제거
+    .replace(/```[\s\S]*?```/g, (m) => m.replace(/```/g, "").trim()) // 코드블록 풀기
+    .replace(/━+/g, "")              // 구분선 제거 (카드가 자체적으로 시각 분리)
+    .trim();
+  const lines = clean.split(/\n+/).map((s) => s.trim()).filter(Boolean);
 
-  try {
-    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: process.env.TELEGRAM_CHAT_ID,
-        text: `*${title}*\n\n${message}`,
-        parse_mode: 'Markdown'
-      })
-    });
-  } catch (error) {
-    console.error('Telegram send error:', error.message);
-  }
+  // 너무 길면 첫 ~25줄만 (카드 가독성)
+  const trimmed = lines.length > 25 ? [...lines.slice(0, 25), "...(이하 생략 — 자세한 내용은 KV 로그 참고)"] : lines;
+
+  await sendCards([buildCard({
+    tag: title.includes("Error") || title.includes("⚠") ? "⚠️" : "🤖",
+    title: title.replace(/^[⚠️🤖]\s*/, ""),
+    lines: trimmed,
+  })]);
 }
 
 // ==================== MAIN HANDLER ====================
@@ -1017,9 +1019,9 @@ export default async function handler(req, res) {
 
     const elapsed = ((Date.now() - now.getTime()) / 1000).toFixed(1);
     report += `\n━━━━━━━━━━━━━━━━━━\n`;
-    report += `🤖 DI금융 Stock Auto v4.1 | ${elapsed}s`;
+    report += `Zepta Stock Auto v4.2 | ${elapsed}s`;
 
-    await sendTelegramReport('Stock Auto-Trading', report);
+    await sendTelegramReport('주식 자동매매 리포트', report);
 
     return res.status(200).json({
       success: true,
@@ -1031,7 +1033,7 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('Cron error:', error);
 
-    await sendTelegramReport('⚠️ Stock Auto-Trading Error', `\`\`\`${error.message}\`\`\``);
+    await sendTelegramReport('주식 자동매매 오류 발생', error.message || String(error));
 
     return res.status(500).json({
       error: error.message,

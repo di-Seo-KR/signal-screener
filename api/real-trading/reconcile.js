@@ -18,24 +18,11 @@ import { getPositionRisk, getAccountInfo, getUserTrades } from "../_shared/binan
 
 export const config = { maxDuration: 60 };
 
+import { sendCards, buildCard } from "../_shared/telegram.js";
+
 async function getKv() {
   const mod = await import("@vercel/kv");
   return mod.kv;
-}
-
-async function sendTelegram(text) {
-  try {
-    const token = process.env.TELEGRAM_BOT_TOKEN;
-    const chat  = process.env.TELEGRAM_CHAT_ID;
-    if (!token || !chat) return;
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chat, text, parse_mode: "Markdown" }),
-    });
-  } catch (e) {
-    console.warn("[reconcile] TG failed:", e?.message);
-  }
 }
 
 async function reconcileUser(userId) {
@@ -122,17 +109,21 @@ async function reconcileUser(userId) {
     await kv.set(key, log.slice(0, 90));
   } catch {}
 
-  // 7) 알림: 차이 있으면 Telegram
+  // 7) 알림: 차이 있으면 Telegram (사용자 친화 카드)
   const hasDiff = diff.missing.length || diff.extra.length || diff.mismatch.length;
   if (hasDiff) {
-    await sendTelegram(
-      `*Zepta Reconcile ALERT*\nuser: ${userId.slice(0, 8)}…\n` +
-      (diff.missing.length ? `missing: ${diff.missing.join(", ")}\n` : "") +
-      (diff.extra.length   ? `extra: ${diff.extra.join(", ")}\n`     : "") +
-      (diff.mismatch.length ? `mismatch: ${diff.mismatch.length} symbols\n` : "") +
-      `equity: $${(diff.equity || 0).toFixed(2)}\n` +
-      `realized today: $${diff.realizedToday.toFixed(2)}`
-    );
+    const lines = [];
+    if (diff.missing.length) lines.push(`기록엔 있는데 실제 포지션 없음: ${diff.missing.join(", ")}`);
+    if (diff.extra.length)   lines.push(`실제 포지션은 있는데 기록 없음: ${diff.extra.join(", ")}`);
+    if (diff.mismatch.length) lines.push(`수량·진입가 불일치 ${diff.mismatch.length}건`);
+    lines.push(`잔고 $${(diff.equity || 0).toFixed(2)}, 오늘 실현손익 $${diff.realizedToday.toFixed(2)}`);
+    await sendCards([buildCard({
+      tag: "🔍",
+      title: "포지션 정합성 점검 — 차이 발견",
+      lines,
+      hint: "실제 거래소 데이터와 기록이 다르면 재조정이 필요해요. 수동 확인 권장",
+      footer: `user ${userId.slice(0, 8)}…`,
+    })]);
   }
 
   return { userId, ok: true, diff, actualOpenCount: Object.keys(actualOpen).length };
