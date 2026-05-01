@@ -30,6 +30,9 @@ import { sendCards, buildCard, fmtKST } from "../_shared/telegram.js";
 import { fetchGA4DailySummary } from "../_shared/ga4.js";
 import { fetchSentryDailySummary } from "../_shared/sentry.js";
 
+// 7 명 에이전트 + 3-pass 구조 — 약 20~30초 소요. Vercel 기본 10s 한도 회피.
+export const config = { maxDuration: 60 };
+
 const MODEL = "claude-sonnet-4-6";
 const PROBE_USER = "__zepta_global_probe__";
 
@@ -478,6 +481,166 @@ function buildCardsForBusinessPlanner(b) {
   });
 }
 
+// ── DEV-IMPL — 시니어 구현 엔지니어 (Week 4) ──
+async function runDevImplementer(client, sentry) {
+  const sys = `당신은 Zepta 의 시니어 구현 엔지니어(DEV-IMPL)입니다.
+- 페르소나: 8년차 풀스택. React + Vercel 환경 깊이 이해.
+- 역할: Sentry 어제 이슈를 트리아지하고 오늘 즉시 착수할 픽스 후보 1건을 제안.
+- 트리아지 원칙:
+  · 사용자 영향(userCount) × 빈도(count) 가중 — 큰 게 우선
+  · level=error/fatal > warning
+  · firstSeen 이 어제 안이고 미해결이면 회귀 가능성
+- 출력: 한국어 존댓말, 간결. JSON 만 응답.`;
+
+  let sentryBlock = "(Sentry 미연동 — 어제 이슈 분석 불가)";
+  if (sentry && !sentry.error) {
+    const newCount = (sentry.newIssues || []).length;
+    const topNew = (sentry.newIssues || []).slice(0, 3).map((i) =>
+      `· [${i.level}] "${i.title}" — ${i.count}회/${i.userCount}명, ${i.culprit || "?"}`
+    ).join("\n") || "(없음)";
+    const topRecurring = (sentry.topIssues || []).slice(0, 3).map((i) =>
+      `· "${i.title}" — ${i.count}회/${i.userCount}명, ${i.culprit || "?"}`
+    ).join("\n") || "(없음)";
+    sentryBlock = [
+      `어제 새 이슈 ${newCount}건`,
+      `[새 이슈 TOP3]`,
+      topNew,
+      `[누적 자주 발생 TOP3]`,
+      topRecurring,
+    ].join("\n");
+  }
+
+  const user = `오늘 자 픽스 후보 트리아지 요청입니다.
+
+[Sentry 어제 데이터]
+${sentryBlock}
+
+다음 형식의 JSON 으로만 답변:
+{
+  "headline": "오늘 픽스 권고 한 줄 (예: '결제 모달 null 참조 에러 → 30분 내 픽스 가능')",
+  "summary": "어제 사이트 안정성 한 줄 진단 (영향 받은 사용자 수 기준)",
+  "fix_candidate": {
+    "issue": "이슈 제목 또는 요약",
+    "severity": "P0 (서비스 중단) | P1 (주요 기능) | P2 (부분 기능) | P3 (마이너)",
+    "user_impact": "영향 받은 사용자 / 빈도",
+    "suspected_cause": "원인 추정 1~2문장",
+    "fix_approach": "어떻게 고칠지 1문장",
+    "estimated_time": "픽스 예상 시간 (예: 30분, 2시간)"
+  },
+  "regression_alert": "회귀 의심 이슈가 있다면 한 줄, 없으면 빈 문자열"
+}`;
+
+  const resp = await client.messages.create({
+    model: MODEL,
+    max_tokens: 1100,
+    system: sys,
+    messages: [{ role: "user", content: user }],
+  });
+  const text = resp.content?.[0]?.text || "";
+  return safeJSONParse(text) || { headline: "DEV-IMPL 응답 파싱 실패", _raw: text.slice(0, 500) };
+}
+
+function buildCardsForDevImplementer(d) {
+  if (!d || d._raw) {
+    return buildCard({
+      tag: "🔧",
+      title: "DEV-IMPL — 오늘의 픽스 후보",
+      lines: ["응답 파싱 실패"],
+      footer: d?._raw || "",
+    });
+  }
+  const lines = [d.headline];
+  if (d.summary) lines.push(`어제 진단: ${d.summary}`);
+  if (d.fix_candidate) {
+    const fc = d.fix_candidate;
+    lines.push(`이슈 [${fc.severity}]: ${fc.issue}`);
+    if (fc.user_impact) lines.push(`영향: ${fc.user_impact}`);
+    if (fc.suspected_cause) lines.push(`원인: ${fc.suspected_cause}`);
+    if (fc.fix_approach) lines.push(`접근: ${fc.fix_approach}`);
+    if (fc.estimated_time) lines.push(`예상 시간: ${fc.estimated_time}`);
+  }
+  return buildCard({
+    tag: "🔧",
+    title: "DEV-IMPL — 오늘의 픽스 후보",
+    lines,
+    hint: d.regression_alert || undefined,
+  });
+}
+
+// ── DEV-PERF — 시니어 성능 엔지니어 (Week 4) ──
+async function runDevPerf(client, ga4, sentry) {
+  const sys = `당신은 Zepta 의 시니어 성능 엔지니어(DEV-PERF)입니다.
+- 페르소나: 7년차 퍼포먼스 엔지니어. Web Vitals, 번들 사이즈, React 렌더링 최적화 전문.
+- 역할: 어제 사용자 데이터(GA4 평균 세션 시간/이탈률) + 사이트 안정성을 보고 성능 회귀나 개선 포인트 1건 제안.
+- 신호 해석:
+  · 이탈률 ↑ + 평균 세션 ↓ → 첫 페인트 / 인터랙션 회귀 의심
+  · Sentry 에 "Long task" / "Hydration" / "Out of memory" 류 → 성능 이슈
+  · 데이터 부족하면 "오늘은 모니터 모드" 라고 솔직히 말할 것
+- 출력: JSON 만 응답.`;
+
+  let ga4Block = "(GA4 미연동)";
+  if (ga4 && !ga4.error) {
+    ga4Block = [
+      `- 사용자 ${ga4.users}, 세션 ${ga4.sessions}, 페이지뷰 ${ga4.pageviews}`,
+      `- 평균 세션 ${(ga4.avgSessionDurationSec || 0).toFixed(0)}초`,
+      `- 이탈률 ${((ga4.bounceRate || 0) * 100).toFixed(0)}%`,
+    ].join("\n");
+  }
+  const sentryBlock = sentry && !sentry.error
+    ? `최근 미해결 이슈 ${(sentry.topIssues || []).length}건. 상위: ${(sentry.topIssues || []).slice(0, 3).map((i) => `"${i.title}" ${i.count}회`).join(" / ") || "(없음)"}`
+    : "(Sentry 미연동)";
+
+  const user = `오늘 자 성능 모니터 보고 요청입니다.
+
+[어제 GA4]
+${ga4Block}
+
+[Sentry 누적 이슈]
+${sentryBlock}
+
+다음 형식의 JSON 으로만 답변:
+{
+  "headline": "오늘의 성능 한 줄 (예: '이탈률 어제 대비 +12% — 첫 페인트 회귀 의심, 즉시 점검 필요')",
+  "verdict": "Green (정상) | Yellow (관찰 필요) | Red (즉시 조치)",
+  "concern": "현재 가장 우려되는 지표 한 줄 (없으면 '특이사항 없음')",
+  "action": "오늘 할 수 있는 액션 1건 (예: 'Lighthouse 모바일 측정 후 LCP 비교')",
+  "watch_list": ["관찰 지표 1~3개"]
+}`;
+
+  const resp = await client.messages.create({
+    model: MODEL,
+    max_tokens: 800,
+    system: sys,
+    messages: [{ role: "user", content: user }],
+  });
+  const text = resp.content?.[0]?.text || "";
+  return safeJSONParse(text) || { headline: "DEV-PERF 응답 파싱 실패", _raw: text.slice(0, 500) };
+}
+
+function buildCardsForDevPerf(p) {
+  if (!p || p._raw) {
+    return buildCard({
+      tag: "⚡",
+      title: "DEV-PERF — 오늘의 성능 모니터",
+      lines: ["응답 파싱 실패"],
+      footer: p?._raw || "",
+    });
+  }
+  const verdictTag =
+    p.verdict === "Red" ? "🔴" :
+    p.verdict === "Yellow" ? "🟡" :
+    p.verdict === "Green" ? "🟢" : "⚡";
+  const lines = [`[${verdictTag} ${p.verdict || "—"}] ${p.headline}`];
+  if (p.concern) lines.push(`우려: ${p.concern}`);
+  if (p.action) lines.push(`오늘 액션: ${p.action}`);
+  if (p.watch_list?.length) lines.push(`관찰: ${p.watch_list.join(", ")}`);
+  return buildCard({
+    tag: "⚡",
+    title: "DEV-PERF — 오늘의 성능 모니터",
+    lines,
+  });
+}
+
 function buildCardsForMarketing(m) {
   if (!m || m._raw) {
     return buildCard({
@@ -543,19 +706,25 @@ export default async function handler(req, res) {
     const research = await runQuantResearcher(client, ledger, weights, summary);
     L(`QUANT-RES done: ${research.headline?.slice(0, 60)}`);
 
-    // 2-스텝 파이프라인:
+    // 3-스텝 파이프라인:
     //   Step 1: RES 완료 (위)
-    //   Step 2: PLAN, MKT, PLAN-SVC, PLAN-BIZ 4명 병렬 — 각자 RES + GA4/Sentry 입력 받음
-    //   (PLAN-BIZ 는 MKT 의 헤드라인도 보지만 동시 실행이라 약간 약함 — 추후 3-pass 가능)
-    const [plan, marketing, servicePlan, businessPlan] = await Promise.all([
+    //   Step 2: PLAN(RES), MKT(RES+GA4), SVC(RES+GA4+Sentry), DEV-IMPL(Sentry), DEV-PERF(GA4+Sentry) 5명 병렬
+    //   Step 3: PLAN-BIZ 만 별도 — Step 2 의 MKT 결과까지 흡수해서 사업 결정 (3-pass)
+    const [plan, marketing, servicePlan, devImpl, devPerf] = await Promise.all([
       runQuantPlanner(client, ledger, weights, research),
       runMarketingLead(client, research, latestQuant, ga4, sentry),
       runServicePlanner(client, ga4, sentry, research),
-      runBusinessPlanner(client, ga4, research, { headline: "(MKT 동시 진행)" }),
+      runDevImplementer(client, sentry),
+      runDevPerf(client, ga4, sentry),
     ]);
     L(`QUANT-PLAN done: ${plan.headline?.slice(0, 60)}`);
     L(`MKT-LEAD done: ${marketing.headline?.slice(0, 60)}`);
     L(`PLAN-SVC done: ${servicePlan.headline?.slice(0, 60)}`);
+    L(`DEV-IMPL done: ${devImpl.headline?.slice(0, 60)}`);
+    L(`DEV-PERF done: ${devPerf.headline?.slice(0, 60)}`);
+
+    // Step 3: PLAN-BIZ — Step 2 결과 모두 보고 결정
+    const businessPlan = await runBusinessPlanner(client, ga4, research, marketing);
     L(`PLAN-BIZ done: ${businessPlan.headline?.slice(0, 60)}`);
 
     const header = buildCard({
@@ -563,7 +732,7 @@ export default async function handler(req, res) {
       title: `Zepta 일일 스탠드업 — ${fmtKST().slice(0, 8)}`,
       lines: [
         `shadow 거래 ${ledger.length}건 진행 중, 누적 마감 ${closedCount}건`,
-        `퀀트팀(RES/PLAN) + 마케팅(MKT) + 기획(SVC/BIZ) 5명 보고`,
+        `퀀트(RES/PLAN) + 마케팅(MKT) + 기획(SVC/BIZ) + 개발(IMPL/PERF) 7명 보고`,
       ],
       footer: ga4 && !ga4.error ? `어제 GA4 사용자 ${ga4.users}명 · 세션 ${ga4.sessions}건` : undefined,
     });
@@ -575,6 +744,8 @@ export default async function handler(req, res) {
       buildCardsForMarketing(marketing),
       buildCardsForServicePlanner(servicePlan),
       buildCardsForBusinessPlanner(businessPlan),
+      buildCardsForDevImplementer(devImpl),
+      buildCardsForDevPerf(devPerf),
     ];
 
     if (dryRun) {
@@ -587,6 +758,8 @@ export default async function handler(req, res) {
         marketing,
         servicePlan,
         businessPlan,
+        devImpl,
+        devPerf,
         ga4: ga4 ? { connected: !ga4.error, ...(ga4.error ? { error: ga4.error } : {}) } : { connected: false },
         sentry: sentry ? { connected: !sentry.error } : { connected: false },
         log,
@@ -605,6 +778,8 @@ export default async function handler(req, res) {
       marketing,
       servicePlan,
       businessPlan,
+      devImpl,
+      devPerf,
       log,
     });
   } catch (err) {

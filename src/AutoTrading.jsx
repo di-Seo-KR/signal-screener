@@ -919,7 +919,13 @@ function ActiveBotCarousel({ activeBots, allBotPerf, onSelectBot, onStopBot, onA
           const roiPct = allocation > 0 ? (totalPL / allocation) * 100 : 0;
           const rawMDD = bp?.snapshot?.mdd || 0;
           const kvMDD = rawMDD >= 99.9 ? 0 : rawMDD;
-          const pnlData = bp?.equityCurve && bp.equityCurve.length >= 2 ? bp.equityCurve : [];
+          // 폴백: history 가 아직 안 쌓였으면 시작점→현재 2점으로 스파크라인 합성
+          // (cron 첫 실행 후 ~15분 내 진짜 곡선으로 자동 교체됨)
+          const pnlData = bp?.equityCurve && bp.equityCurve.length >= 2
+            ? bp.equityCurve
+            : (allocation > 0 && (kvTrades > 0 || totalPL !== 0)
+              ? [100, 100 + (totalPL / allocation) * 100]
+              : []);
           const botIsPositive = roiPct >= 0;
 
           return (
@@ -975,7 +981,7 @@ function ActiveBotCarousel({ activeBots, allBotPerf, onSelectBot, onStopBot, onA
                   );
                 })() : (
                   <div className="h-[46px] flex items-center justify-center rounded" style={{ background: `${c.text3}06` }}>
-                    <span className="text-xs" style={{ color: c.text3 }}>데이터 수집 중...</span>
+                    <span className="text-xs" style={{ color: c.text3 }}>차트는 첫 거래 직후부터 표시돼요</span>
                   </div>
                 )}
               </div>
@@ -1230,17 +1236,33 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
               gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(6, 1fr)",
               gap: isMobile ? "6px" : "10px",
             }}>
-              {[
-                { label: "미실현 손익", value: `${grandUnrealized >= 0 ? "+" : ""}$${grandUnrealized.toFixed(2)}`, color: grandUnrealized >= 0 ? c.green : c.red },
-                { label: "실현 손익", value: `${grandRealized >= 0 ? "+" : ""}$${grandRealized.toFixed(2)}`, color: grandRealized >= 0 ? c.green : c.red },
-                { label: "승률", value: grandTrades > 0 ? `${grandWinRate.toFixed(1)}%` : "--", color: grandWinRate >= 50 ? c.green : c.text1 },
-                { label: "총 거래", value: `${grandTrades}회`, color: c.text1 },
-                { label: "활성 봇", value: `${runningBots.length}개`, color: c.blue },
-                { label: "총 승/패", value: `${grandWins}/${grandTrades - grandWins}`, color: c.text1 },
-              ].map((m, i) => (
-                <div key={i} className="rounded-[10px] text-center" style={{ padding: isMobile ? "8px 6px" : "10px 12px", background: c.card2 }}>
-                  <div className="mb-0.5 whitespace-nowrap" style={{ fontSize: isMobile ? "11px" : "13px", color: c.text3 }}>{m.label}</div>
-                  <div className="font-bold whitespace-nowrap" style={{ fontSize: isMobile ? "14px" : "16px", color: m.color }}>{m.value}</div>
+              {(() => {
+                // 승률 색상 강조 — 트레이더가 바로 알아볼 수 있도록
+                //   < 30% 빨강 (위험)  /  30~49% 노랑 (주의)  /  ≥ 50% 초록 (양호)
+                const winRateColor = grandTrades === 0
+                  ? c.text3
+                  : grandWinRate < 30 ? c.red
+                  : grandWinRate < 50 ? (c.yellow || "#F5A524")
+                  : c.green;
+                const winRateHint = grandTrades === 0 ? ""
+                  : grandWinRate < 30 ? " ⚠️"
+                  : grandWinRate >= 50 ? " ✓" : "";
+                return [
+                  { label: "미실현 손익", value: `${grandUnrealized >= 0 ? "+" : ""}$${grandUnrealized.toFixed(2)}`, color: grandUnrealized >= 0 ? c.green : c.red },
+                  { label: "실현 손익", value: `${grandRealized >= 0 ? "+" : ""}$${grandRealized.toFixed(2)}`, color: grandRealized >= 0 ? c.green : c.red },
+                  { label: "승률", value: grandTrades > 0 ? `${grandWinRate.toFixed(1)}%${winRateHint}` : "--", color: winRateColor },
+                  { label: "총 거래", value: `${grandTrades.toLocaleString()}회`, color: c.text1 },
+                  { label: "활성 봇", value: `${runningBots.length}개`, color: c.blue },
+                  { label: "총 승/패", value: `${grandWins.toLocaleString()}/${(grandTrades - grandWins).toLocaleString()}`, color: c.text1 },
+                ];
+              })().map((m, i) => (
+                <div key={i} className="rounded-[10px] text-center" style={{
+                  padding: isMobile ? "10px 6px" : "12px 12px",
+                  background: c.card2,
+                  border: `1px solid ${c.border}30`,
+                }}>
+                  <div className="mb-1 whitespace-nowrap" style={{ fontSize: isMobile ? "11px" : "13px", color: c.text3 }}>{m.label}</div>
+                  <div className="font-bold whitespace-nowrap" style={{ fontSize: isMobile ? "15px" : "17px", color: m.color, letterSpacing: "-0.01em" }}>{m.value}</div>
                 </div>
               ))}
             </div>
@@ -1270,7 +1292,13 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
           const rawDD = bp?.snapshot?.dd || 0;
           const rawMDD = bp?.snapshot?.mdd || 0;
           const kvMDD = rawMDD >= 99.9 ? 0 : rawMDD;
-          const pnlData = bp?.equityCurve && bp.equityCurve.length >= 2 ? bp.equityCurve : [];
+          // 폴백: history 가 아직 안 쌓였으면 시작점→현재 2점으로 스파크라인 합성
+          // (cron 첫 실행 후 ~15분 내 진짜 곡선으로 자동 교체됨)
+          const pnlData = bp?.equityCurve && bp.equityCurve.length >= 2
+            ? bp.equityCurve
+            : (allocation > 0 && (kvTrades > 0 || totalPL !== 0)
+              ? [100, 100 + (totalPL / allocation) * 100]
+              : []);
           const botIsPositive = roiPct >= 0;
 
           return (
@@ -1329,7 +1357,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                   );
                 })() : (
                   <div className="h-[50px] flex items-center justify-center rounded" style={{ background: `${c.text3}06` }}>
-                    <span className="text-xs" style={{ color: c.text3 }}>데이터 수집 중...</span>
+                    <span className="text-xs" style={{ color: c.text3 }}>차트는 첫 거래 직후부터 표시돼요</span>
                   </div>
                 )}
               </div>

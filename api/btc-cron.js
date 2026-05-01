@@ -687,6 +687,10 @@ export default async function handler(req, res) {
 
         const snapKey = `di:bot:${botId}:snapshot`;
         const prevSnap = (await kv.get(snapKey)) || { peakEquity: botEquity, mdd: 0, history: [] };
+        // 에쿼티 합리 범위 (배분금액 대비) — peak/history 방어용으로 먼저 산출
+        // ⚠️ TDZ 버그 fix: maxEq/minEq 를 사용 시점보다 먼저 선언
+        const maxEq = botAllocation * 3;
+        const minEq = botAllocation * 0.1;
         // 에쿼티 기준 peak/DD/MDD (배분금액 대비)
         // peakEquity도 합리적 범위 내에서만 사용 (손상 데이터 방어)
         const prevPeak = prevSnap.peakEquity || prevSnap.peakValue || botEquity;
@@ -698,8 +702,6 @@ export default async function handler(req, res) {
         const mdd = Math.max(prevMDD, dd);
         // 에쿼티 히스토리 (최근 500개 — 15분 간격이면 ~5일)
         // 구버전에서 전체 포트폴리오 에쿼티가 저장된 손상 항목 자동 정리
-        const maxEq = botAllocation * 3;
-        const minEq = botAllocation * 0.1;
         const cleanedPrevHistory = (prevSnap.history || []).filter(h => {
           const eq = h.equity;
           return eq != null && eq > 0 && eq >= minEq && eq <= maxEq;
