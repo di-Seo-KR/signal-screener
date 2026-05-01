@@ -133,5 +133,60 @@ Phase 3:
 
 ---
 
-**마지막 업데이트**: 2026-04-12
+---
+
+## 일일 자동 스탠드업 (Daily Standup) — 2026-05 도입
+
+### 개요
+매일 KST 06:00 에 Vercel cron 이 `/api/agents/daily-standup` 을 호출하여
+지정된 에이전트들이 Claude API 를 통해 분석 → 텔레그램으로 일괄 발송.
+
+### 운영 모드
+- **자동 실행**: vercel.json `crons` 의 `"path": "/api/agents/daily-standup"` 항목 참고
+- **수동 실행 (dry run)**: `GET /api/agents/daily-standup?dryRun=1` — 텔레그램 발송 없이 JSON 응답으로 결과 확인
+- **수동 실행 (실 발송)**: `GET /api/agents/daily-standup`
+
+### Week 1 — 퀀트팀 (현재 가동)
+
+| 코드명 | 역할 | 입력 | 출력 |
+|---|---|---|---|
+| QUANT-RES | 알파 리서처 | shadow ledger 7일치 + 가중치 | 헤드라인 / 어제 잘된 것·부진한 것 / 오늘 주목 / 새 알파 후보 / 행동 가이드 |
+| QUANT-PLAN | 전략 기획자 | 동일 입력 + RES 메타 | 헤드라인 / 승급·디머지 후보 / 가중치 조정 / 리스크 경고 |
+
+### 텔레그램 메시지 표준
+- 모든 에이전트 메시지는 `api/_shared/telegram.js` 의 `buildCard()` + `sendCards()` 사용
+- **금기**: 전문 용어 직역 (예: "Hurst 레짐 변화 0.45→0.62") — 평어로 풀어서 비유까지
+- **권장**: `tag` (이모지) → `title` (한 줄 제목) → `lines[]` (불릿) → `hint` (그래서 뭐) → `footer` (출처)
+
+### Week 2~ 확장 계획
+
+```
+Week 2: MKT-LEAD
+  - 입력: GA4 어제 데이터, 검색어 트렌드, 경쟁사 변화
+  - 출력: 어제 유입 요약, 오늘 콘텐츠 1건 초안, 광고 최적화 1건
+
+Week 3: PLAN-SVC + PLAN-BIZ
+  - 입력: Supabase 사용자 행동 로그, GA 퍼널, Sentry 이슈
+  - 출력: PLAN-SVC → 화면 개선 제안 1건
+        PLAN-BIZ → 경쟁사 변화 + 수익 다각화 제안
+
+Week 4: DEV-IMPL + DEV-PERF
+  - 입력: Sentry 새 이슈, Lighthouse 어제 대비 변화, npm audit
+  - 출력: DEV-IMPL → 픽스 후보 PR 초안 (위험도 분류)
+        DEV-PERF → 회귀 알림 / 청크 사이즈 변화
+```
+
+### 비용 / 한도
+- Claude API 토큰: 역할당 ~3,000 input + ~1,500 output = $0.05 ~ $0.10/일
+- 7개 역할 매일 = 월 약 $10 ~ $20 (Sonnet 4.6 기준)
+- Vercel cron: Hobby 플랜 무료 한도 내
+
+### 코드 위치
+- `api/agents/daily-standup.js` — 메인 핸들러
+- `api/_shared/telegram.js` — 공용 텔레그램 발송
+- `vercel.json` `crons` — 스케줄 등록
+
+---
+
+**마지막 업데이트**: 2026-05-01
 **적용 대상**: Zepta 팀 전체

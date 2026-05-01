@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
     "@fontsource-variable/geist": "^5.2.8",
     "@supabase/supabase-js": "^2.49.1",
     "@tailwindcss/vite": "^4.2.2",
