@@ -890,9 +890,17 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                       const baseY = toY(baseVal);
                       const isPnl = detailChartTab === "pnl";
                       // Y축 라벨 값 (5단계)
+                      // ROI 모드: equityCurve 가 100 베이스(예: 102.58 = +2.58%) 라서
+                      // 100 을 빼서 진짜 ROI % 로 표시 — 그래야 "+2.58%" 로 보임
                       const ySteps = [0, 0.25, 0.5, 0.75, 1].map(f => {
                         const val = min + rng * (1 - f);
-                        return { y: 6 + f * (ch - 12), label: isPnl ? `$${val.toFixed(0)}` : `${val.toFixed(1)}%` };
+                        const roiPct = val - 100;
+                        return {
+                          y: 6 + f * (ch - 12),
+                          label: isPnl
+                            ? `$${val.toFixed(0)}`
+                            : `${roiPct >= 0 ? "+" : ""}${roiPct.toFixed(1)}%`,
+                        };
                       });
                       return (
                         <div style={{ position: "relative" }}
@@ -950,7 +958,12 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                               boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
                             }}>
                               <div style={{ fontSize: "13px", fontWeight: 700, color: clr }}>
-                                {isPnl ? `$${activeCurve[chartHover.idx].toFixed(2)}` : `${activeCurve[chartHover.idx].toFixed(2)}%`}
+                                {isPnl
+                                  ? `$${activeCurve[chartHover.idx].toFixed(2)}`
+                                  : (() => {
+                                      const r = activeCurve[chartHover.idx] - 100;
+                                      return `${r >= 0 ? "+" : ""}${r.toFixed(2)}%`;
+                                    })()}
                               </div>
                               <div style={{ fontSize: "11px", color: C.text3 }}>#{chartHover.idx + 1}</div>
                             </div>
