@@ -1,7 +1,10 @@
-// Vercel Cron — 멀티 자산 암호화폐 자동매매 서버사이드 엔진
+// Zepta Cron — 멀티 자산 암호화폐 자동매매 서버사이드 엔진
 // 15분마다 실행: Binance 캔들 → 전략 시그널 → KV 가상 포트폴리오 매매
 // 자체 가상매매 엔진 (Binance 실시간 가격 기반)
 // 환경변수: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (선택)
+// 텔레그램 알림: api/_shared/telegram.js 의 buildCard/sendCards (사용자 친화 평어)
+
+import { sendCards, buildCard, fmtKSTShort } from "./_shared/telegram.js";
 
 export const config = { maxDuration: 120 };
 
@@ -726,11 +729,10 @@ export default async function handler(req, res) {
       addLog(`⚠️ 봇별 성과 KV 저장 실패: ${e.message}`);
     }
 
-    // ── 텔레그램 알림 ──
+    // ── 텔레그램 알림 (카드형, 사용자 친화) ──
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    const tgMsg = buildTelegramMessage(assetResults, positionMap, equity, cash, duration, fngData);
-
-    await sendTelegram(TG_TOKEN, TG_CHAT, tgMsg);
+    const cards = buildTelegramCards(assetResults, positionMap, equity, cash, duration, fngData);
+    await sendCards(cards);
     addLog(`📨 텔레그램 전송 완료 (${duration}s)`);
 
     return res.status(200).json({
@@ -750,79 +752,76 @@ export default async function handler(req, res) {
 // ════════════════════════════════════════════════════════
 // 텔레그램 메시지 생성
 // ════════════════════════════════════════════════════════
-function buildTelegramMessage(assetResults, positionMap, equity, cash, duration, fngData) {
-  const now = new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul", hour12: false });
-  const lines = [
-    `🤖 *DI금융 크립토 자동매매 리포트*`,
-    `━━━━━━━━━━━━━━━━━━━━`,
-    `📅 ${now}`,
-  ];
+// 사용자 친화 카드형 메시지 빌더 — buildCard 사용으로 자동 humanize 적용
+function buildTelegramCards(assetResults, positionMap, equity, cash, duration, fngData) {
+  const cards = [];
 
-  // Fear & Greed with visual gauge
+  // 카드 1) 시장 분위기 + 봇 상태 헤더
+  const fngLines = [];
   if (fngData) {
-    const fVal = fngData.value;
-    const fBar = fVal <= 25 ? '🟥🟥🟥⬜⬜' : fVal <= 45 ? '🟧🟧🟧⬜⬜' : fVal <= 55 ? '🟨🟨🟨⬜⬜' : fVal <= 75 ? '🟩🟩🟩⬜⬜' : '🟩🟩🟩🟩🟩';
-    const fAdvice = fVal <= 25 ? '극공포 → 매수 기회 탐색' : fVal <= 45 ? '공포 → 선별적 매수' : fVal <= 55 ? '중립 → 시그널 대기' : fVal <= 75 ? '탐욕 → 신중한 매수' : '극탐욕 → 이익 확보 우선';
-    lines.push(`📊 F&G: ${fVal} ${fBar}`);
-    lines.push(`   ${fngData.classification} → ${fAdvice}`);
+    const v = fngData.value;
+    const mood =
+      v <= 25 ? `극도 공포 (${v}/100) — 단기 급락 후 매수 기회 탐색 구간이에요` :
+      v <= 45 ? `공포 (${v}/100) — 선별적 매수 가능, 분할 진입 권장` :
+      v <= 55 ? `중립 (${v}/100) — 명확한 시그널 나올 때까지 기다리는 구간` :
+      v <= 75 ? `탐욕 (${v}/100) — 신중하게, 추격매수는 자제` :
+                `극도 탐욕 (${v}/100) — 이익 확보 우선, 신규 진입 주의`;
+    fngLines.push(`시장 심리: ${mood}`);
+  }
+  cards.push(buildCard({
+    tag: "🤖",
+    title: "Zepta 크립토 자동매매 리포트",
+    lines: fngLines.length ? fngLines : ["봇이 정상 가동 중이에요"],
+    footer: `${fmtKSTShort()} · 15분 간격 · ${duration}s`,
+  }));
+
+  // 카드 2) 시그널 — 액션 있는 종목만
+  const acted = assetResults.filter((r) => r.signal);
+  if (acted.length > 0) {
+    const lines = acted.map((r) => {
+      const dir = r.signal.type === "BUY" ? "매수" : "매도";
+      const grade = r.signal.confidence === "A" ? "강" : r.signal.confidence === "B" ? "중" : "약";
+      const exec =
+        r.type === "BUY" ? " → 가상 체결됨" :
+        r.type === "SELL" ? " → 가상 정리됨" : "";
+      const amt = r.amount ? ` ($${Number(r.amount).toFixed(0)})` : "";
+      return `${r.asset} ${dir} 신호 (강도 ${grade})${exec}${amt} — ${r.signal.reason}`;
+    });
+    cards.push(buildCard({
+      tag: "🔍",
+      title: `오늘의 매매 신호 ${acted.length}건`,
+      lines,
+    }));
   }
 
-  lines.push(``);
-
-  // Asset signals with detailed breakdown
-  const hasAction = assetResults.some(r => r.signal);
-  if (hasAction) {
-    lines.push(`🔍 *시그널 분석*`);
-  }
-
-  for (const result of assetResults) {
-    if (result.signal) {
-      const icon = result.signal.type === "BUY" ? "🟢" : "🔴";
-      const grade = result.signal.confidence === "A" ? "⭐⭐⭐" : result.signal.confidence === "B" ? "⭐⭐" : "⭐";
-      const actionEmoji = result.type === "BUY" ? " → 매수 체결!" : result.type === "SELL" ? " → 매도 체결!" : "";
-      lines.push(`${icon} *${result.asset}*: ${result.signal.type} ${grade} (${result.signal.score}pt/${result.signal.factors}F)${actionEmoji}`);
-      lines.push(`   📝 ${result.signal.reason}`);
-      if (result.amount) {
-        lines.push(`   💵 체결: $${result.amount.toFixed(0)}`);
-      }
-    } else if (result.action === "wait" || result.action === "skip") {
-      lines.push(`⏸️ ${result.asset}: 시그널 대기`);
-    } else if (!result.ok) {
-      lines.push(`⚠️ ${result.asset}: ${result.error || '오류'}`);
-    }
-  }
-
-  // Portfolio with risk metrics
-  lines.push(``, `💰 *포트폴리오*`);
-  lines.push(`━━━━━━━━━━━━━━━━━━━━`);
+  // 카드 3) 포트폴리오 스냅샷
   const cashPct = equity > 0 ? ((cash / equity) * 100) : 0;
-  lines.push(`계좌: $${equity.toFixed(0)} | 현금: $${cash.toFixed(0)} (${cashPct.toFixed(0)}%)`);
-
-  let totalCryptoValue = 0;
-  let totalCryptoPnL = 0;
+  const portLines = [
+    `계좌 자산 $${equity.toFixed(0)}, 현금 비중 ${cashPct.toFixed(0)}%`,
+  ];
+  let totalValue = 0, totalPnL = 0;
   for (const asset of CRYPTO_ASSETS) {
     const pos = positionMap[asset];
-    if (pos) {
-      const mv = parseFloat(pos.market_value || 0);
-      const pl = parseFloat(pos.unrealized_pl || 0);
-      const cost = parseFloat(pos.cost_basis || 0);
-      const plPct = cost > 0 ? ((pl / cost) * 100) : 0;
-      const weight = equity > 0 ? ((mv / equity) * 100) : 0;
-      totalCryptoValue += mv;
-      totalCryptoPnL += pl;
-      const icon = pl >= 0 ? "📈" : "📉";
-      lines.push(`${icon} ${asset}: $${mv.toFixed(0)} (${plPct >= 0 ? '+' : ''}${plPct.toFixed(1)}%) [${weight.toFixed(0)}%]`);
-    }
+    if (!pos) continue;
+    const mv = parseFloat(pos.market_value || 0);
+    const pl = parseFloat(pos.unrealized_pl || 0);
+    const cost = parseFloat(pos.cost_basis || 0);
+    const plPct = cost > 0 ? ((pl / cost) * 100) : 0;
+    totalValue += mv; totalPnL += pl;
+    const sign = pl >= 0 ? "+" : "";
+    portLines.push(`${asset}: $${mv.toFixed(0)} (${sign}${plPct.toFixed(1)}%)`);
   }
-
-  if (totalCryptoValue > 0) {
-    const totalExposure = equity > 0 ? ((totalCryptoValue / equity) * 100) : 0;
-    lines.push(`──`);
-    lines.push(`📊 크립토 노출: ${totalExposure.toFixed(0)}%/${(MAX_TOTAL_CRYPTO_EXPOSURE * 100).toFixed(0)}% | P/L: $${totalCryptoPnL >= 0 ? '+' : ''}${totalCryptoPnL.toFixed(0)}`);
+  if (totalValue > 0) {
+    const exposure = equity > 0 ? ((totalValue / equity) * 100) : 0;
+    portLines.push(`크립토 노출 ${exposure.toFixed(0)}% / 최대 ${(MAX_TOTAL_CRYPTO_EXPOSURE * 100).toFixed(0)}%, 미실현 손익 ${totalPnL >= 0 ? "+" : ""}$${totalPnL.toFixed(0)}`);
   }
+  cards.push(buildCard({
+    tag: "💰",
+    title: "포트폴리오 현황",
+    lines: portLines,
+  }));
 
-  lines.push(``, `⏱️ ${duration}s | DI금융 Crypto v3`);
-  return lines.join("\n");
+  return cards;
 }
 
 // ════════════════════════════════════════════════════════
@@ -1147,9 +1146,10 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
 }
 
 // ════════════════════════════════════════════════════════
-// 텔레그램 전송
+// (구버전 sendTelegram 제거 — _shared/telegram.js sendCards 로 대체됨)
+// 아래 함수는 호환성을 위해 남겨두지만 호출되지 않습니다.
 // ════════════════════════════════════════════════════════
-async function sendTelegram(token, chatId, text) {
+async function _legacySendTelegram(token, chatId, text) {
   if (!token || !chatId) return;
   try {
     await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {

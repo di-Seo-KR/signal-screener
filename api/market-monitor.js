@@ -1,10 +1,13 @@
 // ═══════════════════════════════════════════════════════════════
-// DI금융 — 24/7 시장 감시 엔진 v1.0
+// Zepta — 24/7 시장 감시 엔진 v1.1
 // ═══════════════════════════════════════════════════════════════
 // 10분마다 실행: 핵심 지표 스냅샷 → KV 누적 → 레짐 변화 감지 → 알림
 // Hurst/ER/ATR 변화율을 연속 추적하여 "시장이 바뀌고 있는 순간" 포착
 // 환경변수: KV_REST_API_URL, KV_REST_API_TOKEN, TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+// 알림 포맷: api/_shared/telegram.js 의 buildCard/sendCards 사용 (사용자 친화)
 // ═══════════════════════════════════════════════════════════════
+
+import { sendCards, buildCard, fmtKSTShort } from "./_shared/telegram.js";
 
 export const config = { maxDuration: 60 };
 
@@ -232,17 +235,18 @@ export default async function handler(req, res) {
       }
 
       if (alertsToSend.length > 0) {
-        const tgMsg = [
-          `🚨 *DI금융 마켓 모니터 알림*`,
-          `━━━━━━━━━━━━━━━━━━━━`,
-          `📅 ${new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul", hour12: false })}`,
-          ``,
-          ...alertsToSend.map(a => a.msg),
-          ``,
-          `⏱️ 10분 간격 자동 감시 | DI금융 v3`,
-        ].join("\n");
+        // 친화 포맷 카드: humanize() 가 알림별 전문 용어를 평어로 자동 변환
+        const card = buildCard({
+          tag: "🚨",
+          title: `시장에서 주목할 신호 ${alertsToSend.length}건`,
+          lines: alertsToSend.map((a) => a.msg),
+          hint: alertsToSend.length >= 3
+            ? "여러 종목·지표가 동시에 흔들리는 중 — 무리한 진입은 잠시 보류하시는 게 안전합니다"
+            : undefined,
+          footer: `${fmtKSTShort()} · 10분 간격 자동 감시 · Zepta`,
+        });
 
-        await sendTelegram(TG_TOKEN, TG_CHAT, tgMsg);
+        await sendCards([card]);
         L(`📨 텔레그램 알림 ${alertsToSend.length}건 전송`);
       }
     }
@@ -341,13 +345,4 @@ function calcSMASimple(arr, period) {
   return sum / period;
 }
 
-async function sendTelegram(token, chatId, text) {
-  if (!token || !chatId) return;
-  try {
-    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "Markdown" }),
-    });
-  } catch (e) { console.error("Telegram error:", e.message); }
-}
+// (구버전 sendTelegram 제거 — _shared/telegram.js 의 sendCards 로 대체됨)

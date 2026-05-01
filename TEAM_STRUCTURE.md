@@ -263,8 +263,8 @@ Zepta 의 본업은 퀀트 자동매매. 알파 리서치와 전략 운용 결�
 ```
 
 **도입 단계**:
-- **Week 1 (현재)**: QUANT-RES + QUANT-PLAN
-- **Week 2**: MKT-LEAD (어제 GA 유입 분석 + 오늘 콘텐츠 후보)
+- **Week 1 (현재)**: QUANT-RES + QUANT-PLAN + **MKT-LEAD** (오늘의 그로스 제안)
+- **Week 2 (예정)**: GA4·Sentry 연동 강화 — MKT-LEAD 가 실제 유입 데이터 분석
 - **Week 3**: PLAN-SVC + PLAN-BIZ (사용자 행동 → 화면/사업 제안)
 - **Week 4**: DEV-IMPL + DEV-PERF (Sentry 에러 트리아지 + Lighthouse 회귀)
 

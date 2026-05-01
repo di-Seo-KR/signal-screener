@@ -1,12 +1,15 @@
 // ═══════════════════════════════════════════════════════════════
-// DI금융 — 퀀트 전략 연구 엔진 v2.0 (Production-Grade)
+// Zepta — 퀀트 전략 연구 엔진 v2.1 (Production-Grade)
 // ═══════════════════════════════════════════════════════════════
 // 매일 06:00 UTC 자동 실행 (Vercel Cron)
 // 일별 배치 로테이션: Day0=대형성장, Day1=대형가치+금융, Day2=반도체+소비재,
 //   Day3=헬스+산업+에너지, Day4=ETF+크립토, Day5=중형성장, Day6=글로벌+테마
 // 15개 전략 × 다중 파라미터 × 8~12종목/일 = 매주 60+종목 커버
 // 환경변수: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+// 텔레그램 알림: api/_shared/telegram.js 의 buildCard/sendCards (사용자 친화)
 // ═══════════════════════════════════════════════════════════════
+
+import { sendCards, buildCard, fmtKSTShort } from "./_shared/telegram.js";
 
 // ── 유니버스: 7개 배치 (요일별 로테이션) ──
 const BATCHES = [
@@ -296,79 +299,77 @@ export default async function handler(req, res) {
     const date = today.toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
     const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
 
-    let msg = `🔬 DI금융 퀀트 리서치 v2.0\n`;
-    msg += `━━━━━━━━━━━━━━━━━━━━\n`;
-    msg += `📅 ${date} (${dayNames[dayOfWeek]}) | ${batch.name}\n`;
-    msg += `📊 ${fetchCount}종목 × ${testCount}건 백테스트 (${dur}s)\n\n`;
-
-    // 시장 센티먼트 요약
+    // ── 사용자 친화 카드형 리포트 ──
+    // Sharpe·MDD·PF 같은 전문 지표는 평어 부연 설명을 함께 표기
     const avgAllSharpe = results.length > 0 ? results.reduce((s, r) => s + (r.sharpe || 0), 0) / results.length : 0;
     const bullSignals = actionable.filter(r => r.lastSignal?.type === "BUY").length;
     const bearSignals = actionable.filter(r => r.lastSignal?.type === "SELL").length;
-    const sentiment = avgAllSharpe > 0.3 ? "🟢 강세" : avgAllSharpe > 0 ? "🟡 중립" : "🔴 약세";
-    msg += `📡 시장 센티먼트: ${sentiment} (avg Sharpe ${avgAllSharpe.toFixed(2)})\n`;
-    msg += `   매수 ${bullSignals} | 매도 ${bearSignals} 시그널\n\n`;
+    const sentimentText =
+      avgAllSharpe > 0.3 ? `강세 흐름 (전략들이 평균적으로 잘 통하는 구간)` :
+      avgAllSharpe > 0   ? `중립 흐름 (어떤 전략은 통하고 어떤 건 안 통함)` :
+                            `약세 흐름 (전반적으로 전략이 잘 안 먹히는 구간 — 신중하게)`;
 
-    // Top 5 Sharpe
-    msg += `🏆 Top 5 리스크 조정 수익\n`;
-    topSharpe.slice(0, 5).forEach((r, i) => {
-      const medal = ["🥇","🥈","🥉","4️⃣","5️⃣"][i];
-      msg += `${medal} ${r.name} × ${r.strat}\n`;
-      msg += `   Sharpe ${r.sharpe?.toFixed(2)} | Sortino ${r.sortino?.toFixed(2)} | 수익 ${r.ret?.toFixed(1)}%\n`;
-      msg += `   승률 ${r.winRate?.toFixed(0)}% | MDD ${r.mdd?.toFixed(1)}% | PF ${r.pf?.toFixed(1)}\n`;
-    });
+    const cards = [];
 
-    // Top 5 수익
-    msg += `\n💰 Top 5 절대수익\n`;
-    topReturn.slice(0, 5).forEach((r, i) => {
-      msg += `${i + 1}. ${r.name} × ${r.strat}: ${r.ret?.toFixed(1)}%`;
-      msg += ` (Sharpe ${r.sharpe?.toFixed(2)}, MDD ${r.mdd?.toFixed(1)}%)\n`;
-    });
+    // 카드 1) 헤더 — 오늘 시장 분위기 + 신호 카운트
+    cards.push(buildCard({
+      tag: "🔬",
+      title: `Zepta 퀀트 리서치 — ${date} (${dayNames[dayOfWeek]})`,
+      lines: [
+        `오늘 분석 배치: ${batch.name}`,
+        `${fetchCount}종목 × ${testCount}건 백테스트 완료 (${dur}초)`,
+        `시장 분위기: ${sentimentText}`,
+        `오늘 신호: 매수 ${bullSignals}건 · 매도 ${bearSignals}건`,
+      ],
+      footer: `Sharpe = 위험 대비 수익률 점수 (1.0 이상이면 우수, 0.5 미만이면 약함)`,
+    }));
 
-    // 전략 랭킹 (간소화)
-    msg += `\n📈 전략 성과 TOP 5\n`;
-    stratRank.slice(0, 5).forEach((s, i) => {
-      msg += `${i + 1}. ${s.name}: Sharpe ${s.avgSharpe.toFixed(2)} | 수익 ${s.avgReturn.toFixed(1)}% | 승률 ${s.avgWinRate.toFixed(0)}%\n`;
-    });
-
-    // 실전 시그널 (강화 v2 — 리스크 조정 신뢰도 + 타이밍)
+    // 카드 2) 실전 시그널 (가장 중요)
     if (actionable.length > 0) {
-      msg += `\n🎯 실전 시그널 (최근 3봉, Sharpe>0.5)\n`;
-      msg += `━━━━━━━━━━━━━━━━━━━━\n`;
-      actionable.slice(0, 5).forEach(r => {
-        const icon = r.lastSignal.type === "BUY" ? "🟢 매수" : "🔴 매도";
-        const conf = r.sharpe >= 1.5 ? "⭐⭐⭐" : r.sharpe >= 1.0 ? "⭐⭐" : "⭐";
-        const ageLabel = r.lastSignal.age === 0 ? "오늘" : r.lastSignal.age === 1 ? "어제" : `${r.lastSignal.age}일전`;
-        const rr = r.pf != null && r.pf > 0 ? `PF ${r.pf.toFixed(1)}` : "";
-        msg += `${icon} ${r.name} @ $${r.lastSignal.price?.toFixed(2)} ${conf} (${ageLabel})\n`;
-        msg += `   ${r.strat} | Sharpe ${r.sharpe?.toFixed(2)} | MDD ${r.mdd?.toFixed(1)}% | 승률 ${r.winRate?.toFixed(0)}%`;
-        if (rr) msg += ` | ${rr}`;
-        msg += `\n`;
+      const lines = actionable.slice(0, 5).map((r) => {
+        const dir = r.lastSignal.type === "BUY" ? "매수" : "매도";
+        const grade = r.sharpe >= 1.5 ? "강력" : r.sharpe >= 1.0 ? "중간" : "약함";
+        const age = r.lastSignal.age === 0 ? "오늘" : r.lastSignal.age === 1 ? "어제" : `${r.lastSignal.age}일 전`;
+        const price = r.lastSignal.price?.toFixed(2) || "-";
+        return `${r.name} ${dir} 신호 (강도 ${grade}, ${age}) @ $${price} — ${r.strat} 전략, 백테스트 승률 ${r.winRate?.toFixed(0)}%`;
       });
-      // 시그널 요약 한줄
-      const buyCount = actionable.filter(r => r.lastSignal.type === "BUY").length;
-      const sellCount = actionable.filter(r => r.lastSignal.type === "SELL").length;
-      msg += `   → 매수 ${buyCount}건 / 매도 ${sellCount}건\n`;
+      cards.push(buildCard({
+        tag: "🎯",
+        title: `오늘 실전 매매 신호 ${actionable.length}건 (최근 3봉)`,
+        lines,
+        hint: actionable.length >= 3
+          ? "여러 신호가 동시에 잡혔어요. 한 번에 다 들어가지 말고 강도 높은 순으로 분할 진입하시는 게 안전합니다"
+          : "신호가 충족됐다고 무조건 들어가지 마시고, 본인 손절선·목표가 정한 후에 진입하세요",
+      }));
     } else {
-      msg += `\n🎯 실전 시그널: 조건 충족 종목 없음 (관망)\n`;
+      cards.push(buildCard({
+        tag: "🎯",
+        title: "오늘 실전 매매 신호: 조건 충족 종목 없음",
+        lines: ["조건이 충족되는 종목이 없어요 — 관망이 정답인 날이에요"],
+      }));
     }
 
-    // 종목별 최적 (개선 — 성과 지표 포함)
-    msg += `\n📋 종목별 베스트\n`;
-    const bestEntries = Object.values(bestBySymbol).sort((a, b) => (b.sharpe || 0) - (a.sharpe || 0));
-    bestEntries.forEach(r => {
-      const tier = (r.sharpe || 0) >= 1.5 ? "🥇" : (r.sharpe || 0) >= 1.0 ? "🥈" : (r.sharpe || 0) >= 0.5 ? "🥉" : "  ";
-      msg += `${tier} ${r.name}: ${r.strat} (S${(r.sharpe || 0).toFixed(1)} R${(r.ret || 0).toFixed(0)}%)\n`;
-    });
-    // 전략 다양성 요약
-    const uniqueStrats = new Set(bestEntries.map(r => r.strat));
-    msg += `   전략 다양성: ${uniqueStrats.size}개 전략 사용\n`;
+    // 카드 3) 강세 전략 / 강세 종목 (요약)
+    const stratLines = stratRank.slice(0, 3).map((s, i) =>
+      `${i + 1}위 ${s.name} — 평균 위험조정수익 ${s.avgSharpe.toFixed(2)}, 평균수익 ${s.avgReturn.toFixed(1)}%, 승률 ${s.avgWinRate.toFixed(0)}%`
+    );
+    const symbolLines = topReturn.slice(0, 3).map((r, i) =>
+      `${i + 1}위 ${r.name}: ${r.ret?.toFixed(1)}% 수익 (전략: ${r.strat})`
+    );
+    cards.push(buildCard({
+      tag: "🏆",
+      title: "오늘 가장 잘 통한 전략·종목 (지난 백테스트 기준)",
+      lines: [
+        `▸ 전략 베스트 3:`,
+        ...stratLines,
+        `▸ 종목 베스트 3:`,
+        ...symbolLines,
+      ],
+      footer: `${fmtKSTShort()} · 내일 분석 배치: ${BATCHES[(dayOfWeek + 1) % 7].name}`,
+    }));
 
-    msg += `\n━━━━━━━━━━━━━━━━━━━━\n`;
-    msg += `⏱️ ${dur}s | 내일: ${BATCHES[(dayOfWeek + 1) % 7].name}`;
-
-    await sendTG(TG_TOKEN, TG_CHAT, msg);
-    L(`📨 리포트 전송 완료`);
+    await sendCards(cards);
+    L(`📨 리포트 전송 완료 (${cards.length}장)`);
 
     // ── 영구 아카이브 (di:quant:latest) — 실전매매 엔진이 참조 ──
     try {
@@ -424,7 +425,8 @@ async function fetchYahoo(sym) {
   } catch { return []; }
 }
 
-async function sendTG(token, chatId, text) {
+// (구버전 sendTG — _shared/telegram.js 의 sendCards 로 대체됨, 호환성용 유지)
+async function _legacySendTG(token, chatId, text) {
   if (!token || !chatId) return;
   try {
     // 텔레그램 메시지 길이 제한 (4096자)
