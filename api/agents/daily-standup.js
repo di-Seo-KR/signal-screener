@@ -136,28 +136,52 @@ ${Object.entries(familyStats).map(([f, s]) =>
 }
 
 // ── QUANT-PLAN — 전략 기획자 ──
-async function runQuantPlanner(client, ledger, weights, researchOutput) {
+async function runQuantPlanner(client, ledger, weights, research) {
+  const closed = ledger.filter((e) => e?.status === "CLOSED");
+  const familyStats = {};
+  for (const e of closed) {
+    const fam = e?.plan?.strategyFamily || e?.signal?.strategyFamily || e?.signal?.source || "기타";
+    familyStats[fam] = familyStats[fam] || { count: 0, wins: 0, pnlSum: 0 };
+    familyStats[fam].count++;
+    if ((e?.netPnL || 0) > 0) familyStats[fam].wins++;
+    familyStats[fam].pnlSum += (e?.netPnL || 0);
+  }
+
   const sys = `당신은 Zepta 의 시니어 퀀트 전략 기획자(QUANT-PLAN)입니다.
-- 페르소나: 10년차 퀀트 PM. 의사결정 단호하지만 근거 명확.
-- 역할: shadow ledger 와 리서처 리포트를 바탕으로 "production 승급 / 디머지 / 가중치 조정" 결정을 내림.
-- 출력: 한국어 존댓말, 평어. JSON 만 응답.`;
+- 페르소나: 10년차 퀀트 PM. 의사결정 단호하되 근거 명확. 데이터 부족하면 보류 결정도 OK.
+- 역할: 리서처 리포트(QUANT-RES) 와 shadow ledger 통계를 종합해 운용 결정을 내림.
+- 결정 원칙:
+  1) 리서처가 제안한 알파 후보가 합리적이면 ⇒ 백테스트 단계로 promote 추천
+  2) 패밀리별 마감 거래 ≥ 30건이고 승률·누적손익이 명백히 부진 ⇒ demote 또는 가중치 하향
+  3) 패밀리별 마감 거래 ≥ 30건이고 명백히 양호 ⇒ promote 또는 가중치 상향
+  4) 30건 미만이면 통계적 유의성 부족 ⇒ 가중치 조정 보류, "데이터 더 필요" 명시
+  5) 리서처가 위험 시그널을 짚었으면 ⇒ risk_note 에 반드시 반영
+- 출력: 한국어 존댓말, 평어. JSON 만 응답 (마크다운 코드블록 가능).`;
 
   const user = `오늘 자 전략 운용 결정을 내려주세요.
 
-[리서치 보고]
-${JSON.stringify(researchOutput, null, 2).slice(0, 1200)}
+[리서처(QUANT-RES) 핵심 보고]
+- 헤드라인: ${research?.headline || "(없음)"}
+- 어제 진단: ${JSON.stringify(research?.yesterday || []).slice(0, 400)}
+- 오늘 주목: ${research?.today_watch || "(없음)"}
+- 새 알파 후보: ${research?.alpha_idea?.name || "(없음)"} — ${research?.alpha_idea?.why || ""}
+- 리서처 제안 행동: ${research?.action || "(없음)"}
 
-[shadow ledger 통계]
-- 거래 ${ledger.length}건
-- 가중치: ${JSON.stringify(weights).slice(0, 400)}
+[shadow ledger 통계 — 마감 ${closed.length}건 기준]
+${Object.entries(familyStats).map(([f, s]) =>
+  `- ${f}: ${s.count}건, 승률 ${s.count ? ((s.wins/s.count)*100).toFixed(0) : 0}%, 누적손익 ${s.pnlSum.toFixed(2)}`
+).join("\n") || "- (마감 거래 없음)"}
 
-JSON 형식:
+[현재 가중치]
+${JSON.stringify(weights).slice(0, 400)}
+
+다음 형식의 JSON 으로만 답변:
 {
-  "headline": "한 줄 요약 (예: 'RSI반전' 본격 운용 시작 권고, '거래량돌파' 일시 중단)",
-  "promote": [{"name":"전략명", "reason":"평어 한 줄"}],
+  "headline": "한 줄 요약 (예: '거래량돌파' 가중치 하향 + 리서치 제안 알파 후보 백테스트 단계 진입)",
+  "promote": [{"name":"전략명/알파명", "reason":"평어 한 줄"}],
   "demote": [{"name":"전략명", "reason":"평어 한 줄"}],
   "weight_changes": [{"name":"전략명", "from":1.0, "to":1.2, "why":"평어 한 줄"}],
-  "risk_note": "오늘 특별히 주의할 시장 리스크 한 줄"
+  "risk_note": "오늘 특별히 주의할 시장 리스크 (리서처 경고 반영)"
 }`;
 
   const resp = await client.messages.create({
@@ -216,6 +240,80 @@ function buildCardsForPlan(p) {
   });
 }
 
+// ── MKT-LEAD — 시니어 그로스 마케터 (Week 2) ──
+async function runMarketingLead(client, research, latestQuant) {
+  const sys = `당신은 Zepta 의 시니어 그로스 마케터(MKT-LEAD)입니다.
+- 페르소나: 8년차 그로스 마케터 + SEO 전문가. 한국 핀테크 시장(토스/뱅크샐러드/카카오페이) 잘 알고 있음.
+- 역할: 오늘 시장·퀀트 상황을 보고 Zepta 의 유입을 늘릴 콘텐츠 1건과 SEO 전략 제안.
+- 톤: 한국어 존댓말, 평어. 광고 카피 같은 톤은 자제하고 실용 중심.
+- 콘텐츠는 네이버 블로그 / 티스토리 / 트위터(X) 발행을 가정. 가장 유리한 채널 1개 선택.
+- 출력: JSON 만 응답.`;
+
+  const today = new Date().toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" });
+  const user = `오늘(${today}) Zepta 마케팅 데일리 제안 작성 요청입니다.
+
+[퀀트 리서치 헤드라인]
+${research?.headline || "(없음)"}
+- 어제 진단: ${JSON.stringify(research?.yesterday || []).slice(0, 200)}
+- 새 알파 후보: ${research?.alpha_idea?.name || "(없음)"}
+
+[최근 자동 리서치 요약]
+${latestQuant ? JSON.stringify({
+  batch: latestQuant.batch,
+  topSymbol: latestQuant.topSharpe?.[0],
+  topStrat: latestQuant.stratRank?.[0],
+}).slice(0, 400) : "(없음)"}
+
+다음 형식의 JSON 으로만 답변:
+{
+  "headline": "오늘의 그로스 한 줄 (예: '극공포 구간 진입 → 역발상 매수 전략 콘텐츠로 검색 유입 노리기')",
+  "content_idea": {
+    "channel": "네이버블로그 | 티스토리 | 트위터",
+    "title": "발행할 글 제목 (검색 타이틀로 클릭 유도)",
+    "angle": "핵심 메시지 한 문장",
+    "outline": ["섹션1 한 줄", "섹션2 한 줄", "섹션3 한 줄"]
+  },
+  "seo_keywords": ["키워드1", "키워드2", "키워드3"],
+  "social_post": "트위터/스레드용 짧은 게시물 280자 이내",
+  "ads_note": "쿠팡파트너스/AdSense 배치·문구 최적화 1건 (선택)"
+}`;
+
+  const resp = await client.messages.create({
+    model: MODEL,
+    max_tokens: 1300,
+    system: sys,
+    messages: [{ role: "user", content: user }],
+  });
+
+  const text = resp.content?.[0]?.text || "";
+  return safeJSONParse(text) || { headline: "마케팅 응답 파싱 실패", _raw: text.slice(0, 500) };
+}
+
+function buildCardsForMarketing(m) {
+  if (!m || m._raw) {
+    return buildCard({
+      tag: "📈",
+      title: "MKT-LEAD — 오늘의 그로스 제안",
+      lines: ["응답 파싱 실패 — 원본을 확인해주세요"],
+      footer: m?._raw || "",
+    });
+  }
+  const lines = [m.headline];
+  if (m.content_idea) {
+    lines.push(`콘텐츠 [${m.content_idea.channel}] "${m.content_idea.title}"`);
+    if (m.content_idea.angle) lines.push(`각도: ${m.content_idea.angle}`);
+    for (const o of m.content_idea.outline || []) lines.push(`  · ${o}`);
+  }
+  if (m.seo_keywords?.length) lines.push(`SEO 키워드: ${m.seo_keywords.join(" / ")}`);
+  if (m.social_post) lines.push(`트위터 초안: ${m.social_post}`);
+  return buildCard({
+    tag: "📈",
+    title: "MKT-LEAD — 오늘의 그로스 제안",
+    lines,
+    hint: m.ads_note,
+  });
+}
+
 // ── 메인 핸들러 ──
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -229,31 +327,37 @@ export default async function handler(req, res) {
     }
 
     const kv = await getKv();
-    const [ledger, weights, summary] = await Promise.all([
+    const [ledger, weights, summary, latestQuant] = await Promise.all([
       readShadowLedger(kv, 7),
       readWeights(kv),
       readShadowSummary(kv),
+      kv.get("di:quant:latest").catch(() => null), // quant-research 가 매일 06:00 적립
     ]);
     const closedCount = ledger.filter((e) => e?.status === "CLOSED").length;
     L(`shadow ledger: ${ledger.length} entries (지난 7일, 마감 ${closedCount})`);
 
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-    const [research, plan] = await Promise.all([
-      runQuantResearcher(client, ledger, weights, summary),
-      // PLAN 은 RES 결과를 참고하지만, 동시 실행 후 PLAN 이 RES 반영하는 2-pass 패턴 대신
-      // 1-pass 빠른 실행 — 우선 둘 다 같은 ledger 보고 독립 의견. 추후 2-pass 로 확장 가능.
-      runQuantPlanner(client, ledger, weights, { note: "리서치 동시 진행 중" }),
+    // 2-pass: RES 먼저 실행 → 결과를 PLAN 에 입력으로 전달
+    // 이래야 PLAN 이 RES 의 알파 후보·진단을 보고 의미 있는 승급/디머지 판단을 내림.
+    // 둘 다 약 5~8초 걸리므로 총 10~16초. Vercel 함수 60초 한도 내 안전.
+    const research = await runQuantResearcher(client, ledger, weights, summary);
+    L(`QUANT-RES done: ${research.headline?.slice(0, 60)}`);
+
+    // 3-스텝 파이프라인: RES → PLAN + MKT 병렬 (각자 RES 결과를 입력으로 받음)
+    const [plan, marketing] = await Promise.all([
+      runQuantPlanner(client, ledger, weights, research),
+      runMarketingLead(client, research, latestQuant),
     ]);
-    L(`QUANT-RES headline: ${research.headline?.slice(0, 60)}`);
-    L(`QUANT-PLAN headline: ${plan.headline?.slice(0, 60)}`);
+    L(`QUANT-PLAN done: ${plan.headline?.slice(0, 60)}`);
+    L(`MKT-LEAD done: ${marketing.headline?.slice(0, 60)}`);
 
     const header = buildCard({
       tag: "🌅",
       title: `Zepta 일일 스탠드업 — ${fmtKST().slice(0, 8)}`,
       lines: [
-        `지난 7일 shadow 거래 ${ledger.length}건 분석 완료`,
-        `리서처(QUANT-RES) + 기획자(QUANT-PLAN) 동시 보고`,
+        `지난 7일 shadow 거래 ${ledger.length}건 (마감 ${closedCount}) 분석 완료`,
+        `퀀트 리서치 → 운용 결정 + 그로스 제안 동시 진행`,
       ],
     });
 
@@ -261,6 +365,7 @@ export default async function handler(req, res) {
       header,
       buildCardsForResearch(research),
       buildCardsForPlan(plan),
+      buildCardsForMarketing(marketing),
     ];
 
     if (dryRun) {
@@ -270,6 +375,7 @@ export default async function handler(req, res) {
         cards,
         research,
         plan,
+        marketing,
         log,
       });
     }
@@ -283,6 +389,7 @@ export default async function handler(req, res) {
       messageId: tg.message_id,
       research,
       plan,
+      marketing,
       log,
     });
   } catch (err) {
