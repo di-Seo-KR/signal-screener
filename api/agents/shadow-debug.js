@@ -218,7 +218,7 @@ export default async function handler(req, res) {
       const lines = [
         `윈도우: 최근 ${days}일 / 마감 ${closed.length}건 / 진행 ${open.length}건`,
         `누적 손익 ${result.totals.netPnL >= 0 ? "+" : ""}$${result.totals.netPnL}, 승률 ${result.totals.winRate}`,
-        `청산 이유: ${Object.entries(closeReasonStats).map(([k, v]) => `${k} ${v.count}건(승률 ${v.count ? ((v.wins/v.count)*100).toFixed(0) : 0}%)`).join(" / ") || "(없음)"}`,
+        `청산 이유: ${Object.entries(closeReasonStats).map(([k, v]) => `${k}(${k === "SOFT_TIME" ? "조기TIME" : k}) ${v.count}건(승률 ${v.count ? ((v.wins/v.count)*100).toFixed(0) : 0}%)`).join(" / ") || "(없음)"}`,
         `보유 시간 중앙값 ${result.holdHoursDist.median ?? "—"}h, p90 ${result.holdHoursDist.p90 ?? "—"}h`,
         `손절폭 중앙값 ${result.slTpProfile.slPct?.median ?? "—"}%, 익절폭 ${result.slTpProfile.tpPct?.median ?? "—"}%`,
         worstTrades.length ? `최악 거래: ${worstTrades[0].symbol} ${worstTrades[0].side} $${worstTrades[0].netPnL} (${worstTrades[0].closeReason}, ${worstTrades[0].holdHours}h 보유)` : "",
