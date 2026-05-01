@@ -13,7 +13,9 @@
 대표(서동인 CEO)의 지시 하에 **4개 시니어 팀, 총 9명**이 에이전트 조직으로 운영됩니다.
 모든 팀원은 **시니어 수준**으로 동작하며, 각자의 전문 영역에서 자율적으로 분석·판단·실행합니다.
 
-> **2026-05 업데이트**: 퀀트팀(QUANT-RES, QUANT-PLAN) 신설 + 매일 KST 06:00 자동 스탠드업 도입.
+> **2026-05 업데이트**: 퀀트팀(QUANT-RES, QUANT-PLAN) 신설 + **매일 KST 06:00 자동 스탠드업 가동 중**.
+> 현재 5명 매일 보고: QUANT-RES, QUANT-PLAN, MKT-LEAD, PLAN-SVC, PLAN-BIZ.
+> GA4 / Sentry 환경변수 설정 시 실측 데이터 기반 분석 자동 활성.
 > 자세한 내용은 `TEAM_STRUCTURE.md` 5~6장 / `AGENT_WORKFLOW.md` 일일 자동 스탠드업 섹션 참고.
 
 ### 🔧 개발팀 (4명) — Development Team
