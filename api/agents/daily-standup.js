@@ -36,16 +36,36 @@ async function getKv() {
 }
 
 // shadow ledger 에서 최근 N일 데이터 가져오기
+// 엔진(engine.js)이 쌓는 엔트리는 openedAt(ISO 문자열) 형태이므로
+// 다양한 timestamp 필드를 모두 호환 처리
+function entryTimeMs(e) {
+  if (!e) return 0;
+  if (typeof e.time === "number") return e.time;
+  if (typeof e.openedAt === "string") return Date.parse(e.openedAt) || 0;
+  if (typeof e.openedAt === "number") return e.openedAt;
+  if (typeof e.closedAt === "string") return Date.parse(e.closedAt) || 0;
+  if (typeof e.id === "string") {
+    const m = e.id.match(/^sh-(\d+)-/);
+    if (m) return Number(m[1]) || 0;
+  }
+  return 0;
+}
+
 async function readShadowLedger(kv, days = 7) {
   const ledger = (await kv.get(`di:real:user:${PROBE_USER}:shadow-ledger`)) || [];
   if (!Array.isArray(ledger) || ledger.length === 0) return [];
   const cutoff = Date.now() - days * 86400000;
-  return ledger.filter((e) => (e?.time || 0) >= cutoff).slice(-200);
+  return ledger.filter((e) => entryTimeMs(e) >= cutoff).slice(-200);
 }
 
 // 전략 가중치 / 패밀리별 성과 요약
 async function readWeights(kv) {
   return (await kv.get("di:real:strategy-weights")) || {};
+}
+
+// shadow-monitor 가 만들어두는 누적 요약 (있으면 활용)
+async function readShadowSummary(kv) {
+  return (await kv.get(`di:real:user:${PROBE_USER}:shadow-summary`)) || null;
 }
 
 // ── 안전 JSON 파싱 (Claude 응답에서 마크다운 코드블록 제거) ──
@@ -57,15 +77,18 @@ function safeJSONParse(text) {
 }
 
 // ── QUANT-RES — 알파 리서처 ──
-async function runQuantResearcher(client, ledger, weights) {
-  const winRate = ledger.length ? ledger.filter(e => (e?.result?.pnl || 0) > 0).length / ledger.length : 0;
+async function runQuantResearcher(client, ledger, weights, summary) {
+  // CLOSED 항목만 승률 산정 — OPEN 은 결과 미확정이라 제외
+  const closed = ledger.filter((e) => e?.status === "CLOSED");
+  const winRate = closed.length ? closed.filter((e) => (e?.netPnL || 0) > 0).length / closed.length : 0;
+
   const familyStats = {};
-  for (const e of ledger) {
-    const fam = e?.plan?.strategyFamily || e?.signal?.family || "기타";
+  for (const e of closed) {
+    const fam = e?.plan?.strategyFamily || e?.signal?.strategyFamily || e?.signal?.source || "기타";
     familyStats[fam] = familyStats[fam] || { count: 0, wins: 0, pnlSum: 0 };
     familyStats[fam].count++;
-    if ((e?.result?.pnl || 0) > 0) familyStats[fam].wins++;
-    familyStats[fam].pnlSum += (e?.result?.pnl || 0);
+    if ((e?.netPnL || 0) > 0) familyStats[fam].wins++;
+    familyStats[fam].pnlSum += (e?.netPnL || 0);
   }
 
   const sys = `당신은 Zepta 의 시니어 퀀트 알파 리서처(QUANT-RES)입니다.
@@ -75,15 +98,17 @@ async function runQuantResearcher(client, ledger, weights) {
 - "그래서 뭘 하면 되나" 행동 가이드 포함.
 - JSON 만 응답 (마크다운 코드블록 안에 넣어도 됨).`;
 
+  const openCount = ledger.length - closed.length;
   const user = `오늘 아침 분석 보고서 작성 요청입니다.
 
 [지난 7일 shadow ledger 요약]
-- 전체 가상 거래: ${ledger.length}건
-- 가상 승률: ${(winRate * 100).toFixed(1)}%
-- 패밀리별 성과:
+- 전체 가상 거래: ${ledger.length}건 (마감 ${closed.length} / 진행 ${openCount})
+- 가상 승률 (마감 기준): ${(winRate * 100).toFixed(1)}%
+- 패밀리별 성과 (마감 기준):
 ${Object.entries(familyStats).map(([f, s]) =>
   `  · ${f}: ${s.count}건, 승률 ${s.count ? ((s.wins/s.count)*100).toFixed(0) : 0}%, 누적 가상손익 ${s.pnlSum.toFixed(2)}`
-).join("\n") || "  (데이터 부족)"}
+).join("\n") || "  (마감된 거래 없음)"}
+- 누적 요약: ${summary ? JSON.stringify({ wins: summary.wins, losses: summary.losses, netPnL: Number(summary.netPnL || 0).toFixed(2) }) : "(없음)"}
 - 현재 가중치: ${JSON.stringify(weights).slice(0, 400)}
 
 다음 형식의 JSON 으로만 답변:
@@ -204,16 +229,18 @@ export default async function handler(req, res) {
     }
 
     const kv = await getKv();
-    const [ledger, weights] = await Promise.all([
+    const [ledger, weights, summary] = await Promise.all([
       readShadowLedger(kv, 7),
       readWeights(kv),
+      readShadowSummary(kv),
     ]);
-    L(`shadow ledger: ${ledger.length} entries (지난 7일)`);
+    const closedCount = ledger.filter((e) => e?.status === "CLOSED").length;
+    L(`shadow ledger: ${ledger.length} entries (지난 7일, 마감 ${closedCount})`);
 
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
     const [research, plan] = await Promise.all([
-      runQuantResearcher(client, ledger, weights),
+      runQuantResearcher(client, ledger, weights, summary),
       // PLAN 은 RES 결과를 참고하지만, 동시 실행 후 PLAN 이 RES 반영하는 2-pass 패턴 대신
       // 1-pass 빠른 실행 — 우선 둘 다 같은 ledger 보고 독립 의견. 추후 2-pass 로 확장 가능.
       runQuantPlanner(client, ledger, weights, { note: "리서치 동시 진행 중" }),
