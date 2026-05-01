@@ -419,13 +419,15 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
           </div>
         </>
       ) : (
-        /* PC: 기존 그리드 */
+        /* PC: 벤토 그리드 — 첫 카드(추천) 만 col-span-2 로 강조 */
         <div className="grid gap-3" style={{
-          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
           justifyContent: "start",
         }}>
-          {bots.map((bot) => (
-            <BotCard key={bot.id} bot={bot} onActivate={onActivate} theme={theme} />
+          {bots.map((bot, i) => (
+            <div key={bot.id} style={{ gridColumn: i === 0 ? "span 2" : "span 1" }}>
+              <BotCard bot={bot} onActivate={onActivate} theme={theme} featured={i === 0} />
+            </div>
           ))}
         </div>
       )}
@@ -1321,10 +1323,18 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                   </div>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <div className="text-lg font-extrabold" style={{ color: botIsPositive ? c.green : c.red }}>
+                  <div
+                    key={`roi-${ab.botId}-${roiPct.toFixed(2)}`}
+                    className="text-lg font-extrabold"
+                    style={{
+                      color: botIsPositive ? c.green : c.red,
+                      animation: "roiFlash 0.5s ease-out",
+                      letterSpacing: "-0.02em",
+                    }}
+                  >
                     {roiPct >= 0 ? "+" : ""}{roiPct.toFixed(2)}%
                   </div>
-                  <div className="text-xs font-semibold" style={{ color: totalPL >= 0 ? c.green : c.red }}>
+                  <div className="text-xs font-semibold" style={{ color: totalPL >= 0 ? c.green : c.red, transition: "color 0.3s" }}>
                     {totalPL >= 0 ? "+" : ""}${totalPL.toFixed(2)}
                   </div>
                 </div>
@@ -1433,7 +1443,14 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
         </div>
       )}
 
-      <style>{`@keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:0.4} }`}</style>
+      <style>{`
+        @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes roiFlash {
+          0% { transform: scale(1); opacity: 0.7; }
+          50% { transform: scale(1.06); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }

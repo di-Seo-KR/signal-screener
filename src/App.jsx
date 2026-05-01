@@ -5850,24 +5850,36 @@ function AppInner() {
       const now = new Date();
       const events = (data.events || []).map(e => {
         // 미국 동부시간(ET) 기준 발표 → 한국시간(KST) 변환
-        // Intl로 US Eastern 시간대 자동 처리 (EST/EDT 서머타임 자동 반영)
-        // 대부분 경제지표는 8:30 AM ET 발표 → KST 21:30(EDT) or 22:30(EST)
-        // FOMC는 2:00 PM ET 발표
+        // 대부분 경제지표는 8:30 AM ET 발표, FOMC는 2:00 PM ET 발표
+        // 미국 일광절약시간(DST): 3월 2번째 일요일 ~ 11월 1번째 일요일 → EDT(UTC-4)
+        // 그 외 → EST(UTC-5)
         const isForFed = /FOMC|Fed.*Rate|Interest Rate/i.test(e.event);
         const etHour = isForFed ? 14 : 8;
         const etMin = isForFed ? 0 : 30;
-        // US Eastern 시간을 UTC로 정확히 변환 (서머타임 자동 반영)
-        const etDateStr = `${e.date}T${String(etHour).padStart(2,"0")}:${String(etMin).padStart(2,"0")}:00`;
-        // Intl.DateTimeFormat으로 ET→UTC 오프셋 계산
-        const tempDate = new Date(e.date + "T12:00:00Z");
+        // ── 안전한 DST 감지 (Intl 로케일 파싱 의존 X) ──
         const etOffset = (() => {
-          const etStr = tempDate.toLocaleString("en-US", { timeZone: "America/New_York", hour: "numeric", hour12: false, minute: "numeric" });
-          const utcStr = tempDate.toLocaleString("en-US", { timeZone: "UTC", hour: "numeric", hour12: false, minute: "numeric" });
-          const [etH] = etStr.split(":").map(Number);
-          const [utcH] = utcStr.split(":").map(Number);
-          return utcH - etH; // EDT=4, EST=5
+          // e.date 형식: "2026-04-15"
+          const m = String(e.date || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+          if (!m) return 5; // 형식 불명 → EST 기본값으로 안전하게
+          const month = Number(m[2]);
+          const day = Number(m[3]);
+          // 1~2월, 12월 → 항상 EST
+          if (month < 3 || month > 11) return 5;
+          // 4~10월 → 항상 EDT
+          if (month > 3 && month < 11) return 4;
+          // 3월: 8일 이후 EDT, 11월: 1일 이후 EST
+          if (month === 3) return day >= 8 ? 4 : 5;
+          if (month === 11) return day >= 1 && day < 8 ? 4 : 5;
+          return 5;
         })();
-        const d = new Date(e.date + `T${String(etHour + etOffset).padStart(2,"0")}:${String(etMin).padStart(2,"0")}:00Z`);
+        // ET 시간 + 오프셋 → UTC 시간으로 변환
+        const utcHour = etHour + etOffset;
+        let d = new Date(`${e.date}T${String(utcHour).padStart(2,"0")}:${String(etMin).padStart(2,"0")}:00Z`);
+        // 마지막 안전망: 그래도 Invalid Date 면 e.date 자정 UTC 로 fallback
+        if (isNaN(d.getTime())) {
+          const fallback = new Date(`${e.date}T00:00:00Z`);
+          if (!isNaN(fallback.getTime())) d = fallback;
+        }
         // 한국 시간 기준 날짜 차이 계산
         const koNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
         const koEvt = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
