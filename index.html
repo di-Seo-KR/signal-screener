@@ -348,19 +348,48 @@
       "keywords": "AI quant trading, stock screener, crypto trading, algorithmic trading, automated investing, portfolio management"
     }
     </script>
-    <!-- Google Analytics (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-C78LMNP87P"></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-C78LMNP87P');
-    </script>
-    <!-- Google AdSense -->
+    <!-- Google AdSense (계정 식별자만 즉시) -->
     <meta name="google-adsense-account" content="ca-pub-5897295133273451">
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5897295133273451" crossorigin="anonymous"></script>
-    <!-- 쿠팡 파트너스 공식 배너 SDK -->
-    <script src="https://ads-partners.coupang.com/g.js" async></script>
+    <!-- ▼ 3rd-party 스크립트 지연 로드 — 첫 페인트 후 main thread 회수 (200~600ms) -->
+    <script>
+      (function () {
+        // gtag stub: 페이지 초기 이벤트가 분실되지 않도록 큐에 쌓아둠
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { window.dataLayer.push(arguments); };
+        window.gtag('js', new Date());
+        window.gtag('config', 'G-C78LMNP87P');
+
+        function loadDeferred() {
+          // GA
+          var ga = document.createElement('script');
+          ga.async = true;
+          ga.src = 'https://www.googletagmanager.com/gtag/js?id=G-C78LMNP87P';
+          document.head.appendChild(ga);
+          // AdSense
+          var ads = document.createElement('script');
+          ads.async = true;
+          ads.crossOrigin = 'anonymous';
+          ads.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5897295133273451';
+          document.head.appendChild(ads);
+          // 쿠팡 파트너스
+          var cpg = document.createElement('script');
+          cpg.async = true;
+          cpg.src = 'https://ads-partners.coupang.com/g.js';
+          document.head.appendChild(cpg);
+        }
+
+        // requestIdleCallback 지원 시 idle 타이밍에, 아니면 load 후 2초
+        function schedule() {
+          if ('requestIdleCallback' in window) {
+            window.requestIdleCallback(loadDeferred, { timeout: 4000 });
+          } else {
+            setTimeout(loadDeferred, 2000);
+          }
+        }
+        if (document.readyState === 'complete') schedule();
+        else window.addEventListener('load', schedule, { once: true });
+      })();
+    </script>
     <style>
       body { margin: 0; padding: 0; background: #060a12; overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
       html { touch-action: manipulation; overflow: hidden; height: 100%; }
