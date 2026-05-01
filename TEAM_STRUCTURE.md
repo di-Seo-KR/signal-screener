@@ -262,10 +262,19 @@ Zepta 의 본업은 퀀트 자동매매. 알파 리서치와 전략 운용 결�
    텔레그램 카드형 메시지 1건으로 통합 발송
 ```
 
-**도입 단계**:
-- **Week 1 (가동 중)**: QUANT-RES + QUANT-PLAN + MKT-LEAD + **PLAN-SVC + PLAN-BIZ** (5명 매일 보고)
-- **Week 1.5 (가동 중)**: GA4 / Sentry 데이터 직접 연동 (env vars 설정 시 자동 활성)
-- **Week 4 (예정)**: DEV-IMPL + DEV-PERF (Sentry 에러 트리아지 + Lighthouse 회귀)
+**도입 단계 — 모두 가동 중 (2026-05)**:
+- **Week 1**: QUANT-RES + QUANT-PLAN
+- **Week 2**: MKT-LEAD (GA4 연동 시 실유입 분석)
+- **Week 3**: PLAN-SVC + PLAN-BIZ (사용자 행동 → 화면/사업 제안)
+- **Week 4**: DEV-IMPL + DEV-PERF (Sentry 에러 트리아지 + 성능 모니터)
+- **추가**: GA4 / Sentry 데이터 직접 연동 (env vars 설정 시 자동 활성)
+
+**총 7명이 매일 KST 06:00 텔레그램 8장 카드로 일일 보고** (헤더 + 7개 역할).
+
+**파이프라인 (3-pass)**:
+1. RES 단독 실행 (퀀트 분석 결과를 다른 모두가 입력으로 받음)
+2. PLAN, MKT, SVC, DEV-IMPL, DEV-PERF 5명 병렬 (각자 RES + GA4 + Sentry 입력)
+3. BIZ 단독 (Step 2 의 MKT 결과까지 흡수해서 사업 결정)
 
 **환경변수 (선택 — 미설정 시 graceful fallback)**:
 ```
