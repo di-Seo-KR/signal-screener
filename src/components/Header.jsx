@@ -384,8 +384,9 @@ export default memo(function Header({
             {/* 검색 — 아이콘 (xl 미만) / 확장형 (xl 이상) */}
             <Button variant="ghost" size="icon-sm"
               onClick={() => setGlobalSearchOpen(true)}
-              className="xl:hidden text-muted-foreground hover:text-foreground transition-colors"
+              className="xl:hidden min-h-[44px] min-w-[44px] text-muted-foreground hover:text-foreground transition-colors"
               title="Search (⌘K)"
+              aria-label="검색"
             >
               <Search className="size-5" />
             </Button>

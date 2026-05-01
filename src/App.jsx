@@ -1848,7 +1848,7 @@ function SearchBar({ onSelect, placeholder = "종목 검색 (예: AAPL, 삼성�
                 onMouseEnter={() => setSelectedIdx(i)}
                 style={{
                   display: "flex", alignItems: "center", gap: "12px",
-                  padding: "12px 16px", cursor: "pointer",
+                  padding: "14px 16px", minHeight: "56px", cursor: "pointer",
                   background: isActive ? C.blueBg : "transparent",
                   borderBottom: i < suggestions.length - 1 ? `1px solid ${C.border}` : "none",
                   transition: "background .15s",
@@ -10927,8 +10927,18 @@ function AppInner() {
             ) : sortedNews.length === 0 ? (
               <div style={{ background: C.card, border: `1px solid ${C.border}20`, textAlign: "center" }} className="rounded-[18px] p-12">
                 <div style={{ background: C.blueBg }} className="w-14 h-14 rounded-[16px] flex items-center justify-center mx-auto mb-3.5 text-2xl">📰</div>
-                <div className="font-bold text-lg mb-1.5 text-foreground" style={{color: C.text1}}>뉴스를 불러오는 중</div>
-                <div className="text-base" style={{ color: C.text3 }}>새로고침을 눌러 최신 뉴스를 확인하세요</div>
+                <div className="font-bold text-lg mb-1.5 text-foreground" style={{color: C.text1}}>아직 받아온 뉴스가 없어요</div>
+                <div className="text-base mb-5" style={{ color: C.text3 }}>오늘의 시장 뉴스를 한 번에 모아드릴게요</div>
+                <button onClick={fetchNews} disabled={newsLoading} aria-label="뉴스 새로고침" style={{
+                  padding: "12px 24px", minHeight: "48px", borderRadius: "12px",
+                  fontSize: "15px", fontWeight: 700,
+                  background: newsLoading ? C.card2 : C.blue, color: "#fff",
+                  border: "none", cursor: newsLoading ? "default" : "pointer",
+                  display: "inline-flex", alignItems: "center", gap: "8px",
+                }}>
+                  <span style={{ fontSize: "16px" }}>🔄</span>
+                  {newsLoading ? "불러오는 중..." : "지금 새로고침"}
+                </button>
               </div>
             ) : (
               <div className="flex flex-col gap-2">
