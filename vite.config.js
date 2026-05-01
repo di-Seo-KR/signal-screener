@@ -14,20 +14,10 @@ export default defineConfig({
     proxy: {}
   },
   build: {
-    // 청크 분리: 변경이 잦은 앱 코드와 거의 변하지 않는 외부 라이브러리를
-    // 별도 청크로 두어 재방문 시 vendor 캐시를 그대로 재사용
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          'react-vendor': ['react', 'react-dom'],
-          'chart-vendor': ['lightweight-charts', 'recharts'],
-          'supabase-vendor': ['@supabase/supabase-js', '@vercel/kv'],
-          'ui-vendor': ['lucide-react', 'sonner', 'class-variance-authority', 'tailwind-merge', 'clsx'],
-          'strategies': ['./src/strategies.js'],
-        },
-      },
-    },
-    // 청크 크기 경고 임계값 상향 (전략/차트 모듈은 본질적으로 큼)
-    chunkSizeWarningLimit: 800,
+    // 코드 스플리팅은 App.jsx 의 React.lazy 가 알아서 별도 청크로 분리합니다.
+    // manualChunks 로 react/react-dom 을 분리하면 lucide-react·radix-ui 등이
+    // 자체 React 를 import 하면서 인스턴스가 이중화되어 invalid hook call →
+    // white screen 이 발생하는 함정이 있어, vendor 강제 분리는 사용하지 않습니다.
+    chunkSizeWarningLimit: 1200,
   },
 })
