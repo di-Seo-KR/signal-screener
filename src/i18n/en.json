@@ -279,10 +279,10 @@
     "step3": "3️⃣ Check real-time returns and AI analysis"
   },
   "autoTrading": {
-    "title": "AI Quant Strategy",
-    "subtitle": "AI-powered quant bots analyze markets 24/7 and generate optimal trading signals",
-    "heroTitle": "AI Quant Strategy",
-    "heroSubtitle": "AI-powered quant bots analyze markets 24/7 and generate optimal trading signals",
+    "title": "AI Quant Auto-Trading",
+    "subtitle": "13 quant bots scan the market every 5 minutes, record paper trades when signals fire, and send a daily report to Telegram at 6 AM KST",
+    "heroTitle": "AI Quant Auto-Trading",
+    "heroSubtitle": "13 quant bots scan the market every 5 minutes, record paper trades when signals fire, and send a daily report to Telegram at 6 AM KST",
     "features": "Key Features",
     "realtime": "Real-time Analysis",
     "signals": "Trading Signals",
