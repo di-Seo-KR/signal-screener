@@ -292,11 +292,31 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     S(`family weights skipped: ${e?.message}`);
   }
 
+  // ★ 중복 진입 차단 — 이미 OPEN 인 심볼에는 신규 진입 안 함
+  // (지난 진단에서 ADAUSDT 같은 종목이 5분마다 반복 진입돼 림보 200건 누적된 문제)
+  const openSymbols = new Set();
+  if (shadow) {
+    try {
+      const kvDup = await getKv();
+      const ledger = (await kvDup.get(`di:real:user:${userId}:shadow-ledger`)) || [];
+      for (const e of ledger) {
+        if (e?.status !== "CLOSED" && e?.plan?.symbol) openSymbols.add(e.plan.symbol);
+      }
+      if (openSymbols.size > 0) S(`open positions: ${openSymbols.size} symbols (dedup will skip)`);
+    } catch {}
+  }
+
   // 7-9) ★ ranked 시그널 순회 — 1순위가 affordability/risk reject 되어도
   // 차순위로 fallback. 첫 번째로 plan.ok 가 나오는 시그널을 채택.
   let best = null, price = null, atr = null, filter = null, plan = null;
   const tried = [];
   for (const cand of ranked.slice(0, 6)) {  // 최대 6개 시도
+    // 중복 진입 차단 — 이미 같은 심볼에 OPEN 포지션 있으면 skip
+    if (openSymbols.has(cand.symbol)) {
+      S(`  ↳ ${cand.symbol}: 이미 OPEN 포지션 존재 — 중복 진입 차단`);
+      tried.push({ symbol: cand.symbol, reason: "already open" });
+      continue;
+    }
     S(`try: ${cand.symbol} ${cand.side} conf=${cand.confidence} fam=${cand.strategyFamily}`);
     try {
       const tick = await getTickerPrice({ symbol: cand.symbol });

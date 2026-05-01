@@ -12,8 +12,28 @@
 
 import { getTickerPrice } from "../_shared/binance-client.js";
 import { respondError } from "../_shared/binance-auth.js";
+import { RISK_CONFIG } from "../_shared/risk-manager.js";
 
 export const config = { maxDuration: 60 };
+
+// risk-manager 의 soft timeStops 를 shadow 에도 적용
+// (이전엔 shadow 가 SL/TP/maxHold 만 봐서 6h/12h/24h 단계 컷이 무시되고 있었음 — 이게 31건 전손실의 한 축)
+const SOFT_TIME_STOPS = RISK_CONFIG?.timeStops || [
+  { afterMs: 6  * 3600000, minProfitR: 0.0 },
+  { afterMs: 12 * 3600000, minProfitR: 0.5 },
+  { afterMs: 24 * 3600000, minProfitR: 1.0 },
+];
+
+// 현재 가격에서 R 단위 수익률 계산 (양수=수익, 음수=손실)
+function currentR(side, entry, mark, plan) {
+  if (!entry || !mark) return 0;
+  const grossPct = side === "LONG" ? (mark - entry) / entry : (entry - mark) / entry;
+  const notional = plan?.notional || 0;
+  const riskAmt = plan?.riskAmount || 0;
+  if (riskAmt <= 0 || notional <= 0) return 0;
+  const grossPnL = notional * grossPct;
+  return grossPnL / riskAmt;
+}
 
 async function getKv() {
   const mod = await import("@vercel/kv");
@@ -75,7 +95,23 @@ async function monitorUser(userId) {
       : Math.max(e.maePrice || mark, mark);
 
     const openedAt = new Date(e.openedAt || now).getTime();
-    const tooOld = now - openedAt > (e.plan.maxHoldMs || 48 * 60 * 60 * 1000);
+    const ageMs = now - openedAt;
+    const tooOld = ageMs > (e.plan.maxHoldMs || 48 * 60 * 60 * 1000);
+
+    // ── soft timeStops 체크: 일정 시간 지났는데 수익이 충분치 않으면 조기 청산 ──
+    // 가장 큰 단계부터 검사 (24h → 12h → 6h) — 첫 매칭에서 결정.
+    let softTimeHit = null;
+    if (!tooOld) {
+      const r = currentR(side, entry, mark, e.plan);
+      // 큰 시간 단계부터 검사하면, 늦은 단계 일수록 R 기준이 엄격
+      const sorted = [...SOFT_TIME_STOPS].sort((a, b) => b.afterMs - a.afterMs);
+      for (const stop of sorted) {
+        if (ageMs >= stop.afterMs && r < (stop.minProfitR ?? 0)) {
+          softTimeHit = { ageMs, r, threshold: stop.minProfitR, afterMs: stop.afterMs };
+          break;
+        }
+      }
+    }
 
     let close = null;
     if (hit === "TP") {
@@ -93,6 +129,13 @@ async function monitorUser(userId) {
     } else if (tooOld) {
       close = {
         closeReason: "TIME",
+        exitPrice: mark,
+        grossPct: side === "LONG" ? (mark - entry) / entry : (entry - mark) / entry,
+      };
+    } else if (softTimeHit) {
+      // soft timeStop 발동 — 진입 후 N시간 지났는데 R 미달 → 조기 청산
+      close = {
+        closeReason: "SOFT_TIME",
         exitPrice: mark,
         grossPct: side === "LONG" ? (mark - entry) / entry : (entry - mark) / entry,
       };
@@ -134,7 +177,7 @@ async function monitorUser(userId) {
     const sum = (await kv.get(summaryKey)) || {
       wins: 0, losses: 0, netPnL: 0, trades: 0, totalRR: 0,
       bestR: 0, worstR: 0, totalHoldMs: 0,
-      byFamily: {}, byCloseReason: { TP: 0, SL: 0, TIME: 0 },
+      byFamily: {}, byCloseReason: { TP: 0, SL: 0, TIME: 0, SOFT_TIME: 0 },
       grossWin: 0, grossLoss: 0,
     };
     // 신규 필드 backfill
