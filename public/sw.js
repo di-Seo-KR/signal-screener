@@ -1,4 +1,5 @@
-const CACHE_NAME = 'zepta-v2';
+// 코드 스플리팅 도입 후 구버전 모놀리식 번들 캐시 강제 무효화 — v3
+const CACHE_NAME = 'zepta-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
