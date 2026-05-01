@@ -1171,7 +1171,17 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
         }}>
           {activeBots.filter(ab => ab.status !== "paused").length}개 활성
         </span>
-        {loading && <span style={{ color: c.text3, fontSize: isMobile ? "12px" : "14px" }}>로딩 중...</span>}
+        {loading && (
+          <span aria-label="데이터 불러오는 중" style={{
+            display: "inline-block",
+            width: isMobile ? "60px" : "72px",
+            height: isMobile ? "12px" : "14px",
+            borderRadius: "6px",
+            background: `linear-gradient(90deg, ${c.card2 || c.card} 25%, ${(c.border || "#888") + "20"} 50%, ${c.card2 || c.card} 75%)`,
+            backgroundSize: "200% 100%",
+            animation: "shimmer 1.5s infinite",
+          }} />
+        )}
       </div>
 
       {/* ── 통합 포트폴리오 요약 카드 ── */}

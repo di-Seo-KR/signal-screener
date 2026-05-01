@@ -883,7 +883,11 @@ function RealTradingInner() {
       actions={<Badge tone="default">{engineLog.length}</Badge>}
     >
       {engineLog.length === 0 ? (
-        <EmptyState icon={<Gauge size={26} />} title="로그 없음" description="엔진이 실행되면 여기에 로그가 쌓입니다." />
+        <EmptyState
+          icon={<Gauge size={26} />}
+          title="아직 실행 기록이 없어요"
+          description='5분마다 자동으로 엔진이 돌면서 기록이 쌓입니다. 지금 바로 보고 싶으시면 위쪽 "모의실행" 버튼을 한 번 눌러보세요.'
+        />
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 360, overflowY: "auto" }}>
           {engineLog.map((e, i) => (
@@ -1024,8 +1028,8 @@ function RealTradingInner() {
       ) : (
         <EmptyState
           icon={<Ghost size={28} />}
-          title="Shadow 기록 없음"
-          description={`"모의실행" 버튼을 누르거나 Shadow 모드를 시작하면 가상 매매가 기록됩니다. 5분마다 자동 수집도 됩니다.`}
+          title="가상 매매 기록이 아직 없어요"
+          description={`실제 돈은 안 쓰고 "이 시그널이 만약 나갔다면 어떻게 됐을까"를 추적하는 영역이에요. 위쪽 "모의실행" 버튼을 누르면 즉시 1건이 기록되고, 그 이후엔 5분마다 자동으로 쌓입니다.`}
         />
       )}
       {shadow.recent?.length > 0 && (
