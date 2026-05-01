@@ -4,7 +4,7 @@
 // v11.2: 퀀트 엔진 v3.9 하위전략 2차 안전필터 + 모바일 터치 UX 개선
 // v11.1: 다중 타임프레임 RSI 스크리닝 조건 + 퀀트 엔진 v3.8 하위전략 안전필터
 // v11.0: 토스증권 벤치마킹 기반 대개편 — 스크리너 프리셋, 글로벌 검색, 위험종목 필터, 실시간 티커
-import { useState, useEffect, useCallback, useRef, useMemo, Component } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, Component, lazy, Suspense } from "react";
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
 import { LanguageProvider, useLanguage } from "./i18n/LanguageContext.jsx";
 import AuthPage from "./AuthPage.jsx";
@@ -239,15 +239,30 @@ class ErrorBoundary extends Component {
     return this.props.children;
   }
 }
-import ChartModal from "./ChartModal.jsx";
-import StrategyPanel from "./StrategyPanel.jsx";
-import BacktestPanel from "./BacktestPanel.jsx";
-import QuantPortfolio from "./QuantPortfolio.jsx";
-import RiskHeatmap from "./RiskHeatmap.jsx";
-import AutoTrading from "./AutoTrading.jsx";
-import DevDashboard from "./DevDashboard.jsx";
-import RealTrading from "./RealTrading.jsx";
+// ── 코드 스플리팅: 무거운 페이지/모달은 lazy 로드 (초기 번들 -40~55% 목표) ──
+const ChartModal = lazy(() => import("./ChartModal.jsx"));
+const StrategyPanel = lazy(() => import("./StrategyPanel.jsx"));
+const BacktestPanel = lazy(() => import("./BacktestPanel.jsx"));
+const QuantPortfolio = lazy(() => import("./QuantPortfolio.jsx"));
+const RiskHeatmap = lazy(() => import("./RiskHeatmap.jsx"));
+const AutoTrading = lazy(() => import("./AutoTrading.jsx"));
+const DevDashboard = lazy(() => import("./DevDashboard.jsx"));
+const RealTrading = lazy(() => import("./RealTrading.jsx"));
 import { ALL_STRATEGIES } from "./strategies.js";
+
+// 공용 lazy fallback — 탭 전환 시 0.1~0.3초 노출
+function LazyTabFallback() {
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+      <div style={{
+        width: 36, height: 36, borderRadius: "50%",
+        border: "3px solid rgba(255,255,255,0.08)",
+        borderTopColor: "#3182f6",
+        animation: "spin 0.8s linear infinite",
+      }} />
+    </div>
+  );
+}
 
 // ════════════════════════════════════════════════════════════════════
 // 데이터 정의
@@ -10321,9 +10336,9 @@ function AppInner() {
             boxShadow: `0 4px 20px rgba(155,111,255,0.08)`,
             display: "flex", flexDirection: "column", gap: "12px"
           }}>
-            <StrategyPanel onRunBacktest={(strategy, symbol) => {
+            <Suspense fallback={<LazyTabFallback />}><StrategyPanel onRunBacktest={(strategy, symbol) => {
               setBtStrategy(strategy); setBtSymbol(symbol); setTab("backtest"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); };
-            }} />
+            }} /></Suspense>
           </div>
         )}
 
@@ -10337,7 +10352,7 @@ function AppInner() {
             boxShadow: `0 4px 20px rgba(155,111,255,0.08)`,
             display: "flex", flexDirection: "column", gap: "12px"
           }}>
-            <QuantPortfolio theme={themeMode} />
+            <Suspense fallback={<LazyTabFallback />}><QuantPortfolio theme={themeMode} /></Suspense>
           </div>
         )}
 
@@ -10351,7 +10366,7 @@ function AppInner() {
             boxShadow: `0 4px 20px rgba(255,77,100,0.08)`,
             display: "flex", flexDirection: "column", gap: "12px"
           }}>
-            <RiskHeatmap marketIndices={marketIndices} fearGreed={fearGreed} />
+            <Suspense fallback={<LazyTabFallback />}><RiskHeatmap marketIndices={marketIndices} fearGreed={fearGreed} /></Suspense>
           </div>
         )}
 
@@ -10821,7 +10836,7 @@ function AppInner() {
             borderRadius: "24px", padding: "24px",
             boxShadow: `0 4px 20px rgba(59,130,246,0.08)`,
           }}>
-            <BacktestPanel initialStrategy={btStrategy} initialSymbol={btSymbol} />
+            <Suspense fallback={<LazyTabFallback />}><BacktestPanel initialStrategy={btStrategy} initialSymbol={btSymbol} /></Suspense>
           </div>
         )}
 
@@ -11937,7 +11952,7 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "auto-trading" && (
           <div className="card-stagger">
-            <AutoTrading theme={themeMode} user={user} />
+            <Suspense fallback={<LazyTabFallback />}><AutoTrading theme={themeMode} user={user} /></Suspense>
           </div>
         )}
 
@@ -11945,7 +11960,7 @@ function AppInner() {
             TAB: 실전매매 (Phase 1 — 단일 사용자 Binance Futures)
         ═══════════════════════════════════════════════════════════ */}
         {tab === "real-trading" && isOwner && (
-          <RealTrading theme={themeMode} />
+          <Suspense fallback={<LazyTabFallback />}><RealTrading theme={themeMode} /></Suspense>
         )}
         {tab === "real-trading" && !isOwner && (
           <div style={{ maxWidth: 720, margin: "80px auto", padding: "40px 24px", textAlign: "center", color: C.text2 }}>
@@ -11960,7 +11975,7 @@ function AppInner() {
             TAB: 개발/QA 대시보드 (zepta.vercel.app/dev)
         ═══════════════════════════════════════════════════════════ */}
         {tab === "dev" && (
-          <DevDashboard theme={themeMode} />
+          <Suspense fallback={<LazyTabFallback />}><DevDashboard theme={themeMode} /></Suspense>
         )}
 
         {/* 종목 상세 팝업 */}
@@ -12657,7 +12672,11 @@ function AppInner() {
         )}
 
         {/* 차트 모달 */}
-        {chartAsset && <ChartModal asset={chartAsset} onClose={() => setChartAsset(null)} krwRate={krwRate} theme={themeMode} />}
+        {chartAsset && (
+          <Suspense fallback={<LazyTabFallback />}>
+            <ChartModal asset={chartAsset} onClose={() => setChartAsset(null)} krwRate={krwRate} theme={themeMode} />
+          </Suspense>
+        )}
 
         {/* ═══ 풋터 (토스 스타일) ═══ */}
         <footer style={{
