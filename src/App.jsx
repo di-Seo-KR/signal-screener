@@ -9154,8 +9154,17 @@ function AppInner() {
                         </span>
                       </div>
                     </div>
+                  ) : portfolio.length > 0 ? (
+                    // 보유 종목은 있는데 가격 아직 안 옴 → 스켈레톤
+                    <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
+                      <Skeleton width="140px" height="28px" />
+                      <Skeleton width="80px" height="20px" />
+                    </div>
                   ) : (
-                    <div style={{ fontSize: "17px", color: C.text3 }}>가격 로딩 중...</div>
+                    // 보유 종목 자체가 없음 → 친화적 엠티 스테이트
+                    <div style={{ fontSize: "15px", color: C.text3, lineHeight: 1.5 }}>
+                      관심 종목을 추가하면 한눈에 수익률을 볼 수 있어요 ✨
+                    </div>
                   )}
                 </div>
               );
