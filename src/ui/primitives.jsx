@@ -462,20 +462,37 @@ export function EmptyState({ icon, title, description, action }) {
 
 // ───────────────────────────── Toast ─────────────────────────────
 const ToastCtx = createContext({ push: () => {} });
+const TOAST_EXIT_MS = 280; // out 애니메이션 길이와 동기화
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
   const push = useCallback((msg, opts = {}) => {
     const id = Math.random().toString(36).slice(2);
     const tone = opts.tone || "default";
     const duration = opts.duration || 3500;
-    setToasts((xs) => [...xs, { id, msg, tone, title: opts.title }]);
-    setTimeout(() => setToasts((xs) => xs.filter((t) => t.id !== id)), duration);
+    setToasts((xs) => [...xs, { id, msg, tone, title: opts.title, exiting: false }]);
+    // duration 시점에 exiting=true 로 표시 → 애니메이션 후 실제 제거
+    setTimeout(() => {
+      setToasts((xs) => xs.map((t) => t.id === id ? { ...t, exiting: true } : t));
+      setTimeout(() => {
+        setToasts((xs) => xs.filter((t) => t.id !== id));
+      }, TOAST_EXIT_MS);
+    }, duration);
   }, []);
   return (
     <ToastCtx.Provider value={{ push }}>
       {children}
+      <style>{`
+        @keyframes z-toast-in {
+          from { opacity: 0; transform: translateX(40px) scale(0.96); }
+          to   { opacity: 1; transform: translateX(0) scale(1); }
+        }
+        @keyframes z-toast-out {
+          from { opacity: 1; transform: translateX(0) scale(1); }
+          to   { opacity: 0; transform: translateX(40px) scale(0.96); }
+        }
+      `}</style>
       <div style={{
-        position: "fixed", bottom: 24, left: "50%", transform: "translateX(-50%)",
+        position: "fixed", bottom: 24, right: 24, left: "auto", transform: "none",
         display: "flex", flexDirection: "column", gap: 8, zIndex: 2000,
         pointerEvents: "none", maxWidth: "calc(100vw - 32px)",
       }}>
@@ -488,10 +505,13 @@ export function ToastProvider({ children }) {
               borderLeft: `3px solid ${accent.bd}`,
               boxShadow: "var(--z-sh-lg)",
               borderRadius: "var(--z-r-md)",
-              padding: "10px 14px", minWidth: 260, maxWidth: 420,
+              padding: "12px 16px", minWidth: 260, maxWidth: 420,
               color: "var(--z-text)", fontSize: 13, fontWeight: 600,
-              animation: "z-fade-in var(--z-dur) var(--z-ease)",
+              animation: t.exiting
+                ? `z-toast-out ${TOAST_EXIT_MS}ms ease-in forwards`
+                : `z-toast-in 280ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards`,
               pointerEvents: "auto",
+              willChange: "transform, opacity",
             }}>
               {t.title && <div style={{ fontSize: 12, color: accent.fg, marginBottom: 2, fontWeight: 800 }}>{t.title}</div>}
               {t.msg}
