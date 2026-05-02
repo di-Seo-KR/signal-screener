@@ -8,11 +8,14 @@
 //   4) 손실 누적 상위 거래 TOP 10 (디버깅용)
 //   5) 진입 시 손절폭(slPct)·목표폭(tpPct) 분포
 //   6) 만약 "최대 보유시간 N시간" 규칙 적용 시 시뮬레이션 결과
+//   7) ★ Retro 시뮬 — closed-archive 데이터로 "다른 SL/TP 룰이었다면?" 재계산
 //
 // 사용:
 //   GET /api/agents/shadow-debug
-//   GET /api/agents/shadow-debug?holdHours=24  // 24시간 강제청산 시뮬
-//   GET /api/agents/shadow-debug?days=30       // 최근 30일치 분석
+//   GET /api/agents/shadow-debug?holdHours=24
+//   GET /api/agents/shadow-debug?days=30
+//   GET /api/agents/shadow-debug?retroSL=4&retroTP=6  // SL 4% + TP 6% 적용 시뮬
+//   GET /api/agents/shadow-debug?retroSL=3,4,5&retroTP=5,6,8  // 다중 변형 비교
 // ════════════════════════════════════════════════════════════════════
 
 import { sendCards, buildCard, fmtKSTShort } from "../_shared/telegram.js";
@@ -59,15 +62,100 @@ function bucketDist(values, buckets) {
   return out;
 }
 
+// ── Retro 시뮬 ──
+// 한계: 실제 가격 경로는 모르고 entry/MFE/MAE 만 알 수 있음.
+// 가정: MFE 와 MAE 사이의 어느 시점에 가격이 도달했다 (시간 순서는 미상).
+//
+// 보수적 가정: 하락(MAE) 이 먼저, 상승(MFE) 이 나중. LONG 기준 "최악의 경우".
+// → 새 SL 이 MAE 보다 가까우면(=덜 손실) 새 SL 에서 청산
+// → 새 TP 가 MFE 보다 가까우면 새 TP 에서 청산 (단, 그 전에 SL 안 맞았어야)
+// → 둘 다 안 맞으면 maxHold 가 짧으면 TIME, 길면 원본 청산가 그대로
+//
+// 더 정확한 분석은 entry 시점부터 maxHold 기간의 분단위 OHLC 가 필요 (별도 백테스트)
+function retroSimOne(c, { slPct, tpPct, holdHours }) {
+  const side = c.side;
+  const entry = c.entryPrice;
+  if (!entry || !side) return null;
+
+  // 입력된 새 SL/TP 비율 적용 (없으면 원본 유지)
+  const newSlPct = slPct != null ? slPct / 100 : c.slPct;
+  const newTpPct = tpPct != null ? tpPct / 100 : c.tpPct;
+  const newSlPrice = side === "LONG" ? entry * (1 - newSlPct) : entry * (1 + newSlPct);
+  const newTpPrice = side === "LONG" ? entry * (1 + newTpPct) : entry * (1 - newTpPct);
+
+  // MAE / MFE 가 새 SL/TP 를 건드렸는지 판정
+  const mae = c.maePrice ?? entry;
+  const mfe = c.mfePrice ?? entry;
+  const slHitByMae = side === "LONG" ? mae <= newSlPrice : mae >= newSlPrice;
+  const tpHitByMfe = side === "LONG" ? mfe >= newTpPrice : mfe <= newTpPrice;
+
+  // 보유 시간 컷
+  const holdMsLimit = holdHours != null ? holdHours * 3600000 : (c.holdMs ?? Infinity);
+  const wouldTimeOut = (c.holdMs ?? 0) > holdMsLimit;
+
+  let newCloseReason, newGrossPct;
+  if (slHitByMae) {
+    // 새 SL 발동
+    newCloseReason = "SL";
+    newGrossPct = side === "LONG" ? -newSlPct : newSlPct; // LONG SL hit → -slPct grossPct
+  } else if (tpHitByMfe) {
+    newCloseReason = "TP";
+    newGrossPct = side === "LONG" ? newTpPct : -newTpPct;
+  } else if (wouldTimeOut) {
+    // 시간 초과 — 시뮬상 단순화: maxHold 시점 가격을 모르니 원본 exit 가격 그대로
+    newCloseReason = "TIME";
+    newGrossPct = c.grossPct ?? 0;
+  } else {
+    // 어떤 룰에도 안 닿음 → 원본 청산 유지
+    newCloseReason = c.closeReason || "UNKNOWN";
+    newGrossPct = c.grossPct ?? 0;
+  }
+
+  const costPct = ((c.feeBps || 8) + (c.slippageBps || 5)) / 10000;
+  const newNetPct = newGrossPct - costPct;
+  const newNetPnL = (c.notional || 0) * newNetPct;
+  const newR = (c.riskAmount || 0) > 0 ? newNetPnL / c.riskAmount : 0;
+  return { closeReason: newCloseReason, netPnL: newNetPnL, rMultiple: newR };
+}
+
+function aggregateSim(sims) {
+  if (!sims.length) return null;
+  const wins = sims.filter((s) => (s.netPnL || 0) > 0).length;
+  const losses = sims.length - wins;
+  const netPnL = sims.reduce((a, s) => a + (s.netPnL || 0), 0);
+  const avgR = sims.reduce((a, s) => a + (s.rMultiple || 0), 0) / sims.length;
+  const reasons = { TP: 0, SL: 0, TIME: 0, SOFT_TIME: 0, UNKNOWN: 0 };
+  for (const s of sims) reasons[s.closeReason || "UNKNOWN"] = (reasons[s.closeReason] || 0) + 1;
+  return {
+    trades: sims.length,
+    wins, losses,
+    winRate: sims.length ? Number(((wins / sims.length) * 100).toFixed(1)) : 0,
+    netPnL: Number(netPnL.toFixed(2)),
+    avgR: Number(avgR.toFixed(3)),
+    byCloseReason: reasons,
+  };
+}
+
+function parseList(s) {
+  if (!s) return [];
+  return String(s).split(",").map((v) => Number(v.trim())).filter((v) => Number.isFinite(v) && v > 0);
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   try {
     const days = Number(req.query?.days) || 30;
     const simHoldHours = Number(req.query?.holdHours) || 0; // 0 = 시뮬 미실행
+    const retroSlList = parseList(req.query?.retroSL); // 단일 또는 콤마 분리 (예: "3,4,5")
+    const retroTpList = parseList(req.query?.retroTP);
+    const retroHoldList = parseList(req.query?.retroHold);
 
     const kv = await getKv();
-    const ledger = (await kv.get(`di:real:user:${PROBE_USER}:shadow-ledger`)) || [];
-    const summary = (await kv.get(`di:real:user:${PROBE_USER}:shadow-summary`)) || null;
+    const [ledger, summary, archive] = await Promise.all([
+      kv.get(`di:real:user:${PROBE_USER}:shadow-ledger`).then((v) => v || []),
+      kv.get(`di:real:user:${PROBE_USER}:shadow-summary`).then((v) => v || null),
+      kv.get(`di:real:user:${PROBE_USER}:shadow-closed-archive`).then((v) => v || []),
+    ]);
 
     const cutoff = Date.now() - days * 86400000;
     const filtered = ledger.filter((e) => entryTimeMs(e) >= cutoff);
@@ -172,6 +260,55 @@ export default async function handler(req, res) {
       };
     }
 
+    // ── Retro 시뮬 — closed-archive 데이터로 다양한 SL/TP/Hold 변형 비교 ──
+    // archive 가 있으면 여러 변형을 동시에 시뮬해서 비교 표 생성
+    const retroSims = (() => {
+      if (!archive.length) return null;
+      // 기준선: 원본 룰 그대로
+      const baseline = aggregateSim(archive.map((c) => ({
+        closeReason: c.closeReason,
+        netPnL: c.netPnL,
+        rMultiple: c.rMultiple,
+      })));
+      // 변형 매트릭스: SL × TP 곱집합 (기본 변형 자동 추가)
+      const slCandidates = retroSlList.length ? retroSlList : [3, 4, 5, 6];
+      const tpCandidates = retroTpList.length ? retroTpList : [4, 6, 8, 10];
+      const holdCandidates = retroHoldList.length ? retroHoldList : [12, 24, 48];
+      const variants = [];
+      for (const sl of slCandidates) {
+        for (const tp of tpCandidates) {
+          if (tp <= sl) continue; // RR < 1 인 변형은 제외
+          for (const hh of holdCandidates) {
+            const sims = archive
+              .map((c) => retroSimOne(c, { slPct: sl, tpPct: tp, holdHours: hh }))
+              .filter(Boolean);
+            const agg = aggregateSim(sims);
+            if (agg) variants.push({ slPct: sl, tpPct: tp, holdHours: hh, rr: Number((tp/sl).toFixed(2)), ...agg });
+          }
+        }
+      }
+      // 누적 손익 기준 상위 5개만 노출 (응답 크기 절감)
+      variants.sort((a, b) => b.netPnL - a.netPnL);
+      const topVariants = variants.slice(0, 5);
+      // 기준선 대비 가장 좋은 변형
+      const bestVsBaseline = topVariants[0] && baseline
+        ? {
+            improvement: Number((topVariants[0].netPnL - baseline.netPnL).toFixed(2)),
+            winRateDelta: Number((topVariants[0].winRate - baseline.winRate).toFixed(1)),
+          }
+        : null;
+      return {
+        archiveSize: archive.length,
+        baseline,
+        variantsCount: variants.length,
+        topVariants,
+        bestVsBaseline,
+        note: archive.length < 10
+          ? "archive 가 충분치 않아요. 시간이 지나면 자연 누적됩니다 (목표: 50건+)"
+          : null,
+      };
+    })();
+
     const result = {
       ok: true,
       windowDays: days,
@@ -180,6 +317,7 @@ export default async function handler(req, res) {
         windowSize: filtered.length,
         open: open.length,
         closed: closed.length,
+        archive: archive.length,
         winRate: closed.length ? `${((closed.filter((e) => (e.netPnL || 0) > 0).length / closed.length) * 100).toFixed(1)}%` : "—",
         netPnL: closed.length ? Number(closed.reduce((s, e) => s + (e.netPnL || 0), 0).toFixed(2)) : 0,
       },
@@ -210,6 +348,7 @@ export default async function handler(req, res) {
           : null,
       },
       holdoutSim,
+      retroSims,
       generatedAt: new Date().toISOString(),
     };
 

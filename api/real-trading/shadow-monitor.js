@@ -173,6 +173,49 @@ async function monitorUser(userId) {
 
   if (closed.length) {
     await kv.set(ledgerKey, ledger.slice(0, 500));
+
+    // ── 마감 거래 아카이브 (retro 분석용) ──
+    // ledger 는 500개 cap 이라 오래된 closed 가 새 OPEN 에 밀려 사라짐.
+    // archive 는 최근 1000건 마감 거래만 보존 (entry/exit/MFE/MAE/closeReason 등 디테일).
+    // shadow-debug retro 시뮬, daily-standup QUANT-RES 백테스트 자동화에 사용.
+    const archiveKey = `di:real:user:${userId}:shadow-closed-archive`;
+    try {
+      const prevArchive = (await kv.get(archiveKey)) || [];
+      // closed 항목에서 retro 시뮬에 필요한 필드만 추려 저장 (응답 크기 최적화)
+      const lite = closed.map((c) => ({
+        id: c.id,
+        openedAt: c.openedAt,
+        closedAt: c.closedAt,
+        symbol: c.plan?.symbol,
+        side: c.plan?.side,
+        family: c.plan?.strategyFamily || c.signal?.strategyFamily || c.signal?.source,
+        entryPrice: c.entryPrice,
+        exitPrice: c.exitPrice,
+        slPrice: c.plan?.slPrice,
+        tpPrice: c.plan?.tpPrice,
+        slPct: c.plan?.slPct,
+        tpPct: c.plan?.tpPct,
+        notional: c.plan?.notional,
+        riskAmount: c.plan?.riskAmount,
+        mfePrice: c.mfePrice,
+        maePrice: c.maePrice,
+        mfeR: c.mfeR,
+        maeR: c.maeR,
+        closeReason: c.closeReason,
+        grossPct: c.grossPct,
+        netPct: c.netPct,
+        netPnL: c.netPnL,
+        rMultiple: c.rMultiple,
+        holdMs: c.holdMs,
+        feeBps: c.feeBps,
+        slippageBps: c.slippageBps,
+      }));
+      // 새 항목을 앞에 추가 (시간 역순). 1000개로 cap.
+      const merged = [...lite, ...prevArchive].slice(0, 1000);
+      await kv.set(archiveKey, merged);
+    } catch (err) {
+      console.error("[shadow-monitor] archive failed:", err?.message || err);
+    }
     // ── 풍부한 summary 업데이트 ──
     const sum = (await kv.get(summaryKey)) || {
       wins: 0, losses: 0, netPnL: 0, trades: 0, totalRR: 0,

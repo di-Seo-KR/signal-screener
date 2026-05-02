@@ -73,6 +73,62 @@ async function readShadowSummary(kv) {
   return (await kv.get(`di:real:user:${PROBE_USER}:shadow-summary`)) || null;
 }
 
+// 마감 거래 아카이브 (retro 백테스트 자동화 input)
+async function readClosedArchive(kv) {
+  return (await kv.get(`di:real:user:${PROBE_USER}:shadow-closed-archive`)) || [];
+}
+
+// QUANT-RES 가 사용할 retro 시뮬 — closed-archive 에 다양한 SL/TP 적용
+// shadow-debug 의 로직을 daily-standup 에서도 호출 가능하게 인라인.
+// 매일 자동으로 "현재 룰 vs 대안 룰" 비교표를 만들어 QUANT-RES 입력에 추가.
+function retroBacktest(archive) {
+  if (!archive || archive.length < 10) return null;
+  const cost = (c) => ((c.feeBps || 8) + (c.slippageBps || 5)) / 10000;
+  const simOne = (c, slPct, tpPct, holdHours) => {
+    const side = c.side, entry = c.entryPrice;
+    if (!entry || !side) return null;
+    const newSlPrice = side === "LONG" ? entry * (1 - slPct/100) : entry * (1 + slPct/100);
+    const newTpPrice = side === "LONG" ? entry * (1 + tpPct/100) : entry * (1 - tpPct/100);
+    const mae = c.maePrice ?? entry;
+    const mfe = c.mfePrice ?? entry;
+    const slHit = side === "LONG" ? mae <= newSlPrice : mae >= newSlPrice;
+    const tpHit = side === "LONG" ? mfe >= newTpPrice : mfe <= newTpPrice;
+    const wouldTimeOut = (c.holdMs ?? 0) > holdHours * 3600000;
+    let grossPct, reason;
+    if (slHit) { grossPct = side === "LONG" ? -slPct/100 : slPct/100; reason = "SL"; }
+    else if (tpHit) { grossPct = side === "LONG" ? tpPct/100 : -tpPct/100; reason = "TP"; }
+    else if (wouldTimeOut) { grossPct = c.grossPct ?? 0; reason = "TIME"; }
+    else { grossPct = c.grossPct ?? 0; reason = c.closeReason || "UNKNOWN"; }
+    const netPct = grossPct - cost(c);
+    const netPnL = (c.notional || 0) * netPct;
+    return { reason, netPnL };
+  };
+  const aggregate = (sims) => {
+    if (!sims.length) return null;
+    const wins = sims.filter((s) => s.netPnL > 0).length;
+    const netPnL = sims.reduce((a, s) => a + s.netPnL, 0);
+    return {
+      trades: sims.length, wins, losses: sims.length - wins,
+      winRate: Number(((wins / sims.length) * 100).toFixed(1)),
+      netPnL: Number(netPnL.toFixed(2)),
+    };
+  };
+  // 기준선
+  const baseline = aggregate(archive.map((c) => ({ netPnL: c.netPnL || 0 })));
+  // 표준 변형 6개 (RR 1.0~2.0)
+  const variants = [];
+  for (const sl of [3, 4, 5]) {
+    for (const tp of [4, 6, 8]) {
+      if (tp <= sl) continue;
+      const sims = archive.map((c) => simOne(c, sl, tp, 24)).filter(Boolean);
+      const agg = aggregate(sims);
+      if (agg) variants.push({ slPct: sl, tpPct: tp, rr: Number((tp/sl).toFixed(2)), ...agg });
+    }
+  }
+  variants.sort((a, b) => b.netPnL - a.netPnL);
+  return { archiveSize: archive.length, baseline, topVariants: variants.slice(0, 3) };
+}
+
 // ── 안전 JSON 파싱 (Claude 응답에서 마크다운 코드블록 제거) ──
 function safeJSONParse(text) {
   if (!text) return null;
@@ -82,7 +138,7 @@ function safeJSONParse(text) {
 }
 
 // ── QUANT-RES — 알파 리서처 ──
-async function runQuantResearcher(client, ledger, weights, summary) {
+async function runQuantResearcher(client, ledger, weights, summary, retroResult) {
   // CLOSED 항목만 승률 산정 — OPEN 은 결과 미확정이라 제외
   const closed = ledger.filter((e) => e?.status === "CLOSED");
   const winRate = closed.length ? closed.filter((e) => (e?.netPnL || 0) > 0).length / closed.length : 0;
@@ -101,9 +157,35 @@ async function runQuantResearcher(client, ledger, weights, summary) {
 - 출력: 한국어 존댓말. 사용자가 "투자 입문자"라고 가정하고 평어로 풀어 설명.
 - 절대 어려운 전문 용어 그대로 쓰지 말 것 — 풀어서 비유 들기.
 - "그래서 뭘 하면 되나" 행동 가이드 포함.
+- 백테스트 결과(retroBacktest)가 주어지면 그 데이터를 첫 번째 근거로 활용.
 - JSON 만 응답 (마크다운 코드블록 안에 넣어도 됨).`;
 
   const openCount = ledger.length - closed.length;
+
+  // Retro 백테스트 결과를 자연어로 풀어서 입력 (LLM 이 바로 활용 가능하도록)
+  let retroBlock = "(아카이브 부족 — 백테스트 자동화 미가동)";
+  if (retroResult && retroResult.archiveSize >= 10) {
+    const lines = [`아카이브 ${retroResult.archiveSize}건 기반 retro 백테스트:`];
+    if (retroResult.baseline) {
+      lines.push(`- 현재 룰 기준선: 승률 ${retroResult.baseline.winRate}%, 누적 손익 $${retroResult.baseline.netPnL}`);
+    }
+    if (retroResult.topVariants?.length) {
+      lines.push(`- 더 좋은 상위 변형 (24h hold 기준):`);
+      for (const v of retroResult.topVariants) {
+        lines.push(`  · SL ${v.slPct}% / TP ${v.tpPct}% (RR ${v.rr}): 승률 ${v.winRate}%, 손익 $${v.netPnL}`);
+      }
+      const best = retroResult.topVariants[0];
+      const baseline = retroResult.baseline;
+      if (best && baseline) {
+        const delta = best.netPnL - baseline.netPnL;
+        if (delta > 0) {
+          lines.push(`  → 최고 변형이 기준선 대비 +$${delta.toFixed(2)} 개선 (시뮬상)`);
+        }
+      }
+    }
+    retroBlock = lines.join("\n");
+  }
+
   const user = `오늘 아침 분석 보고서 작성 요청입니다.
 
 [지난 7일 shadow ledger 요약]
@@ -116,17 +198,23 @@ ${Object.entries(familyStats).map(([f, s]) =>
 - 누적 요약: ${summary ? JSON.stringify({ wins: summary.wins, losses: summary.losses, netPnL: Number(summary.netPnL || 0).toFixed(2) }) : "(없음)"}
 - 현재 가중치: ${JSON.stringify(weights).slice(0, 400)}
 
+[Retro 백테스트 결과 — 다른 SL/TP 룰 적용 시뮬]
+${retroBlock}
+
+위 retro 결과가 있으면 그게 가장 신뢰도 높은 근거입니다. alpha_idea 와 action 은 retro 데이터에 부합해야 합니다.
+
 다음 형식의 JSON 으로만 답변:
 {
   "headline": "한 줄 요약 (예: 추세 추종 전략이 잘 통했지만 변동성 폭발 구간엔 약했어요)",
   "yesterday": ["어제 잘 된 것 1", "어제 부진했던 것 1"],
   "today_watch": "오늘 시장에서 주의 깊게 볼 포인트 1~2줄",
   "alpha_idea": {
-    "name": "새 알파 후보 이름",
-    "why": "왜 시도해볼 만한지 평어로 1~2문장",
+    "name": "새 알파 후보 이름 (retro 결과 활용 시 명시)",
+    "why": "왜 시도해볼 만한지 평어로 1~2문장 (retro 수치 인용 가능)",
     "how": "어떻게 검증할지 (예: 30일 백테스트)"
   },
-  "action": "대표가 오늘 할 만한 일 (예: 'BB바운스' 가중치 0.8→1.2로 늘려보세요)"
+  "retro_recommendation": "retro 데이터가 있으면 추천 SL/TP/RR 한 줄, 없으면 빈 문자열",
+  "action": "대표가 오늘 할 만한 일 (예: 'SL 4% TP 6% 변형을 shadow 1주 운영')"
 }`;
 
   const resp = await client.messages.create({
@@ -218,6 +306,7 @@ function buildCardsForResearch(r) {
       ...(r.yesterday || []).map((s) => `어제: ${s}`),
       r.today_watch ? `오늘 주목: ${r.today_watch}` : "",
       r.alpha_idea ? `새 후보: ${r.alpha_idea.name} — ${r.alpha_idea.why}` : "",
+      r.retro_recommendation ? `백테스트 권고: ${r.retro_recommendation}` : "",
     ],
     hint: r.action,
     footer: `검증: ${r.alpha_idea?.how || "-"}`,
@@ -681,14 +770,18 @@ export default async function handler(req, res) {
     }
 
     const kv = await getKv();
-    const [ledger, weights, summary, latestQuant, ga4, sentry] = await Promise.all([
+    const [ledger, weights, summary, latestQuant, ga4, sentry, archive] = await Promise.all([
       readShadowLedger(kv, 7),
       readWeights(kv),
       readShadowSummary(kv),
       kv.get("di:quant:latest").catch(() => null), // quant-research 가 매일 06:00 적립
       fetchGA4DailySummary({ daysBack: 1 }),       // null = 미연동, error = 인증 실패
       fetchSentryDailySummary({ daysBack: 1 }),
+      readClosedArchive(kv),                       // shadow-monitor 가 누적하는 마감 거래
     ]);
+    // QUANT-RES 입력에 자동 백테스트 결과 주입 (Track A — 리서치·백테스트·적용 사이클)
+    const retroResult = retroBacktest(archive);
+    L(`closed-archive: ${archive.length} entries${retroResult ? ` (retro 변형 ${retroResult.topVariants?.length || 0}개 비교)` : ""}`);
     // ledger 의 status==CLOSED 가 0 이어도 shadow-monitor 가 별도 summary 에 누적함.
     // 표시할 "마감 카운트" 는 summary 가 우선, 없으면 ledger 폴백.
     const closedFromSummary = Number((summary?.wins || 0) + (summary?.losses || 0)) || 0;
@@ -703,7 +796,7 @@ export default async function handler(req, res) {
     // 2-pass: RES 먼저 실행 → 결과를 PLAN 에 입력으로 전달
     // 이래야 PLAN 이 RES 의 알파 후보·진단을 보고 의미 있는 승급/디머지 판단을 내림.
     // 둘 다 약 5~8초 걸리므로 총 10~16초. Vercel 함수 60초 한도 내 안전.
-    const research = await runQuantResearcher(client, ledger, weights, summary);
+    const research = await runQuantResearcher(client, ledger, weights, summary, retroResult);
     L(`QUANT-RES done: ${research.headline?.slice(0, 60)}`);
 
     // 3-스텝 파이프라인:
@@ -760,6 +853,7 @@ export default async function handler(req, res) {
         businessPlan,
         devImpl,
         devPerf,
+        retroBacktest: retroResult,
         ga4: ga4 ? { connected: !ga4.error, ...(ga4.error ? { error: ga4.error } : {}) } : { connected: false },
         sentry: sentry ? { connected: !sentry.error } : { connected: false },
         log,
