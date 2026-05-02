@@ -40,11 +40,34 @@ async function fetchKlinesRange(symbol, interval, startMs, endMs) {
 
   const url = `${BINANCE_FAPI}/fapi/v1/klines?symbol=${symbol}&interval=${interval}` +
               `&startTime=${startMs}&endTime=${endMs}&limit=1500`;
-  const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
-  if (!r.ok) {
-    throw new Error(`klines ${symbol} ${interval} ${r.status}: ${await r.text().then((t) => t.slice(0, 200)).catch(() => "")}`);
+  // User-Agent 필수 — 일부 CDN 이 fetch 기본값 거부.
+  // timeout 15초 (Vercel cold start 고려)
+  let r;
+  try {
+    r = await fetch(url, {
+      signal: AbortSignal.timeout(15000),
+      headers: {
+        "User-Agent": "Zepta/1.0 (backtest-engine)",
+        "Accept": "application/json",
+      },
+    });
+  } catch (e) {
+    throw new Error(`fetch failed: ${e?.message || e?.name || String(e)} (url: ${url.slice(0, 100)}...)`);
   }
-  const data = await r.json();
+  if (!r.ok) {
+    let body = "";
+    try { body = (await r.text()).slice(0, 300); } catch {}
+    throw new Error(`klines ${r.status} ${symbol} ${interval}: ${body}`);
+  }
+  let data;
+  try {
+    data = await r.json();
+  } catch (e) {
+    throw new Error(`klines JSON parse failed: ${e?.message}`);
+  }
+  if (!Array.isArray(data)) {
+    throw new Error(`klines unexpected response shape: ${JSON.stringify(data).slice(0, 200)}`);
+  }
   ohlcCache.set(cacheKey, data);
   return data;
 }
@@ -170,8 +193,13 @@ export async function preciseBacktest({
 export async function batchBacktest(trades, variant) {
   const { slPct, tpPct, holdHours = 48 } = variant;
   const results = [];
+  const errors = [];
+  let skipped = 0;
   for (const t of trades) {
-    if (!t.symbol || !t.side || !t.entryPrice || !t.openedAt) continue;
+    if (!t.symbol || !t.side || !t.entryPrice || !t.openedAt) {
+      skipped++;
+      continue;
+    }
     const sim = await preciseBacktest({
       symbol: t.symbol,
       side: t.side,
@@ -181,13 +209,22 @@ export async function batchBacktest(trades, variant) {
       tpPct: tpPct / 100,
       holdHours,
     });
-    if (sim.error) continue;
+    if (sim.error) {
+      if (errors.length < 3) errors.push({ id: t.id, symbol: t.symbol, error: sim.error });
+      continue;
+    }
     const costPct = ((t.feeBps || 8) + (t.slippageBps || 5)) / 10000;
     const netPct = sim.grossPct - costPct;
     const netPnL = (t.notional || 0) * netPct;
     results.push({ ...sim, netPnL, netPct });
   }
-  if (!results.length) return null;
+  if (!results.length) {
+    return {
+      trades: 0,
+      wins: 0, losses: 0, winRate: 0, netPnL: 0,
+      _diag: { input: trades.length, skipped, errored: errors.length, sampleErrors: errors },
+    };
+  }
   const wins = results.filter((r) => r.netPnL > 0).length;
   const netPnL = results.reduce((a, r) => a + r.netPnL, 0);
   const reasons = { TP: 0, SL: 0, TIME: 0 };
@@ -200,6 +237,7 @@ export async function batchBacktest(trades, variant) {
     netPnL: Number(netPnL.toFixed(2)),
     avgHoldMs: Math.round(results.reduce((a, r) => a + (r.holdMs || 0), 0) / results.length),
     byCloseReason: reasons,
+    _diag: errors.length > 0 ? { input: trades.length, skipped, errored: errors.length, sampleErrors: errors } : undefined,
   };
 }
 
