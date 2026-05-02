@@ -5842,6 +5842,25 @@ function AppInner() {
     fetchingRef.current = false;
   }, []);
 
+  // ── 경제 캘린더 KST 파트 헬퍼 ──
+  // toLocaleString 트릭은 fragile (locale·browser 의존) — UTC+9 시프트 후 getUTC* 로 안전 추출.
+  // Invalid Date 면 모든 필드 NaN 대신 표시용 fallback 값 반환.
+  const kstParts = (d) => {
+    if (!(d instanceof Date) || isNaN(d.getTime())) {
+      return { valid: false, year: 0, month: 0, date: 0, day: 0, hour: 0, min: 0 };
+    }
+    const k = new Date(d.getTime() + 9 * 3600000);
+    return {
+      valid: true,
+      year: k.getUTCFullYear(),
+      month: k.getUTCMonth(),       // 0-11
+      date: k.getUTCDate(),
+      day: k.getUTCDay(),           // 0=일
+      hour: k.getUTCHours(),
+      min: k.getUTCMinutes(),
+    };
+  };
+
   // ── 경제 캘린더 (API 기반 + 실제/예상 수치) ──
   const fetchEconCalendar = useCallback(async () => {
     try {
@@ -9260,15 +9279,14 @@ function AppInner() {
                         const miss = hasActual ? (invertedIndicator ? evt.actual > evt.estimate : evt.actual < evt.estimate) : null;
                         const surprise = hasActual ? Math.abs(evt.actual - evt.estimate).toFixed(1) : null;
                         const isPast = evt.daysUntil < 0;
-                        // 한국 시간 기준 날짜 표시
-                        const kstStr = evt.date.toLocaleString("en-US", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false });
-                        const kstDate = new Date(evt.date.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-                        const y = kstDate.getFullYear();
-                        const m = String(kstDate.getMonth() + 1).padStart(2, "0");
-                        const d = String(kstDate.getDate()).padStart(2, "0");
-                        const dayName = ["일","월","화","수","목","금","토"][kstDate.getDay()];
-                        const kstHour = String(kstDate.getHours()).padStart(2, "0");
-                        const kstMin = String(kstDate.getMinutes()).padStart(2, "0");
+                        // 한국 시간 기준 날짜 표시 (안전한 KST 시프트 헬퍼)
+                        const k = kstParts(evt.date);
+                        const y = k.valid ? k.year : "—";
+                        const m = k.valid ? String(k.month + 1).padStart(2, "0") : "--";
+                        const d = k.valid ? String(k.date).padStart(2, "0") : "--";
+                        const dayName = k.valid ? ["일","월","화","수","목","금","토"][k.day] : "";
+                        const kstHour = k.valid ? String(k.hour).padStart(2, "0") : "--";
+                        const kstMin = k.valid ? String(k.min).padStart(2, "0") : "--";
 
                         return (
                           <div key={`${evt.event}-${y}${m}${d}-${i}`} style={{
@@ -11046,11 +11064,21 @@ function AppInner() {
             });
           }
 
+          // 주차 계산용 헬퍼 (KST 기준 — kstParts 결과 사용)
+          const kstWeekOf = (k) => {
+            // 해당 월 1일의 KST 요일 + 일자로 주차 계산
+            // (실제 Date 객체 없이 산술만 — 안전)
+            const firstDayKstShift = new Date(Date.UTC(k.year, k.month, 1) + 9 * 3600000);
+            const firstDayKey = firstDayKstShift.getUTCDay();
+            return Math.ceil((k.date + firstDayKey) / 7);
+          };
           calEvents.forEach(evt => {
-            const kstDate = new Date(evt.date.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-            const weekKey = `${kstDate.getFullYear()}-${String(kstDate.getMonth()+1).padStart(2,"0")}-W${getWeekOfMonth(kstDate)}`;
-            const monthLabel = `${kstDate.getFullYear()}년 ${kstDate.getMonth()+1}월`;
-            const weekLabel = `${getWeekOfMonth(kstDate)}주차`;
+            const k = kstParts(evt.date);
+            if (!k.valid) return; // invalid 이벤트는 그룹화에서 제외
+            const wk = kstWeekOf(k);
+            const weekKey = `${k.year}-${String(k.month+1).padStart(2,"0")}-W${wk}`;
+            const monthLabel = `${k.year}년 ${k.month+1}월`;
+            const weekLabel = `${wk}주차`;
             if (!eventsByWeek[weekKey]) eventsByWeek[weekKey] = { monthLabel, weekLabel, events: [] };
             eventsByWeek[weekKey].events.push(evt);
           });
@@ -11071,9 +11099,9 @@ function AppInner() {
           // 이벤트가 있는 날짜 세트
           const eventDates = new Set();
           calEvents.forEach(evt => {
-            const kd = new Date(evt.date.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-            if (kd.getMonth() === calMonth && kd.getFullYear() === calYear) {
-              eventDates.add(kd.getDate());
+            const k = kstParts(evt.date);
+            if (k.valid && k.month === calMonth && k.year === calYear) {
+              eventDates.add(k.date);
             }
           });
 
@@ -11176,8 +11204,8 @@ function AppInner() {
                       </div>
                       <div className="text-[14px] text-foreground leading-relaxed" style={{ color: C.text1 }}>
                         {importantToday.map((evt, i) => {
-                          const kd = new Date(evt.date.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-                          const timeStr = `${String(kd.getHours()).padStart(2,"0")}:${String(kd.getMinutes()).padStart(2,"0")}`;
+                          const k = kstParts(evt.date);
+                          const timeStr = k.valid ? `${String(k.hour).padStart(2,"0")}:${String(k.min).padStart(2,"0")}` : "—";
                           const resultStr = evt.actual && evt.estimate
                             ? (parseFloat(evt.actual) > parseFloat(evt.estimate) ? "상승 💚" : "하락 📉")
                             : evt.status === "완료" ? "발표완료" : "예정";
@@ -11213,11 +11241,11 @@ function AppInner() {
                       </div>
                       <div className="text-[15px] text-foreground leading-relaxed"  style={{ color: C.text1 }}>
                         {importantThisWeek.map((evt, i) => {
-                          const kd = new Date(evt.date.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-                          const dayName = ["일","월","화","수","목","금","토"][kd.getDay()];
+                          const k = kstParts(evt.date);
+                          const dayName = k.valid ? ["일","월","화","수","목","금","토"][k.day] : "";
                           return (
                             <div key={i} style={{ marginBottom: i < importantThisWeek.length - 1 ? "8px" : 0 }}>
-                              <strong>{evt.name}</strong> 발표가 {kd.getDate()}일({dayName}) 예정되어 있어요
+                              <strong>{evt.name}</strong> 발표가 {k.valid ? `${k.date}일(${dayName})` : "곧"} 예정되어 있어요
                             </div>
                           );
                         })}
@@ -11282,17 +11310,17 @@ function AppInner() {
                         overflow: "hidden",
                       }} className="rounded-b-[12px]">
                         {group.events.map((evt, i) => {
-                          const kstDate = new Date(evt.date.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-                          const d = kstDate.getDate();
-                          const dayName = ["일","월","화","수","목","금","토"][kstDate.getDay()];
+                          const k = kstParts(evt.date);
+                          const d = k.valid ? k.date : "—";
+                          const dayName = k.valid ? ["일","월","화","수","목","금","토"][k.day] : "";
                           const invertedIndicator = /CPI|PCE|PPI|Unemployment/i.test(evt.event);
                           const hasActual = evt.actual != null && evt.estimate != null;
                           const beat = hasActual ? (invertedIndicator ? evt.actual < evt.estimate : evt.actual > evt.estimate) : null;
                           const miss = hasActual ? (invertedIndicator ? evt.actual > evt.estimate : evt.actual < evt.estimate) : null;
                           const isPast = evt.daysUntil < 0;
                           const isToday = evt.status === "오늘";
-                          const kstHour = String(kstDate.getHours()).padStart(2, "0");
-                          const kstMin = String(kstDate.getMinutes()).padStart(2, "0");
+                          const kstHour = k.valid ? String(k.hour).padStart(2, "0") : "--";
+                          const kstMin = k.valid ? String(k.min).padStart(2, "0") : "--";
 
                           const importanceColor = evt.importance === "high" ? C.red : evt.importance === "medium" ? C.yellow : C.green;
                           return (
