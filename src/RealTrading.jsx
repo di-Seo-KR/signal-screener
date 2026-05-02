@@ -18,6 +18,7 @@ import {
   Wallet, TrendUp, TrendDown,
 } from "./ui/icons.jsx";
 import { useTheme } from "./ui/theme.jsx";
+import BinanceConnect from "./components/BinanceConnect.jsx";
 
 // ═══════════════════════════════════════════════════════════════════
 // Custom Styles for RealTrading Dashboard
@@ -1142,6 +1143,17 @@ function RealTradingInner() {
     }} className="z-anim-in">
       <div style={{ maxWidth: 1280, margin: "0 auto" }}>
         {header}
+
+        {/* 바이낸스 키 등록 — 미연결 시 최상단에 강조 노출. 연결됨이면 작은 상태 카드 */}
+        <div style={{ margin: "0 0 16px" }}>
+          <BinanceConnect
+            userId={userId}
+            theme="dark"
+            useToastFn={useToast}
+            onConnected={() => { refresh(); }}
+          />
+        </div>
+
         {kpiBar}
         {controlPanel}
 
