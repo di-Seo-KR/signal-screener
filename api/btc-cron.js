@@ -732,10 +732,12 @@ export default async function handler(req, res) {
     }
 
     // ── 텔레그램 알림 (카드형, 사용자 친화) ──
+    // ★ virtual 채널 — 환경변수 ZEPTA_TG_VIRTUAL_ENABLED=1 일 때만 발송
+    //   사용자 요청(2026-05-03): 가상매매 리포트는 끄고 실거래 위주로
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     const cards = buildTelegramCards(assetResults, positionMap, equity, cash, duration, fngData);
-    await sendCards(cards);
-    addLog(`📨 텔레그램 전송 완료 (${duration}s)`);
+    const tg = await sendCards(cards, { channel: "virtual" });
+    addLog(`📨 텔레그램 ${tg?.skipped ? "스킵 (virtual muted)" : `전송 완료 (${duration}s)`}`);
 
     return res.status(200).json({
       ok: true,
