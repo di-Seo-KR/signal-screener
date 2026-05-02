@@ -225,6 +225,7 @@ async function monitorUser(userId) {
     };
     // 신규 필드 backfill
     sum.byFamily = sum.byFamily || {};
+    sum.bySymbol = sum.bySymbol || {}; // ★ 종목별 영구 누적 — 자동 차단/가중치에 사용
     sum.byCloseReason = sum.byCloseReason || { TP: 0, SL: 0, TIME: 0 };
     sum.totalHoldMs = sum.totalHoldMs || 0;
     sum.bestR = sum.bestR || 0;
@@ -252,6 +253,15 @@ async function monitorUser(userId) {
       sum.byFamily[fam].trades += 1;
       sum.byFamily[fam].netPnL += c.netPnL || 0;
       if ((c.netPnL || 0) > 0) sum.byFamily[fam].wins += 1;
+      // ★ 종목별 누적 (자동 차단/가중치 시스템 input)
+      const sym = c.plan?.symbol;
+      if (sym) {
+        sum.bySymbol[sym] = sum.bySymbol[sym] || { trades: 0, wins: 0, netPnL: 0, lastClosedAt: null };
+        sum.bySymbol[sym].trades += 1;
+        sum.bySymbol[sym].netPnL += c.netPnL || 0;
+        if ((c.netPnL || 0) > 0) sum.bySymbol[sym].wins += 1;
+        sum.bySymbol[sym].lastClosedAt = c.closedAt || new Date(now).toISOString();
+      }
     }
     sum.profitFactor = sum.grossLoss > 0 ? sum.grossWin / sum.grossLoss : null;
     sum.avgHoldHours = sum.trades > 0 ? sum.totalHoldMs / sum.trades / 3600000 : 0;

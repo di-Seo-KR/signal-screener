@@ -292,6 +292,24 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     S(`family weights skipped: ${e?.message}`);
   }
 
+  // ★ 자동 종목 차단 — shadow-summary.bySymbol 기반 winRate < 30% AND trades >= 20 인 심볼은 신규 진입 거부
+  // (2026-05-03 진단: SOL 18.5%, XRP 11.5% 같은 명백한 손실 종목을 자동 정리)
+  const blockedByPerf = new Set();
+  try {
+    const kvBlock = await getKv();
+    const summary = (await kvBlock.get(`di:real:user:${userId}:shadow-summary`)) || null;
+    const bySym = summary?.bySymbol || {};
+    for (const [sym, s] of Object.entries(bySym)) {
+      const trades = s?.trades || 0;
+      const wins = s?.wins || 0;
+      const wr = trades > 0 ? wins / trades : 0;
+      if (trades >= 20 && wr < 0.3) blockedByPerf.add(sym);
+    }
+    if (blockedByPerf.size > 0) S(`auto-blocked symbols (winRate<30% n>=20): ${Array.from(blockedByPerf).join(", ")}`);
+  } catch (e) {
+    S(`auto-block skipped: ${e?.message}`);
+  }
+
   // ★ 중복 진입 차단 — 이미 OPEN 인 심볼에는 신규 진입 안 함
   // (지난 진단에서 ADAUSDT 같은 종목이 5분마다 반복 진입돼 림보 200건 누적된 문제)
   const openSymbols = new Set();
@@ -311,6 +329,12 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   let best = null, price = null, atr = null, filter = null, plan = null;
   const tried = [];
   for (const cand of ranked.slice(0, 6)) {  // 최대 6개 시도
+    // 자동 차단 — 성과 부진으로 자동 디머지된 종목
+    if (blockedByPerf.has(cand.symbol)) {
+      S(`  ↳ ${cand.symbol}: 부진 자동 차단 (winRate<30% AND n>=20)`);
+      tried.push({ symbol: cand.symbol, reason: "auto-blocked by performance" });
+      continue;
+    }
     // 중복 진입 차단 — 이미 같은 심볼에 OPEN 포지션 있으면 skip
     if (openSymbols.has(cand.symbol)) {
       S(`  ↳ ${cand.symbol}: 이미 OPEN 포지션 존재 — 중복 진입 차단`);
