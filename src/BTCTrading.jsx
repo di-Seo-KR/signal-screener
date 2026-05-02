@@ -792,6 +792,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           const chartColors = [C.blue, "#FCD535", "#85C4FF", C.purple, C.orange, C.green, C.red, "#FF69B4", "#00CED1", "#FF6347"];
           const eqCurve = bp?.equityCurve || [];
           const pnlCurveData = bp?.pnlCurve || [];
+          const dayLabels = bp?.dayLabels || []; // "YYYY-MM-DD" KST 일자 (일단위 그룹핑)
           const activeCurve = detailChartTab === "pnl" ? pnlCurveData : eqCurve;
           // Sharpe Ratio 실제 계산 (일간 수익률 기반, 연환산)
           const calcSharpe = (() => {
@@ -875,8 +876,10 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                     </div>
                     {activeCurve.length >= 2 ? (() => {
                       const yAxisW = 52; // Y축 라벨 너비
+                      const xAxisH = 22; // X축 라벨 높이 (일자 표시 영역)
                       const cw = isMobile ? 300 : 560, ch = isMobile ? 160 : 220;
                       const totalW = cw + yAxisW;
+                      const totalH = ch + xAxisH;
                       const min = Math.min(...activeCurve) * 0.998;
                       const max = Math.max(...activeCurve) * 1.002;
                       const rng = max - min || 1;
@@ -902,6 +905,30 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                             : `${roiPct >= 0 ? "+" : ""}${roiPct.toFixed(1)}%`,
                         };
                       });
+                      // X축 일자 라벨 (1주일 간격) — dayLabels 가 있고 충분할 때만 표시
+                      // 첫·끝 포인트 + 약 7일 간격 표본
+                      const hasDayLabels = Array.isArray(dayLabels) && dayLabels.length === activeCurve.length;
+                      const xLabels = (() => {
+                        if (!hasDayLabels) return [];
+                        const n = dayLabels.length;
+                        if (n < 2) return [];
+                        const stepIdx = Math.max(7, Math.ceil(n / 6)); // 점이 너무 많으면 ~6개로 분산
+                        const out = [];
+                        // 첫 라벨
+                        out.push({ idx: 0, label: dayLabels[0] });
+                        for (let i = stepIdx; i < n - 1; i += stepIdx) {
+                          out.push({ idx: i, label: dayLabels[i] });
+                        }
+                        // 끝 라벨 (중복 방지)
+                        if (out[out.length - 1].idx !== n - 1) {
+                          out.push({ idx: n - 1, label: dayLabels[n - 1] });
+                        }
+                        // "YYYY-MM-DD" → "M/D" 단축 (모바일 가독성)
+                        return out.map((p) => {
+                          const m = p.label.match(/^\d{4}-(\d{2})-(\d{2})$/);
+                          return { ...p, short: m ? `${Number(m[1])}/${Number(m[2])}` : p.label };
+                        });
+                      })();
                       return (
                         <div style={{ position: "relative" }}
                           onMouseMove={(e) => {
@@ -914,7 +941,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                           }}
                           onMouseLeave={() => setChartHover(null)}
                         >
-                          <svg width="100%" viewBox={`0 0 ${totalW} ${ch}`} preserveAspectRatio="none" style={{ borderRadius: "8px", overflow: "visible", display: "block" }}>
+                          <svg width="100%" viewBox={`0 0 ${totalW} ${totalH}`} preserveAspectRatio="none" style={{ borderRadius: "8px", overflow: "visible", display: "block" }}>
                             <defs>
                               <linearGradient id="roi-detail-grad" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor={clr} stopOpacity="0.15" />
@@ -937,6 +964,23 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                             <path d={linePath} fill="none" stroke={clr} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                             {/* 끝점 */}
                             <circle cx={(yAxisW + (activeCurve.length - 1) * xStep).toFixed(1)} cy={toY(activeCurve[activeCurve.length - 1]).toFixed(1)} r="5" fill={C.card} stroke={clr} strokeWidth="2.5" />
+                            {/* X축 일자 라벨 (1주일 간격, 일단위 그룹핑된 데이터 있을 때만) */}
+                            {xLabels.length > 0 && xLabels.map((xl, i) => {
+                              const xPos = yAxisW + xl.idx * xStep;
+                              return (
+                                <g key={`xl-${i}`}>
+                                  <line x1={xPos} y1={ch} x2={xPos} y2={ch + 4} stroke={C.text3} strokeWidth="0.8" opacity="0.4" />
+                                  <text
+                                    x={xPos}
+                                    y={ch + 16}
+                                    textAnchor={i === 0 ? "start" : i === xLabels.length - 1 ? "end" : "middle"}
+                                    fill={C.text3}
+                                    fontSize="10"
+                                    fontFamily="inherit"
+                                  >{xl.short}</text>
+                                </g>
+                              );
+                            })}
                             {/* 호버 수직선 + 포인트 */}
                             {chartHover && chartHover.idx < activeCurve.length && (() => {
                               const hx = yAxisW + chartHover.idx * xStep;
@@ -965,7 +1009,14 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                                       return `${r >= 0 ? "+" : ""}${r.toFixed(2)}%`;
                                     })()}
                               </div>
-                              <div style={{ fontSize: "11px", color: C.text3 }}>#{chartHover.idx + 1}</div>
+                              <div style={{ fontSize: "11px", color: C.text3 }}>
+                                {hasDayLabels && dayLabels[chartHover.idx]
+                                  ? (() => {
+                                      const m = dayLabels[chartHover.idx].match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                                      return m ? `${m[1]}-${m[2]}-${m[3]}` : dayLabels[chartHover.idx];
+                                    })()
+                                  : `#${chartHover.idx + 1}`}
+                              </div>
                             </div>
                           )}
                         </div>

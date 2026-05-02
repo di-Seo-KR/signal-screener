@@ -419,15 +419,13 @@ function BotSection({ title, subtitle, bots, onActivate, theme, isMobile, descri
           </div>
         </>
       ) : (
-        /* PC: 벤토 그리드 — 첫 카드(추천) 만 col-span-2 로 강조 */
-        <div className="grid gap-3" style={{
-          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+        /* PC: 균등 그리드 — 모든 카드 동일 디자인·동일 크기 */
+        <div className="grid gap-4" style={{
+          gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
           justifyContent: "start",
         }}>
-          {bots.map((bot, i) => (
-            <div key={bot.id} style={{ gridColumn: i === 0 ? "span 2" : "span 1" }}>
-              <BotCard bot={bot} onActivate={onActivate} theme={theme} featured={i === 0} />
-            </div>
+          {bots.map((bot) => (
+            <BotCard key={bot.id} bot={bot} onActivate={onActivate} theme={theme} />
           ))}
         </div>
       )}
@@ -446,124 +444,147 @@ function BotCard({ bot, onActivate, theme }) {
   const c = colors[theme];
   const equityCurve = useMemo(() => generateEquityCurve(bot, 12), [bot.id]);
   const chartColor = getRiskColor(bot.riskColor, theme);
+  const riskColor = getRiskColor(bot.riskColor, theme);
 
   return (
     <div
-      className="flex flex-col gap-3.5 p-5 rounded-xl cursor-pointer transition-all duration-300"
+      className="flex flex-col rounded-2xl cursor-pointer"
       style={{
         backgroundColor: c.card,
         border: `1px solid ${c.border}`,
+        padding: "20px",
+        gap: "16px",
+        transition: "transform 0.2s ease-out, border-color 0.2s ease-out, box-shadow 0.2s ease-out",
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = c.blue;
-        e.currentTarget.style.boxShadow = `0 8px 24px rgba(59, 139, 255, 0.1)`;
+        e.currentTarget.style.borderColor = `${c.blue}80`;
+        e.currentTarget.style.boxShadow = `0 8px 24px rgba(59,139,255,0.12)`;
+        e.currentTarget.style.transform = "translateY(-2px)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.borderColor = c.border;
         e.currentTarget.style.boxShadow = "none";
+        e.currentTarget.style.transform = "translateY(0)";
       }}
     >
-      {/* Header with icon and name */}
-      <div className="flex items-center gap-3">
-        <span className="text-[28px]">{bot.icon}</span>
-        <div className="flex-1">
-          <h3 className="m-0 mb-1 text-lg font-semibold" style={{ color: c.text1 }}>
-            {bot.name}
-          </h3>
+      {/* 헤더: 아이콘 + 이름 + 위험도 칩 (한 줄) */}
+      <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+        <span style={{
+          fontSize: "26px",
+          width: "44px", height: "44px",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          borderRadius: "12px",
+          background: `${riskColor}15`,
+          flexShrink: 0,
+        }}>{bot.icon}</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h3 style={{
+            margin: 0,
+            fontSize: "16px",
+            fontWeight: 700,
+            color: c.text1,
+            letterSpacing: "-0.01em",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}>{bot.name}</h3>
+          <div style={{ fontSize: "12px", color: c.text3, marginTop: "2px" }}>
+            예상수익 <span style={{ color: c.green, fontWeight: 700 }}>{bot.expectedReturn}</span>
+          </div>
         </div>
+        <span style={{
+          padding: "4px 10px",
+          borderRadius: "999px",
+          fontSize: "11px",
+          fontWeight: 700,
+          background: `${riskColor}18`,
+          color: riskColor,
+          border: `1px solid ${riskColor}30`,
+          flexShrink: 0,
+        }}>위험도 {bot.risk}</span>
       </div>
 
-      {/* Risk badge and return */}
-      <div className="flex gap-2 justify-between">
-        <div
-          className="px-3 py-1 rounded-full text-sm font-semibold opacity-80"
-          style={{
-            backgroundColor: getRiskColor(bot.riskColor, theme),
-            color: bot.riskColor === "red" ? "#fff" : "#000",
-          }}
-        >
-          {t("autoTrading.riskLevel")}: {bot.risk}
-        </div>
-        <div className="text-base font-semibold" style={{ color: c.green }}>
-          {t("autoTrading.expectedReturn")}: {bot.expectedReturn}
-        </div>
-      </div>
+      {/* 설명: 최대 2줄 클램프 */}
+      <p style={{
+        margin: 0,
+        fontSize: "13px",
+        lineHeight: 1.55,
+        color: c.text2,
+        display: "-webkit-box",
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: "vertical",
+        overflow: "hidden",
+      }}>{bot.description}</p>
 
-      {/* Description */}
-      <p className="m-0 text-[15px] leading-relaxed" style={{ color: c.text2 }}>
-        {bot.description}
-      </p>
-
-      {/* Tags */}
-      <div className="flex gap-2 flex-wrap">
+      {/* 태그 — 하나의 줄로 통일된 작은 칩 */}
+      <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
         {bot.tags.map((tag) => (
-          <span
-            key={tag}
-            className="px-2.5 py-1 rounded-full text-sm"
-            style={{
-              backgroundColor: c.card2,
-              color: c.text2,
-              border: `1px solid ${c.border}`,
-            }}
-          >
-            {tag}
-          </span>
+          <span key={tag} style={{
+            padding: "3px 9px",
+            borderRadius: "6px",
+            fontSize: "11px",
+            fontWeight: 600,
+            background: c.card2,
+            color: c.text3,
+            border: `1px solid ${c.border}`,
+          }}>{tag}</span>
         ))}
       </div>
 
-      {/* Stats */}
-      <div
-        className="grid grid-cols-3 gap-2 p-3 rounded-lg text-sm text-center"
-        style={{
-          backgroundColor: c.card2,
-          color: c.text2,
-        }}
-      >
-        <div>
-          <div className="text-sm" style={{ color: c.text3 }}>{t("botStats.winRate")}</div>
-          <div className="font-semibold" style={{ color: c.green }}>{bot.stats.winRate}</div>
-        </div>
-        <div>
-          <div className="text-sm" style={{ color: c.text3 }}>{t("botStats.sharpeRatio")}</div>
-          <div className="font-semibold" style={{ color: c.blue }}>{bot.stats.sharpeRatio}</div>
-        </div>
-        <div>
-          <div className="text-sm" style={{ color: c.text3 }}>{t("botStats.mdd")}</div>
-          <div className="font-semibold" style={{ color: c.red }}>{bot.stats.mdd}</div>
-        </div>
+      {/* 통계 — 큰 숫자 + 작은 라벨 (정보 위계 명확화) */}
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(3, 1fr)",
+        gap: "8px",
+        padding: "12px",
+        borderRadius: "10px",
+        background: c.card2,
+        border: `1px solid ${c.border}40`,
+      }}>
+        {[
+          { label: t("botStats.winRate"), value: bot.stats.winRate, color: c.green },
+          { label: t("botStats.sharpeRatio"), value: bot.stats.sharpeRatio, color: c.blue },
+          { label: t("botStats.mdd"), value: bot.stats.mdd, color: c.red },
+        ].map((s, i) => (
+          <div key={i} style={{ textAlign: "center" }}>
+            <div style={{ fontSize: "10px", color: c.text3, marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{s.label}</div>
+            <div style={{ fontSize: "16px", fontWeight: 800, color: s.color, letterSpacing: "-0.01em" }}>{s.value}</div>
+          </div>
+        ))}
       </div>
 
-      {/* Equity Curve Chart — 모바일 반응형 적용 */}
-      <div className="p-3 rounded-lg" style={{
-        backgroundColor: c.card2,
-        border: `1px solid ${c.border}60`,
+      {/* 모의 ROI 차트 */}
+      <div style={{
+        padding: "10px",
+        borderRadius: "10px",
+        background: c.card2,
+        border: `1px solid ${c.border}40`,
       }}>
         <MiniEquityChart data={equityCurve} color={chartColor} theme={theme} isMobile={false} />
       </div>
 
-      {/* Action button — 모바일 터치 타겟 44px 최소 높이 보장 */}
+      {/* 활성화 버튼 — 항상 동일 형태, 48px 터치 타겟 */}
       <button
         onClick={() => onActivate(bot)}
-        className="w-full px-4 rounded-lg text-base font-semibold text-white cursor-pointer transition-all duration-200"
         style={{
-          backgroundColor: c.blue,
-          border: "none",
+          width: "100%",
           padding: "12px 16px",
-          minHeight: "44px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          minHeight: "48px",
+          borderRadius: "12px",
+          fontSize: "15px",
+          fontWeight: 700,
+          color: "#fff",
+          background: c.blue,
+          border: "none",
+          cursor: "pointer",
+          transition: "background 0.15s, transform 0.1s",
         }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.opacity = "0.9";
-          e.currentTarget.style.transform = "translateY(-2px)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.opacity = "1";
-          e.currentTarget.style.transform = "translateY(0)";
-        }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = c.blue; e.currentTarget.style.opacity = "0.92"; }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+        onMouseDown={(e) => { e.currentTarget.style.transform = "scale(0.98)"; }}
+        onMouseUp={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
       >
-        {t("autoTrading.activate")}
+        {t("autoTrading.activate")} 시작하기
       </button>
     </div>
   );
