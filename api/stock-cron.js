@@ -607,11 +607,12 @@ async function sendTelegramReport(title, message) {
   // 너무 길면 첫 ~25줄만 (카드 가독성)
   const trimmed = lines.length > 25 ? [...lines.slice(0, 25), "...(이하 생략 — 자세한 내용은 KV 로그 참고)"] : lines;
 
+  // ★ virtual 채널 — 주식 가상 자동매매라 ZEPTA_TG_VIRTUAL_ENABLED=1 일 때만 발송
   await sendCards([buildCard({
     tag: title.includes("Error") || title.includes("⚠") ? "⚠️" : "🤖",
     title: title.replace(/^[⚠️🤖]\s*/, ""),
     lines: trimmed,
-  })]);
+  })], { channel: "virtual" });
 }
 
 // ==================== MAIN HANDLER ====================

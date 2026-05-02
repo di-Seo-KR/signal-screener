@@ -213,8 +213,9 @@ export default async function handler(req, res) {
     }
 
     // Telegram report (카드형, 사용자 친화)
+    // ★ virtual 채널 — 가상 포트폴리오라 ZEPTA_TG_VIRTUAL_ENABLED=1 일 때만 발송
     const cards = buildRebalancingCards(allPositionWeights, allActions, allResults, totalEquity, totalCash);
-    await sendCards(cards);
+    await sendCards(cards, { channel: "virtual" });
 
     return res.status(200).json({
       success: true,

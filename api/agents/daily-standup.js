@@ -73,6 +73,57 @@ async function readShadowSummary(kv) {
   return (await kv.get(`di:real:user:${PROBE_USER}:shadow-summary`)) || null;
 }
 
+// ── 실거래 일일 활동 요약 (사용자 본인 phase1 유저들 기준) ──
+// 어제(KST) 자정~24시 동안의 engine-log 분석 → 진입/청산/손익 집계
+async function readRealTradingActivity(kv) {
+  const phase1Users = (await kv.get("di:real:phase1-users")) || [];
+  if (!phase1Users.length) {
+    return { phase1Count: 0, users: [] };
+  }
+  // KST 기준 어제 0시 ~ 오늘 0시
+  const KST_MS = 9 * 3600000;
+  const nowKst = new Date(Date.now() + KST_MS);
+  const yMidnightKst = Date.UTC(nowKst.getUTCFullYear(), nowKst.getUTCMonth(), nowKst.getUTCDate() - 1);
+  const tMidnightKst = yMidnightKst + 86400000;
+  const sinceMs = yMidnightKst - KST_MS; // KST 자정 → UTC ms
+  const untilMs = tMidnightKst - KST_MS;
+
+  const userActivities = [];
+  for (const uid of phase1Users.slice(0, 5)) {
+    try {
+      const [log, status, posPlans] = await Promise.all([
+        kv.get(`di:real:user:${uid}:engine-log`).then((v) => v || []),
+        kv.get(`di:real:user:${uid}:phase1_enabled`),
+        kv.get(`di:real:user:${uid}:open-positions`).then((v) => v || []),
+      ]);
+      // 어제 윈도우 내 로그만
+      const yLog = log.filter((e) => {
+        const t = e.time ? Date.parse(e.time) : 0;
+        return t >= sinceMs && t < untilMs;
+      });
+      const evaluated = yLog.length;
+      const entries = yLog.filter((e) => e.mode === "live" && e.result?.ok && !e.dryRun);
+      const exits = yLog.filter((e) => e.event === "position_closed");
+      const skipped = yLog.filter((e) => !e.signal && e.reason);
+      const realizedToday = exits.reduce((s, e) => s + (e.netPnL || 0), 0);
+      // 잔고 조회 (status 끼어들기)
+      const realStatus = await kv.get(`di:real:user:${uid}:status-cache`).catch(() => null);
+      userActivities.push({
+        userIdShort: uid.slice(0, 8),
+        phase1Enabled: !!status,
+        evaluated,
+        entries: entries.length,
+        exits: exits.length,
+        skipped: skipped.length,
+        realizedToday: Number(realizedToday.toFixed(2)),
+        openPositions: Array.isArray(posPlans) ? posPlans.length : 0,
+        equity: realStatus?.totalWalletBalance ? Number(realStatus.totalWalletBalance) : null,
+      });
+    } catch {}
+  }
+  return { phase1Count: phase1Users.length, users: userActivities };
+}
+
 // 마감 거래 아카이브 (retro 백테스트 자동화 input)
 async function readClosedArchive(kv) {
   return (await kv.get(`di:real:user:${PROBE_USER}:shadow-closed-archive`)) || [];
@@ -127,6 +178,74 @@ function retroBacktest(archive) {
   }
   variants.sort((a, b) => b.netPnL - a.netPnL);
   return { archiveSize: archive.length, baseline, topVariants: variants.slice(0, 3) };
+}
+
+// ── 실거래 활동 카드 빌더 (직관적, 짧게) ──
+function buildRealTradingActivityCard(activity, summary) {
+  if (!activity || activity.phase1Count === 0) {
+    return buildCard({
+      tag: "💼",
+      title: "어제 실거래 활동",
+      lines: ["등록된 실거래 유저 없음 — 바이낸스 키 등록 후 활성화하세요"],
+    });
+  }
+  // 첫 번째 유저(본인) 기준 요약
+  const me = activity.users[0];
+  if (!me) {
+    return buildCard({
+      tag: "💼",
+      title: "어제 실거래 활동",
+      lines: ["활동 데이터 없음"],
+    });
+  }
+  const lines = [];
+  lines.push(`신호 평가 ${me.evaluated}회 · 진입 ${me.entries}건 · 청산 ${me.exits}건`);
+  if (me.realizedToday !== 0) {
+    const sign = me.realizedToday >= 0 ? "+" : "";
+    lines.push(`어제 실현 손익: ${sign}$${me.realizedToday}`);
+  }
+  if (me.openPositions > 0) {
+    lines.push(`현재 오픈 포지션: ${me.openPositions}건`);
+  }
+  if (me.equity !== null) {
+    lines.push(`잔고: $${me.equity.toFixed(2)}${me.equity < 200 ? "  (< $200 = 진입 자동 차단)" : ""}`);
+  }
+  if (me.entries === 0 && me.skipped > 0) {
+    lines.push(`스킵 사유 ${me.skipped}건 — 잔고 부족 또는 자동 차단`);
+  }
+  return buildCard({
+    tag: "💼",
+    title: "어제 실거래 활동",
+    lines,
+    hint: me.equity !== null && me.equity < 200
+      ? "실거래 본격 가동 조건: 잔고 ≥ $200 + Phase 1 enable. 작은 금액으로 시작하려면 Phase 1 임계값 조정 필요"
+      : undefined,
+  });
+}
+
+// ── 가상매매 한 줄 참고 카드 (짧게) ──
+function buildShadowReferenceCard(summary) {
+  if (!summary) {
+    return buildCard({
+      tag: "🌙",
+      title: "가상매매 (참고용)",
+      lines: ["데이터 누적 중"],
+    });
+  }
+  const total = (summary.wins || 0) + (summary.losses || 0);
+  const wr = total ? ((summary.wins / total) * 100).toFixed(1) : "—";
+  const pf = summary.profitFactor != null ? Number(summary.profitFactor).toFixed(2) : "—";
+  const pnl = Number(summary.netPnL || 0).toFixed(2);
+  const sign = (summary.netPnL || 0) >= 0 ? "+" : "";
+  return buildCard({
+    tag: "🌙",
+    title: "가상매매 누적 (참고용)",
+    lines: [
+      `누적 ${total}건 · 승률 ${wr}% · 손익비 ${pf}`,
+      `누적 손익 ${sign}$${pnl}`,
+    ],
+    footer: pf !== "—" && Number(pf) < 1.2 ? "손익비 1.2 미만 — 전략 개선 필요" : undefined,
+  });
 }
 
 // ── 안전 JSON 파싱 (Claude 응답에서 마크다운 코드블록 제거) ──
@@ -796,7 +915,7 @@ export default async function handler(req, res) {
     }
 
     const kv = await getKv();
-    const [ledger, weights, summary, latestQuant, ga4, sentry, archive] = await Promise.all([
+    const [ledger, weights, summary, latestQuant, ga4, sentry, archive, realActivity] = await Promise.all([
       readShadowLedger(kv, 7),
       readWeights(kv),
       readShadowSummary(kv),
@@ -804,6 +923,7 @@ export default async function handler(req, res) {
       fetchGA4DailySummary({ daysBack: 1 }),       // null = 미연동, error = 인증 실패
       fetchSentryDailySummary({ daysBack: 1 }),
       readClosedArchive(kv),                       // shadow-monitor 가 누적하는 마감 거래
+      readRealTradingActivity(kv),                 // 어제 실거래 활동 (사용자 본인 기준)
     ]);
     // QUANT-RES 입력에 자동 백테스트 결과 주입 (Track A — 리서치·백테스트·적용 사이클)
     const retroResult = retroBacktest(archive);
@@ -848,16 +968,18 @@ export default async function handler(req, res) {
 
     const header = buildCard({
       tag: "🌅",
-      title: `Zepta 일일 스탠드업 — ${fmtKST().slice(0, 8)}`,
+      title: `Zepta 일일 보고 — ${fmtKST().slice(0, 8)}`,
       lines: [
-        `shadow 거래 ${ledger.length}건 진행 중, 누적 마감 ${closedCount}건`,
-        `퀀트(RES/PLAN) + 마케팅(MKT) + 기획(SVC/BIZ) + 개발(IMPL/PERF) 7명 보고`,
+        `실거래 활동 + 가상매매 참고 + 7인 시니어 진단`,
       ],
       footer: ga4 && !ga4.error ? `어제 GA4 사용자 ${ga4.users}명 · 세션 ${ga4.sessions}건` : undefined,
     });
 
     const cards = [
       header,
+      // ★ 실거래 활동 — 헤더 직후에 배치 (가장 중요한 정보)
+      buildRealTradingActivityCard(realActivity, summary),
+      buildShadowReferenceCard(summary),
       buildCardsForResearch(research),
       buildCardsForPlan(plan),
       buildCardsForMarketing(marketing),

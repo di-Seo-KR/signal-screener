@@ -368,7 +368,8 @@ export default async function handler(req, res) {
       footer: `${fmtKSTShort()} · 내일 분석 배치: ${BATCHES[(dayOfWeek + 1) % 7].name}`,
     }));
 
-    await sendCards(cards);
+    // ★ virtual 채널 — 백테스트 결과는 daily-standup 에서 통합 보고하므로 중복 방지
+    await sendCards(cards, { channel: "virtual" });
     L(`📨 리포트 전송 완료 (${cards.length}장)`);
 
     // ── 영구 아카이브 (di:quant:latest) — 실전매매 엔진이 참조 ──

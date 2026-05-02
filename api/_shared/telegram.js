@@ -106,8 +106,20 @@ function clip(text, max = 3900) {
   return text.slice(0, max) + "\n...(이하 생략)";
 }
 
+// 가상매매(shadow/virtual portfolio) 채널 메시지 차단 가드.
+// 사용자 요청(2026-05-03): "텔레그램은 실제매매 리포트 위주로, 가상매매는 끄고 직관적으로"
+// btc-cron / stock-cron / portfolio-rebalance 등 가상매매 cron 의 sendCards 호출에
+// channel: "virtual" 옵션을 붙이면 ZEPTA_TG_VIRTUAL_ENABLED!=="1" 일 때 무음.
+// (실거래·시장알림·daily-standup 은 그대로 발송)
+function isVirtualMuted() {
+  return process.env.ZEPTA_TG_VIRTUAL_ENABLED !== "1";
+}
+
 // 단일 메시지 전송 — 모든 sender 가 이걸 거치게 권장
-export async function sendTelegram({ text, parseMode = "HTML", token, chatId } = {}) {
+export async function sendTelegram({ text, parseMode = "HTML", token, chatId, channel } = {}) {
+  if (channel === "virtual" && isVirtualMuted()) {
+    return { ok: false, skipped: true, reason: "virtual channel muted" };
+  }
   const TG_TOKEN = token || process.env.TELEGRAM_BOT_TOKEN;
   const TG_CHAT = chatId || process.env.TELEGRAM_CHAT_ID;
   if (!TG_TOKEN || !TG_CHAT) {
@@ -145,3 +157,5 @@ export async function sendTelegram({ text, parseMode = "HTML", token, chatId } =
 export async function sendCards(cards, opts = {}) {
   return sendTelegram({ text: joinCards(cards), ...opts });
 }
+
+export { isVirtualMuted };
