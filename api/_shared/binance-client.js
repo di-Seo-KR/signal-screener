@@ -200,20 +200,31 @@ export async function getTickerPrice({ symbol, testnet = false }) {
  * @param {string} [opts.interval="4h"]
  * @param {number} [opts.limit=100]
  */
-export async function getKlines({ symbol, interval = "4h", limit = 100, testnet = false }) {
+export async function getKlines({ symbol, interval = "4h", limit = 100, startTime, endTime, testnet = false }) {
+  const params = { symbol, interval, limit };
+  if (startTime != null) params.startTime = startTime;
+  if (endTime != null) params.endTime = endTime;
   if (isProxyMode()) {
     return await viaProxy({
       method: "GET",
       path: "/fapi/v1/klines",
-      params: { symbol, interval, limit },
+      params,
       testnet,
       signed: false,
     });
   }
   const base = testnet ? BINANCE_FAPI_TESTNET : BINANCE_FAPI;
-  const url = `${base}/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
-  const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
-  if (!resp.ok) throw new Error(`klines ${resp.status}`);
+  let url = `${base}/fapi/v1/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  if (startTime != null) url += `&startTime=${startTime}`;
+  if (endTime != null) url += `&endTime=${endTime}`;
+  const resp = await fetch(url, {
+    signal: AbortSignal.timeout(15000),
+    headers: { "User-Agent": "Zepta/1.0", "Accept": "application/json" },
+  });
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    throw new Error(`klines ${resp.status}: ${body.slice(0, 200)}`);
+  }
   return await resp.json();
 }
 

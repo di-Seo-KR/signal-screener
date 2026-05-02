@@ -21,52 +21,34 @@
 //   const result = await preciseBacktest({ symbol, side, entryPrice, openedAt, slPct, tpPct, holdHours });
 // ════════════════════════════════════════════════════════════════════
 
-const BINANCE_FAPI = process.env.BINANCE_FAPI_BASE || "https://fapi.binance.com";
+// ★ binance-client.js 의 getKlines 활용 — Fly.io 프록시 자동 경유
+//   (Vercel function 은 us-east-1 에서 실행되어 Binance 가 HTTP 451 차단)
+//   BINANCE_PROXY_URL/BINANCE_PROXY_SECRET env 가 있으면 프록시로, 없으면 다이렉트
+import { getKlines } from "./binance-client.js";
 
-// in-memory OHLC 캐시 (Vercel function lifetime 한정 — 보통 cold start 까지)
+// in-memory OHLC 캐시 (Vercel function lifetime 한정)
 const ohlcCache = new Map();
 
 /**
- * Binance USDM Futures klines fetch.
- * @param {string} symbol  예: "ADAUSDT"
- * @param {string} interval  "1m"|"5m"|"15m"|"1h"
- * @param {number} startMs  Unix ms
- * @param {number} endMs    Unix ms
- * @returns {Promise<Array>}  [openTime, open, high, low, close, volume, closeTime, ...]
+ * Binance USDM Futures klines fetch — 프록시 경유 (미국 IP 차단 우회)
  */
 async function fetchKlinesRange(symbol, interval, startMs, endMs) {
   const cacheKey = `${symbol}:${interval}:${startMs}:${endMs}`;
   if (ohlcCache.has(cacheKey)) return ohlcCache.get(cacheKey);
-
-  const url = `${BINANCE_FAPI}/fapi/v1/klines?symbol=${symbol}&interval=${interval}` +
-              `&startTime=${startMs}&endTime=${endMs}&limit=1500`;
-  // User-Agent 필수 — 일부 CDN 이 fetch 기본값 거부.
-  // timeout 15초 (Vercel cold start 고려)
-  let r;
-  try {
-    r = await fetch(url, {
-      signal: AbortSignal.timeout(15000),
-      headers: {
-        "User-Agent": "Zepta/1.0 (backtest-engine)",
-        "Accept": "application/json",
-      },
-    });
-  } catch (e) {
-    throw new Error(`fetch failed: ${e?.message || e?.name || String(e)} (url: ${url.slice(0, 100)}...)`);
-  }
-  if (!r.ok) {
-    let body = "";
-    try { body = (await r.text()).slice(0, 300); } catch {}
-    throw new Error(`klines ${r.status} ${symbol} ${interval}: ${body}`);
-  }
   let data;
   try {
-    data = await r.json();
+    data = await getKlines({
+      symbol,
+      interval,
+      startTime: startMs,
+      endTime: endMs,
+      limit: 1500,
+    });
   } catch (e) {
-    throw new Error(`klines JSON parse failed: ${e?.message}`);
+    throw new Error(`fetchKlines: ${e?.message || String(e)}`);
   }
   if (!Array.isArray(data)) {
-    throw new Error(`klines unexpected response shape: ${JSON.stringify(data).slice(0, 200)}`);
+    throw new Error(`klines unexpected shape: ${JSON.stringify(data).slice(0, 200)}`);
   }
   ohlcCache.set(cacheKey, data);
   return data;
