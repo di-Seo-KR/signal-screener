@@ -81,10 +81,8 @@ async function monitorUser(userId) {
     if (!mark || !Number.isFinite(mark)) continue;
 
     const side = e.plan.side;
-    const sl = e.plan.slPrice;
     const tp = e.plan.tpPrice;
     const entry = e.entryPrice;
-    const hit = side === "LONG" ? hitLong(entry, mark, sl, tp) : hitShort(entry, mark, sl, tp);
 
     // ── MFE / MAE 트래킹 (best/worst 가격) ──
     e.mfePrice = side === "LONG"
@@ -93,6 +91,44 @@ async function monitorUser(userId) {
     e.maePrice = side === "LONG"
       ? Math.min(e.maePrice || mark, mark)
       : Math.max(e.maePrice || mark, mark);
+
+    // ── 트레일링 스탑 적용 (RISK_CONFIG.trailingStop) — hit 체크 전에 SL 업데이트 ──
+    // MFE 기반으로 최고점에서 일정 R 만큼 떨어진 위치로 SL 끌어올림.
+    // 한 번 올린 SL 은 절대 내리지 않음 (one-way ratchet).
+    // 기존 SL 을 e.plan.slPrice 로 덮어쓰며, 다음 hitLong/hitShort 에서 즉시 반영.
+    const trail = RISK_CONFIG?.trailingStop;
+    if (trail?.enabled && e.mfePrice && entry > 0) {
+      const riskAmt = e.plan?.riskAmount || 0;
+      const notional = e.plan?.notional || 0;
+      if (riskAmt > 0 && notional > 0) {
+        // 현재까지 도달한 최고 R (MFE 기준)
+        const mfePct = side === "LONG"
+          ? (e.mfePrice - entry) / entry
+          : (entry - e.mfePrice) / entry;
+        const peakR = (mfePct * notional) / riskAmt;
+        // 1) 브레이크이븐 — peakR ≥ breakEvenAtR 이면 SL 을 최소 entry 로 이동
+        if (peakR >= (trail.breakEvenAtR ?? 0.7)) {
+          if (side === "LONG" && e.plan.slPrice < entry) e.plan.slPrice = entry;
+          if (side === "SHORT" && e.plan.slPrice > entry) e.plan.slPrice = entry;
+        }
+        // 2) 트레일링 — peakR ≥ activationR 이면 SL 을 peak - trailDistanceR 로 끌어올림
+        if (peakR >= (trail.activationR ?? 1.0)) {
+          const lockR = peakR - (trail.trailDistanceR ?? 0.5);
+          // lockR 을 가격으로 환산
+          const lockPct = (lockR * riskAmt) / notional;
+          const newSl = side === "LONG"
+            ? entry * (1 + lockPct)  // LONG: 진입가 + lockR%
+            : entry * (1 - lockPct); // SHORT: 진입가 - lockR%
+          // ratchet — 한 번 올린 SL 은 절대 내리지 않음
+          if (side === "LONG" && newSl > e.plan.slPrice) e.plan.slPrice = newSl;
+          if (side === "SHORT" && newSl < e.plan.slPrice) e.plan.slPrice = newSl;
+        }
+      }
+    }
+
+    // 트레일링이 SL 끌어올린 결과 반영해서 hit 체크 (즉시 효과)
+    const sl = e.plan.slPrice;
+    const hit = side === "LONG" ? hitLong(entry, mark, sl, tp) : hitShort(entry, mark, sl, tp);
 
     const openedAt = new Date(e.openedAt || now).getTime();
     const ageMs = now - openedAt;
