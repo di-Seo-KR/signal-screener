@@ -5868,41 +5868,49 @@ function AppInner() {
       const data = await resp.json();
       const now = new Date();
       const events = (data.events || []).map(e => {
-        // 미국 동부시간(ET) 기준 발표 → 한국시간(KST) 변환
-        // 대부분 경제지표는 8:30 AM ET 발표, FOMC는 2:00 PM ET 발표
-        // 미국 일광절약시간(DST): 3월 2번째 일요일 ~ 11월 1번째 일요일 → EDT(UTC-4)
-        // 그 외 → EST(UTC-5)
+        // API 응답 date 형식 두 종류 호환:
+        //   A) "2026-04-15"            (날짜만)
+        //   B) "2026-04-02 12:30:00"   (UTC 시각 포함)
+        // 시간이 있으면 그대로 UTC 로 파싱, 없으면 ET 표준 발표시간(8:30/14:00) 합성
         const isForFed = /FOMC|Fed.*Rate|Interest Rate/i.test(e.event);
         const etHour = isForFed ? 14 : 8;
         const etMin = isForFed ? 0 : 30;
-        // ── 안전한 DST 감지 (Intl 로케일 파싱 의존 X) ──
-        const etOffset = (() => {
-          // e.date 형식: "2026-04-15"
-          const m = String(e.date || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
-          if (!m) return 5; // 형식 불명 → EST 기본값으로 안전하게
-          const month = Number(m[2]);
-          const day = Number(m[3]);
-          // 1~2월, 12월 → 항상 EST
-          if (month < 3 || month > 11) return 5;
-          // 4~10월 → 항상 EDT
-          if (month > 3 && month < 11) return 4;
-          // 3월: 8일 이후 EDT, 11월: 1일 이후 EST
-          if (month === 3) return day >= 8 ? 4 : 5;
-          if (month === 11) return day >= 1 && day < 8 ? 4 : 5;
-          return 5;
-        })();
-        // ET 시간 + 오프셋 → UTC 시간으로 변환
-        const utcHour = etHour + etOffset;
-        let d = new Date(`${e.date}T${String(utcHour).padStart(2,"0")}:${String(etMin).padStart(2,"0")}:00Z`);
-        // 마지막 안전망: 그래도 Invalid Date 면 e.date 자정 UTC 로 fallback
-        if (isNaN(d.getTime())) {
-          const fallback = new Date(`${e.date}T00:00:00Z`);
-          if (!isNaN(fallback.getTime())) d = fallback;
+        const rawDate = String(e.date || "");
+        const dateOnly = rawDate.slice(0, 10); // "YYYY-MM-DD"
+        const hasTime = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(rawDate);
+        let d = null;
+        if (hasTime) {
+          // API 시간 정보 활용 — 공백을 T 로 치환 + UTC 표시 Z 추가
+          const iso = rawDate.replace(" ", "T") + (rawDate.endsWith("Z") ? "" : "Z");
+          d = new Date(iso);
         }
-        // 한국 시간 기준 날짜 차이 계산
-        const koNow = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-        const koEvt = new Date(d.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-        const diff = Math.floor((new Date(koEvt.getFullYear(), koEvt.getMonth(), koEvt.getDate()) - new Date(koNow.getFullYear(), koNow.getMonth(), koNow.getDate())) / 86400000);
+        if (!d || isNaN(d.getTime())) {
+          // 시간 없거나 파싱 실패 — ET 표준 시간 + DST 자동 보정해서 UTC 합성
+          const md = dateOnly.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+          if (md) {
+            const month = Number(md[2]);
+            const day = Number(md[3]);
+            const etOffset =
+              (month < 3 || month > 11) ? 5 :
+              (month > 3 && month < 11) ? 4 :
+              (month === 3) ? (day >= 8 ? 4 : 5) :
+              (month === 11) ? (day >= 1 && day < 8 ? 4 : 5) :
+              5;
+            const utcHour = etHour + etOffset;
+            d = new Date(`${dateOnly}T${String(utcHour).padStart(2,"0")}:${String(etMin).padStart(2,"0")}:00Z`);
+          }
+        }
+        if (!d || isNaN(d.getTime())) {
+          // 마지막 안전망 — 자정 UTC
+          d = new Date(`${dateOnly}T00:00:00Z`);
+        }
+        // 한국 시간 기준 날짜 차이 계산 (KST = UTC+9 시프트로 안전 추출)
+        const KST_MS = 9 * 3600000;
+        const kstNow = new Date(now.getTime() + KST_MS);
+        const kstEvt = new Date(d.getTime() + KST_MS);
+        const nowDay = Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate());
+        const evtDay = Date.UTC(kstEvt.getUTCFullYear(), kstEvt.getUTCMonth(), kstEvt.getUTCDate());
+        const diff = Math.floor((evtDay - nowDay) / 86400000);
         const evtName = e.event.replace(/\(.*?\)\s*/g, "").trim();
         let icon = "📊";
         let type = "OTHER";
