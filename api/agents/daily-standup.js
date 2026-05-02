@@ -29,8 +29,9 @@ import Anthropic from "@anthropic-ai/sdk";
 import { sendCards, buildCard, fmtKST } from "../_shared/telegram.js";
 import { fetchGA4DailySummary } from "../_shared/ga4.js";
 import { fetchSentryDailySummary } from "../_shared/sentry.js";
+import { batchBacktest } from "../_shared/ohlc-backtest.js";
 
-// 7 명 에이전트 + 3-pass 구조 — 약 20~30초 소요. Vercel 기본 10s 한도 회피.
+// 7 명 에이전트 + OHLC 백테스트 — 약 30~60초 소요. Vercel 기본 10s 한도 회피.
 export const config = { maxDuration: 60 };
 
 const MODEL = "claude-sonnet-4-6";
@@ -129,55 +130,83 @@ async function readClosedArchive(kv) {
   return (await kv.get(`di:real:user:${PROBE_USER}:shadow-closed-archive`)) || [];
 }
 
-// QUANT-RES 가 사용할 retro 시뮬 — closed-archive 에 다양한 SL/TP 적용
-// shadow-debug 의 로직을 daily-standup 에서도 호출 가능하게 인라인.
-// 매일 자동으로 "현재 룰 vs 대안 룰" 비교표를 만들어 QUANT-RES 입력에 추가.
-function retroBacktest(archive) {
-  if (!archive || archive.length < 10) return null;
-  const cost = (c) => ((c.feeBps || 8) + (c.slippageBps || 5)) / 10000;
-  const simOne = (c, slPct, tpPct, holdHours) => {
-    const side = c.side, entry = c.entryPrice;
-    if (!entry || !side) return null;
-    const newSlPrice = side === "LONG" ? entry * (1 - slPct/100) : entry * (1 + slPct/100);
-    const newTpPrice = side === "LONG" ? entry * (1 + tpPct/100) : entry * (1 - tpPct/100);
-    const mae = c.maePrice ?? entry;
-    const mfe = c.mfePrice ?? entry;
-    const slHit = side === "LONG" ? mae <= newSlPrice : mae >= newSlPrice;
-    const tpHit = side === "LONG" ? mfe >= newTpPrice : mfe <= newTpPrice;
-    const wouldTimeOut = (c.holdMs ?? 0) > holdHours * 3600000;
-    let grossPct, reason;
-    if (slHit) { grossPct = side === "LONG" ? -slPct/100 : slPct/100; reason = "SL"; }
-    else if (tpHit) { grossPct = side === "LONG" ? tpPct/100 : -tpPct/100; reason = "TP"; }
-    else if (wouldTimeOut) { grossPct = c.grossPct ?? 0; reason = "TIME"; }
-    else { grossPct = c.grossPct ?? 0; reason = c.closeReason || "UNKNOWN"; }
-    const netPct = grossPct - cost(c);
-    const netPnL = (c.notional || 0) * netPct;
-    return { reason, netPnL };
-  };
-  const aggregate = (sims) => {
-    if (!sims.length) return null;
-    const wins = sims.filter((s) => s.netPnL > 0).length;
-    const netPnL = sims.reduce((a, s) => a + s.netPnL, 0);
-    return {
-      trades: sims.length, wins, losses: sims.length - wins,
-      winRate: Number(((wins / sims.length) * 100).toFixed(1)),
-      netPnL: Number(netPnL.toFixed(2)),
-    };
-  };
-  // 기준선
-  const baseline = aggregate(archive.map((c) => ({ netPnL: c.netPnL || 0 })));
-  // 표준 변형 6개 (RR 1.0~2.0)
-  const variants = [];
-  for (const sl of [3, 4, 5]) {
-    for (const tp of [4, 6, 8]) {
-      if (tp <= sl) continue;
-      const sims = archive.map((c) => simOne(c, sl, tp, 24)).filter(Boolean);
-      const agg = aggregate(sims);
-      if (agg) variants.push({ slPct: sl, tpPct: tp, rr: Number((tp/sl).toFixed(2)), ...agg });
+// QUANT-RES 가 사용할 자동 백테스트 — OHLC 정확 시뮬 (Track B 통합)
+// archive 가 있으면 archive 사용, 없으면 ledger.closed 30건 샘플 fallback.
+// 변형 5개 (3 SL × 변동 TP) × 30건 ≈ 150 fetch ≈ 15~25초 (Vercel 60s 한도 내).
+// Binance 451 차단은 Fly.io 프록시 자동 경유로 우회됨 (binance-client.js getKlines).
+async function retroBacktest(archive, ledgerClosed) {
+  // 입력: archive 우선, 부족하면 ledger.closed 사용
+  let source = "archive";
+  let pool = archive;
+  if (!pool || pool.length < 10) {
+    if (ledgerClosed && ledgerClosed.length >= 10) {
+      // ledger.closed → batchBacktest 입력 형식으로 매핑
+      pool = ledgerClosed.map((c) => ({
+        id: c.id,
+        symbol: c.plan?.symbol,
+        side: c.plan?.side,
+        openedAt: c.openedAt,
+        entryPrice: c.entryPrice,
+        notional: c.plan?.notional,
+        riskAmount: c.plan?.riskAmount,
+        feeBps: c.feeBps,
+        slippageBps: c.slippageBps,
+        netPnL: c.netPnL,
+      }));
+      source = "ledger.closed";
+    } else {
+      return null;
     }
   }
-  variants.sort((a, b) => b.netPnL - a.netPnL);
-  return { archiveSize: archive.length, baseline, topVariants: variants.slice(0, 3) };
+
+  // 샘플링 — 처음 30건. 변형 5개 × 30 = 150 OHLC fetch. 캐시로 중복 제거됨.
+  const sampleSize = Math.min(30, pool.length);
+  const sample = pool.slice(0, sampleSize);
+
+  // 기준선 — 원본 룰 그대로 누적 손익
+  const baselineNetPnL = sample.reduce((a, c) => a + (c.netPnL || 0), 0);
+  const baselineWins = sample.filter((c) => (c.netPnL || 0) > 0).length;
+  const baseline = {
+    trades: sample.length,
+    wins: baselineWins,
+    losses: sample.length - baselineWins,
+    winRate: sample.length ? Number(((baselineWins / sample.length) * 100).toFixed(1)) : 0,
+    netPnL: Number(baselineNetPnL.toFixed(2)),
+  };
+
+  // 변형 매트릭스 5개 — RR 1.5 ~ 2.0 위주 (현재 RR 2.0 baseline 비교)
+  const matrix = [
+    { slPct: 3, tpPct: 4, holdHours: 24 },  // RR 1.33
+    { slPct: 3, tpPct: 6, holdHours: 24 },  // RR 2.00
+    { slPct: 4, tpPct: 6, holdHours: 24 },  // RR 1.50
+    { slPct: 4, tpPct: 8, holdHours: 24 },  // RR 2.00 (현재 SL/TP 1/2배)
+    { slPct: 5, tpPct: 10, holdHours: 24 }, // RR 2.00 (확장)
+  ];
+  const variants = [];
+  for (const v of matrix) {
+    try {
+      const agg = await batchBacktest(sample, v);
+      if (agg && agg.trades > 0) {
+        variants.push({
+          slPct: v.slPct,
+          tpPct: v.tpPct,
+          holdHours: v.holdHours,
+          rr: Number((v.tpPct / v.slPct).toFixed(2)),
+          ...agg,
+        });
+      }
+    } catch (e) {
+      console.warn("[retroBacktest] variant skip:", e?.message);
+    }
+  }
+  variants.sort((a, b) => (b.netPnL || -Infinity) - (a.netPnL || -Infinity));
+  return {
+    sourceSize: pool.length,
+    sampledSize: sample.length,
+    source,
+    baseline,
+    topVariants: variants.slice(0, 3),
+  };
 }
 
 // ── 실거래 활동 카드 빌더 (직관적, 짧게) ──
@@ -306,26 +335,34 @@ async function runQuantResearcher(client, ledger, weights, summary, retroResult)
 
   // Retro 백테스트 결과를 자연어로 풀어서 입력 (LLM 이 바로 활용 가능하도록)
   let retroBlock = "(아카이브 부족 — 백테스트 자동화 미가동)";
-  if (retroResult && retroResult.archiveSize >= 10) {
-    const lines = [`아카이브 ${retroResult.archiveSize}건 기반 retro 백테스트:`];
+  if (retroResult && retroResult.sampledSize >= 10) {
+    const lines = [
+      `${retroResult.source} ${retroResult.sampledSize}건 OHLC 백테스트 결과 (Binance 5m 분봉, 24h maxHold):`,
+    ];
     if (retroResult.baseline) {
       lines.push(`- 현재 룰 기준선: 승률 ${retroResult.baseline.winRate}%, 누적 손익 $${retroResult.baseline.netPnL}`);
     }
     if (retroResult.topVariants?.length) {
-      lines.push(`- 더 좋은 상위 변형 (24h hold 기준):`);
+      lines.push(`- 변형 매트릭스 결과 (상위 3):`);
       for (const v of retroResult.topVariants) {
-        lines.push(`  · SL ${v.slPct}% / TP ${v.tpPct}% (RR ${v.rr}): 승률 ${v.winRate}%, 손익 $${v.netPnL}`);
+        lines.push(`  · SL ${v.slPct}% / TP ${v.tpPct}% (RR ${v.rr}): 승률 ${v.winRate}%, 손익 $${v.netPnL}, ${v.byCloseReason?.SL||0}SL/${v.byCloseReason?.TP||0}TP/${v.byCloseReason?.TIME||0}TIME`);
       }
       const best = retroResult.topVariants[0];
       const baseline = retroResult.baseline;
       if (best && baseline) {
-        const delta = best.netPnL - baseline.netPnL;
+        const delta = (best.netPnL || 0) - (baseline.netPnL || 0);
         if (delta > 0) {
-          lines.push(`  → 최고 변형이 기준선 대비 +$${delta.toFixed(2)} 개선 (시뮬상)`);
+          lines.push(`  → 최고 변형이 기준선 대비 +$${delta.toFixed(2)} 개선 (OHLC 시뮬상)`);
+        } else {
+          lines.push(`  → 모든 변형이 기준선과 비슷하거나 못함 — 진입 룰 자체 재검토 필요`);
         }
       }
+    } else {
+      lines.push(`- 변형 매트릭스 fetch 실패 — 다음 cron 재시도`);
     }
     retroBlock = lines.join("\n");
+  } else if (retroResult) {
+    retroBlock = `${retroResult.source} 데이터 ${retroResult.sourceSize}건 (10건 미만, 통계 의미 부족)`;
   }
 
   const user = `오늘 아침 분석 보고서 작성 요청입니다.
@@ -925,9 +962,30 @@ export default async function handler(req, res) {
       readClosedArchive(kv),                       // shadow-monitor 가 누적하는 마감 거래
       readRealTradingActivity(kv),                 // 어제 실거래 활동 (사용자 본인 기준)
     ]);
-    // QUANT-RES 입력에 자동 백테스트 결과 주입 (Track A — 리서치·백테스트·적용 사이클)
-    const retroResult = retroBacktest(archive);
-    L(`closed-archive: ${archive.length} entries${retroResult ? ` (retro 변형 ${retroResult.topVariants?.length || 0}개 비교)` : ""}`);
+    // QUANT-RES 입력에 OHLC 정확 백테스트 결과 주입 (Track A+B 통합)
+    // archive 누적 부족 시 ledger.closed (최대 30건 샘플) fallback
+    const ledgerClosedForSim = ledger
+      .filter((e) => e?.status === "CLOSED")
+      .slice(0, 30)
+      .map((e) => ({
+        id: e.id,
+        plan: e.plan,
+        openedAt: e.openedAt,
+        entryPrice: e.entryPrice,
+        feeBps: e.feeBps,
+        slippageBps: e.slippageBps,
+        netPnL: e.netPnL,
+      }));
+    L(`closed-archive: ${archive.length}, ledger.closed: ${ledgerClosedForSim.length} (백테스트 input)`);
+    let retroResult = null;
+    try {
+      retroResult = await retroBacktest(archive, ledgerClosedForSim);
+      if (retroResult) {
+        L(`OHLC 백테스트 완료: ${retroResult.source} ${retroResult.sampledSize}건, 변형 ${retroResult.topVariants?.length || 0}개`);
+      }
+    } catch (e) {
+      L(`retroBacktest 실패: ${e?.message}`);
+    }
     // ledger 의 status==CLOSED 가 0 이어도 shadow-monitor 가 별도 summary 에 누적함.
     // 표시할 "마감 카운트" 는 summary 가 우선, 없으면 ledger 폴백.
     const closedFromSummary = Number((summary?.wins || 0) + (summary?.losses || 0)) || 0;
