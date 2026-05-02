@@ -19,8 +19,11 @@
 // ════════════════════════════════════════════════════════════════════
 
 import { sendCards, buildCard, fmtKSTShort } from "../_shared/telegram.js";
+import { batchBacktest } from "../_shared/ohlc-backtest.js";
 
 const PROBE_USER = "__zepta_global_probe__";
+
+export const config = { maxDuration: 60 };
 
 async function getKv() {
   return (await import("@vercel/kv")).kv;
@@ -149,6 +152,7 @@ export default async function handler(req, res) {
     const retroSlList = parseList(req.query?.retroSL); // 단일 또는 콤마 분리 (예: "3,4,5")
     const retroTpList = parseList(req.query?.retroTP);
     const retroHoldList = parseList(req.query?.retroHold);
+    const precise = req.query?.precise === "1" || req.query?.precise === "true"; // OHLC 정확 시뮬 모드
 
     const kv = await getKv();
     const [ledger, summary, archive] = await Promise.all([
@@ -260,12 +264,70 @@ export default async function handler(req, res) {
       };
     }
 
-    // ── Retro 시뮬 — closed-archive 데이터로 다양한 SL/TP/Hold 변형 비교 ──
-    // archive 가 있으면 여러 변형을 동시에 시뮬해서 비교 표 생성
+    // ── 입력 데이터 결정: archive 우선, 없으면 ledger.closed fallback ──
+    // archive 가 비어있는 초기 상태에서도 ledger 의 closed 항목으로 시뮬 가능
+    const tradesForSim = archive.length > 0
+      ? archive
+      : closed.map((c) => ({
+          id: c.id,
+          symbol: c.plan?.symbol,
+          side: c.plan?.side,
+          openedAt: c.openedAt,
+          closedAt: c.closedAt,
+          entryPrice: c.entryPrice,
+          notional: c.plan?.notional,
+          riskAmount: c.plan?.riskAmount,
+          mfePrice: c.mfePrice,
+          maePrice: c.maePrice,
+          slPct: c.plan?.slPct,
+          tpPct: c.plan?.tpPct,
+          closeReason: c.closeReason,
+          netPnL: c.netPnL,
+          rMultiple: c.rMultiple,
+          grossPct: c.grossPct,
+          holdMs: c.holdMs,
+          feeBps: c.feeBps,
+          slippageBps: c.slippageBps,
+        }));
+
+    // ── Precise 모드: OHLC 1분/5분봉 기반 정확한 백테스트 (Track B 1단계) ──
+    // archive 또는 ledger.closed 의 entry 시점부터 maxHold 기간의 실제 분봉 가져와
+    // SL/TP hit 시점을 정확히 판정. 처리 시간 길어 옵트인.
+    let preciseSims = null;
+    if (precise && tradesForSim.length > 0) {
+      const slCandidates = retroSlList.length ? retroSlList : [3, 4, 5];
+      const tpCandidates = retroTpList.length ? retroTpList : [4, 6, 8];
+      const holdCandidates = retroHoldList.length ? retroHoldList : [24];
+      // 처리 시간 제어: 최대 80건만 (5x5x1 * 80 = 2000 봉 fetch 추정)
+      const sampled = tradesForSim.slice(0, 80);
+      const variants = [];
+      for (const sl of slCandidates) {
+        for (const tp of tpCandidates) {
+          if (tp <= sl) continue;
+          for (const hh of holdCandidates) {
+            try {
+              const agg = await batchBacktest(sampled, { slPct: sl, tpPct: tp, holdHours: hh });
+              if (agg) variants.push({ slPct: sl, tpPct: tp, holdHours: hh, rr: Number((tp/sl).toFixed(2)), ...agg });
+            } catch (e) {
+              variants.push({ slPct: sl, tpPct: tp, holdHours: hh, error: e?.message });
+            }
+          }
+        }
+      }
+      variants.sort((a, b) => (b.netPnL || -Infinity) - (a.netPnL || -Infinity));
+      preciseSims = {
+        sampled: sampled.length,
+        source: archive.length > 0 ? "archive" : "ledger.closed",
+        variantsCount: variants.length,
+        topVariants: variants.slice(0, 5),
+      };
+    }
+
+    // ── Retro 시뮬 (보수적 MFE/MAE 근사) — 빠른 평가용 기본 모드 ──
     const retroSims = (() => {
-      if (!archive.length) return null;
+      if (!tradesForSim.length) return null;
       // 기준선: 원본 룰 그대로
-      const baseline = aggregateSim(archive.map((c) => ({
+      const baseline = aggregateSim(tradesForSim.map((c) => ({
         closeReason: c.closeReason,
         netPnL: c.netPnL,
         rMultiple: c.rMultiple,
@@ -279,7 +341,7 @@ export default async function handler(req, res) {
         for (const tp of tpCandidates) {
           if (tp <= sl) continue; // RR < 1 인 변형은 제외
           for (const hh of holdCandidates) {
-            const sims = archive
+            const sims = tradesForSim
               .map((c) => retroSimOne(c, { slPct: sl, tpPct: tp, holdHours: hh }))
               .filter(Boolean);
             const agg = aggregateSim(sims);
@@ -298,7 +360,8 @@ export default async function handler(req, res) {
           }
         : null;
       return {
-        archiveSize: archive.length,
+        sourceSize: tradesForSim.length,
+        source: archive.length > 0 ? "archive" : "ledger.closed",
         baseline,
         variantsCount: variants.length,
         topVariants,
@@ -349,6 +412,7 @@ export default async function handler(req, res) {
       },
       holdoutSim,
       retroSims,
+      preciseSims, // ?precise=1 일 때만 채워짐. OHLC 분봉 기반 정확 시뮬.
       generatedAt: new Date().toISOString(),
     };
 
