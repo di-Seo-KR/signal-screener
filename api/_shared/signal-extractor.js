@@ -191,14 +191,26 @@ export function pickBestSignal(signals) {
 /**
  * confidence/score/sizeHint 기준으로 모든 valid 시그널을 순위화.
  * engine 이 1순위 reject 시 차순위로 fallback 할 수 있도록 사용.
+ *
+ * + 심볼 다양성 보장: 같은 심볼은 가장 높은 점수 1개만 남김.
+ *   (그동안 한 봇이 한 종목으로 15개 시그널을 만들어 ranked 가 사실상
+ *   동일 심볼 6개로 채워지고, dedup 으로 모두 reject 되는 문제 해결)
  */
 export function rankSignals(signals) {
   const valid = (signals || []).filter(Boolean);
-  return valid.sort((a, b) => {
+  const sorted = valid.slice().sort((a, b) => {
     if (b.confidence !== a.confidence) return b.confidence - a.confidence;
     if (b.score !== a.score) return b.score - a.score;
     return (b.sizeHint || 0) - (a.sizeHint || 0);
   });
+  // 심볼별 최고 1개만 유지 — Map 으로 첫 등장(=최고점) 보존
+  const bySymbol = new Map();
+  for (const s of sorted) {
+    const key = s.symbol || s.asset || "";
+    if (!key) continue;
+    if (!bySymbol.has(key)) bySymbol.set(key, s);
+  }
+  return Array.from(bySymbol.values());
 }
 
 export default { extractSignal, pickBestSignal, rankSignals, normalizeAssetKey, ASSET_TO_SYMBOL, PHASE1_ALLOWED_SYMBOLS, classifyStrategyFamily };
