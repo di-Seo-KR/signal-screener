@@ -1868,12 +1868,47 @@ export default function AutoTrading({ theme = "dark", user }) {
           const used = activeBots.reduce((s, ab) => s + (ab.allocation || 0), 0);
           const quickAmounts = [500, 1000, 2000, 5000];
           return (
-            <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50" onClick={() => { setAddFundBotId(null); setAddFundInput(""); }}>
-              <div className="w-min(420px, 90vw) rounded-2xl p-7 border" style={{
-                background: c.card,
-                border: `1px solid ${c.border}`,
-                boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-              }} onClick={e => e.stopPropagation()}>
+            <div
+              className="fixed inset-0 z-50"
+              style={{
+                background: "rgba(0,0,0,0.6)",
+                display: "flex",
+                alignItems: isMobile ? "flex-end" : "center",
+                justifyContent: "center",
+                animation: "fundFadeIn 0.18s ease-out",
+              }}
+              onClick={() => { setAddFundBotId(null); setAddFundInput(""); }}
+            >
+              <style>{`
+                @keyframes fundFadeIn { from{opacity:0} to{opacity:1} }
+                @keyframes fundSlideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+                @keyframes fundSlideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} }
+              `}</style>
+              <div
+                onClick={e => e.stopPropagation()}
+                style={{
+                  background: c.card,
+                  border: `1px solid ${c.border}`,
+                  boxShadow: "0 -8px 40px rgba(0,0,0,0.4)",
+                  // 모바일: 바텀시트(전폭, 상단만 둥글게, 위로 슬라이드 인)
+                  // 데스크탑: 센터 모달(기존)
+                  width: isMobile ? "100%" : "min(420px, 90vw)",
+                  maxHeight: isMobile ? "85vh" : "auto",
+                  overflowY: isMobile ? "auto" : "visible",
+                  borderRadius: isMobile ? "20px 20px 0 0" : "16px",
+                  padding: isMobile ? "20px 18px calc(20px + env(safe-area-inset-bottom)) 18px" : "28px",
+                  animation: isMobile
+                    ? "fundSlideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1)"
+                    : "fundSlideIn 0.2s ease-out",
+                }}
+              >
+                {/* 모바일 바텀시트 그립 핸들 */}
+                {isMobile && (
+                  <div style={{
+                    width: "44px", height: "4px", borderRadius: "2px",
+                    background: c.border, margin: "0 auto 14px auto",
+                  }} />
+                )}
                 <div className="flex items-center gap-3 mb-4">
                   <span className="text-[32px]">{botDef.icon}</span>
                   <div className="min-w-0">
