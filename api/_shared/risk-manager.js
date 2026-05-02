@@ -34,17 +34,22 @@ export const RISK_CONFIG = {
   ],
 
   // 전략 family 별 ATR × 배수 (SL 거리)
+  // ★ 2026-05-03 데이터 기반 조정 — shadow 537건 분석 결과 SL 8.5% 가 너무 멀어
+  // 전체 손익이 마이너스. SL 을 절반(4% 부근)으로 줄여 작은 이익 506건이 큰
+  // 손실 31건에 잡아먹히지 않도록.
   atrMultSL: {
-    trend: 2.5,
-    "mean-revert": 1.5,
-    breakout: 1.2,
-    unknown: 2.0,
+    trend: 1.3,          // 2.5 → 1.3 (큰 추세장 모멘텀 봇 위험 축소)
+    "mean-revert": 0.8,  // 1.5 → 0.8
+    breakout: 0.7,       // 1.2 → 0.7
+    unknown: 1.0,        // 2.0 → 1.0 (SL 거리 절반)
   },
   // TP = SL × rewardToRisk (수수료 차감 전 raw RR)
+  // ★ TP 도 같이 조정 — minNetRR 1.8 유지하려면 RR 자체는 비슷하게.
+  // 실제 효과: SL 작아지면 TP 도 작아져 작은 변동에서 수익 마감 빈도 ↑
   rewardToRisk: {
-    trend: 3.0,          // 절대수익형: 승률 희생하고 기대값 키움
+    trend: 2.5,
     "mean-revert": 1.8,
-    breakout: 2.5,
+    breakout: 2.0,
     unknown: 2.0,
   },
 

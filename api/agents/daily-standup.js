@@ -162,6 +162,29 @@ async function runQuantResearcher(client, ledger, weights, summary, retroResult)
 
   const openCount = ledger.length - closed.length;
 
+  // 종목별 누적 통계 (shadow-summary.bySymbol) — 자동 차단·가중치 input
+  let bySymbolBlock = "(아직 종목별 누적 통계 부족)";
+  if (summary?.bySymbol && Object.keys(summary.bySymbol).length > 0) {
+    const symStats = Object.entries(summary.bySymbol)
+      .map(([sym, s]) => ({
+        sym,
+        trades: s.trades || 0,
+        wins: s.wins || 0,
+        netPnL: s.netPnL || 0,
+        winRate: s.trades > 0 ? (s.wins / s.trades) * 100 : 0,
+      }))
+      .filter((x) => x.trades >= 5)
+      .sort((a, b) => b.trades - a.trades)
+      .slice(0, 10);
+    if (symStats.length) {
+      const lines = symStats.map((x) =>
+        `  · ${x.sym}: ${x.trades}건, 승률 ${x.winRate.toFixed(0)}%, 누적 ${x.netPnL >= 0 ? "+" : ""}$${x.netPnL.toFixed(2)}` +
+        (x.trades >= 20 && x.winRate < 30 ? "  🔴 자동 차단" : x.trades >= 20 && x.winRate >= 70 ? "  🟢 우수" : "")
+      );
+      bySymbolBlock = lines.join("\n");
+    }
+  }
+
   // Retro 백테스트 결과를 자연어로 풀어서 입력 (LLM 이 바로 활용 가능하도록)
   let retroBlock = "(아카이브 부족 — 백테스트 자동화 미가동)";
   if (retroResult && retroResult.archiveSize >= 10) {
@@ -195,8 +218,11 @@ async function runQuantResearcher(client, ledger, weights, summary, retroResult)
 ${Object.entries(familyStats).map(([f, s]) =>
   `  · ${f}: ${s.count}건, 승률 ${s.count ? ((s.wins/s.count)*100).toFixed(0) : 0}%, 누적 가상손익 ${s.pnlSum.toFixed(2)}`
 ).join("\n") || "  (마감된 거래 없음)"}
-- 누적 요약: ${summary ? JSON.stringify({ wins: summary.wins, losses: summary.losses, netPnL: Number(summary.netPnL || 0).toFixed(2) }) : "(없음)"}
+- 누적 요약: ${summary ? JSON.stringify({ wins: summary.wins, losses: summary.losses, netPnL: Number(summary.netPnL || 0).toFixed(2), profitFactor: summary.profitFactor }) : "(없음)"}
 - 현재 가중치: ${JSON.stringify(weights).slice(0, 400)}
+
+[종목별 누적 성과 (영구 통계, 자동 차단 기준 = 20건+ AND 승률<30%)]
+${bySymbolBlock}
 
 [Retro 백테스트 결과 — 다른 SL/TP 룰 적용 시뮬]
 ${retroBlock}
