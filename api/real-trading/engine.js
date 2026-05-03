@@ -349,6 +349,18 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       let a = await computeAtr(cand.symbol, klInterval, 14);
       if (!a || a <= 0) a = defaultAtrApprox(pr);
 
+      // ★ 변동성 임계값 — 박스권 종목 차단
+      // 백테스트 분석에서 모든 거래가 24h 안에 SL/TP 안 닿고 TIME 청산됨 (가격 박스권).
+      // ATR / price < 1.5% 면 24h 동안 의미 있는 가격 변동 발생할 가능성 낮음 → skip.
+      // 환경변수 ZEPTA_MIN_ATR_PCT 로 조정 (기본 1.5%).
+      const minAtrPct = Number(process.env.ZEPTA_MIN_ATR_PCT) || 1.5;
+      const atrPct = (a / pr) * 100;
+      if (atrPct < minAtrPct) {
+        S(`  ↳ low volatility (ATR ${atrPct.toFixed(2)}% < ${minAtrPct}%) — 박스권 차단`);
+        tried.push({ symbol: cand.symbol, reason: `low ATR ${atrPct.toFixed(2)}%` });
+        continue;
+      }
+
       const f = await getSymbolFilter(cand.symbol);
       if (!isSymbolAffordable({ equity: effectiveEquity, filter: f, cfg: RISK_CONFIG })) {
         S(`  ↳ unaffordable (minNotional=${f.minNotional}, equity=${effectiveEquity})`);

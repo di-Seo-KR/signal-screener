@@ -174,13 +174,19 @@ async function retroBacktest(archive, ledgerClosed) {
     netPnL: Number(baselineNetPnL.toFixed(2)),
   };
 
-  // 변형 매트릭스 5개 — RR 1.5 ~ 2.0 위주 (현재 RR 2.0 baseline 비교)
+  // 변형 매트릭스 — holdHours 다양화 (24h 안엔 SL/TP 안 닿는 박스권 패턴 발견 후 확장)
+  // 가격 움직임이 24h 보다 더 긴 시간 필요한지 확인
   const matrix = [
+    // 24h 한도 (기존)
     { slPct: 3, tpPct: 4, holdHours: 24 },  // RR 1.33
     { slPct: 3, tpPct: 6, holdHours: 24 },  // RR 2.00
-    { slPct: 4, tpPct: 6, holdHours: 24 },  // RR 1.50
-    { slPct: 4, tpPct: 8, holdHours: 24 },  // RR 2.00 (현재 SL/TP 1/2배)
-    { slPct: 5, tpPct: 10, holdHours: 24 }, // RR 2.00 (확장)
+    { slPct: 4, tpPct: 8, holdHours: 24 },  // RR 2.00 (SL 절반)
+    // 48h 한도 — 더 긴 시간 두면 SL/TP 발동되는지
+    { slPct: 4, tpPct: 8, holdHours: 48 },
+    { slPct: 5, tpPct: 10, holdHours: 48 },
+    // 72h 한도 — 큰 추세 노림
+    { slPct: 5, tpPct: 12, holdHours: 72 }, // RR 2.4
+    { slPct: 6, tpPct: 12, holdHours: 72 }, // 현재 룰과 비슷
   ];
   const variants = [];
   for (const v of matrix) {
