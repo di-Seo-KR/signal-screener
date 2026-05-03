@@ -59,12 +59,15 @@ async function pullRecentSignals({ userId, lookbackMs = 30 * 60 * 1000, advanceC
   const now = Date.now();
   const minTs = advanceCursor ? lastSeen : (now - lookbackMs);
 
-  const diag = { activeBots: activeBots.length, cryptoBots: cryptoBots.length, tradesScanned: 0, buyFound: 0, inWindow: 0 };
+  const diag = { activeBots: activeBots.length, cryptoBots: cryptoBots.length, tradesScanned: 0, buyFound: 0, inWindow: 0, perBotDedup: 0 };
   const candidates = [];
   for (const b of cryptoBots) {
     const botId = b.id || b.botId;
     const perf = await kv.get(`di:bot:${botId}:perf`);
     if (!perf || !Array.isArray(perf.trades)) continue;
+    // ★ 봇별 종목 dedup — 한 봇이 같은 심볼로 5분마다 17번 시그널 만든 케이스
+    // (2026-05-03 진단: 17개 시그널 모두 AVAXUSDT) → 최신 1개만 유지
+    const seenAssetsThisBot = new Set();
     for (const t of perf.trades.slice(0, 20)) {
       diag.tradesScanned += 1;
       if (!t || !t.time || t.type !== "BUY") continue;
@@ -74,6 +77,12 @@ async function pullRecentSignals({ userId, lookbackMs = 30 * 60 * 1000, advanceC
       if (ts <= minTs) continue;
       if (now - ts > lookbackMs) continue;
       diag.inWindow += 1;
+      // 봇별 종목 dedup — perf.trades 가 시간 역순(최신 우선)이므로 첫 등장이 최신
+      if (seenAssetsThisBot.has(t.asset)) {
+        diag.perBotDedup += 1;
+        continue;
+      }
+      seenAssetsThisBot.add(t.asset);
       candidates.push({
         asset: t.asset,
         source: `bot:${botId}`,
