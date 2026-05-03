@@ -33,14 +33,26 @@ export default async function handler(req, res) {
     const existing = (await kv.get("di:active-bots")) || [];
     const existingIds = new Set(existing.map((b) => b.id || b.botId).filter(Boolean));
 
-    const toAdd = ALL_CRYPTO_BOTS.filter((b) => !existingIds.has(b.id));
+    // 기존 항목의 id/botId 둘 다 체크 (다른 진입점에서 등록한 형식 호환)
+    const existingKeys = new Set();
+    for (const b of existing) {
+      if (b.id) existingKeys.add(b.id);
+      if (b.botId) existingKeys.add(b.botId);
+    }
+    const toAdd = ALL_CRYPTO_BOTS.filter((b) => !existingKeys.has(b.id));
     const merged = [...existing];
     for (const b of toAdd) {
+      // ★ btc-cron 은 ab.botId 만 읽음, engine 은 b.id || b.botId 둘 다.
+      //   둘 다 채워서 모든 cron 호환. allocation 도 가상매매용 기본값 $1000.
       merged.push({
         id: b.id,
+        botId: b.id, // btc-cron 호환
         name: b.name,
         universe: b.universe,
         active: true,
+        status: "active",
+        allocation: 1000, // 가상 자본 $1000 (btc-cron 매매 시뮬용)
+        startedAt: new Date().toISOString(),
         seededAt: new Date().toISOString(),
       });
     }
