@@ -319,6 +319,57 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     S(`auto-block skipped: ${e?.message}`);
   }
 
+  // ★ Regime Filter — Hurst 지수 기반 시장 레짐 가드
+  // di:market:regime (market-monitor 가 10분마다 업데이트) 의 avgHurst 활용:
+  //   > 0.55 추세장 → 모멘텀 봇 진입 OK
+  //   < 0.45 역추세장 → 모멘텀(unknown/trend/breakout) 차단 (가격 평균회귀)
+  //   0.45-0.55 혼조 → 약한 추세, 신중하게
+  //
+  // 모드 (env ZEPTA_REGIME_FILTER_MODE, 기본 "log"):
+  //   "off"    가드 없음 (안전 폴백)
+  //   "log"    레짐만 로그 노출, 차단 안 함 (관찰 모드, 데이터 누적용)
+  //   "soft"   강한 역추세 (avgHurst < 0.40) 만 모멘텀 차단
+  //   "strict" 추세장 (avgHurst > 0.55) 아니면 모멘텀 모두 차단
+  const regimeFilterMode = process.env.ZEPTA_REGIME_FILTER_MODE || "log";
+  let regimeBlock = null; // 차단 결정 (null = 통과)
+  try {
+    const kvR = await getKv();
+    const regime = await kvR.get("di:market:regime");
+    if (regime && Number.isFinite(regime.avgHurst)) {
+      const h = regime.avgHurst;
+      const tag = `regime: avgHurst=${h.toFixed(2)} ${regime.regime || ""}`;
+      if (regimeFilterMode === "off" || regimeFilterMode === "log") {
+        S(`${tag} (mode=${regimeFilterMode}, no block)`);
+      } else if (regimeFilterMode === "soft") {
+        if (h < 0.40) {
+          regimeBlock = `강한 역추세 (Hurst ${h.toFixed(2)} < 0.40) — 모멘텀 봇 진입 차단`;
+          S(`${tag} → ${regimeBlock}`);
+        } else {
+          S(`${tag} (soft mode, no block)`);
+        }
+      } else if (regimeFilterMode === "strict") {
+        if (h <= 0.55) {
+          regimeBlock = `추세장 아님 (Hurst ${h.toFixed(2)} ≤ 0.55) — 모멘텀 봇 진입 차단`;
+          S(`${tag} → ${regimeBlock}`);
+        } else {
+          S(`${tag} (strict mode, trend ok)`);
+        }
+      }
+    } else {
+      S(`regime: data not available — skip filter`);
+    }
+  } catch (e) {
+    S(`regime filter skipped: ${e?.message}`);
+  }
+  // 모멘텀 family 차단 시 — 이번 cron 종료
+  if (regimeBlock) {
+    return {
+      ok: true, userId, ran: false,
+      reason: `regime filter: ${regimeBlock}`,
+      regimeBlocked: true, steps,
+    };
+  }
+
   // ★ 중복 진입 차단 — 이미 OPEN 인 심볼에는 신규 진입 안 함
   // (지난 진단에서 ADAUSDT 같은 종목이 5분마다 반복 진입돼 림보 200건 누적된 문제)
   const openSymbols = new Set();
