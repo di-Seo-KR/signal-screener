@@ -33,25 +33,45 @@ export default async function handler(req, res) {
     const existing = (await kv.get("di:active-bots")) || [];
     const existingIds = new Set(existing.map((b) => b.id || b.botId).filter(Boolean));
 
-    // 기존 항목의 id/botId 둘 다 체크 (다른 진입점에서 등록한 형식 호환)
+    // ★ 자동 업그레이드 모드: 기존 봇 중 botId·allocation 누락된 항목을 보강
+    //   초기 seed-bots 호출 시 id 만 저장됐는데 btc-cron 은 ab.botId 만 읽음 →
+    //   기존 레코드를 한 번 정상화. 멱등 + 무손실 (기존 데이터 보존).
     const existingKeys = new Set();
-    for (const b of existing) {
-      if (b.id) existingKeys.add(b.id);
-      if (b.botId) existingKeys.add(b.botId);
-    }
+    const upgraded = []; // 업그레이드된 봇 ID 목록
+    const merged = existing.map((b) => {
+      const id = b.id || b.botId;
+      if (id) existingKeys.add(id);
+      // 누락된 필드 자동 보강
+      const def = ALL_CRYPTO_BOTS.find((x) => x.id === id);
+      const needsUpgrade = (!b.botId && b.id) || b.allocation == null || !b.status;
+      if (needsUpgrade && id) {
+        upgraded.push(id);
+        return {
+          ...b,
+          id,
+          botId: id,
+          name: b.name || def?.name || id,
+          universe: b.universe || def?.universe || [],
+          active: b.active !== false,
+          status: b.status || "active",
+          allocation: b.allocation || 1000,
+          startedAt: b.startedAt || b.seededAt || new Date().toISOString(),
+        };
+      }
+      return b;
+    });
+
+    // 누락된 봇 추가
     const toAdd = ALL_CRYPTO_BOTS.filter((b) => !existingKeys.has(b.id));
-    const merged = [...existing];
     for (const b of toAdd) {
-      // ★ btc-cron 은 ab.botId 만 읽음, engine 은 b.id || b.botId 둘 다.
-      //   둘 다 채워서 모든 cron 호환. allocation 도 가상매매용 기본값 $1000.
       merged.push({
         id: b.id,
-        botId: b.id, // btc-cron 호환
+        botId: b.id,
         name: b.name,
         universe: b.universe,
         active: true,
         status: "active",
-        allocation: 1000, // 가상 자본 $1000 (btc-cron 매매 시뮬용)
+        allocation: 1000,
         startedAt: new Date().toISOString(),
         seededAt: new Date().toISOString(),
       });
@@ -62,24 +82,30 @@ export default async function handler(req, res) {
         ok: true,
         dryRun: true,
         existingCount: existing.length,
-        existingIds: Array.from(existingIds),
+        existingIds: Array.from(existingKeys),
         wouldAdd: toAdd.map((b) => b.id),
+        wouldUpgrade: upgraded,
         finalCount: merged.length,
       });
     }
 
-    if (toAdd.length > 0) {
+    if (toAdd.length > 0 || upgraded.length > 0) {
       await kv.set("di:active-bots", merged);
     }
 
     return res.status(200).json({
       ok: true,
       added: toAdd.map((b) => b.id),
-      already: Array.from(existingIds),
+      upgraded,
+      already: Array.from(existingKeys).filter((id) => !upgraded.includes(id)),
       total: merged.length,
-      message: toAdd.length > 0
-        ? `${toAdd.length}개 봇 추가 활성화 — 다음 5분 cron 부터 다양한 종목 시그널 평가 시작`
-        : "모든 봇 이미 활성화됨",
+      message: (() => {
+        const msgs = [];
+        if (toAdd.length > 0) msgs.push(`${toAdd.length}개 봇 신규 등록`);
+        if (upgraded.length > 0) msgs.push(`${upgraded.length}개 봇 정보 보강 (botId/allocation)`);
+        if (msgs.length === 0) return "이미 모두 정상 등록됨";
+        return msgs.join(", ") + " — 다음 15분 btc-cron 부터 다양한 종목 시그널 만들기 시작";
+      })(),
     });
   } catch (err) {
     return res.status(200).json({ ok: false, error: err?.message || String(err) });
