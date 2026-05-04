@@ -1733,8 +1733,8 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
               {asset.market === "us" ? "\uD83C\uDDFA\uD83C\uDDF8" : asset.market === "kr" ? "\uD83C\uDDF0\uD83C\uDDF7" : "\u20BF"}
             </span>
             <div style={{ minWidth: 0, overflow: "hidden" }}>
-              <div style={{ color: CC.text1, fontWeight: 700, fontSize: isMobile ? "15px" : "17px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{asset.name}</div>
-              <div style={{ color: CC.text3, fontSize: isMobile ? "12px" : "13px" }}>{asset.symbol}</div>
+              <div style={{ color: CC.text1, fontWeight: 700, fontSize: isMobile ? "15px" : "18px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{asset.name}</div>
+              <div style={{ color: CC.text3, fontSize: isMobile ? "12px" : "14px" }}>{asset.symbol}</div>
             </div>
           </div>
           {liveConnected && (
@@ -1760,17 +1760,17 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
           </span>
           <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "4px" : "6px", minHeight: isMobile ? "40px" : "auto" }}>
             {liveChange != null ? (
-              <span style={{ fontSize: isMobile ? "13px" : "15px", fontWeight: 600, color: liveChange >= 0 ? CC.green : CC.red }}>
+              <span style={{ fontSize: isMobile ? "14px" : "15px", fontWeight: 600, color: liveChange >= 0 ? CC.green : CC.red }}>
                 {liveChange >= 0 ? "\u25B2" : "\u25BC"} {Math.abs(liveChange).toFixed(2)}%
               </span>
             ) : asset.weekChange != null ? (
-              <span style={{ fontSize: isMobile ? "13px" : "15px", fontWeight: 600, color: asset.weekChange >= 0 ? CC.green : CC.red }}>
+              <span style={{ fontSize: isMobile ? "14px" : "15px", fontWeight: 600, color: asset.weekChange >= 0 ? CC.green : CC.red }}>
                 {asset.weekChange >= 0 ? "\u25B2" : "\u25BC"} {Math.abs(asset.weekChange)}%
               </span>
             ) : null}
             {canShowKRW && (
               <button onClick={() => setShowKRW(!showKRW)} style={{
-                fontSize: isMobile ? "11px" : "13px", padding: isMobile ? "6px 8px" : "3px 7px", borderRadius: "6px", cursor: "pointer",
+                fontSize: isMobile ? "12px" : "14px", padding: isMobile ? "6px 8px" : "3px 7px", borderRadius: "6px", cursor: "pointer",
                 background: showKRW ? CC.blue + "33" : "transparent",
                 color: showKRW ? CC.blue : CC.text3,
                 border: `1px solid ${showKRW ? CC.blue : CC.border}`,
@@ -1814,7 +1814,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
             if (!cfg) return null;
             return (
               <button key={key} onClick={() => setTimeframe(key)} style={{
-                padding: isMobile ? "8px 4px" : "5px 10px", borderRadius: "8px", fontSize: isMobile ? "11px" : "14px", cursor: "pointer", fontWeight: 600,
+                padding: isMobile ? "8px 4px" : "5px 10px", borderRadius: "8px", fontSize: isMobile ? "12px" : "14px", cursor: "pointer", fontWeight: 600,
                 background: timeframe === key ? CC.blue : CC.card,
                 color: timeframe === key ? "#fff" : CC.text3,
                 border: `1px solid ${timeframe === key ? CC.blue : CC.border}`,
@@ -1827,7 +1827,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         {/* Log scale toggle button */}
         <div style={{ display: "flex", gap: "4px", marginBottom: "8px", flexWrap: "wrap" }}>
           <button onClick={() => setLogScale(p => !p)} style={{
-            padding: isMobile ? "8px 10px" : "5px 10px", borderRadius: "8px", fontSize: isMobile ? "13px" : "14px", cursor: "pointer", fontWeight: 600,
+            padding: isMobile ? "8px 10px" : "5px 10px", borderRadius: "8px", fontSize: isMobile ? "14px" : "14px", cursor: "pointer", fontWeight: 600,
             background: logScale ? `${CC.yellow}22` : CC.card,
             color: logScale ? CC.yellow : CC.text3,
             border: `1px solid ${logScale ? CC.yellow : CC.border}`,
@@ -1940,7 +1940,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                 <input type="number" value={settings.bb?.period || 20} min={5} max={100} onChange={e => {
                   updateSettings({ ...settings, bb: { ...settings.bb, period: parseInt(e.target.value) || 20 } });
                 }} style={{
-                  width: "50px", padding: "3px 5px", borderRadius: "5px", fontSize: "14px", marginLeft: "4px",
+                  width: "50px", padding: "3px 5px", borderRadius: "6px", fontSize: "14px", marginLeft: "4px",
                   background: CC.card2, color: CC.text1, border: `1px solid ${CC.border2}`, outline: "none",
                 }} />
               </label>
@@ -1948,7 +1948,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                 <input type="number" value={settings.bb?.mult || 2} min={0.5} max={5} step={0.5} onChange={e => {
                   updateSettings({ ...settings, bb: { ...settings.bb, mult: parseFloat(e.target.value) || 2 } });
                 }} style={{
-                  width: "50px", padding: "3px 5px", borderRadius: "5px", fontSize: "14px", marginLeft: "4px",
+                  width: "50px", padding: "3px 5px", borderRadius: "6px", fontSize: "14px", marginLeft: "4px",
                   background: CC.card2, color: CC.text1, border: `1px solid ${CC.border2}`, outline: "none",
                 }} />
               </label>
@@ -1961,7 +1961,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                 <input type="number" value={settings.rsi?.period || 14} min={2} max={50} onChange={e => {
                   updateSettings({ ...settings, rsi: { ...settings.rsi, period: parseInt(e.target.value) || 14 } });
                 }} style={{
-                  width: "50px", padding: "3px 5px", borderRadius: "5px", fontSize: "14px", marginLeft: "4px",
+                  width: "50px", padding: "3px 5px", borderRadius: "6px", fontSize: "14px", marginLeft: "4px",
                   background: CC.card2, color: CC.text1, border: `1px solid ${CC.border2}`, outline: "none",
                 }} />
               </label>
@@ -2004,7 +2004,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                 display: "flex", alignItems: "center", gap: "6px", justifyContent: "space-between",
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ width: "10px", height: "3px", background: "#f472b6", borderRadius: "2px", display: "inline-block" }} />
+                  <span style={{ width: "10px", height: "3px", background: "#f472b6", borderRadius: "4px", display: "inline-block" }} />
                   RSI({settings.rsi?.period || 14})
                 </div>
                 {currentRSI != null && (
@@ -2025,11 +2025,11 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                 display: "flex", alignItems: "center", gap: "10px", color: CC.text3,
               }}>
                 <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <span style={{ width: "10px", height: "3px", background: "#38bdf8", borderRadius: "2px", display: "inline-block" }} />
+                  <span style={{ width: "10px", height: "3px", background: "#38bdf8", borderRadius: "4px", display: "inline-block" }} />
                   <span style={{ color: "#38bdf8" }}>MACD</span>
                 </span>
                 <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <span style={{ width: "10px", height: "3px", background: "#fb923c", borderRadius: "2px", display: "inline-block" }} />
+                  <span style={{ width: "10px", height: "3px", background: "#fb923c", borderRadius: "4px", display: "inline-block" }} />
                   <span style={{ color: "#fb923c" }}>Signal</span>
                 </span>
               </div>
@@ -2051,7 +2051,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
             ...(settings.macd?.enabled ? [{ color: "#38bdf8", label: "MACD" }, { color: "#fb923c", label: "Signal" }] : []),
           ].map(({ color, label }) => (
             <span key={label} style={{ display: "flex", alignItems: "center", gap: "5px", color: CC.text3 }}>
-              <span style={{ width: "16px", height: "3px", background: color, display: "inline-block", borderRadius: "2px" }} />
+              <span style={{ width: "16px", height: "3px", background: color, display: "inline-block", borderRadius: "4px" }} />
               {label}
             </span>
           ))}
@@ -2064,7 +2064,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
             {/* Dropdown toggle */}
             <button onClick={() => setShowDiagnosis(p => !p)} style={{
               width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-              background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "14px",
+              background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "12px",
               padding: "14px 18px", cursor: "pointer", marginBottom: showDiagnosis ? "12px" : "0",
               transition: "all 0.2s",
             }}>
@@ -2088,7 +2088,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
               <>
                 {/* 종합 점수 */}
                 <div style={{
-                  background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "14px",
+                  background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "12px",
                   padding: "18px", marginBottom: "12px",
                   borderTop: "none", borderTopLeftRadius: "0", borderTopRightRadius: "0",
                 }}>
@@ -2171,15 +2171,15 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                           }}>{cat.score}</span>
                         </div>
                         <div style={{
-                          height: "4px", background: CC.border, borderRadius: "2px", overflow: "hidden",
+                          height: "4px", background: CC.border, borderRadius: "4px", overflow: "hidden",
                         }}>
                           <div style={{
-                            height: "100%", borderRadius: "2px", transition: "width 0.6s ease",
+                            height: "100%", borderRadius: "4px", transition: "width 0.6s ease",
                             width: `${cat.score}%`,
                             background: cat.score >= 70 ? CC.green : cat.score >= 40 ? CC.yellow : CC.red,
                           }} />
                         </div>
-                        <div style={{ fontSize: "13px", color: CC.text3, marginTop: "4px" }}>{cat.detail}</div>
+                        <div style={{ fontSize: "14px", color: CC.text3, marginTop: "4px" }}>{cat.detail}</div>
                       </div>
                     ))}
                   </div>
@@ -2188,7 +2188,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                 {/* 상세 시그널 목록 */}
                 {diagData.signals.length > 0 && (
                   <div style={{
-                    background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "14px",
+                    background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "12px",
                     padding: "16px", marginBottom: "12px",
                     borderTop: "none", borderTopLeftRadius: "0", borderTopRightRadius: "0",
                   }}>
@@ -2199,7 +2199,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                         padding: "8px 0", borderBottom: i < diagData.signals.length - 1 ? `1px solid ${CC.border}` : "none",
                       }}>
                         <span style={{
-                          fontSize: "12px", fontWeight: 700, padding: "3px 7px", borderRadius: "5px",
+                          fontSize: "12px", fontWeight: 700, padding: "3px 7px", borderRadius: "6px",
                           flexShrink: 0, marginTop: "2px",
                           background: sig.type === "bullish" ? CC.greenBg : sig.type === "bearish" ? CC.redBg : CC.yellowBg,
                           color: sig.type === "bullish" ? CC.green : sig.type === "bearish" ? CC.red : CC.yellow,

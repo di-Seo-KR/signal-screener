@@ -127,7 +127,7 @@ export default function AuthPage({ theme = "dark", embedded = false, onClose }) 
     },
     btn: {
       width: "100%", padding: "14px", borderRadius: "12px",
-      fontSize: "17px", fontWeight: 700, border: "none", cursor: "pointer",
+      fontSize: "18px", fontWeight: 700, border: "none", cursor: "pointer",
       background: C.blue, color: "#fff", transition: "all 0.2s",
       opacity: loading ? 0.6 : 1, marginTop: "8px",
     },
@@ -256,7 +256,7 @@ export default function AuthPage({ theme = "dark", embedded = false, onClose }) 
               </div>
               <button onClick={() => handleOAuth("google")} disabled={loading} style={{
                 width: "100%", display: "flex", alignItems: "center", justifyContent: "center",
-                gap: "10px", padding: "13px", borderRadius: "12px", fontSize: "16px",
+                gap: "10px", padding: "14px", borderRadius: "12px", fontSize: "16px",
                 fontWeight: 600, border: `1px solid ${C.border}`, cursor: loading ? "default" : "pointer",
                 background: C.isDark ? "#fff" : "#fff", color: "#333", transition: "all 0.2s",
               }}>

@@ -47,6 +47,35 @@ export function getThemeTokens(theme) {
   return theme === "light" ? THEME_TOKENS.light : THEME_TOKENS.dark;
 }
 
+// ── Radius tokens ──────────────────────────────────────────────────
+// 이전엔 14변종 (2/3/4/5/6/8/9/10/12/14/16/18/20/24 px) 무작위 사용 →
+// 6단계로 정규화. 신규 코드는 RADIUS.* 사용 권고.
+export const RADIUS = {
+  xs: "4px",     // 작은 칩·태그 (이전 2/3 도 여기로 정규화)
+  sm: "6px",     // 작은 카드·버튼 (이전 5 도 여기로)
+  md: "8px",     // 표준 카드·버튼 (이전 9 도 여기로)
+  lg: "12px",    // 큰 카드·모달 (이전 14 도 여기로)
+  xl: "16px",    // 페이지 섹션 카드
+  "2xl": "20px",
+  "3xl": "24px",
+  full: "9999px", // pill / circle
+};
+
+// ── Font size tokens ───────────────────────────────────────────────
+// 이전엔 15+ 변종 (10/11/12/13/14/15/16/17/18/20/22/24/28/32/48 px) 사용 →
+// Tailwind text-* 스케일 + 모바일 가독성 최소 12px 기준으로 정규화.
+export const FONT = {
+  xs: "12px",     // 캡션·라벨 (이전 10/11 도 여기로 — 모바일 가독성)
+  sm: "14px",     // 보조 텍스트 (이전 13 도 여기로)
+  base: "16px",   // 본문
+  lg: "18px",     // 강조 텍스트 (이전 17 도 여기로)
+  xl: "20px",     // 카드 제목
+  "2xl": "24px",  // 섹션 제목 (이전 22/26 도 여기로)
+  "3xl": "30px",  // 페이지 제목
+  "4xl": "36px",
+  display: "48px", // 큰 숫자 (잔액 표시 등)
+};
+
 const STORAGE_KEY = "zepta:theme";
 
 function readInitial() {

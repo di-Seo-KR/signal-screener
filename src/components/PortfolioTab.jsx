@@ -33,7 +33,7 @@ export default memo(function PortfolioTab({
   return (
     <div className="tab-content">
       {/* 요약 헤더 */}
-      <div className="rounded-[18px] p-[22px_24px] mb-4" style={{
+      <div className="rounded-[16px] p-[22px_24px] mb-4" style={{
         background: `linear-gradient(135deg, ${C.card}, #0d1f35)`,
         border: `1px solid ${C.border}20`,
       }}>
@@ -75,10 +75,10 @@ export default memo(function PortfolioTab({
 
       {/* 자산 추가 폼 */}
       {showAddAsset && (
-        <div className="rounded-[18px] mb-4" style={{ background: C.card, border: `1px solid ${C.border}20`, padding: isMobile ? "16px 12px" : "22px 24px" }}>
+        <div className="rounded-[16px] mb-4" style={{ background: C.card, border: `1px solid ${C.border}20`, padding: isMobile ? "16px 12px" : "22px 24px" }}>
           <div className="font-bold mb-3.5" style={{ color: C.text1, fontSize: isMobile ? "15px" : "18px" }}>📌 {t("portfolio.addAsset")}</div>
           <div className="mb-3">
-            <div style={{ color: C.text3, marginBottom: "8px", fontSize: isMobile ? "13px" : "14px" }}>{t("portfolio.searchSymbol")}</div>
+            <div style={{ color: C.text3, marginBottom: "8px", fontSize: isMobile ? "14px" : "14px" }}>{t("portfolio.searchSymbol")}</div>
             <SearchBarWrapper SearchBar={SearchBar} placeholder={t("portfolio.symbolPlaceholder")} onSelect={(asset) => {
               const sym = asset.symbol.toUpperCase();
               setNewAsset(p => ({
@@ -97,7 +97,7 @@ export default memo(function PortfolioTab({
               { k: "avgPrice", label: t("portfolio.avgPriceLabel"), ph: t("portfolio.avgPricePlaceholder") },
             ].map(({ k, label, ph }) => (
               <div key={k}>
-                <div style={{ color: C.text3, marginBottom: "6px", fontSize: isMobile ? "13px" : "14px" }}>{label}</div>
+                <div style={{ color: C.text3, marginBottom: "6px", fontSize: isMobile ? "14px" : "14px" }}>{label}</div>
                 <input value={newAsset[k]} onChange={e => setNewAsset(p => ({ ...p, [k]: e.target.value }))}
                   placeholder={ph} className="w-full rounded-[10px] outline-none box-border" style={{
                     background: C.bg, border: `1px solid ${C.border2}`, color: C.text1,
@@ -107,7 +107,7 @@ export default memo(function PortfolioTab({
             ))}
           </div>
           <div className="mb-3">
-            <div style={{ color: C.text3, marginBottom: "10px", fontSize: isMobile ? "13px" : "14px" }}>{t("portfolio.marketLabel")}</div>
+            <div style={{ color: C.text3, marginBottom: "10px", fontSize: isMobile ? "14px" : "14px" }}>{t("portfolio.marketLabel")}</div>
             <div className="flex gap-1.5" style={{ flexDirection: isMobile ? "column" : "row" }}>
               {[["us",t("portfolio.marketUS")], ["kr",t("portfolio.marketKR")], ["crypto",t("portfolio.marketCrypto")]].map(([v, l]) => (
                 <button key={v} onClick={() => setNewAsset(p => ({ ...p, market: v }))} className="rounded-lg font-semibold transition-all" style={{
@@ -115,7 +115,7 @@ export default memo(function PortfolioTab({
                   color: newAsset.market === v ? C.blue : C.text3,
                   border: `1px solid ${newAsset.market === v ? C.blue : C.border2}`,
                   minHeight: "44px", padding: "10px 14px", flex: isMobile ? "1" : "0 0 auto", display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: isMobile ? "13px" : "14px",
+                  fontSize: isMobile ? "14px" : "14px",
                 }}>{l}</button>
               ))}
             </div>
@@ -160,7 +160,7 @@ export default memo(function PortfolioTab({
           <div style={{ fontSize: isMobile ? "16px" : "20px", fontWeight: 800, marginBottom: "8px", color: C.text1 }}>
             {t("portfolio.startPortfolio") || "포트폴리오를 시작하세요"}
           </div>
-          <div style={{ fontSize: isMobile ? "13px" : "16px", color: C.text3, lineHeight: 1.7, marginBottom: "28px" }}>
+          <div style={{ fontSize: isMobile ? "14px" : "16px", color: C.text3, lineHeight: 1.7, marginBottom: "28px" }}>
             {t("portfolio.startDesc") || "보유 자산을 기록하고 성과를 추적하세요"}
           </div>
 
@@ -195,7 +195,7 @@ export default memo(function PortfolioTab({
                 onMouseLeave={e => { e.currentTarget.style.background = `${C.blue}10`; e.currentTarget.style.transform = "translateX(0)"; }}
               >
                 <span style={{ fontSize: isMobile ? "16px" : "18px", minWidth: "24px" }}>{step.icon}</span>
-                <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text2, fontWeight: 500 }}>{step.text}</span>
+                <span style={{ fontSize: isMobile ? "14px" : "15px", color: C.text2, fontWeight: 500 }}>{step.text}</span>
               </div>
             ))}
           </div>
@@ -207,7 +207,7 @@ export default memo(function PortfolioTab({
               style={{
                 padding: isMobile ? "10px 16px" : "10px 24px",
                 borderRadius: "12px",
-                fontSize: isMobile ? "13px" : "15px",
+                fontSize: isMobile ? "14px" : "15px",
                 fontWeight: 700,
                 background: C.blue,
                 color: "#fff",
@@ -228,7 +228,7 @@ export default memo(function PortfolioTab({
               style={{
                 padding: isMobile ? "10px 16px" : "10px 24px",
                 borderRadius: "12px",
-                fontSize: isMobile ? "13px" : "15px",
+                fontSize: isMobile ? "14px" : "15px",
                 fontWeight: 700,
                 background: C.card2,
                 color: C.text2,
@@ -258,7 +258,7 @@ export default memo(function PortfolioTab({
             const mcBg = item.market === "us" ? "#1A2C4F" : item.market === "kr" ? "#1A2A1E" : "#1E1A2A";
             const flag = item.market === "us" ? "🇺🇸" : item.market === "kr" ? "🇰🇷" : "₿";
             return (
-              <div key={idx} className="rounded-[18px] overflow-hidden" style={{
+              <div key={idx} className="rounded-[16px] overflow-hidden" style={{
                 background: C.card, border: `1px solid ${C.border}20`,
               }}>
                 <div className="flex items-center p-4 gap-3.5" style={{ flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center" }}>
@@ -289,22 +289,22 @@ export default memo(function PortfolioTab({
                 </div>
 
                 {cur != null && (
-                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? "8px" : "6px", padding: isMobile ? "12px" : "14px 18px 12px", fontSize: isMobile ? "13px" : "14px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: isMobile ? "8px" : "6px", padding: isMobile ? "12px" : "14px 18px 12px", fontSize: isMobile ? "14px" : "14px" }}>
                     <div className="rounded-lg" style={{ background: C.bg, padding: isMobile ? "10px 12px" : "10px" }}>
-                      <div style={{ marginBottom: "4px", color: C.text3, fontSize: isMobile ? "11px" : "12px" }}>{t("portfolio.investedAmount")}</div>
-                      <div className="font-bold" style={{ color: C.text1, fontSize: isMobile ? "13px" : "16px" }}>
+                      <div style={{ marginBottom: "4px", color: C.text3, fontSize: isMobile ? "12px" : "12px" }}>{t("portfolio.investedAmount")}</div>
+                      <div className="font-bold" style={{ color: C.text1, fontSize: isMobile ? "14px" : "16px" }}>
                         {toDisplay(invested, item.market)}
                       </div>
                     </div>
                     <div className="rounded-lg" style={{ background: C.bg, padding: isMobile ? "10px 12px" : "10px" }}>
-                      <div style={{ marginBottom: "4px", color: C.text3, fontSize: isMobile ? "11px" : "12px" }}>{t("portfolio.evaluatedAmount")}</div>
-                      <div className="font-bold" style={{ color: C.text1, fontSize: isMobile ? "13px" : "16px" }}>
+                      <div style={{ marginBottom: "4px", color: C.text3, fontSize: isMobile ? "12px" : "12px" }}>{t("portfolio.evaluatedAmount")}</div>
+                      <div className="font-bold" style={{ color: C.text1, fontSize: isMobile ? "14px" : "16px" }}>
                         {toDisplay(evalVal, item.market)}
                       </div>
                     </div>
                     <div className="rounded-lg" style={{ background: isPos ? C.greenBg : C.redBg, padding: isMobile ? "10px 12px" : "10px" }}>
-                      <div style={{ marginBottom: "4px", color: C.text3, fontSize: isMobile ? "11px" : "12px" }}>{t("portfolio.profitLoss")}</div>
-                      <div className="font-bold" style={{ color: isPos ? C.green : C.red, fontSize: isMobile ? "13px" : "16px" }}>
+                      <div style={{ marginBottom: "4px", color: C.text3, fontSize: isMobile ? "12px" : "12px" }}>{t("portfolio.profitLoss")}</div>
+                      <div className="font-bold" style={{ color: isPos ? C.green : C.red, fontSize: isMobile ? "14px" : "16px" }}>
                         {isPos ? "+" : ""}{toDisplay(Math.abs(gainVal), item.market)}
                       </div>
                     </div>
@@ -321,7 +321,7 @@ export default memo(function PortfolioTab({
                     });
                   }} className="flex-1 rounded-[10px] font-semibold transition-all flex items-center justify-center gap-1.5" style={{
                     background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}33`,
-                    minHeight: "44px", padding: "8px 12px", fontSize: isMobile ? "13px" : "14px",
+                    minHeight: "44px", padding: "8px 12px", fontSize: isMobile ? "14px" : "14px",
                   }}>{t("portfolio.diagnostic")}</button>
                   <button onClick={() => {
                     const sym = item.market === "crypto"
@@ -330,14 +330,14 @@ export default memo(function PortfolioTab({
                     window.open(sym, "_blank");
                   }} className="flex-1 rounded-[10px] font-semibold transition-all flex items-center justify-center gap-1.5" style={{
                     background: C.card2, color: C.text2, border: `1px solid ${C.border2}`,
-                    minHeight: "44px", padding: "8px 12px", fontSize: isMobile ? "13px" : "14px",
+                    minHeight: "44px", padding: "8px 12px", fontSize: isMobile ? "14px" : "14px",
                   }}>{t("portfolio.detail")}</button>
                   <button onClick={() => {
                     if (!confirm(t("portfolio.deleteConfirm"))) return;
                     setPortfolio(p => p.filter((_, i) => i !== idx));
                   }} className="rounded-[10px] font-semibold transition-all flex items-center justify-center" style={{
                     background: C.redBg, color: C.red, border: `1px solid ${C.red}33`,
-                    minHeight: "44px", padding: "8px 12px", flex: isMobile ? "0 0 auto" : "0 0 auto", fontSize: isMobile ? "13px" : "14px",
+                    minHeight: "44px", padding: "8px 12px", flex: isMobile ? "0 0 auto" : "0 0 auto", fontSize: isMobile ? "14px" : "14px",
                   }}>{t("portfolio.delete")}</button>
                 </div>
               </div>

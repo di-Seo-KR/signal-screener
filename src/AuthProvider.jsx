@@ -20,7 +20,7 @@ function AuthToast({ toast, onClose }) {
     <div style={{
       position: "fixed", top: "24px", left: "50%", transform: "translateX(-50%)",
       zIndex: 999999, minWidth: "320px", maxWidth: "480px",
-      padding: "16px 20px", borderRadius: "14px",
+      padding: "16px 20px", borderRadius: "12px",
       background: isError ? "#2C1520" : "#0B2E1E",
       border: `1px solid ${isError ? "#FF4D5E" : "#00D47E"}`,
       color: isError ? "#FF8A95" : "#6EE7A8",

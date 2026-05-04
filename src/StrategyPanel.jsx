@@ -95,7 +95,7 @@ export default function StrategyPanel({ onRunBacktest }) {
     <div>
       {/* 시장 진단 */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px" }}>
-        <div style={{ fontWeight: 700, fontSize: "17px", marginBottom: "14px" }}>🔬 시장 진단</div>
+        <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "14px" }}>🔬 시장 진단</div>
         <div style={{ display: "flex", gap: isMobile ? "6px" : "8px", alignItems: "center", flexWrap: "wrap", marginBottom: "14px", flexDirection: isMobile ? "column" : "row" }}>
           <select value={selectedSymbol} onChange={e => setSelectedSymbol(e.target.value)} style={{
             padding: isMobile ? "10px 8px" : "8px 12px", borderRadius: "10px", fontSize: isMobile ? "14px" : "15px", fontWeight: 600,
@@ -119,22 +119,22 @@ export default function StrategyPanel({ onRunBacktest }) {
             <div style={{ background: regimeStyle.bg, borderRadius: "12px", padding: isMobile ? "10px 8px" : "14px", textAlign: "center" }}>
               <div style={{ fontSize: isMobile ? "20px" : "24px", marginBottom: "4px" }}>{regimeStyle.icon}</div>
               <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginBottom: "4px" }}>시장 국면</div>
-              <div style={{ fontSize: isMobile ? "14px" : "17px", fontWeight: 700, color: regimeStyle.color }}>{diagnosis.regime}</div>
+              <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 700, color: regimeStyle.color }}>{diagnosis.regime}</div>
             </div>
             <div style={{ background: C.card2, borderRadius: "12px", padding: isMobile ? "10px 8px" : "14px", textAlign: "center" }}>
               <div style={{ fontSize: isMobile ? "20px" : "24px", marginBottom: "4px" }}>{diagnosis.trend === "상승" ? "📈" : diagnosis.trend === "하락" ? "📉" : "➡️"}</div>
               <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginBottom: "4px" }}>추세</div>
-              <div style={{ fontSize: isMobile ? "14px" : "17px", fontWeight: 700, color: C.text1 }}>{diagnosis.trend}</div>
+              <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 700, color: C.text1 }}>{diagnosis.trend}</div>
             </div>
             <div style={{ background: C.card2, borderRadius: "12px", padding: isMobile ? "10px 8px" : "14px", textAlign: "center" }}>
               <div style={{ fontSize: isMobile ? "20px" : "24px", marginBottom: "4px" }}>📊</div>
               <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginBottom: "4px" }}>변동성</div>
-              <div style={{ fontSize: isMobile ? "14px" : "17px", fontWeight: 700, color: C.text1 }}>{diagnosis.volatility} ({diagnosis.atrPct}%)</div>
+              <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 700, color: C.text1 }}>{diagnosis.volatility} ({diagnosis.atrPct}%)</div>
             </div>
             <div style={{ background: C.card2, borderRadius: "12px", padding: isMobile ? "10px 8px" : "14px", textAlign: "center" }}>
               <div style={{ fontSize: isMobile ? "20px" : "24px", marginBottom: "4px" }}>{diagnosis.momentum === "과매수" ? "🔴" : diagnosis.momentum === "과매도" ? "🟢" : "⚪"}</div>
               <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginBottom: "4px" }}>모멘텀</div>
-              <div style={{ fontSize: isMobile ? "14px" : "17px", fontWeight: 700, color: C.text1 }}>{diagnosis.momentum} {diagnosis.rsi != null ? `(RSI ${diagnosis.rsi})` : ""}</div>
+              <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 700, color: C.text1 }}>{diagnosis.momentum} {diagnosis.rsi != null ? `(RSI ${diagnosis.rsi})` : ""}</div>
             </div>
           </div>
         )}
@@ -143,7 +143,7 @@ export default function StrategyPanel({ onRunBacktest }) {
       {/* 추천 전략 */}
       {recs.length > 0 && (
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px" }}>
-          <div style={{ fontWeight: 700, fontSize: "17px", marginBottom: "14px" }}>🎯 추천 전략 (시장 진단 기반)</div>
+          <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "14px" }}>🎯 추천 전략 (시장 진단 기반)</div>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {recs.map((rec, idx) => {
               const s = rec.strategy;
@@ -159,7 +159,7 @@ export default function StrategyPanel({ onRunBacktest }) {
                       <span style={{ fontSize: isMobile ? "16px" : "18px", flexShrink: 0 }}>{s.icon}</span>
                       <span style={{ fontWeight: 700, fontSize: isMobile ? "14px" : "16px", color: C.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
                       <span style={{
-                        padding: "2px 6px", borderRadius: "6px", fontSize: isMobile ? "11px" : "13px", fontWeight: 700,
+                        padding: "2px 6px", borderRadius: "6px", fontSize: isMobile ? "12px" : "14px", fontWeight: 700,
                         background: CAT_BG[s.category] || C.blueBg, color: catColor, flexShrink: 0,
                       }}>{s.category}</span>
                     </div>
@@ -176,10 +176,10 @@ export default function StrategyPanel({ onRunBacktest }) {
                     <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${C.border}` }}>
                       <div style={{ fontSize: "14px", color: C.text2, marginBottom: "8px", lineHeight: 1.6 }}>{s.desc}</div>
                       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
-                        <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "13px", background: C.card, color: C.text3, border: `1px solid ${C.border}` }}>
+                        <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "14px", background: C.card, color: C.text3, border: `1px solid ${C.border}` }}>
                           위험도: {s.risk}
                         </span>
-                        <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "13px", background: CAT_BG[s.category] || C.blueBg, color: CAT_COLORS[s.category] || C.blue, fontWeight: 600 }}>
+                        <span style={{ padding: "3px 8px", borderRadius: "6px", fontSize: "14px", background: CAT_BG[s.category] || C.blueBg, color: CAT_COLORS[s.category] || C.blue, fontWeight: 600 }}>
                           {s.category}
                         </span>
                         {onRunBacktest && (
@@ -202,7 +202,7 @@ export default function StrategyPanel({ onRunBacktest }) {
 
       {/* 전체 전략 목록 */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px" }}>
-        <div style={{ fontWeight: 700, fontSize: "17px", marginBottom: "14px" }}>📋 전체 전략 목록 ({ALL_STRATEGIES.length}개)</div>
+        <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "14px" }}>📋 전체 전략 목록 ({ALL_STRATEGIES.length}개)</div>
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(min(240px, 100%), 1fr))", gap: isMobile ? "8px" : "10px" }}>
           {ALL_STRATEGIES.map(s => {
             const catColor = CAT_COLORS[s.category] || C.blue;
@@ -214,19 +214,19 @@ export default function StrategyPanel({ onRunBacktest }) {
                   <span style={{ fontSize: "18px" }}>{s.icon}</span>
                   <span style={{ fontWeight: 700, fontSize: "15px", color: C.text1, flex: 1 }}>{s.name}</span>
                   <span style={{
-                    padding: "2px 6px", borderRadius: "4px", fontSize: "13px", fontWeight: 600,
+                    padding: "2px 6px", borderRadius: "4px", fontSize: "14px", fontWeight: 600,
                     background: CAT_BG[s.category] || C.blueBg, color: catColor, flexShrink: 0,
                   }}>{s.category}</span>
                 </div>
                 <div style={{ fontSize: "14px", color: C.text2, marginBottom: "8px", lineHeight: 1.5 }}>{s.desc}</div>
                 <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", alignItems: "center" }}>
                   <span style={{
-                    padding: "2px 6px", borderRadius: "4px", fontSize: "13px",
+                    padding: "2px 6px", borderRadius: "4px", fontSize: "14px",
                     background: C.card, color: C.text3,
                   }}>위험도: {s.risk}</span>
                   {onRunBacktest && (
                     <button onClick={() => onRunBacktest(s, selectedSymbol)} style={{
-                      padding: "4px 10px", borderRadius: "6px", fontSize: "13px", fontWeight: 700,
+                      padding: "4px 10px", borderRadius: "6px", fontSize: "14px", fontWeight: 700,
                       background: `linear-gradient(135deg, var(--z-blue), var(--z-blue-hi))`, color: "#fff",
                       border: "none", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "3px",
                       boxShadow: `var(--z-sh-sm)`,

@@ -755,13 +755,13 @@ function InteractiveChart({ returns, width = 600, height = 220 }) {
           <div style={{ fontSize: "14px", color: C.text3, marginBottom: "4px" }}>{hv.date}</div>
           <div style={{ display: "flex", gap: "16px" }}>
             <div>
-              <div style={{ fontSize: "13px", color: C.text3 }}>누적 수익률</div>
+              <div style={{ fontSize: "14px", color: C.text3 }}>누적 수익률</div>
               <div style={{ fontWeight: 800, fontSize: "18px", color: hv.cumulative >= 0 ? C.green : C.red }}>
                 {hv.cumulative >= 0 ? "+" : ""}{hv.cumulative}%
               </div>
             </div>
             <div>
-              <div style={{ fontSize: "13px", color: C.text3 }}>일간 변동</div>
+              <div style={{ fontSize: "14px", color: C.text3 }}>일간 변동</div>
               <div style={{ fontWeight: 700, fontSize: "16px", color: hv.daily >= 0 ? C.green : C.red }}>
                 {hv.daily >= 0 ? "+" : ""}{hv.daily}%
               </div>
@@ -805,8 +805,8 @@ function LoadingSkeleton({ progress }) {
           </div>
         </div>
         <div style={{ maxWidth: "300px", margin: "0 auto" }}>
-          <div style={{ height: "6px", borderRadius: "3px", background: C.bg, overflow: "hidden" }}>
-            <div style={{ width: `${progress}%`, height: "100%", borderRadius: "3px",
+          <div style={{ height: "6px", borderRadius: "4px", background: C.bg, overflow: "hidden" }}>
+            <div style={{ width: `${progress}%`, height: "100%", borderRadius: "4px",
               background: `linear-gradient(90deg, ${C.blue}, ${C.green})`, transition: "width 0.3s ease" }} />
           </div>
           <div style={{ fontSize: "14px", color: C.text3, marginTop: "6px" }}>{progress}%</div>
@@ -815,7 +815,7 @@ function LoadingSkeleton({ progress }) {
       {/* 스켈레톤 카드 */}
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(280px, 1fr))", gap: isMobile ? "8px" : "10px", marginTop: "12px" }}>
         {[1,2,3,4,5,6].map(i => (
-          <div key={i} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px",
+          <div key={i} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px",
             padding: "16px", opacity: 0.5 }}>
             <div style={{ height: "14px", width: "60%", background: C.card2, borderRadius: "4px", marginBottom: "10px" }} />
             <div style={{ height: "24px", width: "40%", background: C.card2, borderRadius: "4px", marginBottom: "8px" }} />
@@ -956,7 +956,7 @@ export default function QuantPortfolio({ theme = "dark" }) {
             ].map((m, i) => (
               <div key={i} style={{ background: C.card2, borderRadius: "8px", padding: "8px 6px", textAlign: "center" }}>
                 <div style={{ fontSize: "12px", color: C.text3, marginBottom: "2px" }}>{m.label}</div>
-                <div style={{ fontWeight: 800, fontSize: "17px", color: m.color }}>{m.value}</div>
+                <div style={{ fontWeight: 800, fontSize: "18px", color: m.color }}>{m.value}</div>
               </div>
             ))}
           </div>
@@ -979,7 +979,7 @@ export default function QuantPortfolio({ theme = "dark" }) {
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "12px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
                 <div style={{ fontWeight: 700 }}>수익률 추이 (실제 데이터)</div>
-                <span style={{ fontSize: "13px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>LIVE</span>
+                <span style={{ fontSize: "14px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>LIVE</span>
               </div>
               <div style={{ fontSize: "14px", color: C.text3, marginBottom: "12px" }}>
                 Yahoo Finance 실시간 시세 기반 · {s.returns.length}거래일
@@ -1028,14 +1028,14 @@ export default function QuantPortfolio({ theme = "dark" }) {
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: "14px" }}>{getName(p.sym)}</div>
-                        <div style={{ fontSize: "13px", color: C.text3, display: "flex", gap: "8px" }}>
+                        <div style={{ fontSize: "14px", color: C.text3, display: "flex", gap: "8px" }}>
                           <span>{p.sym}</span>
                           {lastPrice && <span style={{ color: C.text2 }}>{isKR ? `₩${Math.round(lastPrice).toLocaleString()}` : `$${lastPrice.toFixed(2)}`}</span>}
                           {dayChange && <span style={{ color: parseFloat(dayChange) >= 0 ? C.green : C.red }}>{parseFloat(dayChange) >= 0 ? "+" : ""}{dayChange}%</span>}
                         </div>
                       </div>
-                      <div style={{ width: "60px", height: "4px", borderRadius: "2px", background: C.bg, overflow: "hidden" }}>
-                        <div style={{ width: `${p.w * 100 * 5}%`, height: "100%", borderRadius: "2px",
+                      <div style={{ width: "60px", height: "4px", borderRadius: "4px", background: C.bg, overflow: "hidden" }}>
+                        <div style={{ width: `${p.w * 100 * 5}%`, height: "100%", borderRadius: "4px",
                           background: `hsl(${(i * 23) % 360}, 60%, 50%)` }} />
                       </div>
                       <div style={{ fontWeight: 700, fontSize: "14px", color: C.blue, minWidth: "32px", textAlign: "right" }}>
@@ -1057,7 +1057,7 @@ export default function QuantPortfolio({ theme = "dark" }) {
                 <div style={{ fontWeight: 700 }}>매매기록 ({s.tradeHistory.length}건)</div>
                 <div style={{ fontSize: "14px", color: C.green, marginTop: "2px" }}>전략 generate() 실제 시그널 기반</div>
               </div>
-              <span style={{ fontSize: "13px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>REAL</span>
+              <span style={{ fontSize: "14px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>REAL</span>
             </div>
             {s.tradeHistory.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px 0", color: C.text3 }}>
@@ -1076,7 +1076,7 @@ export default function QuantPortfolio({ theme = "dark" }) {
                   ].map((item, i) => (
                     <div key={i} style={{ background: C.card2, borderRadius: "10px", padding: "10px", textAlign: "center" }}>
                       <div style={{ fontWeight: 800, fontSize: "20px", color: item.color }}>{item.count}</div>
-                      <div style={{ fontSize: "13px", color: C.text3 }}>{item.label}</div>
+                      <div style={{ fontSize: "14px", color: C.text3 }}>{item.label}</div>
                     </div>
                   ))}
                 </div>
@@ -1087,14 +1087,14 @@ export default function QuantPortfolio({ theme = "dark" }) {
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                           <span style={{
-                            padding: "2px 6px", borderRadius: "4px", fontSize: "13px", fontWeight: 700,
+                            padding: "2px 6px", borderRadius: "4px", fontSize: "14px", fontWeight: 700,
                             background: t.action === "매수" ? C.redBg : C.blueBg,
                             color: t.action === "매수" ? C.red : C.blue,
                           }}>{t.action}</span>
                           <span style={{ fontWeight: 700, fontSize: "15px" }}>{t.symbolName}</span>
-                          <span style={{ fontSize: "13px", color: C.text3 }}>{t.symbol}</span>
+                          <span style={{ fontSize: "14px", color: C.text3 }}>{t.symbol}</span>
                         </div>
-                        <span style={{ fontSize: "13px", color: C.text3 }}>{t.date}</span>
+                        <span style={{ fontSize: "14px", color: C.text3 }}>{t.date}</span>
                       </div>
                       <div style={{ display: "flex", gap: "12px", fontSize: "14px", color: C.text2, flexWrap: "wrap" }}>
                         <span>가격 <b style={{ color: C.text1 }}>{t.symbol.includes(".KS") ? `₩${t.price.toLocaleString()}` : `$${t.price.toLocaleString()}`}</b></span>
@@ -1104,7 +1104,7 @@ export default function QuantPortfolio({ theme = "dark" }) {
                           <span>P&L <b style={{ color: t.pnl >= 0 ? C.green : C.red }}>{t.pnl >= 0 ? "+" : ""}{t.pnl}%</b></span>
                         )}
                       </div>
-                      <div style={{ fontSize: "13px", color: C.text3, marginTop: "3px" }}>시그널: {t.reason}</div>
+                      <div style={{ fontSize: "14px", color: C.text3, marginTop: "3px" }}>시그널: {t.reason}</div>
                     </div>
                   ))}
                 </div>
@@ -1118,7 +1118,7 @@ export default function QuantPortfolio({ theme = "dark" }) {
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <div style={{ fontWeight: 700 }}>리밸런싱 이력</div>
-              <span style={{ fontSize: "13px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>실제 비중 드리프트</span>
+              <span style={{ fontSize: "14px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>실제 비중 드리프트</span>
             </div>
             {s.rebalanceHistory.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px 0", color: C.text3 }}>
@@ -1132,14 +1132,14 @@ export default function QuantPortfolio({ theme = "dark" }) {
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         <span style={{
-                          padding: "2px 6px", borderRadius: "4px", fontSize: "13px", fontWeight: 700,
+                          padding: "2px 6px", borderRadius: "4px", fontSize: "14px", fontWeight: 700,
                           background: h.action.includes("증가") ? C.greenBg : h.action.includes("감소") ? C.redBg : C.blueBg,
                           color: h.action.includes("증가") ? C.green : h.action.includes("감소") ? C.red : C.blue,
                         }}>{h.action}</span>
                         <span style={{ fontWeight: 700, fontSize: "15px" }}>{h.symbolName}</span>
-                        <span style={{ fontSize: "13px", color: C.text3 }}>{h.symbol}</span>
+                        <span style={{ fontSize: "14px", color: C.text3 }}>{h.symbol}</span>
                       </div>
-                      <span style={{ fontSize: "13px", color: C.text3 }}>{h.date}</span>
+                      <span style={{ fontSize: "14px", color: C.text3 }}>{h.date}</span>
                     </div>
                     <div style={{ display: "flex", gap: "12px", fontSize: "14px", color: C.text2 }}>
                       <span>비중 {h.beforeWeight}% → <b style={{ color: C.text1 }}>{h.afterWeight}%</b></span>
@@ -1163,7 +1163,7 @@ export default function QuantPortfolio({ theme = "dark" }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "4px" }}>
           <div style={{ fontWeight: 800, fontSize: "18px" }}>퀀트 전략 포트폴리오</div>
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <span style={{ fontSize: "13px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>LIVE</span>
+            <span style={{ fontSize: "14px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>LIVE</span>
             <button onClick={loadData} style={{ background: C.card2, border: `1px solid ${C.border2}`, borderRadius: "6px",
               padding: "4px 10px", fontSize: "14px", color: C.text2, cursor: "pointer" }}>새로고침</button>
           </div>
@@ -1187,7 +1187,7 @@ export default function QuantPortfolio({ theme = "dark" }) {
                 <span style={{ fontWeight: 800, fontSize: "18px", color: s.cumReturn >= 0 ? C.green : C.red }}>
                   {s.cumReturn >= 0 ? "+" : ""}{s.cumReturn}%
                 </span>
-                <span style={{ fontSize: "13px", color: C.text3, alignSelf: "flex-end" }}>{s.validStocks}종목</span>
+                <span style={{ fontSize: "14px", color: C.text3, alignSelf: "flex-end" }}>{s.validStocks}종목</span>
               </div>
             </div>
           ))}
@@ -1196,13 +1196,13 @@ export default function QuantPortfolio({ theme = "dark" }) {
 
       <div style={{ display: "flex", gap: isMobile ? "4px" : "6px", marginBottom: "12px", flexWrap: "wrap", alignItems: "center" }}>
         <button onClick={() => setFilterCat("all")} style={{
-          padding: isMobile ? "8px 10px" : "6px 12px", borderRadius: "8px", fontSize: isMobile ? "13px" : "14px", fontWeight: 600,
+          padding: isMobile ? "8px 10px" : "6px 12px", borderRadius: "8px", fontSize: isMobile ? "14px" : "14px", fontWeight: 600,
           background: filterCat === "all" ? C.blueBg : "transparent", color: filterCat === "all" ? C.blue : C.text3,
           border: `1px solid ${filterCat === "all" ? C.blue : C.border2}`, cursor: "pointer", minHeight: isMobile ? "40px" : "auto", display: "flex", alignItems: "center", justifyContent: "center",
         }}>전체</button>
         {categories.map(cat => (
           <button key={cat} onClick={() => setFilterCat(cat)} style={{
-            padding: isMobile ? "8px 10px" : "6px 12px", borderRadius: "8px", fontSize: isMobile ? "13px" : "14px", fontWeight: 600,
+            padding: isMobile ? "8px 10px" : "6px 12px", borderRadius: "8px", fontSize: isMobile ? "14px" : "14px", fontWeight: 600,
             background: filterCat === cat ? (CAT_COLORS[cat] || C.blue) + "20" : "transparent",
             color: filterCat === cat ? (CAT_COLORS[cat] || C.blue) : C.text3,
             border: `1px solid ${filterCat === cat ? (CAT_COLORS[cat] || C.blue) : C.border2}`, cursor: "pointer", minHeight: isMobile ? "40px" : "auto", display: "flex", alignItems: "center", justifyContent: "center",
@@ -1210,7 +1210,7 @@ export default function QuantPortfolio({ theme = "dark" }) {
         ))}
         <div style={{ flex: 1 }} />
         <select value={sortBy} onChange={e => setSortBy(e.target.value)} style={{
-          padding: isMobile ? "8px 8px" : "6px 10px", borderRadius: "8px", fontSize: isMobile ? "13px" : "14px", fontWeight: 600,
+          padding: isMobile ? "8px 8px" : "6px 10px", borderRadius: "8px", fontSize: isMobile ? "14px" : "14px", fontWeight: 600,
           background: C.card2, color: C.text2, border: `1px solid ${C.border2}`, minHeight: isMobile ? "40px" : "auto",
         }}>
           <option value="return">수익률순</option>
@@ -1222,19 +1222,19 @@ export default function QuantPortfolio({ theme = "dark" }) {
       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(280px, 1fr))", gap: isMobile ? "8px" : "10px" }}>
         {filteredData.map((s, i) => (
           <div key={i} onClick={() => setSelectedStrategy(s)} style={{
-            background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px",
+            background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px",
             padding: isMobile ? "12px" : "16px", cursor: "pointer", transition: "all 0.2s",
           }}
           onMouseEnter={e => e.currentTarget.style.borderColor = C.blue}
           onMouseLeave={e => e.currentTarget.style.borderColor = C.border}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
               <div>
-                <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "13px", fontWeight: 700,
+                <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "14px", fontWeight: 700,
                   background: (CAT_COLORS[s.category] || C.blue) + "20", color: CAT_COLORS[s.category] || C.blue,
                   marginRight: "6px" }}>{s.category}</span>
                 <span style={{ fontWeight: 700, fontSize: "16px" }}>{s.name}</span>
               </div>
-              <span style={{ fontSize: "13px", color: C.text3 }}>{s.validStocks}종목</span>
+              <span style={{ fontSize: "14px", color: C.text3 }}>{s.validStocks}종목</span>
             </div>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "8px" }}>
