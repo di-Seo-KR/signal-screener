@@ -1,5 +1,8 @@
-// 코드 스플리팅 도입 후 구버전 모놀리식 번들 캐시 강제 무효화 — v3
-const CACHE_NAME = 'zepta-v3';
+// v4 — 시세 API stale 위험 차단 + /api/ stale-while-revalidate (5분)
+// 이전 v3 는 yahoo/finnhub/coingecko 응답까지 무조건 cache.put → 모바일 스토리지
+// 비대 + 오래된 시세 노출 위험. 이 버전부터 외부 시세 직접 요청은 캐시 안 함.
+const CACHE_NAME = 'zepta-v4';
+const API_MAX_AGE_MS = 5 * 60 * 1000; // 5분
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -47,19 +50,40 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = event.request.url;
 
-  // 1. API 요청: 네트워크 우선 (실패 시 캐시 폴백)
-  if (url.includes('/api/') || url.includes('yahoo') || url.includes('coingecko') || url.includes('finnhub')) {
+  // 1a. 외부 시세 API (yahoo/coingecko/finnhub) — 절대 캐시 안 함
+  // 이유: 시세는 1초만 늦어도 잘못된 정보. SW 캐시가 stale 응답 노출하면
+  // 사용자에게 "방금 본 가격" 보여 매매 결정 오도. 항상 네트워크.
+  if (url.includes('yahoo') || url.includes('coingecko') || url.includes('finnhub')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
+  // 1b. 자체 API (/api/) — stale-while-revalidate (5분 max-age)
+  // 캐시가 있으면 즉시 반환 (UI 빠르게) + 백그라운드로 갱신.
+  // 캐시가 5분 넘었거나 없으면 네트워크 우선.
+  if (url.includes('/api/')) {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          // 성공 응답만 캐시 (실패는 캐시하지 않음)
-          if (response.ok) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match(event.request))
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cached = await cache.match(event.request);
+        const cachedAt = cached?.headers.get('x-cached-at');
+        const cachedFresh = cached && cachedAt && (Date.now() - Number(cachedAt) < API_MAX_AGE_MS);
+        const fetchPromise = fetch(event.request)
+          .then((response) => {
+            if (response.ok) {
+              // x-cached-at 헤더로 만료 추적 (Response 헤더 mutation 위해 새 Response)
+              const headers = new Headers(response.headers);
+              headers.set('x-cached-at', String(Date.now()));
+              response.clone().blob().then((body) => {
+                const tagged = new Response(body, { status: response.status, statusText: response.statusText, headers });
+                cache.put(event.request, tagged);
+              });
+            }
+            return response;
+          })
+          .catch(() => cached || new Response('', { status: 503 }));
+        // fresh cache 가 있으면 즉시 반환, 없으면 네트워크 대기
+        return cachedFresh ? cached : fetchPromise;
+      })
     );
     return;
   }

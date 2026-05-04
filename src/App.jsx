@@ -5790,14 +5790,22 @@ function AppInner() {
   }, []);
 
   // 홈 탭 진입 시 즉시 로드 + 30초 간격 자동 갱신
+  // ★ 백그라운드 탭 가드 — document.hidden 일 땐 fetch 건너뜀 (모바일 배터리·데이터 절약)
   useEffect(() => {
     if (tab !== "home") return;
     if (marketIndices.length === 0) fetchMarketOverview();
     fetchEconCalendar();
     if (portfolio.length > 0) fetchPortfolioPrices();
-    const iv = setInterval(() => { fetchMarketOverview(); }, 30000);
+    const iv = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      fetchMarketOverview();
+    }, 30000);
+    // 탭 다시 visible 될 때 즉시 갱신 (정확성 회복)
+    const onVis = () => { if (!document.hidden) fetchMarketOverview(); };
+    document.addEventListener("visibilitychange", onVis);
     return () => {
       clearInterval(iv);
+      document.removeEventListener("visibilitychange", onVis);
       // 탭 떠날 때 진행 중인 요청 취소
       if (abortRef.current) abortRef.current.abort();
       fetchingRef.current = false;
@@ -11901,7 +11909,7 @@ function AppInner() {
                     fontSize: "18px", fontWeight: 900, color: "#fff",
                   }}>
                     {(user?.user_metadata?.avatar_url)
-                      ? <img src={user.user_metadata.avatar_url} alt="" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }} />
+                      ? <img src={user.user_metadata.avatar_url} alt="사용자 프로필" width="44" height="44" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }} />
                       : (user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()
                     }
                   </div>
@@ -12195,7 +12203,7 @@ function AppInner() {
                       border: "3px solid rgba(255,255,255,0.3)",
                     }}>
                       {(user?.user_metadata?.avatar_url)
-                        ? <img src={user.user_metadata.avatar_url} alt="" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover" }} />
+                        ? <img src={user.user_metadata.avatar_url} alt="사용자 프로필" width="72" height="72" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover" }} />
                         : displayName[0].toUpperCase()}
                     </div>
                     <div style={{ position: "absolute", bottom: "-4px", right: "-8px", background: C.card, border: `2px solid ${xpInfo.tier.color}`, borderRadius: "8px", padding: "1px 6px", fontSize: "11px", fontWeight: 800, color: xpInfo.tier.color }}>{xpInfo.tier.icon} Lv.{xpInfo.level}</div>
