@@ -5,6 +5,7 @@ import RealTrading from "./RealTrading.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { useLanguage } from "./i18n/LanguageContext.jsx";
 import { supabase } from "./supabaseClient.js";
+import { THEME_TOKENS } from "./ui/theme.jsx";
 
 // ── 에쿼티 커브 생성 (전략 파라미터 기반) ──
 function generateEquityCurve(bot, months = 12) {
@@ -127,39 +128,9 @@ function MiniEquityChart({ data, color, width = 280, height = 80, theme, isMobil
   );
 }
 
-// Zepta tokens.css 와 동기화
-const colors = {
-  dark: {
-    bg: "#070B14",
-    card: "#101828",
-    card2: "#161F33",
-    border: "#1E2A42",
-    blue: "#3B82F6",
-    red: "#FF4D64",
-    green: "#10D884",
-    yellow: "#FFB020",
-    purple: "#9B6FFF",
-    orange: "#FF6B2C",
-    text1: "#F1F5FB",
-    text2: "#9AA7BD",
-    text3: "#64728C",
-  },
-  light: {
-    bg: "#F6F8FC",
-    card: "#FFFFFF",
-    card2: "#F1F4F9",
-    border: "#E2E6EF",
-    blue: "#2563EB",
-    red: "#E11D48",
-    green: "#059B64",
-    yellow: "#D08300",
-    purple: "#7C3AED",
-    orange: "#E8590C",
-    text1: "#0A1224",
-    text2: "#4C5870",
-    text3: "#7D889D",
-  },
-};
+// ★ 디자인 토큰 SSOT — src/ui/theme.jsx 의 THEME_TOKENS 단일 진실 소스 사용
+//   colors.dark / colors.light 인터페이스는 그대로 유지 (호출 측 수정 불필요)
+const colors = THEME_TOKENS;
 
 const STOCK_BOTS = [
   {

@@ -12,6 +12,7 @@ import { CoupangOfficialBanner, CoupangSearchWidget, CoupangInterstitial, Google
 import Header from "./components/Header.jsx";
 import PortfolioTab from "./components/PortfolioTab.jsx";
 import { supabase } from "./supabaseClient.js";
+import { THEME_TOKENS } from "./ui/theme.jsx";
 // 기술 지표 (App.jsx 분리 1단계 — 순수 유틸)
 import {
   calcRSI, calcRSIArray, calcVolumeProfile, calcSMA, calcBB,
@@ -1380,45 +1381,11 @@ function fmtPrice(price, market) {
 // 색상 팔레트 — 다크 / 라이트 테마
 // ════════════════════════════════════════════════════════════════════
 const THEME_KEY = "ss_theme";
-// Zepta 토큰(tokens.css)과 hex 값을 1:1 동기화. 두 시스템이 시각적으로 일치하도록 유지.
-// 알파 hex 합성(`${C.blue}22`)을 위해 var()가 아닌 hex 를 그대로 둠.
-const DARK = {
-  bg: "#070B14", card: "#101828", card2: "#161F33",
-  border: "#1E2A42", border2: "#2A3A58",
-  blue: "#3B82F6", blueL: "#60A5FA", blueBg: "#0F1F3D",
-  red: "#FF4D64", redBg: "#2C1520",
-  green: "#10D884", greenBg: "#0B2E1E",
-  yellow: "#FFB020", yellowBg: "#2B2100",
-  purple: "#9B6FFF", purpleBg: "#201840",
-  orange: "#FF6B2C",
-  text1: "#F1F5FB", text2: "#9AA7BD", text3: "#64728C",
-  isDark: true,
-};
-const LIGHT = {
-  // 토스/카카오뱅크 라이트모드 톤 — Zepta light 토큰과 동기화
-  bg: "#F6F8FC",
-  card: "#FFFFFF",
-  card2: "#F1F4F9",
-  border: "#E2E6EF",
-  border2: "#D0D6E1",
-  blue: "#2563EB",
-  blueL: "#3B82F6",
-  blueBg: "#E8F1FE",
-  red: "#E11D48",
-  redBg: "#FFF0F1",
-  green: "#059B64",
-  greenBg: "#EDFBF2",
-  yellow: "#D08300",
-  yellowBg: "#FFF9EC",
-  purple: "#7C3AED",
-  purpleBg: "#F0EDFF",
-  orange: "#E8590C",
-  text1: "#0A1224",
-  text2: "#4C5870",
-  text3: "#7D889D",
-  isDark: false,
-  cardShadow: "0 2px 10px rgba(15,23,42,0.08), 0 1px 2px rgba(15,23,42,0.04)",
-};
+// ★ Zepta 디자인 시스템 SSOT — src/ui/theme.jsx 의 THEME_TOKENS 가 단일 진실
+//    이전엔 DARK/LIGHT 를 여기서 직접 정의해서 9개 파일이 따로 갖고 있었음.
+//    이제 모든 파일이 THEME_TOKENS 에서 가져옴. 변경은 theme.jsx 에서만.
+const DARK = THEME_TOKENS.dark;
+const LIGHT = THEME_TOKENS.light;
 function loadTheme() { try { return localStorage.getItem(THEME_KEY) || "dark"; } catch { return "dark"; } }
 // C will be set dynamically in App component and passed through context
 let C = DARK;

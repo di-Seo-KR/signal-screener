@@ -4,26 +4,11 @@
 // ════════════════════════════════════════════════════════════════════
 import { useState, useCallback } from "react";
 import { useAuth } from "./AuthProvider.jsx";
+import { THEME_TOKENS } from "./ui/theme.jsx";
 
-// Zepta tokens.css 와 동기화
-const DARK = {
-  bg: "#070B14", card: "#101828", card2: "#161F33",
-  border: "#1E2A42", border2: "#2A3A58",
-  blue: "#3B82F6", blueL: "#60A5FA", blueBg: "#0F1F3D",
-  red: "#FF4D64", redBg: "#2C1520",
-  green: "#10D884", greenBg: "#0B2E1E",
-  text1: "#F1F5FB", text2: "#9AA7BD", text3: "#64728C",
-  isDark: true,
-};
-const LIGHT = {
-  bg: "#F6F8FC", card: "#FFFFFF", card2: "#F1F4F9",
-  border: "#E2E6EF", border2: "#D0D6E1",
-  blue: "#2563EB", blueL: "#3B82F6", blueBg: "#E8F1FE",
-  red: "#E11D48", redBg: "#FFF0F1",
-  green: "#059B64", greenBg: "#EDFBF2",
-  text1: "#0A1224", text2: "#4C5870", text3: "#7D889D",
-  isDark: false,
-};
+// ★ 디자인 토큰 SSOT — src/ui/theme.jsx 의 THEME_TOKENS 사용
+const DARK = THEME_TOKENS.dark;
+const LIGHT = THEME_TOKENS.light;
 
 export default function AuthPage({ theme = "dark", embedded = false, onClose }) {
   const C = theme === "dark" ? DARK : LIGHT;

@@ -3,18 +3,10 @@
 // v3.5: MAE/MFE + Expectancy + Recovery Factor + 평균 보유기간 표시
 import { useState, useCallback, useRef, useEffect } from "react";
 import { ALL_STRATEGIES, runBacktest } from "./strategies.js";
+import { THEME_TOKENS } from "./ui/theme.jsx";
 
-// Zepta tokens.css 와 동기화 (dark)
-const C = {
-  bg: "#070B14", card: "#101828", card2: "#161F33",
-  border: "#1E2A42", border2: "#2A3A58",
-  blue: "#3B82F6", blueL: "#60A5FA", blueBg: "#0F1F3D",
-  red: "#FF4D64", redBg: "#2C1520",
-  green: "#10D884", greenBg: "#0B2E1E",
-  yellow: "#FFB020", yellowBg: "#2B2100",
-  purple: "#9B6FFF", purpleBg: "#201840",
-  text1: "#F1F5FB", text2: "#9AA7BD", text3: "#64728C",
-};
+// ★ 디자인 토큰 SSOT — 다크 전용 패널이라 dark 토큰만 사용
+const C = THEME_TOKENS.dark;
 
 // 모바일 감지 훅
 function useMobile() {
