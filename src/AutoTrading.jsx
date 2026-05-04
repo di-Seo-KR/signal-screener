@@ -6,6 +6,7 @@ import { useAuth } from "./AuthProvider.jsx";
 import { useLanguage } from "./i18n/LanguageContext.jsx";
 import { supabase } from "./supabaseClient.js";
 import { THEME_TOKENS } from "./ui/theme.jsx";
+import { useIsMobile } from "./ui/useBreakpoint.jsx";
 
 // ── 에쿼티 커브 생성 (전략 파라미터 기반) ──
 function generateEquityCurve(bot, months = 12) {
@@ -1470,18 +1471,10 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
 export default function AutoTrading({ theme = "dark", user }) {
   const c = colors[theme];
   const { showToast } = useAuth();
-  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
+  // ★ 모바일 감지는 useIsMobile (src/ui/useBreakpoint.jsx) SSOT 사용
+  const isMobile = useIsMobile();
   const [activeBot, setActiveBot] = useState(null);
   const [pendingBot, setPendingBot] = useState(null);
-
-  // 모바일 반응형 감지
-  useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 640);
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
 
 
   // 운영 중인 봇 목록 (Supabase user_metadata + localStorage 캐시)

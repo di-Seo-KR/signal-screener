@@ -2,6 +2,7 @@
 // 시장 진단 → 전략 추천 → 상세 전략 카드
 import { useState, useCallback, useEffect } from "react";
 import { ALL_STRATEGIES, diagnoseMarket, recommendStrategies } from "./strategies.js";
+import { useIsMobile } from "./ui/useBreakpoint.jsx";
 
 // ── Zepta 토큰 기반 (theme-responsive) ──
 // 모든 색상은 src/ui/tokens.css 의 --z-* CSS 변수를 참조한다.
@@ -17,17 +18,7 @@ const C = {
   text1: "var(--z-text)", text2: "var(--z-text-2)", text3: "var(--z-text-3)",
 };
 
-// 모바일 감지 훅
-function useMobile() {
-  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 640px)");
-    const handler = (e) => setIsMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return isMobile;
-}
+// 모바일 감지는 useIsMobile (src/ui/useBreakpoint.jsx) SSOT 사용
 
 const REGIME_COLORS = {
   "안정적 상승": { bg: C.greenBg, color: C.green, icon: "📈" },
@@ -52,7 +43,7 @@ const CAT_BG = {
 };
 
 export default function StrategyPanel({ onRunBacktest }) {
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
   const [loading, setLoading] = useState(false);
   const [diagnosis, setDiagnosis] = useState(null);
   const [recs, setRecs] = useState([]);

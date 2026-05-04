@@ -13,6 +13,7 @@ import Header from "./components/Header.jsx";
 import PortfolioTab from "./components/PortfolioTab.jsx";
 import { supabase } from "./supabaseClient.js";
 import { THEME_TOKENS } from "./ui/theme.jsx";
+import { useIsMobile } from "./ui/useBreakpoint.jsx";
 // 기술 지표 (App.jsx 분리 1단계 — 순수 유틸)
 import {
   calcRSI, calcRSIArray, calcVolumeProfile, calcSMA, calcBB,
@@ -4329,13 +4330,9 @@ function AppInner() {
   const [sbCollapsed, setSbCollapsed] = useState({ main: false, ops: false, info: false });
 
   // ── 모바일 감지 (폰트 크기 보정용) ──
-  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 640px)");
-    const handler = (e) => setIsMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
+  // ★ SSOT — useIsMobile (src/ui/useBreakpoint.jsx). 이전 자체 useState +
+  //   matchMedia 6곳 중복 → 단일 hook 으로 통일.
+  const isMobile = useIsMobile();
   // 폰트 크기 헬퍼: PC/모바일 가독성 자동 보정
   // PC: 작은 폰트 전체적으로 2~3px 스케일업
   // 모바일: 최소 가독성 보장

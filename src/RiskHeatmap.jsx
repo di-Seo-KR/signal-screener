@@ -2,21 +2,11 @@
 // 8-Point CP 시스템 — 모든 체크포인트 실시간 시장 데이터 기반 동적 산출
 import { useState, useMemo, useEffect } from "react";
 import { THEME_TOKENS } from "./ui/theme.jsx";
+import { useIsMobile } from "./ui/useBreakpoint.jsx";
 
 // ★ 디자인 토큰 SSOT — 다크 전용 패널
 const C = THEME_TOKENS.dark;
-
-// 모바일 감지 훅
-function useMobile() {
-  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 640px)");
-    const handler = (e) => setIsMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return isMobile;
-}
+// 모바일 감지는 useIsMobile (src/ui/useBreakpoint.jsx) SSOT 사용
 
 const SEV = {
   CRITICAL: { label: "CRITICAL", color: "#FF4D64", glow: "#FF4D6433" },
@@ -208,7 +198,7 @@ function Sparkline({ score, trend, width = 64, height = 20 }) {
 }
 
 export default function RiskHeatmap({ marketIndices = [], fearGreed = {} }) {
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
   const [expandedCP, setExpandedCP] = useState(null);
   const [tab, setTab] = useState("dashboard"); // "dashboard" | "matrix" | "history"
 
