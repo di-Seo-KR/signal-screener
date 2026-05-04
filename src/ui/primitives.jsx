@@ -434,6 +434,69 @@ export function Tooltip({ content, children, side = "top" }) {
   );
 }
 
+// ───────────────────────────── MetricInfo ─────────────────────────────
+// 어려운 금융 용어 (Sharpe, MDD, RR 등) 옆에 ⓘ 아이콘을 붙여 클릭/호버 시
+// 한국어 풀이 보여줌. 데스크탑 hover + 모바일 tap 모두 지원.
+//
+// 사용:
+//   <MetricInfo label="안정성 점수" hint="수익이 얼마나 안정적인지 보여주는 점수. 1.0 이상이면 양호, 2.0 이상이면 매우 우수" />
+export function MetricInfo({ label, hint, side = "top", style, labelStyle }) {
+  const [show, setShow] = useState(false);
+  // 외부 클릭 시 닫기 (모바일 tap 후 자동 닫힘)
+  useEffect(() => {
+    if (!show) return;
+    const onDocClick = () => setShow(false);
+    // 다음 frame 부터 리스너 활성 — 토글 클릭이 즉시 닫히지 않도록
+    const id = setTimeout(() => document.addEventListener("click", onDocClick), 0);
+    return () => { clearTimeout(id); document.removeEventListener("click", onDocClick); };
+  }, [show]);
+  return (
+    <span style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 4, ...style }}>
+      <span style={labelStyle}>{label}</span>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setShow((v) => !v); }}
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+        aria-label={`${label} 설명 보기`}
+        style={{
+          width: 16, height: 16, padding: 0, border: "none",
+          background: "transparent", color: "var(--z-text-3)",
+          cursor: "pointer", display: "inline-flex",
+          alignItems: "center", justifyContent: "center",
+          fontSize: 11, fontWeight: 700, opacity: 0.7,
+          borderRadius: "50%",
+        }}
+      >
+        <span style={{
+          display: "inline-block", width: 14, height: 14, lineHeight: "14px",
+          borderRadius: "50%", textAlign: "center",
+          border: "1px solid var(--z-text-3)",
+          fontSize: 10, fontStyle: "italic", fontFamily: "Georgia, serif",
+        }}>i</span>
+      </button>
+      {show && (
+        <span
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "absolute",
+            bottom: side === "top" ? "calc(100% + 8px)" : undefined,
+            top: side === "bottom" ? "calc(100% + 8px)" : undefined,
+            left: "50%", transform: "translateX(-50%)",
+            background: "var(--z-card-hi)", color: "var(--z-text)",
+            padding: "10px 14px", fontSize: 12, fontWeight: 500, lineHeight: 1.5,
+            borderRadius: "8px", border: `1px solid var(--z-border-2)`,
+            width: "max-content", maxWidth: 260, textAlign: "left",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.16)", zIndex: 500,
+            animation: "z-fade-in var(--z-dur-fast) var(--z-ease)",
+            whiteSpace: "normal", wordBreak: "keep-all",
+          }}
+        >{hint}</span>
+      )}
+    </span>
+  );
+}
+
 // ───────────────────────────── Skeleton ─────────────────────────────
 export function Skeleton({ width = "100%", height = 14, rounded = 6, style }) {
   return (

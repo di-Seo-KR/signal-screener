@@ -165,7 +165,7 @@ function RealTradingInner() {
       if (r?.ran) {
         const sym = r.signal?.symbol || "";
         const side = r.signal?.side || "";
-        const shadow = r.shadow ? " → Shadow 기록됨" : "";
+        const shadow = r.shadow ? " → 모의 운영 기록됨" : "";
         toast.push(
           `${sym} ${side} · qty ${fmtQty(r.plan?.qty)} @ ${r.plan?.leverage}×${r.plan?.bumpedToMin ? " · ⚠ bumped" : ""}${shadow}`,
           { tone: "green", title: "✓ 모의 실행 완료", duration: 5000 }
@@ -721,14 +721,14 @@ function RealTradingInner() {
   // SIMPLE MODE — 가이드 스텝
   // ═════════════════════════════════════════════════════════
   const simpleGuide = (
-    <Card title="6단계 안전 활성화 가이드" subtitle="순서대로 따라가면 안전하게 실거래 시작할 수 있어요" icon={<Target size={16} />}>
+    <Card title="6단계 안전 활성화 가이드" subtitle="순서대로 따라가시면 안전하게 실거래를 시작할 수 있어요" icon={<Target size={16} />}>
       {[
-        { n: 1, title: "모의실행", desc: "Shadow 모드로 전체 파이프라인을 점검합니다. 시그널이 없으면 자동 합성 시그널로 테스트합니다.", done: engineLog.some(e => e.shadow || e.dryRun) },
-        { n: 2, title: "Shadow 모드 시작", desc: "실거래 없이 2~4주 가상 트레이드를 축적하고 승률·netPnL·평균 RR 을 관찰합니다.", done: shadowOn },
-        { n: 3, title: "Shadow 결과 검증", desc: "양의 netPnL + 평균 RR ≥ 1.5 를 확인 후 다음 단계로 진행.", done: (shadow.summary?.trades || 0) >= 10 && (shadow.summary?.netPnL || 0) > 0 },
-        { n: 4, title: "Phase 1 등록", desc: "실거래 엔진 순회 대상에 이 계정을 등록합니다. Killswitch 는 여전히 ON 상태.", done: phase1On },
-        { n: 5, title: "Killswitch 해제", desc: "이 시점부터 5분 내 실거래 발생 가능. 소액부터 시작하세요.", done: !killOn },
-        { n: 6, title: "주기적 모니터링", desc: "오픈 포지션·엔진 로그·Reconcile·브레이커 상태를 하루 1~2회 확인.", done: trulyLive },
+        { n: 1, title: "한 번 모의 실행", desc: "실제 돈은 안 쓰고 전체 시스템이 잘 돌아가는지 한 번 점검합니다. 시그널이 없으면 자동으로 가짜 신호를 만들어서 테스트해요.", done: engineLog.some(e => e.shadow || e.dryRun) },
+        { n: 2, title: "모의 운영 시작 (Shadow)", desc: "내 돈은 안 쓰면서 2~4주 동안 가상 거래를 쌓습니다. 승률·누적 손익·평균 손익비를 관찰해요.", done: shadowOn },
+        { n: 3, title: "모의 운영 결과 검증", desc: "누적 손익이 플러스 + 평균 손익비 ≥ 1.5 인지 확인하고 다음 단계로 갑니다.", done: (shadow.summary?.trades || 0) >= 10 && (shadow.summary?.netPnL || 0) > 0 },
+        { n: 4, title: "실거래 등록", desc: "이 계정을 실거래 엔진 대상에 추가합니다. 안전잠금은 여전히 켜져 있어 거래는 일어나지 않아요.", done: phase1On },
+        { n: 5, title: "안전잠금 해제", desc: "이 시점부터 5분 안에 실거래가 시작될 수 있습니다. 소액부터 시작하세요.", done: !killOn },
+        { n: 6, title: "주기적 모니터링", desc: "진행 중 거래·엔진 로그·계정 동기화·차단기 상태를 하루 1~2회 확인합니다.", done: trulyLive },
       ].map((step) => (
         <div key={step.n} style={{
           display: "flex", gap: 14, padding: "12px 0",
@@ -956,8 +956,8 @@ function RealTradingInner() {
   // ═════════════════════════════════════════════════════════
   const shadowCard = (
     <Card
-      title="Shadow 모드"
-      subtitle="실거래 없이 전체 파이프라인 기록 · 수수료 + 슬리피지 반영"
+      title="모의 운영 (Shadow)"
+      subtitle="실거래 없이 전체 시스템을 기록 · 수수료 + 슬리피지 반영"
       icon={<Ghost size={16} />}
       actions={shadowOn ? <Badge tone="purple" dot>활성</Badge> : <Badge tone="default">비활성</Badge>}
     >
