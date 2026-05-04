@@ -5,6 +5,16 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { ALL_STRATEGIES } from "./strategies.js";
 import { THEME_TOKENS } from "./ui/theme.jsx";
 import { useIsMobile } from "./ui/useBreakpoint.jsx";
+import { MetricInfo } from "./ui/primitives.jsx";
+
+// 어려운 금융 지표 풀이
+const METRIC_HINTS = {
+  cumReturn: "투자 시작부터 지금까지 누적 수익률",
+  sharpe: "수익이 얼마나 안정적인지 점수. 1.0 이상 양호, 2.0 이상 매우 우수.",
+  maxDD: "지금까지 가장 크게 잃었던 비율. 작을수록 좋아요.",
+  winRate: "전체 거래 중 이긴 비율. 50%만 넘어도 손익비가 좋으면 수익.",
+  avgReturn: "하루 평균 수익률",
+};
 
 // ★ 디자인 토큰 SSOT — 다크 전용 패널
 const C = THEME_TOKENS.dark;
@@ -946,16 +956,18 @@ export default function QuantPortfolio({ theme = "dark" }) {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(90px, 1fr))", gap: isMobile ? "4px" : "6px" }}>
             {[
-              { label: "누적 수익률", value: `${s.cumReturn >= 0 ? "+" : ""}${s.cumReturn}%`, color: s.cumReturn >= 0 ? C.green : C.red },
-              { label: "샤프 비율", value: s.sharpe, color: s.sharpe > 1 ? C.green : s.sharpe > 0 ? C.yellow : C.red },
-              { label: "MDD", value: `${s.maxDD}%`, color: C.red },
-              { label: "승률", value: `${s.winRate}%`, color: s.winRate >= 55 ? C.green : C.yellow },
-              { label: "일평균", value: `${s.avgReturn >= 0 ? "+" : ""}${s.avgReturn}%`, color: s.avgReturn >= 0 ? C.green : C.red },
-              { label: "종목 수", value: `${s.validStocks}/${s.portfolio.length}`, color: C.blue },
-              { label: "실거래 수", value: s.tradeHistory.length, color: C.purple },
+              { label: "누적 수익률", value: `${s.cumReturn >= 0 ? "+" : ""}${s.cumReturn}%`, color: s.cumReturn >= 0 ? C.green : C.red, hint: METRIC_HINTS.cumReturn },
+              { label: "안정성 점수", value: s.sharpe, color: s.sharpe > 1 ? C.green : s.sharpe > 0 ? C.yellow : C.red, hint: METRIC_HINTS.sharpe },
+              { label: "MDD", value: `${s.maxDD}%`, color: C.red, hint: METRIC_HINTS.maxDD },
+              { label: "승률", value: `${s.winRate}%`, color: s.winRate >= 55 ? C.green : C.yellow, hint: METRIC_HINTS.winRate },
+              { label: "일평균", value: `${s.avgReturn >= 0 ? "+" : ""}${s.avgReturn}%`, color: s.avgReturn >= 0 ? C.green : C.red, hint: METRIC_HINTS.avgReturn },
+              { label: "종목 수", value: `${s.validStocks}/${s.portfolio.length}`, color: C.blue, hint: "유효 종목 / 전체 종목" },
+              { label: "실거래 수", value: s.tradeHistory.length, color: C.purple, hint: "지금까지 발생한 거래 횟수" },
             ].map((m, i) => (
               <div key={i} style={{ background: C.card2, borderRadius: "8px", padding: "8px 6px", textAlign: "center" }}>
-                <div style={{ fontSize: "12px", color: C.text3, marginBottom: "2px" }}>{m.label}</div>
+                <div style={{ fontSize: "12px", color: C.text3, marginBottom: "2px", display: "flex", justifyContent: "center" }}>
+                  <MetricInfo label={m.label} hint={m.hint} side="top" labelStyle={{ color: C.text3 }} />
+                </div>
                 <div style={{ fontWeight: 800, fontSize: "18px", color: m.color }}>{m.value}</div>
               </div>
             ))}
@@ -1214,7 +1226,7 @@ export default function QuantPortfolio({ theme = "dark" }) {
           background: C.card2, color: C.text2, border: `1px solid ${C.border2}`, minHeight: isMobile ? "40px" : "auto",
         }}>
           <option value="return">수익률순</option>
-          <option value="sharpe">샤프비율순</option>
+          <option value="sharpe">안정성순</option>
           <option value="name">이름순</option>
         </select>
       </div>
@@ -1248,7 +1260,7 @@ export default function QuantPortfolio({ theme = "dark" }) {
             </div>
 
             <div style={{ display: "flex", gap: "10px", fontSize: "14px", color: C.text3, marginBottom: "8px" }}>
-              <span>샤프 <b style={{ color: s.sharpe > 1 ? C.green : C.text2 }}>{s.sharpe}</b></span>
+              <span>안정성 <b style={{ color: s.sharpe > 1 ? C.green : C.text2 }}>{s.sharpe}</b></span>
               <span>MDD <b style={{ color: C.red }}>{s.maxDD}%</b></span>
               <span>승률 <b style={{ color: s.winRate >= 55 ? C.green : C.text2 }}>{s.winRate}%</b></span>
             </div>

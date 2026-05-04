@@ -7,6 +7,17 @@ import { useLanguage } from "./i18n/LanguageContext.jsx";
 import { supabase } from "./supabaseClient.js";
 import { THEME_TOKENS } from "./ui/theme.jsx";
 import { useIsMobile } from "./ui/useBreakpoint.jsx";
+import { MetricInfo } from "./ui/primitives.jsx";
+
+// 어려운 금융 지표 풀이 (한국어 입문자 친화 카피)
+const METRIC_HINTS = {
+  MDD: "지금까지 가장 크게 잃었던 비율. 5%면 한 번에 5% 손실 본 적 있다는 뜻. 작을수록 좋아요.",
+  Sharpe: "수익이 얼마나 안정적인지 점수. 1.0 이상이면 양호, 2.0 이상이면 매우 우수.",
+  안정성: "수익이 얼마나 안정적인지 점수 (Sharpe). 1.0 이상이면 양호, 2.0 이상이면 매우 우수.",
+  승률: "전체 거래 중 이긴 비율. 50%만 넘어도 손익비가 좋으면 수익이 됩니다.",
+  손익비: "이긴 거래 평균 이익 ÷ 진 거래 평균 손실. 1.5 이상이면 양호.",
+  RR: "이긴 거래 평균 이익 ÷ 진 거래 평균 손실 (손익비). 1.5 이상이면 양호.",
+};
 
 // ── 에쿼티 커브 생성 (전략 파라미터 기반) ──
 function generateEquityCurve(bot, months = 12) {
@@ -984,13 +995,15 @@ function ActiveBotCarousel({ activeBots, allBotPerf, onSelectBot, onStopBot, onA
               {/* 미니 지표 — 모바일 2분할, 데스크탑 4분할 (이전: 모바일도 4분할 → 360px 셀 폭 70px 줄바꿈) */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                 {[
-                  { label: "투입", value: `$${allocation >= 1000 ? (allocation/1000).toFixed(1)+"k" : allocation.toLocaleString()}` },
-                  { label: "MDD", value: kvMDD > 0 ? `${kvMDD.toFixed(1)}%` : "--" },
-                  { label: "승률", value: kvTrades > 0 ? `${(kvWinCount/kvTrades*100).toFixed(0)}%` : "--" },
-                  { label: "승/패", value: `${kvWinCount}/${kvTrades - kvWinCount}` },
+                  { label: "투입", value: `$${allocation >= 1000 ? (allocation/1000).toFixed(1)+"k" : allocation.toLocaleString()}`, hint: "이 봇에 배정한 금액" },
+                  { label: "MDD", value: kvMDD > 0 ? `${kvMDD.toFixed(1)}%` : "--", hint: METRIC_HINTS.MDD },
+                  { label: "승률", value: kvTrades > 0 ? `${(kvWinCount/kvTrades*100).toFixed(0)}%` : "--", hint: METRIC_HINTS.승률 },
+                  { label: "승/패", value: `${kvWinCount}/${kvTrades - kvWinCount}`, hint: "이긴 거래 / 진 거래 횟수" },
                 ].map((m, i) => (
                   <div key={i} className="p-1.5 rounded text-center" style={{ background: c.card2 }}>
-                    <div className="text-[12px]" style={{ color: c.text3 }}>{m.label}</div>
+                    <div className="text-[12px] flex items-center justify-center" style={{ color: c.text3 }}>
+                      <MetricInfo label={m.label} hint={m.hint} side="top" labelStyle={{ color: c.text3 }} />
+                    </div>
                     <div className="text-sm font-bold" style={{ color: c.text1 }}>{m.value}</div>
                   </div>
                 ))}
@@ -1382,13 +1395,15 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
               {/* 미니 지표 — 모바일 2분할, 데스크탑 4분할 */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                 {[
-                  { label: "투입", value: `$${allocation >= 1000 ? (allocation/1000).toFixed(1)+"k" : allocation.toLocaleString()}`, color: c.text1 },
-                  { label: "MDD", value: kvMDD > 0 ? `${kvMDD.toFixed(1)}%` : "--", color: kvMDD > 10 ? c.red : kvMDD > 5 ? c.yellow : c.green },
-                  { label: "승률", value: kvTrades > 0 ? `${(kvWinCount/kvTrades*100).toFixed(0)}%` : "--", color: c.text1 },
-                  { label: "승/패", value: `${kvWinCount}/${kvTrades - kvWinCount}`, color: c.text1 },
+                  { label: "투입", value: `$${allocation >= 1000 ? (allocation/1000).toFixed(1)+"k" : allocation.toLocaleString()}`, color: c.text1, hint: "이 봇에 배정한 금액" },
+                  { label: "MDD", value: kvMDD > 0 ? `${kvMDD.toFixed(1)}%` : "--", color: kvMDD > 10 ? c.red : kvMDD > 5 ? c.yellow : c.green, hint: METRIC_HINTS.MDD },
+                  { label: "승률", value: kvTrades > 0 ? `${(kvWinCount/kvTrades*100).toFixed(0)}%` : "--", color: c.text1, hint: METRIC_HINTS.승률 },
+                  { label: "승/패", value: `${kvWinCount}/${kvTrades - kvWinCount}`, color: c.text1, hint: "이긴 거래 / 진 거래 횟수" },
                 ].map((m, i) => (
                   <div key={i} className="p-1.5 rounded text-center" style={{ background: c.card2 }}>
-                    <div className="text-[12px]" style={{ color: c.text3 }}>{m.label}</div>
+                    <div className="text-[12px] flex items-center justify-center" style={{ color: c.text3 }}>
+                      <MetricInfo label={m.label} hint={m.hint} side="top" labelStyle={{ color: c.text3 }} />
+                    </div>
                     <div className="text-sm font-bold" style={{ color: m.color }}>{m.value}</div>
                   </div>
                 ))}
@@ -1626,7 +1641,7 @@ export default function AutoTrading({ theme = "dark", user }) {
     const { bot } = confirmRealTrading;
     // 실전매매 확인 후 배분 모달로 진행
     setPendingBot(bot);
-    setAllocationInput("1000");
+    setAllocationInput("500"); // 안전 권장 — 처음엔 소액 ($500) 부터
     setConfirmRealTrading(null);
   }, [confirmRealTrading]);
 
@@ -1833,13 +1848,22 @@ export default function AutoTrading({ theme = "dark", user }) {
                   </div>
                 ) : null;
               })()}
-              <div style={{ marginBottom: "20px" }}>
+
+              {/* 안전 가이드 — 첫 시작 권장 금액 */}
+              <div style={{
+                padding: "10px 12px", background: `${c.green}08`, borderRadius: "8px",
+                border: `1px solid ${c.green}20`, marginBottom: "12px", fontSize: "13px", color: c.text2, lineHeight: 1.55,
+              }}>
+                💡 <strong>처음 시작</strong>은 잃어도 괜찮은 소액 ($100~500) 으로 시작하세요. 실제 봇 성과를 본 뒤 추가 투입할 수 있어요.
+              </div>
+
+              <div style={{ marginBottom: "12px" }}>
                 <label style={{ fontSize: isMobile ? "14px" : "15px", color: c.text2, display: "block", marginBottom: "6px" }}>투입 금액 (USD)</label>
                 <input
                   type="number"
                   value={allocationInput}
                   onChange={e => setAllocationInput(e.target.value)}
-                  placeholder="예: 5000"
+                  placeholder="예: 500"
                   style={{
                     width: "100%", padding: "12px", borderRadius: "8px", border: `1px solid ${c.border}`,
                     background: c.card2, color: c.text1, fontSize: isMobile ? "16px" : "18px", fontWeight: 600, boxSizing: "border-box", minHeight: "44px",
@@ -1847,7 +1871,54 @@ export default function AutoTrading({ theme = "dark", user }) {
                   onKeyDown={e => e.key === "Enter" && handleConfirmAllocation()}
                   autoFocus
                 />
+                {/* 빠른 선택 칩 */}
+                <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
+                  {[100, 500, 1000, 5000].map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setAllocationInput(String(v))}
+                      style={{
+                        padding: "6px 12px", borderRadius: "999px", fontSize: "13px", fontWeight: 600,
+                        background: allocationInput === String(v) ? c.blue : `${c.blue}10`,
+                        color: allocationInput === String(v) ? "#fff" : c.blue,
+                        border: `1px solid ${c.blue}30`, cursor: "pointer", minHeight: "32px",
+                      }}
+                    >
+                      ${v.toLocaleString()}
+                    </button>
+                  ))}
+                </div>
               </div>
+
+              {/* 예상 최대 손실 시뮬 */}
+              {(() => {
+                const amt = parseInt(allocationInput, 10) || 0;
+                if (amt <= 0) return null;
+                // 봇의 MDD (%, 문자열) → 숫자
+                const mddPct = parseInt(pendingBot.stats?.mdd || "20", 10) || 20;
+                const worstLoss = Math.round(amt * mddPct / 100);
+                const conservativeLoss = Math.round(amt * 0.05); // 일반적 5%
+                return (
+                  <div style={{
+                    padding: "12px 14px", background: `${c.yellow}08`, borderRadius: "8px",
+                    border: `1px solid ${c.yellow}25`, marginBottom: "16px", fontSize: "13px", color: c.text2, lineHeight: 1.6,
+                  }}>
+                    <div style={{ fontWeight: 700, color: c.text1, marginBottom: "6px", fontSize: "14px" }}>📊 손실 시뮬레이션</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                      <span>일반 변동 (-5%)</span>
+                      <strong style={{ color: c.yellow }}>−${conservativeLoss.toLocaleString()}</strong>
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between" }}>
+                      <span>역사 최악 케이스 (-{mddPct}%)</span>
+                      <strong style={{ color: c.red }}>−${worstLoss.toLocaleString()}</strong>
+                    </div>
+                    <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: `1px solid ${c.border}30`, fontSize: "12px", color: c.text3 }}>
+                      이 봇의 과거 최대 낙폭 ({mddPct}%) 가 다시 나오면 위 금액만큼 손실 가능. 잃어도 괜찮은 금액인지 확인해주세요.
+                    </div>
+                  </div>
+                );
+              })()}
               <div style={{ display: "flex", gap: "8px" }}>
                 <button onClick={() => setPendingBot(null)} style={{
                   flex: 1, padding: "12px 16px", borderRadius: "8px", fontSize: isMobile ? "14px" : "16px", fontWeight: 600,

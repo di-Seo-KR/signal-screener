@@ -7318,7 +7318,8 @@ function AppInner() {
             <div className="home-left card-stagger" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
             {/* ── 개인화 인사 + 스트릭 ─── */}
-            {(() => {
+            {/* ★ 비로그인 유저는 인사 카드 스킵 — 빈 그리팅 어색함 해소 + 헤로/추천이 첫 카드로 */}
+            {user && (() => {
               const hour = new Date().getHours();
               const greetText = hour < 12 ? (t("tabs.home.goodMorning") || "좋은 아침이에요") : hour < 18 ? (t("tabs.home.goodAfternoon") || "좋은 오후에요") : (t("tabs.home.goodEvening") || "좋은 저녁이에요");
               const displayName = user?.user_metadata?.nickname || user?.email?.split("@")[0] || "";
