@@ -332,11 +332,23 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   //   "strict" 추세장 (avgHurst > 0.55) 아니면 모멘텀 모두 차단
   const regimeFilterMode = process.env.ZEPTA_REGIME_FILTER_MODE || "log";
   let regimeBlock = null; // 차단 결정 (null = 통과)
+  let regimeSnapshot = null; // entry 에 첨부할 스냅샷 (분석용)
   try {
     const kvR = await getKv();
     const regime = await kvR.get("di:market:regime");
     if (regime && Number.isFinite(regime.avgHurst)) {
       const h = regime.avgHurst;
+      // ★ entry 시점 regime 스냅샷 — shadow-ledger / live plan KV 에 첨부.
+      //   1주 후 daily-standup 이 "어떤 Hurst 구간에서 들어간 거래가 이겼는지"
+      //   bucket 분석 → soft/strict 모드 승급 결정의 직접 근거.
+      regimeSnapshot = {
+        mode: regimeFilterMode,
+        avgHurst: Number(h.toFixed(3)),
+        regime: regime.regime || null,         // trending | transitional | mean_reverting
+        efficiency: regime.efficiency || null, // directional | mixed | noisy
+        avgER: Number.isFinite(regime.avgER) ? Number(regime.avgER.toFixed(3)) : null,
+        capturedAt: regime.t || Date.now(),
+      };
       const tag = `regime: avgHurst=${h.toFixed(2)} ${regime.regime || ""}`;
       if (regimeFilterMode === "off" || regimeFilterMode === "log") {
         S(`${tag} (mode=${regimeFilterMode}, no block)`);
@@ -467,6 +479,7 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       entryPrice: price,
       feeBps: 8, // 왕복 taker 0.08%
       slippageBps: 5, // 왕복 예상 슬리피지 0.05%
+      regime: regimeSnapshot, // ★ 진입 시점 시장 레짐 스냅샷 (Hurst bucket 분석용)
     };
     await appendLog(userId, `di:real:user:${userId}:shadow-ledger`, entry, 500);
     S(`shadow: ledger entry ${entry.id}`);
@@ -516,6 +529,7 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
         currentSlPrice: plan.plan.slPrice,
         highWater: plan.plan.entryPrice,
         strategyFamily: plan.plan.strategyFamily,
+        regime: regimeSnapshot, // ★ 진입 시점 시장 레짐 스냅샷 (Hurst bucket 분석용)
       });
       S(`plan persisted to ${planKey}`);
       } // end else (no existing plan)
