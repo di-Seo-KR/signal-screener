@@ -6,32 +6,12 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useLanguage } from "./i18n/LanguageContext.jsx";
 import { ALL_STRATEGIES, runBacktest, diagnoseMarket, strategyHurst, strategyVolCluster, strategyEfficiency, strategyMomDecay, strategyInfoFlow, strategyFundingRate, strategyMicrostructure, strategyEntropy } from "./strategies.js";
+import { THEME_TOKENS } from "./ui/theme.jsx";
 
-// Zepta tokens.css 와 동기화
-const DARK_C = {
-  bg: "#070B14", card: "#101828", card2: "#161F33",
-  border: "#1E2A42", border2: "#2A3A58",
-  blue: "#3B82F6", blueL: "#60A5FA", blueBg: "#0F1F3D",
-  red: "#FF4D64", redBg: "#2C1520",
-  green: "#10D884", greenBg: "#0B2E1E",
-  yellow: "#FFB020", yellowBg: "#2B2100",
-  purple: "#9B6FFF", purpleBg: "#201840",
-  orange: "#FF6B2C", orangeBg: "#2A1A0A",
-  text1: "#F1F5FB", text2: "#9AA7BD", text3: "#64728C",
-  isDark: true,
-};
-const LIGHT_C = {
-  bg: "#F6F8FC", card: "#FFFFFF", card2: "#F1F4F9",
-  border: "#E2E6EF", border2: "#D0D6E1",
-  blue: "#2563EB", blueL: "#3B82F6", blueBg: "#E8F1FE",
-  red: "#E11D48", redBg: "#FFF0F1",
-  green: "#059B64", greenBg: "#EDFBF2",
-  yellow: "#D08300", yellowBg: "#FFF9EC",
-  purple: "#7C3AED", purpleBg: "#F0EDFF",
-  orange: "#E8590C", orangeBg: "#FFF7ED",
-  text1: "#0A1224", text2: "#4C5870", text3: "#7D889D",
-  isDark: false,
-};
+// ★ 디자인 토큰 SSOT — src/ui/theme.jsx 의 THEME_TOKENS 단일 진실 소스 사용.
+//   이전엔 이 파일이 DARK_C/LIGHT_C 를 자체 정의 (9파일 중복).
+const DARK_C = THEME_TOKENS.dark;
+const LIGHT_C = THEME_TOKENS.light;
 
 // 지원 크립토 자산
 // KV 가상 포트폴리오에서 Binance USDT 쌍으로 거래됨
