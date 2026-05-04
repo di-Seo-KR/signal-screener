@@ -165,7 +165,7 @@ export default function BinanceConnect({ userId, onConnected, theme = "dark", us
                 바이낸스 연결됨
                 {status.testnet && (
                   <span style={{
-                    marginLeft: "8px", fontSize: "11px", padding: "2px 8px",
+                    marginLeft: "8px", fontSize: "12px", padding: "2px 8px",
                     background: `${c.yellow}20`, color: c.yellow, borderRadius: "999px",
                     fontWeight: 700,
                   }}>TESTNET</span>
@@ -184,7 +184,7 @@ export default function BinanceConnect({ userId, onConnected, theme = "dark", us
               padding: "8px 14px", minHeight: "36px",
               background: c.card2, color: c.text2,
               border: `1px solid ${c.border}`, borderRadius: "8px",
-              fontSize: "13px", fontWeight: 600, cursor: busy ? "default" : "pointer",
+              fontSize: "14px", fontWeight: 600, cursor: busy ? "default" : "pointer",
             }}
           >연결 해제</button>
         </div>
@@ -291,7 +291,7 @@ export default function BinanceConnect({ userId, onConnected, theme = "dark", us
             padding: "10px 12px",
             background: c.card2, border: `1px solid ${c.border}`,
             borderRadius: "8px", cursor: "pointer",
-            fontSize: "13px", color: c.text2,
+            fontSize: "14px", color: c.text2,
           }}>
             <input
               type="checkbox"
@@ -318,7 +318,7 @@ export default function BinanceConnect({ userId, onConnected, theme = "dark", us
             <div style={{
               padding: "10px 12px",
               background: `${c.red}10`, border: `1px solid ${c.red}30`,
-              borderRadius: "8px", fontSize: "13px", color: c.red,
+              borderRadius: "8px", fontSize: "14px", color: c.red,
               whiteSpace: "pre-line",
             }}>{error}</div>
           )}
@@ -359,7 +359,7 @@ function Stat({ c, label, value, ok }) {
       padding: "10px 12px", background: c.card2,
       border: `1px solid ${c.border}40`, borderRadius: "10px",
     }}>
-      <div style={{ fontSize: "11px", color: c.text3, marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>
+      <div style={{ fontSize: "12px", color: c.text3, marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>
       <div style={{ fontSize: "14px", fontWeight: 700, color, letterSpacing: "-0.01em" }}>{value}</div>
     </div>
   );

@@ -81,6 +81,27 @@
                  "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
   --z-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
+  /* ── Font size 토큰 (Tailwind text-* 동기화) ── */
+  --z-font-xs:    12px;  /* 캡션·라벨 (모바일 가독성 최소) */
+  --z-font-sm:    14px;  /* 보조 텍스트 */
+  --z-font-base:  16px;  /* 본문 */
+  --z-font-lg:    18px;  /* 강조 텍스트 */
+  --z-font-xl:    20px;  /* 카드 제목 */
+  --z-font-2xl:   24px;  /* 섹션 제목 */
+  --z-font-3xl:   30px;  /* 페이지 제목 */
+  --z-font-4xl:   36px;
+  --z-font-display: 48px; /* 큰 숫자 (잔액 등) */
+
+  /* ── Radius 토큰 ── */
+  --z-radius-xs:  4px;   /* 작은 칩·태그 */
+  --z-radius-sm:  6px;
+  --z-radius-md:  8px;   /* 표준 카드·버튼 */
+  --z-radius-lg:  12px;  /* 큰 카드·모달 */
+  --z-radius-xl:  16px;  /* 페이지 섹션 카드 */
+  --z-radius-2xl: 20px;
+  --z-radius-3xl: 24px;
+  --z-radius-full: 9999px;
+
   /* ── Motion ── */
   --z-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --z-dur-fast: 120ms;

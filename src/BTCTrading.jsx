@@ -520,12 +520,12 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
   const stat = (label, val, color, sub) => (
     <div style={{ flex: 1, minWidth: "110px", padding: "12px 14px", borderRadius: "12px", background: C.card2, border: `1px solid ${C.border}` }}>
       <div style={{ fontSize: "14px", color: C.text3, marginBottom: "3px", fontWeight: 500 }}>{label}</div>
-      <div style={{ fontSize: "17px", fontWeight: 800, color: color || C.text1 }}>{val}</div>
-      {sub && <div style={{ fontSize: "13px", color: C.text3, marginTop: "2px" }}>{sub}</div>}
+      <div style={{ fontSize: "18px", fontWeight: 800, color: color || C.text1 }}>{val}</div>
+      {sub && <div style={{ fontSize: "14px", color: C.text3, marginTop: "2px" }}>{sub}</div>}
     </div>
   );
   const badge = (text, bg, color) => (
-    <span style={{ fontSize: isMobile ? "11px" : "13px", padding: isMobile ? "2px 5px" : "2px 7px", borderRadius: "5px", background: bg, color, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0 }}>{text}</span>
+    <span style={{ fontSize: isMobile ? "12px" : "14px", padding: isMobile ? "2px 5px" : "2px 7px", borderRadius: "6px", background: bg, color, fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0 }}>{text}</span>
   );
 
   // ── 탭 퍼시스턴스 ──
@@ -598,7 +598,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
               <span style={{
                 background: subTab === id ? C.blue : C.border2,
                 color: subTab === id ? "#fff" : C.text3,
-                fontSize: "13px", fontWeight: 700, borderRadius: "50%",
+                fontSize: "14px", fontWeight: 700, borderRadius: "50%",
                 width: "20px", height: "20px",
                 display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
               }}>
@@ -631,7 +631,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           border: `1px solid ${C.border}`, borderRadius: "16px", padding: isMobile ? "18px 16px" : "28px 32px",
         }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-            <div style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, fontWeight: 500, whiteSpace: "nowrap", flexShrink: 0 }}>배분 금액</div>
+            <div style={{ fontSize: isMobile ? "14px" : "15px", color: C.text3, fontWeight: 500, whiteSpace: "nowrap", flexShrink: 0 }}>배분 금액</div>
             <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "5px" : "8px", flexWrap: "nowrap" }}>
               {badge("알파 v2", C.orangeBg, C.orange)}
               {autoMode && badge("자동매매 ON", C.greenBg, C.green)}
@@ -674,7 +674,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                   <span style={{
                     position: "absolute",
                     top: "2px",
-                    left: autoMode ? (isMobile ? "18px" : "22px") : "2px",
+                    left: autoMode ? (isMobile ? "18px" : "24px") : "2px",
                     width: "18px",
                     height: "18px",
                     borderRadius: "50%",
@@ -693,23 +693,23 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
             {fmtUSD2(initCapital)}
           </div>
           <div style={{
-            display: "flex", alignItems: "baseline", gap: isMobile ? "6px" : "12px", fontSize: isMobile ? "13px" : "15px", fontWeight: 600,
+            display: "flex", alignItems: "baseline", gap: isMobile ? "6px" : "12px", fontSize: isMobile ? "14px" : "15px", fontWeight: 600,
             color: dayPL >= 0 ? C.green : C.red, marginBottom: "16px", flexWrap: "nowrap",
           }}>
             <span style={{ whiteSpace: "nowrap" }}>{dayPL >= 0 ? "+" : ""}{dayPL.toFixed(2)} USD</span>
             <span style={{ fontSize: isMobile ? "12px" : "14px", whiteSpace: "nowrap" }}>({dayPLPct >= 0 ? "+" : ""}{dayPLPct.toFixed(2)}%)</span>
-            <span style={{ fontSize: isMobile ? "11px" : "13px", color: C.text3, whiteSpace: "nowrap" }}>오늘</span>
+            <span style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, whiteSpace: "nowrap" }}>오늘</span>
           </div>
 
           {/* 자산 구성 */}
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
             <div style={{ padding: isMobile ? "8px 10px" : "10px 14px", borderRadius: "10px", background: C.card2, border: `1px solid ${C.border}` }}>
-              <div style={{ fontSize: isMobile ? "12px" : "13px", color: C.text3, marginBottom: "2px" }}>현금</div>
-              <div style={{ fontSize: isMobile ? "15px" : "17px", fontWeight: 700, color: C.text1 }}>{fmtUSD2(cash)}</div>
+              <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginBottom: "2px" }}>현금</div>
+              <div style={{ fontSize: isMobile ? "15px" : "18px", fontWeight: 700, color: C.text1 }}>{fmtUSD2(cash)}</div>
             </div>
             <div style={{ padding: isMobile ? "8px 10px" : "10px 14px", borderRadius: "10px", background: C.card2, border: `1px solid ${C.border}` }}>
-              <div style={{ fontSize: isMobile ? "12px" : "13px", color: C.text3, marginBottom: "2px" }}>포지션</div>
-              <div style={{ fontSize: isMobile ? "15px" : "17px", fontWeight: 700, color: C.text1 }}>{cryptoPositions.length}개</div>
+              <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginBottom: "2px" }}>포지션</div>
+              <div style={{ fontSize: isMobile ? "15px" : "18px", fontWeight: 700, color: C.text1 }}>{cryptoPositions.length}개</div>
             </div>
           </div>
 
@@ -725,7 +725,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
             ].map((m, i) => (
               <div key={i} style={{ background: C.bg, borderRadius: "8px", padding: isMobile ? "6px 4px" : "8px 10px", textAlign: "center" }}>
                 <div style={{ fontSize: isMobile ? "10px" : "12px", color: C.text3, marginBottom: "2px", fontWeight: 600, whiteSpace: "nowrap" }}>{m.label}</div>
-                <div style={{ fontSize: isMobile ? "13px" : "14px", fontWeight: 800, color: m.color, whiteSpace: "nowrap" }}>{m.value}</div>
+                <div style={{ fontSize: isMobile ? "14px" : "14px", fontWeight: 800, color: m.color, whiteSpace: "nowrap" }}>{m.value}</div>
               </div>
             ))}
           </div>
@@ -846,17 +846,17 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
               }}>
                 {/* ── Performance 카드 (좌측) ── */}
                 <div style={{ ...card, padding: isMobile ? "16px" : "24px" }}>
-                  <div style={{ fontWeight: 700, fontSize: isMobile ? "15px" : "17px", color: C.text1, marginBottom: isMobile ? "12px" : "16px" }}>Performance</div>
+                  <div style={{ fontWeight: 700, fontSize: isMobile ? "15px" : "18px", color: C.text1, marginBottom: isMobile ? "12px" : "16px" }}>Performance</div>
 
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-                    <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3 }}>ROI</span>
-                    <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3 }}>PnL</span>
+                    <span style={{ fontSize: isMobile ? "14px" : "15px", color: C.text3 }}>ROI</span>
+                    <span style={{ fontSize: isMobile ? "14px" : "15px", color: C.text3 }}>PnL</span>
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: isMobile ? "14px" : "20px" }}>
-                    <span style={{ fontSize: isMobile ? "18px" : "22px", fontWeight: 700, color: kvROI >= 0 ? C.green : C.red }}>
+                    <span style={{ fontSize: isMobile ? "18px" : "24px", fontWeight: 700, color: kvROI >= 0 ? C.green : C.red }}>
                       {kvROI >= 0 ? "+" : ""}{kvROI.toFixed(2)}%
                     </span>
-                    <span style={{ fontSize: isMobile ? "18px" : "22px", fontWeight: 700, color: kvTotalPL >= 0 ? C.green : C.red }}>
+                    <span style={{ fontSize: isMobile ? "18px" : "24px", fontWeight: 700, color: kvTotalPL >= 0 ? C.green : C.red }}>
                       {kvTotalPL >= 0 ? "+" : ""}{kvTotalPL.toFixed(2)}
                     </span>
                   </div>
@@ -887,13 +887,13 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                   <div style={{ ...card, padding: "24px", flex: 1 }}>
                     <div style={{ display: "flex", gap: "16px", marginBottom: "16px" }}>
                       <span onClick={() => setDetailChartTab("roi")} style={{
-                        fontWeight: 700, fontSize: "17px", cursor: "pointer",
+                        fontWeight: 700, fontSize: "18px", cursor: "pointer",
                         color: detailChartTab === "roi" ? C.text1 : C.text3,
                         borderBottom: detailChartTab === "roi" ? `2px solid ${C.blue}` : "2px solid transparent",
                         paddingBottom: "4px",
                       }}>ROI</span>
                       <span onClick={() => setDetailChartTab("pnl")} style={{
-                        fontWeight: 700, fontSize: "17px", cursor: "pointer",
+                        fontWeight: 700, fontSize: "18px", cursor: "pointer",
                         color: detailChartTab === "pnl" ? C.text1 : C.text3,
                         borderBottom: detailChartTab === "pnl" ? `2px solid ${C.blue}` : "2px solid transparent",
                         paddingBottom: "4px",
@@ -1026,7 +1026,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                               padding: "6px 12px", pointerEvents: "none", zIndex: 10, whiteSpace: "nowrap",
                               boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
                             }}>
-                              <div style={{ fontSize: "13px", fontWeight: 700, color: clr }}>
+                              <div style={{ fontSize: "14px", fontWeight: 700, color: clr }}>
                                 {isPnl
                                   ? `$${activeCurve[chartHover.idx].toFixed(2)}`
                                   : (() => {
@@ -1034,7 +1034,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                                       return `${r >= 0 ? "+" : ""}${r.toFixed(2)}%`;
                                     })()}
                               </div>
-                              <div style={{ fontSize: "11px", color: C.text3 }}>
+                              <div style={{ fontSize: "12px", color: C.text3 }}>
                                 {hasDayLabels && dayLabels[chartHover.idx]
                                   ? (() => {
                                       const m = dayLabels[chartHover.idx].match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -1064,7 +1064,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "12px" : "16px" }}>
                     {/* 봇 개요 */}
                     <div style={{ ...card, padding: "24px" }}>
-                      <div style={{ fontWeight: 700, fontSize: "17px", color: C.text1, marginBottom: "16px" }}>봇 개요</div>
+                      <div style={{ fontWeight: 700, fontSize: "18px", color: C.text1, marginBottom: "16px" }}>봇 개요</div>
                       {[
                         { label: "투입 금액 (AUM)", value: `$${(botAllocation || 0).toLocaleString()}` },
                         { label: "예상 수익률", value: botPreset?.expectedReturn || "--" },
@@ -1084,7 +1084,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
 
                     {/* 자산 배분 (도넛) */}
                     <div style={{ ...card, padding: "24px" }}>
-                      <div style={{ fontWeight: 700, fontSize: "17px", color: C.text1, marginBottom: "16px" }}>자산 배분</div>
+                      <div style={{ fontWeight: 700, fontSize: "18px", color: C.text1, marginBottom: "16px" }}>자산 배분</div>
                       <div style={{ display: "flex", gap: "20px", alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
                         {/* SVG 도넛 */}
                         {(() => {
@@ -1122,15 +1122,15 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                             const barColor = isCash ? `${C.text3}60` : chartColors[i % chartColors.length];
                             return (
                               <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                                <div style={{ width: "14px", height: "4px", borderRadius: "2px", background: barColor }} />
+                                <div style={{ width: "14px", height: "4px", borderRadius: "4px", background: barColor }} />
                                 <span style={{ fontSize: "14px", fontWeight: 600, color: isCash ? C.text3 : C.text1 }}>{a.name}</span>
-                                <span style={{ fontSize: "13px", color: C.text3, marginLeft: "auto" }}>
+                                <span style={{ fontSize: "14px", color: C.text3, marginLeft: "auto" }}>
                                   {a.value >= 1 ? `$${a.value.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : ""} {pct}%
                                 </span>
                               </div>
                             );
                           })}
-                          {finalAssetData.length > 8 && <span style={{ fontSize: "13px", color: C.text3 }}>외 {finalAssetData.length - 8}개</span>}
+                          {finalAssetData.length > 8 && <span style={{ fontSize: "14px", color: C.text3 }}>외 {finalAssetData.length - 8}개</span>}
                         </div>
                       </div>
                     </div>
@@ -1150,11 +1150,11 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <span style={{ fontSize: "15px", fontWeight: 700, color: C.text1 }}>모니터링 종목</span>
                   {botPreset && (
-                    <span style={{ fontSize: "13px", padding: "2px 8px", borderRadius: "8px",
+                    <span style={{ fontSize: "14px", padding: "2px 8px", borderRadius: "8px",
                       background: `${C.blue}20`, color: C.blue, fontWeight: 600 }}>{botPreset.name}</span>
                   )}
                 </div>
-                {lastUpdate && <span style={{ fontSize: "13px", color: C.text3 }}>{lastUpdate.toLocaleTimeString("ko-KR")}</span>}
+                {lastUpdate && <span style={{ fontSize: "14px", color: C.text3 }}>{lastUpdate.toLocaleTimeString("ko-KR")}</span>}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 {getBotAssets(botPreset?.id).map(a => {
@@ -1169,11 +1169,11 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                       <span style={{ fontSize: "18px", width: "24px", textAlign: "center" }}>{a.icon}</span>
                       <div style={{ flex: 1 }}>
                         <span style={{ fontSize: "14px", fontWeight: 700, color: C.text1 }}>{a.name}</span>
-                        {p?.volume24h && <div style={{ fontSize: "13px", color: C.text3 }}>Vol ${(p.volume24h / 1e9).toFixed(1)}B</div>}
+                        {p?.volume24h && <div style={{ fontSize: "14px", color: C.text3 }}>Vol ${(p.volume24h / 1e9).toFixed(1)}B</div>}
                       </div>
                       <div style={{ textAlign: "right" }}>
                         <div style={{ fontSize: "15px", fontWeight: 800, color: C.text1 }}>{p ? `$${p.price?.toLocaleString()}` : "..."}</div>
-                        {p && <div style={{ fontSize: "13px", fontWeight: 700, color: isUp ? C.green : C.red }}>{isUp ? "+" : ""}{p.change24h?.toFixed(2)}%</div>}
+                        {p && <div style={{ fontSize: "14px", fontWeight: 700, color: isUp ? C.green : C.red }}>{isUp ? "+" : ""}{p.change24h?.toFixed(2)}%</div>}
                       </div>
                     </div>
                   );
@@ -1207,7 +1207,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                           <span style={{ fontSize: "18px" }}>{assetIcon}</span>
                           <div style={{ flex: 1 }}>
                             <div style={{ fontSize: "15px", fontWeight: 700, color: C.text1 }}>{p.symbol || "Unknown"}</div>
-                            <div style={{ fontSize: "13px", color: C.text3 }}>
+                            <div style={{ fontSize: "14px", color: C.text3 }}>
                               수량: {qty < 1 ? qty.toFixed(6) : qty.toFixed(2)} · 매수가: ${avgPrice < 1 ? avgPrice.toFixed(6) : avgPrice.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                             </div>
                           </div>
@@ -1317,7 +1317,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                             {s.reason}
                           </div>
                           {showKvTrades && s.pnl != null && (
-                            <div style={{ fontSize: "13px", fontWeight: 600, color: s.pnl >= 0 ? C.green : C.red, marginTop: "2px" }}>
+                            <div style={{ fontSize: "14px", fontWeight: 600, color: s.pnl >= 0 ? C.green : C.red, marginTop: "2px" }}>
                               PnL: {s.pnl >= 0 ? "+" : ""}${s.pnl.toFixed(2)}
                             </div>
                           )}
@@ -1389,7 +1389,7 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
           </>
         )}
 
-        <div style={{ textAlign: "center", padding: "12px", fontSize: "13px", color: C.text3, lineHeight: 1.5 }}>
+        <div style={{ textAlign: "center", padding: "12px", fontSize: "14px", color: C.text3, lineHeight: 1.5 }}>
           ₿ BTC 알파 v2 · 10팩터 멀티스코어링 · Binance 데이터 · KV 가상매매<br/>
           투자 판단은 본인의 책임입니다 · 시뮬레이션 결과가 미래 수익을 보장하지 않습니다
         </div>

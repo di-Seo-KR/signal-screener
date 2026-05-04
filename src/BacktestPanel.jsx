@@ -16,7 +16,7 @@ function MetricCard({ label, value, color, sub }) {
     <div style={{ background: C.card2, borderRadius: "10px", padding: isMobile ? "10px 8px" : "12px", textAlign: "center", minWidth: isMobile ? "auto" : "100px" }}>
       <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginBottom: "4px" }}>{label}</div>
       <div style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 800, color: color || C.text1 }}>{value}</div>
-      {sub && <div style={{ fontSize: isMobile ? "11px" : "13px", color: C.text3, marginTop: "2px" }}>{sub}</div>}
+      {sub && <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginTop: "2px" }}>{sub}</div>}
     </div>
   );
 }
@@ -250,11 +250,11 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
     <div>
       {/* 설정 패널 */}
       <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px" }}>
-        <div style={{ fontWeight: 700, fontSize: "17px", marginBottom: "14px" }}>📊 백테스트 실행</div>
+        <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "14px" }}>📊 백테스트 실행</div>
 
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(180px, 1fr))", gap: "10px", marginBottom: "14px" }}>
           <div>
-            <label style={{ fontSize: isMobile ? "13px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>전략</label>
+            <label style={{ fontSize: isMobile ? "14px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>전략</label>
             <select value={strategyId} onChange={e => setStrategyId(e.target.value)} style={{
               width: "100%", padding: isMobile ? "10px 8px" : "8px 10px", borderRadius: "8px", fontSize: isMobile ? "14px" : "15px",
               background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none", minHeight: isMobile ? "44px" : "auto",
@@ -263,7 +263,7 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
             </select>
           </div>
           <div>
-            <label style={{ fontSize: isMobile ? "13px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>종목 심볼</label>
+            <label style={{ fontSize: isMobile ? "14px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>종목 심볼</label>
             <input value={symbol} onChange={e => setSymbol(e.target.value.toUpperCase())} placeholder="SPY, AAPL, 005930.KS..."
               list="bt-symbol-list"
               style={{
@@ -277,11 +277,11 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
             </datalist>
           </div>
           <div>
-            <label style={{ fontSize: isMobile ? "13px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>타임프레임</label>
+            <label style={{ fontSize: isMobile ? "14px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>타임프레임</label>
             <div style={{ display: "flex", gap: "4px" }}>
               {[{ v: "1d", l: "일봉" }, { v: "1wk", l: "주봉" }].map(t => (
                 <button key={t.v} onClick={() => setTimeframe(t.v)} style={{
-                  flex: 1, padding: isMobile ? "10px 4px" : "8px", borderRadius: "8px", fontSize: isMobile ? "13px" : "14px", fontWeight: 600,
+                  flex: 1, padding: isMobile ? "10px 4px" : "8px", borderRadius: "8px", fontSize: isMobile ? "14px" : "14px", fontWeight: 600,
                   background: timeframe === t.v ? C.blueBg : C.card2, color: timeframe === t.v ? C.blue : C.text3,
                   border: `1px solid ${timeframe === t.v ? C.blue : C.border2}`, cursor: "pointer", minHeight: isMobile ? "44px" : "auto",
                 }}>{t.l}</button>
@@ -289,7 +289,7 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
             </div>
           </div>
           <div>
-            <label style={{ fontSize: isMobile ? "13px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>기간</label>
+            <label style={{ fontSize: isMobile ? "14px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>기간</label>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: "4px" }}>
               {[{ v: "6mo", l: "6개월" }, { v: "1y", l: "1년" }, { v: "2y", l: "2년" }, { v: "5y", l: "5년" }].map(r => (
                 <button key={r.v} onClick={() => setRange(r.v)} style={{
@@ -304,35 +304,35 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
 
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(140px, 1fr))", gap: "10px", marginBottom: "14px" }}>
           <div>
-            <label style={{ fontSize: isMobile ? "13px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>초기 자본 ($)</label>
+            <label style={{ fontSize: isMobile ? "14px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>초기 자본 ($)</label>
             <input type="number" value={capital} onChange={e => setCapital(+e.target.value || 10000)} style={{
               width: "100%", padding: isMobile ? "10px 8px" : "8px 10px", borderRadius: "8px", fontSize: isMobile ? "14px" : "15px",
               background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none", boxSizing: "border-box", minHeight: isMobile ? "44px" : "auto",
             }} />
           </div>
           <div>
-            <label style={{ fontSize: isMobile ? "13px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>손절 (%, 선택)</label>
+            <label style={{ fontSize: isMobile ? "14px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>손절 (%, 선택)</label>
             <input type="number" value={stopLoss} onChange={e => setStopLoss(e.target.value)} placeholder="예: 5" style={{
               width: "100%", padding: isMobile ? "10px 8px" : "8px 10px", borderRadius: "8px", fontSize: isMobile ? "14px" : "15px",
               background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none", boxSizing: "border-box", minHeight: isMobile ? "44px" : "auto",
             }} />
           </div>
           <div>
-            <label style={{ fontSize: isMobile ? "13px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>익절 (%, 선택)</label>
+            <label style={{ fontSize: isMobile ? "14px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>익절 (%, 선택)</label>
             <input type="number" value={takeProfit} onChange={e => setTakeProfit(e.target.value)} placeholder="예: 10" style={{
               width: "100%", padding: isMobile ? "10px 8px" : "8px 10px", borderRadius: "8px", fontSize: isMobile ? "14px" : "15px",
               background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none", boxSizing: "border-box", minHeight: isMobile ? "44px" : "auto",
             }} />
           </div>
           <div>
-            <label style={{ fontSize: isMobile ? "13px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>트레일링 스톱 (%, 선택)</label>
+            <label style={{ fontSize: isMobile ? "14px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>트레일링 스톱 (%, 선택)</label>
             <input type="number" value={trailingStop} onChange={e => setTrailingStop(e.target.value)} placeholder="예: 8" style={{
               width: "100%", padding: isMobile ? "10px 8px" : "8px 10px", borderRadius: "8px", fontSize: isMobile ? "14px" : "15px",
               background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none", boxSizing: "border-box", minHeight: isMobile ? "44px" : "auto",
             }} />
           </div>
           <div>
-            <label style={{ fontSize: isMobile ? "13px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>낙폭 제한 (%, 선택)</label>
+            <label style={{ fontSize: isMobile ? "14px" : "14px", color: C.text3, display: "block", marginBottom: "4px" }}>낙폭 제한 (%, 선택)</label>
             <input type="number" value={maxDDLimit} onChange={e => setMaxDDLimit(e.target.value)} placeholder="예: 15" style={{
               width: "100%", padding: isMobile ? "10px 8px" : "8px 10px", borderRadius: "8px", fontSize: isMobile ? "14px" : "15px",
               background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, outline: "none", boxSizing: "border-box", minHeight: isMobile ? "44px" : "auto",
@@ -355,7 +355,7 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
           {/* 성과 요약 */}
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px", marginBottom: "16px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-              <div style={{ fontWeight: 700, fontSize: "17px" }}>
+              <div style={{ fontWeight: 700, fontSize: "18px" }}>
                 {result.strategyIcon} {result.strategyName} — {result.symbol}
               </div>
               <span style={{
@@ -444,7 +444,7 @@ export default function BacktestPanel({ initialStrategy, initialSymbol }) {
             <div onClick={() => setShowTrades(!showTrades)} style={{
               display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer",
             }}>
-              <div style={{ fontWeight: 700, fontSize: "17px" }}>📜 거래 내역 ({result.trades.length}건)</div>
+              <div style={{ fontWeight: 700, fontSize: "18px" }}>📜 거래 내역 ({result.trades.length}건)</div>
               <span style={{ color: C.text3, fontSize: "18px" }}>{showTrades ? "▲" : "▼"}</span>
             </div>
             {showTrades && (

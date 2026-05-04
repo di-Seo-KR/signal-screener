@@ -237,7 +237,7 @@ export default memo(function Header({
                 <div className="flex flex-col gap-1 p-3">
                   {mobileMenuSections.map((group) => (
                     <div key={group.section}>
-                      <p className="px-2 pt-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      <p className="px-2 pt-3 pb-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                         {group.section}
                       </p>
                       <div className="grid grid-cols-3 gap-1.5">
@@ -320,7 +320,7 @@ export default memo(function Header({
                     size="default"
                     onClick={() => navigate(cat.directTab)}
                     className={cn(
-                      "text-[13px] xl:text-[15px] font-semibold px-3 xl:px-5",
+                      "text-[14px] xl:text-[15px] font-semibold px-3 xl:px-5",
                       isActive && cat.catId === "ai-quant"
                         ? "bg-purple-500/10 text-purple-400 hover:bg-purple-500/15 hover:text-purple-300"
                         : isActive
@@ -343,7 +343,7 @@ export default memo(function Header({
                       size="default"
                       onClick={toggle}
                       className={cn(
-                        "text-[13px] xl:text-[15px] font-semibold gap-1 xl:gap-1.5 px-3 xl:px-5",
+                        "text-[14px] xl:text-[15px] font-semibold gap-1 xl:gap-1.5 px-3 xl:px-5",
                         (isActive || open)
                           ? "bg-primary/10 text-primary hover:bg-primary/15"
                           : "text-muted-foreground hover:text-foreground"

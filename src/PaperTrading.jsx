@@ -871,7 +871,7 @@ function SetupPanel({ config, setConfig, onConnect, theme }) {
         <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, #0D1B2A 100%)`,
           border: `1px solid ${C.border}`, borderRadius: "16px", padding: "40px 24px", textAlign: "center" }}>
           <div style={{ fontSize: "48px", marginBottom: "12px" }}>🤖</div>
-          <div style={{ fontWeight: 800, fontSize: "22px", marginBottom: "8px" }}>가상매매</div>
+          <div style={{ fontWeight: 800, fontSize: "24px", marginBottom: "8px" }}>가상매매</div>
           <div style={{ color: C.text3, fontSize: "16px", maxWidth: "420px", margin: "0 auto", lineHeight: 1.6, marginBottom: "20px" }}>
             리스크 관리 · 브래킷 주문 · 드로다운 보호 · ATR 포지션 사이징
           </div>
@@ -887,7 +887,7 @@ function SetupPanel({ config, setConfig, onConnect, theme }) {
         <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, #0D1B2A 100%)`,
           border: `1px solid ${C.border}`, borderRadius: "16px", padding: "40px 24px", textAlign: "center", marginBottom: "16px" }}>
           <div style={{ fontSize: "48px", marginBottom: "12px" }}>🤖</div>
-          <div style={{ fontWeight: 800, fontSize: "22px", marginBottom: "8px" }}>가상매매</div>
+          <div style={{ fontWeight: 800, fontSize: "24px", marginBottom: "8px" }}>가상매매</div>
         </div>
         <div style={{ background: C.redBg, border: `1px solid ${C.red}`, borderRadius: "12px", padding: "16px", textAlign: "center" }}>
           <div style={{ color: C.red, fontSize: "16px", fontWeight: 600 }}>{error}</div>
@@ -905,7 +905,7 @@ function SetupPanel({ config, setConfig, onConnect, theme }) {
       <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, #0D1B2A 100%)`,
         border: `1px solid ${C.border}`, borderRadius: "16px", padding: "40px 24px", textAlign: "center" }}>
         <div style={{ fontSize: "48px", marginBottom: "12px" }}>✅</div>
-        <div style={{ fontWeight: 800, fontSize: "22px", marginBottom: "8px" }}>가상매매 준비 완료</div>
+        <div style={{ fontWeight: 800, fontSize: "24px", marginBottom: "8px" }}>가상매매 준비 완료</div>
         <div style={{ color: C.text3, fontSize: "16px", maxWidth: "420px", margin: "0 auto", lineHeight: 1.6 }}>
           자동매매 봇이 실시간으로 시그널을 감지하고 주문을 처리합니다
         </div>
@@ -949,13 +949,13 @@ function OrderModal({ symbol: initSymbol, side, reason, config, onClose, onOrder
         background: C.card, border: `1px solid ${C.border}`, borderRadius: "20px",
         padding: "24px", width: "calc(100% - 32px)", maxWidth: "min(90vw, 400px)", boxSizing: "border-box" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", minWidth: 0 }}>
-          <div style={{ fontWeight: 800, fontSize: "17px" }}>{side === "buy" ? "매수" : "매도"} 주문</div>
+          <div style={{ fontWeight: 800, fontSize: "18px" }}>{side === "buy" ? "매수" : "매도"} 주문</div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: C.text3, fontSize: "20px", cursor: "pointer", padding: "4px 8px", minHeight: "32px", minWidth: "32px", flexShrink: 0 }}>×</button>
         </div>
         {initSymbol ? (
           <div style={{ background: C.card2, borderRadius: "10px", padding: "12px", marginBottom: "12px",
             borderLeft: `3px solid ${side === "buy" ? C.red : C.blue}` }}>
-            <div style={{ fontWeight: 700, fontSize: "17px" }}>{symbol}</div>
+            <div style={{ fontWeight: 700, fontSize: "18px" }}>{symbol}</div>
             {reason && <div style={{ fontSize: "14px", color: C.text3, marginTop: "2px" }}>{reason}</div>}
           </div>
         ) : (
@@ -998,7 +998,7 @@ function OrderModal({ symbol: initSymbol, side, reason, config, onClose, onOrder
             )}
             {error&&<div style={{background:C.redBg,borderRadius:"8px",padding:"10px",fontSize:"14px",color:C.red,marginBottom:"12px"}}>{error}</div>}
             <button onClick={handleSubmit} disabled={submitting||(!qty&&!notional)} style={{
-              width:"100%",padding:"14px",borderRadius:"12px",fontSize:"17px",fontWeight:700,
+              width:"100%",padding:"14px",borderRadius:"12px",fontSize:"18px",fontWeight:700,
               background:submitting?C.card2:side==="buy"?`linear-gradient(135deg,${C.red},#DC2626)`:`linear-gradient(135deg,${C.blue},#2563EB)`,
               color:"#fff",border:"none",cursor:submitting?"default":"pointer",opacity:(!qty&&!notional)?0.5:1,
             }}>{submitting?"전송 중...":side==="buy"?`${symbol} 매수`:`${symbol} 매도`}</button>
@@ -1006,7 +1006,7 @@ function OrderModal({ symbol: initSymbol, side, reason, config, onClose, onOrder
         ) : (
           <div style={{ textAlign: "center", padding: "16px 0" }}>
             <div style={{ fontSize: "40px", marginBottom: "8px" }}>{["accepted","new","filled"].includes(result.status)?"✅":"⚠️"}</div>
-            <div style={{ fontWeight: 700, fontSize: "17px", marginBottom: "4px" }}>
+            <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "4px" }}>
               {result.status==="filled"?"체결 완료":result.status==="accepted"||result.status==="new"?"주문 접수":`상태: ${result.status}`}
             </div>
             <div style={{ fontSize: "14px", color: C.text3 }}>{result.symbol} · {result.qty||result.notional}</div>
@@ -1679,7 +1679,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
               <span style={{
                 background: activeTab === id ? C.blue : C.border2,
                 color: activeTab === id ? "#fff" : C.text3,
-                fontSize: "13px", fontWeight: 700, borderRadius: "50%",
+                fontSize: "14px", fontWeight: 700, borderRadius: "50%",
                 width: "20px", height: "20px",
                 display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
               }}>
@@ -1764,9 +1764,9 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
               { label: "포지션 P&L", value: fmtUSD(positionPL), color: positionPL >= 0 ? C.green : C.red },
             ].map((m, i) => (
               <div key={i} style={{ background: C.card2, borderRadius: "10px", padding: "12px" }}>
-                <div style={{ fontSize: "13px", color: C.text3, marginBottom: "3px", fontWeight: 500 }}>{m.label}</div>
+                <div style={{ fontSize: "14px", color: C.text3, marginBottom: "3px", fontWeight: 500 }}>{m.label}</div>
                 <div style={{ fontWeight: 800, fontSize: "16px", color: m.color }}>{m.value}</div>
-                {m.sub && <div style={{ fontSize: "13px", color: m.color, marginTop: "2px" }}>{m.sub}</div>}
+                {m.sub && <div style={{ fontSize: "14px", color: m.color, marginTop: "2px" }}>{m.sub}</div>}
               </div>
             ))}
           </div>
@@ -1809,22 +1809,22 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
           </div>
 
           <div style={{ marginTop: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "13px", fontWeight: 700,
+            <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "14px", fontWeight: 700,
               background: config.isPaper ? C.yellowBg : C.greenBg, color: config.isPaper ? C.yellow : C.green }}>
               {config.isPaper ? "PAPER" : "LIVE"}</span>
-            <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "13px", fontWeight: 700,
+            <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "14px", fontWeight: 700,
               background: marketOpen ? C.greenBg : C.redBg, color: marketOpen ? C.green : C.red }}>
               {marketOpen ? "장중" : "장 마감"}</span>
             {autoTradeEnabled && !tradingHalted && (
-              <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "13px", fontWeight: 700,
+              <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "14px", fontWeight: 700,
                 background: C.purpleBg, color: C.purple }}>AUTO</span>
             )}
             {tradingHalted && (
-              <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "13px", fontWeight: 700,
+              <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "14px", fontWeight: 700,
                 background: C.redBg, color: C.red }}>HALTED</span>
             )}
             {pendingOrders.length > 0 && (
-              <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "13px", fontWeight: 700,
+              <span style={{ padding: "2px 8px", borderRadius: "4px", fontSize: "14px", fontWeight: 700,
                 background: C.yellowBg, color: C.yellow }}>대기 {pendingOrders.length}</span>
             )}
           </div>
@@ -1891,15 +1891,15 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
                       <div>
                         <span style={{fontWeight:700,fontSize:"16px",marginRight:"6px"}}>{p.symbol}</span>
-                        <span style={{fontSize:"13px",color:C.text3,background:C.card,padding:"1px 6px",borderRadius:"4px"}}>{sector}</span>
+                        <span style={{fontSize:"14px",color:C.text3,background:C.card,padding:"1px 6px",borderRadius:"4px"}}>{sector}</span>
                         <span style={{fontSize:"14px",color:C.text3,marginLeft:"8px"}}>{qty}주 · ${fmt(avgEntry)}</span>
                       </div>
                       <div style={{display:"flex",gap:"4px"}}>
                         <button onClick={()=>setOrderModal({symbol:p.symbol,side:"buy",reason:"추가 매수"})} style={{
-                          padding:"4px 8px",borderRadius:"6px",fontSize:"13px",fontWeight:700,
+                          padding:"4px 8px",borderRadius:"6px",fontSize:"14px",fontWeight:700,
                           background:C.redBg,color:C.red,border:"none",cursor:"pointer"}}>매수</button>
                         <button onClick={()=>closePosition(p.symbol)} style={{
-                          padding:"4px 8px",borderRadius:"6px",fontSize:"13px",fontWeight:700,
+                          padding:"4px 8px",borderRadius:"6px",fontSize:"14px",fontWeight:700,
                           background:C.blueBg,color:C.blue,border:"none",cursor:"pointer"}}>청산</button>
                       </div>
                     </div>
@@ -1933,7 +1933,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
                 <div style={{display:"flex",alignItems:"center",gap:"12px",marginBottom:"16px"}}>
                   <div style={{fontSize:"32px"}}>{regimeInfo.icon}</div>
                   <div style={{flex:1}}>
-                    <div style={{fontWeight:700,fontSize:"17px",display:"flex",alignItems:"center",gap:"8px"}}>
+                    <div style={{fontWeight:700,fontSize:"18px",display:"flex",alignItems:"center",gap:"8px"}}>
                       마켓 레짐: <span style={{color:regimeInfo.color}}>{regimeInfo.label}</span>
                       {r.trendDir && <span style={{fontSize:"14px",color:r.trendDir==="bull"?C.green:C.red,fontWeight:600}}>
                         {r.trendDir==="bull"?"BULL":"BEAR"}
@@ -1945,20 +1945,20 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
                 <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:"8px"}}>
                   {r.annualizedVol!=null && (
                     <div style={{background:C.card2,borderRadius:"10px",padding:"10px",textAlign:"center"}}>
-                      <div style={{fontSize:"13px",color:C.text3,marginBottom:"2px"}}>연환산 변동성</div>
-                      <div style={{fontSize:"17px",fontWeight:800,color:r.annualizedVol>30?C.red:r.annualizedVol>15?C.yellow:C.green}}>{r.annualizedVol.toFixed(1)}%</div>
+                      <div style={{fontSize:"14px",color:C.text3,marginBottom:"2px"}}>연환산 변동성</div>
+                      <div style={{fontSize:"18px",fontWeight:800,color:r.annualizedVol>30?C.red:r.annualizedVol>15?C.yellow:C.green}}>{r.annualizedVol.toFixed(1)}%</div>
                     </div>
                   )}
                   {r.adxProxy!=null && (
                     <div style={{background:C.card2,borderRadius:"10px",padding:"10px",textAlign:"center"}}>
-                      <div style={{fontSize:"13px",color:C.text3,marginBottom:"2px"}}>추세 강도</div>
-                      <div style={{fontSize:"17px",fontWeight:800,color:r.adxProxy>25?C.green:C.yellow}}>{r.adxProxy.toFixed(0)}</div>
+                      <div style={{fontSize:"14px",color:C.text3,marginBottom:"2px"}}>추세 강도</div>
+                      <div style={{fontSize:"18px",fontWeight:800,color:r.adxProxy>25?C.green:C.yellow}}>{r.adxProxy.toFixed(0)}</div>
                     </div>
                   )}
                   {r.strength!=null && (
                     <div style={{background:C.card2,borderRadius:"10px",padding:"10px",textAlign:"center"}}>
-                      <div style={{fontSize:"13px",color:C.text3,marginBottom:"2px"}}>레짐 신뢰도</div>
-                      <div style={{fontSize:"17px",fontWeight:800,color:C.blue}}>{(r.strength*100).toFixed(0)}%</div>
+                      <div style={{fontSize:"14px",color:C.text3,marginBottom:"2px"}}>레짐 신뢰도</div>
+                      <div style={{fontSize:"18px",fontWeight:800,color:C.blue}}>{(r.strength*100).toFixed(0)}%</div>
                     </div>
                   )}
                 </div>
@@ -2003,7 +2003,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
           <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"12px"}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
               <div>
-                <div style={{fontWeight:700,fontSize:"17px"}}>퀀트 전략 스캔</div>
+                <div style={{fontWeight:700,fontSize:"18px"}}>퀀트 전략 스캔</div>
                 <div style={{fontSize:"14px",color:C.text3,marginTop:"2px"}}>
                   {tradeSettings.strategies.length}개 전략 · {collectUSSymbols(tradeSettings.strategies).length}개 종목 · 신뢰도 {tradeSettings.minConfidence*100}%+ 필터
                 </div>
@@ -2015,9 +2015,9 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
               }}>{scanning?`스캔 중... ${scanProgress}%`:"전략 스캔"}</button>
             </div>
             {scanning&&(
-              <div style={{height:"4px",background:C.border,borderRadius:"2px",overflow:"hidden"}}>
+              <div style={{height:"4px",background:C.border,borderRadius:"4px",overflow:"hidden"}}>
                 <div style={{height:"100%",width:`${scanProgress}%`,background:`linear-gradient(90deg,${C.purple},${C.blue})`,
-                  borderRadius:"2px",transition:"width 0.3s"}} />
+                  borderRadius:"4px",transition:"width 0.3s"}} />
               </div>
             )}
           </div>
@@ -2049,16 +2049,16 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
                     <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",
                       padding:"6px 8px",background:C.bg,borderRadius:"6px",fontSize:"14px"}}>
                       <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
-                        <span style={{padding:"1px 5px",borderRadius:"3px",fontWeight:700,fontSize:"13px",
+                        <span style={{padding:"1px 5px",borderRadius:"4px",fontWeight:700,fontSize:"14px",
                           background:sig.type==="BUY"?C.redBg:C.blueBg,
                           color:sig.type==="BUY"?C.red:C.blue}}>{sig.type==="BUY"?"매수":"매도"}</span>
                         <span style={{fontWeight:600}}>{sig.symbol}</span>
-                        <span style={{color:C.text3,fontSize:"13px"}}>{sig.strategy}</span>
+                        <span style={{color:C.text3,fontSize:"14px"}}>{sig.strategy}</span>
                       </div>
                       <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
-                        <span style={{color:C.text3,fontSize:"13px"}}>{new Date(sig.queuedAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}</span>
+                        <span style={{color:C.text3,fontSize:"14px"}}>{new Date(sig.queuedAt).toLocaleTimeString("ko-KR",{hour:"2-digit",minute:"2-digit"})}</span>
                         <button onClick={()=>setPendingOrders(p=>p.filter((_,j)=>j!==i))} style={{
-                          padding:"2px 6px",borderRadius:"4px",fontSize:"13px",
+                          padding:"2px 6px",borderRadius:"4px",fontSize:"14px",
                           background:"transparent",color:C.red,border:`1px solid ${C.red}40`,cursor:"pointer"}}>취소</button>
                       </div>
                     </div>
@@ -2084,13 +2084,13 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
                       borderLeft:`3px solid ${isEnsemble?C.purple:isBuy?C.red:C.blue}`,opacity:wasExec?0.5:1}}>
                       <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"4px"}}>
                         <div style={{display:"flex",alignItems:"center",gap:"6px",flexWrap:"wrap"}}>
-                          <span style={{padding:"2px 6px",borderRadius:"4px",fontSize:"13px",fontWeight:700,
+                          <span style={{padding:"2px 6px",borderRadius:"4px",fontSize:"14px",fontWeight:700,
                             background:isBuy?C.redBg:C.blueBg,color:isBuy?C.red:C.blue}}>{isBuy?"매수":"매도"}</span>
                           <span style={{fontWeight:700}}>{sig.symbol}</span>
                           {isEnsemble && <span style={{fontSize:"12px",padding:"1px 5px",borderRadius:"10px",fontWeight:800,
                             background:C.purpleBg,color:C.purple}}>앙상블 {sig.ensembleCount}x</span>}
-                          <span style={{fontSize:"13px",color:C.purple}}>{sig.strategyIcon} {sig.strategy}</span>
-                          <span style={{fontSize:"12px",padding:"1px 4px",borderRadius:"3px",fontWeight:700,
+                          <span style={{fontSize:"14px",color:C.purple}}>{sig.strategyIcon} {sig.strategy}</span>
+                          <span style={{fontSize:"12px",padding:"1px 4px",borderRadius:"4px",fontWeight:700,
                             background:sig.confidence>=0.7?C.greenBg:sig.confidence>=0.5?C.yellowBg:C.redBg,
                             color:confColor}}>{(sig.confidence*100).toFixed(0)}%</span>
                           {wasExec&&<span style={{fontSize:"12px",color:C.green,fontWeight:700}}>실행됨</span>}
@@ -2137,7 +2137,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
                 <div id="di-qr-container" style={{
                   display:"inline-block",padding:"16px",background:"#ffffff",borderRadius:"16px",
                 }} />
-                <div style={{fontSize:"13px",color:C.text3,marginTop:"16px"}}>
+                <div style={{fontSize:"14px",color:C.text3,marginTop:"16px"}}>
                   API 키 포함 — 주변에 다른 사람이 없을 때 사용
                 </div>
               </>
@@ -2179,7 +2179,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
             >
               {label}
               {count != null && count > 0 && (
-                <span style={{ fontSize: "11px", marginLeft: "2px" }}>({count})</span>
+                <span style={{ fontSize: "12px", marginLeft: "2px" }}>({count})</span>
               )}
             </button>
           ))}

@@ -116,7 +116,7 @@ export function CoupangOfficialBanner({ bannerId = 975392, style = {} }) {
         />
       </a>
       <div style={{
-        fontSize: "11px", color: "#888", marginTop: "4px", textAlign: "center",
+        fontSize: "12px", color: "#888", marginTop: "4px", textAlign: "center",
       }}>이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</div>
     </div>
   );
@@ -138,7 +138,7 @@ export function CoupangBanner({ theme = "dark", style = {}, context = "home" }) 
 
   return (
     <div style={{
-      borderRadius: "2px",
+      borderRadius: "4px",
       background: isDark ? "#1A1A1A" : "#FFFFFF",
       border: `1px solid ${isDark ? "#333333" : "#DDDDDD"}`,
       padding: "12px",
@@ -148,10 +148,10 @@ export function CoupangBanner({ theme = "dark", style = {}, context = "home" }) 
     }}>
       {/* 광고 라벨 */}
       <div style={{
-        fontSize: "11px", fontWeight: 700, padding: "2px 4px",
+        fontSize: "12px", fontWeight: 700, padding: "2px 4px",
         background: isDark ? "#333333" : "#F0F0F0",
         color: isDark ? "#888888" : "#999999",
-        borderRadius: "2px",
+        borderRadius: "4px",
         marginBottom: "8px",
         display: "inline-block",
         letterSpacing: "0.5px",
@@ -173,7 +173,7 @@ export function CoupangBanner({ theme = "dark", style = {}, context = "home" }) 
         style={{
           display: "block",
           padding: "8px 12px",
-          borderRadius: "2px",
+          borderRadius: "4px",
           background: isDark ? "#3B82F6" : "#0066CC",
           color: "#FFFFFF",
           fontSize: "14px",
@@ -197,7 +197,7 @@ export function CoupangBanner({ theme = "dark", style = {}, context = "home" }) 
 
       {/* 공시 */}
       <div style={{
-        fontSize: "11px",
+        fontSize: "12px",
         color: isDark ? "#666666" : "#999999",
         textAlign: "center",
         lineHeight: 1.3,
@@ -256,7 +256,7 @@ export function CoupangButtonAd({ theme = "dark", context = "default" }) {
         style={{
           display: "inline-flex", alignItems: "center", gap: "6px",
           padding: "10px 20px",
-          borderRadius: "3px",
+          borderRadius: "4px",
           background: isHovered ? "#0052A3" : "#0066CC",
           color: "#FFFFFF",
           fontSize: "15px",
@@ -282,7 +282,7 @@ export function CoupangButtonAd({ theme = "dark", context = "default" }) {
 
       {/* 공시 */}
       <div style={{
-        fontSize: "11px",
+        fontSize: "12px",
         color: isDark ? "#666666" : "#999999",
         textAlign: "center",
         lineHeight: 1.3,
@@ -333,7 +333,7 @@ export function CoupangInterstitial({ theme = "dark", onClose, featureName = "�
               background: "none", border: "none", cursor: canClose ? "pointer" : "default",
               fontSize: "16px", fontWeight: 600,
               color: canClose ? (isDark ? "#CCCCCC" : "#333333") : (isDark ? "#666666" : "#AAAAAA"),
-              padding: "2px 6px", borderRadius: "2px",
+              padding: "2px 6px", borderRadius: "4px",
             }}
           >
             {canClose ? "✕" : countdown}
@@ -362,7 +362,7 @@ export function CoupangInterstitial({ theme = "dark", onClose, featureName = "�
           style={{
             display: "inline-block",
             padding: "8px 24px",
-            borderRadius: "2px",
+            borderRadius: "4px",
             background: isDark ? "#0066CC" : "#0066CC",
             color: "#FFFFFF",
             fontSize: "15px",
@@ -375,7 +375,7 @@ export function CoupangInterstitial({ theme = "dark", onClose, featureName = "�
         </a>
 
         <div style={{
-          fontSize: "11px",
+          fontSize: "12px",
           color: isDark ? "#666666" : "#999999",
           marginTop: "10px",
           lineHeight: 1.3,
@@ -411,7 +411,7 @@ export function CoupangNativeCard({ theme = "dark", context = "default" }) {
         color: isDark ? "#888888" : "#AAAAAA",
       }}>
         <span style={{
-          padding: "2px 4px", borderRadius: "2px",
+          padding: "2px 4px", borderRadius: "4px",
           background: isDark ? "#2F2F2F" : "#EEEEEE",
         }}>AD</span>
         <span>쿠팡</span>
@@ -432,7 +432,7 @@ export function CoupangNativeCard({ theme = "dark", context = "default" }) {
         style={{
           display: "block",
           padding: "8px",
-          borderRadius: "2px",
+          borderRadius: "4px",
           background: isDark ? "#0066CC" : "#0066CC",
           color: "#FFFFFF",
           fontSize: "14px",
@@ -455,7 +455,7 @@ export function CoupangNativeCard({ theme = "dark", context = "default" }) {
 
       {/* 공시 */}
       <div style={{
-        fontSize: "11px",
+        fontSize: "12px",
         color: isDark ? "#666666" : "#AAAAAA",
         textAlign: "center",
         lineHeight: 1.2,
@@ -486,7 +486,7 @@ export function CoupangStripBanner({ theme = "dark", context = "default" }) {
           rel="noopener noreferrer"
           style={{
             flex: 1, display: "flex", alignItems: "center", gap: "6px",
-            padding: "8px 10px", borderRadius: "3px",
+            padding: "8px 10px", borderRadius: "4px",
             background: isDark ? "#1F1F1F" : "#F5F5F5",
             border: `1px solid ${isDark ? "#333333" : "#E0E0E0"}`,
             textDecoration: "none",
@@ -497,7 +497,7 @@ export function CoupangStripBanner({ theme = "dark", context = "default" }) {
         >
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontSize: "14px", fontWeight: 600, color: isDark ? "#D0D0D0" : "#333333", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{product.title}</div>
-            <div style={{ fontSize: "11px", color: isDark ? "#666666" : "#999999" }}>쿠팡</div>
+            <div style={{ fontSize: "12px", color: isDark ? "#666666" : "#999999" }}>쿠팡</div>
           </div>
         </a>
       ))}
@@ -571,7 +571,7 @@ export function CoupangFloatingBanner({ theme = "dark", context = "default", aut
 
         {/* 광고 라벨 */}
         <div style={{
-          fontSize: "11px",
+          fontSize: "12px",
           fontWeight: 700,
           color: isDark ? "#666666" : "#999999",
           marginBottom: "6px",
@@ -595,7 +595,7 @@ export function CoupangFloatingBanner({ theme = "dark", context = "default", aut
           style={{
             display: "block",
             padding: "6px 10px",
-            borderRadius: "2px",
+            borderRadius: "4px",
             background: isDark ? "#0066CC" : "#0066CC",
             color: "#FFFFFF",
             fontSize: "14px",
@@ -665,7 +665,7 @@ export function CoupangCarouselBanner({ style = {} }) {
         style={{ maxWidth: "100%", border: "none", borderRadius: "4px" }}
       />
       <div style={{
-        fontSize: "11px", color: "#888", marginTop: "4px", textAlign: "center",
+        fontSize: "12px", color: "#888", marginTop: "4px", textAlign: "center",
       }}>이 포스팅은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.</div>
     </div>
   );

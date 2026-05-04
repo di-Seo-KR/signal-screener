@@ -108,7 +108,7 @@ export default function DevDashboard({ theme = "dark" }) {
         {/* 헤더 */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: "22px", fontWeight: 800, color: c.text1 }}>
+            <h1 style={{ margin: 0, fontSize: "24px", fontWeight: 800, color: c.text1 }}>
               Zepta Dev/QA Dashboard
             </h1>
             <div style={{ fontSize: "14px", color: c.text3, marginTop: "4px" }}>
@@ -186,7 +186,7 @@ export default function DevDashboard({ theme = "dark" }) {
               background: c.card, border: `1px solid ${c.border}`, borderRadius: "10px",
               padding: "12px", textAlign: "center",
             }}>
-              <div style={{ fontSize: "13px", color: c.text3, marginBottom: "6px" }}>{s.label}</div>
+              <div style={{ fontSize: "14px", color: c.text3, marginBottom: "6px" }}>{s.label}</div>
               <StatusBadge ok={s.ok} label={s.ok ? "OK" : "FAIL"} />
             </div>
           ))}
@@ -252,7 +252,7 @@ export default function DevDashboard({ theme = "dark" }) {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: "15px", fontWeight: 700, color: c.text1 }}>{ab.botId}</span>
                 <span style={{
-                  fontSize: "13px", padding: "2px 8px", borderRadius: "8px",
+                  fontSize: "14px", padding: "2px 8px", borderRadius: "8px",
                   background: ab.status === "paused" ? `${c.yellow}20` : `${c.green}20`,
                   color: ab.status === "paused" ? c.yellow : c.green,
                   fontWeight: 700,
@@ -285,7 +285,7 @@ export default function DevDashboard({ theme = "dark" }) {
                 <KVValue label="갱신" value={perf.lastUpdated?.slice(11, 19) || "—"} />
               </div>
               {perf.recentTrades?.length > 0 && (
-                <div style={{ marginTop: "8px", fontSize: "13px", color: c.text3 }}>
+                <div style={{ marginTop: "8px", fontSize: "14px", color: c.text3 }}>
                   <div style={{ fontWeight: 600, marginBottom: "4px" }}>최근 거래:</div>
                   {perf.recentTrades.map((t, i) => (
                     <div key={i} style={{ padding: "2px 0", fontFamily: "monospace" }}>
@@ -360,7 +360,7 @@ export default function DevDashboard({ theme = "dark" }) {
         {/* Raw JSON */}
         <Section title="Raw JSON 데이터" defaultOpen={false}>
           <pre style={{
-            fontSize: "13px", color: c.text2, background: c.bg, padding: "12px",
+            fontSize: "14px", color: c.text2, background: c.bg, padding: "12px",
             borderRadius: "8px", overflow: "auto", maxHeight: "400px", fontFamily: "monospace",
             whiteSpace: "pre-wrap", wordBreak: "break-all",
           }}>

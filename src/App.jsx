@@ -116,7 +116,7 @@ function NicknameEditor({ user, supabase, onUpdate }) {
               onClick={handleGenerateRandom}
               disabled={loading}
               style={{
-                padding: "8px 12px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                padding: "8px 12px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
                 background: "transparent", color: C.blue, border: `1px solid ${C.blue}40`,
                 cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1,
               }}
@@ -124,7 +124,7 @@ function NicknameEditor({ user, supabase, onUpdate }) {
               🎲 생성
             </button>
           </div>
-          {error && <div style={{ fontSize: "13px", color: "#ef4444", marginBottom: "10px" }}>{error}</div>}
+          {error && <div style={{ fontSize: "14px", color: "#ef4444", marginBottom: "10px" }}>{error}</div>}
           <div className="flex gap-2">
             <button
               onClick={() => handleSave()}
@@ -237,7 +237,7 @@ class ErrorBoundary extends Component {
           }}>새로고침</button>
           <details style={{ marginTop: "16px", fontSize: "14px", color: "#6B7D8E", maxWidth: "360px" }}>
             <summary style={{ cursor: "pointer" }}>오류 상세</summary>
-            <pre style={{ textAlign: "left", fontSize: "13px", whiteSpace: "pre-wrap", wordBreak: "break-all", marginTop: "8px" }}>
+            <pre style={{ textAlign: "left", fontSize: "14px", whiteSpace: "pre-wrap", wordBreak: "break-all", marginTop: "8px" }}>
               {this.state.error?.message}
             </pre>
           </details>
@@ -1475,7 +1475,7 @@ function PullToRefresh({ onRefresh, children }) {
           }}>
             {refreshing ? "⏳" : pullDistance >= THRESHOLD ? "↻" : "↓"}
           </div>
-          <span style={{ marginLeft: "8px", fontSize: "17px", color: C.text3, fontWeight: 600 }}>
+          <span style={{ marginLeft: "8px", fontSize: "18px", color: C.text3, fontWeight: 600 }}>
             {refreshing ? "새로고침 중..." : pullDistance >= THRESHOLD ? "놓으면 새로고침" : "아래로 당기기"}
           </span>
         </div>
@@ -1611,7 +1611,7 @@ function SearchBar({ onSelect, placeholder = "종목 검색 (예: AAPL, 삼성�
             width: compact ? "120px" : "100%",
             padding: compact ? "6px 10px" : "13px 16px 13px 42px",
             borderRadius: compact ? "8px" : "14px",
-            fontSize: compact ? "11px" : "14px",
+            fontSize: compact ? "12px" : "14px",
             background: compact ? C.card2 : C.card,
             border: `1px solid ${focused ? C.blue : compact ? C.border2 : C.border}`, color: C.text1,
             outline: "none", transition: "border-color .2s, box-shadow .2s, width .2s",
@@ -1630,7 +1630,7 @@ function SearchBar({ onSelect, placeholder = "종목 검색 (예: AAPL, 삼성�
       {showDrop && (
         <div ref={dropRef} style={{
           position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 200,
-          background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px",
+          background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px",
           boxShadow: "0 8px 32px rgba(0,0,0,.5)", overflow: "hidden", maxHeight: "380px", overflowY: "auto",
         }}>
           {suggestions.map((asset, i) => {
@@ -2579,7 +2579,7 @@ function AssetCard({ asset, onChart, isMobile = false }) {
       background: C.card,
       border: `1px solid ${C.border}`,
       borderLeft: `4px solid ${borderColor}`,
-      borderRadius: "14px",
+      borderRadius: "12px",
       overflow: "hidden",
       transition: "all 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease",
       cursor: "pointer"
@@ -2597,7 +2597,7 @@ function AssetCard({ asset, onChart, isMobile = false }) {
         </div>
         <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
           <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "4px" : "8px", marginBottom: "4px", flexWrap: "nowrap" }}>
-            <span style={{ fontWeight: 700, fontSize: isMobile ? "14px" : "17px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: isMobile ? "80px" : "none" }}>{asset.name}</span>
+            <span style={{ fontWeight: 700, fontSize: isMobile ? "14px" : "18px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: isMobile ? "80px" : "none" }}>{asset.name}</span>
             {!isMobile && <span style={{ fontSize: "16px", color: C.text3 }}>{asset.symbol}</span>}
             {diag && (
               <span style={{
@@ -2613,15 +2613,15 @@ function AssetCard({ asset, onChart, isMobile = false }) {
             {(() => {
               const bd = [asset.macdDivType === "bullish", asset.rsiDivType === "bullish", asset.obvDivType === "bullish"].filter(Boolean).length;
               const sd = [asset.macdDivType === "bearish", asset.rsiDivType === "bearish", asset.obvDivType === "bearish"].filter(Boolean).length;
-              if (bd >= 2) return <span style={{ fontSize: "14px", fontWeight: 800, padding: "2px 7px", borderRadius: "5px", background: `${C.green}28`, color: C.green, border: `1px solid ${C.green}44` }}>{bd === 3 ? "⚡3중 강세" : "복합 강세"}</span>;
-              if (sd >= 2) return <span style={{ fontSize: "14px", fontWeight: 800, padding: "2px 7px", borderRadius: "5px", background: `${C.red}28`, color: C.red, border: `1px solid ${C.red}44` }}>{sd === 3 ? "⚡3중 약세" : "복합 약세"}</span>;
+              if (bd >= 2) return <span style={{ fontSize: "14px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: `${C.green}28`, color: C.green, border: `1px solid ${C.green}44` }}>{bd === 3 ? "⚡3중 강세" : "복합 강세"}</span>;
+              if (sd >= 2) return <span style={{ fontSize: "14px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: `${C.red}28`, color: C.red, border: `1px solid ${C.red}44` }}>{sd === 3 ? "⚡3중 약세" : "복합 약세"}</span>;
               return null;
             })()}
           </div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
           <div style={{ fontWeight: 700, fontSize: isMobile ? "15px" : "18px", color: C.text1 }}>{fmtPrice(asset.price, asset.market)}</div>
-          <div style={{ fontSize: isMobile ? "14px" : "17px", fontWeight: 600, color: isPos ? C.green : C.red }}>
+          <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 600, color: isPos ? C.green : C.red }}>
             {isPos ? "▲" : "▼"} {Math.abs(asset.weekChange)}%
           </div>
           {/* 수급 미니 인디케이터 (CMF/MFI) */}
@@ -2685,9 +2685,9 @@ function AssetCard({ asset, onChart, isMobile = false }) {
                     {diag.categories.map(cat => (
                       <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         <span style={{ fontSize: "14px", color: C.text3, width: "36px" }}>{cat.name}</span>
-                        <div style={{ flex: 1, height: "4px", background: C.border, borderRadius: "2px", overflow: "hidden" }}>
+                        <div style={{ flex: 1, height: "4px", background: C.border, borderRadius: "4px", overflow: "hidden" }}>
                           <div style={{
-                            height: "100%", borderRadius: "2px",
+                            height: "100%", borderRadius: "4px",
                             width: `${cat.score}%`,
                             background: cat.score >= 70 ? C.green : cat.score >= 40 ? C.yellow : C.red,
                             transition: "width 0.4s ease",
@@ -2704,7 +2704,7 @@ function AssetCard({ asset, onChart, isMobile = false }) {
                 <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
                   {diag.signals.slice(0, 5).map((sig, i) => (
                     <span key={i} style={{
-                      fontSize: "14px", fontWeight: 600, padding: "3px 7px", borderRadius: "5px",
+                      fontSize: "14px", fontWeight: 600, padding: "3px 7px", borderRadius: "6px",
                       background: sig.type === "bullish" ? `${C.green}18` : sig.type === "bearish" ? `${C.red}18` : `${C.yellow}18`,
                       color: sig.type === "bullish" ? C.green : sig.type === "bearish" ? C.red : C.yellow,
                     }}>{sig.type === "bullish" ? "▲" : sig.type === "bearish" ? "▼" : "●"} {sig.name}</span>
@@ -2723,11 +2723,11 @@ function AssetCard({ asset, onChart, isMobile = false }) {
               <span style={{ fontSize: "15px", fontWeight: 700, color: C.text3, whiteSpace: "nowrap" }}>💧 수급</span>
               {asset.cmf != null && (
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: "1 1 120px", minWidth: "120px" }}>
-                  <span style={{ fontSize: "14px", color: C.text3, width: "26px" }}>CMF</span>
-                  <div style={{ flex: 1, height: "6px", background: C.border, borderRadius: "3px", overflow: "hidden", position: "relative" }}>
+                  <span style={{ fontSize: "14px", color: C.text3, width: "24px" }}>CMF</span>
+                  <div style={{ flex: 1, height: "6px", background: C.border, borderRadius: "4px", overflow: "hidden", position: "relative" }}>
                     <div style={{ position: "absolute", left: "50%", top: 0, width: "1px", height: "100%", background: C.text3 + "44" }} />
                     <div style={{
-                      position: "absolute", top: 0, height: "100%", borderRadius: "3px",
+                      position: "absolute", top: 0, height: "100%", borderRadius: "4px",
                       background: asset.cmf >= 0 ? C.green : C.red,
                       left: asset.cmf >= 0 ? "50%" : `${50 + (asset.cmf * 100)}%`,
                       width: `${Math.min(Math.abs(asset.cmf) * 100, 50)}%`,
@@ -2741,10 +2741,10 @@ function AssetCard({ asset, onChart, isMobile = false }) {
               )}
               {asset.mfi != null && (
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: "1 1 120px", minWidth: "120px" }}>
-                  <span style={{ fontSize: "14px", color: C.text3, width: "26px" }}>MFI</span>
-                  <div style={{ flex: 1, height: "6px", background: C.border, borderRadius: "3px", overflow: "hidden" }}>
+                  <span style={{ fontSize: "14px", color: C.text3, width: "24px" }}>MFI</span>
+                  <div style={{ flex: 1, height: "6px", background: C.border, borderRadius: "4px", overflow: "hidden" }}>
                     <div style={{
-                      height: "100%", borderRadius: "3px",
+                      height: "100%", borderRadius: "4px",
                       width: `${asset.mfi}%`,
                       background: asset.mfi < 20 ? C.purple : asset.mfi > 80 ? C.red : asset.mfi < 30 ? C.green : asset.mfi > 70 ? C.yellow : C.blue,
                       transition: "width 0.4s ease",
@@ -2758,35 +2758,35 @@ function AssetCard({ asset, onChart, isMobile = false }) {
               {/* 다이버전스 방향 뱃지 */}
               {asset.macdDivType && (
                 <span style={{
-                  fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                  fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "6px",
                   background: asset.macdDivType === "bullish" ? `${C.green}22` : `${C.red}22`,
                   color: asset.macdDivType === "bullish" ? C.green : C.red,
                 }}>{asset.macdDivType === "bullish" ? "📈 MACD 상승전환" : "📉 MACD 하락전환"}</span>
               )}
               {asset.rsiDivType && (
                 <span style={{
-                  fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                  fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "6px",
                   background: asset.rsiDivType === "bullish" ? `${C.green}22` : `${C.red}22`,
                   color: asset.rsiDivType === "bullish" ? C.green : C.red,
                 }}>{asset.rsiDivType === "bullish" ? "📈 RSI 상승전환" : "📉 RSI 하락전환"}</span>
               )}
               {asset.obvDivType && (
                 <span style={{
-                  fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                  fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "6px",
                   background: asset.obvDivType === "bullish" ? `${C.green}22` : `${C.red}22`,
                   color: asset.obvDivType === "bullish" ? C.green : C.red,
                 }}>{asset.obvDivType === "bullish" ? "📊 OBV 매집" : "📊 OBV 분산"}</span>
               )}
               {asset.adx != null && asset.adx >= 25 && (
                 <span style={{
-                  fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                  fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "6px",
                   background: asset.plusDI > asset.minusDI ? `${C.green}22` : `${C.red}22`,
                   color: asset.plusDI > asset.minusDI ? C.green : C.red,
                 }}>{asset.plusDI > asset.minusDI ? "🔼" : "🔽"} ADX {asset.adx} ({asset.plusDI > asset.minusDI ? "매수세" : "매도세"})</span>
               )}
               {asset.bbSqueeze && (
                 <span style={{
-                  fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                  fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "6px",
                   background: `${C.yellow}22`, color: C.yellow,
                 }}>⚡ TTM Squeeze ON</span>
               )}
@@ -2822,7 +2822,7 @@ function AssetCard({ asset, onChart, isMobile = false }) {
           </div>
           <div style={{ display: "flex", gap: "8px", flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : "visible", paddingBottom: isMobile ? "8px" : "0" }}>
             <button onClick={(e) => { e.stopPropagation(); onChart(); }} style={{
-              padding: "10px 20px", borderRadius: "10px", fontSize: "17px", fontWeight: 600, minHeight: "44px",
+              padding: "10px 20px", borderRadius: "10px", fontSize: "18px", fontWeight: 600, minHeight: "44px",
               background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}44`, cursor: "pointer",
               transition: "background 0.15s ease",
             }}>📈 차트 보기</button>
@@ -2831,7 +2831,7 @@ function AssetCard({ asset, onChart, isMobile = false }) {
                 : `https://finance.yahoo.com/quote/${asset.symbolRaw || asset.symbol}`}
               target="_blank" rel="noopener" onClick={e => e.stopPropagation()}
               style={{
-                padding: "10px 20px", borderRadius: "10px", fontSize: "17px", fontWeight: 600, minHeight: "44px",
+                padding: "10px 20px", borderRadius: "10px", fontSize: "18px", fontWeight: 600, minHeight: "44px",
                 background: C.card, color: C.text3, border: `1px solid ${C.border2}`, textDecoration: "none",
                 display: "inline-flex", alignItems: "center",
               }}>🔗 상세 정보</a>
@@ -3263,7 +3263,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             </div>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>{asset.name}</span>
+                <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{asset.name}</span>
                 <span style={{ fontSize: "16px" }}>{flag}</span>
               </div>
               <div style={{ fontSize: "16px", color: C.text3 }}>{asset.symbol.replace(".KS","")}</div>
@@ -3284,7 +3284,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             </div>
             {(change != null || techData?.weekChange != null) && (
               <span style={{
-                fontSize: "17px", fontWeight: 600,
+                fontSize: "18px", fontWeight: 600,
                 color: (techData?.weekChange ?? change ?? 0) >= 0 ? C.green : C.red,
               }}>
                 {(techData?.weekChange ?? change ?? 0) >= 0 ? "▲" : "▼"} {Math.abs(techData?.weekChange ?? change ?? 0).toFixed(2)}%
@@ -3309,7 +3309,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
         <div style={{ padding: "16px 20px" }}>
           {loading ? (
             <div style={{
-              background: C.bg, borderRadius: "14px", padding: "24px", textAlign: "center",
+              background: C.bg, borderRadius: "12px", padding: "24px", textAlign: "center",
               border: `1px solid ${C.border}`,
             }}>
               <div style={{ fontSize: "20px", marginBottom: "8px", animation: "spin 1s linear infinite" }}>⏳</div>
@@ -3317,7 +3317,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             </div>
           ) : (
             <div style={{
-              background: C.bg, borderRadius: "14px", padding: "16px",
+              background: C.bg, borderRadius: "12px", padding: "16px",
               border: `1px solid ${C.border}`,
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "14px" }}>
@@ -3337,7 +3337,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                    <span style={{ fontSize: "17px", fontWeight: 700, color: C.text3 }}>🩺 투자진단</span>
+                    <span style={{ fontSize: "18px", fontWeight: 700, color: C.text3 }}>🩺 투자진단</span>
                     <span style={{
                       fontSize: "18px", fontWeight: 800,
                       color: diag.score >= 70 ? C.green : diag.score >= 40 ? C.yellow : C.red,
@@ -3350,7 +3350,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                     background: diag.opinionColor === "green" ? `${C.green}12` : diag.opinionColor === "red" ? `${C.red}12` : `${C.yellow}12`,
                   }}>
                     <span style={{
-                      fontSize: "17px", fontWeight: 800,
+                      fontSize: "18px", fontWeight: 800,
                       color: diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow,
                     }}>
                       {diag.opinion === "매수" ? "🟢" : diag.opinion === "매도" ? "🔴" : diag.opinion === "중립" ? "🟡" : diag.opinionColor === "green" ? "🟢" : "🔴"} {diag.opinion}
@@ -3361,9 +3361,9 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                     {diag.categories.map(cat => (
                       <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         <span style={{ fontSize: "15px", color: C.text3, width: "36px" }}>{cat.name}</span>
-                        <div style={{ flex: 1, height: "5px", background: C.border, borderRadius: "3px", overflow: "hidden" }}>
+                        <div style={{ flex: 1, height: "5px", background: C.border, borderRadius: "4px", overflow: "hidden" }}>
                           <div style={{
-                            height: "100%", borderRadius: "3px",
+                            height: "100%", borderRadius: "4px",
                             width: `${cat.score}%`,
                             background: cat.score >= 70 ? C.green : cat.score >= 40 ? C.yellow : C.red,
                             transition: "width 0.4s ease",
@@ -3389,9 +3389,9 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
 
               {/* 매수 추천가 3단계 */}
               {buyLevels.levels.length > 0 && (
-                <div style={{ marginTop: "12px", padding: "14px", borderRadius: "14px", background: `${C.blueBg}60`, border: `1px solid ${C.blue}20` }}>
+                <div style={{ marginTop: "12px", padding: "14px", borderRadius: "12px", background: `${C.blueBg}60`, border: `1px solid ${C.blue}20` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                    <span style={{ fontSize: "17px", fontWeight: 700, color: C.text1 }}>🎯 매수 추천가</span>
+                    <span style={{ fontSize: "18px", fontWeight: 700, color: C.text1 }}>🎯 매수 추천가</span>
                     <span style={{ fontSize: "15px", color: C.text3 }}>{buyLevels.summary}</span>
                   </div>
                   <div style={{ display: "flex", gap: "8px" }}>
@@ -3411,8 +3411,8 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                           <div style={{ fontSize: "16px", fontWeight: 700, color: C.red, marginTop: "2px" }}>-{lv.discount}%</div>
                           <div style={{ fontSize: "14px", color: C.text3, marginTop: "4px", lineHeight: 1.3 }}>{lv.rationale}</div>
                           <div style={{ marginTop: "4px" }}>
-                            <div style={{ height: "3px", borderRadius: "2px", background: `${C.border}40`, overflow: "hidden" }}>
-                              <div style={{ height: "100%", width: `${lv.confidence}%`, background: lvColors[li], borderRadius: "2px" }} />
+                            <div style={{ height: "3px", borderRadius: "4px", background: `${C.border}40`, overflow: "hidden" }}>
+                              <div style={{ height: "100%", width: `${lv.confidence}%`, background: lvColors[li], borderRadius: "4px" }} />
                             </div>
                             <div style={{ fontSize: "14px", color: C.text3, marginTop: "2px" }}>신뢰도 {lv.confidence}%</div>
                           </div>
@@ -3451,7 +3451,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           <div style={{ padding: "0 20px 12px" }}>
             {/* ── 섹션 헤더 ── */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-              <span style={{ fontSize: "17px", fontWeight: 800, color: C.text1 }}>기업 정보</span>
+              <span style={{ fontSize: "18px", fontWeight: 800, color: C.text1 }}>기업 정보</span>
               <span style={{ fontSize: "15px", color: C.text3, background: C.card2, padding: "2px 8px", borderRadius: "4px" }}>
                 {fd?.fiscal_date || (fd ? "Financial Datasets" : "Yahoo Finance")}
               </span>
@@ -3465,7 +3465,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             <>
             {/* ── 1. 실적 요약 (Financial Datasets만) ── */}
             {fd && fd.revenue != null && (
-              <div style={{ background: C.card, borderRadius: "14px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
+              <div style={{ background: C.card, borderRadius: "12px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
                 <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>실적 요약</div>
                 {/* 매출/영업이익/순이익 */}
                 <div style={{ display: "flex", gap: "0", marginBottom: "12px" }}>
@@ -3479,7 +3479,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                       ...(idx < 2 ? { borderRight: `1px solid ${C.border}` } : {}),
                     }}>
                       <div style={{ fontSize: "15px", color: C.text3, marginBottom: "4px" }}>{item.label}</div>
-                      <div style={{ fontSize: "17px", fontWeight: 800, color: item.value > 0 ? C.text1 : item.value < 0 ? C.red : C.text3 }}>
+                      <div style={{ fontSize: "18px", fontWeight: 800, color: item.value > 0 ? C.text1 : item.value < 0 ? C.red : C.text3 }}>
                         {fmtMoney(item.value)}
                       </div>
                       {item.growth != null && (
@@ -3501,9 +3501,9 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                     ].filter(m => m.value != null).map(m => (
                       <div key={m.label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <span style={{ fontSize: "15px", color: C.text3, width: "64px", flexShrink: 0 }}>{m.label}</span>
-                        <div style={{ flex: 1, height: "6px", background: `${C.border}60`, borderRadius: "3px", overflow: "hidden" }}>
+                        <div style={{ flex: 1, height: "6px", background: `${C.border}60`, borderRadius: "4px", overflow: "hidden" }}>
                           <div style={{
-                            height: "100%", borderRadius: "3px", transition: "width 0.5s ease",
+                            height: "100%", borderRadius: "4px", transition: "width 0.5s ease",
                             width: `${Math.min(Math.max(m.value, 0), 100)}%`, background: m.color,
                           }} />
                         </div>
@@ -3528,7 +3528,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                         background: g.value > 0 ? `${C.green}10` : g.value < 0 ? `${C.red}10` : C.card2,
                       }}>
                         <div style={{ fontSize: "14px", color: C.text3 }}>{g.label}</div>
-                        <div style={{ fontSize: "17px", fontWeight: 800, color: growthColor(g.value) }}>{fmtGrowth(g.value)}</div>
+                        <div style={{ fontSize: "18px", fontWeight: 800, color: growthColor(g.value) }}>{fmtGrowth(g.value)}</div>
                       </div>
                     ))}
                   </div>
@@ -3553,12 +3553,12 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                             <div key={q.period || i} style={{ flex: 1, textAlign: "center" }}>
                               <div style={{ display: "flex", gap: "2px", justifyContent: "center", alignItems: "flex-end", height: "42px" }}>
                                 <div style={{
-                                  width: "45%", height: `${Math.max(revPct * 42, 3)}px`, borderRadius: "3px 3px 0 0",
+                                  width: "45%", height: `${Math.max(revPct * 42, 3)}px`, borderRadius: "4px 3px 0 0",
                                   background: `${C.blue}80`, transition: "height 0.4s ease",
                                 }} />
                                 {q.netIncome != null && (
                                   <div style={{
-                                    width: "45%", height: `${Math.max(niPct * 42, 2)}px`, borderRadius: "3px 3px 0 0",
+                                    width: "45%", height: `${Math.max(niPct * 42, 2)}px`, borderRadius: "4px 3px 0 0",
                                     background: q.netIncome >= 0 ? `${C.green}80` : `${C.red}60`, transition: "height 0.4s ease",
                                   }} />
                                 )}
@@ -3574,8 +3574,8 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                         })}
                       </div>
                       <div style={{ display: "flex", gap: "12px", justifyContent: "center", marginTop: "6px" }}>
-                        <span style={{ fontSize: "14px", color: C.text3 }}><span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "2px", background: `${C.blue}80`, marginRight: "3px", verticalAlign: "middle" }} />매출</span>
-                        <span style={{ fontSize: "14px", color: C.text3 }}><span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "2px", background: `${C.green}80`, marginRight: "3px", verticalAlign: "middle" }} />순이익</span>
+                        <span style={{ fontSize: "14px", color: C.text3 }}><span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "4px", background: `${C.blue}80`, marginRight: "3px", verticalAlign: "middle" }} />매출</span>
+                        <span style={{ fontSize: "14px", color: C.text3 }}><span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "4px", background: `${C.green}80`, marginRight: "3px", verticalAlign: "middle" }} />순이익</span>
                       </div>
                     </div>
                   );
@@ -3585,7 +3585,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
 
             {/* ── 2. 밸류에이션 ── */}
             {(per != null || pbr != null || psr != null || evEbitda != null) && (
-              <div style={{ background: C.card, borderRadius: "14px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
+              <div style={{ background: C.card, borderRadius: "12px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
                 <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>밸류에이션</div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0" }}>
                   {[
@@ -3630,7 +3630,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
 
             {/* ── 3. 수익성 & 재무 건전성 ── */}
             {(roe != null || roa != null || dte != null || cr != null) && (
-              <div style={{ background: C.card, borderRadius: "14px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
+              <div style={{ background: C.card, borderRadius: "12px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
                 <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>수익성 & 재무건전성</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   {[
@@ -3682,7 +3682,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               const recColors = { buy: C.green, strongBuy: C.green, strong_buy: C.green, hold: C.yellow, sell: C.red, underperform: C.red, overweight: C.green };
 
               return (
-              <div style={{ background: C.card, borderRadius: "14px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
+              <div style={{ background: C.card, borderRadius: "12px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
                   <span style={{ fontSize: "16px", fontWeight: 700, color: C.text3 }}>애널리스트 컨센서스</span>
                   {cnt > 0 && <span style={{ fontSize: "15px", color: C.text3, background: C.card2, padding: "2px 6px", borderRadius: "4px" }}>{cnt}명</span>}
@@ -3692,7 +3692,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 {rec && (
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
                     <span style={{
-                      fontSize: "17px", fontWeight: 800, padding: "4px 12px", borderRadius: "8px",
+                      fontSize: "18px", fontWeight: 800, padding: "4px 12px", borderRadius: "8px",
                       background: `${recColors[rec] || C.yellow}18`, color: recColors[rec] || C.yellow,
                     }}>
                       {recLabels[rec] || rec}
@@ -3718,7 +3718,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                         ...(idx < 2 ? { borderRight: `1px solid ${C.border}40` } : {}),
                       }}>
                         <div style={{ fontSize: "14px", color: C.text3 }}>{item.label}</div>
-                        <div style={{ fontSize: item.main ? "17px" : "13px", fontWeight: 800, color: item.main ? (upside > 0 ? C.green : C.red) : C.text2 }}>
+                        <div style={{ fontSize: item.main ? "18px" : "14px", fontWeight: 800, color: item.main ? (upside > 0 ? C.green : C.red) : C.text2 }}>
                           ${item.value.toFixed(2)}
                         </div>
                         {item.main && upside != null && (
@@ -3752,7 +3752,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                       display: "flex", flexDirection: "column", alignItems: "center",
                     }}>
                       <div style={{ fontSize: "14px", fontWeight: 700, color: C.text2, whiteSpace: "nowrap" }}>현재</div>
-                      <div style={{ width: "3px", height: "16px", background: C.text1, borderRadius: "2px" }} />
+                      <div style={{ width: "3px", height: "16px", background: C.text1, borderRadius: "4px" }} />
                     </div>
                     {/* 목표가 마커 */}
                     {tgtPct != null && (
@@ -3761,7 +3761,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                         display: "flex", flexDirection: "column", alignItems: "center",
                       }}>
                         <div style={{ fontSize: "14px", fontWeight: 700, color: C.blue, whiteSpace: "nowrap" }}>목표</div>
-                        <div style={{ width: "3px", height: "16px", background: C.blue, borderRadius: "2px" }} />
+                        <div style={{ width: "3px", height: "16px", background: C.blue, borderRadius: "4px" }} />
                       </div>
                     )}
                   </div>
@@ -3785,7 +3785,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               const curP = techData.price;
               const models = techData.models || [];
               return (
-              <div style={{ background: C.card, borderRadius: "14px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
+              <div style={{ background: C.card, borderRadius: "12px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
                 <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>적정주가 분석</div>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px" }}>
                   <div style={{ flex: 1 }}>
@@ -3866,7 +3866,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             <>
             {/* 전략 + 핵심 레벨 */}
             <div style={{ padding: "0 20px 12px" }}>
-              <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
+              <div style={{ background: C.bg, borderRadius: "12px", padding: "16px", border: `1px solid ${C.border}` }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                     <span style={{ fontSize: "16px", fontWeight: 700, color: C.text3 }}>🎯 퀀트 전략</span>
@@ -3898,13 +3898,13 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "8px" }}>
                   <div style={{ background: C.card, borderRadius: "8px", padding: "10px" }}>
                     <div style={{ fontSize: "14px", color: C.text3, marginBottom: "3px" }}>목표가</div>
-                    <div style={{ fontSize: "17px", fontWeight: 800, color: C.green }}>{fmtP(targetPrice || techData.analystTarget)}</div>
+                    <div style={{ fontSize: "18px", fontWeight: 800, color: C.green }}>{fmtP(targetPrice || techData.analystTarget)}</div>
                     {upside && <div style={{ fontSize: "15px", color: C.green, marginTop: "2px" }}>+{upside}%</div>}
                     {lv?.targetSources && <div style={{ fontSize: "14px", color: C.text3, marginTop: "4px", lineHeight: 1.4 }}>{lv.targetSources.slice(0, 3).join(" · ")}</div>}
                   </div>
                   <div style={{ background: C.card, borderRadius: "8px", padding: "10px" }}>
                     <div style={{ fontSize: "14px", color: C.text3, marginBottom: "3px" }}>손절가</div>
-                    <div style={{ fontSize: "17px", fontWeight: 800, color: C.red }}>{fmtP(stopLoss)}</div>
+                    <div style={{ fontSize: "18px", fontWeight: 800, color: C.red }}>{fmtP(stopLoss)}</div>
                     {downside > 0 && <div style={{ fontSize: "15px", color: C.red, marginTop: "2px" }}>-{downside}%</div>}
                     {lv?.stopSources && <div style={{ fontSize: "14px", color: C.text3, marginTop: "4px", lineHeight: 1.4 }}>{lv.stopSources.slice(0, 3).join(" · ")}</div>}
                   </div>
@@ -3916,7 +3916,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                     <div style={{ fontSize: "14px", color: C.text3, marginBottom: "5px" }}>지지선</div>
                     {sup1 ? (
                       <>
-                        <div style={{ fontSize: "17px", fontWeight: 700, color: C.blue }}>{fmtP(sup1.price)}</div>
+                        <div style={{ fontSize: "18px", fontWeight: 700, color: C.blue }}>{fmtP(sup1.price)}</div>
                         <div style={{ fontSize: "14px", color: C.text3, marginTop: "2px" }}>{sup1.sources.slice(0, 2).join(" · ")} <span style={{ color: C.blue }}>×{sup1.weight.toFixed(0)}</span></div>
                         {sup2 && <div style={{ fontSize: "15px", color: C.text3, marginTop: "4px" }}>2차: {fmtP(sup2.price)} <span style={{ fontSize: "14px" }}>({sup2.sources[0]})</span></div>}
                       </>
@@ -3926,7 +3926,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                     <div style={{ fontSize: "14px", color: C.text3, marginBottom: "5px" }}>저항선</div>
                     {res1 ? (
                       <>
-                        <div style={{ fontSize: "17px", fontWeight: 700, color: C.purple }}>{fmtP(res1.price)}</div>
+                        <div style={{ fontSize: "18px", fontWeight: 700, color: C.purple }}>{fmtP(res1.price)}</div>
                         <div style={{ fontSize: "14px", color: C.text3, marginTop: "2px" }}>{res1.sources.slice(0, 2).join(" · ")} <span style={{ color: C.purple }}>×{res1.weight.toFixed(0)}</span></div>
                         {res2 && <div style={{ fontSize: "15px", color: C.text3, marginTop: "4px" }}>2차: {fmtP(res2.price)} <span style={{ fontSize: "14px" }}>({res2.sources[0]})</span></div>}
                       </>
@@ -3957,7 +3957,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             {/* ═══ 퀀트 전략 백테스트 결과 (상위 5개) ═══ */}
             {bt.length > 0 && (
               <div style={{ padding: "0 20px 12px" }}>
-                <div style={{ background: C.bg, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
+                <div style={{ background: C.bg, borderRadius: "12px", padding: "16px", border: `1px solid ${C.border}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                     <span style={{ fontSize: "16px", fontWeight: 700, color: C.text3 }}>📊 퀀트 전략 백테스트 (1년)</span>
                     <span style={{ fontSize: "14px", color: C.text3 }}>상위 {bt.length}개</span>
@@ -4011,7 +4011,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
         {/* ═══ 기술적 지표 요약 ═══ */}
         {techData && (
           <div style={{ padding: "0 20px 16px" }}>
-            <div style={{ background: C.card, borderRadius: "14px", padding: "16px", border: `1px solid ${C.border}` }}>
+            <div style={{ background: C.card, borderRadius: "12px", padding: "16px", border: `1px solid ${C.border}` }}>
               <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>기술적 지표</div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: "6px" }}>
                 {[
@@ -4027,7 +4027,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 ].map(({ label, value, color, sub }) => (
                   <div key={label} style={{ background: C.card2, borderRadius: "10px", padding: "8px 10px", textAlign: "center" }}>
                     <div style={{ fontSize: "14px", color: C.text3, marginBottom: "3px" }}>{label}</div>
-                    <div style={{ fontWeight: 700, fontSize: "17px", color: color || C.text1 }}>{value}</div>
+                    <div style={{ fontWeight: 700, fontSize: "18px", color: color || C.text1 }}>{value}</div>
                     {sub && <div style={{ fontSize: "14px", color: C.text3, marginTop: "2px" }}>{sub}</div>}
                   </div>
                 ))}
@@ -4038,13 +4038,13 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                     <span style={{ fontSize: "15px", fontWeight: 700, color: C.text3 }}>수급 흐름</span>
                     {enriched.macdDivType && (
-                      <span style={{ fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                      <span style={{ fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "6px",
                         background: enriched.macdDivType === "bullish" ? `${C.green}18` : `${C.red}18`,
                         color: enriched.macdDivType === "bullish" ? C.green : C.red,
                       }}>{enriched.macdDivType === "bullish" ? "MACD ↑" : "MACD ↓"}</span>
                     )}
                     {enriched.obvDivType && (
-                      <span style={{ fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "5px",
+                      <span style={{ fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "6px",
                         background: enriched.obvDivType === "bullish" ? `${C.green}18` : `${C.red}18`,
                         color: enriched.obvDivType === "bullish" ? C.green : C.red,
                       }}>{enriched.obvDivType === "bullish" ? "OBV ↑" : "OBV ↓"}</span>
@@ -4053,10 +4053,10 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                   {enriched.cmf != null && (
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <span style={{ fontSize: "15px", color: C.text3, width: "30px", flexShrink: 0 }}>CMF</span>
-                      <div style={{ flex: 1, height: "6px", background: `${C.border}40`, borderRadius: "3px", overflow: "hidden", position: "relative" }}>
+                      <div style={{ flex: 1, height: "6px", background: `${C.border}40`, borderRadius: "4px", overflow: "hidden", position: "relative" }}>
                         <div style={{ position: "absolute", left: "50%", top: 0, width: "1px", height: "100%", background: C.text3 + "44" }} />
                         <div style={{
-                          position: "absolute", top: 0, height: "100%", borderRadius: "3px",
+                          position: "absolute", top: 0, height: "100%", borderRadius: "4px",
                           background: enriched.cmf >= 0 ? C.green : C.red,
                           left: enriched.cmf >= 0 ? "50%" : `${50 + (enriched.cmf * 100)}%`,
                           width: `${Math.min(Math.abs(enriched.cmf) * 100, 50)}%`,
@@ -4070,9 +4070,9 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                   {enriched.mfi != null && (
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <span style={{ fontSize: "15px", color: C.text3, width: "30px", flexShrink: 0 }}>MFI</span>
-                      <div style={{ flex: 1, height: "6px", background: `${C.border}40`, borderRadius: "3px", overflow: "hidden" }}>
+                      <div style={{ flex: 1, height: "6px", background: `${C.border}40`, borderRadius: "4px", overflow: "hidden" }}>
                         <div style={{
-                          height: "100%", borderRadius: "3px",
+                          height: "100%", borderRadius: "4px",
                           width: `${enriched.mfi}%`,
                           background: enriched.mfi < 20 ? C.purple : enriched.mfi > 80 ? C.red : enriched.mfi < 30 ? C.green : enriched.mfi > 70 ? C.yellow : C.blue,
                         }} />
@@ -4129,7 +4129,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               navigator.clipboard.writeText(shareText).then(() => showToast("진단 결과가 복사되었습니다!", "success")).catch(() => {});
             }
           }} style={{
-            width: "100%", padding: "10px 0", borderRadius: "10px", fontSize: "17px", fontWeight: 600,
+            width: "100%", padding: "10px 0", borderRadius: "10px", fontSize: "18px", fontWeight: 600,
             background: "transparent", color: C.text3, border: `1px solid ${C.border}${C.isDark ? '30' : '50'}`,
             cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
             transition: "all .15s",
@@ -4340,18 +4340,18 @@ function AppInner() {
     if (isMobile) {
       if (px <= 9) return "12px";
       if (px <= 10) return "12px";
-      if (px <= 11) return "13px";
-      if (px <= 12) return "13px";
+      if (px <= 11) return "14px";
+      if (px <= 12) return "14px";
       return `${px}px`;
     }
     // PC: 전체적으로 폰트 스케일업 (웹접근성 개선)
     if (px <= 9) return "12px";
-    if (px <= 10) return "13px";
+    if (px <= 10) return "14px";
     if (px <= 11) return "14px";
     if (px <= 12) return "14px";
     if (px <= 13) return "15px";
     if (px <= 14) return "16px";
-    if (px <= 15) return "17px";
+    if (px <= 15) return "18px";
     if (px <= 16) return "18px";
     return `${Math.round(px * 1.12)}px`;
   }, [isMobile]);
@@ -7349,7 +7349,7 @@ function AppInner() {
                     <div style={{ fontSize: "19px", fontWeight: 800, color: C.text1, marginBottom: "4px", letterSpacing: "-0.5px" }}>
                       {displayName ? `${displayName}님, ${greetText}` : greetText} 👋
                     </div>
-                    <div style={{ fontSize: "13px", color: C.text3, fontWeight: 500 }}>
+                    <div style={{ fontSize: "14px", color: C.text3, fontWeight: 500 }}>
                       {new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "long" })}
                     </div>
                   </div>
@@ -7365,8 +7365,8 @@ function AppInner() {
                   }}>
                     <span style={{ fontSize: "20px", display: "inline-block" }}>🔥</span>
                     <div>
-                      <div style={{ fontSize: "17px", fontWeight: 800, color: streakData.count > 3 ? C.red : C.orange, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{streakData.count}</div>
-                      <div style={{ fontSize: "11px", color: C.text3, fontWeight: 600 }}>{t("tabs.home.streakDays") || "일 연속"}</div>
+                      <div style={{ fontSize: "18px", fontWeight: 800, color: streakData.count > 3 ? C.red : C.orange, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{streakData.count}</div>
+                      <div style={{ fontSize: "12px", color: C.text3, fontWeight: 600 }}>{t("tabs.home.streakDays") || "일 연속"}</div>
                     </div>
                   </div>
                 </div>
@@ -7391,14 +7391,14 @@ function AppInner() {
                 </p>
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
                   <button onClick={() => setShowAuthModal(true)} style={{
-                    padding: "12px 28px", borderRadius: "14px", fontSize: "15px", fontWeight: 800,
+                    padding: "12px 28px", borderRadius: "12px", fontSize: "15px", fontWeight: 800,
                     background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`,
                     color: "#fff", border: "none", cursor: "pointer",
                     boxShadow: `0 4px 16px ${C.blue}30`,
                     transition: "all 0.2s",
                   }}>무료 가입하기</button>
                   <button onClick={() => setTab("screener")} style={{
-                    padding: "12px 28px", borderRadius: "14px", fontSize: "15px", fontWeight: 700,
+                    padding: "12px 28px", borderRadius: "12px", fontSize: "15px", fontWeight: 700,
                     background: `${C.card2}`, color: C.text2,
                     border: `1px solid ${C.border}`,
                     cursor: "pointer", transition: "all 0.2s",
@@ -7432,8 +7432,8 @@ function AppInner() {
                   }}
                   onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 4px 16px rgba(0,0,0,${C.isDark ? '0.4' : '0.12'})`; }}
                   onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 2px 8px rgba(0,0,0,${C.isDark ? '0.3' : '0.08'})`; }}>
-                    <span style={{ fontSize: "22px" }}>{item.icon}</span>
-                    <span style={{ fontSize: "11px", fontWeight: 700, color: C.text2, whiteSpace: "nowrap" }}>{item.label}</span>
+                    <span style={{ fontSize: "24px" }}>{item.icon}</span>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: C.text2, whiteSpace: "nowrap" }}>{item.label}</span>
                   </button>
                 ))}
               </div>
@@ -7487,7 +7487,7 @@ function AppInner() {
                       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                         <span style={{ fontSize: "16px", color: C.text1, fontWeight: 800, letterSpacing: "-0.5px" }}>{t("tabs.home.marketBriefing")}</span>
                         {marketIndices.length > 0 && (
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", padding: "2px 7px", borderRadius: "5px", background: `${C.green}12`, fontSize: "11px", fontWeight: 700, color: C.green }}>
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", padding: "2px 7px", borderRadius: "6px", background: `${C.green}12`, fontSize: "12px", fontWeight: 700, color: C.green }}>
                             <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: C.green, animation: "livePulse 1.5s ease-in-out infinite" }} /> LIVE
                           </span>
                         )}
@@ -7648,8 +7648,8 @@ function AppInner() {
                       {/* 등락 바 */}
                       <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "8px" }}>
                         <span style={{ fontSize: "12px", fontWeight: 700, color: C.green, minWidth: "32px" }}>{upCount}↑</span>
-                        <div style={{ flex: 1, height: "6px", borderRadius: "3px", background: C.card2, overflow: "hidden", display: "flex", boxShadow: `inset 0 1px 2px rgba(0,0,0,0.2)` }}>
-                          <div style={{ width: `${upPct}%`, background: C.green, borderRadius: "3px 0 0 3px", transition: "width .5s" }} />
+                        <div style={{ flex: 1, height: "6px", borderRadius: "4px", background: C.card2, overflow: "hidden", display: "flex", boxShadow: `inset 0 1px 2px rgba(0,0,0,0.2)` }}>
+                          <div style={{ width: `${upPct}%`, background: C.green, borderRadius: "4px 0 0 3px", transition: "width .5s" }} />
                           <div style={{ flex: 1, background: C.red, borderRadius: "0 3px 3px 0" }} />
                         </div>
                         <span style={{ fontSize: "12px", fontWeight: 700, color: C.red, minWidth: "32px", textAlign: "right" }}>{dnCount}↓</span>
@@ -7665,7 +7665,7 @@ function AppInner() {
                           minWidth: "80px",
                         }}>
                           <span style={{ fontSize: "24px", fontWeight: 900, color: fgColor, lineHeight: 1, letterSpacing: "-0.5px" }}>{fgVal}</span>
-                          <span style={{ fontSize: "11px", fontWeight: 700, color: fgColor, opacity: 0.9 }}>{fgLabel}</span>
+                          <span style={{ fontSize: "12px", fontWeight: 700, color: fgColor, opacity: 0.9 }}>{fgLabel}</span>
                         </div>
                       )}
                     </div>
@@ -7694,7 +7694,7 @@ function AppInner() {
               return (
                 <div style={{
                   background: `linear-gradient(135deg, ${C.isDark ? '#0A1628' : '#F0F4FF'} 0%, ${C.isDark ? '#141024' : '#F5F0FF'} 100%)`,
-                  borderRadius: "18px", padding: isMobile ? "16px" : "18px 20px",
+                  borderRadius: "16px", padding: isMobile ? "16px" : "18px 20px",
                   border: `1px solid ${C.purple}12`,
                   position: "relative", overflow: "hidden",
                 }}>
@@ -7706,7 +7706,7 @@ function AppInner() {
                       display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px",
                     }}>🤖</div>
                     <span style={{ fontWeight: 800, fontSize: "14px", color: C.text1 }}>AI 시장 인사이트</span>
-                    <span style={{ fontSize: "11px", color: C.text3, marginLeft: "auto" }}>방금 업데이트</span>
+                    <span style={{ fontSize: "12px", color: C.text3, marginLeft: "auto" }}>방금 업데이트</span>
                   </div>
                   {insights.map((txt, i) => (
                     <div key={i} style={{
@@ -7802,13 +7802,13 @@ function AppInner() {
 
                   {/* 오늘 진행률 */}
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                    <div style={{ flex: 1, height: "4px", borderRadius: "2px", background: `${C.border}30`, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${pct}%`, borderRadius: "2px",
+                    <div style={{ flex: 1, height: "4px", borderRadius: "4px", background: `${C.border}30`, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${pct}%`, borderRadius: "4px",
                         background: pct === 100 ? C.green : `linear-gradient(90deg, ${C.blue}, ${C.purple})`,
                         transition: "width .5s ease",
                       }} />
                     </div>
-                    <span style={{ fontSize: "11px", fontWeight: 700, color: pct === 100 ? C.green : C.text3, whiteSpace: "nowrap" }}>
+                    <span style={{ fontSize: "12px", fontWeight: 700, color: pct === 100 ? C.green : C.text3, whiteSpace: "nowrap" }}>
                       {totalPoints}/{maxPoints}
                     </span>
                   </div>
@@ -7847,8 +7847,8 @@ function AppInner() {
                         >
                           <span style={{ fontSize: "16px" }}>{done ? "✅" : c.icon}</span>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: "13px", fontWeight: 700, color: done ? C.green : C.text1, lineHeight: 1.2 }}>{c.title}</div>
-                            <div style={{ fontSize: "11px", color: C.text3, lineHeight: 1.2 }}>{done ? `+${c.points}XP 획득` : c.desc}</div>
+                            <div style={{ fontSize: "14px", fontWeight: 700, color: done ? C.green : C.text1, lineHeight: 1.2 }}>{c.title}</div>
+                            <div style={{ fontSize: "12px", color: C.text3, lineHeight: 1.2 }}>{done ? `+${c.points}XP 획득` : c.desc}</div>
                           </div>
                         </button>
                       );
@@ -7858,7 +7858,7 @@ function AppInner() {
                     <div style={{
                       marginTop: "10px", padding: "8px 14px", borderRadius: "10px", textAlign: "center",
                       background: `linear-gradient(90deg, ${C.green}15, ${C.blue}10)`,
-                      fontSize: "13px", fontWeight: 700, color: C.green,
+                      fontSize: "14px", fontWeight: 700, color: C.green,
                     }}>🏆 올클리어! +{XP_REWARDS.daily_all_clear}XP 보너스 획득</div>
                   )}
                 </div>
@@ -7885,9 +7885,9 @@ function AppInner() {
                       background: `linear-gradient(135deg, ${C.yellow}30, ${C.orange}20)`,
                       display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px",
                     }}>⚡</div>
-                    <span style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>{t("tabs.home.anomalyDetection")}</span>
+                    <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{t("tabs.home.anomalyDetection")}</span>
                     <span style={{
-                      fontSize: "13px", padding: "2px 10px", borderRadius: "10px", fontWeight: 700,
+                      fontSize: "14px", padding: "2px 10px", borderRadius: "10px", fontWeight: 700,
                       background: `${C.red}18`, color: C.red, letterSpacing: "0.3px",
                     }}>{anomalies.length}{t("tabs.home.count") || "건"}</span>
                   </div>
@@ -7895,7 +7895,7 @@ function AppInner() {
                     {anomalies.slice(0, 3).map((a, i) => (
                       <div key={a.symbol} onClick={() => { setSelectedAsset(a); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
                         display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "12px", cursor: "pointer", borderRadius: "14px",
+                        padding: "12px", cursor: "pointer", borderRadius: "12px",
                         transition: "all .2s", background: `${C.card2}30`,
                         border: `1px solid ${C.border}10`,
                       }}
@@ -7912,7 +7912,7 @@ function AppInner() {
                           }}>{a.anomalyType === "surge" ? "🚀" : "💥"}</div>
                           <div style={{ minWidth: 0 }}>
                             <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "2px" }}>{a.name}</div>
-                            <div style={{ fontSize: "13px", color: C.text3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            <div style={{ fontSize: "14px", color: C.text3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                               {a.anomalyReasons[0]}
                             </div>
                           </div>
@@ -7926,7 +7926,7 @@ function AppInner() {
                           </div>
                           {a.severity === "high" && (
                             <span style={{
-                              fontSize: "11px", color: C.red, fontWeight: 700,
+                              fontSize: "12px", color: C.red, fontWeight: 700,
                               padding: "1px 6px", borderRadius: "4px", background: `${C.red}15`,
                             }}>{t("tabs.home.severe")}</span>
                           )}
@@ -7941,7 +7941,7 @@ function AppInner() {
             {/* ── 포트폴리오 벤치마킹 ─── */}
             {benchmarkData && (
               <div onClick={() => { setTab("portfolio"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
-                background: C.card, borderRadius: "18px", padding: "18px 20px", cursor: "pointer",
+                background: C.card, borderRadius: "16px", padding: "18px 20px", cursor: "pointer",
                 border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`, transition: "transform .15s",
               }}
               onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
@@ -7949,7 +7949,7 @@ function AppInner() {
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <span style={{ fontSize: "18px" }}>📊</span>
-                    <span style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>{t("tabs.home.myPortfolio")}</span>
+                    <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{t("tabs.home.myPortfolio")}</span>
                   </div>
                   <span style={{ fontSize: "16px", color: C.text3 }}>{portfolio.length}{t("tabs.home.items")} →</span>
                 </div>
@@ -7977,11 +7977,11 @@ function AppInner() {
                     <div key={b.label} style={{ flex: 1, textAlign: "center" }}>
                       <div style={{ fontSize: "16px", color: C.text3, marginBottom: "4px" }}>{b.label}</div>
                       <div style={{
-                        height: "4px", borderRadius: "2px", background: C.card2, overflow: "hidden",
+                        height: "4px", borderRadius: "4px", background: C.card2, overflow: "hidden",
                       }}>
                         <div style={{
                           width: `${Math.min(Math.max(Math.abs(b.value) * 5, 5), 100)}%`,
-                          height: "100%", borderRadius: "2px", background: b.color, transition: "width .5s",
+                          height: "100%", borderRadius: "4px", background: b.color, transition: "width .5s",
                         }} />
                       </div>
                       <div style={{ fontSize: "16px", fontWeight: 700, color: b.color, marginTop: "3px" }}>
@@ -8045,7 +8045,7 @@ function AppInner() {
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <span style={{ fontSize: "18px" }}>🏅</span>
                       <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>투자 랭킹</span>
-                      <span style={{ fontSize: "11px", fontWeight: 600, color: C.text3, padding: "2px 8px", borderRadius: "6px", background: `${C.border}20` }}>XP 기준</span>
+                      <span style={{ fontSize: "12px", fontWeight: 600, color: C.text3, padding: "2px 8px", borderRadius: "6px", background: `${C.border}20` }}>XP 기준</span>
                     </div>
                     <button onClick={() => { setTab("profile"); setTimeout(() => { try { document.getElementById("ranking-section")?.scrollIntoView({ behavior: "smooth" }); } catch {} }, 200); }} style={{
                       fontSize: "12px", color: C.blue, background: `${C.blue}10`, border: `1px solid ${C.blue}20`,
@@ -8072,7 +8072,7 @@ function AppInner() {
                               background: `${u.tierInfo.color}15`, color: u.tierInfo.color,
                             }}>Lv.{u.level}</span>
                           </div>
-                          <div style={{ fontSize: "11px", color: C.text3 }}>
+                          <div style={{ fontSize: "12px", color: C.text3 }}>
                             적중률 {u.winRate}% · {u.predictions}회 예측
                           </div>
                         </div>
@@ -8087,7 +8087,7 @@ function AppInner() {
                     <button onClick={() => setShowAuthModal(true)} style={{
                       width: "100%", marginTop: "12px", padding: "10px", borderRadius: "12px",
                       border: `1px dashed ${C.blue}40`, background: `${C.blue}08`,
-                      color: C.blue, fontSize: "13px", fontWeight: 700, cursor: "pointer",
+                      color: C.blue, fontSize: "14px", fontWeight: 700, cursor: "pointer",
                       transition: "all .2s",
                     }}
                     onMouseEnter={e => e.currentTarget.style.background = `${C.blue}15`}
@@ -8143,7 +8143,7 @@ function AppInner() {
                         <div key={pick.symbol} onClick={() => { setSelectedAsset(pick); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }}
                           style={{
                             display: "flex", alignItems: "center", justifyContent: "space-between",
-                            padding: "12px", cursor: "pointer", borderRadius: "14px",
+                            padding: "12px", cursor: "pointer", borderRadius: "12px",
                             transition: "all .2s", background: isTop3 ? `${C.card2}40` : "transparent",
                             border: `1px solid ${isTop3 ? C.border + '12' : 'transparent'}`,
                             minWidth: isMobile ? "280px" : undefined,
@@ -8218,12 +8218,12 @@ function AppInner() {
                 : hotViewMode === "losers" ? baseSorted.filter(a => a.change < 0).slice(0, hotExpanded ? 30 : 8)
                 : baseAssets.slice(0, hotExpanded ? 50 : 10);
               return (
-                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+                <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                       {[["all", t("tabs.home.all")], ["gainers", t("tabs.home.gainers")], ["losers", t("tabs.home.losers")]].map(([k, l]) => (
                         <button key={k} onClick={() => setHotViewMode(k)} style={{
-                          padding: "5px 12px", borderRadius: "8px", fontSize: "17px", fontWeight: 700,
+                          padding: "5px 12px", borderRadius: "8px", fontSize: "18px", fontWeight: 700,
                           background: hotViewMode === k ? (k === "gainers" ? C.greenBg : k === "losers" ? C.redBg : C.blueBg) : "transparent",
                           color: hotViewMode === k ? (k === "gainers" ? C.green : k === "losers" ? C.red : C.blue) : C.text3,
                           border: "none", cursor: "pointer", transition: "all .15s",
@@ -8233,7 +8233,7 @@ function AppInner() {
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                       <label style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", fontSize: "16px", color: C.text3 }}>
                         <span onClick={() => setHideRisky(!hideRisky)} style={{
-                          width: "32px", height: "18px", borderRadius: "9px", position: "relative",
+                          width: "32px", height: "18px", borderRadius: "8px", position: "relative",
                           background: hideRisky ? C.blue : C.card2, border: `1px solid ${hideRisky ? C.blue : C.border2}`,
                           transition: "all 0.2s", display: "inline-block", cursor: "pointer",
                         }}>
@@ -8278,9 +8278,9 @@ function AppInner() {
                             </div>
                           </div>
                           <div style={{ textAlign: "right" }}>
-                            <div style={{ fontWeight: 600, fontSize: "17px", color: C.text1 }}>{fmtPrice(asset.price, asset.market)}</div>
+                            <div style={{ fontWeight: 600, fontSize: "18px", color: C.text1 }}>{fmtPrice(asset.price, asset.market)}</div>
                             <div style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "flex-end" }}>
-                              <span style={{ fontSize: "17px", fontWeight: 600, color: isPos ? C.green : C.red }}>
+                              <span style={{ fontSize: "18px", fontWeight: 600, color: isPos ? C.green : C.red }}>
                                 {isPos ? "+" : ""}{asset.change}%
                               </span>
                               {ext && (
@@ -8294,7 +8294,7 @@ function AppInner() {
                       );
                     })}
                     {displayAssets.length === 0 && (
-                      <div style={{ textAlign: "center", padding: "16px", color: C.text3, fontSize: "17px" }}>
+                      <div style={{ textAlign: "center", padding: "16px", color: C.text3, fontSize: "18px" }}>
                         해당 종목이 없습니다
                       </div>
                     )}
@@ -8305,7 +8305,7 @@ function AppInner() {
 
             {/* 쿠팡 파트너스 배너 — 홈 중간 */}
             <div style={{ minHeight: 0, overflow: "hidden" }}>
-              <CoupangOfficialBanner width="728" height="90" bannerId={975392} style={{ margin: "4px 0", borderRadius: "14px", overflow: "hidden" }} />
+              <CoupangOfficialBanner width="728" height="90" bannerId={975392} style={{ margin: "4px 0", borderRadius: "12px", overflow: "hidden" }} />
             </div>
 
             </div>{/* end home-left */}
@@ -8357,7 +8357,7 @@ function AppInner() {
               return (
                 <div style={{
                   background: `linear-gradient(135deg, ${C.card} 0%, ${C.purple}08 100%)`,
-                  borderRadius: "18px", padding: "18px", border: `1px solid ${C.purple}15`,
+                  borderRadius: "16px", padding: "18px", border: `1px solid ${C.purple}15`,
                   position: "relative", overflow: "hidden", flexShrink: 0,
                 }}>
                   <div style={{ position: "absolute", top: "-30px", right: "-20px", width: "100px", height: "100px",
@@ -8383,7 +8383,7 @@ function AppInner() {
                         background: yesterdayResult ? `${C.green}10` : `${C.red}10`,
                         border: `1px solid ${yesterdayResult ? C.green : C.red}20`,
                         display: "flex", alignItems: "center", gap: "6px",
-                        fontSize: "13px", color: yesterdayResult ? C.green : C.red, fontWeight: 600,
+                        fontSize: "14px", color: yesterdayResult ? C.green : C.red, fontWeight: 600,
                       }}>
                         {yesterdayResult ? "✅" : "❌"} {t("tabs.home.yesterdayPrediction") || "어제 예측"}: {yesterdayResult ? (t("tabs.home.correct") || "적중!") : (t("tabs.home.wrong") || "빗나감")}
                         <span style={{ color: C.text3, fontWeight: 400 }}>
@@ -8482,7 +8482,7 @@ function AppInner() {
               return (
                 <div style={{
                   background: `linear-gradient(135deg, ${C.card} 0%, ${C.blue}08 100%)`,
-                  borderRadius: "18px", padding: "18px", border: `1px solid ${C.blue}15`,
+                  borderRadius: "16px", padding: "18px", border: `1px solid ${C.blue}15`,
                   position: "relative", overflow: "hidden", flexShrink: 0,
                 }}>
                   <div style={{ position: "absolute", top: "-20px", left: "-15px", width: "80px", height: "80px",
@@ -8514,7 +8514,7 @@ function AppInner() {
                         <div style={{ fontSize: "15px", fontWeight: 700, color: quizAnswered.correct ? C.green : C.red, marginTop: "4px" }}>
                           {quizAnswered.correct ? (t("tabs.home.quizCorrect") || "정답입니다!") : (t("tabs.home.quizWrong") || "아쉽네요!")}
                         </div>
-                        <div style={{ fontSize: "13px", color: C.text3, marginTop: "4px" }}>
+                        <div style={{ fontSize: "14px", color: C.text3, marginTop: "4px" }}>
                           {t("tabs.home.correctAnswer") || "정답"}: {todayQuiz.options[todayQuiz.answer]}
                         </div>
                         <div style={{ fontSize: "12px", color: C.text3, marginTop: "6px" }}>
@@ -8532,7 +8532,7 @@ function AppInner() {
                           }}
                           onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}12`; e.currentTarget.style.borderColor = `${C.blue}30`; e.currentTarget.style.color = C.text1; e.currentTarget.style.borderLeft = `3px solid ${C.blue}`; }}
                           onMouseLeave={e => { e.currentTarget.style.background = `${C.card2}40`; e.currentTarget.style.borderColor = `${C.border}20`; e.currentTarget.style.color = C.text2; e.currentTarget.style.borderLeft = "none"; }}>
-                            <span style={{ width: "28px", height: "28px", borderRadius: "50%", background: `${C.blue}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "13px", fontWeight: 700, color: C.blue, flexShrink: 0 }}>
+                            <span style={{ width: "28px", height: "28px", borderRadius: "50%", background: `${C.blue}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: 700, color: C.blue, flexShrink: 0 }}>
                               {String.fromCharCode(65 + idx)}
                             </span>
                             {opt}
@@ -8563,7 +8563,7 @@ function AppInner() {
               const earnedCount = badges.filter(b => b.earned).length;
 
               return (
-                <div style={{ background: C.card, borderRadius: "18px", padding: "18px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+                <div style={{ background: C.card, borderRadius: "16px", padding: "18px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                       <span style={{ fontSize: "16px" }}>🏆</span>
@@ -8584,8 +8584,8 @@ function AppInner() {
                         <div style={{ fontSize: "28px", marginBottom: "4px", filter: b.earned ? "none" : "grayscale(1)" }}>{b.icon}</div>
                         <div style={{ fontSize: "12px", fontWeight: 600, color: b.earned ? C.text1 : C.text3, lineHeight: 1.2 }}>{b.name}</div>
                         {!b.earned && (
-                          <div style={{ marginTop: "4px", height: "5px", borderRadius: "2px", background: C.card2, overflow: "hidden" }}>
-                            <div style={{ width: `${(b.progress / b.target) * 100}%`, height: "100%", background: C.blue, borderRadius: "2px", transition: "width .3s" }} />
+                          <div style={{ marginTop: "4px", height: "5px", borderRadius: "4px", background: C.card2, overflow: "hidden" }}>
+                            <div style={{ width: `${(b.progress / b.target) * 100}%`, height: "100%", background: C.blue, borderRadius: "4px", transition: "width .3s" }} />
                           </div>
                         )}
                       </div>
@@ -8596,7 +8596,7 @@ function AppInner() {
             })()}
 
             {/* ── 관심종목 (v10.3 유저별 격리) ─── */}
-            <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+            <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: watchlist.length > 0 ? "14px" : "0" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{t("tabs.home.watchlist")}</span>
@@ -8612,10 +8612,10 @@ function AppInner() {
               {!user ? (
                 <div style={{ textAlign: "center", padding: "32px 16px 20px" }}>
                   <div style={{ width: "56px", height: "56px", borderRadius: "16px", background: C.blueBg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", fontSize: "24px" }}>🔒</div>
-                  <div style={{ fontSize: "17px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>{t("tabs.home.loginToManageWatchlist")}</div>
-                  <div style={{ fontSize: "17px", color: C.text3, lineHeight: 1.6, marginBottom: "16px" }}>{t("tabs.home.realtimeQuantDescription")}</div>
+                  <div style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>{t("tabs.home.loginToManageWatchlist")}</div>
+                  <div style={{ fontSize: "18px", color: C.text3, lineHeight: 1.6, marginBottom: "16px" }}>{t("tabs.home.realtimeQuantDescription")}</div>
                   <button onClick={() => setShowAuth(true)} style={{
-                    padding: "10px 24px", borderRadius: "10px", fontSize: "17px", fontWeight: 700,
+                    padding: "10px 24px", borderRadius: "10px", fontSize: "18px", fontWeight: 700,
                     background: C.blue, color: "#fff", border: "none", cursor: "pointer",
                   }}>{t("tabs.home.loginOrSignup")}</button>
                 </div>
@@ -8772,7 +8772,7 @@ function AppInner() {
               }).filter(Boolean).sort((a, b) => b.diag.score - a.diag.score);
               if (!watchDiags.length) return null;
               return (
-                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+                <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
                     <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>📊 투자 진단 & 매수 타점</span>
                     <span style={{ fontSize: mf(11), color: C.text3 }}>실시간 분석</span>
@@ -8825,8 +8825,8 @@ function AppInner() {
                               return (
                                 <div key={c.name} style={{ flex: 1, textAlign: "center" }}>
                                   <div style={{ fontSize: "15px", color: C.text3, marginBottom: "3px" }}>{c.name}</div>
-                                  <div style={{ height: "4px", borderRadius: "2px", background: `${C.border}40`, overflow: "hidden" }}>
-                                    <div style={{ height: "100%", width: `${c.score}%`, background: catColor, borderRadius: "2px", transition: "width .5s" }} />
+                                  <div style={{ height: "4px", borderRadius: "4px", background: `${C.border}40`, overflow: "hidden" }}>
+                                    <div style={{ height: "100%", width: `${c.score}%`, background: catColor, borderRadius: "4px", transition: "width .5s" }} />
                                   </div>
                                   <div style={{ fontSize: "15px", fontWeight: 700, color: catColor, marginTop: "2px" }}>{c.score}</div>
                                 </div>
@@ -8895,7 +8895,7 @@ function AppInner() {
               const reportTime = now.toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 
               return (
-                <div onClick={() => { setTab("quant-report"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`, borderRadius: "18px", padding: "20px", cursor: "pointer", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+                <div onClick={() => { setTab("quant-report"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`, borderRadius: "16px", padding: "20px", cursor: "pointer", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
                     <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{t("tabs.home.quantReport")}</span>
                     <span style={{ fontSize: mf(11), color: C.text3 }}>{reportTime} {t("tabs.home.asOf")} →</span>
@@ -8913,7 +8913,7 @@ function AppInner() {
                       </svg>
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: "17px", fontWeight: 800, color: mktColor, marginBottom: "5px" }}>{mktVerdict}</div>
+                      <div style={{ fontSize: "18px", fontWeight: 800, color: mktColor, marginBottom: "5px" }}>{mktVerdict}</div>
                       <div style={{ fontSize: "16px", color: C.text3, lineHeight: 1.5 }}>
                         {sp ? `S&P ${sp.change >= 0 ? "+" : ""}${sp.change}%` : ""}{nq ? ` · ${t("tabs.home.nasdaqLabel")} ${nq.change >= 0 ? "+" : ""}${nq.change}%` : ""}
                         {ks ? ` · ${t("tabs.home.kospiLabel")} ${ks.change >= 0 ? "+" : ""}${ks.change}%` : ""}
@@ -8925,19 +8925,19 @@ function AppInner() {
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "14px" }}>
                     <div style={{ padding: "10px 12px", borderRadius: "10px", background: `${C.green}10` }}>
                       <div style={{ fontSize: mf(11), color: C.text3, marginBottom: "3px" }}>{t("tabs.home.risingAssets")}</div>
-                      <div style={{ fontSize: "17px", fontWeight: 700, color: C.green }}>{upCount}개 <span style={{ fontSize: "16px", color: C.text3 }}>/ {hotAssets.length}</span></div>
+                      <div style={{ fontSize: "18px", fontWeight: 700, color: C.green }}>{upCount}개 <span style={{ fontSize: "16px", color: C.text3 }}>/ {hotAssets.length}</span></div>
                     </div>
                     <div style={{ padding: "10px 12px", borderRadius: "10px", background: `${C.red}10` }}>
                       <div style={{ fontSize: mf(11), color: C.text3, marginBottom: "3px" }}>{t("tabs.home.fallingAssets")}</div>
-                      <div style={{ fontSize: "17px", fontWeight: 700, color: C.red }}>{dnCount}개 <span style={{ fontSize: "16px", color: C.text3 }}>/ {hotAssets.length}</span></div>
+                      <div style={{ fontSize: "18px", fontWeight: 700, color: C.red }}>{dnCount}개 <span style={{ fontSize: "16px", color: C.text3 }}>/ {hotAssets.length}</span></div>
                     </div>
                     <div style={{ padding: "10px 12px", borderRadius: "10px", background: `${C.yellow}10` }}>
                       <div style={{ fontSize: mf(11), color: C.text3, marginBottom: "3px" }}>{t("tabs.home.fearGreedLabel")}</div>
-                      <div style={{ fontSize: "17px", fontWeight: 700, color: fg ? (fg > 60 ? C.green : fg > 40 ? C.yellow : C.red) : C.text3 }}>{fg || "—"} <span style={{ fontSize: "16px", color: C.text3 }}>{fg ? (fg <= 25 ? t("tabs.home.extremeFear") : fg <= 40 ? t("tabs.home.fear") : fg <= 60 ? t("tabs.home.neutral") : fg <= 75 ? t("tabs.home.greed") : t("tabs.home.extremeGreed")) : ""}</span></div>
+                      <div style={{ fontSize: "18px", fontWeight: 700, color: fg ? (fg > 60 ? C.green : fg > 40 ? C.yellow : C.red) : C.text3 }}>{fg || "—"} <span style={{ fontSize: "16px", color: C.text3 }}>{fg ? (fg <= 25 ? t("tabs.home.extremeFear") : fg <= 40 ? t("tabs.home.fear") : fg <= 60 ? t("tabs.home.neutral") : fg <= 75 ? t("tabs.home.greed") : t("tabs.home.extremeGreed")) : ""}</span></div>
                     </div>
                     <div style={{ padding: "10px 12px", borderRadius: "10px", background: `${C.blue}10` }}>
                       <div style={{ fontSize: mf(11), color: C.text3, marginBottom: "3px" }}>{t("tabs.home.recommendedBuy")}</div>
-                      <div style={{ fontSize: "17px", fontWeight: 700, color: C.blue }}>{buyPicks}개 <span style={{ fontSize: "16px", color: C.text3 }}>/ {dailyPicks.length}</span></div>
+                      <div style={{ fontSize: "18px", fontWeight: 700, color: C.blue }}>{buyPicks}개 <span style={{ fontSize: "16px", color: C.text3 }}>/ {dailyPicks.length}</span></div>
                     </div>
                   </div>
 
@@ -8968,14 +8968,14 @@ function AppInner() {
               const pnlAmt = totalValue - totalCost;
               return (
                 <div onClick={() => { setTab("portfolio"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
-                  background: C.card, borderRadius: "18px", padding: "20px 22px", cursor: "pointer",
+                  background: C.card, borderRadius: "16px", padding: "20px 22px", cursor: "pointer",
                   transition: "transform .15s", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`,
                 }}
                 onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
                 onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
                     <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{t("tabs.home.myPortfolio")}</span>
-                    <span style={{ fontSize: "17px", color: C.text3 }}>{portfolio.length}개 →</span>
+                    <span style={{ fontSize: "18px", color: C.text3 }}>{portfolio.length}개 →</span>
                   </div>
                   {totalValue > 0 ? (
                     <div style={{ display: "flex", alignItems: "baseline", gap: "10px", flexWrap: "wrap" }}>
@@ -8983,7 +8983,7 @@ function AppInner() {
                         {currency === "KRW" ? `₩${Math.round(totalValue * krwRate).toLocaleString()}` : `$${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
                       </span>
                       <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                        <span style={{ fontSize: "17px", fontWeight: 700, color: pnl >= 0 ? C.green : C.red }}>
+                        <span style={{ fontSize: "18px", fontWeight: 700, color: pnl >= 0 ? C.green : C.red }}>
                           {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}%
                         </span>
                         <span style={{ fontSize: "16px", color: C.text3 }}>
@@ -9022,7 +9022,7 @@ function AppInner() {
               ];
 
               return (
-                <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+                <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   {/* 헤더 */}
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
                     <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>경제 캘린더 <span style={{ fontSize: "16px", fontWeight: 500, color: C.text3 }}>(KST)</span></span>
@@ -9115,7 +9115,7 @@ function AppInner() {
                               <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "1px" }}>
                                 <span style={{ fontSize: mf(10), color: C.text3 }}>{dayName} {kstHour}:{kstMin}</span>
                                 <span style={{
-                                  fontSize: "14px", fontWeight: 700, padding: "1px 4px", borderRadius: "3px",
+                                  fontSize: "14px", fontWeight: 700, padding: "1px 4px", borderRadius: "4px",
                                   background: evt.status === "오늘" ? C.redBg : evt.status === "임박" ? C.yellowBg : evt.status === "예정" ? C.blueBg : C.card2,
                                   color: evt.status === "오늘" ? C.red : evt.status === "임박" ? C.yellow : evt.status === "예정" ? C.blue : C.text3,
                                 }}>{evt.status}</span>
@@ -9125,7 +9125,7 @@ function AppInner() {
                             {/* 이벤트명 + 아이콘 */}
                             <div style={{ minWidth: 0, overflow: "hidden" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                                <span style={{ fontSize: "17px", flexShrink: 0 }}>{evt.icon}</span>
+                                <span style={{ fontSize: "18px", flexShrink: 0 }}>{evt.icon}</span>
                                 <span style={{
                                   fontWeight: 600, fontSize: "16px", color: C.text1,
                                   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
@@ -9201,7 +9201,7 @@ function AppInner() {
             })()}
 
             {/* 쿠팡 파트너스 배너 — 사이드바 */}
-            <CoupangOfficialBanner width="320" height="100" bannerId={975393} style={{ margin: "4px 0", borderRadius: "14px", overflow: "hidden" }} />
+            <CoupangOfficialBanner width="320" height="100" bannerId={975393} style={{ margin: "4px 0", borderRadius: "12px", overflow: "hidden" }} />
 
             </div>{/* end home-right */}
             </div>{/* end home-grid */}
@@ -9220,9 +9220,9 @@ function AppInner() {
               <div style={{ position: "absolute", top: "-20px", right: "-10px", fontSize: "80px", opacity: 0.06 }}>🤖</div>
               <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                 <div style={{
-                  width: "48px", height: "48px", borderRadius: "14px",
+                  width: "48px", height: "48px", borderRadius: "12px",
                   background: `linear-gradient(135deg, ${C.purple}, #6D28D9)`,
-                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px", flexShrink: 0,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", flexShrink: 0,
                 }}>🤖</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 800, fontSize: "18px", color: C.text1, marginBottom: "4px" }}>AI 퀀트 전략</div>
@@ -9246,8 +9246,8 @@ function AppInner() {
               }}
               onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
               onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
-                <div style={{ fontSize: "22px", marginBottom: "8px" }}>📊</div>
-                <div style={{ fontWeight: 700, fontSize: "17px", marginBottom: "5px", color: C.text1 }}>전략 운용</div>
+                <div style={{ fontSize: "24px", marginBottom: "8px" }}>📊</div>
+                <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "5px", color: C.text1 }}>전략 운용</div>
                 <div style={{ fontSize: "16px", color: C.text3 }}>33개 전략 포트폴리오</div>
                 <div style={{ fontSize: "16px", color: C.green, fontWeight: 600, marginTop: "6px" }}>
                   실시간 수익률 추적 →
@@ -9260,8 +9260,8 @@ function AppInner() {
               }}
               onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
               onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
-                <div style={{ fontSize: "22px", marginBottom: "8px" }}>🛡️</div>
-                <div style={{ fontWeight: 700, fontSize: "17px", marginBottom: "5px", color: C.text1 }}>리스크 관리</div>
+                <div style={{ fontSize: "24px", marginBottom: "8px" }}>🛡️</div>
+                <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "5px", color: C.text1 }}>리스크 관리</div>
                 <div style={{ fontSize: "16px", color: C.text3 }}>8-Point 히트맵</div>
                 <div style={{ fontSize: "16px", color: C.red, fontWeight: 600, marginTop: "6px" }}>
                   위험 수준 확인 →
@@ -9271,7 +9271,7 @@ function AppInner() {
 
             {/* ── 섹터 히트맵 (접기/펼치기) ─── */}
             {sectorPerf.length > 0 && (
-              <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+              <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                 <div onClick={() => toggleSection("sector")} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
                   <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>섹터 성과</span>
                   <span style={{ fontSize: "16px", color: C.text3 }}>{homeSection.sector ? "▲" : "▼"}</span>
@@ -9299,7 +9299,7 @@ function AppInner() {
                           style={{ background: bg, borderRadius: "10px", padding: "10px 6px", textAlign: "center", cursor: "pointer" }}>
                           <div style={{ fontSize: "18px" }}>{sec.icon}</div>
                           <div style={{ fontSize: mf(10), fontWeight: 600, color: C.text2, margin: "2px 0" }}>{sec.name}</div>
-                          <div style={{ fontSize: "17px", fontWeight: 800, color: sec.change1d >= 0 ? C.green : C.red }}>
+                          <div style={{ fontSize: "18px", fontWeight: 800, color: sec.change1d >= 0 ? C.green : C.red }}>
                             {sec.change1d >= 0 ? "+" : ""}{sec.change1d}%
                           </div>
                         </div>
@@ -9311,7 +9311,7 @@ function AppInner() {
             )}
 
             {/* ── 전체 종목 (접기/펼치기) ─── */}
-            <div style={{ background: C.card, borderRadius: "18px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+            <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
               <div onClick={() => toggleSection("allAssets")} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
                 <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>전체 종목</span>
                 <span style={{ fontSize: "16px", color: C.text3 }}>{ALL_ASSETS.length}개 {homeSection.allAssets ? "▲" : "▼"}</span>
@@ -9360,7 +9360,7 @@ function AppInner() {
               marginTop: "32px", paddingTop: "24px",
               borderTop: `1px solid ${C.border}20`,
               display: "flex", flexWrap: "wrap", justifyContent: "center",
-              gap: "16px", fontSize: "13px", color: C.text3,
+              gap: "16px", fontSize: "14px", color: C.text3,
             }}>
               <span onClick={() => setTab("about")} style={{ cursor: "pointer", transition: "color .15s" }}
                 onMouseEnter={e => e.target.style.color = C.text2}
@@ -9424,7 +9424,7 @@ function AppInner() {
                         setMode(preset.mode);
                       }
                     }} style={{
-                      padding: isMobile ? "10px 12px" : "12px 14px", borderRadius: "14px", textAlign: "left", cursor: "pointer", minHeight: "44px", display: "flex", flexDirection: "column", justifyContent: "center",
+                      padding: isMobile ? "10px 12px" : "12px 14px", borderRadius: "12px", textAlign: "left", cursor: "pointer", minHeight: "44px", display: "flex", flexDirection: "column", justifyContent: "center",
                       background: isActive ? presetBg : `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
                       border: `1px solid ${isActive ? `${presetColor}40` : `${C.border}20`}`,
                       transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)", position: "relative", overflow: "hidden",
@@ -9479,8 +9479,8 @@ function AppInner() {
                   </button>
                   {scanning && (
                     <div style={{ flex: 1, minWidth: "80px" }}>
-                      <div style={{ height: "4px", background: C.border2, borderRadius: "2px", overflow: "hidden" }}>
-                        <div style={{ height: "100%", background: C.blue, borderRadius: "2px", width: `${scanProgress.total ? (scanProgress.done / scanProgress.total) * 100 : 0}%`, transition: "width .3s" }} />
+                      <div style={{ height: "4px", background: C.border2, borderRadius: "4px", overflow: "hidden" }}>
+                        <div style={{ height: "100%", background: C.blue, borderRadius: "4px", width: `${scanProgress.total ? (scanProgress.done / scanProgress.total) * 100 : 0}%`, transition: "width .3s" }} />
                       </div>
                     </div>
                   )}
@@ -9495,7 +9495,7 @@ function AppInner() {
             {/* ── 직접 조건 설정 (접이식) ── */}
             <details style={{ marginBottom: "16px" }} open={!activePreset}>
               <summary style={{
-                padding: "14px 20px", borderRadius: "14px", cursor: "pointer",
+                padding: "14px 20px", borderRadius: "12px", cursor: "pointer",
                 background: C.card, border: `1px solid ${C.border}20`,
                 fontWeight: 700, fontSize: "18px", color: C.text1,
                 display: "flex", alignItems: "center", gap: "8px", listStyle: "none",
@@ -9610,7 +9610,7 @@ function AppInner() {
               {conditions.length === 0 && !scanning && !results.length && (
                 <div style={{
                   textAlign: "center", padding: "14px", borderRadius: "10px", marginBottom: "10px",
-                  background: C.blueBg, border: `1px solid ${C.blue}33`, fontSize: "17px", color: C.blue,
+                  background: C.blueBg, border: `1px solid ${C.blue}33`, fontSize: "18px", color: C.blue,
                 }}>
                   💡 위에서 스크리닝 조건을 1개 이상 선택한 후 스캔을 시작하세요
                 </div>
@@ -9630,9 +9630,9 @@ function AppInner() {
                 </button>
                 {scanning && (
                   <div style={{ flex: 1, minWidth: "120px" }}>
-                    <div style={{ height: "4px", background: C.border2, borderRadius: "2px", overflow: "hidden" }}>
+                    <div style={{ height: "4px", background: C.border2, borderRadius: "4px", overflow: "hidden" }}>
                       <div style={{
-                        height: "100%", background: C.blue, borderRadius: "2px",
+                        height: "100%", background: C.blue, borderRadius: "4px",
                         width: `${scanProgress.total ? (scanProgress.done / scanProgress.total) * 100 : 0}%`, transition: "width .3s",
                       }} />
                     </div>
@@ -9680,7 +9680,7 @@ function AppInner() {
 
             {/* 대기 상태 */}
             {!scanning && results.length === 0 && (
-              <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "48px 24px", textAlign: "center" }}>
+              <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "16px", padding: "48px 24px", textAlign: "center" }}>
                 <div style={{ fontSize: mf(44), marginBottom: "16px" }}>{lastScan ? "🔍" : "📡"}</div>
                 <div style={{ fontWeight: 700, fontSize: mf(18), marginBottom: "8px", color: C.text1 }}>
                   {lastScan ? "시그널 없음" : "스캔 대기 중"}
@@ -9712,7 +9712,7 @@ function AppInner() {
             {results.length > 0 && <GoogleAd format="in-feed" slot="screener-results" style={{ margin: "16px 0" }} />}
 
             {!scanning && results.length > 0 && filtered.length === 0 && (
-              <div style={{ background: C.card, borderRadius: "18px", padding: "32px", textAlign: "center" }}>
+              <div style={{ background: C.card, borderRadius: "16px", padding: "32px", textAlign: "center" }}>
                 <div style={{ fontSize: "32px", marginBottom: "8px" }}>🏷️</div>
                 <div style={{ fontWeight: 600, fontSize: mf(18), color: C.text2, marginBottom: "4px" }}>선택한 시장에 시그널 없음</div>
                 <div style={{ fontSize: mf(16), color: C.text3 }}>다른 시장 필터를 선택해보세요 (전체 {results.length}건 발견)</div>
@@ -9723,7 +9723,7 @@ function AppInner() {
             {/* ═══════════════════════════════════════════════════════
                 저평가 종목 통합 조회
             ═══════════════════════════════════════════════════════ */}
-            <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "22px 24px", marginTop: "20px" }}>
+            <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "16px", padding: "22px 24px", marginTop: "20px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: mf(18), marginBottom: "3px", color: C.text1 }}>💎 저평가 종목 통합 조회</div>
@@ -9743,9 +9743,9 @@ function AppInner() {
               </div>
 
               {valueScanning && (
-                <div style={{ height: "4px", background: C.border2, borderRadius: "2px", overflow: "hidden", marginBottom: "12px" }}>
+                <div style={{ height: "4px", background: C.border2, borderRadius: "4px", overflow: "hidden", marginBottom: "12px" }}>
                   <div style={{
-                    height: "100%", background: C.green, borderRadius: "2px",
+                    height: "100%", background: C.green, borderRadius: "4px",
                     width: `${valueScanProgress.total ? (valueScanProgress.done / valueScanProgress.total) * 100 : 0}%`,
                     transition: "width .3s",
                   }} />
@@ -9912,7 +9912,7 @@ function AppInner() {
               boxShadow: `0 4px 20px rgba(255,77,100,0.12)`,
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px" }}>
-                <div style={{ width: "48px", height: "48px", borderRadius: "14px",
+                <div style={{ width: "48px", height: "48px", borderRadius: "12px",
                   background: `linear-gradient(135deg, ${C.red}, ${C.yellow})`,
                   display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px"
                 }}>⚠️</div>
@@ -9944,7 +9944,7 @@ function AppInner() {
                     textAlign: "center", border: `1px solid ${C.border}60`,
                     boxShadow: `0 2px 12px rgba(0,0,0,0.2)`,
                   }}>
-                    <div style={{ fontSize: "22px", marginBottom: "6px" }}>{s.icon}</div>
+                    <div style={{ fontSize: "24px", marginBottom: "6px" }}>{s.icon}</div>
                     <div style={{ fontSize: "24px", fontWeight: 800, color: s.color }}>{s.value}</div>
                     <div style={{ fontSize: "16px", color: C.text3 }}>{s.label}</div>
                   </div>
@@ -9965,7 +9965,7 @@ function AppInner() {
                   : anomalies.filter(a => a.anomalyType === f.key).length;
                 return (
                   <button key={f.key} onClick={() => setAnomalyFilter(f.key)} style={{
-                    padding: "8px 16px", borderRadius: "12px", fontSize: "17px", fontWeight: 600,
+                    padding: "8px 16px", borderRadius: "12px", fontSize: "18px", fontWeight: 600,
                     background: anomalyFilter === f.key ? C.blueBg : C.card,
                     color: anomalyFilter === f.key ? C.blue : C.text2,
                     border: `1px solid ${anomalyFilter === f.key ? C.blue : C.border}40`,
@@ -9988,16 +9988,16 @@ function AppInner() {
                 : anomalies.filter(a => a.anomalyType === anomalyFilter);
               if (filtered.length === 0) return (
                 <div style={{
-                  background: C.card, borderRadius: "18px", padding: "48px 24px",
+                  background: C.card, borderRadius: "16px", padding: "48px 24px",
                   textAlign: "center", border: `1px solid ${C.border}20`,
                 }}>
                   <div style={{ fontSize: "48px", marginBottom: "16px" }}>
                     {anomalies.length === 0 ? "✅" : "🔍"}
                   </div>
-                  <div style={{ fontWeight: 700, fontSize: "17px", color: C.text1, marginBottom: "8px" }}>
+                  <div style={{ fontWeight: 700, fontSize: "18px", color: C.text1, marginBottom: "8px" }}>
                     {anomalies.length === 0 ? "이상 징후 없음" : "해당 필터 결과 없음"}
                   </div>
-                  <div style={{ color: C.text3, fontSize: "17px", lineHeight: 1.7 }}>
+                  <div style={{ color: C.text3, fontSize: "18px", lineHeight: 1.7 }}>
                     {anomalies.length === 0
                       ? <>현재 시장에서 통계적 이상치가 감지되지 않았습니다<br/>2σ 이상 변동, 3x 이상 거래량 폭증 시 알림됩니다</>
                       : <>다른 필터를 선택하거나 전체 보기를 이용하세요</>}
@@ -10012,7 +10012,7 @@ function AppInner() {
                     return (
                       <div key={`${a.symbol}-${i}`} style={{
                         background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
-                        borderRadius: "14px", borderLeft: `4px solid ${accentColor}`,
+                        borderRadius: "12px", borderLeft: `4px solid ${accentColor}`,
                         padding: isMobile ? "14px" : "18px 20px", border: `1px solid ${accentColor}40`,
                         cursor: "pointer", transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
                         boxShadow: `0 2px 8px rgba(0,0,0,0.15)`,
@@ -10037,7 +10037,7 @@ function AppInner() {
                             alignItems: "center", justifyContent: "center", fontSize: "18px",
                           }}>{isSurge ? "🚀" : "💥"}</div>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>{a.name}</div>
+                            <div style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{a.name}</div>
                             <div style={{ fontSize: "16px", color: C.text3, marginTop: "1px" }}>{a.symbol}</div>
                           </div>
                           <div style={{ textAlign: "right" }}>
@@ -10103,7 +10103,7 @@ function AppInner() {
 
             {/* ── 이상 탐지 히스토리 ── */}
             <div style={{
-              background: C.card, borderRadius: "18px", padding: "20px",
+              background: C.card, borderRadius: "16px", padding: "20px",
               border: `1px solid ${C.border}20`,
             }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
@@ -10119,7 +10119,7 @@ function AppInner() {
                 )}
               </div>
               {anomalyHistory.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "24px 0", color: C.text3, fontSize: "17px" }}>
+                <div style={{ textAlign: "center", padding: "24px 0", color: C.text3, fontSize: "18px" }}>
                   아직 기록된 이상 탐지 히스토리가 없습니다
                 </div>
               ) : (
@@ -10128,7 +10128,7 @@ function AppInner() {
                     <div key={i} style={{
                       display: "flex", alignItems: "center", gap: "10px",
                       padding: "10px 12px", borderRadius: "10px",
-                      background: `${C.card2}60`, fontSize: "17px",
+                      background: `${C.card2}60`, fontSize: "18px",
                     }}>
                       <span>{h.type === "surge" ? "🚀" : "💥"}</span>
                       <span style={{ fontWeight: 600, color: C.text1, flex: 1 }}>{h.name}</span>
@@ -10146,7 +10146,7 @@ function AppInner() {
 
             {/* 탐지 기준 설명 */}
             <div style={{
-              background: C.card, borderRadius: "18px", padding: "18px 20px",
+              background: C.card, borderRadius: "16px", padding: "18px 20px",
               border: `1px solid ${C.border}20`,
             }}>
               <h3 style={{ margin: "0 0 12px", fontSize: "18px", fontWeight: 700, color: C.text1 }}>📐 탐지 기준</h3>
@@ -10162,7 +10162,7 @@ function AppInner() {
                     background: `${C.card2}60`, border: `1px solid ${C.border}20`,
                   }}>
                     <div style={{ fontSize: "18px", marginBottom: "6px" }}>{c.icon}</div>
-                    <div style={{ fontSize: "17px", fontWeight: 600, color: C.text1, marginBottom: "3px" }}>{c.title}</div>
+                    <div style={{ fontSize: "18px", fontWeight: 600, color: C.text1, marginBottom: "3px" }}>{c.title}</div>
                     <div style={{ fontSize: "16px", color: C.text3, lineHeight: 1.5 }}>{c.desc}</div>
                   </div>
                 ))}
@@ -10269,7 +10269,7 @@ function AppInner() {
           return (
             <div className="tab-content flex flex-col gap-3" style={{ maxWidth: "1200px", margin: "0 auto" }}>
               {/* 헤더 */}
-              <div className="rounded-[18px] p-[22px_24px]" style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})` }}>
+              <div className="rounded-[16px] p-[22px_24px]" style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})` }}>
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-black text-xl" style={{ color: C.text1 }}>퀀트 리포트</span>
                   <div className="flex items-center gap-2">
@@ -10317,7 +10317,7 @@ function AppInner() {
               </div>
 
               {/* 주요 지수 현황 */}
-              <div className="rounded-[18px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+              <div className="rounded-[16px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                 <div className="font-bold text-lg mb-3.5" style={{ color: C.text1 }}>주요 지수</div>
                 <div className={isMobile ? "grid grid-cols-2 gap-2" : "grid grid-cols-3 gap-2"}>
                   {[
@@ -10346,7 +10346,7 @@ function AppInner() {
               </div>
 
               {/* 시장 센티먼트 지표 */}
-              <div className="rounded-[18px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+              <div className="rounded-[16px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                 <div className="font-bold text-lg mb-3.5" style={{ color: C.text1 }}>센티먼트 지표</div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-[10px] p-3" style={{ background: C.bg }}>
@@ -10397,7 +10397,7 @@ function AppInner() {
               </div>
 
               {/* 시장별 현황 */}
-              <div className="rounded-[18px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+              <div className="rounded-[16px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                 <div className="font-bold text-lg mb-3.5" style={{ color: C.text1 }}>시장별 현황</div>
                 <div className={isMobile ? "grid grid-cols-1 gap-2" : "grid grid-cols-3 gap-2"}>
                   {[
@@ -10443,7 +10443,7 @@ function AppInner() {
                 if (sectorData.length === 0) return null;
                 const maxAbs = Math.max(...sectorData.map(s => Math.abs(s.avgChange)), 1);
                 return (
-                  <div className="rounded-[18px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+                  <div className="rounded-[16px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                     <div className="font-bold text-lg mb-3.5" style={{ color: C.text1 }}>섹터 퍼포먼스</div>
                     <div className="grid gap-1.5" style={{ gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(140px, 1fr))" }}>
                       {sectorData.map(s => {
@@ -10472,7 +10472,7 @@ function AppInner() {
 
               {/* 급등/급락 TOP 5 */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div className="rounded-[18px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+                <div className="rounded-[16px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div className="flex items-center gap-1 mb-2.5">
                     <span className="w-2 h-2 rounded-full" style={{ background: C.green }} />
                     <span className="font-bold text-lg" style={{ color: C.text1 }}>급등 TOP 5</span>
@@ -10490,7 +10490,7 @@ function AppInner() {
                     </div>
                   ))}
                 </div>
-                <div className="rounded-[18px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+                <div className="rounded-[16px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div className="flex items-center gap-1 mb-2.5">
                     <span className="w-2 h-2 rounded-full" style={{ background: C.red }} />
                     <span className="font-bold text-lg" style={{ color: C.text1 }}>급락 TOP 5</span>
@@ -10512,7 +10512,7 @@ function AppInner() {
 
               {/* 추천 매수 종목 */}
               {topPicks.length > 0 && (
-                <div className="rounded-[18px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+                <div className="rounded-[16px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div className="font-bold text-lg mb-3.5" style={{ color: C.text1 }}>추천 매수 종목</div>
                   {topPicks.map((pick, i) => {
                     const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
@@ -10549,7 +10549,7 @@ function AppInner() {
 
               {/* 종목별 퀀트 전략 Top 10 — 클릭하면 상세 팝업에서 백테스트 확인 */}
               {topPicks.length > 0 && (
-                <div className="rounded-[18px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+                <div className="rounded-[16px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div className="flex items-center justify-between mb-3">
                     <span className="font-bold text-lg" style={{ color: C.text1 }}>종목별 퀀트 전략</span>
                     <span className="text-sm" style={{ color: C.text3 }}>종목 터치 → 백테스트 상세</span>
@@ -10597,7 +10597,7 @@ function AppInner() {
               )}
 
               {/* 오늘의 액션 플랜 */}
-              <div className="rounded-[18px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+              <div className="rounded-[16px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                 <div className="font-bold text-lg mb-3.5" style={{ color: C.text1 }}>📋 오늘의 액션 플랜</div>
                 <div className="flex flex-col gap-2">
                   {(() => {
@@ -10695,7 +10695,7 @@ function AppInner() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap", marginBottom: "14px" }}>
                 <div>
                   <div style={{ fontWeight: 800, fontSize: "24px", color: C.text1, marginBottom: "4px" }}>{t("tabs.news.title")}</div>
-                  <div style={{ fontSize: "13px", color: C.text3 }}>{t("tabs.news.subtitle")}</div>
+                  <div style={{ fontSize: "14px", color: C.text3 }}>{t("tabs.news.subtitle")}</div>
                 </div>
                 <button onClick={fetchNews} disabled={newsLoading} style={{
                   padding: "8px 16px", borderRadius: "10px", fontSize: "14px", fontWeight: 700,
@@ -10758,10 +10758,10 @@ function AppInner() {
 
             {newsLoading ? (
               <div className="flex flex-col gap-2">
-                {[1,2,3,4].map(i => <div key={i} className="skeleton rounded-[14px]" style={{ height: "100px" }} />)}
+                {[1,2,3,4].map(i => <div key={i} className="skeleton rounded-[12px]" style={{ height: "100px" }} />)}
               </div>
             ) : sortedNews.length === 0 ? (
-              <div style={{ background: C.card, border: `1px solid ${C.border}20`, textAlign: "center" }} className="rounded-[18px] p-12">
+              <div style={{ background: C.card, border: `1px solid ${C.border}20`, textAlign: "center" }} className="rounded-[16px] p-12">
                 <div style={{ background: C.blueBg }} className="w-14 h-14 rounded-[16px] flex items-center justify-center mx-auto mb-3.5 text-2xl">📰</div>
                 <div className="font-bold text-lg mb-1.5 text-foreground" style={{color: C.text1}}>아직 받아온 뉴스가 없어요</div>
                 <div className="text-base mb-5" style={{ color: C.text3 }}>오늘의 시장 뉴스를 한 번에 모아드릴게요</div>
@@ -11020,11 +11020,11 @@ function AppInner() {
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
                                 <div style={{ flex: 1 }}>
                                   <strong>{evt.icon} {evt.name}</strong>
-                                  <div style={{ fontSize: "13px", color: C.text2, marginTop: "3px" }}>
+                                  <div style={{ fontSize: "14px", color: C.text2, marginTop: "3px" }}>
                                     {timeStr} {evt.importance === "high" ? "🔴 높음" : "🟡 중간"}
                                   </div>
                                 </div>
-                                <div style={{ fontSize: "13px", fontWeight: 600, color: evt.actual && parseFloat(evt.actual) > parseFloat(evt.estimate) ? C.green : C.red }}>
+                                <div style={{ fontSize: "14px", fontWeight: 600, color: evt.actual && parseFloat(evt.actual) > parseFloat(evt.estimate) ? C.green : C.red }}>
                                   {resultStr}
                                 </div>
                               </div>
@@ -11231,11 +11231,11 @@ function AppInner() {
             <div style={{
               background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
               border: `1px solid ${C.border}20`,
-              borderRadius: "18px",
+              borderRadius: "16px",
               padding: "24px",
               marginBottom: "20px",
               boxShadow: "0 2px 12px rgba(0,0,0,0.2)",
-            }} className="rounded-[18px]">
+            }} className="rounded-[16px]">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <div className="font-bold text-lg">🚨 전략 매매 알림</div>
@@ -11300,7 +11300,7 @@ function AppInner() {
                       }
                     }} style={{
                       padding: "10px 20px",
-                      borderRadius: "14px",
+                      borderRadius: "12px",
                       fontSize: "16px",
                       fontWeight: 700,
                       cursor: "pointer",
@@ -11339,7 +11339,7 @@ function AppInner() {
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <span style={{ fontSize: "18px" }}>{settings.autoScanEnabled ? "🔄" : "⏸️"}</span>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: "17px" }}>자동 스캔</div>
+                      <div style={{ fontWeight: 700, fontSize: "18px" }}>자동 스캔</div>
                       <div style={{ fontSize: "16px", color: C.text3 }}>
                         {settings.autoScanEnabled
                           ? `${settings.autoScanInterval || 30}분 간격으로 자동 실행`
@@ -11446,7 +11446,7 @@ function AppInner() {
                         if (asset) { setSelectedAsset(asset); setTab("screener"); }
                       }} style={{
                         background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
-                        borderRadius: "14px",
+                        borderRadius: "12px",
                         padding: "16px",
                         borderLeft: `4px solid ${isBuy ? C.green : C.red}`,
                         cursor: "pointer",
@@ -11512,7 +11512,7 @@ function AppInner() {
             </div>
 
             {/* ── 텔레그램 설정 ── */}
-            <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "22px 24px", marginBottom: "12px" }}>
+            <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "16px", padding: "22px 24px", marginBottom: "12px" }}>
               <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "16px" }}>📱 텔레그램 연동</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 <div>
@@ -11549,7 +11549,7 @@ function AppInner() {
                     } catch (e) { setTgStatus(`❌ ${e.message}`); }
                   })();
                 }} style={{
-                  padding: "9px 20px", borderRadius: "10px", fontSize: "17px", fontWeight: 700,
+                  padding: "9px 20px", borderRadius: "10px", fontSize: "18px", fontWeight: 700,
                   background: C.blue, color: "#fff", border: "none",
                 }}>📤 연결 테스트</button>
               </div>
@@ -11562,23 +11562,23 @@ function AppInner() {
             </div>
 
             {/* ── 동기화 ── */}
-            <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "18px", padding: "22px 24px" }}>
+            <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "16px", padding: "22px 24px" }}>
               <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "16px" }}>🔄 데이터 동기화</div>
               <div style={{ marginBottom: "12px" }}>
                 <div style={{ fontSize: "16px", color: C.text3, marginBottom: "6px", fontWeight: 600 }}>동기화 PIN (4자리 이상)</div>
                 <input value={syncPin} onChange={e => setSyncPin(e.target.value)} type="password" placeholder="1234"
                   style={{
-                    width: "100%", padding: "10px 12px", borderRadius: "10px", fontSize: "17px",
+                    width: "100%", padding: "10px 12px", borderRadius: "10px", fontSize: "18px",
                     background: C.bg, border: `1px solid ${C.border2}`, color: C.text1, outline: "none", marginBottom: "12px",
                   }} />
               </div>
               <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
                 <button onClick={syncUpload} style={{
-                  padding: "9px 20px", borderRadius: "10px", fontSize: "17px", fontWeight: 700,
+                  padding: "9px 20px", borderRadius: "10px", fontSize: "18px", fontWeight: 700,
                   background: C.blue, color: "#fff", border: "none", flex: 1,
                 }}>📤 업로드</button>
                 <button onClick={syncDownload} style={{
-                  padding: "9px 20px", borderRadius: "10px", fontSize: "17px", fontWeight: 700,
+                  padding: "9px 20px", borderRadius: "10px", fontSize: "18px", fontWeight: 700,
                   background: C.green, color: "#fff", border: "none", flex: 1,
                 }}>📥 다운로드</button>
               </div>
@@ -11618,10 +11618,10 @@ function AppInner() {
             </div>
 
             {/* 검색 헤더 */}
-            <div style={{background:`linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,border:`1px solid ${C.border}20`,borderRadius:"18px",padding:"22px 24px",marginBottom:"12px",boxShadow:"0 2px 12px rgba(0,0,0,0.2)"}}>
+            <div style={{background:`linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,border:`1px solid ${C.border}20`,borderRadius:"16px",padding:"22px 24px",marginBottom:"12px",boxShadow:"0 2px 12px rgba(0,0,0,0.2)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"12px"}}>
                 <div>
-                  <div style={{fontWeight:800,fontSize:"17px",marginBottom:"4px",color:C.text1}}>{t("sentiment.title")}</div>
+                  <div style={{fontWeight:800,fontSize:"18px",marginBottom:"4px",color:C.text1}}>{t("sentiment.title")}</div>
                   <div style={{fontSize:"14px",color:C.text3}}>StockTwits · Reddit(WSB) 기반 실시간 투자 심리</div>
                 </div>
                 <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
@@ -11640,7 +11640,7 @@ function AppInner() {
               <div className={isMobile ? "hscroll" : ""} style={{display:"flex",gap:"6px",marginTop:"12px",flexWrap:isMobile?"nowrap":"wrap",overflowX:isMobile?"auto":"visible",WebkitOverflowScrolling:"touch"}}>
                 {["SPY","AAPL","NVDA","TSLA","MSFT","AMZN","META","AMD","GOOG","COIN"].map(s=>(
                   <button key={s} onClick={()=>{setSentimentSymbol(s);fetchSentiment(s);}} style={{
-                    padding:"4px 10px",borderRadius:"6px",fontSize:"13px",fontWeight:600,
+                    padding:"4px 10px",borderRadius:"6px",fontSize:"14px",fontWeight:600,
                     background:sentimentSymbol===s?C.blueBg:C.card2,color:sentimentSymbol===s?C.blue:C.text3,
                     border:`1px solid ${sentimentSymbol===s?C.blue+"55":C.border2}`,cursor:"pointer",flexShrink:0
                   }}>{s}</button>
@@ -11661,7 +11661,7 @@ function AppInner() {
                 <div style={{
                   background:`linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
                   border:`1px solid ${C.border}20`,
-                  borderRadius:"18px",
+                  borderRadius:"16px",
                   padding:"28px",
                   marginBottom:"12px",
                   textAlign:"center",
@@ -11774,7 +11774,7 @@ function AppInner() {
                   margin:"0 auto",
                   boxShadow:"0 2px 12px rgba(0,0,0,0.2)",
                 }}>
-                  <div style={{fontWeight:700,fontSize:"17px",marginBottom:"12px"}}>트렌딩 심볼</div>
+                  <div style={{fontWeight:700,fontSize:"18px",marginBottom:"12px"}}>트렌딩 심볼</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
                     {sentimentData.trending.map((t,i)=>(
                       <button key={i} onClick={()=>{setSentimentSymbol(t.symbol);fetchSentiment(t.symbol);}} style={{
@@ -11804,7 +11804,7 @@ function AppInner() {
             {!sentimentLoading && !sentimentData && (
               <div style={{textAlign:"center",padding:"60px 24px",color:C.text3}}>
                 <div style={{fontSize:"48px",marginBottom:"12px"}}>💬</div>
-                <div style={{fontWeight:600,fontSize:"17px",marginBottom:"4px"}}>소셜 센티먼트 분석</div>
+                <div style={{fontWeight:600,fontSize:"18px",marginBottom:"4px"}}>소셜 센티먼트 분석</div>
                 <div style={{fontSize:"16px"}}>심볼을 입력하고 "분석" 버튼을 클릭하세요</div>
               </div>
             )}
@@ -11888,11 +11888,11 @@ function AppInner() {
                 </div>
                 <div style={{ display: "flex", gap: "8px" }}>
                   <button onClick={() => setTab("mypage")} style={{
-                    padding: "7px 14px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                    padding: "7px 14px", borderRadius: "10px", fontSize: "14px", fontWeight: 600,
                     background: C.card, border: `1px solid ${C.border}30`, color: C.text2, cursor: "pointer",
                   }}>내 정보</button>
                   <button onClick={toggleTheme} style={{
-                    padding: "7px 12px", borderRadius: "10px", fontSize: "13px", fontWeight: 600,
+                    padding: "7px 12px", borderRadius: "10px", fontSize: "14px", fontWeight: 600,
                     background: C.card, border: `1px solid ${C.border}30`, color: C.text2, cursor: "pointer",
                   }}>{themeMode === "dark" ? "🌙" : "☀️"}</button>
                 </div>
@@ -11939,7 +11939,7 @@ function AppInner() {
                 ].map((item, i) => (
                   <button key={i} onClick={() => item.action ? item.action() : setTab(item.tab)} style={{
                     display: "flex", flexDirection: "column", alignItems: "center", gap: "6px",
-                    padding: "12px 4px", borderRadius: "14px", border: "none",
+                    padding: "12px 4px", borderRadius: "12px", border: "none",
                     background: "transparent", cursor: "pointer",
                     transition: "background .15s",
                   }}
@@ -11970,7 +11970,7 @@ function AppInner() {
                   display: "flex", alignItems: "center", gap: "14px",
                 }}>
                   <div style={{
-                    width: "48px", height: "48px", borderRadius: "14px",
+                    width: "48px", height: "48px", borderRadius: "12px",
                     background: `${xpInfo.tier.color}15`,
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: "24px",
@@ -11979,12 +11979,12 @@ function AppInner() {
                     <div style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "6px" }}>
                       <span style={{ fontSize: "16px", fontWeight: 800, color: xpInfo.tier.color }}>Lv.{xpInfo.level}</span>
                       <span style={{ fontSize: "12px", color: C.text3 }}>{xpInfo.tier.name}</span>
-                      <span style={{ fontSize: "13px", fontWeight: 700, color: C.blue, marginLeft: "auto" }}>{xpData.total.toLocaleString()} XP</span>
+                      <span style={{ fontSize: "14px", fontWeight: 700, color: C.blue, marginLeft: "auto" }}>{xpData.total.toLocaleString()} XP</span>
                     </div>
-                    <div style={{ height: "4px", borderRadius: "2px", background: `${C.border}30`, overflow: "hidden" }}>
+                    <div style={{ height: "4px", borderRadius: "4px", background: `${C.border}30`, overflow: "hidden" }}>
                       <div style={{
                         height: "100%", width: `${Math.round(xpInfo.progress * 100)}%`,
-                        borderRadius: "2px",
+                        borderRadius: "4px",
                         background: `linear-gradient(90deg, ${xpInfo.tier.color}, ${C.blue})`,
                       }} />
                     </div>
@@ -12072,7 +12072,7 @@ function AppInner() {
                               <span style={{ fontWeight: 700, fontSize: "14px", color: u.isMe ? C.blue : C.text1 }}>{u.name}{u.isMe ? " (나)" : ""}</span>
                               <span style={{ fontSize: "10px", fontWeight: 700, padding: "1px 6px", borderRadius: "6px", background: `${u.tierInfo.color}15`, color: u.tierInfo.color }}>Lv.{u.level}</span>
                             </div>
-                            <div style={{ fontSize: "11px", color: C.text3 }}>적중률 {u.winRate}% · {u.predictions}회 예측</div>
+                            <div style={{ fontSize: "12px", color: C.text3 }}>적중률 {u.winRate}% · {u.predictions}회 예측</div>
                           </div>
                           <div style={{ textAlign: "right" }}>
                             <div style={{ fontWeight: 800, fontSize: "14px", color: u.tierInfo.color }}>{u.xp.toLocaleString()} XP</div>
@@ -12170,19 +12170,19 @@ function AppInner() {
                         ? <img src={user.user_metadata.avatar_url} alt="사용자 프로필" width="72" height="72" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover" }} />
                         : displayName[0].toUpperCase()}
                     </div>
-                    <div style={{ position: "absolute", bottom: "-4px", right: "-8px", background: C.card, border: `2px solid ${xpInfo.tier.color}`, borderRadius: "8px", padding: "1px 6px", fontSize: "11px", fontWeight: 800, color: xpInfo.tier.color }}>{xpInfo.tier.icon} Lv.{xpInfo.level}</div>
+                    <div style={{ position: "absolute", bottom: "-4px", right: "-8px", background: C.card, border: `2px solid ${xpInfo.tier.color}`, borderRadius: "8px", padding: "1px 6px", fontSize: "12px", fontWeight: 800, color: xpInfo.tier.color }}>{xpInfo.tier.icon} Lv.{xpInfo.level}</div>
                   </div>
                   <h2 style={{ margin: "0 0 4px", fontSize: "20px", fontWeight: 900, color: C.text1 }}>{displayName}</h2>
-                  <div style={{ fontSize: "13px", color: C.text3, marginBottom: "14px" }}>{user?.email}</div>
+                  <div style={{ fontSize: "14px", color: C.text3, marginBottom: "14px" }}>{user?.email}</div>
                   <div style={{ background: `${C.card}CC`, borderRadius: "12px", padding: "12px", textAlign: "left" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
                       <span style={{ fontSize: "14px", fontWeight: 700, color: xpInfo.tier.color }}>Lv.{xpInfo.level} {xpInfo.tier.name}</span>
                       <span style={{ fontSize: "14px", fontWeight: 700, color: C.blue }}>{xpData.total.toLocaleString()} XP</span>
                     </div>
-                    <div style={{ height: "5px", borderRadius: "3px", background: `${C.border}30`, overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${Math.round(xpInfo.progress * 100)}%`, borderRadius: "3px", background: `linear-gradient(90deg, ${xpInfo.tier.color}, ${C.blue})` }} />
+                    <div style={{ height: "5px", borderRadius: "4px", background: `${C.border}30`, overflow: "hidden" }}>
+                      <div style={{ height: "100%", width: `${Math.round(xpInfo.progress * 100)}%`, borderRadius: "4px", background: `linear-gradient(90deg, ${xpInfo.tier.color}, ${C.blue})` }} />
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "11px", color: C.text3 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "12px", color: C.text3 }}>
                       <span>{xpInfo.currentLevelXp}/{xpInfo.nextLevelXp} XP</span>
                       <span>다음 레벨까지 {xpInfo.nextLevelXp - xpInfo.currentLevelXp} XP</span>
                     </div>
@@ -12240,7 +12240,7 @@ function AppInner() {
             {/* 친구 초대 */}
             <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
               <div style={{ fontSize: "14px", fontWeight: 800, color: C.text1, marginBottom: "10px" }}>친구 초대</div>
-              <div style={{ fontSize: "13px", color: C.text3, marginBottom: "12px" }}>AI 퀀트 전략을 무료로 이용할 수 있어요</div>
+              <div style={{ fontSize: "14px", color: C.text3, marginBottom: "12px" }}>AI 퀀트 전략을 무료로 이용할 수 있어요</div>
               <div style={{ display: "flex", gap: "8px" }}>
                 <button onClick={() => {
                   const txt = "AI가 매수 타점 잡아주는 투자앱이야. 무료인데 한번 써봐 👉 https://zepta.vercel.app";
@@ -12284,7 +12284,7 @@ function AppInner() {
             {/* ── 핵심 기능 카드 그리드 ── */}
             <div style={{ marginBottom: "40px" }}>
               <h2 style={{
-                fontSize: isMobile ? "22px" : "26px", fontWeight: 800, color: C.text1,
+                fontSize: isMobile ? "24px" : "24px", fontWeight: 800, color: C.text1,
                 marginBottom: "24px", textAlign: "center"
               }}>Zepta의 핵심 기능</h2>
               <div style={{
@@ -12321,7 +12321,7 @@ function AppInner() {
                   }}>
                     <div style={{ fontSize: "36px", marginBottom: "12px" }}>{f.icon}</div>
                     <h3 style={{ fontSize: "16px", fontWeight: 800, color: C.text1, marginBottom: "6px" }}>{f.title}</h3>
-                    <p style={{ fontSize: "13px", color: C.text3, lineHeight: 1.5, margin: 0 }}>{f.desc}</p>
+                    <p style={{ fontSize: "14px", color: C.text3, lineHeight: 1.5, margin: 0 }}>{f.desc}</p>
                   </div>
                 ))}
               </div>
@@ -12736,7 +12736,7 @@ function AppInner() {
         position: "fixed", bottom: isMobile ? "100px" : "28px", right: isMobile ? "16px" : "28px",
         width: "56px", height: "56px", borderRadius: "16px", border: "none",
         background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`,
-        color: "#fff", fontSize: "26px", cursor: "pointer",
+        color: "#fff", fontSize: "24px", cursor: "pointer",
         boxShadow: "0 4px 20px rgba(59,130,246,0.4)",
         zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center",
         transition: "transform .2s, box-shadow .2s",
@@ -12762,14 +12762,14 @@ function AppInner() {
             padding: "16px 20px", borderBottom: `1px solid ${C.border}20`,
             background: `linear-gradient(135deg, ${C.card} 0%, ${C.blueBg} 100%)`,
           }}>
-            <div style={{ fontWeight: 700, fontSize: "17px", color: C.text1 }}>🤖 AI 투자 어시스턴트</div>
+            <div style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>🤖 AI 투자 어시스턴트</div>
             <div style={{ fontSize: "16px", color: C.text3, marginTop: "2px" }}>퀀트 데이터 기반 실시간 분석</div>
           </div>
 
           {/* 메시지 영역 */}
           <div style={{ flex: 1, overflow: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: "12px", minHeight: "200px" }}>
             {aiMessages.length === 0 && (
-              <div style={{ textAlign: "center", padding: "16px 0", color: C.text3, fontSize: "17px" }}>
+              <div style={{ textAlign: "center", padding: "16px 0", color: C.text3, fontSize: "18px" }}>
                 <div style={{ fontSize: "28px", marginBottom: "8px" }}>👋</div>
                 <div style={{ fontWeight: 600, color: C.text1, marginBottom: "4px" }}>무엇이든 물어보세요</div>
                 <div style={{ fontSize: "16px", marginBottom: "14px" }}>종목 분석, 시장 현황, 리스크 점검까지</div>
@@ -12796,14 +12796,14 @@ function AppInner() {
                 padding: "10px 14px", borderRadius: m.role === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
                 background: m.role === "user" ? C.blue : C.card2,
                 color: m.role === "user" ? "#fff" : C.text1,
-                fontSize: "17px", lineHeight: 1.6, whiteSpace: "pre-wrap",
+                fontSize: "18px", lineHeight: 1.6, whiteSpace: "pre-wrap",
               }}>
                 {m.text}
               </div>
             ))}
             {aiLoading && (
-              <div style={{ alignSelf: "flex-start", padding: "10px 14px", borderRadius: "14px 14px 14px 4px", background: C.card2 }}>
-                <span style={{ animation: "pulse 1s infinite", fontSize: "17px", color: C.text3 }}>분석 중...</span>
+              <div style={{ alignSelf: "flex-start", padding: "10px 14px", borderRadius: "12px 14px 14px 4px", background: C.card2 }}>
+                <span style={{ animation: "pulse 1s infinite", fontSize: "18px", color: C.text3 }}>분석 중...</span>
               </div>
             )}
           </div>
@@ -12822,7 +12822,7 @@ function AppInner() {
               }}
             />
             <button onClick={() => handleAiChat(aiInput)} disabled={aiLoading || !aiInput.trim()} style={{
-              padding: "10px 18px", borderRadius: "12px", fontSize: "17px", fontWeight: 700,
+              padding: "10px 18px", borderRadius: "12px", fontSize: "18px", fontWeight: 700,
               background: aiInput.trim() ? C.blue : C.card2,
               color: aiInput.trim() ? "#fff" : C.text3,
               border: "none", cursor: aiInput.trim() ? "pointer" : "default", whiteSpace: "nowrap",
@@ -12905,7 +12905,7 @@ function AppInner() {
                           fontWeight: 800, fontSize: "14px", color: C.blue,
                         }}>{s.symbol.slice(0, 4)}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: "17px", color: C.text1 }}>{s.name}</div>
+                          <div style={{ fontWeight: 600, fontSize: "18px", color: C.text1 }}>{s.name}</div>
                           <div style={{ fontSize: "16px", color: C.text3 }}>🇺🇸 {s.symbol}</div>
                         </div>
                       </button>
@@ -12994,7 +12994,7 @@ function AppInner() {
             return (
               <div key={t.id} style={{
                 background: bgGradient,
-                color: "#fff", padding: "14px 20px", borderRadius: "14px", fontSize: "15px", fontWeight: 600,
+                color: "#fff", padding: "14px 20px", borderRadius: "12px", fontSize: "15px", fontWeight: 600,
                 boxShadow: `0 8px 28px ${shadowColor}`,
                 pointerEvents: "auto", maxWidth: "min(360px, 90vw)",
                 textAlign: "center", animation: "toastSlideIn 0.35s ease-out",
