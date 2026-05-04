@@ -245,6 +245,7 @@ async function monitorUser(userId) {
         holdMs: c.holdMs,
         feeBps: c.feeBps,
         slippageBps: c.slippageBps,
+        regime: c.regime || null, // ★ 진입 시점 시장 레짐 스냅샷 (Hurst bucket 분석용)
       }));
       // 새 항목을 앞에 추가 (시간 역순). 1000개로 cap.
       const merged = [...lite, ...prevArchive].slice(0, 1000);

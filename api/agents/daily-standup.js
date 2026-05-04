@@ -130,6 +130,55 @@ async function readClosedArchive(kv) {
   return (await kv.get(`di:real:user:${PROBE_USER}:shadow-closed-archive`)) || [];
 }
 
+// ★ Hurst bucket 분석 — 진입 시점 시장 레짐별 승률/PnL 집계.
+// regime snapshot 이 entry 에 동봉되기 시작한 이후의 거래만 의미 있음 (이전 거래는
+// regime: null → "unknown" bucket 으로 분류). 1주일치 데이터 누적되면 soft/strict
+// 모드 승급 결정의 직접 근거.
+function analyzeRegimeBuckets(archive) {
+  if (!Array.isArray(archive) || archive.length === 0) return null;
+  const buckets = {
+    trending: { trades: 0, wins: 0, netPnL: 0, hurstSum: 0 },        // > 0.55
+    transitional: { trades: 0, wins: 0, netPnL: 0, hurstSum: 0 },    // 0.45 ~ 0.55
+    mean_reverting: { trades: 0, wins: 0, netPnL: 0, hurstSum: 0 },  // < 0.45
+    unknown: { trades: 0, wins: 0, netPnL: 0, hurstSum: 0 },         // regime snapshot 없음
+  };
+  let withRegime = 0;
+  for (const c of archive) {
+    const h = c.regime?.avgHurst;
+    let key = "unknown";
+    if (Number.isFinite(h)) {
+      withRegime += 1;
+      if (h > 0.55) key = "trending";
+      else if (h < 0.45) key = "mean_reverting";
+      else key = "transitional";
+    }
+    const b = buckets[key];
+    b.trades += 1;
+    if ((c.netPnL || 0) > 0) b.wins += 1;
+    b.netPnL += (c.netPnL || 0);
+    if (Number.isFinite(h)) b.hurstSum += h;
+  }
+  // 정리
+  const out = {};
+  for (const [k, b] of Object.entries(buckets)) {
+    if (b.trades === 0) continue;
+    out[k] = {
+      trades: b.trades,
+      wins: b.wins,
+      losses: b.trades - b.wins,
+      winRate: Number(((b.wins / b.trades) * 100).toFixed(1)),
+      netPnL: Number(b.netPnL.toFixed(2)),
+      avgHurst: b.hurstSum > 0 ? Number((b.hurstSum / b.trades).toFixed(3)) : null,
+    };
+  }
+  return {
+    totalArchive: archive.length,
+    withRegimeSnapshot: withRegime,
+    coverage: archive.length ? Number(((withRegime / archive.length) * 100).toFixed(1)) : 0,
+    buckets: out,
+  };
+}
+
 // QUANT-RES 가 사용할 자동 백테스트 — OHLC 정확 시뮬 (Track B 통합)
 // archive 가 있으면 archive 사용, 없으면 ledger.closed 30건 샘플 fallback.
 // 변형 5개 (3 SL × 변동 TP) × 30건 ≈ 150 fetch ≈ 15~25초 (Vercel 60s 한도 내).
@@ -206,12 +255,15 @@ async function retroBacktest(archive, ledgerClosed) {
     }
   }
   variants.sort((a, b) => (b.netPnL || -Infinity) - (a.netPnL || -Infinity));
+  // ★ Hurst regime bucket 분석 (전체 archive 풀 대상, 샘플링 안 함 — 모든 데이터 활용)
+  const regimeBuckets = analyzeRegimeBuckets(pool);
   return {
     sourceSize: pool.length,
     sampledSize: sample.length,
     source,
     baseline,
     topVariants: variants.slice(0, 3),
+    regimeBuckets,
   };
 }
 
@@ -369,6 +421,48 @@ async function runQuantResearcher(client, ledger, weights, summary, retroResult)
     retroBlock = lines.join("\n");
   } else if (retroResult) {
     retroBlock = `${retroResult.source} 데이터 ${retroResult.sourceSize}건 (10건 미만, 통계 의미 부족)`;
+  }
+
+  // ★ Hurst regime bucket 분석 — 어떤 시장 환경에서 들어간 거래가 이겼는지 (regime filter 승급 근거)
+  let regimeBlock = "(레짐 스냅샷 데이터 부족 — 1주일 누적 후 의미 있어짐)";
+  if (retroResult?.regimeBuckets) {
+    const rb = retroResult.regimeBuckets;
+    if (rb.withRegimeSnapshot >= 5) {
+      const lines = [
+        `진입 시점 시장 레짐별 성과 (snapshot ${rb.withRegimeSnapshot}/${rb.totalArchive}건, ${rb.coverage}% 커버):`,
+      ];
+      const order = ["trending", "transitional", "mean_reverting", "unknown"];
+      const labels = {
+        trending: "추세장 (Hurst > 0.55)",
+        transitional: "혼조 (Hurst 0.45~0.55)",
+        mean_reverting: "역추세장 (Hurst < 0.45)",
+        unknown: "레짐 미기록 (이전 거래)",
+      };
+      for (const k of order) {
+        const b = rb.buckets[k];
+        if (!b) continue;
+        const pnlSign = b.netPnL >= 0 ? "+" : "";
+        const avgH = b.avgHurst != null ? ` 평균H=${b.avgHurst}` : "";
+        lines.push(`  · ${labels[k]}: ${b.trades}건, 승률 ${b.winRate}%, 손익 ${pnlSign}$${b.netPnL}${avgH}`);
+      }
+      // 권고 자동 도출
+      const tr = rb.buckets.trending;
+      const mr = rb.buckets.mean_reverting;
+      const tx = rb.buckets.transitional;
+      if (tr && mr && tr.trades >= 5 && mr.trades >= 5) {
+        if (tr.winRate - mr.winRate > 15) {
+          lines.push(`  → 추세장 승률이 역추세장 대비 +${(tr.winRate - mr.winRate).toFixed(0)}%p 우세 — soft 또는 strict 모드 승급 검토 가치 있음`);
+        } else if (Math.abs(tr.winRate - mr.winRate) < 5) {
+          lines.push(`  → 레짐 차이로 승률이 크게 갈리지 않음 — Hurst gating 효과 제한적, log 모드 유지 권고`);
+        }
+      }
+      if (tx && tx.trades >= 5 && tx.winRate < 30) {
+        lines.push(`  → 혼조 구간 (${tx.trades}건) 에서 승률 ${tx.winRate}% — strict 모드면 이 구간을 차단하므로 net 개선 가능성 있음`);
+      }
+      regimeBlock = lines.join("\n");
+    } else {
+      regimeBlock = `진입 시점 레짐 snapshot 누적 부족 (${rb.withRegimeSnapshot}건). 5월 4일 이후 거래부터 기록 시작 → 1주 후부터 의미 있음`;
+    }
   }
 
   const user = `오늘 아침 분석 보고서 작성 요청입니다.
