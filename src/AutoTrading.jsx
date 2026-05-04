@@ -1009,37 +1009,43 @@ function ActiveBotCarousel({ activeBots, allBotPerf, onSelectBot, onStopBot, onA
                 )}
               </div>
 
-              {/* 미니 지표 */}
-              <div className="grid grid-cols-4 gap-1">
+              {/* 미니 지표 — 모바일 2분할, 데스크탑 4분할 (이전: 모바일도 4분할 → 360px 셀 폭 70px 줄바꿈) */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                 {[
                   { label: "투입", value: `$${allocation >= 1000 ? (allocation/1000).toFixed(1)+"k" : allocation.toLocaleString()}` },
                   { label: "MDD", value: kvMDD > 0 ? `${kvMDD.toFixed(1)}%` : "--" },
                   { label: "승률", value: kvTrades > 0 ? `${(kvWinCount/kvTrades*100).toFixed(0)}%` : "--" },
                   { label: "승/패", value: `${kvWinCount}/${kvTrades - kvWinCount}` },
                 ].map((m, i) => (
-                  <div key={i} className="p-1 rounded text-center" style={{ background: c.card2 }}>
-                    <div className="text-[10px]" style={{ color: c.text3 }}>{m.label}</div>
+                  <div key={i} className="p-1.5 rounded text-center" style={{ background: c.card2 }}>
+                    <div className="text-[11px]" style={{ color: c.text3 }}>{m.label}</div>
                     <div className="text-sm font-bold" style={{ color: c.text1 }}>{m.value}</div>
                   </div>
                 ))}
               </div>
 
-              {/* 액션 버튼 */}
-              <div className="flex gap-1.5">
-                <button onClick={(e) => { e.stopPropagation(); onSelectBot(bot); }} className="flex-grow px-1.75 py-1.75 rounded text-xs font-bold text-white border-none cursor-pointer" style={{
+              {/* 액션 버튼 — 44px 터치 타겟 보장 (이전: ≈26×26px WCAG 2.5.5 미달) */}
+              <div className="flex gap-2">
+                <button onClick={(e) => { e.stopPropagation(); onSelectBot(bot); }} className="flex-grow rounded text-sm font-bold text-white border-none cursor-pointer" style={{
                   flexGrow: 2,
+                  minHeight: "44px",
+                  padding: "10px 12px",
                   background: c.blue,
                 }}>상세 보기</button>
-                <button onClick={(e) => { e.stopPropagation(); onAddFund(ab.botId); }} className="flex-1 px-1.75 py-1.75 rounded text-xs font-semibold border cursor-pointer" style={{
+                <button onClick={(e) => { e.stopPropagation(); onAddFund(ab.botId); }} className="flex-1 rounded text-sm font-semibold cursor-pointer" style={{
+                  minHeight: "44px",
+                  padding: "10px 12px",
                   background: `${c.green}12`,
                   color: c.green,
                   border: `1px solid ${c.green}30`,
                 }}>+ 추가</button>
-                <button onClick={(e) => { e.stopPropagation(); onStopBot(ab.botId); }} className="px-2 py-1.75 rounded text-xs font-semibold border cursor-pointer" style={{
+                <button onClick={(e) => { e.stopPropagation(); onStopBot(ab.botId); }} className="rounded text-sm font-semibold cursor-pointer" style={{
+                  minHeight: "44px",
+                  padding: "10px 14px",
                   background: `${c.red}12`,
                   color: c.red,
                   border: `1px solid ${c.red}30`,
-                }}>중지</button>
+                }} aria-label="봇 중지">중지</button>
               </div>
             </div>
           );
@@ -1070,6 +1076,8 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
   useEffect(() => {
     let cancelled = false;
     const fetchAll = async () => {
+      // ★ 백그라운드 탭 가드 — 모바일 배터리·데이터 절약
+      if (typeof document !== "undefined" && document.hidden) return;
       try {
         const res = await fetch("/api/bot-performance?all=1");
         const data = await res.json();
@@ -1078,7 +1086,13 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
     };
     fetchAll();
     const interval = setInterval(fetchAll, 60000);
-    return () => { cancelled = true; clearInterval(interval); };
+    const onVis = () => { if (!document.hidden) fetchAll(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, []);
 
   const hasActiveBots = activeBots && activeBots.some(ab => ab.status !== "paused");
@@ -1393,37 +1407,43 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                 )}
               </div>
 
-              {/* 미니 지표 */}
-              <div className="grid grid-cols-4 gap-1">
+              {/* 미니 지표 — 모바일 2분할, 데스크탑 4분할 */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                 {[
                   { label: "투입", value: `$${allocation >= 1000 ? (allocation/1000).toFixed(1)+"k" : allocation.toLocaleString()}`, color: c.text1 },
                   { label: "MDD", value: kvMDD > 0 ? `${kvMDD.toFixed(1)}%` : "--", color: kvMDD > 10 ? c.red : kvMDD > 5 ? c.yellow : c.green },
                   { label: "승률", value: kvTrades > 0 ? `${(kvWinCount/kvTrades*100).toFixed(0)}%` : "--", color: c.text1 },
                   { label: "승/패", value: `${kvWinCount}/${kvTrades - kvWinCount}`, color: c.text1 },
                 ].map((m, i) => (
-                  <div key={i} className="p-1 rounded text-center" style={{ background: c.card2 }}>
+                  <div key={i} className="p-1.5 rounded text-center" style={{ background: c.card2 }}>
                     <div className="text-[11px]" style={{ color: c.text3 }}>{m.label}</div>
                     <div className="text-sm font-bold" style={{ color: m.color }}>{m.value}</div>
                   </div>
                 ))}
               </div>
 
-              {/* 액션 버튼 */}
-              <div className="flex gap-1.5">
-                <button onClick={(e) => { e.stopPropagation(); onSelectBot(bot); }} className="text-sm font-bold text-white border-none cursor-pointer py-2 px-2 rounded-lg" style={{
+              {/* 액션 버튼 — 44px 터치 타겟 보장 */}
+              <div className="flex gap-2">
+                <button onClick={(e) => { e.stopPropagation(); onSelectBot(bot); }} className="text-sm font-bold text-white border-none cursor-pointer rounded-lg" style={{
                   flexGrow: 2,
+                  minHeight: "44px",
+                  padding: "10px 12px",
                   background: c.blue,
                 }}>상세 보기</button>
-                <button onClick={(e) => { e.stopPropagation(); onAddFund(ab.botId); }} className="flex-1 py-2 px-2 rounded-lg text-sm font-semibold border cursor-pointer" style={{
+                <button onClick={(e) => { e.stopPropagation(); onAddFund(ab.botId); }} className="flex-1 rounded-lg text-sm font-semibold cursor-pointer" style={{
+                  minHeight: "44px",
+                  padding: "10px 12px",
                   background: `${c.green}12`,
                   color: c.green,
                   border: `1px solid ${c.green}30`,
                 }}>+ 추가</button>
-                <button onClick={(e) => { e.stopPropagation(); onStopBot(ab.botId); }} className="py-2 px-2.5 rounded-lg text-sm font-semibold border cursor-pointer" style={{
+                <button onClick={(e) => { e.stopPropagation(); onStopBot(ab.botId); }} className="rounded-lg text-sm font-semibold cursor-pointer" style={{
+                  minHeight: "44px",
+                  padding: "10px 14px",
                   background: `${c.red}12`,
                   color: c.red,
                   border: `1px solid ${c.red}30`,
-                }}>중지</button>
+                }} aria-label="봇 중지">중지</button>
               </div>
             </div>
           );

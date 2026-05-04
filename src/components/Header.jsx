@@ -184,7 +184,7 @@ export default memo(function Header({
         "flex items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/70 text-white font-bold shrink-0 ring-2 ring-primary/20 transition-all",
       )} style={{ width: size, height: size, fontSize: size * 0.55 }}>
         {url
-          ? <img src={url} alt="" className="rounded-full object-cover" style={{ width: size, height: size }} />
+          ? <img src={url} alt="사용자 프로필" width={size} height={size} className="rounded-full object-cover" style={{ width: size, height: size }} />
           : initial
         }
       </div>
@@ -301,7 +301,7 @@ export default memo(function Header({
 
             {/* 로고 */}
             <div onClick={() => navigate("home")} className="flex cursor-pointer select-none items-center gap-2 lg:ml-6">
-              <img src="/zepta-icon-192.png" alt="Zepta" className="size-7 sm:size-8 lg:size-9 shrink-0" />
+              <img src="/zepta-icon-192.png" alt="Zepta 로고" width="36" height="36" className="size-7 sm:size-8 lg:size-9 shrink-0" />
               <span className="text-base font-extrabold tracking-tight text-foreground sm:text-lg lg:text-xl">Zepta</span>
             </div>
           </div>

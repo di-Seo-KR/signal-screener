@@ -302,6 +302,8 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
     if (!bid) return;
     let cancelled = false;
     const fetchBotPerf = async () => {
+      // ★ 백그라운드 탭 가드
+      if (typeof document !== "undefined" && document.hidden) return;
       try {
         const res = await fetch(`/api/bot-performance?botId=${bid}`);
         const data = await res.json();
@@ -310,7 +312,13 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
     };
     fetchBotPerf();
     const interval = setInterval(fetchBotPerf, 60000); // 1분마다 갱신
-    return () => { cancelled = true; clearInterval(interval); };
+    const onVis = () => { if (!document.hidden) fetchBotPerf(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, [botPreset?.id]);
 
   const timerRef = useRef(null);
@@ -648,17 +656,54 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
               {badge("알파 v2", C.orangeBg, C.orange)}
               {autoMode && badge("자동매매 ON", C.greenBg, C.green)}
               {!autoMode && badge("자동매매 OFF", C.card2, C.text3)}
-              <div onClick={() => setAutoMode(!autoMode)} style={{
-                width: isMobile ? "38px" : "44px", height: isMobile ? "20px" : "24px", borderRadius: "12px", cursor: "pointer",
-                background: autoMode ? C.green : C.card2, border: `1px solid ${autoMode ? C.green : C.border}`,
-                position: "relative", transition: "all .3s", flexShrink: 0,
-              }}>
-                <div style={{
-                  width: isMobile ? "14px" : "18px", height: isMobile ? "14px" : "18px", borderRadius: "50%", background: "#fff",
-                  position: "absolute", top: isMobile ? "2px" : "2px", left: autoMode ? (isMobile ? "21px" : "23px") : "2px",
-                  transition: "left .3s", boxShadow: "0 1px 3px rgba(0,0,0,.2)",
-                }} />
-              </div>
+              {/* 접근성 강화 — role="switch" + aria-checked + 키보드 + 44px 터치 타겟
+                  (이전: <div onClick> 38×20px 키보드 미지원, WCAG 2.1.1 + 2.5.5 미달) */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={autoMode}
+                aria-label={autoMode ? "자동매매 끄기" : "자동매매 켜기"}
+                onClick={() => setAutoMode(!autoMode)}
+                style={{
+                  // 시각 트랙 + 44px 터치 영역을 padding 으로 확보 (clickable 영역 ≥ 44×44)
+                  position: "relative",
+                  width: isMobile ? "44px" : "48px",
+                  height: "44px",
+                  background: "transparent",
+                  border: "none",
+                  padding: 0,
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {/* 시각적 트랙 */}
+                <span style={{
+                  display: "block",
+                  width: isMobile ? "40px" : "44px",
+                  height: "24px",
+                  borderRadius: "12px",
+                  background: autoMode ? C.green : C.card2,
+                  border: `1px solid ${autoMode ? C.green : C.border}`,
+                  transition: "all .25s",
+                  position: "relative",
+                }}>
+                  {/* 노브 */}
+                  <span style={{
+                    position: "absolute",
+                    top: "2px",
+                    left: autoMode ? (isMobile ? "18px" : "22px") : "2px",
+                    width: "18px",
+                    height: "18px",
+                    borderRadius: "50%",
+                    background: "#fff",
+                    transition: "left .25s",
+                    boxShadow: "0 1px 3px rgba(0,0,0,.2)",
+                  }} />
+                </span>
+              </button>
             </div>
           </div>
           <div style={{
