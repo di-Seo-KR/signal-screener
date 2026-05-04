@@ -1,5 +1,16 @@
 // ══════════════════════════════════════════════════════════════════
 // Zepta Icons — lightweight inline SVGs (stroke-based, lucide-style)
+//
+// 아이콘 시스템 정책 (3-tier 분리 — 의도적 아키텍처):
+// 1) lucide-react        → shadcn primitives 내부 (components/ui/*) 전용.
+//                          shadcn 생성 코드라 수정 금지.
+// 2) src/ui/icons.jsx    ← 이 파일. Zepta 자체 페이지 (RealTrading 등) 가
+//                          사용하는 canonical 아이콘 세트. lucide 와 시각적
+//                          호환되지만 번들 사이즈 절약 + 일관성 보장.
+// 3) inline SVG          → 차트·스파크라인·1회용 커스텀 아이콘에만 허용.
+//                          icons.jsx 의 표준 아이콘으로 대체 가능하면 그렇게.
+//
+// 신규 아이콘 추가 시: icons.jsx 우선 검토 → 없으면 여기 추가 (lucide 미러).
 // ══════════════════════════════════════════════════════════════════
 import React from "react";
 
