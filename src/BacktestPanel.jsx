@@ -4,24 +4,14 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { ALL_STRATEGIES, runBacktest } from "./strategies.js";
 import { THEME_TOKENS } from "./ui/theme.jsx";
+import { useIsMobile } from "./ui/useBreakpoint.jsx";
 
 // ★ 디자인 토큰 SSOT — 다크 전용 패널이라 dark 토큰만 사용
 const C = THEME_TOKENS.dark;
-
-// 모바일 감지 훅
-function useMobile() {
-  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 640px)");
-    const handler = (e) => setIsMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return isMobile;
-}
+// 모바일 감지는 useIsMobile (src/ui/useBreakpoint.jsx) SSOT 사용
 
 function MetricCard({ label, value, color, sub }) {
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
   return (
     <div style={{ background: C.card2, borderRadius: "10px", padding: isMobile ? "10px 8px" : "12px", textAlign: "center", minWidth: isMobile ? "auto" : "100px" }}>
       <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, marginBottom: "4px" }}>{label}</div>
@@ -199,7 +189,7 @@ const BT_SYMBOLS = [
 ];
 
 export default function BacktestPanel({ initialStrategy, initialSymbol }) {
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
   const [strategyId, setStrategyId] = useState(initialStrategy?.id || ALL_STRATEGIES[0].id);
   const [symbol, setSymbol] = useState(initialSymbol || "SPY");
   const [timeframe, setTimeframe] = useState("1d");

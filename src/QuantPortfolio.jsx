@@ -4,6 +4,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { ALL_STRATEGIES } from "./strategies.js";
 import { THEME_TOKENS } from "./ui/theme.jsx";
+import { useIsMobile } from "./ui/useBreakpoint.jsx";
 
 // ★ 디자인 토큰 SSOT — 다크 전용 패널
 const C = THEME_TOKENS.dark;
@@ -826,23 +827,13 @@ function LoadingSkeleton({ progress }) {
   );
 }
 
-// 모바일 감지 훅
-function useMobile() {
-  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 640px)");
-    const handler = (e) => setIsMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return isMobile;
-}
+// 모바일 감지는 useIsMobile (src/ui/useBreakpoint.jsx) SSOT 사용
 
 // ══════════════════════════════════════════════════════════════
 // 메인 컴포넌트
 // ══════════════════════════════════════════════════════════════
 export default function QuantPortfolio({ theme = "dark" }) {
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
   const [selectedStrategy, setSelectedStrategy] = useState(null);
   const [sortBy, setSortBy] = useState("return");
   const [filterCat, setFilterCat] = useState("all");

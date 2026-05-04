@@ -4,6 +4,7 @@
  */
 import { memo, useState, useEffect } from "react";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { useIsMobile } from "@/ui/useBreakpoint.jsx";
 
 function SearchBarWrapper({ SearchBar, onSelect, placeholder }) {
   return <SearchBar placeholder={placeholder} onSelect={onSelect} />;
@@ -27,12 +28,8 @@ export default memo(function PortfolioTab({
   setTab,
 }) {
   const { t } = useLanguage();
-  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
-  useEffect(() => {
-    const handler = () => setIsMobile(window.innerWidth <= 640);
-    window.addEventListener("resize", handler);
-    return () => window.removeEventListener("resize", handler);
-  }, []);
+  // ★ 모바일 감지 SSOT — useIsMobile (src/ui/useBreakpoint.jsx)
+  const isMobile = useIsMobile();
   return (
     <div className="tab-content">
       {/* 요약 헤더 */}

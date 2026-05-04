@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createChart, CrosshairMode, LineStyle } from "lightweight-charts";
+import { useIsMobile } from "./ui/useBreakpoint.jsx";
 
 // ── 보조지표 계산 ────────────────────────────────────────────────
 function calcSMA(data, period) {
@@ -1270,20 +1271,11 @@ function runDiagnosis(candles) {
 }
 
 // ── Full-page chart component ────────────────────────────────────
-function useMobile() {
-  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth <= 640);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 640px)");
-    const handler = (e) => setIsMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return isMobile;
-}
+// 모바일 감지는 useIsMobile (src/ui/useBreakpoint.jsx) SSOT 사용
 
 export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) {
   const CC = theme === "dark" ? CC_DARK : CC_LIGHT;
-  const isMobile = useMobile();
+  const isMobile = useIsMobile();
   const containerRef = useRef(null);
   const mainRef   = useRef(null);
   const rsiRef    = useRef(null);
