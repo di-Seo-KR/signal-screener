@@ -91,6 +91,38 @@ async function checkUser(userId) {
           });
           await kv.set(logKey, log.slice(0, 200));
           report.closed = report.closed.map((c) => (c === sym ? { sym, realizedPnL: realized } : c));
+
+          // ★ 청산 감지 텔레그램 알림 (사용자가 한 청산도 포함됨 — 수동/자동 구분 위해
+          //    봇 plan 의 존재 여부로 판단)
+          try {
+            const planKey = `di:real:user:${userId}:plan:${sym}`;
+            const plan = await kv.get(planKey);
+            const isBotEntry = !!(plan && plan.openedAt);
+            const { sendCards, buildCard } = await import("../_shared/telegram.js");
+            const sign = realized >= 0 ? "+" : "";
+            const tag = realized >= 0 ? "✅" : "🔻";
+            await sendCards([
+              buildCard({
+                tag,
+                title: `${isBotEntry ? "봇" : "수동"} 포지션 청산 — ${sym}`,
+                lines: [
+                  `실현 손익 ${sign}$${realized.toFixed(2)}`,
+                  isBotEntry
+                    ? `봇 진입 시점: ${new Date(plan.openedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`
+                    : "사용자가 직접 청산하신 포지션입니다.",
+                ],
+                hint: isBotEntry
+                  ? "봇이 SL/TP/시간 손절 룰에 따라 자동 청산했습니다."
+                  : null,
+              }),
+            ]);
+            // 봇 진입이었다면 plan KV 정리
+            if (isBotEntry) {
+              await kv.del(planKey);
+            }
+          } catch (e) {
+            console.warn(`[monitor] telegram close alert failed:`, e?.message);
+          }
         }
       } catch (e) {
         console.warn(`[monitor] userTrades ${sym} failed:`, e?.message);
