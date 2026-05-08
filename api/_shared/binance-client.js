@@ -313,6 +313,8 @@ export function cancelOrder({ apiKey, apiSecret, symbol, orderId, origClientOrde
 export function placeStopOrder({
   apiKey, apiSecret, symbol, type, side, stopPrice,
   quantity, closePosition = false, workingType = "MARK_PRICE",
+  price, // ★ STOP (limit) / TAKE_PROFIT (limit) 의 limit price
+  timeInForce, // ★ STOP (limit) 일 때 GTC 등 명시
   clientOrderId, testnet = false,
 }) {
   const params = {
@@ -328,6 +330,12 @@ export function placeStopOrder({
   } else {
     params.quantity = quantity;
     params.reduceOnly = true;
+  }
+  // ★ STOP / TAKE_PROFIT (limit) 은 price + timeInForce 필요
+  //   STOP_MARKET / TAKE_PROFIT_MARKET 은 price 없음
+  if (price != null && (type === "STOP" || type === "TAKE_PROFIT")) {
+    params.price = price;
+    params.timeInForce = timeInForce || "GTC";
   }
   if (clientOrderId) params.newClientOrderId = clientOrderId;
   return binanceSignedRequest({
