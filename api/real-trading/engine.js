@@ -649,10 +649,14 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       const tpAttached = bracketInfo.tp?.ok;
       const slMode = bracketInfo.slMode; // "quantity_fallback" 등
 
+      // ROI% (마진 대비 손익률, Binance UI 기준) 계산
+      const slRoiPct = (plan.plan.slPct * plan.plan.leverage * 100).toFixed(0);
+      const tpRoiPct = (plan.plan.tpPct * plan.plan.leverage * 100).toFixed(0);
       const lines = [
         `진입가 $${plan.plan.entryPrice} · 수량 ${plan.plan.qty}`,
         `노출 $${plan.plan.notional?.toFixed(2)} · 마진 $${plan.plan.marginRequired.toFixed(2)} (레버리지 ${plan.plan.leverage}x)`,
-        `손절라인 $${plan.plan.slPrice} (-${slPct}%) · 익절라인 $${plan.plan.tpPrice} (+${tpPct}%)`,
+        `손절라인 $${plan.plan.slPrice} (가격 -${slPct}% / ROI -${slRoiPct}%)`,
+        `익절라인 $${plan.plan.tpPrice} (가격 +${tpPct}% / ROI +${tpRoiPct}%)`,
         `손익비 ${plan.plan.effectiveRR?.toFixed(2) || "?"}배 · 감내 손실 $${plan.plan.riskAmount?.toFixed(2) || "?"}`,
         `시그널: ${best.source || "봇"} (conf ${best.confidence})`,
       ];

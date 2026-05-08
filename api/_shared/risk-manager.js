@@ -85,6 +85,15 @@ export const RISK_CONFIG = {
   //  Binance 유지증거금 ~0.4~1.0% 가정 → 단순화: 1/lev × 0.9
   liqSafetyRatio: 0.7,
 
+  // ★ 거래당 ROI 손실 한도 (마진 대비 %, Binance UI 표시 기준).
+  //   대표님 지시 (2026-05-08): "거래당 ROI -40% 까지 가능, 10배 기준".
+  //   가격 변동 % × leverage = ROI %. 즉 SL 거리 = maxRoiLossPct / leverage.
+  //   - 10x → 가격 -4% 까지 SL 거리 허용
+  //   - 5x → 가격 -8%
+  //   - 3x → 가격 -13.3%
+  //   ATR 기반 stopDistPct 가 이 한도를 초과하면 cap. 한도 안이면 그대로 사용.
+  maxRoiLossPct: 0.40,
+
   // minNotional 여유
   minNotionalSafety: 1.05,
   // 절대 노출 상한 — riskPct/leverage 조합과 무관하게 강제. 대표님 요청
@@ -180,11 +189,22 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
   if (!filter) return { ok: false, reason: "symbol filter missing", log };
 
   // 1) ATR → raw stop 거리
-  const stopDistPct = stopDistancePct({ price, atr, family: signal.strategyFamily, cfg });
+  let stopDistPct = stopDistancePct({ price, atr, family: signal.strategyFamily, cfg });
   if (!stopDistPct || stopDistPct <= 0) {
     return { ok: false, reason: "ATR 없음 또는 stop 거리 산출 불가", log };
   }
   push(`rawStopDistPct=${(stopDistPct * 100).toFixed(3)}%`);
+
+  // ★ 1-1) leverage 미리 계산 후 ROI 한도 cap.
+  //   대표님 지시: 거래당 ROI -40% 까지 OK (10x 기준 가격 -4%).
+  //   ATR 기반 stopDistPct 가 ROI 한도를 초과하면 cap.
+  const previewLev = pickLeverage(signal.confidence, signal.strategyFamily, cfg);
+  const maxRoiLossPct = cfg.maxRoiLossPct || 0.40;
+  const slCapByRoi = maxRoiLossPct / previewLev;
+  if (stopDistPct > slCapByRoi) {
+    push(`stopDistPct ${(stopDistPct * 100).toFixed(2)}% > ROI cap ${(slCapByRoi * 100).toFixed(2)}% (lev ${previewLev}x × maxROI ${(maxRoiLossPct * 100).toFixed(0)}%) → cap`);
+    stopDistPct = slCapByRoi;
+  }
 
   // 2) 비용 거리 (수수료 + 슬리피지, 왕복)
   const costPct = (cfg.roundTripFeePct || 0) + (cfg.roundTripSlippagePct || 0);
