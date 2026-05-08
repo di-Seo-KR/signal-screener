@@ -18,6 +18,7 @@ import {
   Wallet, TrendUp, TrendDown,
 } from "./ui/icons.jsx";
 import { useTheme } from "./ui/theme.jsx";
+import { useBreakpoint } from "./ui/useBreakpoint.jsx";
 import BinanceConnect from "./components/BinanceConnect.jsx";
 
 // ═══════════════════════════════════════════════════════════════════
@@ -97,7 +98,10 @@ function RealTradingInner() {
   const [confirm, setConfirm] = useState(null);
   const timerRef = useRef(null);
   const [lastRefresh, setLastRefresh] = useState(null);
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  // ★ SSOT — useBreakpoint. 이전엔 768 미만을 "isMobile" 로 봤음 (iPad 세로 포함).
+  // 그 동작 유지하려면 isSmall (< 1024) 을 isMobile 로 매핑.
+  const { isSmall } = useBreakpoint();
+  const isMobile = isSmall;
 
   // Inject custom styles once
   useEffect(() => {
@@ -108,12 +112,6 @@ function RealTradingInner() {
       document.head.appendChild(style);
       return () => style.remove();
     }
-  }, []);
-
-  useEffect(() => {
-    const h = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", h);
-    return () => window.removeEventListener("resize", h);
   }, []);
 
   useEffect(() => {
@@ -242,7 +240,7 @@ function RealTradingInner() {
     ? ((equity - breaker.equityHigh) / breaker.equityHigh) * 100 : 0;
 
   // ═════════════════════════════════════════════════════════
-  // HEADER (REDESIGNED)
+  // HEADER (REDESIGNED) — 모바일은 padding 절반
   // ═════════════════════════════════════════════════════════
   const header = (
     <div style={{
@@ -253,18 +251,18 @@ function RealTradingInner() {
         ? "1px solid rgba(239, 68, 68, 0.25)"
         : "1px solid rgba(59, 130, 246, 0.2)",
       borderRadius: "var(--z-r-lg)",
-      padding: "24px 20px",
-      marginBottom: 20,
+      padding: isMobile ? "14px 14px" : "24px 20px",
+      marginBottom: isMobile ? 14 : 20,
       display: "flex",
       alignItems: "center",
       justifyContent: "space-between",
       flexWrap: "wrap",
-      gap: 16,
+      gap: isMobile ? 10 : 16,
     }}>
-      <div style={{ flex: 1, minWidth: 240 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 10 }}>
+      <div style={{ flex: 1, minWidth: isMobile ? 0 : 240 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, marginBottom: isMobile ? 6 : 10 }}>
           <div style={{
-            width: 48, height: 48, borderRadius: 14,
+            width: isMobile ? 38 : 48, height: isMobile ? 38 : 48, borderRadius: isMobile ? 10 : 14,
             background: trulyLive
               ? "linear-gradient(135deg, var(--z-red) 0%, #E53935 100%)"
               : "linear-gradient(135deg, var(--z-blue) 0%, #1E40AF 100%)",
@@ -272,21 +270,21 @@ function RealTradingInner() {
             boxShadow: trulyLive
               ? "0 8px 24px rgba(239, 68, 68, 0.35), inset 0 1px 0 rgba(255,255,255,0.2)"
               : "0 8px 24px rgba(59, 130, 246, 0.25), inset 0 1px 0 rgba(255,255,255,0.15)",
-            position: "relative",
+            position: "relative", flexShrink: 0,
           }}>
             {trulyLive && (
               <div className="rt-pulse" style={{
-                position: "absolute", inset: 0, borderRadius: 14,
+                position: "absolute", inset: 0, borderRadius: isMobile ? 10 : 14,
                 background: "rgba(239, 68, 68, 0.3)",
               }} />
             )}
-            <Power size={24} color="#fff" style={{ position: "relative", zIndex: 1 }} />
+            <Power size={isMobile ? 18 : 24} color="#fff" style={{ position: "relative", zIndex: 1 }} />
           </div>
-          <div>
-            <div style={{ fontSize: 28, fontWeight: 900, letterSpacing: "-0.03em", lineHeight: 1 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: isMobile ? 18 : 28, fontWeight: 900, letterSpacing: "-0.03em", lineHeight: 1 }}>
               실전매매 관제센터
             </div>
-            <div style={{ fontSize: 13, color: "var(--z-text-3)", marginTop: 4 }}>
+            <div style={{ fontSize: isMobile ? 11 : 13, color: "var(--z-text-3)", marginTop: isMobile ? 3 : 4 }}>
               Zepta Investment Platform
             </div>
           </div>
@@ -330,9 +328,9 @@ function RealTradingInner() {
               ⚡ BREAKER
             </Badge>
           )}
-          <div style={{ fontSize: 12, color: "var(--z-text-2)", marginLeft: 4 }}>
-            · Binance USDⓈ-M Futures
-            {lastRefresh && <> · {fmtTime(lastRefresh)}</>}
+          <div style={{ fontSize: isMobile ? 11 : 12, color: "var(--z-text-2)", marginLeft: 4 }}>
+            {!isMobile && "· Binance USDⓈ-M Futures"}
+            {lastRefresh && <> {!isMobile ? "· " : ""}<span style={{ color: "var(--z-text-3)" }}>{fmtTime(lastRefresh)} 기준</span></>}
           </div>
         </div>
       </div>
@@ -342,7 +340,7 @@ function RealTradingInner() {
         size="sm"
         onClick={refresh}
         leftIcon={loading ? <Spinner size={14} /> : <Refresh size={14} />}
-        style={{ whiteSpace: "nowrap" }}
+        style={{ whiteSpace: "nowrap", minHeight: 44 }}
       >
         새로고침
       </Button>
@@ -350,189 +348,184 @@ function RealTradingInner() {
   );
 
   // ═════════════════════════════════════════════════════════
-  // KPI BAR (REDESIGNED - HERO METRICS)
+  // KPI BAR (재설계 — 모바일: 1 큰 hero + 4 작은 셀, 데스크탑: 기존 5분할)
   // ═════════════════════════════════════════════════════════
-  const kpiBar = (
+  const heroEquity = (
     <div style={{
-      display: "grid", gap: 12, marginBottom: 20,
-      gridTemplateColumns: isMobile
-        ? "1fr"
-        : "2fr 1fr 1fr",
+      background: "linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(37, 99, 235, 0.06) 100%)",
+      border: "1px solid rgba(59, 130, 246, 0.25)",
+      borderRadius: "var(--z-r-lg)",
+      padding: isMobile ? "16px" : "20px",
+      display: "flex", flexDirection: "column", justifyContent: "center",
+      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+      gridRow: isMobile ? undefined : "span 2",
     }}>
-      {/* HERO METRIC — EQUITY */}
-      <div style={{
-        background: "linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(37, 99, 235, 0.06) 100%)",
-        border: "1px solid rgba(59, 130, 246, 0.25)",
-        borderRadius: "var(--z-r-lg)",
-        padding: "20px",
-        display: "flex", flexDirection: "column", justifyContent: "center",
-        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
-        gridRow: isMobile ? undefined : "span 2",
-      }}>
-        <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 12 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 12,
-            background: "linear-gradient(135deg, var(--z-blue) 0%, #1E40AF 100%)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)",
-          }}>
-            <Wallet size={20} color="#fff" />
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: isMobile ? 10 : 12 }}>
+        <div style={{
+          width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: 12,
+          background: "linear-gradient(135deg, var(--z-blue) 0%, #1E40AF 100%)",
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)",
+        }}>
+          <Wallet size={isMobile ? 16 : 20} color="#fff" />
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, color: "var(--z-text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            보유 자산
           </div>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 12, color: "var(--z-text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
-              현재 에쿼티
-            </div>
-            <div style={{ fontSize: 32, fontWeight: 900, marginTop: 6, lineHeight: 1, fontFamily: "var(--z-font-mono)" }}>
-              {loading && equity == null ? (
-                <Skeleton width={140} height={32} />
-              ) : (
-                fmtUsd(equity)
-              )}
-            </div>
+          <div style={{ fontSize: isMobile ? 26 : 32, fontWeight: 900, marginTop: 4, lineHeight: 1, fontFamily: "var(--z-font-mono)" }}>
+            {loading && equity == null ? (
+              <Skeleton width={140} height={isMobile ? 26 : 32} />
+            ) : (
+              fmtUsd(equity)
+            )}
           </div>
         </div>
-        <div style={{
-          display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr",
-          paddingTop: 12, borderTop: "1px solid rgba(59, 130, 246, 0.1)",
-        }}>
-          <div>
-            <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 4 }}>일 시작 가</div>
-            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)" }}>
-              {breaker.dayStartEquity ? fmtUsd(breaker.dayStartEquity) : "—"}
+        {/* 모바일: 일손익을 hero 우측에 inline 표시 (스크롤 없이 한눈에) */}
+        {isMobile && (
+          <div style={{
+            textAlign: "right",
+            paddingLeft: 8,
+            borderLeft: "1px solid rgba(59, 130, 246, 0.15)",
+          }}>
+            <div style={{ fontSize: 10, color: "var(--z-text-3)", fontWeight: 600 }}>오늘</div>
+            <div style={{
+              fontSize: 16, fontWeight: 800, lineHeight: 1.2,
+              color: dayLossPct < 0 ? "var(--z-red-hi)" : dayLossPct > 0 ? "var(--z-green-hi)" : "var(--z-text)",
+              fontFamily: "var(--z-font-mono)",
+            }}>
+              {fmtPct(dayLossPct)}
             </div>
           </div>
-          <div>
-            <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 4 }}>최고 수익</div>
-            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)", color: "var(--z-green-hi)" }}>
-              {breaker.equityHigh ? fmtUsd(breaker.equityHigh) : "—"}
-            </div>
+        )}
+      </div>
+      <div style={{
+        display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr",
+        paddingTop: 10, borderTop: "1px solid rgba(59, 130, 246, 0.1)",
+      }}>
+        <div>
+          <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 4 }}>일 시작 가</div>
+          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)" }}>
+            {breaker.dayStartEquity ? fmtUsd(breaker.dayStartEquity) : "—"}
+          </div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 4 }}>최고 수익</div>
+          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)", color: "var(--z-green-hi)" }}>
+            {breaker.equityHigh ? fmtUsd(breaker.equityHigh) : "—"}
           </div>
         </div>
       </div>
+    </div>
+  );
 
-      {/* SECONDARY METRICS — P&L and MDD */}
+  // 4개 보조 메트릭 카드 빌더 — 모바일: 2x2 그리드, 데스크탑: 기존 분할
+  const renderMetricCard = ({ label, value, color, hint, gradient, border }) => (
+    <div style={{
+      background: gradient,
+      border,
+      borderRadius: "var(--z-r-lg)",
+      padding: isMobile ? "12px" : "16px",
+      display: "flex", flexDirection: "column", justifyContent: "center",
+      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+      minHeight: isMobile ? "auto" : "100%",
+    }}>
       <div style={{
-        background: dayLossPct < 0
+        fontSize: isMobile ? 10 : 11, color: "var(--z-text-3)",
+        fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5,
+        marginBottom: isMobile ? 4 : 8,
+      }}>
+        {label}
+      </div>
+      <div style={{
+        fontSize: isMobile ? 18 : 24, fontWeight: 900, lineHeight: 1,
+        color, fontFamily: "var(--z-font-mono)",
+      }}>
+        {value}
+      </div>
+      {hint && (
+        <div style={{
+          marginTop: isMobile ? 4 : 8, fontSize: 10, color: "var(--z-text-3)",
+          padding: isMobile ? "3px 6px" : "6px 8px",
+          background: "rgba(0, 0, 0, 0.15)", borderRadius: "var(--z-r-md)",
+        }}>
+          {hint}
+        </div>
+      )}
+    </div>
+  );
+
+  const metricCards = [
+    {
+      key: "pnl",
+      el: !isMobile ? renderMetricCard({
+        label: "일 손익", value: fmtPct(dayLossPct),
+        color: dayLossPct < 0 ? "var(--z-red-hi)" : dayLossPct > 0 ? "var(--z-green-hi)" : "var(--z-text)",
+        hint: <>한도 <span style={{ fontWeight: 700 }}>-4%</span></>,
+        gradient: dayLossPct < 0
           ? "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)"
           : "linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(22, 163, 74, 0.06) 100%)",
-        border: dayLossPct < 0
-          ? "1px solid rgba(239, 68, 68, 0.25)"
-          : "1px solid rgba(34, 197, 94, 0.25)",
-        borderRadius: "var(--z-r-lg)",
-        padding: "18px",
-        display: "flex", flexDirection: "column", justifyContent: "space-between",
-        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
-      }}>
-        <div style={{ fontSize: 12, color: "var(--z-text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
-          일 손익
-        </div>
-        <div style={{
-          fontSize: 28, fontWeight: 900, lineHeight: 1,
-          color: dayLossPct < 0
-            ? "var(--z-red-hi)"
-            : dayLossPct > 0
-              ? "var(--z-green-hi)"
-              : "var(--z-text)",
-          fontFamily: "var(--z-font-mono)",
-        }}>
-          {fmtPct(dayLossPct)}
-        </div>
-        <div style={{
-          marginTop: 10, fontSize: 11, color: "var(--z-text-3)",
-          padding: "8px 10px", background: "rgba(0, 0, 0, 0.15)", borderRadius: "var(--z-r-md)",
-        }}>
-          한도 <span style={{ fontWeight: 700 }}>-4%</span>
-        </div>
-      </div>
-
-      <div style={{
-        background: mddPct < -8
+        border: dayLossPct < 0 ? "1px solid rgba(239, 68, 68, 0.25)" : "1px solid rgba(34, 197, 94, 0.25)",
+      }) : null, // 모바일에선 hero 안에 흡수됨
+    },
+    {
+      key: "mdd",
+      el: renderMetricCard({
+        label: "최대 낙폭", value: fmtPct(mddPct),
+        color: mddPct < -10 ? "var(--z-red-hi)" : mddPct < -5 ? "var(--z-yellow-hi)" : "var(--z-purple)",
+        hint: <>한도 <span style={{ fontWeight: 700 }}>-15%</span></>,
+        gradient: mddPct < -8
           ? "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)"
           : "linear-gradient(135deg, rgba(168, 85, 247, 0.12) 0%, rgba(147, 51, 234, 0.06) 100%)",
-        border: mddPct < -8
-          ? "1px solid rgba(239, 68, 68, 0.25)"
-          : "1px solid rgba(168, 85, 247, 0.25)",
-        borderRadius: "var(--z-r-lg)",
-        padding: "18px",
-        display: "flex", flexDirection: "column", justifyContent: "space-between",
-        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
-      }}>
-        <div style={{ fontSize: 12, color: "var(--z-text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
-          MDD
-        </div>
-        <div style={{
-          fontSize: 28, fontWeight: 900, lineHeight: 1,
-          color: mddPct < -10
-            ? "var(--z-red-hi)"
-            : mddPct < -5
-              ? "var(--z-yellow-hi)"
-              : "var(--z-purple)",
-          fontFamily: "var(--z-font-mono)",
-        }}>
-          {fmtPct(mddPct)}
-        </div>
-        <div style={{
-          marginTop: 10, fontSize: 11, color: "var(--z-text-3)",
-          padding: "8px 10px", background: "rgba(0, 0, 0, 0.15)", borderRadius: "var(--z-r-md)",
-        }}>
-          한도 <span style={{ fontWeight: 700 }}>-15%</span>
-        </div>
-      </div>
-
-      {/* SUPPORTING METRICS */}
-      <div style={{
-        background: positions.length >= 2
+        border: mddPct < -8 ? "1px solid rgba(239, 68, 68, 0.25)" : "1px solid rgba(168, 85, 247, 0.25)",
+      }),
+    },
+    {
+      key: "open",
+      el: renderMetricCard({
+        label: "진행 거래", value: positions.length,
+        color: positions.length >= 2 ? "var(--z-yellow-hi)" : "var(--z-text)",
+        hint: "최대 2개",
+        gradient: positions.length >= 2
           ? "linear-gradient(135deg, rgba(234, 179, 8, 0.12) 0%, rgba(202, 138, 4, 0.06) 100%)"
           : "linear-gradient(135deg, rgba(100, 116, 139, 0.12) 0%, rgba(71, 85, 105, 0.06) 100%)",
-        border: positions.length >= 2
-          ? "1px solid rgba(234, 179, 8, 0.25)"
-          : "1px solid rgba(100, 116, 139, 0.2)",
-        borderRadius: "var(--z-r-lg)",
-        padding: "16px",
-        display: "flex", flexDirection: "column", justifyContent: "center",
-        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
-      }}>
-        <div style={{ fontSize: 11, color: "var(--z-text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
-          오픈 포지션
-        </div>
-        <div style={{ fontSize: 24, fontWeight: 900, lineHeight: 1, color: positions.length >= 2 ? "var(--z-yellow-hi)" : "var(--z-text)" }}>
-          {positions.length}
-        </div>
-        <div style={{
-          marginTop: 8, fontSize: 10, color: "var(--z-text-3)",
-          padding: "6px 8px", background: "rgba(0, 0, 0, 0.15)", borderRadius: "var(--z-r-md)",
-        }}>
-          최대 2개
-        </div>
-      </div>
-
-      <div style={{
-        background: (breaker.consecLosses || 0) >= 3
+        border: positions.length >= 2 ? "1px solid rgba(234, 179, 8, 0.25)" : "1px solid rgba(100, 116, 139, 0.2)",
+      }),
+    },
+    {
+      key: "loss",
+      el: renderMetricCard({
+        label: "연속 손실", value: `${breaker.consecLosses || 0} / 5`,
+        color: (breaker.consecLosses || 0) >= 3 ? "var(--z-red-hi)" : "var(--z-text)",
+        hint: "쿨다운 24h",
+        gradient: (breaker.consecLosses || 0) >= 3
           ? "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)"
           : "linear-gradient(135deg, rgba(100, 116, 139, 0.12) 0%, rgba(71, 85, 105, 0.06) 100%)",
-        border: (breaker.consecLosses || 0) >= 3
-          ? "1px solid rgba(239, 68, 68, 0.25)"
-          : "1px solid rgba(100, 116, 139, 0.2)",
-        borderRadius: "var(--z-r-lg)",
-        padding: "16px",
-        display: "flex", flexDirection: "column", justifyContent: "center",
-        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
-      }}>
-        <div style={{ fontSize: 11, color: "var(--z-text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
-          연속 손실
-        </div>
-        <div style={{
-          fontSize: 24, fontWeight: 900, lineHeight: 1,
-          color: (breaker.consecLosses || 0) >= 3 ? "var(--z-red-hi)" : "var(--z-text)",
-        }}>
-          {breaker.consecLosses || 0} / 5
-        </div>
-        <div style={{
-          marginTop: 8, fontSize: 10, color: "var(--z-text-3)",
-          padding: "6px 8px", background: "rgba(0, 0, 0, 0.15)", borderRadius: "var(--z-r-md)",
-        }}>
-          쿨다운 24h
-        </div>
+        border: (breaker.consecLosses || 0) >= 3 ? "1px solid rgba(239, 68, 68, 0.25)" : "1px solid rgba(100, 116, 139, 0.2)",
+      }),
+    },
+  ].filter(m => m.el);
+
+  const kpiBar = (
+    <div style={{ marginBottom: 20 }}>
+      {/* hero */}
+      <div style={{ marginBottom: isMobile ? 10 : 12 }}>
+        {!isMobile ? (
+          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "2fr 1fr 1fr" }}>
+            {heroEquity}
+            {metricCards.find(m => m.key === "pnl")?.el}
+            {metricCards.find(m => m.key === "mdd")?.el}
+            {metricCards.find(m => m.key === "open")?.el}
+            {metricCards.find(m => m.key === "loss")?.el}
+          </div>
+        ) : (
+          <>
+            {heroEquity}
+            <div style={{ marginTop: 10, display: "grid", gap: 8, gridTemplateColumns: "repeat(3, 1fr)" }}>
+              {metricCards.map(m => <React.Fragment key={m.key}>{m.el}</React.Fragment>)}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -570,6 +563,8 @@ function RealTradingInner() {
       <div style={{
         display: "grid",
         gap: 10,
+        // 모바일: 시작/중지 1행, 일시정지/재개 1행, 긴급정지 별도 1행 (위험 액션 분리)
+        // 데스크탑: 1열로 정렬 [시작 / 일시정지 / 빈 / 긴급정지]
         gridTemplateColumns: isMobile
           ? "1fr"
           : "1fr 1fr auto 1fr",
@@ -759,14 +754,91 @@ function RealTradingInner() {
   );
 
   // ═════════════════════════════════════════════════════════
-  // OPEN POSITIONS
+  // OPEN POSITIONS — 모바일은 카드 형식 (Table 가로 스크롤 회피)
   // ═════════════════════════════════════════════════════════
+  const renderPositionCard = (p, idx) => {
+    const isLong = p.positionAmt > 0;
+    const pnl = p.unRealizedProfit || 0;
+    const pnlPct = p.entryPrice > 0
+      ? ((p.markPrice - p.entryPrice) / p.entryPrice) * (isLong ? 100 : -100) * (p.leverage || 1)
+      : 0;
+    return (
+      <div key={`${p.symbol}-${idx}`} style={{
+        padding: 14,
+        background: "var(--z-card-2)",
+        border: `1px solid var(--z-border)`,
+        borderRadius: "var(--z-r-md)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+      }}>
+        {/* 헤더 — 심볼 + 방향 + 손익 (큰 글씨) */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+            <span style={{ fontSize: 16, fontWeight: 800, color: "var(--z-text)" }}>{p.symbol}</span>
+            <Badge tone={isLong ? "green" : "red"} size="sm">
+              {isLong ? "롱" : "숏"} {p.leverage}×
+            </Badge>
+          </div>
+          <div style={{ textAlign: "right", flexShrink: 0 }}>
+            <div style={{
+              fontSize: 18, fontWeight: 900, lineHeight: 1,
+              color: pnl >= 0 ? "var(--z-green-hi)" : "var(--z-red-hi)",
+              fontFamily: "var(--z-font-mono)",
+            }}>
+              {pnl >= 0 ? "+" : ""}{fmtUsd(pnl)}
+            </div>
+            <div style={{
+              fontSize: 11, fontWeight: 700, marginTop: 2,
+              color: pnl >= 0 ? "var(--z-green-hi)" : "var(--z-red-hi)",
+            }}>
+              {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
+            </div>
+          </div>
+        </div>
+
+        {/* 본문 — 수량/진입/현재 (가로 분할) */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr 1fr",
+          gap: 8,
+          paddingTop: 10,
+          borderTop: `1px solid var(--z-border)`,
+        }}>
+          <div>
+            <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 2 }}>수량</div>
+            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)" }}>
+              {fmtQty(Math.abs(p.positionAmt))}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 2 }}>진입가</div>
+            <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)" }}>
+              {fmtUsd(p.entryPrice)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 2 }}>현재가</div>
+            <div style={{
+              fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)",
+              color: p.markPrice > p.entryPrice
+                ? (isLong ? "var(--z-green-hi)" : "var(--z-red-hi)")
+                : (isLong ? "var(--z-red-hi)" : "var(--z-green-hi)"),
+            }}>
+              {fmtUsd(p.markPrice)}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const positionsCard = (
     <Card
-      title="오픈 포지션"
+      title="진행 중 거래"
       icon={<Activity size={16} />}
       actions={<Badge tone={positions.length > 0 ? "blue" : "default"}>{positions.length}</Badge>}
-      pad={0}
+      pad={positions.length === 0 || isMobile ? 0 : undefined}
     >
       {positions.length === 0 ? (
         <div style={{
@@ -786,12 +858,18 @@ function RealTradingInner() {
           }}>
             <Activity size={28} color="#fff" />
           </div>
-          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>오픈 포지션 없음</div>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>진행 중 거래 없음</div>
           <div style={{ fontSize: 13, color: "var(--z-text-3)", lineHeight: 1.5 }}>
-            실거래가 활성화되고 신호가 발생하면<br />여기에 포지션이 표시됩니다.
+            실거래가 활성화되고 시그널이 발생하면<br />여기에 포지션이 표시됩니다.
           </div>
         </div>
+      ) : isMobile ? (
+        // ★ 모바일 — 카드 그리드 (Table 가로 스크롤 회피)
+        <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+          {positions.map((p, i) => renderPositionCard(p, i))}
+        </div>
       ) : (
+        // 데스크탑 — 기존 Table 유지
         <Table
           columns={[
             { key: "symbol", label: "심볼",
