@@ -642,18 +642,40 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       const sideKr = plan.plan.side === "LONG" ? "롱(상승)" : "숏(하락)";
       const slPct = (plan.plan.slPct * 100).toFixed(2);
       const tpPct = (plan.plan.tpPct * 100).toFixed(2);
+      // ★ bracket SL/TP 상태 점검 — rescue 발동 또는 SL attach 실패 시 경고
+      const bracketInfo = result.bracket || {};
+      const bracketRescue = result.bracketRescue;
+      const slAttached = bracketInfo.sl?.ok;
+      const tpAttached = bracketInfo.tp?.ok;
+      const slMode = bracketInfo.slMode; // "quantity_fallback" 등
+
+      const lines = [
+        `진입가 $${plan.plan.entryPrice} · 수량 ${plan.plan.qty}`,
+        `노출 $${plan.plan.notional?.toFixed(2)} · 마진 $${plan.plan.marginRequired.toFixed(2)} (레버리지 ${plan.plan.leverage}x)`,
+        `손절라인 $${plan.plan.slPrice} (-${slPct}%) · 익절라인 $${plan.plan.tpPrice} (+${tpPct}%)`,
+        `손익비 ${plan.plan.effectiveRR?.toFixed(2) || "?"}배 · 감내 손실 $${plan.plan.riskAmount?.toFixed(2) || "?"}`,
+        `시그널: ${best.source || "봇"} (conf ${best.confidence})`,
+      ];
+      // SL/TP attach 상태 명시
+      if (slAttached && tpAttached) {
+        lines.push(`✅ Binance 손절·익절 자동 주문 등록됨${slMode ? ` (${slMode})` : ""}`);
+      } else if (slAttached && !tpAttached) {
+        lines.push(`⚠️ 손절은 등록 / 익절은 실패 — 익절 도달 시 직접 청산 권장`);
+      } else if (!slAttached && bracketRescue?.critical) {
+        lines.push(`🚨 손절 등록 실패: ${bracketRescue.slError || "unknown"}`);
+        lines.push(`🚨 ${bracketRescue.warning || "binance UI 에서 직접 SL 추가 권장"}`);
+      } else if (!slAttached) {
+        lines.push(`⚠️ 손절·익절 자동 주문 미확인 — 봇이 시간 손절로 보호 중`);
+      }
+
       await sendCards([
         buildCard({
           tag: "🤖",
           title: `봇 진입 — ${plan.plan.symbol} ${sideKr}`,
-          lines: [
-            `진입가 $${plan.plan.entryPrice} · 수량 ${plan.plan.qty}`,
-            `노출 $${plan.plan.notional?.toFixed(2)} · 마진 $${plan.plan.marginRequired.toFixed(2)} (레버리지 ${plan.plan.leverage}x)`,
-            `손절라인 $${plan.plan.slPrice} (-${slPct}%) · 익절라인 $${plan.plan.tpPrice} (+${tpPct}%)`,
-            `손익비 ${plan.plan.effectiveRR?.toFixed(2) || "?"}배 · 감내 손실 $${plan.plan.riskAmount?.toFixed(2) || "?"}`,
-            `시그널: ${best.source || "봇"} (conf ${best.confidence})`,
-          ],
-          hint: "포지션은 손절라인·익절라인까지 자동 추적됩니다. 필요시 안전잠금으로 즉시 차단 가능.",
+          lines,
+          hint: slAttached
+            ? "포지션은 손절라인·익절라인까지 자동 추적됩니다. 필요시 안전잠금으로 즉시 차단 가능."
+            : "손절 자동 등록 실패 — Binance 앱에서 SL 직접 추가하시는 걸 강력 권장합니다.",
         }),
       ]);
     } catch (e) {

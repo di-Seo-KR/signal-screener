@@ -164,33 +164,73 @@ export async function executeOrderPlan(opts) {
   }
 
   let bracketRescue = null;
+  // ★ 2026-05-08: Rescue 모드 환경변수로 제어 가능하게 변경.
+  //   이전 default=force_close 가 SL attach 실패 시 즉시 시장가 청산 → 봇이
+  //   진입 0.03초 만에 종료되는 사고 발생 (AAVE 케이스). 원인 미파악 상태에서
+  //   rescue 가 너무 공격적이라 손실 확정.
+  //   현재 default=quantity_fallback — closePosition=true 실패 시 quantity+
+  //   reduceOnly 로 한 번 더 시도. 여전히 실패하면 alert 만 (즉시 청산 X).
+  //   ZEPTA_BRACKET_RESCUE_MODE = "force_close" | "quantity_fallback" | "alert_only"
+  const rescueMode = process.env.ZEPTA_BRACKET_RESCUE_MODE || "quantity_fallback";
+
   if (stopLossPrice && Number.isFinite(stopLossPrice)) {
-    const slRes = await tryStopOrder({
+    let slRes = await tryStopOrder({
       apiKey, apiSecret, symbol, type: "STOP_MARKET", side: closeSide,
       stopPrice: stopLossPrice, closePosition: true, testnet,
       clientOrderId: clientOrderId ? `${clientOrderId}-SL` : undefined,
     }, "SL");
     bracketResults.sl = slRes;
 
+    // ★ Fallback: closePosition=true 실패 시 quantity+reduceOnly 로 재시도.
+    //   Binance Hedge Mode 에서 closePosition=true 가 reject 되는 케이스 대응.
+    if (!slRes.ok && rescueMode !== "force_close" && rescueMode !== "alert_only") {
+      console.warn(`[executeOrderPlan] SL closePosition=true failed → trying quantity+reduceOnly`);
+      const slRes2 = await tryStopOrder({
+        apiKey, apiSecret, symbol, type: "STOP_MARKET", side: closeSide,
+        stopPrice: stopLossPrice, quantity: qty, testnet,
+        clientOrderId: clientOrderId ? `${clientOrderId}-SL2` : undefined,
+      }, "SL-fallback");
+      if (slRes2.ok) {
+        bracketResults.sl = slRes2;
+        bracketResults.slMode = "quantity_fallback";
+        slRes = slRes2;
+      } else {
+        bracketResults.slFallbackError = slRes2.error;
+      }
+    }
+
     if (!slRes.ok) {
-      // ★ Rescue: SL 예약 실패 → 즉시 포지션 시장가 청산
-      console.error(`[executeOrderPlan] CRITICAL SL attach failed → force close position`);
-      try {
-        const rescueResp = await placeOrder({
-          apiKey, apiSecret, testnet,
-          params: {
-            symbol,
-            side: closeSide,
-            type: "MARKET",
-            quantity: qty,
-            reduceOnly: true,
-            newOrderRespType: "RESULT",
-            newClientOrderId: clientOrderId ? `${clientOrderId}-RESCUE` : undefined,
-          },
-        });
-        bracketRescue = { ok: true, orderId: rescueResp.orderId, reason: "SL attach failed, force-closed" };
-      } catch (e) {
-        bracketRescue = { ok: false, error: e?.data?.msg || e?.message, critical: true };
+      // 두 시도 모두 실패. rescueMode 에 따라 분기.
+      const errMsg = bracketResults.slFallbackError || slRes.error || "unknown";
+      console.error(`[executeOrderPlan] SL attach FAILED (mode=${rescueMode}): ${errMsg}`);
+      if (rescueMode === "force_close") {
+        // 옛 동작 — 위험. 명시적으로 켤 때만 사용.
+        try {
+          const rescueResp = await placeOrder({
+            apiKey, apiSecret, testnet,
+            params: {
+              symbol, side: closeSide, type: "MARKET", quantity: qty,
+              reduceOnly: true, newOrderRespType: "RESULT",
+              newClientOrderId: clientOrderId ? `${clientOrderId}-RESCUE` : undefined,
+            },
+          });
+          bracketRescue = { ok: true, orderId: rescueResp.orderId, reason: "SL attach failed, force-closed (legacy)", slError: errMsg };
+        } catch (e) {
+          bracketRescue = { ok: false, error: e?.data?.msg || e?.message, critical: true, slError: errMsg };
+        }
+      } else {
+        // alert_only 또는 quantity_fallback 둘 다 실패한 경우.
+        // 포지션은 유지 + position-monitor 가 plan KV 기반 시간손절/트레일링으로
+        // 보호. SL 누락 사실을 명확히 노출해 사용자가 binance UI 에서 직접
+        // SL 추가 가능.
+        bracketRescue = {
+          ok: false,
+          critical: true,
+          reason: "SL attach failed — position held without binance bracket. Position-monitor still tracks via plan KV.",
+          slError: errMsg,
+          rescueMode,
+          warning: "binance UI 에서 직접 SL 추가 권장 (안전).",
+        };
       }
     }
   }
