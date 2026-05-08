@@ -1483,13 +1483,39 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
   );
 }
 
-export default function AutoTrading({ theme = "dark", user }) {
+export default function AutoTrading({ theme = "dark", user, isOwner = false, onNavigate }) {
   const c = colors[theme];
   const { showToast } = useAuth();
   // ★ 모바일 감지는 useIsMobile (src/ui/useBreakpoint.jsx) SSOT 사용
   const isMobile = useIsMobile();
   const [activeBot, setActiveBot] = useState(null);
   const [pendingBot, setPendingBot] = useState(null);
+
+  // ── 실거래 상태 라이브 폴링 (owner 전용 진입 카드용) ──
+  // 헤더 바로 아래 "실전매매 관제센터" 카드에 보유 자산·진행 거래·오늘 손익을 보여줌.
+  // 백그라운드 가드 + visibilitychange 적용 (배터리 절약).
+  const [realStatus, setRealStatus] = useState(null);
+  useEffect(() => {
+    if (!isOwner || !user?.id) return;
+    let cancelled = false;
+    const fetchStatus = async () => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      try {
+        const res = await fetch(`/api/real-trading/status?userId=${user.id}`);
+        const data = await res.json();
+        if (!cancelled && data.ok) setRealStatus(data);
+      } catch { /* 실패 시 기존 값 유지 */ }
+    };
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 60000); // 1분마다
+    const onVis = () => { if (!document.hidden) fetchStatus(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [isOwner, user?.id]);
 
 
   // 운영 중인 봇 목록 (Supabase user_metadata + localStorage 캐시)
@@ -1819,6 +1845,101 @@ export default function AutoTrading({ theme = "dark", user }) {
       }}
     >
       <div style={{ maxWidth: "1100px", margin: "0 auto", display: "flex", flexDirection: "column", gap: isMobile ? "16px" : "24px" }}>
+        {/* ★ Owner 전용 실전매매 진입 카드 (모바일/PC 양쪽 — 라이브 상태 요약 + 실전매매 페이지 진입)
+            이전: 모바일 햄버거 작은 셀에만 있어서 잘 안 보임.
+            현재: AI매매 진입 시 첫 카드로 노출 → 한눈에 라이브 상태 파악 + 한 탭에 진입. */}
+        {isOwner && onNavigate && (
+          <button
+            onClick={() => onNavigate("real-trading")}
+            style={{
+              background: `linear-gradient(135deg, ${c.blue}18 0%, ${c.purple || c.blue}10 100%)`,
+              border: `1px solid ${c.blue}40`,
+              borderRadius: "16px",
+              padding: isMobile ? "16px 14px" : "20px 24px",
+              cursor: "pointer",
+              textAlign: "left",
+              boxShadow: `0 4px 16px ${c.blue}10`,
+              minHeight: "72px",
+              display: "flex",
+              alignItems: "center",
+              gap: isMobile ? "12px" : "16px",
+              width: "100%",
+            }}
+          >
+            <div style={{
+              width: isMobile ? "40px" : "48px",
+              height: isMobile ? "40px" : "48px",
+              borderRadius: "12px",
+              background: `${c.blue}25`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0,
+            }}>
+              <span style={{ fontSize: isMobile ? "20px" : "24px" }}>⚡</span>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                fontSize: isMobile ? "15px" : "16px",
+                fontWeight: 800,
+                color: c.text1,
+                marginBottom: "4px",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                flexWrap: "wrap",
+              }}>
+                실전매매 관제센터
+                {realStatus?.phase1Enabled && !realStatus?.killswitchOn && !realStatus?.halted && (
+                  <span style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: c.green,
+                    background: `${c.green}15`,
+                    padding: "2px 8px",
+                    borderRadius: "999px",
+                    border: `1px solid ${c.green}30`,
+                  }}>● 자동매매 가동중</span>
+                )}
+                {realStatus?.killswitchOn && (
+                  <span style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: c.yellow,
+                    background: `${c.yellow}15`,
+                    padding: "2px 8px",
+                    borderRadius: "999px",
+                  }}>안전잠금</span>
+                )}
+              </div>
+              {realStatus ? (
+                <div style={{
+                  fontSize: isMobile ? "12px" : "13px",
+                  color: c.text3,
+                  display: "flex",
+                  gap: isMobile ? "10px" : "16px",
+                  flexWrap: "wrap",
+                }}>
+                  <span>보유 <strong style={{ color: c.text1 }}>${(realStatus.equity || 0).toFixed(2)}</strong></span>
+                  <span>진행 <strong style={{ color: c.text1 }}>{realStatus.openPositions?.length || 0}건</strong></span>
+                  {(() => {
+                    const recentClosed = (realStatus.recentEngineLog || []).filter(e => e.event === "position_closed").slice(0, 5);
+                    const dayPnL = recentClosed.reduce((s, e) => s + (e.realizedPnL || 0), 0);
+                    return (
+                      <span>최근 청산 <strong style={{ color: dayPnL >= 0 ? c.green : c.red }}>
+                        {dayPnL >= 0 ? "+" : ""}${dayPnL.toFixed(2)}
+                      </strong></span>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <div style={{ fontSize: "12px", color: c.text3 }}>
+                  실시간 포지션·자동 청산·엔진 로그 보기 →
+                </div>
+              )}
+            </div>
+            <span style={{ color: c.text3, fontSize: "20px", flexShrink: 0 }}>›</span>
+          </button>
+        )}
+
         {/* 수동 배분 모달 */}
         {pendingBot && (
           <div style={{
