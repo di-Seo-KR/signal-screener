@@ -126,7 +126,7 @@ async function checkUser(userId) {
                 : "사용자가 직접 청산하신 포지션입니다.",
             ],
             hint: isBotEntry
-              ? "봇이 SL/TP/시간 손절 룰에 따라 자동 청산했습니다."
+              ? "봇이 SL/TP 룰 또는 트레일링 스탑으로 자동 청산했습니다."
               : null,
           }),
         ]);

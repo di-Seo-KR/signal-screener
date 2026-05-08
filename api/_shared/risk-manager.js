@@ -109,18 +109,12 @@ export const RISK_CONFIG = {
   //   reject 되는 문제를 해결하면서 리스크 상한은 유지.
   minNotionalBumpCap: 1.5,
 
-  // 시간 손절 (engine 외부에서 참조)
-  maxHoldMs: 48 * 60 * 60 * 1000,
-
-  // ── 시간 손절 단계화 ──
-  // 일정 시간이 지났는데 +수익이 충분히 나지 않은 포지션은 조기 청산.
-  // softTimeStop: 보유 시간 (ms), minProfitR: 그 시점에 최소로 떠 있어야 할 R 배수
-  // 만족 못하면 포지션 청산. maxHoldMs 보다 짧은 단계.
-  timeStops: [
-    { afterMs: 6  * 60 * 60 * 1000, minProfitR: 0.0  }, // 6h: 본전 미만이면 컷
-    { afterMs: 12 * 60 * 60 * 1000, minProfitR: 0.5  }, // 12h: +0.5R 미만이면 컷
-    { afterMs: 24 * 60 * 60 * 1000, minProfitR: 1.0  }, // 24h: +1.0R 미만이면 컷
-  ],
+  // ★ 시간 손절 — 2026-05-08 대표님 지시로 비활성화.
+  //   "그런 제한을 뭐하러 둬" 의지 반영. TP/SL/안전잠금 만으로 청산 결정.
+  //   maxHoldMs 는 plan 에 보존 (참조용) 하지만 매우 크게 두어 자연 발동 안 함.
+  //   evaluateTimeStop 도 cfg.timeStops 비어있으면 신호 안 줌.
+  maxHoldMs: 30 * 24 * 60 * 60 * 1000, // 30일 (사실상 무한 — TP/SL 도달이 더 빠름)
+  timeStops: [], // 단계적 시간 손절 제거 (이전: 6h/12h/24h)
 
   // ── 트레일링 스탑 ──
   // 포지션이 +activationR 이상으로 가면, 그때부터 SL 을 trailDistanceR 만큼
