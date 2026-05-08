@@ -61,12 +61,14 @@ export const RISK_CONFIG = {
   // TP·SL 가격이 커버해야 할 "고정비용 거리" = 0.13% + 약간의 버퍼
   minNetRR: 1.8,                 // 비용 차감 후 실질 RR 하한
 
-  // 레버리지 — Option A 는 2~5x (청산 사고 위험 축소)
-  minLeverage: 2,
-  maxLeverage: 5,
+  // 레버리지 — 2026-05-08: 5x → 10x 상향 (자본 효율 ↑, riskAmount 는 상수
+  // 라 거래당 위험은 동일. 청산 거리 9% × liqSafetyRatio 0.7 = safeSL 6.3%
+  // 로 SL 5% 미만 보장).
+  minLeverage: 3,
+  maxLeverage: 10,
   leverageBias: {
-    trend: 1,
-    breakout: 0,
+    trend: 2,         // 추세장에서 더 끌어올림
+    breakout: 1,
     "mean-revert": -1,
     unknown: 0,
   },
