@@ -11818,7 +11818,7 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "auto-trading" && (
           <div className="card-stagger">
-            <Suspense fallback={<LazyTabFallback />}><AutoTrading theme={themeMode} user={user} /></Suspense>
+            <Suspense fallback={<LazyTabFallback />}><AutoTrading theme={themeMode} user={user} isOwner={isOwner} onNavigate={setTab} /></Suspense>
           </div>
         )}
 

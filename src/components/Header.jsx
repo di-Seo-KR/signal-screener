@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/sheet";
 import { Separator } from "@/components/ui/separator";
 import {
-  Menu, X, Search, ChevronDown, Sun, Moon, LogOut, User,
+  Menu, X, Search, ChevronDown, ChevronRight, Sun, Moon, LogOut, User,
   Bot, BarChart3, Shield, Briefcase, Newspaper, MessageSquare,
   CalendarDays, Bell, Zap, Target, FileText, LineChart,
   LayoutDashboard, TrendingUp, Activity,
@@ -115,13 +115,13 @@ const getNavCategories = (t) => [
   },
 ];
 
-/* 모바일 메뉴 섹션 (3열 그리드용) */
+/* 모바일 메뉴 섹션 (3열 그리드용)
+   ★ real-trading 은 owner 전용 큰 배너로 분리 (Sheet 상단) — 여기 셀에서는 제외 */
 const getMobileMenuSections = (isOwner, t) => [
   {
     section: t("nav.home"), items: [
       { id: "home", label: t("nav.home"), icon: LayoutDashboard },
       { id: "auto-trading", label: t("nav.aiQuant"), icon: Bot },
-      ...(isOwner ? [{ id: "real-trading", label: t("header.liveTrading"), icon: Activity }] : []),
     ],
   },
   {
@@ -232,6 +232,34 @@ export default memo(function Header({
                     </div>
                   )}
                 </SheetHeader>
+
+                {/* ★ Owner 전용 실전매매 빠른 진입 배너 (모바일 햄버거 상단)
+                    이전엔 햄버거 → 홈 섹션의 3분할 셀로 들어가 있어서 잘 안 보임. */}
+                {user && isOwner && (
+                  <div className="px-3 pt-3">
+                    <button
+                      onClick={() => navigate("real-trading")}
+                      className={cn(
+                        "w-full flex items-center gap-3 rounded-xl p-3.5 text-left transition-all",
+                        tab === "real-trading"
+                          ? "bg-primary/15 border border-primary/30 ring-1 ring-primary/20"
+                          : "bg-gradient-to-br from-primary/10 to-primary/5 hover:from-primary/15 hover:to-primary/10 border border-primary/20"
+                      )}
+                      style={{ minHeight: "56px" }}
+                    >
+                      <div className="flex size-10 items-center justify-center rounded-lg bg-primary/20 shrink-0">
+                        <Activity className="size-5 text-primary" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[14px] font-bold text-foreground">실전매매 관제센터</div>
+                        <div className="text-[12px] text-muted-foreground mt-0.5">
+                          실시간 포지션·자동 청산·엔진 로그
+                        </div>
+                      </div>
+                      <ChevronRight className="size-4 text-muted-foreground shrink-0" />
+                    </button>
+                  </div>
+                )}
 
                 {/* 메뉴 섹션 */}
                 <div className="flex flex-col gap-1 p-3">
