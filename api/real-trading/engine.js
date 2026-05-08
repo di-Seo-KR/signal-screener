@@ -603,6 +603,32 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     shadow,
   });
 
+  // 11b) ★ 실거래 진입 성공 시 텔레그램 알림 (모바일에서 즉시 인지)
+  // dry/shadow 는 알림 안 보냄 (스팸 방지). live 만 발송.
+  if (!dryRun && !shadow && result?.ok && !result?.error) {
+    try {
+      const { sendCards, buildCard } = await import("../_shared/telegram.js");
+      const sideKr = plan.plan.side === "LONG" ? "롱(상승)" : "숏(하락)";
+      const slPct = (plan.plan.slPct * 100).toFixed(2);
+      const tpPct = (plan.plan.tpPct * 100).toFixed(2);
+      await sendCards([
+        buildCard({
+          tag: "🤖",
+          title: `봇 진입 — ${plan.plan.symbol} ${sideKr}`,
+          lines: [
+            `진입가 $${plan.plan.entryPrice} · 수량 ${plan.plan.qty}`,
+            `투입 $${plan.plan.marginRequired.toFixed(2)} (레버리지 ${plan.plan.leverage}x)`,
+            `손절 $${plan.plan.slPrice} (-${slPct}%) · 익절 $${plan.plan.tpPrice} (+${tpPct}%)`,
+            `손익비 ${plan.plan.effectiveRR?.toFixed(2) || "?"}배 · ${best.source || "봇"}`,
+          ],
+          hint: "포지션은 손절·익절 라인까지 자동 추적합니다. 필요시 안전잠금으로 즉시 차단 가능.",
+        }),
+      ]);
+    } catch (e) {
+      console.warn("[engine] telegram entry alert failed:", e?.message);
+    }
+  }
+
   return { ok: true, userId, ran: true, dryRun, shadow, signal: best, plan: plan.plan, result, diag, steps };
 }
 
