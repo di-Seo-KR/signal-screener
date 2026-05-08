@@ -4122,9 +4122,9 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           <button onClick={() => {
             const score = techData?.overallScore || 0;
             const verdict = score >= 80 ? "강력매수" : score >= 65 ? "매수" : score >= 50 ? "중립" : score >= 35 ? "주의" : "매도";
-            const shareText = `[Zepta AI 진단] ${asset.name}(${asset.symbol}) — 투자점수 ${score}점 (${verdict})\n\nAI 퀀트 33개 전략 분석 결과입니다.\n무료로 확인해보세요 👉 https://zepta.vercel.app`;
+            const shareText = `[Zepta AI 진단] ${asset.name}(${asset.symbol}) — 투자점수 ${score}점 (${verdict})\n\nAI 퀀트 33개 전략 분석 결과입니다.\n무료로 확인해보세요 👉 https://zepta.app`;
             if (navigator.share) {
-              navigator.share({ title: `${asset.name} AI 투자 진단`, text: shareText, url: "https://zepta.vercel.app" }).catch(() => {});
+              navigator.share({ title: `${asset.name} AI 투자 진단`, text: shareText, url: "https://zepta.app" }).catch(() => {});
             } else {
               navigator.clipboard.writeText(shareText).then(() => showToast("진단 결과가 복사되었습니다!", "success")).catch(() => {});
             }
@@ -4653,7 +4653,7 @@ function AppInner() {
     // canonical URL 동적 설정
     const canonical = document.querySelector('link[rel="canonical"]');
     if (canonical) {
-      const canonicalUrl = tab === "home" ? "https://zepta.vercel.app/" : `https://zepta.vercel.app/${tab}`;
+      const canonicalUrl = tab === "home" ? "https://zepta.app/" : `https://zepta.app/${tab}`;
       canonical.setAttribute("href", canonicalUrl);
     }
   }, [marketIndices, tab, selectedAsset, hotAssets]);
@@ -7690,7 +7690,7 @@ function AppInner() {
                 const ksChg = ks.change || 0;
                 insights.push(`코스피 ${ksChg >= 0 ? "+" : ""}${ksChg.toFixed(1)}% · ${ksChg > 1 ? "외국인 순매수 주도 강세" : ksChg < -1 ? "외국인 매도 압력 상승" : "기관·외국인 혼조세 지속"}`);
               }
-              const shareText = `[Zepta AI 인사이트] ${insights[0]} ${insights[1] || ""}\n\nhttps://zepta.vercel.app`;
+              const shareText = `[Zepta AI 인사이트] ${insights[0]} ${insights[1] || ""}\n\nhttps://zepta.app`;
 
               return (
                 <div style={{
@@ -8188,8 +8188,8 @@ function AppInner() {
                   {/* 공유 버튼 */}
                   <button onClick={() => {
                     const top5 = dailyPicks.slice(0, 5).map((p, i) => `${i + 1}. ${p.name} (${p.symbol}) ${p.change >= 0 ? "+" : ""}${p.change}%`).join("\n");
-                    const txt = `[Zepta AI ${t("tabs.home.todayPicks") || "오늘의 추천"}]\n\n${top5}\n\n${t("tabs.home.shareDesc") || "AI 퀀트 33개 전략이 실시간으로 찾아낸 종목입니다"}\n👉 https://zepta.vercel.app`;
-                    if (navigator.share) navigator.share({ title: `Zepta AI ${t("tabs.home.todayPicks") || "오늘의 추천"}`, text: txt, url: "https://zepta.vercel.app" }).catch(() => {});
+                    const txt = `[Zepta AI ${t("tabs.home.todayPicks") || "오늘의 추천"}]\n\n${top5}\n\n${t("tabs.home.shareDesc") || "AI 퀀트 33개 전략이 실시간으로 찾아낸 종목입니다"}\n👉 https://zepta.app`;
+                    if (navigator.share) navigator.share({ title: `Zepta AI ${t("tabs.home.todayPicks") || "오늘의 추천"}`, text: txt, url: "https://zepta.app" }).catch(() => {});
                     else navigator.clipboard.writeText(txt).then(() => showToast(t("tabs.home.copied") || "추천 종목이 복사되었습니다!", "success")).catch(() => {});
                   }} style={{
                     width: "100%", padding: "10px 0", marginTop: "12px", borderRadius: "12px",
@@ -10275,9 +10275,9 @@ function AppInner() {
                   <span className="font-black text-xl" style={{ color: C.text1 }}>퀀트 리포트</span>
                   <div className="flex items-center gap-2">
                     <button onClick={() => {
-                      const shareText = `[Zepta AI 시장 리포트] ${reportTime}\n\n시장 점수: ${mktScore}/100 (${mktVerdict})\n상승 ${upCount}개 · 하락 ${dnCount}개\n\nAI 퀀트 33개 전략 실시간 분석\n👉 https://zepta.vercel.app`;
+                      const shareText = `[Zepta AI 시장 리포트] ${reportTime}\n\n시장 점수: ${mktScore}/100 (${mktVerdict})\n상승 ${upCount}개 · 하락 ${dnCount}개\n\nAI 퀀트 33개 전략 실시간 분석\n👉 https://zepta.app`;
                       if (navigator.share) {
-                        navigator.share({ title: "Zepta AI 시장 리포트", text: shareText, url: "https://zepta.vercel.app" }).catch(() => {});
+                        navigator.share({ title: "Zepta AI 시장 리포트", text: shareText, url: "https://zepta.app" }).catch(() => {});
                       } else {
                         navigator.clipboard.writeText(shareText).then(() => showToast("리포트가 복사되었습니다!", "success")).catch(() => {});
                       }
@@ -11838,7 +11838,7 @@ function AppInner() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════
-            TAB: 개발/QA 대시보드 (zepta.vercel.app/dev)
+            TAB: 개발/QA 대시보드 (zepta.app/dev)
         ═══════════════════════════════════════════════════════════ */}
         {tab === "dev" && (
           <Suspense fallback={<LazyTabFallback />}><DevDashboard theme={themeMode} /></Suspense>
@@ -12228,7 +12228,7 @@ function AppInner() {
               <button onClick={() => {
                 const days = (() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })();
                 const bots = (() => { try { return JSON.parse(localStorage.getItem(`zepta_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })();
-                const txt = `[Zepta AI 투자 성적표]\n${user?.user_metadata?.nickname || "투자자"}님 · 관심종목 ${watchlist.length}개 | 봇 ${bots}개 | ${days}일째\n무료 시작 👉 https://zepta.vercel.app`;
+                const txt = `[Zepta AI 투자 성적표]\n${user?.user_metadata?.nickname || "투자자"}님 · 관심종목 ${watchlist.length}개 | 봇 ${bots}개 | ${days}일째\n무료 시작 👉 https://zepta.app`;
                 if (navigator.share) navigator.share({ title: "Zepta 성적표", text: txt }).catch(() => {});
                 else navigator.clipboard.writeText(txt).then(() => showToast("복사되었습니다!", "success")).catch(() => {});
               }} style={{
@@ -12244,11 +12244,11 @@ function AppInner() {
               <div style={{ fontSize: "14px", color: C.text3, marginBottom: "12px" }}>AI 퀀트 전략을 무료로 이용할 수 있어요</div>
               <div style={{ display: "flex", gap: "8px" }}>
                 <button onClick={() => {
-                  const txt = "AI가 매수 타점 잡아주는 투자앱이야. 무료인데 한번 써봐 👉 https://zepta.vercel.app";
+                  const txt = "AI가 매수 타점 잡아주는 투자앱이야. 무료인데 한번 써봐 👉 https://zepta.app";
                   if (navigator.share) navigator.share({ text: txt }).catch(() => {});
                   else navigator.clipboard.writeText(txt).then(() => showToast("복사됨!", "success")).catch(() => {});
                 }} style={{ flex: 1, padding: "10px", borderRadius: "10px", fontSize: "14px", fontWeight: 700, background: C.blue, color: "#fff", border: "none", cursor: "pointer" }}>공유하기</button>
-                <button onClick={() => navigator.clipboard.writeText("https://zepta.vercel.app").then(() => showToast("링크 복사!", "success")).catch(() => {})} style={{
+                <button onClick={() => navigator.clipboard.writeText("https://zepta.app").then(() => showToast("링크 복사!", "success")).catch(() => {})} style={{
                   flex: 1, padding: "10px", borderRadius: "10px", fontSize: "14px", fontWeight: 700,
                   background: "transparent", color: C.text2, border: `1px solid ${C.border}30`, cursor: "pointer",
                 }}>링크 복사</button>
@@ -12370,7 +12370,7 @@ function AppInner() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0" }}>운영자: <strong style={{ color: C.text1 }}>서동인</strong></p>
                   <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0" }}>이메일: <strong style={{ color: C.text1 }}>donginseo0421@gmail.com</strong></p>
-                  <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0" }}>서비스 URL: <strong style={{ color: C.text1 }}>zepta.vercel.app</strong></p>
+                  <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0" }}>서비스 URL: <strong style={{ color: C.text1 }}>zepta.app</strong></p>
                 </div>
               </section>
 
