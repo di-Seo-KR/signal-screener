@@ -20,7 +20,7 @@ import {
   Menu, X, Search, ChevronDown, ChevronRight, Sun, Moon, LogOut, User,
   Bot, BarChart3, Shield, Briefcase, Newspaper, MessageSquare,
   CalendarDays, Bell, Zap, Target, FileText, LineChart,
-  LayoutDashboard, TrendingUp, Activity,
+  LayoutDashboard, TrendingUp, Activity, BookOpen,
 } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -110,6 +110,7 @@ const getNavCategories = (t) => [
       { id: "news", label: t("nav.news"), icon: Newspaper },
       { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
       { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
+      { id: "/blog", label: "블로그", icon: BookOpen },
       { id: "alerts", label: t("nav.alerts"), icon: Bell, locked: true },
     ],
   },
@@ -145,6 +146,7 @@ const getMobileMenuSections = (isOwner, t) => [
       { id: "news", label: t("nav.news"), icon: Newspaper },
       { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
       { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
+      { id: "/blog", label: "블로그", icon: BookOpen },
       { id: "alerts", label: t("nav.alerts"), icon: Bell, locked: true },
     ],
   },
@@ -171,6 +173,11 @@ export default memo(function Header({
   const mobileMenuSections = getMobileMenuSections(isOwner, t);
 
   const navigate = useCallback((tabId) => {
+    // 외부 path (블로그처럼 정적 HTML) — 새 페이지로 이동
+    if (typeof tabId === "string" && tabId.startsWith("/")) {
+      window.location.href = tabId;
+      return;
+    }
     setTab(tabId);
     setMobileOpen(false);
   }, [setTab]);
