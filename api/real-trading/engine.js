@@ -404,13 +404,17 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     };
   }
 
-  // ★ 중복 진입 차단 — 이미 OPEN 인 심볼에는 신규 진입 안 함
-  // (1) shadow ledger 기반: shadow/probe 모드에서 가상 OPEN 추적
-  // (2) ★ 2026-05-08 추가 — 실거래 모드에서도 Binance 실제 positions 기반 dedup.
-  //      이전 버그: `if (shadow)` 만 있어 실거래 모드에서 dedup 작동 안 함 →
-  //      사용자가 수동으로 ETH 보유 중에 봇이 ETH 진입 시도하면 중복 포지션 위험.
+  // ★ 중복 진입 차단 (옵션) — 환경변수 ZEPTA_SAME_SYMBOL_DEDUP 로 제어
+  //   "off" (기본): 같은 종목 추가 진입 허용 (averaging up/down). 대표님 지시
+  //                 "같은 포지션 추가 진입도 되게" (2026-05-09).
+  //   "on": shadow + live 모두 dedup. 옛 동작.
+  //
+  //   shadow/probe 는 가상 거래 통계 위해 항상 dedup (옵션 무관).
+  //   실거래는 옵션 따라 결정.
+  const sameSymbolDedup = (process.env.ZEPTA_SAME_SYMBOL_DEDUP || "off").toLowerCase() === "on";
   const openSymbols = new Set();
   if (shadow) {
+    // shadow 는 항상 dedup — 가상 매매 통계가 한 종목에 몰리면 alpha 측정 왜곡
     try {
       const kvDup = await getKv();
       const ledger = (await kvDup.get(`di:real:user:${userId}:shadow-ledger`)) || [];
@@ -419,8 +423,8 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       }
       if (openSymbols.size > 0) S(`open positions (shadow): ${openSymbols.size} symbols (dedup will skip)`);
     } catch {}
-  } else if (!forceDryRun) {
-    // 실거래 모드 — Binance positions 직접 조회해서 OPEN 인 심볼 dedup
+  } else if (!forceDryRun && sameSymbolDedup) {
+    // 실거래 모드 — dedup 옵션 ON 일 때만 적용
     try {
       const positions = await getPositionRisk(creds);
       for (const p of positions || []) {
@@ -433,6 +437,9 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     } catch (e) {
       S(`live dedup skipped: ${e?.message || String(e)}`);
     }
+  } else if (!forceDryRun && !sameSymbolDedup) {
+    // 실거래 모드 + dedup OFF (기본) — 정보용 로그만, 차단 안 함
+    S(`live mode: same-symbol dedup OFF (averaging 허용)`);
   }
 
   // 7-9) ★ ranked 시그널 순회 — 1순위가 affordability/risk reject 되어도
