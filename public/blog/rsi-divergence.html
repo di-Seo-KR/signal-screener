@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>RSI 다이버전스 — 추세 전환을 미리 알아채는 법 | Zepta 블로그</title>
+  <meta name="description" content="RSI 다이버전스(다이버전스)란 무엇인지, 강세·약세 패턴 식별법, 진짜 신호와 가짜 신호 구분, 자동매매에 활용하는 법까지. 차트 그림과 실전 케이스로 정리."/>
+  <meta name="keywords" content="RSI 다이버전스, 다이버전스 매매, 강세 다이버전스, 약세 다이버전스, RSI 매매, 추세 전환 신호"/>
+  <link rel="canonical" href="https://zepta.app/blog/rsi-divergence"/>
+  <meta name="robots" content="index, follow"/>
+  <meta property="og:title" content="RSI 다이버전스 — 추세 전환을 미리 알아채는 법"/>
+  <meta property="og:description" content="강세·약세 다이버전스 식별과 실전 활용 가이드."/>
+  <meta property="og:type" content="article"/>
+  <meta property="og:url" content="https://zepta.app/blog/rsi-divergence"/>
+  <meta property="og:image" content="https://zepta.app/og-image.png"/>
+  <meta property="og:locale" content="ko_KR"/>
+  <meta name="google-adsense-account" content="ca-pub-5897295133273451"/>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"RSI 다이버전스 — 추세 전환을 미리 알아채는 법","author":{"@type":"Organization","name":"Zepta"},"publisher":{"@type":"Organization","name":"Zepta","url":"https://zepta.app/"},"datePublished":"2026-05-09","mainEntityOfPage":"https://zepta.app/blog/rsi-divergence","image":"https://zepta.app/og-image.png","inLanguage":"ko"}</script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#070B14;color:#9AA7BD;line-height:1.85}
+    .wrap{max-width:780px;margin:0 auto;padding:40px 20px}
+    nav{background:#101828;border-bottom:1px solid #1E2A42;padding:14px 20px;text-align:center}
+    nav a{margin:0 12px;font-size:15px;color:#9AA7BD;text-decoration:none}
+    nav a:hover{color:#F1F5FB}
+    .breadcrumb{font-size:13px;color:#64728C;margin-bottom:18px}
+    .breadcrumb a{color:#60A5FA;text-decoration:none}
+    h1{font-size:30px;font-weight:800;color:#F1F5FB;margin-bottom:10px;letter-spacing:-0.02em;line-height:1.3}
+    .meta-row{font-size:13px;color:#64728C;margin-bottom:28px}
+    h2{font-size:21px;font-weight:700;color:#F1F5FB;margin:36px 0 14px;letter-spacing:-0.01em}
+    h3{font-size:17px;color:#F1F5FB;margin:18px 0 8px}
+    p{font-size:16px;margin-bottom:14px}
+    strong{color:#F1F5FB}
+    a{color:#60A5FA;text-decoration:none}a:hover{text-decoration:underline}
+    .callout{background:#0F1F3D;border-left:3px solid #3B82F6;padding:14px 18px;margin:18px 0;border-radius:6px;font-size:15px}
+    ul{margin:0 0 16px 22px}
+    li{margin-bottom:8px;font-size:16px}
+    .pattern{background:#101828;border:1px solid #1E2A42;border-radius:12px;padding:18px 22px;margin:14px 0}
+    .pattern h3{margin-top:0}
+    .green{color:#10D884;font-weight:700}
+    .red{color:#FF7B91;font-weight:700}
+    .related{background:#101828;border:1px solid #1E2A42;border-radius:12px;padding:20px;margin-top:48px}
+    .related h3{font-size:16px;color:#F1F5FB;margin-bottom:12px}
+    .related a{display:block;padding:8px 0;font-size:15px;border-top:1px solid #1E2A42;color:#9AA7BD}
+    .related a:first-of-type{border-top:none}
+    .cta{background:linear-gradient(135deg,#0F1F3D 0%,#0a1530 100%);border:1px solid #3B82F640;border-radius:14px;padding:24px;text-align:center;margin:36px 0}
+    .cta a{display:inline-block;background:#3B82F6;color:#fff;padding:11px 22px;border-radius:8px;font-weight:700;margin-top:10px}
+    footer{text-align:center;padding:40px 20px;color:#64728C;font-size:14px;border-top:1px solid #1E2A42;margin-top:60px}
+    @media(max-width:640px){h1{font-size:24px}.wrap{padding:24px 16px}p,li{font-size:15px}}
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/auto-trading">AI 매매</a>
+    <a href="/screener">스크리너</a>
+    <a href="/blog">블로그</a>
+    <a href="/about">소개</a>
+  </nav>
+  <main class="wrap">
+    <div class="breadcrumb"><a href="/blog">← 블로그</a></div>
+    <h1>RSI 다이버전스 — 추세 전환을 미리 알아채는 법</h1>
+    <div class="meta-row">2026년 5월 9일 · 지표 활용 · 7분 읽기</div>
+
+    <p>RSI 다이버전스(divergence) 는 가격과 지표가 <strong>서로 반대 방향으로 움직이는 패턴</strong>입니다. 가격은 신고가인데 RSI 는 못 따라간다? 추세가 곧 약해진다는 신호일 수 있어요. 잘 잡으면 추세 전환 직전에 진입·청산 가능. 단 가짜 신호도 많아서 다른 지표와 조합 필수.</p>
+
+    <h2>RSI 가 뭔지 빠른 복습</h2>
+    <p>RSI (Relative Strength Index) 는 0~100 사이 값. 70 이상은 과매수, 30 이하는 과매도로 흔히 봅니다. 14일 기간이 표준. 단순 과매수·과매도 신호로만 쓰면 추세장에서 자주 틀리지만, 다이버전스를 보면 추세 전환 정확도 ↑.</p>
+
+    <h2>2가지 핵심 패턴</h2>
+
+    <div class="pattern">
+      <h3><span class="green">강세 다이버전스 (Bullish Divergence)</span></h3>
+      <p><strong>패턴</strong>: 가격은 더 낮은 저점 (lower low) 인데, RSI 는 더 높은 저점 (higher low). 즉 하락 모멘텀이 약해지고 있다는 신호.</p>
+      <p><strong>의미</strong>: "가격이 더 떨어졌지만 매도 압력은 줄고 있다 → 곧 반등 가능성".</p>
+      <p><strong>활용</strong>: 매수 진입 후보. 단 추세선 돌파 또는 거래량 동반 확인 후 진입 권장.</p>
+    </div>
+
+    <div class="pattern">
+      <h3><span class="red">약세 다이버전스 (Bearish Divergence)</span></h3>
+      <p><strong>패턴</strong>: 가격은 더 높은 고점 (higher high) 인데, RSI 는 더 낮은 고점 (lower high). 상승 모멘텀이 약해지고 있다는 신호.</p>
+      <p><strong>의미</strong>: "가격이 더 올랐지만 매수 압력은 줄고 있다 → 곧 조정 가능성".</p>
+      <p><strong>활용</strong>: 매도·청산 후보. 또는 단기 숏 진입.</p>
+    </div>
+
+    <h2>실전 식별 — 3가지 체크리스트</h2>
+    <ul>
+      <li><strong>2개 이상 고점/저점</strong> 비교. 1번만으론 우연일 수도.</li>
+      <li><strong>고점·저점 사이 거리</strong>가 너무 가까우면 무시 (보통 5~30 봉 사이).</li>
+      <li><strong>거래량 변화</strong>도 동반 — 다이버전스 + 거래량 감소 = 강한 신호.</li>
+    </ul>
+
+    <h2>가짜 신호 피하는 법</h2>
+    <p>다이버전스 만으로 진입하면 강한 추세장에서 자주 손실. 가짜 신호 식별 팁:</p>
+    <ul>
+      <li><strong>강한 추세장에서는 다이버전스 무시</strong>: Hurst &gt; 0.6 같은 강한 추세에선 RSI 가 70 위에서 며칠 머물러도 가격은 더 오릅니다.</li>
+      <li><strong>고점·저점이 명확해야</strong>: 모호한 출렁거림은 다이버전스 아님.</li>
+      <li><strong>최소 1개 다른 지표 확인</strong>: 추세선 돌파, MACD 교차, 거래량 변화.</li>
+      <li><strong>큰 시간프레임 우선</strong>: 일봉 다이버전스 &gt; 1시간봉 &gt; 5분봉. 작은 시간프레임은 노이즈 많음.</li>
+    </ul>
+
+    <div class="callout">
+      <strong>💡 핵심</strong>: 다이버전스는 "추세 전환 가능성"을 알려줄 뿐 "확정 신호" 가 아닙니다. 진입 전에 거래량·다른 지표 확인하고, 진입 후엔 반드시 손절 라인 설정.
+    </div>
+
+    <h2>자동매매에서의 활용</h2>
+    <p>다이버전스는 사람 눈으로 패턴 식별이 직관적이지만 코드로 구현하면 까다롭습니다. 일반적 접근:</p>
+    <ul>
+      <li>최근 N개 봉에서 가격 고점·저점 + RSI 고점·저점 자동 추출</li>
+      <li>두 시리즈의 추세 방향 비교</li>
+      <li>다이버전스 패턴 발견 시 다른 지표 (MACD, 볼륨, 추세선) 와 cross-check</li>
+      <li>모든 조건 통과 시 시그널 생성</li>
+    </ul>
+    <p>Zepta 의 33개 알파 전략 중 일부 (Mean Reversion 카테고리) 가 다이버전스 패턴을 활용합니다. 단 단독으로 쓰지 않고 항상 다른 필터 (Hurst 지수, 변동성 등) 와 조합.</p>
+
+    <div class="cta">
+      <p>다이버전스 패턴 자동 감지 + 다른 33개 전략 조합을 한 화면에서 운영해보세요.</p>
+      <a href="/auto-trading">AI 매매 시작하기 →</a>
+    </div>
+
+    <div class="related">
+      <h3>이어서 읽기</h3>
+      <a href="/blog/screener-guide">주식 스크리너 사용법 — 강한 종목 5분 만에 찾기</a>
+      <a href="/blog/quant-strategies">퀀트 전략 33가지, 한눈에 정리</a>
+      <a href="/blog/hurst-explained">Hurst 지수란? 추세장과 박스권 구분하는 법</a>
+    </div>
+  </main>
+  <footer>
+    <p>© 2026 Zepta — <a href="/">홈</a> · <a href="/blog">블로그</a> · <a href="/contact">문의</a></p>
+  </footer>
+</body>
+</html>
