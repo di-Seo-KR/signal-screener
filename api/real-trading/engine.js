@@ -648,11 +648,12 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
           title: `봇 진입 — ${plan.plan.symbol} ${sideKr}`,
           lines: [
             `진입가 $${plan.plan.entryPrice} · 수량 ${plan.plan.qty}`,
-            `투입 $${plan.plan.marginRequired.toFixed(2)} (레버리지 ${plan.plan.leverage}x)`,
-            `손절 $${plan.plan.slPrice} (-${slPct}%) · 익절 $${plan.plan.tpPrice} (+${tpPct}%)`,
-            `손익비 ${plan.plan.effectiveRR?.toFixed(2) || "?"}배 · ${best.source || "봇"}`,
+            `노출 $${plan.plan.notional?.toFixed(2)} · 마진 $${plan.plan.marginRequired.toFixed(2)} (레버리지 ${plan.plan.leverage}x)`,
+            `손절라인 $${plan.plan.slPrice} (-${slPct}%) · 익절라인 $${plan.plan.tpPrice} (+${tpPct}%)`,
+            `손익비 ${plan.plan.effectiveRR?.toFixed(2) || "?"}배 · 감내 손실 $${plan.plan.riskAmount?.toFixed(2) || "?"}`,
+            `시그널: ${best.source || "봇"} (conf ${best.confidence})`,
           ],
-          hint: "포지션은 손절·익절 라인까지 자동 추적합니다. 필요시 안전잠금으로 즉시 차단 가능.",
+          hint: "포지션은 손절라인·익절라인까지 자동 추적됩니다. 필요시 안전잠금으로 즉시 차단 가능.",
         }),
       ]);
     } catch (e) {
