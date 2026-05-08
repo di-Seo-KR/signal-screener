@@ -664,12 +664,15 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       if (slAttached && tpAttached) {
         lines.push(`✅ Binance 손절·익절 자동 주문 등록됨${slMode ? ` (${slMode})` : ""}`);
       } else if (slAttached && !tpAttached) {
-        lines.push(`⚠️ 손절은 등록 / 익절은 실패 — 익절 도달 시 직접 청산 권장`);
-      } else if (!slAttached && bracketRescue?.critical) {
-        lines.push(`🚨 손절 등록 실패: ${bracketRescue.slError || "unknown"}`);
-        lines.push(`🚨 ${bracketRescue.warning || "binance UI 에서 직접 SL 추가 권장"}`);
+        lines.push(`⚠️ 손절은 binance 등록 / 익절은 봇 모니터링 (3분 주기)`);
       } else if (!slAttached) {
-        lines.push(`⚠️ 손절·익절 자동 주문 미확인 — 봇이 시간 손절로 보호 중`);
+        // ★ Binance bracket endpoint 가 reject (Algo Order API 요구) 한 케이스.
+        //   대신 봇이 position-monitor 에서 mark price 와 plan.slPrice/tpPrice
+        //   직접 비교 → 도달 시 시장가 청산. binance bracket 의존성 0.
+        lines.push(`🛡️ 손절·익절 모두 봇이 직접 모니터링 (3분 주기 mark price 체크)`);
+        if (bracketRescue?.slError) {
+          lines.push(`ℹ️ Binance API: "${bracketRescue.slError.slice(0, 80)}"`);
+        }
       }
 
       await sendCards([
@@ -679,7 +682,7 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
           lines,
           hint: slAttached
             ? "포지션은 손절라인·익절라인까지 자동 추적됩니다. 필요시 안전잠금으로 즉시 차단 가능."
-            : "손절 자동 등록 실패 — Binance 앱에서 SL 직접 추가하시는 걸 강력 권장합니다.",
+            : "Binance bracket 미지원 계정 — 봇이 3분마다 mark price 체크해 손절·익절 발동. 안전잠금으로 즉시 차단도 가능.",
         }),
       ]);
     } catch (e) {

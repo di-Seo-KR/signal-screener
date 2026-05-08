@@ -163,6 +163,68 @@ async function checkUser(userId) {
       await kv.set(planKey, plan);
     }
 
+    // ── ★ (a-pre) 가격 SL/TP — binance bracket endpoint 가 reject 되는
+    //   계정 케이스 대응. 봇이 매 cron (3분) 마다 mark price 와 plan.slPrice/
+    //   plan.tpPrice 비교 → 도달 시 즉시 시장가 청산.
+    //   binance API 변화에 면역. SL endpoint 의존성 0.
+    const slHit = plan.slPrice && (
+      side === "LONG" ? markPrice <= plan.slPrice : markPrice >= plan.slPrice
+    );
+    const tpHit = plan.tpPrice && (
+      side === "LONG" ? markPrice >= plan.tpPrice : markPrice <= plan.tpPrice
+    );
+    if (slHit || tpHit) {
+      const reason = slHit ? "price_sl_hit" : "price_tp_hit";
+      const refPrice = slHit ? plan.slPrice : plan.tpPrice;
+      try {
+        const closeQty = Math.abs(parseFloat(p.positionAmt));
+        await placeOrder({
+          ...creds,
+          params: {
+            symbol: sym,
+            side: side === "LONG" ? "SELL" : "BUY",
+            type: "MARKET",
+            quantity: closeQty,
+            reduceOnly: "true",
+            newOrderRespType: "RESULT",
+          },
+        });
+        const logKey = `di:real:user:${userId}:engine-log`;
+        const log = (await kv.get(logKey)) || [];
+        log.unshift({
+          time: new Date().toISOString(),
+          event: reason,
+          symbol: sym,
+          markPrice, refPrice,
+          side,
+        });
+        await kv.set(logKey, log.slice(0, 200));
+        // 텔레그램 알림 — 봇 자체 SL/TP 청산 (binance bracket 없이도 작동)
+        try {
+          const { sendCards, buildCard } = await import("../_shared/telegram.js");
+          const tag = tpHit ? "🎯" : "🛑";
+          const label = tpHit ? "익절" : "손절";
+          await sendCards([
+            buildCard({
+              tag,
+              title: `봇 ${label} 발동 — ${sym}`,
+              lines: [
+                `mark $${markPrice.toFixed(4)} → ${tpHit ? "익절" : "손절"}라인 $${refPrice} 도달`,
+                `시장가 청산 주문 발송 (실현 손익은 잠시 후 확인)`,
+                `봇 진입 시점: ${new Date(plan.openedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`,
+              ],
+              hint: "봇이 직접 mark price 모니터링으로 청산 (binance bracket endpoint 우회).",
+            }),
+          ]);
+        } catch {}
+        // plan KV 정리 — 다음 cron 의 closed 감지에서 "수동" 으로 잘못 분류 방지
+        await kv.del(planKey);
+        continue; // 시간손절·트레일링 평가 스킵
+      } catch (e) {
+        console.warn(`[monitor] price SL/TP close failed for ${sym}:`, e?.message);
+      }
+    }
+
     // ── (a) 시간 손절 ──
     const ts = evaluateTimeStop({
       openedAt: plan.openedAt,
