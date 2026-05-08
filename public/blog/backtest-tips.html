@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>백테스트 정확도 높이는 7가지 팁 | Zepta 블로그</title>
+  <meta name="description" content="백테스트 결과는 좋은데 실거래에서 무너지는 이유는 보통 정해져 있습니다. 수수료·슬리피지·룩어헤드·과적합 같은 흔한 함정 7가지와 해결법."/>
+  <meta name="keywords" content="백테스트, 백테스팅, 퀀트 백테스트, 과적합, 슬리피지, 룩어헤드 바이어스, 워크포워드 검증"/>
+  <link rel="canonical" href="https://zepta.app/blog/backtest-tips"/>
+  <meta name="robots" content="index, follow"/>
+  <meta property="og:title" content="백테스트 정확도 높이는 7가지 팁"/>
+  <meta property="og:description" content="백테스트 vs 실거래 차이의 7가지 원인과 해결법."/>
+  <meta property="og:type" content="article"/>
+  <meta property="og:url" content="https://zepta.app/blog/backtest-tips"/>
+  <meta property="og:image" content="https://zepta.app/og-image.png"/>
+  <meta property="og:locale" content="ko_KR"/>
+  <meta name="google-adsense-account" content="ca-pub-5897295133273451"/>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"백테스트 정확도 높이는 7가지 팁","author":{"@type":"Organization","name":"Zepta"},"publisher":{"@type":"Organization","name":"Zepta","url":"https://zepta.app/"},"datePublished":"2026-05-09","mainEntityOfPage":"https://zepta.app/blog/backtest-tips","image":"https://zepta.app/og-image.png","inLanguage":"ko"}</script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#070B14;color:#9AA7BD;line-height:1.85}
+    .wrap{max-width:780px;margin:0 auto;padding:40px 20px}
+    nav{background:#101828;border-bottom:1px solid #1E2A42;padding:14px 20px;text-align:center}
+    nav a{margin:0 12px;font-size:15px;color:#9AA7BD;text-decoration:none}
+    nav a:hover{color:#F1F5FB}
+    .breadcrumb{font-size:13px;color:#64728C;margin-bottom:18px}
+    .breadcrumb a{color:#60A5FA;text-decoration:none}
+    h1{font-size:30px;font-weight:800;color:#F1F5FB;margin-bottom:10px;letter-spacing:-0.02em;line-height:1.3}
+    .meta-row{font-size:13px;color:#64728C;margin-bottom:28px}
+    h2{font-size:20px;font-weight:700;color:#F1F5FB;margin:32px 0 12px;letter-spacing:-0.01em}
+    p{font-size:16px;margin-bottom:14px}
+    strong{color:#F1F5FB}
+    a{color:#60A5FA;text-decoration:none}a:hover{text-decoration:underline}
+    .tip{background:#101828;border:1px solid #1E2A42;border-radius:12px;padding:20px 22px;margin:14px 0;border-left:3px solid #3B82F6}
+    .tip-num{display:inline-block;background:#3B82F6;color:#fff;font-size:13px;font-weight:700;padding:4px 10px;border-radius:6px;margin-bottom:10px}
+    .related{background:#101828;border:1px solid #1E2A42;border-radius:12px;padding:20px;margin-top:48px}
+    .related h3{font-size:16px;color:#F1F5FB;margin-bottom:12px}
+    .related a{display:block;padding:8px 0;font-size:15px;border-top:1px solid #1E2A42;color:#9AA7BD}
+    .related a:first-of-type{border-top:none}
+    .cta{background:linear-gradient(135deg,#0F1F3D 0%,#0a1530 100%);border:1px solid #3B82F640;border-radius:14px;padding:24px;text-align:center;margin:36px 0}
+    .cta a{display:inline-block;background:#3B82F6;color:#fff;padding:11px 22px;border-radius:8px;font-weight:700;margin-top:10px}
+    footer{text-align:center;padding:40px 20px;color:#64728C;font-size:14px;border-top:1px solid #1E2A42;margin-top:60px}
+    @media(max-width:640px){h1{font-size:24px}.wrap{padding:24px 16px}p{font-size:15px}}
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/auto-trading">AI 매매</a>
+    <a href="/screener">스크리너</a>
+    <a href="/blog">블로그</a>
+    <a href="/about">소개</a>
+  </nav>
+  <main class="wrap">
+    <div class="breadcrumb"><a href="/blog">← 블로그</a></div>
+    <h1>백테스트 정확도 높이는 7가지 팁</h1>
+    <div class="meta-row">2026년 5월 9일 · 중급 · 7분 읽기</div>
+
+    <p>백테스트에서는 연 30% 수익이 나오는데 실거래에서는 -10%인 케이스, 흔하죠. 이 차이는 보통 <strong>7가지 함정</strong> 중 하나에서 옵니다. 각각 어떻게 피할 수 있는지 정리했습니다.</p>
+
+    <div class="tip">
+      <span class="tip-num">팁 1</span>
+      <h2>수수료·슬리피지를 반드시 반영하세요</h2>
+      <p>Binance Futures taker 수수료 0.04%, 진입+청산 왕복 0.08%. 슬리피지 0.025%를 더하면 한 거래당 0.13% 비용. 거래 100번이면 13% 차감. 수수료 무시한 백테스트는 의미 없습니다.</p>
+    </div>
+
+    <div class="tip">
+      <span class="tip-num">팁 2</span>
+      <h2>룩어헤드 바이어스 (Look-ahead Bias) 제거</h2>
+      <p>"오늘 종가가 어제보다 높으면 어제 매수" 같은 코드, 보면 우습지만 실제로 자주 만들어집니다. 시점 t의 결정에는 시점 t-1까지의 데이터만 써야 합니다. <strong>모든 인디케이터에 lag(1)</strong>이 들어갔는지 확인하세요.</p>
+    </div>
+
+    <div class="tip">
+      <span class="tip-num">팁 3</span>
+      <h2>생존 편향 (Survivorship Bias) 주의</h2>
+      <p>현재 S&P 500 종목으로만 과거 백테스트하면 이미 살아남은 강한 종목들만 보는 거. 망한 종목을 빼고 보니 결과가 좋아 보입니다. <strong>Point-in-Time 데이터</strong>(그 시점에 실제로 지수에 있던 종목)를 사용해야 합니다.</p>
+    </div>
+
+    <div class="tip">
+      <span class="tip-num">팁 4</span>
+      <h2>과적합 (Overfitting) 피하기</h2>
+      <p>"RSI 27.3 + 거래량 1.71배 + 8.4일선" 같은 정밀한 파라미터, 보통 과적합입니다. 깔끔한 숫자(RSI 30, 50일선)로도 비슷한 성과 나오지 않으면 그건 모델이 데이터를 외운 거. <strong>파라미터 1~2개만 미세 조정 vs 큰 변화에서도 작동하는지</strong> 확인.</p>
+    </div>
+
+    <div class="tip">
+      <span class="tip-num">팁 5</span>
+      <h2>워크포워드 (Walk-Forward) 검증</h2>
+      <p>전체 데이터로 최적화 + 같은 데이터로 평가는 의미 없습니다. <strong>2020~2023 데이터로 최적화 → 2024~2025로 평가</strong> 같은 방식으로 미래 데이터에 어떻게 작동하는지 확인. 이게 진짜 검증입니다.</p>
+    </div>
+
+    <div class="tip">
+      <span class="tip-num">팁 6</span>
+      <h2>여러 시장·종목으로 검증</h2>
+      <p>BTC 2021년 강세장에 잘 맞는 전략이 ETH 2022년 약세장에 무너지는 경우 흔합니다. <strong>다른 종목·다른 시기·다른 시장 국면</strong>에서도 일관되게 작동하면 그제야 신뢰 가능합니다.</p>
+    </div>
+
+    <div class="tip">
+      <span class="tip-num">팁 7</span>
+      <h2>실전 도입 전 Shadow / Paper 모드 2~4주</h2>
+      <p>백테스트 통과해도 실시간 시장은 다릅니다. 실거래 전에 <strong>"가짜 돈 모의 운영"으로 2~4주 돌려보고</strong> 백테스트 결과와 일치하는지 검증. 차이 크면 코드 버그 또는 백테스트 환경 차이.</p>
+    </div>
+
+    <h2>요약 체크리스트</h2>
+    <p>새 전략 백테스트 후 실거래 전에 위 7가지를 체크하시는 습관을 들이면 실패율이 크게 줄어듭니다. 특히 <strong>팁 5 (워크포워드) 와 팁 7 (Shadow 모드)</strong> 만 잘 해도 큰 사고는 막을 수 있습니다.</p>
+    <p>Zepta는 33개 알파 전략을 모두 워크포워드 검증 후, Shadow 모드로 2주간 가상 운영한 데이터를 누적해서 운영합니다. 새 전략 추가 시에도 같은 절차를 따릅니다.</p>
+
+    <div class="cta">
+      <p>실시간 백테스트 + Shadow 모드 검증을 한 화면에서 처리해보세요.</p>
+      <a href="/backtest">백테스트 시작하기 →</a>
+    </div>
+
+    <div class="related">
+      <h3>이어서 읽기</h3>
+      <a href="/blog/quant-strategies">퀀트 전략 33가지, 한눈에 정리</a>
+      <a href="/blog/ai-trading-guide">AI 자동매매란? 시작 전에 꼭 알아야 할 것들</a>
+      <a href="/blog/hurst-explained">Hurst 지수란? 추세장과 박스권 구분하는 법</a>
+    </div>
+  </main>
+  <footer>
+    <p>© 2026 Zepta — <a href="/">홈</a> · <a href="/blog">블로그</a> · <a href="/contact">문의</a></p>
+  </footer>
+</body>
+</html>

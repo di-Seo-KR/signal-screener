@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>퀀트 전략 33가지, 한눈에 정리 | Zepta 블로그</title>
+  <meta name="description" content="추세추종·평균회귀·돌파·변동성 4가지 카테고리로 나눈 퀀트 전략 33가지. 각 전략의 작동 원리, 잘 통하는 시장, 안 통하는 시장을 정리했습니다."/>
+  <meta name="keywords" content="퀀트 전략, 퀀트 투자, 알고리즘 트레이딩, 추세추종 전략, 평균회귀 전략, 돌파 전략, 변동성 전략"/>
+  <link rel="canonical" href="https://zepta.app/blog/quant-strategies"/>
+  <meta name="robots" content="index, follow"/>
+  <meta property="og:title" content="퀀트 전략 33가지, 한눈에 정리"/>
+  <meta property="og:description" content="추세추종·평균회귀·돌파·변동성 4가지 카테고리 정리."/>
+  <meta property="og:type" content="article"/>
+  <meta property="og:url" content="https://zepta.app/blog/quant-strategies"/>
+  <meta property="og:image" content="https://zepta.app/og-image.png"/>
+  <meta property="og:locale" content="ko_KR"/>
+  <meta name="google-adsense-account" content="ca-pub-5897295133273451"/>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"퀀트 전략 33가지, 한눈에 정리","author":{"@type":"Organization","name":"Zepta"},"publisher":{"@type":"Organization","name":"Zepta","url":"https://zepta.app/"},"datePublished":"2026-05-09","mainEntityOfPage":"https://zepta.app/blog/quant-strategies","image":"https://zepta.app/og-image.png","inLanguage":"ko"}</script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#070B14;color:#9AA7BD;line-height:1.85}
+    .wrap{max-width:780px;margin:0 auto;padding:40px 20px}
+    nav{background:#101828;border-bottom:1px solid #1E2A42;padding:14px 20px;text-align:center}
+    nav a{margin:0 12px;font-size:15px;color:#9AA7BD;text-decoration:none}
+    nav a:hover{color:#F1F5FB}
+    .breadcrumb{font-size:13px;color:#64728C;margin-bottom:18px}
+    .breadcrumb a{color:#60A5FA;text-decoration:none}
+    h1{font-size:30px;font-weight:800;color:#F1F5FB;margin-bottom:10px;letter-spacing:-0.02em;line-height:1.3}
+    .meta-row{font-size:13px;color:#64728C;margin-bottom:28px}
+    h2{font-size:21px;font-weight:700;color:#F1F5FB;margin:36px 0 14px;letter-spacing:-0.01em}
+    h3{font-size:17px;color:#F1F5FB;margin:18px 0 8px}
+    p{font-size:16px;margin-bottom:14px}
+    strong{color:#F1F5FB}
+    a{color:#60A5FA;text-decoration:none}a:hover{text-decoration:underline}
+    .cat{background:#101828;border:1px solid #1E2A42;border-radius:14px;padding:24px;margin:18px 0}
+    .cat .badge{display:inline-block;font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;margin-bottom:10px}
+    .b1{background:#0F1F3D;color:#60A5FA}
+    .b2{background:#201840;color:#9B6FFF}
+    .b3{background:#2B2100;color:#FFB020}
+    .b4{background:#2C1520;color:#FF7B91}
+    .strats{font-size:14px;color:#64728C;line-height:1.7;margin-top:8px}
+    .when{font-size:14px;color:#9AA7BD;margin-top:10px}
+    .when strong{color:#F1F5FB}
+    .related{background:#101828;border:1px solid #1E2A42;border-radius:12px;padding:20px;margin-top:48px}
+    .related h3{font-size:16px;color:#F1F5FB;margin-bottom:12px}
+    .related a{display:block;padding:8px 0;font-size:15px;border-top:1px solid #1E2A42;color:#9AA7BD}
+    .related a:first-of-type{border-top:none}
+    .cta{background:linear-gradient(135deg,#0F1F3D 0%,#0a1530 100%);border:1px solid #3B82F640;border-radius:14px;padding:24px;text-align:center;margin:36px 0}
+    .cta a{display:inline-block;background:#3B82F6;color:#fff;padding:11px 22px;border-radius:8px;font-weight:700;margin-top:10px}
+    footer{text-align:center;padding:40px 20px;color:#64728C;font-size:14px;border-top:1px solid #1E2A42;margin-top:60px}
+    @media(max-width:640px){h1{font-size:24px}.wrap{padding:24px 16px}p{font-size:15px}}
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/auto-trading">AI 매매</a>
+    <a href="/screener">스크리너</a>
+    <a href="/blog">블로그</a>
+    <a href="/about">소개</a>
+  </nav>
+  <main class="wrap">
+    <div class="breadcrumb"><a href="/blog">← 블로그</a></div>
+    <h1>퀀트 전략 33가지, 한눈에 정리</h1>
+    <div class="meta-row">2026년 5월 9일 · 전략 카탈로그 · 10분 읽기</div>
+
+    <p>퀀트 전략은 보통 4가지 패밀리로 나뉩니다. <strong>추세추종</strong>(가격이 한 방향으로 움직이는 걸 따라가기), <strong>평균회귀</strong>(과매수·과매도면 반대 베팅), <strong>돌파</strong>(저항·지지 깨질 때 진입), <strong>변동성</strong>(시장 변동성 자체를 거래). 어떤 전략이든 이 4가지 중 하나에 속합니다. 시장 국면이 바뀌면 잘 통하는 패밀리도 바뀌는데, 이 글에서 각 패밀리가 언제 강하고 언제 약한지 정리합니다.</p>
+
+    <div class="cat">
+      <span class="badge b1">추세추종 (Trend Following)</span>
+      <h3>가격이 한 방향으로 움직이는 걸 따라가는 전략</h3>
+      <p>대표 지표: 이동평균 교차, ADX, Donchian Channel, Supertrend, MACD Cross, Ichimoku.</p>
+      <p class="strats">대표 전략: SMA Cross / EMA Ribbon / 200일선 위 / Donchian 20-day / Turtle 20일 / Supertrend / MACD Cross / ADX Trend / Channel Breakout / Triple Screen</p>
+      <div class="when">
+        <strong>잘 통할 때</strong>: 큰 추세장 (Hurst &gt; 0.55). 비트코인 강세장, 메가캡 주도 시장.<br/>
+        <strong>안 통할 때</strong>: 박스권. 추세 false signal 로 fakeout 자주 맞음.
+      </div>
+    </div>
+
+    <div class="cat">
+      <span class="badge b2">평균회귀 (Mean Reversion)</span>
+      <h3>가격이 평균에서 벗어나면 다시 돌아온다는 가정</h3>
+      <p>대표 지표: RSI, 볼린저밴드, Stochastic, Z-Score, Williams %R, 이격도.</p>
+      <p class="strats">대표 전략: RSI 30/70 / BB Bounce / Stoch K%D / Z-Score Pair / Williams %R / Pairs Trading / Distance from MA / Daily Reversal / Overnight Gap Fade / Quintile Reversal</p>
+      <div class="when">
+        <strong>잘 통할 때</strong>: 박스권 (Hurst &lt; 0.45). 변동성은 있지만 큰 방향 없음.<br/>
+        <strong>안 통할 때</strong>: 강한 추세장. RSI 70 넘어도 더 올라가는 경우 손실.
+      </div>
+    </div>
+
+    <div class="cat">
+      <span class="badge b3">돌파 (Breakout)</span>
+      <h3>중요 가격대를 깰 때 진입</h3>
+      <p>대표 지표: 20/52주 신고가, 볼린저밴드 폭 압축 후 돌파, ATR 갑자기 증가, 거래량 급증.</p>
+      <p class="strats">대표 전략: 20-day High Breakout / 52-week High / BB Squeeze Breakout / Volume Spike / Range Break / Opening Range Breakout / Pivot Point / Darvas Box / NR4-NR7 / Inside Bar</p>
+      <div class="when">
+        <strong>잘 통할 때</strong>: 변동성 압축 후 폭발. 펀더멘털 변화 시작 시점.<br/>
+        <strong>안 통할 때</strong>: false breakout 많음. 특히 거래량 미동반 시.
+      </div>
+    </div>
+
+    <div class="cat">
+      <span class="badge b4">변동성 (Volatility)</span>
+      <h3>시장 변동성 자체를 거래 대상으로</h3>
+      <p>대표 지표: ATR, VIX, Realized Volatility, GARCH, Volatility Clustering, Funding Rate.</p>
+      <p class="strats">대표 전략: ATR Position Sizing / VIX Regime / Vol Clustering / Hurst Filter / Entropy Detection / Funding Rate Carry / Microstructure / Information Flow / Order Flow Imbalance / Realized Vol Targeting</p>
+      <div class="when">
+        <strong>잘 통할 때</strong>: 다른 모든 전략의 보조. 포지션 사이징과 리스크 관리에 핵심.<br/>
+        <strong>안 통할 때</strong>: 단독으로 진입 신호 만들기엔 부족. 항상 다른 전략의 필터로 사용.
+      </div>
+    </div>
+
+    <h2>실전 운영의 핵심 — 멀티 전략 조합</h2>
+    <p>한 전략만 고집하면 그 전략이 안 통하는 시기에 큰 손실 납니다. 보통 <strong>3~5개 전략을 시장 국면별로 가중치를 다르게 두고 조합</strong>하는 게 정석입니다. 추세장에서는 추세추종 가중치 70%, 박스권에서는 평균회귀 가중치 60% 이런 식.</p>
+    <p>Zepta는 33개 알파 전략을 자동으로 시장 국면 (Hurst 지수 기반) 에 따라 가중치를 다르게 줘서 운영합니다. 사용자가 직접 시장 판단할 필요 없이 봇이 알아서 처리합니다.</p>
+
+    <div class="cta">
+      <p>33개 알파 전략 조합을 직접 운영하면서 결과를 받아보세요.</p>
+      <a href="/auto-trading">AI 매매 시작하기 →</a>
+    </div>
+
+    <div class="related">
+      <h3>이어서 읽기</h3>
+      <a href="/blog/ai-trading-guide">AI 자동매매란? 시작 전에 꼭 알아야 할 것들</a>
+      <a href="/blog/hurst-explained">Hurst 지수란? 추세장과 박스권 구분하는 법</a>
+      <a href="/blog/backtest-tips">백테스트 정확도 높이는 7가지 팁</a>
+    </div>
+  </main>
+  <footer>
+    <p>© 2026 Zepta — <a href="/">홈</a> · <a href="/blog">블로그</a> · <a href="/contact">문의</a></p>
+  </footer>
+</body>
+</html>
