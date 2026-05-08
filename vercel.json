@@ -9,7 +9,13 @@
     { "source": "/privacy", "destination": "/privacy.html" },
     { "source": "/terms", "destination": "/terms.html" },
     { "source": "/contact", "destination": "/contact.html" },
-    { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon)(?!about)(?!guide)(?!privacy)(?!terms)(?!contact).*)", "destination": "/index.html" }
+    { "source": "/blog", "destination": "/blog/index.html" },
+    { "source": "/blog/ai-trading-guide", "destination": "/blog/ai-trading-guide.html" },
+    { "source": "/blog/screener-guide", "destination": "/blog/screener-guide.html" },
+    { "source": "/blog/quant-strategies", "destination": "/blog/quant-strategies.html" },
+    { "source": "/blog/backtest-tips", "destination": "/blog/backtest-tips.html" },
+    { "source": "/blog/hurst-explained", "destination": "/blog/hurst-explained.html" },
+    { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon)(?!about)(?!guide)(?!privacy)(?!terms)(?!contact)(?!blog).*)", "destination": "/index.html" }
   ],
   "headers": [
     {

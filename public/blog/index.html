@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Zepta 블로그 — AI 자동매매·퀀트 전략·주식 스크리너 가이드</title>
+  <meta name="description" content="AI 자동매매 입문자 가이드, 퀀트 전략 33가지, 주식·코인 스크리너 사용법, 백테스트 정확도 개선, Hurst 지수 해설. Zepta가 직접 운영하면서 검증한 내용을 정리합니다."/>
+  <meta name="keywords" content="AI 자동매매, 퀀트 전략, 주식 스크리너, 비트코인 자동매매, 백테스트, Hurst 지수, Zepta 블로그"/>
+  <link rel="canonical" href="https://zepta.app/blog"/>
+  <meta name="robots" content="index, follow"/>
+  <meta property="og:title" content="Zepta 블로그 — AI 자동매매·퀀트 전략 가이드"/>
+  <meta property="og:description" content="실전 자동매매 운영하며 정리한 입문자 가이드와 전략 해설."/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:url" content="https://zepta.app/blog"/>
+  <meta property="og:image" content="https://zepta.app/og-image.png"/>
+  <meta property="og:locale" content="ko_KR"/>
+  <meta name="google-adsense-account" content="ca-pub-5897295133273451"/>
+  <meta name="google-site-verification" content="JUQdy_fK50dBcXAomofWSueoAMckVnuoGcVvjswZzGk"/>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Blog",
+    "name": "Zepta 블로그",
+    "description": "AI 자동매매와 퀀트 전략 입문자 가이드",
+    "url": "https://zepta.app/blog",
+    "publisher": { "@type": "Organization", "name": "Zepta", "url": "https://zepta.app/" }
+  }
+  </script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#070B14;color:#9AA7BD;line-height:1.7}
+    .wrap{max-width:880px;margin:0 auto;padding:40px 20px}
+    h1{font-size:32px;font-weight:800;color:#F1F5FB;margin-bottom:12px;letter-spacing:-0.02em}
+    .lead{font-size:17px;color:#9AA7BD;margin-bottom:36px}
+    nav{background:#101828;border-bottom:1px solid #1E2A42;padding:14px 20px;text-align:center}
+    nav a{margin:0 12px;font-size:15px;color:#9AA7BD;text-decoration:none}
+    nav a:hover{color:#F1F5FB}
+    .post-list{display:flex;flex-direction:column;gap:18px}
+    .post{background:#101828;border:1px solid #1E2A42;border-radius:14px;padding:24px;transition:border-color .2s,transform .2s}
+    .post:hover{border-color:#3B82F6;transform:translateY(-2px)}
+    .post a{color:inherit;text-decoration:none;display:block}
+    .post h2{font-size:21px;font-weight:700;color:#F1F5FB;margin-bottom:8px;letter-spacing:-0.01em}
+    .post p{font-size:15px;color:#9AA7BD;margin-bottom:12px}
+    .post .meta{font-size:13px;color:#64728C;display:flex;gap:14px;flex-wrap:wrap}
+    .post .meta span{display:inline-flex;align-items:center;gap:4px}
+    .tag{display:inline-block;background:#0F1F3D;color:#60A5FA;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;border:1px solid #3B82F622}
+    footer{text-align:center;padding:40px 20px;color:#64728C;font-size:14px;border-top:1px solid #1E2A42;margin-top:60px}
+    footer a{color:#60A5FA;text-decoration:none;margin:0 8px}
+    @media(max-width:640px){h1{font-size:26px}.post h2{font-size:18px}.wrap{padding:28px 16px}}
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/auto-trading">AI 매매</a>
+    <a href="/screener">스크리너</a>
+    <a href="/blog">블로그</a>
+    <a href="/about">소개</a>
+  </nav>
+  <main class="wrap">
+    <h1>Zepta 블로그</h1>
+    <p class="lead">AI 자동매매를 직접 운영하면서 정리한 가이드와 전략 해설입니다. 처음 시작하시는 분도 이해하실 수 있도록 평어로 풀어 썼습니다.</p>
+
+    <div class="post-list">
+      <article class="post">
+        <a href="/blog/ai-trading-guide">
+          <span class="tag">입문자 가이드</span>
+          <h2>AI 자동매매란? 시작 전에 꼭 알아야 할 것들</h2>
+          <p>AI 자동매매가 어떻게 작동하는지, 무엇을 잘하고 무엇을 못하는지, 그리고 실제로 시작할 때 자본·리스크·감정 면에서 무엇을 챙겨야 하는지 정리했습니다.</p>
+          <div class="meta"><span>📖 8분 읽기</span><span>입문자 친화</span></div>
+        </a>
+      </article>
+
+      <article class="post">
+        <a href="/blog/screener-guide">
+          <span class="tag">스크리너</span>
+          <h2>주식 스크리너 사용법 — 강한 종목 5분 만에 찾기</h2>
+          <p>RSI·MACD·거래량 같은 지표를 한 번에 조합해 매수 후보를 빠르게 좁히는 방법. Zepta 스크리너에서 실제로 자주 쓰는 프리셋 5가지도 함께 소개합니다.</p>
+          <div class="meta"><span>📖 6분 읽기</span><span>실전 활용</span></div>
+        </a>
+      </article>
+
+      <article class="post">
+        <a href="/blog/quant-strategies">
+          <span class="tag">퀀트 전략</span>
+          <h2>퀀트 전략 33가지, 한눈에 정리</h2>
+          <p>추세추종·평균회귀·돌파·변동성 4가지 카테고리로 나눠 각 전략이 언제 잘 통하고 언제 안 통하는지, 그리고 시장 국면별로 어떻게 조합해야 하는지 정리했습니다.</p>
+          <div class="meta"><span>📖 10분 읽기</span><span>전략 카탈로그</span></div>
+        </a>
+      </article>
+
+      <article class="post">
+        <a href="/blog/backtest-tips">
+          <span class="tag">백테스트</span>
+          <h2>백테스트 정확도 높이는 7가지 팁</h2>
+          <p>실거래 결과와 백테스트가 차이 나는 이유는 보통 정해져 있습니다. 수수료·슬리피지·룩어헤드·과적합 같은 흔한 함정을 피하는 7가지 체크포인트.</p>
+          <div class="meta"><span>📖 7분 읽기</span><span>중급</span></div>
+        </a>
+      </article>
+
+      <article class="post">
+        <a href="/blog/hurst-explained">
+          <span class="tag">지표 해설</span>
+          <h2>Hurst 지수란? 추세장과 박스권 구분하는 법</h2>
+          <p>Hurst 지수가 0.5보다 크면 추세장, 0.5보다 작으면 평균회귀(박스권). 이 한 숫자만 봐도 지금 전략을 바꿔야 하는지 판단 가능합니다.</p>
+          <div class="meta"><span>📖 5분 읽기</span><span>지표 입문</span></div>
+        </a>
+      </article>
+    </div>
+  </main>
+  <footer>
+    <p>© 2026 Zepta — <a href="/">홈</a> · <a href="/about">소개</a> · <a href="/contact">문의</a></p>
+  </footer>
+</body>
+</html>

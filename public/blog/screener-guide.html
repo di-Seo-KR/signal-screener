@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>주식 스크리너 사용법 — 강한 종목 5분 만에 찾기 | Zepta 블로그</title>
+  <meta name="description" content="RSI·MACD·거래량 같은 지표를 조합해 매수 후보를 빠르게 좁히는 주식 스크리너 사용법. Zepta 스크리너에서 자주 쓰는 프리셋 5가지도 함께."/>
+  <meta name="keywords" content="주식 스크리너, 주식 스크리너 추천, 강한 종목 찾기, 미국 주식 스크리너, RSI 스크리너, 거래량 급증 종목"/>
+  <link rel="canonical" href="https://zepta.app/blog/screener-guide"/>
+  <meta name="robots" content="index, follow"/>
+  <meta property="og:title" content="주식 스크리너 사용법 — 강한 종목 5분 만에 찾기"/>
+  <meta property="og:description" content="RSI·MACD·거래량 조합으로 매수 후보 빠르게 좁히는 법."/>
+  <meta property="og:type" content="article"/>
+  <meta property="og:url" content="https://zepta.app/blog/screener-guide"/>
+  <meta property="og:image" content="https://zepta.app/og-image.png"/>
+  <meta property="og:locale" content="ko_KR"/>
+  <meta name="google-adsense-account" content="ca-pub-5897295133273451"/>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"주식 스크리너 사용법 — 강한 종목 5분 만에 찾기","author":{"@type":"Organization","name":"Zepta"},"publisher":{"@type":"Organization","name":"Zepta","url":"https://zepta.app/"},"datePublished":"2026-05-09","mainEntityOfPage":"https://zepta.app/blog/screener-guide","image":"https://zepta.app/og-image.png","inLanguage":"ko"}</script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#070B14;color:#9AA7BD;line-height:1.85}
+    .wrap{max-width:780px;margin:0 auto;padding:40px 20px}
+    nav{background:#101828;border-bottom:1px solid #1E2A42;padding:14px 20px;text-align:center}
+    nav a{margin:0 12px;font-size:15px;color:#9AA7BD;text-decoration:none}
+    nav a:hover{color:#F1F5FB}
+    .breadcrumb{font-size:13px;color:#64728C;margin-bottom:18px}
+    .breadcrumb a{color:#60A5FA;text-decoration:none}
+    h1{font-size:30px;font-weight:800;color:#F1F5FB;margin-bottom:10px;letter-spacing:-0.02em;line-height:1.3}
+    .meta-row{font-size:13px;color:#64728C;margin-bottom:28px}
+    h2{font-size:21px;font-weight:700;color:#F1F5FB;margin:36px 0 14px;letter-spacing:-0.01em}
+    p{font-size:16px;margin-bottom:14px}
+    strong{color:#F1F5FB}
+    a{color:#60A5FA;text-decoration:none}a:hover{text-decoration:underline}
+    .callout{background:#0F1F3D;border-left:3px solid #3B82F6;padding:14px 18px;margin:18px 0;border-radius:6px;font-size:15px}
+    ul{margin:0 0 16px 22px}
+    li{margin-bottom:8px;font-size:16px}
+    .preset{background:#101828;border:1px solid #1E2A42;border-radius:10px;padding:16px 18px;margin:12px 0}
+    .preset h3{font-size:16px;color:#F1F5FB;margin-bottom:6px}
+    .preset code{background:#0F1F3D;color:#60A5FA;padding:2px 8px;border-radius:4px;font-size:13px}
+    .related{background:#101828;border:1px solid #1E2A42;border-radius:12px;padding:20px;margin-top:48px}
+    .related h3{font-size:16px;color:#F1F5FB;margin-bottom:12px}
+    .related a{display:block;padding:8px 0;font-size:15px;border-top:1px solid #1E2A42;color:#9AA7BD}
+    .related a:first-of-type{border-top:none}
+    .cta{background:linear-gradient(135deg,#0F1F3D 0%,#0a1530 100%);border:1px solid #3B82F640;border-radius:14px;padding:24px;text-align:center;margin:36px 0}
+    .cta a{display:inline-block;background:#3B82F6;color:#fff;padding:11px 22px;border-radius:8px;font-weight:700;margin-top:10px}
+    footer{text-align:center;padding:40px 20px;color:#64728C;font-size:14px;border-top:1px solid #1E2A42;margin-top:60px}
+    @media(max-width:640px){h1{font-size:24px}.wrap{padding:24px 16px}p,li{font-size:15px}}
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/auto-trading">AI 매매</a>
+    <a href="/screener">스크리너</a>
+    <a href="/blog">블로그</a>
+    <a href="/about">소개</a>
+  </nav>
+  <main class="wrap">
+    <div class="breadcrumb"><a href="/blog">← 블로그</a></div>
+    <h1>주식 스크리너 사용법 — 강한 종목 5분 만에 찾기</h1>
+    <div class="meta-row">2026년 5월 9일 · 실전 활용 · 6분 읽기</div>
+
+    <p>매일 미국 주식 5,000개를 다 쳐다볼 수는 없습니다. <strong>스크리너</strong>는 정해진 조건(가격 변동, 거래량, RSI 같은 기술 지표)에 맞는 종목만 걸러주는 도구입니다. 잘 쓰면 5분 만에 "지금 강한 종목 10개"를 추려낼 수 있고, 잘못 쓰면 의미 없는 노이즈만 잡습니다.</p>
+
+    <h2>좋은 스크리닝 조건의 3가지 원칙</h2>
+    <ul>
+      <li><strong>여러 조건 조합</strong> — RSI 하나만 보는 건 노이즈가 많습니다. 보통 3개 정도 조합 (예: RSI + 거래량 + 추세).</li>
+      <li><strong>너무 빡빡하지 않게</strong> — 조건 5개 이상 걸면 결과가 0개. 보통 3~4개에서 결과 5~30개 정도가 적정.</li>
+      <li><strong>시장 국면 반영</strong> — 추세장에서 평균회귀 조건은 별로. 박스권에서 돌파 조건은 가짜 신호 많음.</li>
+    </ul>
+
+    <h2>입문자에게 추천하는 5가지 프리셋</h2>
+
+    <div class="preset">
+      <h3>1. 모멘텀 강세 — 추세장 매수 후보</h3>
+      <p><code>RSI &gt; 60</code> + <code>주가 &gt; 50일 이평선</code> + <code>거래량 &gt; 평균의 1.5배</code></p>
+      <p>최근 강한 상승세에 진입한 종목. 추세추종 전략의 기본 후보.</p>
+    </div>
+
+    <div class="preset">
+      <h3>2. 과매도 반등 — 평균회귀</h3>
+      <p><code>RSI &lt; 30</code> + <code>볼린저 하단 터치</code> + <code>주봉 추세 상승</code></p>
+      <p>큰 추세는 살아있는데 일시 과매도 구간. 단기 반등 후보.</p>
+    </div>
+
+    <div class="preset">
+      <h3>3. 거래량 급증 — 변화 신호</h3>
+      <p><code>거래량 &gt; 30일 평균의 3배</code> + <code>주가 변동 ±3% 이상</code></p>
+      <p>뉴스든 펀더멘털이든 뭔가가 일어난 종목. 추가 분석 필요.</p>
+    </div>
+
+    <div class="preset">
+      <h3>4. 신고가 돌파 — 추세 시작</h3>
+      <p><code>52주 신고가</code> + <code>거래량 평균 이상</code> + <code>MACD 히스토그램 양</code></p>
+      <p>강한 종목이 더 강해지는 패턴. 큰 추세 초입 후보.</p>
+    </div>
+
+    <div class="preset">
+      <h3>5. 변동성 압축 — 돌파 대기</h3>
+      <p><code>볼린저밴드 폭 최저 20%</code> + <code>ATR 감소세</code></p>
+      <p>변동성이 압축된 후엔 보통 큰 움직임이 옵니다. 방향 결정 후 진입.</p>
+    </div>
+
+    <div class="callout">
+      <strong>💡 팁</strong>: 한 가지 프리셋만 고집하지 말고, 시장 상황에 따라 바꾸세요. 추세장이면 1번·4번, 박스권이면 2번·5번이 잘 통합니다.
+    </div>
+
+    <h2>스크리너 결과를 어떻게 활용하나</h2>
+    <p>스크리너가 종목 10개를 추려줘도 그 자체로는 매수 신호가 아닙니다. 추려진 종목을 <strong>차트로 한 번 확인</strong>하고, <strong>최근 뉴스 / 실적 발표 일정</strong>을 검토한 후, <strong>전체 자본의 일부만</strong> 진입하는 게 정석입니다.</p>
+    <p>또는 자동화하고 싶으면 추려진 종목을 AI 자동매매 봇에 넘겨서 매매 타이밍 결정을 맡길 수도 있습니다. Zepta는 스크리너와 자동매매가 같은 플랫폼에서 연결돼 있어 한 번에 처리됩니다.</p>
+
+    <div class="cta">
+      <p>실시간 데이터로 5,000개 종목을 1분 만에 스크리닝해보세요. 회원가입 없이 바로 사용 가능합니다.</p>
+      <a href="/screener">스크리너 사용해보기 →</a>
+    </div>
+
+    <div class="related">
+      <h3>이어서 읽기</h3>
+      <a href="/blog/ai-trading-guide">AI 자동매매란? 시작 전에 꼭 알아야 할 것들</a>
+      <a href="/blog/quant-strategies">퀀트 전략 33가지, 한눈에 정리</a>
+      <a href="/blog/hurst-explained">Hurst 지수란? 추세장과 박스권 구분하는 법</a>
+    </div>
+  </main>
+  <footer>
+    <p>© 2026 Zepta — <a href="/">홈</a> · <a href="/blog">블로그</a> · <a href="/contact">문의</a></p>
+  </footer>
+</body>
+</html>
