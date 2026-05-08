@@ -70,15 +70,16 @@ export const RISK_CONFIG = {
   // TP·SL 가격이 커버해야 할 "고정비용 거리" = 0.13% + 약간의 버퍼
   minNetRR: 1.8,                 // 비용 차감 후 실질 RR 하한
 
-  // 레버리지 — 2026-05-08: 5x → 10x 상향 (자본 효율 ↑, riskAmount 는 상수
-  // 라 거래당 위험은 동일. 청산 거리 9% × liqSafetyRatio 0.7 = safeSL 6.3%
-  // 로 SL 5% 미만 보장).
-  minLeverage: 3,
+  // 레버리지 — 2026-05-09 대표님 지시로 고정 10x 로 변경.
+  // 이전 (3~10x 가변, conf 기반) 방식에선 conf 0.7 시그널이 약 6x 로 진입 →
+  // 사용자 의지 (항상 10x) 와 불일치. min=max=10 으로 통일.
+  // ROI -40% cap 으로 SL 거리는 4% 로 자동 제한됨 (10x × 4% = ROI 40%).
+  minLeverage: 10,
   maxLeverage: 10,
   leverageBias: {
-    trend: 2,         // 추세장에서 더 끌어올림
-    breakout: 1,
-    "mean-revert": -1,
+    trend: 0,
+    breakout: 0,
+    "mean-revert": 0,
     unknown: 0,
   },
 
