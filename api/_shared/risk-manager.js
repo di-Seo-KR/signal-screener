@@ -15,12 +15,17 @@
 
 // ── Option A: 절대수익형 기본 설정 ──
 export const RISK_CONFIG = {
-  // Fractional Kelly ~ 1/8. $100 기준 1회 -$0.8 손실 목표.
-  // (수수료·슬리피지 흡수 후에도 실질 risk 가 의도와 맞도록 축소)
-  riskPerTradePct: 0.008, // 0.8%
+  // 거래당 위험 한도 — 자본 대비 % (SL 맞을 때 잃는 돈).
+  // ★ 2026-05-08: 0.8% → 4% 상향 (대표님 지시 — 거래당 노출 $300 까지 OK).
+  //   - 자본 $325 × 4% = $13 위험
+  //   - SL 거리 5% 가정 시 notional ≈ $260 (요청 한도 $300 근접)
+  //   - 안전 장치: 일 손실 한도 -4% / 연속 손실 5회 → 24h 쿨다운 유지
+  //   - 만약 매우 보수적으로 돌리고 싶을 땐 0.01~0.02 로 다시 낮출 것.
+  riskPerTradePct: 0.04, // 4% (이전 0.8%)
 
-  // 한 포지션 최대 증거금 비중
-  maxMarginPct: 0.35,
+  // 한 포지션 최대 증거금 비중 — 자본 대비 마진 상한 (lev 별 차이 흡수)
+  // ★ 자본 $325 × 0.5 = $163 마진 상한 (8x lev 면 노출 $1,300 — 충분)
+  maxMarginPct: 0.5,
 
   // 동시 보유 포지션 상한 (상관 위험 관리)
   maxConcurrentPositions: 2,
@@ -81,7 +86,10 @@ export const RISK_CONFIG = {
 
   // minNotional 여유
   minNotionalSafety: 1.05,
-  absoluteMaxNotional: 500,
+  // 절대 노출 상한 — riskPct/leverage 조합과 무관하게 강제. 대표님 요청
+  // "한 거래에 최대 $300" 반영. 그래도 일부 케이스에서 SL 거리 작으면
+  // notional 이 자연스럽게 커지는 걸 잘라낼 cap.
+  absoluteMaxNotional: 300,
 
   // ★ 작은 계정 구제: notional 이 minNotional×safety 미만일 때
   //   qty 를 bump 하되, 그 결과의 실효 손실(effLossPct × notional) 이
