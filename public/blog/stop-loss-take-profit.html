@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>손절·익절 라인 설정법 — 직관적인 5가지 방법 | Zepta 블로그</title>
+  <meta name="description" content="손절(SL) 익절(TP) 라인을 어디에 잡아야 할지 — ATR 기반, %, 지지·저항, 손익비, 트레일링 스탑까지. 입문자도 따라할 수 있는 5가지 방법 정리."/>
+  <meta name="keywords" content="손절 라인, 익절 라인, 스탑로스 설정, 손익비, ATR 손절, 트레일링 스탑, SL TP 설정"/>
+  <link rel="canonical" href="https://zepta.app/blog/stop-loss-take-profit"/>
+  <meta name="robots" content="index, follow"/>
+  <meta property="og:title" content="손절·익절 라인 설정법 — 직관적인 5가지 방법"/>
+  <meta property="og:description" content="입문자도 따라할 수 있는 SL/TP 설정 5가지 방법."/>
+  <meta property="og:type" content="article"/>
+  <meta property="og:url" content="https://zepta.app/blog/stop-loss-take-profit"/>
+  <meta property="og:image" content="https://zepta.app/og-image.png"/>
+  <meta property="og:locale" content="ko_KR"/>
+  <meta name="google-adsense-account" content="ca-pub-5897295133273451"/>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"Article","headline":"손절·익절 라인 설정법 — 직관적인 5가지 방법","author":{"@type":"Organization","name":"Zepta"},"publisher":{"@type":"Organization","name":"Zepta","url":"https://zepta.app/"},"datePublished":"2026-05-09","mainEntityOfPage":"https://zepta.app/blog/stop-loss-take-profit","image":"https://zepta.app/og-image.png","inLanguage":"ko"}</script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#070B14;color:#9AA7BD;line-height:1.85}
+    .wrap{max-width:780px;margin:0 auto;padding:40px 20px}
+    nav{background:#101828;border-bottom:1px solid #1E2A42;padding:14px 20px;text-align:center}
+    nav a{margin:0 12px;font-size:15px;color:#9AA7BD;text-decoration:none}
+    nav a:hover{color:#F1F5FB}
+    .breadcrumb{font-size:13px;color:#64728C;margin-bottom:18px}
+    .breadcrumb a{color:#60A5FA;text-decoration:none}
+    h1{font-size:30px;font-weight:800;color:#F1F5FB;margin-bottom:10px;letter-spacing:-0.02em;line-height:1.3}
+    .meta-row{font-size:13px;color:#64728C;margin-bottom:28px}
+    h2{font-size:21px;font-weight:700;color:#F1F5FB;margin:36px 0 14px;letter-spacing:-0.01em}
+    h3{font-size:17px;color:#F1F5FB;margin:18px 0 8px}
+    p{font-size:16px;margin-bottom:14px}
+    strong{color:#F1F5FB}
+    a{color:#60A5FA;text-decoration:none}a:hover{text-decoration:underline}
+    .callout{background:#0F1F3D;border-left:3px solid #3B82F6;padding:14px 18px;margin:18px 0;border-radius:6px;font-size:15px}
+    ul,ol{margin:0 0 16px 22px}
+    li{margin-bottom:8px;font-size:16px}
+    .method{background:#101828;border:1px solid #1E2A42;border-radius:10px;padding:18px;margin:14px 0}
+    .method-num{display:inline-block;background:#3B82F6;color:#fff;font-size:13px;font-weight:700;padding:3px 10px;border-radius:6px;margin-bottom:10px}
+    .method code{background:#0F1F3D;color:#60A5FA;padding:2px 8px;border-radius:4px;font-size:13px}
+    .related{background:#101828;border:1px solid #1E2A42;border-radius:12px;padding:20px;margin-top:48px}
+    .related h3{font-size:16px;color:#F1F5FB;margin-bottom:12px}
+    .related a{display:block;padding:8px 0;font-size:15px;border-top:1px solid #1E2A42;color:#9AA7BD}
+    .related a:first-of-type{border-top:none}
+    .cta{background:linear-gradient(135deg,#0F1F3D 0%,#0a1530 100%);border:1px solid #3B82F640;border-radius:14px;padding:24px;text-align:center;margin:36px 0}
+    .cta a{display:inline-block;background:#3B82F6;color:#fff;padding:11px 22px;border-radius:8px;font-weight:700;margin-top:10px}
+    footer{text-align:center;padding:40px 20px;color:#64728C;font-size:14px;border-top:1px solid #1E2A42;margin-top:60px}
+    @media(max-width:640px){h1{font-size:24px}.wrap{padding:24px 16px}p,li{font-size:15px}}
+  </style>
+</head>
+<body>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/auto-trading">AI 매매</a>
+    <a href="/screener">스크리너</a>
+    <a href="/blog">블로그</a>
+    <a href="/about">소개</a>
+  </nav>
+  <main class="wrap">
+    <div class="breadcrumb"><a href="/blog">← 블로그</a></div>
+    <h1>손절·익절 라인 설정법 — 직관적인 5가지 방법</h1>
+    <div class="meta-row">2026년 5월 9일 · 리스크 관리 · 6분 읽기</div>
+
+    <p>"손절은 어디에 잡아야 해?" — 가장 흔한 입문자 질문이자 가장 중요한 질문입니다. 손절을 잘 잡으면 작은 손실로 끝나지만 잘못 잡으면 큰 손실 후 청산. 익절도 마찬가지 — 너무 빠르면 수익 작고, 너무 늦으면 수익이 사라집니다. 5가지 방법 중 본인 스타일에 맞는 걸 고르세요.</p>
+
+    <h2>왜 손절·익절 라인이 진입보다 중요한가</h2>
+    <p>매매에서 가장 통제 가능한 건 <strong>"잃을 수 있는 최대 금액"</strong> 뿐입니다. 가격이 어디로 갈지는 모르지만, "이 가격까지 빠지면 청산" 라인은 사람이 정할 수 있어요. 손절 라인 없이 진입하면 감정에 휘둘려 본전 만들기 위해 더 들고 가다가 큰 손실. <strong>진입 전에 손절·익절 둘 다 정하는 게 정석</strong>.</p>
+
+    <div class="method">
+      <span class="method-num">방법 1</span>
+      <h3>고정 % — 가장 단순</h3>
+      <p><code>SL = 진입가 × (1 - 0.05)</code> = 진입가에서 5% 떨어진 위치. <code>TP = 진입가 × (1 + 0.10)</code> = 10% 올라간 위치.</p>
+      <p><strong>장점</strong>: 계산 간단. 종목·시기 무관 일관 적용.<br/><strong>단점</strong>: 종목별 변동성 무시. 알트코인은 5% 정도 그냥 흔들. 우량주는 5% 큰 움직임.</p>
+    </div>
+
+    <div class="method">
+      <span class="method-num">방법 2</span>
+      <h3>ATR 기반 — 변동성 반영</h3>
+      <p>ATR (Average True Range) 는 일평균 변동폭. <code>SL = 진입가 - 2 × ATR</code>. ATR 이 종목별 다르니 손절 거리가 자연스럽게 변동성에 비례.</p>
+      <p><strong>장점</strong>: 변동성 큰 종목엔 SL 멀리, 작은 종목엔 가깝게 자동 조정.<br/><strong>단점</strong>: ATR 계산 필요. 단일 % 보다 약간 복잡.</p>
+    </div>
+
+    <div class="method">
+      <span class="method-num">방법 3</span>
+      <h3>지지·저항선 — 차트 기반</h3>
+      <p>차트에서 명확한 지지선 (가격이 여러 번 반등한 라인) 아래에 SL. 명확한 저항선 (여러 번 막힌 라인) 아래에 TP.</p>
+      <p><strong>장점</strong>: 다른 트레이더들도 같은 라인을 의식 → 라인 부근에서 실제로 반등·반락 자주 일어남.<br/><strong>단점</strong>: 라인 식별이 주관적. 여러 라인 중 어느 걸 쓸지 판단 필요.</p>
+    </div>
+
+    <div class="method">
+      <span class="method-num">방법 4</span>
+      <h3>손익비 (Risk:Reward) 기반</h3>
+      <p>손실 1 당 이익 N — 보통 1:2 ~ 1:3. 손절을 -3% 로 잡으면 익절은 +6% 또는 +9%. 승률 50% 정도여도 장기적으로 수익.</p>
+      <p><strong>장점</strong>: 통계적으로 일관된 수익 가능. 큰 손실 → 작은 이익 패턴 자동 차단.<br/><strong>단점</strong>: 시장 상황 무시. 추세장에선 더 멀리 갈 수익 놓침.</p>
+    </div>
+
+    <div class="method">
+      <span class="method-num">방법 5</span>
+      <h3>트레일링 스탑 — 수익 늘리기</h3>
+      <p>가격이 오를 때마다 SL 도 따라 올림. 처음 SL 이 -5% 였으면, 가격이 +5% 가면 SL 을 본전 (0%) 으로, +10% 가면 SL 을 +5% 로 끌어올림. <strong>한 번 올린 SL 은 절대 내리지 않음</strong>.</p>
+      <p><strong>장점</strong>: 큰 추세에서 끝까지 따라감. 손실은 제한, 수익은 무제한.<br/><strong>단점</strong>: 출렁거림에 자주 걸림. 큰 시간프레임에서 작동 잘함.</p>
+    </div>
+
+    <div class="callout">
+      <strong>💡 입문자 추천 조합</strong>: 처음엔 <strong>방법 1 (5% SL / 10% TP)</strong> 또는 <strong>방법 4 (손익비 1:2)</strong> 로 단순하게 시작. 익숙해지면 <strong>방법 2 (ATR)</strong> 추가. 추세장 자주 잡으면 <strong>방법 5 (트레일링)</strong> 적용.
+    </div>
+
+    <h2>자동매매 봇의 SL/TP 처리</h2>
+    <p>좋은 자동매매 봇은 <strong>진입 동시에 SL/TP 자동 등록</strong>. 사용자가 잠자거나 출장 중에도 SL 라인 도달하면 즉시 청산. Zepta 는 ATR 기반 SL + ROI -40% 한도 cap + 트레일링 스탑 (+1R 도달 후 자동 SL 끌어올림) 을 모두 자동 적용. 사람이 SL 위치 신경 쓸 필요 없음.</p>
+
+    <h2>한 가지 주의 — SL 너무 가깝게 잡지 마세요</h2>
+    <p>SL 을 1~2% 처럼 너무 가깝게 잡으면 <strong>일상 출렁거림 (noise) 에 자주 걸려서</strong> 원래 의도한 추세 잡기도 전에 청산. 보통 ATR × 1.5~2 또는 % 5~8% 가 적정. 너무 멀게 잡으면 큰 손실 위험. <strong>균형점을 찾는 게 핵심</strong>.</p>
+
+    <div class="cta">
+      <p>SL/TP 자동 설정 + 트레일링 스탑까지 봇이 모두 처리. 사용자는 결과만 확인.</p>
+      <a href="/auto-trading">AI 매매 시작하기 →</a>
+    </div>
+
+    <div class="related">
+      <h3>이어서 읽기</h3>
+      <a href="/blog/ai-trading-guide">AI 자동매매란? 시작 전에 꼭 알아야 할 것들</a>
+      <a href="/blog/binance-api-guide">Binance API 키 발급 가이드 — 안전 셋업</a>
+      <a href="/blog/backtest-tips">백테스트 정확도 높이는 7가지 팁</a>
+    </div>
+  </main>
+  <footer>
+    <p>© 2026 Zepta — <a href="/">홈</a> · <a href="/blog">블로그</a> · <a href="/contact">문의</a></p>
+  </footer>
+</body>
+</html>
