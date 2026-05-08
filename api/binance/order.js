@@ -188,7 +188,7 @@ export async function executeOrderPlan(opts) {
     }, "SL");
     bracketResults.sl = slRes;
 
-    // ★ Fallback: closePosition=true 실패 시 quantity+reduceOnly 로 재시도.
+    // ★ Fallback 1: closePosition=true 실패 시 quantity+reduceOnly 로 재시도.
     //   Binance Hedge Mode 에서 closePosition=true 가 reject 되는 케이스 대응.
     if (!slRes.ok && rescueMode !== "force_close" && rescueMode !== "alert_only") {
       console.warn(`[executeOrderPlan] SL closePosition=true failed → trying quantity+reduceOnly`);
@@ -203,6 +203,36 @@ export async function executeOrderPlan(opts) {
         slRes = slRes2;
       } else {
         bracketResults.slFallbackError = slRes2.error;
+      }
+    }
+
+    // ★ Fallback 2 (2026-05-08): STOP_MARKET 자체가 reject 되는 케이스 대응.
+    //   Binance 에러 "Order type not supported for this endpoint. Please use
+    //   the Algo Order API endpoints instead" 시 발동.
+    //   해결: STOP (limit) 주문 — binance 가 항상 지원하는 표준 endpoint.
+    //   limit price 는 stopPrice 에서 0.5% slippage 버퍼 (LONG SL 은 더 낮게,
+    //   SHORT SL 은 더 높게).
+    if (!slRes.ok && rescueMode !== "force_close" && rescueMode !== "alert_only") {
+      const slipBuffer = 0.005; // 0.5% slippage 마진
+      const limitPrice = side === "LONG"
+        ? stopLossPrice * (1 - slipBuffer)
+        : stopLossPrice * (1 + slipBuffer);
+      // tickSize 알기 어려우니 8 자리로 round (binance 가 무시할 자릿수는 자동 처리)
+      const limitPriceRounded = Number(limitPrice.toFixed(filter.pricePrecision || 4));
+      console.warn(`[executeOrderPlan] STOP_MARKET unsupported → trying STOP (limit) @ ${limitPriceRounded}`);
+      const slRes3 = await tryStopOrder({
+        apiKey, apiSecret, symbol, type: "STOP", side: closeSide,
+        stopPrice: stopLossPrice,
+        price: limitPriceRounded, // STOP (limit) 의 실제 limit price
+        quantity: qty, testnet,
+        clientOrderId: clientOrderId ? `${clientOrderId}-SL3` : undefined,
+      }, "SL-stop-limit");
+      if (slRes3.ok) {
+        bracketResults.sl = slRes3;
+        bracketResults.slMode = "stop_limit_fallback";
+        slRes = slRes3;
+      } else {
+        bracketResults.slStopLimitError = slRes3.error;
       }
     }
 
@@ -244,11 +274,30 @@ export async function executeOrderPlan(opts) {
 
   // TP 는 SL 이 있는 상태에서만, 실패해도 RESCUE 안 함 (SL 이 이미 하방을 지킴)
   if (takeProfitPrice && Number.isFinite(takeProfitPrice) && bracketResults.sl?.ok) {
-    const tpRes = await tryStopOrder({
+    let tpRes = await tryStopOrder({
       apiKey, apiSecret, symbol, type: "TAKE_PROFIT_MARKET", side: closeSide,
       stopPrice: takeProfitPrice, closePosition: true, testnet,
       clientOrderId: clientOrderId ? `${clientOrderId}-TP` : undefined,
     }, "TP");
+    // ★ Fallback: TAKE_PROFIT_MARKET 거부 시 TAKE_PROFIT (limit) 사용
+    if (!tpRes.ok) {
+      const slipBuffer = 0.003; // TP 는 익절 방향이라 slippage 좀 더 타이트
+      const limitPrice = side === "LONG"
+        ? takeProfitPrice * (1 - slipBuffer)  // LONG TP → 약간 낮은 limit 으로 체결 보장
+        : takeProfitPrice * (1 + slipBuffer);
+      const limitPriceRounded = Number(limitPrice.toFixed(filter.pricePrecision || 4));
+      const tpRes2 = await tryStopOrder({
+        apiKey, apiSecret, symbol, type: "TAKE_PROFIT", side: closeSide,
+        stopPrice: takeProfitPrice,
+        price: limitPriceRounded,
+        quantity: qty, testnet,
+        clientOrderId: clientOrderId ? `${clientOrderId}-TP2` : undefined,
+      }, "TP-limit");
+      if (tpRes2.ok) {
+        tpRes = tpRes2;
+        bracketResults.tpMode = "limit_fallback";
+      }
+    }
     bracketResults.tp = tpRes;
   }
 
