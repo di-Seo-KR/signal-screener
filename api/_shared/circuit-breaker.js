@@ -13,11 +13,13 @@
 // 이 모듈은 "판단만" 한다 — 실제 halt 는 엔진이 flag 를 읽고 스킵.
 
 const BREAKER_LIMITS = {
-  // Phase 1 ($100 기준) — 손익 퍼센트 한도
-  dailyLossPct: 0.04,   // 하루 -4% 넘으면 halt ($100 기준 -$4)
-  weeklyLossPct: 0.08,  // 주간 -8%
-  mddPct: 0.15,         // MDD -15%
-  consecLossThreshold: 5, // 연속 손실 5회 → 24h cooldown
+  // ★ 2026-05-08: 대표님 지시로 대폭 완화.
+  //   거래당 ROI -40% 까지 허용한 만큼 서킷브레이커 한도도 일치시켜야
+  //   한 거래만으로 자동매매가 그날 멈추는 사태 방지.
+  dailyLossPct: 0.40,   // 하루 -40% 넘으면 halt (이전 -4%)
+  weeklyLossPct: 0.60,  // 주간 -60% (이전 -8%) — 연속 사고 차단
+  mddPct: 0.50,         // MDD -50% (이전 -15%) — 자본 절반 보호
+  consecLossThreshold: 5, // 연속 손실 5회 → 24h cooldown (그대로)
   cooldownMs: 24 * 60 * 60 * 1000,
 };
 
@@ -97,9 +99,32 @@ export async function preTradeCheck(userId, currentEquity) {
     };
   }
 
-  // 3) 수동 halt
+  // 3) 수동/자동 halt — 단, 한도 완화로 자동 발동된 halt 는 새 한도 안에 있으면 자동 해제
   if (state.halted) {
-    return { allowed: false, reason: `halted: ${state.haltedReason || "manual"}`, state };
+    // ★ auto-recovery: 자동 발동된 한도(daily/weekly/MDD) 가 현재 새 한도 안에
+    //   있으면 자동 해제. 사용자 수동 halt 는 그대로 유지.
+    const reason = state.haltedReason || "";
+    const isAutoLimit = /daily loss|weekly loss|MDD/.test(reason);
+    if (isAutoLimit && state.dayStartEquity && state.weekStartEquity && state.equityHigh) {
+      const dPnL = (currentEquity - state.dayStartEquity) / state.dayStartEquity;
+      const wPnL = (currentEquity - state.weekStartEquity) / state.weekStartEquity;
+      const mddNow = (state.equityHigh - currentEquity) / state.equityHigh;
+      const inBounds =
+        dPnL > -BREAKER_LIMITS.dailyLossPct &&
+        wPnL > -BREAKER_LIMITS.weeklyLossPct &&
+        mddNow < BREAKER_LIMITS.mddPct;
+      if (inBounds) {
+        state.halted = false;
+        state.haltedReason = null;
+        state.haltedAt = null;
+        await kv.set(key, state);
+        // 통과 (allowed) — 5번 한도 체크에서 다시 평가
+      } else {
+        return { allowed: false, reason: `halted: ${reason}`, state };
+      }
+    } else {
+      return { allowed: false, reason: `halted: ${reason || "manual"}`, state };
+    }
   }
 
   // 4) 일/주 시작 에쿼티 초기화
