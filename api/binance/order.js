@@ -173,6 +173,13 @@ export async function executeOrderPlan(opts) {
   //   ZEPTA_BRACKET_RESCUE_MODE = "force_close" | "quantity_fallback" | "alert_only"
   const rescueMode = process.env.ZEPTA_BRACKET_RESCUE_MODE || "quantity_fallback";
 
+  // ★ 진입 직후 mark price stabilize 시간 (300ms). binance 가 진입 직후의
+  //   mark price 일시 swing 으로 STOP_MARKET 을 "would immediately trigger"
+  //   reject 하는 케이스 방지.
+  if (stopLossPrice || takeProfitPrice) {
+    await sleep(300);
+  }
+
   if (stopLossPrice && Number.isFinite(stopLossPrice)) {
     let slRes = await tryStopOrder({
       apiKey, apiSecret, symbol, type: "STOP_MARKET", side: closeSide,
