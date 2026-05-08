@@ -589,19 +589,50 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     }
   }
 
-  // 11) engine-log
+  // 11) engine-log — ★ result.error 도 기록 (실패 사유 추적)
   await appendLog(userId, `di:real:user:${userId}:engine-log`, {
     time: startedAt,
     mode: shadow ? "shadow" : (dryRun ? "dry" : "live"),
     signal: best,
     plan: { ...plan.plan, log: undefined },
     result: result ? {
-      ok: result.ok, orderId: result.orderId, dryRun: !!result.dryRun,
-      bracket: result.bracket, bracketRescue: result.bracketRescue, shadow: !!result.shadow,
+      ok: result.ok,
+      orderId: result.orderId,
+      dryRun: !!result.dryRun,
+      bracket: result.bracket,
+      bracketRescue: result.bracketRescue,
+      shadow: !!result.shadow,
+      // ★ 진입 실패 시 binance 에러 메시지 보존 — 추후 디버깅 핵심
+      error: result.error || null,
+      errorCode: result.errorCode || null,
+      // executeOrderPlan 에서 단계별 로그를 result.steps 로 반환할 경우
+      steps: Array.isArray(result.steps) ? result.steps.slice(0, 10) : undefined,
     } : null,
     dryRun,
     shadow,
   });
+
+  // 11c) ★ 봇 진입 실패 시 텔레그램 알림 (왜 실패했는지 즉시 인지)
+  if (!dryRun && !shadow && (!result?.ok || result?.error)) {
+    try {
+      const { sendCards, buildCard } = await import("../_shared/telegram.js");
+      const sideKr = plan.plan.side === "LONG" ? "롱" : "숏";
+      await sendCards([
+        buildCard({
+          tag: "⚠️",
+          title: `봇 진입 실패 — ${plan.plan.symbol} ${sideKr}`,
+          lines: [
+            `사유: ${result?.error || "알 수 없음 (orderId 없음)"}`,
+            `시도한 plan: qty ${plan.plan.qty} · 투입 $${plan.plan.marginRequired.toFixed(2)} · ${plan.plan.leverage}x`,
+            `시그널: ${best.source || "봇"} (conf ${best.confidence})`,
+          ],
+          hint: "다음 cycle에서 재시도. 자본·minNotional·시장 상태 확인 권장.",
+        }),
+      ]);
+    } catch (e) {
+      console.warn("[engine] telegram fail alert error:", e?.message);
+    }
+  }
 
   // 11b) ★ 실거래 진입 성공 시 텔레그램 알림 (모바일에서 즉시 인지)
   // dry/shadow 는 알림 안 보냄 (스팸 방지). live 만 발송.

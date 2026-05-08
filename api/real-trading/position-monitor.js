@@ -71,61 +71,71 @@ async function checkUser(userId) {
   }
 
   // 2) realizedPnL 계산 — userTrades 에서 최근 청산 트레이드의 realizedPnl 합산
+  // ★ 2026-05-08: lookback 10분 → 60분 (cron 주기 3분 + binance 지연 + 사용자 인지
+  //    시간 여유 확보). realized=0 케이스도 fallback 알림 (감지만이라도).
   if (report.closed.length) {
-    const lookbackMs = 10 * 60 * 1000; // 최근 10분
+    const lookbackMs = 60 * 60 * 1000; // 60분 (이전 10분 → 너무 좁아 청산 감지 누락)
     const startTime = Date.now() - lookbackMs;
     for (const sym of report.closed) {
+      let realized = null;
       try {
         const trades = await getUserTrades({ ...creds, symbol: sym, startTime, limit: 50 });
-        const realized = (trades || []).reduce((s, t) => s + parseFloat(t.realizedPnl || 0), 0);
-        if (Number.isFinite(realized) && realized !== 0) {
-          await recordTradeResult(userId, realized);
-          // 청산 로그에 반영
-          const logKey = `di:real:user:${userId}:engine-log`;
-          const log = (await kv.get(logKey)) || [];
-          log.unshift({
-            time: new Date().toISOString(),
-            event: "position_closed",
-            symbol: sym,
-            realizedPnL: Number(realized.toFixed(4)),
-          });
-          await kv.set(logKey, log.slice(0, 200));
-          report.closed = report.closed.map((c) => (c === sym ? { sym, realizedPnL: realized } : c));
-
-          // ★ 청산 감지 텔레그램 알림 (사용자가 한 청산도 포함됨 — 수동/자동 구분 위해
-          //    봇 plan 의 존재 여부로 판단)
-          try {
-            const planKey = `di:real:user:${userId}:plan:${sym}`;
-            const plan = await kv.get(planKey);
-            const isBotEntry = !!(plan && plan.openedAt);
-            const { sendCards, buildCard } = await import("../_shared/telegram.js");
-            const sign = realized >= 0 ? "+" : "";
-            const tag = realized >= 0 ? "✅" : "🔻";
-            await sendCards([
-              buildCard({
-                tag,
-                title: `${isBotEntry ? "봇" : "수동"} 포지션 청산 — ${sym}`,
-                lines: [
-                  `실현 손익 ${sign}$${realized.toFixed(2)}`,
-                  isBotEntry
-                    ? `봇 진입 시점: ${new Date(plan.openedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`
-                    : "사용자가 직접 청산하신 포지션입니다.",
-                ],
-                hint: isBotEntry
-                  ? "봇이 SL/TP/시간 손절 룰에 따라 자동 청산했습니다."
-                  : null,
-              }),
-            ]);
-            // 봇 진입이었다면 plan KV 정리
-            if (isBotEntry) {
-              await kv.del(planKey);
-            }
-          } catch (e) {
-            console.warn(`[monitor] telegram close alert failed:`, e?.message);
-          }
-        }
+        const sum = (trades || []).reduce((s, t) => s + parseFloat(t.realizedPnl || 0), 0);
+        if (Number.isFinite(sum)) realized = sum;
       } catch (e) {
         console.warn(`[monitor] userTrades ${sym} failed:`, e?.message);
+      }
+
+      // ★ realized 가 null (API 실패) 또는 0 이어도 청산 자체는 발생했으니 로그 + 알림.
+      const realizedSafe = Number.isFinite(realized) ? realized : 0;
+      if (realized != null && realized !== 0) {
+        await recordTradeResult(userId, realized);
+      }
+      // 청산 이벤트 engine-log 기록 (realized 0/null 도 항상 기록)
+      const logKey = `di:real:user:${userId}:engine-log`;
+      const log = (await kv.get(logKey)) || [];
+      log.unshift({
+        time: new Date().toISOString(),
+        event: "position_closed",
+        symbol: sym,
+        realizedPnL: Number(realizedSafe.toFixed(4)),
+        pnlSource: realized != null ? "userTrades" : "unavailable",
+      });
+      await kv.set(logKey, log.slice(0, 200));
+      report.closed = report.closed.map((c) => (c === sym ? { sym, realizedPnL: realizedSafe } : c));
+
+      // ★ 청산 감지 텔레그램 알림 (수동·자동 구분, realized 누락도 fallback)
+      try {
+        const planKey = `di:real:user:${userId}:plan:${sym}`;
+        const plan = await kv.get(planKey);
+        const isBotEntry = !!(plan && plan.openedAt);
+        const { sendCards, buildCard } = await import("../_shared/telegram.js");
+        const hasPnl = realized != null && realized !== 0;
+        const sign = realizedSafe >= 0 ? "+" : "";
+        const tag = !hasPnl ? "🔔" : realizedSafe >= 0 ? "✅" : "🔻";
+        await sendCards([
+          buildCard({
+            tag,
+            title: `${isBotEntry ? "봇" : "수동"} 포지션 청산 — ${sym}`,
+            lines: [
+              hasPnl
+                ? `실현 손익 ${sign}$${realizedSafe.toFixed(2)}`
+                : "실현 손익은 잠시 후 binance 거래 내역 확인 가능 (API 지연)",
+              isBotEntry
+                ? `봇 진입 시점: ${new Date(plan.openedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`
+                : "사용자가 직접 청산하신 포지션입니다.",
+            ],
+            hint: isBotEntry
+              ? "봇이 SL/TP/시간 손절 룰에 따라 자동 청산했습니다."
+              : null,
+          }),
+        ]);
+        // 봇 진입이었다면 plan KV 정리
+        if (isBotEntry) {
+          await kv.del(planKey);
+        }
+      } catch (e) {
+        console.warn(`[monitor] telegram close alert failed:`, e?.message);
       }
     }
   }
