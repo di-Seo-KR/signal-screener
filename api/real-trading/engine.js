@@ -27,7 +27,7 @@ import { loadFamilyWeightsRobust, applyWeightsToRanking } from "../_shared/strat
 import { planTrade, RISK_CONFIG } from "../_shared/risk-manager.js";
 import { preTradeCheck } from "../_shared/circuit-breaker.js";
 import { getSymbolFilter, isSymbolAffordable } from "../_shared/exchange-info.js";
-import { getTickerPrice, getAccountInfo, getKlines } from "../_shared/binance-client.js";
+import { getTickerPrice, getAccountInfo, getKlines, getPositionRisk } from "../_shared/binance-client.js";
 import { executeOrderPlan } from "../binance/order.js";
 
 export const config = { maxDuration: 60 };
@@ -278,13 +278,35 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   }
 
   // 6) canonical — dry run 은 strict 해제 (더 많은 심볼 통과)
+  // rejectStats 로 시그널이 떨어진 원인 카운트 (디버깅 + engine-log 노출)
+  const rejectStats = {};
   const canonical = rawSignals
-    .map((r) => extractSignal(r, { strict: !forceDryRun }))
+    .map((r) => extractSignal(r, { strict: !forceDryRun, rejectStats }))
     .filter(Boolean);
-  S(`canonical=${canonical.length}`);
+  // reject 사유 요약 (notAllowedSymbols 는 Set 이라 toArray)
+  const rejectSummary = (() => {
+    const out = { ...rejectStats };
+    if (out.notAllowedSymbols instanceof Set) {
+      out.notAllowedSymbols = Array.from(out.notAllowedSymbols);
+    }
+    return out;
+  })();
+  S(`canonical=${canonical.length}` + (canonical.length === 0 && rawSignals.length > 0 ? ` (rejected: ${JSON.stringify(rejectSummary).slice(0, 200)})` : ""));
   let ranked = rankSignals(canonical);
   if (!ranked.length) {
-    return { ok: true, userId, ran: false, reason: "no valid canonical signal", diag, steps };
+    // ★ engine-log 에도 reject 사유 기록 — 추후 분석 가능
+    try {
+      await appendLog(userId, `di:real:user:${userId}:engine-log`, {
+        time: startedAt,
+        mode: shadow ? "shadow" : (forceDryRun ? "dry" : "live"),
+        ran: false,
+        reason: "no valid canonical signal",
+        diag,
+        rejectStats: rejectSummary,
+        rawSignalsCount: rawSignals.length,
+      });
+    } catch {}
+    return { ok: true, userId, ran: false, reason: "no valid canonical signal", diag, rejectStats: rejectSummary, steps };
   }
   // family 가중치 적용 — shadow ledger 성과 기반 자동 튜닝
   try {
@@ -383,7 +405,10 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   }
 
   // ★ 중복 진입 차단 — 이미 OPEN 인 심볼에는 신규 진입 안 함
-  // (지난 진단에서 ADAUSDT 같은 종목이 5분마다 반복 진입돼 림보 200건 누적된 문제)
+  // (1) shadow ledger 기반: shadow/probe 모드에서 가상 OPEN 추적
+  // (2) ★ 2026-05-08 추가 — 실거래 모드에서도 Binance 실제 positions 기반 dedup.
+  //      이전 버그: `if (shadow)` 만 있어 실거래 모드에서 dedup 작동 안 함 →
+  //      사용자가 수동으로 ETH 보유 중에 봇이 ETH 진입 시도하면 중복 포지션 위험.
   const openSymbols = new Set();
   if (shadow) {
     try {
@@ -392,8 +417,22 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       for (const e of ledger) {
         if (e?.status !== "CLOSED" && e?.plan?.symbol) openSymbols.add(e.plan.symbol);
       }
-      if (openSymbols.size > 0) S(`open positions: ${openSymbols.size} symbols (dedup will skip)`);
+      if (openSymbols.size > 0) S(`open positions (shadow): ${openSymbols.size} symbols (dedup will skip)`);
     } catch {}
+  } else if (!forceDryRun) {
+    // 실거래 모드 — Binance positions 직접 조회해서 OPEN 인 심볼 dedup
+    try {
+      const positions = await getPositionRisk(creds);
+      for (const p of positions || []) {
+        const amt = parseFloat(p.positionAmt || 0);
+        if (Math.abs(amt) > 0 && p.symbol) openSymbols.add(p.symbol);
+      }
+      if (openSymbols.size > 0) {
+        S(`open positions (live): ${openSymbols.size} symbols [${Array.from(openSymbols).join(", ")}] — dedup will skip`);
+      }
+    } catch (e) {
+      S(`live dedup skipped: ${e?.message || String(e)}`);
+    }
   }
 
   // 7-9) ★ ranked 시그널 순회 — 1순위가 affordability/risk reject 되어도
@@ -456,6 +495,18 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     }
   }
   if (!best || !plan) {
+    // ★ engine-log 에 reject 사유 기록 — 어떤 시그널이 왜 떨어졌는지 추후 분석 가능
+    try {
+      await appendLog(userId, `di:real:user:${userId}:engine-log`, {
+        time: startedAt,
+        mode: shadow ? "shadow" : (forceDryRun ? "dry" : "live"),
+        ran: false,
+        reason: `all ${tried.length} signals rejected`,
+        tried,
+        equity: effectiveEquity,
+        candidatesScanned: ranked.length,
+      });
+    } catch {}
     return {
       ok: true, userId, ran: false,
       reason: `all ${tried.length} signals rejected`,

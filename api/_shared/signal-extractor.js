@@ -34,7 +34,8 @@
 const CONFIDENCE_MAP = { A: 0.9, B: 0.7, C: 0.5, D: 0.3 };
 
 // 가상매매에서 쓰는 자산 이름 → 바이낸스 Futures 심볼 매핑.
-// Phase 1 에서는 minNotional 제약 때문에 BTC 는 제외하고 ETH/SOL 을 우선 사용한다.
+// 7봇 universe 와 동기화: btc-alpha/highcap-momentum/defi-infra/meme-trend/l2-emerging
+// 누락되면 시그널이 canonical 단계에서 null 로 떨어져 봇이 진입 못 함.
 export const ASSET_TO_SYMBOL = {
   BTC: "BTCUSDT",
   ETH: "ETHUSDT",
@@ -47,10 +48,18 @@ export const ASSET_TO_SYMBOL = {
   LINK: "LINKUSDT",
   MATIC: "MATICUSDT",
   DOT: "DOTUSDT",
+  // ★ 2026-05-08 추가 — 봇 universe 와 동기화
+  UNI: "UNIUSDT",     // defi-infra
+  AAVE: "AAVEUSDT",   // defi-infra
+  ARB: "ARBUSDT",     // l2-emerging
+  OP: "OPUSDT",       // l2-emerging
+  // SHIB / PEPE 는 1000-단위 페어 (1000SHIBUSDT, 1000PEPEUSDT) 라 추후 별도 처리.
 };
 
-// Phase 1 허용 심볼 (자본 $100 기준으로 minNotional 이 부담 없는 것만)
-// BTCUSDT 는 $100 minNotional 이라 자본 전체가 한 포지션에 들어가 제외.
+// Phase 1 허용 심볼 (Binance Futures minNotional 부담 없는 종목)
+// 자본 $300+ 기준으로 진입 가능한 심볼만 포함.
+// ★ 2026-05-08: 봇 universe 와 동기화 — DOT/UNI/AAVE/ARB/OP 추가.
+//   BTCUSDT 는 minNotional 100 USDT 라 자본 $343 의 약 1/3 이라 부담 — 일단 제외.
 export const PHASE1_ALLOWED_SYMBOLS = new Set([
   "ETHUSDT",
   "SOLUSDT",
@@ -61,6 +70,11 @@ export const PHASE1_ALLOWED_SYMBOLS = new Set([
   "AVAXUSDT",
   "LINKUSDT",
   "MATICUSDT",
+  "DOTUSDT",   // ★ 추가
+  "UNIUSDT",   // ★ 추가
+  "AAVEUSDT",  // ★ 추가
+  "ARBUSDT",   // ★ 추가
+  "OPUSDT",    // ★ 추가
 ]);
 
 // 전략명(reason 안에 들어있거나, 별도 strategy 필드로 올 경우) 을 family 로 분류.
@@ -136,20 +150,44 @@ export function normalizeAssetKey(asset) {
 }
 
 export function extractSignal({ asset, signal, source, stratName }, opts = {}) {
-  if (!signal || !signal.type) return null;
-  if (!asset) return null;
+  // ★ opts.rejectStats: 디버깅용 카운터 객체 (선택). reject 원인을 카운트.
+  const rs = opts.rejectStats;
+  if (!signal || !signal.type) {
+    if (rs) rs.noSignal = (rs.noSignal || 0) + 1;
+    return null;
+  }
+  if (!asset) {
+    if (rs) rs.noAsset = (rs.noAsset || 0) + 1;
+    return null;
+  }
 
   const key = normalizeAssetKey(asset);
-  if (!key) return null;
+  if (!key) {
+    if (rs) rs.unknownAsset = (rs.unknownAsset || 0) + 1;
+    return null;
+  }
   const symbol = ASSET_TO_SYMBOL[key];
-  if (!symbol) return null;
-  if (opts.strict !== false && !PHASE1_ALLOWED_SYMBOLS.has(symbol)) return null;
+  if (!symbol) {
+    if (rs) rs.noSymbolMap = (rs.noSymbolMap || 0) + 1;
+    return null;
+  }
+  if (opts.strict !== false && !PHASE1_ALLOWED_SYMBOLS.has(symbol)) {
+    if (rs) {
+      rs.notAllowed = (rs.notAllowed || 0) + 1;
+      rs.notAllowedSymbols = rs.notAllowedSymbols || new Set();
+      rs.notAllowedSymbols.add(symbol);
+    }
+    return null;
+  }
 
   let side;
   if (signal.type === "BUY") side = "LONG";
   else if (signal.type === "SELL") side = "SHORT";
   else if (signal.type === "CLOSE") side = "CLOSE";
-  else return null;
+  else {
+    if (rs) rs.invalidType = (rs.invalidType || 0) + 1;
+    return null;
+  }
 
   const conf =
     typeof signal.confidence === "number"
