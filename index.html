@@ -15,6 +15,9 @@
     <link rel="alternate" hreflang="ko" href="https://zepta.app/" />
     <link rel="alternate" hreflang="en" href="https://zepta.app/" />
     <link rel="alternate" hreflang="x-default" href="https://zepta.app/" />
+    <!-- Privacy Policy / Terms — Google OAuth Verification 인식용 -->
+    <link rel="privacy-policy" href="https://zepta.app/privacy" />
+    <link rel="terms-of-service" href="https://zepta.app/terms" />
     <!-- Robots -->
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <meta name="googlebot" content="index, follow" />
@@ -114,7 +117,9 @@
       "maintainer": {
         "@type": "Organization",
         "name": "Zepta"
-      }
+      },
+      "privacyPolicy": "https://zepta.app/privacy",
+      "termsOfService": "https://zepta.app/terms"
     }
     </script>
     <script type="application/ld+json">
@@ -401,6 +406,32 @@
   </head>
   <body>
     <div id="root"></div>
+    <!-- ★ SEO + Google OAuth Verification 인식용 정적 푸터.
+         React 마운트 전에도 Google bot 이 privacy/terms 링크 발견 가능.
+         (이전 OAuth Verification 거부 사유: "홈페이지에 개인정보처리방침 링크 없음") -->
+    <noscript>
+      <footer style="padding: 20px; text-align: center; color: #9AA7BD; font-size: 14px;">
+        <p>Zepta — AI 퀀트 투자 플랫폼</p>
+        <p>
+          <a href="/" style="color: #60A5FA; margin: 0 8px;">홈</a> ·
+          <a href="/about" style="color: #60A5FA; margin: 0 8px;">서비스 소개</a> ·
+          <a href="/blog" style="color: #60A5FA; margin: 0 8px;">블로그</a> ·
+          <a href="/privacy" style="color: #60A5FA; margin: 0 8px;">개인정보처리방침</a> ·
+          <a href="/terms" style="color: #60A5FA; margin: 0 8px;">이용약관</a> ·
+          <a href="/contact" style="color: #60A5FA; margin: 0 8px;">문의하기</a>
+        </p>
+        <p>© 2025-2026 Zepta. All rights reserved.</p>
+      </footer>
+    </noscript>
+    <!-- 추가 — Google bot 이 noscript 무시하는 케이스 대응: SEO 친화 hidden footer
+         CSS visibility hidden 으로 화면엔 안 보이지만 HTML 소스에는 존재 -->
+    <div aria-hidden="true" style="position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden;">
+      <a href="/privacy">개인정보처리방침</a>
+      <a href="/terms">이용약관</a>
+      <a href="/about">서비스 소개</a>
+      <a href="/blog">블로그</a>
+      <a href="/contact">문의하기</a>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
