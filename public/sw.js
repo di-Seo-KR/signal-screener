@@ -1,7 +1,8 @@
+// v5 — 블로그 진입 (GNB / 햄버거 / 사용자 드롭다운) 추가, 옛 캐시 무효화.
 // v4 — 시세 API stale 위험 차단 + /api/ stale-while-revalidate (5분)
 // 이전 v3 는 yahoo/finnhub/coingecko 응답까지 무조건 cache.put → 모바일 스토리지
-// 비대 + 오래된 시세 노출 위험. 이 버전부터 외부 시세 직접 요청은 캐시 안 함.
-const CACHE_NAME = 'zepta-v4';
+// 비대 + 오래된 시세 노출 위험. v4 부터 외부 시세 직접 요청은 캐시 안 함.
+const CACHE_NAME = 'zepta-v5';
 const API_MAX_AGE_MS = 5 * 60 * 1000; // 5분
 const STATIC_ASSETS = [
   '/',
