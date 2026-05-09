@@ -20,6 +20,9 @@ export default function AuthPage({ theme = "dark", embedded = false, onClose }) 
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  // ★ 2026-05-09: 회원가입 시 약관·면책·위험 인지 동의 (법적 안전장치)
+  const [agreeTerms, setAgreeTerms] = useState(false);  // 이용약관 + 개인정보처리방침
+  const [agreeRisk, setAgreeRisk] = useState(false);    // 투자 위험 인지 + 손실 책임
 
   const validateEmail = (emailStr) => {
     return emailStr.includes("@") && emailStr.includes(".");
@@ -43,12 +46,25 @@ export default function AuthPage({ theme = "dark", embedded = false, onClose }) 
           : err.message);
       } else if (mode === "signup") {
         if (password.length < 6) { setError("비밀번호는 최소 6자 이상이어야 합니다."); setLoading(false); return; }
+        // ★ 약관·면책 동의 확인
+        if (!agreeTerms) { setError("이용약관·개인정보처리방침 동의가 필요합니다."); setLoading(false); return; }
+        if (!agreeRisk) { setError("투자 위험 인지·손실 책임 동의가 필요합니다."); setLoading(false); return; }
         const { error: err } = await signUp(email, password, displayName);
         if (err) {
           setError(err.message === "User already registered"
             ? "이미 등록된 이메일입니다."
             : err.message);
         } else {
+          // 동의 시각 user_metadata 에 기록 (감사 로그)
+          try {
+            const { supabase } = await import("./supabaseClient.js");
+            await supabase.auth.updateUser({
+              data: {
+                terms_agreed_at: new Date().toISOString(),
+                risk_agreed_at: new Date().toISOString(),
+              },
+            });
+          } catch {}
           setSuccess("가입 완료! 이메일 인증 링크를 확인해주세요.");
           setMode("login");
         }
@@ -61,7 +77,7 @@ export default function AuthPage({ theme = "dark", embedded = false, onClose }) 
       setError("서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
     }
     setLoading(false);
-  }, [mode, email, password, displayName, signIn, signUp, resetPassword]);
+  }, [mode, email, password, displayName, agreeTerms, agreeRisk, signIn, signUp, resetPassword]);
 
   const handleOAuth = useCallback(async (provider) => {
     setError(""); setLoading(true);
@@ -230,6 +246,54 @@ export default function AuthPage({ theme = "dark", embedded = false, onClose }) 
                   onFocus={e => e.target.style.borderColor = C.blue}
                   onBlur={e => e.target.style.borderColor = C.border}
                 />
+              </div>
+            )}
+
+            {/* ★ 2026-05-09 — 회원가입 시 약관·면책·위험 인지 동의 (법적 안전장치) */}
+            {mode === "signup" && (
+              <div style={{
+                background: C.card2, padding: "14px 16px", borderRadius: "12px",
+                marginTop: "8px", marginBottom: "4px",
+                border: `1px solid ${C.border}`,
+              }}>
+                <label style={{
+                  display: "flex", alignItems: "flex-start", gap: "10px",
+                  cursor: "pointer", padding: "8px 0", fontSize: "13px",
+                  color: C.text2, lineHeight: 1.5,
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={agreeTerms}
+                    onChange={e => setAgreeTerms(e.target.checked)}
+                    style={{ marginTop: "3px", accentColor: C.blue, flexShrink: 0 }}
+                  />
+                  <span>
+                    <strong style={{ color: C.text1 }}>(필수)</strong>{" "}
+                    <a href="/terms" target="_blank" rel="noopener" style={{ color: C.blue, textDecoration: "underline" }}>이용약관</a>
+                    {" 및 "}
+                    <a href="/privacy" target="_blank" rel="noopener" style={{ color: C.blue, textDecoration: "underline" }}>개인정보처리방침</a>
+                    에 동의합니다.
+                  </span>
+                </label>
+                <label style={{
+                  display: "flex", alignItems: "flex-start", gap: "10px",
+                  cursor: "pointer", padding: "8px 0", fontSize: "13px",
+                  color: C.text2, lineHeight: 1.5,
+                  borderTop: `1px solid ${C.border}40`,
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={agreeRisk}
+                    onChange={e => setAgreeRisk(e.target.checked)}
+                    style={{ marginTop: "3px", accentColor: C.blue, flexShrink: 0 }}
+                  />
+                  <span>
+                    <strong style={{ color: C.text1 }}>(필수)</strong>{" "}
+                    Zepta는 투자 도구 제공자이며 투자자문업자가 아니라는 점,{" "}
+                    <strong style={{ color: C.text1 }}>모든 투자 결정과 손익은 본인 책임</strong>이라는 점,
+                    과거 백테스트가 미래 수익을 보장하지 않는다는 점을 인지하고 동의합니다.
+                  </span>
+                </label>
               </div>
             )}
 
