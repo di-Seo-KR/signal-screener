@@ -88,8 +88,9 @@
       "schedule": "*/5 * * * *"
     },
     {
+      "_comment": "★ 2026-05-09 audit M6: position-monitor 를 매 2분으로 단축 — SL latency 단축, engine 사이클 중간에 청산 감지.",
       "path": "/api/real-trading/position-monitor",
-      "schedule": "*/3 * * * *"
+      "schedule": "*/2 * * * *"
     },
     {
       "path": "/api/real-trading/shadow-monitor",

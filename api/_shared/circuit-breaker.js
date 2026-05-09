@@ -127,18 +127,30 @@ export async function preTradeCheck(userId, currentEquity) {
       // ★ rolling 30일 peak 사용 (auto-recovery 도 일관된 기준)
       const peakForMdd = state.equityHigh30d || state.equityHigh;
       const mddNow = (peakForMdd - currentEquity) / peakForMdd;
+      // ★ 2026-05-09 audit C2: hysteresis 적용 — 한도의 80% 까지 회복해야 자동 해제.
+      //   이전: 한도 안에 들어오면 즉시 해제 → -42% halt → -38% 회복 → 즉시 해제 → 또 진입 → -45% 사이클.
+      //   현재: 한 번 halt 면 -32% (=한도 80%) 까지 회복 후에만 해제 → 진동 방지.
+      const HYSTERESIS = 0.80;
+      const dailyHysCap = BREAKER_LIMITS.dailyLossPct * HYSTERESIS;
+      const weeklyHysCap = BREAKER_LIMITS.weeklyLossPct * HYSTERESIS;
+      const mddHysCap = BREAKER_LIMITS.mddPct * HYSTERESIS;
       const inBounds =
-        dPnL > -BREAKER_LIMITS.dailyLossPct &&
-        wPnL > -BREAKER_LIMITS.weeklyLossPct &&
-        mddNow < BREAKER_LIMITS.mddPct;
+        dPnL > -dailyHysCap &&
+        wPnL > -weeklyHysCap &&
+        mddNow < mddHysCap;
       if (inBounds) {
         state.halted = false;
         state.haltedReason = null;
         state.haltedAt = null;
+        state.haltedRecoveredAt = now;
         await kv.set(key, state);
         // 통과 (allowed) — 5번 한도 체크에서 다시 평가
       } else {
-        return { allowed: false, reason: `halted: ${reason}`, state };
+        return {
+          allowed: false,
+          reason: `halted: ${reason} (hysteresis: 한도 ${(HYSTERESIS*100).toFixed(0)}% 까지 회복 필요)`,
+          state,
+        };
       }
     } else {
       return { allowed: false, reason: `halted: ${reason || "manual"}`, state };

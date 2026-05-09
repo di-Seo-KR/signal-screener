@@ -10,7 +10,7 @@
 //
 // cron: */5 분
 
-import { getTickerPrice } from "../_shared/binance-client.js";
+import { getTickerPrice, getKlines } from "../_shared/binance-client.js";
 import { respondError } from "../_shared/binance-auth.js";
 import { RISK_CONFIG } from "../_shared/risk-manager.js";
 
@@ -40,12 +40,32 @@ async function getKv() {
   return mod.kv;
 }
 
-function hitLong(entry, markPrice, sl, tp) {
+// ★ 2026-05-09 audit M4/N6: 5분 캔들의 high/low 까지 봐서 SL/TP wick 통과 검사.
+//   이전: cron 시점 mark price 만 비교 → 5분 사이 SL 통과했다 회복하면 SL 미체결 기록 (TP 편향).
+//   현재: 마지막 5분 캔들 high/low 가 SL/TP 통과했는지 확인. 둘 다 통과 시 SL 우선 (보수적).
+//   그게 없으면 mark price 로 fallback (이전 동작).
+function hitLong(entry, markPrice, sl, tp, candle) {
+  // 5m candle 기준으로 wick 통과 확인 (있으면)
+  if (candle && Number.isFinite(candle.low) && Number.isFinite(candle.high)) {
+    const slHit = candle.low <= sl;
+    const tpHit = candle.high >= tp;
+    if (slHit && tpHit) return "SL";   // ← SL 우선 (보수적 — 둘 다 wick 통과 시 손실 가정)
+    if (slHit) return "SL";
+    if (tpHit) return "TP";
+  }
+  // fallback: mark price 비교
   if (markPrice <= sl) return "SL";
   if (markPrice >= tp) return "TP";
   return null;
 }
-function hitShort(entry, markPrice, sl, tp) {
+function hitShort(entry, markPrice, sl, tp, candle) {
+  if (candle && Number.isFinite(candle.low) && Number.isFinite(candle.high)) {
+    const slHit = candle.high >= sl;
+    const tpHit = candle.low <= tp;
+    if (slHit && tpHit) return "SL";
+    if (slHit) return "SL";
+    if (tpHit) return "TP";
+  }
   if (markPrice >= sl) return "SL";
   if (markPrice <= tp) return "TP";
   return null;
@@ -55,6 +75,23 @@ async function tickFor(symbol) {
   try {
     const r = await getTickerPrice({ symbol });
     return parseFloat(r.price);
+  } catch {
+    return null;
+  }
+}
+
+// ★ 2026-05-09 audit M4: 5분 봉 1개의 high/low 가져옴 (가장 최근 closed 캔들).
+async function lastCandleFor(symbol) {
+  try {
+    const kl = await getKlines({ symbol, interval: "5m", limit: 2 });
+    if (!Array.isArray(kl) || kl.length === 0) return null;
+    // 마지막 (현재 진행중) 캔들 사용 — high/low 가 가장 신선
+    const c = kl[kl.length - 1];
+    return {
+      high: parseFloat(c[2]),
+      low: parseFloat(c[3]),
+      close: parseFloat(c[4]),
+    };
   } catch {
     return null;
   }
@@ -72,12 +109,16 @@ async function monitorUser(userId) {
   const closed = [];
   const symbolPrice = {};
 
+  // ★ M4: 심볼별 5분 캔들 캐시 (한 번 fetch 해서 재사용)
+  const symbolCandle = {};
   for (const e of ledger) {
     if (e.status !== "OPEN") continue;
     const sym = e.plan?.symbol;
     if (!sym) continue;
     if (!(sym in symbolPrice)) symbolPrice[sym] = await tickFor(sym);
+    if (!(sym in symbolCandle)) symbolCandle[sym] = await lastCandleFor(sym);
     const mark = symbolPrice[sym];
+    const candle = symbolCandle[sym];
     if (!mark || !Number.isFinite(mark)) continue;
 
     const side = e.plan.side;
@@ -127,8 +168,9 @@ async function monitorUser(userId) {
     }
 
     // 트레일링이 SL 끌어올린 결과 반영해서 hit 체크 (즉시 효과)
+    // ★ M4: candle high/low 까지 함께 검사 (TP 편향 제거)
     const sl = e.plan.slPrice;
-    const hit = side === "LONG" ? hitLong(entry, mark, sl, tp) : hitShort(entry, mark, sl, tp);
+    const hit = side === "LONG" ? hitLong(entry, mark, sl, tp, candle) : hitShort(entry, mark, sl, tp, candle);
 
     const openedAt = new Date(e.openedAt || now).getTime();
     const ageMs = now - openedAt;
@@ -269,6 +311,9 @@ async function monitorUser(userId) {
     sum.worstR = sum.worstR || 0;
     sum.grossWin = sum.grossWin || 0;
     sum.grossLoss = sum.grossLoss || 0;
+    // ★ 2026-05-09 audit M3: confidence·timeframe 별 누적 (가중치 학습 input)
+    sum.byConfidence = sum.byConfidence || {};
+    sum.byTimeframe = sum.byTimeframe || {};
 
     for (const c of closed) {
       sum.trades += 1;
@@ -299,6 +344,23 @@ async function monitorUser(userId) {
         if ((c.netPnL || 0) > 0) sum.bySymbol[sym].wins += 1;
         sum.bySymbol[sym].lastClosedAt = c.closedAt || new Date(now).toISOString();
       }
+      // ★ M3: confidence 별 누적 (signal 의 conf 값 기준 — A/B/C 또는 숫자)
+      const conf = c.signal?.confidence ?? c.plan?.confidence;
+      if (conf != null) {
+        const confKey = typeof conf === "number"
+          ? (conf >= 0.85 ? "A" : conf >= 0.65 ? "B" : "C")
+          : String(conf).toUpperCase();
+        sum.byConfidence[confKey] = sum.byConfidence[confKey] || { trades: 0, wins: 0, netPnL: 0 };
+        sum.byConfidence[confKey].trades += 1;
+        sum.byConfidence[confKey].netPnL += c.netPnL || 0;
+        if ((c.netPnL || 0) > 0) sum.byConfidence[confKey].wins += 1;
+      }
+      // ★ M3: timeframe 별 누적
+      const tf = c.signal?.timeframe || c.plan?.timeframe || "unknown";
+      sum.byTimeframe[tf] = sum.byTimeframe[tf] || { trades: 0, wins: 0, netPnL: 0 };
+      sum.byTimeframe[tf].trades += 1;
+      sum.byTimeframe[tf].netPnL += c.netPnL || 0;
+      if ((c.netPnL || 0) > 0) sum.byTimeframe[tf].wins += 1;
     }
     sum.profitFactor = sum.grossLoss > 0 ? sum.grossWin / sum.grossLoss : null;
     sum.avgHoldHours = sum.trades > 0 ? sum.totalHoldMs / sum.trades / 3600000 : 0;

@@ -22,6 +22,7 @@ import {
   getUserTrades,
 } from "../_shared/binance-client.js";
 import { recordTradeResult } from "../_shared/circuit-breaker.js";
+import { recordLiveTrade } from "../_shared/live-summary.js";
 import {
   evaluateTimeStop,
   evaluateTrailingStop,
@@ -48,6 +49,9 @@ async function checkUser(userId) {
     ? Object.fromEntries(lastPosRaw.map((p) => [p.symbol, p]))
     : lastPosRaw;
 
+  // ★ 2026-05-09 audit M5: closed 를 처음부터 객체 배열로 만들어 buggy map 회피.
+  //   이전: closed = ["BTC", "ETH"] (string) → 처리 후 첫 심볼만 객체 변환되고 나머지 누락.
+  //   현재: closed = [{ sym, realizedPnL? }] 일관 형태.
   const report = { userId, positions: nonZero.length, closed: [], orphansCleaned: [] };
 
   // 1) 고아 SL/TP 정리 — 포지션 없는 심볼에 남은 reduce-only 주문 취소
@@ -66,7 +70,7 @@ async function checkUser(userId) {
       } catch (e) {
         report.orphansCleaned.push({ sym, error: e?.message });
       }
-      report.closed.push(sym);
+      report.closed.push({ sym });  // ← 객체 형태로 통일
     }
   }
 
@@ -76,7 +80,8 @@ async function checkUser(userId) {
   if (report.closed.length) {
     const lookbackMs = 60 * 60 * 1000; // 60분 (이전 10분 → 너무 좁아 청산 감지 누락)
     const startTime = Date.now() - lookbackMs;
-    for (const sym of report.closed) {
+    for (const closedEntry of report.closed) {
+      const sym = closedEntry.sym;
       let realized = null;
       try {
         const trades = await getUserTrades({ ...creds, symbol: sym, startTime, limit: 50 });
@@ -92,6 +97,23 @@ async function checkUser(userId) {
       const realizedSafe = Number.isFinite(realized) ? realized : 0;
       if (realized != null) {
         await recordTradeResult(userId, realized);
+        // ★ 2026-05-09 audit M7: live-summary 누적 — 자동 차단 기준 (live 우선) + 가중치 학습 input
+        try {
+          // plan KV 에서 진입 시점 메타 가져오기 (family/confidence/timeframe)
+          const planForMeta = await kv.get(`di:real:user:${userId}:plan:${sym}`);
+          await recordLiveTrade(userId, {
+            symbol: sym,
+            side: planForMeta?.side,
+            family: planForMeta?.strategyFamily,
+            confidence: planForMeta?.confidence,
+            timeframe: planForMeta?.timeframe,
+            realizedPnL: realized,
+            openedAt: planForMeta?.openedAt,
+            closedAt: new Date().toISOString(),
+          });
+        } catch (e) {
+          console.warn(`[live-summary] update failed for ${sym}:`, e?.message);
+        }
       }
       // 청산 이벤트 engine-log 기록 (realized 0/null 도 항상 기록)
       const logKey = `di:real:user:${userId}:engine-log`;
@@ -104,7 +126,8 @@ async function checkUser(userId) {
         pnlSource: realized != null ? "userTrades" : "unavailable",
       });
       await kv.set(logKey, log.slice(0, 200));
-      report.closed = report.closed.map((c) => (c === sym ? { sym, realizedPnL: realizedSafe } : c));
+      // ★ M5 fix: 객체 배열 직접 mutate (이전엔 string vs 객체 비교 버그)
+      closedEntry.realizedPnL = realizedSafe;
 
       // ★ 청산 감지 텔레그램 알림 (수동·자동 구분, realized 누락도 fallback)
       try {
@@ -147,11 +170,77 @@ async function checkUser(userId) {
   // 여기서 그 plan 을 읽어 trailing/timeStop 판정.
   report.timeStopped = [];
   report.trailed = [];
+  report.slMissingForceClosed = [];
   for (const p of nonZero) {
     const sym = p.symbol;
     const planKey = `di:real:user:${userId}:plan:${sym}`;
     const plan = await kv.get(planKey);
     if (!plan || !plan.openedAt || !plan.slPct) continue;
+
+    // ★ 2026-05-09 audit C3: bracket SL attach 실패한 포지션 5분 후 자동 force-close.
+    //   plan.slMissingSince 가 5분 이상 경과 + 여전히 binance SL 주문 없음 → 즉시 청산.
+    //   AAVE 0.03초 사고 같은 즉시 청산 위험 회피 위해 5분 cooldown.
+    if (plan.slMissingSince) {
+      const elapsed = Date.now() - plan.slMissingSince;
+      const COOLDOWN_MS = 5 * 60 * 1000;
+      if (elapsed >= COOLDOWN_MS) {
+        // 사용자가 binance UI 에서 SL 직접 추가했는지 확인
+        let userAddedSL = false;
+        try {
+          const opens = await getOpenOrders({ ...creds, symbol: sym });
+          userAddedSL = (opens || []).some((o) =>
+            (o.type === "STOP_MARKET" || o.type === "STOP")
+            && (o.reduceOnly || o.closePosition === "true" || o.closePosition === true)
+          );
+        } catch {}
+        if (userAddedSL) {
+          // 사용자가 SL 추가했으면 slMissingSince 클리어
+          delete plan.slMissingSince;
+          await kv.set(planKey, plan);
+        } else {
+          // 강제 시장가 청산
+          try {
+            const closeQty = Math.abs(parseFloat(p.positionAmt));
+            await placeOrder({
+              ...creds,
+              params: {
+                symbol: sym,
+                side: parseFloat(p.positionAmt) > 0 ? "SELL" : "BUY",
+                type: "MARKET",
+                quantity: closeQty,
+                reduceOnly: "true",
+                newOrderRespType: "RESULT",
+              },
+            });
+            report.slMissingForceClosed.push({ sym, elapsedMin: (elapsed / 60000).toFixed(1) });
+            const logKey = `di:real:user:${userId}:engine-log`;
+            const log = (await kv.get(logKey)) || [];
+            log.unshift({
+              time: new Date().toISOString(),
+              event: "sl_missing_force_close",
+              symbol: sym,
+              elapsedMin: (elapsed / 60000).toFixed(1),
+            });
+            await kv.set(logKey, log.slice(0, 200));
+            try {
+              const { sendCards, buildCard } = await import("../_shared/telegram.js");
+              await sendCards([buildCard({
+                tag: "🚨",
+                title: `SL 누락 자동 청산 — ${sym}`,
+                lines: [
+                  `${(elapsed / 60000).toFixed(1)}분 동안 binance SL 부재 → 안전 차원에서 시장가 청산`,
+                  `다음에도 같은 종목 SL attach 실패하면 ZEPTA_BRACKET_RESCUE_MODE 또는 수동 SL 부착 검토.`,
+                ],
+              })], { channel: "real" });
+            } catch {}
+            await kv.del(planKey);
+            continue; // 다음 단계 평가 스킵
+          } catch (e) {
+            console.warn(`[monitor] SL-missing force close failed for ${sym}:`, e?.message);
+          }
+        }
+      }
+    }
 
     const side = parseFloat(p.positionAmt) > 0 ? "LONG" : "SHORT";
     const entryPrice = parseFloat(p.entryPrice);
