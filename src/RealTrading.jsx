@@ -236,8 +236,25 @@ function RealTradingInner() {
     ? ((equity - breaker.dayStartEquity) / breaker.dayStartEquity) * 100 : 0;
   const weekLossPct = breaker.weekStartEquity && equity
     ? ((equity - breaker.weekStartEquity) / breaker.weekStartEquity) * 100 : 0;
-  const mddPct = breaker.equityHigh && equity
-    ? ((equity - breaker.equityHigh) / breaker.equityHigh) * 100 : 0;
+  // ★ 2026-05-09: MDD 기준점 — 30일 rolling peak 우선, 폴백은 all-time equityHigh
+  //   이전: all-time equityHigh 만 사용 → 큰 상승 후엔 정상 조정도 -50% 트리거 위험
+  //   이후: 서버가 주는 equityHigh30d 사용 (없으면 equityHigh 로 폴백)
+  const mddBaseline = breaker.equityHigh30d || breaker.equityHigh;
+  const mddPct = mddBaseline && equity
+    ? ((equity - mddBaseline) / mddBaseline) * 100 : 0;
+
+  // ★ 2026-05-09 — 브레이커 한도값 (status API 가 안 내려주면 폴백)
+  //   이전엔 UI 에 -4%/-8%/-15% 하드코딩 → 실제 -40%/-60%/-50% 와 불일치.
+  //   이제 breaker.limits 가 있으면 그것을, 없으면 폴백 (현재 한도와 일치).
+  const breakerLimits = breaker.limits || {
+    dailyLossPct: 0.40,
+    weeklyLossPct: 0.60,
+    mddPct: 0.50,
+    consecLossThreshold: 5,
+  };
+  const dayLimitPct = (breakerLimits.dailyLossPct || 0.40) * 100;   // 40
+  const weekLimitPct = (breakerLimits.weeklyLossPct || 0.60) * 100; // 60
+  const mddLimitPct = (breakerLimits.mddPct || 0.50) * 100;         // 50
 
   // ═════════════════════════════════════════════════════════
   // HEADER (REDESIGNED) — 모바일은 padding 절반
@@ -404,15 +421,22 @@ function RealTradingInner() {
         paddingTop: 10, borderTop: "1px solid rgba(59, 130, 246, 0.1)",
       }}>
         <div>
-          <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 4 }}>일 시작 가</div>
+          <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 4 }}>오늘 시작 잔고</div>
           <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)" }}>
             {breaker.dayStartEquity ? fmtUsd(breaker.dayStartEquity) : "—"}
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 4 }}>최고 수익</div>
+          <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 4 }}>
+            MDD 기준 (30일 최고)
+            {breaker.equityHigh && breaker.equityHigh30d && breaker.equityHigh > breaker.equityHigh30d && (
+              <span style={{ marginLeft: 6, fontSize: 9, color: "var(--z-text-3)" }}>
+                · 역대 {fmtUsd(breaker.equityHigh)}
+              </span>
+            )}
+          </div>
           <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)", color: "var(--z-green-hi)" }}>
-            {breaker.equityHigh ? fmtUsd(breaker.equityHigh) : "—"}
+            {mddBaseline ? fmtUsd(mddBaseline) : "—"}
           </div>
         </div>
       </div>
@@ -461,7 +485,7 @@ function RealTradingInner() {
       el: !isMobile ? renderMetricCard({
         label: "일 손익", value: fmtPct(dayLossPct),
         color: dayLossPct < 0 ? "var(--z-red-hi)" : dayLossPct > 0 ? "var(--z-green-hi)" : "var(--z-text)",
-        hint: <>한도 <span style={{ fontWeight: 700 }}>-4%</span></>,
+        hint: <>한도 <span style={{ fontWeight: 700 }}>-{dayLimitPct.toFixed(0)}%</span></>,
         gradient: dayLossPct < 0
           ? "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)"
           : "linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(22, 163, 74, 0.06) 100%)",
@@ -473,7 +497,7 @@ function RealTradingInner() {
       el: renderMetricCard({
         label: "최대 낙폭", value: fmtPct(mddPct),
         color: mddPct < -10 ? "var(--z-red-hi)" : mddPct < -5 ? "var(--z-yellow-hi)" : "var(--z-purple)",
-        hint: <>한도 <span style={{ fontWeight: 700 }}>-15%</span></>,
+        hint: <>한도 <span style={{ fontWeight: 700 }}>-{mddLimitPct.toFixed(0)}%</span></>,
         gradient: mddPct < -8
           ? "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)"
           : "linear-gradient(135deg, rgba(168, 85, 247, 0.12) 0%, rgba(147, 51, 234, 0.06) 100%)",
@@ -910,45 +934,82 @@ function RealTradingInner() {
   // ═════════════════════════════════════════════════════════
   const breakerCard = (
     <Card title="서킷브레이커" icon={<Shield size={16} />}
-      subtitle="일 -4% · 주 -8% · MDD -15% · 5연속손실 → 24h 쿨다운">
+      subtitle={`일 -${dayLimitPct.toFixed(0)}% · 주 -${weekLimitPct.toFixed(0)}% · MDD -${mddLimitPct.toFixed(0)}% · ${breakerLimits.consecLossThreshold}연속손실 → 24h 쿨다운`}>
       <div style={{ display: "grid", gap: 10, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(220px, 1fr))" }}>
         <div>
           <Progress
-            label={`일 손실 ${fmtPct(dayLossPct)}`}
-            value={Math.min(100, Math.abs(dayLossPct) * 25)}
-            tone={dayLossPct <= -3 ? "red" : dayLossPct <= -2 ? "yellow" : "green"}
+            label={`일 손실 ${fmtPct(dayLossPct)} / -${dayLimitPct.toFixed(0)}%`}
+            value={Math.min(100, (Math.abs(dayLossPct) / dayLimitPct) * 100)}
+            tone={Math.abs(dayLossPct) >= dayLimitPct * 0.75 ? "red" : Math.abs(dayLossPct) >= dayLimitPct * 0.5 ? "yellow" : "green"}
           />
         </div>
         <div>
           <Progress
-            label={`주 손실 ${fmtPct(weekLossPct)}`}
-            value={Math.min(100, Math.abs(weekLossPct) * 12.5)}
-            tone={weekLossPct <= -6 ? "red" : weekLossPct <= -4 ? "yellow" : "green"}
+            label={`주 손실 ${fmtPct(weekLossPct)} / -${weekLimitPct.toFixed(0)}%`}
+            value={Math.min(100, (Math.abs(weekLossPct) / weekLimitPct) * 100)}
+            tone={Math.abs(weekLossPct) >= weekLimitPct * 0.75 ? "red" : Math.abs(weekLossPct) >= weekLimitPct * 0.5 ? "yellow" : "green"}
           />
         </div>
         <div>
           <Progress
-            label={`MDD ${fmtPct(mddPct)}`}
-            value={Math.min(100, Math.abs(mddPct) * 6.67)}
-            tone={mddPct <= -12 ? "red" : mddPct <= -8 ? "yellow" : "green"}
+            label={`최대 낙폭 ${fmtPct(mddPct)} / -${mddLimitPct.toFixed(0)}%`}
+            value={Math.min(100, (Math.abs(mddPct) / mddLimitPct) * 100)}
+            tone={Math.abs(mddPct) >= mddLimitPct * 0.75 ? "red" : Math.abs(mddPct) >= mddLimitPct * 0.5 ? "yellow" : "green"}
           />
         </div>
         <div>
           <Progress
-            label={`연속 손실 ${breaker.consecLosses || 0}/5`}
-            value={((breaker.consecLosses || 0) / 5) * 100}
-            tone={(breaker.consecLosses || 0) >= 4 ? "red" : (breaker.consecLosses || 0) >= 3 ? "yellow" : "green"}
+            label={`연속 손실 ${breaker.consecLosses || 0}/${breakerLimits.consecLossThreshold}`}
+            value={((breaker.consecLosses || 0) / breakerLimits.consecLossThreshold) * 100}
+            tone={(breaker.consecLosses || 0) >= breakerLimits.consecLossThreshold - 1 ? "red" : (breaker.consecLosses || 0) >= breakerLimits.consecLossThreshold - 2 ? "yellow" : "green"}
           />
         </div>
       </div>
       <div style={{ marginTop: 14, display: "grid", gap: 8, gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(160px, 1fr))", fontSize: 12 }}>
-        <KV label="일 시작 에쿼티" value={fmtUsd(breaker.dayStartEquity)} />
-        <KV label="주 시작 에쿼티" value={fmtUsd(breaker.weekStartEquity)} />
-        <KV label="최고 에쿼티" value={fmtUsd(breaker.equityHigh)} />
+        <KV label="오늘 시작 잔고" value={fmtUsd(breaker.dayStartEquity)} />
+        <KV label="이번 주 시작 잔고" value={fmtUsd(breaker.weekStartEquity)} />
+        <KV label="MDD 기준 (30일 최고)" value={fmtUsd(mddBaseline)} />
         <KV label="쿨다운 종료"
           value={breaker.cooldownUntil && breaker.cooldownUntil > Date.now()
             ? fmtDT(breaker.cooldownUntil) : "—"} mono={false} />
       </div>
+
+      {/* ★ 2026-05-09: MDD 기준점 리셋 버튼 — 큰 상승 후 정상 조정도 -50% 트리거 위험 시 사용 */}
+      {breaker.equityHigh && equity && breaker.equityHigh > equity * 1.05 && (
+        <div style={{
+          marginTop: 14, padding: "10px 12px",
+          background: "rgba(168, 85, 247, 0.08)",
+          border: "1px solid rgba(168, 85, 247, 0.2)",
+          borderRadius: "var(--z-r-md)",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 10, flexWrap: "wrap",
+        }}>
+          <div style={{ fontSize: 11, color: "var(--z-text-2)", lineHeight: 1.5 }}>
+            <strong style={{ color: "var(--z-purple)" }}>MDD 기준 재설정</strong>
+            <br />
+            현재 잔고 대비 30일 최고가 {((breaker.equityHigh / equity - 1) * 100).toFixed(1)}% 높음 — 큰 상승 후 정상 조정에도 자동정지 위험. 현재 잔고를 새 기준으로 잡으려면 클릭.
+          </div>
+          <button
+            onClick={() => setConfirm({
+              tone: "warn",
+              title: "MDD 기준점을 현재 잔고로 재설정",
+              desc: `현재 30일 최고 ${fmtUsd(mddBaseline)} → 현재 잔고 ${fmtUsd(equity)} 로 재설정합니다.\n낙폭(MDD) 카운터가 0% 부터 다시 시작됩니다. 자동정지 상태는 변경되지 않습니다.`,
+              confirmLabel: "재설정",
+              confirmVariant: "primary",
+              onConfirm: () => act("reset-mdd-baseline", { currentEquity: equity }, "MDD 기준점 재설정 완료"),
+            })}
+            disabled={busy}
+            style={{
+              padding: "6px 12px", fontSize: 12, fontWeight: 600,
+              background: "var(--z-purple)", color: "#fff",
+              border: "none", borderRadius: "var(--z-r-md)",
+              cursor: busy ? "not-allowed" : "pointer", opacity: busy ? 0.5 : 1,
+            }}
+          >
+            기준점 재설정
+          </button>
+        </div>
+      )}
     </Card>
   );
 
@@ -1184,13 +1245,13 @@ function RealTradingInner() {
         <KV label="최대 증거금 비율" value="35%" />
         <KV label="레버리지 범위" value="2× ~ 5×" />
         <KV label="동시 포지션 한도" value="최대 2 (상관군 분리)" />
-        <KV label="SL/TP 방식" value="ATR(14) + 비용 반영" />
+        <KV label="SL/TP 방식" value="ATR(14) + ROI -40% cap" />
         <KV label="최소 net RR" value="1.8R" />
-        <KV label="최대 보유 시간" value="48h" />
+        <KV label="최대 보유 시간" value="무제한 (TP/SL 만)" />
         <KV label="청산 안전버퍼" value="0.7 × liqDist" />
         <KV label="비용 가정" value="수수료 0.08% + 슬립 0.05%" />
-        <KV label="일/주/MDD 한도" value="-4% / -8% / -15%" />
-        <KV label="연속손실 쿨다운" value="5회 → 24h" />
+        <KV label="일/주/MDD 한도" value={`-${dayLimitPct.toFixed(0)}% / -${weekLimitPct.toFixed(0)}% / -${mddLimitPct.toFixed(0)}%`} />
+        <KV label="연속손실 쿨다운" value={`${breakerLimits.consecLossThreshold}회 → 24h`} />
         <KV label="심볼 선택" value="exchangeInfo 동적 필터" />
       </div>
       <div style={{

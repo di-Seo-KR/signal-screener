@@ -19,7 +19,10 @@ import {
   setKillSwitch,
   getBreakerState,
   resetBreaker,
+  resetEquityHigh,
 } from "../_shared/circuit-breaker.js";
+import { loadUserCredentials } from "../_shared/binance-auth.js";
+import { getAccountInfo } from "../_shared/binance-client.js";
 
 async function getKv() {
   return (await import("@vercel/kv")).kv;
@@ -107,6 +110,29 @@ export default async function handler(req, res) {
         const list = (await kv.get("di:real:shadow-users")) || [];
         await kv.set("di:real:shadow-users", list.filter((u) => u !== userId));
         return res.status(200).json({ ok: true, shadowEnabled: false });
+      }
+      // ★ 2026-05-09: MDD 기준점 (equityHigh / 30일 rolling) 만 현재가로 재설정.
+      //   큰 상승 후 정상 조정에도 옛 peak 가 발목 잡을 때 사용.
+      //   halted/cooldown 상태는 건드리지 않음 — 별도 'resume' 액션 사용.
+      if (action === "reset-mdd-baseline") {
+        let equity = body?.currentEquity;
+        if (equity == null || !isFinite(parseFloat(equity))) {
+          // 클라이언트가 안 보내면 서버에서 직접 조회
+          try {
+            const creds = await loadUserCredentials(userId);
+            const acct = await getAccountInfo(creds);
+            equity = parseFloat(acct.totalWalletBalance || "0");
+          } catch (e) {
+            return res.status(400).json({ error: `currentEquity unavailable: ${e?.message || e}` });
+          }
+        } else {
+          equity = parseFloat(equity);
+        }
+        if (!equity || equity <= 0) {
+          return res.status(400).json({ error: "currentEquity must be > 0" });
+        }
+        const state = await resetEquityHigh(userId, equity);
+        return res.status(200).json({ ok: true, breaker: state, newBaseline: equity });
       }
       if (action === "reset-shadow") {
         await kv.set(`di:real:user:${userId}:shadow-ledger`, []);

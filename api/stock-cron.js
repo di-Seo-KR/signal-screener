@@ -16,6 +16,26 @@ const MAX_EQUITY_PER_STOCK = 0.15;
 const MAX_TOTAL_STOCK_EXPOSURE = 0.80;
 const TRAILING_STOP_LOSS = -0.04;
 
+// ── 주식 봇별 자산 매핑 (btc-cron 의 BOT_ASSET_MAP 패턴) ──
+// ★ 2026-05-09: 이전엔 자산-봇 매핑 없이 모든 활성 주식 봇에 동일 주문이 누적되어
+//   활성 봇 N개면 한 거래가 tradeCount/winCount/realizedPL 모두 N번 카운트됐다.
+//   각 봇의 성격(블루칩/모멘텀/회귀)에 따라 자산을 나눠 다중 카운트를 통제한다.
+const STOCK_BOT_ASSET_MAP = {
+  "stable-quant":     ['AAPL', 'MSFT', 'GOOG', 'AMZN', 'AVGO'],          // 블루칩만
+  "balanced-quant":   WATCHLIST,                                          // 전체 (앙상블 균형)
+  "aggressive-quant": ['NVDA', 'TSLA', 'AMD', 'META', 'AVGO', 'CRM'],     // 고변동
+  "trend-follow":     ['NVDA', 'TSLA', 'AMD', 'META', 'AVGO'],            // 모멘텀
+  "mean-reversion":   ['AAPL', 'MSFT', 'GOOG', 'AMZN', 'CRM'],            // 안정/회귀
+  "ensemble-signal":  WATCHLIST,                                          // 전체 (가장 보수적, 합의)
+};
+
+// 자산 → 해당 자산을 다루는 주식 봇 목록 (활성 봇 중)
+function getStockBotsForAsset(symbol, activeBotIds) {
+  return Object.entries(STOCK_BOT_ASSET_MAP)
+    .filter(([botId, assets]) => activeBotIds.includes(botId) && assets.includes(symbol))
+    .map(([botId]) => botId);
+}
+
 // ==================== TECHNICAL INDICATOR CALCULATIONS ====================
 
 function calcSMA(data, period) {
@@ -780,13 +800,21 @@ export default async function handler(req, res) {
       const activeBotIds = activeStockBots.map(ab => ab.botId);
 
       if (orders.length > 0 && activeBotIds.length > 0) {
-        for (const botId of activeBotIds) {
-          const key = `di:bot:${botId}:perf`;
-          const existing = (await kv.get(key)) || {
-            botId, trades: [], realizedPL: 0, totalBuyCost: 0, totalSellRevenue: 0,
-            tradeCount: 0, winCount: 0, lastUpdated: null,
-          };
-          for (const order of orders) {
+        // ★ 2026-05-09: btc-cron 의 getBotsForAsset 패턴 적용 — 자산별 분배
+        //   이전: 모든 활성 봇 × 모든 주문 → 활성 봇 N개면 한 거래가 N번 카운트
+        //   이후: 자산을 다루는 봇에만 카운트 → 다중 카운트 통제
+        // 거래 단위로 루프 → 각 거래마다 해당 자산을 다루는 봇 목록만 갱신
+        const writtenBots = new Set();
+        for (const order of orders) {
+          const bots = getStockBotsForAsset(order.symbol, activeBotIds);
+          if (bots.length === 0) continue;
+          for (const botId of bots) {
+            const key = `di:bot:${botId}:perf`;
+            const existing = (await kv.get(key)) || {
+              botId, trades: [], realizedPL: 0, totalBuyCost: 0, totalSellRevenue: 0,
+              tradeCount: 0, winCount: 0, closedCount: 0, lossCount: 0,
+              grossWin: 0, grossLoss: 0, lastUpdated: null,
+            };
             existing.trades = [
               { time: new Date().toISOString(), asset: order.symbol, type: order.side.replace(' (SL)', ''),
                 amount: (order.qty || 0) * (order.price || 0), reason: order.reason || '' },
@@ -797,16 +825,26 @@ export default async function handler(req, res) {
               existing.totalBuyCost = (existing.totalBuyCost || 0) + (order.qty * order.price);
             } else {
               existing.totalSellRevenue = (existing.totalSellRevenue || 0) + (order.qty * order.price);
+              // ★ 2026-05-09: closedCount/lossCount/grossWin/grossLoss 누적 (btc-cron 동일)
+              //   winRate = winCount / closedCount (분모 SELL 만), PF = grossWin / grossLoss
               if (order.pnl != null) {
                 existing.realizedPL = (existing.realizedPL || 0) + order.pnl;
-                if (order.pnl > 0) existing.winCount = (existing.winCount || 0) + 1;
+                existing.closedCount = (existing.closedCount || 0) + 1;
+                if (order.pnl > 0) {
+                  existing.winCount = (existing.winCount || 0) + 1;
+                  existing.grossWin = (existing.grossWin || 0) + order.pnl;
+                } else if (order.pnl < 0) {
+                  existing.lossCount = (existing.lossCount || 0) + 1;
+                  existing.grossLoss = (existing.grossLoss || 0) + Math.abs(order.pnl);
+                }
               }
             }
+            existing.lastUpdated = new Date().toISOString();
+            await kv.set(key, existing);
+            writtenBots.add(botId);
           }
-          existing.lastUpdated = new Date().toISOString();
-          await kv.set(key, existing);
         }
-        console.log(`📊 주식 봇별 성과 KV 저장: ${orders.length}건 → ${activeBotIds.length}개 봇`);
+        console.log(`📊 주식 봇별 성과 KV 저장: ${orders.length}건 → ${writtenBots.size}개 봇 (자산-봇 매핑 적용)`);
       }
 
       // 주식 봇별 포지션 스냅샷 (활성 봇만)

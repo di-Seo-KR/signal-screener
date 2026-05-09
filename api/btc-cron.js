@@ -606,7 +606,8 @@ export default async function handler(req, res) {
             const key = `di:bot:${botId}:perf`;
             const existing = (await kv.get(key)) || {
               botId, trades: [], realizedPL: 0, totalBuyCost: 0, totalSellRevenue: 0,
-              tradeCount: 0, winCount: 0, peakValue: 0, mdd: 0, lastUpdated: null,
+              tradeCount: 0, winCount: 0, closedCount: 0, lossCount: 0,
+              grossWin: 0, grossLoss: 0, peakValue: 0, mdd: 0, lastUpdated: null,
             };
             // 거래 기록 추가 (최근 200건 유지)
             existing.trades = [
@@ -620,10 +621,20 @@ export default async function handler(req, res) {
               existing.totalBuyCost = (existing.totalBuyCost || 0) + (trade.amount || 0);
             } else {
               existing.totalSellRevenue = (existing.totalSellRevenue || 0) + (trade.amount || 0);
-              // 실현 손익 누적 (매도 시 계산된 P&L)
+              // ★ 2026-05-09: closedCount/lossCount/grossWin/grossLoss 누적 — 정확한 승률·PF 계산용
+              //   이전: winRate = winCount / tradeCount  ← 분모 BUY+SELL 라 항상 절반
+              //   이후: winRate = winCount / closedCount  ← 분모 SELL 만, 정확
+              //   PF = grossWin / grossLoss  ← 승률보다 의미 있는 지표
               if (trade.pnl != null) {
                 existing.realizedPL = (existing.realizedPL || 0) + trade.pnl;
-                if (trade.pnl > 0) existing.winCount = (existing.winCount || 0) + 1;
+                existing.closedCount = (existing.closedCount || 0) + 1;
+                if (trade.pnl > 0) {
+                  existing.winCount = (existing.winCount || 0) + 1;
+                  existing.grossWin = (existing.grossWin || 0) + trade.pnl;
+                } else if (trade.pnl < 0) {
+                  existing.lossCount = (existing.lossCount || 0) + 1;
+                  existing.grossLoss = (existing.grossLoss || 0) + Math.abs(trade.pnl);
+                }
               }
             }
             existing.lastUpdated = new Date().toISOString();
