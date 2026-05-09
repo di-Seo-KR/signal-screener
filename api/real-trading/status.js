@@ -17,7 +17,7 @@
 
 import { loadUserCredentials, respondError } from "../_shared/binance-auth.js";
 import { getAccountInfo, getPositionRisk } from "../_shared/binance-client.js";
-import { isKillSwitchEnabled, getBreakerState } from "../_shared/circuit-breaker.js";
+import { isKillSwitchEnabled, getBreakerState, BREAKER_LIMITS } from "../_shared/circuit-breaker.js";
 
 async function getKv() {
   return (await import("@vercel/kv")).kv;
@@ -81,7 +81,7 @@ export default async function handler(req, res) {
       openPositions,
       recentEngineLog: (engineLog || []).slice(0, 20),
       recentOrders: (orders || []).slice(0, 10),
-      breaker,
+      breaker: { ...breaker, limits: BREAKER_LIMITS },  // ★ UI 가 옛 한도 하드코딩 안 하도록 함께 내려줌
       shadow: {
         summary: shadowSummary || null,
         openCount: (shadowLedger || []).filter((e) => e.status === "OPEN").length,

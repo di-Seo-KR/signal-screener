@@ -13,11 +13,28 @@ import { MetricInfo } from "./ui/primitives.jsx";
 const METRIC_HINTS = {
   MDD: "지금까지 가장 크게 잃었던 비율. 5%면 한 번에 5% 손실 본 적 있다는 뜻. 작을수록 좋아요.",
   Sharpe: "수익이 얼마나 안정적인지 점수. 1.0 이상이면 양호, 2.0 이상이면 매우 우수.",
-  안정성: "수익이 얼마나 안정적인지 점수 (Sharpe). 1.0 이상이면 양호, 2.0 이상이면 매우 우수.",
+  안정성: "수익이 위아래로 얼마나 흔들렸는지를 보고, 변동성 대비 얼마나 꾸준히 벌었나 평가하는 점수예요. 위 등급이 안정적일수록 손실 위험이 작다는 뜻.",
   승률: "전체 거래 중 이긴 비율. 50%만 넘어도 손익비가 좋으면 수익이 됩니다.",
   손익비: "이긴 거래 평균 이익 ÷ 진 거래 평균 손실. 1.5 이상이면 양호.",
   RR: "이긴 거래 평균 이익 ÷ 진 거래 평균 손실 (손익비). 1.5 이상이면 양호.",
 };
+
+// ★ 2026-05-09: Sharpe → 사람이 읽기 좋은 "안정성 등급"
+//   숫자만 봐서는 입문자가 의미 파악 어렵다. 대표님 지시로 등급 라벨 도입.
+//   - >= 2.0  매우 우수 (S)
+//   - >= 1.5  우수    (A)
+//   - >= 1.0  양호    (B)
+//   - >= 0.5  보통    (C)
+//   - <  0.5  주의    (D)
+function sharpeToGrade(sharpe) {
+  const s = parseFloat(sharpe);
+  if (!isFinite(s)) return { label: "—", grade: "—", color: "default" };
+  if (s >= 2.0) return { label: "매우 우수", grade: "S", color: "green" };
+  if (s >= 1.5) return { label: "우수",     grade: "A", color: "green" };
+  if (s >= 1.0) return { label: "양호",     grade: "B", color: "blue" };
+  if (s >= 0.5) return { label: "보통",     grade: "C", color: "yellow" };
+  return                { label: "주의",     grade: "D", color: "red" };
+}
 
 // ── 에쿼티 커브 생성 (전략 파라미터 기반) ──
 function generateEquityCurve(bot, months = 12) {
@@ -524,16 +541,27 @@ function BotCard({ bot, onActivate, theme }) {
         background: c.card2,
         border: `1px solid ${c.border}40`,
       }}>
-        {[
-          { label: t("botStats.winRate"), value: bot.stats.winRate, color: c.green },
-          { label: t("botStats.sharpeRatio"), value: bot.stats.sharpeRatio, color: c.blue },
-          { label: t("botStats.mdd"), value: bot.stats.mdd, color: c.red },
-        ].map((s, i) => (
-          <div key={i} style={{ textAlign: "center" }}>
-            <div style={{ fontSize: "10px", color: c.text3, marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{s.label}</div>
-            <div style={{ fontSize: "16px", fontWeight: 800, color: s.color, letterSpacing: "-0.01em" }}>{s.value}</div>
-          </div>
-        ))}
+        {(() => {
+          // ★ 2026-05-09: Sharpe → 안정성 등급으로 휴머나이즈 (S/A/B/C/D + 한글 라벨)
+          const sg = sharpeToGrade(bot.stats.sharpeRatio);
+          const sgColor = sg.color === "green" ? c.green : sg.color === "blue" ? c.blue
+                        : sg.color === "yellow" ? c.yellow : sg.color === "red" ? c.red : c.text3;
+          return [
+            { label: t("botStats.winRate"), value: bot.stats.winRate, color: c.green },
+            { label: "안정성", value: `${sg.grade} ${sg.label}`, color: sgColor, raw: bot.stats.sharpeRatio },
+            { label: t("botStats.mdd"), value: bot.stats.mdd, color: c.red },
+          ].map((s, i) => (
+            <div key={i} style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "10px", color: c.text3, marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{s.label}</div>
+              <div style={{ fontSize: i === 1 ? "13px" : "16px", fontWeight: 800, color: s.color, letterSpacing: "-0.01em" }}>{s.value}</div>
+              {s.raw && (
+                <div style={{ fontSize: "9px", color: c.text3, marginTop: "1px", fontFamily: "var(--z-font-mono)" }}>
+                  Sharpe {s.raw}
+                </div>
+              )}
+            </div>
+          ));
+        })()}
       </div>
 
       {/* 모의 ROI 차트 */}
@@ -916,8 +944,17 @@ function ActiveBotCarousel({ activeBots, allBotPerf, onSelectBot, onStopBot, onA
           const hours = Math.floor((elapsed % 86400000) / 3600000);
           const isStock = STOCK_BOTS.some(b => b.id === ab.botId);
           const bp = allBotPerf[ab.botId];
-          const kvTrades = bp?.perf?.tradeCount || 0;
+          // ★ 2026-05-09: 승률 분모를 closedCount (청산 횟수) 로 변경.
+          //   이전: tradeCount = BUY+SELL 합계 → 분모 2배라 승률 항상 절반 왜곡.
+          //   현재: closedCount = SELL (PnL 기록) 만 카운트 → 정확한 승률.
+          //   closedCount 가 없으면 폴백 (옛 데이터 호환): tradeCount/2 (대략).
+          const kvTrades = bp?.perf?.closedCount ?? Math.round((bp?.perf?.tradeCount || 0) / 2);
           const kvWinCount = bp?.perf?.winCount || 0;
+          const kvLossCount = bp?.perf?.lossCount ?? Math.max(0, kvTrades - kvWinCount);
+          // Profit Factor — grossWin / grossLoss (NaN 방지)
+          const kvGrossWin = bp?.perf?.grossWin || 0;
+          const kvGrossLoss = bp?.perf?.grossLoss || 0;
+          const kvProfitFactor = kvGrossLoss > 0 ? (kvGrossWin / kvGrossLoss) : (kvGrossWin > 0 ? Infinity : 0);
           const kvUnrealized = bp?.snapshot?.unrealizedPL || 0;
           const realizedPL = bp?.perf?.realizedPL || 0;
           const totalPL = kvUnrealized + realizedPL;
@@ -998,7 +1035,7 @@ function ActiveBotCarousel({ activeBots, allBotPerf, onSelectBot, onStopBot, onA
                   { label: "투입", value: `$${allocation >= 1000 ? (allocation/1000).toFixed(1)+"k" : allocation.toLocaleString()}`, hint: "이 봇에 배정한 금액" },
                   { label: "MDD", value: kvMDD > 0 ? `${kvMDD.toFixed(1)}%` : "--", hint: METRIC_HINTS.MDD },
                   { label: "승률", value: kvTrades > 0 ? `${(kvWinCount/kvTrades*100).toFixed(0)}%` : "--", hint: METRIC_HINTS.승률 },
-                  { label: "승/패", value: `${kvWinCount}/${kvTrades - kvWinCount}`, hint: "이긴 거래 / 진 거래 횟수" },
+                  { label: "손익비", value: kvProfitFactor === Infinity ? "∞" : kvProfitFactor > 0 ? kvProfitFactor.toFixed(2) : "--", hint: METRIC_HINTS.손익비 },
                 ].map((m, i) => (
                   <div key={i} className="p-1.5 rounded text-center" style={{ background: c.card2 }}>
                     <div className="text-[12px] flex items-center justify-center" style={{ color: c.text3 }}>
@@ -1218,7 +1255,8 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
         let grandTotalPL = 0, grandUnrealized = 0, grandRealized = 0, grandTrades = 0, grandWins = 0;
         runningBots.forEach(ab => {
           const bp = allBotPerf[ab.botId];
-          grandTrades += bp?.perf?.tradeCount || 0;
+          // ★ 2026-05-09: 합산도 closedCount 사용 (winRate 정확성)
+          grandTrades += (bp?.perf?.closedCount ?? Math.round((bp?.perf?.tradeCount || 0) / 2));
           grandWins += bp?.perf?.winCount || 0;
           grandUnrealized += bp?.snapshot?.unrealizedPL || 0;
           grandRealized += bp?.perf?.realizedPL || 0;
@@ -1304,8 +1342,17 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
           const hours = Math.floor((elapsed % 86400000) / 3600000);
           const isStock = STOCK_BOTS.some(b => b.id === ab.botId);
           const bp = allBotPerf[ab.botId];
-          const kvTrades = bp?.perf?.tradeCount || 0;
+          // ★ 2026-05-09: 승률 분모를 closedCount (청산 횟수) 로 변경.
+          //   이전: tradeCount = BUY+SELL 합계 → 분모 2배라 승률 항상 절반 왜곡.
+          //   현재: closedCount = SELL (PnL 기록) 만 카운트 → 정확한 승률.
+          //   closedCount 가 없으면 폴백 (옛 데이터 호환): tradeCount/2 (대략).
+          const kvTrades = bp?.perf?.closedCount ?? Math.round((bp?.perf?.tradeCount || 0) / 2);
           const kvWinCount = bp?.perf?.winCount || 0;
+          const kvLossCount = bp?.perf?.lossCount ?? Math.max(0, kvTrades - kvWinCount);
+          // Profit Factor — grossWin / grossLoss (NaN 방지)
+          const kvGrossWin = bp?.perf?.grossWin || 0;
+          const kvGrossLoss = bp?.perf?.grossLoss || 0;
+          const kvProfitFactor = kvGrossLoss > 0 ? (kvGrossWin / kvGrossLoss) : (kvGrossWin > 0 ? Infinity : 0);
           const kvUnrealized = bp?.snapshot?.unrealizedPL || 0;
           const realizedPL = bp?.perf?.realizedPL || 0;
           const totalPL = kvUnrealized + realizedPL;
@@ -1398,7 +1445,7 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
                   { label: "투입", value: `$${allocation >= 1000 ? (allocation/1000).toFixed(1)+"k" : allocation.toLocaleString()}`, color: c.text1, hint: "이 봇에 배정한 금액" },
                   { label: "MDD", value: kvMDD > 0 ? `${kvMDD.toFixed(1)}%` : "--", color: kvMDD > 10 ? c.red : kvMDD > 5 ? c.yellow : c.green, hint: METRIC_HINTS.MDD },
                   { label: "승률", value: kvTrades > 0 ? `${(kvWinCount/kvTrades*100).toFixed(0)}%` : "--", color: c.text1, hint: METRIC_HINTS.승률 },
-                  { label: "승/패", value: `${kvWinCount}/${kvTrades - kvWinCount}`, color: c.text1, hint: "이긴 거래 / 진 거래 횟수" },
+                  { label: "손익비", value: kvProfitFactor === Infinity ? "∞" : kvProfitFactor > 0 ? kvProfitFactor.toFixed(2) : "--", color: kvProfitFactor >= 1.5 ? c.green : kvProfitFactor >= 1 ? c.yellow : c.red, hint: METRIC_HINTS.손익비 },
                 ].map((m, i) => (
                   <div key={i} className="p-1.5 rounded text-center" style={{ background: c.card2 }}>
                     <div className="text-[12px] flex items-center justify-center" style={{ color: c.text3 }}>

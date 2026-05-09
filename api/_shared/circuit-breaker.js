@@ -12,7 +12,9 @@
 //
 // 이 모듈은 "판단만" 한다 — 실제 halt 는 엔진이 flag 를 읽고 스킵.
 
-const BREAKER_LIMITS = {
+// ★ 2026-05-09: BREAKER_LIMITS export — UI 가 옛 한도 하드코딩 안 하도록.
+//   status.js 가 이 객체를 함께 내려보내고, RealTrading.jsx 가 그것 사용.
+export const BREAKER_LIMITS = {
   // ★ 2026-05-08: 대표님 지시로 대폭 완화.
   //   거래당 ROI -40% 까지 허용한 만큼 서킷브레이커 한도도 일치시켜야
   //   한 거래만으로 자동매매가 그날 멈추는 사태 방지.
@@ -23,14 +25,28 @@ const BREAKER_LIMITS = {
   cooldownMs: 24 * 60 * 60 * 1000,
 };
 
+// ★ 2026-05-09: KST 기준 reset 으로 변경 (이전: UTC).
+//   이전엔 UTC 자정 = KST 09:00 에 카운터 reset → 새벽 매매가 두 거래일로 쪼개짐.
+//   현재는 KST 자정 = UTC 15:00 에 reset.
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+function kstDate(d = new Date()) {
+  return new Date(d.getTime() + KST_OFFSET_MS);
+}
 function dayKey(d = new Date()) {
-  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+  return kstDate(d).toISOString().slice(0, 10); // YYYY-MM-DD (KST)
 }
 function weekKey(d = new Date()) {
-  // ISO week (대충): 연+주차
-  const onejan = new Date(d.getFullYear(), 0, 1);
-  const week = Math.ceil((((d - onejan) / 86400000) + onejan.getDay() + 1) / 7);
-  return `${d.getFullYear()}-W${week}`;
+  // ISO 8601 week — 첫 목요일 기준. KST 시각 기반으로 계산.
+  const k = kstDate(d);
+  // ISO week 계산 정공법 (Mon 시작, 첫 목요일 포함 주가 1주차)
+  const target = new Date(Date.UTC(k.getUTCFullYear(), k.getUTCMonth(), k.getUTCDate()));
+  const dayNum = (target.getUTCDay() + 6) % 7; // Mon=0 ~ Sun=6
+  target.setUTCDate(target.getUTCDate() - dayNum + 3); // 그 주의 목요일
+  const firstThursday = new Date(Date.UTC(target.getUTCFullYear(), 0, 4));
+  const firstDayNum = (firstThursday.getUTCDay() + 6) % 7;
+  firstThursday.setUTCDate(firstThursday.getUTCDate() - firstDayNum + 3);
+  const week = 1 + Math.round((target - firstThursday) / (7 * 86400000));
+  return `${target.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
 async function getKv() {
@@ -108,7 +124,9 @@ export async function preTradeCheck(userId, currentEquity) {
     if (isAutoLimit && state.dayStartEquity && state.weekStartEquity && state.equityHigh) {
       const dPnL = (currentEquity - state.dayStartEquity) / state.dayStartEquity;
       const wPnL = (currentEquity - state.weekStartEquity) / state.weekStartEquity;
-      const mddNow = (state.equityHigh - currentEquity) / state.equityHigh;
+      // ★ rolling 30일 peak 사용 (auto-recovery 도 일관된 기준)
+      const peakForMdd = state.equityHigh30d || state.equityHigh;
+      const mddNow = (peakForMdd - currentEquity) / peakForMdd;
       const inBounds =
         dPnL > -BREAKER_LIMITS.dailyLossPct &&
         wPnL > -BREAKER_LIMITS.weeklyLossPct &&
@@ -146,10 +164,30 @@ export async function preTradeCheck(userId, currentEquity) {
     dirty = true;
   }
 
+  // ★ 2026-05-09: rolling 30일 equityHigh 도입.
+  //   기존 equityHigh 는 all-time 이라 한 번 큰 상승 후엔 영원히 -50% MDD 트리거 위험.
+  //   현재: 최근 30일 내 최고점 대비로 MDD 계산 → 장기 보유 후 정상 조정도 지나치게 안 막음.
+  //   equityHistory: [{ ts, equity }] — 30일 초과분은 자동 폐기, 봉당 1개만 유지.
+  const ROLLING_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+  const ROLLING_BUCKET_MS = 60 * 60 * 1000; // 1시간 간격 샘플링 (KV 사이즈 제어)
+  if (!Array.isArray(state.equityHistory)) state.equityHistory = [];
+  const lastSample = state.equityHistory[state.equityHistory.length - 1];
+  if (!lastSample || (now - lastSample.ts) >= ROLLING_BUCKET_MS) {
+    state.equityHistory.push({ ts: now, equity: currentEquity });
+    // 30일 초과 샘플 폐기
+    state.equityHistory = state.equityHistory.filter((s) => now - s.ts <= ROLLING_WINDOW_MS);
+    dirty = true;
+  }
+  const equityHigh30d = state.equityHistory.length > 0
+    ? Math.max(...state.equityHistory.map((s) => s.equity), currentEquity)
+    : currentEquity;
+  state.equityHigh30d = equityHigh30d;
+
   // 5) 한도 체크
   const dayPnL = state.dayStartEquity ? (currentEquity - state.dayStartEquity) / state.dayStartEquity : 0;
   const weekPnL = state.weekStartEquity ? (currentEquity - state.weekStartEquity) / state.weekStartEquity : 0;
-  const mdd = state.equityHigh ? (state.equityHigh - currentEquity) / state.equityHigh : 0;
+  // ★ MDD 계산은 30일 rolling peak 사용 (이전: all-time equityHigh)
+  const mdd = equityHigh30d > 0 ? (equityHigh30d - currentEquity) / equityHigh30d : 0;
 
   if (dayPnL <= -BREAKER_LIMITS.dailyLossPct) {
     state.halted = true;
@@ -167,7 +205,7 @@ export async function preTradeCheck(userId, currentEquity) {
   }
   if (mdd >= BREAKER_LIMITS.mddPct) {
     state.halted = true;
-    state.haltedReason = `MDD ${(mdd * 100).toFixed(2)}% >= ${(BREAKER_LIMITS.mddPct * 100).toFixed(0)}%`;
+    state.haltedReason = `MDD ${(mdd * 100).toFixed(2)}% >= ${(BREAKER_LIMITS.mddPct * 100).toFixed(0)}% (30일 peak 기준)`;
     state.haltedAt = now;
     await kv.set(key, state);
     return { allowed: false, reason: state.haltedReason, state };
@@ -189,6 +227,10 @@ export async function recordTradeResult(userId, realizedPnL) {
     const state = (await kv.get(key)) || {};
     const now = Date.now();
 
+    // ★ 2026-05-09: realized=0 (수수료 break-even) 도 streak break.
+    //   이전 정책: realizedPnL < 0 만 +1, > 0 만 reset → 0 거래는 영원히 무영향
+    //   → 연속손실 streak 가 영원히 안 끊일 수 있음 (예: -loss / 0 / -loss / 0 ...)
+    //   현재: realizedPnL < 0 만 +1, > 0 또는 == 0 이면 reset.
     if (realizedPnL < 0) {
       state.consecLosses = (state.consecLosses || 0) + 1;
       state.lastLossAt = now;
@@ -196,7 +238,8 @@ export async function recordTradeResult(userId, realizedPnL) {
         state.cooldownUntil = now + BREAKER_LIMITS.cooldownMs;
         state.consecLosses = 0;
       }
-    } else if (realizedPnL > 0) {
+    } else {
+      // > 0 또는 == 0 (break-even) — streak 끊김
       state.consecLosses = 0;
     }
 
@@ -226,12 +269,31 @@ export async function resetBreaker(userId) {
   return state;
 }
 
+/**
+ * ★ 2026-05-09: MDD 기준점 (equityHigh / equityHigh30d / equityHistory) 만 리셋.
+ * 큰 상승 후 정상 조정에도 옛 peak 가 발목 잡을 때 유저가 수동으로 기준점을 현재가로 재설정.
+ * halted 상태는 건드리지 않음 (그건 resetBreaker 가 별도 처리).
+ */
+export async function resetEquityHigh(userId, currentEquity) {
+  const kv = await getKv();
+  const key = `di:real:user:${userId}:breaker`;
+  const state = (await kv.get(key)) || {};
+  const now = Date.now();
+  state.equityHigh = currentEquity;
+  state.equityHigh30d = currentEquity;
+  state.equityHistory = [{ ts: now, equity: currentEquity }];
+  state.equityHighResetAt = now;
+  await kv.set(key, state);
+  return state;
+}
+
 export const BREAKER_CONFIG = BREAKER_LIMITS;
 
 export default {
   preTradeCheck,
   recordTradeResult,
   resetBreaker,
+  resetEquityHigh,
   isKillSwitchEnabled,
   setKillSwitch,
   getBreakerState,

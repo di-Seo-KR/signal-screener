@@ -87,8 +87,10 @@ async function checkUser(userId) {
       }
 
       // ★ realized 가 null (API 실패) 또는 0 이어도 청산 자체는 발생했으니 로그 + 알림.
+      // ★ 2026-05-09: realized=0 도 recordTradeResult 호출 → 연속손실 streak 끊김.
+      //   (이전: !=null && !==0 가드로 0 거래는 카운터 영향 0 → streak 영원히 안 끊김)
       const realizedSafe = Number.isFinite(realized) ? realized : 0;
-      if (realized != null && realized !== 0) {
+      if (realized != null) {
         await recordTradeResult(userId, realized);
       }
       // 청산 이벤트 engine-log 기록 (realized 0/null 도 항상 기록)
