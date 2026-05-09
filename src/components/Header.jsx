@@ -476,6 +476,9 @@ export default memo(function Header({
                     <CssDropdownItem onClick={() => { navigate("portfolio"); close(); }}>
                       <Briefcase className="size-4" /><span>{t("nav.portfolio")}</span>
                     </CssDropdownItem>
+                    <CssDropdownItem onClick={() => { navigate("/blog"); close(); }}>
+                      <BookOpen className="size-4" /><span>블로그</span>
+                    </CssDropdownItem>
                     <div className="border-t border-border/20 my-1" />
                     <CssDropdownItem onClick={() => { toggleTheme(); close(); }}>
                       {themeMode === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
