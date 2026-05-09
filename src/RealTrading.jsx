@@ -20,6 +20,11 @@ import {
 import { useTheme } from "./ui/theme.jsx";
 import { useBreakpoint } from "./ui/useBreakpoint.jsx";
 import BinanceConnect from "./components/BinanceConnect.jsx";
+// ★ 2026-05-09: 옵션 D — 대시보드 강화 7개 위젯
+import {
+  EquityCurveChart, LiveMetricsRow, PositionDonutChart,
+  TradeHistoryTable, DailyPnLHeatmap, SignalWatchlist, SystemStatusIndicator,
+} from "./ui/dashboard-widgets.jsx";
 
 // ═══════════════════════════════════════════════════════════════════
 // Custom Styles for RealTrading Dashboard
@@ -97,7 +102,10 @@ function RealTradingInner() {
   const [section, setSection] = useState("dashboard");
   const [confirm, setConfirm] = useState(null);
   const timerRef = useRef(null);
+  const watchlistTimerRef = useRef(null);
   const [lastRefresh, setLastRefresh] = useState(null);
+  // ★ 2026-05-09: Widget 6 시그널 워치리스트 (별도 fetch — 60s 주기)
+  const [watchlist, setWatchlist] = useState({ signals: [], loading: false });
   // ★ SSOT — useBreakpoint. 이전엔 768 미만을 "isMobile" 로 봤음 (iPad 세로 포함).
   // 그 동작 유지하려면 isSmall (< 1024) 을 isMobile 로 매핑.
   const { isSmall } = useBreakpoint();
@@ -140,6 +148,29 @@ function RealTradingInner() {
     timerRef.current = setInterval(refresh, 15_000);
     return () => clearInterval(timerRef.current);
   }, [refresh, userId]);
+
+  // ★ 2026-05-09: 시그널 워치리스트 — 60초 주기 별도 갱신 (status 와 분리)
+  const refreshWatchlist = useCallback(async () => {
+    if (!userId) return;
+    setWatchlist((prev) => ({ ...prev, loading: true }));
+    try {
+      const r = await jget(`/api/real-trading/signal-watchlist?userId=${encodeURIComponent(userId)}&limit=8&hours=4`);
+      if (r?.ok) {
+        setWatchlist({ signals: r.signals || [], loading: false });
+      } else {
+        setWatchlist({ signals: [], loading: false });
+      }
+    } catch {
+      setWatchlist((prev) => ({ ...prev, loading: false }));
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+    refreshWatchlist();
+    watchlistTimerRef.current = setInterval(refreshWatchlist, 60_000);
+    return () => clearInterval(watchlistTimerRef.current);
+  }, [refreshWatchlist, userId]);
 
   const act = async (action, body = {}, okMsg) => {
     if (!userId) return;
@@ -1301,13 +1332,53 @@ function RealTradingInner() {
         </div>
 
         {section === "dashboard" && (
-          <div style={{ display: "grid", gap: 14, gridTemplateColumns: !isMobile ? "minmax(0, 2fr) minmax(0, 1fr)" : "1fr" }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {positionsCard}
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* Widget 7: 시스템 상태 표시등 (대시보드 진입 즉시 보이게 상단) */}
+            <SystemStatusIndicator status={status?.systemHealth || {}} isMobile={isMobile} />
+
+            {/* Widget 1: 30일 자산 추이 라인 차트 + Widget 2: 라이브 성과 메트릭 */}
+            <Card title="포트폴리오 성과" icon={<TrendUp size={16} />}
+              subtitle="자동매매 30일 자산 곡선 + 누적 거래 메트릭">
+              <EquityCurveChart
+                history={breaker.equityHistory || []}
+                currentEquity={equity}
+                peakEquity={breaker.equityHigh30d || breaker.equityHigh}
+                isMobile={isMobile}
+              />
+              <div style={{ marginTop: 14 }}>
+                <LiveMetricsRow orders={orders || []} isMobile={isMobile} />
+              </div>
+            </Card>
+
+            {/* 좌: 포지션 도넛 + 거래 히스토리 / 우: 시그널 워치 + 서킷브레이커 */}
+            <div style={{ display: "grid", gap: 14, gridTemplateColumns: !isMobile ? "minmax(0, 1.4fr) minmax(0, 1fr)" : "1fr" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {/* Widget 3: 포지션 비중 도넛 */}
+                <Card title="포트폴리오 분산" icon={<Wallet size={16} />}
+                  subtitle={`${positions.length}개 포지션 · 자산 ${fmtUsd(equity)}`}>
+                  <PositionDonutChart positions={positions} equity={equity || 0} isMobile={isMobile} />
+                </Card>
+                {/* Widget 4: 최근 거래 히스토리 강화 */}
+                <Card title="최근 거래" icon={<Activity size={16} />}
+                  subtitle="최근 10건 (체결·미체결·청산 포함)">
+                  <TradeHistoryTable orders={orders || []} maxRows={10} isMobile={isMobile} />
+                </Card>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {/* Widget 6: 시그널 워치리스트 */}
+                <Card title="진입 후보 시그널" icon={<Target size={16} />}
+                  subtitle={`최근 4시간 · 활성 봇 신호 (60초 갱신)`}>
+                  <SignalWatchlist signals={watchlist.signals} loading={watchlist.loading} isMobile={isMobile} />
+                </Card>
+                {breakerCard}
+              </div>
             </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              {breakerCard}
-            </div>
+
+            {/* Widget 5: 일별 손익 히트맵 — 폭이 넓어 단독 행 */}
+            <Card title="일별 손익 히트맵" icon={<Gauge size={16} />}
+              subtitle="최근 30일 일자별 실현손익 강도 — 잘 한 날 vs 잃은 날 한눈에">
+              <DailyPnLHeatmap orders={orders || []} days={30} isMobile={isMobile} />
+            </Card>
           </div>
         )}
         {section === "positions" && (
