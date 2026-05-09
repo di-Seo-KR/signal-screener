@@ -9356,39 +9356,8 @@ function AppInner() {
             {/* 쿠팡 검색 위젯 — 홈 하단 */}
             <CoupangSearchWidget style={{ margin: "12px 0" }} />
 
-            {/* ── 푸터 ── */}
-            <div style={{
-              marginTop: "32px", paddingTop: "24px",
-              borderTop: `1px solid ${C.border}20`,
-              display: "flex", flexWrap: "wrap", justifyContent: "center",
-              gap: "16px", fontSize: "14px", color: C.text3,
-            }}>
-              <span onClick={() => setTab("about")} style={{ cursor: "pointer", transition: "color .15s" }}
-                onMouseEnter={e => e.target.style.color = C.text2}
-                onMouseLeave={e => e.target.style.color = C.text3}
-              >서비스 소개</span>
-              <span>·</span>
-              <span onClick={() => setTab("privacy")} style={{ cursor: "pointer", transition: "color .15s" }}
-                onMouseEnter={e => e.target.style.color = C.text2}
-                onMouseLeave={e => e.target.style.color = C.text3}
-              >개인정보처리방침</span>
-              <span>·</span>
-              <span onClick={() => setTab("terms")} style={{ cursor: "pointer", transition: "color .15s" }}
-                onMouseEnter={e => e.target.style.color = C.text2}
-                onMouseLeave={e => e.target.style.color = C.text3}
-              >이용약관</span>
-              <span>·</span>
-              <span onClick={() => setTab("contact")} style={{ cursor: "pointer", transition: "color .15s" }}
-                onMouseEnter={e => e.target.style.color = C.text2}
-                onMouseLeave={e => e.target.style.color = C.text3}
-              >문의하기</span>
-            </div>
-            <div style={{
-              textAlign: "center", fontSize: "12px", color: C.text3,
-              paddingTop: "12px", paddingBottom: "20px", opacity: 0.6,
-            }}>
-              © 2026 Zepta. All rights reserved.
-            </div>
+            {/* ★ 2026-05-09 — 홈 안 푸터 제거. 글로벌 footer (line ~12550)
+                만 유지. 이전엔 홈 페이지에서 푸터가 두 번 그려져 중복. */}
           </div>
         )}
 
@@ -11929,14 +11898,21 @@ function AppInner() {
                 gap: "4px",
               }}>
                 {[
+                  // ★ 2026-05-09 — 빠른접근 그리드 12개로 확장 + 잘못된 tab 값 수정
+                  // (이전: "calendar" → "econ-calendar", "settings-sub" → "mypage")
                   { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="1.8"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>, label: "스크리너", tab: "screener" },
                   { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.purple} strokeWidth="1.8"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 12l3 3 5-6" strokeWidth="2"/></svg>, label: "AI매매", tab: "auto-trading" },
+                  ...(isOwner ? [{ icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.red || "#ef4444"} strokeWidth="1.8"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>, label: "실거래", tab: "real-trading" }] : []),
                   { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="1.8"><path d="M3 3v18h18"/><path d="M7 16l4-6 4 3 5-7"/></svg>, label: "전략분석", tab: "strategy" },
                   { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E67E22" strokeWidth="1.8"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 7h8M8 11h5M8 15h7"/></svg>, label: "뉴스", tab: "news" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.red || "#ef4444"} strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, label: "캘린더", tab: "calendar" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.red || "#ef4444"} strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, label: "캘린더", tab: "econ-calendar" },
                   { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="1.8"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" fill="none"/></svg>, label: "포트폴리오", tab: "portfolio" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.purple} strokeWidth="1.8"><path d="M3 12l3-9 6 18 4-12 5 9"/></svg>, label: "백테스트", tab: "backtest" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FF6B2C" strokeWidth="1.8"><path d="M12 2 2 22h20L12 2zm0 5 6 13H6l6-13z"/><circle cx="12" cy="17" r="1"/></svg>, label: "위험맵", tab: "risk-map" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9B6FFF" strokeWidth="1.8"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>, label: "시장 심리", tab: "sentiment" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>, label: "블로그", action: () => { window.location.href = "/blog"; } },
                   { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="1.8"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7L12 16.4 5.7 21l2.3-7L2 9.4h7.6z"/></svg>, label: "랭킹", action: () => { setTab("profile"); setTimeout(() => document.getElementById("ranking-section")?.scrollIntoView({ behavior: "smooth" }), 100); } },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.text3} strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>, label: "설정", tab: "settings-sub" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.text3} strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>, label: "내 정보", tab: "mypage" },
                 ].map((item, i) => (
                   <button key={i} onClick={() => item.action ? item.action() : setTab(item.tab)} style={{
                     display: "flex", flexDirection: "column", alignItems: "center", gap: "6px",
@@ -12544,42 +12520,52 @@ function AppInner() {
           </Suspense>
         )}
 
-        {/* ═══ 풋터 (토스 스타일) ═══ */}
+        {/* ═══ 풋터 (토스 스타일) — 모바일 column / 데스크탑 가로 ═══ */}
         <footer style={{
           maxWidth: "1400px", margin: "60px auto 0",
-          padding: "32px 24px calc(40px + env(safe-area-inset-bottom, 0px))",
+          padding: isMobile
+            ? "24px 16px calc(100px + env(safe-area-inset-bottom, 0px))"
+            : "32px 24px calc(40px + env(safe-area-inset-bottom, 0px))",
           borderTop: `1px solid ${C.border}${C.isDark ? '20' : '40'}`,
         }}>
-          {/* 상단: 네비게이션 링크 */}
-          <div style={{ display: "flex", alignItems: "center", gap: "0", flexWrap: "wrap", marginBottom: "20px" }}>
+          {/* 상단: 네비게이션 링크 — 모바일 column / 데스크탑 가로 wrap */}
+          <div style={{
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: isMobile ? "flex-start" : "center",
+            gap: isMobile ? "10px" : "0",
+            flexWrap: "wrap",
+            marginBottom: isMobile ? "16px" : "20px",
+          }}>
             {[
               { label: "개인정보 처리방침", tab: "privacy", bold: true },
               { label: "이용약관", tab: "terms" },
               { label: "서비스 소개", tab: "about" },
+              { label: "블로그", href: "/blog" },
               { label: "투자 가이드", href: "/guide" },
               { label: "문의하기", tab: "contact" },
             ].map((item, i) => (
               <span key={item.tab || item.href} style={{ display: "flex", alignItems: "center" }}>
-                {i > 0 && <span style={{ margin: "0 10px", color: C.text2, opacity: 0.25 }}>|</span>}
+                {!isMobile && i > 0 && <span style={{ margin: "0 10px", color: C.text2, opacity: 0.25 }}>|</span>}
                 {item.href ? (
                   <a
                     href={item.href}
                     style={{
-                      fontSize: "16px", color: C.text2, cursor: "pointer",
+                      fontSize: isMobile ? "14px" : "16px", color: C.text2, cursor: "pointer",
                       fontWeight: item.bold ? 700 : 400, textDecoration: "none",
+                      minHeight: isMobile ? "32px" : "auto",
+                      display: "flex", alignItems: "center",
                     }}
-                    onMouseEnter={e => { e.target.style.color = C.text1; }}
-                    onMouseLeave={e => { e.target.style.color = C.text2; }}
                   >{item.label}</a>
                 ) : (
                   <span
                     onClick={() => setTab(item.tab)}
                     style={{
-                      fontSize: "16px", color: C.text2, cursor: "pointer",
+                      fontSize: isMobile ? "14px" : "16px", color: C.text2, cursor: "pointer",
                       fontWeight: item.bold ? 700 : 400,
+                      minHeight: isMobile ? "32px" : "auto",
+                      display: "flex", alignItems: "center",
                     }}
-                    onMouseEnter={e => { e.target.style.color = C.text1; }}
-                    onMouseLeave={e => { e.target.style.color = C.text2; }}
                   >{item.label}</span>
                 )}
               </span>
@@ -12587,20 +12573,32 @@ function AppInner() {
           </div>
 
           {/* 중단: 사업자 정보 */}
-          <div style={{ fontSize: "16px", color: C.text2, lineHeight: 1.8, marginBottom: "16px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+          <div style={{ fontSize: isMobile ? "13px" : "16px", color: C.text2, lineHeight: 1.7, marginBottom: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
               <img src="/zepta-icon-192.png" alt="Zepta" width="18" height="18" style={{ flexShrink: 0 }} />
-              <span style={{ fontWeight: 600, fontSize: "16px", color: C.text1 }}>Zepta</span>
+              <span style={{ fontWeight: 600, fontSize: isMobile ? "14px" : "16px", color: C.text1 }}>Zepta</span>
             </div>
-            <span>대표: 서동인</span>
-            <span style={{ margin: "0 8px", opacity: 0.3 }}>·</span>
-            <span>문의: donginseo0421@gmail.com</span>
+            <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: isMobile ? "2px" : "0" }}>
+              <span>대표: 서동인</span>
+              {!isMobile && <span style={{ margin: "0 8px", opacity: 0.3 }}>·</span>}
+              <span>문의: donginseo0421@gmail.com</span>
+            </div>
           </div>
 
-          {/* 하단: 면책 + 저작권 */}
-          <div style={{ fontSize: "16px", color: C.text3, lineHeight: 1.7 }}>
+          {/* 하단: 면책 + 저작권 — 법적 안전장치 강화 (2026-05-09) */}
+          <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, lineHeight: 1.7 }}>
+            <p style={{ margin: "0 0 6px", fontWeight: 600 }}>
+              ⚠️ 투자 면책 고지
+            </p>
             <p style={{ margin: "0 0 6px" }}>
-              Zepta에서 제공하는 투자 정보는 고객의 투자 판단을 위한 단순 참고용이며, 투자 제안 및 권유, 종목 추천을 위해 작성된 것이 아닙니다.
+              Zepta는 투자 도구 제공 서비스이며, 투자자문업·투자일임업자가 아닙니다.
+              제공되는 모든 정보·시그널·자동매매 결과는 투자 판단의 단순 참고용으로,
+              종목 추천이나 투자 권유가 아닙니다.
+            </p>
+            <p style={{ margin: "0 0 6px" }}>
+              모든 투자 결정과 그 결과(손익)는 사용자 본인의 책임이며,
+              Zepta는 투자 손실에 대해 어떠한 보증도 하지 않습니다.
+              과거의 백테스트·시뮬레이션 성과가 미래의 수익을 보장하지 않습니다.
             </p>
             <p style={{ margin: 0 }}>© 2025-2026 Zepta. All rights reserved.</p>
           </div>
