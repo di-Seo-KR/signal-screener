@@ -164,23 +164,33 @@ export async function executeOrderPlan(opts) {
   }
 
   let bracketRescue = null;
-  // ★ 2026-05-08: Rescue 모드 환경변수로 제어 가능하게 변경.
-  //   이전 default=force_close 가 SL attach 실패 시 즉시 시장가 청산 → 봇이
-  //   진입 0.03초 만에 종료되는 사고 발생 (AAVE 케이스). 원인 미파악 상태에서
-  //   rescue 가 너무 공격적이라 손실 확정.
-  //   현재 default=quantity_fallback — closePosition=true 실패 시 quantity+
-  //   reduceOnly 로 한 번 더 시도. 여전히 실패하면 alert 만 (즉시 청산 X).
-  //   ZEPTA_BRACKET_RESCUE_MODE = "force_close" | "quantity_fallback" | "alert_only"
+  // ★ 2026-05-11 대표 지시: bracket SL/TP attach 로직 자체 비활성화.
+  //   배경: STOP_MARKET / STOP / TAKE_PROFIT_MARKET 모두 사용자 binance 계정에서
+  //   거의 항상 reject ("Order type not supported... use Algo Order API").
+  //   3단 fallback 다 실패해서 텔레그램 critical alert 만 매번 발송 → 노이즈.
+  //   봇이 position-monitor 의 mark-price 모니터링 (plan.slPrice/tpPrice 도달 시
+  //   시장가 청산) 으로 직접 SL/TP 처리하므로 bracket attach 시도 불필요.
+  //
+  //   재활성화 방법: ZEPTA_TRY_BRACKET=1 환경변수 설정.
+  const tryBracket = process.env.ZEPTA_TRY_BRACKET === "1";
   const rescueMode = process.env.ZEPTA_BRACKET_RESCUE_MODE || "quantity_fallback";
 
-  // ★ 진입 직후 mark price stabilize 시간 (300ms). binance 가 진입 직후의
-  //   mark price 일시 swing 으로 STOP_MARKET 을 "would immediately trigger"
-  //   reject 하는 케이스 방지.
-  if (stopLossPrice || takeProfitPrice) {
+  if (!tryBracket) {
+    // bracket attach 시도 안 함 — 봇 mark-price 모니터링에 위임
+    bracketResults = { sl: null, tp: null, skipped: true };
+    bracketRescue = {
+      ok: true,
+      skipped: true,
+      reason: "bracket attach disabled — bot mark-price monitoring (plan.slPrice/tpPrice) only",
+    };
+  } else if (stopLossPrice || takeProfitPrice) {
+    // ★ 진입 직후 mark price stabilize 시간 (300ms). binance 가 진입 직후의
+    //   mark price 일시 swing 으로 STOP_MARKET 을 "would immediately trigger"
+    //   reject 하는 케이스 방지.
     await sleep(300);
   }
 
-  if (stopLossPrice && Number.isFinite(stopLossPrice)) {
+  if (tryBracket && stopLossPrice && Number.isFinite(stopLossPrice)) {
     let slRes = await tryStopOrder({
       apiKey, apiSecret, symbol, type: "STOP_MARKET", side: closeSide,
       stopPrice: stopLossPrice, closePosition: true, testnet,
@@ -290,7 +300,8 @@ export async function executeOrderPlan(opts) {
   }
 
   // TP 는 SL 이 있는 상태에서만, 실패해도 RESCUE 안 함 (SL 이 이미 하방을 지킴)
-  if (takeProfitPrice && Number.isFinite(takeProfitPrice) && bracketResults.sl?.ok) {
+  // ★ 2026-05-11: tryBracket=false 면 SL 안 걸었으니 TP 도 안 걸음 (봇 mark-price 모니터링이 처리)
+  if (tryBracket && takeProfitPrice && Number.isFinite(takeProfitPrice) && bracketResults.sl?.ok) {
     let tpRes = await tryStopOrder({
       apiKey, apiSecret, symbol, type: "TAKE_PROFIT_MARKET", side: closeSide,
       stopPrice: takeProfitPrice, closePosition: true, testnet,

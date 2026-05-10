@@ -129,19 +129,35 @@ async function checkUser(userId) {
       // ★ M5 fix: 객체 배열 직접 mutate (이전엔 string vs 객체 비교 버그)
       closedEntry.realizedPnL = realizedSafe;
 
-      // ★ 청산 감지 텔레그램 알림 (수동·자동 구분, realized 누락도 fallback)
+      // ★ 청산 감지 텔레그램 알림 (수동·봇 구분, realized 누락도 fallback)
       try {
         const planKey = `di:real:user:${userId}:plan:${sym}`;
         const plan = await kv.get(planKey);
         const isBotEntry = !!(plan && plan.openedAt);
+        // ★ 2026-05-11 fix: plan.botClosedAt 이 set 됐으면 직전 cron 에서 봇이 가격
+        //   SL/TP 도달로 청산한 케이스 → 정확한 사유 라벨 + 알림 톤 조정.
+        const wasBotClose = !!(plan && plan.botClosedAt);
+        const botReason = plan?.botCloseReason; // "price_sl_hit" | "price_tp_hit"
         const { sendCards, buildCard } = await import("../_shared/telegram.js");
         const hasPnl = realized != null && realized !== 0;
         const sign = realizedSafe >= 0 ? "+" : "";
         const tag = !hasPnl ? "🔔" : realizedSafe >= 0 ? "✅" : "🔻";
+
+        // 제목 결정: 봇 SL/TP 청산이면 정확한 사유, 일반 봇 진입이면 "봇 포지션 청산", 그 외 "수동"
+        let title;
+        if (wasBotClose) {
+          const label = botReason === "price_tp_hit" ? "익절 확정" : botReason === "price_sl_hit" ? "손절 확정" : "봇 청산 확정";
+          title = `${label} — ${sym}`;
+        } else if (isBotEntry) {
+          title = `봇 포지션 청산 — ${sym}`;
+        } else {
+          title = `수동 포지션 청산 — ${sym}`;
+        }
+
         await sendCards([
           buildCard({
             tag,
-            title: `${isBotEntry ? "봇" : "수동"} 포지션 청산 — ${sym}`,
+            title,
             lines: [
               hasPnl
                 ? `실현 손익 ${sign}$${realizedSafe.toFixed(2)}`
@@ -150,12 +166,14 @@ async function checkUser(userId) {
                 ? `봇 진입 시점: ${new Date(plan.openedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`
                 : "사용자가 직접 청산하신 포지션입니다.",
             ],
-            hint: isBotEntry
-              ? "봇이 SL/TP 룰 또는 트레일링 스탑으로 자동 청산했습니다."
-              : null,
+            hint: wasBotClose
+              ? "봇이 mark price 모니터링으로 SL/TP 가격 도달 시 시장가 청산했습니다."
+              : isBotEntry
+                ? "봇이 진입한 포지션이지만 사용자가 직접 청산하거나 외부 요인으로 닫혔습니다."
+                : null,
           }),
         ]);
-        // 봇 진입이었다면 plan KV 정리
+        // 봇 진입이었으면 plan KV 정리 (botClosedAt 포함)
         if (isBotEntry) {
           await kv.del(planKey);
         }
@@ -249,8 +267,12 @@ async function checkUser(userId) {
             }),
           ]);
         } catch {}
-        // plan KV 정리 — 다음 cron 의 closed 감지에서 "수동" 으로 잘못 분류 방지
-        await kv.del(planKey);
+        // ★ 2026-05-11 fix: plan KV 즉시 삭제하지 않고 botClosedAt 플래그 set.
+        //   이전 (kv.del): 다음 cron 의 close detection 이 plan 못 찾아 "수동 청산" 으로 잘못 분류 + 알림 중복 발송.
+        //   현재: 플래그만 set → 다음 cron 이 플래그 보고 봇 청산으로 인지 + 실현 PnL 알림 후 plan 정리.
+        plan.botClosedAt = Date.now();
+        plan.botCloseReason = reason;
+        await kv.set(planKey, plan);
         continue; // 시간손절·트레일링 평가 스킵
       } catch (e) {
         console.warn(`[monitor] price SL/TP close failed for ${sym}:`, e?.message);
