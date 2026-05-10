@@ -257,36 +257,33 @@ export async function executeOrderPlan(opts) {
         }
       } else {
         // alert_only 또는 quantity_fallback 둘 다 실패한 경우.
-        // 포지션은 유지 + position-monitor 가 plan KV 기반 시간손절/트레일링으로
-        // 보호. SL 누락 사실을 명확히 노출해 사용자가 binance UI 에서 직접
-        // SL 추가 가능.
-        // ★ 2026-05-09 audit C3: critical alert 강화 + position-monitor 의 delayed-force-close 트리거.
-        //   slMissingSince 타임스탬프를 KV 에 기록해 position-monitor 가 N 분 후 자동 force_close.
-        const slMissingSince = Date.now();
+        // 포지션은 유지 + position-monitor 가 plan.slPrice/tpPrice 기반 mark-price 모니터링으로
+        // 도달 시 시장가 청산. binance bracket 없어도 봇이 직접 가격 보고 청산하는 fallback.
+        // ★ 2026-05-11 대표 지시: slMissingSince force-close 로직 제거. mark-price 모니터링만 의존.
         bracketRescue = {
           ok: false,
           critical: true,
-          reason: "SL attach failed — position held without binance bracket. Position-monitor will force-close after 5 min if SL still missing.",
+          reason: "SL attach failed — position held without binance bracket. Position-monitor uses mark-price monitoring (plan.slPrice/tpPrice) as fallback.",
           slError: errMsg,
           rescueMode,
-          slMissingSince,  // ← position-monitor 가 이 값 보고 5분 후 force_close 트리거
-          warning: "binance UI 에서 직접 SL 추가 권장 (안전).",
+          warning: "binance UI 에서 직접 SL 추가 권장 (이중 안전망).",
         };
-        // ★ 즉시 텔레그램 critical 경보
+        // ★ 즉시 텔레그램 critical 경보 (force-close 안 함, 알림만)
         try {
           const tg = await import("../_shared/telegram.js");
           await tg.sendCards([tg.buildCard({
-            tag: "🚨",
+            tag: "⚠️",
             title: `SL attach 실패 — ${symbol} ${side}`,
             lines: [
               `자동 SL 부착 3단 모두 실패: ${errMsg}`,
               `포지션 ${qty} @ ${price?.toFixed?.(4) || price}`,
-              `5분 안에 binance UI 에서 SL 직접 추가 안 하면 position-monitor 가 자동 force-close 합니다.`,
+              `봇이 mark-price 모니터링으로 SL/TP 가격 도달 시 시장가 청산합니다.`,
+              `이중 안전망을 원하시면 binance UI 에서 직접 SL 추가 가능.`,
               `rescueMode=${rescueMode}`,
             ],
           })], { channel: "real" });
         } catch (e) {
-          console.warn("[critical SL alert] telegram 발송 실패:", e?.message);
+          console.warn("[SL attach 실패 alert] telegram 발송 실패:", e?.message);
         }
       }
     }

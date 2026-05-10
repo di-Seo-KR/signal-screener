@@ -641,10 +641,9 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       if (existingPlan && existingPlan.openedAt) {
         S(`plan already exists for ${plan.plan.symbol} (opened ${new Date(existingPlan.openedAt).toISOString()}) — skip overwrite`);
       } else {
-      // ★ 2026-05-09 audit C3: bracket SL attach 실패 (critical) 면
-      //   slMissingSince 마킹 → position-monitor 가 5분 후 force-close 트리거.
-      const bracketCritical = !!result?.bracketRescue?.critical;
-      const slMissingSince = bracketCritical ? (result.bracketRescue.slMissingSince || Date.now()) : null;
+      // ★ 2026-05-11 대표 지시: slMissingSince 제거.
+      //   bracket SL attach 실패해도 position-monitor 가 plan.slPrice/tpPrice 로
+      //   mark-price 모니터링하면서 도달 시 시장가 청산하므로 force-close 불필요.
       await kv.set(planKey, {
         symbol: plan.plan.symbol,
         side: plan.plan.side,
@@ -660,7 +659,6 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
         highWater: plan.plan.entryPrice,
         strategyFamily: plan.plan.strategyFamily,
         regime: regimeSnapshot, // ★ 진입 시점 시장 레짐 스냅샷 (Hurst bucket 분석용)
-        slMissingSince,         // ★ bracket attach 실패 시 5분 후 force-close
       });
       S(`plan persisted to ${planKey}`);
       } // end else (no existing plan)
