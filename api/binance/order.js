@@ -260,14 +260,34 @@ export async function executeOrderPlan(opts) {
         // 포지션은 유지 + position-monitor 가 plan KV 기반 시간손절/트레일링으로
         // 보호. SL 누락 사실을 명확히 노출해 사용자가 binance UI 에서 직접
         // SL 추가 가능.
+        // ★ 2026-05-09 audit C3: critical alert 강화 + position-monitor 의 delayed-force-close 트리거.
+        //   slMissingSince 타임스탬프를 KV 에 기록해 position-monitor 가 N 분 후 자동 force_close.
+        const slMissingSince = Date.now();
         bracketRescue = {
           ok: false,
           critical: true,
-          reason: "SL attach failed — position held without binance bracket. Position-monitor still tracks via plan KV.",
+          reason: "SL attach failed — position held without binance bracket. Position-monitor will force-close after 5 min if SL still missing.",
           slError: errMsg,
           rescueMode,
+          slMissingSince,  // ← position-monitor 가 이 값 보고 5분 후 force_close 트리거
           warning: "binance UI 에서 직접 SL 추가 권장 (안전).",
         };
+        // ★ 즉시 텔레그램 critical 경보
+        try {
+          const tg = await import("../_shared/telegram.js");
+          await tg.sendCards([tg.buildCard({
+            tag: "🚨",
+            title: `SL attach 실패 — ${symbol} ${side}`,
+            lines: [
+              `자동 SL 부착 3단 모두 실패: ${errMsg}`,
+              `포지션 ${qty} @ ${price?.toFixed?.(4) || price}`,
+              `5분 안에 binance UI 에서 SL 직접 추가 안 하면 position-monitor 가 자동 force-close 합니다.`,
+              `rescueMode=${rescueMode}`,
+            ],
+          })], { channel: "real" });
+        } catch (e) {
+          console.warn("[critical SL alert] telegram 발송 실패:", e?.message);
+        }
       }
     }
   }

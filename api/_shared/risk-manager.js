@@ -34,6 +34,15 @@ export const RISK_CONFIG = {
   //   동시 = 노출 ~$1,500). 위험 감내 의지 반영.
   maxConcurrentPositions: 10,
 
+  // ★ 2026-05-09 (audit C1): 합산 노셔널 가드 추가.
+  //   동시 10포지션 × 노셔널 $300 = 잠재 노출 $3,000 (자본 $370 × 8.1배).
+  //   maxMarginPct 0.5 는 단일 포지션 한도라 합산 제한 없음 → 자본 8배 노출 가능.
+  //   잠재 ROI -40% × 10포지션 = 손실 $1,200 (자본 3.2배) → 마진콜 위험.
+  //   현재: 모든 오픈 포지션의 합산 노셔널이 자본의 maxTotalNotionalRatio 배 초과 시 reject.
+  maxTotalNotionalRatio: 1.5,   // 자본 $370 × 1.5 = 약 $555 합산 노셔널 cap
+  // 합산 마진 노출 cap (위 노셔널과 별개로 마진 합산도 제한)
+  maxTotalMarginRatio: 0.6,     // 자본의 60% 가 마진 묶이면 추가 진입 차단
+
   // 심볼 간 상관 그룹 — 같은 그룹에서 동시 2개 금지
   correlationGroups: [
     ["BTCUSDT", "ETHUSDT", "BNBUSDT"],              // 메가캡
@@ -74,14 +83,10 @@ export const RISK_CONFIG = {
   // 이전 (3~10x 가변, conf 기반) 방식에선 conf 0.7 시그널이 약 6x 로 진입 →
   // 사용자 의지 (항상 10x) 와 불일치. min=max=10 으로 통일.
   // ROI -40% cap 으로 SL 거리는 4% 로 자동 제한됨 (10x × 4% = ROI 40%).
+  // ★ audit M3/N4: leverageBias 객체 + 가변 lev 로직 모두 제거 (dead code).
+  //   복원 시 minLeverage 와 maxLeverage 를 다르게 두면 됨.
   minLeverage: 10,
   maxLeverage: 10,
-  leverageBias: {
-    trend: 0,
-    breakout: 0,
-    "mean-revert": 0,
-    unknown: 0,
-  },
 
   // 청산거리 안전 버퍼
   //  SL 거리 ≤ 청산거리 × liqSafetyRatio 강제.
@@ -146,9 +151,102 @@ function round(x, decimals)     { const f = Math.pow(10, decimals || 0); return 
 function clamp(x, lo, hi)       { return Math.max(lo, Math.min(hi, x)); }
 
 export function pickLeverage(confidence, family, cfg = RISK_CONFIG) {
+  // ★ 2026-05-09 audit M3: min === max 일 때 가변 분기는 dead code.
+  //   고정 lev 모드면 즉시 리턴 (옛 confidence/bias 분기 제거).
+  if (cfg.minLeverage === cfg.maxLeverage) return cfg.minLeverage;
   const base = cfg.minLeverage + (cfg.maxLeverage - cfg.minLeverage) * clamp((confidence - 0.5) / 0.5, 0, 1);
-  const bias = cfg.leverageBias[family] || 0;
+  const bias = (cfg.leverageBias && cfg.leverageBias[family]) || 0;
   return Math.round(clamp(base + bias, cfg.minLeverage, cfg.maxLeverage));
+}
+
+/**
+ * ★ 2026-05-09 audit C1: 합산 노출 가드.
+ * 새 진입 후보 plan 이 기존 오픈 포지션과 합쳐 자본 한도(maxTotalNotionalRatio,
+ * maxTotalMarginRatio) 초과인지 검사.
+ *
+ * @param {object} args
+ * @param {object} args.plan          새 진입 plan (planTrade 결과)
+ * @param {Array}  args.openPositions Binance positionRisk 배열
+ *                                    [{ symbol, positionAmt, entryPrice, leverage, ... }]
+ * @param {number} args.equity        자본 (USDT)
+ * @param {object} [args.cfg=RISK_CONFIG]
+ * @returns {{ ok: boolean, reason?: string, sumNotional, sumMargin, log: string[] }}
+ */
+export function checkAggregateExposure({ plan, openPositions, equity, cfg = RISK_CONFIG }) {
+  const log = [];
+  const push = (m) => log.push(m);
+  if (!plan || !plan.notional) return { ok: false, reason: "invalid plan", log };
+  if (!(equity > 0)) return { ok: false, reason: "equity <= 0", log };
+
+  // 오픈 포지션의 노셔널/마진 합산 (자기 심볼 averaging 도 같은 방향이면 합산)
+  let sumNotional = 0;
+  let sumMargin = 0;
+  for (const p of openPositions || []) {
+    const amt = Math.abs(parseFloat(p.positionAmt || 0));
+    if (amt === 0) continue;
+    const ep = parseFloat(p.entryPrice || p.markPrice || 0);
+    const lv = parseFloat(p.leverage || cfg.maxLeverage || 10);
+    const notional = amt * ep;
+    sumNotional += notional;
+    sumMargin += notional / Math.max(lv, 1);
+  }
+  push(`기존 합산 noSi=$${sumNotional.toFixed(2)} margin=$${sumMargin.toFixed(2)}`);
+
+  const newSumNotional = sumNotional + plan.notional;
+  const newSumMargin = sumMargin + (plan.marginRequired || (plan.notional / (plan.leverage || 10)));
+  const notionalCap = equity * (cfg.maxTotalNotionalRatio || 1.5);
+  const marginCap = equity * (cfg.maxTotalMarginRatio || 0.6);
+  push(`예정 합산 noSi=$${newSumNotional.toFixed(2)} margin=$${newSumMargin.toFixed(2)} (cap noSi=$${notionalCap.toFixed(2)}, margin=$${marginCap.toFixed(2)})`);
+
+  if (newSumNotional > notionalCap) {
+    return {
+      ok: false,
+      reason: `합산 노셔널 $${newSumNotional.toFixed(2)} > 한도 $${notionalCap.toFixed(2)} (${((cfg.maxTotalNotionalRatio||1.5)*100).toFixed(0)}% of equity)`,
+      sumNotional, sumMargin, log,
+    };
+  }
+  if (newSumMargin > marginCap) {
+    return {
+      ok: false,
+      reason: `합산 마진 $${newSumMargin.toFixed(2)} > 한도 $${marginCap.toFixed(2)} (${((cfg.maxTotalMarginRatio||0.6)*100).toFixed(0)}% of equity)`,
+      sumNotional, sumMargin, log,
+    };
+  }
+  return { ok: true, sumNotional, sumMargin, log };
+}
+
+/**
+ * ★ 2026-05-09 audit M1: 같은 심볼 averaging 가드.
+ * 같은 심볼·같은 방향 추가 진입 시 가격이 첫 진입 대비 +1R 이상 (피라미딩) 일 때만 허용.
+ * 가격이 +1R 이상이면 "이미 이긴 거래에 추가 매수" → 정상 알파 행동
+ * 가격이 - 거나 0~+1R 이면 "물타기" (Martingale) → 차단
+ *
+ * @param {object} args
+ * @param {object} args.plan          새 진입 plan
+ * @param {object} args.existingPos   같은 심볼 기존 포지션 (Binance positionRisk 한 항목)
+ * @returns {{ ok: boolean, reason?: string, currentR?: number }}
+ */
+export function checkPyramidGuard({ plan, existingPos }) {
+  if (!existingPos || Math.abs(parseFloat(existingPos.positionAmt || 0)) === 0) return { ok: true };
+  // 방향 다르면 OK (long → short 헤지 또는 익절 같은 다른 의도)
+  const existingSide = parseFloat(existingPos.positionAmt) > 0 ? "LONG" : "SHORT";
+  if (existingSide !== plan.side) return { ok: true };
+  // 같은 방향 — 현재 R 계산
+  const entryPrice = parseFloat(existingPos.entryPrice || 0);
+  const markPrice = parseFloat(existingPos.markPrice || plan.entryPrice || 0);
+  if (!entryPrice || !markPrice || !plan.slPct) return { ok: true };
+  const moveFrac = plan.side === "LONG"
+    ? (markPrice - entryPrice) / entryPrice
+    : (entryPrice - markPrice) / entryPrice;
+  const currentR = moveFrac / plan.slPct;
+  if (currentR < 1.0) {
+    return {
+      ok: false,
+      reason: `같은 ${plan.side} averaging 차단 — 현재 R=${currentR.toFixed(2)} < 1.0R (피라미딩 가능 라인). 물타기 위험.`,
+      currentR,
+    };
+  }
+  return { ok: true, currentR };
 }
 
 export function stopDistancePct({ price, atr, family, cfg = RISK_CONFIG }) {
@@ -230,26 +328,20 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
   push(`leverage=${leverage}x (conf=${signal.confidence}, fam=${signal.strategyFamily})`);
 
   // 6) ★ liquidation 버퍼 검증 — SL 이 청산보다 먼저 와야 함
+  // ★ 2026-05-09 audit (bonus): IIFE 중복 계산 제거. needLev/adjLev 한 번만 계산.
   const liqPct = approxLiquidationPct(leverage);
   const safeSL = liqPct * (cfg.liqSafetyRatio || 0.7);
+  let finalLev = leverage;
   if (stopDistPct > safeSL) {
-    push(`SL ${(stopDistPct * 100).toFixed(2)}% > safe ${(safeSL * 100).toFixed(2)}% — leverage 낮춰야 함`);
-    // 자동 조정: 필요한 최소 레버리지 계산
+    push(`SL ${(stopDistPct * 100).toFixed(2)}% > safe ${(safeSL * 100).toFixed(2)}% — leverage 조정 필요`);
     const needLev = Math.ceil(1 / (stopDistPct / (cfg.liqSafetyRatio || 0.7) / 0.9));
     const adjLev = clamp(needLev, cfg.minLeverage, cfg.maxLeverage);
     if (adjLev >= leverage) {
       return { ok: false, reason: `SL ${(stopDistPct * 100).toFixed(2)}% 가 최대 레버리지에서도 청산거리 초과 — 거부`, log };
     }
     push(`auto-adjust leverage → ${adjLev}x`);
+    finalLev = adjLev;
   }
-  const finalLev = (() => {
-    if (stopDistPct > safeSL) {
-      // reconcile 이 위에서 이미 return 했으면 여긴 안 옴
-      const needLev = Math.ceil(1 / (stopDistPct / (cfg.liqSafetyRatio || 0.7) / 0.9));
-      return clamp(needLev, cfg.minLeverage, cfg.maxLeverage);
-    }
-    return leverage;
-  })();
 
   // 7) 증거금 상한
   const margin0 = notional / finalLev;
@@ -396,6 +488,9 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
  * @returns {{ shouldClose: boolean, reason?: string, currentR?: number }}
  */
 export function evaluateTimeStop({ openedAt, entryPrice, markPrice, side, slPct, now = Date.now(), cfg = RISK_CONFIG }) {
+  // ★ 2026-05-09 audit N5: 시간손절 비활성화 (대표 지시) — RISK_CONFIG.timeStops=[].
+  //   maxHoldMs = 30일 (사실상 무한). TP/SL 도달이 더 빠르게 청산.
+  //   복원하려면 RISK_CONFIG.timeStops 채우면 됨.
   if (!openedAt || !entryPrice || !markPrice || !slPct) return { shouldClose: false };
   const heldMs = now - openedAt;
   if (heldMs < 0) return { shouldClose: false };
@@ -514,5 +609,7 @@ export default {
   evaluateTimeStop,
   evaluateTrailingStop,
   evaluatePartialTP,
+  checkAggregateExposure,
+  checkPyramidGuard,
   RISK_CONFIG,
 };

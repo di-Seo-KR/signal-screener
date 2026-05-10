@@ -537,14 +537,15 @@ function RealTradingInner() {
     },
     {
       key: "open",
+      // ★ 2026-05-09 대표 지시: 동시 거래 개수 제한 표기 제거.
+      //   실제 한도는 maxConcurrentPositions 10 + 합산 노셔널 cap (자본의 1.5배) 으로
+      //   자연 제한. 개수 자체는 제한 아님 (= 노셔널 안에서 무제한).
       el: renderMetricCard({
         label: "진행 거래", value: positions.length,
-        color: positions.length >= 2 ? "var(--z-yellow-hi)" : "var(--z-text)",
-        hint: "최대 2개",
-        gradient: positions.length >= 2
-          ? "linear-gradient(135deg, rgba(234, 179, 8, 0.12) 0%, rgba(202, 138, 4, 0.06) 100%)"
-          : "linear-gradient(135deg, rgba(100, 116, 139, 0.12) 0%, rgba(71, 85, 105, 0.06) 100%)",
-        border: positions.length >= 2 ? "1px solid rgba(234, 179, 8, 0.25)" : "1px solid rgba(100, 116, 139, 0.2)",
+        color: "var(--z-text)",
+        hint: "합산 노셔널 한도 내 자동 진입",
+        gradient: "linear-gradient(135deg, rgba(100, 116, 139, 0.12) 0%, rgba(71, 85, 105, 0.06) 100%)",
+        border: "1px solid rgba(100, 116, 139, 0.2)",
       }),
     },
     {
@@ -1272,10 +1273,11 @@ function RealTradingInner() {
     <Card title="리스크 프리셋 · Option A 절대수익형" icon={<Shield size={16} />}
       subtitle="api/_shared/risk-manager.js::RISK_CONFIG">
       <div style={{ display: "grid", gap: 8, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(200px, 1fr))" }}>
-        <KV label="트레이드당 리스크" value="0.8% equity" />
-        <KV label="최대 증거금 비율" value="35%" />
-        <KV label="레버리지 범위" value="2× ~ 5×" />
-        <KV label="동시 포지션 한도" value="최대 2 (상관군 분리)" />
+        {/* ★ 2026-05-09: 옛 하드코딩 값 (0.8%, 35%, 2×~5×, 최대 2) 정정 — 현재 RISK_CONFIG 일치 */}
+        <KV label="트레이드당 리스크" value="10% equity" />
+        <KV label="최대 증거금 비율" value="50% (단일) · 60% (합산)" />
+        <KV label="레버리지" value="고정 10×" />
+        <KV label="동시 포지션 한도" value="합산 노셔널 1.5× equity 까지 (개수 무제한)" />
         <KV label="SL/TP 방식" value="ATR(14) + ROI -40% cap" />
         <KV label="최소 net RR" value="1.8R" />
         <KV label="최대 보유 시간" value="무제한 (TP/SL 만)" />

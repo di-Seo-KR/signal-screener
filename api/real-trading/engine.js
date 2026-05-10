@@ -22,9 +22,10 @@
 // cron 기본 동작 (GET): phase1_enabled 유저 순회, 실전 집행.
 
 import { loadUserCredentials, respondError } from "../_shared/binance-auth.js";
-import { extractSignal, pickBestSignal, rankSignals } from "../_shared/signal-extractor.js";
+// ★ 2026-05-09 audit N2: pickBestSignal 미사용 (rankSignals 만 사용) — dead import 제거
+import { extractSignal, rankSignals } from "../_shared/signal-extractor.js";
 import { loadFamilyWeightsRobust, applyWeightsToRanking } from "../_shared/strategy-weights.js";
-import { planTrade, RISK_CONFIG } from "../_shared/risk-manager.js";
+import { planTrade, RISK_CONFIG, checkAggregateExposure, checkPyramidGuard } from "../_shared/risk-manager.js";
 import { preTradeCheck } from "../_shared/circuit-breaker.js";
 import { getSymbolFilter, isSymbolAffordable } from "../_shared/exchange-info.js";
 import { getTickerPrice, getAccountInfo, getKlines, getPositionRisk } from "../_shared/binance-client.js";
@@ -59,7 +60,10 @@ async function pullRecentSignals({ userId, lookbackMs = 30 * 60 * 1000, advanceC
   const now = Date.now();
   const minTs = advanceCursor ? lastSeen : (now - lookbackMs);
 
-  const diag = { activeBots: activeBots.length, cryptoBots: cryptoBots.length, tradesScanned: 0, buyFound: 0, inWindow: 0, perBotDedup: 0 };
+  // ★ 2026-05-09 audit M2: BUY 만 수집하던 게 SHORT 시그널 영구 누락 원인.
+  //   가상매매 봇이 SELL 시그널을 만들어도 실전 엔진이 절대 못 봄 → 약세장 알파 0.
+  //   현재: BUY/SELL 둘 다 수집. signal-extractor 가 LONG/SHORT 매핑 처리.
+  const diag = { activeBots: activeBots.length, cryptoBots: cryptoBots.length, tradesScanned: 0, buyFound: 0, sellFound: 0, inWindow: 0, perBotDedup: 0 };
   const candidates = [];
   for (const b of cryptoBots) {
     const botId = b.id || b.botId;
@@ -70,8 +74,12 @@ async function pullRecentSignals({ userId, lookbackMs = 30 * 60 * 1000, advanceC
     const seenAssetsThisBot = new Set();
     for (const t of perf.trades.slice(0, 20)) {
       diag.tradesScanned += 1;
-      if (!t || !t.time || t.type !== "BUY") continue;
-      diag.buyFound += 1;
+      if (!t || !t.time) continue;
+      const isBuy = t.type === "BUY";
+      const isSell = t.type === "SELL";
+      if (!isBuy && !isSell) continue;
+      if (isBuy) diag.buyFound += 1;
+      if (isSell) diag.sellFound += 1;
       const ts = new Date(t.time).getTime();
       if (!Number.isFinite(ts)) continue;
       if (ts <= minTs) continue;
@@ -87,10 +95,10 @@ async function pullRecentSignals({ userId, lookbackMs = 30 * 60 * 1000, advanceC
         asset: t.asset,
         source: `bot:${botId}`,
         signal: {
-          type: "BUY",
+          type: t.type,  // "BUY" | "SELL" — extractSignal 이 LONG/SHORT 로 변환
           confidence: t.signal?.confidence || "B",
           score: t.signal?.score || 60,
-          reason: t.signal?.reason || `${botId} BUY`,
+          reason: t.signal?.reason || `${botId} ${t.type}`,
           positionSize: 0.5,
         },
         ts,
@@ -238,8 +246,11 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     S(`equity < $200 — skip (Phase 1 minimum)`);
     return { ok: true, userId, ran: false, reason: "insufficient equity (min $200)", equity, steps };
   }
-  // dry run fallback: $1000 — 모든 메이저 알트 + BTC 거래 시뮬 가능
-  const effectiveEquity = equity > 0 ? equity : (forceDryRun ? 1000 : 0);
+  // ★ 2026-05-09 audit N3: dry-run fallback equity 환경변수화.
+  //   기본 $1000 은 실제 자본 ~$370 과 차이 커서 plan 시뮬이 실거래와 다름.
+  //   ZEPTA_DRYRUN_EQUITY 로 조정 가능. 미설정 시 $370 (현재 실자본 근사).
+  const dryRunFallback = parseFloat(process.env.ZEPTA_DRYRUN_EQUITY || "370") || 370;
+  const effectiveEquity = equity > 0 ? equity : (forceDryRun ? dryRunFallback : 0);
   if (forceDryRun && equity <= 0) S(`dry-run: using $${effectiveEquity} fallback equity`);
 
   // 4) 서킷브레이커 — dry run 은 조회만 하고 차단은 안 함
@@ -323,20 +334,36 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     S(`family weights skipped: ${e?.message}`);
   }
 
-  // ★ 자동 종목 차단 — shadow-summary.bySymbol 기반 winRate < 30% AND trades >= 20 인 심볼은 신규 진입 거부
-  // (2026-05-03 진단: SOL 18.5%, XRP 11.5% 같은 명백한 손실 종목을 자동 정리)
+  // ★ 자동 종목 차단 — 2026-05-09 audit M7: live-summary 우선 + shadow 보조.
+  //   이전: shadow-summary.bySymbol 만 사용 → shadow 와 live 분포 다르면 misaligned.
+  //   현재: live-summary (>=10건) 면 그것만 본다, 부족하면 shadow (>=20건) 보조.
+  //   (2026-05-03 진단: SOL 18.5%, XRP 11.5% 같은 명백한 손실 종목을 자동 정리)
   const blockedByPerf = new Set();
   try {
     const kvBlock = await getKv();
-    const summary = (await kvBlock.get(`di:real:user:${userId}:shadow-summary`)) || null;
-    const bySym = summary?.bySymbol || {};
-    for (const [sym, s] of Object.entries(bySym)) {
-      const trades = s?.trades || 0;
-      const wins = s?.wins || 0;
-      const wr = trades > 0 ? wins / trades : 0;
-      if (trades >= 20 && wr < 0.3) blockedByPerf.add(sym);
+    const liveSummary = (await kvBlock.get(`di:real:user:${userId}:live-summary`)) || null;
+    const shadowSummary = (await kvBlock.get(`di:real:user:${userId}:shadow-summary`)) || null;
+    const liveBySym = liveSummary?.bySymbol || {};
+    const shadowBySym = shadowSummary?.bySymbol || {};
+    // 모든 등장 심볼 합집합
+    const allSyms = new Set([...Object.keys(liveBySym), ...Object.keys(shadowBySym)]);
+    for (const sym of allSyms) {
+      const live = liveBySym[sym];
+      const shadow = shadowBySym[sym];
+      // 우선순위 1: live n>=10
+      if (live && live.trades >= 10) {
+        const wr = live.wins / live.trades;
+        if (wr < 0.30) {
+          blockedByPerf.add(sym);
+          continue;
+        }
+      } else if (shadow && shadow.trades >= 20) {
+        // 우선순위 2: shadow n>=20 (live 부족 시)
+        const wr = shadow.wins / shadow.trades;
+        if (wr < 0.30) blockedByPerf.add(sym);
+      }
     }
-    if (blockedByPerf.size > 0) S(`auto-blocked symbols (winRate<30% n>=20): ${Array.from(blockedByPerf).join(", ")}`);
+    if (blockedByPerf.size > 0) S(`auto-blocked symbols (live n>=10 또는 shadow n>=20, winRate<30%): ${Array.from(blockedByPerf).join(", ")}`);
   } catch (e) {
     S(`auto-block skipped: ${e?.message}`);
   }
@@ -463,7 +490,13 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     try {
       const tick = await getTickerPrice({ symbol: cand.symbol });
       const pr = parseFloat(tick.price);
-      const klInterval = cand.timeframe === "1h" ? "1h" : cand.timeframe === "1d" ? "1d" : "4h";
+      // ★ 2026-05-09 audit N1: family-aware ATR interval.
+      //   mean-revert 는 4h 시그널이라도 더 짧은 1h ATR 이 적절 (회귀는 단기 변동성 ↑).
+      //   trend/breakout 은 4h 가 적절. timeframe 명시 우선.
+      const klInterval = cand.timeframe === "1h" ? "1h"
+                       : cand.timeframe === "1d" ? "1d"
+                       : cand.strategyFamily === "mean-revert" ? "1h"
+                       : "4h";
       let a = await computeAtr(cand.symbol, klInterval, 14);
       if (!a || a <= 0) a = defaultAtrApprox(pr);
 
@@ -491,6 +524,40 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
         tried.push({ symbol: cand.symbol, reason: p.reason });
         continue;
       }
+
+      // ★ 2026-05-09 audit C1: 합산 노셔널/마진 가드.
+      //   단일 plan 은 통과해도 기존 오픈 포지션과 합쳐 자본 한도 초과면 reject.
+      //   shadow/dryRun 모드는 오픈 포지션 조회 안 됨 → 스킵.
+      if (!forceDryRun && !shadow) {
+        let liveOpenPositions = [];
+        try {
+          liveOpenPositions = await getPositionRisk(creds);
+        } catch (e) {
+          S(`  ↳ aggregate check skipped (positionRisk fetch failed): ${e?.message}`);
+        }
+        const aggCheck = checkAggregateExposure({
+          plan: p.plan, openPositions: liveOpenPositions, equity: effectiveEquity, cfg: RISK_CONFIG,
+        });
+        if (!aggCheck.ok) {
+          S(`  ↳ 합산 노출 reject: ${aggCheck.reason}`);
+          tried.push({ symbol: cand.symbol, reason: aggCheck.reason });
+          continue;
+        }
+        // ★ audit M1: 같은 심볼 averaging 가드 (피라미딩만 허용, 물타기 차단)
+        const samePos = (liveOpenPositions || []).find((pos) => pos.symbol === p.plan.symbol);
+        if (samePos) {
+          const pyrCheck = checkPyramidGuard({ plan: p.plan, existingPos: samePos });
+          if (!pyrCheck.ok) {
+            S(`  ↳ pyramid guard reject: ${pyrCheck.reason}`);
+            tried.push({ symbol: cand.symbol, reason: pyrCheck.reason });
+            continue;
+          }
+          if (pyrCheck.currentR != null) {
+            S(`  ↳ averaging 허용: 기존 ${p.plan.side} R=${pyrCheck.currentR.toFixed(2)} (피라미딩)`);
+          }
+        }
+      }
+
       // 채택!
       best = cand; price = pr; atr = a; filter = f; plan = p;
       S(`✓ picked: ${cand.symbol} ${cand.side} (after ${tried.length} reject${tried.length === 1 ? "" : "s"})`);
@@ -529,7 +596,8 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   if (shadow) {
     // shadow: 주문 안 보내고 ledger 에 기록
     const entry = {
-      id: `sh-${Date.now()}-${best.id}`,
+      // ★ 2026-05-09 audit (bonus): 같은 ts 에 같은 시그널 두 번 진입 시 id 충돌 방지 — random 8자 추가
+      id: `sh-${Date.now()}-${best.id}-${Math.random().toString(36).slice(2, 10)}`,
       openedAt: startedAt,
       status: "OPEN",
       signal: best,
@@ -573,6 +641,10 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       if (existingPlan && existingPlan.openedAt) {
         S(`plan already exists for ${plan.plan.symbol} (opened ${new Date(existingPlan.openedAt).toISOString()}) — skip overwrite`);
       } else {
+      // ★ 2026-05-09 audit C3: bracket SL attach 실패 (critical) 면
+      //   slMissingSince 마킹 → position-monitor 가 5분 후 force-close 트리거.
+      const bracketCritical = !!result?.bracketRescue?.critical;
+      const slMissingSince = bracketCritical ? (result.bracketRescue.slMissingSince || Date.now()) : null;
       await kv.set(planKey, {
         symbol: plan.plan.symbol,
         side: plan.plan.side,
@@ -588,6 +660,7 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
         highWater: plan.plan.entryPrice,
         strategyFamily: plan.plan.strategyFamily,
         regime: regimeSnapshot, // ★ 진입 시점 시장 레짐 스냅샷 (Hurst bucket 분석용)
+        slMissingSince,         // ★ bracket attach 실패 시 5분 후 force-close
       });
       S(`plan persisted to ${planKey}`);
       } // end else (no existing plan)
