@@ -106,15 +106,17 @@ export const RISK_CONFIG = {
   // minNotional 여유
   minNotionalSafety: 1.05,
   // 절대 노출 상한 — riskPct/leverage 조합과 무관하게 강제. 대표님 요청
-  // "한 거래에 최대 $300" 반영. 그래도 일부 케이스에서 SL 거리 작으면
-  // notional 이 자연스럽게 커지는 걸 잘라낼 cap.
-  absoluteMaxNotional: 300,
+  // "한 거래에 최대 $300" 반영.
+  // ★ 2026-05-11 의미 정정: 원래 의도가 "한 거래에 들어가는 실제 돈 $300"
+  //   (= 마진) 였는데 변수명이 absoluteMaxNotional 이라 혼선. 새 변수로 분리.
+  //   - absoluteMaxMarginUsd: 마진(실 위험 자본) 상한. 이게 진짜 사용자 의도.
+  //   - absoluteMaxNotional: 레거시. 하위 호환 위해 보존만 (사용 안 함).
+  absoluteMaxMarginUsd: 300, // 한 거래 마진 최대 $300 → 10x lev = 노셔널 $3000
+  absoluteMaxNotional: 300,  // (deprecated, no longer enforced)
 
   // ★ 2026-05-11 대표 지시: 포지션당 최소 원금 (마진 기준) $100.
   //   너무 작은 포지션은 수수료/슬리피지 대비 의미 없는 거래라 ROI 기여도 0에 가까움.
-  //   $100 마진 × lev 10x = 노셔널 $1000 — absoluteMaxNotional($300) 보다 큼.
-  //   ★ 우선순위: minMarginUsd 가 absoluteMaxNotional 보다 위. 즉 자본 부족하면 reject.
-  //   계산: minNotional = minMarginUsd × leverage. 이 값으로 평소 산정한 notional 을 floor.
+  //   $100 마진 × lev 10x = 노셔널 $1000 (absoluteMaxMarginUsd=$300 안에 들어감)
   //   자본 $370 × 마진 50% cap = $185 → minMargin $100 만족 가능 (개당).
   minMarginUsd: 100,
 
@@ -326,9 +328,14 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
   let notional = riskAmount / effLossPct;
   push(`effLossPct=${(effLossPct * 100).toFixed(3)}% → rawNotional=$${notional.toFixed(2)}`);
 
-  if (notional > cfg.absoluteMaxNotional) {
-    notional = cfg.absoluteMaxNotional;
-    push(`capped by absoluteMaxNotional=$${cfg.absoluteMaxNotional}`);
+  // ★ 2026-05-11 의미 정정: 변수명은 Notional 이지만 실 cap 은 마진(실 위험 자본).
+  //   사용자 의도 "거래당 $300 들어가도 됨" = 마진 $300 = 노셔널 $3000 (10x).
+  //   이 단계에선 leverage 미정이라 사용자 maxLeverage 기준으로 notional cap 산출.
+  const previewLevForCap = cfg.maxLeverage || 10;
+  const maxNotionalCap = (cfg.absoluteMaxMarginUsd || 300) * previewLevForCap;
+  if (notional > maxNotionalCap) {
+    notional = maxNotionalCap;
+    push(`capped by absoluteMaxMargin=$${cfg.absoluteMaxMarginUsd} × lev ${previewLevForCap} = noSi $${maxNotionalCap}`);
   }
 
   // 5) 레버리지
