@@ -431,27 +431,42 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     };
   }
 
-  // ★ 중복 진입 차단 (옵션) — 환경변수 ZEPTA_SAME_SYMBOL_DEDUP 로 제어
-  //   "off" (기본): 같은 종목 추가 진입 허용 (averaging up/down). 대표님 지시
-  //                 "같은 포지션 추가 진입도 되게" (2026-05-09).
-  //   "on": shadow + live 모두 dedup. 옛 동작.
+  // ★ 2026-05-11 대표 지시: dedup OFF 모드 전면 도입.
+  //   ZEPTA_DEDUP_MODE = "off" (default) | "live-only" | "always"
+  //     - "off": shadow + live 모두 dedup 안 함. 같은 종목 averaging 허용 + shadow
+  //             가 같은 종목으로 시그널 풀 다양화 차단하지 않게.
+  //     - "live-only": 옛 동작. shadow 만 dedup, live 는 averaging 허용.
+  //     - "always": 둘 다 dedup. 옛옛 동작.
   //
-  //   shadow/probe 는 가상 거래 통계 위해 항상 dedup (옵션 무관).
-  //   실거래는 옵션 따라 결정.
-  const sameSymbolDedup = (process.env.ZEPTA_SAME_SYMBOL_DEDUP || "off").toLowerCase() === "on";
+  //   shadow 통계 왜곡 우려가 있지만 시그널 다양성 부족 (같은 6개 종목 만 반복)
+  //   이 더 큰 문제라 대표 지시로 OFF 기본.
+  const dedupMode = (process.env.ZEPTA_DEDUP_MODE || "off").toLowerCase();
   const openSymbols = new Set();
-  if (shadow) {
-    // shadow 는 항상 dedup — 가상 매매 통계가 한 종목에 몰리면 alpha 측정 왜곡
+  if (shadow && dedupMode === "always") {
+    // shadow always dedup mode
     try {
       const kvDup = await getKv();
       const ledger = (await kvDup.get(`di:real:user:${userId}:shadow-ledger`)) || [];
       for (const e of ledger) {
         if (e?.status !== "CLOSED" && e?.plan?.symbol) openSymbols.add(e.plan.symbol);
       }
-      if (openSymbols.size > 0) S(`open positions (shadow): ${openSymbols.size} symbols (dedup will skip)`);
+      if (openSymbols.size > 0) S(`shadow dedup ON: ${openSymbols.size} symbols open (skip)`);
     } catch {}
-  } else if (!forceDryRun && sameSymbolDedup) {
-    // 실거래 모드 — dedup 옵션 ON 일 때만 적용
+  } else if (shadow && dedupMode === "live-only") {
+    // 옛 default — shadow always dedup, live not
+    try {
+      const kvDup = await getKv();
+      const ledger = (await kvDup.get(`di:real:user:${userId}:shadow-ledger`)) || [];
+      for (const e of ledger) {
+        if (e?.status !== "CLOSED" && e?.plan?.symbol) openSymbols.add(e.plan.symbol);
+      }
+      if (openSymbols.size > 0) S(`shadow dedup (live-only mode): ${openSymbols.size} symbols open (skip)`);
+    } catch {}
+  } else if (shadow && dedupMode === "off") {
+    // ★ 새 default — shadow 도 dedup OFF. 같은 종목 매매 통계 누적 허용.
+    S(`shadow mode: dedup OFF (다양성 풀 확보 우선)`);
+  } else if (!forceDryRun && (dedupMode === "always" || dedupMode === "live-only")) {
+    // 실거래 dedup — always 또는 live-only
     try {
       const positions = await getPositionRisk(creds);
       for (const p of positions || []) {
@@ -459,14 +474,14 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
         if (Math.abs(amt) > 0 && p.symbol) openSymbols.add(p.symbol);
       }
       if (openSymbols.size > 0) {
-        S(`open positions (live): ${openSymbols.size} symbols [${Array.from(openSymbols).join(", ")}] — dedup will skip`);
+        S(`live dedup: ${openSymbols.size} symbols [${Array.from(openSymbols).join(", ")}] (skip)`);
       }
     } catch (e) {
       S(`live dedup skipped: ${e?.message || String(e)}`);
     }
-  } else if (!forceDryRun && !sameSymbolDedup) {
-    // 실거래 모드 + dedup OFF (기본) — 정보용 로그만, 차단 안 함
-    S(`live mode: same-symbol dedup OFF (averaging 허용)`);
+  } else if (!forceDryRun && dedupMode === "off") {
+    // ★ 새 default — live 도 dedup OFF. averaging 허용 (pyramid guard 가 마틴게일 차단)
+    S(`live mode: dedup OFF (averaging 허용, pyramid guard 가 마틴게일 차단)`);
   }
 
   // 7-9) ★ ranked 시그널 순회 — 1순위가 affordability/risk reject 되어도
