@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>비트코인 자동매매 시작하기 — 입문자 5단계 가이드 | Zepta 블로그</title>
+  <meta name="description" content="비트코인 자동매매를 처음 시작하시는 분을 위한 5단계 가이드. 거래소 선택, API 발급, 봇 설정, 소액 검증, 운영 모니터링까지 실전 경험 기반으로 정리했습니다."/>
+  <meta name="keywords" content="비트코인 자동매매, 코인 자동매매 시작, BTC 봇, 암호화폐 알고리즘 트레이딩, 자동매매 입문, 비트코인 봇"/>
+  <link rel="canonical" href="https://zepta.app/blog/bitcoin-auto-trading-5-steps"/>
+  <meta name="robots" content="index, follow"/>
+  <meta property="og:title" content="비트코인 자동매매 시작하기 — 입문자 5단계 가이드"/>
+  <meta property="og:description" content="비트코인 자동매매 입문자를 위한 5단계 실전 가이드. 거래소·API·봇 셋업부터 소액 검증까지."/>
+  <meta property="og:type" content="article"/>
+  <meta property="og:url" content="https://zepta.app/blog/bitcoin-auto-trading-5-steps"/>
+  <meta property="og:image" content="https://zepta.app/og-image.png"/>
+  <meta property="og:locale" content="ko_KR"/>
+  <meta name="google-adsense-account" content="ca-pub-5897295133273451"/>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "비트코인 자동매매 시작하기 — 입문자 5단계 가이드",
+    "description": "비트코인 자동매매를 처음 시작하시는 분을 위한 5단계 가이드. 거래소 선택, API 발급, 봇 설정, 소액 검증, 운영 모니터링까지.",
+    "author": { "@type": "Organization", "name": "Zepta" },
+    "publisher": { "@type": "Organization", "name": "Zepta", "url": "https://zepta.app/", "logo": { "@type": "ImageObject", "url": "https://zepta.app/favicon-32.png" } },
+    "datePublished": "2026-05-11",
+    "dateModified": "2026-05-11",
+    "mainEntityOfPage": "https://zepta.app/blog/bitcoin-auto-trading-5-steps",
+    "image": "https://zepta.app/og-image.png",
+    "inLanguage": "ko"
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "홈", "item": "https://zepta.app/" },
+      { "@type": "ListItem", "position": 2, "name": "블로그", "item": "https://zepta.app/blog" },
+      { "@type": "ListItem", "position": 3, "name": "비트코인 자동매매 5단계", "item": "https://zepta.app/blog/bitcoin-auto-trading-5-steps" }
+    ]
+  }
+  </script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#070B14;color:#9AA7BD;line-height:1.85}
+    .wrap{max-width:780px;margin:0 auto;padding:40px 20px}
+    nav{background:#101828;border-bottom:1px solid #1E2A42;padding:14px 20px;text-align:center}
+    nav a{margin:0 12px;font-size:15px;color:#9AA7BD;text-decoration:none}
+    nav a:hover{color:#F1F5FB}
+    .breadcrumb{font-size:13px;color:#64728C;margin-bottom:18px}
+    .breadcrumb a{color:#60A5FA;text-decoration:none}
+    h1{font-size:30px;font-weight:800;color:#F1F5FB;margin-bottom:10px;letter-spacing:-0.02em;line-height:1.3}
+    .meta-row{font-size:13px;color:#64728C;margin-bottom:28px}
+    h2{font-size:21px;font-weight:700;color:#F1F5FB;margin:36px 0 14px;letter-spacing:-0.01em}
+    h3{font-size:17px;font-weight:700;color:#F1F5FB;margin:22px 0 10px}
+    p{font-size:16px;margin-bottom:14px}
+    strong{color:#F1F5FB}
+    a{color:#60A5FA;text-decoration:none}
+    a:hover{text-decoration:underline}
+    .callout{background:#0F1F3D;border-left:3px solid #3B82F6;padding:14px 18px;margin:18px 0;border-radius:6px;font-size:15px}
+    ul,ol{margin:0 0 16px 22px}
+    li{margin-bottom:6px;font-size:16px}
+    .related{background:#101828;border:1px solid #1E2A42;border-radius:12px;padding:20px;margin-top:48px}
+    .related h3{font-size:16px;color:#F1F5FB;margin-bottom:12px}
+    .related a{display:block;padding:8px 0;font-size:15px;border-top:1px solid #1E2A42;color:#9AA7BD}
+    .related a:first-of-type{border-top:none}
+    .related a:hover{color:#60A5FA;text-decoration:none}
+    .cta{background:linear-gradient(135deg,#0F1F3D 0%,#0a1530 100%);border:1px solid #3B82F640;border-radius:14px;padding:24px;text-align:center;margin:36px 0}
+    .cta a{display:inline-block;background:#3B82F6;color:#fff;padding:11px 22px;border-radius:8px;font-weight:700;margin-top:10px}
+    .ad-slot{margin:28px 0;padding:14px;background:#0A1220;border:1px solid #1E2A42;border-radius:10px;text-align:center;font-size:12px;color:#64728C}
+    footer{text-align:center;padding:40px 20px;color:#64728C;font-size:14px;border-top:1px solid #1E2A42;margin-top:60px}
+    @media(max-width:640px){h1{font-size:24px}.wrap{padding:24px 16px}p,li{font-size:15px}}
+  </style>
+  <!-- GA4 — 블로그 스크롤 추적 -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-BMP34JQ649"></script>
+  <script>
+    window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
+    gtag('js',new Date());gtag('config','G-BMP34JQ649',{page_path:'/blog/bitcoin-auto-trading-5-steps'});
+    // 75% 스크롤 이벤트
+    let _scrolled75=false;window.addEventListener('scroll',()=>{
+      const sp=(window.scrollY+window.innerHeight)/document.body.scrollHeight;
+      if(sp>=0.75&&!_scrolled75){_scrolled75=true;gtag('event','blog_post_read',{post:'bitcoin-auto-trading-5-steps',depth:75});}
+    },{passive:true});
+  </script>
+  <!-- AdSense -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5897295133273451" crossorigin="anonymous"></script>
+</head>
+<body>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/auto-trading">AI 매매</a>
+    <a href="/screener">스크리너</a>
+    <a href="/blog">블로그</a>
+    <a href="/about">소개</a>
+  </nav>
+  <main class="wrap">
+    <div class="breadcrumb"><a href="/blog">← 블로그</a></div>
+    <h1>비트코인 자동매매 시작하기 — 입문자 5단계 가이드</h1>
+    <div class="meta-row">2026년 5월 11일 · 입문자 가이드 · 9분 읽기</div>
+
+    <p>비트코인 자동매매에 관심이 가지만 "뭐부터 시작해야 할지 모르겠다"는 분이 많습니다. 솔직히 처음에는 정보가 너무 흩어져 있어서 답답하시죠. 이 글은 거래소 선택부터 첫 실거래 운영까지 5단계로 정리한 실전 가이드입니다. Zepta가 직접 비트코인 봇을 운영하면서 정리한 내용이라 빈말 없이 현실적으로 풀어드립니다.</p>
+
+    <div class="callout">
+      <strong>요약</strong>: 거래소 선택 → API 발급 → 전략 선정 → 소액 검증(2주) → 운영 자동화. 1~3번은 하루, 4번은 2주, 5번부터는 평생.
+    </div>
+
+    <h2>1단계 — 거래소 선택 (한국인 입장에서 현실적인 선택지)</h2>
+    <p>비트코인 자동매매를 하려면 <strong>API 매매가 가능한 거래소</strong>를 골라야 합니다. 한국 거주자가 합법적으로 쓸 수 있는 선택지는 사실상 둘로 좁혀집니다.</p>
+    <ul>
+      <li><strong>업비트·빗썸 (국내)</strong> — 원화 입금 가능. 단, API 매매가 가능한 계정이 따로 있고 KYC 필수.</li>
+      <li><strong>Binance·Bybit (해외)</strong> — 선물·레버리지 자동매매에 강력. 트래블룰 송금 절차가 필요하지만 일단 자본만 들어가면 알고리즘 트레이딩에는 최적.</li>
+    </ul>
+    <p>처음이시면 <strong>현물 매매는 업비트, 자동매매는 Binance 현물 또는 선물</strong> 조합을 추천드립니다. <a href="/blog/binance-api-guide">Binance API 키 발급 가이드</a>에서 단계별로 안전 셋업까지 정리해뒀습니다.</p>
+
+    <h2>2단계 — API 키 발급과 보안 셋업</h2>
+    <p>거래소를 정했으면 API 키를 발급받습니다. 여기서 <strong>가장 흔한 실수가 권한 설정</strong>입니다. 자동매매에 필요한 권한은 정확히 두 가지뿐입니다.</p>
+    <ol>
+      <li><strong>읽기 권한</strong> — 잔고·주문 내역 조회용. 반드시 켭니다.</li>
+      <li><strong>매매(주문) 권한</strong> — 시장가·지정가 주문 실행용. 반드시 켭니다.</li>
+      <li><strong>출금 권한은 절대 끕니다</strong> — 키가 유출돼도 자산을 빼가지 못하게 막는 핵심 안전장치.</li>
+    </ol>
+    <p>그리고 <strong>IP 화이트리스트</strong>를 반드시 설정합니다. 어디서 API가 호출될지(Zepta 같은 클라우드 서비스의 IP) 미리 등록해두면 다른 곳에서 키가 새도 거부됩니다.</p>
+
+    <div class="ad-slot">
+      <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-5897295133273451" data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="true"></ins>
+      <script>(adsbygoogle=window.adsbygoogle||[]).push({});</script>
+    </div>
+
+    <h2>3단계 — 전략 선택 (33개 알파 중 어느 걸 켜는가)</h2>
+    <p>입문자가 가장 헤매는 부분이 "어떤 전략을 켤까"입니다. 33개 알파 전략을 다 켜면 자본이 분산돼서 수익이 잘 안 보이고, 1개만 켜면 그 전략이 안 통하는 시장에서 손실이 누적됩니다.</p>
+    <p>처음에는 <strong>추세추종 1개 + 평균회귀 1개 = 총 2개 조합</strong>을 권장합니다. 시장 국면이 변할 때 둘 중 하나는 통하기 때문에 변동성이 줄어듭니다. 어떤 전략이 어떤 국면에 통하는지 잘 모르시면 <a href="/blog/quant-strategies">퀀트 전략 33가지 정리</a>를 먼저 읽어보시면 좋습니다.</p>
+    <p>Zepta 에서는 <a href="/strategy">전략 패널</a>에서 각 알파의 최근 30일 성과를 바로 확인할 수 있습니다. 샤프 비율이 1.0 이상인 전략부터 켜는 게 안전합니다.</p>
+
+    <h2>4단계 — 소액 검증 (2주는 무조건)</h2>
+    <p>여기서 절대 건너뛰면 안 됩니다. 큰돈을 바로 넣으면 봇이 진짜 어떻게 행동하는지 모르는 상태로 손실 위험에 노출됩니다. <strong>$100~500 짜리 작은 계정으로 2주는 운영</strong>해보세요.</p>
+    <p>2주 동안 보셔야 할 것:</p>
+    <ul>
+      <li><strong>진입 빈도</strong> — 하루 몇 번 매매하는지. 너무 자주면 수수료에 까임.</li>
+      <li><strong>승률과 평균 수익률</strong> — 승률 50%여도 평균 수익이 평균 손실보다 크면 흑자.</li>
+      <li><strong>최대 낙폭(MDD)</strong> — 가장 크게 빠진 순간의 잔고 감소율. 자기 심리 한계 안에 있어야 함.</li>
+      <li><strong>슬리피지</strong> — 백테스트와 실거래 가격 차이. 0.1% 넘으면 전략 재검토.</li>
+    </ul>
+
+    <h2>5단계 — 운영 자동화 (알림·안전잠금·정기 점검)</h2>
+    <p>여기까지 왔으면 본격 운영입니다. 단 봇이 24시간 돌더라도 사람이 손 놓아도 되는 건 아닙니다. 다음 3가지는 무조건 자동화해두세요.</p>
+    <ol>
+      <li><strong>텔레그램 알림</strong> — 진입·청산마다 알림. <a href="/blog/telegram-trading-alerts">텔레그램 매매 알림 봇 활용법</a> 참고.</li>
+      <li><strong>안전잠금(Kill switch)</strong> — 일일 손실 한도 초과 시 자동 매매 중단. Zepta는 ROI -40% 자동 청산이 기본 적용됩니다.</li>
+      <li><strong>주 1회 점검</strong> — 알파 성과 변화 확인. 통계적 우위가 사라진 전략은 끄거나 비중을 줄입니다.</li>
+    </ol>
+
+    <div class="callout">
+      <strong>💡 결론</strong>: 비트코인 자동매매는 "잘 골라서, 작게 검증하고, 자동으로 안전망 만든다" — 이 세 가지만 지키면 입문자도 충분히 시작할 수 있습니다.
+    </div>
+
+    <div class="cta">
+      <p>거래소 연결·전략 선정·안전잠금이 한 화면에서 끝나는 자동매매. 소액부터 안전하게 시작하세요.</p>
+      <a href="/auto-trading">Zepta 에서 시작하기 →</a>
+    </div>
+
+    <div class="related">
+      <h3>이어서 읽기</h3>
+      <a href="/blog/binance-api-guide">Binance API 키 발급 가이드 — 자동매매 안전 셋업</a>
+      <a href="/blog/ai-trading-guide">AI 자동매매란? 시작 전에 꼭 알아야 할 것들</a>
+      <a href="/blog/leverage-risk-guide">암호화폐 레버리지 매매 위험과 안전한 사용법</a>
+      <a href="/blog/realistic-roi-expectation">자동매매 수익률 현실적 기대치 — Zepta 1주 데이터</a>
+      <a href="/blog/stop-loss-take-profit">손절·익절 라인 설정법 — 직관적인 5가지 방법</a>
+    </div>
+  </main>
+  <footer>
+    <p>© 2026 Zepta — <a href="/">홈</a> · <a href="/blog">블로그</a> · <a href="/contact">문의</a></p>
+  </footer>
+</body>
+</html>
