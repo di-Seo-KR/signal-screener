@@ -346,6 +346,25 @@ const CRYPTO_BOTS = [
     stats: { winRate: "52%", sharpeRatio: "1.3", mdd: "45%" },
     details: "16개 코인 전체를 대상으로 고변동성 구간을 감지하여 단기 스윙 거래합니다.",
   },
+  // ──────────────────────────────────────────────────────────────
+  // PLAN-BIZ #5 (2026-05-11) — DCA (Dollar-Cost Averaging) 봇
+  //   매수 타이밍 신경 안 쓰는 정기 정액 매수.
+  //   Pionex hit feature — 입문자 가장 안전한 진입.
+  //   isDCA: true 플래그로 활성화 모달이 DCA 전용 설정으로 분기.
+  // ──────────────────────────────────────────────────────────────
+  {
+    id: "dca-stable",
+    name: "DCA 정기매수 봇",
+    icon: "📈",
+    risk: "안전",
+    riskColor: "blue",
+    expectedReturn: "5-15%",
+    description: "정해진 주기로 정해진 금액만큼 자동 매수. 시장 타이밍 신경 X.",
+    tags: ["정기매수", "DCA", "장기투자"],
+    stats: { winRate: "—", sharpeRatio: "—", mdd: "—" },
+    details: "매일/매주/매월 같은 금액 매수. 평균 단가 안정화. 변동성 큰 시장에서 안전. 단, 시장 하락이 지속되면 평단가도 같이 내려가며 손실 가능.",
+    isDCA: true,
+  },
 ];
 
 function getRiskColor(riskColor, theme) {
@@ -533,47 +552,65 @@ function BotCard({ bot, onActivate, theme }) {
       </div>
 
       {/* 통계 — 큰 숫자 + 작은 라벨 (정보 위계 명확화) */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(3, 1fr)",
-        gap: "8px",
-        padding: "12px",
-        borderRadius: "10px",
-        background: c.card2,
-        border: `1px solid ${c.border}40`,
-      }}>
-        {(() => {
-          // ★ 2026-05-09: Sharpe → 안정성 등급으로 휴머나이즈 (S/A/B/C/D + 한글 라벨)
-          const sg = sharpeToGrade(bot.stats.sharpeRatio);
-          const sgColor = sg.color === "green" ? c.green : sg.color === "blue" ? c.blue
-                        : sg.color === "yellow" ? c.yellow : sg.color === "red" ? c.red : c.text3;
-          return [
-            { label: t("botStats.winRate"), value: bot.stats.winRate, color: c.green },
-            { label: "안정성", value: `${sg.grade} ${sg.label}`, color: sgColor, raw: bot.stats.sharpeRatio },
-            { label: t("botStats.mdd"), value: bot.stats.mdd, color: c.red },
-          ].map((s, i) => (
-            <div key={i} style={{ textAlign: "center" }}>
-              <div style={{ fontSize: "10px", color: c.text3, marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{s.label}</div>
-              <div style={{ fontSize: i === 1 ? "13px" : "16px", fontWeight: 800, color: s.color, letterSpacing: "-0.01em" }}>{s.value}</div>
-              {s.raw && (
-                <div style={{ fontSize: "9px", color: c.text3, marginTop: "1px", fontFamily: "var(--z-font-mono)" }}>
-                  Sharpe {s.raw}
-                </div>
-              )}
-            </div>
-          ));
-        })()}
-      </div>
+      {/* ★ DCA 봇은 백테스트 통계 대신 전용 안내 — "타이밍 안 보는 정기매수" 강조 */}
+      {bot.isDCA ? (
+        <div style={{
+          padding: "12px 14px",
+          borderRadius: "10px",
+          background: `${c.blue}08`,
+          border: `1px solid ${c.blue}25`,
+          fontSize: "13px",
+          color: c.text2,
+          lineHeight: 1.55,
+        }}>
+          <div style={{ fontWeight: 700, color: c.text1, marginBottom: "4px", fontSize: "13px" }}>📈 어떻게 작동하나요?</div>
+          매일/매주/매월 같은 금액을 자동으로 매수해요. 가격이 떨어진 날은 더 많이, 오른 날은 더 적게 사서 <strong style={{ color: c.text1 }}>평균 단가</strong>가 안정화됩니다.
+        </div>
+      ) : (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: "8px",
+          padding: "12px",
+          borderRadius: "10px",
+          background: c.card2,
+          border: `1px solid ${c.border}40`,
+        }}>
+          {(() => {
+            // ★ 2026-05-09: Sharpe → 안정성 등급으로 휴머나이즈 (S/A/B/C/D + 한글 라벨)
+            const sg = sharpeToGrade(bot.stats.sharpeRatio);
+            const sgColor = sg.color === "green" ? c.green : sg.color === "blue" ? c.blue
+                          : sg.color === "yellow" ? c.yellow : sg.color === "red" ? c.red : c.text3;
+            return [
+              { label: t("botStats.winRate"), value: bot.stats.winRate, color: c.green },
+              { label: "안정성", value: `${sg.grade} ${sg.label}`, color: sgColor, raw: bot.stats.sharpeRatio },
+              { label: t("botStats.mdd"), value: bot.stats.mdd, color: c.red },
+            ].map((s, i) => (
+              <div key={i} style={{ textAlign: "center" }}>
+                <div style={{ fontSize: "10px", color: c.text3, marginBottom: "3px", textTransform: "uppercase", letterSpacing: "0.04em" }}>{s.label}</div>
+                <div style={{ fontSize: i === 1 ? "13px" : "16px", fontWeight: 800, color: s.color, letterSpacing: "-0.01em" }}>{s.value}</div>
+                {s.raw && (
+                  <div style={{ fontSize: "9px", color: c.text3, marginTop: "1px", fontFamily: "var(--z-font-mono)" }}>
+                    Sharpe {s.raw}
+                  </div>
+                )}
+              </div>
+            ));
+          })()}
+        </div>
+      )}
 
-      {/* 모의 ROI 차트 */}
-      <div style={{
-        padding: "10px",
-        borderRadius: "10px",
-        background: c.card2,
-        border: `1px solid ${c.border}40`,
-      }}>
-        <MiniEquityChart data={equityCurve} color={chartColor} theme={theme} isMobile={false} />
-      </div>
+      {/* 모의 ROI 차트 — DCA 봇은 백테스트가 의미 없어 숨김 */}
+      {!bot.isDCA && (
+        <div style={{
+          padding: "10px",
+          borderRadius: "10px",
+          background: c.card2,
+          border: `1px solid ${c.border}40`,
+        }}>
+          <MiniEquityChart data={equityCurve} color={chartColor} theme={theme} isMobile={false} />
+        </div>
+      )}
 
       {/* 활성화 버튼 — 항상 동일 형태, 48px 터치 타겟 */}
       <button
@@ -1695,6 +1732,17 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
   // 실전매매 확인 다이얼로그
   const [confirmRealTrading, setConfirmRealTrading] = useState(null); // { bot, isStockBot }
 
+  // ── PLAN-BIZ #5 (2026-05-11): DCA 봇 전용 설정 모달 상태 ──
+  //   isDCA 봇은 일반 봇과 달리 종목/금액/주기/시간을 입력받음.
+  //   별도 모달로 분리해 일반 봇 플로우 보존.
+  const [pendingDCABot, setPendingDCABot] = useState(null);
+  const [dcaConfig, setDcaConfig] = useState({
+    symbol: "BTCUSDT",
+    amount: "50",
+    frequency: "weekly", // daily | weekly | monthly
+    hour: 9, // UTC 0~23
+  });
+
   const handleActivateBot = useCallback((bot) => {
     if (!user) {
       showToast("error", "로그인이 필요합니다. 먼저 로그인해주세요.");
@@ -1713,11 +1761,74 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
   const handleConfirmRealTradingStart = useCallback(() => {
     if (!confirmRealTrading) return;
     const { bot } = confirmRealTrading;
+    // ★ DCA 봇은 전용 모달로 분기 — 종목·금액·주기·시간 입력 필요
+    if (bot.isDCA) {
+      setPendingDCABot(bot);
+      setDcaConfig({ symbol: "BTCUSDT", amount: "50", frequency: "weekly", hour: 9 });
+      setConfirmRealTrading(null);
+      return;
+    }
     // 실전매매 확인 후 배분 모달로 진행
     setPendingBot(bot);
     setAllocationInput("500"); // 안전 권장 — 처음엔 소액 ($500) 부터
     setConfirmRealTrading(null);
   }, [confirmRealTrading]);
+
+  // ── DCA 봇 활성화 확정 핸들러 ──
+  //   1) /api/dca-config 호출 → KV `di:dca:user:<uid>:configs` 에 저장
+  //   2) activeBots 에 isDCA 플래그 + dcaConfig 보존하여 등록
+  //   3) dca-runner cron 이 매시간 이 KV 를 읽어 매수 주문 실행
+  const handleConfirmDCAStart = useCallback(async () => {
+    if (!pendingDCABot || !user) return;
+    const amt = parseFloat(dcaConfig.amount);
+    if (!amt || amt < 10) {
+      showToast("error", "최소 매수 금액은 10 USDT 입니다.");
+      return;
+    }
+    const symbol = String(dcaConfig.symbol || "").toUpperCase().trim();
+    if (!symbol || !/^[A-Z0-9]{3,15}USDT$/.test(symbol)) {
+      showToast("error", "올바른 USDT 페어를 입력해주세요. 예: BTCUSDT");
+      return;
+    }
+    const config = {
+      id: `dca-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      symbol,
+      amount: amt,
+      frequency: dcaConfig.frequency,
+      hour: Math.min(23, Math.max(0, parseInt(dcaConfig.hour, 10) || 0)),
+      createdAt: Date.now(),
+      lastRun: null,
+      totalInvested: 0,
+      runs: 0,
+    };
+    try {
+      const res = await fetch("/api/dca-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, action: "add", config }),
+      });
+      const j = await res.json();
+      if (!j?.ok) throw new Error(j?.error || "DCA 설정 저장 실패");
+    } catch (e) {
+      showToast("error", `DCA 설정 실패: ${e.message}`);
+      return;
+    }
+    // activeBots 에 등록 — allocation 은 12회 분 추정 (월 기준)
+    const estimatedMonthly = dcaConfig.frequency === "daily" ? amt * 30
+                          : dcaConfig.frequency === "weekly" ? amt * 4 : amt;
+    setActiveBots(prev => [...prev, {
+      botId: pendingDCABot.id,
+      startedAt: Date.now(),
+      trades: 0,
+      allocation: Math.round(estimatedMonthly * 6), // 6개월 가정
+      isDCA: true,
+      dcaConfig: config,
+    }]);
+    setActiveBot(pendingDCABot);
+    showToast("success", `DCA 봇 시작 — ${config.symbol} ${amt} USDT/${config.frequency}`);
+    ga.botActivated(pendingDCABot.id);
+    setPendingDCABot(null);
+  }, [pendingDCABot, dcaConfig, user, showToast]);
 
   const handleConfirmAllocation = useCallback(() => {
     if (!pendingBot) return;
@@ -2101,6 +2212,151 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
                   background: c.blue, color: "#fff", border: "none", cursor: "pointer", minHeight: "44px",
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>운영 시작</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ──────────────────────────────────────────────────────────
+            DCA 봇 활성화 모달 (PLAN-BIZ #5, 2026-05-11)
+            종목 / 매수 금액 / 주기 / 시간 입력
+        ────────────────────────────────────────────────────────── */}
+        {pendingDCABot && (
+          <div style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 9999,
+          }} onClick={() => setPendingDCABot(null)}>
+            <div style={{
+              background: c.card, borderRadius: "16px", padding: isMobile ? "20px 16px" : "28px",
+              width: "min(460px, 92vw)", maxHeight: "92vh", overflowY: "auto",
+              border: `1px solid ${c.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+            }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
+                <span style={{ fontSize: "32px" }}>{pendingDCABot.icon}</span>
+                <div style={{ minWidth: 0 }}>
+                  <h3 style={{ margin: 0, color: c.text1, fontSize: "20px" }}>{pendingDCABot.name}</h3>
+                  <span style={{ fontSize: "14px", color: c.text2 }}>정기 매수 설정</span>
+                </div>
+              </div>
+
+              {/* 안내 */}
+              <div style={{
+                padding: "10px 12px", background: `${c.blue}08`, borderRadius: "8px",
+                border: `1px solid ${c.blue}25`, marginBottom: "14px", fontSize: "13px",
+                color: c.text2, lineHeight: 1.55,
+              }}>
+                💡 입력한 주기와 시간(UTC)에 자동으로 매수가 실행됩니다. 변동성 큰 시장에서 평균 단가를 안정화하는 입문자 친화 전략이에요.
+              </div>
+
+              {/* 종목 */}
+              <div style={{ marginBottom: "14px" }}>
+                <label style={{ fontSize: "13px", color: c.text2, display: "block", marginBottom: "6px", fontWeight: 600 }}>매수 종목 (USDT 페어)</label>
+                <input
+                  type="text"
+                  value={dcaConfig.symbol}
+                  onChange={e => setDcaConfig({ ...dcaConfig, symbol: e.target.value.toUpperCase() })}
+                  placeholder="예: BTCUSDT"
+                  style={{
+                    width: "100%", padding: "12px", borderRadius: "8px", border: `1px solid ${c.border}`,
+                    background: c.card2, color: c.text1, fontSize: "16px", fontWeight: 600, boxSizing: "border-box", minHeight: "44px",
+                    textTransform: "uppercase",
+                  }}
+                />
+                <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
+                  {["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"].map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setDcaConfig({ ...dcaConfig, symbol: s })}
+                      style={{
+                        padding: "6px 12px", borderRadius: "999px", fontSize: "12px", fontWeight: 600,
+                        background: dcaConfig.symbol === s ? c.blue : `${c.blue}10`,
+                        color: dcaConfig.symbol === s ? "#fff" : c.blue,
+                        border: `1px solid ${c.blue}30`, cursor: "pointer", minHeight: "30px",
+                      }}
+                    >{s.replace("USDT", "")}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 매수 금액 */}
+              <div style={{ marginBottom: "14px" }}>
+                <label style={{ fontSize: "13px", color: c.text2, display: "block", marginBottom: "6px", fontWeight: 600 }}>매수 금액 (USDT, 1회당)</label>
+                <input
+                  type="number"
+                  value={dcaConfig.amount}
+                  onChange={e => setDcaConfig({ ...dcaConfig, amount: e.target.value })}
+                  placeholder="예: 50"
+                  min="10"
+                  style={{
+                    width: "100%", padding: "12px", borderRadius: "8px", border: `1px solid ${c.border}`,
+                    background: c.card2, color: c.text1, fontSize: "16px", fontWeight: 600, boxSizing: "border-box", minHeight: "44px",
+                  }}
+                />
+                <div style={{ fontSize: "11px", color: c.text3, marginTop: "4px" }}>최소 10 USDT — 입문자는 소액부터 권장</div>
+              </div>
+
+              {/* 주기 */}
+              <div style={{ marginBottom: "14px" }}>
+                <label style={{ fontSize: "13px", color: c.text2, display: "block", marginBottom: "6px", fontWeight: 600 }}>매수 주기</label>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  {[
+                    { v: "daily", label: "매일" },
+                    { v: "weekly", label: "매주 (월요일)" },
+                    { v: "monthly", label: "매월 (1일)" },
+                  ].map(opt => (
+                    <button
+                      key={opt.v}
+                      type="button"
+                      onClick={() => setDcaConfig({ ...dcaConfig, frequency: opt.v })}
+                      style={{
+                        flex: 1, padding: "10px", borderRadius: "8px", fontSize: "13px", fontWeight: 600,
+                        background: dcaConfig.frequency === opt.v ? c.blue : c.card2,
+                        color: dcaConfig.frequency === opt.v ? "#fff" : c.text2,
+                        border: `1px solid ${dcaConfig.frequency === opt.v ? c.blue : c.border}`,
+                        cursor: "pointer", minHeight: "44px",
+                      }}
+                    >{opt.label}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 시간 */}
+              <div style={{ marginBottom: "16px" }}>
+                <label style={{ fontSize: "13px", color: c.text2, display: "block", marginBottom: "6px", fontWeight: 600 }}>실행 시간 (UTC)</label>
+                <select
+                  value={dcaConfig.hour}
+                  onChange={e => setDcaConfig({ ...dcaConfig, hour: parseInt(e.target.value, 10) })}
+                  style={{
+                    width: "100%", padding: "12px", borderRadius: "8px", border: `1px solid ${c.border}`,
+                    background: c.card2, color: c.text1, fontSize: "15px", fontWeight: 600, boxSizing: "border-box", minHeight: "44px",
+                  }}
+                >
+                  {Array.from({ length: 24 }, (_, h) => (
+                    <option key={h} value={h}>{String(h).padStart(2, "0")}:00 UTC (KST {String((h + 9) % 24).padStart(2, "0")}:00)</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 법적 면책 */}
+              <div style={{
+                padding: "10px 12px", background: `${c.yellow}08`, borderRadius: "8px",
+                border: `1px solid ${c.yellow}25`, marginBottom: "16px", fontSize: "12px",
+                color: c.text2, lineHeight: 1.55,
+              }}>
+                ⚠️ <strong>주의</strong>: DCA 도 손실 가능합니다 — 시장 하락이 지속되면 평단가도 같이 내려가요. 본 도구는 투자 권유가 아니며, 매매 결정은 본인 책임입니다.
+              </div>
+
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button onClick={() => setPendingDCABot(null)} style={{
+                  flex: 1, padding: "12px 16px", borderRadius: "8px", fontSize: "15px", fontWeight: 600,
+                  background: c.card2, color: c.text2, border: `1px solid ${c.border}`, cursor: "pointer", minHeight: "44px",
+                }}>취소</button>
+                <button onClick={handleConfirmDCAStart} style={{
+                  flex: 1, padding: "12px 16px", borderRadius: "8px", fontSize: "15px", fontWeight: 700,
+                  background: c.blue, color: "#fff", border: "none", cursor: "pointer", minHeight: "44px",
+                }}>DCA 시작</button>
               </div>
             </div>
           </div>
