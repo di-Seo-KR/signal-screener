@@ -62,7 +62,16 @@ async function pullRecentSignals({ userId, lookbackMs = 4 * 60 * 60 * 1000, adva
   const lastSeenKey = `di:real:user:${userId}:last-signal-ts`;
   const lastSeen = advanceCursor ? ((await kv.get(lastSeenKey)) || 0) : 0;
   const now = Date.now();
-  const minTs = advanceCursor ? lastSeen : (now - lookbackMs);
+  // ★ 2026-05-11 fix: cursor 와 lookback 둘 다 적용.
+  //   이전: advanceCursor=true 면 lastSeen 만 보고 lookback 무시 →
+  //         가상 포트폴리오 한도로 cursor 가 14:46 같이 너무 앞에 가있으면
+  //         다음 cron 마다 "그 이후 시그널만" 봐서 풀 빔.
+  //   현재: minTs = min(lastSeen, now - lookbackMs).
+  //         cursor 와 lookback 중 더 오래된 시점을 minTs 로 → lookback 윈도우 안의 시그널은 항상 잡힘.
+  //   (작을수록 더 많이 보는 게 minTs 의미)
+  const minTs = advanceCursor
+    ? Math.min(lastSeen, now - lookbackMs)
+    : (now - lookbackMs);
 
   // ★ 2026-05-09 audit M2: BUY 만 수집하던 게 SHORT 시그널 영구 누락 원인.
   //   가상매매 봇이 SELL 시그널을 만들어도 실전 엔진이 절대 못 봄 → 약세장 알파 0.
