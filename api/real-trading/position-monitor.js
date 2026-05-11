@@ -129,19 +129,35 @@ async function checkUser(userId) {
       // ★ M5 fix: 객체 배열 직접 mutate (이전엔 string vs 객체 비교 버그)
       closedEntry.realizedPnL = realizedSafe;
 
-      // ★ 청산 감지 텔레그램 알림 (수동·자동 구분, realized 누락도 fallback)
+      // ★ 청산 감지 텔레그램 알림 (수동·봇 구분, realized 누락도 fallback)
       try {
         const planKey = `di:real:user:${userId}:plan:${sym}`;
         const plan = await kv.get(planKey);
         const isBotEntry = !!(plan && plan.openedAt);
+        // ★ 2026-05-11 fix: plan.botClosedAt 이 set 됐으면 직전 cron 에서 봇이 가격
+        //   SL/TP 도달로 청산한 케이스 → 정확한 사유 라벨 + 알림 톤 조정.
+        const wasBotClose = !!(plan && plan.botClosedAt);
+        const botReason = plan?.botCloseReason; // "price_sl_hit" | "price_tp_hit"
         const { sendCards, buildCard } = await import("../_shared/telegram.js");
         const hasPnl = realized != null && realized !== 0;
         const sign = realizedSafe >= 0 ? "+" : "";
         const tag = !hasPnl ? "🔔" : realizedSafe >= 0 ? "✅" : "🔻";
+
+        // 제목 결정: 봇 SL/TP 청산이면 정확한 사유, 일반 봇 진입이면 "봇 포지션 청산", 그 외 "수동"
+        let title;
+        if (wasBotClose) {
+          const label = botReason === "price_tp_hit" ? "익절 확정" : botReason === "price_sl_hit" ? "손절 확정" : "봇 청산 확정";
+          title = `${label} — ${sym}`;
+        } else if (isBotEntry) {
+          title = `봇 포지션 청산 — ${sym}`;
+        } else {
+          title = `수동 포지션 청산 — ${sym}`;
+        }
+
         await sendCards([
           buildCard({
             tag,
-            title: `${isBotEntry ? "봇" : "수동"} 포지션 청산 — ${sym}`,
+            title,
             lines: [
               hasPnl
                 ? `실현 손익 ${sign}$${realizedSafe.toFixed(2)}`
@@ -150,12 +166,14 @@ async function checkUser(userId) {
                 ? `봇 진입 시점: ${new Date(plan.openedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}`
                 : "사용자가 직접 청산하신 포지션입니다.",
             ],
-            hint: isBotEntry
-              ? "봇이 SL/TP 룰 또는 트레일링 스탑으로 자동 청산했습니다."
-              : null,
+            hint: wasBotClose
+              ? "봇이 mark price 모니터링으로 SL/TP 가격 도달 시 시장가 청산했습니다."
+              : isBotEntry
+                ? "봇이 진입한 포지션이지만 사용자가 직접 청산하거나 외부 요인으로 닫혔습니다."
+                : null,
           }),
         ]);
-        // 봇 진입이었다면 plan KV 정리
+        // 봇 진입이었으면 plan KV 정리 (botClosedAt 포함)
         if (isBotEntry) {
           await kv.del(planKey);
         }
@@ -170,77 +188,18 @@ async function checkUser(userId) {
   // 여기서 그 plan 을 읽어 trailing/timeStop 판정.
   report.timeStopped = [];
   report.trailed = [];
-  report.slMissingForceClosed = [];
   for (const p of nonZero) {
     const sym = p.symbol;
     const planKey = `di:real:user:${userId}:plan:${sym}`;
     const plan = await kv.get(planKey);
     if (!plan || !plan.openedAt || !plan.slPct) continue;
 
-    // ★ 2026-05-09 audit C3: bracket SL attach 실패한 포지션 5분 후 자동 force-close.
-    //   plan.slMissingSince 가 5분 이상 경과 + 여전히 binance SL 주문 없음 → 즉시 청산.
-    //   AAVE 0.03초 사고 같은 즉시 청산 위험 회피 위해 5분 cooldown.
-    if (plan.slMissingSince) {
-      const elapsed = Date.now() - plan.slMissingSince;
-      const COOLDOWN_MS = 5 * 60 * 1000;
-      if (elapsed >= COOLDOWN_MS) {
-        // 사용자가 binance UI 에서 SL 직접 추가했는지 확인
-        let userAddedSL = false;
-        try {
-          const opens = await getOpenOrders({ ...creds, symbol: sym });
-          userAddedSL = (opens || []).some((o) =>
-            (o.type === "STOP_MARKET" || o.type === "STOP")
-            && (o.reduceOnly || o.closePosition === "true" || o.closePosition === true)
-          );
-        } catch {}
-        if (userAddedSL) {
-          // 사용자가 SL 추가했으면 slMissingSince 클리어
-          delete plan.slMissingSince;
-          await kv.set(planKey, plan);
-        } else {
-          // 강제 시장가 청산
-          try {
-            const closeQty = Math.abs(parseFloat(p.positionAmt));
-            await placeOrder({
-              ...creds,
-              params: {
-                symbol: sym,
-                side: parseFloat(p.positionAmt) > 0 ? "SELL" : "BUY",
-                type: "MARKET",
-                quantity: closeQty,
-                reduceOnly: "true",
-                newOrderRespType: "RESULT",
-              },
-            });
-            report.slMissingForceClosed.push({ sym, elapsedMin: (elapsed / 60000).toFixed(1) });
-            const logKey = `di:real:user:${userId}:engine-log`;
-            const log = (await kv.get(logKey)) || [];
-            log.unshift({
-              time: new Date().toISOString(),
-              event: "sl_missing_force_close",
-              symbol: sym,
-              elapsedMin: (elapsed / 60000).toFixed(1),
-            });
-            await kv.set(logKey, log.slice(0, 200));
-            try {
-              const { sendCards, buildCard } = await import("../_shared/telegram.js");
-              await sendCards([buildCard({
-                tag: "🚨",
-                title: `SL 누락 자동 청산 — ${sym}`,
-                lines: [
-                  `${(elapsed / 60000).toFixed(1)}분 동안 binance SL 부재 → 안전 차원에서 시장가 청산`,
-                  `다음에도 같은 종목 SL attach 실패하면 ZEPTA_BRACKET_RESCUE_MODE 또는 수동 SL 부착 검토.`,
-                ],
-              })], { channel: "real" });
-            } catch {}
-            await kv.del(planKey);
-            continue; // 다음 단계 평가 스킵
-          } catch (e) {
-            console.warn(`[monitor] SL-missing force close failed for ${sym}:`, e?.message);
-          }
-        }
-      }
-    }
+    // ★ 2026-05-11 대표 지시로 force-close 로직 제거.
+    //   이전 (audit C3): bracket SL attach 실패 시 5분 후 자동 force-close.
+    //   문제: 거의 항상 SL attach 가 실패하는 환경이라 매 진입마다 5분 만에 청산됨.
+    //   복구: bracket attach 실패해도 청산 안 함. 아래 mark-price 기반 SL/TP 모니터링
+    //         (slHit/tpHit 블록) 이 plan.slPrice/tpPrice 도달 시 시장가 청산함.
+    //         즉 binance bracket 없어도 봇이 직접 가격 보고 청산하는 fallback 동작.
 
     const side = parseFloat(p.positionAmt) > 0 ? "LONG" : "SHORT";
     const entryPrice = parseFloat(p.entryPrice);
@@ -308,8 +267,12 @@ async function checkUser(userId) {
             }),
           ]);
         } catch {}
-        // plan KV 정리 — 다음 cron 의 closed 감지에서 "수동" 으로 잘못 분류 방지
-        await kv.del(planKey);
+        // ★ 2026-05-11 fix: plan KV 즉시 삭제하지 않고 botClosedAt 플래그 set.
+        //   이전 (kv.del): 다음 cron 의 close detection 이 plan 못 찾아 "수동 청산" 으로 잘못 분류 + 알림 중복 발송.
+        //   현재: 플래그만 set → 다음 cron 이 플래그 보고 봇 청산으로 인지 + 실현 PnL 알림 후 plan 정리.
+        plan.botClosedAt = Date.now();
+        plan.botCloseReason = reason;
+        await kv.set(planKey, plan);
         continue; // 시간손절·트레일링 평가 스킵
       } catch (e) {
         console.warn(`[monitor] price SL/TP close failed for ${sym}:`, e?.message);
