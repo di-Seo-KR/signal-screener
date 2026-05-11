@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>암호화폐 레버리지 매매 위험과 안전한 사용법 | Zepta 블로그</title>
+  <meta name="description" content="레버리지 매매는 수익을 빠르게 늘리지만 자본을 한 번에 잃을 수도 있습니다. 청산가 계산, 적정 배율, 마진콜 회피, 손절 라인 설정까지 안전한 운용 가이드."/>
+  <meta name="keywords" content="암호화폐 레버리지, 비트코인 레버리지, 선물거래 위험, 청산가, 마진콜, 안전한 레버리지, 코인 선물"/>
+  <link rel="canonical" href="https://zepta.app/blog/leverage-risk-guide"/>
+  <meta name="robots" content="index, follow"/>
+  <meta property="og:title" content="암호화폐 레버리지 매매 위험과 안전한 사용법"/>
+  <meta property="og:description" content="레버리지 매매의 위험과 안전 운용 가이드. 청산가·적정 배율·마진콜 회피·손절 라인 설정까지."/>
+  <meta property="og:type" content="article"/>
+  <meta property="og:url" content="https://zepta.app/blog/leverage-risk-guide"/>
+  <meta property="og:image" content="https://zepta.app/og-image.png"/>
+  <meta property="og:locale" content="ko_KR"/>
+  <meta name="google-adsense-account" content="ca-pub-5897295133273451"/>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "암호화폐 레버리지 매매 위험과 안전한 사용법",
+    "description": "레버리지 매매의 위험과 안전 운용 가이드. 청산가·적정 배율·마진콜 회피·손절 라인 설정까지.",
+    "author": { "@type": "Organization", "name": "Zepta" },
+    "publisher": { "@type": "Organization", "name": "Zepta", "url": "https://zepta.app/", "logo": { "@type": "ImageObject", "url": "https://zepta.app/favicon-32.png" } },
+    "datePublished": "2026-05-11",
+    "dateModified": "2026-05-11",
+    "mainEntityOfPage": "https://zepta.app/blog/leverage-risk-guide",
+    "image": "https://zepta.app/og-image.png",
+    "inLanguage": "ko"
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "홈", "item": "https://zepta.app/" },
+      { "@type": "ListItem", "position": 2, "name": "블로그", "item": "https://zepta.app/blog" },
+      { "@type": "ListItem", "position": 3, "name": "레버리지 매매 위험", "item": "https://zepta.app/blog/leverage-risk-guide" }
+    ]
+  }
+  </script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#070B14;color:#9AA7BD;line-height:1.85}
+    .wrap{max-width:780px;margin:0 auto;padding:40px 20px}
+    nav{background:#101828;border-bottom:1px solid #1E2A42;padding:14px 20px;text-align:center}
+    nav a{margin:0 12px;font-size:15px;color:#9AA7BD;text-decoration:none}
+    nav a:hover{color:#F1F5FB}
+    .breadcrumb{font-size:13px;color:#64728C;margin-bottom:18px}
+    .breadcrumb a{color:#60A5FA;text-decoration:none}
+    h1{font-size:30px;font-weight:800;color:#F1F5FB;margin-bottom:10px;letter-spacing:-0.02em;line-height:1.3}
+    .meta-row{font-size:13px;color:#64728C;margin-bottom:28px}
+    h2{font-size:21px;font-weight:700;color:#F1F5FB;margin:36px 0 14px;letter-spacing:-0.01em}
+    p{font-size:16px;margin-bottom:14px}
+    strong{color:#F1F5FB}
+    a{color:#60A5FA;text-decoration:none}
+    a:hover{text-decoration:underline}
+    .callout{background:#0F1F3D;border-left:3px solid #3B82F6;padding:14px 18px;margin:18px 0;border-radius:6px;font-size:15px}
+    .warn{background:#3D0F1F;border-left:3px solid #EF4444;padding:14px 18px;margin:18px 0;border-radius:6px;font-size:15px;color:#FCA5A5}
+    .warn strong{color:#FECACA}
+    ul,ol{margin:0 0 16px 22px}
+    li{margin-bottom:6px;font-size:16px}
+    table{width:100%;border-collapse:collapse;margin:18px 0;font-size:15px}
+    th,td{border:1px solid #1E2A42;padding:10px;text-align:left}
+    th{background:#101828;color:#F1F5FB}
+    .related{background:#101828;border:1px solid #1E2A42;border-radius:12px;padding:20px;margin-top:48px}
+    .related h3{font-size:16px;color:#F1F5FB;margin-bottom:12px}
+    .related a{display:block;padding:8px 0;font-size:15px;border-top:1px solid #1E2A42;color:#9AA7BD}
+    .related a:first-of-type{border-top:none}
+    .related a:hover{color:#60A5FA;text-decoration:none}
+    .cta{background:linear-gradient(135deg,#0F1F3D 0%,#0a1530 100%);border:1px solid #3B82F640;border-radius:14px;padding:24px;text-align:center;margin:36px 0}
+    .cta a{display:inline-block;background:#3B82F6;color:#fff;padding:11px 22px;border-radius:8px;font-weight:700;margin-top:10px}
+    .ad-slot{margin:28px 0;padding:14px;background:#0A1220;border:1px solid #1E2A42;border-radius:10px;text-align:center;font-size:12px;color:#64728C}
+    footer{text-align:center;padding:40px 20px;color:#64728C;font-size:14px;border-top:1px solid #1E2A42;margin-top:60px}
+    @media(max-width:640px){h1{font-size:24px}.wrap{padding:24px 16px}p,li{font-size:15px}}
+  </style>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-BMP34JQ649"></script>
+  <script>
+    window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
+    gtag('js',new Date());gtag('config','G-BMP34JQ649',{page_path:'/blog/leverage-risk-guide'});
+    let _s75=false;window.addEventListener('scroll',()=>{
+      const sp=(window.scrollY+window.innerHeight)/document.body.scrollHeight;
+      if(sp>=0.75&&!_s75){_s75=true;gtag('event','blog_post_read',{post:'leverage-risk-guide',depth:75});}
+    },{passive:true});
+  </script>
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5897295133273451" crossorigin="anonymous"></script>
+</head>
+<body>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/auto-trading">AI 매매</a>
+    <a href="/screener">스크리너</a>
+    <a href="/blog">블로그</a>
+    <a href="/about">소개</a>
+  </nav>
+  <main class="wrap">
+    <div class="breadcrumb"><a href="/blog">← 블로그</a></div>
+    <h1>암호화폐 레버리지 매매 위험과 안전한 사용법</h1>
+    <div class="meta-row">2026년 5월 11일 · 리스크 관리 · 8분 읽기</div>
+
+    <p>비트코인 가격이 1% 움직였을 때 10배 레버리지면 내 잔고가 10% 움직입니다. 같은 1%인데 효과가 10배. 매력적이죠. 하지만 그 1%가 반대 방향으로 가면 자본 10%가 사라지고, 10% 빠지면 청산입니다. 레버리지 매매는 잘 쓰면 가속기, 잘못 쓰면 자본 파괴기입니다. 이 글에서 둘을 가르는 선이 정확히 어디인지 풀어드립니다.</p>
+
+    <div class="warn">
+      <strong>⚠️ 시작 전 한 마디</strong>: 레버리지 매매로 100% 손실(청산)을 경험하지 않은 트레이더는 거의 없습니다. "나는 안 그럴 거다"는 자만이 가장 위험합니다. 청산은 통계적으로 정해진 빈도로 발생합니다.
+    </div>
+
+    <h2>레버리지의 실제 작동 원리</h2>
+    <p>10배 레버리지로 $1,000 포지션을 잡는다는 건 $100 증거금으로 $1,000짜리 거래를 한다는 뜻입니다. 거래소가 $900을 빌려준 셈이고, 가격이 불리하게 움직여 증거금($100)이 다 까이면 거래소가 자동 청산합니다. 그게 마진콜입니다.</p>
+    <p>핵심 공식 (롱 포지션, 유지증거금률 무시 단순 계산):</p>
+    <ul>
+      <li><strong>청산가 ≈ 진입가 × (1 - 1/레버리지)</strong></li>
+      <li>예: 진입 $50,000, 10배 → 청산가 ≈ $45,000 (10% 하락)</li>
+      <li>예: 진입 $50,000, 50배 → 청산가 ≈ $49,000 (2% 하락)</li>
+    </ul>
+    <p>비트코인은 하루에 2~5% 흔들리는 게 흔합니다. 50배 레버리지면 평범한 하루 변동성에도 청산됩니다. 자세한 계산법은 <a href="/blog/liquidation-price-calculation">선물거래 청산가 계산법</a>에서 다뤘습니다.</p>
+
+    <h2>안전한 레버리지 배율은 어디까지?</h2>
+    <table>
+      <tr><th>배율</th><th>청산까지 허용 변동</th><th>안전도</th></tr>
+      <tr><td>1배 (현물)</td><td>100%</td><td>🟢 안전</td></tr>
+      <tr><td>2~3배</td><td>33~50%</td><td>🟢 안전</td></tr>
+      <tr><td>5배</td><td>20%</td><td>🟡 주의</td></tr>
+      <tr><td>10배</td><td>10%</td><td>🟠 위험</td></tr>
+      <tr><td>20배+</td><td>5% 이하</td><td>🔴 도박</td></tr>
+    </table>
+    <p>입문자께는 <strong>2~3배 이상은 권장하지 않습니다</strong>. 통계적으로 비트코인 일중 변동성은 평균 3% 안팎이라 5배만 돼도 평균보다 큰 하루가 오면 청산권에 들어갑니다.</p>
+
+    <div class="ad-slot">
+      <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-5897295133273451" data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="true"></ins>
+      <script>(adsbygoogle=window.adsbygoogle||[]).push({});</script>
+    </div>
+
+    <h2>마진콜 회피 4가지 규칙</h2>
+    <ol>
+      <li><strong>증거금 여유 확보</strong> — 청산가까지 거리를 최소 15% 이상 두기. 진입할 때부터 "여기까지 빠져도 살아남게" 배율을 정합니다.</li>
+      <li><strong>손절가는 청산가보다 위에</strong> — 손절가가 청산가보다 아래면 청산이 먼저 터집니다. 자동매매 봇은 항상 손절가가 청산가 위인지 확인해야 합니다.</li>
+      <li><strong>분할 진입</strong> — 한 번에 들어가지 말고 3회로 나눠 평단을 낮춥니다. 변동성 큰 시장일수록 효과적.</li>
+      <li><strong>크로스 vs 이솔레이티드 선택</strong> — 입문자는 이솔레이티드(격리) 마진. 한 포지션 손실이 전체 잔고로 번지지 않습니다.</li>
+    </ol>
+
+    <h2>레버리지가 정당화되는 시점</h2>
+    <p>레버리지를 무조건 피하라는 게 아닙니다. 다음 조건이 모두 충족될 때만 합리적입니다.</p>
+    <ul>
+      <li>백테스트 샤프 비율이 1.5 이상인 전략 — <a href="/blog/sharpe-ratio-profit-factor">샤프 비율 이해</a> 참고</li>
+      <li>최대 낙폭(MDD) 15% 이하 — 변동성이 충분히 낮아야 레버리지가 의미가 있음</li>
+      <li>손절 라인이 자동으로 잡히는 봇 — <a href="/blog/stop-loss-take-profit">손절·익절 라인 설정법</a></li>
+      <li>전체 자본 중 10% 이하만 레버리지에 노출</li>
+    </ul>
+
+    <h2>Zepta 의 안전 운용 방식</h2>
+    <p>Zepta <a href="/real-trading">실거래 자동매매</a>는 기본 배율이 <strong>3배</strong>로 고정되어 있고, 거래마다 <strong>ROI -40% 자동 손절</strong>이 강제로 설정됩니다. 이 두 가지만으로도 청산을 통계적으로 거의 막을 수 있습니다. 사용자가 임의로 배율을 더 높이지 못하게 막은 게 의도된 설계입니다.</p>
+
+    <div class="callout">
+      <strong>💡 한 줄 요약</strong>: 레버리지는 변동성 증폭기입니다. 2~3배까지는 도구, 10배 이상은 도박입니다. 청산가까지 거리를 항상 측정하고, 그 거리가 일중 변동성의 5배 이상일 때만 사용하세요.
+    </div>
+
+    <div class="cta">
+      <p>3배 고정 배율 + 자동 손절로 안전하게 설계된 자동매매. 입문자도 무리 없이 시작할 수 있습니다.</p>
+      <a href="/real-trading">안전 자동매매 시작하기 →</a>
+    </div>
+
+    <div class="related">
+      <h3>이어서 읽기</h3>
+      <a href="/blog/liquidation-price-calculation">선물거래 청산가 계산법 — 마진콜 회피</a>
+      <a href="/blog/stop-loss-take-profit">손절·익절 라인 설정법 — 직관적인 5가지 방법</a>
+      <a href="/blog/kelly-criterion-position-sizing">켈리 공식으로 포지션 사이징</a>
+      <a href="/blog/bitcoin-auto-trading-5-steps">비트코인 자동매매 시작하기 5단계 가이드</a>
+    </div>
+  </main>
+  <footer>
+    <p>© 2026 Zepta — <a href="/">홈</a> · <a href="/blog">블로그</a> · <a href="/contact">문의</a></p>
+  </footer>
+</body>
+</html>

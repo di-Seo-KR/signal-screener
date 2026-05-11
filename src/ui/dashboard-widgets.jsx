@@ -221,6 +221,238 @@ export function LiveMetricsRow({ orders = [], isMobile = false }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// Widget 2b — 기간별 수익률 + 금액 (일/주/월/누적)
+// ═══════════════════════════════════════════════════════════════════
+
+/** equityHistory 에서 targetTs (ms) 와 가장 가까운 sample 의 equity 반환.
+ *  history 형식: [{ ts, equity }]
+ *  ts 가 target 보다 작거나 같은 가장 큰 sample 우선 (= "그 시점의 equity").
+ *  없으면 가장 오래된 sample 반환.
+ */
+function equityAt(history, targetTs) {
+  if (!Array.isArray(history) || history.length === 0) return null;
+  // sample 들은 시간순으로 정렬돼 있다고 가정 (push 순서)
+  let best = null;
+  for (const s of history) {
+    if (s.ts <= targetTs) best = s;
+    else break;
+  }
+  return best ? best.equity : history[0].equity;
+}
+
+export function PeriodReturnsCard({ equity, breaker = {}, isMobile = false }) {
+  const periods = useMemo(() => {
+    if (!equity || equity <= 0) return [];
+    const now = Date.now();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const history = Array.isArray(breaker.equityHistory) ? breaker.equityHistory : [];
+
+    // 일: breaker.dayStartEquity 우선 (정확한 KST 자정 reset 기반)
+    const dayStart = breaker.dayStartEquity || equityAt(history, now - dayMs) || equity;
+    const weekStart = breaker.weekStartEquity || equityAt(history, now - 7 * dayMs) || equity;
+    const monthStart = equityAt(history, now - 30 * dayMs) || equity;
+    // 누적: equityHistory 의 가장 오래된 sample = 봇 시작 시점 근사
+    const allStart = history.length > 0 ? history[0].equity : equity;
+
+    const mk = (label, start, hint) => {
+      const change = equity - start;
+      const pct = start > 0 ? (change / start) * 100 : 0;
+      return { label, start, change, pct, hint };
+    };
+
+    return [
+      mk("오늘", dayStart, "KST 자정 reset 기준"),
+      mk("이번 주", weekStart, "월요일 KST 자정 기준"),
+      mk("이번 달", monthStart, "최근 30일 시작"),
+      mk("누적", allStart, "봇 시작 이후"),
+    ];
+  }, [equity, breaker]);
+
+  if (periods.length === 0) {
+    return (
+      <div style={{
+        padding: 18, textAlign: "center", fontSize: 12,
+        color: "var(--z-text-3)", border: "1px dashed var(--z-border)",
+        borderRadius: "var(--z-r-md)",
+      }}>
+        자본 데이터가 준비되면 표시됩니다.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)",
+      gap: 8,
+    }}>
+      {periods.map((p, i) => {
+        const isUp = p.change >= 0;
+        const color = isUp ? "var(--z-green-hi)" : "var(--z-red-hi)";
+        const bg = isUp
+          ? "linear-gradient(135deg, rgba(34, 197, 94, 0.10) 0%, rgba(22, 163, 74, 0.04) 100%)"
+          : "linear-gradient(135deg, rgba(239, 68, 68, 0.10) 0%, rgba(220, 38, 38, 0.04) 100%)";
+        const border = isUp ? "1px solid rgba(34, 197, 94, 0.2)" : "1px solid rgba(239, 68, 68, 0.2)";
+        return (
+          <div key={i} style={{
+            background: bg, border,
+            borderRadius: "var(--z-r-md)", padding: isMobile ? "10px 12px" : "12px 14px",
+            display: "flex", flexDirection: "column", justifyContent: "center",
+            minHeight: isMobile ? 78 : 92,
+          }}>
+            <div style={{
+              fontSize: 14, color: "var(--z-text-3)", fontWeight: 700,
+              marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5,
+            }}>
+              {p.label} 수익
+            </div>
+            <div style={{
+              fontSize: isMobile ? 17 : 21, fontWeight: 900, color,
+              fontFamily: "var(--z-font-mono)", lineHeight: 1.05,
+            }}>
+              {isUp ? "+" : ""}{p.pct.toFixed(2)}%
+            </div>
+            <div style={{
+              fontSize: 14, color, fontWeight: 700, fontFamily: "var(--z-font-mono)",
+              marginTop: 2, lineHeight: 1.2,
+            }}>
+              {isUp ? "+" : ""}{fmtUsd(p.change, 2)}
+            </div>
+            <div style={{ fontSize: 14, color: "var(--z-text-3)", marginTop: 4, lineHeight: 1.2 }}>
+              시작 {fmtUsd(p.start, 0)} · {p.hint}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// Widget 2c — 운영 메트릭 (평균 보유시간 · 거래 빈도 · 노출률 · 마진 사용률)
+// ═══════════════════════════════════════════════════════════════════
+export function OperationalMetrics({ positions = [], orders = [], equity = 0, isMobile = false }) {
+  const metrics = useMemo(() => {
+    // 1) 평균 보유시간 — orders 에서 BUY → SELL 쌍 시간 차 평균
+    const buys = (orders || []).filter((o) => o.side === "BUY");
+    const sells = (orders || []).filter((o) => o.side === "SELL" || o.reduceOnly);
+    let holdMs = 0;
+    let holdCount = 0;
+    const bySymbol = {};
+    for (const b of buys) bySymbol[b.symbol] = b.time;
+    for (const s of sells) {
+      const bTime = bySymbol[s.symbol];
+      if (bTime && s.time) {
+        const diff = new Date(s.time).getTime() - new Date(bTime).getTime();
+        if (diff > 0) { holdMs += diff; holdCount += 1; }
+      }
+    }
+    const avgHoldH = holdCount > 0 ? holdMs / holdCount / 3600000 : 0;
+
+    // 2) 거래 빈도 — 최근 24h 동안의 청산 수 (SELL with pnl)
+    const dayAgo = Date.now() - 24 * 3600000;
+    const dayClosed = (orders || []).filter((o) => {
+      const t = o.time ? new Date(o.time).getTime() : 0;
+      const pnl = parseFloat(o.pnl || o.realizedPnl || 0);
+      return t >= dayAgo && pnl !== 0;
+    }).length;
+
+    // 3) 현재 노셔널 노출 + 마진 사용률
+    let totalNotional = 0, totalMargin = 0;
+    for (const p of positions) {
+      const notional = Math.abs((p.markPrice || p.entryPrice || 0) * (p.positionAmt || 0));
+      const lev = parseFloat(p.leverage || 10) || 10;
+      totalNotional += notional;
+      totalMargin += notional / lev;
+    }
+    const marginUsedPct = equity > 0 ? (totalMargin / equity) * 100 : 0;
+    const notionalRatio = equity > 0 ? totalNotional / equity : 0;
+
+    // 4) 현재 unrealized P&L
+    const unrealized = positions.reduce((s, p) => s + (parseFloat(p.unRealizedProfit) || 0), 0);
+    const unrealizedPct = equity > 0 ? (unrealized / equity) * 100 : 0;
+
+    return {
+      avgHoldH, holdCount,
+      dayClosed,
+      totalNotional, totalMargin, marginUsedPct, notionalRatio,
+      unrealized, unrealizedPct,
+      positionCount: positions.length,
+    };
+  }, [positions, orders, equity]);
+
+  const cards = [
+    {
+      label: "평균 보유시간",
+      value: metrics.holdCount > 0 ? `${metrics.avgHoldH.toFixed(1)}h` : "—",
+      sub: metrics.holdCount > 0 ? `최근 ${metrics.holdCount}건 청산 기준` : "청산 후 집계",
+      color: "var(--z-text-1)",
+    },
+    {
+      label: "24h 거래량",
+      value: metrics.dayClosed > 0 ? `${metrics.dayClosed}건` : "0건",
+      sub: "최근 24시간 청산",
+      color: metrics.dayClosed >= 5 ? "var(--z-green-hi)" : metrics.dayClosed >= 1 ? "var(--z-yellow-hi)" : "var(--z-text-3)",
+    },
+    {
+      label: "마진 사용률",
+      value: `${metrics.marginUsedPct.toFixed(0)}%`,
+      sub: `${fmtUsd(metrics.totalMargin, 0)} / ${fmtUsd(equity, 0)}`,
+      color: metrics.marginUsedPct >= 80 ? "var(--z-red-hi)"
+           : metrics.marginUsedPct >= 50 ? "var(--z-yellow-hi)"
+           : "var(--z-green-hi)",
+    },
+    {
+      label: "노셔널 노출",
+      value: `${metrics.notionalRatio.toFixed(1)}×`,
+      sub: `${fmtUsd(metrics.totalNotional, 0)} · ${metrics.positionCount}개 포지션`,
+      color: metrics.notionalRatio >= 5 ? "var(--z-red-hi)"
+           : metrics.notionalRatio >= 2 ? "var(--z-yellow-hi)"
+           : "var(--z-text-1)",
+    },
+    {
+      label: "미실현 손익",
+      value: `${metrics.unrealized >= 0 ? "+" : ""}${fmtUsd(metrics.unrealized, 2)}`,
+      sub: `${metrics.unrealized >= 0 ? "+" : ""}${metrics.unrealizedPct.toFixed(2)}% of 자본`,
+      color: metrics.unrealized > 0 ? "var(--z-green-hi)" : metrics.unrealized < 0 ? "var(--z-red-hi)" : "var(--z-text-3)",
+    },
+  ];
+
+  return (
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(5, 1fr)",
+      gap: 8,
+    }}>
+      {cards.map((c, i) => (
+        <div key={i} style={{
+          background: "var(--z-card-2)", border: "1px solid var(--z-border)",
+          borderRadius: "var(--z-r-md)", padding: isMobile ? "10px 12px" : "12px 14px",
+          display: "flex", flexDirection: "column", justifyContent: "center",
+          minHeight: isMobile ? 74 : 82,
+        }}>
+          <div style={{
+            fontSize: 14, color: "var(--z-text-3)", fontWeight: 600,
+            marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4,
+          }}>
+            {c.label}
+          </div>
+          <div style={{
+            fontSize: isMobile ? 15 : 18, fontWeight: 800, color: c.color,
+            fontFamily: "var(--z-font-mono)", lineHeight: 1.1,
+          }}>
+            {c.value}
+          </div>
+          <div style={{ fontSize: 14, color: "var(--z-text-3)", marginTop: 3, lineHeight: 1.3 }}>
+            {c.sub}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // Widget 3 — 포지션 비중 도넛 차트
 // ═══════════════════════════════════════════════════════════════════
 const POS_COLORS = [

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>선물거래 청산가 계산법 — 마진콜 회피 안전 운용 | Zepta 블로그</title>
+  <meta name="description" content="선물거래 청산가가 어떻게 결정되는지, 롱·숏 별 공식, 유지증거금 영향, 실전에서 청산가까지 거리를 측정하는 법까지 한 번에."/>
+  <meta name="keywords" content="청산가, 청산가격, 선물 청산, 마진콜, 유지증거금, 비트코인 선물, 청산 회피"/>
+  <link rel="canonical" href="https://zepta.app/blog/liquidation-price-calculation"/>
+  <meta name="robots" content="index, follow"/>
+  <meta property="og:title" content="선물거래 청산가 계산법 — 마진콜 회피 안전 운용"/>
+  <meta property="og:description" content="청산가 결정 원리, 롱·숏 공식, 유지증거금 영향, 실전 거리 측정법."/>
+  <meta property="og:type" content="article"/>
+  <meta property="og:url" content="https://zepta.app/blog/liquidation-price-calculation"/>
+  <meta property="og:image" content="https://zepta.app/og-image.png"/>
+  <meta property="og:locale" content="ko_KR"/>
+  <meta name="google-adsense-account" content="ca-pub-5897295133273451"/>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "선물거래 청산가 계산법 — 마진콜 회피 안전 운용",
+    "description": "청산가 결정 원리, 롱·숏 공식, 유지증거금 영향, 실전 거리 측정법.",
+    "author": { "@type": "Organization", "name": "Zepta" },
+    "publisher": { "@type": "Organization", "name": "Zepta", "url": "https://zepta.app/", "logo": { "@type": "ImageObject", "url": "https://zepta.app/favicon-32.png" } },
+    "datePublished": "2026-05-11",
+    "dateModified": "2026-05-11",
+    "mainEntityOfPage": "https://zepta.app/blog/liquidation-price-calculation",
+    "image": "https://zepta.app/og-image.png",
+    "inLanguage": "ko"
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "홈", "item": "https://zepta.app/" },
+      { "@type": "ListItem", "position": 2, "name": "블로그", "item": "https://zepta.app/blog" },
+      { "@type": "ListItem", "position": 3, "name": "청산가 계산법", "item": "https://zepta.app/blog/liquidation-price-calculation" }
+    ]
+  }
+  </script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#070B14;color:#9AA7BD;line-height:1.85}
+    .wrap{max-width:780px;margin:0 auto;padding:40px 20px}
+    nav{background:#101828;border-bottom:1px solid #1E2A42;padding:14px 20px;text-align:center}
+    nav a{margin:0 12px;font-size:15px;color:#9AA7BD;text-decoration:none}
+    nav a:hover{color:#F1F5FB}
+    .breadcrumb{font-size:13px;color:#64728C;margin-bottom:18px}
+    .breadcrumb a{color:#60A5FA;text-decoration:none}
+    h1{font-size:30px;font-weight:800;color:#F1F5FB;margin-bottom:10px;letter-spacing:-0.02em;line-height:1.3}
+    .meta-row{font-size:13px;color:#64728C;margin-bottom:28px}
+    h2{font-size:21px;font-weight:700;color:#F1F5FB;margin:36px 0 14px;letter-spacing:-0.01em}
+    p{font-size:16px;margin-bottom:14px}
+    strong{color:#F1F5FB}
+    a{color:#60A5FA;text-decoration:none}
+    a:hover{text-decoration:underline}
+    .callout{background:#0F1F3D;border-left:3px solid #3B82F6;padding:14px 18px;margin:18px 0;border-radius:6px;font-size:15px}
+    ul,ol{margin:0 0 16px 22px}
+    li{margin-bottom:6px;font-size:16px}
+    .formula{background:#0A1220;border:1px solid #1E2A42;border-radius:8px;padding:14px 18px;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:15px;color:#E5E7EB;margin:14px 0}
+    table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14px}
+    th,td{border:1px solid #1E2A42;padding:8px;text-align:left}
+    th{background:#101828;color:#F1F5FB}
+    .related{background:#101828;border:1px solid #1E2A42;border-radius:12px;padding:20px;margin-top:48px}
+    .related h3{font-size:16px;color:#F1F5FB;margin-bottom:12px}
+    .related a{display:block;padding:8px 0;font-size:15px;border-top:1px solid #1E2A42;color:#9AA7BD}
+    .related a:first-of-type{border-top:none}
+    .related a:hover{color:#60A5FA;text-decoration:none}
+    .cta{background:linear-gradient(135deg,#0F1F3D 0%,#0a1530 100%);border:1px solid #3B82F640;border-radius:14px;padding:24px;text-align:center;margin:36px 0}
+    .cta a{display:inline-block;background:#3B82F6;color:#fff;padding:11px 22px;border-radius:8px;font-weight:700;margin-top:10px}
+    .ad-slot{margin:28px 0;padding:14px;background:#0A1220;border:1px solid #1E2A42;border-radius:10px;text-align:center;font-size:12px;color:#64728C}
+    footer{text-align:center;padding:40px 20px;color:#64728C;font-size:14px;border-top:1px solid #1E2A42;margin-top:60px}
+    @media(max-width:640px){h1{font-size:24px}.wrap{padding:24px 16px}p,li{font-size:15px}}
+  </style>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-BMP34JQ649"></script>
+  <script>
+    window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
+    gtag('js',new Date());gtag('config','G-BMP34JQ649',{page_path:'/blog/liquidation-price-calculation'});
+    let _s75=false;window.addEventListener('scroll',()=>{
+      const sp=(window.scrollY+window.innerHeight)/document.body.scrollHeight;
+      if(sp>=0.75&&!_s75){_s75=true;gtag('event','blog_post_read',{post:'liquidation-price-calculation',depth:75});}
+    },{passive:true});
+  </script>
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5897295133273451" crossorigin="anonymous"></script>
+</head>
+<body>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/auto-trading">AI 매매</a>
+    <a href="/screener">스크리너</a>
+    <a href="/blog">블로그</a>
+    <a href="/about">소개</a>
+  </nav>
+  <main class="wrap">
+    <div class="breadcrumb"><a href="/blog">← 블로그</a></div>
+    <h1>선물거래 청산가 계산법 — 마진콜 회피 안전 운용</h1>
+    <div class="meta-row">2026년 5월 11일 · 리스크 관리 · 8분 읽기</div>
+
+    <p>"내 포지션 청산가가 정확히 얼마인지" 모르고 선물 매매하시는 분이 의외로 많습니다. 청산가는 거래소가 자동으로 보여주긴 하지만 왜 그 값이 나오는지 모르면 변동성 큰 순간에 패닉합니다. 이 글은 청산가가 어떻게 정해지는지, 그리고 청산까지 거리를 항상 안전권 안에 두는 법을 정리합니다.</p>
+
+    <h2>청산이 일어나는 이유</h2>
+    <p>선물거래에서는 일정 비율의 <strong>유지증거금</strong>이 항상 유지돼야 합니다. 가격이 불리하게 움직여 평가손실이 커지면 증거금 비율이 떨어지는데, 이게 거래소가 정한 유지증거금률 밑으로 떨어지면 <strong>강제 청산</strong>이 발생합니다.</p>
+    <p>거래소는 정확히 0%까지 기다리지 않습니다. 보통 0.5~1% 유지증거금률 시점에 자동 청산을 걸어두기 때문에 실제 잔고는 청산 직후 거의 0이 됩니다.</p>
+
+    <h2>청산가 단순 공식 (이솔레이티드 마진 기준)</h2>
+    <p>유지증거금률을 잠시 무시한 가장 단순한 근사식입니다.</p>
+    <div class="formula">
+      롱 청산가 ≈ 진입가 × (1 - 1/레버리지)
+      <br>숏 청산가 ≈ 진입가 × (1 + 1/레버리지)
+    </div>
+
+    <h3>예시 — BTC 진입가 $50,000</h3>
+    <table>
+      <tr><th>레버리지</th><th>롱 청산가</th><th>숏 청산가</th><th>허용 변동</th></tr>
+      <tr><td>2배</td><td>$25,000</td><td>$75,000</td><td>50%</td></tr>
+      <tr><td>5배</td><td>$40,000</td><td>$60,000</td><td>20%</td></tr>
+      <tr><td>10배</td><td>$45,000</td><td>$55,000</td><td>10%</td></tr>
+      <tr><td>25배</td><td>$48,000</td><td>$52,000</td><td>4%</td></tr>
+      <tr><td>50배</td><td>$49,000</td><td>$51,000</td><td>2%</td></tr>
+    </table>
+
+    <div class="ad-slot">
+      <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-5897295133273451" data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="true"></ins>
+      <script>(adsbygoogle=window.adsbygoogle||[]).push({});</script>
+    </div>
+
+    <h2>유지증거금률(MMR) 보정</h2>
+    <p>실제 청산가는 위 단순 공식보다 살짝 앞서서(불리하게) 잡힙니다. 유지증거금률이 0.5%면 그만큼 청산이 일찍 트리거됩니다.</p>
+    <div class="formula">
+      롱 청산가 ≈ 진입가 × (1 - 1/L + MMR)
+      <br>(L=레버리지, MMR=유지증거금률)
+    </div>
+    <p>10배 레버리지에 MMR 0.5%면 청산이 진입가의 89.5% 즉 $44,750에서 터집니다. 거래소마다 MMR 이 다르니 포지션 잡기 전에 확인하시는 게 좋습니다.</p>
+
+    <h2>크로스 vs 이솔레이티드 마진</h2>
+    <ul>
+      <li><strong>이솔레이티드(격리)</strong> — 해당 포지션에 할당된 증거금만 사용. 그 포지션이 청산돼도 나머지 잔고는 안전.</li>
+      <li><strong>크로스(교차)</strong> — 계좌 전체 잔고가 증거금으로 함께 사용됨. 청산가가 멀어 보이지만, 청산되면 잔고 전체 손실 가능.</li>
+    </ul>
+    <p>입문자께는 무조건 <strong>이솔레이티드 마진</strong>을 권장합니다. 자세한 사용법은 <a href="/blog/leverage-risk-guide">암호화폐 레버리지 매매 가이드</a> 참고.</p>
+
+    <h2>실전 안전 룰 — 청산가까지 거리 측정</h2>
+    <p>포지션 잡기 전에 다음을 항상 계산하세요.</p>
+    <ol>
+      <li>청산가 (= 거래소 표시값)</li>
+      <li>진입가에서 청산가까지의 % 거리 (= 청산 거리)</li>
+      <li>해당 코인의 일중 평균 변동성(ATR) 측정</li>
+      <li><strong>청산 거리 ≥ ATR × 5</strong> 인지 확인</li>
+    </ol>
+    <p>비트코인 일중 변동성이 평균 3% 라면 청산 거리는 최소 15% 이상 필요합니다. 즉 약 7배 이하 레버리지에서만 안전합니다.</p>
+
+    <h2>Zepta 의 청산 회피 설계</h2>
+    <p>Zepta <a href="/real-trading">실거래 자동매매</a>는 다음 안전장치로 청산을 통계적으로 거의 막습니다.</p>
+    <ul>
+      <li>기본 레버리지 3배 고정 (청산 거리 33%)</li>
+      <li>이솔레이티드 마진 강제</li>
+      <li>ROI -40% 자동 손절 (청산가 도달 전에 미리 정리)</li>
+      <li>포지션 모니터 cron 2분마다 → 위험권 진입 시 즉시 청산</li>
+    </ul>
+    <p>이 4가지가 자동으로 적용되니 사용자가 청산가 계산을 직접 안 하셔도 됩니다.</p>
+
+    <div class="callout">
+      <strong>💡 한 줄 요약</strong>: 청산가 = 진입가 × (1 ± 1/레버리지). 청산 거리는 일중 변동성(ATR)의 5배 이상 확보하세요. 이솔레이티드 마진 + 자동 손절은 필수입니다.
+    </div>
+
+    <div class="cta">
+      <p>청산가 계산·자동 손절·격리 마진까지 자동 적용. 청산 걱정 없는 안전 자동매매.</p>
+      <a href="/real-trading">안전 자동매매 시작하기 →</a>
+    </div>
+
+    <div class="related">
+      <h3>이어서 읽기</h3>
+      <a href="/blog/leverage-risk-guide">암호화폐 레버리지 매매 위험과 안전한 사용법</a>
+      <a href="/blog/stop-loss-take-profit">손절·익절 라인 설정법 — 직관적인 5가지 방법</a>
+      <a href="/blog/kelly-criterion-position-sizing">켈리 공식으로 포지션 사이징</a>
+      <a href="/blog/binance-api-guide">Binance API 키 발급 가이드</a>
+    </div>
+  </main>
+  <footer>
+    <p>© 2026 Zepta — <a href="/">홈</a> · <a href="/blog">블로그</a> · <a href="/contact">문의</a></p>
+  </footer>
+</body>
+</html>

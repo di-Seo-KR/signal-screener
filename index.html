@@ -325,6 +325,44 @@
       ]
     }
     </script>
+    <!-- JSON-LD WebSite Schema (2026-05-11 추가) — Google 사이트링크 검색박스 -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Zepta",
+      "alternateName": "젭타",
+      "url": "https://zepta.app/",
+      "description": "AI 퀀트 자동매매 + 실시간 주식·코인 스크리너. 33개 알파 전략, 24/7 자동 운영, 무료 시작.",
+      "inLanguage": ["ko", "en"],
+      "publisher": {
+        "@type": "Organization",
+        "name": "Zepta",
+        "url": "https://zepta.app/",
+        "logo": "https://zepta.app/favicon-32.png"
+      },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": {
+          "@type": "EntryPoint",
+          "urlTemplate": "https://zepta.app/screener?q={search_term_string}"
+        },
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+    <!-- JSON-LD Article (Blog Hub) Schema (2026-05-11 추가) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Blog",
+      "name": "Zepta 블로그",
+      "url": "https://zepta.app/blog",
+      "description": "AI 자동매매와 퀀트 전략 입문자 가이드. 19편의 한국어 블로그 글.",
+      "publisher": { "@type": "Organization", "name": "Zepta", "url": "https://zepta.app/" },
+      "inLanguage": "ko"
+    }
+    </script>
     <!-- JSON-LD WebPage Schema -->
     <script type="application/ld+json">
     {
@@ -424,13 +462,37 @@
       </footer>
     </noscript>
     <!-- 추가 — Google bot 이 noscript 무시하는 케이스 대응: SEO 친화 hidden footer
-         CSS visibility hidden 으로 화면엔 안 보이지만 HTML 소스에는 존재 -->
+         CSS visibility hidden 으로 화면엔 안 보이지만 HTML 소스에는 존재
+         2026-05-11: 주요 페이지 + 인기 블로그 글 anchor text 보강 (MKT-LEAD Phase C) -->
     <div aria-hidden="true" style="position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden;">
       <a href="/privacy">개인정보처리방침</a>
       <a href="/terms">이용약관</a>
-      <a href="/about">서비스 소개</a>
-      <a href="/blog">블로그</a>
+      <a href="/about">Zepta 서비스 소개</a>
+      <a href="/blog">Zepta 블로그</a>
       <a href="/contact">문의하기</a>
+      <a href="/auto-trading">AI 자동매매</a>
+      <a href="/real-trading">실거래 자동매매</a>
+      <a href="/screener">주식·코인 스크리너</a>
+      <a href="/strategy">퀀트 전략 패널</a>
+      <a href="/backtest">백테스트 엔진</a>
+      <a href="/alpha-lab">Alpha Lab — 알파 연구실</a>
+      <a href="/portfolio">포트폴리오 리밸런싱</a>
+      <a href="/risk-map">리스크 맵</a>
+      <a href="/sentiment">시장 심리</a>
+      <a href="/econ-calendar">경제 캘린더</a>
+      <a href="/news">금융 뉴스</a>
+      <a href="/sector-flow">섹터 자금 흐름</a>
+      <a href="/quant-portfolio">퀀트 포트폴리오</a>
+      <a href="/quant-report">퀀트 일일 리포트</a>
+      <a href="/blog/ai-trading-guide">AI 자동매매 입문자 가이드</a>
+      <a href="/blog/bitcoin-auto-trading-5-steps">비트코인 자동매매 시작하기</a>
+      <a href="/blog/quant-strategies">퀀트 전략 33가지 정리</a>
+      <a href="/blog/binance-api-guide">Binance API 키 발급 가이드</a>
+      <a href="/blog/macd-golden-cross">MACD 골든크로스 매매법</a>
+      <a href="/blog/kelly-criterion-position-sizing">켈리 공식 포지션 사이징</a>
+      <a href="/blog/sharpe-ratio-profit-factor">Sharpe Ratio 이해</a>
+      <a href="/blog/leverage-risk-guide">레버리지 매매 안전 사용법</a>
+      <a href="/blog/realistic-roi-expectation">자동매매 수익률 현실치</a>
     </div>
     <script type="module" src="/src/main.jsx"></script>
     <script>

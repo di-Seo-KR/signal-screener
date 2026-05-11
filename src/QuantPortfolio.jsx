@@ -800,6 +800,9 @@ function MiniChart({ returns, width = 120, height = 36 }) {
 // 로딩 스켈레톤
 // ══════════════════════════════════════════════════════════════
 function LoadingSkeleton({ progress }) {
+  // ★ 2026-05-11 fix: 스켈레톤 그리드도 isMobile 사용 — 메인 함수의 useIsMobile() 과 별도 호출.
+  //   이전: isMobile 가 정의 안 돼 ReferenceError "isMobile is not defined" 발생.
+  const isMobile = useIsMobile();
   return (
     <div className="tab-content">
       <div style={{ background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,

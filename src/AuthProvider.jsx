@@ -3,6 +3,7 @@
 // ════════════════════════════════════════════════════════════════════
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "./supabaseClient.js";
+import { ga } from "./lib/analytics.js";
 
 const AuthContext = createContext(null);
 
@@ -79,6 +80,10 @@ export default function AuthProvider({ children }) {
             || s?.user?.email?.split("@")[0]
             || "사용자";
           showToast("success", `환영합니다, ${displayName}님! 🎉`);
+
+          // GA4 — 로그인 성공 이벤트 (OAuth/이메일 모두 포함)
+          const provider = s?.user?.app_metadata?.provider || "email";
+          ga.signinSuccess(provider);
 
           // OAuth 리다이렉트 URL 정리
           const url = new URL(window.location.href);
@@ -198,6 +203,9 @@ export default function AuthProvider({ children }) {
 
   // ── 이메일 회원가입 ──
   const signUp = async (email, password, displayName) => {
+    // GA4 — 회원가입 시작
+    ga.signupStarted("email");
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -228,6 +236,9 @@ export default function AuthProvider({ children }) {
         return { data, error: { message: msg, userMessage: msg } };
       }
 
+      // GA4 — 회원가입 완료
+      ga.signupCompleted("email");
+
       if (data.session) {
         // 이메일 확인 꺼져있으면 바로 로그인
         showToast("success", "회원가입 완료! 환영합니다! 🎉");
@@ -256,6 +267,9 @@ export default function AuthProvider({ children }) {
 
   // ── 소셜 로그인 (Google, GitHub) ──
   const signInWithOAuth = async (provider) => {
+    // GA4 — OAuth 시작 (= signup 시작과 의미상 동일)
+    ga.signupStarted(provider);
+
     const currentOrigin = window.location.origin;
     console.log("[Zepta Auth] Starting OAuth:", provider, "redirect:", currentOrigin);
 

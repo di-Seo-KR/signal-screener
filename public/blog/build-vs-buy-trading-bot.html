@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI 트레이딩 봇 직접 만들기 vs 서비스 사용 — 비교 가이드 | Zepta 블로그</title>
+  <meta name="description" content="자동매매 봇을 직접 코딩할지 서비스를 쓸지 결정하는 6가지 기준. 시간·비용·러닝커브·유지보수·법적 책임까지 솔직하게 비교."/>
+  <meta name="keywords" content="자동매매 봇 만들기, 트레이딩 봇 코딩, 자동매매 서비스, DIY 봇, Python 트레이딩, 봇 vs 서비스, 알고리즘 트레이딩"/>
+  <link rel="canonical" href="https://zepta.app/blog/build-vs-buy-trading-bot"/>
+  <meta name="robots" content="index, follow"/>
+  <meta property="og:title" content="AI 트레이딩 봇 직접 만들기 vs 서비스 사용 — 비교 가이드"/>
+  <meta property="og:description" content="자동매매 봇 직접 코딩 vs 서비스 6가지 비교 기준."/>
+  <meta property="og:type" content="article"/>
+  <meta property="og:url" content="https://zepta.app/blog/build-vs-buy-trading-bot"/>
+  <meta property="og:image" content="https://zepta.app/og-image.png"/>
+  <meta property="og:locale" content="ko_KR"/>
+  <meta name="google-adsense-account" content="ca-pub-5897295133273451"/>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "AI 트레이딩 봇 직접 만들기 vs 서비스 사용 — 비교 가이드",
+    "description": "자동매매 봇을 직접 코딩할지 서비스를 쓸지 결정하는 6가지 기준.",
+    "author": { "@type": "Organization", "name": "Zepta" },
+    "publisher": { "@type": "Organization", "name": "Zepta", "url": "https://zepta.app/", "logo": { "@type": "ImageObject", "url": "https://zepta.app/favicon-32.png" } },
+    "datePublished": "2026-05-11",
+    "dateModified": "2026-05-11",
+    "mainEntityOfPage": "https://zepta.app/blog/build-vs-buy-trading-bot",
+    "image": "https://zepta.app/og-image.png",
+    "inLanguage": "ko"
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "홈", "item": "https://zepta.app/" },
+      { "@type": "ListItem", "position": 2, "name": "블로그", "item": "https://zepta.app/blog" },
+      { "@type": "ListItem", "position": 3, "name": "봇 만들기 vs 서비스", "item": "https://zepta.app/blog/build-vs-buy-trading-bot" }
+    ]
+  }
+  </script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#070B14;color:#9AA7BD;line-height:1.85}
+    .wrap{max-width:780px;margin:0 auto;padding:40px 20px}
+    nav{background:#101828;border-bottom:1px solid #1E2A42;padding:14px 20px;text-align:center}
+    nav a{margin:0 12px;font-size:15px;color:#9AA7BD;text-decoration:none}
+    nav a:hover{color:#F1F5FB}
+    .breadcrumb{font-size:13px;color:#64728C;margin-bottom:18px}
+    .breadcrumb a{color:#60A5FA;text-decoration:none}
+    h1{font-size:30px;font-weight:800;color:#F1F5FB;margin-bottom:10px;letter-spacing:-0.02em;line-height:1.3}
+    .meta-row{font-size:13px;color:#64728C;margin-bottom:28px}
+    h2{font-size:21px;font-weight:700;color:#F1F5FB;margin:36px 0 14px;letter-spacing:-0.01em}
+    h3{font-size:17px;font-weight:700;color:#F1F5FB;margin:22px 0 10px}
+    p{font-size:16px;margin-bottom:14px}
+    strong{color:#F1F5FB}
+    a{color:#60A5FA;text-decoration:none}
+    a:hover{text-decoration:underline}
+    .callout{background:#0F1F3D;border-left:3px solid #3B82F6;padding:14px 18px;margin:18px 0;border-radius:6px;font-size:15px}
+    ul,ol{margin:0 0 16px 22px}
+    li{margin-bottom:6px;font-size:16px}
+    table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14px}
+    th,td{border:1px solid #1E2A42;padding:8px;text-align:left}
+    th{background:#101828;color:#F1F5FB}
+    .related{background:#101828;border:1px solid #1E2A42;border-radius:12px;padding:20px;margin-top:48px}
+    .related h3{font-size:16px;color:#F1F5FB;margin-bottom:12px}
+    .related a{display:block;padding:8px 0;font-size:15px;border-top:1px solid #1E2A42;color:#9AA7BD}
+    .related a:first-of-type{border-top:none}
+    .related a:hover{color:#60A5FA;text-decoration:none}
+    .cta{background:linear-gradient(135deg,#0F1F3D 0%,#0a1530 100%);border:1px solid #3B82F640;border-radius:14px;padding:24px;text-align:center;margin:36px 0}
+    .cta a{display:inline-block;background:#3B82F6;color:#fff;padding:11px 22px;border-radius:8px;font-weight:700;margin-top:10px}
+    .ad-slot{margin:28px 0;padding:14px;background:#0A1220;border:1px solid #1E2A42;border-radius:10px;text-align:center;font-size:12px;color:#64728C}
+    footer{text-align:center;padding:40px 20px;color:#64728C;font-size:14px;border-top:1px solid #1E2A42;margin-top:60px}
+    @media(max-width:640px){h1{font-size:24px}.wrap{padding:24px 16px}p,li{font-size:15px}}
+  </style>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-BMP34JQ649"></script>
+  <script>
+    window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
+    gtag('js',new Date());gtag('config','G-BMP34JQ649',{page_path:'/blog/build-vs-buy-trading-bot'});
+    let _s75=false;window.addEventListener('scroll',()=>{
+      const sp=(window.scrollY+window.innerHeight)/document.body.scrollHeight;
+      if(sp>=0.75&&!_s75){_s75=true;gtag('event','blog_post_read',{post:'build-vs-buy-trading-bot',depth:75});}
+    },{passive:true});
+  </script>
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5897295133273451" crossorigin="anonymous"></script>
+</head>
+<body>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/auto-trading">AI 매매</a>
+    <a href="/screener">스크리너</a>
+    <a href="/blog">블로그</a>
+    <a href="/about">소개</a>
+  </nav>
+  <main class="wrap">
+    <div class="breadcrumb"><a href="/blog">← 블로그</a></div>
+    <h1>AI 트레이딩 봇 직접 만들기 vs 서비스 사용 — 비교 가이드</h1>
+    <div class="meta-row">2026년 5월 11일 · 의사결정 가이드 · 8분 읽기</div>
+
+    <p>자동매매에 입문하시려는 분이 가장 먼저 마주하는 갈림길은 "내가 직접 봇을 코딩할까, 아니면 서비스를 쓸까"입니다. 둘 다 장단점이 명확하고 한쪽이 무조건 좋다고 단언할 수 없습니다. 이 글에서는 6가지 기준으로 솔직하게 비교해드립니다.</p>
+
+    <h2>한눈에 비교</h2>
+    <table>
+      <tr><th>기준</th><th>직접 만들기</th><th>서비스 사용</th></tr>
+      <tr><td>초기 시간</td><td>2~6개월</td><td>10분</td></tr>
+      <tr><td>러닝커브</td><td>높음 (Python+금융)</td><td>낮음</td></tr>
+      <tr><td>월 비용</td><td>$30~100 (서버·데이터)</td><td>$0~50</td></tr>
+      <tr><td>커스텀 자유도</td><td>무한</td><td>제한적</td></tr>
+      <tr><td>유지보수</td><td>본인 책임</td><td>서비스 책임</td></tr>
+      <tr><td>안전장치</td><td>본인 구현</td><td>기본 제공</td></tr>
+    </table>
+
+    <h2>1. 시간 — 가장 큰 차이</h2>
+    <p>봇을 직접 만든다는 건 결국 다음을 다 직접 짜야 한다는 뜻입니다.</p>
+    <ul>
+      <li>거래소 API 연동 (인증, 주문, 잔고 조회, 웹소켓)</li>
+      <li>전략 로직 (지표 계산, 시그널 생성, 진입·청산 규칙)</li>
+      <li>백테스트 엔진 (수수료, 슬리피지, 룩어헤드 방지)</li>
+      <li>리스크 관리 (손절, 청산가 모니터, Kill switch)</li>
+      <li>알림·로깅 (텔레그램, DB 저장)</li>
+      <li>서버 운영 (24/7 가동, 장애 복구)</li>
+    </ul>
+    <p>경험 있는 개발자도 <strong>처음부터 끝까지 2~6개월</strong> 걸립니다. 백테스트 정확도 끌어올리는 데만 한 달 잡아야 합니다. 자세한 함정은 <a href="/blog/backtest-tips">백테스트 정확도 높이는 7가지 팁</a>에서 다뤘습니다.</p>
+
+    <h2>2. 비용 — 의외로 직접이 더 비쌀 수도</h2>
+    <p>"직접 만들면 공짜"는 착각입니다. 실제로 들어가는 비용:</p>
+    <ul>
+      <li><strong>서버</strong>: AWS/Vercel 등 $10~30/월</li>
+      <li><strong>데이터 피드</strong>: 무료 API 한도 넘어가면 $20~100/월</li>
+      <li><strong>본인 시간</strong>: 시급 환산하면 $2,000~10,000 수준 (2~6개월 풀타임)</li>
+      <li><strong>실패 비용</strong>: 버그 1개로 손실 본 경험은 거의 모든 개발자가 합니다</li>
+    </ul>
+    <p>서비스는 보통 무료~$50/월 수준이라 시간 절약을 감안하면 비용 면에서도 우위입니다.</p>
+
+    <div class="ad-slot">
+      <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-5897295133273451" data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="true"></ins>
+      <script>(adsbygoogle=window.adsbygoogle||[]).push({});</script>
+    </div>
+
+    <h2>3. 커스텀 자유도</h2>
+    <p>여기는 직접 만들기가 압도적입니다. 자신만의 비공개 알파가 있다면 직접 코딩 외에는 답이 없습니다. 서비스는 보통 미리 정해진 전략 카탈로그 안에서 선택하는 구조입니다.</p>
+    <p>다만 Zepta 같은 일부 서비스는 <a href="/strategy">전략 패널</a>에서 33개 알파 중 켜고 끄기, 파라미터 조정, 가중치 변경이 모두 가능해서 어느 정도 커스텀이 됩니다.</p>
+
+    <h2>4. 유지보수 — 만드는 것보다 운영이 더 힘듭니다</h2>
+    <p>봇을 만든 다음이 진짜 시작입니다. 시장 구조 변화·API 변경·버그 수정·전략 노후화 대응까지 모두 본인이 해야 합니다.</p>
+    <ul>
+      <li>거래소 API 가 깨지거나 변경되면 1주 내 수정 필요</li>
+      <li>알파가 통하지 않는 시장 국면이 오면 새 알파 리서치 필요</li>
+      <li>버그가 들어가면 한 거래로 자본 일부 손실</li>
+    </ul>
+    <p>이게 풀타임 직장에 다니면서 가능한가? 솔직히 어렵습니다.</p>
+
+    <h2>5. 안전장치</h2>
+    <p>자동매매에서 가장 중요한 게 안전장치입니다. 직접 만들면 다음을 모두 본인이 구현해야 합니다.</p>
+    <ul>
+      <li>일일 손실 한도 도달 시 자동 중단 (Kill switch)</li>
+      <li>거래소 API 장애 시 안전 모드 전환</li>
+      <li>이상 시그널 감지 (예: 진입가의 50% 폭락 시 일시 중단)</li>
+      <li>청산가까지 거리 실시간 모니터 — <a href="/blog/liquidation-price-calculation">청산가 계산법</a></li>
+    </ul>
+    <p>Zepta <a href="/real-trading">실거래 자동매매</a>는 이게 기본 적용입니다. ROI -40% 자동 손절, 2분마다 포지션 모니터, 일일 손실 한도 알림이 디폴트로 켜져 있습니다.</p>
+
+    <h2>6. 법적 책임</h2>
+    <p>한국에서 본인이 만든 봇으로 매매하는 건 본인 책임입니다. 한편 자동매매 서비스를 쓰는 건 일반 거래 행위로 간주됩니다. 서비스가 종목 추천을 하지 않고 알고리즘 도구만 제공하는 한 자본시장법 이슈가 거의 없습니다.</p>
+
+    <h2>의사결정 가이드</h2>
+    <h3>직접 만들기를 추천하는 경우</h3>
+    <ul>
+      <li>본인이 개발자이고 Python·금융 지식이 둘 다 있음</li>
+      <li>독자적인 알파 아이디어가 있어서 비공개 유지 필요</li>
+      <li>2~6개월 풀타임 투자할 시간이 있음</li>
+      <li>유지보수도 본인이 평생 할 수 있음</li>
+    </ul>
+
+    <h3>서비스를 추천하는 경우</h3>
+    <ul>
+      <li>개발자가 아니거나 본업이 따로 있음</li>
+      <li>일단 자동매매가 어떤 건지 경험해보고 싶음</li>
+      <li>안전장치를 직접 구현하기 부담스러움</li>
+      <li>"내 시간을 코딩 대신 다른 데 쓰는 게 더 가치 있다" 판단</li>
+    </ul>
+
+    <div class="callout">
+      <strong>💡 한 줄 요약</strong>: 개발 경험이 깊고 시간이 많으면 직접, 그 외에는 서비스. 한국 입문자 대부분은 서비스로 시작해서 익숙해진 다음 본인만의 알파를 별도로 만드는 흐름이 가장 효율적입니다.
+    </div>
+
+    <div class="cta">
+      <p>33개 알파, 안전장치, 텔레그램 알림까지 즉시 사용. 코딩 없이 10분만에 시작.</p>
+      <a href="/auto-trading">Zepta 에서 시작하기 →</a>
+    </div>
+
+    <div class="related">
+      <h3>이어서 읽기</h3>
+      <a href="/blog/ai-trading-guide">AI 자동매매란? 시작 전에 꼭 알아야 할 것들</a>
+      <a href="/blog/bitcoin-auto-trading-5-steps">비트코인 자동매매 시작하기 5단계 가이드</a>
+      <a href="/blog/quant-strategies">퀀트 전략 33가지, 한눈에 정리</a>
+      <a href="/blog/realistic-roi-expectation">자동매매 수익률 현실적 기대치</a>
+    </div>
+  </main>
+  <footer>
+    <p>© 2026 Zepta — <a href="/">홈</a> · <a href="/blog">블로그</a> · <a href="/contact">문의</a></p>
+  </footer>
+</body>
+</html>

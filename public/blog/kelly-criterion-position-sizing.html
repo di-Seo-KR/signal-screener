@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>켈리 공식으로 포지션 사이징 — 손실 최소화 자본 배분 | Zepta 블로그</title>
+  <meta name="description" content="켈리 공식이 뭔지, 왜 풀켈리는 위험한지, 하프켈리·쿼터켈리가 실전에서 더 안전한 이유. 자동매매에 적용하는 구체적인 방법까지."/>
+  <meta name="keywords" content="켈리 공식, 포지션 사이징, 자본 배분, 손실 최소화, 자금 관리, 켈리 기준, 머니 매니지먼트"/>
+  <link rel="canonical" href="https://zepta.app/blog/kelly-criterion-position-sizing"/>
+  <meta name="robots" content="index, follow"/>
+  <meta property="og:title" content="켈리 공식으로 포지션 사이징 — 손실 최소화 자본 배분"/>
+  <meta property="og:description" content="켈리 공식 이해, 실전 적용, 하프켈리·쿼터켈리 안전 변형까지 정리."/>
+  <meta property="og:type" content="article"/>
+  <meta property="og:url" content="https://zepta.app/blog/kelly-criterion-position-sizing"/>
+  <meta property="og:image" content="https://zepta.app/og-image.png"/>
+  <meta property="og:locale" content="ko_KR"/>
+  <meta name="google-adsense-account" content="ca-pub-5897295133273451"/>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "켈리 공식으로 포지션 사이징 — 손실 최소화 자본 배분",
+    "description": "켈리 공식이 뭔지, 왜 풀켈리는 위험한지, 하프켈리·쿼터켈리가 실전에서 더 안전한 이유.",
+    "author": { "@type": "Organization", "name": "Zepta" },
+    "publisher": { "@type": "Organization", "name": "Zepta", "url": "https://zepta.app/", "logo": { "@type": "ImageObject", "url": "https://zepta.app/favicon-32.png" } },
+    "datePublished": "2026-05-11",
+    "dateModified": "2026-05-11",
+    "mainEntityOfPage": "https://zepta.app/blog/kelly-criterion-position-sizing",
+    "image": "https://zepta.app/og-image.png",
+    "inLanguage": "ko"
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      { "@type": "ListItem", "position": 1, "name": "홈", "item": "https://zepta.app/" },
+      { "@type": "ListItem", "position": 2, "name": "블로그", "item": "https://zepta.app/blog" },
+      { "@type": "ListItem", "position": 3, "name": "켈리 공식 포지션 사이징", "item": "https://zepta.app/blog/kelly-criterion-position-sizing" }
+    ]
+  }
+  </script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#070B14;color:#9AA7BD;line-height:1.85}
+    .wrap{max-width:780px;margin:0 auto;padding:40px 20px}
+    nav{background:#101828;border-bottom:1px solid #1E2A42;padding:14px 20px;text-align:center}
+    nav a{margin:0 12px;font-size:15px;color:#9AA7BD;text-decoration:none}
+    nav a:hover{color:#F1F5FB}
+    .breadcrumb{font-size:13px;color:#64728C;margin-bottom:18px}
+    .breadcrumb a{color:#60A5FA;text-decoration:none}
+    h1{font-size:30px;font-weight:800;color:#F1F5FB;margin-bottom:10px;letter-spacing:-0.02em;line-height:1.3}
+    .meta-row{font-size:13px;color:#64728C;margin-bottom:28px}
+    h2{font-size:21px;font-weight:700;color:#F1F5FB;margin:36px 0 14px;letter-spacing:-0.01em}
+    p{font-size:16px;margin-bottom:14px}
+    strong{color:#F1F5FB}
+    a{color:#60A5FA;text-decoration:none}
+    a:hover{text-decoration:underline}
+    .callout{background:#0F1F3D;border-left:3px solid #3B82F6;padding:14px 18px;margin:18px 0;border-radius:6px;font-size:15px}
+    ul,ol{margin:0 0 16px 22px}
+    li{margin-bottom:6px;font-size:16px}
+    .formula{background:#0A1220;border:1px solid #1E2A42;border-radius:8px;padding:14px 18px;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:15px;color:#E5E7EB;margin:14px 0}
+    .related{background:#101828;border:1px solid #1E2A42;border-radius:12px;padding:20px;margin-top:48px}
+    .related h3{font-size:16px;color:#F1F5FB;margin-bottom:12px}
+    .related a{display:block;padding:8px 0;font-size:15px;border-top:1px solid #1E2A42;color:#9AA7BD}
+    .related a:first-of-type{border-top:none}
+    .related a:hover{color:#60A5FA;text-decoration:none}
+    .cta{background:linear-gradient(135deg,#0F1F3D 0%,#0a1530 100%);border:1px solid #3B82F640;border-radius:14px;padding:24px;text-align:center;margin:36px 0}
+    .cta a{display:inline-block;background:#3B82F6;color:#fff;padding:11px 22px;border-radius:8px;font-weight:700;margin-top:10px}
+    .ad-slot{margin:28px 0;padding:14px;background:#0A1220;border:1px solid #1E2A42;border-radius:10px;text-align:center;font-size:12px;color:#64728C}
+    footer{text-align:center;padding:40px 20px;color:#64728C;font-size:14px;border-top:1px solid #1E2A42;margin-top:60px}
+    @media(max-width:640px){h1{font-size:24px}.wrap{padding:24px 16px}p,li{font-size:15px}}
+  </style>
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-BMP34JQ649"></script>
+  <script>
+    window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
+    gtag('js',new Date());gtag('config','G-BMP34JQ649',{page_path:'/blog/kelly-criterion-position-sizing'});
+    let _s75=false;window.addEventListener('scroll',()=>{
+      const sp=(window.scrollY+window.innerHeight)/document.body.scrollHeight;
+      if(sp>=0.75&&!_s75){_s75=true;gtag('event','blog_post_read',{post:'kelly-criterion-position-sizing',depth:75});}
+    },{passive:true});
+  </script>
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5897295133273451" crossorigin="anonymous"></script>
+</head>
+<body>
+  <nav>
+    <a href="/">홈</a>
+    <a href="/auto-trading">AI 매매</a>
+    <a href="/screener">스크리너</a>
+    <a href="/blog">블로그</a>
+    <a href="/about">소개</a>
+  </nav>
+  <main class="wrap">
+    <div class="breadcrumb"><a href="/blog">← 블로그</a></div>
+    <h1>켈리 공식으로 포지션 사이징 — 손실 최소화 자본 배분</h1>
+    <div class="meta-row">2026년 5월 11일 · 자금 관리 · 8분 읽기</div>
+
+    <p>"한 번에 얼마를 베팅해야 할까?" 트레이더가 평생 답해야 하는 질문입니다. 너무 작게 베팅하면 수익이 안 보이고, 너무 크게 베팅하면 한두 번 손실로 자본이 절반 사라집니다. 이 균형을 수학적으로 풀어낸 게 <strong>켈리 공식</strong>입니다. 1956년 벨연구소의 존 켈리가 발표한 이래로 트레이딩·도박·투자에 두루 쓰이고 있죠.</p>
+
+    <h2>켈리 공식의 핵심</h2>
+    <p>한 거래에 자본의 몇 %를 베팅할지 정하는 공식입니다.</p>
+    <div class="formula">
+      f* = (bp - q) / b
+      <br><br>
+      f* = 최적 베팅 비율
+      <br>b = 손익비 (이기면 받는 배수, 예: 1:2면 b=2)
+      <br>p = 승률 (0~1)
+      <br>q = 패율 (1-p)
+    </div>
+    <p>예를 들어 승률 55%, 손익비 1:2 인 전략이라면:</p>
+    <ul>
+      <li>f* = (2×0.55 - 0.45) / 2 = (1.1 - 0.45) / 2 = 0.325</li>
+      <li>→ 매 거래에 자본의 <strong>32.5%</strong>를 베팅해야 장기 수익이 최대화됨</li>
+    </ul>
+
+    <h2>왜 풀켈리(100%)는 위험한가</h2>
+    <p>이론상 32.5%가 최적이라도, 실전에서는 32.5%를 그대로 베팅하면 거의 모두 파산합니다. 이유:</p>
+    <ol>
+      <li><strong>승률·손익비 추정 오차</strong> — 백테스트로 측정한 승률 55%가 실제로는 50%일 수 있습니다. 이 작은 오차가 베팅 비율을 크게 어긋나게 합니다.</li>
+      <li><strong>변동성</strong> — 32.5% 베팅으로 5번 연속 지면 자본의 85%가 사라집니다. 통계적으로 5연패는 흔합니다.</li>
+      <li><strong>심리</strong> — 큰 변동성을 견딜 수 있는 트레이더는 거의 없습니다. 중간에 멈춰버리면 켈리의 장기 우위가 작동 안 함.</li>
+    </ol>
+
+    <div class="ad-slot">
+      <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-5897295133273451" data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="true"></ins>
+      <script>(adsbygoogle=window.adsbygoogle||[]).push({});</script>
+    </div>
+
+    <h2>하프켈리·쿼터켈리 — 실전 안전 변형</h2>
+    <p>전문 트레이더는 거의 모두 <strong>풀켈리의 1/2 또는 1/4</strong>을 씁니다.</p>
+    <ul>
+      <li><strong>하프켈리 (1/2 켈리)</strong>: 풀켈리 수익의 약 75%를 누리면서 변동성은 절반으로 낮춤. 가장 일반적.</li>
+      <li><strong>쿼터켈리 (1/4 켈리)</strong>: 변동성이 1/4. 자본 보호 중시 트레이더에 적합.</li>
+    </ul>
+    <p>위 예시(승률 55%, 손익비 1:2)에서 하프켈리는 16.25%, 쿼터켈리는 8.1%가 됩니다. 입문자께는 <strong>쿼터켈리 또는 1~2%</strong>를 권장합니다.</p>
+
+    <h2>여러 전략을 동시에 운영할 때</h2>
+    <p>33개 알파 전략을 동시에 켜는 Zepta 같은 환경에서는 각 전략에 켈리를 따로 적용한 뒤 <strong>전체 자본의 노출이 100% 넘지 않게</strong> 정규화합니다. 자세한 분산 효과는 <a href="/blog/portfolio-rebalancing">포트폴리오 리밸런싱</a> 글에서 다뤘습니다.</p>
+
+    <h2>고정 % 룰과 비교</h2>
+    <p>입문자에게는 켈리보다 단순한 <strong>고정 1~2% 룰</strong>이 더 안전할 수 있습니다.</p>
+    <ul>
+      <li>매 거래에 자본의 1~2%만 베팅 (= 손실 시 1~2% 손실)</li>
+      <li>승률·손익비 추정이 부정확해도 파산 위험 거의 없음</li>
+      <li>50번 연속 져도 자본이 60% 정도 남음 (1% 기준)</li>
+    </ul>
+    <p>Zepta <a href="/auto-trading">자동매매</a>는 기본 설정이 <strong>거래당 자본의 2%</strong>로 잡혀있습니다. 입문자 모드에서는 이 값이 0.5%까지 자동으로 줄어듭니다.</p>
+
+    <h2>실전 적용 체크리스트</h2>
+    <ol>
+      <li>전략의 승률·손익비를 <a href="/backtest">백테스트</a>에서 측정 — 최소 100거래 이상의 표본 필요</li>
+      <li>측정값에 안전 마진 적용 (승률 -5%p, 손익비 -10%)</li>
+      <li>풀켈리 계산</li>
+      <li>1/4 또는 고정 1~2% 중 보수적인 값 사용</li>
+      <li>실전 운영하면서 분기마다 승률·손익비 재측정</li>
+    </ol>
+
+    <div class="callout">
+      <strong>💡 한 줄 요약</strong>: 켈리 공식은 최적 베팅 비율을 알려주지만 풀켈리는 위험합니다. 입문자는 쿼터켈리(1/4) 또는 고정 1~2% 룰부터 시작하시고, 통계가 충분히 쌓이면 하프켈리로 올리시면 됩니다.
+    </div>
+
+    <div class="cta">
+      <p>거래당 자본 % 자동 계산, 안전 마진 자동 적용. 직접 계산할 필요 없이 자동매매가 처리합니다.</p>
+      <a href="/auto-trading">자동매매 시작하기 →</a>
+    </div>
+
+    <div class="related">
+      <h3>이어서 읽기</h3>
+      <a href="/blog/portfolio-rebalancing">포트폴리오 리밸런싱이란? 자동화 방법까지</a>
+      <a href="/blog/sharpe-ratio-profit-factor">Sharpe Ratio, Profit Factor 이해</a>
+      <a href="/blog/stop-loss-take-profit">손절·익절 라인 설정법</a>
+      <a href="/blog/leverage-risk-guide">암호화폐 레버리지 매매 위험과 안전한 사용법</a>
+    </div>
+  </main>
+  <footer>
+    <p>© 2026 Zepta — <a href="/">홈</a> · <a href="/blog">블로그</a> · <a href="/contact">문의</a></p>
+  </footer>
+</body>
+</html>
