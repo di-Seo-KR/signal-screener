@@ -8,6 +8,7 @@
 // ══════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "./AuthProvider.jsx";
+import { ga } from "./lib/analytics.js";
 import {
   Button, Card, Badge, Stat, Tabs, Dialog, Tooltip, Skeleton, Switch, Segmented,
   Table, SectionHeader, KV, Progress, EmptyState, ToastProvider, useToast, Spinner,
@@ -663,7 +664,11 @@ function RealTradingInner() {
               desc: "이 버튼을 누르면 다음 사이클(5분)부터 실거래가 발생합니다.\n자본·리스크 파라미터를 확인하셨나요?",
               confirmLabel: "실거래 시작",
               confirmVariant: "danger",
-              onConfirm: () => act("enable", {}, "실거래 시작 완료"),
+              onConfirm: () => {
+                // GA4 — 실거래 활성화 이벤트
+                ga.realTradingStarted("live");
+                act("enable", {}, "실거래 시작 완료");
+              },
             })}
             style={{
               fontSize: 14,

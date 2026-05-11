@@ -100,6 +100,26 @@ const ROUTES = [
     title: "Zepta 퀀트 리포트 — AI 일일 분석",
     desc: "AI 에이전트 매일 시장 분석 리포트. 알파 후보, 리스크 알림, 포트폴리오 추천.",
   },
+  {
+    path: "notifications",
+    title: "Zepta 알림 센터 — 가격·시그널·뉴스·포트폴리오 통합",
+    desc: "모든 알림을 한 곳에서 — 가격 변동, 시그널 발생, 뉴스 영향도, 포트폴리오 임계값. 채널 별 설정.",
+  },
+  {
+    path: "saved-screeners",
+    title: "Zepta 저장한 스크리너 — 관심 조건 자동 매칭 알림",
+    desc: "RSI 과매도, 골든크로스, 볼린저밴드, ATR 폭발 등 저장한 조건이 시장에서 매칭되면 알림 전송.",
+  },
+  {
+    path: "leaderboard",
+    title: "Zepta 봇 리더보드 — 익명 사용자 봇 성과 랭킹",
+    desc: "모든 사용자의 자동매매 봇 성과를 익명으로 비교. 30일 수익률, 안정성(Sharpe), MDD, 거래수 매시간 갱신.",
+  },
+  {
+    path: "reports",
+    title: "Zepta 봇 리포트 — 봇별 누적 성과·에쿼티 커브",
+    desc: "13개 자동매매 봇의 누적 수익, 승률, PF, MDD, 최근 30일 에쿼티 커브와 거래 내역을 한 곳에서 확인.",
+  },
 ];
 
 function replaceMetaTag(html, attrName, attrValue, contentAttr, newContent) {

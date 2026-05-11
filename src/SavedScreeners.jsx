@@ -1,0 +1,337 @@
+// ══════════════════════════════════════════════════════════════════
+// Zepta — 저장한 스크리너 (/saved-screeners)
+// ──────────────────────────────────────────────────────────────────
+// 사용자가 저장한 스크리너 조건 목록.
+//   - 카드: 이름, 조건 요약, 마지막 매칭, 알림 토글
+//   - +추천 조건 버튼 → 4개 검증된 패턴 중 선택
+//   - 클릭 시 /screener 로 이동
+//   - Free 3개 제한, hint UI 표시
+//
+// API:
+//   GET    /api/screeners/list?uid=
+//   POST   /api/screeners/save        (저장/갱신/토글)
+//   DELETE /api/screeners/save        (삭제)
+// ══════════════════════════════════════════════════════════════════
+import { useEffect, useState, useCallback } from "react";
+import { useThemeTokens, FONT, RADIUS } from "./ui/theme.jsx";
+import { useAuth } from "./AuthProvider.jsx";
+
+const FREE_LIMIT = 3;
+
+function summarizeConditions(conditions) {
+  if (!conditions) return "조건 없음";
+  const parts = [];
+  if (conditions.rsi) parts.push(`RSI ${conditions.rsi.op} ${conditions.rsi.value}`);
+  if (conditions.volume_ratio) parts.push(`거래량 ${conditions.volume_ratio.op} ${conditions.volume_ratio.value}배`);
+  if (conditions.ma_state === "ma50_below_ma200") parts.push("MA50 < MA200");
+  if (conditions.ma50_slope) parts.push(`MA50 기울기 ${conditions.ma50_slope.op} ${conditions.ma50_slope.value}`);
+  if (conditions.bb_position === "lower") parts.push("BB 하단 터치");
+  if (conditions.atr_ratio) parts.push(`ATR 비율 ${conditions.atr_ratio.op} ${conditions.atr_ratio.value}`);
+  if (conditions.price_change_pct) parts.push(`등락 ${conditions.price_change_pct.op} ${conditions.price_change_pct.value}%`);
+  return parts.length ? parts.join(" · ") : "사용자 정의";
+}
+
+function fmtAgo(iso) {
+  if (!iso) return "아직 매칭 없음";
+  const ms = Date.now() - Date.parse(iso);
+  if (ms < 60_000) return "방금 매칭";
+  if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}분 전 매칭`;
+  if (ms < 86_400_000) return `${Math.floor(ms / 3_600_000)}시간 전 매칭`;
+  return `${Math.floor(ms / 86_400_000)}일 전 매칭`;
+}
+
+export default function SavedScreeners({ onNavigate }) {
+  const C = useThemeTokens();
+  const { user } = useAuth();
+  const uid = user?.id || "guest";
+
+  const [screeners, setScreeners] = useState([]);
+  const [suggested, setSuggested] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showSuggested, setShowSuggested] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/screeners/list?uid=${encodeURIComponent(uid)}`);
+      const data = await r.json();
+      if (data?.ok) {
+        setScreeners(data.screeners || []);
+        setSuggested(data.suggested || []);
+      }
+    } catch {} finally {
+      setLoading(false);
+    }
+  }, [uid]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const toggleAlert = useCallback(async (id) => {
+    setScreeners(prev => prev.map(s => s.id === id ? { ...s, alert_enabled: !s.alert_enabled } : s));
+    try {
+      await fetch("/api/screeners/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid, id, action: "toggle-alert" }),
+      });
+    } catch {}
+  }, [uid]);
+
+  const remove = useCallback(async (id) => {
+    if (!confirm("이 스크리너를 삭제할까요?")) return;
+    setScreeners(prev => prev.filter(s => s.id !== id));
+    try {
+      await fetch("/api/screeners/save", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid, id }),
+      });
+    } catch {}
+  }, [uid]);
+
+  const addSuggested = useCallback(async (s) => {
+    if (screeners.length >= FREE_LIMIT) {
+      alert(`무료 플랜은 ${FREE_LIMIT}개까지만 저장할 수 있어요. 기존 항목을 삭제하거나 Pro 로 업그레이드하세요.`);
+      return;
+    }
+    const screener = {
+      name: s.name,
+      conditions: s.conditions,
+      alert_enabled: true,
+      template_id: s.template_id,
+    };
+    try {
+      const r = await fetch("/api/screeners/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid, screener }),
+      });
+      const data = await r.json();
+      if (data?.ok) {
+        load();
+        setShowSuggested(false);
+      } else {
+        alert(data?.message || "저장에 실패했어요");
+      }
+    } catch (e) {
+      alert("저장에 실패했어요: " + e.message);
+    }
+  }, [uid, screeners.length, load]);
+
+  const isGuest = !uid || uid === "guest";
+  const remaining = FREE_LIMIT - screeners.length;
+
+  return (
+    <div style={{ maxWidth: 920, margin: "0 auto", padding: 16 }}>
+      {/* 헤더 */}
+      <div style={{
+        background: `linear-gradient(135deg, ${C.purpleBg} 0%, ${C.card} 100%)`,
+        borderRadius: RADIUS["3xl"],
+        padding: 24,
+        marginBottom: 16,
+        border: `1px solid ${C.border}`,
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: FONT["2xl"], fontWeight: 900, color: C.text1 }}>📌 저장한 스크리너</div>
+            <div style={{ fontSize: FONT.sm, color: C.text2, marginTop: 4 }}>
+              관심 조건을 저장하면 매칭되는 종목이 생길 때 알림이 와요
+            </div>
+          </div>
+          <button onClick={() => setShowSuggested(true)} style={{
+            padding: "10px 18px", borderRadius: RADIUS.md,
+            background: C.purple, color: "#fff", border: "none",
+            fontWeight: 700, fontSize: FONT.sm, cursor: "pointer",
+          }}>+ 추천 조건 추가</button>
+        </div>
+
+        {/* Free hint */}
+        <div style={{
+          marginTop: 16, padding: 10,
+          background: C.card2, borderRadius: RADIUS.md,
+          fontSize: FONT.xs, color: C.text2,
+          display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap",
+        }}>
+          <span>
+            <strong style={{ color: C.text1 }}>무료 플랜</strong>: 최대 {FREE_LIMIT}개 저장 ·
+            현재 <strong style={{ color: remaining > 0 ? C.green : C.red }}>{screeners.length} / {FREE_LIMIT}</strong>
+          </span>
+          <span style={{ color: C.text3 }}>Pro 로 업그레이드하면 무제한 (곧 출시)</span>
+        </div>
+      </div>
+
+      {/* 콘텐츠 */}
+      {loading ? (
+        <EmptyBox C={C} title="불러오는 중…" />
+      ) : isGuest ? (
+        <EmptyBox C={C} icon="🔐"
+          title="로그인 후 저장할 수 있어요"
+          desc="로그인하면 조건을 저장하고 매칭 시 알림을 받으실 수 있습니다." />
+      ) : screeners.length === 0 ? (
+        <EmptyBox C={C} icon="✨"
+          title="저장된 스크리너가 없어요"
+          desc="추천 조건 4개 중 마음에 드는 것을 골라 시작해보세요."
+          action={
+            <button onClick={() => setShowSuggested(true)} style={{
+              padding: "10px 18px", borderRadius: RADIUS.md,
+              background: C.purple, color: "#fff", border: "none",
+              fontWeight: 700, fontSize: FONT.sm, cursor: "pointer", marginTop: 12,
+            }}>+ 추천 조건 보기</button>
+          }
+        />
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+          {screeners.map(s => (
+            <ScreenerCard
+              key={s.id}
+              s={s}
+              C={C}
+              onToggleAlert={() => toggleAlert(s.id)}
+              onRemove={() => remove(s.id)}
+              onOpen={() => onNavigate && onNavigate("screener")}
+            />
+          ))}
+        </div>
+      )}
+
+      {showSuggested && (
+        <SuggestedModal
+          C={C}
+          suggested={suggested}
+          remaining={remaining}
+          onClose={() => setShowSuggested(false)}
+          onAdd={addSuggested}
+        />
+      )}
+    </div>
+  );
+}
+
+function ScreenerCard({ s, C, onToggleAlert, onRemove, onOpen }) {
+  return (
+    <div style={{
+      background: C.card, border: `1px solid ${C.border}`,
+      borderRadius: RADIUS.xl, padding: 16,
+      boxShadow: C.cardShadow,
+      display: "flex", flexDirection: "column", gap: 10,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: FONT.base, fontWeight: 800, color: C.text1, marginBottom: 4 }}>{s.name}</div>
+          <div style={{ fontSize: FONT.xs, color: C.text3, lineHeight: 1.5 }}>{summarizeConditions(s.conditions)}</div>
+        </div>
+        <button onClick={onRemove} style={{
+          background: "none", border: "none", color: C.text3,
+          fontSize: 18, cursor: "pointer", padding: 4,
+        }} title="삭제">🗑</button>
+      </div>
+
+      <div style={{
+        padding: "8px 10px", background: C.card2, borderRadius: RADIUS.sm,
+        fontSize: FONT.xs, color: C.text2,
+      }}>
+        {s.last_matched_at
+          ? `${fmtAgo(s.last_matched_at)} · ${s.last_match_count}개 종목`
+          : "아직 매칭된 종목이 없어요"}
+      </div>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
+        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+          <span style={{ position: "relative", display: "inline-block", width: 34, height: 18 }}>
+            <input type="checkbox" checked={s.alert_enabled} onChange={onToggleAlert}
+              style={{ opacity: 0, width: 0, height: 0 }} />
+            <span style={{
+              position: "absolute", inset: 0, borderRadius: 9,
+              background: s.alert_enabled ? C.green : C.border2, transition: "0.15s",
+            }} />
+            <span style={{
+              position: "absolute", top: 2, left: s.alert_enabled ? 18 : 2,
+              width: 14, height: 14, borderRadius: "50%", background: "#fff",
+              transition: "0.15s",
+            }} />
+          </span>
+          <span style={{ fontSize: FONT.xs, color: C.text2, fontWeight: 600 }}>
+            {s.alert_enabled ? "🔔 알림 ON" : "🔕 알림 OFF"}
+          </span>
+        </label>
+        <button onClick={onOpen} style={{
+          padding: "6px 12px", borderRadius: RADIUS.sm,
+          background: C.blueBg, color: C.blueL, border: `1px solid ${C.blue}40`,
+          fontSize: FONT.xs, fontWeight: 700, cursor: "pointer",
+        }}>스크리너 열기 →</button>
+      </div>
+    </div>
+  );
+}
+
+function SuggestedModal({ C, suggested, remaining, onClose, onAdd }) {
+  return (
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9999,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: C.card, border: `1px solid ${C.border}`, borderRadius: RADIUS["2xl"],
+        padding: 24, maxWidth: 560, width: "100%", maxHeight: "90vh", overflow: "auto",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: FONT.xl, fontWeight: 800, color: C.text1 }}>✨ 추천 스크리너</div>
+            <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 2 }}>
+              검증된 4개 패턴 · 남은 슬롯 {remaining}개
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: C.text2, fontSize: 22, cursor: "pointer" }}>✕</button>
+        </div>
+
+        {suggested.length === 0 ? (
+          <div style={{ padding: "32px 0", textAlign: "center", color: C.text3 }}>
+            ✅ 추천 조건을 모두 추가하셨네요!
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {suggested.map(s => (
+              <div key={s.template_id} style={{
+                background: C.card2, border: `1px solid ${C.border}`,
+                borderRadius: RADIUS.lg, padding: 14,
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: FONT.base, fontWeight: 700, color: C.text1, marginBottom: 4 }}>
+                      {s.name}
+                    </div>
+                    <div style={{ fontSize: FONT.sm, color: C.text2, marginBottom: 4 }}>{s.summary}</div>
+                    <div style={{ fontSize: FONT.xs, color: C.text3, lineHeight: 1.5 }}>{s.description}</div>
+                  </div>
+                  <button onClick={() => onAdd(s)} disabled={remaining <= 0} style={{
+                    padding: "6px 12px", borderRadius: RADIUS.sm,
+                    background: remaining > 0 ? C.purple : C.card,
+                    color: remaining > 0 ? "#fff" : C.text3,
+                    border: "none",
+                    fontSize: FONT.xs, fontWeight: 700,
+                    cursor: remaining > 0 ? "pointer" : "not-allowed",
+                    whiteSpace: "nowrap",
+                  }}>+ 추가</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EmptyBox({ C, icon = "📭", title, desc, action }) {
+  return (
+    <div style={{
+      background: C.card, border: `1px solid ${C.border}`, borderRadius: RADIUS.lg,
+      padding: "48px 24px", textAlign: "center",
+    }}>
+      <div style={{ fontSize: 40, marginBottom: 8 }}>{icon}</div>
+      <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1, marginBottom: 4 }}>{title}</div>
+      {desc && <div style={{ fontSize: FONT.sm, color: C.text3 }}>{desc}</div>}
+      {action}
+    </div>
+  );
+}

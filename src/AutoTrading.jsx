@@ -8,6 +8,7 @@ import { supabase } from "./supabaseClient.js";
 import { THEME_TOKENS } from "./ui/theme.jsx";
 import { useIsMobile } from "./ui/useBreakpoint.jsx";
 import { MetricInfo } from "./ui/primitives.jsx";
+import { ga } from "./lib/analytics.js";
 
 // 어려운 금융 지표 풀이 (한국어 입문자 친화 카피)
 const METRIC_HINTS = {
@@ -1740,6 +1741,8 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
     }]);
     setActiveBot(pendingBot);
     showToast("success", `${pendingBot.name} 실전매매 시작 — $${amount.toLocaleString()} 투입`);
+    // GA4 — 봇 활성화 이벤트
+    ga.botActivated(pendingBot.id || pendingBot.name || "unknown");
     setPendingBot(null);
     setAllocationInput("");
   }, [pendingBot, allocationInput, showToast]);

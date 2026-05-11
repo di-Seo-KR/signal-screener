@@ -15,6 +15,7 @@
 // ══════════════════════════════════════════════════════════════════
 import React, { useEffect, useMemo, useState } from "react";
 import { useThemeTokens, FONT, RADIUS } from "./ui/theme.jsx";
+import { ga } from "./lib/analytics.js";
 
 const REFRESH_MS = 60_000;
 
@@ -484,6 +485,9 @@ export default function AlphaLab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastFetched, setLastFetched] = useState(null);
+
+  // GA4 — Alpha Lab 페이지 진입 (마운트 시 1회)
+  useEffect(() => { ga.alphaLabViewed(); }, []);
 
   const fetchData = async () => {
     try {
