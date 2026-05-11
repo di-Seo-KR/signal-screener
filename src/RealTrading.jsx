@@ -240,7 +240,7 @@ function RealTradingInner() {
         <Card pad={32} style={{ maxWidth: 420, textAlign: "center" }}>
           <Lock size={32} />
           <div style={{ fontSize: 16, fontWeight: 800, marginTop: 12 }}>로그인이 필요합니다</div>
-          <div style={{ fontSize: 13, color: "var(--z-text-2)", marginTop: 6 }}>
+          <div style={{ fontSize: 14, color: "var(--z-text-2)", marginTop: 6 }}>
             실전매매 관제센터는 인증된 사용자만 접근할 수 있습니다.
           </div>
         </Card>
@@ -332,7 +332,7 @@ function RealTradingInner() {
             <div style={{ fontSize: isMobile ? 18 : 28, fontWeight: 900, letterSpacing: "-0.03em", lineHeight: 1 }}>
               실전매매 관제센터
             </div>
-            <div style={{ fontSize: isMobile ? 11 : 13, color: "var(--z-text-3)", marginTop: isMobile ? 3 : 4 }}>
+            <div style={{ fontSize: isMobile ? 13 : 15, color: "var(--z-text-3)", marginTop: isMobile ? 3 : 4 }}>
               Zepta Investment Platform
             </div>
           </div>
@@ -345,7 +345,7 @@ function RealTradingInner() {
               solid
               className="rt-pulse"
               style={{
-                fontSize: 12,
+                fontSize: 14,
                 fontWeight: 700,
                 padding: "6px 12px",
               }}
@@ -356,7 +356,7 @@ function RealTradingInner() {
             <Badge
               tone="default"
               style={{
-                fontSize: 12,
+                fontSize: 14,
                 fontWeight: 700,
                 padding: "6px 12px",
               }}
@@ -368,7 +368,7 @@ function RealTradingInner() {
             <Badge
               tone="yellow"
               style={{
-                fontSize: 12,
+                fontSize: 14,
                 fontWeight: 700,
                 padding: "6px 12px",
               }}
@@ -376,7 +376,7 @@ function RealTradingInner() {
               ⚡ BREAKER
             </Badge>
           )}
-          <div style={{ fontSize: isMobile ? 11 : 12, color: "var(--z-text-2)", marginLeft: 4 }}>
+          <div style={{ fontSize: isMobile ? 13 : 14, color: "var(--z-text-2)", marginLeft: 4 }}>
             {!isMobile && "· Binance USDⓈ-M Futures"}
             {lastRefresh && <> {!isMobile ? "· " : ""}<span style={{ color: "var(--z-text-3)" }}>{fmtTime(lastRefresh)} 기준</span></>}
           </div>
@@ -418,7 +418,7 @@ function RealTradingInner() {
           <Wallet size={isMobile ? 16 : 20} color="#fff" />
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, color: "var(--z-text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+          <div style={{ fontSize: 14, color: "var(--z-text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
             보유 자산
           </div>
           <div style={{ fontSize: isMobile ? 26 : 32, fontWeight: 900, marginTop: 4, lineHeight: 1, fontFamily: "var(--z-font-mono)" }}>
@@ -436,7 +436,7 @@ function RealTradingInner() {
             paddingLeft: 8,
             borderLeft: "1px solid rgba(59, 130, 246, 0.15)",
           }}>
-            <div style={{ fontSize: 10, color: "var(--z-text-3)", fontWeight: 600 }}>오늘</div>
+            <div style={{ fontSize: 14, color: "var(--z-text-3)", fontWeight: 600 }}>오늘</div>
             <div style={{
               fontSize: 16, fontWeight: 800, lineHeight: 1.2,
               color: dayLossPct < 0 ? "var(--z-red-hi)" : dayLossPct > 0 ? "var(--z-green-hi)" : "var(--z-text)",
@@ -452,16 +452,16 @@ function RealTradingInner() {
         paddingTop: 10, borderTop: "1px solid rgba(59, 130, 246, 0.1)",
       }}>
         <div>
-          <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 4 }}>오늘 시작 잔고</div>
+          <div style={{ fontSize: 14, color: "var(--z-text-3)", marginBottom: 4 }}>오늘 시작 잔고</div>
           <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)" }}>
             {breaker.dayStartEquity ? fmtUsd(breaker.dayStartEquity) : "—"}
           </div>
         </div>
         <div>
-          <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 4 }}>
+          <div style={{ fontSize: 14, color: "var(--z-text-3)", marginBottom: 4 }}>
             MDD 기준 (30일 최고)
             {breaker.equityHigh && breaker.equityHigh30d && breaker.equityHigh > breaker.equityHigh30d && (
-              <span style={{ marginLeft: 6, fontSize: 9, color: "var(--z-text-3)" }}>
+              <span style={{ marginLeft: 6, fontSize: 14, color: "var(--z-text-3)" }}>
                 · 역대 {fmtUsd(breaker.equityHigh)}
               </span>
             )}
@@ -486,7 +486,7 @@ function RealTradingInner() {
       minHeight: isMobile ? "auto" : "100%",
     }}>
       <div style={{
-        fontSize: isMobile ? 10 : 11, color: "var(--z-text-3)",
+        fontSize: isMobile ? 12 : 13, color: "var(--z-text-3)",
         fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5,
         marginBottom: isMobile ? 4 : 8,
       }}>
@@ -500,7 +500,7 @@ function RealTradingInner() {
       </div>
       {hint && (
         <div style={{
-          marginTop: isMobile ? 4 : 8, fontSize: 10, color: "var(--z-text-3)",
+          marginTop: isMobile ? 4 : 8, fontSize: 14, color: "var(--z-text-3)",
           padding: isMobile ? "3px 6px" : "6px 8px",
           background: "rgba(0, 0, 0, 0.15)", borderRadius: "var(--z-r-md)",
         }}>
@@ -606,11 +606,11 @@ function RealTradingInner() {
           </div>
         </div>
         {trulyLive ? (
-          <Badge tone="green" dot style={{ fontSize: 11, fontWeight: 700, padding: "6px 10px" }}>
+          <Badge tone="green" dot style={{ fontSize: 14, fontWeight: 700, padding: "6px 10px" }}>
             ✓ 실거래 중
           </Badge>
         ) : (
-          <Badge tone="default" style={{ fontSize: 11, fontWeight: 700, padding: "6px 10px" }}>
+          <Badge tone="default" style={{ fontSize: 14, fontWeight: 700, padding: "6px 10px" }}>
             ⊙ 대기 중
           </Badge>
         )}
@@ -738,7 +738,7 @@ function RealTradingInner() {
           border: `1px solid rgba(234, 179, 8, 0.3)`,
           borderRadius: "var(--z-r-md)",
           color: "var(--z-yellow-hi)",
-          fontSize: 12,
+          fontSize: 14,
           fontWeight: 700,
           display: "flex",
           alignItems: "center",
@@ -755,7 +755,7 @@ function RealTradingInner() {
           border: `1px solid rgba(239, 68, 68, 0.3)`,
           borderRadius: "var(--z-r-md)",
           color: "var(--z-red-hi)",
-          fontSize: 12,
+          fontSize: 14,
           fontWeight: 700,
           display: "flex",
           alignItems: "center",
@@ -790,17 +790,17 @@ function RealTradingInner() {
             background: step.done ? "var(--z-green)" : "var(--z-card-hi)",
             color: step.done ? "#021B10" : "var(--z-text-3)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 13, fontWeight: 800,
+            fontSize: 14, fontWeight: 800,
             border: `1px solid ${step.done ? "var(--z-green)" : "var(--z-border-2)"}`,
           }}>
             {step.done ? <Check size={16} /> : step.n}
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: step.done ? "var(--z-text)" : "var(--z-text-2)" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: step.done ? "var(--z-text)" : "var(--z-text-2)" }}>
               {step.title}
               {step.done && <Badge tone="green" size="sm" style={{ marginLeft: 8 }}>완료</Badge>}
             </div>
-            <div style={{ fontSize: 11, color: "var(--z-text-3)", marginTop: 3, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 14, color: "var(--z-text-3)", marginTop: 3, lineHeight: 1.5 }}>
               {step.desc}
             </div>
           </div>
@@ -845,7 +845,7 @@ function RealTradingInner() {
               {pnl >= 0 ? "+" : ""}{fmtUsd(pnl)}
             </div>
             <div style={{
-              fontSize: 11, fontWeight: 700, marginTop: 2,
+              fontSize: 14, fontWeight: 700, marginTop: 2,
               color: pnl >= 0 ? "var(--z-green-hi)" : "var(--z-red-hi)",
             }}>
               {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
@@ -862,19 +862,19 @@ function RealTradingInner() {
           borderTop: `1px solid var(--z-border)`,
         }}>
           <div>
-            <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 2 }}>수량</div>
+            <div style={{ fontSize: 14, color: "var(--z-text-3)", marginBottom: 2 }}>수량</div>
             <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)" }}>
               {fmtQty(Math.abs(p.positionAmt))}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 2 }}>진입가</div>
+            <div style={{ fontSize: 14, color: "var(--z-text-3)", marginBottom: 2 }}>진입가</div>
             <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)" }}>
               {fmtUsd(p.entryPrice)}
             </div>
           </div>
           <div>
-            <div style={{ fontSize: 11, color: "var(--z-text-3)", marginBottom: 2 }}>현재가</div>
+            <div style={{ fontSize: 14, color: "var(--z-text-3)", marginBottom: 2 }}>현재가</div>
             <div style={{
               fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)",
               color: p.markPrice > p.entryPrice
@@ -915,7 +915,7 @@ function RealTradingInner() {
             <Activity size={28} color="#fff" />
           </div>
           <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>진행 중 거래 없음</div>
-          <div style={{ fontSize: 13, color: "var(--z-text-3)", lineHeight: 1.5 }}>
+          <div style={{ fontSize: 14, color: "var(--z-text-3)", lineHeight: 1.5 }}>
             실거래가 활성화되고 시그널이 발생하면<br />여기에 포지션이 표시됩니다.
           </div>
         </div>
@@ -967,26 +967,29 @@ function RealTradingInner() {
   const breakerCard = (
     <Card title="서킷브레이커" icon={<Shield size={16} />}
       subtitle={`일 -${dayLimitPct.toFixed(0)}% · 주 -${weekLimitPct.toFixed(0)}% · MDD -${mddLimitPct.toFixed(0)}% · ${breakerLimits.consecLossThreshold}연속손실 → 24h 쿨다운`}>
+      {/* ★ 2026-05-11 fix: 손실 한도 막대는 "음수 (손실)" 일 때만 채워야 함.
+          이전: Math.abs() 로 양수 (수익) 도 채워서 +35% 인데 89% 빨간 막대 표시.
+          현재: 양수면 0% / default tone. 음수일 때만 절댓값 비율로 채움. */}
       <div style={{ display: "grid", gap: 10, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(220px, 1fr))" }}>
         <div>
           <Progress
-            label={`일 손실 ${fmtPct(dayLossPct)} / -${dayLimitPct.toFixed(0)}%`}
-            value={Math.min(100, (Math.abs(dayLossPct) / dayLimitPct) * 100)}
-            tone={Math.abs(dayLossPct) >= dayLimitPct * 0.75 ? "red" : Math.abs(dayLossPct) >= dayLimitPct * 0.5 ? "yellow" : "green"}
+            label={`일 손익 ${fmtPct(dayLossPct)} / -${dayLimitPct.toFixed(0)}%`}
+            value={dayLossPct >= 0 ? 0 : Math.min(100, (Math.abs(dayLossPct) / dayLimitPct) * 100)}
+            tone={dayLossPct >= 0 ? "default" : Math.abs(dayLossPct) >= dayLimitPct * 0.75 ? "red" : Math.abs(dayLossPct) >= dayLimitPct * 0.5 ? "yellow" : "green"}
           />
         </div>
         <div>
           <Progress
-            label={`주 손실 ${fmtPct(weekLossPct)} / -${weekLimitPct.toFixed(0)}%`}
-            value={Math.min(100, (Math.abs(weekLossPct) / weekLimitPct) * 100)}
-            tone={Math.abs(weekLossPct) >= weekLimitPct * 0.75 ? "red" : Math.abs(weekLossPct) >= weekLimitPct * 0.5 ? "yellow" : "green"}
+            label={`주 손익 ${fmtPct(weekLossPct)} / -${weekLimitPct.toFixed(0)}%`}
+            value={weekLossPct >= 0 ? 0 : Math.min(100, (Math.abs(weekLossPct) / weekLimitPct) * 100)}
+            tone={weekLossPct >= 0 ? "default" : Math.abs(weekLossPct) >= weekLimitPct * 0.75 ? "red" : Math.abs(weekLossPct) >= weekLimitPct * 0.5 ? "yellow" : "green"}
           />
         </div>
         <div>
           <Progress
             label={`최대 낙폭 ${fmtPct(mddPct)} / -${mddLimitPct.toFixed(0)}%`}
-            value={Math.min(100, (Math.abs(mddPct) / mddLimitPct) * 100)}
-            tone={Math.abs(mddPct) >= mddLimitPct * 0.75 ? "red" : Math.abs(mddPct) >= mddLimitPct * 0.5 ? "yellow" : "green"}
+            value={mddPct >= 0 ? 0 : Math.min(100, (Math.abs(mddPct) / mddLimitPct) * 100)}
+            tone={mddPct >= 0 ? "default" : Math.abs(mddPct) >= mddLimitPct * 0.75 ? "red" : Math.abs(mddPct) >= mddLimitPct * 0.5 ? "yellow" : "green"}
           />
         </div>
         <div>
@@ -997,7 +1000,7 @@ function RealTradingInner() {
           />
         </div>
       </div>
-      <div style={{ marginTop: 14, display: "grid", gap: 8, gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(160px, 1fr))", fontSize: 12 }}>
+      <div style={{ marginTop: 14, display: "grid", gap: 8, gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(160px, 1fr))", fontSize: 14 }}>
         <KV label="오늘 시작 잔고" value={fmtUsd(breaker.dayStartEquity)} />
         <KV label="이번 주 시작 잔고" value={fmtUsd(breaker.weekStartEquity)} />
         <KV label="MDD 기준 (30일 최고)" value={fmtUsd(mddBaseline)} />
@@ -1016,7 +1019,7 @@ function RealTradingInner() {
           display: "flex", alignItems: "center", justifyContent: "space-between",
           gap: 10, flexWrap: "wrap",
         }}>
-          <div style={{ fontSize: 11, color: "var(--z-text-2)", lineHeight: 1.5 }}>
+          <div style={{ fontSize: 14, color: "var(--z-text-2)", lineHeight: 1.5 }}>
             <strong style={{ color: "var(--z-purple)" }}>MDD 기준 재설정</strong>
             <br />
             현재 잔고 대비 30일 최고가 {((breaker.equityHigh / equity - 1) * 100).toFixed(1)}% 높음 — 큰 상승 후 정상 조정에도 자동정지 위험. 현재 잔고를 새 기준으로 잡으려면 클릭.
@@ -1032,7 +1035,7 @@ function RealTradingInner() {
             })}
             disabled={busy}
             style={{
-              padding: "6px 12px", fontSize: 12, fontWeight: 600,
+              padding: "6px 12px", fontSize: 14, fontWeight: 600,
               background: "var(--z-purple)", color: "#fff",
               border: "none", borderRadius: "var(--z-r-md)",
               cursor: busy ? "not-allowed" : "pointer", opacity: busy ? 0.5 : 1,
@@ -1066,10 +1069,10 @@ function RealTradingInner() {
             <div key={i} style={{
               padding: 12, background: "var(--z-card-2)",
               borderRadius: "var(--z-r-md)", border: `1px solid var(--z-border)`,
-              fontSize: 12,
+              fontSize: 14,
             }}>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 4 }}>
-                <span style={{ color: "var(--z-text-3)", fontFamily: "var(--z-font-mono)", fontSize: 11 }}>
+                <span style={{ color: "var(--z-text-3)", fontFamily: "var(--z-font-mono)", fontSize: 14 }}>
                   {fmtDT(e.time)}
                 </span>
                 {e.event === "position_closed" ? <Badge tone="purple" size="sm">CLOSED</Badge>
@@ -1091,13 +1094,13 @@ function RealTradingInner() {
                 )}
               </div>
               {e.plan && (
-                <div style={{ color: "var(--z-text-2)", fontSize: 11, fontFamily: "var(--z-font-mono)" }}>
+                <div style={{ color: "var(--z-text-2)", fontSize: 14, fontFamily: "var(--z-font-mono)" }}>
                   qty {fmtQty(e.plan.qty)} · {e.plan.leverage}× · SL {fmtUsd(e.plan.slPrice)} · TP {fmtUsd(e.plan.tpPrice)}{e.plan.bumpedToMin ? " · bumped" : ""}
                   {e.plan.effectiveRR && <> · RR {e.plan.effectiveRR.toFixed(2)}</>}
                 </div>
               )}
               {e.result?.orderId && (
-                <div style={{ color: "var(--z-text-3)", fontSize: 10, fontFamily: "var(--z-font-mono)" }}>
+                <div style={{ color: "var(--z-text-3)", fontSize: 14, fontFamily: "var(--z-font-mono)" }}>
                   orderId: {e.result.orderId}
                 </div>
               )}
@@ -1105,7 +1108,7 @@ function RealTradingInner() {
                 <div style={{
                   marginTop: 6, padding: "6px 10px", background: "var(--z-red-bg)",
                   border: `1px solid var(--z-red)55`, borderRadius: "var(--z-r-xs)",
-                  color: "var(--z-red-hi)", fontSize: 11, fontWeight: 700,
+                  color: "var(--z-red-hi)", fontSize: 14, fontWeight: 700,
                   display: "flex", alignItems: "center", gap: 6,
                 }}>
                   <AlertIcon size={12} />
@@ -1113,7 +1116,7 @@ function RealTradingInner() {
                 </div>
               )}
               {e.reason && !e.signal && (
-                <div style={{ color: "var(--z-text-3)", fontSize: 11 }}>reason: {e.reason}</div>
+                <div style={{ color: "var(--z-text-3)", fontSize: 14 }}>reason: {e.reason}</div>
               )}
             </div>
           ))}
@@ -1169,7 +1172,7 @@ function RealTradingInner() {
               marginBottom: 12, padding: 10,
               background: "var(--z-card-2)", borderRadius: "var(--z-r-sm)",
               border: `1px solid var(--z-border)`,
-              display: "flex", gap: 14, flexWrap: "wrap", fontSize: 11,
+              display: "flex", gap: 14, flexWrap: "wrap", fontSize: 14,
             }}>
               <span style={{ color: "var(--z-text-3)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5 }}>청산 사유</span>
               <span><Badge tone="green" size="sm">TP</Badge> {shadow.summary.byCloseReason.TP || 0}</span>
@@ -1183,8 +1186,8 @@ function RealTradingInner() {
               background: "var(--z-card-2)", borderRadius: "var(--z-r-sm)",
               border: `1px solid var(--z-border)`,
             }}>
-              <div style={{ fontSize: 10, color: "var(--z-text-3)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>전략 family 별</div>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 11 }}>
+              <div style={{ fontSize: 14, color: "var(--z-text-3)", fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>전략 family 별</div>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: 14 }}>
                 {Object.entries(shadow.summary.byFamily).map(([fam, st]) => (
                   <div key={fam} style={{ display: "flex", gap: 4, alignItems: "center" }}>
                     <Badge tone="blue" size="sm">{fam}</Badge>
@@ -1210,7 +1213,7 @@ function RealTradingInner() {
             <div key={s.id || i} style={{
               padding: 10, background: "var(--z-card-2)",
               borderRadius: "var(--z-r-sm)", border: `1px solid var(--z-border)`,
-              fontSize: 11, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center",
+              fontSize: 14, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center",
             }}>
               <span style={{ color: "var(--z-text-3)", fontFamily: "var(--z-font-mono)" }}>{fmtDT(s.openedAt)}</span>
               <Badge tone={s.status === "OPEN" ? "blue" : "purple"} size="sm">{s.status}</Badge>
@@ -1242,10 +1245,10 @@ function RealTradingInner() {
           return (
             <div key={i} style={{
               padding: 10, background: "var(--z-card-2)",
-              borderRadius: "var(--z-r-sm)", border: `1px solid var(--z-border)`, fontSize: 12,
+              borderRadius: "var(--z-r-sm)", border: `1px solid var(--z-border)`, fontSize: 14,
             }}>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                <span style={{ color: "var(--z-text-3)", fontFamily: "var(--z-font-mono)", fontSize: 11 }}>{fmtDT(r.time)}</span>
+                <span style={{ color: "var(--z-text-3)", fontFamily: "var(--z-font-mono)", fontSize: 14 }}>{fmtDT(r.time)}</span>
                 <Badge tone={hasDrift ? "yellow" : "green"} size="sm">{hasDrift ? "DRIFT" : "OK"}</Badge>
                 {r.realizedToday != null && (
                   <span style={{
@@ -1255,7 +1258,7 @@ function RealTradingInner() {
                 )}
               </div>
               {r.drift && (
-                <div style={{ color: "var(--z-text-2)", fontSize: 11, marginTop: 4, fontFamily: "var(--z-font-mono)" }}>
+                <div style={{ color: "var(--z-text-2)", fontSize: 14, marginTop: 4, fontFamily: "var(--z-font-mono)" }}>
                   missing {r.drift.missing?.length || 0} · extra {r.drift.extra?.length || 0} · mismatch {r.drift.mismatch?.length || 0}
                 </div>
               )}
@@ -1290,7 +1293,7 @@ function RealTradingInner() {
       <div style={{
         marginTop: 14, padding: 12, background: "var(--z-blue-bg)",
         border: `1px solid var(--z-blue)33`, borderRadius: "var(--z-r-sm)",
-        fontSize: 11, color: "var(--z-text-2)", lineHeight: 1.6,
+        fontSize: 14, color: "var(--z-text-2)", lineHeight: 1.6,
       }}>
         <Badge tone="blue" size="sm" style={{ marginRight: 6 }}>안전장치</Badge>
         Killswitch fail-closed · Bracket 실패 시 자동 강제청산 · 일일 Reconcile(Binance=진실) · 상관군 제한
@@ -1368,8 +1371,8 @@ function RealTradingInner() {
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                 {/* Widget 6: 시그널 워치리스트 */}
-                <Card title="진입 후보 시그널" icon={<Target size={16} />}
-                  subtitle={`최근 4시간 · 활성 봇 신호 (60초 갱신)`}>
+                <Card title="📡 봇이 추적 중인 시그널" icon={<Target size={16} />}
+                  subtitle="아직 진입 안 함 — 봇이 추적 중인 후보. 한도/리스크 통과하면 자동 진입 (60초 갱신)">
                   <SignalWatchlist signals={watchlist.signals} loading={watchlist.loading} isMobile={isMobile} />
                 </Card>
                 {breakerCard}
