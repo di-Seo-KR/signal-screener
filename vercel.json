@@ -42,6 +42,7 @@
     { "source": "/real-trading", "destination": "/real-trading.html" },
     { "source": "/alpha-lab", "destination": "/alpha-lab.html" },
     { "source": "/portfolio", "destination": "/portfolio.html" },
+    { "source": "/portfolio-analysis", "destination": "/portfolio-analysis.html" },
     { "source": "/backtest", "destination": "/backtest.html" },
     { "source": "/strategy", "destination": "/strategy.html" },
     { "source": "/risk-map", "destination": "/risk-map.html" },
@@ -58,7 +59,10 @@
     { "source": "/leaderboard", "destination": "/leaderboard.html" },
     { "source": "/reports", "destination": "/reports.html" },
     { "source": "/reports/:botId", "destination": "/reports.html" },
-    { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon)(?!about)(?!guide)(?!privacy)(?!terms)(?!contact)(?!blog)(?!screener)(?!auto-trading)(?!real-trading)(?!alpha-lab)(?!portfolio)(?!backtest)(?!strategy)(?!risk-map)(?!sentiment)(?!econ-calendar)(?!news)(?!anomaly)(?!alerts)(?!sector-flow)(?!quant-portfolio)(?!quant-report)(?!notifications)(?!saved-screeners)(?!leaderboard)(?!reports).*)", "destination": "/index.html" }
+    { "source": "/backtest-compare", "destination": "/backtest-compare.html" },
+    { "source": "/copy-trading", "destination": "/copy-trading.html" },
+    { "source": "/pricing", "destination": "/pricing.html" },
+    { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon)(?!about)(?!guide)(?!privacy)(?!terms)(?!contact)(?!blog)(?!screener)(?!auto-trading)(?!real-trading)(?!alpha-lab)(?!portfolio)(?!backtest-compare)(?!backtest)(?!strategy)(?!risk-map)(?!sentiment)(?!econ-calendar)(?!news)(?!anomaly)(?!alerts)(?!sector-flow)(?!quant-portfolio)(?!quant-report)(?!notifications)(?!saved-screeners)(?!leaderboard)(?!reports)(?!copy-trading)(?!pricing).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
@@ -164,6 +168,10 @@
     {
       "path": "/api/agents/leaderboard",
       "schedule": "15 * * * *"
+    },
+    {
+      "path": "/api/agents/dca-runner",
+      "schedule": "0 * * * *"
     }
   ]
 }

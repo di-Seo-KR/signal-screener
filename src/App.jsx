@@ -261,6 +261,13 @@ const NotificationHub = lazy(() => import("./NotificationHub.jsx"));
 const SavedScreeners = lazy(() => import("./SavedScreeners.jsx"));
 const BotLeaderboard = lazy(() => import("./BotLeaderboard.jsx"));
 const BotReport = lazy(() => import("./BotReport.jsx"));
+const BacktestCompare = lazy(() => import("./BacktestCompare.jsx"));
+const CopyTrading = lazy(() => import("./CopyTrading.jsx"));
+const Onboarding = lazy(() => import("./Onboarding.jsx"));
+// PLAN-SVC #3 (2026-05-11) — 포트폴리오 분석 페이지
+const PortfolioAnalysis = lazy(() => import("./PortfolioAnalysis.jsx"));
+// PLAN-BIZ Q3 #1 (2026-05-11) — 구독 모델 (Free / Pro / Premium)
+const Pricing = lazy(() => import("./Pricing.jsx"));
 import { ALL_STRATEGIES } from "./strategies.js";
 
 // 공용 lazy fallback — 탭 전환 시 0.1~0.3초 노출
@@ -4223,6 +4230,24 @@ function AppInner() {
     }
   }, [user, showAuthModal]);
 
+  // ── 입문자 온보딩 (PLAN-SVC #5, 2026-05-11) ──
+  // 가입 직후 1회 자동 표시. user_metadata.onboarding.completed 로 1회 가드.
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const onboardingChecked = useRef(false);
+  useEffect(() => {
+    if (!user || onboardingChecked.current) return;
+    onboardingChecked.current = true;
+    try {
+      const meta = user.user_metadata || {};
+      const remote = meta.onboarding;
+      const local = (() => { try { return JSON.parse(localStorage.getItem(`di:onboarding:${user.id}`) || "null"); } catch { return null; } })();
+      const completed = !!(remote?.completed || local?.completed);
+      if (!completed) setShowOnboarding(true);
+    } catch (e) { console.warn("[Onboarding] check failed:", e?.message); }
+  }, [user]);
+  // 유저 변경 시 가드 리셋
+  useEffect(() => { onboardingChecked.current = false; }, [user?.id]);
+
   // 게스트 접근 허용 — 로그인 필요 기능만 제한
   const requireLogin = useCallback((targetTab) => {
     if (!user && LOGIN_REQUIRED_TABS.includes(targetTab)) {
@@ -4240,7 +4265,7 @@ function AppInner() {
     });
   }, []);
 
-  const validTabs = ["home","auto-trading","real-trading","alpha-lab","portfolio","screener","alerts","notifications","saved-screeners","news","quant-portfolio","quant-port","risk-map","sector-flow","backtest","sentiment","strategy","anomaly","quant-report","econ-calendar","leaderboard","reports","bot-report","profile","dev","about","privacy","terms","contact"];
+  const validTabs = ["home","auto-trading","real-trading","alpha-lab","portfolio","portfolio-analysis","screener","alerts","notifications","saved-screeners","news","quant-portfolio","quant-port","risk-map","sector-flow","backtest","backtest-compare","copy-trading","sentiment","strategy","anomaly","quant-report","econ-calendar","leaderboard","reports","bot-report","profile","dev","pricing","about","privacy","terms","contact"];
 
   // ── 경로 → tab 변환 ──
   //   /reports             → "reports"
@@ -11851,7 +11876,15 @@ function AppInner() {
             TAB: Alpha Lab — 24/7 알파 추적 + 자동 개선 시스템
         ═══════════════════════════════════════════════════════════ */}
         {tab === "alpha-lab" && (
-          <Suspense fallback={<LazyTabFallback />}><AlphaLab /></Suspense>
+          <Suspense fallback={<LazyTabFallback />}><AlphaLab onRequestLogin={() => setShowAuthModal(true)} /></Suspense>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 포트폴리오 분석 (/portfolio-analysis) — PLAN-SVC #3
+            자산 배분 · 상관관계 · 분산 점수 · 리밸런싱 추천
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "portfolio-analysis" && (
+          <Suspense fallback={<LazyTabFallback />}><PortfolioAnalysis /></Suspense>
         )}
 
         {/* ═══════════════════════════════════════════════════════════
@@ -11896,6 +11929,34 @@ function AppInner() {
         {tab === "bot-report" && (
           <Suspense fallback={<LazyTabFallback />}>
             <BotReport botId={reportBotId} onNavigate={setTab} />
+          </Suspense>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 백테스트 비교 (/backtest-compare)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "backtest-compare" && (
+          <Suspense fallback={<LazyTabFallback />}>
+            <BacktestCompare onNavigate={setTab} />
+          </Suspense>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 카피트레이딩 (/copy-trading) — 법적 안전 모드 (알림 + 설정 복사)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "copy-trading" && (
+          <Suspense fallback={<LazyTabFallback />}>
+            <CopyTrading onNavigate={setTab} />
+          </Suspense>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 구독 가격 (/pricing) — PLAN-BIZ Q3 #1
+            Free / Pro / Premium 3 tier 비교 · FAQ · 14일 trial CTA
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "pricing" && (
+          <Suspense fallback={<LazyTabFallback />}>
+            <Pricing onRequestLogin={() => setShowAuthModal(true)} />
           </Suspense>
         )}
 
@@ -13067,6 +13128,16 @@ function AppInner() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── 입문자 온보딩 5스텝 (가입 직후 1회) ── */}
+      {showOnboarding && (
+        <Suspense fallback={null}>
+          <Onboarding
+            onClose={() => setShowOnboarding(false)}
+            onNavigate={(targetTab) => { try { setTab(targetTab); } catch {} }}
+          />
+        </Suspense>
       )}
 
       {/* ── CTA 광고 (쿠팡 인터스티셜) ── */}

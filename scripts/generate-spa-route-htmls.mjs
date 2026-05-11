@@ -46,6 +46,11 @@ const ROUTES = [
     desc: "켈리·평균-분산·블랙리터만 다중 알고리즘 포트폴리오 최적화. 실시간 마켓벨류 + 자동 리밸런싱.",
   },
   {
+    path: "portfolio-analysis",
+    title: "Zepta 포트폴리오 분석 — 분산도·상관관계·리밸런싱",
+    desc: "보유 자산의 카테고리 배분, 30일 상관관계 히트맵, 분산 점수, 리밸런싱 추천을 한 화면에서 확인하세요.",
+  },
+  {
     path: "backtest",
     title: "Zepta 백테스트 — OHLC 시계열 walk-forward",
     desc: "30/60/90일 walk-forward 백테스트. Sharpe·PF·MDD·Calmar 자동 산출. 파라미터 grid search.",
@@ -119,6 +124,21 @@ const ROUTES = [
     path: "reports",
     title: "Zepta 봇 리포트 — 봇별 누적 성과·에쿼티 커브",
     desc: "13개 자동매매 봇의 누적 수익, 승률, PF, MDD, 최근 30일 에쿼티 커브와 거래 내역을 한 곳에서 확인.",
+  },
+  {
+    path: "backtest-compare",
+    title: "Zepta 백테스트 비교 — 멀티 전략 동시 백테스트",
+    desc: "같은 자산·기간에 추세·돌파·평균회귀·앙상블 등 여러 strategy 를 한 차트에 overlay 비교. Sharpe·PF·MDD·승률 메트릭 테이블.",
+  },
+  {
+    path: "copy-trading",
+    title: "Zepta 카피트레이딩 — 신호 알림 + 설정 복사 (법적 안전 모드)",
+    desc: "다른 봇의 진입·청산 신호를 알림으로 받거나 strategy / parameter 만 복사. 자동 미러 매매 X — 한국 자본시장법 준수.",
+  },
+  {
+    path: "pricing",
+    title: "Zepta 가격 — Free · Pro · Premium 구독 플랜",
+    desc: "투자 도구 SaaS 3 tier 비교. Pro 14일 무료 체험. 봇·백테스트·알림·AlphaLab·카피트레이딩 풀 액세스. 환불 정책 명시.",
   },
 ];
 
