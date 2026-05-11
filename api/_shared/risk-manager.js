@@ -110,6 +110,14 @@ export const RISK_CONFIG = {
   // notional 이 자연스럽게 커지는 걸 잘라낼 cap.
   absoluteMaxNotional: 300,
 
+  // ★ 2026-05-11 대표 지시: 포지션당 최소 원금 (마진 기준) $100.
+  //   너무 작은 포지션은 수수료/슬리피지 대비 의미 없는 거래라 ROI 기여도 0에 가까움.
+  //   $100 마진 × lev 10x = 노셔널 $1000 — absoluteMaxNotional($300) 보다 큼.
+  //   ★ 우선순위: minMarginUsd 가 absoluteMaxNotional 보다 위. 즉 자본 부족하면 reject.
+  //   계산: minNotional = minMarginUsd × leverage. 이 값으로 평소 산정한 notional 을 floor.
+  //   자본 $370 × 마진 50% cap = $185 → minMargin $100 만족 가능 (개당).
+  minMarginUsd: 100,
+
   // ★ 작은 계정 구제: notional 이 minNotional×safety 미만일 때
   //   qty 를 bump 하되, 그 결과의 실효 손실(effLossPct × notional) 이
   //   원래 riskAmount 의 minNotionalBumpCap 배수 이내면 허용.
@@ -355,6 +363,28 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
   const sizeHint = clamp(signal.sizeHint ?? 0.5, 0.1, 1.0);
   notional = notional * sizeHint;
   push(`sizeHint=${sizeHint} → notional=$${notional.toFixed(2)}`);
+
+  // 8.5) ★ 2026-05-11 대표 지시: 포지션당 최소 마진 $100 강제.
+  //   너무 작은 포지션 (수수료/슬리피지 대비 의미 없음) reject.
+  //   minNotional = minMarginUsd × leverage 를 floor 로.
+  //   notional 이 absoluteMaxNotional($300) 보다 작아도 minMarginNotional 이상은 보장.
+  const minMarginUsd = cfg.minMarginUsd || 0;
+  if (minMarginUsd > 0) {
+    const minMarginNotional = minMarginUsd * finalLev;
+    if (notional < minMarginNotional) {
+      // 자본 가드 — equity × maxMarginPct 안에 들어가면 bump-up 허용
+      const maxMargin = equity * (cfg.maxMarginPct || 0.5);
+      if (minMarginUsd > maxMargin) {
+        return {
+          ok: false,
+          reason: `최소 마진 $${minMarginUsd} > 자본 한도 $${maxMargin.toFixed(2)} (equity ${(cfg.maxMarginPct*100).toFixed(0)}%) — 자본 부족`,
+          log,
+        };
+      }
+      push(`min-margin bump: notional $${notional.toFixed(2)} → $${minMarginNotional.toFixed(2)} (margin $${minMarginUsd} × lev ${finalLev})`);
+      notional = minMarginNotional;
+    }
+  }
 
   // 9) minNotional — 작은 계정 bump-to-min 로직
   const minN = filter.minNotional || 0;
