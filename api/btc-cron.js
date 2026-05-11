@@ -28,8 +28,12 @@ const BINANCE_SYMBOLS = {
   "PEPE/USD": "PEPEUSDT", "ARB/USD": "ARBUSDT", "OP/USD": "OPUSDT",
   "MATIC/USD": "MATICUSDT",
 };
-const MAX_POSITION_PER_ASSET = 0.30;
-const MAX_TOTAL_CRYPTO_EXPOSURE = 0.80;
+// ★ 2026-05-11: 가상 포트폴리오 노출 한도 임시 완화.
+//   80% 도달 후 매수 SKIP 되어 perf.trades 에 BUY 기록 안 됨 → engine 시그널 풀 빔.
+//   95% 로 완화해 새 BUY 가 perf.trades 에 흘러 들어가도록.
+//   실거래는 별도 risk-manager 의 합산 노출 가드(자본 1.5배) 가 안전망.
+const MAX_POSITION_PER_ASSET = 0.35;     // 0.30 → 0.35
+const MAX_TOTAL_CRYPTO_EXPOSURE = 0.95;  // 0.80 → 0.95
 
 // CryptoCompare 심볼 매핑 (Binance/Bybit 미국 차단 우회)
 const CC_SYMBOLS = {
