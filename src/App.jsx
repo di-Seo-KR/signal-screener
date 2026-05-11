@@ -257,6 +257,10 @@ const AutoTrading = lazy(() => import("./AutoTrading.jsx"));
 const DevDashboard = lazy(() => import("./DevDashboard.jsx"));
 const RealTrading = lazy(() => import("./RealTrading.jsx"));
 const AlphaLab = lazy(() => import("./AlphaLab.jsx"));
+const NotificationHub = lazy(() => import("./NotificationHub.jsx"));
+const SavedScreeners = lazy(() => import("./SavedScreeners.jsx"));
+const BotLeaderboard = lazy(() => import("./BotLeaderboard.jsx"));
+const BotReport = lazy(() => import("./BotReport.jsx"));
 import { ALL_STRATEGIES } from "./strategies.js";
 
 // 공용 lazy fallback — 탭 전환 시 0.1~0.3초 노출
@@ -4236,12 +4240,31 @@ function AppInner() {
     });
   }, []);
 
-  const validTabs = ["home","auto-trading","real-trading","alpha-lab","portfolio","screener","alerts","news","quant-portfolio","quant-port","risk-map","sector-flow","backtest","sentiment","strategy","anomaly","quant-report","econ-calendar","profile","dev","about","privacy","terms","contact"];
+  const validTabs = ["home","auto-trading","real-trading","alpha-lab","portfolio","screener","alerts","notifications","saved-screeners","news","quant-portfolio","quant-port","risk-map","sector-flow","backtest","sentiment","strategy","anomaly","quant-report","econ-calendar","leaderboard","reports","bot-report","profile","dev","about","privacy","terms","contact"];
+
+  // ── 경로 → tab 변환 ──
+  //   /reports             → "reports"
+  //   /reports/stable-quant → "bot-report" (botId 별도 state)
+  //   그 외                 → validTabs 매칭
+  const resolvePathToTab = (rawPath) => {
+    const path = String(rawPath || "").replace(/^\//, "").replace(/\/$/, "");
+    if (!path) return { tab: null, botId: null };
+    const reportsMatch = path.match(/^reports\/([a-zA-Z0-9_-]+)$/);
+    if (reportsMatch) return { tab: "bot-report", botId: reportsMatch[1] };
+    if (path === "reports") return { tab: "reports", botId: null };
+    if (validTabs.includes(path)) return { tab: path, botId: null };
+    return { tab: null, botId: null };
+  };
+
+  const [reportBotId, setReportBotId] = useState(() => {
+    try { return resolvePathToTab(window.location.pathname).botId; } catch { return null; }
+  });
+
   const [tab, setTabRaw] = useState(() => {
     try {
-      // 1순위: URL pathname (/screener, /auto-trading 등)
-      const path = window.location.pathname.replace(/^\//, "").replace(/\/$/, "");
-      if (path && validTabs.includes(path)) return path;
+      // 1순위: URL pathname (/screener, /auto-trading, /reports/<botId> 등)
+      const resolved = resolvePathToTab(window.location.pathname);
+      if (resolved.tab) return resolved.tab;
       // 2순위: URL ?tab= 파라미터 (레거시 호환)
       const p = new URLSearchParams(window.location.search);
       const t = p.get("tab");
@@ -4253,13 +4276,24 @@ function AppInner() {
     return "home";
   });
   const setTab = useCallback((newTab) => {
-    setTabRaw(newTab);
+    // "reports/<botId>" 형식 허용 — bot-report 페이지 + botId 동시 설정
+    let actualTab = newTab;
+    let botId = null;
+    if (typeof newTab === "string" && newTab.startsWith("reports/")) {
+      botId = newTab.split("/")[1] || null;
+      actualTab = "bot-report";
+    }
+    setTabRaw(actualTab);
+    setReportBotId(botId);
     try {
-      sessionStorage.setItem("zepta_tab", newTab);
+      sessionStorage.setItem("zepta_tab", actualTab);
       // URL을 경로 기반으로 업데이트 (페이지 리로드 없이)
-      const newPath = newTab === "home" ? "/" : `/${newTab}`;
+      let newPath;
+      if (actualTab === "home") newPath = "/";
+      else if (actualTab === "bot-report" && botId) newPath = `/reports/${botId}`;
+      else newPath = `/${actualTab}`;
       if (window.location.pathname !== newPath) {
-        window.history.pushState({ tab: newTab }, "", newPath);
+        window.history.pushState({ tab: actualTab, botId }, "", newPath);
       }
     } catch {}
     // 탭 전환 시 스크롤 최상단으로 이동
@@ -4269,9 +4303,15 @@ function AppInner() {
   // ── 브라우저 뒤로가기/앞으로가기 지원 ──
   useEffect(() => {
     const onPopState = () => {
-      const path = window.location.pathname.replace(/^\//, "").replace(/\/$/, "");
-      if (path && validTabs.includes(path)) { setTabRaw(path); try { sessionStorage.setItem("zepta_tab", path); } catch {} }
-      else { setTabRaw("home"); }
+      const resolved = resolvePathToTab(window.location.pathname);
+      if (resolved.tab) {
+        setTabRaw(resolved.tab);
+        setReportBotId(resolved.botId);
+        try { sessionStorage.setItem("zepta_tab", resolved.tab); } catch {}
+      } else {
+        setTabRaw("home");
+        setReportBotId(null);
+      }
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -11812,6 +11852,51 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "alpha-lab" && (
           <Suspense fallback={<LazyTabFallback />}><AlphaLab /></Suspense>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 통합 알림 센터 (/notifications)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "notifications" && (
+          <Suspense fallback={<LazyTabFallback />}>
+            <NotificationHub onNavigate={setTab} />
+          </Suspense>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 저장한 스크리너 (/saved-screeners)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "saved-screeners" && (
+          <Suspense fallback={<LazyTabFallback />}>
+            <SavedScreeners onNavigate={setTab} />
+          </Suspense>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 봇 리더보드 (/leaderboard)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "leaderboard" && (
+          <Suspense fallback={<LazyTabFallback />}>
+            <BotLeaderboard onNavigate={setTab} />
+          </Suspense>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 봇 리포트 목록 (/reports)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "reports" && (
+          <Suspense fallback={<LazyTabFallback />}>
+            <BotReport onNavigate={setTab} />
+          </Suspense>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 봇 리포트 상세 (/reports/<botId>)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "bot-report" && (
+          <Suspense fallback={<LazyTabFallback />}>
+            <BotReport botId={reportBotId} onNavigate={setTab} />
+          </Suspense>
         )}
 
         {/* ═══════════════════════════════════════════════════════════

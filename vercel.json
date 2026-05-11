@@ -45,7 +45,12 @@
     { "source": "/sector-flow", "destination": "/sector-flow.html" },
     { "source": "/quant-portfolio", "destination": "/quant-portfolio.html" },
     { "source": "/quant-report", "destination": "/quant-report.html" },
-    { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon)(?!about)(?!guide)(?!privacy)(?!terms)(?!contact)(?!blog)(?!screener)(?!auto-trading)(?!real-trading)(?!alpha-lab)(?!portfolio)(?!backtest)(?!strategy)(?!risk-map)(?!sentiment)(?!econ-calendar)(?!news)(?!anomaly)(?!alerts)(?!sector-flow)(?!quant-portfolio)(?!quant-report).*)", "destination": "/index.html" }
+    { "source": "/notifications", "destination": "/notifications.html" },
+    { "source": "/saved-screeners", "destination": "/saved-screeners.html" },
+    { "source": "/leaderboard", "destination": "/leaderboard.html" },
+    { "source": "/reports", "destination": "/reports.html" },
+    { "source": "/reports/:botId", "destination": "/reports.html" },
+    { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon)(?!about)(?!guide)(?!privacy)(?!terms)(?!contact)(?!blog)(?!screener)(?!auto-trading)(?!real-trading)(?!alpha-lab)(?!portfolio)(?!backtest)(?!strategy)(?!risk-map)(?!sentiment)(?!econ-calendar)(?!news)(?!anomaly)(?!alerts)(?!sector-flow)(?!quant-portfolio)(?!quant-report)(?!notifications)(?!saved-screeners)(?!leaderboard)(?!reports).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
@@ -143,6 +148,14 @@
     {
       "path": "/api/agents/continuous-backtest",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/agents/screener-alert-monitor",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/agents/leaderboard",
+      "schedule": "15 * * * *"
     }
   ]
 }

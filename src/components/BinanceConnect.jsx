@@ -19,6 +19,7 @@
 // ════════════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useCallback } from "react";
+import { ga } from "../lib/analytics.js";
 
 const colors = {
   dark: {
@@ -85,6 +86,8 @@ export default function BinanceConnect({ userId, onConnected, theme = "dark", us
     setError(null);
     if (!form.apiKey || form.apiKey.length < 10) { setError("API Key 가 너무 짧습니다."); return; }
     if (!form.apiSecret || form.apiSecret.length < 10) { setError("API Secret 이 너무 짧습니다."); return; }
+    // GA4 — 바이낸스 연동 클릭 (폼 제출 시점)
+    ga.binanceConnectClicked();
     setBusy(true);
     try {
       const r = await jpost("/api/binance/connect", {
@@ -103,6 +106,8 @@ export default function BinanceConnect({ userId, onConnected, theme = "dark", us
         return;
       }
       notify("바이낸스 API 키 등록 완료", { tone: "green", title: "✓ 연결 성공" });
+      // GA4 — 바이낸스 연동 성공
+      ga.binanceConnectSuccess();
       setShowForm(false);
       setForm({ apiKey: "", apiSecret: "", testnet: false, label: "Binance Futures" });
       await refresh();
