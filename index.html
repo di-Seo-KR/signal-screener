@@ -434,9 +434,38 @@
     </div>
     <script type="module" src="/src/main.jsx"></script>
     <script>
+      // ★ 2026-05-11: 배포 자동 반영 — Service Worker 업데이트 감지 후 즉시 reload.
+      //   이전: 사용자가 dev tools → Application → Service Workers → Unregister 해야 새 버전 보임.
+      //   현재: 1) sw.js fetch 갱신 강제 (updateViaCache: 'none'),
+      //         2) controllerchange 이벤트 시 자동 1회 reload,
+      //         3) 5분마다 sw.js 변경 체크 (update() 호출).
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        window.addEventListener('load', async () => {
+          try {
+            const reg = await navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' });
+            // 새 SW 가 활성화되면 페이지 1회 자동 reload (한 번만)
+            let reloaded = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+              if (reloaded) return;
+              reloaded = true;
+              console.log('[SW] new version activated, reloading…');
+              window.location.reload();
+            });
+            // 새 SW 발견 시 즉시 activate (skipWaiting 우회)
+            reg.addEventListener('updatefound', () => {
+              const installing = reg.installing;
+              if (!installing) return;
+              installing.addEventListener('statechange', () => {
+                if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+                  installing.postMessage({ type: 'SKIP_WAITING' });
+                }
+              });
+            });
+            // 5분마다 sw.js 변경 체크 (장시간 탭 켜둔 사용자도 자동 갱신)
+            setInterval(() => { reg.update().catch(() => {}); }, 5 * 60 * 1000);
+          } catch (e) {
+            console.warn('[SW] register failed:', e?.message);
+          }
         });
       }
     </script>

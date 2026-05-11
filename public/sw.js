@@ -1,8 +1,10 @@
+// v6 — 자동 업데이트 (controllerchange 시 페이지 reload) + SKIP_WAITING 메시지 핸들러.
+//      배포하면 사용자가 dev tools 안 만져도 새 버전 즉시 반영.
 // v5 — 블로그 진입 (GNB / 햄버거 / 사용자 드롭다운) 추가, 옛 캐시 무효화.
 // v4 — 시세 API stale 위험 차단 + /api/ stale-while-revalidate (5분)
 // 이전 v3 는 yahoo/finnhub/coingecko 응답까지 무조건 cache.put → 모바일 스토리지
 // 비대 + 오래된 시세 노출 위험. v4 부터 외부 시세 직접 요청은 캐시 안 함.
-const CACHE_NAME = 'zepta-v5';
+const CACHE_NAME = 'zepta-v6';
 const API_MAX_AGE_MS = 5 * 60 * 1000; // 5분
 const STATIC_ASSETS = [
   '/',
@@ -45,6 +47,15 @@ self.addEventListener('activate', (event) => {
     })
   );
   self.clients.claim();
+});
+
+// ★ 2026-05-11: 클라이언트가 SKIP_WAITING 메시지 보내면 즉시 활성화 → controllerchange 발동.
+//   index.html 의 'updatefound' 핸들러가 새 SW 발견하면 이걸 호출 → 즉시 활성화 →
+//   클라이언트의 controllerchange 가 페이지 reload → 사용자는 새 버전 즉시 보임.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 // Fetch: 전략적 캐싱 (API는 네트워크 우선, 정적 자산은 캐시 우선)

@@ -5,6 +5,7 @@
 // 텔레그램 알림: api/_shared/telegram.js 의 buildCard/sendCards (사용자 친화 평어)
 
 import { sendCards, buildCard, fmtKSTShort } from "./_shared/telegram.js";
+import { runStrategyForBot, getStrategyNameForBot } from "./_shared/strategies/index.js";
 
 export const config = { maxDuration: 120 };
 
@@ -373,10 +374,24 @@ export default async function handler(req, res) {
       // monitorAlerts에서 현재 자산 관련 알림 추출
       const binSymbol = BINANCE_SYMBOLS[asset] || asset;
       const assetAlerts = monitorAlerts.filter(a => a.ticker === binSymbol || a.ticker === asset);
-      let latestSignal = analyzeLatest(candles, closes, highs, lows, volumes, {
-        rsi, bb, ema21, ema55, ema200, macdLine, macdSig, histogram,
-        adx, atr, stoch, obv, obvEma, volSMA, weeklyTrendUp,
-      }, fngValue, marketRegime, assetAlerts);
+
+      // ★ 2026-05-11: 봇별 strategy dispatcher 도입
+      //   이 자산을 다루는 활성 봇 각각의 전용 strategy 실행.
+      //   결과: { botId, signal } 배열. 최고 점수를 latestSignal 로 채택.
+      //   봇별 perf 저장 시에도 이 botSignals 를 사용해 봇마다 다른 메타데이터 기록.
+      const botSignals = computeBotSignals({ asset, closes, highs, lows, volumes, timeframe: "1d" });
+
+      // 일봉 단계 — 봇별 strategy 결과 중 가장 점수 높은 1개를 우선 시그널로
+      let latestSignal = pickTopBotSignal(botSignals);
+
+      // 봇별 strategy 가 아무도 시그널 안 내면 기존 단일 analyzeLatest 로 fallback
+      // (백워드 호환: 봇 매핑 안 된 자산이나 활성 봇 없는 케이스 처리)
+      if (!latestSignal) {
+        latestSignal = analyzeLatest(candles, closes, highs, lows, volumes, {
+          rsi, bb, ema21, ema55, ema200, macdLine, macdSig, histogram,
+          adx, atr, stoch, obv, obvEma, volSMA, weeklyTrendUp,
+        }, fngValue, marketRegime, assetAlerts);
+      }
 
       // 일봉에서 시그널 없으면 4시간봉으로 재시도
       if (!latestSignal && candles4h.length >= 61) {
@@ -386,27 +401,39 @@ export default async function handler(req, res) {
         const highs4h = c4h.map(c => c.high);
         const lows4h = c4h.map(c => c.low);
         const volumes4h = c4h.map(c => c.volume || 0);
-        const rsi4h = calcRSI(closes4h, 14);
-        const bb4h = calcBB(closes4h, 20, 2.0);
-        const ema21_4h = calcEMA(closes4h, 21);
-        const ema55_4h = calcEMA(closes4h, 55);
-        const ema200_4h = closes4h.length > 200 ? calcEMA(closes4h, 200) : [];
-        const macd4h = calcMACD(closes4h);
-        const adx4h = calcADX(highs4h, lows4h, closes4h, 14);
-        const atr4h = calcATR(highs4h, lows4h, closes4h, 14);
-        const stoch4h = calcStochastic(highs4h, lows4h, closes4h, 14, 3);
-        const obv4h = calcOBV(closes4h, volumes4h);
-        const obvEma4h = calcEMA(obv4h, 20);
-        const volSMA4h = calcSMA(volumes4h, 20);
-        latestSignal = analyzeLatest(c4h, closes4h, highs4h, lows4h, volumes4h, {
-          rsi: rsi4h, bb: bb4h, ema21: ema21_4h, ema55: ema55_4h, ema200: ema200_4h,
-          macdLine: macd4h.macdLine, macdSig: macd4h.signal, histogram: macd4h.histogram,
-          adx: adx4h, atr: atr4h, stoch: stoch4h, obv: obv4h, obvEma: obvEma4h, volSMA: volSMA4h, weeklyTrendUp,
-        }, fngValue, marketRegime, assetAlerts);
-        if (latestSignal) {
-          latestSignal.reason = `[4h] ${latestSignal.reason}`;
-          // 4시간봉 시그널은 포지션 크기 50%로 축소
+
+        // ★ 봇별 strategy 4h 단계 — 일봉 빈 자산도 더 짧은 TF 로 한 번 더 기회
+        const botSignals4h = computeBotSignals({ asset, closes: closes4h, highs: highs4h, lows: lows4h, volumes: volumes4h, timeframe: "4h" });
+        latestSignal = pickTopBotSignal(botSignals4h);
+
+        if (!latestSignal) {
+          // 봇 strategy 가 4h 도 비면 단일 analyzeLatest 로 fallback
+          const rsi4h = calcRSI(closes4h, 14);
+          const bb4h = calcBB(closes4h, 20, 2.0);
+          const ema21_4h = calcEMA(closes4h, 21);
+          const ema55_4h = calcEMA(closes4h, 55);
+          const ema200_4h = closes4h.length > 200 ? calcEMA(closes4h, 200) : [];
+          const macd4h = calcMACD(closes4h);
+          const adx4h = calcADX(highs4h, lows4h, closes4h, 14);
+          const atr4h = calcATR(highs4h, lows4h, closes4h, 14);
+          const stoch4h = calcStochastic(highs4h, lows4h, closes4h, 14, 3);
+          const obv4h = calcOBV(closes4h, volumes4h);
+          const obvEma4h = calcEMA(obv4h, 20);
+          const volSMA4h = calcSMA(volumes4h, 20);
+          latestSignal = analyzeLatest(c4h, closes4h, highs4h, lows4h, volumes4h, {
+            rsi: rsi4h, bb: bb4h, ema21: ema21_4h, ema55: ema55_4h, ema200: ema200_4h,
+            macdLine: macd4h.macdLine, macdSig: macd4h.signal, histogram: macd4h.histogram,
+            adx: adx4h, atr: atr4h, stoch: stoch4h, obv: obv4h, obvEma: obvEma4h, volSMA: volSMA4h, weeklyTrendUp,
+          }, fngValue, marketRegime, assetAlerts);
+          if (latestSignal) {
+            latestSignal.reason = `[4h] ${latestSignal.reason}`;
+            latestSignal.positionSize = (latestSignal.positionSize || 0.5) * 0.5;
+            latestSignal.timeframe = "4h";
+          }
+        } else {
+          // 봇 strategy 4h 결과: 포지션 50% 축소
           latestSignal.positionSize = (latestSignal.positionSize || 0.5) * 0.5;
+          latestSignal.sizeHint = (latestSignal.sizeHint || 0.5) * 0.5;
         }
       }
 
@@ -420,27 +447,37 @@ export default async function handler(req, res) {
         const highs1h = c1h.map(c => c.high);
         const lows1h = c1h.map(c => c.low);
         const volumes1h = c1h.map(c => c.volume || 0);
-        const rsi1h = calcRSI(closes1h, 14);
-        const bb1h = calcBB(closes1h, 20, 2.0);
-        const ema21_1h = calcEMA(closes1h, 21);
-        const ema55_1h = calcEMA(closes1h, 55);
-        const ema200_1h = closes1h.length > 200 ? calcEMA(closes1h, 200) : [];
-        const macd1h = calcMACD(closes1h);
-        const adx1h = calcADX(highs1h, lows1h, closes1h, 14);
-        const atr1h = calcATR(highs1h, lows1h, closes1h, 14);
-        const stoch1h = calcStochastic(highs1h, lows1h, closes1h, 14, 3);
-        const obv1h = calcOBV(closes1h, volumes1h);
-        const obvEma1h = calcEMA(obv1h, 20);
-        const volSMA1h = calcSMA(volumes1h, 20);
-        latestSignal = analyzeLatest(c1h, closes1h, highs1h, lows1h, volumes1h, {
-          rsi: rsi1h, bb: bb1h, ema21: ema21_1h, ema55: ema55_1h, ema200: ema200_1h,
-          macdLine: macd1h.macdLine, macdSig: macd1h.signal, histogram: macd1h.histogram,
-          adx: adx1h, atr: atr1h, stoch: stoch1h, obv: obv1h, obvEma: obvEma1h, volSMA: volSMA1h, weeklyTrendUp,
-        }, fngValue, marketRegime, assetAlerts);
-        if (latestSignal) {
-          latestSignal.reason = `[1h] ${latestSignal.reason}`;
-          // 1시간봉 시그널은 포지션 크기 30%로 축소 (단기 트레이드)
+
+        // ★ 봇별 strategy 1h 단계
+        const botSignals1h = computeBotSignals({ asset, closes: closes1h, highs: highs1h, lows: lows1h, volumes: volumes1h, timeframe: "1h" });
+        latestSignal = pickTopBotSignal(botSignals1h);
+
+        if (!latestSignal) {
+          const rsi1h = calcRSI(closes1h, 14);
+          const bb1h = calcBB(closes1h, 20, 2.0);
+          const ema21_1h = calcEMA(closes1h, 21);
+          const ema55_1h = calcEMA(closes1h, 55);
+          const ema200_1h = closes1h.length > 200 ? calcEMA(closes1h, 200) : [];
+          const macd1h = calcMACD(closes1h);
+          const adx1h = calcADX(highs1h, lows1h, closes1h, 14);
+          const atr1h = calcATR(highs1h, lows1h, closes1h, 14);
+          const stoch1h = calcStochastic(highs1h, lows1h, closes1h, 14, 3);
+          const obv1h = calcOBV(closes1h, volumes1h);
+          const obvEma1h = calcEMA(obv1h, 20);
+          const volSMA1h = calcSMA(volumes1h, 20);
+          latestSignal = analyzeLatest(c1h, closes1h, highs1h, lows1h, volumes1h, {
+            rsi: rsi1h, bb: bb1h, ema21: ema21_1h, ema55: ema55_1h, ema200: ema200_1h,
+            macdLine: macd1h.macdLine, macdSig: macd1h.signal, histogram: macd1h.histogram,
+            adx: adx1h, atr: atr1h, stoch: stoch1h, obv: obv1h, obvEma: obvEma1h, volSMA: volSMA1h, weeklyTrendUp,
+          }, fngValue, marketRegime, assetAlerts);
+          if (latestSignal) {
+            latestSignal.reason = `[1h] ${latestSignal.reason}`;
+            latestSignal.positionSize = (latestSignal.positionSize || 0.5) * 0.3;
+            latestSignal.timeframe = "1h";
+          }
+        } else {
           latestSignal.positionSize = (latestSignal.positionSize || 0.5) * 0.3;
+          latestSignal.sizeHint = (latestSignal.sizeHint || 0.5) * 0.3;
         }
       }
 
@@ -610,10 +647,34 @@ export default async function handler(req, res) {
               grossWin: 0, grossLoss: 0, peakValue: 0, mdd: 0, lastUpdated: null,
             };
             // 거래 기록 추가 (최근 200건 유지)
+            // ★ 2026-05-11: signal 을 객체로 저장. engine.js pullRecentSignals 가
+            //   t.signal.confidence / t.signal.score / t.signal.reason 으로 직접 접근.
+            //   기존엔 signal 이 reason 문자열만 들어가서 metadata 가 모두 fallback 60/B/string.
+            //   이제 family/timeframe 까지 전달되어 가중치 학습·실거래 라우팅 가능.
+            const stratName = trade.signal?.family
+              ? `${trade.signal.family}/${trade.signal.timeframe || "1d"}`
+              : getStrategyNameForBot(botId);
             existing.trades = [
-              { time: new Date().toISOString(), asset: trade.asset, type: trade.type,
-                amount: trade.amount, signal: trade.signal?.reason?.slice(0, 60),
-                score: trade.signal?.score, confidence: trade.signal?.confidence },
+              {
+                time: new Date().toISOString(),
+                asset: trade.asset,
+                type: trade.type,
+                amount: trade.amount,
+                price: trade.price,
+                pnl: trade.pnl,
+                strategy: stratName,
+                signal: {
+                  reason: (trade.signal?.reason || "").slice(0, 200),
+                  score: trade.signal?.score ?? 60,
+                  confidence: trade.signal?.confidence || "B",
+                  family: trade.signal?.family || "unknown",
+                  timeframe: trade.signal?.timeframe || "1d",
+                  botSource: botId,
+                },
+                // 백워드 호환: 기존 UI/조회 코드가 평면 score/confidence 도 읽음
+                score: trade.signal?.score ?? 60,
+                confidence: trade.signal?.confidence || "B",
+              },
               ...(existing.trades || []),
             ].slice(0, 200);
             existing.tradeCount = (existing.tradeCount || 0) + 1;
@@ -870,6 +931,45 @@ function calcEfficiencyRatio(closes, period = 10) {
     er.push(volatility > 0 ? direction / volatility : 0);
   }
   return er;
+}
+
+// ════════════════════════════════════════════════════════
+// 봇별 Strategy Dispatcher 헬퍼 (2026-05-11 추가)
+// ────────────────────────────────────────────────────────
+// computeBotSignals: 이 자산을 다루는 모든 활성 봇 각각에 대해 그 봇의
+//                    전용 strategy 함수를 실행. 결과: [{botId, signal}, ...]
+// pickTopBotSignal:  여러 봇 시그널 중 최고 점수 1개를 단일 시그널로 채택.
+//                    (분배는 호출 측에서 다시 봇별로 처리)
+// ════════════════════════════════════════════════════════
+function computeBotSignals({ asset, closes, highs, lows, volumes, timeframe }) {
+  const out = [];
+  const botIds = getBotsForAsset(asset); // 이 자산을 다루는 봇 ID 목록
+  for (const botId of botIds) {
+    try {
+      const sig = runStrategyForBot(botId, { closes, highs, lows, volumes, asset, timeframe });
+      if (sig) out.push({ botId, signal: sig });
+    } catch (e) {
+      // 한 봇 strategy 실패가 다른 봇에 영향 안 주도록 격리
+      console.warn(`[strategy] ${botId} failed for ${asset}:`, e?.message);
+    }
+  }
+  return out;
+}
+
+function pickTopBotSignal(botSignals) {
+  if (!Array.isArray(botSignals) || botSignals.length === 0) return null;
+  // score 우선, 동점이면 confidence 등급
+  const confRank = { A: 3, B: 2, C: 1 };
+  const sorted = botSignals.slice().sort((a, b) => {
+    const sA = a.signal.score || 0;
+    const sB = b.signal.score || 0;
+    if (sA !== sB) return sB - sA;
+    return (confRank[b.signal.confidence] || 0) - (confRank[a.signal.confidence] || 0);
+  });
+  // type 필드를 btc-cron 호환으로 보장 (BUY/SELL)
+  const top = sorted[0].signal;
+  if (!top.type) top.type = top.side === "LONG" ? "BUY" : (top.side === "SHORT" ? "SELL" : "BUY");
+  return top;
 }
 
 // ════════════════════════════════════════════════════════

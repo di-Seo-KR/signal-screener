@@ -256,6 +256,7 @@ const RiskHeatmap = lazy(() => import("./RiskHeatmap.jsx"));
 const AutoTrading = lazy(() => import("./AutoTrading.jsx"));
 const DevDashboard = lazy(() => import("./DevDashboard.jsx"));
 const RealTrading = lazy(() => import("./RealTrading.jsx"));
+const AlphaLab = lazy(() => import("./AlphaLab.jsx"));
 import { ALL_STRATEGIES } from "./strategies.js";
 
 // 공용 lazy fallback — 탭 전환 시 0.1~0.3초 노출
@@ -4235,7 +4236,7 @@ function AppInner() {
     });
   }, []);
 
-  const validTabs = ["home","auto-trading","real-trading","portfolio","screener","alerts","news","quant-portfolio","quant-port","risk-map","sector-flow","backtest","sentiment","strategy","anomaly","quant-report","econ-calendar","profile","dev","about","privacy","terms","contact"];
+  const validTabs = ["home","auto-trading","real-trading","alpha-lab","portfolio","screener","alerts","news","quant-portfolio","quant-port","risk-map","sector-flow","backtest","sentiment","strategy","anomaly","quant-report","econ-calendar","profile","dev","about","privacy","terms","contact"];
   const [tab, setTabRaw] = useState(() => {
     try {
       // 1순위: URL pathname (/screener, /auto-trading 등)
@@ -11804,6 +11805,13 @@ function AppInner() {
             <div style={{ fontSize: 15, color: C.text3, marginBottom: 24 }}>요청하신 페이지는 존재하지 않거나 접근할 수 없습니다.</div>
             <button onClick={() => setTab("home")} style={{ padding: "10px 20px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text1, fontWeight: 700, cursor: "pointer" }}>홈으로</button>
           </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: Alpha Lab — 24/7 알파 추적 + 자동 개선 시스템
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "alpha-lab" && (
+          <Suspense fallback={<LazyTabFallback />}><AlphaLab /></Suspense>
         )}
 
         {/* ═══════════════════════════════════════════════════════════

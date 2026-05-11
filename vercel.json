@@ -102,6 +102,22 @@
     {
       "path": "/api/agents/daily-standup",
       "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/agents/alpha-lab",
+      "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/agents/param-tuner",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/agents/auto-promote",
+      "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/agents/continuous-backtest",
+      "schedule": "0 7 * * *"
     }
   ]
 }
