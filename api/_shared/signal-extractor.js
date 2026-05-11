@@ -79,12 +79,22 @@ export const PHASE1_ALLOWED_SYMBOLS = new Set([
 
 // 전략명(reason 안에 들어있거나, 별도 strategy 필드로 올 경우) 을 family 로 분류.
 // 리스크 매니저가 ATR 배수를 고를 때 쓴다.
-const TREND_KEYWORDS = ["ema", "trend", "supertrend", "ichimoku", "donchian", "macd cross", "adx"];
-const MEAN_REVERT_KEYWORDS = ["rsi", "reversion", "bb bounce", "stoch", "zscore", "mean reversion"];
-const BREAKOUT_KEYWORDS = ["breakout", "range break", "vol spike", "bollinger break", "20d high"];
+//
+// ★ 2026-05-11: strategy dispatcher 도입으로 reason 에 `[1d|trend-follow]` 형태
+//   prefix 가 박힘 → 직접 키워드 매칭으로 정확히 분류. 또한 raw signal.family 가
+//   이미 있으면 우선 사용 (extractSignal 에서 처리).
+const TREND_KEYWORDS = ["trend-follow", "hurst-trend", "ema", "trend", "supertrend", "ichimoku", "donchian", "macd cross", "adx"];
+const MEAN_REVERT_KEYWORDS = ["mean-revert", "rsi", "reversion", "bb bounce", "stoch", "zscore", "mean reversion"];
+const BREAKOUT_KEYWORDS = ["breakout", "range break", "vol spike", "bollinger break", "20d high", "20일고점", "20일저점", "55일고점"];
+const MOMENTUM_KEYWORDS = ["momentum-rotation", "defi-momentum", "모멘텀 정렬", "강한 모멘텀"];
+const VOLATILITY_KEYWORDS = ["volatility-arb", "bb 압축", "atr폭발", "atr 폭발", "압축→"];
+const ENSEMBLE_KEYWORDS = ["ensemble", "합의"];
 
 export function classifyStrategyFamily(reason, stratName) {
   const text = `${reason || ""} ${stratName || ""}`.toLowerCase();
+  if (ENSEMBLE_KEYWORDS.some((k) => text.includes(k))) return "ensemble";
+  if (VOLATILITY_KEYWORDS.some((k) => text.includes(k))) return "volatility";
+  if (MOMENTUM_KEYWORDS.some((k) => text.includes(k))) return "momentum";
   if (BREAKOUT_KEYWORDS.some((k) => text.includes(k))) return "breakout";
   if (MEAN_REVERT_KEYWORDS.some((k) => text.includes(k))) return "mean-revert";
   if (TREND_KEYWORDS.some((k) => text.includes(k))) return "trend";
@@ -194,8 +204,12 @@ export function extractSignal({ asset, signal, source, stratName }, opts = {}) {
       ? Math.max(0, Math.min(1, signal.confidence))
       : CONFIDENCE_MAP[(signal.confidence || "C").toUpperCase()] || 0.5;
 
-  const timeframe = parseTimeframe(signal.reason);
-  const family = classifyStrategyFamily(signal.reason, stratName);
+  // timeframe: signal 객체에 명시되어 있으면 우선, 없으면 reason prefix 로 추론
+  const timeframe = signal.timeframe || parseTimeframe(signal.reason);
+  // family: dispatcher 가 채워준 값이 있으면 우선 (정확). 없을 때만 텍스트 추론.
+  const family =
+    (signal.family && signal.family !== "unknown") ? signal.family :
+    classifyStrategyFamily(signal.reason, stratName);
 
   const generatedAt = new Date().toISOString();
   const idRaw = `${source}|${asset}|${side}|${timeframe}|${signal.score || 0}|${generatedAt.slice(0, 16)}`;

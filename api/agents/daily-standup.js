@@ -335,6 +335,50 @@ function buildShadowReferenceCard(summary) {
   });
 }
 
+// ── Alpha Lab 카드 빌더 (Phase 1~6 시스템 결과 요약) ──
+function buildAlphaLabCard(leaderboard, candidates) {
+  if (!leaderboard) {
+    return buildCard({
+      tag: "🧬",
+      title: "Alpha Lab — 24/7 알파 추적",
+      lines: ["leaderboard 미생성 — alpha-lab cron 첫 실행 대기"],
+    });
+  }
+  const strategies = leaderboard.strategies || {};
+  const ranked = Object.entries(strategies)
+    .map(([id, m]) => ({ id, ...m }))
+    .sort((a, b) => (b.sharpe || 0) - (a.sharpe || 0));
+  const top3 = ranked.slice(0, 3);
+  const worst = ranked.slice(-1)[0];
+  const regime = leaderboard.regime;
+  const lines = [];
+  if (regime) {
+    const regimeKo = regime.regime === "trending" ? "추세장" :
+                     regime.regime === "mean_reverting" ? "역추세장" :
+                     regime.regime === "transitional" ? "혼조" : regime.regime;
+    lines.push(`시장 레짐: ${regimeKo} (Hurst ${regime.hurst?.toFixed(3) || "—"}, ATR ${regime.atrRatio?.toFixed(2) || "—"}x)`);
+  }
+  if (top3.length > 0) {
+    lines.push(`상위 3전략 (Sharpe 기준):`);
+    for (const s of top3) {
+      lines.push(`  · ${s.id}: ${s.trades}건, Sharpe ${s.sharpe?.toFixed(2)}, PF ${s.profitFactor != null ? s.profitFactor.toFixed(2) : "—"}`);
+    }
+  }
+  if (worst && worst !== top3[0] && (worst.sharpe || 0) < 0) {
+    lines.push(`주의: ${worst.id} Sharpe ${worst.sharpe?.toFixed(2)} (${worst.trades}건)`);
+  }
+  const candCount = Array.isArray(candidates) ? candidates.length : 0;
+  if (candCount > 0) {
+    lines.push(`관찰중 후보 전략: ${candCount}개`);
+  }
+  return buildCard({
+    tag: "🧬",
+    title: "Alpha Lab — 24/7 알파 추적",
+    lines,
+    footer: leaderboard.generatedAt ? `갱신 ${leaderboard.generatedAt}` : undefined,
+  });
+}
+
 // ── 안전 JSON 파싱 (Claude 응답에서 마크다운 코드블록 제거) ──
 function safeJSONParse(text) {
   if (!text) return null;
@@ -1052,7 +1096,7 @@ export default async function handler(req, res) {
     }
 
     const kv = await getKv();
-    const [ledger, weights, summary, latestQuant, ga4, sentry, archive, realActivity] = await Promise.all([
+    const [ledger, weights, summary, latestQuant, ga4, sentry, archive, realActivity, alphaLeaderboard, alphaCandidates] = await Promise.all([
       readShadowLedger(kv, 7),
       readWeights(kv),
       readShadowSummary(kv),
@@ -1061,6 +1105,8 @@ export default async function handler(req, res) {
       fetchSentryDailySummary({ daysBack: 1 }),
       readClosedArchive(kv),                       // shadow-monitor 가 누적하는 마감 거래
       readRealTradingActivity(kv),                 // 어제 실거래 활동 (사용자 본인 기준)
+      kv.get("di:alpha:leaderboard").catch(() => null),         // alpha-lab cron 결과
+      kv.get("di:alpha:strategy-candidates").catch(() => null), // continuous-backtest 후보
     ]);
     // QUANT-RES 입력에 OHLC 정확 백테스트 결과 주입 (Track A+B 통합)
     // archive 누적 부족 시 ledger.closed (최대 30건 샘플) fallback
@@ -1138,6 +1184,8 @@ export default async function handler(req, res) {
       // ★ 실거래 활동 — 헤더 직후에 배치 (가장 중요한 정보)
       buildRealTradingActivityCard(realActivity, summary),
       buildShadowReferenceCard(summary),
+      // ★ Alpha Lab (Phase 1~6) — 24/7 자동 알파 추적 결과
+      buildAlphaLabCard(alphaLeaderboard, alphaCandidates),
       buildCardsForResearch(research),
       buildCardsForPlan(plan),
       buildCardsForMarketing(marketing),

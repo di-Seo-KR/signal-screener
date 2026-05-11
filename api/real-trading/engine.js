@@ -96,9 +96,12 @@ async function pullRecentSignals({ userId, lookbackMs = 30 * 60 * 1000, advanceC
         source: `bot:${botId}`,
         signal: {
           type: t.type,  // "BUY" | "SELL" — extractSignal 이 LONG/SHORT 로 변환
-          confidence: t.signal?.confidence || "B",
-          score: t.signal?.score || 60,
+          confidence: t.signal?.confidence || t.confidence || "B",
+          score: t.signal?.score || t.score || 60,
           reason: t.signal?.reason || `${botId} ${t.type}`,
+          // ★ 2026-05-11: strategy dispatcher 가 채워주는 family/timeframe 전달
+          family: t.signal?.family || undefined,
+          timeframe: t.signal?.timeframe || undefined,
           positionSize: 0.5,
         },
         ts,
