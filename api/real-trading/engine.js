@@ -48,7 +48,11 @@ async function getKv() {
  * @param {number} args.lookbackMs    최근 몇 밀리초 이내만 (기본 30분)
  * @param {boolean} args.advanceCursor lastSeen 을 advance 할지 (dry run 은 false)
  */
-async function pullRecentSignals({ userId, lookbackMs = 30 * 60 * 1000, advanceCursor = true }) {
+// ★ 2026-05-11: lookback 30분 → 4시간 확장.
+//   가상 포트폴리오 노출 한도(80%) 도달로 btc-cron 이 신호 생성해도 perf.trades 에
+//   BUY 가 매번 기록되진 않음. 30분 lookback 이라 시그널 풀이 자주 비어 진입 못 함.
+//   4시간으로 늘려 최근 사이클의 시그널까지 진입 후보로 사용.
+async function pullRecentSignals({ userId, lookbackMs = 4 * 60 * 60 * 1000, advanceCursor = true }) {
   const kv = await getKv();
   const activeBots = (await kv.get("di:active-bots")) || [];
   const cryptoBots = activeBots.filter((b) =>
@@ -273,8 +277,9 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     S("dry-run: breaker/killswitch/concurrency checks skipped");
   }
 
-  // 5) 시그널 수집 — dry run 은 24h lookback, cursor advance 안 함, strict 해제
-  const lbMs = lookbackMs || (forceDryRun ? 24 * 60 * 60 * 1000 : 30 * 60 * 1000);
+  // 5) 시그널 수집 — dry run 은 24h lookback, live 는 4h (이전 30분).
+  //    가상 포트폴리오 노출 한도(80%) 로 btc-cron 의 신호 기록 빈도가 낮아 30분 너무 짧음.
+  const lbMs = lookbackMs || (forceDryRun ? 24 * 60 * 60 * 1000 : 4 * 60 * 60 * 1000);
   const { candidates, diag } = await pullRecentSignals({
     userId,
     lookbackMs: lbMs,
