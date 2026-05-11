@@ -83,6 +83,35 @@
     <priority>0.8</priority>
   </url>
 
+  <!-- 2026-05-11 추가: 실거래 + Alpha Lab + 누락된 SPA 경로 -->
+  <url>
+    <loc>https://zepta.app/real-trading</loc>
+    <lastmod>2026-05-11</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.9</priority>
+  </url>
+
+  <url>
+    <loc>https://zepta.app/alpha-lab</loc>
+    <lastmod>2026-05-11</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
+  <url>
+    <loc>https://zepta.app/sector-flow</loc>
+    <lastmod>2026-05-11</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://zepta.app/quant-portfolio</loc>
+    <lastmod>2026-05-11</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.75</priority>
+  </url>
+
   <url>
     <loc>https://zepta.app/anomaly</loc>
     <lastmod>2026-05-01</lastmod>

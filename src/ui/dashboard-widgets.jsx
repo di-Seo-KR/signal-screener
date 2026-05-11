@@ -42,7 +42,7 @@ export function EquityCurveChart({ history = [], currentEquity, peakEquity, isMo
   if (!chartData) {
     return (
       <div style={{
-        padding: 28, textAlign: "center", fontSize: 12,
+        padding: 28, textAlign: "center", fontSize: 14,
         color: "var(--z-text-3)", border: "1px dashed var(--z-border)",
         borderRadius: "var(--z-r-md)",
       }}>
@@ -80,7 +80,7 @@ export function EquityCurveChart({ history = [], currentEquity, peakEquity, isMo
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
-        <div style={{ fontSize: 11, color: "var(--z-text-3)", fontWeight: 600 }}>
+        <div style={{ fontSize: 14, color: "var(--z-text-3)", fontWeight: 600 }}>
           최근 {days}일 자산 추이
         </div>
         <div style={{
@@ -113,7 +113,7 @@ export function EquityCurveChart({ history = [], currentEquity, peakEquity, isMo
         <circle cx={xOf(maxTs)} cy={yOf(last)} r="3.5" fill={lineColor} />
         <circle cx={xOf(maxTs)} cy={yOf(last)} r="6" fill={lineColor} opacity="0.2" />
       </svg>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--z-text-3)", marginTop: 4 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "var(--z-text-3)", marginTop: 4 }}>
         <span>{fmtTimeShort(minTs)}</span>
         {peakEquity && <span style={{ color: "var(--z-purple)" }}>· · · 30일 peak {fmtUsd(peakEquity)}</span>}
         <span>{fmtTimeShort(maxTs)}</span>
@@ -205,13 +205,13 @@ export function LiveMetricsRow({ orders = [], isMobile = false }) {
           borderRadius: "var(--z-r-md)", padding: isMobile ? "10px 12px" : "12px 14px",
           minHeight: isMobile ? 76 : 84, display: "flex", flexDirection: "column", justifyContent: "center",
         }}>
-          <div style={{ fontSize: 10, color: "var(--z-text-3)", fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>
+          <div style={{ fontSize: 14, color: "var(--z-text-3)", fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4 }}>
             {c.label}
           </div>
           <div style={{ fontSize: isMobile ? 16 : 19, fontWeight: 800, color: c.color, fontFamily: "var(--z-font-mono)", lineHeight: 1.1 }}>
             {c.value}
           </div>
-          <div style={{ fontSize: 10, color: "var(--z-text-3)", marginTop: 3, lineHeight: 1.3 }}>
+          <div style={{ fontSize: 14, color: "var(--z-text-3)", marginTop: 3, lineHeight: 1.3 }}>
             {c.sub}
           </div>
         </div>
@@ -229,10 +229,19 @@ const POS_COLORS = [
 ];
 
 export function PositionDonutChart({ positions = [], equity = 0, isMobile = false }) {
+  // ★ 2026-05-11 fix: 포지션을 "마진 (실 위험 자본)" 기준으로 비중 계산.
+  //   이전: notional (마크가격 × 수량) 사용 → 10x lev 이면 마진의 10배. 합산이 자본의 10배 표시됨.
+  //   현재: notional / leverage = margin 사용. 현금과 같은 단위 (실제 묶인 돈).
   const slices = useMemo(() => {
     const arr = (positions || []).map((p) => {
-      const mv = Math.abs((p.markPrice || p.entryPrice || 0) * (p.positionAmt || 0));
-      return { symbol: p.symbol, value: mv, side: p.positionAmt > 0 ? "L" : "S", pnl: p.unRealizedProfit || 0 };
+      const notional = Math.abs((p.markPrice || p.entryPrice || 0) * (p.positionAmt || 0));
+      const lev = parseFloat(p.leverage || 10) || 10;
+      const marginUsed = notional / lev; // 실 마진
+      return {
+        symbol: p.symbol, value: marginUsed,
+        notional, leverage: lev,
+        side: p.positionAmt > 0 ? "L" : "S", pnl: p.unRealizedProfit || 0,
+      };
     }).filter((s) => s.value > 0);
     arr.sort((a, b) => b.value - a.value);
     return arr;
@@ -245,7 +254,7 @@ export function PositionDonutChart({ positions = [], equity = 0, isMobile = fals
   if (totalPos === 0 || grandTotal === 0) {
     return (
       <div style={{
-        padding: 28, textAlign: "center", fontSize: 12,
+        padding: 28, textAlign: "center", fontSize: 14,
         color: "var(--z-text-3)", border: "1px dashed var(--z-border)",
         borderRadius: "var(--z-r-md)",
       }}>
@@ -278,9 +287,9 @@ export function PositionDonutChart({ positions = [], equity = 0, isMobile = fals
           offset += len;
           return el;
         })}
-        <text x="50%" y="46%" textAnchor="middle" style={{ fontSize: isMobile ? 10 : 11, fill: "var(--z-text-3)" }}>총 자산</text>
+        <text x="50%" y="46%" textAnchor="middle" style={{ fontSize: isMobile ? 12 : 13, fill: "var(--z-text-3)" }}>총 자본</text>
         <text x="50%" y="58%" textAnchor="middle" style={{ fontSize: isMobile ? 14 : 16, fontWeight: 800, fill: "var(--z-text-1)", fontFamily: "var(--z-font-mono)" }}>
-          {fmtUsd(grandTotal, 0)}
+          {fmtUsd(equity, 0)}
         </text>
       </svg>
       <div style={{ flex: 1, minWidth: 180, display: "flex", flexDirection: "column", gap: 5 }}>
@@ -288,15 +297,20 @@ export function PositionDonutChart({ positions = [], equity = 0, isMobile = fals
           const pct = (s.value / grandTotal) * 100;
           const color = s.symbol === "현금" ? "rgba(148,163,184,0.6)" : POS_COLORS[i % POS_COLORS.length];
           return (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14 }}>
               <span style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0 }} />
               <span style={{ flex: 1, color: "var(--z-text-1)", fontWeight: s.symbol === "현금" ? 400 : 600 }}>
                 {s.symbol}
-                {s.side === "L" && <span style={{ marginLeft: 4, fontSize: 9, color: "var(--z-green-hi)" }}>L</span>}
-                {s.side === "S" && <span style={{ marginLeft: 4, fontSize: 9, color: "var(--z-red-hi)" }}>S</span>}
+                {s.side === "L" && <span style={{ marginLeft: 4, fontSize: 14, color: "var(--z-green-hi)" }}>L</span>}
+                {s.side === "S" && <span style={{ marginLeft: 4, fontSize: 14, color: "var(--z-red-hi)" }}>S</span>}
+                {s.leverage && s.leverage > 1 && (
+                  <span style={{ marginLeft: 4, fontSize: 14, color: "var(--z-text-3)" }}>
+                    {s.leverage}× ↗ ${(s.notional / 1000).toFixed(1)}k
+                  </span>
+                )}
               </span>
-              <span style={{ fontFamily: "var(--z-font-mono)", color: "var(--z-text-2)", fontSize: 11 }}>{pct.toFixed(1)}%</span>
-              <span style={{ fontFamily: "var(--z-font-mono)", color: "var(--z-text-3)", fontSize: 10, minWidth: 56, textAlign: "right" }}>
+              <span style={{ fontFamily: "var(--z-font-mono)", color: "var(--z-text-2)", fontSize: 14 }}>{pct.toFixed(1)}%</span>
+              <span style={{ fontFamily: "var(--z-font-mono)", color: "var(--z-text-3)", fontSize: 14, minWidth: 56, textAlign: "right" }}>
                 {fmtUsd(s.value, 0)}
               </span>
             </div>
@@ -315,7 +329,7 @@ export function TradeHistoryTable({ orders = [], maxRows = 10, isMobile = false 
   if (rows.length === 0) {
     return (
       <div style={{
-        padding: 24, textAlign: "center", fontSize: 12,
+        padding: 24, textAlign: "center", fontSize: 14,
         color: "var(--z-text-3)", border: "1px dashed var(--z-border)",
         borderRadius: "var(--z-r-md)",
       }}>
@@ -331,7 +345,7 @@ export function TradeHistoryTable({ orders = [], maxRows = 10, isMobile = false 
         <div style={{
           display: "grid",
           gridTemplateColumns: "90px 80px 50px 1fr 90px 70px",
-          gap: 8, fontSize: 10, color: "var(--z-text-3)", fontWeight: 600,
+          gap: 8, fontSize: 14, color: "var(--z-text-3)", fontWeight: 600,
           padding: "0 10px", textTransform: "uppercase", letterSpacing: 0.3,
         }}>
           <span>시간</span><span>심볼</span><span>Side</span><span style={{ textAlign: "right" }}>가격</span>
@@ -351,7 +365,7 @@ export function TradeHistoryTable({ orders = [], maxRows = 10, isMobile = false 
             <div key={i} style={{
               padding: "8px 10px", background: "var(--z-card-2)",
               border: "1px solid var(--z-border)", borderRadius: "var(--z-r-md)",
-              fontSize: 11,
+              fontSize: 14,
             }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 3 }}>
                 <span style={{ fontWeight: 700, color: "var(--z-text-1)" }}>{o.symbol || "—"}</span>
@@ -370,9 +384,9 @@ export function TradeHistoryTable({ orders = [], maxRows = 10, isMobile = false 
             display: "grid", gridTemplateColumns: "90px 80px 50px 1fr 90px 70px", gap: 8,
             padding: "8px 10px", background: i % 2 === 0 ? "var(--z-card-2)" : "transparent",
             border: "1px solid var(--z-border)", borderRadius: "var(--z-r-md)",
-            fontSize: 12, alignItems: "center",
+            fontSize: 14, alignItems: "center",
           }}>
-            <span style={{ color: "var(--z-text-3)", fontFamily: "var(--z-font-mono)", fontSize: 11 }}>
+            <span style={{ color: "var(--z-text-3)", fontFamily: "var(--z-font-mono)", fontSize: 14 }}>
               {fmtTimeShort(o.time)}
             </span>
             <span style={{ fontWeight: 700, color: "var(--z-text-1)" }}>{o.symbol || "—"}</span>
@@ -383,7 +397,7 @@ export function TradeHistoryTable({ orders = [], maxRows = 10, isMobile = false 
             <span style={{ textAlign: "right", color: pnlColor, fontWeight: hasPnl ? 700 : 400, fontFamily: "var(--z-font-mono)" }}>
               {hasPnl ? `${pnl >= 0 ? "+" : ""}${fmtUsd(pnl, 2)}` : "—"}
             </span>
-            <span style={{ textAlign: "right", fontSize: 10, color: statusColor, fontWeight: 600 }}>
+            <span style={{ textAlign: "right", fontSize: 14, color: statusColor, fontWeight: 600 }}>
               {o.status || "—"}
             </span>
           </div>
@@ -449,10 +463,10 @@ export function DailyPnLHeatmap({ orders = [], days = 30, isMobile = false }) {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8, flexWrap: "wrap", gap: 6 }}>
-        <div style={{ fontSize: 11, color: "var(--z-text-3)", fontWeight: 600 }}>
+        <div style={{ fontSize: 14, color: "var(--z-text-3)", fontWeight: 600 }}>
           최근 {days}일 일별 손익 ({tradeDays}일 거래)
         </div>
-        <div style={{ display: "flex", gap: 10, fontSize: 11, fontFamily: "var(--z-font-mono)" }}>
+        <div style={{ display: "flex", gap: 10, fontSize: 14, fontFamily: "var(--z-font-mono)" }}>
           <span style={{ color: "var(--z-green-hi)", fontWeight: 700 }}>+{winDays}일</span>
           <span style={{ color: "var(--z-red-hi)", fontWeight: 700 }}>-{lossDays}일</span>
           <span style={{ color: totalPnl >= 0 ? "var(--z-green-hi)" : "var(--z-red-hi)", fontWeight: 800 }}>
@@ -480,14 +494,14 @@ export function DailyPnLHeatmap({ orders = [], days = 30, isMobile = false }) {
           />
         ))}
       </div>
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 9, color: "var(--z-text-3)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 6, fontSize: 14, color: "var(--z-text-3)" }}>
         <span>{days}일 전</span>
         <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-          <span style={{ fontSize: 9 }}>적음</span>
+          <span style={{ fontSize: 14 }}>적음</span>
           {[0.15, 0.35, 0.55, 0.75].map((a, i) => (
             <span key={i} style={{ width: 8, height: 8, background: `rgba(34, 197, 94, ${a})`, borderRadius: 2 }} />
           ))}
-          <span style={{ fontSize: 9 }}>많음</span>
+          <span style={{ fontSize: 14 }}>많음</span>
         </span>
         <span>오늘</span>
       </div>
@@ -502,7 +516,7 @@ export function SignalWatchlist({ signals = [], loading = false, isMobile = fals
   if (loading) {
     return (
       <div style={{
-        padding: 18, textAlign: "center", fontSize: 12,
+        padding: 18, textAlign: "center", fontSize: 14,
         color: "var(--z-text-3)",
       }}>
         시그널 분석 중...
@@ -512,7 +526,7 @@ export function SignalWatchlist({ signals = [], loading = false, isMobile = fals
   if (!Array.isArray(signals) || signals.length === 0) {
     return (
       <div style={{
-        padding: 24, textAlign: "center", fontSize: 12,
+        padding: 24, textAlign: "center", fontSize: 14,
         color: "var(--z-text-3)", border: "1px dashed var(--z-border)",
         borderRadius: "var(--z-r-md)",
       }}>
@@ -536,19 +550,19 @@ export function SignalWatchlist({ signals = [], loading = false, isMobile = fals
             gap: 8, alignItems: "center",
             padding: "7px 10px", background: "var(--z-card-2)",
             border: "1px solid var(--z-border)", borderRadius: "var(--z-r-md)",
-            fontSize: 12,
+            fontSize: 14,
           }}>
             <span style={{ fontWeight: 700, color: "var(--z-text-1)" }}>{s.symbol || s.asset || "—"}</span>
-            {!isMobile && <span style={{ color: sideColor, fontWeight: 700, fontSize: 11 }}>{s.side?.toUpperCase() || "—"}</span>}
+            {!isMobile && <span style={{ color: sideColor, fontWeight: 700, fontSize: 14 }}>{s.side?.toUpperCase() || "—"}</span>}
             {!isMobile && (
-              <span style={{ color: "var(--z-text-3)", fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ color: "var(--z-text-3)", fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {s.reason || s.strategy || "—"}
               </span>
             )}
             <span style={{ textAlign: "right", color: scoreColor, fontWeight: 700, fontFamily: "var(--z-font-mono)" }}>
               {score > 0 ? score.toFixed(1) : "—"}
             </span>
-            <span style={{ textAlign: "right", color: "var(--z-text-3)", fontSize: 10, fontFamily: "var(--z-font-mono)" }}>
+            <span style={{ textAlign: "right", color: "var(--z-text-3)", fontSize: 14, fontFamily: "var(--z-font-mono)" }}>
               {s.confidence ? `${(parseFloat(s.confidence) * 100).toFixed(0)}%` : "—"}
             </span>
           </div>
@@ -591,7 +605,7 @@ export function SystemStatusIndicator({ status = {}, isMobile = false }) {
       border: "1px solid var(--z-border)", borderRadius: "var(--z-r-md)",
     }}>
       {dots.map((d, i) => (
-        <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}>
+        <div key={i} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 14 }}>
           <span style={{
             width: 8, height: 8, borderRadius: "50%",
             background: d.ok ? "var(--z-green-hi)" : "var(--z-red-hi)",
@@ -599,7 +613,7 @@ export function SystemStatusIndicator({ status = {}, isMobile = false }) {
             flexShrink: 0,
           }} />
           <span style={{ color: "var(--z-text-2)", fontWeight: 600 }}>{d.label}</span>
-          <span style={{ color: "var(--z-text-3)", fontFamily: "var(--z-font-mono)", fontSize: 10 }}>{d.detail}</span>
+          <span style={{ color: "var(--z-text-3)", fontFamily: "var(--z-font-mono)", fontSize: 14 }}>{d.detail}</span>
         </div>
       ))}
     </div>

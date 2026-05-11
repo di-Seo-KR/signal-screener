@@ -20,7 +20,23 @@
     { "source": "/blog/korea-vs-us-stocks", "destination": "/blog/korea-vs-us-stocks.html" },
     { "source": "/blog/rsi-divergence", "destination": "/blog/rsi-divergence.html" },
     { "source": "/blog/stop-loss-take-profit", "destination": "/blog/stop-loss-take-profit.html" },
-    { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon)(?!about)(?!guide)(?!privacy)(?!terms)(?!contact)(?!blog).*)", "destination": "/index.html" }
+    { "source": "/screener", "destination": "/screener.html" },
+    { "source": "/auto-trading", "destination": "/auto-trading.html" },
+    { "source": "/real-trading", "destination": "/real-trading.html" },
+    { "source": "/alpha-lab", "destination": "/alpha-lab.html" },
+    { "source": "/portfolio", "destination": "/portfolio.html" },
+    { "source": "/backtest", "destination": "/backtest.html" },
+    { "source": "/strategy", "destination": "/strategy.html" },
+    { "source": "/risk-map", "destination": "/risk-map.html" },
+    { "source": "/sentiment", "destination": "/sentiment.html" },
+    { "source": "/econ-calendar", "destination": "/econ-calendar.html" },
+    { "source": "/news", "destination": "/news.html" },
+    { "source": "/anomaly", "destination": "/anomaly.html" },
+    { "source": "/alerts", "destination": "/alerts.html" },
+    { "source": "/sector-flow", "destination": "/sector-flow.html" },
+    { "source": "/quant-portfolio", "destination": "/quant-portfolio.html" },
+    { "source": "/quant-report", "destination": "/quant-report.html" },
+    { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon)(?!about)(?!guide)(?!privacy)(?!terms)(?!contact)(?!blog)(?!screener)(?!auto-trading)(?!real-trading)(?!alpha-lab)(?!portfolio)(?!backtest)(?!strategy)(?!risk-map)(?!sentiment)(?!econ-calendar)(?!news)(?!anomaly)(?!alerts)(?!sector-flow)(?!quant-portfolio)(?!quant-report).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
