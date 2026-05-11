@@ -27,6 +27,8 @@ const PALETTE = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4
 // 도넛 차트 — SVG 기반, 외부 라이브러리 의존 X
 // ────────────────────────────────────────────────
 function DonutChart({ segments, total, size = 200, label = "총 자산", C }) {
+  // 모바일에선 자동으로 더 작게 — caller 가 명시한 size 가 200 이상이면 150 으로 줄임
+  // (호출처에서 isMobile flag 로 직접 size prop 넘기는 편이 더 명확)
   const radius = size / 2 - 12;
   const cx = size / 2, cy = size / 2;
   const inner = radius * 0.6;
@@ -248,8 +250,12 @@ export default function PortfolioAnalysis() {
                 onChange={e => setNewSymbol(e.target.value.toUpperCase())}
                 placeholder="심볼 (예: BTC)"
                 style={{
-                  flex: "1 1 120px", minWidth: "120px", padding: "8px 12px", borderRadius: "8px",
-                  border: `1px solid ${C.border}`, background: C.card2, color: C.text1, fontSize: "14px",
+                  flex: "1 1 120px", minWidth: "120px",
+                  padding: isMobile ? "12px 14px" : "8px 12px",
+                  minHeight: 44,
+                  borderRadius: "8px",
+                  border: `1px solid ${C.border}`, background: C.card2, color: C.text1,
+                  fontSize: isMobile ? 16 : 14, // iOS zoom 방지
                 }}
               />
               <input
@@ -257,31 +263,46 @@ export default function PortfolioAnalysis() {
                 onChange={e => setNewQty(e.target.value)}
                 placeholder="수량"
                 type="number"
+                inputMode="decimal"
                 style={{
-                  flex: "1 1 100px", minWidth: "100px", padding: "8px 12px", borderRadius: "8px",
-                  border: `1px solid ${C.border}`, background: C.card2, color: C.text1, fontSize: "14px",
+                  flex: "1 1 100px", minWidth: "100px",
+                  padding: isMobile ? "12px 14px" : "8px 12px",
+                  minHeight: 44,
+                  borderRadius: "8px",
+                  border: `1px solid ${C.border}`, background: C.card2, color: C.text1,
+                  fontSize: isMobile ? 16 : 14,
                 }}
               />
               <select
                 value={newType}
                 onChange={e => setNewType(e.target.value)}
                 style={{
-                  padding: "8px 12px", borderRadius: "8px",
-                  border: `1px solid ${C.border}`, background: C.card2, color: C.text1, fontSize: "14px",
+                  padding: isMobile ? "12px 14px" : "8px 12px",
+                  minHeight: 44,
+                  borderRadius: "8px",
+                  border: `1px solid ${C.border}`, background: C.card2, color: C.text1,
+                  fontSize: isMobile ? 16 : 14,
                 }}
               >
                 <option value="crypto">코인</option>
                 <option value="stock">주식</option>
               </select>
               <button onClick={addHolding} style={{
-                padding: "8px 16px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
+                padding: isMobile ? "12px 18px" : "8px 16px",
+                minHeight: 44,
+                borderRadius: "8px",
+                fontSize: isMobile ? 15 : 14, fontWeight: 600,
                 background: C.green, color: "#fff", border: "none", cursor: "pointer",
               }}>추가</button>
             </div>
           )}
 
           <button onClick={runAnalysis} disabled={loading} style={{
-            width: "100%", padding: "10px", borderRadius: "8px", fontSize: "14px", fontWeight: 700,
+            width: "100%",
+            padding: isMobile ? "14px" : "10px",
+            minHeight: 48,
+            borderRadius: "8px",
+            fontSize: isMobile ? 15 : 14, fontWeight: 700,
             background: loading ? C.card2 : C.blue, color: "#fff", border: "none",
             cursor: loading ? "default" : "pointer", opacity: loading ? 0.6 : 1,
           }}>{loading ? "분석 중..." : "분석 실행"}</button>
@@ -313,10 +334,13 @@ export default function PortfolioAnalysis() {
               <div style={card}>
                 <h3 style={{ margin: "0 0 12px", fontSize: "15px", color: C.text1, fontWeight: 700 }}>종목별 배분</h3>
                 <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: "center", gap: "16px" }}>
-                  <DonutChart segments={symbolSegments} total={data.totalValue} C={C} />
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px", width: isMobile ? "100%" : "auto" }}>
+                  <DonutChart segments={symbolSegments} total={data.totalValue} size={isMobile ? 160 : 200} C={C} />
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px", width: isMobile ? "100%" : "auto" }}>
                     {symbolSegments.slice(0, 8).map((s, i) => (
-                      <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+                      <div key={i} style={{
+                        display: "flex", alignItems: "center", gap: "8px",
+                        fontSize: "13px", minHeight: isMobile ? 32 : undefined,
+                      }}>
                         <span style={{ width: "10px", height: "10px", borderRadius: "2px", background: s.color, flexShrink: 0 }} />
                         <span style={{ color: C.text1, flex: 1 }}>{s.label}</span>
                         <span style={{ color: C.text2, fontWeight: 600 }}>{(s.weight * 100).toFixed(1)}%</span>
@@ -329,10 +353,13 @@ export default function PortfolioAnalysis() {
               <div style={card}>
                 <h3 style={{ margin: "0 0 12px", fontSize: "15px", color: C.text1, fontWeight: 700 }}>카테고리 배분</h3>
                 <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: "center", gap: "16px" }}>
-                  <DonutChart segments={categorySegments} total={data.totalValue} label="카테고리" C={C} />
-                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "6px", width: isMobile ? "100%" : "auto" }}>
+                  <DonutChart segments={categorySegments} total={data.totalValue} size={isMobile ? 160 : 200} label="카테고리" C={C} />
+                  <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px", width: isMobile ? "100%" : "auto" }}>
                     {categorySegments.map((s, i) => (
-                      <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px" }}>
+                      <div key={i} style={{
+                        display: "flex", alignItems: "center", gap: "8px",
+                        fontSize: "13px", minHeight: isMobile ? 32 : undefined,
+                      }}>
                         <span style={{ width: "10px", height: "10px", borderRadius: "2px", background: s.color, flexShrink: 0 }} />
                         <span style={{ color: C.text1, flex: 1 }}>{s.label}</span>
                         <span style={{ color: C.text2, fontWeight: 600 }}>{(s.weight * 100).toFixed(1)}%</span>
@@ -356,10 +383,17 @@ export default function PortfolioAnalysis() {
 
               <div style={card}>
                 <h3 style={{ margin: "0 0 12px", fontSize: "15px", color: C.text1, fontWeight: 700 }}>변동성 메트릭 (30일)</h3>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
+                {/* 모바일: 2열 — 첫 행 ATR/MDD, 둘째 행 Sharpe (단일) */}
+                <div style={{
+                  display: "grid",
+                  gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(3, 1fr)",
+                  gap: "10px",
+                }}>
                   <Metric label="일일 변동성 (ATR)" value={data.volatility?.atr14} unit="%" color={C.yellow} C={C} hint="평균 일일 변동폭. 낮을수록 변동성 작음." />
                   <Metric label="최대 낙폭 (MDD)" value={data.volatility?.mdd30} unit="%" color={C.red} C={C} hint="30일 중 가장 큰 손실 폭." />
-                  <Metric label="안정성 (Sharpe)" value={data.volatility?.sharpe30} unit="" color={data.volatility?.sharpe30 >= 1 ? C.green : C.text2} C={C} hint="수익이 얼마나 안정적인지. 1.0 이상이면 양호." />
+                  <div style={{ gridColumn: isMobile ? "span 2" : undefined }}>
+                    <Metric label="안정성 (Sharpe)" value={data.volatility?.sharpe30} unit="" color={data.volatility?.sharpe30 >= 1 ? C.green : C.text2} C={C} hint="수익이 얼마나 안정적인지. 1.0 이상이면 양호." />
+                  </div>
                 </div>
               </div>
             </div>
@@ -379,8 +413,16 @@ export default function PortfolioAnalysis() {
                 <p style={{ margin: "0 0 12px", fontSize: "12px", color: C.text3 }}>
                   +1 = 함께 움직임 · 0 = 무관 · −1 = 반대 움직임. 평균 절대 상관: <strong style={{ color: C.text1 }}>{data.correlation.avgAbs}</strong>
                 </p>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ borderCollapse: "collapse", fontSize: "11px", margin: "0 auto" }}>
+                {isMobile && (
+                  <div style={{ fontSize: 11, color: C.text3, marginBottom: 6 }}>
+                    ← 좌우로 스크롤해서 모두 볼 수 있어요
+                  </div>
+                )}
+                <div style={{
+                  overflowX: "auto", WebkitOverflowScrolling: "touch",
+                  margin: isMobile ? "0 -16px" : 0, padding: isMobile ? "0 16px" : 0,
+                }}>
+                  <table style={{ borderCollapse: "collapse", fontSize: isMobile ? "10px" : "11px", margin: isMobile ? 0 : "0 auto" }}>
                     <thead>
                       <tr>
                         <th></th>
@@ -398,7 +440,8 @@ export default function PortfolioAnalysis() {
                               padding: "0", textAlign: "center",
                               background: i === j ? `${C.blue}25` : corrColor(r),
                               color: C.text1, fontWeight: i === j ? 700 : 500,
-                              minWidth: "44px", height: "32px",
+                              minWidth: isMobile ? "32px" : "44px",
+                              height: isMobile ? "28px" : "32px",
                               border: `1px solid ${C.border}40`,
                             }}>{i === j ? "—" : r.toFixed(2)}</td>
                           ))}

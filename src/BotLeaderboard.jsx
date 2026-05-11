@@ -12,7 +12,8 @@
 // 갱신: 폴링 없음 — cron 이 시간당 갱신. 새로고침 버튼 제공.
 // ══════════════════════════════════════════════════════════════════
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useThemeTokens, FONT, RADIUS } from "./ui/theme.jsx";
+import { useThemeTokens, FONT, RADIUS, pickFont } from "./ui/theme.jsx";
+import { useBreakpoint } from "./ui/useBreakpoint.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 
 // ── 한국어 라벨 ────────────────────────────────────────────────────
@@ -81,21 +82,43 @@ function Card({ children, style, ...rest }) {
 
 function Pill({ active, children, onClick, color }) {
   const C = useThemeTokens();
+  const { isMobile } = useBreakpoint();
   return (
     <button
       type="button"
       onClick={onClick}
       style={{
-        padding: "6px 12px",
+        padding: isMobile ? "10px 14px" : "6px 12px",
+        minHeight: isMobile ? 44 : undefined,
         borderRadius: RADIUS.full,
         border: `1px solid ${active ? (color || C.blue) : C.border}`,
         background: active ? (color || C.blue) : "transparent",
         color: active ? "#fff" : C.text2,
-        fontSize: FONT.xs, fontWeight: 700, cursor: "pointer",
+        fontSize: isMobile ? FONT.sm : FONT.xs,
+        fontWeight: 700, cursor: "pointer",
         transition: "all 120ms",
         whiteSpace: "nowrap",
+        scrollSnapAlign: "start",
+        flexShrink: 0,
       }}
     >{children}</button>
+  );
+}
+
+// 모바일 chip row — 라벨 + 가로 스크롤
+function ChipRow({ label, C, children }) {
+  return (
+    <div>
+      <div style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, marginBottom: 6 }}>{label}</div>
+      <div style={{
+        display: "flex", gap: 8, overflowX: "auto",
+        flexWrap: "nowrap", WebkitOverflowScrolling: "touch",
+        scrollSnapType: "x mandatory", scrollbarWidth: "none",
+        paddingBottom: 2,
+      }}>
+        {children}
+      </div>
+    </div>
   );
 }
 
@@ -113,6 +136,7 @@ function Stat({ label, value, sub, color }) {
 // ── 메인 ──────────────────────────────────────────────────────────
 export default function BotLeaderboard({ onNavigate } = {}) {
   const C = useThemeTokens();
+  const { isMobile } = useBreakpoint();
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -194,9 +218,13 @@ export default function BotLeaderboard({ onNavigate } = {}) {
             onClick={load}
             disabled={loading}
             style={{
-              padding: "6px 12px", borderRadius: RADIUS.sm,
+              padding: isMobile ? "10px 16px" : "6px 12px",
+              minHeight: 44,
+              borderRadius: RADIUS.sm,
               background: C.card, border: `1px solid ${C.border}`,
-              color: C.text2, fontSize: FONT.xs, fontWeight: 700, cursor: "pointer",
+              color: C.text2,
+              fontSize: pickFont("button", isMobile) ?? FONT.xs,
+              fontWeight: 700, cursor: "pointer",
               whiteSpace: "nowrap",
             }}
           >{loading ? "갱신 중…" : "새로고침"}</button>
@@ -239,37 +267,60 @@ export default function BotLeaderboard({ onNavigate } = {}) {
         </div>
       </Card>
 
-      {/* 필터 컨트롤 */}
+      {/* 필터 컨트롤 — 모바일: 가로 스크롤 chip / 데스크탑: wrap */}
       <Card>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {/* 자산 카테고리 */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, minWidth: 64 }}>봇 종류</span>
-            {Object.entries(BOT_KIND_LABEL).map(([k, label]) => (
-              <Pill key={k} active={botKind === k} onClick={() => setBotKind(k)}>{label}</Pill>
-            ))}
-          </div>
-          {/* 정렬 */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, minWidth: 64 }}>정렬</span>
-            {Object.entries(SORT_LABEL).map(([k, label]) => (
-              <Pill key={k} active={sort === k} onClick={() => setSort(k)}>{label}</Pill>
-            ))}
-          </div>
-          {/* 기간 */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, minWidth: 64 }}>기간</span>
-            {[7, 30, 90].map((p) => (
-              <Pill key={p} active={period === p} onClick={() => setPeriod(p)}>{PERIOD_LABEL[p]}</Pill>
-            ))}
-          </div>
-          {/* Top N */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, minWidth: 64 }}>표시</span>
-            {[10, 50, 100].map((n) => (
-              <Pill key={n} active={limit === n} onClick={() => setLimit(n)}>{LIMIT_LABEL[n]}</Pill>
-            ))}
-          </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {isMobile ? (
+            <>
+              <ChipRow label="봇 종류" C={C}>
+                {Object.entries(BOT_KIND_LABEL).map(([k, label]) => (
+                  <Pill key={k} active={botKind === k} onClick={() => setBotKind(k)}>{label}</Pill>
+                ))}
+              </ChipRow>
+              <ChipRow label="정렬" C={C}>
+                {Object.entries(SORT_LABEL).map(([k, label]) => (
+                  <Pill key={k} active={sort === k} onClick={() => setSort(k)}>{label}</Pill>
+                ))}
+              </ChipRow>
+              <ChipRow label="기간" C={C}>
+                {[7, 30, 90].map((p) => (
+                  <Pill key={p} active={period === p} onClick={() => setPeriod(p)}>{PERIOD_LABEL[p]}</Pill>
+                ))}
+              </ChipRow>
+              <ChipRow label="표시 (Top N)" C={C}>
+                {[10, 50, 100].map((n) => (
+                  <Pill key={n} active={limit === n} onClick={() => setLimit(n)}>{LIMIT_LABEL[n]}</Pill>
+                ))}
+              </ChipRow>
+            </>
+          ) : (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, minWidth: 64 }}>봇 종류</span>
+                {Object.entries(BOT_KIND_LABEL).map(([k, label]) => (
+                  <Pill key={k} active={botKind === k} onClick={() => setBotKind(k)}>{label}</Pill>
+                ))}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, minWidth: 64 }}>정렬</span>
+                {Object.entries(SORT_LABEL).map(([k, label]) => (
+                  <Pill key={k} active={sort === k} onClick={() => setSort(k)}>{label}</Pill>
+                ))}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, minWidth: 64 }}>기간</span>
+                {[7, 30, 90].map((p) => (
+                  <Pill key={p} active={period === p} onClick={() => setPeriod(p)}>{PERIOD_LABEL[p]}</Pill>
+                ))}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <span style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, minWidth: 64 }}>표시</span>
+                {[10, 50, 100].map((n) => (
+                  <Pill key={n} active={limit === n} onClick={() => setLimit(n)}>{LIMIT_LABEL[n]}</Pill>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </Card>
 
@@ -290,7 +341,78 @@ export default function BotLeaderboard({ onNavigate } = {}) {
             아직 표시할 데이터가 없어요. 봇이 활성화되고 매매 기록이 쌓이면 매시간 자동 집계됩니다.
           </div>
         )}
-        {!err && entries.length > 0 && (
+        {!err && entries.length > 0 && isMobile && (
+          <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+            {entries.map((e, i) => {
+              const isMe = myHash && e.userHash === myHash;
+              const rank = i + 1;
+              const rankBadge = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : `#${rank}`;
+              return (
+                <div
+                  key={`m-${e.userHash}-${e.botId}-${i}`}
+                  onClick={() => onNavigate && onNavigate(`reports/${e.botId}`)}
+                  style={{
+                    padding: 14,
+                    background: isMe ? `${C.blueBg}` : C.card2,
+                    border: `1px solid ${isMe ? C.blue : C.border}`,
+                    borderLeft: isMe ? `5px solid ${C.blue}` : `5px solid ${rank <= 3 ? C.yellow : C.border2}`,
+                    borderRadius: RADIUS.md,
+                    cursor: "pointer",
+                    minHeight: 88,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                    <span style={{
+                      fontSize: 18, fontWeight: 800,
+                      color: rank <= 3 ? C.yellow : C.text2,
+                      minWidth: 36,
+                    }}>{rankBadge}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 15, fontWeight: 800,
+                        color: isMe ? C.blueL : C.text1,
+                        whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                      }}>
+                        {e.nick}{isMe && <span style={{ color: C.blueL, marginLeft: 6, fontSize: 12 }}>(나)</span>}
+                      </div>
+                      <div style={{ fontSize: 12, color: C.text3 }}>
+                        {BOT_NAME_KO[e.botId] || e.botId} · {e.botKind === "crypto" ? "코인" : e.botKind === "stock" ? "주식" : ""}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr 1fr",
+                    gap: 8,
+                  }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: C.text3 }}>수익률</div>
+                      <div style={{
+                        fontSize: 15, fontWeight: 800,
+                        color: e.returnPct >= 0 ? C.green : C.red,
+                      }}>{fmtPct(e.returnPct, 1)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: C.text3 }}>안정성</div>
+                      <div style={{
+                        fontSize: 15, fontWeight: 800,
+                        color: e.sharpe >= 1.5 ? C.green : e.sharpe <= 0 ? C.red : C.text1,
+                      }}>{fmtNum(e.sharpe)}</div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: C.text3 }}>MDD</div>
+                      <div style={{ fontSize: 15, fontWeight: 800, color: C.red }}>
+                        {fmtPct(-Math.abs(e.mdd), 0)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {!err && entries.length > 0 && !isMobile && (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
               <thead>

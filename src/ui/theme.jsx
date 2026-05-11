@@ -76,6 +76,31 @@ export const FONT = {
   display: "48px", // 큰 숫자 (잔액 표시 등)
 };
 
+// ── Mobile-first font size tokens (iPhone 16 393pt 기준) ────────────
+// 모바일에선 입문자 친화 + 시인성 우선 — 데스크탑에선 컴팩트.
+// useBreakpoint().isMobile 와 함께 사용:
+//   const { isMobile } = useBreakpoint();
+//   <h1 style={{ fontSize: isMobile ? FONT_MOBILE.h1.mobile : FONT_MOBILE.h1.desktop }}>
+//
+// 본문 16px = iOS 자동 zoom-in 방지 임계값 (input/textarea 는 항상 16px 권장).
+export const FONT_MOBILE = {
+  body:    { mobile: 15, desktop: 14 },  // 본문
+  small:   { mobile: 13, desktop: 12 },  // 보조 텍스트, 캡션
+  h1:      { mobile: 24, desktop: 32 },  // 페이지 제목
+  h2:      { mobile: 19, desktop: 24 },  // 섹션 제목
+  h3:      { mobile: 16, desktop: 18 },  // 카드 제목
+  mono:    { mobile: 16, desktop: 14 },  // 모노스페이스 (숫자) — 본문 +1
+  input:   { mobile: 16, desktop: 14 },  // input/textarea (iOS 자동 zoom-in 방지)
+  button:  { mobile: 15, desktop: 13 },  // 버튼 라벨
+};
+
+/** 현재 breakpoint 에 맞는 폰트 사이즈 반환 (px 단위 number) */
+export function pickFont(key, isMobile) {
+  const t = FONT_MOBILE[key];
+  if (!t) return undefined;
+  return isMobile ? t.mobile : t.desktop;
+}
+
 const STORAGE_KEY = "zepta:theme";
 
 function readInitial() {

@@ -17,7 +17,9 @@
 // 캐시: 서버 5분 캐시 — UI 는 그대로 fetch.
 // ══════════════════════════════════════════════════════════════════
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useThemeTokens, FONT, RADIUS } from "./ui/theme.jsx";
+import { useThemeTokens, FONT, RADIUS, pickFont } from "./ui/theme.jsx";
+import { useBreakpoint } from "./ui/useBreakpoint.jsx";
+import { BottomSheet } from "./ui/primitives.jsx";
 
 // ── 옵션 ───────────────────────────────────────────────────────────
 const ASSETS = [
@@ -69,21 +71,44 @@ function Card({ children, style, ...rest }) {
 
 function Pill({ active, children, onClick, color }) {
   const C = useThemeTokens();
+  const { isMobile } = useBreakpoint();
   return (
     <button
       type="button"
       onClick={onClick}
       style={{
-        padding: "6px 12px",
+        padding: isMobile ? "10px 16px" : "6px 12px",
+        minHeight: isMobile ? 44 : undefined,
         borderRadius: RADIUS.full,
         border: `1px solid ${active ? (color || C.blue) : C.border}`,
         background: active ? (color || C.blue) : "transparent",
         color: active ? "#fff" : C.text2,
-        fontSize: FONT.xs, fontWeight: 700, cursor: "pointer",
+        fontSize: isMobile ? FONT.sm : FONT.xs,
+        fontWeight: 700, cursor: "pointer",
         transition: "all 120ms",
         whiteSpace: "nowrap",
+        scrollSnapAlign: "start",
+        flexShrink: 0,
       }}
     >{children}</button>
+  );
+}
+
+// 가로 스크롤 chip 컨테이너 (모바일 전용)
+function ChipRow({ children }) {
+  return (
+    <div style={{
+      display: "flex", gap: 8,
+      overflowX: "auto", flexWrap: "nowrap",
+      scrollSnapType: "x mandatory",
+      WebkitOverflowScrolling: "touch",
+      paddingBottom: 2,
+      // scrollbar 숨김
+      msOverflowStyle: "none",
+      scrollbarWidth: "none",
+    }}>
+      {children}
+    </div>
   );
 }
 
@@ -165,6 +190,7 @@ function CompareChart({ series, baselineCurve, height = 280 }) {
 // ── 메인 ──────────────────────────────────────────────────────────
 export default function BacktestCompare({ onNavigate } = {}) {
   const C = useThemeTokens();
+  const { isMobile } = useBreakpoint();
 
   const [symbol, setSymbol] = useState("BTC");
   const [period, setPeriod] = useState(60);
@@ -172,6 +198,7 @@ export default function BacktestCompare({ onNavigate } = {}) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
+  const [strategySheetOpen, setStrategySheetOpen] = useState(false);
 
   const toggleStrategy = useCallback((id) => {
     setSelected(prev => {
@@ -248,49 +275,170 @@ export default function BacktestCompare({ onNavigate } = {}) {
         </div>
       </Card>
 
-      {/* 필터 — 자산 */}
+      {/* 필터 — 자산 / 기간 / 전략 */}
       <Card>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, minWidth: 64 }}>자산</span>
-            {ASSETS.map(a => (
-              <Pill key={a.id} active={symbol === a.id} onClick={() => setSymbol(a.id)} color={a.kind === "crypto" ? C.orange : C.blue}>
-                {a.label}
-              </Pill>
-            ))}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* 자산 — 모바일은 가로 스크롤 */}
+          <div>
+            <div style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, marginBottom: 6 }}>자산</div>
+            {isMobile ? (
+              <ChipRow>
+                {ASSETS.map(a => (
+                  <Pill key={a.id} active={symbol === a.id} onClick={() => setSymbol(a.id)} color={a.kind === "crypto" ? C.orange : C.blue}>
+                    {a.label}
+                  </Pill>
+                ))}
+              </ChipRow>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                {ASSETS.map(a => (
+                  <Pill key={a.id} active={symbol === a.id} onClick={() => setSymbol(a.id)} color={a.kind === "crypto" ? C.orange : C.blue}>
+                    {a.label}
+                  </Pill>
+                ))}
+              </div>
+            )}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, minWidth: 64 }}>기간</span>
-            {PERIODS.map(p => (
-              <Pill key={p.value} active={period === p.value} onClick={() => setPeriod(p.value)}>
-                {p.label}
-              </Pill>
-            ))}
+
+          {/* 기간 */}
+          <div>
+            <div style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, marginBottom: 6 }}>기간</div>
+            {isMobile ? (
+              <ChipRow>
+                {PERIODS.map(p => (
+                  <Pill key={p.value} active={period === p.value} onClick={() => setPeriod(p.value)}>
+                    {p.label}
+                  </Pill>
+                ))}
+              </ChipRow>
+            ) : (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                {PERIODS.map(p => (
+                  <Pill key={p.value} active={period === p.value} onClick={() => setPeriod(p.value)}>
+                    {p.label}
+                  </Pill>
+                ))}
+              </div>
+            )}
           </div>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
-            <span style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, minWidth: 64, paddingTop: 6 }}>전략</span>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {STRATEGIES.map(s => (
-                <Pill key={s.id} active={selected.includes(s.id)} onClick={() => toggleStrategy(s.id)} color={s.color}>
-                  {s.label}
-                </Pill>
-              ))}
-            </div>
+
+          {/* 전략 — 모바일은 BottomSheet 트리거 + 선택 미리보기 */}
+          <div>
+            <div style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, marginBottom: 6 }}>전략 ({selected.length})</div>
+            {isMobile ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setStrategySheetOpen(true)}
+                  style={{
+                    width: "100%",
+                    padding: "14px 16px",
+                    minHeight: 48,
+                    background: C.card2,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: RADIUS.md,
+                    color: C.text1,
+                    fontSize: FONT.sm, fontWeight: 700,
+                    cursor: "pointer", textAlign: "left",
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    gap: 8,
+                  }}
+                >
+                  <span style={{
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    flex: 1, minWidth: 0,
+                  }}>
+                    {selected.map(id => STRATEGIES.find(s => s.id === id)?.label || id).join(", ") || "선택하세요"}
+                  </span>
+                  <span style={{ color: C.text3, fontSize: FONT.xs }}>변경 ▸</span>
+                </button>
+              </>
+            ) : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {STRATEGIES.map(s => (
+                  <Pill key={s.id} active={selected.includes(s.id)} onClick={() => toggleStrategy(s.id)} color={s.color}>
+                    {s.label}
+                  </Pill>
+                ))}
+              </div>
+            )}
           </div>
+
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
             <button
               onClick={run}
               disabled={loading || selected.length === 0}
               style={{
-                padding: "8px 16px", borderRadius: RADIUS.md,
+                padding: isMobile ? "14px 18px" : "8px 16px",
+                minHeight: 48,
+                width: isMobile ? "100%" : undefined,
+                borderRadius: RADIUS.md,
                 background: C.blue, color: "#fff", border: "none",
-                fontSize: FONT.sm, fontWeight: 700, cursor: loading ? "wait" : "pointer",
+                fontSize: pickFont("button", isMobile) ?? FONT.sm,
+                fontWeight: 700, cursor: loading ? "wait" : "pointer",
                 opacity: loading || selected.length === 0 ? 0.6 : 1,
               }}
             >{loading ? "분석 중…" : "다시 실행"}</button>
           </div>
         </div>
       </Card>
+
+      {/* 전략 선택 BottomSheet — 모바일 */}
+      <BottomSheet
+        open={strategySheetOpen}
+        onClose={() => setStrategySheetOpen(false)}
+        title="전략 선택"
+        description="최소 1개, 최대 6개까지 선택할 수 있어요."
+        footer={
+          <button
+            onClick={() => setStrategySheetOpen(false)}
+            style={{
+              width: "100%", padding: "14px 16px", minHeight: 48,
+              borderRadius: RADIUS.md, background: C.blue,
+              border: "none", color: "#fff",
+              fontSize: 15, fontWeight: 700, cursor: "pointer",
+            }}
+          >확인 ({selected.length}개 선택)</button>
+        }
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {STRATEGIES.map(s => {
+            const active = selected.includes(s.id);
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => toggleStrategy(s.id)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 12,
+                  padding: "14px 16px", minHeight: 52,
+                  border: `1px solid ${active ? s.color : C.border}`,
+                  background: active ? `${s.color}22` : C.card2,
+                  borderRadius: RADIUS.md,
+                  cursor: "pointer", textAlign: "left",
+                }}
+              >
+                <span style={{
+                  width: 14, height: 14, borderRadius: "50%",
+                  background: s.color, flexShrink: 0,
+                }} />
+                <span style={{
+                  flex: 1, fontSize: 15, fontWeight: 700,
+                  color: C.text1,
+                }}>{s.label}</span>
+                {active && (
+                  <span style={{
+                    width: 24, height: 24, borderRadius: "50%",
+                    background: s.color, color: "#fff",
+                    display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 14, fontWeight: 800,
+                  }}>✓</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </BottomSheet>
 
       {/* 차트 + 결과 */}
       {err && (
@@ -373,7 +521,64 @@ export default function BacktestCompare({ onNavigate } = {}) {
             </div>
           </Card>
 
-          {/* 메트릭 테이블 */}
+          {/* 메트릭 — 모바일 카드 / 데스크탑 테이블 */}
+          {isMobile ? (
+            <Card style={{ padding: 12 }}>
+              <h2 style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1, margin: "0 0 12px" }}>
+                전략별 성과
+              </h2>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {results
+                  .slice()
+                  .sort((a, b) => (b.metrics?.sharpe || 0) - (a.metrics?.sharpe || 0))
+                  .map(r => {
+                    const isBest = best && r.strategy === best.strategy;
+                    const m = r.metrics || {};
+                    return (
+                      <div key={r.strategy} style={{
+                        padding: 12,
+                        background: isBest ? C.blueBg : C.card2,
+                        border: `1px solid ${isBest ? r.color : C.border}`,
+                        borderLeft: `4px solid ${r.color}`,
+                        borderRadius: RADIUS.md,
+                      }}>
+                        <div style={{
+                          display: "flex", alignItems: "center", gap: 8,
+                          marginBottom: 10,
+                        }}>
+                          <span style={{
+                            width: 12, height: 12, borderRadius: "50%",
+                            background: r.color,
+                          }} />
+                          <span style={{ fontSize: 15, fontWeight: 700, color: C.text1, flex: 1 }}>
+                            {r.label}
+                          </span>
+                          {isBest && (
+                            <span style={{
+                              fontSize: 11, color: "#fff", fontWeight: 800,
+                              padding: "2px 8px", borderRadius: RADIUS.full,
+                              background: r.color,
+                            }}>BEST</span>
+                          )}
+                        </div>
+                        <div style={{
+                          display: "grid", gridTemplateColumns: "1fr 1fr",
+                          gap: 8,
+                        }}>
+                          <Metric label="수익률" value={fmtPct(m.netReturn)}
+                            color={(m.netReturn || 0) >= 0 ? C.green : C.red} C={C} />
+                          <Metric label="안정성" value={fmtNum(m.sharpe)} C={C} />
+                          <Metric label="PF" value={m.profitFactor != null ? fmtNum(m.profitFactor) : "—"} C={C} />
+                          <Metric label="MDD" value={fmtPct(-Math.abs(m.maxDD || 0), 1)} color={C.red} C={C} />
+                          <Metric label="거래수" value={(m.trades || 0).toLocaleString()} C={C} />
+                          <Metric label="승률" value={`${fmtNum(m.winRate, 1)}%`} C={C} />
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </Card>
+          ) : (
           <Card style={{ padding: 0 }}>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
@@ -424,6 +629,7 @@ export default function BacktestCompare({ onNavigate } = {}) {
               </table>
             </div>
           </Card>
+          )}
         </>
       )}
 
@@ -441,6 +647,28 @@ export default function BacktestCompare({ onNavigate } = {}) {
         <strong>PF (Profit Factor)</strong> 는 1.5 이상이면 안정적인 알파.{" "}
         <strong>MDD</strong> 는 고점 대비 최대 낙폭. 과거 성과가 미래를 보장하지 않습니다.
       </div>
+    </div>
+  );
+}
+
+// ── 모바일 카드용 메트릭 셀 ──────────────────────────────────────
+function Metric({ label, value, color, C }) {
+  return (
+    <div style={{
+      background: "rgba(0,0,0,0.06)",
+      borderRadius: RADIUS.sm,
+      padding: "8px 10px",
+      display: "flex", flexDirection: "column", gap: 2,
+    }}>
+      <span style={{ fontSize: 11, color: C.text3, fontWeight: 700, letterSpacing: 0.4, textTransform: "uppercase" }}>
+        {label}
+      </span>
+      <span style={{
+        fontSize: 16, fontWeight: 800,
+        color: color || C.text1,
+        fontFamily: "var(--z-font-mono)",
+        fontVariantNumeric: "tabular-nums",
+      }}>{value}</span>
     </div>
   );
 }

@@ -14,6 +14,7 @@ import PortfolioTab from "./components/PortfolioTab.jsx";
 import { supabase } from "./supabaseClient.js";
 import { THEME_TOKENS } from "./ui/theme.jsx";
 import { useIsMobile } from "./ui/useBreakpoint.jsx";
+import { BottomSheet, ActionSheet } from "./ui/bottom-sheet.jsx";
 // 기술 지표 (App.jsx 분리 1단계 — 순수 유틸)
 import {
   calcRSI, calcRSIArray, calcVolumeProfile, calcSMA, calcBB,
@@ -4545,6 +4546,8 @@ function AppInner() {
   const [mode, setMode]               = useState("or");
   const [filterMarket, setFilterMarket] = useState("all");
   const [sortBy, setSortBy]           = useState("rsi");
+  // 모바일 스크리너 — 정렬 ActionSheet open
+  const [sortSheetOpen, setSortSheetOpen] = useState(false);
   const [scanErrors, setScanErrors]   = useState([]);
   const [activePreset, setActivePreset] = useState(null);
   const [lastScan, setLastScan]       = useState(null);
@@ -9432,9 +9435,15 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "screener" && (
           <div className="tab-content">
-            {/* ── 스크리너 헤더 (그래디언트 히어로 스타일) ── */}
-            <div style={{ background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.card} 100%)`, borderRadius: "24px", padding: "28px", marginBottom: "20px", boxShadow: `0 4px 16px ${C.blue}15` }}>
-              <div style={{ fontWeight: 800, fontSize: "24px", color: C.text1 }}>{t("tabs.screener.title")}</div>
+            {/* ── 스크리너 헤더 (그래디언트 히어로 스타일) — 모바일 압축 ── */}
+            <div style={{
+              background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.card} 100%)`,
+              borderRadius: isMobile ? 18 : 24,
+              padding: isMobile ? "18px 18px" : "28px",
+              marginBottom: isMobile ? 14 : 20,
+              boxShadow: `0 4px 16px ${C.blue}15`,
+            }}>
+              <div style={{ fontWeight: 800, fontSize: isMobile ? 19 : 24, color: C.text1 }}>{t("tabs.screener.title")}</div>
               <div style={{ fontSize: mf(14), color: C.text3, marginTop: "4px" }}>{t("tabs.screener.subtitle")}</div>
             </div>
 
@@ -9690,29 +9699,70 @@ function AppInner() {
             </div>
             </details>
 
-            {/* 결과 필터 */}
-            {results.length > 0 && (
-              <div style={{ display: "flex", gap: "7px", alignItems: "center", marginBottom: "12px", flexWrap: "wrap" }}>
-                <span style={{ fontSize: mf(17), color: C.text2, fontWeight: 600 }}>🎯 {filtered.length}개</span>
-                {["all","us","kr","crypto"].map(m => (
-                  <button key={m} onClick={() => setFilterMarket(m)} style={{
-                    padding: "4px 10px", borderRadius: "8px", fontSize: mf(16), fontWeight: 600,
-                    background: filterMarket === m ? C.blueBg : "transparent",
-                    color: filterMarket === m ? C.blue : C.text3, border: `1px solid ${filterMarket === m ? C.blue : C.border2}`,
-                  }}>{m === "all" ? "전체" : m === "us" ? "🇺🇸 미국" : m === "kr" ? "🇰🇷 한국" : "₿ 크립토"}</button>
-                ))}
-                <div style={{ marginLeft: "auto", display: "flex", gap: "5px", alignItems: "center" }}>
-                  <span style={{ fontSize: mf(16), color: C.text3 }}>정렬</span>
-                  {[["score","퀀트점수"], ["rsi","RSI"], ["change","변동률"], ["vol","거래량"], ["signals","시그널"]].map(([v, l]) => (
-                    <button key={v} onClick={() => setSortBy(v)} style={{
-                      padding: "3px 8px", borderRadius: "6px", fontSize: mf(16), fontWeight: 600,
-                      background: sortBy === v ? C.blueBg : "transparent", color: sortBy === v ? C.blue : C.text3,
-                      border: `1px solid ${sortBy === v ? C.blue : C.border2}`,
-                    }}>{l}</button>
-                  ))}
+            {/* 결과 필터 — 모바일: 필터 가로 스크롤 + 정렬은 ActionSheet 트리거 */}
+            {results.length > 0 && (() => {
+              const sortOptions = [
+                { v: "score", l: "퀀트점수" }, { v: "rsi", l: "RSI" },
+                { v: "change", l: "변동률" }, { v: "vol", l: "거래량" },
+                { v: "signals", l: "시그널" },
+              ];
+              const curSort = sortOptions.find(o => o.v === sortBy);
+              return (
+                <div style={{ marginBottom: "12px" }}>
+                  <div style={{
+                    display: "flex", gap: "7px", alignItems: "center", flexWrap: isMobile ? "nowrap" : "wrap",
+                    overflowX: isMobile ? "auto" : "visible",
+                    WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none",
+                    paddingBottom: isMobile ? "4px" : 0,
+                  }} className={isMobile ? "hscroll" : undefined}>
+                    <span style={{ fontSize: mf(17), color: C.text2, fontWeight: 600, flexShrink: 0 }}>🎯 {filtered.length}개</span>
+                    {["all","us","kr","crypto"].map(m => (
+                      <button key={m} onClick={() => setFilterMarket(m)} style={{
+                        padding: isMobile ? "8px 12px" : "4px 10px", borderRadius: "8px", fontSize: mf(16), fontWeight: 600,
+                        background: filterMarket === m ? C.blueBg : "transparent",
+                        color: filterMarket === m ? C.blue : C.text3, border: `1px solid ${filterMarket === m ? C.blue : C.border2}`,
+                        flexShrink: 0, minHeight: isMobile ? 36 : undefined, whiteSpace: "nowrap",
+                      }}>{m === "all" ? "전체" : m === "us" ? "🇺🇸 미국" : m === "kr" ? "🇰🇷 한국" : "₿ 크립토"}</button>
+                    ))}
+                    {isMobile ? (
+                      // 모바일: 정렬을 ActionSheet 트리거 단일 버튼으로 압축 (가로 폭 절약)
+                      <button onClick={() => setSortSheetOpen(true)} style={{
+                        marginLeft: "auto", padding: "8px 12px", borderRadius: 8, fontSize: mf(16), fontWeight: 700,
+                        background: C.card2, color: C.text2, border: `1px solid ${C.border2}`,
+                        display: "inline-flex", alignItems: "center", gap: 6, minHeight: 36, flexShrink: 0, whiteSpace: "nowrap",
+                      }}>
+                        <span style={{ color: C.text3, fontSize: mf(15) }}>정렬</span>
+                        <span style={{ color: C.blue }}>{curSort?.l || "—"}</span>
+                        <span style={{ fontSize: 10, color: C.text3 }}>▼</span>
+                      </button>
+                    ) : (
+                      <div style={{ marginLeft: "auto", display: "flex", gap: "5px", alignItems: "center" }}>
+                        <span style={{ fontSize: mf(16), color: C.text3 }}>정렬</span>
+                        {sortOptions.map(({ v, l }) => (
+                          <button key={v} onClick={() => setSortBy(v)} style={{
+                            padding: "3px 8px", borderRadius: "6px", fontSize: mf(16), fontWeight: 600,
+                            background: sortBy === v ? C.blueBg : "transparent", color: sortBy === v ? C.blue : C.text3,
+                            border: `1px solid ${sortBy === v ? C.blue : C.border2}`,
+                          }}>{l}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {/* 정렬 ActionSheet — 모바일 전용 */}
+                  {isMobile && (
+                    <ActionSheet
+                      open={sortSheetOpen}
+                      onClose={() => setSortSheetOpen(false)}
+                      title="정렬 방식"
+                      value={sortBy}
+                      items={sortOptions.map(({ v, l }) => ({
+                        id: v, label: l, onSelect: () => setSortBy(v),
+                      }))}
+                    />
+                  )}
                 </div>
-              </div>
-            )}
+              );
+            })()}
 
             {/* 대기 상태 */}
             {!scanning && results.length === 0 && (

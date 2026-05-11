@@ -23,8 +23,9 @@
 //   {showOnboarding && <Onboarding onClose={...} onNavigate={(tab) => setTab(tab)} />}
 // ══════════════════════════════════════════════════════════════════
 import React, { useState, useCallback, useEffect } from "react";
-import { useThemeTokens, FONT, RADIUS } from "./ui/theme.jsx";
+import { useThemeTokens, FONT, RADIUS, pickFont } from "./ui/theme.jsx";
 import { useBreakpoint } from "./ui/useBreakpoint.jsx";
+import { Stepper } from "./ui/primitives.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { supabase } from "./supabaseClient.js";
 import { ga } from "./lib/analytics.js";
@@ -94,7 +95,8 @@ function ProgressBar({ step, total, C }) {
 function ChipMulti({ active, onClick, children, C }) {
   return (
     <button onClick={onClick} style={{
-      padding: "10px 16px",
+      padding: "12px 18px",
+      minHeight: 44,
       background: active ? C.blueBg : C.card2,
       color: active ? C.blueL : C.text2,
       border: `1.5px solid ${active ? C.blue : C.border}`,
@@ -113,6 +115,7 @@ function OptionCard({ active, onClick, emoji, label, desc, sub, C }) {
   return (
     <button onClick={onClick} style={{
       padding: 16,
+      minHeight: 64, // 44+여유 — 다중 라인 카드도 충분
       background: active ? C.blueBg : C.card2,
       border: `2px solid ${active ? C.blue : C.border}`,
       borderRadius: RADIUS.lg,
@@ -350,10 +353,12 @@ export default function Onboarding({ onClose, onNavigate }) {
               ga.ctaClick("onboarding", "binance-later");
               handleNext();
             }} style={{
-              flex: 1, padding: "12px 18px",
+              flex: 1, padding: isMobile ? "14px 18px" : "12px 18px",
+              minHeight: 48,
               background: C.card2, color: C.text1,
               border: `1.5px solid ${C.border}`,
-              borderRadius: RADIUS.md, fontSize: FONT.sm, fontWeight: 700, cursor: "pointer",
+              borderRadius: RADIUS.md,
+              fontSize: pickFont("button", isMobile) ?? FONT.sm, fontWeight: 700, cursor: "pointer",
             }}>
               나중에 연결하기
             </button>
@@ -367,10 +372,12 @@ export default function Onboarding({ onClose, onNavigate }) {
                 if (typeof onClose === "function") onClose();
               });
             }} style={{
-              flex: 1, padding: "12px 18px",
+              flex: 1, padding: isMobile ? "14px 18px" : "12px 18px",
+              minHeight: 48,
               background: C.blue, color: "#fff",
               border: "none",
-              borderRadius: RADIUS.md, fontSize: FONT.sm, fontWeight: 700, cursor: "pointer",
+              borderRadius: RADIUS.md,
+              fontSize: pickFont("button", isMobile) ?? FONT.sm, fontWeight: 700, cursor: "pointer",
             }}>
               지금 연결하러 가기
             </button>
@@ -412,10 +419,12 @@ export default function Onboarding({ onClose, onNavigate }) {
                 if (typeof onClose === "function") onClose();
               });
             }} style={{
-              flex: 1, padding: "12px 18px",
+              flex: 1, padding: isMobile ? "14px 18px" : "12px 18px",
+              minHeight: 48,
               background: C.card2, color: C.text1,
               border: `1.5px solid ${C.border}`,
-              borderRadius: RADIUS.md, fontSize: FONT.sm, fontWeight: 700, cursor: "pointer",
+              borderRadius: RADIUS.md,
+              fontSize: pickFont("button", isMobile) ?? FONT.sm, fontWeight: 700, cursor: "pointer",
             }}>
               📊 스크리너 둘러보기
             </button>
@@ -426,10 +435,12 @@ export default function Onboarding({ onClose, onNavigate }) {
                 if (typeof onClose === "function") onClose();
               });
             }} style={{
-              flex: 1, padding: "12px 18px",
+              flex: 1, padding: isMobile ? "14px 18px" : "12px 18px",
+              minHeight: 48,
               background: C.blue, color: "#fff",
               border: "none",
-              borderRadius: RADIUS.md, fontSize: FONT.sm, fontWeight: 700, cursor: "pointer",
+              borderRadius: RADIUS.md,
+              fontSize: pickFont("button", isMobile) ?? FONT.sm, fontWeight: 700, cursor: "pointer",
             }}>
               🤖 자동매매 살펴보기
             </button>
@@ -474,11 +485,13 @@ export default function Onboarding({ onClose, onNavigate }) {
         display: "flex", flexDirection: "column",
         overflow: "hidden",
       }}>
-        {/* 헤더 */}
+        {/* 헤더 — safe-area-top 반영, Stepper 우선 + ProgressBar 백업 */}
         <div style={{
-          padding: "16px 20px",
+          padding: isMobile
+            ? "calc(env(safe-area-inset-top, 0px) + 12px) 20px 14px"
+            : "16px 20px",
           borderBottom: `1px solid ${C.border}`,
-          display: "flex", flexDirection: "column", gap: 10,
+          display: "flex", flexDirection: "column", gap: 12,
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 600 }}>
@@ -487,12 +500,15 @@ export default function Onboarding({ onClose, onNavigate }) {
             <button onClick={handleSkip} style={{
               background: "none", border: "none",
               color: C.text3, fontSize: FONT.xs, fontWeight: 600,
-              cursor: "pointer", padding: "4px 8px",
+              cursor: "pointer", padding: "8px 10px", minHeight: 44,
             }}>
               건너뛰기 ✕
             </button>
           </div>
-          <ProgressBar step={step} total={TOTAL_STEPS} C={C} />
+          {/* 모바일은 Stepper 점, 데스크탑은 progress bar */}
+          {isMobile
+            ? <Stepper current={step} total={TOTAL_STEPS} showLabel={false} />
+            : <ProgressBar step={step} total={TOTAL_STEPS} C={C} />}
         </div>
 
         {/* 바디 */}
@@ -500,18 +516,23 @@ export default function Onboarding({ onClose, onNavigate }) {
           <StepContent />
         </div>
 
-        {/* 푸터 (네비게이션) */}
+        {/* 푸터 (네비게이션) — sticky 하단 + safe-area-bottom */}
         {!hideExternalNav && (
           <div style={{
-            padding: "12px 20px 20px",
+            padding: isMobile
+              ? "14px 20px calc(env(safe-area-inset-bottom, 0px) + 16px)"
+              : "12px 20px 20px",
             borderTop: `1px solid ${C.border}`,
             display: "flex", gap: 10, justifyContent: "space-between",
+            background: C.card,
           }}>
             <button onClick={handlePrev} disabled={step === 1} style={{
-              padding: "10px 18px",
+              padding: isMobile ? "14px 18px" : "10px 18px",
+              minHeight: 48,
               background: "transparent", color: step === 1 ? C.text4 : C.text2,
               border: `1px solid ${C.border}`,
-              borderRadius: RADIUS.md, fontSize: FONT.sm, fontWeight: 600,
+              borderRadius: RADIUS.md,
+              fontSize: pickFont("button", isMobile) ?? FONT.sm, fontWeight: 600,
               cursor: step === 1 ? "not-allowed" : "pointer",
               opacity: step === 1 ? 0.4 : 1,
             }}>
@@ -519,11 +540,13 @@ export default function Onboarding({ onClose, onNavigate }) {
             </button>
             <button onClick={handleNext} disabled={!canProceed || saving} style={{
               flex: 1, maxWidth: 220,
-              padding: "10px 18px",
+              padding: isMobile ? "14px 18px" : "10px 18px",
+              minHeight: 48,
               background: canProceed ? C.blue : C.card2,
               color: canProceed ? "#fff" : C.text3,
               border: "none",
-              borderRadius: RADIUS.md, fontSize: FONT.sm, fontWeight: 700,
+              borderRadius: RADIUS.md,
+              fontSize: pickFont("button", isMobile) ?? FONT.sm, fontWeight: 700,
               cursor: canProceed ? "pointer" : "not-allowed",
             }}>
               {saving ? "저장 중…" : (step === TOTAL_STEPS ? "완료" : "다음 →")}

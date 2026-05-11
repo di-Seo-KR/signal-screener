@@ -12,7 +12,7 @@
 // "Pro 14일 무료 체험" CTA 가능 — useTrial=true.
 // ══════════════════════════════════════════════════════════════════
 import React, { useState, useCallback, useMemo } from "react";
-import { useThemeTokens, FONT, RADIUS } from "./ui/theme.jsx";
+import { useThemeTokens, FONT, RADIUS, FONT_MOBILE, pickFont } from "./ui/theme.jsx";
 import { useBreakpoint } from "./ui/useBreakpoint.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import {
@@ -209,19 +209,20 @@ function TierCard({ tier, isCurrent, isRecommended, onSelect, onTrial, lang, C, 
         ))}
       </ul>
 
-      {/* CTA */}
+      {/* CTA — 모바일은 minHeight 48 (큰 터치 영역) */}
       <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 8 }}>
         {tier === "free" && (
           <button
             disabled={isCurrent || busy}
             onClick={() => onSelect(tier)}
             style={{
-              padding: "12px 16px",
+              padding: isMobile ? "14px 16px" : "12px 16px",
+              minHeight: 48,
               background: isCurrent ? C.card2 : accentBg,
               color: isCurrent ? C.text3 : accent,
               border: `1px solid ${isCurrent ? C.border : accent}`,
               borderRadius: RADIUS.md,
-              fontSize: FONT.base, fontWeight: 700,
+              fontSize: pickFont("button", isMobile) ?? FONT.base, fontWeight: 700,
               cursor: isCurrent ? "default" : "pointer",
             }}
           >
@@ -234,12 +235,13 @@ function TierCard({ tier, isCurrent, isRecommended, onSelect, onTrial, lang, C, 
               disabled={isCurrent || busy}
               onClick={() => onTrial(tier)}
               style={{
-                padding: "12px 16px",
+                padding: isMobile ? "14px 16px" : "12px 16px",
+                minHeight: 48,
                 background: accent,
                 color: "#fff",
                 border: "none",
                 borderRadius: RADIUS.md,
-                fontSize: FONT.base, fontWeight: 700,
+                fontSize: pickFont("button", isMobile) ?? FONT.base, fontWeight: 700,
                 cursor: (isCurrent || busy) ? "default" : "pointer",
                 opacity: (isCurrent || busy) ? 0.6 : 1,
               }}
@@ -250,7 +252,8 @@ function TierCard({ tier, isCurrent, isRecommended, onSelect, onTrial, lang, C, 
               disabled={isCurrent || busy}
               onClick={() => onSelect(tier)}
               style={{
-                padding: "10px 16px",
+                padding: isMobile ? "12px 16px" : "10px 16px",
+                minHeight: 44,
                 background: "transparent",
                 color: accent,
                 border: `1px solid ${accent}`,
@@ -268,12 +271,13 @@ function TierCard({ tier, isCurrent, isRecommended, onSelect, onTrial, lang, C, 
             disabled={isCurrent || busy}
             onClick={() => onSelect(tier)}
             style={{
-              padding: "12px 16px",
+              padding: isMobile ? "14px 16px" : "12px 16px",
+              minHeight: 48,
               background: accent,
               color: "#fff",
               border: "none",
               borderRadius: RADIUS.md,
-              fontSize: FONT.base, fontWeight: 700,
+              fontSize: pickFont("button", isMobile) ?? FONT.base, fontWeight: 700,
               cursor: (isCurrent || busy) ? "default" : "pointer",
               opacity: (isCurrent || busy) ? 0.6 : 1,
             }}
@@ -288,6 +292,8 @@ function TierCard({ tier, isCurrent, isRecommended, onSelect, onTrial, lang, C, 
 
 // ── Feature matrix 비교 표 ───────────────────────────────────────
 function FeatureMatrix({ C, isMobile }) {
+  // 모바일에선 기본 접힘 — 좁은 폭에서 너무 길어 화면 압박
+  const [open, setOpen] = useState(!isMobile);
   return (
     <div style={{
       background: C.card,
@@ -296,10 +302,38 @@ function FeatureMatrix({ C, isMobile }) {
       padding: isMobile ? 16 : 24,
       marginTop: 32,
     }}>
-      <h3 style={{ fontSize: FONT.xl, fontWeight: 700, color: C.text1, margin: "0 0 16px" }}>
-        기능 비교
-      </h3>
-      <div style={{ overflowX: "auto" }}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          width: "100%",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 12,
+          background: "transparent", border: "none", padding: 0,
+          margin: "0 0 16px",
+          cursor: isMobile ? "pointer" : "default",
+          textAlign: "left", minHeight: isMobile ? 44 : undefined,
+        }}
+        aria-expanded={open}
+      >
+        <h3 style={{ fontSize: FONT.xl, fontWeight: 700, color: C.text1, margin: 0 }}>
+          기능 비교
+        </h3>
+        {isMobile && (
+          <span style={{
+            color: C.text2, fontSize: FONT.lg, fontWeight: 700,
+            width: 32, height: 32, display: "inline-flex",
+            alignItems: "center", justifyContent: "center",
+          }}>{open ? "−" : "+"}</span>
+        )}
+      </button>
+      {!open && (
+        <p style={{ margin: 0, color: C.text3, fontSize: FONT.sm }}>
+          탭하면 펼쳐서 자세히 볼 수 있어요.
+        </p>
+      )}
+      {open && (
+      <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 600 }}>
           <thead>
             <tr style={{ borderBottom: `2px solid ${C.border}` }}>
@@ -343,6 +377,7 @@ function FeatureMatrix({ C, isMobile }) {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }
@@ -376,7 +411,8 @@ function FAQSection({ C, isMobile }) {
                 onClick={() => setOpenIdx(isOpen ? -1 : i)}
                 style={{
                   width: "100%",
-                  padding: 14,
+                  padding: isMobile ? "16px 14px" : 14,
+                  minHeight: 52,
                   background: isOpen ? C.card2 : "transparent",
                   border: "none",
                   textAlign: "left",
@@ -538,13 +574,28 @@ export default function Pricing({ onRequestLogin } = {}) {
         )}
       </div>
 
-      {/* 3 tier 카드 */}
+      {/* 3 tier 카드 — 모바일은 1컬럼 stack, Pro 카드를 맨 위로 */}
       <div style={{
         display: "flex",
+        flexDirection: isMobile ? "column" : "row",
         gap: 16,
         flexWrap: "wrap",
         alignItems: "stretch",
       }}>
+        {/* 모바일에선 Pro 를 먼저 보여줘서 추천 강조 */}
+        {isMobile && (
+          <TierCard
+            tier="pro"
+            isCurrent={currentTier === "pro"}
+            isRecommended={true}
+            onSelect={(t) => handleUpgrade(t, false)}
+            onTrial={(t) => handleUpgrade(t, true)}
+            lang={lang}
+            C={C}
+            isMobile={isMobile}
+            busy={busy}
+          />
+        )}
         <TierCard
           tier="free"
           isCurrent={currentTier === "free"}
@@ -556,17 +607,19 @@ export default function Pricing({ onRequestLogin } = {}) {
           isMobile={isMobile}
           busy={busy}
         />
-        <TierCard
-          tier="pro"
-          isCurrent={currentTier === "pro"}
-          isRecommended={true}
-          onSelect={(t) => handleUpgrade(t, false)}
-          onTrial={(t) => handleUpgrade(t, true)}
-          lang={lang}
-          C={C}
-          isMobile={isMobile}
-          busy={busy}
-        />
+        {!isMobile && (
+          <TierCard
+            tier="pro"
+            isCurrent={currentTier === "pro"}
+            isRecommended={true}
+            onSelect={(t) => handleUpgrade(t, false)}
+            onTrial={(t) => handleUpgrade(t, true)}
+            lang={lang}
+            C={C}
+            isMobile={isMobile}
+            busy={busy}
+          />
+        )}
         <TierCard
           tier="premium"
           isCurrent={currentTier === "premium"}

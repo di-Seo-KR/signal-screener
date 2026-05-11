@@ -116,6 +116,34 @@
   --z-mobile-tab-h: 60px;
 
   /* ══════════════════════════════════════════════════════════════════
+     Safe-area inset 토큰 (iPhone notch / Dynamic Island / 홈 인디케이터)
+     index.html 에 viewport-fit=cover 가 설정돼 있어야 동작.
+     사용:  padding-top: var(--z-safe-top);
+            padding-bottom: max(12px, var(--z-safe-bottom));
+     fallback 0px 으로 안드로이드·데스크탑에서도 안전.
+     ══════════════════════════════════════════════════════════════════ */
+  --z-safe-top:    env(safe-area-inset-top, 0px);
+  --z-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --z-safe-left:   env(safe-area-inset-left, 0px);
+  --z-safe-right:  env(safe-area-inset-right, 0px);
+
+  /* ══════════════════════════════════════════════════════════════════
+     모바일 우선 폰트 사이즈 토큰 (iPhone 16 393pt 기준)
+     입문자 친화 + 시인성 — 데스크탑에선 자동으로 더 컴팩트.
+     본문 16px = iOS 자동 zoom-in 방지 임계값.
+     ══════════════════════════════════════════════════════════════════ */
+  --z-font-mobile-body:   15px;
+  --z-font-mobile-small:  13px;
+  --z-font-mobile-h1:     24px;
+  --z-font-mobile-h2:     19px;
+  --z-font-mobile-h3:     16px;
+  --z-font-mobile-num:    16px;   /* 모노스페이스 숫자 — 본문 +1 */
+  --z-font-input:         16px;   /* iOS 자동 확대 방지 임계값 */
+
+  /* 터치 영역 — WCAG 2.5.5 / iOS HIG 최소 44×44 */
+  --z-tap-target:         44px;
+
+  /* ══════════════════════════════════════════════════════════════════
      Shadcn ↔ Zepta Bridge Layer
      모든 Shadcn CSS variable 은 Zepta --z-* 토큰을 참조한다.
      이렇게 하면 Shadcn 컴포넌트가 자동으로 Zepta 색상을 쓰고,
@@ -216,6 +244,41 @@ body {
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   모바일 글로벌 UX 베이스 (iPhone 16 393pt 기준 최적)
+   - 탭 하이라이트 제거
+   - 관성 스크롤
+   - 스크롤 바운스 제어
+   - input/textarea 자동 zoom-in 방지 (font-size ≥ 16px)
+   ══════════════════════════════════════════════════════════════════ */
+html, body {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* iOS Safari — input focus 시 자동 zoom-in 방지 (font-size ≥ 16px) */
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  font-size: max(16px, 1em);
+}
+
+/* 모바일 fixed bottom 요소 — safe-area-inset-bottom 자동 적용
+   대상: .z-fixed-bottom 클래스를 단 요소 (BottomSheet, FAB, BottomNav 등) */
+.z-fixed-bottom {
+  bottom: max(0px, var(--z-safe-bottom));
+}
+
+/* 모바일 터치 영역 표준 (WCAG 2.5.5 / iOS HIG) */
+@media (pointer: coarse) {
+  button, a[role="button"], [role="button"], [role="switch"], [role="tab"] {
+    min-height: var(--z-tap-target);
+  }
+  /* 인라인 텍스트 링크 등은 제외 */
+  a:not([role="button"]) { min-height: auto; }
 }
 
 :focus-visible {
@@ -366,21 +429,17 @@ main, [class*="panel"], [class*="dashboard"] {
   [class*="card"]:not(button):not(.no-z-polish):hover {
     transform: none;
   }
-  /* 모바일 가독성 — 본문 최소 14px 강제 (iOS 줌 방지에 16px 권장이지만 dense UI 우선) */
-  body { font-size: 14px; }
-  /* 카드 패딩 자동 축소 */
-  [class*="card"]:not(button) {
-    /* padding 은 인라인 스타일이 우선이므로 강제 못 함 — 권장값만 제공 */
-  }
+  /* 모바일 가독성 — iPhone 16 393pt 기준 15px (입문자 친화) */
+  body { font-size: 15px; }
   /* 가로 스크롤 방지 안전망 */
   html, body { overflow-x: hidden; }
-  /* 표 모바일 가독성 */
+  /* 표 모바일 가독성 — 데이터 dense 라 13px 까지만 축소 */
   table { font-size: 13px; }
 }
 
 @media (max-width: 480px) {
-  /* 작은 핸드폰 — 더 컴팩트 */
-  body { font-size: 13px; }
+  /* 작은 핸드폰 (iPhone SE 등) — 본문은 14px 까지만 축소 */
+  body { font-size: 14px; }
   table { font-size: 12px; }
 }
 

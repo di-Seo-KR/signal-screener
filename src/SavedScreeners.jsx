@@ -13,7 +13,9 @@
 //   DELETE /api/screeners/save        (삭제)
 // ══════════════════════════════════════════════════════════════════
 import { useEffect, useState, useCallback } from "react";
-import { useThemeTokens, FONT, RADIUS } from "./ui/theme.jsx";
+import { useThemeTokens, FONT, RADIUS, pickFont } from "./ui/theme.jsx";
+import { useBreakpoint } from "./ui/useBreakpoint.jsx";
+import { BottomSheet } from "./ui/primitives.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 
 const FREE_LIMIT = 3;
@@ -42,6 +44,7 @@ function fmtAgo(iso) {
 
 export default function SavedScreeners({ onNavigate }) {
   const C = useThemeTokens();
+  const { isMobile } = useBreakpoint();
   const { user } = useAuth();
   const uid = user?.id || "guest";
 
@@ -139,9 +142,14 @@ export default function SavedScreeners({ onNavigate }) {
             </div>
           </div>
           <button onClick={() => setShowSuggested(true)} style={{
-            padding: "10px 18px", borderRadius: RADIUS.md,
+            padding: isMobile ? "14px 18px" : "10px 18px",
+            minHeight: 48,
+            borderRadius: RADIUS.md,
             background: C.purple, color: "#fff", border: "none",
-            fontWeight: 700, fontSize: FONT.sm, cursor: "pointer",
+            fontWeight: 700,
+            fontSize: pickFont("button", isMobile) ?? FONT.sm,
+            cursor: "pointer",
+            width: isMobile ? "100%" : undefined,
           }}>+ 추천 조건 추가</button>
         </div>
 
@@ -180,12 +188,17 @@ export default function SavedScreeners({ onNavigate }) {
           }
         />
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(280px, 1fr))",
+          gap: 12,
+        }}>
           {screeners.map(s => (
             <ScreenerCard
               key={s.id}
               s={s}
               C={C}
+              isMobile={isMobile}
               onToggleAlert={() => toggleAlert(s.id)}
               onRemove={() => remove(s.id)}
               onOpen={() => onNavigate && onNavigate("screener")}
@@ -194,9 +207,11 @@ export default function SavedScreeners({ onNavigate }) {
         </div>
       )}
 
+      {/* 추천 조건 — 모바일 BottomSheet (가로 chip 미리보기도 시각) */}
       {showSuggested && (
         <SuggestedModal
           C={C}
+          isMobile={isMobile}
           suggested={suggested}
           remaining={remaining}
           onClose={() => setShowSuggested(false)}
@@ -207,7 +222,7 @@ export default function SavedScreeners({ onNavigate }) {
   );
 }
 
-function ScreenerCard({ s, C, onToggleAlert, onRemove, onOpen }) {
+function ScreenerCard({ s, C, isMobile, onToggleAlert, onRemove, onOpen }) {
   return (
     <div style={{
       background: C.card, border: `1px solid ${C.border}`,
@@ -222,12 +237,13 @@ function ScreenerCard({ s, C, onToggleAlert, onRemove, onOpen }) {
         </div>
         <button onClick={onRemove} style={{
           background: "none", border: "none", color: C.text3,
-          fontSize: 18, cursor: "pointer", padding: 4,
+          fontSize: 20, cursor: "pointer", padding: 8,
+          minWidth: 44, minHeight: 44,
         }} title="삭제">🗑</button>
       </div>
 
       <div style={{
-        padding: "8px 10px", background: C.card2, borderRadius: RADIUS.sm,
+        padding: "10px 12px", background: C.card2, borderRadius: RADIUS.sm,
         fontSize: FONT.xs, color: C.text2,
       }}>
         {s.last_matched_at
@@ -236,35 +252,127 @@ function ScreenerCard({ s, C, onToggleAlert, onRemove, onOpen }) {
       </div>
 
       <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between" }}>
-        <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-          <span style={{ position: "relative", display: "inline-block", width: 34, height: 18 }}>
+        {/* 알림 토글 — 큰 터치 영역 */}
+        <label style={{
+          display: "flex", alignItems: "center", gap: 10,
+          cursor: "pointer", minHeight: 44, padding: "4px 0",
+        }}>
+          <span style={{
+            position: "relative", display: "inline-block",
+            width: 44, height: 24,
+          }}>
             <input type="checkbox" checked={s.alert_enabled} onChange={onToggleAlert}
               style={{ opacity: 0, width: 0, height: 0 }} />
             <span style={{
-              position: "absolute", inset: 0, borderRadius: 9,
+              position: "absolute", inset: 0, borderRadius: 12,
               background: s.alert_enabled ? C.green : C.border2, transition: "0.15s",
             }} />
             <span style={{
-              position: "absolute", top: 2, left: s.alert_enabled ? 18 : 2,
-              width: 14, height: 14, borderRadius: "50%", background: "#fff",
-              transition: "0.15s",
+              position: "absolute", top: 2, left: s.alert_enabled ? 22 : 2,
+              width: 20, height: 20, borderRadius: "50%", background: "#fff",
+              transition: "0.15s", boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
             }} />
           </span>
-          <span style={{ fontSize: FONT.xs, color: C.text2, fontWeight: 600 }}>
+          <span style={{ fontSize: FONT.sm, color: C.text2, fontWeight: 600 }}>
             {s.alert_enabled ? "🔔 알림 ON" : "🔕 알림 OFF"}
           </span>
         </label>
         <button onClick={onOpen} style={{
-          padding: "6px 12px", borderRadius: RADIUS.sm,
+          padding: isMobile ? "10px 14px" : "6px 12px",
+          minHeight: 44,
+          borderRadius: RADIUS.sm,
           background: C.blueBg, color: C.blueL, border: `1px solid ${C.blue}40`,
-          fontSize: FONT.xs, fontWeight: 700, cursor: "pointer",
+          fontSize: pickFont("button", isMobile) ?? FONT.xs,
+          fontWeight: 700, cursor: "pointer",
         }}>스크리너 열기 →</button>
       </div>
     </div>
   );
 }
 
-function SuggestedModal({ C, suggested, remaining, onClose, onAdd }) {
+function SuggestedModal({ C, isMobile, suggested, remaining, onClose, onAdd }) {
+  const body = suggested.length === 0 ? (
+    <div style={{ padding: "32px 0", textAlign: "center", color: C.text3 }}>
+      ✅ 추천 조건을 모두 추가하셨네요!
+    </div>
+  ) : (
+    <>
+      {/* 모바일: 가로 chip 스크롤 미리보기 */}
+      {isMobile && (
+        <div style={{
+          display: "flex", gap: 8, overflowX: "auto",
+          flexWrap: "nowrap", paddingBottom: 8, marginBottom: 12,
+          WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
+          scrollSnapType: "x mandatory",
+        }}>
+          {suggested.map(s => (
+            <button
+              key={`chip-${s.template_id}`}
+              onClick={() => onAdd(s)}
+              disabled={remaining <= 0}
+              style={{
+                padding: "8px 14px", minHeight: 36, flexShrink: 0,
+                background: remaining > 0 ? C.purpleBg : C.card2,
+                color: remaining > 0 ? C.purple : C.text3,
+                border: `1px solid ${remaining > 0 ? C.purple + "55" : C.border}`,
+                borderRadius: RADIUS.full,
+                fontSize: FONT.sm, fontWeight: 700,
+                cursor: remaining > 0 ? "pointer" : "not-allowed",
+                whiteSpace: "nowrap",
+                scrollSnapAlign: "start",
+              }}
+            >+ {s.name}</button>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {suggested.map(s => (
+          <div key={s.template_id} style={{
+            background: C.card2, border: `1px solid ${C.border}`,
+            borderRadius: RADIUS.lg, padding: 14,
+          }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: FONT.base, fontWeight: 700, color: C.text1, marginBottom: 4 }}>
+                  {s.name}
+                </div>
+                <div style={{ fontSize: FONT.sm, color: C.text2, marginBottom: 4 }}>{s.summary}</div>
+                <div style={{ fontSize: FONT.xs, color: C.text3, lineHeight: 1.5 }}>{s.description}</div>
+              </div>
+              <button onClick={() => onAdd(s)} disabled={remaining <= 0} style={{
+                padding: isMobile ? "10px 14px" : "6px 12px",
+                minHeight: 44,
+                borderRadius: RADIUS.sm,
+                background: remaining > 0 ? C.purple : C.card,
+                color: remaining > 0 ? "#fff" : C.text3,
+                border: "none",
+                fontSize: pickFont("button", isMobile) ?? FONT.xs,
+                fontWeight: 700,
+                cursor: remaining > 0 ? "pointer" : "not-allowed",
+                whiteSpace: "nowrap", flexShrink: 0,
+              }}>+ 추가</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+
+  if (isMobile) {
+    return (
+      <BottomSheet
+        open={true}
+        onClose={onClose}
+        title="✨ 추천 스크리너"
+        description={`검증된 4개 패턴 · 남은 슬롯 ${remaining}개`}
+        maxHeight="88vh"
+      >
+        {body}
+      </BottomSheet>
+    );
+  }
+
   return (
     <div onClick={onClose} style={{
       position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9999,
@@ -283,40 +391,7 @@ function SuggestedModal({ C, suggested, remaining, onClose, onAdd }) {
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: C.text2, fontSize: 22, cursor: "pointer" }}>✕</button>
         </div>
-
-        {suggested.length === 0 ? (
-          <div style={{ padding: "32px 0", textAlign: "center", color: C.text3 }}>
-            ✅ 추천 조건을 모두 추가하셨네요!
-          </div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {suggested.map(s => (
-              <div key={s.template_id} style={{
-                background: C.card2, border: `1px solid ${C.border}`,
-                borderRadius: RADIUS.lg, padding: 14,
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: FONT.base, fontWeight: 700, color: C.text1, marginBottom: 4 }}>
-                      {s.name}
-                    </div>
-                    <div style={{ fontSize: FONT.sm, color: C.text2, marginBottom: 4 }}>{s.summary}</div>
-                    <div style={{ fontSize: FONT.xs, color: C.text3, lineHeight: 1.5 }}>{s.description}</div>
-                  </div>
-                  <button onClick={() => onAdd(s)} disabled={remaining <= 0} style={{
-                    padding: "6px 12px", borderRadius: RADIUS.sm,
-                    background: remaining > 0 ? C.purple : C.card,
-                    color: remaining > 0 ? "#fff" : C.text3,
-                    border: "none",
-                    fontSize: FONT.xs, fontWeight: 700,
-                    cursor: remaining > 0 ? "pointer" : "not-allowed",
-                    whiteSpace: "nowrap",
-                  }}>+ 추가</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {body}
       </div>
     </div>
   );
