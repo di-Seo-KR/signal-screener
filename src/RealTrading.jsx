@@ -628,9 +628,10 @@ function RealTradingInner() {
       background: "linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(79, 70, 229, 0.04) 100%)",
       border: "1px solid rgba(99, 102, 241, 0.2)",
       borderRadius: "var(--z-r-lg)",
-      padding: "20px",
-      marginBottom: 20,
-      display: "flex", flexDirection: "column", gap: 16,
+      // iPhone 16 (393pt) 기준 — 모바일에선 가용 폭 절약 위해 padding 축소
+      padding: isMobile ? "14px 12px" : "20px",
+      marginBottom: isMobile ? 14 : 20,
+      display: "flex", flexDirection: "column", gap: isMobile ? 12 : 16,
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>

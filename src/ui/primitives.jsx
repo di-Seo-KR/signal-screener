@@ -8,6 +8,11 @@
 // ══════════════════════════════════════════════════════════════════
 import React, { useEffect, useState, useCallback, useRef, createContext, useContext } from "react";
 import { Cross, ChevronR } from "./icons.jsx";
+import { useBreakpoint } from "./useBreakpoint.jsx";
+
+// ── 모바일 우선 컴포넌트 re-export (BottomSheet/ActionSheet/Stepper)
+//    구현은 ./bottom-sheet.jsx 에 있고, primitives 의 단일 import 경로 보존.
+export { BottomSheet, ActionSheet, Stepper } from "./bottom-sheet.jsx";
 
 // ───────────────────────────── Button ─────────────────────────────
 const BTN_VARIANTS = {
@@ -34,8 +39,13 @@ export function Button({
 }) {
   const [hover, setHover] = useState(false);
   const [focus, setFocus] = useState(false);
+  const { isTouchDevice } = useBreakpoint();
   const v = BTN_VARIANTS[variant] || BTN_VARIANTS.default;
   const s = BTN_SIZES[size] || BTN_SIZES.md;
+  // WCAG 2.5.5 / iOS HIG — 터치 디바이스에선 최소 44px 강제 (xs/sm 사이즈도 보정)
+  const minH = isTouchDevice ? Math.max(s.h, 44) : s.h;
+  // 터치 디바이스에선 폰트도 살짝 키워서 시인성 확보 (xs/sm 만)
+  const fs = isTouchDevice && s.fs < 13 ? 13 : s.fs;
   return (
     <button
       type={type}
@@ -52,8 +62,8 @@ export function Button({
         color: v.fg,
         borderColor: v.bd,
         padding: s.p,
-        fontSize: s.fs,
-        minHeight: s.h,
+        fontSize: fs,
+        minHeight: minH,
         width: fullWidth ? "100%" : undefined,
         textDecoration: variant === "link" ? "underline" : "none",
         borderRadius: "var(--z-r-md)",
@@ -62,7 +72,7 @@ export function Button({
       }}
       {...rest}
     >
-      {loading && <Spinner size={s.fs + 2} />}
+      {loading && <Spinner size={fs + 2} />}
       {!loading && leftIcon}
       {children}
       {!loading && rightIcon}
@@ -215,8 +225,12 @@ export function Stat({ label, value, sub, tone, icon, trend, mono = true, loadin
 
 // ───────────────────────────── Tabs ─────────────────────────────
 export function Tabs({ value, onChange, items, variant = "underline", size = "md", fullWidth }) {
+  const { isTouchDevice } = useBreakpoint();
   const fs = size === "sm" ? 12 : 13;
-  const pd = size === "sm" ? "8px 12px" : "10px 16px";
+  // 터치 디바이스에선 최소 44px 높이 보장 (WCAG 2.5.5)
+  const pd = isTouchDevice
+    ? (size === "sm" ? "12px 14px" : "14px 18px")
+    : (size === "sm" ? "8px 12px" : "10px 16px");
   if (variant === "pills") {
     return (
       <div style={{
@@ -287,11 +301,18 @@ export function Tabs({ value, onChange, items, variant = "underline", size = "md
 
 // ───────────────────────────── Switch ─────────────────────────────
 export function Switch({ checked, onChange, disabled, label, size = "md" }) {
+  const { isTouchDevice } = useBreakpoint();
   const w = size === "sm" ? 32 : 40;
   const h = size === "sm" ? 18 : 22;
   const k = h - 4;
   return (
-    <label style={{ display: "inline-flex", alignItems: "center", gap: 10, cursor: disabled ? "not-allowed" : "pointer" }}>
+    <label style={{
+      display: "inline-flex", alignItems: "center", gap: 10,
+      cursor: disabled ? "not-allowed" : "pointer",
+      // 터치 디바이스에선 라벨 전체가 44px tap target 이 되도록
+      minHeight: isTouchDevice ? 44 : undefined,
+      padding: isTouchDevice ? "4px 0" : 0,
+    }}>
       <span
         role="switch"
         aria-checked={checked}

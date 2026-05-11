@@ -17,19 +17,32 @@ export const BREAKPOINTS = {
 
 function getBreakpointState() {
   if (typeof window === "undefined") {
-    return { isMobile: false, isTablet: false, isDesktop: true, isSmall: false, width: BREAKPOINTS.lg };
+    return {
+      isMobile: false, isTablet: false, isDesktop: true, isSmall: false,
+      isTouchDevice: false, isLandscape: false,
+      width: BREAKPOINTS.lg, height: 800,
+    };
   }
   const w = window.innerWidth;
+  const h = window.innerHeight;
+  // pointer:coarse = 손가락 터치 (iPhone, Android, iPad). hover 없는 디바이스 식별에 신뢰성 높음
+  const isTouchDevice = typeof window.matchMedia === "function"
+    && window.matchMedia("(pointer: coarse)").matches;
   return {
-    // 기존 시맨틱 유지 — 폰 (≤ 640px)
+    // 기존 시맨틱 유지 — 폰 (≤ 640px) — iPhone 16 (393pt) 포함
     isMobile: w <= BREAKPOINTS.sm,
-    // 신규 — 태블릿 (641~1023, iPad/갤탭 영역)
+    // 태블릿 (641~1023, iPad/갤탭 영역)
     isTablet: w > BREAKPOINTS.sm && w < BREAKPOINTS.lg,
-    // 신규 — 데스크탑 (≥ 1024)
+    // 데스크탑 (≥ 1024)
     isDesktop: w >= BREAKPOINTS.lg,
     // 폰 + 태블릿 합집합 (작은 화면 일반)
     isSmall: w < BREAKPOINTS.lg,
+    // 터치 디바이스 — 마우스 hover UX 분기에 활용
+    isTouchDevice,
+    // 가로 모드 (iPhone 가로, iPad 등) — fixed bottom 요소 노출 결정에 활용
+    isLandscape: w > h,
     width: w,
+    height: h,
   };
 }
 

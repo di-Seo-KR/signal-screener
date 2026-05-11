@@ -14,7 +14,8 @@
 // 비로그인 사용자도 접근 가능 (SEO).
 // ══════════════════════════════════════════════════════════════════
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useThemeTokens, FONT, RADIUS } from "./ui/theme.jsx";
+import { useThemeTokens, FONT, RADIUS, pickFont } from "./ui/theme.jsx";
+import { useBreakpoint } from "./ui/useBreakpoint.jsx";
 
 const BOT_NAME_KO = {
   "btc-alpha":        "BTC 알파",
@@ -205,11 +206,16 @@ function BotReportList({ onNavigate }) {
 
 function BotGrid({ title, bots, onNavigate }) {
   const C = useThemeTokens();
+  const { isMobile } = useBreakpoint();
   if (!bots || bots.length === 0) return null;
   return (
     <Card>
       <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1, marginBottom: 12 }}>{title}</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+      <div style={{
+        display: "grid",
+        gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(260px, 1fr))",
+        gap: 12,
+      }}>
         {bots.map((b) => (
           <a
             key={b.botId}
@@ -221,7 +227,10 @@ function BotGrid({ title, bots, onNavigate }) {
               }
             }}
             style={{
-              display: "block", padding: 14, borderRadius: RADIUS.md,
+              display: "block",
+              padding: isMobile ? 16 : 14,
+              minHeight: isMobile ? 96 : undefined,
+              borderRadius: RADIUS.md,
               border: `1px solid ${C.border}`, background: C.card2,
               textDecoration: "none", transition: "all 140ms",
             }}
@@ -249,6 +258,7 @@ function BotGrid({ title, bots, onNavigate }) {
 // ── 봇 상세 페이지 ───────────────────────────────────────────────
 function BotReportDetail({ botId, onNavigate }) {
   const C = useThemeTokens();
+  const { isMobile } = useBreakpoint();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -290,9 +300,13 @@ function BotReportDetail({ botId, onNavigate }) {
               else if (typeof window !== "undefined") window.history.back();
             }}
             style={{
-              fontSize: FONT.xs, color: C.text3,
+              fontSize: pickFont("button", isMobile) ?? FONT.xs,
+              color: C.text3,
               background: "transparent", border: "none",
-              cursor: "pointer", padding: 0, marginBottom: 6,
+              cursor: "pointer",
+              padding: isMobile ? "8px 0" : 0,
+              minHeight: isMobile ? 44 : undefined,
+              marginBottom: 6,
             }}
           >← 전체 봇 리포트</button>
           <h1 style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, margin: 0 }}>
@@ -306,9 +320,13 @@ function BotReportDetail({ botId, onNavigate }) {
           onClick={load}
           disabled={loading}
           style={{
-            padding: "6px 12px", borderRadius: RADIUS.sm,
+            padding: isMobile ? "10px 16px" : "6px 12px",
+            minHeight: 44,
+            borderRadius: RADIUS.sm,
             background: C.card, border: `1px solid ${C.border}`,
-            color: C.text2, fontSize: FONT.xs, fontWeight: 700, cursor: "pointer",
+            color: C.text2,
+            fontSize: pickFont("button", isMobile) ?? FONT.xs,
+            fontWeight: 700, cursor: "pointer",
           }}
         >{loading ? "새로고침 중…" : "새로고침"}</button>
       </div>
@@ -317,10 +335,14 @@ function BotReportDetail({ botId, onNavigate }) {
         <Card><div style={{ color: C.red, fontSize: FONT.sm }}>리포트를 불러오지 못했습니다. ({err})</div></Card>
       )}
 
-      {/* 누적 메트릭 */}
+      {/* 누적 메트릭 — 모바일은 2 col grid */}
       <Card>
         <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1, marginBottom: 12 }}>누적 성과</div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(auto-fit, minmax(140px, 1fr))",
+          gap: 12,
+        }}>
           <Stat
             label="누적 수익률"
             value={fmtPct(cum.returnPct, 2)}
@@ -380,6 +402,49 @@ function BotReportDetail({ botId, onNavigate }) {
         {trades.length === 0 ? (
           <div style={{ padding: 24, textAlign: "center", color: C.text3, fontSize: FONT.sm }}>
             {empty ? "이 봇은 아직 거래 기록이 없습니다." : "최근 거래가 없습니다."}
+          </div>
+        ) : isMobile ? (
+          /* 모바일 — 카드 리스트 */
+          <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+            {trades.map((t, i) => {
+              const isBuy = String(t.type).startsWith("BUY");
+              return (
+                <div key={i} style={{
+                  padding: 12,
+                  background: C.card2,
+                  border: `1px solid ${C.border}`,
+                  borderLeft: `4px solid ${isBuy ? C.green : C.red}`,
+                  borderRadius: RADIUS.md,
+                }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    gap: 8, marginBottom: 6,
+                  }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: C.text1 }}>
+                      {t.asset || "—"}
+                    </span>
+                    <span style={{
+                      fontSize: 12, fontWeight: 800,
+                      color: isBuy ? C.green : C.red,
+                      padding: "2px 8px", borderRadius: RADIUS.full,
+                      background: isBuy ? C.greenBg : C.redBg,
+                    }}>{t.type || "—"}</span>
+                  </div>
+                  <div style={{
+                    display: "flex", justifyContent: "space-between",
+                    fontSize: 12, color: C.text2, marginBottom: 4,
+                  }}>
+                    <span style={{ fontFamily: "var(--z-font-mono)" }}>{fmtDate(t.time)}</span>
+                    <span style={{ fontWeight: 700, color: C.text1 }}>{fmtMoney(t.amount)}</span>
+                  </div>
+                  {t.reason && (
+                    <div style={{ fontSize: 11, color: C.text3, lineHeight: 1.4 }}>
+                      {t.reason}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div style={{ overflowX: "auto" }}>

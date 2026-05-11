@@ -19,6 +19,7 @@
 // ══════════════════════════════════════════════════════════════════
 import React, { useEffect, useMemo, useState } from "react";
 import { useThemeTokens, FONT, RADIUS } from "./ui/theme.jsx";
+import { useIsMobile } from "./ui/useBreakpoint.jsx";
 import { ga } from "./lib/analytics.js";
 import { useAuth } from "./AuthProvider.jsx";
 
@@ -222,6 +223,8 @@ function RegimePanel({ data }) {
 // ────────────────────────────────────────────────
 function LeaderboardTable({ data }) {
   const C = useThemeTokens();
+  // iPhone 16 (393pt) 기준 — 모바일은 카드 리스트로 정보 위계 축소 (테이블 가로 스크롤보다 가독성 우위)
+  const isMobile = useIsMobile();
   const strategies = data?.leaderboard?.strategies || {};
   const statuses = data?.statuses || {};
   const params = data?.params || {};
@@ -270,62 +273,121 @@ function LeaderboardTable({ data }) {
       <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 8 }}>
         안정성 등급은 위험 대비 수익률 (Sharpe) 기준 — S/A 등급일수록 변동성 대비 꾸준한 수익을 냅니다.
       </div>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
-          <thead>
-            <tr>
-              <th style={thStyle}>전략</th>
-              <th style={thStyle}>운영 상태</th>
-              <th style={{ ...thStyle, textAlign: "right" }} title="누적 거래 횟수">거래수</th>
-              <th style={{ ...thStyle, textAlign: "right" }} title={METRIC_TOOLTIP.winRate}>승률</th>
-              <th style={{ ...thStyle, textAlign: "right" }} title={METRIC_TOOLTIP.sharpe}>안정성 등급</th>
-              <th style={{ ...thStyle, textAlign: "right" }} title={METRIC_TOOLTIP.pf}>손익비</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>누적 수익률</th>
-              <th style={{ ...thStyle, textAlign: "right" }} title={METRIC_TOOLTIP.mdd}>최대 낙폭</th>
-              <th style={{ ...thStyle, textAlign: "right" }}>평균 보유</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => {
-              const statusInfo = STATUS_LABEL[r.status] || STATUS_LABEL.active;
-              const pnlColor = r.netPnL > 0 ? C.green : r.netPnL < 0 ? C.red : C.text2;
-              const sharpeColor = r.sharpe >= 1.5 ? C.green : r.sharpe <= 0 ? C.red : C.text1;
-              const grade = sharpeToGrade(r.sharpe);
-              return (
-                <tr key={r.id}>
-                  <td style={tdStyle}>
-                    <div style={{ fontWeight: 600 }}>{r.name}</div>
+      {isMobile ? (
+        // 모바일 카드 리스트 — 가로 스크롤 테이블보다 위계가 명확
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {rows.map((r) => {
+            const statusInfo = STATUS_LABEL[r.status] || STATUS_LABEL.active;
+            const pnlColor = r.netPnL > 0 ? C.green : r.netPnL < 0 ? C.red : C.text2;
+            const sharpeColor = r.sharpe >= 1.5 ? C.green : r.sharpe <= 0 ? C.red : C.text1;
+            const grade = sharpeToGrade(r.sharpe);
+            return (
+              <div key={r.id} style={{
+                background: C.card2, border: `1px solid ${C.border}`,
+                borderRadius: RADIUS.md, padding: 12, display: "flex", flexDirection: "column", gap: 8,
+              }}>
+                {/* 헤더: 이름 + 상태 */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: C.text1 }}>{r.name}</div>
                     <div style={{ fontSize: FONT.xs, color: C.text3 }}>{r.id}</div>
-                    {r.tunedAt && (
-                      <div style={{ fontSize: FONT.xs, color: C.text3 }}>파라미터 튜닝 {fmtAgo(r.tunedAt)}</div>
-                    )}
-                  </td>
-                  <td style={tdStyle}>
-                    <Badge kind={r.status}>{statusInfo.emoji} {statusInfo.label}</Badge>
-                    {r.statusReason && (
-                      <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 2 }} title={r.statusReason}>
-                        {r.statusReason.length > 28 ? r.statusReason.slice(0, 28) + "…" : r.statusReason}
-                      </div>
-                    )}
-                  </td>
-                  <td style={{ ...tdStyle, textAlign: "right" }}>{fmtInt(r.trades)}</td>
-                  <td style={{ ...tdStyle, textAlign: "right" }}>{fmtPct(r.winRate)}</td>
-                  <td style={{ ...tdStyle, textAlign: "right", color: sharpeColor, fontWeight: 700 }} title={METRIC_TOOLTIP.sharpe}>
-                    <div>{grade.grade}</div>
-                    <div style={{ fontSize: FONT.xs, fontWeight: 500, color: C.text3 }}>{fmtNum(r.sharpe, 2)}</div>
-                  </td>
-                  <td style={{ ...tdStyle, textAlign: "right" }} title={METRIC_TOOLTIP.pf}>{r.pf == null ? "—" : fmtNum(r.pf, 2)}</td>
-                  <td style={{ ...tdStyle, textAlign: "right", color: pnlColor, fontWeight: 600 }}>
-                    {r.netPnL > 0 ? "+" : ""}{fmtNum(r.netPnL, 2)}%
-                  </td>
-                  <td style={{ ...tdStyle, textAlign: "right" }} title={METRIC_TOOLTIP.mdd}>{fmtPct(r.maxDD)}</td>
-                  <td style={{ ...tdStyle, textAlign: "right" }}>{fmtNum(r.avgHold, 1)}h</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                  </div>
+                  <Badge kind={r.status}>{statusInfo.emoji} {statusInfo.label}</Badge>
+                </div>
+                {/* 핵심 메트릭 2x2 그리드 */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <div style={{ background: C.card, borderRadius: RADIUS.sm, padding: "8px 10px" }}>
+                    <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>안정성 등급</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: sharpeColor }}>{grade.grade}
+                      <span style={{ fontSize: FONT.xs, fontWeight: 500, color: C.text3, marginLeft: 4 }}>{fmtNum(r.sharpe, 2)}</span>
+                    </div>
+                  </div>
+                  <div style={{ background: C.card, borderRadius: RADIUS.sm, padding: "8px 10px" }}>
+                    <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>누적 수익률</div>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: pnlColor }}>
+                      {r.netPnL > 0 ? "+" : ""}{fmtNum(r.netPnL, 2)}%
+                    </div>
+                  </div>
+                  <div style={{ background: C.card, borderRadius: RADIUS.sm, padding: "8px 10px" }}>
+                    <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>승률</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.text1 }}>{fmtPct(r.winRate)}</div>
+                  </div>
+                  <div style={{ background: C.card, borderRadius: RADIUS.sm, padding: "8px 10px" }}>
+                    <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>최대 낙폭</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: C.text1 }}>{fmtPct(r.maxDD)}</div>
+                  </div>
+                </div>
+                {/* 보조 메트릭 — 인라인 한 줄 */}
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: FONT.xs, color: C.text3 }}>
+                  <span>거래 {fmtInt(r.trades)}</span>
+                  <span>손익비 {r.pf == null ? "—" : fmtNum(r.pf, 2)}</span>
+                  <span>평균보유 {fmtNum(r.avgHold, 1)}h</span>
+                </div>
+                {r.statusReason && (
+                  <div style={{ fontSize: FONT.xs, color: C.text3, lineHeight: 1.5 }}>{r.statusReason}</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>전략</th>
+                <th style={thStyle}>운영 상태</th>
+                <th style={{ ...thStyle, textAlign: "right" }} title="누적 거래 횟수">거래수</th>
+                <th style={{ ...thStyle, textAlign: "right" }} title={METRIC_TOOLTIP.winRate}>승률</th>
+                <th style={{ ...thStyle, textAlign: "right" }} title={METRIC_TOOLTIP.sharpe}>안정성 등급</th>
+                <th style={{ ...thStyle, textAlign: "right" }} title={METRIC_TOOLTIP.pf}>손익비</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>누적 수익률</th>
+                <th style={{ ...thStyle, textAlign: "right" }} title={METRIC_TOOLTIP.mdd}>최대 낙폭</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>평균 보유</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => {
+                const statusInfo = STATUS_LABEL[r.status] || STATUS_LABEL.active;
+                const pnlColor = r.netPnL > 0 ? C.green : r.netPnL < 0 ? C.red : C.text2;
+                const sharpeColor = r.sharpe >= 1.5 ? C.green : r.sharpe <= 0 ? C.red : C.text1;
+                const grade = sharpeToGrade(r.sharpe);
+                return (
+                  <tr key={r.id}>
+                    <td style={tdStyle}>
+                      <div style={{ fontWeight: 600 }}>{r.name}</div>
+                      <div style={{ fontSize: FONT.xs, color: C.text3 }}>{r.id}</div>
+                      {r.tunedAt && (
+                        <div style={{ fontSize: FONT.xs, color: C.text3 }}>파라미터 튜닝 {fmtAgo(r.tunedAt)}</div>
+                      )}
+                    </td>
+                    <td style={tdStyle}>
+                      <Badge kind={r.status}>{statusInfo.emoji} {statusInfo.label}</Badge>
+                      {r.statusReason && (
+                        <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 2 }} title={r.statusReason}>
+                          {r.statusReason.length > 28 ? r.statusReason.slice(0, 28) + "…" : r.statusReason}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right" }}>{fmtInt(r.trades)}</td>
+                    <td style={{ ...tdStyle, textAlign: "right" }}>{fmtPct(r.winRate)}</td>
+                    <td style={{ ...tdStyle, textAlign: "right", color: sharpeColor, fontWeight: 700 }} title={METRIC_TOOLTIP.sharpe}>
+                      <div>{grade.grade}</div>
+                      <div style={{ fontSize: FONT.xs, fontWeight: 500, color: C.text3 }}>{fmtNum(r.sharpe, 2)}</div>
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right" }} title={METRIC_TOOLTIP.pf}>{r.pf == null ? "—" : fmtNum(r.pf, 2)}</td>
+                    <td style={{ ...tdStyle, textAlign: "right", color: pnlColor, fontWeight: 600 }}>
+                      {r.netPnL > 0 ? "+" : ""}{fmtNum(r.netPnL, 2)}%
+                    </td>
+                    <td style={{ ...tdStyle, textAlign: "right" }} title={METRIC_TOOLTIP.mdd}>{fmtPct(r.maxDD)}</td>
+                    <td style={{ ...tdStyle, textAlign: "right" }}>{fmtNum(r.avgHold, 1)}h</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
       <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 12, padding: "8px 10px", background: C.card2, borderRadius: RADIUS.sm }}>
         ⚠ Zepta 는 분석 도구입니다. 위 수치는 과거 시뮬레이션 결과이며 미래 수익을 보장하지 않습니다. 매매 결정과 손익은 본인 책임입니다.
       </div>
@@ -380,15 +442,14 @@ function SharpeHistoryChart({ data }) {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }} title={METRIC_TOOLTIP.sharpe}>안정성 추이 (최근 {hist.length}시간)</div>
       </div>
-      <div style={{ overflowX: "auto" }}>
-        <svg width={W} height={H} style={{ display: "block" }}>
-          <line x1={P} y1={zeroY} x2={W - P} y2={zeroY} stroke={C.border} strokeDasharray="3 3" />
-          {series.map((s, idx) => {
-            const d = s.points.map((p, i) => `${i === 0 ? "M" : "L"} ${P + p.i * xStep} ${yMap(p.v)}`).join(" ");
-            return <path key={s.sid} d={d} stroke={colors[idx]} strokeWidth={2} fill="none" />;
-          })}
-        </svg>
-      </div>
+      {/* viewBox 로 모바일에서도 가용 폭에 맞춰 비례 축소 (iPhone 16: 393pt → 가용 폭 약 320pt 까지 축소) */}
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ display: "block", width: "100%", height: "auto" }}>
+        <line x1={P} y1={zeroY} x2={W - P} y2={zeroY} stroke={C.border} strokeDasharray="3 3" />
+        {series.map((s, idx) => {
+          const d = s.points.map((p, i) => `${i === 0 ? "M" : "L"} ${P + p.i * xStep} ${yMap(p.v)}`).join(" ");
+          return <path key={s.sid} d={d} stroke={colors[idx]} strokeWidth={2} fill="none" />;
+        })}
+      </svg>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 8 }}>
         {series.map((s, idx) => (
           <div key={s.sid} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: FONT.xs, color: C.text2 }}>
@@ -692,7 +753,7 @@ export default function AlphaLab({ onRequestLogin }) {
   // ── 비로그인 view (Public Mode) ──────────────────
   if (isPublic) {
     return (
-      <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 16, maxWidth: 1200, margin: "0 auto" }}>
+      <div style={{ padding: "14px 14px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 1200, margin: "0 auto" }}>
         <div>
           <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1 }}>Alpha Lab</div>
           <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4 }}>
@@ -727,7 +788,7 @@ export default function AlphaLab({ onRequestLogin }) {
 
   // ── 로그인 view (전체 정보) ──────────────────
   return (
-    <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 16, maxWidth: 1200, margin: "0 auto" }}>
+    <div style={{ padding: "14px 14px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 1200, margin: "0 auto" }}>
       <div>
         <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1 }}>Alpha Lab</div>
         <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4 }}>

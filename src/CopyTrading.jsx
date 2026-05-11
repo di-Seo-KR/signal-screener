@@ -24,7 +24,9 @@
 //   - POST /api/follow/copy-config  (설정 복사)
 // ══════════════════════════════════════════════════════════════════
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { useThemeTokens, FONT, RADIUS } from "./ui/theme.jsx";
+import { useThemeTokens, FONT, RADIUS, pickFont } from "./ui/theme.jsx";
+import { useBreakpoint } from "./ui/useBreakpoint.jsx";
+import { BottomSheet } from "./ui/primitives.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 
 // ── 한국어 라벨 ────────────────────────────────────────────────────
@@ -64,8 +66,10 @@ function Card({ children, style, ...rest }) {
 }
 
 // ── 면책 모달 ──────────────────────────────────────────────────────
+// 모바일에선 BottomSheet 로 렌더 (iOS 네이티브 패턴)
 function DisclaimerModal({ open, targetBot, mode, setMode, onCancel, onConfirm, loading }) {
   const C = useThemeTokens();
+  const { isMobile } = useBreakpoint();
   const [agreed, setAgreed] = useState(false);
 
   useEffect(() => {
@@ -79,6 +83,149 @@ function DisclaimerModal({ open, targetBot, mode, setMode, onCancel, onConfirm, 
     ? "이 봇이 진입·청산할 때마다 알림만 받습니다. 매매는 본인이 직접 결정합니다."
     : "이 봇의 strategy / parameter 만 내 봇에 한 번 복사합니다. 이후 두 봇은 독립 운영됩니다.";
 
+  const body = (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* 모드 선택 */}
+      <div>
+        <div style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, marginBottom: 8 }}>팔로우 방식</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <label style={{
+            display: "flex", alignItems: "flex-start", gap: 10,
+            padding: 14, borderRadius: RADIUS.md, minHeight: 56,
+            border: `1px solid ${mode === "alert" ? C.blue : C.border}`,
+            background: mode === "alert" ? C.blueBg : "transparent",
+            cursor: "pointer",
+          }}>
+            <input
+              type="radio"
+              name="copy-mode"
+              value="alert"
+              checked={mode === "alert"}
+              onChange={() => setMode("alert")}
+              style={{ marginTop: 3, width: 18, height: 18 }}
+            />
+            <div>
+              <div style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>신호 알림만 받기</div>
+              <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 2, lineHeight: 1.5 }}>
+                이 봇의 진입·청산 시점을 텔레그램·앱으로 알려드려요. <strong>매매 실행은 본인이 직접</strong> 합니다.
+              </div>
+            </div>
+          </label>
+          <label style={{
+            display: "flex", alignItems: "flex-start", gap: 10,
+            padding: 14, borderRadius: RADIUS.md, minHeight: 56,
+            border: `1px solid ${mode === "copy" ? C.purple : C.border}`,
+            background: mode === "copy" ? C.purpleBg : "transparent",
+            cursor: "pointer",
+          }}>
+            <input
+              type="radio"
+              name="copy-mode"
+              value="copy"
+              checked={mode === "copy"}
+              onChange={() => setMode("copy")}
+              style={{ marginTop: 3, width: 18, height: 18 }}
+            />
+            <div>
+              <div style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>설정 복사 (1회)</div>
+              <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 2, lineHeight: 1.5 }}>
+                이 봇의 strategy / parameter 를 내 봇에 한 번 복사합니다. <strong>이후 두 봇은 독립 운영</strong> 됩니다.
+                실시간 미러링은 하지 않아요.
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      {/* 면책 텍스트 */}
+      <div style={{
+        background: C.yellowBg, border: `1px solid ${C.yellow}40`,
+        borderRadius: RADIUS.md, padding: 14,
+      }}>
+        <div style={{ fontSize: FONT.xs, color: C.text2, lineHeight: 1.7 }}>
+          <strong style={{ color: C.text1, display: "block", marginBottom: 6 }}>
+            {modeLabel} 동의 사항
+          </strong>
+          <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4 }}>
+            <li>{modeDesc}</li>
+            <li>이 기능은 <strong>매매를 대신 실행하지 않습니다</strong>. Zepta 는 투자일임업이 아닙니다.</li>
+            <li>신호 알림 / 설정 복사 후의 모든 매매와 결과는 <strong>본인 책임</strong>입니다.</li>
+            <li>과거 성과는 미래 수익을 보장하지 않으며, <strong>손실이 발생할 수 있습니다</strong>.</li>
+            <li>언제든 본인의 봇 설정을 직접 수정·중단할 수 있습니다.</li>
+          </ul>
+        </div>
+      </div>
+
+      {/* 체크박스 */}
+      <label style={{
+        display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer",
+        padding: "8px 0", minHeight: 44,
+      }}>
+        <input
+          type="checkbox"
+          checked={agreed}
+          onChange={(e) => setAgreed(e.target.checked)}
+          style={{ marginTop: 3, width: 20, height: 20 }}
+        />
+        <span style={{ fontSize: FONT.sm, color: C.text2, lineHeight: 1.5 }}>
+          위 내용을 모두 확인했고, <strong style={{ color: C.text1 }}>본인 책임 하에 진행</strong>하는 것에 동의합니다.
+        </span>
+      </label>
+    </div>
+  );
+
+  const footer = (
+    <>
+      <button
+        onClick={onCancel}
+        disabled={loading}
+        style={{
+          flex: isMobile ? 1 : undefined,
+          padding: isMobile ? "14px 16px" : "10px 16px",
+          minHeight: 48,
+          borderRadius: RADIUS.md,
+          background: "transparent", border: `1px solid ${C.border}`,
+          color: C.text2,
+          fontSize: pickFont("button", isMobile) ?? FONT.sm, fontWeight: 600,
+          cursor: "pointer",
+        }}
+      >취소</button>
+      <button
+        onClick={onConfirm}
+        disabled={!agreed || loading}
+        style={{
+          flex: isMobile ? 2 : undefined,
+          padding: isMobile ? "14px 16px" : "10px 16px",
+          minHeight: 48,
+          borderRadius: RADIUS.md,
+          background: agreed ? C.blue : C.border,
+          border: "none", color: "#fff",
+          fontSize: pickFont("button", isMobile) ?? FONT.sm, fontWeight: 700,
+          cursor: agreed && !loading ? "pointer" : "not-allowed",
+          opacity: agreed && !loading ? 1 : 0.6,
+        }}
+      >{loading ? "처리 중…" : `${modeLabel}로 팔로우`}</button>
+    </>
+  );
+
+  // 모바일은 BottomSheet 로
+  if (isMobile) {
+    return (
+      <BottomSheet
+        open={open}
+        onClose={onCancel}
+        title={BOT_NAME_KO[targetBot] || targetBot}
+        description="⚠️ 카피트레이딩 면책 동의"
+        footer={footer}
+        dismissOnBackdrop={false}
+        maxHeight="92vh"
+      >
+        {body}
+      </BottomSheet>
+    );
+  }
+
+  // 데스크탑은 기존 center modal
   return (
     <div
       role="dialog"
@@ -99,7 +246,6 @@ function DisclaimerModal({ open, targetBot, mode, setMode, onCancel, onConfirm, 
         border: `1px solid ${C.border}`,
         boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
       }}>
-        {/* 헤더 */}
         <div style={{ padding: 20, borderBottom: `1px solid ${C.border}` }}>
           <div style={{ fontSize: FONT.xs, color: C.yellow, fontWeight: 800, marginBottom: 4 }}>
             ⚠️ 카피트레이딩 면책 동의
@@ -108,121 +254,12 @@ function DisclaimerModal({ open, targetBot, mode, setMode, onCancel, onConfirm, 
             {BOT_NAME_KO[targetBot] || targetBot}
           </h2>
         </div>
-
-        {/* 본문 */}
-        <div style={{ padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
-          {/* 모드 선택 */}
-          <div>
-            <div style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700, marginBottom: 8 }}>팔로우 방식</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <label style={{
-                display: "flex", alignItems: "flex-start", gap: 10,
-                padding: 12, borderRadius: RADIUS.md,
-                border: `1px solid ${mode === "alert" ? C.blue : C.border}`,
-                background: mode === "alert" ? C.blueBg : "transparent",
-                cursor: "pointer",
-              }}>
-                <input
-                  type="radio"
-                  name="copy-mode"
-                  value="alert"
-                  checked={mode === "alert"}
-                  onChange={() => setMode("alert")}
-                  style={{ marginTop: 3 }}
-                />
-                <div>
-                  <div style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>신호 알림만 받기</div>
-                  <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 2, lineHeight: 1.5 }}>
-                    이 봇의 진입·청산 시점을 텔레그램·앱으로 알려드려요. <strong>매매 실행은 본인이 직접</strong> 합니다.
-                  </div>
-                </div>
-              </label>
-              <label style={{
-                display: "flex", alignItems: "flex-start", gap: 10,
-                padding: 12, borderRadius: RADIUS.md,
-                border: `1px solid ${mode === "copy" ? C.purple : C.border}`,
-                background: mode === "copy" ? C.purpleBg : "transparent",
-                cursor: "pointer",
-              }}>
-                <input
-                  type="radio"
-                  name="copy-mode"
-                  value="copy"
-                  checked={mode === "copy"}
-                  onChange={() => setMode("copy")}
-                  style={{ marginTop: 3 }}
-                />
-                <div>
-                  <div style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>설정 복사 (1회)</div>
-                  <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 2, lineHeight: 1.5 }}>
-                    이 봇의 strategy / parameter 를 내 봇에 한 번 복사합니다. <strong>이후 두 봇은 독립 운영</strong> 됩니다.
-                    실시간 미러링은 하지 않아요.
-                  </div>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {/* 면책 텍스트 */}
-          <div style={{
-            background: C.yellowBg, border: `1px solid ${C.yellow}40`,
-            borderRadius: RADIUS.md, padding: 14,
-          }}>
-            <div style={{ fontSize: FONT.xs, color: C.text2, lineHeight: 1.7 }}>
-              <strong style={{ color: C.text1, display: "block", marginBottom: 6 }}>
-                {modeLabel} 동의 사항
-              </strong>
-              <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 4 }}>
-                <li>{modeDesc}</li>
-                <li>이 기능은 <strong>매매를 대신 실행하지 않습니다</strong>. Zepta 는 투자일임업이 아닙니다.</li>
-                <li>신호 알림 / 설정 복사 후의 모든 매매와 결과는 <strong>본인 책임</strong>입니다.</li>
-                <li>과거 성과는 미래 수익을 보장하지 않으며, <strong>손실이 발생할 수 있습니다</strong>.</li>
-                <li>언제든 본인의 봇 설정을 직접 수정·중단할 수 있습니다.</li>
-              </ul>
-            </div>
-          </div>
-
-          {/* 체크박스 */}
-          <label style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={agreed}
-              onChange={(e) => setAgreed(e.target.checked)}
-              style={{ marginTop: 3 }}
-            />
-            <span style={{ fontSize: FONT.sm, color: C.text2, lineHeight: 1.5 }}>
-              위 내용을 모두 확인했고, <strong style={{ color: C.text1 }}>본인 책임 하에 진행</strong>하는 것에 동의합니다.
-            </span>
-          </label>
-        </div>
-
-        {/* 푸터 */}
+        <div style={{ padding: 20 }}>{body}</div>
         <div style={{
           padding: 16, borderTop: `1px solid ${C.border}`,
           display: "flex", justifyContent: "flex-end", gap: 8,
         }}>
-          <button
-            onClick={onCancel}
-            disabled={loading}
-            style={{
-              padding: "8px 16px", borderRadius: RADIUS.md,
-              background: "transparent", border: `1px solid ${C.border}`,
-              color: C.text2, fontSize: FONT.sm, fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >취소</button>
-          <button
-            onClick={onConfirm}
-            disabled={!agreed || loading}
-            style={{
-              padding: "8px 16px", borderRadius: RADIUS.md,
-              background: agreed ? C.blue : C.border,
-              border: "none", color: "#fff",
-              fontSize: FONT.sm, fontWeight: 700,
-              cursor: agreed && !loading ? "pointer" : "not-allowed",
-              opacity: agreed && !loading ? 1 : 0.6,
-            }}
-          >{loading ? "처리 중…" : `${modeLabel}로 팔로우`}</button>
+          {footer}
         </div>
       </div>
     </div>
@@ -232,6 +269,7 @@ function DisclaimerModal({ open, targetBot, mode, setMode, onCancel, onConfirm, 
 // ── 메인 ──────────────────────────────────────────────────────────
 export default function CopyTrading({ onNavigate } = {}) {
   const C = useThemeTokens();
+  const { isMobile } = useBreakpoint();
   const { user } = useAuth();
   const uid = user?.id || null;
 
@@ -430,14 +468,18 @@ export default function CopyTrading({ onNavigate } = {}) {
                     {f.followedAt && ` · ${new Date(f.followedAt).toLocaleDateString("ko-KR")}`}
                   </div>
                 </div>
-                <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
                   <select
                     value={f.mode}
                     onChange={(e) => changeMode(f.targetBotId, e.target.value)}
                     style={{
-                      padding: "6px 10px", borderRadius: RADIUS.sm,
+                      padding: isMobile ? "10px 12px" : "6px 10px",
+                      minHeight: 44,
+                      borderRadius: RADIUS.sm,
                       background: C.card, border: `1px solid ${C.border}`,
-                      color: C.text1, fontSize: FONT.xs, cursor: "pointer",
+                      color: C.text1,
+                      fontSize: isMobile ? 16 : FONT.xs, // iOS zoom 방지
+                      cursor: "pointer",
                     }}
                   >
                     <option value="alert">신호 알림</option>
@@ -446,9 +488,13 @@ export default function CopyTrading({ onNavigate } = {}) {
                   <button
                     onClick={() => unfollow(f.targetBotId)}
                     style={{
-                      padding: "6px 12px", borderRadius: RADIUS.sm,
+                      padding: isMobile ? "10px 14px" : "6px 12px",
+                      minHeight: 44,
+                      borderRadius: RADIUS.sm,
                       background: "transparent", border: `1px solid ${C.red}40`,
-                      color: C.red, fontSize: FONT.xs, fontWeight: 700, cursor: "pointer",
+                      color: C.red,
+                      fontSize: pickFont("button", isMobile) ?? FONT.xs,
+                      fontWeight: 700, cursor: "pointer",
                     }}
                   >해제</button>
                 </div>
@@ -488,7 +534,7 @@ export default function CopyTrading({ onNavigate } = {}) {
         {!err && !loading && followableBots.length > 0 && (
           <div style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(280px, 1fr))",
             gap: 12,
           }}>
             {followableBots.map(b => {
@@ -542,9 +588,14 @@ export default function CopyTrading({ onNavigate } = {}) {
                     <button
                       onClick={() => unfollow(b.botId)}
                       style={{
-                        width: "100%", padding: "8px 12px", borderRadius: RADIUS.sm,
+                        width: "100%",
+                        padding: isMobile ? "12px 14px" : "8px 12px",
+                        minHeight: 44,
+                        borderRadius: RADIUS.sm,
                         background: "transparent", border: `1px solid ${C.border}`,
-                        color: C.text2, fontSize: FONT.xs, fontWeight: 700, cursor: "pointer",
+                        color: C.text2,
+                        fontSize: pickFont("button", isMobile) ?? FONT.xs,
+                        fontWeight: 700, cursor: "pointer",
                       }}
                     >팔로우 해제</button>
                   ) : (
@@ -552,10 +603,14 @@ export default function CopyTrading({ onNavigate } = {}) {
                       onClick={() => startFollow(b.botId)}
                       disabled={!uid}
                       style={{
-                        width: "100%", padding: "8px 12px", borderRadius: RADIUS.sm,
+                        width: "100%",
+                        padding: isMobile ? "12px 14px" : "8px 12px",
+                        minHeight: 44,
+                        borderRadius: RADIUS.sm,
                         background: uid ? C.blue : C.border,
                         border: "none", color: "#fff",
-                        fontSize: FONT.xs, fontWeight: 700,
+                        fontSize: pickFont("button", isMobile) ?? FONT.xs,
+                        fontWeight: 700,
                         cursor: uid ? "pointer" : "not-allowed",
                         opacity: uid ? 1 : 0.6,
                       }}

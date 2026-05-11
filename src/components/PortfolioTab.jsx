@@ -5,6 +5,7 @@
 import { memo, useState, useEffect } from "react";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { useIsMobile } from "@/ui/useBreakpoint.jsx";
+import { BottomSheet } from "@/ui/bottom-sheet.jsx";
 
 function SearchBarWrapper({ SearchBar, onSelect, placeholder }) {
   return <SearchBar placeholder={placeholder} onSelect={onSelect} />;
@@ -73,78 +74,105 @@ export default memo(function PortfolioTab({
         )}
       </div>
 
-      {/* 자산 추가 폼 */}
-      {showAddAsset && (
-        <div className="rounded-[16px] mb-4" style={{ background: C.card, border: `1px solid ${C.border}20`, padding: isMobile ? "16px 12px" : "22px 24px" }}>
-          <div className="font-bold mb-3.5" style={{ color: C.text1, fontSize: isMobile ? "15px" : "18px" }}>📌 {t("portfolio.addAsset")}</div>
-          <div className="mb-3">
-            <div style={{ color: C.text3, marginBottom: "8px", fontSize: isMobile ? "14px" : "14px" }}>{t("portfolio.searchSymbol")}</div>
-            <SearchBarWrapper SearchBar={SearchBar} placeholder={t("portfolio.symbolPlaceholder")} onSelect={(asset) => {
-              const sym = asset.symbol.toUpperCase();
-              setNewAsset(p => ({
-                ...p,
-                symbol: sym,
-                name: asset.name,
-                market: asset.market,
-              }));
-            }} />
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: "10px", marginBottom: "12px" }}>
-            {[
-              { k: "symbol",   label: t("portfolio.symbolPlaceholder").split(",")[0], ph: t("portfolio.symbolPlaceholder") },
-              { k: "name",     label: t("portfolio.nameLabel"), ph: t("portfolio.namePlaceholder") },
-              { k: "qty",      label: t("portfolio.qtyLabel"), ph: t("portfolio.qtyPlaceholder") },
-              { k: "avgPrice", label: t("portfolio.avgPriceLabel"), ph: t("portfolio.avgPricePlaceholder") },
-            ].map(({ k, label, ph }) => (
-              <div key={k}>
-                <div style={{ color: C.text3, marginBottom: "6px", fontSize: isMobile ? "14px" : "14px" }}>{label}</div>
-                <input value={newAsset[k]} onChange={e => setNewAsset(p => ({ ...p, [k]: e.target.value }))}
-                  placeholder={ph} className="w-full rounded-[10px] outline-none box-border" style={{
-                    background: C.bg, border: `1px solid ${C.border2}`, color: C.text1,
-                    padding: "10px 12px", minHeight: "44px", fontSize: isMobile ? "14px" : "16px",
-                  }} />
-              </div>
-            ))}
-          </div>
-          <div className="mb-3">
-            <div style={{ color: C.text3, marginBottom: "10px", fontSize: isMobile ? "14px" : "14px" }}>{t("portfolio.marketLabel")}</div>
-            <div className="flex gap-1.5" style={{ flexDirection: isMobile ? "column" : "row" }}>
-              {[["us",t("portfolio.marketUS")], ["kr",t("portfolio.marketKR")], ["crypto",t("portfolio.marketCrypto")]].map(([v, l]) => (
-                <button key={v} onClick={() => setNewAsset(p => ({ ...p, market: v }))} className="rounded-lg font-semibold transition-all" style={{
-                  background: newAsset.market === v ? C.blueBg : C.card2,
-                  color: newAsset.market === v ? C.blue : C.text3,
-                  border: `1px solid ${newAsset.market === v ? C.blue : C.border2}`,
-                  minHeight: "44px", padding: "10px 14px", flex: isMobile ? "1" : "0 0 auto", display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: isMobile ? "14px" : "14px",
-                }}>{l}</button>
+      {/* 자산 추가 폼 — 데스크탑: inline 카드 / 모바일: BottomSheet (홈 인디케이터 회피, 드래그 닫기) */}
+      {(() => {
+        const submitAsset = () => {
+          if (!newAsset.symbol || !newAsset.qty || !newAsset.avgPrice) return;
+          const sym = newAsset.symbol.toUpperCase();
+          const symbolRaw = newAsset.market === "kr" && !sym.includes(".KS") ? `${sym}.KS` : sym;
+          const cryptoA = CRYPTO_ASSETS.find(c => c.symbol === sym || c.id === sym.toLowerCase());
+          setPortfolio(p => [...p, {
+            ...newAsset, symbol: sym, symbolRaw, cryptoId: cryptoA?.id || sym.toLowerCase(),
+            qty: parseFloat(newAsset.qty), avgPrice: parseFloat(newAsset.avgPrice), addedAt: Date.now(),
+          }]);
+          setNewAsset({ symbol: "", name: "", market: "us", qty: "", avgPrice: "" });
+          setShowAddAsset(false);
+        };
+        const formBody = (
+          <>
+            <div className="mb-3">
+              <div style={{ color: C.text3, marginBottom: "8px", fontSize: "14px" }}>{t("portfolio.searchSymbol")}</div>
+              <SearchBarWrapper SearchBar={SearchBar} placeholder={t("portfolio.symbolPlaceholder")} onSelect={(asset) => {
+                const sym = asset.symbol.toUpperCase();
+                setNewAsset(p => ({ ...p, symbol: sym, name: asset.name, market: asset.market }));
+              }} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: "10px", marginBottom: "12px" }}>
+              {[
+                { k: "symbol",   label: t("portfolio.symbolPlaceholder").split(",")[0], ph: t("portfolio.symbolPlaceholder") },
+                { k: "name",     label: t("portfolio.nameLabel"), ph: t("portfolio.namePlaceholder") },
+                { k: "qty",      label: t("portfolio.qtyLabel"), ph: t("portfolio.qtyPlaceholder") },
+                { k: "avgPrice", label: t("portfolio.avgPriceLabel"), ph: t("portfolio.avgPricePlaceholder") },
+              ].map(({ k, label, ph }) => (
+                <div key={k}>
+                  <div style={{ color: C.text3, marginBottom: "6px", fontSize: "14px" }}>{label}</div>
+                  <input value={newAsset[k]} onChange={e => setNewAsset(p => ({ ...p, [k]: e.target.value }))}
+                    placeholder={ph} className="w-full rounded-[10px] outline-none box-border" style={{
+                      background: C.bg, border: `1px solid ${C.border2}`, color: C.text1,
+                      padding: "10px 12px", minHeight: "44px",
+                      // iOS Safari 자동 zoom-in 방지 — 모바일에선 16px 강제
+                      fontSize: isMobile ? "16px" : "14px",
+                    }} />
+                </div>
               ))}
             </div>
-          </div>
-          <div className="flex gap-2" style={{ flexDirection: isMobile ? "column" : "row" }}>
-            <button onClick={() => {
-              if (!newAsset.symbol || !newAsset.qty || !newAsset.avgPrice) return;
-              const sym = newAsset.symbol.toUpperCase();
-              const symbolRaw = newAsset.market === "kr" && !sym.includes(".KS") ? `${sym}.KS` : sym;
-              const cryptoA = CRYPTO_ASSETS.find(c => c.symbol === sym || c.id === sym.toLowerCase());
-              setPortfolio(p => [...p, {
-                ...newAsset, symbol: sym, symbolRaw, cryptoId: cryptoA?.id || sym.toLowerCase(),
-                qty: parseFloat(newAsset.qty), avgPrice: parseFloat(newAsset.avgPrice), addedAt: Date.now(),
-              }]);
-              setNewAsset({ symbol: "", name: "", market: "us", qty: "", avgPrice: "" });
-              setShowAddAsset(false);
-            }} className="flex-1 rounded-[10px] font-bold border-none transition-all" style={{
+            <div className="mb-1">
+              <div style={{ color: C.text3, marginBottom: "10px", fontSize: "14px" }}>{t("portfolio.marketLabel")}</div>
+              <div className="flex gap-1.5" style={{ flexDirection: isMobile ? "row" : "row" }}>
+                {[["us",t("portfolio.marketUS")], ["kr",t("portfolio.marketKR")], ["crypto",t("portfolio.marketCrypto")]].map(([v, l]) => (
+                  <button key={v} onClick={() => setNewAsset(p => ({ ...p, market: v }))} className="rounded-lg font-semibold transition-all" style={{
+                    background: newAsset.market === v ? C.blueBg : C.card2,
+                    color: newAsset.market === v ? C.blue : C.text3,
+                    border: `1px solid ${newAsset.market === v ? C.blue : C.border2}`,
+                    minHeight: "44px", padding: "10px 12px", flex: "1", display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "14px",
+                  }}>{l}</button>
+                ))}
+              </div>
+            </div>
+          </>
+        );
+        const footerButtons = (
+          <>
+            <button onClick={submitAsset} className="flex-1 rounded-[10px] font-bold border-none transition-all" style={{
               background: C.blue, color: "#fff",
               minHeight: "44px", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: isMobile ? "14px" : "16px",
+              fontSize: isMobile ? "15px" : "16px",
             }}>{t("portfolio.addBtn")}</button>
             <button onClick={() => setShowAddAsset(false)} className="flex-1 rounded-[10px] font-semibold transition-all" style={{
               background: C.card2, color: C.text3, border: `1px solid ${C.border2}`,
               minHeight: "44px", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: isMobile ? "14px" : "16px",
+              fontSize: isMobile ? "15px" : "16px",
             }}>{t("portfolio.cancelBtn")}</button>
+          </>
+        );
+
+        // 모바일: BottomSheet — iOS 네이티브 패턴, safe-area 자동, 드래그 닫기
+        if (isMobile) {
+          return (
+            <BottomSheet
+              open={showAddAsset}
+              onClose={() => setShowAddAsset(false)}
+              title={`📌 ${t("portfolio.addAsset")}`}
+              footer={<div className="flex gap-2 w-full">{footerButtons}</div>}
+              maxHeight="88vh"
+            >
+              {formBody}
+            </BottomSheet>
+          );
+        }
+        // 데스크탑: inline 카드 유지
+        if (!showAddAsset) return null;
+        return (
+          <div className="rounded-[16px] mb-4" style={{ background: C.card, border: `1px solid ${C.border}20`, padding: "22px 24px" }}>
+            <div className="font-bold mb-3.5" style={{ color: C.text1, fontSize: "18px" }}>📌 {t("portfolio.addAsset")}</div>
+            {formBody}
+            <div className="flex gap-2 mt-3">
+              {footerButtons}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* 포트폴리오 아이템 */}
       {portfolio.length === 0 ? (

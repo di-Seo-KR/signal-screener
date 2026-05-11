@@ -8,6 +8,7 @@ import { supabase } from "./supabaseClient.js";
 import { THEME_TOKENS } from "./ui/theme.jsx";
 import { useIsMobile } from "./ui/useBreakpoint.jsx";
 import { MetricInfo } from "./ui/primitives.jsx";
+import { BottomSheet } from "./ui/bottom-sheet.jsx";
 import { ga } from "./lib/analytics.js";
 
 // 어려운 금융 지표 풀이 (한국어 입문자 친화 카피)
@@ -2101,21 +2102,48 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
           </button>
         )}
 
-        {/* 수동 배분 모달 */}
+        {/* 수동 배분 / DCA 모달 — 모바일은 화면 하단 시트, 데스크탑은 센터 모달
+            iPhone 16 (393pt) 기준 풀-너비 + 홈 인디케이터 회피 + 슬라이드-업. */}
+        <style>{`
+          @keyframes auto-sheet-up {
+            from { transform: translateY(100%); }
+            to   { transform: translateY(0); }
+          }
+        `}</style>
         {pendingBot && (
           <div style={{
             position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(0,0,0,0.6)",
+            display: isMobile ? "block" : "flex",
+            alignItems: "center", justifyContent: "center",
             zIndex: 9999,
           }} onClick={() => setPendingBot(null)}>
             <div style={{
-              background: c.card, borderRadius: "16px", padding: isMobile ? "20px 16px" : "28px", width: "min(400px, 90vw)",
+              background: c.card,
+              borderRadius: isMobile ? "20px 20px 0 0" : "16px",
+              padding: isMobile ? "20px 16px" : "28px",
+              width: isMobile ? "100%" : "min(400px, 90vw)",
+              maxWidth: isMobile ? "100%" : undefined,
+              position: isMobile ? "absolute" : "static",
+              bottom: isMobile ? 0 : undefined,
+              left: isMobile ? 0 : undefined,
+              right: isMobile ? 0 : undefined,
+              maxHeight: isMobile ? "90vh" : undefined,
+              overflowY: isMobile ? "auto" : "visible",
+              paddingBottom: isMobile ? "max(20px, env(safe-area-inset-bottom))" : "28px",
               border: `1px solid ${c.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+              animation: isMobile ? "auto-sheet-up 240ms cubic-bezier(.2,.8,.2,1)" : undefined,
             }} onClick={e => e.stopPropagation()}>
+              {/* drag handle (모바일 affordance) */}
+              {isMobile && (
+                <div style={{ display: "flex", justifyContent: "center", padding: "0 0 12px" }}>
+                  <div style={{ width: 36, height: 4, borderRadius: 999, background: c.border2 }} />
+                </div>
+              )}
               <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
                 <span style={{ fontSize: "32px" }}>{pendingBot.icon}</span>
                 <div style={{ minWidth: 0 }}>
-                  <h3 style={{ margin: 0, color: c.text1, fontSize: "20px", wordBreak: "break-word" }}>{pendingBot.name}</h3>
+                  <h3 style={{ margin: 0, color: c.text1, fontSize: isMobile ? 18 : 20, wordBreak: "break-word" }}>{pendingBot.name}</h3>
                   <span style={{ fontSize: "14px", color: c.text2 }}>투입 금액을 설정해주세요</span>
                 </div>
               </div>
@@ -2224,18 +2252,36 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
         {pendingDCABot && (
           <div style={{
             position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(0,0,0,0.6)",
+            display: isMobile ? "block" : "flex",
+            alignItems: "center", justifyContent: "center",
             zIndex: 9999,
           }} onClick={() => setPendingDCABot(null)}>
             <div style={{
-              background: c.card, borderRadius: "16px", padding: isMobile ? "20px 16px" : "28px",
-              width: "min(460px, 92vw)", maxHeight: "92vh", overflowY: "auto",
+              background: c.card,
+              borderRadius: isMobile ? "20px 20px 0 0" : "16px",
+              padding: isMobile ? "20px 16px" : "28px",
+              width: isMobile ? "100%" : "min(460px, 92vw)",
+              maxHeight: isMobile ? "90vh" : "92vh",
+              overflowY: "auto",
+              position: isMobile ? "absolute" : "static",
+              bottom: isMobile ? 0 : undefined,
+              left: isMobile ? 0 : undefined,
+              right: isMobile ? 0 : undefined,
+              paddingBottom: isMobile ? "max(20px, env(safe-area-inset-bottom))" : "28px",
               border: `1px solid ${c.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+              animation: isMobile ? "auto-sheet-up 240ms cubic-bezier(.2,.8,.2,1)" : undefined,
             }} onClick={e => e.stopPropagation()}>
+              {/* drag handle (모바일 affordance) */}
+              {isMobile && (
+                <div style={{ display: "flex", justifyContent: "center", padding: "0 0 12px" }}>
+                  <div style={{ width: 36, height: 4, borderRadius: 999, background: c.border2 }} />
+                </div>
+              )}
               <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "20px" }}>
                 <span style={{ fontSize: "32px" }}>{pendingDCABot.icon}</span>
                 <div style={{ minWidth: 0 }}>
-                  <h3 style={{ margin: 0, color: c.text1, fontSize: "20px" }}>{pendingDCABot.name}</h3>
+                  <h3 style={{ margin: 0, color: c.text1, fontSize: isMobile ? 18 : 20 }}>{pendingDCABot.name}</h3>
                   <span style={{ fontSize: "14px", color: c.text2 }}>정기 매수 설정</span>
                 </div>
               </div>
