@@ -158,8 +158,11 @@
 
 ### Git 및 배포
 - 커밋 메시지: 한국어 존댓말, 명확한 변경 이력
-- Git push는 Mac에서 대표가 수동으로 진행 (Sandbox 제한)
-- 배포 전 품질 검증 필수
+- **★ 2026-05-11 업데이트 — 권한 위임**: 이제 Claude 가 commit → push → PR 생성 → 머지 → Vercel 배포 확인까지 풀 파이프라인 자동 수행.
+  대표는 의사결정·결재·UI 확인만. 터미널 작업 안 함.
+  (이전 룰 "Git push는 Mac에서 대표가 수동" 폐지됨)
+- 배포 전 품질 검증 필수 (syntax check + npm run build)
+- 배포 후 zepta.app 라이브 chunk 확인까지 보고
 
 ---
 
