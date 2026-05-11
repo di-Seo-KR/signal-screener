@@ -21,9 +21,11 @@ import { useTheme } from "./ui/theme.jsx";
 import { useBreakpoint } from "./ui/useBreakpoint.jsx";
 import BinanceConnect from "./components/BinanceConnect.jsx";
 // ★ 2026-05-09: 옵션 D — 대시보드 강화 7개 위젯
+// ★ 2026-05-11: PeriodReturnsCard + OperationalMetrics 추가 (대표 지시: 일/주/월 수익 + 운영 메트릭)
 import {
   EquityCurveChart, LiveMetricsRow, PositionDonutChart,
   TradeHistoryTable, DailyPnLHeatmap, SignalWatchlist, SystemStatusIndicator,
+  PeriodReturnsCard, OperationalMetrics,
 } from "./ui/dashboard-widgets.jsx";
 
 // ═══════════════════════════════════════════════════════════════════
@@ -383,15 +385,37 @@ function RealTradingInner() {
         </div>
       </div>
 
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={refresh}
-        leftIcon={loading ? <Spinner size={14} /> : <Refresh size={14} />}
-        style={{ whiteSpace: "nowrap", minHeight: 44 }}
-      >
-        새로고침
-      </Button>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        {/* ★ 2026-05-11: Alpha Lab 진입 버튼 — 사용자 직접 URL 입력 없이 한 클릭으로 */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            // SPA 라우팅 — App.jsx 의 tab state 통해 alpha-lab 으로 이동
+            try {
+              window.location.href = "/alpha-lab";
+            } catch {}
+          }}
+          leftIcon={<Target size={14} />}
+          style={{
+            whiteSpace: "nowrap", minHeight: 44,
+            background: "linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(147, 51, 234, 0.06))",
+            border: "1px solid rgba(168, 85, 247, 0.3)",
+            color: "var(--z-purple)",
+          }}
+        >
+          🧬 Alpha Lab
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={refresh}
+          leftIcon={loading ? <Spinner size={14} /> : <Refresh size={14} />}
+          style={{ whiteSpace: "nowrap", minHeight: 44 }}
+        >
+          새로고침
+        </Button>
+      </div>
     </div>
   );
 
@@ -1340,6 +1364,18 @@ function RealTradingInner() {
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {/* Widget 7: 시스템 상태 표시등 (대시보드 진입 즉시 보이게 상단) */}
             <SystemStatusIndicator status={status?.systemHealth || {}} isMobile={isMobile} />
+
+            {/* ★ 2026-05-11: 기간별 수익 (일/주/월/누적) — 가장 먼저 보고 싶은 정보 */}
+            <Card title="기간별 수익" icon={<TrendUp size={16} />}
+              subtitle="일·주·월·누적 수익률 + 금액 한눈에">
+              <PeriodReturnsCard equity={equity} breaker={breaker} isMobile={isMobile} />
+            </Card>
+
+            {/* ★ 2026-05-11: 운영 메트릭 (평균 보유, 24h 거래, 마진 사용률, 노출, 미실현 손익) */}
+            <Card title="운영 메트릭" icon={<Activity size={16} />}
+              subtitle="포지션 운영 상태 한눈에 — 마진 사용률 80% 이상 시 빨강 경고">
+              <OperationalMetrics positions={positions} orders={orders || []} equity={equity || 0} isMobile={isMobile} />
+            </Card>
 
             {/* Widget 1: 30일 자산 추이 라인 차트 + Widget 2: 라이브 성과 메트릭 */}
             <Card title="포트폴리오 성과" icon={<TrendUp size={16} />}
