@@ -304,13 +304,17 @@ function RealTradingInner() {
       borderRadius: "var(--z-r-lg)",
       padding: isMobile ? "14px 14px" : "24px 20px",
       marginBottom: isMobile ? 14 : 20,
+      // ★ 2026-05-11 fix: 모바일에선 column 레이아웃 (제목 위 + 버튼 아래).
+      //   이전: flex-wrap 으로 버튼이 좌측 제목 영역을 침범해 "실전매매관제센터" 글자가 세로로 깨짐.
+      //   현재: 모바일은 헤더 전체 column, 버튼은 width 100% 로 다음 줄.
       display: "flex",
-      alignItems: "center",
+      flexDirection: isMobile ? "column" : "row",
+      alignItems: isMobile ? "stretch" : "center",
       justifyContent: "space-between",
       flexWrap: "wrap",
-      gap: isMobile ? 10 : 16,
+      gap: isMobile ? 12 : 16,
     }}>
-      <div style={{ flex: 1, minWidth: isMobile ? 0 : 240 }}>
+      <div style={{ flex: 1, minWidth: 0, width: isMobile ? "100%" : "auto" }}>
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, marginBottom: isMobile ? 6 : 10 }}>
           <div style={{
             width: isMobile ? 38 : 48, height: isMobile ? 38 : 48, borderRadius: isMobile ? 10 : 14,
@@ -386,16 +390,20 @@ function RealTradingInner() {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        {/* ★ 2026-05-11: Alpha Lab 진입 버튼 — 사용자 직접 URL 입력 없이 한 클릭으로 */}
+      {/* ★ 2026-05-11 fix: 모바일 버튼 행 — width 100%, 두 버튼 1:1 grid */}
+      <div style={{
+        display: isMobile ? "grid" : "flex",
+        gridTemplateColumns: isMobile ? "1fr 1fr" : undefined,
+        gap: 8,
+        flexWrap: isMobile ? undefined : "wrap",
+        width: isMobile ? "100%" : "auto",
+      }}>
+        {/* Alpha Lab 진입 버튼 — 사용자 직접 URL 입력 없이 한 클릭으로 */}
         <Button
           variant="ghost"
           size="sm"
           onClick={() => {
-            // SPA 라우팅 — App.jsx 의 tab state 통해 alpha-lab 으로 이동
-            try {
-              window.location.href = "/alpha-lab";
-            } catch {}
+            try { window.location.href = "/alpha-lab"; } catch {}
           }}
           leftIcon={<Target size={14} />}
           style={{
@@ -403,6 +411,7 @@ function RealTradingInner() {
             background: "linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(147, 51, 234, 0.06))",
             border: "1px solid rgba(168, 85, 247, 0.3)",
             color: "var(--z-purple)",
+            justifyContent: "center",
           }}
         >
           🧬 Alpha Lab
@@ -412,7 +421,7 @@ function RealTradingInner() {
           size="sm"
           onClick={refresh}
           leftIcon={loading ? <Spinner size={14} /> : <Refresh size={14} />}
-          style={{ whiteSpace: "nowrap", minHeight: 44 }}
+          style={{ whiteSpace: "nowrap", minHeight: 44, justifyContent: "center" }}
         >
           새로고침
         </Button>

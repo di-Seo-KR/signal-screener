@@ -1,4 +1,12 @@
 {
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": "zepta.vercel.app" }],
+      "destination": "https://zepta.app/$1",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     { "source": "/api/yahoo-ohlc", "destination": "/api/yahoo?_mode=ohlc" },
     { "source": "/api/yahoo-batch", "destination": "/api/yahoo?_mode=batch" },
