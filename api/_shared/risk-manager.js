@@ -48,6 +48,19 @@ export const RISK_CONFIG = {
   // 합산 마진 노출 cap (위 노셔널과 별개로 마진 합산도 제한)
   maxTotalMarginRatio: 0.6,     // 자본의 60% 가 마진 묶이면 추가 진입 차단
 
+  // ★ 2026-05-12 대표 지시: 같은 심볼 averaging 자유화.
+  //   pyramidMinR — checkPyramidGuard 가 averaging 차단 시 사용할 R 임계값.
+  //     기존 하드코딩 1.0R (피라미딩만 허용, 물타기 차단) 너무 엄격해 강한 시그널
+  //     + 약간 손해 상태에서도 추가 진입 막힘.
+  //     기본 0.0 = averaging 완전 자유 (대표 요청).
+  //     1.0 으로 옛 보수 동작 복원 가능 (env ZEPTA_PYRAMID_MIN_R).
+  //   sameSymbolMaxNotionalPct — pyramid guard 완화의 대가로 추가한 안전망.
+  //     한 심볼에 합산 노시오날이 자본의 N% 초과면 추가 진입 차단 (마틴게일 폭주 방지).
+  //     기본 0.30 = 자본의 30%.
+  //     env ZEPTA_SAME_SYMBOL_MAX_PCT 로 조정.
+  pyramidMinR: 0.0,
+  sameSymbolMaxNotionalPct: 0.30,
+
   // 심볼 간 상관 그룹 — 같은 그룹에서 동시 2개 금지
   correlationGroups: [
     ["BTCUSDT", "ETHUSDT", "BNBUSDT"],              // 메가캡
@@ -243,16 +256,18 @@ export function checkAggregateExposure({ plan, openPositions, equity, cfg = RISK
 
 /**
  * ★ 2026-05-09 audit M1: 같은 심볼 averaging 가드.
- * 같은 심볼·같은 방향 추가 진입 시 가격이 첫 진입 대비 +1R 이상 (피라미딩) 일 때만 허용.
- * 가격이 +1R 이상이면 "이미 이긴 거래에 추가 매수" → 정상 알파 행동
- * 가격이 - 거나 0~+1R 이면 "물타기" (Martingale) → 차단
+ * ★ 2026-05-12: 대표 지시로 임계값 동적화 (cfg.pyramidMinR / env ZEPTA_PYRAMID_MIN_R).
+ *   - 기본 0.0R → averaging 자유. "강한 시그널이면 약간 손해 중에도 추가 진입" 가능.
+ *   - 1.0R 옛 동작 복원: cfg.pyramidMinR = 1.0 또는 env ZEPTA_PYRAMID_MIN_R=1.0.
+ *   - 마틴게일 폭주는 별도 sameSymbolMaxNotionalPct 가드로 차단 (checkSameSymbolNotional).
  *
  * @param {object} args
  * @param {object} args.plan          새 진입 plan
  * @param {object} args.existingPos   같은 심볼 기존 포지션 (Binance positionRisk 한 항목)
+ * @param {object} [args.cfg=RISK_CONFIG]
  * @returns {{ ok: boolean, reason?: string, currentR?: number }}
  */
-export function checkPyramidGuard({ plan, existingPos }) {
+export function checkPyramidGuard({ plan, existingPos, cfg = RISK_CONFIG }) {
   if (!existingPos || Math.abs(parseFloat(existingPos.positionAmt || 0)) === 0) return { ok: true };
   // 방향 다르면 OK (long → short 헤지 또는 익절 같은 다른 의도)
   const existingSide = parseFloat(existingPos.positionAmt) > 0 ? "LONG" : "SHORT";
@@ -265,14 +280,69 @@ export function checkPyramidGuard({ plan, existingPos }) {
     ? (markPrice - entryPrice) / entryPrice
     : (entryPrice - markPrice) / entryPrice;
   const currentR = moveFrac / plan.slPct;
-  if (currentR < 1.0) {
+
+  // ★ 동적 임계값: env ZEPTA_PYRAMID_MIN_R 우선 → cfg.pyramidMinR → fallback 0.0
+  const envMinR = Number(process.env.ZEPTA_PYRAMID_MIN_R);
+  const minR = Number.isFinite(envMinR)
+    ? envMinR
+    : (typeof cfg.pyramidMinR === "number" ? cfg.pyramidMinR : 0.0);
+
+  if (currentR < minR) {
     return {
       ok: false,
-      reason: `같은 ${plan.side} averaging 차단 — 현재 R=${currentR.toFixed(2)} < 1.0R (피라미딩 가능 라인). 물타기 위험.`,
+      reason: `같은 ${plan.side} averaging 차단 — 현재 R=${currentR.toFixed(2)} < ${minR.toFixed(2)}R (피라미딩 가능 라인). 물타기 위험.`,
       currentR,
     };
   }
   return { ok: true, currentR };
+}
+
+/**
+ * ★ 2026-05-12 신규: 같은 심볼 합산 노시오날 cap 가드 (마틴게일 폭주 방지).
+ *
+ * checkPyramidGuard 가 averaging 자유로 풀린 만큼 (1.0R → 0.0R) 한 심볼에
+ * 끝없이 물타기 들어가는 것을 막는 별도 안전망.
+ *
+ * 기존 포지션 노시오날 + 새 plan 노시오날 합 > 자본 × sameSymbolMaxNotionalPct
+ * 이면 차단. checkAggregateExposure (전체 노시오날) 와 별개로 동작.
+ *
+ * @param {object} args
+ * @param {object} args.plan          새 진입 plan
+ * @param {object} args.existingPos   같은 심볼 기존 포지션 (Binance positionRisk 한 항목)
+ * @param {number} args.equity        자본 (USDT)
+ * @param {object} [args.cfg=RISK_CONFIG]
+ * @returns {{ ok: boolean, reason?: string, sameSymbolNotional?: number, capUsd?: number }}
+ */
+export function checkSameSymbolNotional({ plan, existingPos, equity, cfg = RISK_CONFIG }) {
+  if (!plan || !plan.notional) return { ok: true };
+  if (!(equity > 0)) return { ok: true };
+  if (!existingPos) return { ok: true };
+  const amt = Math.abs(parseFloat(existingPos.positionAmt || 0));
+  if (amt === 0) return { ok: true };
+
+  const ep = parseFloat(existingPos.entryPrice || existingPos.markPrice || 0);
+  if (!ep) return { ok: true };
+  const existingNotional = amt * ep;
+  const newTotalNotional = existingNotional + plan.notional;
+
+  // env override 우선
+  const envPct = Number(process.env.ZEPTA_SAME_SYMBOL_MAX_PCT);
+  const capPct = Number.isFinite(envPct)
+    ? envPct
+    : (typeof cfg.sameSymbolMaxNotionalPct === "number" ? cfg.sameSymbolMaxNotionalPct : 0.30);
+  const capUsd = equity * capPct;
+
+  if (newTotalNotional > capUsd) {
+    const usedPct = (newTotalNotional / equity) * 100;
+    const capPctDisp = capPct * 100;
+    return {
+      ok: false,
+      reason: `같은 심볼 합산 노시오날 ${usedPct.toFixed(1)}% > cap ${capPctDisp.toFixed(1)}% — 추가 진입 보류 (기존 $${existingNotional.toFixed(2)} + 신규 $${plan.notional.toFixed(2)} = $${newTotalNotional.toFixed(2)} > $${capUsd.toFixed(2)})`,
+      sameSymbolNotional: newTotalNotional,
+      capUsd,
+    };
+  }
+  return { ok: true, sameSymbolNotional: newTotalNotional, capUsd };
 }
 
 export function stopDistancePct({ price, atr, family, cfg = RISK_CONFIG }) {
@@ -673,5 +743,6 @@ export default {
   evaluatePartialTP,
   checkAggregateExposure,
   checkPyramidGuard,
+  checkSameSymbolNotional,
   RISK_CONFIG,
 };
