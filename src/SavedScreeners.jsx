@@ -15,7 +15,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useThemeTokens, FONT, RADIUS, pickFont } from "./ui/theme.jsx";
 import { useBreakpoint } from "./ui/useBreakpoint.jsx";
-import { BottomSheet } from "./ui/primitives.jsx";
+import { BottomSheet, LoadingBlock } from "./ui/primitives.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 
 const FREE_LIMIT = 3;
@@ -233,7 +233,8 @@ export default function SavedScreeners({ onNavigate }) {
 
       {/* 콘텐츠 */}
       {loading ? (
-        <EmptyBox C={C} title="불러오는 중…" />
+        // 2026-05-12 — Skeleton 표준화 (LoadingBlock)
+        <LoadingBlock rows={3} height={88} label="저장된 조건 불러오는 중…" />
       ) : isGuest ? (
         <EmptyBox C={C} icon="🔐"
           title="로그인 후 저장할 수 있어요"

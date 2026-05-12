@@ -132,9 +132,14 @@ export function BottomSheet({
           }
         `}</style>
 
-        {/* drag handle (시각적 affordance) */}
+        {/* drag handle (시각적 affordance)
+            iOS status bar 겹침 방지: 시트가 키보드/모달로 화면 상단까지 밀려 올라가도
+            드래그 핸들이 status bar (44pt) 와 겹치지 않도록 safe-area-inset-top 보강 */}
         {draggable && (
-          <div style={{ display: "flex", justifyContent: "center", padding: "8px 0 4px" }}>
+          <div style={{
+            display: "flex", justifyContent: "center",
+            padding: "max(8px, env(safe-area-inset-top)) 0 4px",
+          }}>
             <div style={{
               width: 36, height: 4, borderRadius: 999,
               background: "var(--z-border-2)",
@@ -142,11 +147,13 @@ export function BottomSheet({
           </div>
         )}
 
-        {/* 헤더 */}
+        {/* 헤더 — draggable=false 시 status bar 겹침 방지 paddingTop 보강 */}
         {(title || description) && (
           <header style={{
             display: "flex", alignItems: "flex-start", gap: 12,
-            padding: "12px 18px 8px",
+            padding: draggable
+              ? "12px 18px 8px"
+              : "max(12px, env(safe-area-inset-top)) 18px 8px",
             borderBottom: title ? `1px solid var(--z-border)` : "none",
           }}>
             <div style={{ flex: 1, minWidth: 0 }}>

@@ -1136,8 +1136,16 @@ export default function QuantPortfolio({ theme = "dark" }) {
               <span style={{ fontSize: "14px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>실제 비중 드리프트</span>
             </div>
             {s.rebalanceHistory.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: C.text3 }}>
-                리밸런싱 데이터 없음
+              // 2026-05-12 — 빈 상태 친절 카피 + 다음 액션 가이드
+              <div style={{ textAlign: "center", padding: "44px 20px", color: C.text3 }}>
+                <div style={{ fontSize: 32, lineHeight: 1, marginBottom: 8 }}>⚖️</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: C.text1, marginBottom: 6, letterSpacing: "-0.01em" }}>
+                  아직 리밸런싱 기록이 없어요
+                </div>
+                <div style={{ fontSize: 13, color: C.text2, maxWidth: 380, margin: "0 auto", lineHeight: 1.55, wordBreak: "keep-all" }}>
+                  포트폴리오 비중이 5% 이상 드리프트되면 자동으로 기록됩니다.
+                  현재 비중이 목표에 가깝게 유지되고 있는 상태예요.
+                </div>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
