@@ -46,7 +46,11 @@ export const RISK_CONFIG = {
   //   노셔널 가드는 10x 늘려 사실상 비활성 — 마진 가드 의지.
   maxTotalNotionalRatio: 10.0,  // 사실상 무제한 (마진 가드 0.6 이 실 안전망)
   // 합산 마진 노출 cap (위 노셔널과 별개로 마진 합산도 제한)
-  maxTotalMarginRatio: 0.6,     // 자본의 60% 가 마진 묶이면 추가 진입 차단
+  // ★ 2026-05-12 hotfix: 0.6 → 0.85 완화 (대표 보고: 자본 $518 중 $276 사용했는데 진입 차단됨).
+  //   $518 × 0.60 = $311 한도 vs 현재 $276 → 추가 $35 만 가능 → 사실상 새 진입 0건.
+  //   $518 × 0.85 = $440 한도 → 추가 $164 까지 가능 → 거래 다양화 정상화.
+  //   isolated margin 모드 가정 (cross 면 100% 까지도 안전). env ZEPTA_MAX_TOTAL_MARGIN_RATIO 로 조정 가능.
+  maxTotalMarginRatio: 0.85,    // 자본의 85% 가 마진 묶이면 추가 진입 차단
 
   // ★ 2026-05-12 대표 지시: 같은 심볼 averaging 자유화.
   //   pyramidMinR — checkPyramidGuard 가 averaging 차단 시 사용할 R 임계값.
@@ -234,7 +238,9 @@ export function checkAggregateExposure({ plan, openPositions, equity, cfg = RISK
   const newSumNotional = sumNotional + plan.notional;
   const newSumMargin = sumMargin + (plan.marginRequired || (plan.notional / (plan.leverage || 10)));
   const notionalCap = equity * (cfg.maxTotalNotionalRatio || 1.5);
-  const marginCap = equity * (cfg.maxTotalMarginRatio || 0.6);
+  // env override 우선 — 런타임 조정 가능 (대표가 위험 식별 시 즉시 0.6 로 strict 복원 가능)
+  const marginRatio = Number(process.env.ZEPTA_MAX_TOTAL_MARGIN_RATIO) || cfg.maxTotalMarginRatio || 0.85;
+  const marginCap = equity * marginRatio;
   push(`예정 합산 noSi=$${newSumNotional.toFixed(2)} margin=$${newSumMargin.toFixed(2)} (cap noSi=$${notionalCap.toFixed(2)}, margin=$${marginCap.toFixed(2)})`);
 
   if (newSumNotional > notionalCap) {
@@ -247,7 +253,7 @@ export function checkAggregateExposure({ plan, openPositions, equity, cfg = RISK
   if (newSumMargin > marginCap) {
     return {
       ok: false,
-      reason: `합산 마진 $${newSumMargin.toFixed(2)} > 한도 $${marginCap.toFixed(2)} (${((cfg.maxTotalMarginRatio||0.6)*100).toFixed(0)}% of equity)`,
+      reason: `합산 마진 $${newSumMargin.toFixed(2)} > 한도 $${marginCap.toFixed(2)} (${(marginRatio*100).toFixed(0)}% of equity)`,
       sumNotional, sumMargin, log,
     };
   }
