@@ -2737,15 +2737,47 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
               </div>
             </div>
 
-            {/* Trading Panel — 실전매매 (Binance 실거래) */}
+            {/* Trading Panel — 모의매매 (가상 자금 시뮬레이션)
+                ★ 2026-05-12 critical fix: STOCK_BOTS 봇 활성화 시 RealTrading (실거래) 렌더링을 차단.
+                AutoTrading 페이지는 "모의 자금 시뮬레이션" 컨텍스트이므로 RealTrading inline 렌더링은
+                사용자 오해 + 컴플라이언스 리스크. CRYPTO_BOTS 만 BTCTrading (가상 KV) 으로 유지.
+                STOCK_BOTS 는 별도 모니터링 영역에서 처리 (실거래 원하면 [실전매매] 메뉴). */}
             {(() => {
               const ab = activeBots.find(b => b.botId === activeBot.id);
               const alloc = ab?.allocation || null;
-              return STOCK_BOTS.some((b) => b.id === activeBot.id) ? (
-                <RealTrading theme={theme} user={user} botPreset={activeBot} botAllocation={alloc} isMobile={isMobile} />
-              ) : (
-                <BTCTrading theme={theme} user={user} botPreset={activeBot} botAllocation={alloc} isMobile={isMobile} />
-              );
+              const isStock = STOCK_BOTS.some((b) => b.id === activeBot.id);
+              if (isStock) {
+                // 주식 봇 — 가상매매 안내 카드 (RealTrading 차단)
+                return (
+                  <div style={{
+                    background: c.card, border: `1px solid ${c.border}`, borderRadius: "12px",
+                    padding: isMobile ? "20px 16px" : "24px", marginTop: "16px",
+                    display: "flex", flexDirection: "column", gap: "12px",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span style={{ fontSize: "24px" }}>🧪</span>
+                      <h3 style={{ margin: 0, color: c.text1, fontSize: isMobile ? "16px" : "18px", fontWeight: 700 }}>
+                        모의 자금 시뮬레이션 진행 중
+                      </h3>
+                    </div>
+                    <p style={{ margin: 0, color: c.text2, fontSize: isMobile ? "14px" : "15px", lineHeight: 1.6 }}>
+                      <strong style={{ color: c.green, fontWeight: 700 }}>실제 돈은 사용되지 않습니다.</strong>{" "}
+                      <strong style={{ color: c.text1 }}>{activeBot.name}</strong> 의 매매 시그널을
+                      실시간으로 추적하며 가상 자금에 자동 반영합니다.
+                    </p>
+                    <div style={{
+                      padding: "10px 12px", background: c.card2, borderRadius: "8px",
+                      border: `1px solid ${c.border}`, fontSize: isMobile ? "13px" : "14px", color: c.text2, lineHeight: 1.55,
+                    }}>
+                      💡 진행 상황은 상단 <strong style={{ color: c.text1 }}>활성 봇</strong> 카드에서 ROI · 거래 횟수 · 보유 종목으로 확인할 수 있어요.
+                      <br />
+                      실제 매매를 원하시면 <strong style={{ color: c.blue }}>[실전매매]</strong> 메뉴에서 별도로 활성화해주세요.
+                    </div>
+                  </div>
+                );
+              }
+              // 코인 봇 — 기존 BTCTrading (가상 KV 포트폴리오)
+              return <BTCTrading theme={theme} user={user} botPreset={activeBot} botAllocation={alloc} isMobile={isMobile} />;
             })()}
           </div>
         ) : (
