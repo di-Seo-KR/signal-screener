@@ -116,16 +116,24 @@ export const RISK_CONFIG = {
   //   (= 마진) 였는데 변수명이 absoluteMaxNotional 이라 혼선. 새 변수로 분리.
   //   - absoluteMaxMarginUsd: 마진(실 위험 자본) 상한. 이게 진짜 사용자 의도.
   //   - absoluteMaxNotional: 레거시. 하위 호환 위해 보존만 (사용 안 함).
-  absoluteMaxMarginUsd: 300, // 한 거래 마진 최대 $300 → 10x lev = 노셔널 $3000
-  absoluteMaxNotional: 300,  // (deprecated, no longer enforced)
-
-  // ★ 2026-05-11 대표 지시: 포지션당 최소 원금 (마진 기준).
-  //   너무 작은 포지션은 수수료/슬리피지 대비 의미 없는 거래라 ROI 기여도 0에 가까움.
-  // ★ 2026-05-12: $100 → $50 완화.
-  //   자본 $519 + maxTotalMarginRatio 0.6 = 마진 한도 $311.
-  //   minMargin $100 면 거래 3개 (자본 60%). 다양화 부족.
-  //   minMargin $50 → 거래 6개 가능 (자본 60% 안 6×$50=$300). 시그널 다양성 ↑.
-  //   $50 마진 × lev 10x = 노셔널 $500 (absoluteMaxMarginUsd=$300 안에 들어감)
+  // ★ 2026-05-12 자본 비례 자동 조정 (대표 지시):
+  //   이전: absoluteMaxMarginUsd $300, minMarginUsd $50 절대값 → 자본 변경 시 수동 조정 필요.
+  //   이후: 자본 비례 + floor/ceiling. 자본 $500 부터 $50,000 까지 자동 적용.
+  //   ┌────────────────┬──────────────┬──────────────┐
+  //   │ 자본              │ minMargin     │ maxMargin     │
+  //   ├────────────────┼──────────────┼──────────────┤
+  //   │ $500            │ $25 (5%)      │ $100 (20%)    │
+  //   │ $5,000          │ $250 (5%)     │ $1,000 (20%)  │
+  //   │ $50,000         │ $2,500 (5%)   │ $2,000 (ceil) │
+  //   └────────────────┴──────────────┴──────────────┘
+  absoluteMaxMarginPct: 0.20,        // 자본의 20% (한 거래 마진 최대)
+  absoluteMaxMarginFloor: 50,        // 최소 $50 (작은 자본 구제)
+  absoluteMaxMarginCeiling: 2000,    // 최대 $2,000 (큰 자본도 슬리피지 위험 차단)
+  minMarginPct: 0.05,                // 자본의 5% (포지션 최소 마진)
+  minMarginFloor: 20,                // 최소 $20 (거래소 minNotional 안전)
+  // ★ deprecated (자본 비례 시 무시) — 하위 호환 보존만
+  absoluteMaxMarginUsd: 300,
+  absoluteMaxNotional: 300,
   minMarginUsd: 50,
 
   // ★ 작은 계정 구제: notional 이 minNotional×safety 미만일 때
@@ -340,10 +348,17 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
   //   사용자 의도 "거래당 $300 들어가도 됨" = 마진 $300 = 노셔널 $3000 (10x).
   //   이 단계에선 leverage 미정이라 사용자 maxLeverage 기준으로 notional cap 산출.
   const previewLevForCap = cfg.maxLeverage || 10;
-  const maxNotionalCap = (cfg.absoluteMaxMarginUsd || 300) * previewLevForCap;
+  // ★ 2026-05-12: 자본 비례 maxMargin 산출 (자본 변경 시 자동 조정).
+  //   기존 absoluteMaxMarginUsd 절대값 → equity × absoluteMaxMarginPct + floor/ceiling.
+  const effMaxMargin = clamp(
+    equity * (cfg.absoluteMaxMarginPct || 0.20),
+    cfg.absoluteMaxMarginFloor || 50,
+    cfg.absoluteMaxMarginCeiling || 2000,
+  );
+  const maxNotionalCap = effMaxMargin * previewLevForCap;
   if (notional > maxNotionalCap) {
     notional = maxNotionalCap;
-    push(`capped by absoluteMaxMargin=$${cfg.absoluteMaxMarginUsd} × lev ${previewLevForCap} = noSi $${maxNotionalCap}`);
+    push(`capped by effMaxMargin=$${effMaxMargin.toFixed(0)} (equity ${(cfg.absoluteMaxMarginPct*100).toFixed(0)}%) × lev ${previewLevForCap} = noSi $${maxNotionalCap.toFixed(0)}`);
   }
 
   // 5) 레버리지
@@ -379,11 +394,13 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
   notional = notional * sizeHint;
   push(`sizeHint=${sizeHint} → notional=$${notional.toFixed(2)}`);
 
-  // 8.5) ★ 2026-05-11 대표 지시: 포지션당 최소 마진 $100 강제.
-  //   너무 작은 포지션 (수수료/슬리피지 대비 의미 없음) reject.
-  //   minNotional = minMarginUsd × leverage 를 floor 로.
-  //   notional 이 absoluteMaxNotional($300) 보다 작아도 minMarginNotional 이상은 보장.
-  const minMarginUsd = cfg.minMarginUsd || 0;
+  // 8.5) ★ 2026-05-12 자본 비례 최소 마진 강제 (이전: absoluteValue $50).
+  //   minMargin = max(equity × minMarginPct, minMarginFloor)
+  //   자본 $500 → $25, 자본 $5,000 → $250, 자본 $50,000 → $2,500.
+  const minMarginUsd = Math.max(
+    equity * (cfg.minMarginPct || 0.05),
+    cfg.minMarginFloor || 20,
+  );
   if (minMarginUsd > 0) {
     const minMarginNotional = minMarginUsd * finalLev;
     if (notional < minMarginNotional) {
