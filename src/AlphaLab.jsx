@@ -56,8 +56,14 @@ const STRATEGY_KO = {
   "ensemble":          "앙상블 합의",
 };
 
-// G-1 — 미매핑 strategy ID 는 리스트에서 숨김 (옛 데이터의 "trend", "unknown" 등 노출 방지)
+// G-1 — 옛 데이터의 raw ID ("trend", "unknown") 만 숨기고, 나머지는 한글 fallback 으로 표시.
+// 2026-05-12 hotfix: 필터가 너무 공격적이면 strategy 응답 키가 STRATEGY_KO 와 100% 일치
+// 안 할 때 전략 순위표가 통째로 비어 보이는 critical issue 발생 → fallback 라벨 패턴 도입.
 const KNOWN_STRATEGY_IDS = new Set(Object.keys(STRATEGY_KO));
+const BLOCKED_RAW_IDS = new Set(["trend", "unknown", "default", "n/a", "null", "undefined"]);
+const isValidStrategyId = (id) =>
+  typeof id === "string" && id.length > 0 && !BLOCKED_RAW_IDS.has(id.toLowerCase());
+const strategyLabel = (id) => STRATEGY_KO[id] || "AI 전략";
 
 // 어려운 지표 → 입문자 친화 툴팁 설명 (PLAN-BIZ #1)
 const METRIC_TOOLTIP = {
@@ -211,7 +217,7 @@ function RegimePanel({ data }) {
               justifyContent: "space-between",
               alignItems: "center",
             }}>
-              <span style={{ fontSize: FONT.xs, color: C.text2 }}>{STRATEGY_KO[k] || k}</span>
+              <span style={{ fontSize: FONT.xs, color: C.text2 }}>{strategyLabel(k)}</span>
               <span style={{ fontSize: FONT.sm, fontWeight: 700, color: tone }}>×{fmtNum(v, 2)}</span>
             </div>
           );
@@ -234,13 +240,13 @@ function LeaderboardTable({ data }) {
 
   const rows = useMemo(() => {
     return Object.entries(strategies)
-      .filter(([id]) => KNOWN_STRATEGY_IDS.has(id)) // G-1 — 미매핑 ID 숨김
+      .filter(([id]) => isValidStrategyId(id)) // G-1 hotfix — raw ID 만 숨기고 나머지는 fallback 라벨
       .map(([id, m]) => {
         const statusObj = statuses[id];
         const status = (statusObj?.status) || "active";
         return {
           id,
-          name: STRATEGY_KO[id] || id,
+          name: strategyLabel(id),
           status,
           statusReason: statusObj?.reason || "",
           trades: m.trades || 0,
@@ -409,7 +415,7 @@ function SharpeHistoryChart({ data }) {
   const strategies = data?.leaderboard?.strategies || {};
   const top4 = useMemo(() => {
     return Object.entries(strategies)
-      .filter(([id]) => KNOWN_STRATEGY_IDS.has(id)) // G-1 — 미매핑 ID 숨김
+      .filter(([id]) => isValidStrategyId(id)) // G-1 hotfix — raw ID 만 숨기고 나머지는 fallback 라벨
       .sort((a, b) => (b[1].sharpe || 0) - (a[1].sharpe || 0))
       .slice(0, 4)
       .map(([k]) => k);
@@ -460,7 +466,7 @@ function SharpeHistoryChart({ data }) {
         {series.map((s, idx) => (
           <div key={s.sid} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: FONT.xs, color: C.text2 }}>
             <span style={{ width: 10, height: 3, background: colors[idx] }} />
-            {STRATEGY_KO[s.sid] || s.sid}
+            {strategyLabel(s.sid)}
           </div>
         ))}
       </div>
@@ -567,7 +573,7 @@ function CandidatesPanel({ data }) {
                 border: `1px solid ${C.border}`,
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: FONT.sm, fontWeight: 600, color: C.text1 }}>{STRATEGY_KO[c.parentStrategy] || c.parentStrategy} 변형</span>
+                  <span style={{ fontSize: FONT.sm, fontWeight: 600, color: C.text1 }}>{strategyLabel(c.parentStrategy)} 변형</span>
                   <span style={{ fontSize: FONT.xs, color: C.text3 }}>{fmtAgo(c.createdAt)}</span>
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
@@ -600,7 +606,7 @@ function PublicAlphaShowcase({ data, onSignup }) {
   const strategies = data?.leaderboard?.strategies || {};
   const top3 = useMemo(() => {
     return Object.entries(strategies)
-      .filter(([id]) => KNOWN_STRATEGY_IDS.has(id)) // G-1 — 미매핑 ID 숨김
+      .filter(([id]) => isValidStrategyId(id)) // G-1 hotfix — raw ID 만 숨기고 나머지는 fallback 라벨
       .sort((a, b) => (b[1].sharpe || 0) - (a[1].sharpe || 0))
       .slice(0, 3)
       .map(([id, m]) => ({ id, ...m }));
@@ -646,7 +652,7 @@ function PublicAlphaShowcase({ data, onSignup }) {
                   <span style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 600 }}>#{idx + 1}</span>
                   <Badge kind={grade.color}>{grade.label}</Badge>
                 </div>
-                <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>{STRATEGY_KO[s.id] || s.id}</div>
+                <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>{strategyLabel(s.id)}</div>
                 <div style={{ fontSize: FONT.xs, color: C.text2, lineHeight: 1.5 }}>
                   {s.id === "trend-follow" && "한 방향으로 흐름이 잡혔을 때 따라가는 전략"}
                   {s.id === "mean-revert" && "박스권에서 과도하게 빠질 때 반등을 노리는 전략"}
