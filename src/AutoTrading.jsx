@@ -1826,7 +1826,7 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
       dcaConfig: config,
     }]);
     setActiveBot(pendingDCABot);
-    showToast("success", `DCA 봇 시작 — ${config.symbol} ${amt} USDT/${config.frequency}`);
+    showToast("success", `DCA 모의 시뮬레이션 시작 — ${config.symbol} ${amt} USDT/${config.frequency}`);
     ga.botActivated(pendingDCABot.id);
     setPendingDCABot(null);
   }, [pendingDCABot, dcaConfig, user, showToast]);
@@ -1852,7 +1852,7 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
       allocation: amount,
     }]);
     setActiveBot(pendingBot);
-    showToast("success", `${pendingBot.name} 실전매매 시작 — $${amount.toLocaleString()} 투입`);
+    showToast("success", `${pendingBot.name} 모의매매 시작 — 가상 자금 $${amount.toLocaleString()} 로 시뮬레이션`);
     // GA4 — 봇 활성화 이벤트
     ga.botActivated(pendingBot.id || pendingBot.name || "unknown");
     setPendingBot(null);
@@ -2154,17 +2154,17 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
                     padding: "8px 12px", background: `${c.blue}08`, borderRadius: "8px",
                     border: `1px solid ${c.blue}15`, marginBottom: "16px", fontSize: "14px", color: c.text2,
                   }}>
-                    배분 완료: <strong style={{ color: c.orange || c.yellow }}>${used.toLocaleString()}</strong>
+                    현재 모의 자금 잔액: <strong style={{ color: c.text2 }}>${used.toLocaleString()}</strong>
                   </div>
                 ) : null;
               })()}
 
-              {/* 안전 가이드 — 첫 시작 권장 금액 */}
+              {/* 안전 가이드 — 첫 시작 권장 금액 (정보성 hint, 강조 X) */}
               <div style={{
-                padding: "10px 12px", background: `${c.green}08`, borderRadius: "8px",
-                border: `1px solid ${c.green}20`, marginBottom: "12px", fontSize: "13px", color: c.text2, lineHeight: 1.55,
+                padding: "10px 12px", background: c.card2, borderRadius: "8px",
+                border: `1px solid ${c.border}`, marginBottom: "12px", fontSize: "13px", color: c.text2, lineHeight: 1.55,
               }}>
-                💡 <strong>처음 시작</strong>은 잃어도 괜찮은 소액 ($100~500) 으로 시작하세요. 실제 봇 성과를 본 뒤 추가 투입할 수 있어요.
+                💡 처음이라면 $500 ~ $1,000 정도의 작은 금액부터 추천드려요. 익숙해진 뒤 단계적으로 늘릴 수 있어요.
               </div>
 
               <div style={{ marginBottom: "12px" }}>
@@ -2752,7 +2752,7 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
           <BotCatalog onActivate={handleActivateBot} theme={theme} isMobile={isMobile} />
         )}
 
-        {/* ── 실전매매 확인 다이얼로그 — 모바일 반응형 ── */}
+        {/* ── 모의매매 시작 확인 다이얼로그 — 모바일 반응형 ── */}
         {confirmRealTrading && (
           <div style={{
             position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
@@ -2765,20 +2765,25 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
               border: `1px solid ${colors[theme].border}`,
             }}>
               <div style={{ fontSize: "32px", marginBottom: "16px", textAlign: "center" }}>
-                ⚠️
+                🧪
               </div>
               <h3 style={{
                 fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: colors[theme].text1,
                 marginBottom: "12px", textAlign: "center",
               }}>
-                실전 매매를 시작합니다
+                모의 자금으로 시뮬레이션을 시작합니다
               </h3>
               <p style={{
                 fontSize: isMobile ? "14px" : "15px", color: colors[theme].text2, marginBottom: "20px",
                 textAlign: "center", lineHeight: "1.6",
               }}>
-                실제 자금이 사용됩니다.<br />
-                {confirmRealTrading.bot.name}으로<br />Binance 실거래를 시작하시겠습니까?
+                <strong style={{ color: colors[theme].green, fontWeight: 700 }}>실제 돈은 사용되지 않습니다.</strong><br />
+                Zepta 가상 자금 (시작 잔고 기준) 으로<br />
+                {confirmRealTrading.bot.name} 의 매매 시그널을<br />
+                실시간으로 따라합니다.<br />
+                <span style={{ fontSize: isMobile ? "12px" : "13px", color: colors[theme].text3 }}>
+                  실제 매매로 전환하려면 [실전매매] 메뉴를 이용해주세요.
+                </span>
               </p>
               <div style={{ display: "flex", gap: "12px" }}>
                 <button
@@ -2805,7 +2810,7 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
                   onMouseEnter={(e) => { e.target.style.opacity = "0.85"; }}
                   onMouseLeave={(e) => { e.target.style.opacity = "1"; }}
                 >
-                  시작
+                  모의매매 시작
                 </button>
               </div>
             </div>

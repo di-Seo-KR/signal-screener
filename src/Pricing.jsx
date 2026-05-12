@@ -20,7 +20,7 @@ import {
   TIER_LIMITS,
   getTier,
   getTrialDaysLeft,
-  requestUpgrade,
+  // requestUpgrade — 베타 단계에서는 호출하지 않음. 정식 결제 오픈 시 재활성화.
 } from "./lib/subscription.js";
 import { ga } from "./lib/analytics.js";
 
@@ -76,28 +76,32 @@ const FEATURE_MATRIX = [
 // ── FAQ ──────────────────────────────────────────────────────────
 const FAQ = [
   {
+    q: "현재 결제가 가능한가요?",
+    a: "아니요, 아직 베타 단계입니다. Zepta 구독 결제는 현재 시뮬레이션만 제공하며, 실제 카드 결제 (토스 페이먼츠·Stripe) 는 2026 Q3 안에 정식 오픈 예정입니다. 베타 알림을 신청하시면 정식 결제가 열리는 즉시 가장 먼저 알려드릴게요.",
+  },
+  {
     q: "수익을 보장하나요?",
     a: "아니요. Zepta 는 투자 도구를 제공할 뿐, 수익을 보장하지 않습니다. 모든 투자 판단과 결과 책임은 사용자에게 있습니다. 자본시장법상 투자자문업이 아닙니다.",
   },
   {
     q: "14일 무료 체험은 어떻게 동작하나요?",
-    a: "Pro tier 가입 시 1회에 한해 14일 무료 사용이 가능합니다. 체험 기간 종료 후 자동 결제로 전환되며, 종료 전 언제든 취소 가능합니다.",
+    a: "현재 베타 단계로 실제 결제와 무료 체험 모두 시뮬레이션만 제공됩니다. 정식 출시 (2026 Q3 예정) 시 Pro tier 가입자에게 1회 14일 무료 체험을 제공할 계획입니다.",
   },
   {
     q: "언제든 해지할 수 있나요?",
-    a: "네. 마이페이지 → 구독 관리에서 즉시 해지 가능합니다. 해지 후에도 현재 결제 주기 종료일까지 Pro/Premium 기능을 사용할 수 있습니다.",
+    a: "현재는 베타 단계이므로 실제 결제·해지가 발생하지 않습니다. 정식 출시 후에는 마이페이지 → 구독 관리에서 즉시 해지 가능하도록 준비 중입니다.",
   },
   {
     q: "환불 정책은 어떻게 되나요?",
-    a: "결제일로부터 7일 이내 100% 환불, 7일 후에는 잔여기간에 비례하여 환불됩니다. 단, 14일 무료 체험은 결제 발생 전이므로 환불 대상이 아닙니다.",
+    a: "베타 단계에서는 실제 결제가 진행되지 않아 환불 대상이 없습니다. 정식 출시 후 환불 정책은 결제일로부터 7일 이내 100% 환불, 이후 잔여기간 비례 환불을 적용할 예정입니다.",
   },
   {
     q: "Tier 변경은 자유로운가요?",
-    a: "Free → Pro → Premium 업그레이드는 즉시 가능합니다. 다운그레이드는 현재 결제 주기 종료 시점에 적용됩니다.",
+    a: "베타 단계에서는 시뮬레이션상 자유롭게 변경 가능합니다. 정식 출시 후 Free → Pro → Premium 업그레이드는 즉시, 다운그레이드는 현재 결제 주기 종료 시점에 적용될 예정입니다.",
   },
   {
     q: "결제 수단은 무엇이 있나요?",
-    a: "현재는 출시 준비 단계로 결제 시뮬레이션만 가능합니다. 토스 페이먼츠 / Stripe 카드 결제 통합이 곧 출시될 예정입니다.",
+    a: "현재는 출시 준비 단계로 결제 시뮬레이션만 가능합니다. 토스 페이먼츠 / Stripe 카드 결제 통합이 2026 Q3 안에 정식 오픈될 예정입니다.",
   },
 ];
 
@@ -260,9 +264,20 @@ function TierCard({ tier, isCurrent, isRecommended, onSelect, onTrial, lang, C, 
                 borderRadius: RADIUS.md,
                 fontSize: FONT.sm, fontWeight: 600,
                 cursor: (isCurrent || busy) ? "default" : "pointer",
+                display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
               }}
             >
               바로 구독
+              <span style={{
+                background: `${C.yellow}22`,
+                border: `1px solid ${C.yellow}`,
+                color: C.yellow,
+                padding: "2px 6px",
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 700,
+                lineHeight: 1,
+              }}>베타</span>
             </button>
           </>
         )}
@@ -280,9 +295,22 @@ function TierCard({ tier, isCurrent, isRecommended, onSelect, onTrial, lang, C, 
               fontSize: pickFont("button", isMobile) ?? FONT.base, fontWeight: 700,
               cursor: (isCurrent || busy) ? "default" : "pointer",
               opacity: (isCurrent || busy) ? 0.6 : 1,
+              display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8,
             }}
           >
             {busy ? "처리 중…" : "Premium 구독"}
+            {!busy && (
+              <span style={{
+                background: `${C.yellow}22`,
+                border: `1px solid ${C.yellow}`,
+                color: C.yellow,
+                padding: "2px 6px",
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 700,
+                lineHeight: 1,
+              }}>베타</span>
+            )}
           </button>
         )}
       </div>
@@ -470,7 +498,8 @@ function LegalFooter({ C }) {
         개별 종목 매매 추천이나 자산 운용 위임을 받지 않으며, 사용자가 도구를 활용하여 직접 매매 결정을 내립니다.
       </p>
       <p style={{ margin: 0 }}>
-        결제 진행 시 <a href="/terms" style={{ color: C.blue, textDecoration: "underline" }}>이용약관</a>
+        Zepta 구독 결제는 현재 베타 단계로, 실제 결제는 2026 Q3 안에 정식 오픈됩니다.
+        정식 결제 시작 시 <a href="/terms" style={{ color: C.blue, textDecoration: "underline" }}>이용약관</a>
         {" · "}
         <a href="/privacy" style={{ color: C.blue, textDecoration: "underline" }}>개인정보처리방침</a>
         {" 에 동의한 것으로 간주합니다."}
@@ -498,6 +527,8 @@ export default function Pricing({ onRequestLogin } = {}) {
   // 상태
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState(null);
+  // 베타 결제 차단 모달 — 무료 플랜 외 모든 업그레이드 시도 시 노출
+  const [betaModal, setBetaModal] = useState(null); // { targetTier, useTrial } | null
 
   const showToast = useCallback((msg, type = "info") => {
     setToast({ msg, type });
@@ -505,7 +536,9 @@ export default function Pricing({ onRequestLogin } = {}) {
   }, []);
 
   // ── 핸들러 ──
-  const handleUpgrade = useCallback(async (targetTier, useTrial = false) => {
+  // 베타 단계: Pro/Premium 업그레이드 시 실제 결제 진행 전 안내 모달 강제 노출.
+  // 사용자가 "베타 알림 신청" 을 선택하면 waitlist 에 등록만 진행. 실제 결제는 미진행.
+  const handleUpgrade = useCallback((targetTier, useTrial = false) => {
     if (!user?.id) {
       if (onRequestLogin) onRequestLogin();
       else showToast("로그인 후 구독할 수 있어요.", "warn");
@@ -515,29 +548,51 @@ export default function Pricing({ onRequestLogin } = {}) {
       showToast("이미 무료 플랜을 사용 중이세요.", "info");
       return;
     }
+    // 베타 단계 — 실제 결제 호출 (requestUpgrade) 차단, 안내 모달만 표시
+    try { ga.event("subscription_beta_blocked", { tier: targetTier, trial: useTrial }); } catch {}
+    setBetaModal({ targetTier, useTrial });
+  }, [user, onRequestLogin, showToast]);
+
+  // 베타 알림 신청 — localStorage + (선택) API
+  const handleBetaWaitlist = useCallback(async () => {
+    if (!betaModal) return;
     setBusy(true);
     try {
-      const newSub = await requestUpgrade({
-        uid: user.id,
-        targetTier,
-        useTrial,
-        paymentToken: useTrial ? null : `mock-${Date.now()}`,
-      });
-      try { ga.event("subscription_upgrade", { tier: targetTier, trial: useTrial }); } catch {}
-      showToast(
-        useTrial
-          ? `14일 Pro 무료 체험이 시작되었어요. (만료: ${new Date(newSub.trialEndsAt).toLocaleDateString("ko-KR")})`
-          : `${TIER_LABELS[targetTier].ko} 구독이 활성화되었어요.`,
-        "success"
-      );
-      // 사용자 객체 갱신 — App.jsx 가 polling 으로 반영하거나 새로고침 권장
-      setTimeout(() => window.location.reload(), 1500);
+      const payload = {
+        email: user?.email || null,
+        uid: user?.id || null,
+        targetTier: betaModal.targetTier,
+        useTrial: betaModal.useTrial,
+        requestedAt: new Date().toISOString(),
+      };
+      // 1차: localStorage 로컬 캐시 (서버 미배포 환경 대비)
+      try {
+        const key = "zepta:beta-waitlist:payment";
+        const prev = JSON.parse(localStorage.getItem(key) || "[]");
+        prev.push(payload);
+        localStorage.setItem(key, JSON.stringify(prev));
+      } catch {}
+      // 2차: 서버 적재 시도 (실패해도 UX 진행)
+      try {
+        await fetch("/api/beta-waitlist", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      } catch (e) {
+        // 서버 없음 — silent fallback
+        // eslint-disable-next-line no-console
+        console.info("[beta-waitlist] server未연결, localStorage 만 저장됨", e?.message);
+      }
+      try { ga.event("subscription_beta_waitlist", { tier: betaModal.targetTier }); } catch {}
+      showToast("베타 알림 신청 완료! 정식 결제가 열리면 가장 먼저 알려드릴게요.", "success");
+      setBetaModal(null);
     } catch (e) {
-      showToast(`업그레이드 실패: ${e.message}`, "error");
+      showToast(`신청 실패: ${e.message}`, "error");
     } finally {
       setBusy(false);
     }
-  }, [user, onRequestLogin, showToast]);
+  }, [betaModal, user, showToast]);
 
   return (
     <div style={{
@@ -558,6 +613,31 @@ export default function Pricing({ onRequestLogin } = {}) {
         <p style={{ fontSize: FONT.base, color: C.text2, margin: 0, lineHeight: 1.6 }}>
           투자 도구를 더 강력하게. 언제든 시작하고, 언제든 해지하세요.
         </p>
+        {/* 🧪 베타 단계 배지 — 결제는 시뮬레이션만 가능 (A-1) */}
+        <div style={{
+          marginTop: 16,
+          padding: isMobile ? "10px 14px" : "12px 18px",
+          background: `${C.yellow}15`,
+          border: `1px solid ${C.yellow}55`,
+          borderRadius: RADIUS.lg,
+          color: C.text1,
+          fontSize: FONT.sm,
+          fontWeight: 600,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          flexWrap: "wrap",
+          justifyContent: "center",
+          lineHeight: 1.5,
+          maxWidth: 720,
+        }}>
+          <span style={{ fontSize: 16 }}>🧪</span>
+          <strong style={{ color: C.yellow }}>베타</strong>
+          <span style={{ color: C.text2 }}>·</span>
+          <span style={{ color: C.text2 }}>실제 결제는 2026 Q3 오픈 예정</span>
+          <span style={{ color: C.text3 }}>·</span>
+          <span style={{ color: C.text3 }}>지금은 기능 체험용</span>
+        </div>
         {trialDaysLeft > 0 && (
           <div style={{
             display: "inline-block",
@@ -641,6 +721,120 @@ export default function Pricing({ onRequestLogin } = {}) {
 
       {/* 면책 */}
       <LegalFooter C={C} />
+
+      {/* 🧪 베타 결제 차단 안내 모달 (A-1) — 모든 Pro/Premium 구독 시도 시 강제 표시 */}
+      {betaModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="beta-modal-title"
+          onClick={() => !busy && setBetaModal(null)}
+          style={{
+            position: "fixed", inset: 0,
+            background: "rgba(0,0,0,0.65)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            zIndex: 11000,
+            padding: isMobile ? 16 : 0,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: C.card,
+              border: `1px solid ${C.border}`,
+              borderRadius: 16,
+              padding: isMobile ? "24px 18px" : "32px 28px",
+              maxWidth: 440,
+              width: "100%",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.45)",
+            }}
+          >
+            <div style={{ fontSize: 36, textAlign: "center", marginBottom: 12 }}>🧪</div>
+            <h3
+              id="beta-modal-title"
+              style={{
+                margin: "0 0 12px",
+                fontSize: isMobile ? FONT.lg : FONT.xl,
+                fontWeight: 800,
+                color: C.text1,
+                textAlign: "center",
+                lineHeight: 1.4,
+              }}
+            >
+              결제는 아직 베타 단계입니다
+            </h3>
+            <p style={{
+              margin: "0 0 12px",
+              fontSize: FONT.sm,
+              color: C.text2,
+              lineHeight: 1.7,
+              textAlign: "center",
+            }}>
+              Zepta 구독 결제는 현재 <strong style={{ color: C.text1 }}>시뮬레이션만</strong> 제공하고 있어요.
+            </p>
+            <p style={{
+              margin: "0 0 12px",
+              fontSize: FONT.sm,
+              color: C.text2,
+              lineHeight: 1.7,
+              textAlign: "center",
+            }}>
+              실제 카드 결제 (토스 페이먼츠·Stripe) 는 <strong style={{ color: C.text1 }}>2026 Q3</strong> 안에 정식 오픈 예정입니다.
+            </p>
+            <p style={{
+              margin: "0 0 20px",
+              fontSize: FONT.sm,
+              color: C.text2,
+              lineHeight: 1.7,
+              textAlign: "center",
+            }}>
+              베타 알림을 신청하시면 정식 결제가 열리는 즉시 가장 먼저 알려드릴게요.
+            </p>
+            <div style={{ display: "flex", gap: 12, flexDirection: isMobile ? "column-reverse" : "row" }}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setBetaModal(null)}
+                style={{
+                  flex: 1,
+                  padding: "12px 16px",
+                  minHeight: 44,
+                  background: C.card2,
+                  border: `1px solid ${C.border}`,
+                  color: C.text1,
+                  borderRadius: RADIUS.md,
+                  fontSize: FONT.sm,
+                  fontWeight: 700,
+                  cursor: busy ? "default" : "pointer",
+                  opacity: busy ? 0.6 : 1,
+                }}
+              >
+                닫기
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={handleBetaWaitlist}
+                style={{
+                  flex: 1,
+                  padding: "12px 16px",
+                  minHeight: 44,
+                  background: C.blue,
+                  border: "none",
+                  color: "#fff",
+                  borderRadius: RADIUS.md,
+                  fontSize: FONT.sm,
+                  fontWeight: 700,
+                  cursor: busy ? "default" : "pointer",
+                  opacity: busy ? 0.7 : 1,
+                }}
+              >
+                {busy ? "신청 중…" : "베타 알림 신청 →"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Toast */}
       {toast && (
