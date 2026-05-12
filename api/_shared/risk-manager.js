@@ -117,11 +117,14 @@ export const RISK_CONFIG = {
   absoluteMaxMarginUsd: 300, // 한 거래 마진 최대 $300 → 10x lev = 노셔널 $3000
   absoluteMaxNotional: 300,  // (deprecated, no longer enforced)
 
-  // ★ 2026-05-11 대표 지시: 포지션당 최소 원금 (마진 기준) $100.
+  // ★ 2026-05-11 대표 지시: 포지션당 최소 원금 (마진 기준).
   //   너무 작은 포지션은 수수료/슬리피지 대비 의미 없는 거래라 ROI 기여도 0에 가까움.
-  //   $100 마진 × lev 10x = 노셔널 $1000 (absoluteMaxMarginUsd=$300 안에 들어감)
-  //   자본 $370 × 마진 50% cap = $185 → minMargin $100 만족 가능 (개당).
-  minMarginUsd: 100,
+  // ★ 2026-05-12: $100 → $50 완화.
+  //   자본 $519 + maxTotalMarginRatio 0.6 = 마진 한도 $311.
+  //   minMargin $100 면 거래 3개 (자본 60%). 다양화 부족.
+  //   minMargin $50 → 거래 6개 가능 (자본 60% 안 6×$50=$300). 시그널 다양성 ↑.
+  //   $50 마진 × lev 10x = 노셔널 $500 (absoluteMaxMarginUsd=$300 안에 들어감)
+  minMarginUsd: 50,
 
   // ★ 작은 계정 구제: notional 이 minNotional×safety 미만일 때
   //   qty 를 bump 하되, 그 결과의 실효 손실(effLossPct × notional) 이
