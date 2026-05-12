@@ -58,12 +58,40 @@ async function fetchUserData(kv, userId) {
   return { userId, shadow, live, ledger };
 }
 
+// ★ 2026-05-12 hotfix: shadow ledger 의 옛 trade 들이 strategy id 를 raw family
+// 값 ("trend", "mean", "unknown" 등) 으로 적재해서 leaderboard 가 옛 키만 가짐.
+// auto-promote 는 DEFAULT_STRATEGY_WEIGHTS 의 새 키 (trend-follow, mean-revert 등) 로
+// 조회하므로 모든 strategy 가 metrics 없음 → "no data" 강등 발생.
+// 매핑 테이블로 raw family → 새 strategy id 통합 → leaderboard 정상화.
+const RAW_SID_TO_NEW = {
+  "trend":          "trend-follow",
+  "trending":       "trend-follow",
+  "mean-reverting": "mean-revert",
+  "mean":           "mean-revert",
+  "reverting":      "mean-revert",
+  "breakout":       "breakout",
+  "momentum":       "momentum-rotation",
+  "rotation":       "momentum-rotation",
+  "volatility":     "volatility-arb",
+  "vol-arb":        "volatility-arb",
+  "hurst":          "hurst-trend",
+  "defi":           "defi-momentum",
+  "ensemble":       "ensemble",
+};
+function normalizeStrategyId(rawSid) {
+  if (!rawSid) return "unknown";
+  if (RAW_SID_TO_NEW[rawSid]) return RAW_SID_TO_NEW[rawSid];
+  // 이미 정규화된 id (trend-follow 등) 또는 신규 family 는 그대로
+  return rawSid;
+}
+
 // ledger 의 CLOSED 항목에서 strategy 별 PnL 시계열 추출 (Sharpe / maxDD 계산용)
 function strategyPnlSeries(ledger) {
   const out = {}; // strategyId -> Array<{ts, pnlPct, holdMs}>
   for (const e of ledger || []) {
     if (e?.status !== "CLOSED") continue;
-    const sid = e?.plan?.strategyId || e?.signal?.strategy || e?.plan?.strategyFamily || e?.signal?.strategyFamily || "unknown";
+    const rawSid = e?.plan?.strategyId || e?.signal?.strategy || e?.plan?.strategyFamily || e?.signal?.strategyFamily || "unknown";
+    const sid = normalizeStrategyId(rawSid);
     const tf = e?.signal?.timeframe || "unknown";
     const sym = e?.plan?.symbol || e?.signal?.symbol || "unknown";
     const ts = Date.parse(e.closedAt || e.openedAt || "") || 0;
@@ -143,9 +171,11 @@ function aggregateAcrossUsers(userDatas) {
       }
     }
     // shadow-summary fallback (ledger 가 빈약해도 byFamily 는 누적됨)
+    // ★ family raw id ("trend", "mean" 등) 도 normalizeStrategyId 로 정규화 → new id 통합
     const sum = ud.shadow;
     if (sum?.byFamily) {
-      for (const [fam, s] of Object.entries(sum.byFamily)) {
+      for (const [rawFam, s] of Object.entries(sum.byFamily)) {
+        const fam = normalizeStrategyId(rawFam);
         if (!familyFallback[fam]) familyFallback[fam] = { trades: 0, wins: 0, netPnL: 0 };
         familyFallback[fam].trades += s.trades || 0;
         familyFallback[fam].wins += s.wins || 0;
