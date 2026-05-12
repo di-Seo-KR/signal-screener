@@ -34,12 +34,13 @@ export default async function handler(req, res) {
     if (!userId) return res.status(400).json({ error: "userId required" });
 
     const kv = await getKv();
-    const [killed, phase1, shadowEnrolled, breaker, engineLog, orders, shadowSummary, shadowLedger, reconcileLog] = await Promise.all([
+    const [killed, phase1, shadowEnrolled, breaker, engineLog, engineHeartbeat, orders, shadowSummary, shadowLedger, reconcileLog] = await Promise.all([
       isKillSwitchEnabled(userId),
       kv.get(`di:real:user:${userId}:phase1_enabled`),
       kv.get(`di:real:user:${userId}:shadow_enabled`),
       getBreakerState(userId),
       kv.get(`di:real:user:${userId}:engine-log`),
+      kv.get(`di:real:user:${userId}:engine-heartbeat`),  // ★ 매 cron 갱신 — dot 판정 SSOT
       kv.get(`di:real:user:${userId}:orders`),
       kv.get(`di:real:user:${userId}:shadow-summary`),
       kv.get(`di:real:user:${userId}:shadow-ledger`),
@@ -72,11 +73,18 @@ export default async function handler(req, res) {
     }
 
     // ★ 2026-05-09: 시스템 상태 위젯 (Widget 7) — 엔진 마지막 실행 / 최근 오류 추출
-    //   engine-log 의 마지막 항목과 마지막 error 항목 시각만 뽑아 가볍게 노출.
+    // ★ 2026-05-13 fix: engineLastRunAt 는 engine-heartbeat KV 를 SSOT 로 사용.
+    //   engine-log 는 "시그널 처리 사이클" 만 기록 → "no recent signals" 빈 사이클 누락 →
+    //   30분 빈 사이클 연속 시 dot 빨강. heartbeat 는 매 cron 진입 시 갱신 → 정확.
+    //   fallback 으로 engine-log 도 사용 (옛 데이터 보호 + heartbeat 미적재 케이스).
     let engineLastRunAt = null;
     let lastErrorAt = null;
-    if (Array.isArray(engineLog) && engineLog.length > 0) {
+    if (engineHeartbeat?.time) {
+      engineLastRunAt = engineHeartbeat.time;
+    } else if (Array.isArray(engineLog) && engineLog.length > 0) {
       engineLastRunAt = engineLog[0]?.time || null;
+    }
+    if (Array.isArray(engineLog) && engineLog.length > 0) {
       const errEntry = engineLog.find((e) => e?.error || e?.level === "error");
       lastErrorAt = errEntry?.time || null;
     }

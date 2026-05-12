@@ -54,6 +54,12 @@ async function getKv() {
 //   4시간으로 늘려 최근 사이클의 시그널까지 진입 후보로 사용.
 async function pullRecentSignals({ userId, lookbackMs = 4 * 60 * 60 * 1000, advanceCursor = true }) {
   const kv = await getKv();
+  // ★ 2026-05-13 architectural fix: 시그널 풀 SSOT 우선 사용.
+  //   대표 지시: "다시는 실제매매 쪽이 이런 이슈들로 영향받지 않게"
+  //   기존 di:bot:*:perf 의존성은 가상 포트폴리오 한도/skip 에 영향 받음 → 풀 empty 위험.
+  //   di:signals:realtime-pool 은 btc-cron 이 시그널 생성 시 항상 push (가상매매 결과 무관)
+  //   → real-trading engine 이 이 풀에서 직접 fetch 하면 가상매매와 완전 분리.
+  //   fallback 으로 di:bot:*:perf 도 유지 (옛 데이터 또는 풀 미적재 케이스 대비).
   const activeBots = (await kv.get("di:active-bots")) || [];
   const cryptoBots = activeBots.filter((b) =>
     /^(btc-alpha|highcap-momentum|defi-infra|meme-trend|l2-emerging|crypto-diversity|crypto-swing)/
@@ -76,8 +82,51 @@ async function pullRecentSignals({ userId, lookbackMs = 4 * 60 * 60 * 1000, adva
   // ★ 2026-05-09 audit M2: BUY 만 수집하던 게 SHORT 시그널 영구 누락 원인.
   //   가상매매 봇이 SELL 시그널을 만들어도 실전 엔진이 절대 못 봄 → 약세장 알파 0.
   //   현재: BUY/SELL 둘 다 수집. signal-extractor 가 LONG/SHORT 매핑 처리.
-  const diag = { activeBots: activeBots.length, cryptoBots: cryptoBots.length, tradesScanned: 0, buyFound: 0, sellFound: 0, inWindow: 0, perBotDedup: 0 };
+  const diag = { activeBots: activeBots.length, cryptoBots: cryptoBots.length, tradesScanned: 0, buyFound: 0, sellFound: 0, inWindow: 0, perBotDedup: 0, poolHits: 0, perfHits: 0 };
   const candidates = [];
+  const seenAssetType = new Set(); // (asset:type) dedup — 풀과 perf 양쪽에서 최신 1개만
+
+  // ★ 2026-05-13 architectural fix: 시그널 풀 SSOT 우선 사용 (가상매매와 완전 분리).
+  //   di:signals:realtime-pool 은 btc-cron 이 시그널 생성 시마다 push (가상 포트폴리오 한도/skip 무관).
+  //   pool 이 비어있으면 fallback 으로 di:bot:*:perf 사용 → 다중 소스 fail-safe.
+  try {
+    const pool = (await kv.get("di:signals:realtime-pool")) || [];
+    // 최신순 정렬 (방어적 — btc-cron 에서 prepend 하므로 이미 최신순이지만 확실히)
+    const sortedPool = [...pool].sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    for (const entry of sortedPool) {
+      const ts = entry.ts || 0;
+      if (ts <= minTs) continue;
+      if (now - ts > lookbackMs) continue;
+      const isBuy = entry.type === "BUY";
+      const isSell = entry.type === "SELL";
+      if (!isBuy && !isSell) continue;
+      const key = `${entry.asset}:${entry.type}`;
+      if (seenAssetType.has(key)) continue; // 최신 1개만
+      seenAssetType.add(key);
+      diag.poolHits += 1;
+      if (isBuy) diag.buyFound += 1;
+      if (isSell) diag.sellFound += 1;
+      diag.inWindow += 1;
+      candidates.push({
+        asset: entry.asset,
+        source: entry.source || "signal-pool",
+        signal: {
+          type: entry.type,
+          confidence: entry.confidence || "B",
+          score: entry.score ?? 60,
+          reason: entry.reason || `${entry.source || "pool"} ${entry.type}`,
+          family: entry.family || undefined,
+          timeframe: entry.timeframe || undefined,
+          positionSize: entry.positionSize || 0.5,
+        },
+        ts,
+      });
+    }
+  } catch (poolErr) {
+    diag.poolError = poolErr?.message;
+  }
+
+  // Fallback: di:bot:*:perf 의 trades — 풀 미적재 케이스 또는 옛 데이터 보강
   for (const b of cryptoBots) {
     const botId = b.id || b.botId;
     const perf = await kv.get(`di:bot:${botId}:perf`);
@@ -103,7 +152,15 @@ async function pullRecentSignals({ userId, lookbackMs = 4 * 60 * 60 * 1000, adva
         diag.perBotDedup += 1;
         continue;
       }
+      // ★ 전역 (asset:type) dedup — 시그널 풀에서 이미 가져왔으면 중복 적재 방지
+      const globalKey = `${t.asset}:${t.type}`;
+      if (seenAssetType.has(globalKey)) {
+        diag.perBotDedup += 1;
+        continue;
+      }
       seenAssetsThisBot.add(t.asset);
+      seenAssetType.add(globalKey);
+      diag.perfHits += 1;
       candidates.push({
         asset: t.asset,
         source: `bot:${botId}`,
@@ -223,6 +280,23 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   const steps = [];
   const S = (m) => steps.push(m);
   const startedAt = new Date().toISOString();
+
+  // ★ 2026-05-13 fix: engine heartbeat — 진입 즉시 timestamp KV 갱신.
+  //   대시보드의 "엔진" dot 가 engine-log[0]?.time 으로 판정하는데, "no recent signals"
+  //   사이클은 engine-log 에 push 안 함 → 30분 빈 사이클 연속 시 dot 빨강 표시.
+  //   heartbeat 는 어떤 종료 사유든 무관하게 매 cron 마다 update → dot 정확 표시.
+  //   shadow/dry-run/probe 도 모두 heartbeat 갱신 (엔진이 살아있다는 사실 표시).
+  try {
+    const kvHb = await getKv();
+    await kvHb.set(`di:real:user:${userId}:engine-heartbeat`, {
+      time: startedAt,
+      mode: shadow ? "shadow" : (forceDryRun ? "dry" : "live"),
+      probe: !!probe,
+    });
+  } catch (hbErr) {
+    // heartbeat 실패는 정상 흐름 막지 않음
+    S(`heartbeat failed: ${hbErr?.message}`);
+  }
 
   // 1) phase1_enabled (dry run 은 우회)
   if (!forceDryRun) {

@@ -493,6 +493,35 @@ export default async function handler(req, res) {
 
       addLog(`🎯 ${asset} 시그널: ${latestSignal.type} | ${latestSignal.confidence}급 | ${latestSignal.score}pt`);
 
+      // ★ 2026-05-13 architectural fix: 시그널 풀 SSOT 적재.
+      //   실거래 engine 이 di:bot:*:perf 가 아닌 di:signals:realtime-pool 에서 시그널을 가져오면
+      //   가상 포트폴리오 한도 / cron 중단 / skip 여부와 완전 독립적으로 작동.
+      //   대표 지시: "다시는 실제매매 쪽이 이런 이슈들로 영향받지 않게"
+      try {
+        const poolKey = "di:signals:realtime-pool";
+        const existingPool = (await kv.get(poolKey)) || [];
+        const newEntry = {
+          ts: Date.now(),
+          time: new Date().toISOString(),
+          asset,
+          type: latestSignal.type,
+          confidence: latestSignal.confidence,
+          score: latestSignal.score,
+          family: latestSignal.family,
+          timeframe: latestSignal.timeframe,
+          side: latestSignal.side,
+          reason: (latestSignal.reason || "").slice(0, 200),
+          positionSize: latestSignal.positionSize || 0.5,
+          source: "btc-cron",
+        };
+        // 최근 4시간 윈도우만 유지 + 최대 200건 cap
+        const cutoffMs = Date.now() - 4 * 60 * 60 * 1000;
+        const updatedPool = [newEntry, ...existingPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200);
+        await kv.set(poolKey, updatedPool);
+      } catch (poolErr) {
+        addLog(`⚠️ ${asset} 시그널 풀 적재 실패: ${poolErr.message}`);
+      }
+
       // 현재 포지션 확인
       const pos = positionMap[asset];
       const currentExposure = pos ? parseFloat(pos.market_value || 0) : 0;
@@ -618,7 +647,20 @@ export default async function handler(req, res) {
       }
 
       if (!latestSignal || (latestSignal.type === "BUY" && tradeAmount <= 10)) {
-        assetResults.push({ asset, ok: true, action: "skip", signal: latestSignal });
+        // ★ 2026-05-13 hotfix: skip 인 BUY 시그널도 signalOnly 마커로 기록.
+        //   가상 포트폴리오 95% 한도 도달 시 모든 BUY skip → perf.trades 누적 중단 →
+        //   실거래 engine 의 pullRecentSignals 시그널 풀 empty → "no recent signals" 영구화.
+        //   해결: skip 시에도 type:"BUY" + amount:0 + signalOnly:true 로 기록 → engine 시그널 풀 유지.
+        //   가상 포트폴리오 손익 (realizedPL, totalBuyCost) 에는 영향 없음 (amount 0).
+        if (latestSignal && latestSignal.type === "BUY") {
+          assetResults.push({
+            asset, ok: true, type: "BUY", signal: latestSignal,
+            amount: 0, price: currentPrice, pnl: null,
+            signalOnly: true,  // 봇 perf 누적 시 통계 제외 마커
+          });
+        } else {
+          assetResults.push({ asset, ok: true, action: "skip", signal: latestSignal });
+        }
       }
     }
 
@@ -637,6 +679,7 @@ export default async function handler(req, res) {
 
     // ── 봇별 성과 KV 저장 ──
     try {
+      // ★ signalOnly 마커 trade 도 포함 — perf.trades 에 누적 후 통계는 별도 처리 (라인 ~699)
       const executedTrades = assetResults.filter(r => r.type === "BUY" || r.type === "SELL");
 
       if (executedTrades.length > 0) {
@@ -667,6 +710,7 @@ export default async function handler(req, res) {
                 price: trade.price,
                 pnl: trade.pnl,
                 strategy: stratName,
+                signalOnly: !!trade.signalOnly,  // signal-only 마커 보존 (UI/통계 분기용)
                 signal: {
                   reason: (trade.signal?.reason || "").slice(0, 200),
                   score: trade.signal?.score ?? 60,
@@ -681,6 +725,10 @@ export default async function handler(req, res) {
               },
               ...(existing.trades || []),
             ].slice(0, 200);
+            // ★ signalOnly 인 trade 는 tradeCount/realizedPL/totalBuyCost 등 통계 제외 — 시그널 풀 전용 기록
+            if (trade.signalOnly) {
+              // 통계 누적 건너뜀 — 다음 if/else 모두 skip
+            } else {
             existing.tradeCount = (existing.tradeCount || 0) + 1;
             if (trade.type === "BUY") {
               existing.totalBuyCost = (existing.totalBuyCost || 0) + (trade.amount || 0);
@@ -702,11 +750,14 @@ export default async function handler(req, res) {
                 }
               }
             }
+            } // ← signalOnly else 블록 닫기
             existing.lastUpdated = new Date().toISOString();
             await kv.set(key, existing);
           }
         }
-        addLog(`📊 봇별 성과 KV 저장: ${executedTrades.length}건 분배`);
+        const realCount = executedTrades.filter(t => !t.signalOnly).length;
+        const sigCount = executedTrades.filter(t => t.signalOnly).length;
+        addLog(`📊 봇별 성과 KV 저장: ${executedTrades.length}건 (실거래 ${realCount} + 시그널풀 ${sigCount})`);
       }
 
       // 봇별 포지션 스냅샷 (활성 봇만 — 비활성 봇은 스냅샷 갱신하지 않음)
