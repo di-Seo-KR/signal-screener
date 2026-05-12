@@ -46,7 +46,22 @@ export const RISK_CONFIG = {
   //   노셔널 가드는 10x 늘려 사실상 비활성 — 마진 가드 의지.
   maxTotalNotionalRatio: 10.0,  // 사실상 무제한 (마진 가드 0.6 이 실 안전망)
   // 합산 마진 노출 cap (위 노셔널과 별개로 마진 합산도 제한)
-  maxTotalMarginRatio: 0.6,     // 자본의 60% 가 마진 묶이면 추가 진입 차단
+  // ★ 2026-05-12 hotfix v2: 0.85 → 0.95 (대표 지시: "자본 한도의 95%까지는 다 사용해서 진입").
+  //   $518 × 0.95 = $492 한도 → 자본 거의 풀 사용 → 거래 다양화 극대화.
+  //   대신 "무지성 진입 방지" 안전망: utilizationMinConfidence 단계별 quality guard 도입 (아래).
+  //   env ZEPTA_MAX_TOTAL_MARGIN_RATIO 로 즉시 strict 복원 가능 (위험 식별 시 0.7 또는 0.85).
+  maxTotalMarginRatio: 0.95,    // 자본의 95% 까지 마진 사용 허용
+
+  // ★ 무지성 진입 방지 — 자본 사용률이 높을수록 신규 진입의 시그널 강도 요구 상향.
+  //   대표 지시 (2026-05-12): "한도 맞추려고 무지성으로 진입하게 해서는 안되고"
+  //   사용률 0.0~0.70: 기본 minConfidence (시그널 자체의 quality 가드만)
+  //   사용률 0.70~0.85: confidence >= 0.65 (중강도 시그널)
+  //   사용률 0.85~0.95: confidence >= 0.75 (강한 시그널만)
+  //   사용률 ≥ 0.95: 무조건 차단
+  utilizationMinConfidence: [
+    { threshold: 0.70, minConf: 0.65 },
+    { threshold: 0.85, minConf: 0.75 },
+  ],
 
   // ★ 2026-05-12 대표 지시: 같은 심볼 averaging 자유화.
   //   pyramidMinR — checkPyramidGuard 가 averaging 차단 시 사용할 R 임계값.
@@ -234,7 +249,9 @@ export function checkAggregateExposure({ plan, openPositions, equity, cfg = RISK
   const newSumNotional = sumNotional + plan.notional;
   const newSumMargin = sumMargin + (plan.marginRequired || (plan.notional / (plan.leverage || 10)));
   const notionalCap = equity * (cfg.maxTotalNotionalRatio || 1.5);
-  const marginCap = equity * (cfg.maxTotalMarginRatio || 0.6);
+  // env override 우선 — 런타임 조정 가능 (대표가 위험 식별 시 즉시 0.6 로 strict 복원 가능)
+  const marginRatio = Number(process.env.ZEPTA_MAX_TOTAL_MARGIN_RATIO) || cfg.maxTotalMarginRatio || 0.85;
+  const marginCap = equity * marginRatio;
   push(`예정 합산 noSi=$${newSumNotional.toFixed(2)} margin=$${newSumMargin.toFixed(2)} (cap noSi=$${notionalCap.toFixed(2)}, margin=$${marginCap.toFixed(2)})`);
 
   if (newSumNotional > notionalCap) {
@@ -247,10 +264,33 @@ export function checkAggregateExposure({ plan, openPositions, equity, cfg = RISK
   if (newSumMargin > marginCap) {
     return {
       ok: false,
-      reason: `합산 마진 $${newSumMargin.toFixed(2)} > 한도 $${marginCap.toFixed(2)} (${((cfg.maxTotalMarginRatio||0.6)*100).toFixed(0)}% of equity)`,
+      reason: `합산 마진 $${newSumMargin.toFixed(2)} > 한도 $${marginCap.toFixed(2)} (${(marginRatio*100).toFixed(0)}% of equity)`,
       sumNotional, sumMargin, log,
     };
   }
+
+  // ★ 무지성 진입 방지 — 자본 사용률 기반 동적 quality guard.
+  //   사용률이 높을수록 강한 시그널만 통과시켜 "한도 맞추려고 약한 시그널도 진입" 차단.
+  //   plan.confidence 는 signal.confidence 그대로 복사됨 (planTrade 결과).
+  const utilizationPct = newSumMargin / equity;
+  const guardTiers = cfg.utilizationMinConfidence || [];
+  // tier 는 threshold 오름차순. 사용률이 가장 높은 적용 tier 의 minConf 사용.
+  let requiredMinConf = 0;
+  for (const tier of guardTiers) {
+    if (utilizationPct >= tier.threshold) requiredMinConf = tier.minConf;
+  }
+  if (requiredMinConf > 0) {
+    const planConf = plan.confidence ?? plan.signalConfidence ?? 0;
+    if (planConf < requiredMinConf) {
+      push(`utilization guard: ${(utilizationPct*100).toFixed(0)}% used → require conf ≥ ${requiredMinConf}, plan conf=${planConf}`);
+      return {
+        ok: false,
+        reason: `자본 사용률 ${(utilizationPct*100).toFixed(0)}% — 강한 시그널 (confidence ≥ ${requiredMinConf}) 만 추가 진입 허용 (현재 ${planConf})`,
+        sumNotional, sumMargin, log,
+      };
+    }
+  }
+
   return { ok: true, sumNotional, sumMargin, log };
 }
 

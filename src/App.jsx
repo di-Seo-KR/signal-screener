@@ -15,6 +15,7 @@ import { supabase } from "./supabaseClient.js";
 import { THEME_TOKENS } from "./ui/theme.jsx";
 import { useIsMobile } from "./ui/useBreakpoint.jsx";
 import { BottomSheet, ActionSheet } from "./ui/bottom-sheet.jsx";
+import { PageHeader } from "./ui/primitives.jsx";
 // 기술 지표 (App.jsx 분리 1단계 — 순수 유틸)
 import {
   calcRSI, calcRSIArray, calcVolumeProfile, calcSMA, calcBB,
@@ -110,7 +111,9 @@ function NicknameEditor({ user, supabase, onUpdate }) {
               style={{
                 flex: 1, padding: "8px 12px", borderRadius: "8px",
                 border: `1px solid ${C.border}40`, background: "transparent",
-                color: C.text1, fontSize: "14px",
+                color: C.text1,
+                // iOS Safari zoom 방지 — input fontSize ≥ 16px
+                fontSize: "16px",
               }}
             />
             <button
@@ -1624,7 +1627,8 @@ function SearchBar({ onSelect, placeholder = "종목 검색 (예: AAPL, 삼성�
             width: compact ? "120px" : "100%",
             padding: compact ? "6px 10px" : "13px 16px 13px 42px",
             borderRadius: compact ? "8px" : "14px",
-            fontSize: compact ? "12px" : "14px",
+            // iOS Safari zoom 방지 — 모바일 input fontSize ≥ 16px (compact 모드도 동일)
+            fontSize: "16px",
             background: compact ? C.card2 : C.card,
             border: `1px solid ${focused ? C.blue : compact ? C.border2 : C.border}`, color: C.text1,
             outline: "none", transition: "border-color .2s, box-shadow .2s, width .2s",
@@ -2860,6 +2864,26 @@ function AssetCard({ asset, onChart, isMobile = false }) {
 // ════════════════════════════════════════════════════════════════════
 function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHours = {}, isWatched = false, onToggleWatch = () => {} }) {
   const isMobile = useIsMobile();
+  // mf — 모바일 폰트 스케일 헬퍼 (line 4424 메인 컴포넌트와 동일 정의).
+  // 2026-05-12 critical fix: AssetDetailPopup closure 에 mf 미정의 → line 4000~4009 의
+  // mf(15) 4곳 호출 시 ReferenceError 발생 → 종목 카드 클릭 시 새로고침/오류.
+  const mf = useCallback((px) => {
+    if (isMobile) {
+      if (px <= 9) return "12px";
+      if (px <= 10) return "12px";
+      if (px <= 11) return "14px";
+      if (px <= 12) return "14px";
+      return `${px}px`;
+    }
+    if (px <= 9) return "12px";
+    if (px <= 10) return "14px";
+    if (px <= 11) return "14px";
+    if (px <= 12) return "14px";
+    if (px <= 13) return "15px";
+    if (px <= 14) return "16px";
+    if (px <= 15) return "18px";
+    return `${px}px`;
+  }, [isMobile]);
   const [techData, setTechData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fundamentals, setFundamentals] = useState(null);
@@ -4232,6 +4256,27 @@ function AppInner() {
       setShowAuthModal(false);
     }
   }, [user, showAuthModal]);
+
+  // ── 베타 가입자 수 (MKT-LEAD 2026-05-12) ──
+  // 홈 비로그인 배너의 신뢰 시그널 4-pill 중 "베타 무료" → "베타 사용자 N+" 로 동적 노출.
+  // 비로그인 사용자만 fetch (로그인 사용자에겐 배너 미노출).
+  const [betaCount, setBetaCount] = useState(null);
+  useEffect(() => {
+    if (user) return; // 로그인 사용자는 fetch 불필요
+    let cancelled = false;
+    fetch("/api/stats/beta-count")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled) return;
+        if (d?.ok && typeof d.count === "number" && d.count > 0) {
+          setBetaCount(d.count);
+        }
+      })
+      .catch(() => {
+        /* fail-soft — static fallback ("베타 무료") 유지 */
+      });
+    return () => { cancelled = true; };
+  }, [user]);
 
   // ── 입문자 온보딩 (PLAN-SVC #5, 2026-05-11) ──
   // 가입 직후 1회 자동 표시. user_metadata.onboarding.completed 로 1회 가드.
@@ -7508,7 +7553,10 @@ function AppInner() {
                     { icon: "🧪", label: "검증 전략", value: "33개" },
                     { icon: "📡", label: "라이브 데이터", value: "Yahoo · Binance" },
                     { icon: "🔒", label: "보안", value: "TLS 1.3 · Supabase Auth" },
-                    { icon: "💳", label: "결제", value: "베타 무료" },
+                    // ★ 2026-05-12 MKT-LEAD: 베타 가입자 수 동적 노출 (fail-soft → "베타 무료")
+                    betaCount && betaCount > 0
+                      ? { icon: "👥", label: "베타 사용자", value: `${betaCount.toLocaleString("ko-KR")}+` }
+                      : { icon: "💳", label: "결제", value: "베타 무료" },
                   ].map((it, i) => (
                     <div key={i} style={{
                       display: "inline-flex", alignItems: "center", gap: "8px",
@@ -9826,21 +9874,106 @@ function AppInner() {
               );
             })()}
 
-            {/* 대기 상태 */}
+            {/* 대기 상태 + 조건 완화 추천 (DEV-IMPL 2026-05-12) */}
             {!scanning && results.length === 0 && (
               <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "16px", padding: "48px 24px", textAlign: "center" }}>
                 <div style={{ fontSize: mf(44), marginBottom: "16px" }}>{lastScan ? "🔍" : "📡"}</div>
                 <div style={{ fontWeight: 700, fontSize: mf(18), marginBottom: "8px", color: C.text1 }}>
-                  {lastScan ? "시그널 없음" : "스캔 대기 중"}
+                  {lastScan ? "조건에 맞는 종목이 없어요" : "스캔 대기 중"}
                 </div>
                 <div style={{ color: C.text3, fontSize: mf(18), lineHeight: 1.7 }}>
                   {lastScan ? (
-                    <>선택한 조건에 해당하는 종목이 없습니다<br />조건을 변경하거나 OR 모드를 사용해보세요</>
+                    <>현재 조건이 너무 엄격할 수 있어요<br />아래 추천 중 하나를 골라 다시 스캔해보세요</>
                   ) : (
                     <>조건 선택 후 <strong style={{ color: C.blue }}>스캔 시작</strong>을 눌러주세요<br />
                     미국 · 한국 주식 + 크립토 {US_ASSETS.length + KR_ASSETS.length + CRYPTO_ASSETS.length}개 자산 분석</>
                   )}
                 </div>
+
+                {/* ── 조건 완화 추천 (lastScan 이후, results 0건일 때만) ── */}
+                {lastScan && (
+                  <div style={{
+                    marginTop: "20px",
+                    display: "flex", flexDirection: "column", gap: "8px",
+                    maxWidth: "360px", margin: "20px auto 0",
+                  }}>
+                    {/* 진단 1: AND 모드 + 조건 다수 → OR 모드로 전환 */}
+                    {mode === "and" && conditions.length >= 2 && (
+                      <button
+                        onClick={() => setMode("or")}
+                        style={{
+                          padding: "12px 16px", borderRadius: "12px", fontSize: mf(15), fontWeight: 700,
+                          background: C.blueBg, color: C.blue,
+                          border: `1px solid ${C.blue}40`, cursor: "pointer",
+                          textAlign: "left", display: "flex", alignItems: "center", gap: "8px",
+                          minHeight: "44px",
+                        }}
+                      >
+                        <span>🔀</span>
+                        <span>AND → OR 모드로 변경 (하나라도 맞으면 표시)</span>
+                      </button>
+                    )}
+                    {/* 진단 2: 조건이 4개 이상 → 절반으로 줄이기 */}
+                    {conditions.length >= 4 && (
+                      <button
+                        onClick={() => setConditions(prev => prev.slice(0, Math.ceil(prev.length / 2)))}
+                        style={{
+                          padding: "12px 16px", borderRadius: "12px", fontSize: mf(15), fontWeight: 700,
+                          background: C.purpleBg, color: C.purple,
+                          border: `1px solid ${C.purple}40`, cursor: "pointer",
+                          textAlign: "left", display: "flex", alignItems: "center", gap: "8px",
+                          minHeight: "44px",
+                        }}
+                      >
+                        <span>✂️</span>
+                        <span>조건 {conditions.length}개 → {Math.ceil(conditions.length / 2)}개로 줄이기</span>
+                      </button>
+                    )}
+                    {/* 진단 3: 시장 필터가 적용중 → 전체로 확장 */}
+                    {filterMarket !== "all" && (
+                      <button
+                        onClick={() => setFilterMarket("all")}
+                        style={{
+                          padding: "12px 16px", borderRadius: "12px", fontSize: mf(15), fontWeight: 700,
+                          background: C.greenBg || `${C.green}15`, color: C.green,
+                          border: `1px solid ${C.green}40`, cursor: "pointer",
+                          textAlign: "left", display: "flex", alignItems: "center", gap: "8px",
+                          minHeight: "44px",
+                        }}
+                      >
+                        <span>🌍</span>
+                        <span>시장 필터 → 전체로 확장</span>
+                      </button>
+                    )}
+                    {/* 진단 4: 조건 1개 이상 → 전체 초기화 fallback */}
+                    {conditions.length > 0 && (
+                      <button
+                        onClick={() => { setConditions([]); setActivePreset(null); }}
+                        style={{
+                          padding: "12px 16px", borderRadius: "12px", fontSize: mf(14), fontWeight: 600,
+                          background: "transparent", color: C.text3,
+                          border: `1px solid ${C.border}`, cursor: "pointer",
+                          minHeight: "44px",
+                        }}
+                      >
+                        조건 전체 초기화
+                      </button>
+                    )}
+                    {/* 진단 5: 모든 진단이 false 인 경우 — 기본 안내 */}
+                    {mode === "or" && conditions.length < 2 && filterMarket === "all" && (
+                      <div style={{
+                        padding: "12px 16px", borderRadius: "12px",
+                        background: `${C.yellow}15`, color: C.text2,
+                        border: `1px solid ${C.yellow}40`,
+                        fontSize: mf(14), fontWeight: 600,
+                        textAlign: "center",
+                      }}>
+                        💡 추천 조건 중 하나를 선택해 다시 스캔해보세요
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {lastScan && (
                   <div style={{ fontSize: "16px", color: C.text3, marginTop: "12px" }}>
                     마지막 스캔: {lastScan.toLocaleTimeString("ko-KR")}
@@ -9863,7 +9996,17 @@ function AppInner() {
               <div style={{ background: C.card, borderRadius: "16px", padding: "32px", textAlign: "center" }}>
                 <div style={{ fontSize: "32px", marginBottom: "8px" }}>🏷️</div>
                 <div style={{ fontWeight: 600, fontSize: mf(18), color: C.text2, marginBottom: "4px" }}>선택한 시장에 시그널 없음</div>
-                <div style={{ fontSize: mf(16), color: C.text3 }}>다른 시장 필터를 선택해보세요 (전체 {results.length}건 발견)</div>
+                <div style={{ fontSize: mf(16), color: C.text3, marginBottom: "16px" }}>다른 시장 필터를 선택해보세요 (전체 {results.length}건 발견)</div>
+                <button
+                  onClick={() => setFilterMarket("all")}
+                  style={{
+                    padding: "10px 20px", borderRadius: "10px", fontSize: mf(14), fontWeight: 700,
+                    background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}40`,
+                    cursor: "pointer", minHeight: "44px",
+                  }}
+                >
+                  🌍 시장 필터 → 전체로 확장 ({results.length}건 모두 보기)
+                </button>
               </div>
             )}
 
@@ -11775,7 +11918,7 @@ function AppInner() {
                 <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
                   <input value={sentimentSymbol} onChange={e=>setSentimentSymbol(e.target.value.toUpperCase())}
                     placeholder="SPY" onKeyDown={e=>{if(e.key==="Enter")fetchSentiment(sentimentSymbol);}}
-                    style={{width:isMobile?"80px":"100px",padding:"8px 12px",borderRadius:"8px",fontSize:"15px",fontWeight:700,
+                    style={{width:isMobile?"80px":"100px",padding:"8px 12px",borderRadius:"8px",fontSize:"16px",fontWeight:700,
                       background:C.card2,border:`1px solid ${C.border2}`,color:C.text1,outline:"none",textAlign:"center"}} />
                   <button onClick={()=>fetchSentiment(sentimentSymbol)} disabled={sentimentLoading} style={{
                     padding:"8px 16px",borderRadius:"8px",fontSize:"14px",fontWeight:700,
@@ -12634,8 +12777,12 @@ function AppInner() {
 
         {tab === "privacy" && (
           <div className="tab-content" style={{ maxWidth: "800px", margin: "0 auto", padding: isMobile ? "16px" : "32px 40px", lineHeight: 1.7, color: C.text2 }}>
-            <h1 style={{ fontSize: isMobile ? "24px" : "28px", fontWeight: 800, color: C.text1, marginBottom: "8px" }}>개인정보처리방침</h1>
-            <p style={{ fontSize: isMobile ? "14px" : "15px", color: C.text3, marginBottom: "24px" }}>시행일: 2025년 1월 1일 · 최종 수정: 2026년 4월 5일</p>
+            <PageHeader
+              title="개인정보처리방침"
+              subtitle="시행일: 2025년 1월 1일 · 최종 수정: 2026년 4월 5일"
+              isMobile={isMobile}
+              style={{ marginBottom: 24 }}
+            />
 
             <section style={{ marginBottom: "28px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.blue}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>1. 수집하는 개인정보 항목</h2>
@@ -12703,8 +12850,12 @@ function AppInner() {
 
         {tab === "terms" && (
           <div className="tab-content" style={{ maxWidth: "800px", margin: "0 auto", padding: isMobile ? "16px" : "32px 40px", lineHeight: 1.7, color: C.text2 }}>
-            <h1 style={{ fontSize: isMobile ? "24px" : "28px", fontWeight: 800, color: C.text1, marginBottom: "8px" }}>이용약관</h1>
-            <p style={{ fontSize: isMobile ? "14px" : "15px", color: C.text3, marginBottom: "24px" }}>시행일: 2025년 1월 1일 · 최종 수정: 2026년 4월 5일</p>
+            <PageHeader
+              title="이용약관"
+              subtitle="시행일: 2025년 1월 1일 · 최종 수정: 2026년 4월 5일"
+              isMobile={isMobile}
+              style={{ marginBottom: 24 }}
+            />
 
             <section style={{ marginBottom: "28px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.blue}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제1조 (목적)</h2>
@@ -12759,7 +12910,11 @@ function AppInner() {
 
         {tab === "contact" && (
           <div className="tab-content" style={{ maxWidth: "800px", margin: "0 auto", padding: isMobile ? "16px" : "32px 40px", lineHeight: 1.7, color: C.text2 }}>
-            <h1 style={{ fontSize: isMobile ? "24px" : "28px", fontWeight: 800, color: C.text1, marginBottom: "24px" }}>문의하기</h1>
+            <PageHeader
+              title="문의하기"
+              isMobile={isMobile}
+              style={{ marginBottom: 24 }}
+            />
             <section style={{ marginBottom: "32px" }}>
               <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "14px", lineHeight: 1.7 }}>
                 Zepta 서비스에 대한 문의, 건의, 불편 사항은 아래 연락처로 연락해 주세요. 최대한 빠르게 답변 드리겠습니다.
