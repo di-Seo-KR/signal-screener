@@ -281,6 +281,23 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   const S = (m) => steps.push(m);
   const startedAt = new Date().toISOString();
 
+  // ★ 2026-05-13 fix: engine heartbeat — 진입 즉시 timestamp KV 갱신.
+  //   대시보드의 "엔진" dot 가 engine-log[0]?.time 으로 판정하는데, "no recent signals"
+  //   사이클은 engine-log 에 push 안 함 → 30분 빈 사이클 연속 시 dot 빨강 표시.
+  //   heartbeat 는 어떤 종료 사유든 무관하게 매 cron 마다 update → dot 정확 표시.
+  //   shadow/dry-run/probe 도 모두 heartbeat 갱신 (엔진이 살아있다는 사실 표시).
+  try {
+    const kvHb = await getKv();
+    await kvHb.set(`di:real:user:${userId}:engine-heartbeat`, {
+      time: startedAt,
+      mode: shadow ? "shadow" : (forceDryRun ? "dry" : "live"),
+      probe: !!probe,
+    });
+  } catch (hbErr) {
+    // heartbeat 실패는 정상 흐름 막지 않음
+    S(`heartbeat failed: ${hbErr?.message}`);
+  }
+
   // 1) phase1_enabled (dry run 은 우회)
   if (!forceDryRun) {
     const enabled = await isPhase1Enabled(userId);
