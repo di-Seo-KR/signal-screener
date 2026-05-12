@@ -56,6 +56,9 @@ const STRATEGY_KO = {
   "ensemble":          "앙상블 합의",
 };
 
+// G-1 — 미매핑 strategy ID 는 리스트에서 숨김 (옛 데이터의 "trend", "unknown" 등 노출 방지)
+const KNOWN_STRATEGY_IDS = new Set(Object.keys(STRATEGY_KO));
+
 // 어려운 지표 → 입문자 친화 툴팁 설명 (PLAN-BIZ #1)
 const METRIC_TOOLTIP = {
   sharpe: "위험 대비 수익률 — 같은 변동성에서 얼마나 안정적으로 벌었는지. 1.0 이상이면 양호, 2.0 이상이면 매우 우수.",
@@ -230,24 +233,26 @@ function LeaderboardTable({ data }) {
   const params = data?.params || {};
 
   const rows = useMemo(() => {
-    return Object.entries(strategies).map(([id, m]) => {
-      const statusObj = statuses[id];
-      const status = (statusObj?.status) || "active";
-      return {
-        id,
-        name: STRATEGY_KO[id] || id,
-        status,
-        statusReason: statusObj?.reason || "",
-        trades: m.trades || 0,
-        winRate: m.winRate || 0,
-        sharpe: m.sharpe || 0,
-        pf: m.profitFactor,
-        netPnL: m.netPnL || 0,
-        maxDD: m.maxDD || 0,
-        avgHold: m.avgHoldHours || 0,
-        tunedAt: params[id]?.tunedAt,
-      };
-    }).sort((a, b) => b.sharpe - a.sharpe);
+    return Object.entries(strategies)
+      .filter(([id]) => KNOWN_STRATEGY_IDS.has(id)) // G-1 — 미매핑 ID 숨김
+      .map(([id, m]) => {
+        const statusObj = statuses[id];
+        const status = (statusObj?.status) || "active";
+        return {
+          id,
+          name: STRATEGY_KO[id] || id,
+          status,
+          statusReason: statusObj?.reason || "",
+          trades: m.trades || 0,
+          winRate: m.winRate || 0,
+          sharpe: m.sharpe || 0,
+          pf: m.profitFactor,
+          netPnL: m.netPnL || 0,
+          maxDD: m.maxDD || 0,
+          avgHold: m.avgHoldHours || 0,
+          tunedAt: params[id]?.tunedAt,
+        };
+      }).sort((a, b) => b.sharpe - a.sharpe);
   }, [strategies, statuses, params]);
 
   if (rows.length === 0) {
@@ -404,6 +409,7 @@ function SharpeHistoryChart({ data }) {
   const strategies = data?.leaderboard?.strategies || {};
   const top4 = useMemo(() => {
     return Object.entries(strategies)
+      .filter(([id]) => KNOWN_STRATEGY_IDS.has(id)) // G-1 — 미매핑 ID 숨김
       .sort((a, b) => (b[1].sharpe || 0) - (a[1].sharpe || 0))
       .slice(0, 4)
       .map(([k]) => k);
@@ -594,6 +600,7 @@ function PublicAlphaShowcase({ data, onSignup }) {
   const strategies = data?.leaderboard?.strategies || {};
   const top3 = useMemo(() => {
     return Object.entries(strategies)
+      .filter(([id]) => KNOWN_STRATEGY_IDS.has(id)) // G-1 — 미매핑 ID 숨김
       .sort((a, b) => (b[1].sharpe || 0) - (a[1].sharpe || 0))
       .slice(0, 3)
       .map(([id, m]) => ({ id, ...m }));

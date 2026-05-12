@@ -82,6 +82,27 @@ async function getKv() {
 }
 
 // ── 데이터 fetch ──────────────────────────────────────────────────
+// timeout-aware fetch (E-5)
+async function fetchWithTimeout(url, opts = {}, timeoutMs = 10_000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...opts, signal: ctrl.signal });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// coingecko symbol id 매핑 (코인 fallback 용)
+const COINGECKO_ID = {
+  BTC: "bitcoin", ETH: "ethereum", SOL: "solana", BNB: "binancecoin",
+  XRP: "ripple", ADA: "cardano", DOGE: "dogecoin", AVAX: "avalanche-2",
+  MATIC: "matic-network", DOT: "polkadot", LINK: "chainlink", UNI: "uniswap",
+  ATOM: "cosmos", LTC: "litecoin", TRX: "tron", ARB: "arbitrum",
+  OP: "optimism", APT: "aptos", SUI: "sui", NEAR: "near",
+};
+
 async function fetchCryptoOhlc(symbol, days) {
   const bSym = toBinanceSymbol(symbol);
   // 4h 봉 = 6 candles/day → 30/60/90 일 = 180/360/540 봉
@@ -91,11 +112,28 @@ async function fetchCryptoOhlc(symbol, days) {
   return klinesToOhlc(klines);
 }
 
+// E-5 — Binance 실패 시 coingecko market_chart fallback (일봉 정밀도)
+async function fetchCryptoOhlcCoingecko(symbol, days) {
+  const base = String(symbol || "").toUpperCase().replace(/[/-].*/, "");
+  const cgId = COINGECKO_ID[base];
+  if (!cgId) throw new Error(`coingecko id unmapped: ${base}`);
+  const cgDays = Math.min(365, Math.max(30, days + 7));
+  const url = `https://api.coingecko.com/api/v3/coins/${encodeURIComponent(cgId)}/market_chart?vs_currency=usd&days=${cgDays}&interval=daily`;
+  const res = await fetchWithTimeout(url, {}, 10_000);
+  if (!res.ok) throw new Error(`coingecko fetch failed: ${res.status}`);
+  const json = await res.json();
+  const prices = Array.isArray(json?.prices) ? json.prices : [];
+  // [ts, price] 만 노출 — high/low 부재. 단봉 OHLC 로 대체 (open=close=high=low).
+  return prices
+    .map(([ts, p]) => ({ ts, o: p, h: p, l: p, c: p, v: 0 }))
+    .filter(x => Number.isFinite(x.c));
+}
+
 async function fetchStockOhlc(symbol, days, baseUrl) {
   // 일봉 — Yahoo Finance
   const range = days <= 30 ? "3mo" : days <= 60 ? "6mo" : days <= 90 ? "1y" : "1y";
   const url = `${baseUrl}/api/yahoo?_mode=ohlc&symbol=${encodeURIComponent(symbol)}&interval=1d&range=${range}`;
-  const res = await fetch(url);
+  const res = await fetchWithTimeout(url, {}, 10_000);
   if (!res.ok) throw new Error(`yahoo fetch failed: ${res.status}`);
   const json = await res.json();
   const candles = Array.isArray(json?.candles) ? json.candles : [];
@@ -104,6 +142,27 @@ async function fetchStockOhlc(symbol, days, baseUrl) {
     ts: c.time * 1000,
     o: c.open, h: c.high, l: c.low, c: c.close, v: c.volume,
   })).filter(x => Number.isFinite(x.c));
+}
+
+// E-5 — Yahoo 실패 시 stooq.com CSV fallback (미국 주식 일봉)
+async function fetchStockOhlcStooq(symbol) {
+  // stooq.com 미국 종목: .us suffix 사용 (예: AAPL → aapl.us)
+  const stooqSym = `${String(symbol || "").toLowerCase()}.us`;
+  const url = `https://stooq.com/q/d/l/?s=${encodeURIComponent(stooqSym)}&i=d`;
+  const res = await fetchWithTimeout(url, {}, 10_000);
+  if (!res.ok) throw new Error(`stooq fetch failed: ${res.status}`);
+  const text = await res.text();
+  // CSV: Date,Open,High,Low,Close,Volume
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) throw new Error("stooq csv empty");
+  return lines.slice(1).map(line => {
+    const [date, o, h, l, c, v] = line.split(",");
+    return {
+      ts: Date.parse(date),
+      o: parseFloat(o), h: parseFloat(h), l: parseFloat(l), c: parseFloat(c),
+      v: parseFloat(v) || 0,
+    };
+  }).filter(x => Number.isFinite(x.c) && Number.isFinite(x.ts));
 }
 
 // ── 메인 핸들러 ────────────────────────────────────────────────────
@@ -149,18 +208,50 @@ export default async function handler(req, res) {
     const host = req.headers["x-forwarded-host"] || req.headers.host || "zepta.app";
     const baseUrl = `${proto}://${host}`;
 
+    // E-5 — 1차 fetch 실패 시 fallback 으로 재시도. 모두 실패 시 errorCode 응답.
     let ohlc;
     let timeframeLabel;
+    const fetchErrors = [];
     try {
       if (isCrypto(symbol)) {
-        ohlc = await fetchCryptoOhlc(symbol, period);
-        timeframeLabel = "4h";
+        try {
+          ohlc = await fetchCryptoOhlc(symbol, period);
+          timeframeLabel = "4h";
+        } catch (e1) {
+          fetchErrors.push(`binance: ${e1?.message || String(e1)}`);
+          // 코인 fallback — coingecko (일봉)
+          try {
+            ohlc = await fetchCryptoOhlcCoingecko(symbol, period);
+            timeframeLabel = "1d";
+          } catch (e2) {
+            fetchErrors.push(`coingecko: ${e2?.message || String(e2)}`);
+            throw new Error(fetchErrors.join(" | "));
+          }
+        }
       } else {
-        ohlc = await fetchStockOhlc(symbol, period, baseUrl);
-        timeframeLabel = "1d";
+        try {
+          ohlc = await fetchStockOhlc(symbol, period, baseUrl);
+          timeframeLabel = "1d";
+        } catch (e1) {
+          fetchErrors.push(`yahoo: ${e1?.message || String(e1)}`);
+          // 주식 fallback — stooq CSV
+          try {
+            ohlc = await fetchStockOhlcStooq(symbol);
+            timeframeLabel = "1d";
+          } catch (e2) {
+            fetchErrors.push(`stooq: ${e2?.message || String(e2)}`);
+            throw new Error(fetchErrors.join(" | "));
+          }
+        }
       }
     } catch (e) {
-      return res.status(502).json({ ok: false, error: `OHLC fetch 실패: ${e?.message || String(e)}` });
+      return res.status(502).json({
+        ok: false,
+        errorCode: "OHLC_UNAVAILABLE",
+        error: `OHLC fetch 실패: ${e?.message || String(e)}`,
+        symbol,
+        retryAfterSec: 60,
+      });
     }
 
     if (!Array.isArray(ohlc) || ohlc.length < 70) {

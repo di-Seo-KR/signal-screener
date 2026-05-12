@@ -383,7 +383,8 @@ export function Dialog({ open, onClose, title, description, children, footer, ma
       role="dialog"
       aria-modal="true"
       style={{
-        position: "fixed", inset: 0, zIndex: 1000,
+        // E-4 — Dialog 도 BottomSheet 와 동일 정책 (모바일 nav 10000 위)
+        position: "fixed", inset: 0, zIndex: 11000,
         background: "rgba(4, 8, 16, 0.72)", backdropFilter: "blur(4px)",
         display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
         animation: "z-fade-in var(--z-dur) var(--z-ease)",
