@@ -38,6 +38,17 @@ const BOT_NAME_KO = {
   "ensemble-signal":  "앙상블 시그널",
 };
 
+// botFamily 한글 라벨 — 미매핑 family ID 는 null 반환하여 표시 생략 (G-2)
+const BOT_FAMILY_KO = {
+  "trend-follow":   "추세 추종",
+  "mean-revert":    "평균 회귀",
+  "breakout":       "돌파",
+  "momentum":       "모멘텀",
+  "volatility":    "변동성",
+  "defi":           "DeFi",
+  "ensemble":       "앙상블",
+};
+
 // ── 헬퍼 ──────────────────────────────────────────────────────────
 const fmtPct = (v, d = 1) => (v == null || !isFinite(v)) ? "—" : `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(d)}%`;
 const fmtNum = (v, d = 2) => (v == null || !isFinite(v)) ? "—" : Number(v).toFixed(d);
@@ -184,13 +195,26 @@ export default function BotLeaderboard({ onNavigate } = {}) {
   const total = data?.total || 0;
   const userCount = data?.userCount || 0;
   const generatedAt = data?.generatedAt;
-  const empty = !!data?.empty || (entries.length === 0 && !loading && !err);
 
-  // 본인 ranking (전체 ranking 에서 검색)
+  // F-1 — 매매 0회 / returnPct null 인 봇은 ranking 에서 숨김.
+  // "본인 봇 highlight" 카드만 raw entries 를 사용해 미진입 상태 안내까지 보여드립니다.
+  const visibleEntries = useMemo(() => {
+    return entries.filter((e) => (e.tradeCount ?? 0) > 0 && e.returnPct != null);
+  }, [entries]);
+
+  const empty = !!data?.empty || (visibleEntries.length === 0 && !loading && !err);
+
+  // 본인 ranking (전체 ranking 에서 검색) — 매매 0회여도 본인 봇은 표시
   const myEntry = useMemo(() => {
     if (!myHash) return null;
     return entries.find((e) => e.userHash === myHash) || null;
   }, [entries, myHash]);
+  const myEntryHasTrades = !!(myEntry && (myEntry.tradeCount ?? 0) > 0 && myEntry.returnPct != null);
+  const myEntryRank = useMemo(() => {
+    if (!myEntry || !myEntryHasTrades) return null;
+    const idx = visibleEntries.findIndex((e) => e === myEntry || (e.userHash === myEntry.userHash && e.botId === myEntry.botId));
+    return idx >= 0 ? idx + 1 : null;
+  }, [myEntry, myEntryHasTrades, visibleEntries]);
 
   // ── 렌더 ────────────────────────────────────────────────────────
   return (
@@ -231,36 +255,75 @@ export default function BotLeaderboard({ onNavigate } = {}) {
         </div>
       </Card>
 
-      {/* 본인 봇 highlight */}
+      {/* 본인 봇 highlight — 매매 0회여도 노출하되 안내 카피로 분기 (F-1, F-3) */}
       {myEntry && (
         <Card style={{ borderColor: C.blue, borderWidth: 2 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-            <div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: isMobile ? "flex-start" : "center",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
+              flexDirection: isMobile ? "column" : "row",
+            }}
+          >
+            <div style={{ width: isMobile ? "100%" : "auto" }}>
               <div style={{ fontSize: FONT.xs, color: C.blueL, fontWeight: 700, marginBottom: 4 }}>내 봇</div>
               <div style={{ fontSize: FONT.lg, fontWeight: 800, color: C.text1 }}>
                 {myEntry.nick} · {BOT_NAME_KO[myEntry.botId] || myEntry.botId}
               </div>
               <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 2 }}>
-                {entries.findIndex((e) => e === myEntry) + 1}위 / {total}명
+                {myEntryHasTrades && myEntryRank
+                  ? `${myEntryRank}위 / ${visibleEntries.length}개 봇 (등재된 봇 기준)`
+                  : "아직 매매 기록이 없어요 — 리더보드 등재 대기 중"}
               </div>
             </div>
-            <div style={{ display: "flex", gap: 16 }}>
-              <Stat
-                label="수익률"
-                value={fmtPct(myEntry.returnPct, 1)}
-                color={myEntry.returnPct >= 0 ? C.green : C.red}
-              />
-              <Stat label="안정성" value={fmtNum(myEntry.sharpe, 2)} />
-              <Stat label="MDD" value={fmtPct(-Math.abs(myEntry.mdd), 1)} color={C.red} />
-            </div>
+            {myEntryHasTrades ? (
+              <div
+                style={
+                  isMobile
+                    ? { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8, width: "100%" }
+                    : { display: "flex", gap: 16 }
+                }
+              >
+                <Stat
+                  label="수익률"
+                  value={fmtPct(myEntry.returnPct, 1)}
+                  color={myEntry.returnPct >= 0 ? C.green : C.red}
+                />
+                <Stat label="안정성" value={fmtNum(myEntry.sharpe, 2)} />
+                <Stat label="MDD" value={fmtPct(-Math.abs(myEntry.mdd), 1)} color={C.red} />
+              </div>
+            ) : (
+              <div
+                style={{
+                  width: isMobile ? "100%" : "auto",
+                  background: C.card2,
+                  border: `1px dashed ${C.border}`,
+                  borderRadius: RADIUS.md,
+                  padding: 12,
+                  fontSize: FONT.xs,
+                  color: C.text2,
+                  lineHeight: 1.6,
+                }}
+              >
+                📊 봇은 첫 매매가 발생한 시점부터 순위에 포함돼요.<br />
+                보통 첫 진입까지 30분~2시간 정도 걸려요.
+              </div>
+            )}
           </div>
         </Card>
       )}
 
-      {/* 요약 통계 */}
+      {/* 요약 통계 — visibleEntries (매매 발생 봇) 기준으로 표시 (F-1) */}
       <Card>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
-          <Stat label="등록된 봇" value={total ? `${total}개` : "—"} sub="익명 기준 entry 수" />
+          <Stat
+            label="등재된 봇"
+            value={visibleEntries.length ? `${visibleEntries.length}개` : "—"}
+            sub={total > visibleEntries.length ? `전체 ${total}개 중 매매 발생` : "익명 기준 entry 수"}
+          />
           <Stat label="참여 사용자" value={userCount ? `${userCount}명` : "—"} sub="해시 기준 추정" />
           <Stat label="기간" value={PERIOD_LABEL[period]} sub={period !== 30 ? "* 현재 30일 데이터만 적재" : ""} />
           <Stat label="갱신" value={fmtAgo(generatedAt)} sub="매시간 자동 집계" />
@@ -331,31 +394,42 @@ export default function BotLeaderboard({ onNavigate } = {}) {
             데이터를 불러오지 못했습니다. ({err})
           </div>
         )}
-        {!err && loading && entries.length === 0 && (
+        {!err && loading && visibleEntries.length === 0 && (
           <div style={{ padding: 32, textAlign: "center", color: C.text3, fontSize: FONT.sm }}>
             리더보드 불러오는 중…
           </div>
         )}
         {!err && !loading && empty && (
-          <div style={{ padding: 32, textAlign: "center", color: C.text3, fontSize: FONT.sm }}>
-            아직 표시할 데이터가 없어요. 봇이 활성화되고 매매 기록이 쌓이면 매시간 자동 집계됩니다.
+          <div style={{ padding: 32, textAlign: "center", color: C.text3, fontSize: FONT.sm, lineHeight: 1.7 }}>
+            📊 리더보드에 등재 가능한 봇이 아직 없어요<br />
+            <span style={{ color: C.text2 }}>봇은 첫 매매가 발생한 시점부터 순위에 포함됩니다.</span><br />
+            <span style={{ color: C.text3 }}>보통 첫 진입까지 30분~2시간 정도 걸려요.</span>
           </div>
         )}
-        {!err && entries.length > 0 && isMobile && (
+        {!err && visibleEntries.length > 0 && isMobile && (
           <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-            {entries.map((e, i) => {
+            {visibleEntries.map((e, i) => {
               const isMe = myHash && e.userHash === myHash;
               const rank = i + 1;
               const rankBadge = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : `#${rank}`;
+              // F-2 — Top3 시각 강조 (메달 색 그라데이션 + 좌측 borderLeft)
+              const top3Color = rank === 1 ? C.yellow : rank === 2 ? "#C0C0C0" : rank === 3 ? "#CD7F32" : null;
+              const top3Bg = top3Color
+                ? `linear-gradient(90deg, ${top3Color}22, transparent)`
+                : C.card2;
               return (
                 <div
                   key={`m-${e.userHash}-${e.botId}-${i}`}
                   onClick={() => onNavigate && onNavigate(`reports/${e.botId}`)}
                   style={{
                     padding: 14,
-                    background: isMe ? `${C.blueBg}` : C.card2,
+                    background: isMe ? `${C.blueBg}` : top3Bg,
                     border: `1px solid ${isMe ? C.blue : C.border}`,
-                    borderLeft: isMe ? `5px solid ${C.blue}` : `5px solid ${rank <= 3 ? C.yellow : C.border2}`,
+                    borderLeft: isMe
+                      ? `5px solid ${C.blue}`
+                      : top3Color
+                        ? `4px solid ${top3Color}`
+                        : `5px solid ${C.border2}`,
                     borderRadius: RADIUS.md,
                     cursor: "pointer",
                     minHeight: 88,
@@ -364,7 +438,7 @@ export default function BotLeaderboard({ onNavigate } = {}) {
                   <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                     <span style={{
                       fontSize: 18, fontWeight: 800,
-                      color: rank <= 3 ? C.yellow : C.text2,
+                      color: top3Color || C.text2,
                       minWidth: 36,
                     }}>{rankBadge}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -412,7 +486,7 @@ export default function BotLeaderboard({ onNavigate } = {}) {
           </div>
         )}
 
-        {!err && entries.length > 0 && !isMobile && (
+        {!err && visibleEntries.length > 0 && !isMobile && (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
               <thead>
@@ -429,20 +503,34 @@ export default function BotLeaderboard({ onNavigate } = {}) {
                 </tr>
               </thead>
               <tbody>
-                {entries.map((e, i) => {
+                {visibleEntries.map((e, i) => {
                   const isMe = myHash && e.userHash === myHash;
                   const rank = i + 1;
                   const rankBadge = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : `${rank}`;
+                  // F-2 — Top3 강조 색
+                  const top3Color = rank === 1 ? C.yellow : rank === 2 ? "#C0C0C0" : rank === 3 ? "#CD7F32" : null;
+                  // G-2 — botFamily 한글 라벨 (미매핑이면 null)
+                  const familyLabel = BOT_FAMILY_KO[e.botFamily] || null;
+                  const rowBg = isMe
+                    ? C.blueBg
+                    : top3Color
+                      ? `linear-gradient(90deg, ${top3Color}22, transparent)`
+                      : "transparent";
+                  const rowBorder = isMe
+                    ? `3px solid ${C.blue}`
+                    : top3Color
+                      ? `4px solid ${top3Color}`
+                      : "3px solid transparent";
                   return (
                     <tr
                       key={`${e.userHash}-${e.botId}-${i}`}
                       style={{
-                        background: isMe ? `${C.blueBg}` : "transparent",
-                        borderLeft: isMe ? `3px solid ${C.blue}` : "3px solid transparent",
+                        background: rowBg,
+                        borderLeft: rowBorder,
                       }}
                     >
                       <td style={tdStyle(C)}>
-                        <span style={{ fontSize: FONT.sm, fontWeight: 700, color: rank <= 3 ? C.yellow : C.text2 }}>
+                        <span style={{ fontSize: FONT.sm, fontWeight: 700, color: top3Color || C.text2 }}>
                           {rankBadge}
                         </span>
                       </td>
@@ -455,7 +543,7 @@ export default function BotLeaderboard({ onNavigate } = {}) {
                       <td style={tdStyle(C)}>
                         <div style={{ fontWeight: 600, color: C.text1, fontSize: FONT.sm }}>{BOT_NAME_KO[e.botId] || e.botId}</div>
                         <div style={{ fontSize: FONT.xs, color: C.text3 }}>
-                          {e.botKind === "crypto" ? "코인" : e.botKind === "stock" ? "주식" : ""} · {e.botFamily}
+                          {e.botKind === "crypto" ? "코인" : e.botKind === "stock" ? "주식" : ""}{familyLabel ? ` · ${familyLabel}` : ""}
                         </div>
                       </td>
                       <td style={{ ...tdStyle(C), textAlign: "right", color: e.returnPct >= 0 ? C.green : C.red, fontWeight: 800 }}>

@@ -93,7 +93,8 @@ export function BottomSheet({
       aria-modal="true"
       aria-labelledby={title ? "bs-title" : undefined}
       style={{
-        position: "fixed", inset: 0, zIndex: 1000,
+        // E-4 — 모바일 하단 nav (10000) 위로 올림. 토스트(99999) > Modal(11000) > nav(10000)
+        position: "fixed", inset: 0, zIndex: 11000,
         background: "rgba(4, 8, 16, 0.6)",
         backdropFilter: "blur(2px)",
         display: "flex", alignItems: "flex-end", justifyContent: "center",
@@ -254,7 +255,8 @@ export function ActionSheet({
       role="dialog"
       aria-modal="true"
       style={{
-        position: "fixed", inset: 0, zIndex: 1000,
+        // E-4 — ActionSheet 도 BottomSheet 와 동일 정책 (nav 10000 위)
+        position: "fixed", inset: 0, zIndex: 11000,
         background: "rgba(4, 8, 16, 0.5)",
         display: "flex", alignItems: "flex-end", justifyContent: "center",
         padding: "0 8px",

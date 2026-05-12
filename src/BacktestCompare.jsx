@@ -440,10 +440,65 @@ export default function BacktestCompare({ onNavigate } = {}) {
         </div>
       </BottomSheet>
 
-      {/* 차트 + 결과 */}
+      {/* E-5 — 차트 + 결과 에러 UI (재시도 + 기간 늘리기) */}
       {err && (
-        <Card style={{ background: C.redBg, border: `1px solid ${C.red}40` }}>
-          <div style={{ color: C.red, fontSize: FONT.sm }}>오류: {err}</div>
+        <Card style={{ background: `${C.yellow}11`, border: `1px solid ${C.yellow}` }}>
+          <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>
+            ⚠️ 시세 데이터를 불러오지 못했어요
+          </div>
+          <div style={{ fontSize: FONT.sm, color: C.text2, marginTop: 8, lineHeight: 1.6 }}>
+            Yahoo Finance 가 잠시 응답하지 않거나, 해당 종목·기간 조합의 데이터가 부족합니다.
+          </div>
+          <div style={{ fontSize: FONT.sm, color: C.text2, marginTop: 12, fontWeight: 600 }}>다음을 시도해보세요:</div>
+          <ul style={{
+            margin: "8px 0 0 0", paddingLeft: 18,
+            fontSize: FONT.sm, color: C.text2, lineHeight: 1.7,
+          }}>
+            <li>기간을 {period}일 → {Math.min(180, period + 30)}일 로 늘려보기</li>
+            <li>다른 종목으로 변경 (예: BTC ↔ ETH ↔ SOL)</li>
+            <li>전략 선택 개수를 줄이거나 늘려보기</li>
+          </ul>
+          <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={run}
+              disabled={loading}
+              style={{
+                padding: isMobile ? "12px 18px" : "8px 14px",
+                minHeight: 44,
+                borderRadius: RADIUS.md,
+                background: C.blue, color: "#fff", border: "none",
+                fontSize: pickFont("button", isMobile) ?? FONT.sm,
+                fontWeight: 700, cursor: loading ? "wait" : "pointer",
+                opacity: loading ? 0.6 : 1,
+              }}
+            >↻ 다시 시도</button>
+            <button
+              type="button"
+              onClick={() => {
+                const next = Math.min(180, period + 30);
+                if (next === period) return;
+                setPeriod(next);
+                // setTimeout 으로 state 반영 후 run — 자동 실행 effect 가 처리하지만 명시적 호출도 안전
+                setTimeout(() => { run(); }, 100);
+              }}
+              disabled={loading || period >= 180}
+              style={{
+                padding: isMobile ? "12px 18px" : "8px 14px",
+                minHeight: 44,
+                borderRadius: RADIUS.md,
+                background: "transparent",
+                border: `1px solid ${C.border}`,
+                color: C.text1,
+                fontSize: pickFont("button", isMobile) ?? FONT.sm,
+                fontWeight: 700, cursor: loading || period >= 180 ? "not-allowed" : "pointer",
+                opacity: loading || period >= 180 ? 0.5 : 1,
+              }}
+            >기간 늘리기</button>
+          </div>
+          <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 10, opacity: 0.8 }}>
+            상세 오류: {err}
+          </div>
         </Card>
       )}
 

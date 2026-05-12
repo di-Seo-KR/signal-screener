@@ -232,7 +232,8 @@ function DisclaimerModal({ open, targetBot, mode, setMode, onCancel, onConfirm, 
       aria-modal="true"
       aria-label="카피트레이딩 면책 동의"
       style={{
-        position: "fixed", inset: 0, zIndex: 9999,
+        // E-4 — BottomSheet/Dialog 와 동일 정책 (모바일 nav 10000 위)
+        position: "fixed", inset: 0, zIndex: 11000,
         background: "rgba(0,0,0,0.6)",
         display: "flex", alignItems: "center", justifyContent: "center",
         padding: 16,
