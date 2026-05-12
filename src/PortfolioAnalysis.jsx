@@ -17,6 +17,24 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useThemeTokens, RADIUS } from "./ui/theme.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { useIsMobile } from "./ui/useBreakpoint.jsx";
+import { MetricInfo } from "./ui/primitives.jsx";
+
+// ────────────────────────────────────────────────
+// 기본 holdings — 빈 상태 분기 시 비교에 사용
+// ────────────────────────────────────────────────
+const DEFAULT_HOLDINGS = [
+  { symbol: "BTC", quantity: 0.1, type: "crypto" },
+  { symbol: "ETH", quantity: 2, type: "crypto" },
+  { symbol: "AAPL", quantity: 10, type: "stock" },
+];
+
+function isDefaultHoldings(holdings) {
+  if (!Array.isArray(holdings) || holdings.length !== DEFAULT_HOLDINGS.length) return false;
+  return DEFAULT_HOLDINGS.every((d, i) => {
+    const h = holdings[i];
+    return h && h.symbol === d.symbol && h.quantity === d.quantity && h.type === d.type;
+  });
+}
 
 // ────────────────────────────────────────────────
 // 색상 팔레트 — 도넛/히트맵 공통
@@ -115,12 +133,10 @@ export default function PortfolioAnalysis() {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const [manualHoldings, setManualHoldings] = useState([
-    { symbol: "BTC", quantity: 0.1, type: "crypto" },
-    { symbol: "ETH", quantity: 2, type: "crypto" },
-    { symbol: "AAPL", quantity: 10, type: "stock" },
-  ]);
+  const [manualHoldings, setManualHoldings] = useState(DEFAULT_HOLDINGS);
   const [editMode, setEditMode] = useState(false);
+  // 사용자가 한 번이라도 holdings 를 수정했는지 추적 (가이드 카드 숨김 조건)
+  const [userTouched, setUserTouched] = useState(false);
   const [newSymbol, setNewSymbol] = useState("");
   const [newQty, setNewQty] = useState("");
   const [newType, setNewType] = useState("crypto");
@@ -155,12 +171,17 @@ export default function PortfolioAnalysis() {
     const qty = parseFloat(newQty);
     if (!sym || !qty || qty <= 0) return;
     setManualHoldings(prev => [...prev, { symbol: sym, quantity: qty, type: newType }]);
+    setUserTouched(true);
     setNewSymbol("");
     setNewQty("");
   };
   const removeHolding = (idx) => {
     setManualHoldings(prev => prev.filter((_, i) => i !== idx));
+    setUserTouched(true);
   };
+
+  // 가이드 카드 표시 조건: 한 번도 편집 안 했고, holdings 가 default 와 동일
+  const showStarterGuide = !userTouched && isDefaultHoldings(manualHoldings);
 
   // ── 도넛 segments ──
   const symbolSegments = useMemo(() => {
@@ -206,6 +227,76 @@ export default function PortfolioAnalysis() {
             보유 자산의 배분·상관관계·분산도를 한 눈에 확인하고, 리밸런싱 힌트를 받아보세요.
           </p>
         </div>
+
+        {/* 첫 사용 가이드 — 사용자가 holdings 를 한 번도 안 만진 경우 */}
+        {showStarterGuide && (
+          <div style={{
+            background: `linear-gradient(135deg, ${C.blue}12 0%, ${C.card} 100%)`,
+            border: `1px solid ${C.blue}40`,
+            borderRadius: RADIUS.md,
+            padding: isMobile ? "16px" : "20px",
+          }}>
+            <div style={{ fontSize: isMobile ? "15px" : "16px", fontWeight: 800, color: C.text1, marginBottom: "10px" }}>
+              🎯 포트폴리오 진단 시작하기
+            </div>
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+              gap: "10px",
+              marginBottom: "10px",
+            }}>
+              {[
+                { n: "①", title: "보유 자산 입력", desc: "아래 ‘편집’ 버튼으로 본인 자산 추가" },
+                { n: "②", title: "분석 실행", desc: "‘내 자산 분석하기’ 누르면 약 2~3초 소요" },
+                { n: "③", title: "결과 해석", desc: "배분·상관·분산점수 확인 후 리밸런싱" },
+              ].map((step, i) => (
+                <div key={i} style={{
+                  padding: "10px 12px",
+                  background: C.card2,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: RADIUS.sm,
+                  display: "flex", flexDirection: "column", gap: "4px",
+                }}>
+                  <div style={{ fontSize: "13px", fontWeight: 800, color: C.blue }}>{step.n} {step.title}</div>
+                  <div style={{ fontSize: "12px", color: C.text2, lineHeight: 1.5 }}>{step.desc}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: "12px", color: C.text3, lineHeight: 1.5 }}>
+              💡 지금은 <strong style={{ color: C.text2 }}>예시 데이터 (BTC·ETH·AAPL)</strong> 가 입력되어 있어요.
+              본인 자산으로 바꾸려면 아래 <strong style={{ color: C.text2 }}>‘편집’</strong> 버튼을 눌러주세요.
+            </div>
+          </div>
+        )}
+
+        {/* Primary CTA — 분석 실행 강조 카드 */}
+        <button
+          onClick={runAnalysis}
+          disabled={loading}
+          style={{
+            width: "100%",
+            padding: isMobile ? "16px 20px" : "14px 24px",
+            minHeight: 56,
+            borderRadius: RADIUS.md,
+            fontSize: isMobile ? "16px" : "16px",
+            fontWeight: 800,
+            background: loading ? C.card2 : C.blue,
+            color: "#fff",
+            border: "none",
+            cursor: loading ? "default" : "pointer",
+            opacity: loading ? 0.6 : 1,
+            boxShadow: loading ? "none" : `0 4px 12px ${C.blue}40`,
+            display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {loading ? "분석 중…" : (
+            <>
+              <span>🚀</span>
+              <span>내 자산 분석하기</span>
+            </>
+          )}
+        </button>
 
         {/* 입력 영역 — 토글 */}
         <div style={card}>
@@ -299,13 +390,15 @@ export default function PortfolioAnalysis() {
 
           <button onClick={runAnalysis} disabled={loading} style={{
             width: "100%",
-            padding: isMobile ? "14px" : "10px",
-            minHeight: 48,
+            padding: isMobile ? "12px" : "10px",
+            minHeight: 44,
             borderRadius: "8px",
-            fontSize: isMobile ? 15 : 14, fontWeight: 700,
-            background: loading ? C.card2 : C.blue, color: "#fff", border: "none",
+            fontSize: isMobile ? 14 : 13, fontWeight: 600,
+            background: loading ? C.card2 : `${C.blue}15`,
+            color: loading ? C.text3 : C.blue,
+            border: `1px solid ${C.blue}40`,
             cursor: loading ? "default" : "pointer", opacity: loading ? 0.6 : 1,
-          }}>{loading ? "분석 중..." : "분석 실행"}</button>
+          }}>{loading ? "분석 중..." : "↻ 다시 분석"}</button>
         </div>
 
         {/* 에러 */}
@@ -332,7 +425,14 @@ export default function PortfolioAnalysis() {
               gap: "16px",
             }}>
               <div style={card}>
-                <h3 style={{ margin: "0 0 12px", fontSize: "15px", color: C.text1, fontWeight: 700 }}>종목별 배분</h3>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <h3 style={{ margin: 0, fontSize: "15px", color: C.text1, fontWeight: 700 }}>종목별 배분</h3>
+                  <MetricInfo
+                    label=""
+                    hint="한 종목에 30% 이상 몰리면 위험합니다. 종목당 비중을 분산할수록 충격 흡수력이 커져요."
+                    side="bottom"
+                  />
+                </div>
                 <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: "center", gap: "16px" }}>
                   <DonutChart segments={symbolSegments} total={data.totalValue} size={isMobile ? 160 : 200} C={C} />
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px", width: isMobile ? "100%" : "auto" }}>
@@ -351,7 +451,14 @@ export default function PortfolioAnalysis() {
               </div>
 
               <div style={card}>
-                <h3 style={{ margin: "0 0 12px", fontSize: "15px", color: C.text1, fontWeight: 700 }}>카테고리 배분</h3>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <h3 style={{ margin: 0, fontSize: "15px", color: C.text1, fontWeight: 700 }}>카테고리 배분</h3>
+                  <MetricInfo
+                    label=""
+                    hint="자산 종류 (코인·주식·채권 등) 별 분포. 한 종류에 80% 이상 몰리면 시장 충격에 취약해요."
+                    side="bottom"
+                  />
+                </div>
                 <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: "center", gap: "16px" }}>
                   <DonutChart segments={categorySegments} total={data.totalValue} size={isMobile ? 160 : 200} label="카테고리" C={C} />
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "8px", width: isMobile ? "100%" : "auto" }}>
@@ -377,7 +484,14 @@ export default function PortfolioAnalysis() {
               gap: "16px",
             }}>
               <div style={card}>
-                <h3 style={{ margin: "0 0 12px", fontSize: "15px", color: C.text1, fontWeight: 700 }}>분산 점수</h3>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                  <h3 style={{ margin: 0, fontSize: "15px", color: C.text1, fontWeight: 700 }}>분산 점수</h3>
+                  <MetricInfo
+                    label=""
+                    hint="0=한 종목 몰빵 / 100=완전 분산. 70 이상이면 양호. HHI 집중도 + 상관관계 페널티로 계산해요."
+                    side="bottom"
+                  />
+                </div>
                 <DiversityGauge score={data.diversityScore} label={data.diversityLabel} C={C} />
               </div>
 
@@ -409,7 +523,14 @@ export default function PortfolioAnalysis() {
             {/* 행 4: 상관관계 히트맵 */}
             {data.correlation?.matrix?.length > 1 && (
               <div style={card}>
-                <h3 style={{ margin: "0 0 4px", fontSize: "15px", color: C.text1, fontWeight: 700 }}>상관관계 히트맵 (30일 일일 수익률)</h3>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                  <h3 style={{ margin: 0, fontSize: "15px", color: C.text1, fontWeight: 700 }}>상관관계 히트맵 (30일 일일 수익률)</h3>
+                  <MetricInfo
+                    label=""
+                    hint="초록=같이 움직임 / 빨강=반대로 움직임. 자산 간 상관이 다양할수록 한 시장 충격에 안정적이에요."
+                    side="bottom"
+                  />
+                </div>
                 <p style={{ margin: "0 0 12px", fontSize: "12px", color: C.text3 }}>
                   +1 = 함께 움직임 · 0 = 무관 · −1 = 반대 움직임. 평균 절대 상관: <strong style={{ color: C.text1 }}>{data.correlation.avgAbs}</strong>
                 </p>

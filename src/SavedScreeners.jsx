@@ -12,7 +12,7 @@
 //   POST   /api/screeners/save        (저장/갱신/토글)
 //   DELETE /api/screeners/save        (삭제)
 // ══════════════════════════════════════════════════════════════════
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useThemeTokens, FONT, RADIUS, pickFont } from "./ui/theme.jsx";
 import { useBreakpoint } from "./ui/useBreakpoint.jsx";
 import { BottomSheet } from "./ui/primitives.jsx";
@@ -45,13 +45,18 @@ function fmtAgo(iso) {
 export default function SavedScreeners({ onNavigate }) {
   const C = useThemeTokens();
   const { isMobile } = useBreakpoint();
-  const { user } = useAuth();
+  const { user, showToast } = useAuth();
   const uid = user?.id || "guest";
 
   const [screeners, setScreeners] = useState([]);
   const [suggested, setSuggested] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showSuggested, setShowSuggested] = useState(false);
+  // 커스텀 confirm 모달 — 네이티브 confirm 대체
+  const [confirmState, setConfirmState] = useState(null);
+  // 최신 screeners 참조 (낙관적 업데이트의 length 체크에 활용)
+  const screenersRef = useRef(screeners);
+  useEffect(() => { screenersRef.current = screeners; }, [screeners]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,56 +75,114 @@ export default function SavedScreeners({ onNavigate }) {
   useEffect(() => { load(); }, [load]);
 
   const toggleAlert = useCallback(async (id) => {
-    setScreeners(prev => prev.map(s => s.id === id ? { ...s, alert_enabled: !s.alert_enabled } : s));
+    // 이전 상태 스냅샷 (실패 시 롤백)
+    let prevState = null;
+    setScreeners(prev => {
+      prevState = prev;
+      return prev.map(s => s.id === id ? { ...s, alert_enabled: !s.alert_enabled } : s);
+    });
     try {
-      await fetch("/api/screeners/save", {
+      const r = await fetch("/api/screeners/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ uid, id, action: "toggle-alert" }),
       });
-    } catch {}
-  }, [uid]);
+      if (!r.ok) throw new Error("toggle failed");
+    } catch {
+      // 롤백
+      if (prevState) setScreeners(prevState);
+      showToast?.("error", "알림 설정 변경에 실패했어요. 다시 시도해주세요.");
+    }
+  }, [uid, showToast]);
 
-  const remove = useCallback(async (id) => {
-    if (!confirm("이 스크리너를 삭제할까요?")) return;
-    setScreeners(prev => prev.filter(s => s.id !== id));
+  const doRemove = useCallback(async (id) => {
+    // 낙관적 제거 + 실패 시 롤백
+    let prevState = null;
+    setScreeners(prev => {
+      prevState = prev;
+      return prev.filter(s => s.id !== id);
+    });
     try {
-      await fetch("/api/screeners/save", {
+      const r = await fetch("/api/screeners/save", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ uid, id }),
       });
-    } catch {}
-  }, [uid]);
+      if (!r.ok) throw new Error("delete failed");
+    } catch {
+      if (prevState) setScreeners(prevState);
+      showToast?.("error", "삭제에 실패했어요. 다시 시도해주세요.");
+    }
+  }, [uid, showToast]);
+
+  const remove = useCallback((id) => {
+    setConfirmState({
+      id,
+      title: "이 스크리너를 삭제할까요?",
+      desc: "삭제하면 알림 발송도 함께 중단돼요. 되돌릴 수 없어요.",
+    });
+  }, []);
 
   const addSuggested = useCallback(async (s) => {
-    if (screeners.length >= FREE_LIMIT) {
-      alert(`무료 플랜은 ${FREE_LIMIT}개까지만 저장할 수 있어요. 기존 항목을 삭제하거나 Pro 로 업그레이드하세요.`);
+    if (screenersRef.current.length >= FREE_LIMIT) {
+      showToast?.(
+        "error",
+        `무료 플랜은 ${FREE_LIMIT}개까지만 저장할 수 있어요. 기존 항목을 삭제하거나 Pro 로 업그레이드하세요.`,
+        6000,
+      );
       return;
     }
+    const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const tempCard = {
+      id: tempId,
+      name: s.name,
+      conditions: s.conditions,
+      alert_enabled: true,
+      template_id: s.template_id,
+      last_matched_at: null,
+      last_match_count: 0,
+      _pending: true,
+      _failed: false,
+      _retryPayload: s,
+    };
+
+    // 1) 즉시 임시 카드 추가 — 사용자 인지 0ms
+    setScreeners(prev => [tempCard, ...prev]);
+    // 2) 추천 BottomSheet 닫기
+    setShowSuggested(false);
+
     const screener = {
       name: s.name,
       conditions: s.conditions,
       alert_enabled: true,
       template_id: s.template_id,
     };
+
     try {
       const r = await fetch("/api/screeners/save", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ uid, screener }),
       });
-      const data = await r.json();
-      if (data?.ok) {
-        load();
-        setShowSuggested(false);
-      } else {
-        alert(data?.message || "저장에 실패했어요");
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !data?.ok) {
+        throw new Error(data?.message || "저장 실패");
       }
-    } catch (e) {
-      alert("저장에 실패했어요: " + e.message);
+      // 응답이 screener 객체를 포함하면 임시 카드 in-place 교체
+      if (data?.screener?.id) {
+        setScreeners(prev => prev.map(x => x.id === tempId ? data.screener : x));
+      } else {
+        // fallback — 풀 refetch
+        await load();
+      }
+    } catch (err) {
+      // 실패 시 임시 카드 제거 + 토스트
+      setScreeners(prev => prev.filter(x => x.id !== tempId));
+      showToast?.("error", err.message?.includes("FREE_LIMIT")
+        ? err.message
+        : "저장에 실패했어요. 다시 시도해주세요.");
     }
-  }, [uid, screeners.length, load]);
+  }, [uid, load, showToast]);
 
   const isGuest = !uid || uid === "guest";
   const remaining = FREE_LIMIT - screeners.length;
@@ -218,27 +281,66 @@ export default function SavedScreeners({ onNavigate }) {
           onAdd={addSuggested}
         />
       )}
+
+      {/* 삭제 확인 모달 — 네이티브 confirm 대체 */}
+      {confirmState && (
+        <ConfirmModal
+          C={C}
+          isMobile={isMobile}
+          title={confirmState.title}
+          desc={confirmState.desc}
+          confirmLabel="삭제"
+          cancelLabel="취소"
+          danger
+          onConfirm={() => {
+            const id = confirmState.id;
+            setConfirmState(null);
+            doRemove(id);
+          }}
+          onCancel={() => setConfirmState(null)}
+        />
+      )}
     </div>
   );
 }
 
 function ScreenerCard({ s, C, isMobile, onToggleAlert, onRemove, onOpen }) {
+  const pending = !!s._pending;
   return (
     <div style={{
       background: C.card, border: `1px solid ${C.border}`,
       borderRadius: RADIUS.xl, padding: 16,
       boxShadow: C.cardShadow,
       display: "flex", flexDirection: "column", gap: 10,
+      opacity: pending ? 0.7 : 1,
+      position: "relative",
+      transition: "opacity 0.2s ease",
+      pointerEvents: pending ? "none" : "auto",
     }}>
+      {pending && (
+        <div style={{
+          position: "absolute", top: 8, right: 12,
+          fontSize: FONT.xs, color: C.purple, fontWeight: 700,
+          display: "flex", alignItems: "center", gap: 4,
+          background: C.purpleBg, padding: "2px 8px", borderRadius: RADIUS.full,
+          border: `1px solid ${C.purple}55`,
+        }}>
+          <span style={{
+            display: "inline-block", width: 6, height: 6, borderRadius: "50%",
+            background: C.purple, animation: "z-pulse 1.2s ease-in-out infinite",
+          }} />
+          저장 중…
+        </div>
+      )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: FONT.base, fontWeight: 800, color: C.text1, marginBottom: 4 }}>{s.name}</div>
           <div style={{ fontSize: FONT.xs, color: C.text3, lineHeight: 1.5 }}>{summarizeConditions(s.conditions)}</div>
         </div>
-        <button onClick={onRemove} style={{
+        <button onClick={onRemove} disabled={pending} style={{
           background: "none", border: "none", color: C.text3,
-          fontSize: 20, cursor: "pointer", padding: 8,
-          minWidth: 44, minHeight: 44,
+          fontSize: 20, cursor: pending ? "not-allowed" : "pointer", padding: 8,
+          minWidth: 44, minHeight: 44, opacity: pending ? 0.4 : 1,
         }} title="삭제">🗑</button>
       </div>
 
@@ -392,6 +494,79 @@ function SuggestedModal({ C, isMobile, suggested, remaining, onClose, onAdd }) {
           <button onClick={onClose} style={{ background: "none", border: "none", color: C.text2, fontSize: 22, cursor: "pointer" }}>✕</button>
         </div>
         {body}
+      </div>
+    </div>
+  );
+}
+
+function ConfirmModal({ C, isMobile, title, desc, confirmLabel = "확인", cancelLabel = "취소", danger = false, onConfirm, onCancel }) {
+  // ESC 키 처리 + body scroll 잠금
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onCancel?.(); };
+    document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [onCancel]);
+
+  const confirmColor = danger ? C.red : C.blue;
+
+  return (
+    <div
+      onClick={onCancel}
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      style={{
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 10000,
+        display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center",
+        padding: isMobile ? 0 : 16,
+      }}
+    >
+      <div onClick={e => e.stopPropagation()} style={{
+        background: C.card, border: `1px solid ${C.border}`,
+        borderRadius: isMobile ? `${RADIUS.xl} ${RADIUS.xl} 0 0` : RADIUS["2xl"],
+        padding: 24, maxWidth: 420, width: "100%",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+      }}>
+        <div style={{ fontSize: FONT.lg, fontWeight: 800, color: C.text1, marginBottom: 8 }}>
+          {title}
+        </div>
+        {desc && (
+          <div style={{ fontSize: FONT.sm, color: C.text2, marginBottom: 20, lineHeight: 1.55 }}>
+            {desc}
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 8, flexDirection: isMobile ? "column-reverse" : "row", justifyContent: "flex-end" }}>
+          <button
+            onClick={onCancel}
+            style={{
+              padding: isMobile ? "14px 20px" : "10px 18px",
+              minHeight: 48,
+              borderRadius: RADIUS.md,
+              background: C.card2, color: C.text1,
+              border: `1px solid ${C.border}`,
+              fontSize: FONT.sm, fontWeight: 600, cursor: "pointer",
+              flex: isMobile ? 1 : "0 0 auto",
+            }}
+          >{cancelLabel}</button>
+          <button
+            onClick={onConfirm}
+            autoFocus
+            style={{
+              padding: isMobile ? "14px 20px" : "10px 18px",
+              minHeight: 48,
+              borderRadius: RADIUS.md,
+              background: confirmColor, color: "#fff",
+              border: "none",
+              fontSize: FONT.sm, fontWeight: 700, cursor: "pointer",
+              flex: isMobile ? 1 : "0 0 auto",
+            }}
+          >{confirmLabel}</button>
+        </div>
       </div>
     </div>
   );
