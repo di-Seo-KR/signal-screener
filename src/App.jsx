@@ -2860,6 +2860,26 @@ function AssetCard({ asset, onChart, isMobile = false }) {
 // ════════════════════════════════════════════════════════════════════
 function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHours = {}, isWatched = false, onToggleWatch = () => {} }) {
   const isMobile = useIsMobile();
+  // mf — 모바일 폰트 스케일 헬퍼 (line 4424 메인 컴포넌트와 동일 정의).
+  // 2026-05-12 critical fix: AssetDetailPopup closure 에 mf 미정의 → line 4000~4009 의
+  // mf(15) 4곳 호출 시 ReferenceError 발생 → 종목 카드 클릭 시 새로고침/오류.
+  const mf = useCallback((px) => {
+    if (isMobile) {
+      if (px <= 9) return "12px";
+      if (px <= 10) return "12px";
+      if (px <= 11) return "14px";
+      if (px <= 12) return "14px";
+      return `${px}px`;
+    }
+    if (px <= 9) return "12px";
+    if (px <= 10) return "14px";
+    if (px <= 11) return "14px";
+    if (px <= 12) return "14px";
+    if (px <= 13) return "15px";
+    if (px <= 14) return "16px";
+    if (px <= 15) return "18px";
+    return `${px}px`;
+  }, [isMobile]);
   const [techData, setTechData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fundamentals, setFundamentals] = useState(null);
