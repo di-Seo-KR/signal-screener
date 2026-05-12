@@ -92,10 +92,10 @@ const getNavCategories = (t) => [
     id: "analysis", label: t("nav.analysis"), catId: "analysis", icon: BarChart3,
     items: [
       { id: "screener", label: t("nav.screener"), icon: Search },
-      { id: "saved-screeners", label: "저장한 스크리너", icon: Save },     // ★ 신규
+      { id: "saved-screeners", label: "저장한 조건", icon: Save },     // ★ 신규
       { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
       { id: "strategy", label: t("nav.strategy"), icon: Target },
-      { id: "alpha-lab", label: "🧬 Alpha Lab", icon: Sparkles },           // ★ 신규
+      { id: "alpha-lab", label: "🧬 알파 랩", icon: Sparkles },           // ★ 신규
       { id: "quant-report", label: t("nav.report"), icon: FileText },
       { id: "backtest", label: t("nav.backtest"), icon: LineChart },
       { id: "backtest-compare", label: "전략 비교", icon: GitCompare },     // ★ 신규
@@ -107,7 +107,7 @@ const getNavCategories = (t) => [
       { id: "quant-port", label: t("nav.trading"), icon: TrendingUp },
       { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
       { id: "portfolio", label: t("nav.portfolio"), icon: Briefcase },
-      { id: "portfolio-analysis", label: "포트폴리오 분석", icon: PieChart }, // ★ 신규
+      { id: "portfolio-analysis", label: "자산 분석", icon: PieChart }, // ★ 신규
     ],
   },
   {
@@ -116,9 +116,9 @@ const getNavCategories = (t) => [
     items: [
       { id: "auto-trading", label: t("nav.aiQuant"), icon: Bot },
       { id: "real-trading", label: "실전매매", icon: Activity, ownerOnly: true },
-      { id: "copy-trading", label: "카피매매", icon: Share2 },               // ★ 신규
-      { id: "leaderboard", label: "🏆 봇 리더보드", icon: Trophy },          // ★ 신규
-      { id: "reports", label: "봇 리포트", icon: FileText },                 // ★ 신규
+      { id: "copy-trading", label: "카피트레이딩", icon: Share2 },
+      { id: "leaderboard", label: "🏆 봇 랭킹", icon: Trophy },
+      { id: "reports", label: "봇 리포트", icon: FileText },
     ],
   },
   {
@@ -129,8 +129,8 @@ const getNavCategories = (t) => [
       { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
       { id: "/blog", label: "블로그", icon: BookOpen },
       { id: "alerts", label: t("nav.alerts"), icon: Bell, locked: true },
-      { id: "notifications", label: "🔔 알림 센터", icon: Bell },            // ★ 신규
-      { id: "pricing", label: "👑 프리미엄", icon: Crown },                  // ★ 신규
+      { id: "notifications", label: "🔔 알림", icon: Bell },
+      { id: "pricing", label: "👑 멤버십", icon: Crown },
     ],
   },
 ];
@@ -147,10 +147,10 @@ const getMobileMenuSections = (isOwner, t) => [
   {
     section: t("nav.analysis"), items: [
       { id: "screener", label: t("nav.screener"), icon: Search },
-      { id: "saved-screeners", label: "저장한 스크리너", icon: Save },
+      { id: "saved-screeners", label: "저장한 조건", icon: Save },
       { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
       { id: "strategy", label: t("nav.strategy"), icon: Target },
-      { id: "alpha-lab", label: "🧬 Alpha Lab", icon: Sparkles },
+      { id: "alpha-lab", label: "🧬 알파 랩", icon: Sparkles },
       { id: "quant-report", label: t("nav.report"), icon: FileText },
       { id: "backtest", label: t("nav.backtest"), icon: LineChart },
       { id: "backtest-compare", label: "전략 비교", icon: GitCompare },
@@ -161,15 +161,15 @@ const getMobileMenuSections = (isOwner, t) => [
       { id: "quant-port", label: t("nav.trading"), icon: TrendingUp },
       { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
       { id: "portfolio", label: t("nav.portfolio"), icon: Briefcase },
-      { id: "portfolio-analysis", label: "포트폴리오 분석", icon: PieChart },
+      { id: "portfolio-analysis", label: "자산 분석", icon: PieChart },
     ],
   },
   {
     section: "자동매매", items: [
       { id: "auto-trading", label: t("nav.aiQuant"), icon: Bot },
       ...(isOwner ? [{ id: "real-trading", label: "실전매매", icon: Activity }] : []),
-      { id: "copy-trading", label: "카피매매", icon: Share2 },
-      { id: "leaderboard", label: "🏆 봇 리더보드", icon: Trophy },
+      { id: "copy-trading", label: "카피트레이딩", icon: Share2 },
+      { id: "leaderboard", label: "🏆 봇 랭킹", icon: Trophy },
       { id: "reports", label: "봇 리포트", icon: FileText },
     ],
   },
@@ -179,9 +179,9 @@ const getMobileMenuSections = (isOwner, t) => [
       { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
       { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
       { id: "/blog", label: "블로그", icon: BookOpen },
-      { id: "notifications", label: "🔔 알림 센터", icon: Bell },
+      { id: "notifications", label: "🔔 알림", icon: Bell },
       { id: "alerts", label: t("nav.alerts"), icon: Bell, locked: true },
-      { id: "pricing", label: "👑 프리미엄", icon: Crown },
+      { id: "pricing", label: "👑 멤버십", icon: Crown },
     ],
   },
 ];

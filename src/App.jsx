@@ -7502,21 +7502,22 @@ function AppInner() {
                 WebkitOverflowScrolling: "touch", paddingBottom: "4px",
               }} className="hscroll">
                 {[
-                  // ★ 2026-05-12: PLAN-SVC B-1 라벨 재정비 — 입문자 친화 카피
+                  // ★ 2026-05-12 v2: 한국 핀테크 컨벤션 재정비 — 토스/카카오/미래에셋 reference
+                  //   원칙: 짧은 명사형, AI 마케팅 단어 제거, 업계 표준 외래어 유지 (백테스트/카피트레이딩)
                   { icon: "🔍", label: "스크리너", tab: "screener" },
-                  { icon: "🤖", label: "AI 자동매매", tab: "auto-trading" },
-                  { icon: "🧬", label: "전략 연구소", tab: "alpha-lab" },
-                  { icon: "🏆", label: "봇 순위", tab: "leaderboard" },
-                  { icon: "🔗", label: "따라하기", tab: "copy-trading" },
+                  { icon: "🤖", label: "자동매매", tab: "auto-trading" },
+                  { icon: "🧬", label: "알파 랩", tab: "alpha-lab" },
+                  { icon: "🏆", label: "봇 랭킹", tab: "leaderboard" },
+                  { icon: "🔗", label: "카피트레이딩", tab: "copy-trading" },
                   { icon: "📊", label: "전략 분석", tab: "strategy" },
-                  { icon: "🎯", label: "과거 시뮬레이션", tab: "backtest" },
-                  { icon: "⚖️", label: "전략 비교 시뮬", tab: "backtest-compare" },
-                  { icon: "💼", label: "포트폴리오 진단", tab: "portfolio-analysis" },
-                  { icon: "💾", label: "저장한 스크리너", tab: "saved-screeners" },
+                  { icon: "🎯", label: "백테스트", tab: "backtest" },
+                  { icon: "⚖️", label: "전략 비교", tab: "backtest-compare" },
+                  { icon: "💼", label: "자산 분석", tab: "portfolio-analysis" },
+                  { icon: "💾", label: "저장한 조건", tab: "saved-screeners" },
                   { icon: "🔔", label: "알림", tab: "notifications" },
-                  { icon: "👑", label: "구독 플랜", tab: "pricing" },
+                  { icon: "👑", label: "멤버십", tab: "pricing" },
                   { icon: "📰", label: "뉴스", tab: "news" },
-                  { icon: "📅", label: "경제 캘린더", tab: "econ-calendar" },
+                  { icon: "📅", label: "경제 일정", tab: "econ-calendar" },
                 ].map((item) => (
                   <button key={item.tab} onClick={() => setTab(item.tab)} style={{
                     display: "flex", flexDirection: "column", alignItems: "center", gap: "6px",
@@ -12128,24 +12129,24 @@ function AppInner() {
                 gap: "4px",
               }}>
                 {[
-                  // ★ 2026-05-12 — PLAN-SVC B-1 라벨 재정비 적용 (입문자 친화 카피)
+                  // ★ 2026-05-12 v2 — 한국 핀테크 컨벤션 재정비 (토스/카카오/미래에셋 reference)
                   { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="1.8"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>, label: "스크리너", tab: "screener" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.purple} strokeWidth="1.8"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 12l3 3 5-6" strokeWidth="2"/></svg>, label: "AI 자동매매", tab: "auto-trading" },
-                  ...(isOwner ? [{ icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.red || "#ef4444"} strokeWidth="1.8"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>, label: "실거래", tab: "real-trading" }] : []),
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#A855F7" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>, label: "전략 연구소", tab: "alpha-lab" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="1.8"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7L12 16.4 5.7 21l2.3-7L2 9.4h7.6z"/></svg>, label: "봇 순위", tab: "leaderboard" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="1.8"><path d="M14 9V5a3 3 0 0 0-6 0v4"/><rect x="3" y="9" width="18" height="12" rx="2"/></svg>, label: "따라하기", tab: "copy-trading" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.purple} strokeWidth="1.8"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 12l3 3 5-6" strokeWidth="2"/></svg>, label: "자동매매", tab: "auto-trading" },
+                  ...(isOwner ? [{ icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.red || "#ef4444"} strokeWidth="1.8"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>, label: "실전매매", tab: "real-trading" }] : []),
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#A855F7" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>, label: "알파 랩", tab: "alpha-lab" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="1.8"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7L12 16.4 5.7 21l2.3-7L2 9.4h7.6z"/></svg>, label: "봇 랭킹", tab: "leaderboard" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="1.8"><path d="M14 9V5a3 3 0 0 0-6 0v4"/><rect x="3" y="9" width="18" height="12" rx="2"/></svg>, label: "카피트레이딩", tab: "copy-trading" },
                   { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="1.8"><path d="M3 3v18h18"/><path d="M7 16l4-6 4 3 5-7"/></svg>, label: "전략 분석", tab: "strategy" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.purple} strokeWidth="1.8"><path d="M3 12l3-9 6 18 4-12 5 9"/></svg>, label: "과거 시뮬레이션", tab: "backtest" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#06B6D4" strokeWidth="1.8"><path d="M9 19V6l-7 4 7 4"/><path d="M15 5v13l7-4-7-4"/></svg>, label: "전략 비교 시뮬", tab: "backtest-compare" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.purple} strokeWidth="1.8"><path d="M3 12l3-9 6 18 4-12 5 9"/></svg>, label: "백테스트", tab: "backtest" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#06B6D4" strokeWidth="1.8"><path d="M9 19V6l-7 4 7 4"/><path d="M15 5v13l7-4-7-4"/></svg>, label: "전략 비교", tab: "backtest-compare" },
                   { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="1.8"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" fill="none"/></svg>, label: "포트폴리오", tab: "portfolio" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0EA5E9" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/></svg>, label: "포트폴리오 진단", tab: "portfolio-analysis" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FF6B2C" strokeWidth="1.8"><path d="M12 2 2 22h20L12 2zm0 5 6 13H6l6-13z"/><circle cx="12" cy="17" r="1"/></svg>, label: "위험맵", tab: "risk-map" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.purple} strokeWidth="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2h-4"/><path d="M9 13h6M9 17h4"/></svg>, label: "저장한 스크리너", tab: "saved-screeners" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0EA5E9" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/></svg>, label: "자산 분석", tab: "portfolio-analysis" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FF6B2C" strokeWidth="1.8"><path d="M12 2 2 22h20L12 2zm0 5 6 13H6l6-13z"/><circle cx="12" cy="17" r="1"/></svg>, label: "리스크맵", tab: "risk-map" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.purple} strokeWidth="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2h-4"/><path d="M9 13h6M9 17h4"/></svg>, label: "저장한 조건", tab: "saved-screeners" },
                   { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>, label: "알림", tab: "notifications" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="1.8"><circle cx="12" cy="8" r="6"/><path d="M15.5 12.5L17 22l-5-3-5 3 1.5-9.5"/></svg>, label: "구독 플랜", tab: "pricing" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="1.8"><circle cx="12" cy="8" r="6"/><path d="M15.5 12.5L17 22l-5-3-5 3 1.5-9.5"/></svg>, label: "멤버십", tab: "pricing" },
                   { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E67E22" strokeWidth="1.8"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 7h8M8 11h5M8 15h7"/></svg>, label: "뉴스", tab: "news" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.red || "#ef4444"} strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, label: "경제 캘린더", tab: "econ-calendar" },
+                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.red || "#ef4444"} strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, label: "경제 일정", tab: "econ-calendar" },
                   { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9B6FFF" strokeWidth="1.8"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>, label: "시장 심리", tab: "sentiment" },
                   { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>, label: "블로그", action: () => { window.location.href = "/blog"; } },
                   { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.text3} strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>, label: "내 정보", tab: "mypage" },
@@ -12921,9 +12922,9 @@ function AppInner() {
           {[
             { id: "home", label: "홈", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><path d={active ? "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10.5z" : "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-4.5v-6h-3v6H4a1 1 0 0 1-1-1V10.5z"} />{active && <rect x="9" y="14" width="6" height="7" rx="0.5" fill={C.isDark ? C.bg : "#fff"} />}</svg> },
             { id: "screener", label: "스크리너", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1}/><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg> },
-            { id: "auto-trading", label: "AI 자동", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="3" fill={active ? "currentColor" : "none"} /><path d="M8 12l3 3 5-6" stroke={active ? (C.isDark ? C.bg : "#fff") : "currentColor"} strokeWidth="2" fill="none" />{active && <circle cx="18" cy="6" r="3.5" fill={C.green} stroke="none" />}</svg> },
+            { id: "auto-trading", label: "자동매매", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="3" fill={active ? "currentColor" : "none"} /><path d="M8 12l3 3 5-6" stroke={active ? (C.isDark ? C.bg : "#fff") : "currentColor"} strokeWidth="2" fill="none" />{active && <circle cx="18" cy="6" r="3.5" fill={C.green} stroke="none" />}</svg> },
             { id: "portfolio", label: "자산", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" fill="none" stroke={active ? (C.isDark ? C.bg : "#fff") : "currentColor"} strokeWidth="1.8" /></svg> },
-            { id: "more", label: "더보기", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg> },
+            { id: "more", label: "메뉴", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg> },
           ].map(item => {
             const isActive = item.id === "more"
               ? !["home","screener","auto-trading","portfolio"].includes(tab)
