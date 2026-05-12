@@ -143,7 +143,9 @@ export async function executeOrderPlan(opts) {
   //   진입은 체결됐는데 bracket 이 안 걸리면 "벌거벗은 포지션" 이 남아서 재앙.
   //   전략: SL 을 반드시 먼저 3회 재시도 → 실패 시 즉시 시장가로 포지션 강제 청산.
   //   SL 성공 후 TP 는 best-effort (TP 실패는 손실 무제한이 아니므로 close 까진 안 함).
-  const bracketResults = { sl: null, tp: null };
+  // ★ 2026-05-12 fix: const → let. tryBracket=false 분기에서 재할당 발생 (line 180).
+  //   "Assignment to constant variable" 에러로 모든 진입 시도 실패.
+  let bracketResults = { sl: null, tp: null };
   const closeSide = side === "LONG" ? "SELL" : "BUY";
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
