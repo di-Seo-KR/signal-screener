@@ -25,7 +25,7 @@ import { loadUserCredentials, respondError } from "../_shared/binance-auth.js";
 // ★ 2026-05-09 audit N2: pickBestSignal 미사용 (rankSignals 만 사용) — dead import 제거
 import { extractSignal, rankSignals } from "../_shared/signal-extractor.js";
 import { loadFamilyWeightsRobust, applyWeightsToRanking } from "../_shared/strategy-weights.js";
-import { planTrade, RISK_CONFIG, checkAggregateExposure, checkPyramidGuard } from "../_shared/risk-manager.js";
+import { planTrade, RISK_CONFIG, checkAggregateExposure, checkPyramidGuard, checkSameSymbolNotional } from "../_shared/risk-manager.js";
 import { preTradeCheck } from "../_shared/circuit-breaker.js";
 import { getSymbolFilter, isSymbolAffordable } from "../_shared/exchange-info.js";
 import { getTickerPrice, getAccountInfo, getKlines, getPositionRisk } from "../_shared/binance-client.js";
@@ -501,6 +501,21 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     S(`live mode: dedup OFF (averaging 허용, pyramid guard 가 마틴게일 차단)`);
   }
 
+  // ★ 2026-05-12 averaging 자유화 가드 임계값 로그.
+  //   pyramid guard 임계값 (R) 과 같은 심볼 합산 노시오날 cap 표기.
+  {
+    const envMinR = Number(process.env.ZEPTA_PYRAMID_MIN_R);
+    const minR = Number.isFinite(envMinR)
+      ? envMinR
+      : (typeof RISK_CONFIG.pyramidMinR === "number" ? RISK_CONFIG.pyramidMinR : 0.0);
+    const envPct = Number(process.env.ZEPTA_SAME_SYMBOL_MAX_PCT);
+    const capPct = Number.isFinite(envPct)
+      ? envPct
+      : (typeof RISK_CONFIG.sameSymbolMaxNotionalPct === "number" ? RISK_CONFIG.sameSymbolMaxNotionalPct : 0.30);
+    S(`pyramid minR threshold = ${minR.toFixed(2)}R (0.0 = averaging 자유)`);
+    S(`same-symbol notional cap = ${(capPct * 100).toFixed(0)}% of equity`);
+  }
+
   // 7-9) ★ ranked 시그널 순회 — 1순위가 affordability/risk reject 되어도
   // 차순위로 fallback. 첫 번째로 plan.ok 가 나오는 시그널을 채택.
   let best = null, price = null, atr = null, filter = null, plan = null;
@@ -512,10 +527,11 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       tried.push({ symbol: cand.symbol, reason: "auto-blocked by performance" });
       continue;
     }
-    // 중복 진입 차단 — 이미 같은 심볼에 OPEN 포지션 있으면 skip
+    // 중복 진입 차단 — dedupMode 가 always/live-only 일 때만 openSymbols 가 채워짐.
+    // dedupMode='off' (기본) 이면 이 set 은 비어있어 통과 → averaging 허용.
     if (openSymbols.has(cand.symbol)) {
-      S(`  ↳ ${cand.symbol}: 이미 OPEN 포지션 존재 — 중복 진입 차단`);
-      tried.push({ symbol: cand.symbol, reason: "already open" });
+      S(`  ↳ ${cand.symbol}: dedup mode '${dedupMode}' — 같은 심볼 OPEN 상태로 스킵`);
+      tried.push({ symbol: cand.symbol, reason: `dedup '${dedupMode}': already open` });
       continue;
     }
     S(`try: ${cand.symbol} ${cand.side} conf=${cand.confidence} fam=${cand.strategyFamily}`);
@@ -575,17 +591,28 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
           tried.push({ symbol: cand.symbol, reason: aggCheck.reason });
           continue;
         }
-        // ★ audit M1: 같은 심볼 averaging 가드 (피라미딩만 허용, 물타기 차단)
+        // ★ audit M1: 같은 심볼 averaging 가드 (cfg.pyramidMinR / env ZEPTA_PYRAMID_MIN_R).
+        //   2026-05-12 기본 0.0R → averaging 자유. 1.0 으로 옛 보수 모드 복원.
         const samePos = (liveOpenPositions || []).find((pos) => pos.symbol === p.plan.symbol);
         if (samePos) {
-          const pyrCheck = checkPyramidGuard({ plan: p.plan, existingPos: samePos });
+          const pyrCheck = checkPyramidGuard({ plan: p.plan, existingPos: samePos, cfg: RISK_CONFIG });
           if (!pyrCheck.ok) {
             S(`  ↳ pyramid guard reject: ${pyrCheck.reason}`);
             tried.push({ symbol: cand.symbol, reason: pyrCheck.reason });
             continue;
           }
           if (pyrCheck.currentR != null) {
-            S(`  ↳ averaging 허용: 기존 ${p.plan.side} R=${pyrCheck.currentR.toFixed(2)} (피라미딩)`);
+            S(`  ↳ averaging 허용: 기존 ${p.plan.side} R=${pyrCheck.currentR.toFixed(2)}`);
+          }
+          // ★ 2026-05-12 신규: 같은 심볼 합산 노시오날 cap (마틴게일 폭주 방지).
+          //   pyramid guard 가 0.0R 로 풀린 만큼 별도 안전망 필수.
+          const symNotCheck = checkSameSymbolNotional({
+            plan: p.plan, existingPos: samePos, equity: effectiveEquity, cfg: RISK_CONFIG,
+          });
+          if (!symNotCheck.ok) {
+            S(`  ↳ same-symbol notional reject: ${symNotCheck.reason}`);
+            tried.push({ symbol: cand.symbol, reason: symNotCheck.reason });
+            continue;
           }
         }
       }
