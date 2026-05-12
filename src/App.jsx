@@ -2859,6 +2859,7 @@ function AssetCard({ asset, onChart, isMobile = false }) {
 // 서브 컴포넌트: AssetDetailPopup (종목 상세 팝업 + 투자진단)
 // ════════════════════════════════════════════════════════════════════
 function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHours = {}, isWatched = false, onToggleWatch = () => {} }) {
+  const isMobile = useIsMobile();
   const [techData, setTechData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fundamentals, setFundamentals] = useState(null);
