@@ -26,7 +26,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useThemeTokens, FONT, RADIUS, pickFont } from "./ui/theme.jsx";
 import { useBreakpoint } from "./ui/useBreakpoint.jsx";
-import { BottomSheet } from "./ui/primitives.jsx";
+import { BottomSheet, LoadingBlock, EmptyState } from "./ui/primitives.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 
 // ── 한국어 라벨 ────────────────────────────────────────────────────
@@ -271,7 +271,7 @@ function DisclaimerModal({ open, targetBot, mode, setMode, onCancel, onConfirm, 
 export default function CopyTrading({ onNavigate } = {}) {
   const C = useThemeTokens();
   const { isMobile } = useBreakpoint();
-  const { user } = useAuth();
+  const { user, showToast } = useAuth();
   const uid = user?.id || null;
 
   const [leaderboard, setLeaderboard] = useState(null);
@@ -316,12 +316,13 @@ export default function CopyTrading({ onNavigate } = {}) {
   // 팔로우 시작 (모달 열기)
   const startFollow = useCallback((botId) => {
     if (!uid) {
-      alert("로그인 후 이용해주세요.");
+      // 2026-05-12 — native alert 제거, 토스트 표준화
+      showToast?.("로그인 후 이용하실 수 있어요", "warning");
       return;
     }
     setModalBot(botId);
     setModalMode("alert");
-  }, [uid]);
+  }, [uid, showToast]);
 
   // 모달 confirm
   const confirmFollow = useCallback(async () => {
@@ -361,12 +362,14 @@ export default function CopyTrading({ onNavigate } = {}) {
 
       await loadFollows();
       setModalBot(null);
+      showToast?.(modalMode === "copy" ? "전략 설정이 복사되었어요" : "팔로우가 시작됐어요", "success");
     } catch (e) {
-      alert(`팔로우 실패: ${e?.message || String(e)}`);
+      // 2026-05-12 — native alert 제거, 토스트 표준화
+      showToast?.(`팔로우 실패: ${e?.message || String(e)}`, "error");
     } finally {
       setModalLoading(false);
     }
-  }, [modalBot, modalMode, uid, loadFollows]);
+  }, [modalBot, modalMode, uid, loadFollows, showToast]);
 
   const unfollow = useCallback(async (targetBotId) => {
     if (!uid) return;
@@ -521,15 +524,17 @@ export default function CopyTrading({ onNavigate } = {}) {
         )}
 
         {!err && loading && (
-          <div style={{ padding: 24, textAlign: "center", color: C.text3, fontSize: FONT.sm }}>
-            불러오는 중…
-          </div>
+          // 2026-05-12 — Skeleton 표준화 (LoadingBlock)
+          <LoadingBlock rows={3} height={72} label="팔로우 가능한 봇 불러오는 중…" />
         )}
 
         {!err && !loading && followableBots.length === 0 && (
-          <div style={{ padding: 24, textAlign: "center", color: C.text3, fontSize: FONT.sm }}>
-            아직 등록된 봇이 없습니다. 리더보드가 누적된 후 다시 확인해주세요.
-          </div>
+          // 2026-05-12 — EmptyState 표준화 (친절 카피 + 다음 액션)
+          <EmptyState
+            icon="🤖"
+            title="아직 등록된 봇이 없어요"
+            description="리더보드가 누적된 후 자동으로 표시됩니다. 며칠 후 다시 확인해주세요."
+          />
         )}
 
         {!err && !loading && followableBots.length > 0 && (

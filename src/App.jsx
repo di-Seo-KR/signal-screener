@@ -7461,7 +7461,8 @@ function AppInner() {
               );
             })()}
 
-            {/* ── 비로그인 유저 웰컴 배너 — 가입 유도 */}
+            {/* ── 비로그인 유저 웰컴 배너 — 가입 유도 + 신뢰 시그널
+                 2026-05-12 v3: AI 단어 노출 보정 (핀테크 표준 어휘) + TrustRow 신뢰 시그널 추가 */}
             {!user && (
               <div style={{
                 background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.purpleBg} 50%, ${C.blueBg} 100%)`,
@@ -7471,26 +7472,59 @@ function AppInner() {
                 position: "relative", overflow: "hidden",
               }}>
                 <div style={{ position: "absolute", top: "-30px", right: "-20px", fontSize: "100px", opacity: 0.06 }}>🚀</div>
-                <h2 style={{ fontSize: isMobile ? "20px" : "24px", fontWeight: 900, color: C.text1, marginBottom: "8px" }}>
-                  AI가 찾아주는 최적의 매수 타점
+                <h2 style={{ fontSize: isMobile ? "20px" : "24px", fontWeight: 900, color: C.text1, marginBottom: "8px", letterSpacing: "-0.02em" }}>
+                  퀀트 33개 전략으로 매수 타점을 검증합니다
                 </h2>
-                <p style={{ fontSize: "15px", color: C.text2, marginBottom: "16px", lineHeight: 1.5 }}>
-                  33개 퀀트 전략으로 주식·코인을 자동 분석합니다. 무료로 시작하세요.
+                <p style={{ fontSize: "15px", color: C.text2, marginBottom: "16px", lineHeight: 1.55, wordBreak: "keep-all" }}>
+                  주식 · 코인 · 외환까지. 무료로 시작하고 검증된 전략을 골라 쓰세요.
                 </p>
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "16px" }}>
                   <button onClick={() => setShowAuthModal(true)} style={{
                     padding: "12px 28px", borderRadius: "12px", fontSize: "15px", fontWeight: 800,
                     background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`,
                     color: "#fff", border: "none", cursor: "pointer",
                     boxShadow: `0 4px 16px ${C.blue}30`,
                     transition: "all 0.2s",
-                  }}>무료 가입하기</button>
+                  }}>무료로 시작하기</button>
                   <button onClick={() => setTab("screener")} style={{
                     padding: "12px 28px", borderRadius: "12px", fontSize: "15px", fontWeight: 700,
                     background: `${C.card2}`, color: C.text2,
                     border: `1px solid ${C.border}`,
                     cursor: "pointer", transition: "all 0.2s",
                   }}>둘러보기</button>
+                </div>
+                {/* ── 신뢰 시그널 — 4개 메트릭 (MKT-LEAD 2026-05-12) */}
+                <div style={{
+                  display: "flex",
+                  gap: isMobile ? "8px" : "10px",
+                  overflowX: isMobile ? "auto" : "visible",
+                  scrollbarWidth: "none",
+                  WebkitOverflowScrolling: "touch",
+                  flexWrap: isMobile ? "nowrap" : "wrap",
+                  paddingTop: "8px",
+                  borderTop: `1px solid ${C.purple}25`,
+                }}>
+                  {[
+                    { icon: "🧪", label: "검증 전략", value: "33개" },
+                    { icon: "📡", label: "라이브 데이터", value: "Yahoo · Binance" },
+                    { icon: "🔒", label: "보안", value: "TLS 1.3 · Supabase Auth" },
+                    { icon: "💳", label: "결제", value: "베타 무료" },
+                  ].map((it, i) => (
+                    <div key={i} style={{
+                      display: "inline-flex", alignItems: "center", gap: "8px",
+                      padding: "8px 12px",
+                      background: `${C.card}cc`,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: "999px",
+                      flexShrink: 0, whiteSpace: "nowrap",
+                      backdropFilter: "blur(8px)",
+                      WebkitBackdropFilter: "blur(8px)",
+                    }}>
+                      <span style={{ fontSize: "14px", lineHeight: 1 }}>{it.icon}</span>
+                      <span style={{ fontSize: "10px", fontWeight: 700, color: C.text3, letterSpacing: 0.3, textTransform: "uppercase" }}>{it.label}</span>
+                      <span style={{ fontSize: "12px", fontWeight: 800, color: C.text1, letterSpacing: "-0.01em" }}>{it.value}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

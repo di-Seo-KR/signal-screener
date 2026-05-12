@@ -19,7 +19,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useThemeTokens, FONT, RADIUS, pickFont } from "./ui/theme.jsx";
 import { useBreakpoint } from "./ui/useBreakpoint.jsx";
-import { BottomSheet } from "./ui/primitives.jsx";
+import { BottomSheet, LoadingBlock } from "./ui/primitives.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 
 const REFRESH_MS = 30_000;
@@ -207,7 +207,8 @@ export default function NotificationHub({ onNavigate }) {
 
       {/* 리스트 */}
       {loading ? (
-        <EmptyBox C={C} title="불러오는 중…" />
+        // 2026-05-12 — Skeleton 표준화 (LoadingBlock)
+        <LoadingBlock rows={4} height={64} label="알림 불러오는 중…" />
       ) : !uid || uid === "guest" ? (
         <EmptyBox
           C={C}

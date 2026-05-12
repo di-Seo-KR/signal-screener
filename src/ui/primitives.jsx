@@ -527,20 +527,208 @@ export function Skeleton({ width = "100%", height = 14, rounded = 6, style }) {
 }
 
 // ───────────────────────────── Empty State ─────────────────────────────
-export function EmptyState({ icon, title, description, action }) {
+// 빈 상태 표준 컴포넌트 — 친절한 카피 + 다음 액션 가이드.
+// 사용:
+//   <EmptyState icon="✨" title="저장된 조건이 없어요"
+//     description="추천 조건 4개 중 마음에 드는 것을 골라 시작해보세요."
+//     action={<Button variant="primary" onClick={...}>추천 조건 보기</Button>} />
+//
+// props.bordered=true 시 dashed border + card2 bg 컨테이너로 감싸짐 (페이지 inline 용).
+// props.icon 은 emoji string 또는 ReactNode 모두 지원.
+export function EmptyState({ icon, title, description, action, bordered, compact, style }) {
+  const isEmoji = typeof icon === "string";
+  const containerStyle = bordered ? {
+    background: "var(--z-card-2)",
+    border: "1px dashed var(--z-border-2)",
+    borderRadius: "var(--z-r-lg)",
+    margin: "8px 0",
+  } : {};
   return (
     <div style={{
-      padding: "40px 20px", textAlign: "center",
+      padding: compact ? "24px 16px" : "44px 24px",
+      textAlign: "center",
       display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+      ...containerStyle,
+      ...style,
     }}>
-      {icon && <div style={{ color: "var(--z-text-3)", opacity: 0.7 }}>{icon}</div>}
-      {title && <div style={{ fontSize: 14, fontWeight: 700, color: "var(--z-text-2)" }}>{title}</div>}
+      {icon && (
+        isEmoji
+          ? <div style={{ fontSize: 36, lineHeight: 1, opacity: 0.85 }}>{icon}</div>
+          : <div style={{ color: "var(--z-text-3)", opacity: 0.7 }}>{icon}</div>
+      )}
+      {title && (
+        <div style={{
+          fontSize: 15, fontWeight: 800, color: "var(--z-text)",
+          letterSpacing: "-0.01em", marginTop: icon ? 4 : 0,
+        }}>{title}</div>
+      )}
       {description && (
-        <div style={{ fontSize: 12, color: "var(--z-text-3)", maxWidth: 360, lineHeight: 1.6 }}>
+        <div style={{
+          fontSize: 13, color: "var(--z-text-2)",
+          maxWidth: 380, lineHeight: 1.6, wordBreak: "keep-all",
+        }}>
           {description}
         </div>
       )}
-      {action && <div style={{ marginTop: 6 }}>{action}</div>}
+      {action && <div style={{ marginTop: 8 }}>{action}</div>}
+    </div>
+  );
+}
+
+// ───────────────────────────── PageHeader ─────────────────────────────
+// 페이지 최상단 H1 + 부제 + action 의 표준 컴포넌트.
+// raw <h1 fontSize: FONT["2xl"]> 패턴을 모두 대체.
+//
+// 모바일 24px / 데스크탑 30px (FONT_MOBILE.h1 기준)
+// 사용:
+//   <PageHeader
+//     icon="🧬"
+//     title="알파 랩"
+//     subtitle="검증된 33개 전략을 한 자리에서 비교하세요"
+//     badge={<Badge tone="purple">베타</Badge>}
+//     action={<Button variant="primary">새 백테스트</Button>}
+//   />
+export function PageHeader({ title, subtitle, action, badge, icon, isMobile: isMobileProp, style }) {
+  const { isMobile } = useBreakpoint();
+  const mobile = typeof isMobileProp === "boolean" ? isMobileProp : isMobile;
+  const isEmoji = typeof icon === "string";
+  return (
+    <header style={{
+      display: "flex", alignItems: "flex-start", justifyContent: "space-between",
+      gap: 16, marginBottom: mobile ? 16 : 20, flexWrap: "wrap",
+      ...style,
+    }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0, flex: 1 }}>
+        {icon && (
+          isEmoji
+            ? <span style={{ fontSize: mobile ? 26 : 32, lineHeight: 1, flexShrink: 0 }}>{icon}</span>
+            : <span style={{ color: "var(--z-text)", flexShrink: 0 }}>{icon}</span>
+        )}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <h1 style={{
+              margin: 0,
+              fontSize: mobile ? 24 : 30,
+              fontWeight: 800,
+              color: "var(--z-text)",
+              letterSpacing: "-0.02em",
+              lineHeight: 1.2,
+              fontFamily: "var(--z-font-sans)",
+            }}>{title}</h1>
+            {badge}
+          </div>
+          {subtitle && (
+            <p style={{
+              margin: "6px 0 0",
+              fontSize: mobile ? 13 : 14,
+              color: "var(--z-text-2)",
+              lineHeight: 1.55,
+              wordBreak: "keep-all",
+            }}>{subtitle}</p>
+          )}
+        </div>
+      </div>
+      {action && (
+        <div style={{
+          display: "flex", gap: 8, alignItems: "center", flexShrink: 0,
+          marginLeft: mobile ? 0 : "auto",
+        }}>{action}</div>
+      )}
+    </header>
+  );
+}
+
+// ───────────────────────────── LoadingBlock ─────────────────────────────
+// 로딩 표준 컴포넌트 — raw "불러오는 중…" 텍스트 대체.
+// Skeleton 3개 카드 + 텍스트.
+//
+// 사용:
+//   {loading ? <LoadingBlock label="알파 데이터 불러오는 중…" /> : <Result data={data} />}
+export function LoadingBlock({ rows = 3, label = "불러오는 중…", height = 60, style }) {
+  return (
+    <div style={{
+      display: "flex", flexDirection: "column", gap: 10,
+      padding: "12px 0",
+      ...style,
+    }} role="status" aria-live="polite" aria-busy="true">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div
+          key={i}
+          className="z-skel"
+          style={{
+            height,
+            width: "100%",
+            borderRadius: "var(--z-r-md)",
+            opacity: 1 - i * 0.15,
+          }}
+        />
+      ))}
+      {label && (
+        <div style={{
+          textAlign: "center", marginTop: 4,
+          fontSize: 12, color: "var(--z-text-3)", fontWeight: 600,
+        }}>{label}</div>
+      )}
+    </div>
+  );
+}
+
+// ───────────────────────────── TrustRow ─────────────────────────────
+// 신뢰 시그널 노출용 mini-row. 비로그인 랜딩 / 가입 배너 직하단에 사용.
+//
+// 사용:
+//   <TrustRow items={[
+//     { icon: "👥", label: "베타 가입자", value: "1,200+" },
+//     { icon: "🧪", label: "검증 전략", value: "33개" },
+//     { icon: "📡", label: "데이터", value: "Yahoo · Binance Live" },
+//     { icon: "🔒", label: "보안", value: "TLS 1.3" },
+//   ]} />
+export function TrustRow({ items, dense, style }) {
+  const { isMobile } = useBreakpoint();
+  if (!items?.length) return null;
+  return (
+    <div style={{
+      display: "flex",
+      gap: isMobile ? 8 : 12,
+      overflowX: isMobile ? "auto" : "visible",
+      scrollbarWidth: "none",
+      WebkitOverflowScrolling: "touch",
+      flexWrap: isMobile ? "nowrap" : "wrap",
+      ...style,
+    }}>
+      {items.map((it, i) => (
+        <div
+          key={i}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+            padding: dense ? "8px 12px" : "10px 14px",
+            background: "var(--z-card-2)",
+            border: "1px solid var(--z-border)",
+            borderRadius: "var(--z-r-full)",
+            flexShrink: 0,
+            whiteSpace: "nowrap",
+            boxShadow: "var(--z-sh-sm)",
+          }}
+          title={it.label}
+        >
+          {it.icon && (
+            typeof it.icon === "string"
+              ? <span style={{ fontSize: 14, lineHeight: 1 }}>{it.icon}</span>
+              : it.icon
+          )}
+          <span style={{
+            fontSize: 11, fontWeight: 700, color: "var(--z-text-3)",
+            letterSpacing: 0.3, textTransform: "uppercase",
+          }}>{it.label}</span>
+          <span style={{
+            fontSize: 13, fontWeight: 800, color: "var(--z-text)",
+            fontFamily: "var(--z-font-mono)", fontVariantNumeric: "tabular-nums",
+            letterSpacing: "-0.01em",
+          }}>{it.value}</span>
+        </div>
+      ))}
     </div>
   );
 }

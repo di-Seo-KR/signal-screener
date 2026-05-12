@@ -22,6 +22,7 @@ import { useThemeTokens, FONT, RADIUS } from "./ui/theme.jsx";
 import { useIsMobile } from "./ui/useBreakpoint.jsx";
 import { ga } from "./lib/analytics.js";
 import { useAuth } from "./AuthProvider.jsx";
+import { LoadingBlock } from "./ui/primitives.jsx";
 
 const REFRESH_MS = 60_000;
 
@@ -758,8 +759,15 @@ export default function AlphaLab({ onRequestLogin }) {
   }, []);
 
   if (loading && !data) {
+    // 2026-05-12 — Skeleton 표준화 (LoadingBlock)
     return (
-      <div style={{ padding: 24, color: C.text2, fontSize: FONT.sm }}>Alpha Lab 데이터 불러오는 중…</div>
+      <div style={{ padding: "14px 14px", maxWidth: 1200, margin: "0 auto" }}>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, letterSpacing: "-0.02em" }}>알파 랩</div>
+          <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4 }}>검증된 33개 전략을 한 자리에서 비교하세요</div>
+        </div>
+        <LoadingBlock rows={4} height={84} label="알파 데이터 불러오는 중…" />
+      </div>
     );
   }
 
@@ -768,9 +776,9 @@ export default function AlphaLab({ onRequestLogin }) {
     return (
       <div style={{ padding: "14px 14px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 1200, margin: "0 auto" }}>
         <div>
-          <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1 }}>Alpha Lab</div>
-          <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4 }}>
-            Zepta AI 가 24시간 시장을 추적하며 가장 잘 작동하는 매매 전략을 자동으로 찾습니다.
+          <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, letterSpacing: "-0.02em" }}>알파 랩</div>
+          <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4, lineHeight: 1.55 }}>
+            33개 매매 전략을 24시간 검증합니다. 가장 잘 작동하는 알파를 자동으로 골라냅니다.
           </div>
         </div>
 
@@ -803,8 +811,8 @@ export default function AlphaLab({ onRequestLogin }) {
   return (
     <div style={{ padding: "14px 14px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 1200, margin: "0 auto" }}>
       <div>
-        <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1 }}>Alpha Lab</div>
-        <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4 }}>
+        <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, letterSpacing: "-0.02em" }}>알파 랩</div>
+        <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4, lineHeight: 1.55 }}>
           24시간 매매 전략 추적 · 자동 튜닝 · 시장 흐름에 맞춰 가중치 자동 조정.
           {lastFetched && <> · 마지막 갱신 {lastFetched.toLocaleTimeString("ko-KR", { hour12: false })}</>}
         </div>
