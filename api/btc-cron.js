@@ -493,6 +493,35 @@ export default async function handler(req, res) {
 
       addLog(`🎯 ${asset} 시그널: ${latestSignal.type} | ${latestSignal.confidence}급 | ${latestSignal.score}pt`);
 
+      // ★ 2026-05-13 architectural fix: 시그널 풀 SSOT 적재.
+      //   실거래 engine 이 di:bot:*:perf 가 아닌 di:signals:realtime-pool 에서 시그널을 가져오면
+      //   가상 포트폴리오 한도 / cron 중단 / skip 여부와 완전 독립적으로 작동.
+      //   대표 지시: "다시는 실제매매 쪽이 이런 이슈들로 영향받지 않게"
+      try {
+        const poolKey = "di:signals:realtime-pool";
+        const existingPool = (await kv.get(poolKey)) || [];
+        const newEntry = {
+          ts: Date.now(),
+          time: new Date().toISOString(),
+          asset,
+          type: latestSignal.type,
+          confidence: latestSignal.confidence,
+          score: latestSignal.score,
+          family: latestSignal.family,
+          timeframe: latestSignal.timeframe,
+          side: latestSignal.side,
+          reason: (latestSignal.reason || "").slice(0, 200),
+          positionSize: latestSignal.positionSize || 0.5,
+          source: "btc-cron",
+        };
+        // 최근 4시간 윈도우만 유지 + 최대 200건 cap
+        const cutoffMs = Date.now() - 4 * 60 * 60 * 1000;
+        const updatedPool = [newEntry, ...existingPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200);
+        await kv.set(poolKey, updatedPool);
+      } catch (poolErr) {
+        addLog(`⚠️ ${asset} 시그널 풀 적재 실패: ${poolErr.message}`);
+      }
+
       // 현재 포지션 확인
       const pos = positionMap[asset];
       const currentExposure = pos ? parseFloat(pos.market_value || 0) : 0;
