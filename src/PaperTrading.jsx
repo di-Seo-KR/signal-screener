@@ -943,7 +943,7 @@ function OrderModal({ symbol: initSymbol, side, reason, config, onClose, onOrder
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center",
+    <div style={{ position: "fixed", inset: 0, zIndex: 11000, display: "flex", alignItems: "center",
       justifyContent: "center", background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
         background: C.card, border: `1px solid ${C.border}`, borderRadius: "20px",

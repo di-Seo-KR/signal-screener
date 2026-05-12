@@ -855,7 +855,7 @@ export default function Pricing({ onRequestLogin } = {}) {
           boxShadow: C.cardShadow,
           fontSize: FONT.sm,
           fontWeight: 600,
-          zIndex: 9999,
+          zIndex: 11000,
           maxWidth: "90vw",
         }}>
           {toast.msg}
