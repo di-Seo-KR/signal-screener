@@ -477,7 +477,7 @@ function SuggestedModal({ C, isMobile, suggested, remaining, onClose, onAdd }) {
 
   return (
     <div onClick={onClose} style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 9999,
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 11000,
       display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
     }}>
       <div onClick={e => e.stopPropagation()} style={{

@@ -2116,7 +2116,7 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
             background: "rgba(0,0,0,0.6)",
             display: isMobile ? "block" : "flex",
             alignItems: "center", justifyContent: "center",
-            zIndex: 9999,
+            zIndex: 11000,
           }} onClick={() => setPendingBot(null)}>
             <div style={{
               background: c.card,
@@ -2128,9 +2128,9 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
               bottom: isMobile ? 0 : undefined,
               left: isMobile ? 0 : undefined,
               right: isMobile ? 0 : undefined,
-              maxHeight: isMobile ? "90vh" : undefined,
+              maxHeight: isMobile ? "calc(100dvh - 24px)" : undefined,
               overflowY: isMobile ? "auto" : "visible",
-              paddingBottom: isMobile ? "max(20px, env(safe-area-inset-bottom))" : "28px",
+              paddingBottom: isMobile ? "calc(env(safe-area-inset-bottom, 0px) + 100px)" : "28px",
               border: `1px solid ${c.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
               animation: isMobile ? "auto-sheet-up 240ms cubic-bezier(.2,.8,.2,1)" : undefined,
             }} onClick={e => e.stopPropagation()}>
@@ -2255,20 +2255,20 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
             background: "rgba(0,0,0,0.6)",
             display: isMobile ? "block" : "flex",
             alignItems: "center", justifyContent: "center",
-            zIndex: 9999,
+            zIndex: 11000,
           }} onClick={() => setPendingDCABot(null)}>
             <div style={{
               background: c.card,
               borderRadius: isMobile ? "20px 20px 0 0" : "16px",
               padding: isMobile ? "20px 16px" : "28px",
               width: isMobile ? "100%" : "min(460px, 92vw)",
-              maxHeight: isMobile ? "90vh" : "92vh",
+              maxHeight: isMobile ? "calc(100dvh - 24px)" : "92vh",
               overflowY: "auto",
               position: isMobile ? "absolute" : "static",
               bottom: isMobile ? 0 : undefined,
               left: isMobile ? 0 : undefined,
               right: isMobile ? 0 : undefined,
-              paddingBottom: isMobile ? "max(20px, env(safe-area-inset-bottom))" : "28px",
+              paddingBottom: isMobile ? "calc(env(safe-area-inset-bottom, 0px) + 100px)" : "28px",
               border: `1px solid ${c.border}`, boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
               animation: isMobile ? "auto-sheet-up 240ms cubic-bezier(.2,.8,.2,1)" : undefined,
             }} onClick={e => e.stopPropagation()}>
@@ -2757,7 +2757,7 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
           <div style={{
             position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
             background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center",
-            justifyContent: "center", zIndex: 9999, padding: isMobile ? "16px" : "0",
+            justifyContent: "center", zIndex: 11000, padding: isMobile ? "16px" : "0",
           }}>
             <div style={{
               background: colors[theme].card, borderRadius: "16px", padding: isMobile ? "24px 16px" : "32px 24px",
