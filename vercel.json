@@ -153,7 +153,7 @@
     },
     {
       "path": "/api/agents/param-tuner",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 */3 * * *"
     },
     {
       "path": "/api/agents/auto-promote",
@@ -161,7 +161,7 @@
     },
     {
       "path": "/api/agents/continuous-backtest",
-      "schedule": "0 7 * * *"
+      "schedule": "0 */4 * * *"
     },
     {
       "path": "/api/agents/screener-alert-monitor",

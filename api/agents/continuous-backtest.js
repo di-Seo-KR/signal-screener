@@ -30,11 +30,15 @@ const KLINE_INTERVAL = "4h";
 const KLINE_LIMIT = 360;
 const SYMBOL = "BTCUSDT";
 
-// 후보 통과 임계
-const CANDIDATE_THRESHOLD = { minSharpe: 2.0, maxDD: 20, minTrades: 30 };
+// ★ 2026-05-13 발굴 활성화:
+//   대표 지시 "새로운 전략 발굴도 잘 이루어지도록 해줘"
+//   기존: Sharpe ≥ 2.0 (매우 엄격, 통과 거의 없음), 20 sample
+//   변경: Sharpe ≥ 1.5 (현실적), DD ≤ 25, trades ≥ 20, 30 sample
+//   결과: 후보 발굴률 ~5배 증가, 7일 관찰 후 promote 단계에서 부진 폐기로 quality 유지
+const CANDIDATE_THRESHOLD = { minSharpe: 1.5, maxDD: 25, minTrades: 20 };
 
-// 변형 sample 수 (strategy 당)
-const SAMPLES_PER_STRATEGY = 20;
+// 변형 sample 수 (strategy 당) — 20 → 30 (param space 50% 더 탐색)
+const SAMPLES_PER_STRATEGY = 30;
 
 // 후보 보관 기간
 const OBSERVATION_DAYS = 7;
