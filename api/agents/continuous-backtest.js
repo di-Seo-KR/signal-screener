@@ -28,16 +28,25 @@ export const config = { maxDuration: 60 };
 // 60일 = 4h 봉 360개 (binance limit 1500 이내)
 const KLINE_INTERVAL = "4h";
 const KLINE_LIMIT = 360;
-const SYMBOL = "BTCUSDT";
 
-// ★ 2026-05-13 발굴 활성화:
-//   대표 지시 "새로운 전략 발굴도 잘 이루어지도록 해줘"
-//   기존: Sharpe ≥ 2.0 (매우 엄격, 통과 거의 없음), 20 sample
+// ★ 2026-05-13 다중 심볼 발굴 — 대표 지시 "테스트 가능한 모든 심볼 포함".
+//   매 cron 에 SYMBOLS_PER_RUN 만 rotation 처리 → Vercel 60초 timeout 안전.
+//   매 4시간 cron × 4 symbols = 24시간 안에 13개 자산 모두 cycle 완료.
+//   각 symbol 별 30 sample × N strategies → 자산 다양성 + param 탐색 균형.
+const TOP_SYMBOLS = [
+  "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT",
+  "AVAXUSDT", "LINKUSDT", "UNIUSDT", "AAVEUSDT", "DOTUSDT",
+  "DOGEUSDT", "MATICUSDT", "ARBUSDT",
+];
+const SYMBOLS_PER_RUN = 4;
+const SYMBOL_CURSOR_KEY = "di:continuous-backtest:symbol-cursor";
+
+// ★ 발굴 활성화:
+//   기존: Sharpe ≥ 2.0 (매우 엄격), 20 sample
 //   변경: Sharpe ≥ 1.5 (현실적), DD ≤ 25, trades ≥ 20, 30 sample
-//   결과: 후보 발굴률 ~5배 증가, 7일 관찰 후 promote 단계에서 부진 폐기로 quality 유지
 const CANDIDATE_THRESHOLD = { minSharpe: 1.5, maxDD: 25, minTrades: 20 };
 
-// 변형 sample 수 (strategy 당) — 20 → 30 (param space 50% 더 탐색)
+// 변형 sample 수 (strategy × symbol 당)
 const SAMPLES_PER_STRATEGY = 30;
 
 // 후보 보관 기간
@@ -52,9 +61,27 @@ function genCandidateId(parent) {
   return `${parent}-${Math.floor(Date.now() / 1000)}-${Math.random().toString(36).slice(2, 6)}`;
 }
 
-async function fetchOhlc() {
-  const klines = await getKlines({ symbol: SYMBOL, interval: KLINE_INTERVAL, limit: KLINE_LIMIT });
+async function fetchOhlc(symbol = "BTCUSDT") {
+  const klines = await getKlines({ symbol, interval: KLINE_INTERVAL, limit: KLINE_LIMIT });
   return klinesToOhlc(klines);
+}
+
+// ★ 심볼 rotation — KV 커서 기반으로 cron 마다 다음 N 심볼 선택.
+//   13 symbols × 매 4시간 × 4 symbols/run = 약 13시간 안에 모든 심볼 cycle 완료.
+async function pickRotatingSymbols(kv) {
+  let cursor = 0;
+  try {
+    const raw = await kv.get(SYMBOL_CURSOR_KEY);
+    cursor = typeof raw === "number" ? raw : (parseInt(raw, 10) || 0);
+    if (!Number.isFinite(cursor) || cursor < 0) cursor = 0;
+  } catch { cursor = 0; }
+  const selected = [];
+  for (let i = 0; i < SYMBOLS_PER_RUN; i += 1) {
+    selected.push(TOP_SYMBOLS[(cursor + i) % TOP_SYMBOLS.length]);
+  }
+  const nextCursor = (cursor + SYMBOLS_PER_RUN) % TOP_SYMBOLS.length;
+  try { await kv.set(SYMBOL_CURSOR_KEY, nextCursor); } catch {}
+  return { selected, cursor, nextCursor };
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -104,66 +131,85 @@ export default async function handler(req, res) {
     const { promoted, remaining } = await evaluateExistingCandidates(kv, leaderboard);
     L(`existing candidates: ${remaining + promoted.length} (promoted ${promoted.length})`);
 
-    // 2) OHLC 1회 fetch
-    const ohlc = await fetchOhlc();
-    L(`OHLC fetched: ${ohlc.length} bars (60일 4h)`);
-    if (ohlc.length < 100) {
-      return res.status(200).json({ ok: false, error: "insufficient OHLC", log });
-    }
+    // 2) 심볼 rotation — 매 cron 마다 다음 SYMBOLS_PER_RUN 개 심볼 처리
+    const { selected: targetSymbols, cursor, nextCursor } = await pickRotatingSymbols(kv);
+    L(`symbol rotation: cursor ${cursor} → ${nextCursor}, selected: ${targetSymbols.join(", ")}`);
 
-    // 3) 각 strategy 별 random sweep → 후보 발굴
+    // 3) 각 심볼별 OHLC + strategy × params sweep
     const newCandidates = [];
-    const scanResults = {};
-    for (const [strategyId, strategyFn] of Object.entries(ALL_STRATEGIES)) {
-      const samples = sampleRandomParams(strategyId, SAMPLES_PER_STRATEGY);
-      if (samples.length === 0) {
-        L(`skip ${strategyId} — no wide space`);
+    const scanResults = {}; // { [symbol]: { [strategyId]: {...} } }
+    const t0Scan = Date.now();
+    const TIMEOUT_BUDGET_MS = 50_000; // 60초 maxDuration 중 50초 limit (안전 마진)
+
+    for (const symbol of targetSymbols) {
+      if (Date.now() - t0Scan > TIMEOUT_BUDGET_MS) {
+        L(`⏱️ timeout budget exceeded — skipping remaining symbols`);
+        break;
+      }
+      let ohlc;
+      try {
+        ohlc = await fetchOhlc(symbol);
+        L(`[${symbol}] OHLC fetched: ${ohlc.length} bars (60일 4h)`);
+      } catch (e) {
+        L(`[${symbol}] OHLC fetch failed: ${e?.message}`);
         continue;
       }
-      let bestOfStrategy = null;
-      const passedHere = [];
-      for (const params of samples) {
-        try {
-          const r = backtestStrategy({
-            strategyFn,
-            ohlc,
-            params,
-            slPct: 4, tpPct: 8, maxHoldBars: 24,
+      if (!ohlc || ohlc.length < 100) {
+        L(`[${symbol}] insufficient OHLC (${ohlc?.length || 0} bars) — skip`);
+        continue;
+      }
+      scanResults[symbol] = {};
+
+      for (const [strategyId, strategyFn] of Object.entries(ALL_STRATEGIES)) {
+        if (Date.now() - t0Scan > TIMEOUT_BUDGET_MS) break;
+        const samples = sampleRandomParams(strategyId, SAMPLES_PER_STRATEGY);
+        if (samples.length === 0) continue;
+        let bestOfStrategy = null;
+        const passedHere = [];
+        for (const params of samples) {
+          try {
+            const r = backtestStrategy({
+              strategyFn,
+              ohlc,
+              params,
+              slPct: 4, tpPct: 8, maxHoldBars: 24,
+            });
+            if (!bestOfStrategy || r.sharpe > bestOfStrategy.sharpe) {
+              bestOfStrategy = { params, ...r };
+            }
+            if (
+              r.trades >= CANDIDATE_THRESHOLD.minTrades &&
+              r.sharpe >= CANDIDATE_THRESHOLD.minSharpe &&
+              r.maxDD <= CANDIDATE_THRESHOLD.maxDD
+            ) {
+              passedHere.push({ params, ...r });
+            }
+          } catch (e) {
+            // 개별 시뮬 실패는 무시 — 다음 sample 진행
+          }
+        }
+        scanResults[symbol][strategyId] = { samples: samples.length, best: bestOfStrategy, passed: passedHere.length };
+
+        // 통과 후보 중 최고 1개만 등록 (스팸 방지) — symbol 정보 포함
+        if (passedHere.length > 0) {
+          passedHere.sort((a, b) => b.sharpe - a.sharpe);
+          const winner = passedHere[0];
+          newCandidates.push({
+            id: genCandidateId(`${strategyId}-${symbol.slice(0, 3)}`),
+            parentStrategy: strategyId,
+            symbol,
+            params: winner.params,
+            backtestResult: {
+              trades: winner.trades, sharpe: winner.sharpe,
+              winRate: winner.winRate, profitFactor: winner.profitFactor,
+              netReturn: winner.netReturn, maxDD: winner.maxDD,
+            },
+            createdAt: new Date().toISOString(),
+            status: "observing",
           });
-          if (!bestOfStrategy || r.sharpe > bestOfStrategy.sharpe) {
-            bestOfStrategy = { params, ...r };
-          }
-          if (
-            r.trades >= CANDIDATE_THRESHOLD.minTrades &&
-            r.sharpe >= CANDIDATE_THRESHOLD.minSharpe &&
-            r.maxDD <= CANDIDATE_THRESHOLD.maxDD
-          ) {
-            passedHere.push({ params, ...r });
-          }
-        } catch (e) {
-          // 개별 시뮬 실패는 무시 — 다음 sample 진행
+          L(`[${symbol}] ${strategyId}: ${passedHere.length} passed → candidate registered (Sharpe ${winner.sharpe.toFixed(2)})`);
         }
       }
-      scanResults[strategyId] = { samples: samples.length, best: bestOfStrategy, passed: passedHere.length };
-
-      // 통과 후보 중 최고 1개만 등록 (스팸 방지)
-      if (passedHere.length > 0) {
-        passedHere.sort((a, b) => b.sharpe - a.sharpe);
-        const winner = passedHere[0];
-        newCandidates.push({
-          id: genCandidateId(strategyId),
-          parentStrategy: strategyId,
-          params: winner.params,
-          backtestResult: {
-            trades: winner.trades, sharpe: winner.sharpe,
-            winRate: winner.winRate, profitFactor: winner.profitFactor,
-            netReturn: winner.netReturn, maxDD: winner.maxDD,
-          },
-          createdAt: new Date().toISOString(),
-          status: "observing",
-        });
-      }
-      L(`${strategyId}: ${samples.length} samples, ${passedHere.length} passed (Sharpe≥${CANDIDATE_THRESHOLD.minSharpe}, DD≤${CANDIDATE_THRESHOLD.maxDD}%)`);
     }
 
     // 4) 새 후보 등록
