@@ -28,13 +28,30 @@ async function getKv() {
   return (await import("@vercel/kv")).kv;
 }
 
-// ★ POST 변경 작업은 CRON_SECRET 또는 TRADING_ADMIN_SECRET 인증 필수
-// GET 조회는 userId 만으로 허용 (대시보드 표시용, 민감 정보 미노출)
+// ★ POST 변경 작업의 인증 정책 (2026-05-13 reworked):
+//   1) ADMIN action (권한 부여) — admin token 필수: enable, disable (killswitch), enable-phase1, enable-shadow, disable-shadow
+//   2) SELF action (본인 봇 운영) — phase1 등록 사용자만 통과: resume, halt, reset-mdd-baseline, reset-shadow
+//   대표 보고 (2026-05-13): "기준점 재설정 시 unauthorized" — UI 가 admin token 없이 호출하던 문제.
+//   self-action 은 phase1-users KV 멤버십으로 검증 → owner 가 자기 봇 조작 가능, 외부 사용자 차단.
+const SELF_ACTIONS = new Set(["resume", "halt", "reset-mdd-baseline", "reset-shadow"]);
+
 function verifyAdminAuth(req) {
   const secret = process.env.TRADING_ADMIN_SECRET || process.env.CRON_SECRET;
   if (!secret) return true; // 시크릿 미설정 시 개발 환경으로 간주
   const auth = req.headers?.authorization || "";
   return auth === `Bearer ${secret}`;
+}
+
+// SELF action — phase1-users KV 에 등록된 사용자인지 검증.
+// owner 가 직접 자기 봇의 risk 운영을 컨트롤할 때 admin token 없이도 허용.
+async function verifyPhase1User(userId, kv) {
+  if (!userId) return false;
+  try {
+    const list = (await kv.get("di:real:phase1-users")) || [];
+    return list.includes(userId);
+  } catch {
+    return false;
+  }
 }
 
 export default async function handler(req, res) {
@@ -63,13 +80,30 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
-      // ★ 인증 검증 — 제3자가 킬스위치/phase1 을 조작하는 것을 차단
-      if (!verifyAdminAuth(req)) {
-        return res.status(401).json({ error: "Unauthorized: Bearer token required" });
-      }
       const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : (req.body || {});
       const { userId, action, reason } = body;
       if (!userId || !action) return res.status(400).json({ error: "userId, action required" });
+
+      // ★ 인증 검증 — 2-tier:
+      //   1) admin token 있으면 모든 action 통과
+      //   2) admin token 없어도 SELF_ACTIONS 는 phase1 사용자 본인이면 통과
+      //   3) 그 외 (privilege-granting) 는 admin token 강제
+      const adminOk = verifyAdminAuth(req);
+      if (!adminOk) {
+        if (!SELF_ACTIONS.has(action)) {
+          return res.status(401).json({
+            error: "Unauthorized: Bearer token required (이 액션은 관리자만 가능합니다)",
+            hint: `SELF actions (admin token 불필요): ${[...SELF_ACTIONS].join(", ")}`,
+          });
+        }
+        // SELF action — phase1 등록 사용자만 통과
+        const isPhase1 = await verifyPhase1User(userId, kv);
+        if (!isPhase1) {
+          return res.status(401).json({
+            error: "Unauthorized: phase1 등록 사용자만 자기 봇 조작이 가능합니다",
+          });
+        }
+      }
 
       if (action === "disable") {
         await setKillSwitch(userId, true);

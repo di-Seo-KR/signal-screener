@@ -21,7 +21,7 @@ export const BREAKER_LIMITS = {
   dailyLossPct: 0.40,   // 하루 -40% 넘으면 halt (이전 -4%)
   weeklyLossPct: 0.60,  // 주간 -60% (이전 -8%) — 연속 사고 차단
   mddPct: 0.50,         // MDD -50% (이전 -15%) — 자본 절반 보호
-  consecLossThreshold: 5, // 연속 손실 5회 → 24h cooldown (그대로)
+  consecLossThreshold: 10, // 연속 손실 10회 → 24h cooldown (2026-05-13: 5→10, 손실 streak 관대화)
   cooldownMs: 24 * 60 * 60 * 1000,
 };
 
