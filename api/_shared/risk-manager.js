@@ -84,25 +84,68 @@ export const RISK_CONFIG = {
     ["MATICUSDT", "LINKUSDT"],                      // 인프라
   ],
 
-  // 전략 family 별 ATR × 배수 (SL 거리)
+  // 전략 family 별 ATR × 배수 (SL 거리) — 하위 호환용 (구버전 family 명)
   // ★ 2026-05-03 데이터 기반 조정 — shadow 537건 분석 결과 SL 8.5% 가 너무 멀어
   // 전체 손익이 마이너스. SL 을 절반(4% 부근)으로 줄여 작은 이익 506건이 큰
   // 손실 31건에 잡아먹히지 않도록.
+  // ★ 2026-05-17 (QUANT-RES): 신규 dynamicSL 시스템 도입. 이 atrMultSL 은 legacy
+  //   path (signal.strategyFamily 가 옛 raw id 일 때) 폴백용. 신규 family-id 는
+  //   familySLTPMatrix 사용 (아래).
   atrMultSL: {
     trend: 1.3,          // 2.5 → 1.3 (큰 추세장 모멘텀 봇 위험 축소)
     "mean-revert": 0.8,  // 1.5 → 0.8
     breakout: 0.7,       // 1.2 → 0.7
     unknown: 1.0,        // 2.0 → 1.0 (SL 거리 절반)
   },
-  // TP = SL × rewardToRisk (수수료 차감 전 raw RR)
-  // ★ TP 도 같이 조정 — minNetRR 1.8 유지하려면 RR 자체는 비슷하게.
-  // 실제 효과: SL 작아지면 TP 도 작아져 작은 변동에서 수익 마감 빈도 ↑
+  // TP = SL × rewardToRisk (수수료 차감 전 raw RR) — legacy path 용
   rewardToRisk: {
     trend: 2.5,
     "mean-revert": 1.8,
     breakout: 2.0,
     unknown: 2.0,
   },
+
+  // ── 동적 SL/TP 매트릭스 (★ 2026-05-17 QUANT-RES 신규) ──
+  //
+  // 배경: 대표 지시 "손실 40% / 익절 100% 하드코딩 학습력 떨어진다.
+  //       매도 시점은 RSI 등 다양한 로직으로 계속 산출하는 방향".
+  //
+  // 산출 공식:
+  //   atrPct  = ATR / price            (현재 변동성, 소수)
+  //   slPct   = atrPct × slAtrMul × regimeSLBoost
+  //   tpPct   = atrPct × tpAtrMul × regimeTPBoost
+  //   → cap   = clamp(slPct, slFloor, slCeil), clamp(tpPct, tpFloor, tpCeil)
+  //
+  // family 별 매핑 (신규 strategy id 체계 — alpha-lab RAW_SID_TO_NEW 와 일치):
+  familySLTPMatrix: {
+    "trend-follow":       { slAtrMul: 2.5, tpAtrMul: 5.0 },  // 추세 — 멀리
+    "mean-revert":        { slAtrMul: 1.5, tpAtrMul: 2.0 },  // 회귀 — 짧게
+    "breakout":           { slAtrMul: 2.0, tpAtrMul: 4.0 },
+    "momentum-rotation":  { slAtrMul: 2.5, tpAtrMul: 4.0 },
+    "volatility-arb":     { slAtrMul: 1.2, tpAtrMul: 1.8 },
+    "hurst-trend":        { slAtrMul: 2.5, tpAtrMul: 5.0 },
+    "defi-momentum":      { slAtrMul: 3.0, tpAtrMul: 6.0 },  // 변동성 큰 자산
+    "ensemble":           { slAtrMul: 2.0, tpAtrMul: 4.0 },
+    // legacy family 명 (signal.strategyFamily 가 옛 raw 일 때 일치)
+    "trend":              { slAtrMul: 2.5, tpAtrMul: 5.0 },
+    "momentum":           { slAtrMul: 2.5, tpAtrMul: 4.0 },
+    "default":            { slAtrMul: 2.0, tpAtrMul: 3.0 },
+  },
+  // regime 보정 (BTC 시장 레짐 — strategy-router 가 산출)
+  regimeSLTPBoost: {
+    trending:       { slBoost: 1.0, tpBoost: 1.3 },  // 추세장 — TP 더 멀리
+    mean_reverting: { slBoost: 0.8, tpBoost: 0.8 },  // 박스 — 양쪽 짧게
+    transitional:   { slBoost: 0.8, tpBoost: 1.0 },  // 보수 — SL 짧게
+    default:        { slBoost: 1.0, tpBoost: 1.0 },
+  },
+  // 안전 cap — 동적 산출 결과가 비현실적이지 않게 floor/ceiling
+  dynamicSLFloorPct: 0.015,  // 최소 1.5% (너무 가까운 SL = costPct 못 이김)
+  dynamicSLCeilPct:  0.08,   // 최대 8% (10x lev 시 ROI -80% — maxRoiLossPct 가드와 충돌 안 함)
+  dynamicTPFloorPct: 0.02,   // 최소 2% (수수료 0.13% 대비 minNetRR 확보)
+  dynamicTPCeilPct:  0.15,   // 최대 15% (장기 추세 봇 한계)
+  // 전역 env over-ride (모든 family 일괄 적용)
+  //   ZEPTA_SL_ATR_MUL / ZEPTA_TP_ATR_MUL — 수동 over-ride 우선.
+  //   미설정 시 위 family + regime 매핑 사용.
 
   // 수수료 + 슬리피지 가정 (왕복 기준, 명목가 대비)
   // Binance USDⓈ-M Futures taker 0.04% × 2 = 0.08%.
@@ -385,10 +428,85 @@ export function checkSameSymbolNotional({ plan, existingPos, equity, cfg = RISK_
   return { ok: true, sameSymbolNotional: newTotalNotional, capUsd };
 }
 
-export function stopDistancePct({ price, atr, family, cfg = RISK_CONFIG }) {
+/**
+ * 동적 SL/TP 산출 — family + regime + ATR 기반 (★ 2026-05-17 QUANT-RES 신규).
+ *
+ * 우선순위:
+ *   1) env ZEPTA_SL_ATR_MUL / ZEPTA_TP_ATR_MUL (수동 over-ride)
+ *   2) cfg.familySLTPMatrix[family] (신규 family-id 별)
+ *   3) cfg.atrMultSL[family] (legacy 폴백)
+ *   4) cfg.familySLTPMatrix.default
+ *
+ * regime 보정:
+ *   regime ∈ {trending, mean_reverting, transitional} 인 경우 cfg.regimeSLTPBoost 적용.
+ *   미상이면 boost 1.0 (no-op).
+ *
+ * 안전 cap:
+ *   slPct ∈ [dynamicSLFloorPct, dynamicSLCeilPct]
+ *   tpPct ∈ [dynamicTPFloorPct, dynamicTPCeilPct]
+ *
+ * @returns {{ slPct, tpPct, atrPct, slMul, tpMul, slBoost, tpBoost, source }}
+ */
+export function dynamicSLTP({ price, atr, family, regime, cfg = RISK_CONFIG }) {
   if (!atr || !price || atr <= 0 || price <= 0) return null;
-  const mult = cfg.atrMultSL[family] || cfg.atrMultSL.unknown;
-  return (atr * mult) / price;
+  const atrPct = atr / price; // 소수
+
+  // 1) env over-ride
+  const envSL = Number(process.env.ZEPTA_SL_ATR_MUL);
+  const envTP = Number(process.env.ZEPTA_TP_ATR_MUL);
+
+  // 2~4) family lookup
+  const matrix = cfg.familySLTPMatrix || {};
+  const famKey = family || "default";
+  const famEntry =
+    matrix[famKey] ||
+    matrix[famKey?.replace(/-/g, "_")] ||
+    matrix.default || { slAtrMul: 2.0, tpAtrMul: 3.0 };
+
+  // legacy atrMultSL 폴백 (familySLTPMatrix 에 없을 때만)
+  const legacySLMul = cfg.atrMultSL?.[famKey] ?? cfg.atrMultSL?.unknown;
+  const legacyTPMul = legacySLMul != null ? legacySLMul * (cfg.rewardToRisk?.[famKey] ?? cfg.rewardToRisk?.unknown ?? 2.0) : null;
+
+  let slMul = Number.isFinite(envSL) ? envSL
+            : (famEntry.slAtrMul ?? legacySLMul ?? 2.0);
+  let tpMul = Number.isFinite(envTP) ? envTP
+            : (famEntry.tpAtrMul ?? legacyTPMul ?? 4.0);
+
+  // regime 보정
+  const regimeKey = regime?.regime || regime || "default";
+  const regBoost = (cfg.regimeSLTPBoost || {})[regimeKey] || (cfg.regimeSLTPBoost || {}).default || { slBoost: 1, tpBoost: 1 };
+  const slBoost = regBoost.slBoost ?? 1.0;
+  const tpBoost = regBoost.tpBoost ?? 1.0;
+
+  let slPct = atrPct * slMul * slBoost;
+  let tpPct = atrPct * tpMul * tpBoost;
+
+  // 안전 cap
+  const slFloor = cfg.dynamicSLFloorPct ?? 0.015;
+  const slCeil  = cfg.dynamicSLCeilPct  ?? 0.08;
+  const tpFloor = cfg.dynamicTPFloorPct ?? 0.02;
+  const tpCeil  = cfg.dynamicTPCeilPct  ?? 0.15;
+
+  slPct = Math.min(slCeil, Math.max(slFloor, slPct));
+  tpPct = Math.min(tpCeil, Math.max(tpFloor, tpPct));
+
+  return {
+    slPct, tpPct, atrPct,
+    slMul, tpMul, slBoost, tpBoost,
+    regimeKey,
+    source: Number.isFinite(envSL) || Number.isFinite(envTP) ? "env" : (matrix[famKey] ? "family-matrix" : "legacy"),
+  };
+}
+
+/**
+ * Legacy 호환 — 기존 호출 측 ({ price, atr, family, cfg }) 그대로 동작.
+ * 신규 dynamicSLTP 의 slPct 만 반환.
+ *
+ * ★ 2026-05-17: 내부적으로 dynamicSLTP 위임. regime 미전달 시 boost 1.0 동작.
+ */
+export function stopDistancePct({ price, atr, family, regime = null, cfg = RISK_CONFIG }) {
+  const r = dynamicSLTP({ price, atr, family, regime, cfg });
+  return r ? r.slPct : null;
 }
 
 /** Isolated 포지션의 대략적 청산거리 비율 (보수적 가정). */
@@ -408,8 +526,11 @@ export function inSameCorrelationGroup(symbol, openSymbols, cfg = RISK_CONFIG) {
 
 /**
  * 핵심: 신호 + 계정 상태 → 실제 주문 파라미터.
+ *
+ * ★ 2026-05-17 (QUANT-RES): regime 파라미터 추가. signal.regime 또는 args.regime
+ *   로 전달 가능. 동적 SL/TP 가 regime 보정 자동 적용.
  */
-export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFIG }) {
+export function planTrade({ signal, equity, price, atr, filter, regime = null, cfg = RISK_CONFIG }) {
   const log = [];
   const push = (m) => log.push(m);
 
@@ -420,12 +541,18 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
   if (!(price > 0)) return { ok: false, reason: "price invalid", log };
   if (!filter) return { ok: false, reason: "symbol filter missing", log };
 
-  // 1) ATR → raw stop 거리
-  let stopDistPct = stopDistancePct({ price, atr, family: signal.strategyFamily, cfg });
-  if (!stopDistPct || stopDistPct <= 0) {
+  // regime 우선순위: 인자 → signal.regime → null (boost 1.0)
+  const effectiveRegime = regime || signal.regime || null;
+
+  // 1) ATR → 동적 SL/TP (family + regime 매트릭스)
+  const dyn = dynamicSLTP({ price, atr, family: signal.strategyFamily, regime: effectiveRegime, cfg });
+  if (!dyn || !dyn.slPct || dyn.slPct <= 0) {
     return { ok: false, reason: "ATR 없음 또는 stop 거리 산출 불가", log };
   }
-  push(`rawStopDistPct=${(stopDistPct * 100).toFixed(3)}%`);
+  let stopDistPct = dyn.slPct;
+  let dynamicTpPct = dyn.tpPct;
+  push(`dynamicSLTP source=${dyn.source} regime=${dyn.regimeKey} atr%=${(dyn.atrPct*100).toFixed(2)} slMul=${dyn.slMul}×${dyn.slBoost} tpMul=${dyn.tpMul}×${dyn.tpBoost}`);
+  push(`rawStopDistPct=${(stopDistPct * 100).toFixed(3)}% (dynamic TP=${(dynamicTpPct * 100).toFixed(3)}%)`);
 
   // ★ 1-1) leverage 미리 계산 후 ROI 한도 cap.
   //   대표님 지시: 거래당 ROI -40% 까지 OK (10x 기준 가격 -4%).
@@ -588,17 +715,20 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
     return { ok: false, reason: `finalNotional ${finalNotional.toFixed(2)} < minNotional ${minN}`, log };
   }
 
-  // 11) SL / TP 가격 — TP 는 "비용 차감 후 순 RR" 기준으로 역산
+  // 11) SL / TP 가격
+  // ★ 2026-05-17 (QUANT-RES): 동적 TP 우선. dynamicSLTP 가 family + regime 기반으로
+  //   tpPct 를 이미 산출했으므로 그것을 base 로 사용하되, "비용 차감 후 순 RR" 하한은
+  //   여전히 강제 (minNetRR 안전망).
   const slPct = stopDistPct;
-  const rawRR = cfg.rewardToRisk[signal.strategyFamily] || cfg.rewardToRisk.unknown;
-  // 순 RR: (tpPct - costPct) / (slPct + costPct) ≥ minNetRR 가 되도록 tpPct 강제
-  const requiredTpPct = Math.max(
-    slPct * rawRR,
-    (cfg.minNetRR || 1.8) * (slPct + costPct) + costPct,
-  );
-  const tpPct = requiredTpPct;
+  // dynamic TP 기본 — 위 dyn.tpPct (slPct 가 cap 으로 줄었어도 dynamicTpPct 는 보존).
+  const dynamicBaseTp = Number.isFinite(dynamicTpPct) && dynamicTpPct > 0 ? dynamicTpPct : slPct * 2.0;
+  // legacy rewardToRisk 폴백 (env / family 매핑 없을 때만 영향)
+  const legacyRR = cfg.rewardToRisk?.[signal.strategyFamily] || cfg.rewardToRisk?.unknown || 2.0;
+  // 순 RR 하한: (tpPct - costPct) / (slPct + costPct) ≥ minNetRR
+  const minNetTp = (cfg.minNetRR || 1.8) * (slPct + costPct) + costPct;
+  const tpPct = Math.max(dynamicBaseTp, slPct * legacyRR, minNetTp);
   const netRR = (tpPct - costPct) / (slPct + costPct);
-  push(`rawRR=${rawRR} tpPct=${(tpPct * 100).toFixed(3)}% netRR=${netRR.toFixed(2)}`);
+  push(`tp source: dynamic=${(dynamicBaseTp*100).toFixed(2)}% legacyRR=${legacyRR} minNetFloor=${(minNetTp*100).toFixed(2)}% → tpPct=${(tpPct * 100).toFixed(3)}% netRR=${netRR.toFixed(2)}`);
   if (netRR < (cfg.minNetRR || 1.8)) {
     return { ok: false, reason: `net RR ${netRR.toFixed(2)} < min ${cfg.minNetRR}`, log };
   }
@@ -637,6 +767,16 @@ export function planTrade({ signal, equity, price, atr, filter, cfg = RISK_CONFI
     safeSL,
     maxHoldMs: cfg.maxHoldMs,
     bumpedToMin: bumped,
+    // ★ 2026-05-17 (QUANT-RES) 동적 SL/TP 메타 — 분석/디버깅용 KV 적재
+    dynamic: dyn ? {
+      source: dyn.source,
+      regimeKey: dyn.regimeKey,
+      atrPct: Number(dyn.atrPct.toFixed(5)),
+      slMul: dyn.slMul,
+      tpMul: dyn.tpMul,
+      slBoost: dyn.slBoost,
+      tpBoost: dyn.tpBoost,
+    } : null,
     log,
   };
   return { ok: true, plan };
@@ -776,6 +916,7 @@ export default {
   planTrade,
   pickLeverage,
   stopDistancePct,
+  dynamicSLTP,
   approxLiquidationPct,
   inSameCorrelationGroup,
   evaluateTimeStop,

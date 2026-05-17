@@ -640,7 +640,9 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
         tried.push({ symbol: cand.symbol, reason: "unaffordable" });
         continue;
       }
-      const p = planTrade({ signal: cand, equity: effectiveEquity, price: pr, atr: a, filter: f, cfg: RISK_CONFIG });
+      // ★ 2026-05-17 (QUANT-RES): regime 을 planTrade 로 전달 — 동적 SL/TP 보정.
+      //   trending 시 TP +30%, mean_reverting 시 양쪽 -20% 자동 적용.
+      const p = planTrade({ signal: cand, equity: effectiveEquity, price: pr, atr: a, filter: f, regime: regimeSnapshot, cfg: RISK_CONFIG });
       if (!p.ok) {
         S(`  ↳ risk reject: ${p.reason}`);
         tried.push({ symbol: cand.symbol, reason: p.reason });

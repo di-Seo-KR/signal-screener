@@ -86,6 +86,12 @@ function normalizeStrategyId(rawSid) {
 }
 
 // ledger 의 CLOSED 항목에서 strategy 별 PnL 시계열 추출 (Sharpe / maxDD 계산용)
+//
+// ★ 2026-05-17 단위 정정 (QUANT-RES):
+//   pnlPct = pnl / notional 은 ROI (마진 대비) 가 아니라 "노시오날 대비 손익률".
+//   이 값을 단순 합산 (reduce + 단위 ×100) 하니 1000건의 작은 손실이 -1000%+ 가 됨.
+//   해결: pnlPct 는 "거래당 ROI ratio" (소수, 예: 0.012 = 1.2%) 로 정의하고
+//        합산 대신 평균/복리/메디안 등 robust statistics 사용.
 function strategyPnlSeries(ledger) {
   const out = {}; // strategyId -> Array<{ts, pnlPct, holdMs}>
   for (const e of ledger || []) {
@@ -95,47 +101,94 @@ function strategyPnlSeries(ledger) {
     const tf = e?.signal?.timeframe || "unknown";
     const sym = e?.plan?.symbol || e?.signal?.symbol || "unknown";
     const ts = Date.parse(e.closedAt || e.openedAt || "") || 0;
-    const notional = Number(e?.plan?.notional || 1);
+    const notional = Number(e?.plan?.notional || 0);
+    const marginRequired = Number(e?.plan?.marginRequired || 0);
     const pnl = Number(e?.netPnL || 0);
-    const pnlPct = notional > 0 ? pnl / notional : 0;
+    // ROI ratio: 마진 대비 손익. 마진 없으면 notional 폴백.
+    const denom = marginRequired > 0 ? marginRequired : (notional > 0 ? notional : 1);
+    let pnlPct = pnl / denom;
+    // ★ 단위 sanity guard: ROI ratio 가 |±5| 이상이면 100x 배율 오류 의심 → drop.
+    //   정상 거래의 ROI 는 -1.0 ~ +5.0 (마진 대비 -100% ~ +500%) 범위.
+    if (!Number.isFinite(pnlPct) || Math.abs(pnlPct) > 5) continue;
     const holdMs = ts && e.openedAt ? Math.max(0, ts - Date.parse(e.openedAt)) : 0;
     if (!out[sid]) out[sid] = [];
-    out[sid].push({ ts, pnlPct, holdMs, sym, tf });
+    out[sid].push({ ts, pnlPct, holdMs, sym, tf, pnlUsd: pnl });
   }
   return out;
 }
 
+// Winsorize — 상하 1% 절단 (robust statistics).
+// 1건의 이상치가 표준편차 / 합산 결과를 왜곡하지 않게 trim.
+function winsorize(values, pct = 0.01) {
+  if (!values || values.length < 20) return values.slice(); // 표본 작으면 trim 안 함
+  const sorted = [...values].sort((a, b) => a - b);
+  const k = Math.floor(sorted.length * pct);
+  if (k === 0) return sorted;
+  const lo = sorted[k];
+  const hi = sorted[sorted.length - 1 - k];
+  return values.map((v) => Math.min(hi, Math.max(lo, v)));
+}
+
 // 메트릭 계산 — Sharpe, PF, hit rate, maxDD, avgHoldMs
+//
+// ★ 2026-05-17 정정 (QUANT-RES):
+//   - netPnL: "거래당 평균 ROI × 100" (백분율) — 이전 "ROI 단순 합" 은 비현실 (-12919% 등).
+//   - netPnLUsd: 누적 USD 손익 (있을 때만, 신규 필드).
+//   - sharpe: stdDev < 0.001 가드 + winsorize + cap (-10 ~ +10) 로 폭주 방지.
+//   - maxDD: ROI 복리 누적 (기존 유지하되 ROI ratio 가 클리닝된 값 기반).
 function computeMetrics(trades) {
   if (!trades || trades.length === 0) {
-    return { trades: 0, wins: 0, losses: 0, winRate: 0, netPnL: 0, sharpe: 0, profitFactor: null, maxDD: 0, avgHoldMs: 0, avgHoldHours: 0 };
+    return { trades: 0, wins: 0, losses: 0, winRate: 0, netPnL: 0, netPnLUsd: 0, avgROI: 0, sharpe: 0, profitFactor: null, maxDD: 0, avgHoldMs: 0, avgHoldHours: 0 };
   }
-  const wins = trades.filter((t) => (t.pnlPct ?? t.netPnL ?? 0) > 0).length;
+  const wins = trades.filter((t) => (t.pnlPct ?? 0) > 0).length;
   const losses = trades.length - wins;
-  const total = trades.reduce((a, t) => a + (t.pnlPct ?? 0), 0);
-  const grossWin = trades.filter((t) => t.pnlPct > 0).reduce((a, b) => a + b.pnlPct, 0);
-  const grossLoss = trades.filter((t) => t.pnlPct < 0).reduce((a, b) => a + Math.abs(b.pnlPct), 0);
-  const profitFactor = grossLoss > 0 ? grossWin / grossLoss : (grossWin > 0 ? null : 0);
-  const mean = total / trades.length;
-  const variance = trades.reduce((a, t) => a + ((t.pnlPct ?? 0) - mean) ** 2, 0) / trades.length;
+
+  const rawPcts = trades.map((t) => Number(t.pnlPct) || 0);
+  const pcts = winsorize(rawPcts, 0.01); // 상하 1% 절단
+
+  const sum = pcts.reduce((a, v) => a + v, 0);
+  const mean = sum / pcts.length;
+  const variance = pcts.reduce((a, v) => a + (v - mean) ** 2, 0) / pcts.length;
   const sd = Math.sqrt(variance);
-  const sharpe = sd > 0 ? (mean / sd) * Math.sqrt(252) : 0;
-  // maxDD on cumulative equity
+
+  // Sharpe — 표본당 단위 (annualize 제거. 거래 빈도가 다양해 252 multiplier 가 왜곡).
+  //   원하면 daily-bar 기반 annualize 별도 산출 가능.
+  let sharpe = 0;
+  if (sd > 0.001 && Number.isFinite(mean)) {
+    sharpe = mean / sd;
+    // 안전 cap — 표본 수 20개 미만이면 통계적 유의성 약하므로 cap 강하게
+    const cap = pcts.length < 20 ? 3 : 10;
+    if (sharpe > cap) sharpe = cap;
+    if (sharpe < -cap) sharpe = -cap;
+  }
+
+  // ProfitFactor — winsorized values 기준
+  const grossWin = pcts.filter((v) => v > 0).reduce((a, b) => a + b, 0);
+  const grossLoss = pcts.filter((v) => v < 0).reduce((a, b) => a + Math.abs(b), 0);
+  const profitFactor = grossLoss > 0 ? grossWin / grossLoss : (grossWin > 0 ? null : 0);
+
+  // maxDD — 복리 equity 곡선 기반 (winsorized).
   let equity = 1.0, peak = 1.0, maxDD = 0;
-  // 시간순 정렬
-  const sorted = [...trades].sort((a, b) => (a.ts || 0) - (b.ts || 0));
-  for (const t of sorted) {
-    equity *= 1 + (t.pnlPct || 0);
+  const sortedIdx = pcts.map((v, i) => ({ v, ts: trades[i]?.ts || 0 })).sort((a, b) => a.ts - b.ts);
+  for (const t of sortedIdx) {
+    equity *= 1 + (t.v || 0);
     if (equity > peak) peak = equity;
     const dd = (peak - equity) / peak;
     if (dd > maxDD) maxDD = dd;
   }
+
   const avgHoldMs = trades.reduce((a, t) => a + (t.holdMs || 0), 0) / trades.length;
+  // 누적 USD (있을 때만 — 신규 plan 부터 marginRequired 적재됨)
+  const netPnLUsd = trades.reduce((a, t) => a + (Number(t.pnlUsd) || 0), 0);
+
   return {
     trades: trades.length,
     wins, losses,
     winRate: Number((wins / trades.length * 100).toFixed(2)),
-    netPnL: Number((total * 100).toFixed(2)), // 백분율 누적
+    // ★ netPnL — "거래당 평균 ROI %" 로 의미 변경 (이전 단순 합산은 비현실).
+    netPnL: Number((mean * 100).toFixed(2)),
+    avgROI: Number((mean * 100).toFixed(2)),
+    netPnLUsd: Number(netPnLUsd.toFixed(2)),
     sharpe: Number(sharpe.toFixed(3)),
     profitFactor: profitFactor != null ? Number(profitFactor.toFixed(3)) : null,
     maxDD: Number((maxDD * 100).toFixed(2)),
