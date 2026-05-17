@@ -465,12 +465,16 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   //   < 0.45 역추세장 → 모멘텀(unknown/trend/breakout) 차단 (가격 평균회귀)
   //   0.45-0.55 혼조 → 약한 추세, 신중하게
   //
-  // 모드 (env ZEPTA_REGIME_FILTER_MODE, 기본 "log"):
+  // 모드 (env ZEPTA_REGIME_FILTER_MODE, 기본 "soft"):
   //   "off"    가드 없음 (안전 폴백)
   //   "log"    레짐만 로그 노출, 차단 안 함 (관찰 모드, 데이터 누적용)
-  //   "soft"   강한 역추세 (avgHurst < 0.40) 만 모멘텀 차단
+  //   "soft"   강한 역추세 (avgHurst < 0.40) 만 모멘텀 차단  ← 기본
   //   "strict" 추세장 (avgHurst > 0.55) 아니면 모멘텀 모두 차단
-  const regimeFilterMode = process.env.ZEPTA_REGIME_FILTER_MODE || "log";
+  //
+  //   ★ 2026-05-17 (QUANT-PLAN): 대표 보고 "장 하락할때는 손을 못 쓸정도" 대응.
+  //     기본값을 "log" → "soft" 로 변경. 강한 역추세장(Hurst<0.40)만 모멘텀 차단.
+  //     env 미설정 시에도 보호 자동 활성 — env 명시로만 비활성 가능.
+  const regimeFilterMode = process.env.ZEPTA_REGIME_FILTER_MODE || "soft";
   let regimeBlock = null; // 차단 결정 (null = 통과)
   let regimeSnapshot = null; // entry 에 첨부할 스냅샷 (분석용)
   try {

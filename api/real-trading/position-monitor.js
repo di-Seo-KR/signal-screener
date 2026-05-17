@@ -20,6 +20,7 @@ import {
   placeStopOrder,
   placeOrder,
   getUserTrades,
+  getAccountInfo,
 } from "../_shared/binance-client.js";
 import { recordTradeResult } from "../_shared/circuit-breaker.js";
 import { recordLiveTrade } from "../_shared/live-summary.js";
@@ -29,6 +30,8 @@ import {
   RISK_CONFIG,
 } from "../_shared/risk-manager.js";
 import { getSymbolFilter } from "../_shared/exchange-info.js";
+import { evaluateMtfExitSignals } from "../_shared/exit-signals.js";
+import { evaluateDrawdownGuard } from "./drawdown-guard.js";
 
 export const config = { maxDuration: 60 };
 
@@ -279,6 +282,93 @@ async function checkUser(userId) {
       }
     }
 
+    // ── ★ (a-mtf) 다중 timeframe 청산 시그널 (2026-05-17 — QUANT-PLAN) ──
+    //   1h/4h RSI, MACD, ATR, regime flip, profit-lock trail 등 5개 시그널.
+    //   confidence >= 2 → 즉시 시장가 청산. confidence == 1 → plan.exitWatch 마킹만.
+    //
+    //   ZEPTA_MTF_EXIT_MODE: off | soft | strict (기본 soft)
+    //     - off: 평가 안 함
+    //     - soft: confidence >= 2 일 때만 청산
+    //     - strict: confidence >= 1 일 때 청산 (가장 공격적)
+    const mtfMode = (process.env.ZEPTA_MTF_EXIT_MODE || "soft").toLowerCase();
+    if (mtfMode !== "off") {
+      try {
+        const mtf = await evaluateMtfExitSignals({
+          symbol: sym,
+          side,
+          entryPrice,
+          markPrice,
+          highWater: newHW,
+          entryRegime: plan.regime || null,
+        });
+        const triggerClose =
+          (mtfMode === "soft" && mtf.shouldClose) ||
+          (mtfMode === "strict" && mtf.confidence >= 1);
+        if (triggerClose) {
+          try {
+            await cancelAllOpenOrders({ ...creds, symbol: sym }).catch(() => {});
+            const closeQty = Math.abs(parseFloat(p.positionAmt));
+            await placeOrder({
+              ...creds,
+              params: {
+                symbol: sym,
+                side: side === "LONG" ? "SELL" : "BUY",
+                type: "MARKET",
+                quantity: closeQty,
+                reduceOnly: "true",
+                newOrderRespType: "RESULT",
+              },
+            });
+            const logKey = `di:real:user:${userId}:engine-log`;
+            const log = (await kv.get(logKey)) || [];
+            log.unshift({
+              time: new Date().toISOString(),
+              event: "mtf_exit",
+              symbol: sym,
+              side,
+              confidence: mtf.confidence,
+              reasons: mtf.reasons,
+            });
+            await kv.set(logKey, log.slice(0, 200));
+            // 알림
+            try {
+              const { sendCards, buildCard } = await import("../_shared/telegram.js");
+              await sendCards([
+                buildCard({
+                  tag: "🚨",
+                  title: `다중 시그널 청산 — ${sym}`,
+                  lines: [
+                    `${mtf.confidence}개 시그널 일치 (mode=${mtfMode}):`,
+                    ...mtf.reasons.slice(0, 4).map((r) => `· ${r}`),
+                    `시장가 청산 주문 발송`,
+                  ],
+                  hint: "1h/4h RSI·MACD·ATR + 시장 regime + profit-lock trail 5개 신호 중 2개 이상 동시 발생.",
+                }),
+              ]);
+            } catch {}
+            plan.botClosedAt = Date.now();
+            plan.botCloseReason = "mtf_exit";
+            await kv.set(planKey, plan);
+            if (!report.mtfClosed) report.mtfClosed = [];
+            report.mtfClosed.push({ sym, confidence: mtf.confidence, reasons: mtf.reasons });
+            continue; // 후속 평가 skip
+          } catch (e) {
+            console.warn(`[monitor] mtf exit close failed for ${sym}:`, e?.message);
+          }
+        } else if (mtf.watchOnly) {
+          // 1개 시그널만 — plan KV 에 마킹만 (다음 cron 에서 다시 평가)
+          plan.exitWatch = {
+            confidence: mtf.confidence,
+            reasons: mtf.reasons,
+            markedAt: Date.now(),
+          };
+          await kv.set(planKey, plan);
+        }
+      } catch (e) {
+        console.warn(`[monitor] mtf eval skipped for ${sym}:`, e?.message);
+      }
+    }
+
     // ── (a) 시간 손절 ──
     const ts = evaluateTimeStop({
       openedAt: plan.openedAt,
@@ -410,6 +500,23 @@ async function checkUser(userId) {
     };
   }
   await kv.set(lastPosKey, nextMap);
+
+  // ── ★ 5) drawdown guard (2026-05-17 — QUANT-PLAN) ──
+  //   peak (equityHigh30d) 대비 현재 equity 의 drawdown 평가.
+  //   10/15/20% 단계별 자동 청산 + cooldown.
+  try {
+    const acct = await getAccountInfo(creds);
+    const currentEquity = parseFloat(acct?.totalWalletBalance || "0")
+      + (Array.isArray(nonZero) ? nonZero.reduce((s, p) => s + parseFloat(p.unRealizedProfit || 0), 0) : 0);
+    if (Number.isFinite(currentEquity) && currentEquity > 0) {
+      const dd = await evaluateDrawdownGuard({
+        userId, creds, positions: nonZero, currentEquity,
+      });
+      report.drawdownGuard = dd;
+    }
+  } catch (e) {
+    report.drawdownGuard = { triggered: false, error: e?.message };
+  }
 
   return report;
 }
