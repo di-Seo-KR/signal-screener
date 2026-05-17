@@ -53,6 +53,36 @@ const SAMPLES_PER_STRATEGY = 30;
 const OBSERVATION_DAYS = 7;
 const MAX_CANDIDATES = 100;
 
+// ────────────────────────────────────────────────────────────────────
+// ★ 2026-05-17 (QUANT-PLAN): family quota 시스템.
+// 문제: 한 family (예: defi-momentum) 가 sample 통과 threshold 를 압도하면
+//       다른 family 후보가 한 cron 에서 잘 발굴 안 됨 (대표 보고: DeFi 모멘텀 변형 13건 일색).
+// 해결: 매 cron 에 family 별 최대 PER_FAMILY_QUOTA 만 등록 + 적응형 임계 완화.
+//
+// 메커니즘:
+//   1) cron 한 사이클 안에서 family 당 PER_FAMILY_QUOTA 개까지만 후보 등록.
+//   2) family 별 발굴 통계 (KV: di:alpha:family-discovery-stats) 추적 →
+//      통과 0개 누적 family 는 다음 cron 에 임계 0.1 (Sharpe) 완화.
+//   3) 8 family × 2 quota = 최대 16 후보 / cron → 다양성 확보.
+// ────────────────────────────────────────────────────────────────────
+const PER_FAMILY_QUOTA = 2;
+const FAMILY_STATS_KEY = "di:alpha:family-discovery-stats";
+const FAMILY_RELAX_MAX_STEPS = 3;   // 최대 -0.3 (Sharpe 1.5 → 1.2) 까지 완화
+const FAMILY_RELAX_STEP = 0.1;       // 한 번에 0.1 씩
+
+// family 별 적응형 임계 계산 — 직전 N cron 동안 통과 0이면 단계적 완화
+function relaxedThresholdFor(familyStats, family) {
+  const s = familyStats?.[family] || { dryRuns: 0, lastPassedAt: null };
+  const dryRuns = Math.min(FAMILY_RELAX_MAX_STEPS, s.dryRuns || 0);
+  const relaxedSharpe = CANDIDATE_THRESHOLD.minSharpe - dryRuns * FAMILY_RELAX_STEP;
+  return {
+    minSharpe: Math.max(1.0, relaxedSharpe),     // 절대 1.0 미만은 절대 안 함
+    maxDD: CANDIDATE_THRESHOLD.maxDD + dryRuns * 2, // DD 도 살짝 완화 (25 → 31)
+    minTrades: CANDIDATE_THRESHOLD.minTrades,
+    relaxStep: dryRuns,
+  };
+}
+
 async function getKv() {
   return (await import("@vercel/kv")).kv;
 }
@@ -135,9 +165,16 @@ export default async function handler(req, res) {
     const { selected: targetSymbols, cursor, nextCursor } = await pickRotatingSymbols(kv);
     L(`symbol rotation: cursor ${cursor} → ${nextCursor}, selected: ${targetSymbols.join(", ")}`);
 
+    // ★ family 별 발굴 통계 + quota 카운터 초기화 (이번 cron 한정)
+    const familyStats = (await kv.get(FAMILY_STATS_KEY)) || {};
+    const familyQuotaUsed = {}; // { [strategyId]: count }
+    const familyRelaxLog = {};  // 보고용
+
     // 3) 각 심볼별 OHLC + strategy × params sweep
-    const newCandidates = [];
-    const scanResults = {}; // { [symbol]: { [strategyId]: {...} } }
+    // ★ family 균등 발굴: passedHere 후보를 모두 buffer → 마지막에 family quota 적용 후 등록.
+    //    각 family 별로 sharpe top N 만 채택 → DeFi 한 family 가 cron 을 점령하는 현상 해소.
+    const allPassedByFamily = {}; // { [strategyId]: [{ symbol, params, ...metrics }] }
+    const scanResults = {};       // { [symbol]: { [strategyId]: {...} } }
     const t0Scan = Date.now();
     const TIMEOUT_BUDGET_MS = 50_000; // 60초 maxDuration 중 50초 limit (안전 마진)
 
@@ -162,6 +199,13 @@ export default async function handler(req, res) {
 
       for (const [strategyId, strategyFn] of Object.entries(ALL_STRATEGIES)) {
         if (Date.now() - t0Scan > TIMEOUT_BUDGET_MS) break;
+        // family 별 적응형 임계 (직전 dry-run 누적 시 완화)
+        const thr = relaxedThresholdFor(familyStats, strategyId);
+        if (thr.relaxStep > 0 && !familyRelaxLog[strategyId]) {
+          familyRelaxLog[strategyId] = { relaxStep: thr.relaxStep, minSharpe: thr.minSharpe, maxDD: thr.maxDD };
+          L(`[relax] ${strategyId}: dryRuns ${familyStats[strategyId]?.dryRuns || 0} → minSharpe ${thr.minSharpe.toFixed(2)}, maxDD ${thr.maxDD}`);
+        }
+
         const samples = sampleRandomParams(strategyId, SAMPLES_PER_STRATEGY);
         if (samples.length === 0) continue;
         let bestOfStrategy = null;
@@ -178,9 +222,9 @@ export default async function handler(req, res) {
               bestOfStrategy = { params, ...r };
             }
             if (
-              r.trades >= CANDIDATE_THRESHOLD.minTrades &&
-              r.sharpe >= CANDIDATE_THRESHOLD.minSharpe &&
-              r.maxDD <= CANDIDATE_THRESHOLD.maxDD
+              r.trades >= thr.minTrades &&
+              r.sharpe >= thr.minSharpe &&
+              r.maxDD <= thr.maxDD
             ) {
               passedHere.push({ params, ...r });
             }
@@ -190,26 +234,82 @@ export default async function handler(req, res) {
         }
         scanResults[symbol][strategyId] = { samples: samples.length, best: bestOfStrategy, passed: passedHere.length };
 
-        // 통과 후보 중 최고 1개만 등록 (스팸 방지) — symbol 정보 포함
+        // family quota buffer 에 적재 (등록은 모든 symbol 스캔 끝난 뒤 일괄 처리).
+        // family-symbol 쌍 당 best 1개씩만 buffer 에 → 다양한 symbol 도 보장.
         if (passedHere.length > 0) {
           passedHere.sort((a, b) => b.sharpe - a.sharpe);
           const winner = passedHere[0];
-          newCandidates.push({
-            id: genCandidateId(`${strategyId}-${symbol.slice(0, 3)}`),
-            parentStrategy: strategyId,
+          if (!allPassedByFamily[strategyId]) allPassedByFamily[strategyId] = [];
+          allPassedByFamily[strategyId].push({
             symbol,
             params: winner.params,
-            backtestResult: {
-              trades: winner.trades, sharpe: winner.sharpe,
-              winRate: winner.winRate, profitFactor: winner.profitFactor,
-              netReturn: winner.netReturn, maxDD: winner.maxDD,
-            },
-            createdAt: new Date().toISOString(),
-            status: "observing",
+            trades: winner.trades,
+            sharpe: winner.sharpe,
+            winRate: winner.winRate,
+            profitFactor: winner.profitFactor,
+            netReturn: winner.netReturn,
+            maxDD: winner.maxDD,
           });
-          L(`[${symbol}] ${strategyId}: ${passedHere.length} passed → candidate registered (Sharpe ${winner.sharpe.toFixed(2)})`);
         }
       }
+    }
+
+    // ★ family quota 적용 — 각 family 별로 sharpe top PER_FAMILY_QUOTA 만 등록.
+    //    추가로 다양성 가산점: 같은 family 내에서 symbol 중복 시 두 번째 candidate 부터 sharpe 0.05 감점.
+    //    → 같은 family 가 다른 symbol 로 분산 발굴되도록 유도.
+    const newCandidates = [];
+    for (const [strategyId, pool] of Object.entries(allPassedByFamily)) {
+      // symbol 다양성 가산: 한 family 내 unique symbol 우선 정렬
+      const seenSymbols = new Set();
+      const rescored = pool.map((p) => {
+        const dup = seenSymbols.has(p.symbol);
+        seenSymbols.add(p.symbol);
+        return { ...p, _adjSharpe: dup ? p.sharpe - 0.05 : p.sharpe };
+      });
+      rescored.sort((a, b) => b._adjSharpe - a._adjSharpe);
+      const chosen = rescored.slice(0, PER_FAMILY_QUOTA);
+      familyQuotaUsed[strategyId] = chosen.length;
+      for (const c of chosen) {
+        newCandidates.push({
+          id: genCandidateId(`${strategyId}-${c.symbol.slice(0, 3)}`),
+          parentStrategy: strategyId,
+          symbol: c.symbol,
+          params: c.params,
+          backtestResult: {
+            trades: c.trades, sharpe: c.sharpe,
+            winRate: c.winRate, profitFactor: c.profitFactor,
+            netReturn: c.netReturn, maxDD: c.maxDD,
+          },
+          createdAt: new Date().toISOString(),
+          status: "observing",
+        });
+      }
+      if (chosen.length > 0) {
+        L(`[quota] ${strategyId}: pool ${pool.length} → chosen ${chosen.length} (sharpe ${chosen.map(c => c.sharpe.toFixed(2)).join(", ")})`);
+      }
+    }
+
+    // ★ family-discovery-stats 업데이트 — dry-run 카운터 증감 + last passed 기록
+    const nextFamilyStats = { ...familyStats };
+    for (const strategyId of Object.keys(ALL_STRATEGIES)) {
+      const prev = nextFamilyStats[strategyId] || { dryRuns: 0, totalPassed: 0, lastPassedAt: null };
+      const passedThisRun = familyQuotaUsed[strategyId] || 0;
+      if (passedThisRun > 0) {
+        nextFamilyStats[strategyId] = {
+          dryRuns: 0,
+          totalPassed: (prev.totalPassed || 0) + passedThisRun,
+          lastPassedAt: new Date().toISOString(),
+        };
+      } else {
+        nextFamilyStats[strategyId] = {
+          dryRuns: (prev.dryRuns || 0) + 1,
+          totalPassed: prev.totalPassed || 0,
+          lastPassedAt: prev.lastPassedAt,
+        };
+      }
+    }
+    if (!dryRun) {
+      try { await kv.set(FAMILY_STATS_KEY, nextFamilyStats); } catch (e) { L(`family-stats persist failed: ${e?.message}`); }
     }
 
     // 4) 새 후보 등록
@@ -217,7 +317,7 @@ export default async function handler(req, res) {
       const existing = (await kv.get("di:alpha:strategy-candidates")) || [];
       const merged = [...existing, ...newCandidates].slice(-MAX_CANDIDATES);
       await kv.set("di:alpha:strategy-candidates", merged);
-      L(`new candidates registered: ${newCandidates.length}, total: ${merged.length}`);
+      L(`new candidates registered: ${newCandidates.length} (across ${Object.keys(familyQuotaUsed).length} families), total: ${merged.length}`);
     }
 
     return res.status(200).json({
@@ -225,6 +325,9 @@ export default async function handler(req, res) {
       durationMs: Date.now() - t0,
       promoted,
       newCandidates,
+      familyQuota: familyQuotaUsed,
+      familyRelax: familyRelaxLog,
+      familyStats: nextFamilyStats,
       scanResults,
       dryRun,
       log,
