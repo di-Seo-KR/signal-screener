@@ -24,10 +24,14 @@ import { sendCards, buildCard } from "../_shared/telegram.js";
 export const config = { maxDuration: 30 };
 
 // 규칙 — KV override 가능
+// ★ 2026-05-17 대표 지시: "전략 일시 중단 등 로직은 빼줘. 돈을 잃더라도 계속 테스트"
+//   demote (active → disabled) 자체 비활성화. 부진해도 watch 까지만 허용 (운영 지속).
+//   복원: ZEPTA_AUTO_DEMOTE=1 환경변수.
 const RULES = {
   promote: { minTrades: 30, minSharpe: 1.5, minPF: 1.3 },
-  demote:  { minTrades: 20, maxSharpe: 0,   minWinRate: 30 }, // OR 조건
+  demote:  { minTrades: 20, maxSharpe: 0,   minWinRate: 30 }, // OR 조건 (env 활성화 시만 적용)
 };
+const AUTO_DEMOTE_ENABLED = process.env.ZEPTA_AUTO_DEMOTE === "1";
 
 async function getKv() {
   return (await import("@vercel/kv")).kv;
@@ -45,13 +49,14 @@ function decide(metrics) {
       reason: `n=${trades}, Sharpe ${sharpe} ≥ ${RULES.promote.minSharpe}, PF ${pf} ≥ ${RULES.promote.minPF}`,
     };
   }
-  if (trades >= RULES.demote.minTrades && (sharpe <= RULES.demote.maxSharpe || winRate < RULES.demote.minWinRate)) {
+  if (AUTO_DEMOTE_ENABLED && trades >= RULES.demote.minTrades && (sharpe <= RULES.demote.maxSharpe || winRate < RULES.demote.minWinRate)) {
     const cause = sharpe <= 0 ? `Sharpe ${sharpe} ≤ 0` : `winRate ${winRate}% < 30%`;
     return {
       next: STRATEGY_STATUS.DISABLED,
       reason: `n=${trades}, ${cause}`,
     };
   }
+  // demote 비활성 시 부진해도 watch — 운영 지속 (대표 지시).
   return { next: STRATEGY_STATUS.WATCH, reason: `n=${trades}, Sharpe ${sharpe}, PF ${pf}` };
 }
 

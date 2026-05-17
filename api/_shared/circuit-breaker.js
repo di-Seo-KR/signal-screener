@@ -14,15 +14,29 @@
 
 // ★ 2026-05-09: BREAKER_LIMITS export — UI 가 옛 한도 하드코딩 안 하도록.
 //   status.js 가 이 객체를 함께 내려보내고, RealTrading.jsx 가 그것 사용.
+// ★ 2026-05-17 대표 지시: "DD나 MDD나 연속 손실에 따른 전략 일시 중단 등 로직은 빼줘.
+//   돈을 잃더라도 계속 테스트하고 전략 개선하는게 중요하니깐"
+//
+// 모든 자동 halt/cooldown 사실상 비활성화 — 한도를 99% 로 올려서 영구 trigger 안 됨.
+// 환경변수 ZEPTA_BREAKER_MODE 로 옛 정책 복원 가능:
+//   - "off" (기본): 자동 중단 없음 (대표 요청)
+//   - "loose": 80%/120%/100%/100회 (테스트 모드)
+//   - "strict": 옛 정책 (40%/60%/50%/10회)
+const BREAKER_MODE = (process.env.ZEPTA_BREAKER_MODE || "off").toLowerCase();
+const BREAKER_PRESETS = {
+  off:    { dailyLossPct: 0.99, weeklyLossPct: 0.99, mddPct: 0.99, consecLossThreshold: 9999 },
+  loose:  { dailyLossPct: 0.80, weeklyLossPct: 1.20, mddPct: 1.00, consecLossThreshold: 100 },
+  strict: { dailyLossPct: 0.40, weeklyLossPct: 0.60, mddPct: 0.50, consecLossThreshold: 10 },
+};
+const preset = BREAKER_PRESETS[BREAKER_MODE] || BREAKER_PRESETS.off;
+
 export const BREAKER_LIMITS = {
-  // ★ 2026-05-08: 대표님 지시로 대폭 완화.
-  //   거래당 ROI -40% 까지 허용한 만큼 서킷브레이커 한도도 일치시켜야
-  //   한 거래만으로 자동매매가 그날 멈추는 사태 방지.
-  dailyLossPct: 0.40,   // 하루 -40% 넘으면 halt (이전 -4%)
-  weeklyLossPct: 0.60,  // 주간 -60% (이전 -8%) — 연속 사고 차단
-  mddPct: 0.50,         // MDD -50% (이전 -15%) — 자본 절반 보호
-  consecLossThreshold: 10, // 연속 손실 10회 → 24h cooldown (2026-05-13: 5→10, 손실 streak 관대화)
+  dailyLossPct: preset.dailyLossPct,
+  weeklyLossPct: preset.weeklyLossPct,
+  mddPct: preset.mddPct,
+  consecLossThreshold: preset.consecLossThreshold,
   cooldownMs: 24 * 60 * 60 * 1000,
+  _mode: BREAKER_MODE,  // 디버깅용 — status 응답에서 어떤 모드인지 확인
 };
 
 // ★ 2026-05-09: KST 기준 reset 으로 변경 (이전: UTC).

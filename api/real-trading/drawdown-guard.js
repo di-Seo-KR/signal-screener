@@ -75,7 +75,9 @@ async function closeReducePct({ creds, p, pct }) {
  * @returns {Promise<{ triggered: boolean, level?: number, ddPct?: number, actions: Array, reason?: string }>}
  */
 export async function evaluateDrawdownGuard({ userId, creds, positions, currentEquity } = {}) {
-  const mode = (process.env.ZEPTA_DD_PROTECTION_MODE || "soft").toLowerCase();
+  // ★ 2026-05-17 대표 지시: 기본 off — "DD나 MDD에 따른 일시 중단 빼줘"
+  //   복원 시 ZEPTA_DD_PROTECTION_MODE=soft 또는 strict 환경변수 지정.
+  const mode = (process.env.ZEPTA_DD_PROTECTION_MODE || "off").toLowerCase();
   if (mode === "off") {
     return { triggered: false, actions: [], reason: "mode=off" };
   }
