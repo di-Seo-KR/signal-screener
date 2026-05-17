@@ -242,18 +242,30 @@ function aggregateAcrossUsers(userDatas) {
   for (const [sid, trades] of Object.entries(byStrategy)) {
     strategies[sid] = computeMetrics(trades);
   }
-  // fallback — ledger 데이터 없는 family 는 summary 의 누적치 사용
+  // fallback — ledger 데이터 없는 family 는 summary 의 누적치 사용.
+  //
+  // ★ 2026-05-17 정정 (QUANT-RES v2): shadow-summary.byFamily.netPnL 의 값이
+  //   옛 cron 에서 ROI ratio 단순 합산으로 적재되어 -12919% 같은 비현실 누적치 발생.
+  //   → 거래수 대비 평균으로 변환 + sanity cap (-200% ~ +500%) 으로 정상화.
+  //   ledger 적재가 정상화되면 이 fallback 경로는 자연 sunset (strategies[fam] 이미 채워짐).
   for (const [fam, s] of Object.entries(familyFallback)) {
     if (strategies[fam]) continue;
     if (!s.trades) continue;
     const winRate = s.wins / s.trades;
+    // 평균 ROI 로 변환 — netPnL 의미를 computeMetrics 와 일관성 있게 (거래당 평균 %).
+    const avgPnLPct = s.netPnL / Math.max(s.trades, 1);
+    // sanity cap — 옛 누적 합산 잔재 (-12919% 같은 값) 차단.
+    const safeAvg = Math.max(-200, Math.min(500, avgPnLPct));
     strategies[fam] = {
       trades: s.trades,
       wins: s.wins, losses: s.trades - s.wins,
       winRate: Number((winRate * 100).toFixed(2)),
-      netPnL: Number(s.netPnL.toFixed(2)),
+      netPnL: Number(safeAvg.toFixed(2)),
+      avgROI: Number(safeAvg.toFixed(2)),
+      netPnLUsd: 0,  // fallback 경로는 USD 정보 없음
       sharpe: 0, profitFactor: null, maxDD: 0, avgHoldMs: 0, avgHoldHours: 0,
       _source: "summary-fallback",
+      _rawNetPnL: Number(s.netPnL.toFixed(2)),  // 디버깅용 — 원본 보존
     };
   }
 
