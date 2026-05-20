@@ -41,13 +41,16 @@ const TOP_SYMBOLS = [
 const SYMBOLS_PER_RUN = 4;
 const SYMBOL_CURSOR_KEY = "di:continuous-backtest:symbol-cursor";
 
-// ★ 발굴 활성화:
-//   기존: Sharpe ≥ 2.0 (매우 엄격), 20 sample
-//   변경: Sharpe ≥ 1.5 (현실적), DD ≤ 25, trades ≥ 20, 30 sample
-const CANDIDATE_THRESHOLD = { minSharpe: 1.5, maxDD: 25, minTrades: 20 };
+// ★ 2026-05-20 추가 완화 — 대표 지시 "전략 다양화 멈춰있는 거 아니냐":
+//   기존 1.5 / 30 sample → MATICUSDT + ARBUSDT 만 통과 (35건 모두 2개 자산).
+//   - minSharpe 1.5 → 1.0: BTC/ETH/SOL 등 메이저 자산도 통과 가능
+//   - minTrades 20 → 15: 표본 적은 strategy 도 candidate 등록 기회
+//   - SAMPLES_PER_STRATEGY 30 → 50: param space 더 넓게 탐색
+//   7일 관찰 단계에서 부진 폐기로 quality 유지 (OBSERVATION_DAYS 7).
+const CANDIDATE_THRESHOLD = { minSharpe: 1.0, maxDD: 25, minTrades: 15 };
 
 // 변형 sample 수 (strategy × symbol 당)
-const SAMPLES_PER_STRATEGY = 30;
+const SAMPLES_PER_STRATEGY = 50;
 
 // 후보 보관 기간
 const OBSERVATION_DAYS = 7;
