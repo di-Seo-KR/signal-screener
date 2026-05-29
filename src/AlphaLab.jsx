@@ -739,7 +739,8 @@ function LiveTuningBanner({ data }) {
   if (tuned.length === 0) return null;
 
   return (
-    <Card style={{ borderColor: C.green, background: C.greenBg || C.card }}>
+    <Card style={{ position: "relative", overflow: "hidden" }}>
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: C.green }} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 }}>
         <div style={{ fontSize: FONT.lg, fontWeight: 800, color: C.text1 }}>🧬 발굴 전략 실거래 반영중</div>
         <Badge kind="active">{tuned.length}개 적용</Badge>
