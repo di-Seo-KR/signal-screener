@@ -447,8 +447,9 @@ function RealTradingInner() {
       border: "1px solid var(--z-border)",
       borderRadius: "var(--z-r-lg)",
       padding: isMobile ? "16px 16px 16px 18px" : "22px 24px 22px 26px",
-      display: "flex", flexDirection: "column", justifyContent: "space-between",
-      gap: isMobile ? 12 : 18,
+      display: "flex", flexDirection: "column",
+      justifyContent: isMobile ? "flex-start" : "space-between",
+      gap: isMobile ? 14 : 18,
       gridRow: isMobile ? undefined : "span 2",
     }}>
       <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--z-blue)" }} />
@@ -615,7 +616,8 @@ function RealTradingInner() {
         ) : (
           <>
             {heroEquity}
-            <div style={{ marginTop: 10, display: "grid", gap: 8, gridTemplateColumns: "repeat(3, 1fr)" }}>
+            {/* 모바일: 3열은 빡빡 → 2열 (각 카드 폭 ↑, hint 줄바꿈·잘림 해소) */}
+            <div style={{ marginTop: 10, display: "grid", gap: 10, gridTemplateColumns: "repeat(2, 1fr)" }}>
               {metricCards.map(m => <React.Fragment key={m.key}>{m.el}</React.Fragment>)}
             </div>
           </>
@@ -706,9 +708,10 @@ function RealTradingInner() {
               fontSize: 14,
               fontWeight: 700,
               padding: "14px 20px",
-              background: "linear-gradient(135deg, var(--z-yellow) 0%, #EAB308 100%)",
-              boxShadow: "0 4px 12px rgba(234, 179, 8, 0.3)",
-              border: "1px solid rgba(234, 179, 8, 0.4)",
+              background: "var(--z-card-2)",
+              color: "var(--z-yellow-hi)",
+              boxShadow: "none",
+              border: "1px solid rgba(255, 176, 32, 0.45)",
             }}
           >
             🔒 실거래 중지
