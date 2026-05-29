@@ -442,15 +442,16 @@ function RealTradingInner() {
   // ═════════════════════════════════════════════════════════
   const heroEquity = (
     <div style={{
-      background: "linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(37, 99, 235, 0.06) 100%)",
-      border: "1px solid rgba(59, 130, 246, 0.25)",
+      position: "relative", overflow: "hidden",
+      background: "var(--z-card)",
+      border: "1px solid var(--z-border)",
       borderRadius: "var(--z-r-lg)",
-      padding: isMobile ? "16px" : "22px 24px",
+      padding: isMobile ? "16px 16px 16px 18px" : "22px 24px 22px 26px",
       display: "flex", flexDirection: "column", justifyContent: "space-between",
       gap: isMobile ? 12 : 18,
-      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
       gridRow: isMobile ? undefined : "span 2",
     }}>
+      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--z-blue)" }} />
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: isMobile ? 10 : 0 }}>
         <div style={{
           width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: 12,
@@ -517,40 +518,36 @@ function RealTradingInner() {
     </div>
   );
 
-  // 4개 보조 메트릭 카드 빌더 — 모바일: 2x2 그리드, 데스크탑: 기존 분할
-  //   tip: 쉬운 말 설명 (label 옆 ⓘ + hover/길게누르기 툴팁) — 용어 가독성 개선 (2026-05-29)
-  const renderMetricCard = ({ label, value, color, hint, gradient, border, tip }) => (
+  // 4개 보조 메트릭 카드 빌더 — 프리미엄 다크 (2026-05-29 재디자인)
+  //   탁한 그라디언트 배경 제거 → 솔리드 카드 + 좌측 얇은 accent 바 + 색은 숫자에만.
+  //   tip: label 옆 ⓘ + hover/길게누르기 툴팁.
+  const renderMetricCard = ({ label, value, color, hint, accent, tip }) => (
     <div title={tip || undefined} style={{
-      background: gradient,
-      border,
+      position: "relative", overflow: "hidden",
+      background: "var(--z-card)",
+      border: "1px solid var(--z-border)",
       borderRadius: "var(--z-r-lg)",
-      padding: isMobile ? "14px 12px" : "16px",
-      display: "flex", flexDirection: "column", justifyContent: "center",
-      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+      padding: isMobile ? "15px 15px 15px 17px" : "18px 18px 18px 20px",
+      display: "flex", flexDirection: "column", gap: isMobile ? 7 : 9,
       minHeight: isMobile ? "auto" : "100%",
     }}>
+      {accent && <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: accent }} />}
       <div style={{
         fontSize: isMobile ? 12.5 : 13, color: "var(--z-text-3)",
-        fontWeight: 600, letterSpacing: 0.2,
-        marginBottom: isMobile ? 5 : 8,
+        fontWeight: 600, letterSpacing: 0.1,
         display: "flex", alignItems: "center", gap: 3,
       }}>
         {label}
-        {tip && <span style={{ opacity: 0.5, fontSize: 11, cursor: "help" }}>ⓘ</span>}
+        {tip && <span style={{ opacity: 0.45, fontSize: 11, cursor: "help" }}>ⓘ</span>}
       </div>
       <div style={{
-        fontSize: isMobile ? 21 : 24, fontWeight: 900, lineHeight: 1.05,
-        color, fontFamily: "var(--z-font-mono)",
+        fontSize: isMobile ? 22 : 27, fontWeight: 800, lineHeight: 1.0,
+        color: color || "var(--z-text)", fontFamily: "var(--z-font-mono)", letterSpacing: "-0.015em",
       }}>
         {value}
       </div>
       {hint && (
-        <div style={{
-          marginTop: isMobile ? 5 : 8, fontSize: isMobile ? 11.5 : 13, color: "var(--z-text-3)",
-          padding: isMobile ? "3px 7px" : "6px 8px",
-          background: "rgba(0, 0, 0, 0.15)", borderRadius: "var(--z-r-md)",
-          lineHeight: 1.35,
-        }}>
+        <div style={{ fontSize: isMobile ? 11.5 : 12.5, color: "var(--z-text-3)", lineHeight: 1.4 }}>
           {hint}
         </div>
       )}
@@ -565,10 +562,7 @@ function RealTradingInner() {
         tip: "오늘 시작 잔고 대비 지금까지의 손익률입니다.",
         color: dayLossPct < 0 ? "var(--z-red-hi)" : dayLossPct > 0 ? "var(--z-green-hi)" : "var(--z-text)",
         hint: <>하루 손실 한도 <span style={{ fontWeight: 700 }}>-{dayLimitPct.toFixed(0)}%</span></>,
-        gradient: dayLossPct < 0
-          ? "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)"
-          : "linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(22, 163, 74, 0.06) 100%)",
-        border: dayLossPct < 0 ? "1px solid rgba(239, 68, 68, 0.25)" : "1px solid rgba(34, 197, 94, 0.25)",
+        accent: dayLossPct < 0 ? "var(--z-red)" : dayLossPct > 0 ? "var(--z-green)" : "var(--z-text-3)",
       }) : null, // 모바일에선 hero 안에 흡수됨
     },
     {
@@ -578,10 +572,7 @@ function RealTradingInner() {
         tip: "고점(30일 최고 잔고) 대비 지금까지 가장 크게 떨어진 폭입니다. 작을수록 안정적이에요.",
         color: mddPct < -10 ? "var(--z-red-hi)" : mddPct < -5 ? "var(--z-yellow-hi)" : "var(--z-purple)",
         hint: <>자동정지 한도 <span style={{ fontWeight: 700 }}>-{mddLimitPct.toFixed(0)}%</span></>,
-        gradient: mddPct < -8
-          ? "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)"
-          : "linear-gradient(135deg, rgba(168, 85, 247, 0.12) 0%, rgba(147, 51, 234, 0.06) 100%)",
-        border: mddPct < -8 ? "1px solid rgba(239, 68, 68, 0.25)" : "1px solid rgba(168, 85, 247, 0.25)",
+        accent: mddPct < -8 ? "var(--z-red)" : "var(--z-purple)",
       }),
     },
     {
@@ -594,8 +585,7 @@ function RealTradingInner() {
         tip: "지금 열려 있는 포지션(매매) 개수입니다.",
         color: "var(--z-text)",
         hint: "포지션 총액 한도 내에서 자동 진입",
-        gradient: "linear-gradient(135deg, rgba(100, 116, 139, 0.12) 0%, rgba(71, 85, 105, 0.06) 100%)",
-        border: "1px solid rgba(100, 116, 139, 0.2)",
+        accent: positions.length > 0 ? "var(--z-blue)" : "var(--z-text-3)",
       }),
     },
     {
@@ -605,10 +595,7 @@ function RealTradingInner() {
         tip: "연달아 손실이 난 횟수입니다. 한도에 닿으면 봇이 잠시 매매를 멈추고 쉬어갑니다.",
         color: (breaker.consecLosses || 0) >= 3 ? "var(--z-red-hi)" : "var(--z-text)",
         hint: "연속 손실 시 자동 휴식",
-        gradient: (breaker.consecLosses || 0) >= 3
-          ? "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)"
-          : "linear-gradient(135deg, rgba(100, 116, 139, 0.12) 0%, rgba(71, 85, 105, 0.06) 100%)",
-        border: (breaker.consecLosses || 0) >= 3 ? "1px solid rgba(239, 68, 68, 0.25)" : "1px solid rgba(100, 116, 139, 0.2)",
+        accent: (breaker.consecLosses || 0) >= 3 ? "var(--z-red)" : "var(--z-text-3)",
       }),
     },
   ].filter(m => m.el);
