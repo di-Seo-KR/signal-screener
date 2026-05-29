@@ -493,15 +493,15 @@ function RealTradingInner() {
         display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr",
         paddingTop: 10, borderTop: "1px solid rgba(59, 130, 246, 0.1)",
       }}>
-        <div>
+        <div title="오늘 0시 기준 시작 잔고입니다. 오늘 손익은 이 금액과 비교해 계산돼요.">
           <div style={{ fontSize: 14, color: "var(--z-text-3)", marginBottom: 4 }}>오늘 시작 잔고</div>
           <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)" }}>
             {breaker.dayStartEquity ? fmtUsd(breaker.dayStartEquity) : "—"}
           </div>
         </div>
-        <div>
+        <div title="낙폭(최대 하락폭)을 계산하는 기준선 — 최근 30일 중 가장 높았던 잔고입니다.">
           <div style={{ fontSize: 14, color: "var(--z-text-3)", marginBottom: 4 }}>
-            MDD 기준 (30일 최고)
+            낙폭 기준선 (30일 최고) ⓘ
             {breaker.equityHigh && breaker.equityHigh30d && breaker.equityHigh > breaker.equityHigh30d && (
               <span style={{ marginLeft: 6, fontSize: 14, color: "var(--z-text-3)" }}>
                 · 역대 {fmtUsd(breaker.equityHigh)}
@@ -517,34 +517,38 @@ function RealTradingInner() {
   );
 
   // 4개 보조 메트릭 카드 빌더 — 모바일: 2x2 그리드, 데스크탑: 기존 분할
-  const renderMetricCard = ({ label, value, color, hint, gradient, border }) => (
-    <div style={{
+  //   tip: 쉬운 말 설명 (label 옆 ⓘ + hover/길게누르기 툴팁) — 용어 가독성 개선 (2026-05-29)
+  const renderMetricCard = ({ label, value, color, hint, gradient, border, tip }) => (
+    <div title={tip || undefined} style={{
       background: gradient,
       border,
       borderRadius: "var(--z-r-lg)",
-      padding: isMobile ? "12px" : "16px",
+      padding: isMobile ? "14px 12px" : "16px",
       display: "flex", flexDirection: "column", justifyContent: "center",
       boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
       minHeight: isMobile ? "auto" : "100%",
     }}>
       <div style={{
-        fontSize: isMobile ? 12 : 13, color: "var(--z-text-3)",
-        fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5,
-        marginBottom: isMobile ? 4 : 8,
+        fontSize: isMobile ? 12.5 : 13, color: "var(--z-text-3)",
+        fontWeight: 600, letterSpacing: 0.2,
+        marginBottom: isMobile ? 5 : 8,
+        display: "flex", alignItems: "center", gap: 3,
       }}>
         {label}
+        {tip && <span style={{ opacity: 0.5, fontSize: 11, cursor: "help" }}>ⓘ</span>}
       </div>
       <div style={{
-        fontSize: isMobile ? 18 : 24, fontWeight: 900, lineHeight: 1,
+        fontSize: isMobile ? 21 : 24, fontWeight: 900, lineHeight: 1.05,
         color, fontFamily: "var(--z-font-mono)",
       }}>
         {value}
       </div>
       {hint && (
         <div style={{
-          marginTop: isMobile ? 4 : 8, fontSize: 14, color: "var(--z-text-3)",
-          padding: isMobile ? "3px 6px" : "6px 8px",
+          marginTop: isMobile ? 5 : 8, fontSize: isMobile ? 11.5 : 13, color: "var(--z-text-3)",
+          padding: isMobile ? "3px 7px" : "6px 8px",
           background: "rgba(0, 0, 0, 0.15)", borderRadius: "var(--z-r-md)",
+          lineHeight: 1.35,
         }}>
           {hint}
         </div>
@@ -556,9 +560,10 @@ function RealTradingInner() {
     {
       key: "pnl",
       el: !isMobile ? renderMetricCard({
-        label: "일 손익", value: fmtPct(dayLossPct),
+        label: "오늘 손익", value: fmtPct(dayLossPct),
+        tip: "오늘 시작 잔고 대비 지금까지의 손익률입니다.",
         color: dayLossPct < 0 ? "var(--z-red-hi)" : dayLossPct > 0 ? "var(--z-green-hi)" : "var(--z-text)",
-        hint: <>한도 <span style={{ fontWeight: 700 }}>-{dayLimitPct.toFixed(0)}%</span></>,
+        hint: <>하루 손실 한도 <span style={{ fontWeight: 700 }}>-{dayLimitPct.toFixed(0)}%</span></>,
         gradient: dayLossPct < 0
           ? "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)"
           : "linear-gradient(135deg, rgba(34, 197, 94, 0.12) 0%, rgba(22, 163, 74, 0.06) 100%)",
@@ -569,8 +574,9 @@ function RealTradingInner() {
       key: "mdd",
       el: renderMetricCard({
         label: "최대 낙폭", value: fmtPct(mddPct),
+        tip: "고점(30일 최고 잔고) 대비 지금까지 가장 크게 떨어진 폭입니다. 작을수록 안정적이에요.",
         color: mddPct < -10 ? "var(--z-red-hi)" : mddPct < -5 ? "var(--z-yellow-hi)" : "var(--z-purple)",
-        hint: <>한도 <span style={{ fontWeight: 700 }}>-{mddLimitPct.toFixed(0)}%</span></>,
+        hint: <>자동정지 한도 <span style={{ fontWeight: 700 }}>-{mddLimitPct.toFixed(0)}%</span></>,
         gradient: mddPct < -8
           ? "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)"
           : "linear-gradient(135deg, rgba(168, 85, 247, 0.12) 0%, rgba(147, 51, 234, 0.06) 100%)",
@@ -584,8 +590,9 @@ function RealTradingInner() {
       //   자연 제한. 개수 자체는 제한 아님 (= 노셔널 안에서 무제한).
       el: renderMetricCard({
         label: "진행 거래", value: positions.length,
+        tip: "지금 열려 있는 포지션(매매) 개수입니다.",
         color: "var(--z-text)",
-        hint: "합산 노셔널 한도 내 자동 진입",
+        hint: "포지션 총액 한도 내에서 자동 진입",
         gradient: "linear-gradient(135deg, rgba(100, 116, 139, 0.12) 0%, rgba(71, 85, 105, 0.06) 100%)",
         border: "1px solid rgba(100, 116, 139, 0.2)",
       }),
@@ -593,9 +600,10 @@ function RealTradingInner() {
     {
       key: "loss",
       el: renderMetricCard({
-        label: "연속 손실", value: `${breaker.consecLosses || 0} / 5`,
+        label: "연속 손실", value: `${breaker.consecLosses || 0}회`,
+        tip: "연달아 손실이 난 횟수입니다. 한도에 닿으면 봇이 잠시 매매를 멈추고 쉬어갑니다.",
         color: (breaker.consecLosses || 0) >= 3 ? "var(--z-red-hi)" : "var(--z-text)",
-        hint: "쿨다운 24h",
+        hint: "연속 손실 시 자동 휴식",
         gradient: (breaker.consecLosses || 0) >= 3
           ? "linear-gradient(135deg, rgba(239, 68, 68, 0.12) 0%, rgba(220, 38, 38, 0.06) 100%)"
           : "linear-gradient(135deg, rgba(100, 116, 139, 0.12) 0%, rgba(71, 85, 105, 0.06) 100%)",
