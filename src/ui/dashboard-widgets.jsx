@@ -387,34 +387,39 @@ export function OperationalMetrics({ positions = [], orders = [], equity = 0, is
       value: metrics.holdCount > 0 ? `${metrics.avgHoldH.toFixed(1)}h` : "—",
       sub: metrics.holdCount > 0 ? `최근 ${metrics.holdCount}건 청산 기준` : "청산 후 집계",
       color: "var(--z-text-1)",
+      tip: "포지션 하나를 평균 몇 시간 들고 있었는지입니다.",
     },
     {
-      label: "24h 거래량",
+      label: "24h 거래",
       value: metrics.dayClosed > 0 ? `${metrics.dayClosed}건` : "0건",
       sub: "최근 24시간 청산",
       color: metrics.dayClosed >= 5 ? "var(--z-green-hi)" : metrics.dayClosed >= 1 ? "var(--z-yellow-hi)" : "var(--z-text-3)",
+      tip: "최근 24시간 동안 마무리(청산)된 매매 건수입니다.",
     },
     {
-      label: "마진 사용률",
+      label: "자본 사용률",
       value: `${metrics.marginUsedPct.toFixed(0)}%`,
       sub: `${fmtUsd(metrics.totalMargin, 0)} / ${fmtUsd(equity, 0)}`,
       color: metrics.marginUsedPct >= 80 ? "var(--z-red-hi)"
            : metrics.marginUsedPct >= 50 ? "var(--z-yellow-hi)"
            : "var(--z-green-hi)",
+      tip: "내 자본 중 지금 포지션 증거금으로 묶여 있는 비율입니다. 80% 넘으면 빨강 경고.",
     },
     {
-      label: "노셔널 노출",
+      label: "포지션 총액",
       value: `${metrics.notionalRatio.toFixed(1)}×`,
       sub: `${fmtUsd(metrics.totalNotional, 0)} · ${metrics.positionCount}개 포지션`,
       color: metrics.notionalRatio >= 5 ? "var(--z-red-hi)"
            : metrics.notionalRatio >= 2 ? "var(--z-yellow-hi)"
            : "var(--z-text-1)",
+      tip: "레버리지 포함 포지션 총액이 내 자본의 몇 배인지입니다. 높을수록 변동성에 민감.",
     },
     {
       label: "미실현 손익",
       value: `${metrics.unrealized >= 0 ? "+" : ""}${fmtUsd(metrics.unrealized, 2)}`,
-      sub: `${metrics.unrealized >= 0 ? "+" : ""}${metrics.unrealizedPct.toFixed(2)}% of 자본`,
+      sub: `자본 대비 ${metrics.unrealized >= 0 ? "+" : ""}${metrics.unrealizedPct.toFixed(2)}%`,
       color: metrics.unrealized > 0 ? "var(--z-green-hi)" : metrics.unrealized < 0 ? "var(--z-red-hi)" : "var(--z-text-3)",
+      tip: "아직 청산 안 한 포지션의 평가 손익입니다. 청산해야 확정돼요.",
     },
   ];
 
@@ -425,25 +430,27 @@ export function OperationalMetrics({ positions = [], orders = [], equity = 0, is
       gap: 8,
     }}>
       {cards.map((c, i) => (
-        <div key={i} style={{
+        <div key={i} title={c.tip || undefined} style={{
           background: "var(--z-card-2)", border: "1px solid var(--z-border)",
-          borderRadius: "var(--z-r-md)", padding: isMobile ? "10px 12px" : "12px 14px",
+          borderRadius: "var(--z-r-md)", padding: isMobile ? "12px 12px" : "12px 14px",
           display: "flex", flexDirection: "column", justifyContent: "center",
-          minHeight: isMobile ? 74 : 82,
+          minHeight: isMobile ? 78 : 82,
         }}>
           <div style={{
-            fontSize: 14, color: "var(--z-text-3)", fontWeight: 600,
-            marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.4,
+            fontSize: 13, color: "var(--z-text-3)", fontWeight: 600,
+            marginBottom: 5, letterSpacing: 0.2,
+            display: "flex", alignItems: "center", gap: 3,
           }}>
             {c.label}
+            {c.tip && <span style={{ opacity: 0.5, fontSize: 11, cursor: "help" }}>ⓘ</span>}
           </div>
           <div style={{
-            fontSize: isMobile ? 15 : 18, fontWeight: 800, color: c.color,
+            fontSize: isMobile ? 18 : 19, fontWeight: 800, color: c.color,
             fontFamily: "var(--z-font-mono)", lineHeight: 1.1,
           }}>
             {c.value}
           </div>
-          <div style={{ fontSize: 14, color: "var(--z-text-3)", marginTop: 3, lineHeight: 1.3 }}>
+          <div style={{ fontSize: 12, color: "var(--z-text-3)", marginTop: 4, lineHeight: 1.3 }}>
             {c.sub}
           </div>
         </div>
