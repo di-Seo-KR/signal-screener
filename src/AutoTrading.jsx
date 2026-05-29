@@ -1275,6 +1275,14 @@ function ActiveBotsDashboard({ activeBots, stoppedBots, onSelectBot, onStopBot, 
         }}>
           {activeBots.filter(ab => ab.status !== "paused").length}개 활성
         </span>
+        {/* 2026-05-29 — 알파랩 발굴·튜닝 전략이 자동 반영됨을 안내 (실거래 배선 연결) */}
+        <span className="px-2.5 py-0.75 rounded-xl font-semibold flex-shrink-0" title="알파랩이 2시간마다 발굴·검증한 최적 전략 파라미터가 자동으로 반영됩니다" style={{
+          background: `${c.blue}18`,
+          color: c.blue,
+          fontSize: isMobile ? "11px" : "13px",
+        }}>
+          🧬 AI 자동 튜닝
+        </span>
         {loading && (
           <span aria-label="데이터 불러오는 중" style={{
             display: "inline-block",

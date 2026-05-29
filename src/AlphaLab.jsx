@@ -302,7 +302,11 @@ function LeaderboardTable({ data }) {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 15, color: C.text1 }}>{r.name}</div>
-                    <div style={{ fontSize: FONT.xs, color: C.text3 }}>{r.id}</div>
+                    {r.tunedAt && (
+                      <div style={{ fontSize: FONT.xs, color: C.green, fontWeight: 600, marginTop: 1 }}>
+                        🧬 실거래 반영중 · 튜닝 {fmtAgo(r.tunedAt)}
+                      </div>
+                    )}
                   </div>
                   <Badge kind={r.status}>{statusInfo.emoji} {statusInfo.label}</Badge>
                 </div>
@@ -370,7 +374,9 @@ function LeaderboardTable({ data }) {
                       <div style={{ fontWeight: 600 }}>{r.name}</div>
                       <div style={{ fontSize: FONT.xs, color: C.text3 }}>{r.id}</div>
                       {r.tunedAt && (
-                        <div style={{ fontSize: FONT.xs, color: C.text3 }}>파라미터 튜닝 {fmtAgo(r.tunedAt)}</div>
+                        <div style={{ fontSize: FONT.xs, color: C.green, fontWeight: 600, marginTop: 2 }}>
+                          🧬 실거래 반영중 · {fmtAgo(r.tunedAt)}
+                        </div>
                       )}
                     </td>
                     <td style={tdStyle}>
@@ -556,33 +562,46 @@ function CandidatesPanel({ data }) {
         <Badge kind="info">{candidates.length}건 관찰중</Badge>
       </div>
       <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 8 }}>
-        백테스트 엔진이 매일 새 변형을 시뮬레이션해 유망한 후보를 찾아냅니다. 검증을 거친 뒤에만 실제 운영에 투입됩니다.
+        백테스트 엔진이 2시간마다 새 변형을 시뮬레이션해 유망한 후보를 찾아냅니다. 충분히 우수한 후보는 자동매매에 즉시 반영됩니다.
       </div>
       {candidates.length === 0 ? (
         <div style={{ fontSize: FONT.sm, color: C.text3, padding: "16px 0", textAlign: "center" }}>
-          현재 관찰중인 후보가 없습니다 — 매일 오후 4시(KST) 자동 발굴됩니다.
+          현재 관찰중인 후보가 없습니다 — 2시간마다 자동 발굴됩니다.
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 8 }}>
-          {candidates.slice(0, 12).map((c) => {
-            const g = sharpeToGrade(c.backtestResult?.sharpe);
+          {[...candidates]
+            .sort((a, b) => (b.backtestResult?.sharpe || 0) - (a.backtestResult?.sharpe || 0))
+            .slice(0, 12).map((c) => {
+            const br = c.backtestResult || {};
+            const g = sharpeToGrade(br.sharpe);
+            const sym = (c.symbol || "").replace("USDT", "");
+            const sharpeColor = (br.sharpe || 0) >= 1.5 ? C.green : (br.sharpe || 0) <= 0 ? C.red : C.text1;
             return (
               <div key={c.id} style={{
-                padding: 10,
+                padding: 12,
                 background: C.card2,
                 borderRadius: RADIUS.sm,
                 border: `1px solid ${C.border}`,
               }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: FONT.sm, fontWeight: 600, color: C.text1 }}>{strategyLabel(c.parentStrategy)} 변형</span>
-                  <span style={{ fontSize: FONT.xs, color: C.text3 }}>{fmtAgo(c.createdAt)}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <span style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>{strategyLabel(c.parentStrategy)}</span>
+                    {sym && <span style={{ fontSize: FONT.xs, color: C.text3, marginLeft: 6 }}>{sym}</span>}
+                  </div>
+                  <span style={{ fontSize: FONT.xs, color: C.text3, whiteSpace: "nowrap" }}>{fmtAgo(c.createdAt)}</span>
                 </div>
-                <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
-                  <Badge kind="info">{g.label}</Badge>
-                  <Badge>거래 {c.backtestResult?.trades}회</Badge>
-                  <Badge>승률 {fmtPct(c.backtestResult?.winRate)}</Badge>
+                {/* 핵심 지표 — 안정성 크게 */}
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 6 }}>
+                  <span style={{ fontSize: 18, fontWeight: 800, color: sharpeColor }}>{g.grade}</span>
+                  <span style={{ fontSize: FONT.xs, color: C.text3 }}>안정성 {fmtNum(br.sharpe, 2)}</span>
                 </div>
-                <details style={{ marginTop: 6 }}>
+                <div style={{ display: "flex", gap: 10, marginTop: 6, flexWrap: "wrap", fontSize: FONT.xs, color: C.text2 }}>
+                  <span>승률 <b style={{ color: C.text1 }}>{fmtPct(br.winRate)}</b></span>
+                  <span>손익비 <b style={{ color: C.text1 }}>{br.profitFactor == null ? "—" : fmtNum(br.profitFactor, 2)}</b></span>
+                  <span>거래 <b style={{ color: C.text1 }}>{br.trades}</b></span>
+                </div>
+                <details style={{ marginTop: 8 }}>
                   <summary style={{ fontSize: FONT.xs, color: C.text3, cursor: "pointer" }}>상세 파라미터 보기</summary>
                   <pre style={{ fontSize: FONT.xs, color: C.text2, margin: "4px 0 0", whiteSpace: "pre-wrap" }}>
                     {JSON.stringify(c.params || {}, null, 0)}
@@ -702,6 +721,55 @@ function PublicAlphaShowcase({ data, onSignup }) {
 // ────────────────────────────────────────────────
 // 메인 페이지
 // ────────────────────────────────────────────────
+// ────────────────────────────────────────────────
+// 발굴 → 실거래 반영 현황 배너 (2026-05-29)
+// 알파랩이 발굴한 우수 전략의 튜닝 파라미터가 실제 자동매매에 적용된 상태를
+// 한눈에 보여준다. di:alpha:params 에 적재된(=tunedAt 있는) 전략만 집계.
+// ────────────────────────────────────────────────
+function LiveTuningBanner({ data }) {
+  const C = useThemeTokens();
+  const params = data?.params || {};
+  const tuned = useMemo(() => {
+    return Object.entries(params)
+      .filter(([id, p]) => p && p.tunedAt && isValidStrategyId(id))
+      .map(([id, p]) => ({ id, name: strategyLabel(id), sharpe: p.sharpe ?? null, tunedAt: p.tunedAt }))
+      .sort((a, b) => (b.sharpe || 0) - (a.sharpe || 0));
+  }, [params]);
+
+  if (tuned.length === 0) return null;
+
+  return (
+    <Card style={{ borderColor: C.green, background: C.greenBg || C.card }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 }}>
+        <div style={{ fontSize: FONT.lg, fontWeight: 800, color: C.text1 }}>🧬 발굴 전략 실거래 반영중</div>
+        <Badge kind="active">{tuned.length}개 적용</Badge>
+      </div>
+      <div style={{ fontSize: FONT.xs, color: C.text2, marginBottom: 10, lineHeight: 1.55 }}>
+        알파랩이 발굴·검증한 우수 전략의 최적 파라미터가 자동매매 신호에 적용돼 있습니다.
+        2시간마다 더 나은 전략이 나오면 자동으로 교체됩니다.
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {tuned.map((t) => {
+          const grade = sharpeToGrade(t.sharpe);
+          return (
+            <div key={t.id} style={{
+              display: "flex", alignItems: "center", gap: 8,
+              background: C.card, border: `1px solid ${C.border}`,
+              borderRadius: RADIUS.full, padding: "5px 12px",
+            }}>
+              <span style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>{t.name}</span>
+              <span style={{ fontSize: FONT.xs, fontWeight: 700, color: C.green }}>
+                {grade.grade}{t.sharpe != null && <span style={{ color: C.text3, fontWeight: 500 }}> · {fmtNum(t.sharpe, 1)}</span>}
+              </span>
+              <span style={{ fontSize: FONT.xs, color: C.text3 }}>{fmtAgo(t.tunedAt)}</span>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
+
 export default function AlphaLab({ onRequestLogin }) {
   const C = useThemeTokens();
   const [data, setData] = useState(null);
@@ -823,6 +891,7 @@ export default function AlphaLab({ onRequestLogin }) {
         )}
       </div>
 
+      <LiveTuningBanner data={data} />
       <RegimePanel data={data} />
       <LeaderboardTable data={data} />
       <SharpeHistoryChart data={data} />
@@ -830,7 +899,7 @@ export default function AlphaLab({ onRequestLogin }) {
       <CandidatesPanel data={data} />
 
       <div style={{ fontSize: FONT.xs, color: C.text3, textAlign: "center", padding: "16px 0", lineHeight: 1.6 }}>
-        매시 정각 자동 갱신 · 파라미터 튜닝 6시간 주기 · 자동 승급 매일 15:30 · 새 후보 발굴 매일 16:00 (KST)<br/>
+        매시 정각 순위 갱신 · 새 전략 발굴 2시간 주기 · 파라미터 튜닝 3시간 주기 · 우수 전략은 자동매매에 자동 반영 (KST)<br/>
         ⚠ Zepta 는 분석 도구입니다. 매매 결정과 손익은 본인 책임이며, 표시되는 수치는 미래 수익을 보장하지 않습니다.
       </div>
     </div>
