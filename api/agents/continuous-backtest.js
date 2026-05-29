@@ -58,7 +58,10 @@ const SAMPLES_PER_STRATEGY = 50;
 //   - candidate 의 backtest 지표가 param-aware 이므로 (전략이 params 를 실제 소비) 의미 있는 주입.
 //   - flapping 방지: 기존 적재 Sharpe 대비 +INJECT_IMPROVE_MARGIN 이상일 때만 교체.
 //   - INJECT 임계는 candidate 등록 임계(완화)보다 엄격 — 실거래엔 진짜 검증된 것만.
-const INJECT_THRESHOLD = { minSharpe: 2.0, minTrades: 20, maxDD: 20, minWinRate: 45, minProfitFactor: 1.3 };
+// 임계 튜닝 (2026-05-29 라이브 검증): 60일/4h 발굴은 선별적이라 후보 거래수 15~18.
+//   minTrades 20 은 사실상 모든 우수 후보를 차단 → 실시간 반영 무력화.
+//   minTrades 15 로 맞추되, 표본이 작은 만큼 Sharpe 바를 2.5 로 올려 robust 한 것만 통과.
+const INJECT_THRESHOLD = { minSharpe: 2.5, minTrades: 15, maxDD: 20, minWinRate: 48, minProfitFactor: 1.4 };
 const INJECT_IMPROVE_MARGIN = 0.3;
 
 // 이번 회차 신규 후보 중 family 별 best 를 골라 실거래 파라미터로 주입.
