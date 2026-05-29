@@ -17,9 +17,17 @@ import { computeIndicatorBundle, gradeConfidence, scaleScore } from "./_indicato
 const FAMILY = "mean-revert";
 const MIN_BARS = 60;
 
-export function runMeanRevert({ closes, highs, lows, volumes, asset, timeframe = "1d" }) {
+export function runMeanRevert({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null }) {
   if (!closes || closes.length < MIN_BARS) return null;
-  const ind = computeIndicatorBundle({ closes, highs, lows, volumes });
+  // ★ 2026-05-29 — 튜닝 파라미터 주입 (없으면 기존 하드코딩 값 그대로).
+  const P = params || {};
+  const RSI_OVERSOLD   = P.RSI_OVERSOLD   ?? 30;
+  const RSI_OVERBOUGHT = P.RSI_OVERBOUGHT ?? 70;
+  const ADX_MAX        = P.ADX_MAX        ?? 28;
+  const MIN_ABS_NET    = P.MIN_ABS_NET    ?? 2;
+  const ind = computeIndicatorBundle({ closes, highs, lows, volumes }, {
+    BB_PERIOD: P.BB_PERIOD, BB_MULT: P.BB_MULT,
+  });
   const L = closes.length - 1;
   const price = closes[L];
 
@@ -30,7 +38,7 @@ export function runMeanRevert({ closes, highs, lows, volumes, asset, timeframe =
   const hurst = ind.hurst;
 
   // 강한 추세장이면 회귀 전략 자체가 위험 → 보류
-  if (adx > 28 && hurst > 0.6) {
+  if (adx > ADX_MAX && hurst > 0.6) {
     return null;
   }
 
@@ -39,12 +47,12 @@ export function runMeanRevert({ closes, highs, lows, volumes, asset, timeframe =
 
   // RSI 극단 (핵심 3점)
   if (rsi != null) {
-    if (rsi < 30) { buy += 3; reasons.push(`RSI${rsi.toFixed(0)} 과매도`); }
-    else if (rsi < 38 && rsiPrev != null && rsi > rsiPrev) {
+    if (rsi < RSI_OVERSOLD) { buy += 3; reasons.push(`RSI${rsi.toFixed(0)} 과매도`); }
+    else if (rsi < RSI_OVERSOLD + 8 && rsiPrev != null && rsi > rsiPrev) {
       buy += 2; reasons.push(`RSI${rsi.toFixed(0)} 반등 시작`);
     }
-    if (rsi > 70) { sell += 3; reasons.push(`RSI${rsi.toFixed(0)} 과매수`); }
-    else if (rsi > 62 && rsiPrev != null && rsi < rsiPrev) {
+    if (rsi > RSI_OVERBOUGHT) { sell += 3; reasons.push(`RSI${rsi.toFixed(0)} 과매수`); }
+    else if (rsi > RSI_OVERBOUGHT - 8 && rsiPrev != null && rsi < rsiPrev) {
       sell += 2; reasons.push(`RSI${rsi.toFixed(0)} 꺾임`);
     }
   }
@@ -83,7 +91,7 @@ export function runMeanRevert({ closes, highs, lows, volumes, asset, timeframe =
 
   const net = buy - sell;
   const absNet = Math.abs(net);
-  if (absNet < 2) return null;
+  if (absNet < MIN_ABS_NET) return null;
 
   const side = net > 0 ? "LONG" : "SHORT";
   return {

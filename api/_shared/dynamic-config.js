@@ -76,23 +76,23 @@ export const DEFAULT_STRATEGY_PARAMS = {
     MIN_ABS_NET: 2,
   },
   "breakout": {
-    BREAKOUT_PERIOD: 20, VOL_MULT: 1.5,
-    ATR_PERIOD: 14, MIN_ABS_NET: 2,
+    BREAKOUT_PERIOD: 20, VOL_MULT: 2.0,
+    ATR_PERIOD: 14, MIN_ABS_NET: 3,
   },
   "momentum-rotation": {
-    LOOKBACK_DAYS: 21, TOP_N: 3, MIN_ABS_NET: 2,
+    LOOKBACK_DAYS: 30, TOP_N: 3, MIN_ABS_NET: 3,
   },
   "volatility-arb": {
-    ATR_PERIOD: 14, BB_PERIOD: 20, BB_SQUEEZE_THRESHOLD: 0.05,
-    MIN_ABS_NET: 2,
+    ATR_PERIOD: 14, BB_PERIOD: 20, BB_SQUEEZE_THRESHOLD: 0.08,
+    MIN_ABS_NET: 3,
   },
   "hurst-trend": {
-    HURST_TREND_MIN: 0.55, HURST_REVERT_MAX: 0.45,
-    RSI_BULL: 55, RSI_BEAR: 45, MIN_ABS_NET: 2,
+    HURST_TREND_MIN: 0.55, HURST_REVERT_MAX: 0.50,
+    RSI_BULL: 55, RSI_BEAR: 45, MIN_ABS_NET: 3,
   },
   "defi-momentum": {
-    EMA_FAST: 13, EMA_SLOW: 34,
-    OBV_LOOKBACK: 20, MIN_ABS_NET: 2,
+    EMA_FAST: 21, EMA_SLOW: 55,
+    OBV_LOOKBACK: 20, MIN_ABS_NET: 3,
   },
   "ensemble": {
     CONSENSUS_MIN: 2, // 최소 2개 sub-strategy 합의
@@ -132,6 +132,35 @@ export async function getStrategyParams(strategyId) {
     cacheSet(cacheKey, defaults);
     return defaults;
   }
+}
+
+/**
+ * ★ 2026-05-29 — 라이브 실행용 "실제 튜닝된" 파라미터만 반환 (default 머지 안 함).
+ *   getStrategyParams 는 KV 비었을 때 default 를 돌려주기 때문에
+ *   "튜닝 안 됨" 과 "default 로 튜닝됨" 을 구분할 수 없다.
+ *   라이브 신호 생성 시에는 *진짜로* 적재된 파라미터가 있을 때만 주입해야
+ *   하드코딩 baseline 동작이 보존되므로, raw stored.params (또는 null) 을 돌려준다.
+ *
+ * @returns {Promise<Object<string, object>>} { [strategyId]: paramsObj } — 적재된 것만.
+ */
+export async function getAllStoredStrategyParams() {
+  const ids = Object.keys(DEFAULT_STRATEGY_PARAMS);
+  const out = {};
+  try {
+    const kv = await getKv();
+    if (!kv) return out;
+    await Promise.all(ids.map(async (id) => {
+      try {
+        const stored = await kv.get(`di:alpha:params:${id}`);
+        if (stored && stored.params && typeof stored.params === "object") {
+          out[id] = stored.params;
+        }
+      } catch {}
+    }));
+  } catch (e) {
+    console.warn("[dynamic-config] getAllStoredStrategyParams 실패:", e?.message);
+  }
+  return out;
 }
 
 /**

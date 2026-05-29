@@ -6,6 +6,7 @@
 
 import { sendCards, buildCard, fmtKSTShort } from "./_shared/telegram.js";
 import { runStrategyForBot, getStrategyNameForBot } from "./_shared/strategies/index.js";
+import { getAllStoredStrategyParams } from "./_shared/dynamic-config.js";
 
 export const config = { maxDuration: 120 };
 
@@ -303,6 +304,21 @@ export default async function handler(req, res) {
     // ── 멀티 자산 스캔 및 주문 실행 ──
     const assetResults = [];
 
+    // ★ 2026-05-29 — 알파랩에서 발굴·튜닝된 전략 파라미터를 라이브 신호 생성에 주입.
+    //   getAllStoredStrategyParams 는 *실제로 적재된* 파라미터만 반환 (없으면 빈 객체)
+    //   → 튜닝 전엔 모든 전략이 기존 하드코딩 baseline 으로 동작 (default-preserving).
+    //   continuous-backtest / param-tuner 가 di:alpha:params 에 적재하면 즉시 반영.
+    let paramsByStrategy = {};
+    try {
+      paramsByStrategy = await getAllStoredStrategyParams();
+      const tunedList = Object.keys(paramsByStrategy);
+      if (tunedList.length > 0) {
+        addLog(`🧬 튜닝 파라미터 적용: ${tunedList.join(", ")}`);
+      }
+    } catch (e) {
+      addLog(`⚠️ 전략 파라미터 로드 실패 (baseline 사용): ${e?.message}`);
+    }
+
     for (const asset of CRYPTO_ASSETS) {
       addLog(`\n📊 ${asset} 스캔 중...`);
       const ccSymbol = CC_SYMBOLS[asset];
@@ -383,7 +399,7 @@ export default async function handler(req, res) {
       //   이 자산을 다루는 활성 봇 각각의 전용 strategy 실행.
       //   결과: { botId, signal } 배열. 최고 점수를 latestSignal 로 채택.
       //   봇별 perf 저장 시에도 이 botSignals 를 사용해 봇마다 다른 메타데이터 기록.
-      const botSignals = computeBotSignals({ asset, closes, highs, lows, volumes, timeframe: "1d" });
+      const botSignals = computeBotSignals({ asset, closes, highs, lows, volumes, timeframe: "1d", paramsByStrategy });
 
       // 일봉 단계 — 봇별 strategy 결과 중 가장 점수 높은 1개를 우선 시그널로
       let latestSignal = pickTopBotSignal(botSignals);
@@ -407,7 +423,7 @@ export default async function handler(req, res) {
         const volumes4h = c4h.map(c => c.volume || 0);
 
         // ★ 봇별 strategy 4h 단계 — 일봉 빈 자산도 더 짧은 TF 로 한 번 더 기회
-        const botSignals4h = computeBotSignals({ asset, closes: closes4h, highs: highs4h, lows: lows4h, volumes: volumes4h, timeframe: "4h" });
+        const botSignals4h = computeBotSignals({ asset, closes: closes4h, highs: highs4h, lows: lows4h, volumes: volumes4h, timeframe: "4h", paramsByStrategy });
         latestSignal = pickTopBotSignal(botSignals4h);
 
         if (!latestSignal) {
@@ -453,7 +469,7 @@ export default async function handler(req, res) {
         const volumes1h = c1h.map(c => c.volume || 0);
 
         // ★ 봇별 strategy 1h 단계
-        const botSignals1h = computeBotSignals({ asset, closes: closes1h, highs: highs1h, lows: lows1h, volumes: volumes1h, timeframe: "1h" });
+        const botSignals1h = computeBotSignals({ asset, closes: closes1h, highs: highs1h, lows: lows1h, volumes: volumes1h, timeframe: "1h", paramsByStrategy });
         latestSignal = pickTopBotSignal(botSignals1h);
 
         if (!latestSignal) {
@@ -996,12 +1012,15 @@ function calcEfficiencyRatio(closes, period = 10) {
 // pickTopBotSignal:  여러 봇 시그널 중 최고 점수 1개를 단일 시그널로 채택.
 //                    (분배는 호출 측에서 다시 봇별로 처리)
 // ════════════════════════════════════════════════════════
-function computeBotSignals({ asset, closes, highs, lows, volumes, timeframe }) {
+function computeBotSignals({ asset, closes, highs, lows, volumes, timeframe, paramsByStrategy = {} }) {
   const out = [];
   const botIds = getBotsForAsset(asset); // 이 자산을 다루는 봇 ID 목록
   for (const botId of botIds) {
     try {
-      const sig = runStrategyForBot(botId, { closes, highs, lows, volumes, asset, timeframe });
+      // ★ 2026-05-29 — 이 봇 strategy 에 발굴·튜닝된 파라미터가 있으면 주입.
+      const stratName = getStrategyNameForBot(botId);
+      const params = paramsByStrategy[stratName] || null;
+      const sig = runStrategyForBot(botId, { closes, highs, lows, volumes, asset, timeframe, params });
       if (sig) out.push({ botId, signal: sig });
     } catch (e) {
       // 한 봇 strategy 실패가 다른 봇에 영향 안 주도록 격리

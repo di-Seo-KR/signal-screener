@@ -18,11 +18,17 @@ import { runMomentumRotation } from "./momentum-rotation.js";
 const FAMILY = "ensemble";
 
 export function runEnsemble(input) {
+  // ★ 2026-05-29 — 튜닝 파라미터 주입 (없으면 기존 하드코딩 값 그대로).
+  //   ensemble 의 params 는 합의 임계(CONSENSUS_MIN) 만 제어. sub-strategy 들은
+  //   각자의 default 로 실행 (ensemble params 가 sub 임계를 오염시키지 않도록 분리).
+  const P = input?.params || {};
+  const CONSENSUS_MIN = P.CONSENSUS_MIN ?? 2;
+  const subInput = { ...input, params: null };
   const sigs = [
-    runTrendFollow(input),
-    runMeanRevert(input),
-    runBreakout(input),
-    runMomentumRotation(input),
+    runTrendFollow(subInput),
+    runMeanRevert(subInput),
+    runBreakout(subInput),
+    runMomentumRotation(subInput),
   ].filter(Boolean);
 
   if (sigs.length < 2) return null; // 최소 2개 전략 합의 필요
@@ -42,9 +48,9 @@ export function runEnsemble(input) {
   avgScore = sigs.length > 0 ? avgScore / sigs.length : 0;
 
   const agree = Math.max(longCount, shortCount);
-  // 3 전략 합의 시 강 신호, 2 전략은 약 신호 (반대 신호 없어야 함)
+  // CONSENSUS_MIN 전략 합의 시 진입 (반대 신호 없어야 함)
   const conflicting = longCount > 0 && shortCount > 0;
-  if (agree < 2 || conflicting) return null;
+  if (agree < CONSENSUS_MIN || conflicting) return null;
 
   const side = longCount > shortCount ? "LONG" : "SHORT";
   const confidence = agree >= 3 ? "A" : "B";

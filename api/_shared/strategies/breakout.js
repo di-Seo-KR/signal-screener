@@ -16,17 +16,28 @@ import { computeIndicatorBundle, gradeConfidence, scaleScore, calcSMA } from "./
 const FAMILY = "breakout";
 const MIN_BARS = 60;
 
-export function runBreakout({ closes, highs, lows, volumes, asset, timeframe = "1d" }) {
+export function runBreakout({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null }) {
   if (!closes || closes.length < MIN_BARS) return null;
-  const ind = computeIndicatorBundle({ closes, highs, lows, volumes });
+  // ★ 2026-05-29 — 튜닝 파라미터 주입 (없으면 기존 하드코딩 값 그대로).
+  const P = params || {};
+  const BREAKOUT_PERIOD = P.BREAKOUT_PERIOD ?? 20;
+  const VOL_MULT        = P.VOL_MULT        ?? 2.0;  // 강한 거래량 tier 기준
+  const MIN_ABS_NET     = P.MIN_ABS_NET     ?? 3;
+  const strongVol = VOL_MULT;
+  const weakVol   = Math.max(1.2, VOL_MULT * 0.65);  // default 2.0 → 1.3
+  const ind = computeIndicatorBundle({ closes, highs, lows, volumes }, {
+    ATR_PERIOD: P.ATR_PERIOD,
+  });
   const L = closes.length - 1;
   const price = closes[L];
   const prev = closes[L - 1] || price;
 
-  const high20 = Math.max(...highs.slice(-20));
-  const low20 = Math.min(...lows.slice(-20));
-  const high55 = highs.length >= 55 ? Math.max(...highs.slice(-55)) : high20;
-  const low55 = lows.length >= 55 ? Math.min(...lows.slice(-55)) : low20;
+  const bp = BREAKOUT_PERIOD;
+  const bp2 = Math.round(bp * 2.75);  // default 20 → 55 (중기 돌파 기간)
+  const high20 = Math.max(...highs.slice(-bp));
+  const low20 = Math.min(...lows.slice(-bp));
+  const high55 = highs.length >= bp2 ? Math.max(...highs.slice(-bp2)) : high20;
+  const low55 = lows.length >= bp2 ? Math.min(...lows.slice(-bp2)) : low20;
 
   const reasons = [];
   let buy = 0, sell = 0;
@@ -47,10 +58,10 @@ export function runBreakout({ closes, highs, lows, volumes, asset, timeframe = "
   let volMult = 1;
   if (volAvg && volAvg > 0 && curVol > 0) {
     volMult = curVol / volAvg;
-    if (volMult > 2) {
+    if (volMult > strongVol) {
       if (price > prev) { buy += 2; reasons.push(`거래량${volMult.toFixed(1)}x↑`); }
       else { sell += 2; reasons.push(`거래량${volMult.toFixed(1)}x↓`); }
-    } else if (volMult > 1.3) {
+    } else if (volMult > weakVol) {
       if (price > prev) { buy += 1; reasons.push(`거래량${volMult.toFixed(1)}x`); }
       else { sell += 1; reasons.push(`거래량${volMult.toFixed(1)}x`); }
     }
@@ -84,7 +95,7 @@ export function runBreakout({ closes, highs, lows, volumes, asset, timeframe = "
 
   const netScore = buy - sell;
   const absNet = Math.abs(netScore);
-  if (absNet < 3) return null; // 돌파는 강한 합의만 진입
+  if (absNet < MIN_ABS_NET) return null; // 돌파는 강한 합의만 진입
 
   const side = netScore > 0 ? "LONG" : "SHORT";
   return {

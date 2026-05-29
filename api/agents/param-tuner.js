@@ -21,12 +21,22 @@ import { PARAM_SPACE } from "../_shared/strategy-param-space.js";
 import { setStrategyParams } from "../_shared/dynamic-config.js";
 import { ALL_STRATEGIES } from "../_shared/strategies/index.js";
 
+async function getKv() { return (await import("@vercel/kv")).kv; }
+
 export const config = { maxDuration: 60 };
 
-// 30일 4h 봉 = 180봉, 충분히 의미 있는 표본
+// ★ 2026-05-29 — 30일(180봉)에선 전략이 선별적이라 trades<10 으로 매번 기각됐음.
+//   83일(500봉)로 확대 → 표본 충분 (BTC 기준 전략당 12~30 trades).
+//   또한 전략이 이제 params 를 실제 소비하므로 grid search 가 의미 있는 차이를 만든다.
 const KLINE_INTERVAL = "4h";
-const KLINE_LIMIT = 180;
+const KLINE_LIMIT = 500;
 const SYMBOL = "BTCUSDT";
+
+// 실거래 파라미터 교체 기준 — continuous-backtest 와 같은 키(di:alpha:params:<id>)를
+//   공유하므로, 기존 적재 Sharpe 보다 +margin 이상 우수할 때만 덮어쓴다 (flapping 방지).
+const TUNER_MIN_SHARPE = 1.0;
+const TUNER_MIN_PF = 1.1;
+const TUNER_IMPROVE_MARGIN = 0.3;
 
 // 백테스트 룰 (고정) — 파라미터만 튜닝, exit 룰은 별도 (auto-promote 에서 조정)
 const BACKTEST_RULES = { slPct: 4, tpPct: 8, maxHoldBars: 24 };
@@ -87,17 +97,28 @@ export default async function handler(req, res) {
         };
         L(`${strategyId}: ${gs.totalCombos} combos in ${durMs}ms — best Sharpe=${best.sharpe}, trades=${best.trades}, PF=${best.profitFactor}`);
 
-        // 의미 있는 결과만 KV 에 적재 (>= 10 trades + sharpe>0 or PF>0.8)
-        if (best.trades >= 10 && (best.sharpe > 0 || (best.profitFactor || 0) > 0.8)) {
-          await setStrategyParams(strategyId, best.params, {
-            sharpe: best.sharpe,
-            trades: best.trades,
-            version: Math.floor(Date.now() / 1000),
-          });
-          tuned.push({ strategyId, sharpe: best.sharpe, trades: best.trades, params: best.params });
-          L(`  → KV updated: di:alpha:params:${strategyId}`);
+        // 실거래 적재 기준: 충분한 표본 + 품질 + 기존보다 우수(margin)할 때만.
+        const qualityOk = best.trades >= 10 && (best.sharpe || 0) >= TUNER_MIN_SHARPE && (best.profitFactor || 0) >= TUNER_MIN_PF;
+        if (!qualityOk) {
+          L(`  → 품질 미달 (trades ${best.trades}, Sharpe ${best.sharpe}, PF ${best.profitFactor}), KV 유지`);
         } else {
-          L(`  → not enough quality data (trades<10 or sharpe<=0), KV unchanged`);
+          let storedSharpe = null;
+          try {
+            const kv = await getKv();
+            const stored = await kv.get(`di:alpha:params:${strategyId}`);
+            if (stored && Number.isFinite(stored.sharpe)) storedSharpe = stored.sharpe;
+          } catch {}
+          if (storedSharpe != null && (best.sharpe || 0) < storedSharpe + TUNER_IMPROVE_MARGIN) {
+            L(`  → 기존 적재(Sharpe ${storedSharpe.toFixed(2)})보다 우수하지 않음 (${(best.sharpe || 0).toFixed(2)}), KV 유지`);
+          } else {
+            await setStrategyParams(strategyId, best.params, {
+              sharpe: best.sharpe,
+              trades: best.trades,
+              version: Math.floor(Date.now() / 1000),
+            });
+            tuned.push({ strategyId, sharpe: best.sharpe, trades: best.trades, params: best.params });
+            L(`  → ✅ di:alpha:params:${strategyId} 실거래 반영 (Sharpe ${(best.sharpe || 0).toFixed(2)}, ${best.trades}T)`);
+          }
         }
       } catch (e) {
         L(`${strategyId} ERROR: ${e?.message}`);
