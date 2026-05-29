@@ -289,6 +289,9 @@ function RealTradingInner() {
   const dayLimitPct = (breakerLimits.dailyLossPct || 0.40) * 100;   // 40
   const weekLimitPct = (breakerLimits.weeklyLossPct || 0.60) * 100; // 60
   const mddLimitPct = (breakerLimits.mddPct || 0.50) * 100;         // 50
+  // ★ 2026-05-29 — 자동정지(breaker) off 모드 감지: 한도가 사실상 무한(99%/9999)이면
+  //   "-99% / 0/9999" 같은 의미 없는 한도 막대 대신 "비활성" 안내를 보여준다.
+  const breakerOff = (breakerLimits.consecLossThreshold || 0) >= 1000 || dayLimitPct >= 95 || mddLimitPct >= 95;
 
   // ═════════════════════════════════════════════════════════
   // HEADER (REDESIGNED) — 모바일은 padding 절반
@@ -1011,11 +1014,26 @@ function RealTradingInner() {
   // BREAKER
   // ═════════════════════════════════════════════════════════
   const breakerCard = (
-    <Card title="서킷브레이커" icon={<Shield size={16} />}
-      subtitle={`일 -${dayLimitPct.toFixed(0)}% · 주 -${weekLimitPct.toFixed(0)}% · MDD -${mddLimitPct.toFixed(0)}% · ${breakerLimits.consecLossThreshold}연속손실 → 24h 쿨다운`}>
-      {/* ★ 2026-05-11 fix: 손실 한도 막대는 "음수 (손실)" 일 때만 채워야 함.
-          이전: Math.abs() 로 양수 (수익) 도 채워서 +35% 인데 89% 빨간 막대 표시.
-          현재: 양수면 0% / default tone. 음수일 때만 절댓값 비율로 채움. */}
+    <Card title="안전장치 (자동정지)" icon={<Shield size={16} />}
+      subtitle={breakerOff
+        ? "현재 비활성 — 손실이 나도 멈추지 않고 계속 운영·학습합니다"
+        : `일 -${dayLimitPct.toFixed(0)}% · 주 -${weekLimitPct.toFixed(0)}% · 낙폭 -${mddLimitPct.toFixed(0)}% · ${breakerLimits.consecLossThreshold}연속손실 → 24h 휴식`}>
+      {breakerOff ? (
+        // 자동정지 off — 의미 없는 -99%/9999 막대 대신 명확한 안내
+        <div style={{
+          padding: "13px 15px", background: "var(--z-card-2)",
+          border: "1px solid var(--z-border)", borderRadius: "var(--z-r-md)",
+          display: "flex", gap: 11, alignItems: "flex-start",
+        }}>
+          <span style={{ fontSize: 18, lineHeight: 1.2 }}>🟢</span>
+          <div style={{ fontSize: 13, color: "var(--z-text-2)", lineHeight: 1.55 }}>
+            자동정지(일·주 손실 한도, 낙폭 한도, 연속손실 차단)가 <b style={{ color: "var(--z-text-1)" }}>꺼져 있습니다</b>.
+            손실이 나도 멈추지 않고 계속 매매하며 전략을 학습합니다.
+            단, 개별 거래의 손절(SL)·익절(TP)은 정상 작동합니다.
+          </div>
+        </div>
+      ) : (
+      // ★ 2026-05-11 fix: 손실 한도 막대는 "음수 (손실)" 일 때만 채움.
       <div style={{ display: "grid", gap: 10, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(220px, 1fr))" }}>
         <div>
           <Progress
@@ -1046,10 +1064,11 @@ function RealTradingInner() {
           />
         </div>
       </div>
+      )}
       <div style={{ marginTop: 14, display: "grid", gap: 8, gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(160px, 1fr))", fontSize: 14 }}>
         <KV label="오늘 시작 잔고" value={fmtUsd(breaker.dayStartEquity)} />
-        <KV label="이번 주 시작 잔고" value={fmtUsd(breaker.weekStartEquity)} />
-        <KV label="MDD 기준 (30일 최고)" value={fmtUsd(mddBaseline)} />
+        <KV label="이번 주 시작" value={fmtUsd(breaker.weekStartEquity)} />
+        <KV label="낙폭 기준선 (30일 최고)" value={fmtUsd(mddBaseline)} />
         <KV label="쿨다운 종료"
           value={breaker.cooldownUntil && breaker.cooldownUntil > Date.now()
             ? fmtDT(breaker.cooldownUntil) : "—"} mono={false} />
@@ -1066,9 +1085,9 @@ function RealTradingInner() {
           gap: 10, flexWrap: "wrap",
         }}>
           <div style={{ fontSize: 14, color: "var(--z-text-2)", lineHeight: 1.5 }}>
-            <strong style={{ color: "var(--z-purple)" }}>MDD 기준 재설정</strong>
+            <strong style={{ color: "var(--z-purple)" }}>낙폭 기준선 재설정</strong>
             <br />
-            현재 잔고 대비 30일 최고가 {((breaker.equityHigh / equity - 1) * 100).toFixed(1)}% 높음 — 큰 상승 후 정상 조정에도 자동정지 위험. 현재 잔고를 새 기준으로 잡으려면 클릭.
+            현재 잔고보다 30일 최고가 {((breaker.equityHigh / equity - 1) * 100).toFixed(1)}% 높습니다 — 큰 상승 뒤 정상 조정에도 자동정지가 걸릴 수 있어요. 현재 잔고를 새 기준선으로 잡으려면 누르세요.
           </div>
           <button
             onClick={() => setConfirm({
