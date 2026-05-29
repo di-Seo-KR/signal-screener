@@ -289,36 +289,31 @@ export function PeriodReturnsCard({ equity, breaker = {}, isMobile = false }) {
       {periods.map((p, i) => {
         const isUp = p.change >= 0;
         const color = isUp ? "var(--z-green-hi)" : "var(--z-red-hi)";
-        const bg = isUp
-          ? "linear-gradient(135deg, rgba(34, 197, 94, 0.10) 0%, rgba(22, 163, 74, 0.04) 100%)"
-          : "linear-gradient(135deg, rgba(239, 68, 68, 0.10) 0%, rgba(220, 38, 38, 0.04) 100%)";
-        const border = isUp ? "1px solid rgba(34, 197, 94, 0.2)" : "1px solid rgba(239, 68, 68, 0.2)";
+        const accent = isUp ? "var(--z-green)" : "var(--z-red)";
         return (
           <div key={i} style={{
-            background: bg, border,
-            borderRadius: "var(--z-r-md)", padding: isMobile ? "10px 12px" : "12px 14px",
-            display: "flex", flexDirection: "column", justifyContent: "center",
-            minHeight: isMobile ? 78 : 92,
+            position: "relative", overflow: "hidden",
+            background: "var(--z-card)", border: "1px solid var(--z-border)",
+            borderRadius: "var(--z-r-lg)", padding: isMobile ? "14px 14px 14px 16px" : "16px 16px 16px 18px",
+            display: "flex", flexDirection: "column", gap: 4,
+            minHeight: isMobile ? 86 : 96,
           }}>
-            <div style={{
-              fontSize: 14, color: "var(--z-text-3)", fontWeight: 700,
-              marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5,
-            }}>
+            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: accent }} />
+            <div style={{ fontSize: 13, color: "var(--z-text-3)", fontWeight: 600, letterSpacing: 0.1 }}>
               {p.label} 수익
             </div>
             <div style={{
-              fontSize: isMobile ? 17 : 21, fontWeight: 900, color,
-              fontFamily: "var(--z-font-mono)", lineHeight: 1.05,
+              fontSize: isMobile ? 19 : 22, fontWeight: 800, color,
+              fontFamily: "var(--z-font-mono)", lineHeight: 1.0, letterSpacing: "-0.015em",
             }}>
               {isUp ? "+" : ""}{p.pct.toFixed(2)}%
             </div>
             <div style={{
-              fontSize: 14, color, fontWeight: 700, fontFamily: "var(--z-font-mono)",
-              marginTop: 2, lineHeight: 1.2,
+              fontSize: 13, color, fontWeight: 700, fontFamily: "var(--z-font-mono)", lineHeight: 1.2,
             }}>
               {isUp ? "+" : ""}{fmtUsd(p.change, 2)}
             </div>
-            <div style={{ fontSize: 14, color: "var(--z-text-3)", marginTop: 4, lineHeight: 1.2 }}>
+            <div style={{ fontSize: 11.5, color: "var(--z-text-3)", marginTop: 1, lineHeight: 1.3 }}>
               시작 {fmtUsd(p.start, 0)} · {p.hint}
             </div>
           </div>
