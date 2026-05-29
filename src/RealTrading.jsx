@@ -445,12 +445,13 @@ function RealTradingInner() {
       background: "linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(37, 99, 235, 0.06) 100%)",
       border: "1px solid rgba(59, 130, 246, 0.25)",
       borderRadius: "var(--z-r-lg)",
-      padding: isMobile ? "16px" : "20px",
-      display: "flex", flexDirection: "column", justifyContent: "center",
+      padding: isMobile ? "16px" : "22px 24px",
+      display: "flex", flexDirection: "column", justifyContent: "space-between",
+      gap: isMobile ? 12 : 18,
       boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
       gridRow: isMobile ? undefined : "span 2",
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: isMobile ? 10 : 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: isMobile ? 10 : 0 }}>
         <div style={{
           width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: 12,
           background: "linear-gradient(135deg, var(--z-blue) 0%, #1E40AF 100%)",
@@ -463,9 +464,9 @@ function RealTradingInner() {
           <div style={{ fontSize: 14, color: "var(--z-text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
             보유 자산
           </div>
-          <div style={{ fontSize: isMobile ? 26 : 32, fontWeight: 900, marginTop: 4, lineHeight: 1, fontFamily: "var(--z-font-mono)" }}>
+          <div style={{ fontSize: isMobile ? 28 : 40, fontWeight: 900, marginTop: 4, lineHeight: 1, fontFamily: "var(--z-font-mono)", letterSpacing: "-0.02em" }}>
             {loading && equity == null ? (
-              <Skeleton width={140} height={isMobile ? 26 : 32} />
+              <Skeleton width={140} height={isMobile ? 28 : 40} />
             ) : (
               fmtUsd(equity)
             )}
