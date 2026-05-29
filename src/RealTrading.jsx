@@ -383,6 +383,14 @@ function RealTradingInner() {
               ⚡ BREAKER
             </Badge>
           )}
+          {/* 2026-05-29 — 알파랩 발굴·튜닝 전략 자동 반영 안내 (실거래 배선 연결) */}
+          <Badge
+            tone="purple"
+            title="알파랩이 2시간마다 발굴·검증한 최적 전략 파라미터가 자동매매 신호에 반영됩니다"
+            style={{ fontSize: 13, fontWeight: 700, padding: "6px 12px" }}
+          >
+            🧬 AI 자동 튜닝
+          </Badge>
           <div style={{ fontSize: isMobile ? 13 : 14, color: "var(--z-text-2)", marginLeft: 4 }}>
             {!isMobile && "· Binance USDⓈ-M Futures"}
             {lastRefresh && <> {!isMobile ? "· " : ""}<span style={{ color: "var(--z-text-3)" }}>{fmtTime(lastRefresh)} 기준</span></>}
