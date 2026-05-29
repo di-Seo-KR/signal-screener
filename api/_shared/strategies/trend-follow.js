@@ -17,11 +17,19 @@ import { computeIndicatorBundle, gradeConfidence, scaleScore } from "./_indicato
 const FAMILY = "trend";
 const MIN_BARS = 60;
 
-export function runTrendFollow({ closes, highs, lows, volumes, asset, timeframe = "1d" }) {
+export function runTrendFollow({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null }) {
   if (!closes || closes.length < MIN_BARS) {
     return null;
   }
-  const ind = computeIndicatorBundle({ closes, highs, lows, volumes });
+  // ★ 2026-05-29 — 튜닝 파라미터 주입 (없으면 기존 하드코딩 값 그대로).
+  const P = params || {};
+  const ADX_MIN     = P.ADX_MIN     ?? 22;
+  const RSI_BULL    = P.RSI_BULL    ?? 55;
+  const RSI_BEAR    = P.RSI_BEAR    ?? 45;
+  const MIN_ABS_NET = P.MIN_ABS_NET ?? 2;
+  const ind = computeIndicatorBundle({ closes, highs, lows, volumes }, {
+    EMA_FAST: P.EMA_FAST, EMA_SLOW: P.EMA_SLOW,
+  });
   const L = closes.length - 1;
   const price = closes[L];
   const prev = closes[L - 1] || price;
@@ -34,8 +42,8 @@ export function runTrendFollow({ closes, highs, lows, volumes, asset, timeframe 
   const hist = ind.histogram[L];
   const adx = ind.adx[L] || 0;
 
-  // 추세 강도 필터: ADX 22 미만이면 트렌드 미성숙으로 보고 보류
-  if (adx < 22) {
+  // 추세 강도 필터: ADX_MIN 미만이면 트렌드 미성숙으로 보고 보류
+  if (adx < ADX_MIN) {
     return null;
   }
 
@@ -69,8 +77,8 @@ export function runTrendFollow({ closes, highs, lows, volumes, asset, timeframe 
   // RSI 모멘텀 (확인용 1점, 트렌드 follow 에선 과매수도 강세)
   const rsi = ind.rsi[L];
   if (rsi != null) {
-    if (rsi > 55 && macd > macdSig) { buy += 1; reasons.push(`RSI${rsi.toFixed(0)} 강세지속`); }
-    if (rsi < 45 && macd < macdSig) { sell += 1; reasons.push(`RSI${rsi.toFixed(0)} 약세지속`); }
+    if (rsi > RSI_BULL && macd > macdSig) { buy += 1; reasons.push(`RSI${rsi.toFixed(0)} 강세지속`); }
+    if (rsi < RSI_BEAR && macd < macdSig) { sell += 1; reasons.push(`RSI${rsi.toFixed(0)} 약세지속`); }
   }
 
   // EMA 골든/데드 크로스 발생 시 추가 가중 (2점)
@@ -85,7 +93,7 @@ export function runTrendFollow({ closes, highs, lows, volumes, asset, timeframe 
 
   const net = buy - sell;
   const absNet = Math.abs(net);
-  if (absNet < 2) return null; // 추세장 약한 합의는 매매 안 함
+  if (absNet < MIN_ABS_NET) return null; // 추세장 약한 합의는 매매 안 함
 
   const side = net > 0 ? "LONG" : "SHORT";
   return {

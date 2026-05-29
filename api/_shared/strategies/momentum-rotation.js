@@ -16,14 +16,18 @@ import { computeIndicatorBundle, gradeConfidence, scaleScore } from "./_indicato
 const FAMILY = "momentum";
 const MIN_BARS = 60;
 
-export function runMomentumRotation({ closes, highs, lows, volumes, asset, timeframe = "1d" }) {
+export function runMomentumRotation({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null }) {
   if (!closes || closes.length < MIN_BARS) return null;
+  // ★ 2026-05-29 — 튜닝 파라미터 주입 (없으면 기존 하드코딩 값 그대로).
+  const P = params || {};
+  const LOOKBACK_DAYS = P.LOOKBACK_DAYS ?? 30;
+  const MIN_ABS_NET   = P.MIN_ABS_NET   ?? 3;
   const ind = computeIndicatorBundle({ closes, highs, lows, volumes });
   const L = closes.length - 1;
   const price = closes[L];
 
-  // 30일 / 14일 / 7일 수익률 (모멘텀 코어)
-  const back30 = closes[Math.max(0, L - 30)];
+  // 장기/14일/7일 수익률 (모멘텀 코어) — 장기 구간은 LOOKBACK_DAYS 로 조정
+  const back30 = closes[Math.max(0, L - LOOKBACK_DAYS)];
   const back14 = closes[Math.max(0, L - 14)];
   const back7 = closes[Math.max(0, L - 7)];
   const ret30 = back30 > 0 ? (price / back30 - 1) * 100 : 0;
@@ -72,7 +76,7 @@ export function runMomentumRotation({ closes, highs, lows, volumes, asset, timef
 
   const netScore = buy - sell;
   const absNet = Math.abs(netScore);
-  if (absNet < 3) return null; // 회전 전략은 명확한 모멘텀 필요
+  if (absNet < MIN_ABS_NET) return null; // 회전 전략은 명확한 모멘텀 필요
 
   const side = netScore > 0 ? "LONG" : "SHORT";
   return {

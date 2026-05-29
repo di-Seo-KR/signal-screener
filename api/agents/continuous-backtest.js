@@ -21,7 +21,7 @@ import { getKlines } from "../_shared/binance-client.js";
 import { backtestStrategy, klinesToOhlc } from "../_shared/strategy-backtester.js";
 import { sampleRandomParams } from "../_shared/strategy-param-space.js";
 import { ALL_STRATEGIES } from "../_shared/strategies/index.js";
-import { setStrategyStatus, STRATEGY_STATUS } from "../_shared/dynamic-config.js";
+import { setStrategyStatus, setStrategyParams, STRATEGY_STATUS } from "../_shared/dynamic-config.js";
 
 export const config = { maxDuration: 60 };
 
@@ -51,6 +51,59 @@ const CANDIDATE_THRESHOLD = { minSharpe: 1.0, maxDD: 25, minTrades: 15 };
 
 // 변형 sample 수 (strategy × symbol 당)
 const SAMPLES_PER_STRATEGY = 50;
+
+// ★ 2026-05-29 (대표 지시: "발굴된 우수전략을 실거래에 실시간 반영, 계속 진행")
+//   매 cron 마다 이번 회차 발굴 후보 중 *충분히 우수한* 것을 실거래 파라미터로 즉시 주입.
+//   주입 대상: di:alpha:params:<family> → btc-cron 이 다음 신호 생성부터 적용 → 실거래 풀 반영.
+//   - candidate 의 backtest 지표가 param-aware 이므로 (전략이 params 를 실제 소비) 의미 있는 주입.
+//   - flapping 방지: 기존 적재 Sharpe 대비 +INJECT_IMPROVE_MARGIN 이상일 때만 교체.
+//   - INJECT 임계는 candidate 등록 임계(완화)보다 엄격 — 실거래엔 진짜 검증된 것만.
+const INJECT_THRESHOLD = { minSharpe: 2.0, minTrades: 20, maxDD: 20, minWinRate: 45, minProfitFactor: 1.3 };
+const INJECT_IMPROVE_MARGIN = 0.3;
+
+// 이번 회차 신규 후보 중 family 별 best 를 골라 실거래 파라미터로 주입.
+async function injectWinningParams(kv, newCandidates, L) {
+  const injected = [];
+  const bestByFamily = {};
+  for (const c of newCandidates) {
+    const r = c.backtestResult || {};
+    const pass =
+      (r.sharpe || 0) >= INJECT_THRESHOLD.minSharpe &&
+      (r.trades || 0) >= INJECT_THRESHOLD.minTrades &&
+      (r.maxDD ?? 100) <= INJECT_THRESHOLD.maxDD &&
+      (r.winRate ?? 0) >= INJECT_THRESHOLD.minWinRate &&
+      (r.profitFactor ?? 0) >= INJECT_THRESHOLD.minProfitFactor;
+    if (!pass) continue;
+    const cur = bestByFamily[c.parentStrategy];
+    if (!cur || (r.sharpe || 0) > (cur.backtestResult?.sharpe || 0)) {
+      bestByFamily[c.parentStrategy] = c;
+    }
+  }
+  for (const [family, c] of Object.entries(bestByFamily)) {
+    const r = c.backtestResult || {};
+    let storedSharpe = null;
+    try {
+      const stored = await kv.get(`di:alpha:params:${family}`);
+      if (stored && Number.isFinite(stored.sharpe)) storedSharpe = stored.sharpe;
+    } catch {}
+    if (storedSharpe != null && (r.sharpe || 0) < storedSharpe + INJECT_IMPROVE_MARGIN) {
+      L(`[inject] ${family} skip — best ${(r.sharpe || 0).toFixed(2)} ≤ 현재 ${storedSharpe.toFixed(2)}+${INJECT_IMPROVE_MARGIN}`);
+      continue;
+    }
+    const ok = await setStrategyParams(family, c.params, {
+      sharpe: r.sharpe,
+      trades: r.trades,
+      version: Math.floor(Date.now() / 1000),
+    });
+    if (ok) {
+      // 주입된 family 는 자동 active (실거래 정식 가동)
+      try { await setStrategyStatus(family, STRATEGY_STATUS.ACTIVE, `param-inject ${c.symbol} Sharpe ${(r.sharpe || 0).toFixed(2)}`); } catch {}
+      injected.push({ family, symbol: c.symbol, sharpe: r.sharpe, trades: r.trades, params: c.params });
+      L(`[inject] ✅ ${family} ← ${c.symbol} (Sharpe ${(r.sharpe || 0).toFixed(2)}, ${r.trades}T, PF ${r.profitFactor}, DD ${r.maxDD}%) → di:alpha:params 실거래 반영`);
+    }
+  }
+  return injected;
+}
 
 // 후보 보관 기간
 const OBSERVATION_DAYS = 7;
@@ -133,15 +186,21 @@ async function evaluateExistingCandidates(kv, leaderboard) {
       kept.push(c);
       continue;
     }
-    // 1주 경과 — leaderboard 에 부모 strategy 가 여전히 우수면 promote
-    const parentMetrics = leaderboard?.strategies?.[c.parentStrategy];
-    const stillGood = parentMetrics && (parentMetrics.sharpe || 0) >= 1.0 && (parentMetrics.trades || 0) >= 10;
+    // ★ 2026-05-29 — 승급 게이트를 후보 *자신의* 백테스트 지표로 판정.
+    //   (기존엔 production leaderboard Sharpe 에 의존했는데, 그 값이 summary-fallback 으로
+    //    항상 0 이라 어떤 후보도 절대 승급 못 하는 버그였음 — 발굴→실거래 단절의 핵심 원인.)
+    const r = c.backtestResult || {};
+    const stillGood = (r.sharpe || 0) >= 1.0 && (r.trades || 0) >= 10 && (r.maxDD ?? 100) <= 30;
     if (stillGood) {
       // promote — status=active 로 적재 (candidate 도 keep but flag)
-      const r = await setStrategyStatus(c.parentStrategy, STRATEGY_STATUS.ACTIVE, `auto-promote from candidate ${c.id}`);
-      promoted.push({ ...c, promotedAt: new Date().toISOString(), kvResult: r });
+      const sr = await setStrategyStatus(
+        c.parentStrategy,
+        STRATEGY_STATUS.ACTIVE,
+        `auto-promote from candidate ${c.id} (Sharpe ${(r.sharpe || 0).toFixed(2)}, ${r.trades}T)`
+      );
+      promoted.push({ ...c, promotedAt: new Date().toISOString(), kvResult: sr });
     } else {
-      // 부모 부진 — 후보도 폐기
+      // 후보 부진 — 폐기
     }
   }
 
@@ -323,10 +382,22 @@ export default async function handler(req, res) {
       L(`new candidates registered: ${newCandidates.length} (across ${Object.keys(familyQuotaUsed).length} families), total: ${merged.length}`);
     }
 
+    // 5) ★ 발굴된 우수전략 실거래 즉시 반영 (매 cron — 실시간 지속)
+    let injected = [];
+    if (newCandidates.length > 0 && !dryRun) {
+      injected = await injectWinningParams(kv, newCandidates, L);
+      if (injected.length > 0) {
+        L(`★ 실거래 파라미터 주입 완료: ${injected.map((i) => `${i.family}(${i.symbol} Sharpe ${(i.sharpe || 0).toFixed(2)})`).join(", ")}`);
+      } else {
+        L(`실거래 주입 대상 없음 (INJECT 임계 Sharpe≥${INJECT_THRESHOLD.minSharpe}/${INJECT_THRESHOLD.minTrades}T/DD≤${INJECT_THRESHOLD.maxDD}% 미달 또는 기존보다 우수하지 않음)`);
+      }
+    }
+
     return res.status(200).json({
       ok: true,
       durationMs: Date.now() - t0,
       promoted,
+      injected,
       newCandidates,
       familyQuota: familyQuotaUsed,
       familyRelax: familyRelaxLog,

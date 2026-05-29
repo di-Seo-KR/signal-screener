@@ -16,9 +16,15 @@ import { computeIndicatorBundle, gradeConfidence, scaleScore, calcSMA } from "./
 const FAMILY = "volatility";
 const MIN_BARS = 60;
 
-export function runVolatilityArb({ closes, highs, lows, volumes, asset, timeframe = "1d" }) {
+export function runVolatilityArb({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null }) {
   if (!closes || closes.length < MIN_BARS) return null;
-  const ind = computeIndicatorBundle({ closes, highs, lows, volumes });
+  // ★ 2026-05-29 — 튜닝 파라미터 주입 (없으면 기존 하드코딩 값 그대로).
+  const P = params || {};
+  const BB_SQUEEZE  = P.BB_SQUEEZE_THRESHOLD ?? 0.08;
+  const MIN_ABS_NET = P.MIN_ABS_NET          ?? 3;
+  const ind = computeIndicatorBundle({ closes, highs, lows, volumes }, {
+    ATR_PERIOD: P.ATR_PERIOD, BB_PERIOD: P.BB_PERIOD,
+  });
   const L = closes.length - 1;
   const price = closes[L];
   const prev = closes[L - 1] || price;
@@ -39,7 +45,7 @@ export function runVolatilityArb({ closes, highs, lows, volumes, asset, timefram
   // BB 폭 압축 → 폭발 패턴 (핵심)
   // bw = (upper-lower) / middle. 5봉 전 대비 현재 폭이 1.3배 이상이면 폭발 시작
   const bwExpansion = bbPrev.bw > 0 ? bb.bw / bbPrev.bw : 1;
-  const compressedBefore = bbPrev.bw < 0.08; // 압축 기준 (BTC 일봉 기준)
+  const compressedBefore = bbPrev.bw < BB_SQUEEZE; // 압축 기준 (BTC 일봉 기준)
   const expandingNow = bwExpansion > 1.3;
 
   if (compressedBefore && expandingNow) {
@@ -77,7 +83,7 @@ export function runVolatilityArb({ closes, highs, lows, volumes, asset, timefram
 
   const netScore = buy - sell;
   const absNet = Math.abs(netScore);
-  if (absNet < 3) return null; // 변동성 진입은 강한 합의 요구
+  if (absNet < MIN_ABS_NET) return null; // 변동성 진입은 강한 합의 요구
 
   const side = netScore > 0 ? "LONG" : "SHORT";
   return {

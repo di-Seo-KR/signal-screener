@@ -173,18 +173,29 @@ export function calcEfficiencyRatio(closes, period = 10) {
 // 공통 헬퍼: 지표 묶음 한 번에 계산
 // strategy 모듈이 매번 같은 지표 재계산하지 않도록 한 번 만들어서 넘김.
 // ────────────────────────────────────────────────────────
-export function computeIndicatorBundle({ closes, highs, lows, volumes }) {
-  const rsi = calcRSI(closes, 14);
-  const bb = calcBB(closes, 20, 2.0);
-  const ema21 = calcEMA(closes, 21);
-  const ema55 = calcEMA(closes, 55);
+// cfg: 선택적 기간/배수 override (param-tuner / 발굴된 후보 파라미터 주입용).
+//   비우면 모든 값이 기존 하드코딩과 동일 → 동작 불변 (default-preserving).
+//   ema21/ema55 필드명은 호환 위해 유지하되 실제 기간은 EMA_FAST/EMA_SLOW 를 따른다.
+export function computeIndicatorBundle({ closes, highs, lows, volumes }, cfg = {}) {
+  const rsiP   = cfg.RSI_PERIOD   || 14;
+  const bbP    = cfg.BB_PERIOD    || 20;
+  const bbMult = cfg.BB_MULT      || 2.0;
+  const emaF   = cfg.EMA_FAST     || 21;
+  const emaS   = cfg.EMA_SLOW     || 55;
+  const adxP   = cfg.ADX_PERIOD   || 14;
+  const atrP   = cfg.ATR_PERIOD   || 14;
+  const obvP   = cfg.OBV_LOOKBACK || 20;
+  const rsi = calcRSI(closes, rsiP);
+  const bb = calcBB(closes, bbP, bbMult);
+  const ema21 = calcEMA(closes, emaF);
+  const ema55 = calcEMA(closes, emaS);
   const ema200 = closes.length > 200 ? calcEMA(closes, 200) : new Array(closes.length).fill(null);
   const macd = calcMACD(closes);
-  const adx = calcADX(highs, lows, closes, 14);
-  const atr = calcATR(highs, lows, closes, 14);
+  const adx = calcADX(highs, lows, closes, adxP);
+  const atr = calcATR(highs, lows, closes, atrP);
   const stoch = calcStochastic(highs, lows, closes, 14, 3);
   const obv = calcOBV(closes, volumes || []);
-  const obvEma = calcEMA(obv, 20);
+  const obvEma = calcEMA(obv, obvP);
   const volSMA = calcSMA(volumes || [], 20);
   const hurst = calcHurst(closes.slice(-100));
   const er = calcEfficiencyRatio(closes, 10);

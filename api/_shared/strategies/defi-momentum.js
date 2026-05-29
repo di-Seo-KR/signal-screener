@@ -17,9 +17,14 @@ import { computeIndicatorBundle, gradeConfidence, scaleScore } from "./_indicato
 const FAMILY = "momentum";
 const MIN_BARS = 60;
 
-export function runDefiMomentum({ closes, highs, lows, volumes, asset, timeframe = "1d" }) {
+export function runDefiMomentum({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null }) {
   if (!closes || closes.length < MIN_BARS) return null;
-  const ind = computeIndicatorBundle({ closes, highs, lows, volumes });
+  // ★ 2026-05-29 — 튜닝 파라미터 주입 (없으면 기존 하드코딩 값 그대로).
+  const P = params || {};
+  const MIN_ABS_NET = P.MIN_ABS_NET ?? 3;
+  const ind = computeIndicatorBundle({ closes, highs, lows, volumes }, {
+    EMA_FAST: P.EMA_FAST, EMA_SLOW: P.EMA_SLOW, OBV_LOOKBACK: P.OBV_LOOKBACK,
+  });
   const L = closes.length - 1;
   const price = closes[L];
 
@@ -76,7 +81,7 @@ export function runDefiMomentum({ closes, highs, lows, volumes, asset, timeframe
 
   const netScore = buy - sell;
   const absNet = Math.abs(netScore);
-  if (absNet < 3) return null;
+  if (absNet < MIN_ABS_NET) return null;
 
   const side = netScore > 0 ? "LONG" : "SHORT";
   return {

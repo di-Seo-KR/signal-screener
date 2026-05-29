@@ -81,7 +81,21 @@ export default async function handler(req, res) {
 
     for (const strategyId of Object.keys(DEFAULT_STRATEGY_WEIGHTS)) {
       const metrics = leaderboard.strategies?.[strategyId];
-      const decision = decide(metrics);
+      let decision = decide(metrics);
+      // ★ 2026-05-29 — 알파랩이 실거래 파라미터를 주입한(=검증된 백테스트 Sharpe 보유)
+      //   전략은 production leaderboard 가 summary-fallback 으로 Sharpe 0 이어도
+      //   active 로 유지한다. (안 그러면 30분마다 auto-promote 가 watch 로 되돌려
+      //   continuous-backtest/param-tuner 의 승급을 무효화함 — 발굴→실거래 단절 재발.)
+      try {
+        const tuned = await kv.get(`di:alpha:params:${strategyId}`);
+        if (tuned && Number.isFinite(tuned.sharpe) && tuned.sharpe >= RULES.promote.minSharpe
+            && decision.next !== STRATEGY_STATUS.ACTIVE) {
+          decision = {
+            next: STRATEGY_STATUS.ACTIVE,
+            reason: `tuned params 적용 (backtest Sharpe ${tuned.sharpe.toFixed(2)}) — 실거래 유지`,
+          };
+        }
+      } catch {}
       const currentStatus = await getStrategyStatus(strategyId);
       if (decision.next === currentStatus) {
         noChanges.push({ strategyId, status: currentStatus, ...decision });

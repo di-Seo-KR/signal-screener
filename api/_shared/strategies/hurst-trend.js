@@ -17,8 +17,13 @@ import { computeIndicatorBundle, gradeConfidence, scaleScore } from "./_indicato
 const FAMILY = "trend";
 const MIN_BARS = 80;
 
-export function runHurstTrend({ closes, highs, lows, volumes, asset, timeframe = "1d" }) {
+export function runHurstTrend({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null }) {
   if (!closes || closes.length < MIN_BARS) return null;
+  // ★ 2026-05-29 — 튜닝 파라미터 주입 (없으면 기존 하드코딩 값 그대로).
+  const P = params || {};
+  const HURST_TREND_MIN  = P.HURST_TREND_MIN  ?? 0.55;
+  const HURST_REVERT_MAX = P.HURST_REVERT_MAX ?? 0.50;
+  const MIN_ABS_NET      = P.MIN_ABS_NET      ?? 3;
   const ind = computeIndicatorBundle({ closes, highs, lows, volumes });
   const L = closes.length - 1;
   const price = closes[L];
@@ -30,7 +35,7 @@ export function runHurstTrend({ closes, highs, lows, volumes, asset, timeframe =
   const ema55 = ind.ema55[L];
 
   // Hurst 회귀장은 이 전략의 본령이 아님 → 보류
-  if (hurst < 0.5) {
+  if (hurst < HURST_REVERT_MAX) {
     return null;
   }
 
@@ -38,11 +43,11 @@ export function runHurstTrend({ closes, highs, lows, volumes, asset, timeframe =
   let buy = 0, sell = 0;
 
   // Hurst 강도 기반 핵심 점수 (최대 3점)
-  if (hurst > 0.6) {
+  if (hurst > HURST_TREND_MIN + 0.05) {
     // 매우 강한 추세 지속 성향
     if (price > prev5) { buy += 3; reasons.push("강한 추세지속↑"); }
     else { sell += 3; reasons.push("강한 추세지속↓"); }
-  } else if (hurst > 0.55) {
+  } else if (hurst > HURST_TREND_MIN) {
     if (price > prev5) { buy += 2; reasons.push("추세지속↑"); }
     else { sell += 2; reasons.push("추세지속↓"); }
   }
@@ -76,7 +81,7 @@ export function runHurstTrend({ closes, highs, lows, volumes, asset, timeframe =
 
   const netScore = buy - sell;
   const absNet = Math.abs(netScore);
-  if (absNet < 3) return null;
+  if (absNet < MIN_ABS_NET) return null;
 
   const side = netScore > 0 ? "LONG" : "SHORT";
   return {
