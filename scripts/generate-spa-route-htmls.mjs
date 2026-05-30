@@ -598,6 +598,91 @@ function buildPrerenderBody(route) {
   `;
 }
 
+// ────────────────────────────────────────────────────────────────────
+// ★ 2026-05-30 — 홈페이지(index.html) prerender (AdSense "low value content" 대응)
+//   기존 홈은 nav 링크만 있는 ~465자 shell → AdSense 가 첫 화면을 빈 페이지로 판정해 반려.
+//   홈에 실질 콘텐츠(소개 3문단 · 기능 모듈 · 가이드 링크 · FAQ · 면책)를 채운다.
+// ────────────────────────────────────────────────────────────────────
+const HOME = {
+  title: "Zepta — AI 퀀트 투자 플랫폼 | 주식·코인 자동매매·스크리너·백테스트",
+  desc: "Zepta는 주식과 암호화폐를 위한 올인원 AI 퀀트 투자 플랫폼입니다. 실시간 스크리너, 검증된 알파 기반 자동매매, walk-forward 백테스트, 포트폴리오 최적화, 시장 심리·경제 캘린더까지 한 곳에서 제공합니다.",
+  h1: "Zepta — 주식·코인을 위한 올인원 AI 퀀트 투자 플랫폼",
+  intros: [
+    "Zepta는 개인 투자자가 기관 수준의 퀀트 도구를 쉽게 쓸 수 있도록 만든 올인원 투자 플랫폼입니다. 33개 알파 시그널을 통합한 실시간 스크리너로 매수 후보를 찾고, 백테스트로 검증된 전략을 자동매매 봇으로 24시간 운영하며, 포트폴리오 최적화와 리스크 분석까지 한 화면에서 처리합니다.",
+    "모든 전략은 walk-forward 백테스트와 교차심볼·out-of-sample 검증을 거쳐 과적합을 걸러낸 뒤에만 실거래에 반영됩니다. Alpha Lab은 8개 전략군의 Sharpe·손익비·승률을 매시간 추적하고 시장 레짐(추세/횡보)에 맞춰 가중치를 자동 조정합니다.",
+    "Zepta는 투자 결정을 돕는 분석·자동화 도구입니다. 자금은 본인 거래소 계좌에 그대로 있고, Zepta는 매매 권한만 받은 API로 주문을 전송하며 출금 권한은 절대 요청하지 않습니다.",
+  ],
+  modules: [
+    "실시간 스크리너 — 미국 주식·한국 주식·암호화폐를 33개 알파 통합 스코어로 스크리닝",
+    "자동매매 — 백테스트 검증 전략으로 자동 진입·청산, 손절·익절 자동 관리",
+    "Alpha Lab — 8개 전략군 성과를 매시간 추적하고 파라미터를 자동 튜닝",
+    "백테스트 엔진 — Walk-forward 방식으로 Sharpe·MDD·Profit Factor 산출",
+    "포트폴리오 최적화 — 켈리·평균분산·블랙리터만·리스크패리티 다중 알고리즘",
+    "리스크 맵 — 상관관계 히트맵·변동성 레짐·집중도 시각화",
+    "시장 심리 — Fear & Greed, 비트코인 도미넌스, 펀딩비 종합 센티먼트",
+    "경제 캘린더·뉴스 — FOMC·CPI 일정과 AI 요약 시장 뉴스",
+  ],
+  guides: [
+    { href: "/blog/ai-trading-guide", title: "AI 자동매매 입문자 가이드" },
+    { href: "/blog/bitcoin-auto-trading-5-steps", title: "비트코인 자동매매 5단계로 시작하기" },
+    { href: "/blog/quant-strategies", title: "퀀트 전략 33가지 정리" },
+    { href: "/blog/backtest-tips", title: "백테스트 제대로 하는 법" },
+    { href: "/blog/sharpe-ratio-profit-factor", title: "Sharpe Ratio와 Profit Factor 이해하기" },
+    { href: "/blog/realistic-roi-expectation", title: "자동매매 현실적인 수익률 기대치" },
+  ],
+  faq: [
+    { q: "Zepta는 무엇인가요?", a: "주식과 암호화폐를 위한 올인원 AI 퀀트 투자 플랫폼입니다. 스크리너, 자동매매, 백테스트, 포트폴리오 최적화, 시장 분석을 한 곳에서 제공합니다." },
+    { q: "Zepta가 수익을 보장하나요?", a: "아니요. Zepta는 분석·자동화 도구이며 투자에는 항상 원금 손실 위험이 있습니다. 모든 백테스트 수치는 과거 성과일 뿐 미래 수익을 보장하지 않습니다." },
+    { q: "Zepta가 제 자금을 보관하나요?", a: "아니요. 자금은 본인 거래소 계좌에 그대로 있습니다. Zepta는 매매 권한만 받은 API 키로 주문을 전송하며 출금 권한은 요청하지 않습니다." },
+    { q: "무료로 사용할 수 있나요?", a: "기본 스크리너·시장 뉴스·페이퍼 트레이딩은 무료입니다. 자동매매 실거래·Alpha Lab·고급 알림은 Pro 플랜에서 제공됩니다." },
+    { q: "초보자도 사용할 수 있나요?", a: "네. 입문자 가이드와 페이퍼 트레이딩으로 위험 없이 시작할 수 있고, 어려운 지표는 쉬운 설명과 툴팁으로 안내합니다." },
+  ],
+};
+
+function buildHomePrerender(h) {
+  const intros = h.intros.map((p) => `<p style="font-size:16px;color:#9AA7BD;margin:0 0 16px;">${escapeText(p)}</p>`).join("");
+  const modules = h.modules.map((m) => `<li style="margin-bottom:8px;">${escapeText(m)}</li>`).join("");
+  const guides = h.guides.map((g) => `<li style="margin-bottom:6px;"><a href="${escapeAttr(g.href)}" style="color:#60A5FA;">${escapeText(g.title)}</a></li>`).join("");
+  const faqHtml = h.faq.map(({ q, a }) => `<div style="margin-bottom:12px;"><h3 style="font-size:16px;color:#F1F5FB;margin:0 0 4px;">${escapeText(q)}</h3><p style="margin:0;color:#9AA7BD;">${escapeText(a)}</p></div>`).join("");
+  return `
+    <section class="seo-prerender" style="display:block;padding:24px;max-width:860px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#F1F5FB;background:#060a12;line-height:1.7;">
+      <h1 style="font-size:28px;font-weight:800;margin:0 0 16px;">${escapeText(h.h1)}</h1>
+      ${intros}
+      <h2 style="font-size:20px;font-weight:700;margin:28px 0 12px;">Zepta가 제공하는 것</h2>
+      <ul style="padding-left:20px;color:#9AA7BD;">${modules}</ul>
+      <h2 style="font-size:20px;font-weight:700;margin:28px 0 12px;">투자 가이드</h2>
+      <ul style="padding-left:20px;">${guides}</ul>
+      <h2 style="font-size:20px;font-weight:700;margin:28px 0 12px;">자주 묻는 질문</h2>
+      ${faqHtml}
+      <p style="font-size:13px;color:#64728C;margin-top:24px;border-top:1px solid #1E2A42;padding-top:16px;">⚠ Zepta는 투자 분석·자동화 도구이며 투자 자문이 아닙니다. 모든 수치는 과거 시뮬레이션 결과로 미래 수익을 보장하지 않으며, 투자에는 원금 손실 위험이 따릅니다. 최종 투자 결정과 책임은 본인에게 있습니다.</p>
+      <nav style="margin-top:24px;font-size:14px;">
+        <a href="/screener" style="color:#60A5FA;margin-right:12px;">스크리너</a>
+        <a href="/auto-trading" style="color:#60A5FA;margin-right:12px;">자동매매</a>
+        <a href="/alpha-lab" style="color:#60A5FA;margin-right:12px;">Alpha Lab</a>
+        <a href="/backtest" style="color:#60A5FA;margin-right:12px;">백테스트</a>
+        <a href="/blog" style="color:#60A5FA;margin-right:12px;">블로그</a>
+        <a href="/pricing" style="color:#60A5FA;">요금제</a>
+      </nav>
+    </section>`;
+}
+
+function transformHomeHtml(baseHtml, h) {
+  let html = baseHtml;
+  const url = "https://zepta.app/";
+  html = html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeText(h.title)}</title>`);
+  html = html.replace(/(<link\s+rel="canonical"[^>]*href=")[^"]+(")/i, `$1${url}$2`);
+  html = replaceMetaTag(html, "name", "description", "content", h.desc);
+  html = replaceMetaTag(html, "property", "og:title", "content", h.title);
+  html = replaceMetaTag(html, "property", "og:description", "content", h.desc);
+  html = replaceMetaTag(html, "property", "og:url", "content", url);
+  html = replaceMetaTag(html, "name", "twitter:title", "content", h.title);
+  html = replaceMetaTag(html, "name", "twitter:description", "content", h.desc);
+  const faqLd = buildFaqJsonLd(h.faq);
+  html = html.replace(/<\/head>/i, `\n    <script type="application/ld+json">${faqLd}</script>\n  </head>`);
+  html = html.replace(/<div id="root"><\/div>/i, `<div id="root">${buildHomePrerender(h)}</div>`);
+  return html;
+}
+
 function transformHtml(baseHtml, route) {
   const url = `https://zepta.app/${route.path}`;
   let html = baseHtml;
@@ -653,6 +738,16 @@ function main() {
   console.log(
     `[spa-routes] ${count}/${ROUTES.length} SPA 경로별 HTML 생성 완료 — prerender 콘텐츠 ${prerendered}개 / FAQ JSON-LD ${prerendered}개 주입.`,
   );
+
+  // ★ 홈(index.html) prerender 주입 — 라우트 HTML 은 baseHtml(메모리) 로 이미 생성됨.
+  //   여기서 index.html 을 콘텐츠 풍부한 홈으로 덮어써 AdSense low-value-content 반려 해소.
+  try {
+    const homeHtml = transformHomeHtml(baseHtml, HOME);
+    fs.writeFileSync(indexPath, homeHtml);
+    console.log("[spa-routes] 홈(index.html) prerender 콘텐츠 주입 완료 — AdSense low-value-content 대응.");
+  } catch (e) {
+    console.error("[spa-routes] 홈 prerender 실패:", e?.message);
+  }
 }
 
 main();
