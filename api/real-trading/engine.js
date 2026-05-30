@@ -331,10 +331,13 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   } else {
     S(`dry-run: skipping equity fetch (no creds)`);
   }
-  // Phase 1 최저 원금 = $200 (BTCUSDT minNotional $100 거래 가능 + 안전 마진)
-  if (equity < 200 && !forceDryRun) {
-    S(`equity < $200 — skip (Phase 1 minimum)`);
-    return { ok: true, userId, ran: false, reason: "insufficient equity (min $200)", equity, steps };
+  // 최저 원금 하한선 — env ZEPTA_MIN_EQUITY (기본 $50, 대표 지시로 $200→$50 하향).
+  //   실거래 가능 최소치 근처. 이 아래에선 minNotional 대비 사이징이 의미 없어 진입 안 함.
+  //   개별 종목 affordability(minNotional) 체크가 추가 backstop 으로 동작.
+  const MIN_EQUITY = parseFloat(process.env.ZEPTA_MIN_EQUITY) || 50;
+  if (equity < MIN_EQUITY && !forceDryRun) {
+    S(`equity < $${MIN_EQUITY} — skip (min equity)`);
+    return { ok: true, userId, ran: false, reason: `insufficient equity (min $${MIN_EQUITY})`, equity, steps };
   }
   // ★ 2026-05-09 audit N3: dry-run fallback equity 환경변수화.
   //   기본 $1000 은 실제 자본 ~$370 과 차이 커서 plan 시뮬이 실거래와 다름.
