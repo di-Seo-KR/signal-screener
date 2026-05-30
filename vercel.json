@@ -161,7 +161,7 @@
     },
     {
       "path": "/api/agents/continuous-backtest",
-      "schedule": "0 */2 * * *"
+      "schedule": "0 */6 * * *"
     },
     {
       "path": "/api/agents/screener-alert-monitor",
