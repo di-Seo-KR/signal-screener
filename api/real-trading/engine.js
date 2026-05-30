@@ -663,6 +663,23 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
         } catch (e) {
           S(`  ↳ aggregate check skipped (positionRisk fetch failed): ${e?.message}`);
         }
+        // ★ 2026-05-30 (QUANT-PLAN) — 롱/숏 한 방향 과밀 차단.
+        //   대표 관찰: "계속 숏만 잡는다". 약세 알트 + 혼조 레짐이면 전 종목이 한 방향으로
+        //   쏠려 진입 → 시장 반전 시 동반 손실. env ZEPTA_MAX_PER_SIDE (기본 0=비활성).
+        //   예: 4 로 두면 같은 방향 4개까지만, 5번째부터 차단 → 자연스레 방향 분산 유도.
+        const maxPerSide = Number(process.env.ZEPTA_MAX_PER_SIDE) || 0;
+        if (maxPerSide > 0 && Array.isArray(liveOpenPositions) && liveOpenPositions.length) {
+          const sameSideCount = liveOpenPositions.filter((pos) => {
+            const amt = parseFloat(pos.positionAmt || 0);
+            if (!amt) return false;
+            return (amt > 0 ? "LONG" : "SHORT") === cand.side;
+          }).length;
+          if (sameSideCount >= maxPerSide) {
+            S(`  ↳ 방향 과밀 차단: ${cand.side} 이미 ${sameSideCount}개 (한도 ${maxPerSide})`);
+            tried.push({ symbol: cand.symbol, reason: `side concentration: ${sameSideCount} ${cand.side} ≥ ${maxPerSide}` });
+            continue;
+          }
+        }
         const aggCheck = checkAggregateExposure({
           plan: p.plan, openPositions: liveOpenPositions, equity: effectiveEquity, cfg: RISK_CONFIG,
         });
