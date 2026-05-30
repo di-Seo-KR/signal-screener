@@ -61,12 +61,59 @@ const SAMPLES_PER_STRATEGY = 50;
 // 임계 튜닝 (2026-05-29 라이브 검증): 60일/4h 발굴은 선별적이라 후보 거래수 15~18.
 //   minTrades 20 은 사실상 모든 우수 후보를 차단 → 실시간 반영 무력화.
 //   minTrades 15 로 맞추되, 표본이 작은 만큼 Sharpe 바를 2.5 로 올려 robust 한 것만 통과.
+// 1차 선별(in-sample) 임계 — 후보가 자기 심볼에서 충분히 우수한가
 const INJECT_THRESHOLD = { minSharpe: 2.5, minTrades: 15, maxDD: 20, minWinRate: 48, minProfitFactor: 1.4 };
 const INJECT_IMPROVE_MARGIN = 0.3;
 
-// 이번 회차 신규 후보 중 family 별 best 를 골라 실거래 파라미터로 주입.
-async function injectWinningParams(kv, newCandidates, L) {
+// ★ 2026-05-30 과적합 가드 — 실거래 주입 전 "교차심볼 + out-of-sample" 검증.
+//   단일 심볼 in-sample Sharpe(예: 17) 는 곡선맞추기일 수 있음. 같은 파라미터가
+//   (a) 다른 심볼들에서도, (b) 학습에 안 쓴 최근 구간(OOS)에서도 통해야 진짜 알파.
+//   둘 다 통과한 것만 주입하고, 저장 Sharpe 도 "교차검증 중앙값"으로 정직하게 기록.
+const VALIDATE_THRESHOLD = {
+  minSymbols: 3,        // 최소 3개 심볼에서 검증
+  minMedianSharpe: 1.0, // 교차심볼 full-window 중앙 Sharpe
+  minPosFrac: 0.6,      // 60% 이상 심볼에서 + 수익
+  minOosSharpe: 0.3,    // out-of-sample 중앙 Sharpe (양수 + 의미)
+  minOosPosFrac: 0.5,   // 50% 이상 심볼 OOS 에서 + 수익
+};
+
+function median(arr) {
+  const a = arr.filter(Number.isFinite).sort((x, y) => x - y);
+  if (!a.length) return 0;
+  const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+}
+
+// 한 파라미터 세트를 캐시된 모든 심볼 + OOS 구간에 재검증.
+function validateParamSet(strategyFn, params, ohlcCache) {
+  const per = [];
+  for (const [sym, ohlc] of Object.entries(ohlcCache)) {
+    if (!ohlc || ohlc.length < 120) continue;
+    const full = backtestStrategy({ strategyFn, ohlc, params, slPct: 4, tpPct: 8, maxHoldBars: 24 });
+    // out-of-sample = 최근 35% (후보 선택에 안 쓰인 구간)
+    const cut = Math.floor(ohlc.length * 0.65);
+    const oosOhlc = ohlc.slice(cut);
+    const oos = oosOhlc.length >= 80
+      ? backtestStrategy({ strategyFn, ohlc: oosOhlc, params, slPct: 4, tpPct: 8, maxHoldBars: 24 })
+      : null;
+    per.push({ sym, full, oos });
+  }
+  const fulls = per.map((p) => p.full).filter(Boolean);
+  const ooss = per.map((p) => p.oos).filter(Boolean);
+  return {
+    symbolsTested: per.length,
+    medianSharpe: median(fulls.map((f) => f.sharpe)),
+    posFrac: fulls.length ? fulls.filter((f) => (f.netReturn || 0) > 0).length / fulls.length : 0,
+    medianOosSharpe: median(ooss.map((o) => o.sharpe)),
+    oosPosFrac: ooss.length ? ooss.filter((o) => (o.netReturn || 0) > 0).length / ooss.length : 0,
+    avgTrades: Math.round(median(fulls.map((f) => f.trades))),
+  };
+}
+
+// 이번 회차 신규 후보 중 family 별 best 를 골라 *검증 후* 실거래 파라미터로 주입.
+async function injectWinningParams(kv, newCandidates, ohlcCache, L) {
   const injected = [];
+  const rejected = [];
   const bestByFamily = {};
   for (const c of newCandidates) {
     const r = c.backtestResult || {};
@@ -84,28 +131,91 @@ async function injectWinningParams(kv, newCandidates, L) {
   }
   for (const [family, c] of Object.entries(bestByFamily)) {
     const r = c.backtestResult || {};
+    const strategyFn = ALL_STRATEGIES[family];
+    if (!strategyFn) continue;
+
+    // ── 과적합 가드: 교차심볼 + OOS 검증 ──
+    const v = validateParamSet(strategyFn, c.params, ohlcCache);
+    const V = VALIDATE_THRESHOLD;
+    const robust =
+      v.symbolsTested >= V.minSymbols &&
+      v.medianSharpe >= V.minMedianSharpe &&
+      v.posFrac >= V.minPosFrac &&
+      v.medianOosSharpe >= V.minOosSharpe &&
+      v.oosPosFrac >= V.minOosPosFrac;
+    if (!robust) {
+      rejected.push({ family, symbol: c.symbol, inSampleSharpe: r.sharpe, ...v });
+      L(`[inject] ${family} ✗ 과적합 의심 — in-sample ${(r.sharpe || 0).toFixed(1)} 인데 교차심볼 중앙 ${v.medianSharpe.toFixed(2)} (+${(v.posFrac * 100).toFixed(0)}%), OOS 중앙 ${v.medianOosSharpe.toFixed(2)} (+${(v.oosPosFrac * 100).toFixed(0)}%) — 주입 거부`);
+      continue;
+    }
+
+    // 저장 Sharpe = 교차검증 중앙값(정직한 일반화 성능). flapping 방지 비교도 이 값 기준.
+    const validatedSharpe = Number(v.medianSharpe.toFixed(2));
     let storedSharpe = null;
     try {
       const stored = await kv.get(`di:alpha:params:${family}`);
       if (stored && Number.isFinite(stored.sharpe)) storedSharpe = stored.sharpe;
     } catch {}
-    if (storedSharpe != null && (r.sharpe || 0) < storedSharpe + INJECT_IMPROVE_MARGIN) {
-      L(`[inject] ${family} skip — best ${(r.sharpe || 0).toFixed(2)} ≤ 현재 ${storedSharpe.toFixed(2)}+${INJECT_IMPROVE_MARGIN}`);
+    if (storedSharpe != null && validatedSharpe < storedSharpe + INJECT_IMPROVE_MARGIN) {
+      L(`[inject] ${family} skip — 검증 Sharpe ${validatedSharpe} ≤ 현재 ${storedSharpe}+${INJECT_IMPROVE_MARGIN}`);
       continue;
     }
     const ok = await setStrategyParams(family, c.params, {
-      sharpe: r.sharpe,
+      sharpe: validatedSharpe,            // ★ 정직한 일반화 성능 (단일심볼 inflated 값 아님)
+      inSampleSharpe: Number((r.sharpe || 0).toFixed(2)),
+      oosSharpe: Number(v.medianOosSharpe.toFixed(2)),
+      symbolsValidated: v.symbolsTested,
+      posFrac: Number(v.posFrac.toFixed(2)),
       trades: r.trades,
       version: Math.floor(Date.now() / 1000),
     });
     if (ok) {
-      // 주입된 family 는 자동 active (실거래 정식 가동)
-      try { await setStrategyStatus(family, STRATEGY_STATUS.ACTIVE, `param-inject ${c.symbol} Sharpe ${(r.sharpe || 0).toFixed(2)}`); } catch {}
-      injected.push({ family, symbol: c.symbol, sharpe: r.sharpe, trades: r.trades, params: c.params });
-      L(`[inject] ✅ ${family} ← ${c.symbol} (Sharpe ${(r.sharpe || 0).toFixed(2)}, ${r.trades}T, PF ${r.profitFactor}, DD ${r.maxDD}%) → di:alpha:params 실거래 반영`);
+      try { await setStrategyStatus(family, STRATEGY_STATUS.ACTIVE, `param-inject ${c.symbol} 검증Sharpe ${validatedSharpe} (OOS ${v.medianOosSharpe.toFixed(2)})`); } catch {}
+      injected.push({ family, symbol: c.symbol, validatedSharpe, oosSharpe: Number(v.medianOosSharpe.toFixed(2)), inSampleSharpe: Number((r.sharpe || 0).toFixed(2)), symbolsValidated: v.symbolsTested });
+      L(`[inject] ✅ ${family} ← ${c.symbol} | in-sample ${(r.sharpe || 0).toFixed(1)} → 검증 중앙 ${validatedSharpe} (${v.symbolsTested}심볼, +${(v.posFrac * 100).toFixed(0)}%), OOS ${v.medianOosSharpe.toFixed(2)} → 실거래 반영`);
     }
   }
-  return injected;
+  return { injected, rejected };
+}
+
+// ★ 2026-05-30 — 이미 실거래에 적재된 파라미터도 매 회차 재검증.
+//   과거(검증 도입 전) inflated 단일심볼 Sharpe 로 주입된 것들이 실제로는
+//   일반화 안 되면(교차심볼/OOS 실패) default 로 되돌려 실거래에서 제거.
+//   통과분은 저장 Sharpe 를 정직한 검증 중앙값으로 갱신.
+async function revalidateStoredParams(kv, ohlcCache, L) {
+  const cleared = [], refreshed = [];
+  if (Object.keys(ohlcCache).length < VALIDATE_THRESHOLD.minSymbols) return { cleared, refreshed };
+  const V = VALIDATE_THRESHOLD;
+  for (const family of Object.keys(ALL_STRATEGIES)) {
+    let stored;
+    try { stored = await kv.get(`di:alpha:params:${family}`); } catch { continue; }
+    if (!stored || !stored.params) continue;
+    const fn = ALL_STRATEGIES[family];
+    let v;
+    try { v = validateParamSet(fn, stored.params, ohlcCache); } catch { continue; }
+    if (v.symbolsTested < V.minSymbols) continue; // 표본 부족 → 판단 보류
+    const robust = v.medianSharpe >= V.minMedianSharpe && v.posFrac >= V.minPosFrac &&
+      v.medianOosSharpe >= V.minOosSharpe && v.oosPosFrac >= V.minOosPosFrac;
+    if (!robust) {
+      try { await kv.del(`di:alpha:params:${family}`); } catch {}
+      cleared.push({ family, medianSharpe: Number(v.medianSharpe.toFixed(2)), oosSharpe: Number(v.medianOosSharpe.toFixed(2)) });
+      L(`[revalidate] ${family} ✗ 실거래 파라미터 검증 실패 (교차중앙 ${v.medianSharpe.toFixed(2)}, OOS ${v.medianOosSharpe.toFixed(2)}, +${(v.posFrac * 100).toFixed(0)}%) → default 복귀(제거)`);
+    } else {
+      const validatedSharpe = Number(v.medianSharpe.toFixed(2));
+      if (Math.abs((stored.sharpe || 0) - validatedSharpe) > 0.05) {
+        try {
+          await setStrategyParams(family, stored.params, {
+            sharpe: validatedSharpe, oosSharpe: Number(v.medianOosSharpe.toFixed(2)),
+            symbolsValidated: v.symbolsTested, posFrac: Number(v.posFrac.toFixed(2)),
+            trades: stored.trades, version: Math.floor(Date.now() / 1000),
+          });
+          refreshed.push({ family, from: stored.sharpe, to: validatedSharpe });
+        } catch {}
+      }
+    }
+  }
+  if (cleared.length || refreshed.length) L(`[revalidate] 제거 ${cleared.length}개 · 정직화 ${refreshed.length}개`);
+  return { cleared, refreshed };
 }
 
 // 후보 보관 기간
@@ -240,6 +350,7 @@ export default async function handler(req, res) {
     //    각 family 별로 sharpe top N 만 채택 → DeFi 한 family 가 cron 을 점령하는 현상 해소.
     const allPassedByFamily = {}; // { [strategyId]: [{ symbol, params, ...metrics }] }
     const scanResults = {};       // { [symbol]: { [strategyId]: {...} } }
+    const ohlcCache = {};         // { [symbol]: ohlc } — 주입 시 교차검증 재사용 (과적합 가드)
     const t0Scan = Date.now();
     const TIMEOUT_BUDGET_MS = 50_000; // 60초 maxDuration 중 50초 limit (안전 마진)
 
@@ -260,6 +371,7 @@ export default async function handler(req, res) {
         L(`[${symbol}] insufficient OHLC (${ohlc?.length || 0} bars) — skip`);
         continue;
       }
+      ohlcCache[symbol] = ohlc; // 교차검증용 캐시
       scanResults[symbol] = {};
 
       for (const [strategyId, strategyFn] of Object.entries(ALL_STRATEGIES)) {
@@ -385,14 +497,24 @@ export default async function handler(req, res) {
       L(`new candidates registered: ${newCandidates.length} (across ${Object.keys(familyQuotaUsed).length} families), total: ${merged.length}`);
     }
 
-    // 5) ★ 발굴된 우수전략 실거래 즉시 반영 (매 cron — 실시간 지속)
+    // 4.5) ★ 기존 적재 파라미터 재검증 — 과적합/성능붕괴면 default 복귀 (실거래 정리)
+    let revalidated = { cleared: [], refreshed: [] };
+    if (!dryRun) {
+      try { revalidated = await revalidateStoredParams(kv, ohlcCache, L); }
+      catch (e) { L(`[revalidate] 실패: ${e?.message}`); }
+    }
+
+    // 5) ★ 발굴된 우수전략 실거래 즉시 반영 (매 cron) — 단, 교차심볼+OOS 검증 통과분만.
     let injected = [];
+    let injectRejected = [];
     if (newCandidates.length > 0 && !dryRun) {
-      injected = await injectWinningParams(kv, newCandidates, L);
+      const out = await injectWinningParams(kv, newCandidates, ohlcCache, L);
+      injected = out.injected;
+      injectRejected = out.rejected;
       if (injected.length > 0) {
-        L(`★ 실거래 파라미터 주입 완료: ${injected.map((i) => `${i.family}(${i.symbol} Sharpe ${(i.sharpe || 0).toFixed(2)})`).join(", ")}`);
+        L(`★ 실거래 파라미터 주입(검증통과): ${injected.map((i) => `${i.family}(검증 ${i.validatedSharpe}/OOS ${i.oosSharpe})`).join(", ")}`);
       } else {
-        L(`실거래 주입 대상 없음 (INJECT 임계 Sharpe≥${INJECT_THRESHOLD.minSharpe}/${INJECT_THRESHOLD.minTrades}T/DD≤${INJECT_THRESHOLD.maxDD}% 미달 또는 기존보다 우수하지 않음)`);
+        L(`실거래 주입 0건 — ${injectRejected.length}개 과적합 거부 또는 임계 미달 (in-sample 우수해도 교차심볼/OOS 검증 실패)`);
       }
     }
 
@@ -401,6 +523,8 @@ export default async function handler(req, res) {
       durationMs: Date.now() - t0,
       promoted,
       injected,
+      injectRejected,
+      revalidated,
       newCandidates,
       familyQuota: familyQuotaUsed,
       familyRelax: familyRelaxLog,
