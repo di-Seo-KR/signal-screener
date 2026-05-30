@@ -61,8 +61,10 @@ const SAMPLES_PER_STRATEGY = 50;
 // 임계 튜닝 (2026-05-29 라이브 검증): 60일/4h 발굴은 선별적이라 후보 거래수 15~18.
 //   minTrades 20 은 사실상 모든 우수 후보를 차단 → 실시간 반영 무력화.
 //   minTrades 15 로 맞추되, 표본이 작은 만큼 Sharpe 바를 2.5 로 올려 robust 한 것만 통과.
-// 1차 선별(in-sample) 임계 — 후보가 자기 심볼에서 충분히 우수한가
-const INJECT_THRESHOLD = { minSharpe: 2.5, minTrades: 15, maxDD: 20, minWinRate: 48, minProfitFactor: 1.4 };
+// 1차 선별 임계 — 후보의 *교차심볼 중앙* 지표 기준 (단일심볼 inflated 값 아님).
+//   2026-05-30: 발굴이 교차심볼 중앙값으로 바뀌어 값 자체가 정직(낮음) → 임계도 현실화.
+//   진짜 게이트는 validateParamSet(OOS 포함)이고 이건 명백히 약한 후보만 빠르게 거른다.
+const INJECT_THRESHOLD = { minSharpe: 1.3, minTrades: 12, maxDD: 25, minWinRate: 45, minProfitFactor: 1.15 };
 const INJECT_IMPROVE_MARGIN = 0.3;
 
 // ★ 2026-05-30 과적합 가드 — 실거래 주입 전 "교차심볼 + out-of-sample" 검증.
@@ -354,116 +356,91 @@ export default async function handler(req, res) {
     const t0Scan = Date.now();
     const TIMEOUT_BUDGET_MS = 50_000; // 60초 maxDuration 중 50초 limit (안전 마진)
 
+    // 3a) 대상 심볼 OHLC 일괄 확보 (교차심볼 발굴/검증 공용 캐시)
     for (const symbol of targetSymbols) {
-      if (Date.now() - t0Scan > TIMEOUT_BUDGET_MS) {
-        L(`⏱️ timeout budget exceeded — skipping remaining symbols`);
-        break;
-      }
-      let ohlc;
+      if (Date.now() - t0Scan > TIMEOUT_BUDGET_MS) { L(`⏱️ timeout — OHLC fetch 중단`); break; }
       try {
-        ohlc = await fetchOhlc(symbol);
-        L(`[${symbol}] OHLC fetched: ${ohlc.length} bars (60일 4h)`);
-      } catch (e) {
-        L(`[${symbol}] OHLC fetch failed: ${e?.message}`);
-        continue;
-      }
-      if (!ohlc || ohlc.length < 100) {
-        L(`[${symbol}] insufficient OHLC (${ohlc?.length || 0} bars) — skip`);
-        continue;
-      }
-      ohlcCache[symbol] = ohlc; // 교차검증용 캐시
-      scanResults[symbol] = {};
+        const ohlc = await fetchOhlc(symbol);
+        if (ohlc && ohlc.length >= 100) { ohlcCache[symbol] = ohlc; L(`[${symbol}] OHLC ${ohlc.length} bars`); }
+        else L(`[${symbol}] insufficient OHLC (${ohlc?.length || 0}) — skip`);
+      } catch (e) { L(`[${symbol}] OHLC fetch failed: ${e?.message}`); }
+    }
+    const cachedSymbols = Object.keys(ohlcCache);
+    const MIN_SYMS = Math.min(VALIDATE_THRESHOLD.minSymbols, cachedSymbols.length || 1);
+    L(`★ 교차심볼 발굴 대상: ${cachedSymbols.length}개 (${cachedSymbols.join(", ")})`);
 
-      for (const [strategyId, strategyFn] of Object.entries(ALL_STRATEGIES)) {
+    // 3b) ★ 2026-05-30 교차심볼 발굴 — 단일심볼 곡선맞추기(과적합) 대신,
+    //     각 strategy 의 random param 을 *모든 심볼*에 적용해 교차심볼 중앙 Sharpe +
+    //     60% 심볼 +수익 을 만족하는 가장 robust 한 1개를 후보로. 처음부터 일반화 탐색.
+    for (const [strategyId, strategyFn] of Object.entries(ALL_STRATEGIES)) {
+      if (Date.now() - t0Scan > TIMEOUT_BUDGET_MS) { L(`⏱️ timeout — strategy 스캔 중단`); break; }
+      if (cachedSymbols.length < MIN_SYMS) break;
+      const thr = relaxedThresholdFor(familyStats, strategyId);
+      if (thr.relaxStep > 0 && !familyRelaxLog[strategyId]) {
+        familyRelaxLog[strategyId] = { relaxStep: thr.relaxStep, minSharpe: thr.minSharpe, maxDD: thr.maxDD };
+        L(`[relax] ${strategyId}: dryRuns ${familyStats[strategyId]?.dryRuns || 0} → minSharpe ${thr.minSharpe.toFixed(2)}`);
+      }
+      const samples = sampleRandomParams(strategyId, SAMPLES_PER_STRATEGY);
+      if (samples.length === 0) continue;
+      let best = null;    // 임계 통과분 중 교차심볼 중앙 sharpe 최고
+      let bestAny = null; // 통과 무관 최고 (dry-run 로그)
+      for (const params of samples) {
         if (Date.now() - t0Scan > TIMEOUT_BUDGET_MS) break;
-        // family 별 적응형 임계 (직전 dry-run 누적 시 완화)
-        const thr = relaxedThresholdFor(familyStats, strategyId);
-        if (thr.relaxStep > 0 && !familyRelaxLog[strategyId]) {
-          familyRelaxLog[strategyId] = { relaxStep: thr.relaxStep, minSharpe: thr.minSharpe, maxDD: thr.maxDD };
-          L(`[relax] ${strategyId}: dryRuns ${familyStats[strategyId]?.dryRuns || 0} → minSharpe ${thr.minSharpe.toFixed(2)}, maxDD ${thr.maxDD}`);
+        const per = [];
+        for (const sym of cachedSymbols) {
+          try { per.push(backtestStrategy({ strategyFn, ohlc: ohlcCache[sym], params, slPct: 4, tpPct: 8, maxHoldBars: 24 })); } catch {}
         }
-
-        const samples = sampleRandomParams(strategyId, SAMPLES_PER_STRATEGY);
-        if (samples.length === 0) continue;
-        let bestOfStrategy = null;
-        const passedHere = [];
-        for (const params of samples) {
-          try {
-            const r = backtestStrategy({
-              strategyFn,
-              ohlc,
-              params,
-              slPct: 4, tpPct: 8, maxHoldBars: 24,
-            });
-            if (!bestOfStrategy || r.sharpe > bestOfStrategy.sharpe) {
-              bestOfStrategy = { params, ...r };
-            }
-            if (
-              r.trades >= thr.minTrades &&
-              r.sharpe >= thr.minSharpe &&
-              r.maxDD <= thr.maxDD
-            ) {
-              passedHere.push({ params, ...r });
-            }
-          } catch (e) {
-            // 개별 시뮬 실패는 무시 — 다음 sample 진행
-          }
+        if (per.length < MIN_SYMS) continue;
+        const medSharpe = median(per.map((r) => r.sharpe));
+        const medTrades = Math.round(median(per.map((r) => r.trades)));
+        const medMaxDD = median(per.map((r) => r.maxDD));
+        const medWin = median(per.map((r) => r.winRate));
+        const pfs = per.map((r) => r.profitFactor).filter(Number.isFinite);
+        const medPF = pfs.length ? median(pfs) : null;
+        const medRet = median(per.map((r) => r.netReturn));
+        const posFrac = per.filter((r) => (r.netReturn || 0) > 0).length / per.length;
+        const agg = { params, sharpe: medSharpe, trades: medTrades, maxDD: medMaxDD, winRate: medWin, profitFactor: medPF, netReturn: medRet, posFrac, symbolsTested: per.length };
+        if (!bestAny || medSharpe > bestAny.sharpe) bestAny = agg;
+        if (medTrades >= thr.minTrades && medSharpe >= thr.minSharpe && medMaxDD <= thr.maxDD && posFrac >= 0.6) {
+          if (!best || medSharpe > best.sharpe) best = agg;
         }
-        scanResults[symbol][strategyId] = { samples: samples.length, best: bestOfStrategy, passed: passedHere.length };
-
-        // family quota buffer 에 적재 (등록은 모든 symbol 스캔 끝난 뒤 일괄 처리).
-        // family-symbol 쌍 당 best 1개씩만 buffer 에 → 다양한 symbol 도 보장.
-        if (passedHere.length > 0) {
-          passedHere.sort((a, b) => b.sharpe - a.sharpe);
-          const winner = passedHere[0];
-          if (!allPassedByFamily[strategyId]) allPassedByFamily[strategyId] = [];
-          allPassedByFamily[strategyId].push({
-            symbol,
-            params: winner.params,
-            trades: winner.trades,
-            sharpe: winner.sharpe,
-            winRate: winner.winRate,
-            profitFactor: winner.profitFactor,
-            netReturn: winner.netReturn,
-            maxDD: winner.maxDD,
-          });
-        }
+      }
+      scanResults[strategyId] = {
+        samples: samples.length, crossSymbol: cachedSymbols.length,
+        bestMedianSharpe: bestAny ? Number((bestAny.sharpe || 0).toFixed(2)) : null,
+        bestPosFrac: bestAny ? Number((bestAny.posFrac || 0).toFixed(2)) : null,
+        passed: best ? 1 : 0,
+      };
+      if (best) {
+        allPassedByFamily[strategyId] = [best];
+        L(`[발굴] ${strategyId}: 교차심볼 중앙 Sharpe ${best.sharpe.toFixed(2)} (+${(best.posFrac * 100).toFixed(0)}% 심볼, ${best.trades}T 중앙) — 일반화 후보 ✓`);
       }
     }
 
-    // ★ family quota 적용 — 각 family 별로 sharpe top PER_FAMILY_QUOTA 만 등록.
-    //    추가로 다양성 가산점: 같은 family 내에서 symbol 중복 시 두 번째 candidate 부터 sharpe 0.05 감점.
-    //    → 같은 family 가 다른 symbol 로 분산 발굴되도록 유도.
+    // 후보 등록 — 교차심볼 발굴이라 family 당 robust 1개 (별도 quota dedup 불필요).
     const newCandidates = [];
     for (const [strategyId, pool] of Object.entries(allPassedByFamily)) {
-      // symbol 다양성 가산: 한 family 내 unique symbol 우선 정렬
-      const seenSymbols = new Set();
-      const rescored = pool.map((p) => {
-        const dup = seenSymbols.has(p.symbol);
-        seenSymbols.add(p.symbol);
-        return { ...p, _adjSharpe: dup ? p.sharpe - 0.05 : p.sharpe };
+      const c = pool[0];
+      if (!c) continue;
+      familyQuotaUsed[strategyId] = 1;
+      newCandidates.push({
+        id: genCandidateId(`${strategyId}-xsym`),
+        parentStrategy: strategyId,
+        symbol: `교차 ${c.symbolsTested}심볼`,
+        params: c.params,
+        backtestResult: {
+          trades: c.trades,
+          sharpe: Number((c.sharpe || 0).toFixed(3)),
+          winRate: Number((c.winRate || 0).toFixed(2)),
+          profitFactor: c.profitFactor == null ? null : Number(c.profitFactor.toFixed(3)),
+          netReturn: Number((c.netReturn || 0).toFixed(2)),
+          maxDD: Number((c.maxDD || 0).toFixed(2)),
+          crossSymbol: true,
+          posFrac: Number((c.posFrac || 0).toFixed(2)),
+        },
+        createdAt: new Date().toISOString(),
+        status: "observing",
       });
-      rescored.sort((a, b) => b._adjSharpe - a._adjSharpe);
-      const chosen = rescored.slice(0, PER_FAMILY_QUOTA);
-      familyQuotaUsed[strategyId] = chosen.length;
-      for (const c of chosen) {
-        newCandidates.push({
-          id: genCandidateId(`${strategyId}-${c.symbol.slice(0, 3)}`),
-          parentStrategy: strategyId,
-          symbol: c.symbol,
-          params: c.params,
-          backtestResult: {
-            trades: c.trades, sharpe: c.sharpe,
-            winRate: c.winRate, profitFactor: c.profitFactor,
-            netReturn: c.netReturn, maxDD: c.maxDD,
-          },
-          createdAt: new Date().toISOString(),
-          status: "observing",
-        });
-      }
-      if (chosen.length > 0) {
-        L(`[quota] ${strategyId}: pool ${pool.length} → chosen ${chosen.length} (sharpe ${chosen.map(c => c.sharpe.toFixed(2)).join(", ")})`);
-      }
     }
 
     // ★ family-discovery-stats 업데이트 — dry-run 카운터 증감 + last passed 기록
