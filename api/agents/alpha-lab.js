@@ -208,8 +208,21 @@ function aggregateAcrossUsers(userDatas) {
 
   // shadow-summary 의 byFamily 기반 fallback 메트릭 (ledger 없을 때)
   const familyFallback = {};
+  // ★ 2026-05-31 — 실거래(live-summary) byFamily 집계 = 진짜 라이브 성과 측정.
+  //   기존엔 live-summary 를 fetch 만 하고 리더보드에 안 썼음(측정 루프 미완).
+  const liveByFamily = {};
 
   for (const ud of userDatas) {
+    const lv = ud.live;
+    if (lv?.byFamily) {
+      for (const [rawFam, s] of Object.entries(lv.byFamily)) {
+        const fam = normalizeStrategyId(rawFam);
+        if (!liveByFamily[fam]) liveByFamily[fam] = { trades: 0, wins: 0, netPnLUsd: 0 };
+        liveByFamily[fam].trades += s.trades || 0;
+        liveByFamily[fam].wins += s.wins || 0;
+        liveByFamily[fam].netPnLUsd += s.netPnL || 0; // live-summary.netPnL 은 USDT 실손익
+      }
+    }
     const series = strategyPnlSeries(ud.ledger);
     for (const [sid, trades] of Object.entries(series)) {
       if (!byStrategy[sid]) byStrategy[sid] = [];
@@ -267,6 +280,26 @@ function aggregateAcrossUsers(userDatas) {
       _source: "summary-fallback",
       _rawNetPnL: Number(s.netPnL.toFixed(2)),  // 디버깅용 — 원본 보존
     };
+  }
+
+  // ★ 실거래 성과를 전략별로 부착 — 백테스트 등급 옆에 "진짜 라이브 결과" 노출.
+  //   strategies 에 없던 family 도 live 데이터 있으면 entry 생성.
+  for (const [fam, lv] of Object.entries(liveByFamily)) {
+    if (!lv.trades) continue;
+    const liveBlock = {
+      trades: lv.trades,
+      winRate: Number(((lv.wins / lv.trades) * 100).toFixed(1)),
+      netPnLUsd: Number(lv.netPnLUsd.toFixed(2)),
+      avgPnLUsd: Number((lv.netPnLUsd / lv.trades).toFixed(2)),
+    };
+    if (!strategies[fam]) {
+      strategies[fam] = {
+        trades: 0, wins: 0, losses: 0, winRate: 0, netPnL: 0, avgROI: 0, netPnLUsd: 0,
+        sharpe: 0, profitFactor: null, maxDD: 0, avgHoldMs: 0, avgHoldHours: 0,
+        _source: "live-only",
+      };
+    }
+    strategies[fam].live = liveBlock;
   }
 
   const symbols = {};
