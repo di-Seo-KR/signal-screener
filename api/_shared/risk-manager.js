@@ -554,15 +554,29 @@ export function planTrade({ signal, equity, price, atr, filter, regime = null, c
   push(`dynamicSLTP source=${dyn.source} regime=${dyn.regimeKey} atr%=${(dyn.atrPct*100).toFixed(2)} slMul=${dyn.slMul}×${dyn.slBoost} tpMul=${dyn.tpMul}×${dyn.tpBoost}`);
   push(`rawStopDistPct=${(stopDistPct * 100).toFixed(3)}% (dynamic TP=${(dynamicTpPct * 100).toFixed(3)}%)`);
 
-  // ★ 1-1) leverage 미리 계산 후 ROI 한도 cap.
-  //   대표님 지시: 거래당 ROI -40% 까지 OK (10x 기준 가격 -4%).
-  //   ATR 기반 stopDistPct 가 ROI 한도를 초과하면 cap.
+  // ★ 1-1) 손절 거리 결정.
+  //   2026-05-31 대표 지시: "익절·손절 모두 내가 지정하지 말고 전략이 알아서 정하게".
+  //   → 사용자 고정 ROI 손절 캡 기본 해제. SL 은 dynamicSLTP 의 ATR×family×regime 거리
+  //     (가격 1.5~8%, dynamicSLFloor/Ceil 로 자동 bound) 를 그대로 사용.
+  //   ★ 거래당 $위험은 불변: 손절폭이 넓어지면 포지션이 그만큼 작게 사이징됨
+  //     (notional = riskAmount / effLossPct). 청산버퍼 검증(아래)이 안전 backstop.
+  //   옛 고정 캡 복원: env ZEPTA_MAX_ROI_LOSS_PCT (예: 0.40 → 10x 기준 가격 4%).
   const previewLev = pickLeverage(signal.confidence, signal.strategyFamily, cfg);
-  const maxRoiLossPct = cfg.maxRoiLossPct || 0.40;
-  const slCapByRoi = maxRoiLossPct / previewLev;
-  if (stopDistPct > slCapByRoi) {
-    push(`stopDistPct ${(stopDistPct * 100).toFixed(2)}% > ROI cap ${(slCapByRoi * 100).toFixed(2)}% (lev ${previewLev}x × maxROI ${(maxRoiLossPct * 100).toFixed(0)}%) → cap`);
-    stopDistPct = slCapByRoi;
+  // 손절은 전략 ATR 거리(dynamicSLTP) 그대로 — 사용자 고정 ROI 캡 제거.
+  //   단, SL 은 청산보다 먼저 와야 하므로 "청산-안전 거리"로만 상한 (물리적 안전 bound, 사용자값 아님).
+  //   상한에 걸려도 trade 거부가 아니라 안전거리로 cap → 전략 SL 최대한 살리되 청산 안전.
+  const previewLiqSafe = approxLiquidationPct(previewLev) * (cfg.liqSafetyRatio || 0.7);
+  if (stopDistPct > previewLiqSafe) {
+    push(`stopDistPct ${(stopDistPct * 100).toFixed(2)}% > 청산안전 ${(previewLiqSafe * 100).toFixed(2)}% → 안전거리로 cap (전략 SL, 사용자 ROI 캡 없음)`);
+    stopDistPct = previewLiqSafe;
+  } else {
+    push(`손절 = 전략 ATR 거리 ${(stopDistPct * 100).toFixed(2)}% (사용자 ROI 캡 없음, 포지션 자동 사이징으로 $위험 일정)`);
+  }
+  // 옛 고정 ROI 캡 복원용 — 기본 미설정 = 비활성 (env ZEPTA_MAX_ROI_LOSS_PCT, 예: 0.40).
+  const roiCapEnv = parseFloat(process.env.ZEPTA_MAX_ROI_LOSS_PCT);
+  if (Number.isFinite(roiCapEnv) && roiCapEnv > 0) {
+    const slCapByRoi = roiCapEnv / previewLev;
+    if (stopDistPct > slCapByRoi) { push(`+ env ROI cap → ${(slCapByRoi * 100).toFixed(2)}%`); stopDistPct = slCapByRoi; }
   }
 
   // 2) 비용 거리 (수수료 + 슬리피지, 왕복)
