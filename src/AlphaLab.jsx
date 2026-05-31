@@ -268,6 +268,7 @@ function LeaderboardTable({ data }) {
           gradeSharpe,
           isFallback,           // production 누적 신뢰 불가 → 수집중 표시
           backtestGrade: tunedSharpe != null, // 등급이 백테스트 기준임
+          live: m.live || null,  // ★ 실거래 성과 {trades, winRate, netPnLUsd, avgPnLUsd}
         };
       }).sort((a, b) => b.gradeSharpe - a.gradeSharpe);
   }, [strategies, statuses, params]);
@@ -331,8 +332,15 @@ function LeaderboardTable({ data }) {
                     </div>
                   </div>
                   <div style={{ background: C.card, borderRadius: RADIUS.sm, padding: "8px 10px" }}>
-                    <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>누적 수익률</div>
-                    {r.isFallback ? (
+                    <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>{r.live ? "실거래 손익" : "누적 수익률"}</div>
+                    {r.live ? (
+                      <>
+                        <div style={{ fontSize: 16, fontWeight: 800, color: r.live.netPnLUsd > 0 ? C.green : r.live.netPnLUsd < 0 ? C.red : C.text2 }}>
+                          {r.live.netPnLUsd > 0 ? "+" : ""}${fmtNum(r.live.netPnLUsd, 2)}
+                        </div>
+                        <div style={{ fontSize: FONT.xs, color: C.text3 }}>{fmtInt(r.live.trades)}건 · 승률 {fmtNum(r.live.winRate, 0)}%</div>
+                      </>
+                    ) : r.isFallback ? (
                       <div style={{ fontSize: 13, fontWeight: 600, color: C.text3 }}>실거래 수집중</div>
                     ) : (
                       <div style={{ fontSize: 16, fontWeight: 800, color: pnlColor }}>
@@ -411,7 +419,14 @@ function LeaderboardTable({ data }) {
                       <div style={{ fontSize: FONT.xs, fontWeight: 500, color: C.text3 }}>{fmtNum(r.gradeSharpe, 2)}</div>
                     </td>
                     <td style={{ ...tdStyle, textAlign: "right" }} title={METRIC_TOOLTIP.pf}>{r.isFallback || r.pf == null ? "—" : fmtNum(r.pf, 2)}</td>
-                    {r.isFallback ? (
+                    {r.live ? (
+                      <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600 }} title={`실거래 ${r.live.trades}건 · 승률 ${r.live.winRate}% · 거래당 평균 $${r.live.avgPnLUsd}`}>
+                        <div style={{ color: r.live.netPnLUsd > 0 ? C.green : r.live.netPnLUsd < 0 ? C.red : C.text2 }}>
+                          {r.live.netPnLUsd > 0 ? "+" : ""}${fmtNum(r.live.netPnLUsd, 2)}
+                        </div>
+                        <div style={{ fontSize: FONT.xs, fontWeight: 500, color: C.text3 }}>{fmtInt(r.live.trades)}건 · {fmtNum(r.live.winRate, 0)}%</div>
+                      </td>
+                    ) : r.isFallback ? (
                       <td style={muted} title="실거래 누적 손익은 데이터 수집 후 표시됩니다">수집중</td>
                     ) : (
                       <td style={{ ...tdStyle, textAlign: "right", color: pnlColor, fontWeight: 600 }}>

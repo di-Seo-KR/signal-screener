@@ -38,6 +38,13 @@ const TUNER_MIN_SHARPE = 1.0;
 const TUNER_MIN_PF = 1.1;
 const TUNER_IMPROVE_MARGIN = 0.3;
 
+// ★ 2026-05-31 (QUANT-PLAN) — param-tuner 직접 주입 기본 비활성.
+//   문제: param-tuner 는 BTC 단일심볼 grid 만 보고 di:alpha:params 에 직접 써서,
+//   continuous-backtest 의 교차심볼+OOS 과적합 가드를 *우회*함 (BTC-overfit 주입 위험).
+//   해결: 검증 가드가 있는 continuous-backtest 를 유일 주입자로. param-tuner 는
+//   grid search 결과를 로그/후보로만 남긴다. 복원 시 ZEPTA_PARAM_TUNER_INJECT=1.
+const TUNER_INJECT_ENABLED = process.env.ZEPTA_PARAM_TUNER_INJECT === "1";
+
 // 백테스트 룰 (고정) — 파라미터만 튜닝, exit 룰은 별도 (auto-promote 에서 조정)
 const BACKTEST_RULES = { slPct: 4, tpPct: 8, maxHoldBars: 24 };
 
@@ -101,6 +108,10 @@ export default async function handler(req, res) {
         const qualityOk = best.trades >= 10 && (best.sharpe || 0) >= TUNER_MIN_SHARPE && (best.profitFactor || 0) >= TUNER_MIN_PF;
         if (!qualityOk) {
           L(`  → 품질 미달 (trades ${best.trades}, Sharpe ${best.sharpe}, PF ${best.profitFactor}), KV 유지`);
+        } else if (!TUNER_INJECT_ENABLED) {
+          // 직접 주입 비활성 — 교차심볼/OOS 가드 우회 방지. 로그만 남기고 continuous-backtest 에 위임.
+          L(`  → [advisory] BTC grid 우수(Sharpe ${(best.sharpe||0).toFixed(2)}, ${best.trades}T)이나 직접 주입 안 함 — 교차검증(continuous-backtest)에 위임`);
+          tuned.push({ strategyId, sharpe: best.sharpe, trades: best.trades, params: best.params, injected: false });
         } else {
           let storedSharpe = null;
           try {
