@@ -240,16 +240,23 @@ function LeaderboardTable({ data }) {
   const params = data?.params || {};
 
   const rows = useMemo(() => {
-    return Object.entries(strategies)
-      .filter(([id]) => isValidStrategyId(id)) // G-1 hotfix — raw ID 만 숨기고 나머지는 fallback 라벨
-      .map(([id, m]) => {
+    // ★ 2026-06-01 — 리더보드 누락 수정: production 데이터 없는 family(검증된 mean-revert 등)도
+    //   표에 나오도록, strategies ∪ statuses ∪ params 의 합집합으로 모든 전략을 표시.
+    const allIds = Array.from(new Set([
+      ...Object.keys(strategies || {}),
+      ...Object.keys(statuses || {}),
+      ...Object.keys(params || {}),
+    ])).filter((id) => isValidStrategyId(id));
+    return allIds
+      .map((id) => {
+        const m = strategies[id] || {};
         const statusObj = statuses[id];
         const status = (statusObj?.status) || "active";
-        // ★ 2026-05-29 — 지표 정합성: production 메트릭이 summary-fallback(실거래 ledger 부족)
-        //   이면 Sharpe·PF·netPnL 이 신뢰 불가(stale). 이때는 백테스트로 검증된 등급을 쓰고
-        //   불확실한 누적 수치는 "수집중"으로 표시 (배너 ↔ 순위표 모순 해소).
+        // ★ 2026-05-29 — 지표 정합성: production 메트릭이 신뢰 불가(summary-fallback 또는 거래 없음)
+        //   이면 Sharpe·PF·netPnL 대신 백테스트 검증 등급 + "수집중" 표시.
         const tunedSharpe = (params[id] && Number.isFinite(params[id].sharpe)) ? params[id].sharpe : null;
-        const isFallback = m._source === "summary-fallback";
+        // 실거래 누적 신뢰 불가: summary-fallback 이거나 실거래 trade 가 0
+        const isFallback = m._source === "summary-fallback" || !(m.trades > 0);
         const gradeSharpe = tunedSharpe != null ? tunedSharpe : (m.sharpe || 0);
         return {
           id,
@@ -268,6 +275,9 @@ function LeaderboardTable({ data }) {
           gradeSharpe,
           isFallback,           // production 누적 신뢰 불가 → 수집중 표시
           backtestGrade: tunedSharpe != null, // 등급이 백테스트 기준임
+          // 등급이 의미 있는 경우: 백테스트 검증(tuned) 또는 신뢰 가능한 실거래 Sharpe.
+          //   데이터·검증 없으면 등급을 "—" 로 (0 → D 오표시 방지).
+          gradeMeaningful: tunedSharpe != null || (m._source !== "summary-fallback" && m.trades > 0 && Number.isFinite(m.sharpe)),
           live: m.live || null,  // ★ 실거래 성과 {trades, winRate, netPnLUsd, avgPnLUsd}
         };
       }).sort((a, b) => b.gradeSharpe - a.gradeSharpe);
@@ -326,10 +336,14 @@ function LeaderboardTable({ data }) {
                 {/* 핵심 메트릭 2x2 그리드 */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                   <div style={{ background: C.card, borderRadius: RADIUS.sm, padding: "8px 10px" }}>
-                    <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>안정성 등급{r.backtestGrade ? " · 백테스트" : ""}</div>
-                    <div style={{ fontSize: 16, fontWeight: 800, color: sharpeColor }}>{grade.grade}
-                      <span style={{ fontSize: FONT.xs, fontWeight: 500, color: C.text3, marginLeft: 4 }}>{fmtNum(r.gradeSharpe, 2)}</span>
-                    </div>
+                    <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>안정성 등급{r.gradeMeaningful && r.backtestGrade ? " · 백테스트" : ""}</div>
+                    {r.gradeMeaningful ? (
+                      <div style={{ fontSize: 16, fontWeight: 800, color: sharpeColor }}>{grade.grade}
+                        <span style={{ fontSize: FONT.xs, fontWeight: 500, color: C.text3, marginLeft: 4 }}>{fmtNum(r.gradeSharpe, 2)}</span>
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 14, fontWeight: 600, color: C.text3 }}>— <span style={{ fontSize: FONT.xs }}>측정 전</span></div>
+                    )}
                   </div>
                   <div style={{ background: C.card, borderRadius: RADIUS.sm, padding: "8px 10px" }}>
                     <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>{r.live ? "실거래 손익" : "누적 수익률"}</div>
@@ -414,9 +428,15 @@ function LeaderboardTable({ data }) {
                     </td>
                     <td style={{ ...tdStyle, textAlign: "right" }}>{fmtInt(r.trades)}</td>
                     <td style={{ ...tdStyle, textAlign: "right" }}>{r.isFallback ? "—" : fmtPct(r.winRate)}</td>
-                    <td style={{ ...tdStyle, textAlign: "right", color: sharpeColor, fontWeight: 700 }} title={r.backtestGrade ? "백테스트로 검증된 안정성 등급 (실거래 누적 데이터 수집 중)" : METRIC_TOOLTIP.sharpe}>
-                      <div>{grade.grade}{r.backtestGrade ? <span style={{ fontSize: FONT.xs, fontWeight: 500, color: C.text3 }}> ·BT</span> : null}</div>
-                      <div style={{ fontSize: FONT.xs, fontWeight: 500, color: C.text3 }}>{fmtNum(r.gradeSharpe, 2)}</div>
+                    <td style={{ ...tdStyle, textAlign: "right", color: r.gradeMeaningful ? sharpeColor : C.text3, fontWeight: 700 }} title={r.backtestGrade ? "백테스트로 검증된 안정성 등급 (실거래 누적 데이터 수집 중)" : METRIC_TOOLTIP.sharpe}>
+                      {r.gradeMeaningful ? (
+                        <>
+                          <div>{grade.grade}{r.backtestGrade ? <span style={{ fontSize: FONT.xs, fontWeight: 500, color: C.text3 }}> ·BT</span> : null}</div>
+                          <div style={{ fontSize: FONT.xs, fontWeight: 500, color: C.text3 }}>{fmtNum(r.gradeSharpe, 2)}</div>
+                        </>
+                      ) : (
+                        <div style={{ fontWeight: 600 }}>— <span style={{ fontSize: FONT.xs, fontWeight: 400 }}>측정 전</span></div>
+                      )}
                     </td>
                     <td style={{ ...tdStyle, textAlign: "right" }} title={METRIC_TOOLTIP.pf}>{r.isFallback || r.pf == null ? "—" : fmtNum(r.pf, 2)}</td>
                     {r.live ? (
