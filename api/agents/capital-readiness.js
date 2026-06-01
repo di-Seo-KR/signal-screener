@@ -58,22 +58,33 @@ export default async function handler(req, res) {
   try {
     const kv = await getKv();
 
-    // ── 1) 실거래 누적 성과 읽기 ──────────────────────────────────────
+    // ── 1) 실거래 누적 성과 읽기 (all-time) ──────────────────────────
     const live = (await kv.get(`di:real:user:${OWNER_USER_ID}:live-summary`)) || {};
-    const trades = Number(live.trades) || 0;
-    const wins = Number(live.wins) || 0;
-    const netPnL = Number(live.netPnL) || 0;
-    const winRate = trades > 0 ? wins / trades : 0;
+    const allTrades = Number(live.trades) || 0;
+    const allWins = Number(live.wins) || 0;
+    const allNetPnL = Number(live.netPnL) || 0;
 
-    // ── 2) 트래커 상태 (시작 시각·직전 판정) ─────────────────────────
+    // ── 2) 트래커 상태 + 기준선(baseline) ────────────────────────────
+    //   ★ 핵심: 판정은 "트래킹 시작 이후 증분(since)"으로만. 과거 −47% 같은
+    //   all-time 누적에 발목 잡히지 않도록, 시작 시점 성과를 baseline 으로 고정하고
+    //   그 이후 쌓인 데이터만 평가한다. (대표가 청산 후 새로 쌓는 데이터 = 진짜 판단 대상)
     const state = (await kv.get(STATE_KEY)) || {};
-    const startedAtMs = state.startedAtMs || nowMs; // 최초 실행 시각 고정
+    const isInit = state.baseline == null; // 최초 실행(또는 baseline 미설정 마이그레이션)
+
+    const baseline = state.baseline || { trades: allTrades, wins: allWins, netPnL: allNetPnL };
+    const startedAtMs = (state.baseline != null && state.startedAtMs) ? state.startedAtMs : nowMs;
     const daysElapsed = Math.floor((nowMs - startedAtMs) / 86400000);
 
+    // 증분 — 트래킹 시작 이후
+    const trades = Math.max(0, allTrades - baseline.trades);
+    const wins = Math.max(0, allWins - baseline.wins);
+    const netPnL = allNetPnL - baseline.netPnL;
+    const winRate = trades > 0 ? wins / trades : 0;
+
     // ── 3) 기준 평가 (전부 충족해야 ✅) ──────────────────────────────
-    const c1 = trades >= READY_MIN_TRADES;            // 표본 충분
+    const c1 = trades >= READY_MIN_TRADES;            // 표본 충분 (since)
     const c2 = daysElapsed >= READY_MIN_DAYS;         // 기간/국면
-    const c3 = netPnL >= 0 && winRate >= READY_MIN_WINRATE; // 엣지 확인
+    const c3 = netPnL >= 0 && winRate >= READY_MIN_WINRATE; // 엣지 확인 (since)
     const ready = c1 && c2 && c3;
     const verdict = ready ? "ready" : "not-ready";
 
@@ -83,36 +94,39 @@ export default async function handler(req, res) {
     else if (!c2) blocker = `기간 ${daysElapsed}/${READY_MIN_DAYS}일`;
     else if (!c3) blocker = netPnL < 0 ? `순손익 ${fmtUsd(netPnL)}` : `승률 ${(winRate * 100).toFixed(0)}%`;
 
-    // ── 4) 알림 여부 결정 (상태 변화 시에만) ─────────────────────────
+    // ── 4) 알림 여부 결정 ────────────────────────────────────────────
+    //   최초 실행(isInit)은 baseline 만 조용히 고정하고 알리지 않는다
+    //   (대표는 이미 "지금부터 쌓는다"를 알고 있음 — 무의미한 알림 방지).
     const lastVerdict = state.lastVerdict || null;
     const lastMilestone = state.lastMilestone || 0;
-    // 현재 도달한 최고 마일스톤
     const reachedMilestone = MILESTONES.filter((m) => trades >= m).pop() || 0;
 
     let notify = false;
     let text = null;
 
-    if (lastVerdict !== verdict) {
-      // 판정 전환 — 핵심 순간
-      notify = true;
-      if (ready) {
+    if (!isInit) {
+      if (lastVerdict !== verdict) {
+        // 판정 전환 — 핵심 순간
+        notify = true;
+        if (ready) {
+          text =
+            `📊 Zepta — 데이터 검증 충족 ✅\n` +
+            `최근 ${trades}건 · ${daysElapsed}일 · 순손익 ${fmtUsd(netPnL)} · 승률 ${(winRate * 100).toFixed(0)}%\n` +
+            `백테스트 엣지가 실거래로 확인됨. 자본 판단 근거 마련 (결정은 대표님).`;
+        } else {
+          text =
+            `📊 Zepta — 데이터 근거 약화 ⏳\n` +
+            `최근 ${trades}건 · 순손익 ${fmtUsd(netPnL)} · 승률 ${(winRate * 100).toFixed(0)}%\n` +
+            `미충족: ${blocker}. 추가 데이터 수집 중.`;
+        }
+      } else if (!ready && reachedMilestone > lastMilestone) {
+        // ⏳ 진행 중 새 표본 마일스톤 도달
+        notify = true;
         text =
-          `📊 Zepta — 데이터 검증 충족 ✅\n` +
-          `실거래 ${trades}건 · ${daysElapsed}일 · 누적 ${fmtUsd(netPnL)} · 승률 ${(winRate * 100).toFixed(0)}%\n` +
-          `백테스트 엣지가 실거래로 확인됨. 자본 판단 근거 마련 (결정은 대표님).`;
-      } else {
-        text =
-          `📊 Zepta — 데이터 근거 후퇴 ⏳\n` +
-          `현재 ${trades}건 · 누적 ${fmtUsd(netPnL)} · 승률 ${(winRate * 100).toFixed(0)}%\n` +
-          `미충족: ${blocker}. 추가 데이터 수집 중.`;
+          `📊 Zepta — 데이터 축적 ${trades}건 도달 ⏳\n` +
+          `순손익 ${fmtUsd(netPnL)} · 승률 ${(winRate * 100).toFixed(0)}% · ${daysElapsed}일\n` +
+          `아직 검증 미충족(${blocker}). 계속 수집 중.`;
       }
-    } else if (!ready && reachedMilestone > lastMilestone) {
-      // ⏳ 진행 중 새 마일스톤 도달
-      notify = true;
-      text =
-        `📊 Zepta — 데이터 축적 ${trades}건 도달 ⏳\n` +
-        `누적 ${fmtUsd(netPnL)} · 승률 ${(winRate * 100).toFixed(0)}% · ${daysElapsed}일\n` +
-        `아직 검증 미충족(${blocker}). 계속 수집 중.`;
     }
 
     let sendResult = null;
@@ -123,6 +137,7 @@ export default async function handler(req, res) {
     // ── 5) 상태 저장 ─────────────────────────────────────────────────
     await kv.set(STATE_KEY, {
       startedAtMs,
+      baseline, // 시작 시점 성과 고정 (이후 변경 안 함)
       lastVerdict: verdict,
       lastMilestone: Math.max(lastMilestone, reachedMilestone),
       lastTrades: trades,
@@ -133,8 +148,11 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       verdict,
+      init: isInit,
       criteria: { c1_sample: c1, c2_duration: c2, c3_edge: c3 },
-      metrics: { trades, winRate: Number(winRate.toFixed(3)), netPnL, daysElapsed },
+      since: { trades, winRate: Number(winRate.toFixed(3)), netPnL: Number(netPnL.toFixed(2)), daysElapsed },
+      allTime: { trades: allTrades, netPnL: Number(allNetPnL.toFixed(2)) },
+      baseline,
       thresholds: { READY_MIN_TRADES, READY_MIN_DAYS, READY_MIN_WINRATE },
       blocker,
       notified: notify,
