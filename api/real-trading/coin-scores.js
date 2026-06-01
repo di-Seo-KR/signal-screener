@@ -39,10 +39,18 @@ function normSide(entry) {
   return null;
 }
 
+// 베이스 티커 추출 — 풀의 asset 은 "BTC/USD", "OP/USD", "BTC", "BTCUSDT" 등 다양.
+//   "/" 앞부분 + 후행 USDT/USD 제거 → 순수 티커("BTC").
+function baseTicker(asset) {
+  let a = String(asset || "").toUpperCase().trim();
+  if (!a) return "";
+  if (a.includes("/")) a = a.split("/")[0];
+  a = a.replace(/USDT$/, "").replace(/USD$/, "");
+  return a;
+}
 function toSymbol(asset) {
-  const a = String(asset || "").toUpperCase();
-  if (!a) return "—";
-  return a.endsWith("USDT") ? a : `${a}USDT`;
+  const b = baseTicker(asset);
+  return b ? `${b}USDT` : "—";
 }
 
 export default async function handler(req, res) {
@@ -66,14 +74,14 @@ export default async function handler(req, res) {
       if (!e || (e.ts || 0) < cutoff) continue;
       const side = normSide(e);
       if (!side) continue;
-      const asset = String(e.asset || "").toUpperCase();
-      if (!asset) continue;
+      const ticker = baseTicker(e.asset);
+      if (!ticker) continue;
       const score = parseFloat(e.score || 0) || 0;
-      const prev = byAsset.get(asset);
+      const prev = byAsset.get(ticker);
       if (!prev || score > prev.score || (score === prev.score && (e.ts || 0) > prev.ts)) {
-        byAsset.set(asset, {
-          asset,
-          symbol: toSymbol(asset),
+        byAsset.set(ticker, {
+          asset: ticker,
+          symbol: `${ticker}USDT`,
           side,
           type: String(e.type || (side === "LONG" ? "BUY" : "SELL")).toUpperCase(),
           score,                                  // 0~100 (풀 원본 스케일)
