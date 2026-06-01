@@ -807,6 +807,114 @@ export function SignalWatchlist({ signals = [], loading = false, isMobile = fals
 }
 
 // ═══════════════════════════════════════════════════════════════════
+// 코인별 롱숏 점수 (Long/Short Score Board)
+//   engine 이 보는 시그널 풀(di:signals:realtime-pool)의 양방향 신호를
+//   코인별로 LONG(초록)/SHORT(빨강) 으로 구분해 점수 막대로 한눈에 표시.
+// ═══════════════════════════════════════════════════════════════════
+export function CoinDirectionScores({ coins = [], counts = {}, loading = false, isMobile = false }) {
+  if (loading) {
+    return (
+      <div style={{ padding: 18, textAlign: "center", fontSize: 14, color: "var(--z-text-3)" }}>
+        코인 신호 분석 중...
+      </div>
+    );
+  }
+  if (!Array.isArray(coins) || coins.length === 0) {
+    return (
+      <div style={{
+        padding: 24, textAlign: "center", fontSize: 14,
+        color: "var(--z-text-3)", border: "1px dashed var(--z-border)", borderRadius: "var(--z-r-md)",
+      }}>
+        현재 집계된 코인 신호가 없어요. 15분마다 갱신됩니다.
+      </div>
+    );
+  }
+
+  const long = counts.long ?? coins.filter((c) => c.side === "LONG").length;
+  const short = counts.short ?? coins.filter((c) => c.side === "SHORT").length;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      {/* 요약 — 롱 vs 숏 카운트 */}
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 11px",
+          background: "var(--z-green-bg)", color: "var(--z-green-hi)",
+          border: "1px solid var(--z-green)", borderRadius: "var(--z-r-full)",
+          fontSize: 13, fontWeight: 800,
+        }}>▲ 롱 {long}</span>
+        <span style={{
+          display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 11px",
+          background: "var(--z-red-bg)", color: "var(--z-red-hi)",
+          border: "1px solid var(--z-red)", borderRadius: "var(--z-r-full)",
+          fontSize: 13, fontWeight: 800,
+        }}>▼ 숏 {short}</span>
+        <span style={{ fontSize: 11, color: "var(--z-text-3)", marginLeft: "auto" }}>
+          점수 높을수록 신호 강함
+        </span>
+      </div>
+
+      {/* 코인 리스트 — 점수순 */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {coins.map((c, i) => {
+          const isLong = c.side === "LONG";
+          const accent = isLong ? "var(--z-green-hi)" : "var(--z-red-hi)";
+          const accentBg = isLong ? "var(--z-green-bg)" : "var(--z-red-bg)";
+          const score = Math.max(0, Math.min(100, parseFloat(c.score || 0)));
+          const conf = c.confidence != null ? Math.round(parseFloat(c.confidence) * 100) : null;
+          return (
+            <div key={c.asset || i} style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "92px 1fr 44px" : "120px 64px 1fr 52px",
+              gap: 10, alignItems: "center",
+              padding: "9px 12px",
+              background: "var(--z-card-2)",
+              borderLeft: `3px solid ${accent}`,
+              border: "1px solid var(--z-border)",
+              borderLeftWidth: 3, borderLeftColor: accent,
+              borderRadius: "var(--z-r-md)",
+            }}>
+              {/* 심볼 + 방향 태그 */}
+              <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+                <span style={{ fontWeight: 800, color: "var(--z-text-1)", fontSize: 14 }}>
+                  {(c.symbol || c.asset || "—").replace("USDT", "")}
+                </span>
+                <span style={{
+                  fontSize: 10, fontWeight: 800, padding: "1px 6px", borderRadius: "var(--z-r-full)",
+                  background: accentBg, color: accent, whiteSpace: "nowrap",
+                }}>{isLong ? "롱" : "숏"}</span>
+              </div>
+
+              {/* 데스크톱: 타임프레임/전략 */}
+              {!isMobile && (
+                <span style={{ fontSize: 11, color: "var(--z-text-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                  {c.timeframe || c.family || "—"}
+                </span>
+              )}
+
+              {/* 점수 막대 */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                <div style={{ flex: 1, height: 7, background: "var(--z-card-hi)", borderRadius: 4, overflow: "hidden", minWidth: 36 }}>
+                  <div style={{ width: `${score}%`, height: "100%", background: accent, borderRadius: 4 }} />
+                </div>
+                <span style={{ fontFamily: "var(--z-font-mono)", fontWeight: 800, color: accent, fontSize: 13, width: 28, textAlign: "right" }}>
+                  {Math.round(score)}
+                </span>
+              </div>
+
+              {/* 확신도 */}
+              <span style={{ textAlign: "right", fontFamily: "var(--z-font-mono)", color: "var(--z-text-3)", fontSize: 12 }}>
+                {conf != null ? `${conf}%` : "—"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════
 // Widget 7 — 시스템 상태 표시등
 // ═══════════════════════════════════════════════════════════════════
 export function SystemStatusIndicator({ status = {}, isMobile = false }) {

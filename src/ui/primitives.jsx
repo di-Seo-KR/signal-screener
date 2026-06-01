@@ -92,7 +92,10 @@ export function Spinner({ size = 16, color = "currentColor" }) {
 }
 
 // ───────────────────────────── Card ─────────────────────────────
-export function Card({ children, title, subtitle, actions, icon, tone, pad = 18, style, noBorder, onClick }) {
+export function Card({ children, title, subtitle, actions, icon, tone, pad = 18, style, noBorder, onClick, collapsible = false, defaultCollapsed = false }) {
+  // ★ 접기 기능 (모바일 스크롤 축소용). collapsible=true 일 때만 헤더 클릭으로 본문 토글.
+  const [collapsed, setCollapsed] = useState(defaultCollapsed);
+  const canCollapse = collapsible && !!title;
   const toneBorder = tone
     ? { danger: "var(--z-red)", warn: "var(--z-yellow)", success: "var(--z-green)", info: "var(--z-blue)" }[tone]
     : "var(--z-border)";
@@ -114,10 +117,16 @@ export function Card({ children, title, subtitle, actions, icon, tone, pad = 18,
       }}
     >
       {(title || actions) && (
-        <header style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "14px 18px", borderBottom: `1px solid var(--z-border)`, gap: 12,
-        }}>
+        <header
+          onClick={canCollapse ? () => setCollapsed((v) => !v) : undefined}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "14px 18px",
+            borderBottom: collapsed ? "none" : `1px solid var(--z-border)`,
+            gap: 12,
+            cursor: canCollapse ? "pointer" : "default",
+            userSelect: canCollapse ? "none" : "auto",
+          }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
             {icon && <div style={{ color: "var(--z-text-2)" }}>{icon}</div>}
             <div style={{ minWidth: 0 }}>
@@ -126,15 +135,26 @@ export function Card({ children, title, subtitle, actions, icon, tone, pad = 18,
                   {title}
                 </div>
               )}
-              {subtitle && (
+              {subtitle && !collapsed && (
                 <div style={{ fontSize: 11, color: "var(--z-text-3)", marginTop: 2 }}>{subtitle}</div>
               )}
             </div>
           </div>
-          {actions && <div style={{ display: "flex", gap: 6, alignItems: "center" }}>{actions}</div>}
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {actions}
+            {canCollapse && (
+              <div style={{
+                color: "var(--z-text-3)", display: "flex", alignItems: "center",
+                transform: collapsed ? "rotate(90deg)" : "rotate(-90deg)",
+                transition: "transform var(--z-dur) var(--z-ease)",
+              }}>
+                <ChevronR size={16} />
+              </div>
+            )}
+          </div>
         </header>
       )}
-      <div style={{ padding: pad }}>{children}</div>
+      {!collapsed && <div style={{ padding: pad }}>{children}</div>}
     </section>
   );
 }
