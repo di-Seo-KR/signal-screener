@@ -25,7 +25,7 @@ import BinanceConnect from "./components/BinanceConnect.jsx";
 // ★ 2026-05-11: PeriodReturnsCard + OperationalMetrics 추가 (대표 지시: 일/주/월 수익 + 운영 메트릭)
 import {
   EquityCurveChart, LiveMetricsRow, PositionDonutChart,
-  TradeHistoryTable, DailyPnLHeatmap, SignalWatchlist, SystemStatusIndicator,
+  TradeHistoryTable, DailyPnLHeatmap, SystemStatusIndicator,
   PeriodReturnsCard, OperationalMetrics, CoinDirectionScores,
 } from "./ui/dashboard-widgets.jsx";
 
@@ -107,9 +107,7 @@ function RealTradingInner() {
   const timerRef = useRef(null);
   const watchlistTimerRef = useRef(null);
   const [lastRefresh, setLastRefresh] = useState(null);
-  // ★ 2026-05-09: Widget 6 시그널 워치리스트 (별도 fetch — 60s 주기)
-  const [watchlist, setWatchlist] = useState({ signals: [], loading: false });
-  // ★ 2026-06-01: 코인별 롱숏 점수 (시그널 풀 양방향 집계 — 워치리스트와 같은 60s 주기)
+  // ★ 2026-06-01: 코인별 롱숏 점수 (시그널 풀 양방향 집계 — 60s 주기)
   const [coinScores, setCoinScores] = useState({ coins: [], counts: {}, loading: false });
   // ★ SSOT — useBreakpoint. 이전엔 768 미만을 "isMobile" 로 봤음 (iPad 세로 포함).
   // 그 동작 유지하려면 isSmall (< 1024) 을 isMobile 로 매핑.
@@ -154,22 +152,19 @@ function RealTradingInner() {
     return () => clearInterval(timerRef.current);
   }, [refresh, userId]);
 
-  // ★ 2026-05-09: 시그널 워치리스트 + 코인 롱숏 점수 — 60초 주기 별도 갱신 (status 와 분리)
+  // ★ 2026-06-01: 코인 롱숏 점수 — 60초 주기 별도 갱신 (status 와 분리)
+  //   (옛 signal-watchlist 는 BUY만 보여줘 제거 — coin-scores 가 양방향 대체)
   const refreshWatchlist = useCallback(async () => {
     if (!userId) return;
-    setWatchlist((prev) => ({ ...prev, loading: true }));
     setCoinScores((prev) => ({ ...prev, loading: true }));
-    // 워치리스트(롱 후보) + 코인 롱숏 점수(양방향) 병렬 조회
-    const [wl, cs] = await Promise.allSettled([
-      jget(`/api/real-trading/signal-watchlist?userId=${encodeURIComponent(userId)}&limit=8&hours=4`),
-      jget(`/api/real-trading/coin-scores?limit=30`),
-    ]);
-    const r = wl.status === "fulfilled" ? wl.value : null;
-    setWatchlist(r?.ok ? { signals: r.signals || [], loading: false } : { signals: [], loading: false });
-    const c = cs.status === "fulfilled" ? cs.value : null;
-    setCoinScores(c?.ok
-      ? { coins: c.coins || [], counts: c.counts || {}, loading: false }
-      : { coins: [], counts: {}, loading: false });
+    try {
+      const c = await jget(`/api/real-trading/coin-scores?limit=30`);
+      setCoinScores(c?.ok
+        ? { coins: c.coins || [], counts: c.counts || {}, loading: false }
+        : { coins: [], counts: {}, loading: false });
+    } catch {
+      setCoinScores((prev) => ({ ...prev, loading: false }));
+    }
   }, [userId]);
 
   useEffect(() => {
@@ -178,6 +173,11 @@ function RealTradingInner() {
     watchlistTimerRef.current = setInterval(refreshWatchlist, 60_000);
     return () => clearInterval(watchlistTimerRef.current);
   }, [refreshWatchlist, userId]);
+
+  // 데스크톱으로 전환 시 모바일 전용 '상세분석' 탭에 머물러 있으면 대시보드로 복귀
+  useEffect(() => {
+    if (!isMobile && section === "analysis") setSection("dashboard");
+  }, [isMobile, section]);
 
   const act = async (action, body = {}, okMsg) => {
     if (!userId) return;
@@ -346,9 +346,12 @@ function RealTradingInner() {
             <div style={{ fontSize: isMobile ? 18 : 28, fontWeight: 900, letterSpacing: "-0.03em", lineHeight: 1 }}>
               실전매매 관제센터
             </div>
-            <div style={{ fontSize: isMobile ? 13 : 15, color: "var(--z-text-3)", marginTop: isMobile ? 3 : 4 }}>
-              Zepta Investment Platform
-            </div>
+            {/* 모바일: 부제(브랜딩) 생략 — 최상단 간소화 */}
+            {!isMobile && (
+              <div style={{ fontSize: 15, color: "var(--z-text-3)", marginTop: 4 }}>
+                Zepta Investment Platform
+              </div>
+            )}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
@@ -1375,6 +1378,8 @@ function RealTradingInner() {
   // ═════════════════════════════════════════════════════════
   const tabs = [
     { id: "dashboard", label: "대시보드" },
+    // 모바일: 무거운 분석 카드(차트·도넛·거래내역·히트맵)는 별도 탭으로 분리 → 대시보드 짧게 유지
+    ...(isMobile ? [{ id: "analysis", label: "상세분석" }] : []),
     { id: "positions", label: `포지션 (${positions.length})` },
   ];
 
@@ -1428,10 +1433,54 @@ function RealTradingInner() {
               <OperationalMetrics positions={positions} orders={orders || []} equity={equity || 0} isMobile={isMobile} />
             </Card>
 
-            {/* Widget 1: 30일 자산 추이 라인 차트 + Widget 2: 라이브 성과 메트릭 */}
+            {/* 안전장치(서킷브레이커)는 핵심이라 모바일 대시보드에도 노출 */}
+            {isMobile && breakerCard}
+
+            {/* ── 무거운 분석 카드: 데스크톱은 대시보드에 그대로, 모바일은 '상세분석' 탭으로 분리 ── */}
+            {!isMobile && (
+              <>
+                {/* Widget 1: 30일 자산 추이 라인 차트 + Widget 2: 라이브 성과 메트릭 */}
+                <Card title="포트폴리오 성과" icon={<TrendUp size={16} />}
+                  subtitle="자동매매 30일 자산 곡선 + 누적 거래 메트릭">
+                  <EquityCurveChart
+                    history={breaker.equityHistory || []}
+                    currentEquity={equity}
+                    peakEquity={breaker.equityHigh30d || breaker.equityHigh}
+                    isMobile={isMobile}
+                  />
+                  <div style={{ marginTop: 14 }}>
+                    <LiveMetricsRow orders={orders || []} isMobile={isMobile} />
+                  </div>
+                </Card>
+
+                <div style={{ display: "grid", gap: 14, gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    <Card title="포트폴리오 분산" icon={<Wallet size={16} />}
+                      subtitle={`${positions.length}개 포지션 · 자산 ${fmtUsd(equity)}`}>
+                      <PositionDonutChart positions={positions} equity={equity || 0} isMobile={isMobile} />
+                    </Card>
+                    <Card title="최근 거래" icon={<Activity size={16} />}
+                      subtitle="최근 10건 (체결·미체결·청산 포함)">
+                      <TradeHistoryTable orders={orders || []} maxRows={10} isMobile={isMobile} />
+                    </Card>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    {breakerCard}
+                  </div>
+                </div>
+
+                <Card title="일별 손익 히트맵" icon={<Gauge size={16} />}
+                  subtitle="최근 30일 일자별 실현손익 강도 — 잘 한 날 vs 잃은 날 한눈에">
+                  <DailyPnLHeatmap orders={orders || []} days={30} isMobile={isMobile} />
+                </Card>
+              </>
+            )}
+          </div>
+        )}
+        {section === "analysis" && isMobile && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <Card title="포트폴리오 성과" icon={<TrendUp size={16} />}
-              subtitle="자동매매 30일 자산 곡선 + 누적 거래 메트릭"
-              collapsible={isMobile} defaultCollapsed={isMobile}>
+              subtitle="30일 자산 곡선 + 누적 거래 메트릭">
               <EquityCurveChart
                 history={breaker.equityHistory || []}
                 currentEquity={equity}
@@ -1442,37 +1491,16 @@ function RealTradingInner() {
                 <LiveMetricsRow orders={orders || []} isMobile={isMobile} />
               </div>
             </Card>
-
-            {/* 좌: 포지션 도넛 + 거래 히스토리 / 우: 시그널 워치 + 서킷브레이커 */}
-            <div style={{ display: "grid", gap: 14, gridTemplateColumns: !isMobile ? "minmax(0, 1.4fr) minmax(0, 1fr)" : "1fr" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {/* Widget 3: 포지션 비중 도넛 */}
-                <Card title="포트폴리오 분산" icon={<Wallet size={16} />}
-                  subtitle={`${positions.length}개 포지션 · 자산 ${fmtUsd(equity)}`}
-                  collapsible={isMobile} defaultCollapsed={isMobile}>
-                  <PositionDonutChart positions={positions} equity={equity || 0} isMobile={isMobile} />
-                </Card>
-                {/* Widget 4: 최근 거래 히스토리 강화 */}
-                <Card title="최근 거래" icon={<Activity size={16} />}
-                  subtitle="최근 10건 (체결·미체결·청산 포함)"
-                  collapsible={isMobile} defaultCollapsed={isMobile}>
-                  <TradeHistoryTable orders={orders || []} maxRows={10} isMobile={isMobile} />
-                </Card>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {/* Widget 6: 시그널 워치리스트 */}
-                <Card title="📡 봇이 추적 중인 시그널" icon={<Target size={16} />}
-                  subtitle="아직 진입 안 함 — 봇이 추적 중인 후보. 한도/리스크 통과하면 자동 진입 (60초 갱신)">
-                  <SignalWatchlist signals={watchlist.signals} loading={watchlist.loading} isMobile={isMobile} />
-                </Card>
-                {breakerCard}
-              </div>
-            </div>
-
-            {/* Widget 5: 일별 손익 히트맵 — 폭이 넓어 단독 행 */}
+            <Card title="포트폴리오 분산" icon={<Wallet size={16} />}
+              subtitle={`${positions.length}개 포지션 · 자산 ${fmtUsd(equity)}`}>
+              <PositionDonutChart positions={positions} equity={equity || 0} isMobile={isMobile} />
+            </Card>
+            <Card title="최근 거래" icon={<Activity size={16} />}
+              subtitle="최근 10건 (체결·미체결·청산 포함)">
+              <TradeHistoryTable orders={orders || []} maxRows={10} isMobile={isMobile} />
+            </Card>
             <Card title="일별 손익 히트맵" icon={<Gauge size={16} />}
-              subtitle="최근 30일 일자별 실현손익 강도 — 잘 한 날 vs 잃은 날 한눈에"
-              collapsible={isMobile} defaultCollapsed={isMobile}>
+              subtitle="최근 30일 일자별 실현손익 강도">
               <DailyPnLHeatmap orders={orders || []} days={30} isMobile={isMobile} />
             </Card>
           </div>

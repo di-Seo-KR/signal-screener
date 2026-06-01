@@ -3,7 +3,7 @@
 // 7개 위젯: 자산곡선·라이브메트릭·포지션도넛·거래내역·일별히트맵·
 //          시그널워치리스트·시스템상태
 // ══════════════════════════════════════════════════════════════════
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 
 // ═══════════════════════════════════════════════════════════════════
 // 공통 포맷터
@@ -812,6 +812,7 @@ export function SignalWatchlist({ signals = [], loading = false, isMobile = fals
 //   코인별로 LONG(초록)/SHORT(빨강) 으로 구분해 점수 막대로 한눈에 표시.
 // ═══════════════════════════════════════════════════════════════════
 export function CoinDirectionScores({ coins = [], counts = {}, loading = false, isMobile = false }) {
+  const [showAll, setShowAll] = useState(false);
   if (loading) {
     return (
       <div style={{ padding: 18, textAlign: "center", fontSize: 14, color: "var(--z-text-3)" }}>
@@ -832,6 +833,11 @@ export function CoinDirectionScores({ coins = [], counts = {}, loading = false, 
 
   const long = counts.long ?? coins.filter((c) => c.side === "LONG").length;
   const short = counts.short ?? coins.filter((c) => c.side === "SHORT").length;
+
+  // 너무 길어지지 않게 기본은 상위 N개만 (점수순). 모바일은 더 짧게.
+  const collapsedLimit = isMobile ? 6 : 12;
+  const visible = showAll ? coins : coins.slice(0, collapsedLimit);
+  const hiddenCount = coins.length - visible.length;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -856,7 +862,7 @@ export function CoinDirectionScores({ coins = [], counts = {}, loading = false, 
 
       {/* 코인 리스트 — 점수순 */}
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-        {coins.map((c, i) => {
+        {visible.map((c, i) => {
           const isLong = c.side === "LONG";
           const accent = isLong ? "var(--z-green-hi)" : "var(--z-red-hi)";
           const accentBg = isLong ? "var(--z-green-bg)" : "var(--z-red-bg)";
@@ -910,6 +916,20 @@ export function CoinDirectionScores({ coins = [], counts = {}, loading = false, 
           );
         })}
       </div>
+
+      {/* 더보기 / 접기 — 리스트가 길면 기본 축약 */}
+      {(hiddenCount > 0 || showAll) && coins.length > collapsedLimit && (
+        <button
+          onClick={() => setShowAll((v) => !v)}
+          style={{
+            marginTop: 2, padding: "8px 10px", width: "100%",
+            background: "transparent", border: "1px dashed var(--z-border)",
+            borderRadius: "var(--z-r-md)", color: "var(--z-text-2)",
+            fontSize: 12, fontWeight: 700, cursor: "pointer",
+          }}>
+          {showAll ? "접기" : `전체 ${coins.length}개 보기 (+${hiddenCount})`}
+        </button>
+      )}
     </div>
   );
 }
