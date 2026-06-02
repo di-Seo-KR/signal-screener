@@ -85,11 +85,13 @@ export default async function handler(req, res) {
       if (raw.length) add("warn", "주입", `canonical 외 raw family 키 잔재: ${raw.join(", ")}`);
     } catch (e) { add("warn", "주입", `확인 실패: ${e?.message}`); }
 
-    // ── [알파랩] 후보 과적합 노출 (UI 오해 소지) ──
+    // ── [알파랩] 후보 데이터 freshness ──
+    //   (옛 'Sharpe>10 단일심볼 노출' 체크는 제거: UI 가 '단일심볼·교차검증 전' 으로 정직하게
+    //    라벨링하므로 오해 소지가 사라졌고, 실제 위험인 '과적합 후보의 승급/주입' 은 위
+    //    '주입 파라미터 과적합(Sharpe>8)' 체크가 담당. 매일 헛알림 방지.)
     try {
       const cands = (await kv.get("di:alpha:strategy-candidates")) || [];
-      const overfit = (Array.isArray(cands) ? cands : []).filter((c) => (c.backtestResult?.sharpe || 0) > 10).length;
-      if (overfit > 0) add("warn", "후보", `과적합 의심 후보 ${overfit}개 노출(Sharpe>10 단일심볼) — UI 오해 소지`);
+      if (!Array.isArray(cands) || cands.length === 0) add("warn", "후보", "후보 풀 비어있음 — 발굴 엔진 점검");
     } catch (e) { add("warn", "후보", `확인 실패: ${e?.message}`); }
 
     const fails = findings.filter((f) => f.level === "fail");
