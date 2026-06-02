@@ -407,7 +407,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "marginType must be ISOLATED or CROSSED" });
     }
 
-    const { apiKey, apiSecret, testnet } = await loadUserCredentials(userId);
+    const { apiKey, apiSecret, testnet } = await loadUserCredentials(userId, req); // ★ 인증 게이트(HTTP 핸들러)
 
     // === 1) 심볼 필터 조회 ===
     const filter = await getSymbolFilter(symbol, testnet);

@@ -11,7 +11,7 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const { apiKey, apiSecret, testnet } = await loadUserCredentials(req.query.userId);
+    const { apiKey, apiSecret, testnet } = await loadUserCredentials(req.query.userId, req);
     const symbol = req.query.symbol;
     const raw = await getPositionRisk({ apiKey, apiSecret, symbol, testnet });
 
