@@ -1483,16 +1483,17 @@ function RealTradingInner() {
             {/* Widget 7: 시스템 상태 표시등 (대시보드 진입 즉시 보이게 상단) */}
             <SystemStatusIndicator status={status?.systemHealth || {}} isMobile={isMobile} />
 
+            {/* ★ 2026-06-03 정보위계: '오늘 얼마 벌었나'를 최상단으로 — 진입 즉시 핵심부터 (대표 지시: 딱딱딱) */}
+            {/* ★ 2026-05-11: 기간별 수익 (일/주/월/누적) — 가장 먼저 보고 싶은 정보 */}
+            <Card title="기간별 수익" icon={<TrendUp size={16} />}
+              subtitle="일·주·월·누적 수익률 + 금액 한눈에 (입출금 제외 순수 매매손익)">
+              <PeriodReturnsCard equity={equity} breaker={breaker} transfers={transfers} isMobile={isMobile} />
+            </Card>
+
             {/* ★ 2026-06-01: 코인별 롱숏 점수 — 엔진이 보는 양방향 신호를 한눈에 (대표 지시) */}
             <Card title="코인별 롱숏 점수" icon={<Target size={16} />}
               subtitle="엔진이 보는 시그널 — 코인별 롱(초록)·숏(빨강) 방향과 강도 (60초 갱신)">
               <CoinDirectionScores coins={coinScores.coins} counts={coinScores.counts} loading={coinScores.loading} isMobile={isMobile} />
-            </Card>
-
-            {/* ★ 2026-05-11: 기간별 수익 (일/주/월/누적) — 가장 먼저 보고 싶은 정보 */}
-            <Card title="기간별 수익" icon={<TrendUp size={16} />}
-              subtitle="일·주·월·누적 수익률 + 금액 한눈에">
-              <PeriodReturnsCard equity={equity} breaker={breaker} transfers={transfers} isMobile={isMobile} />
             </Card>
 
             {/* ★ 2026-05-11: 운영 메트릭 (평균 보유, 24h 거래, 마진 사용률, 노출, 미실현 손익) */}
