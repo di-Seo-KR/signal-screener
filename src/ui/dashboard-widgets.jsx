@@ -229,7 +229,7 @@ export function LiveMetricsRow({ orders = [], isMobile = false }) {
  *  ts 가 target 보다 작거나 같은 가장 큰 sample 우선 (= "그 시점의 equity").
  *  없으면 가장 오래된 sample 반환.
  */
-function equityAt(history, targetTs) {
+function equitySampleAt(history, targetTs) {
   if (!Array.isArray(history) || history.length === 0) return null;
   // sample 들은 시간순으로 정렬돼 있다고 가정 (push 순서)
   let best = null;
@@ -237,43 +237,53 @@ function equityAt(history, targetTs) {
     if (s.ts <= targetTs) best = s;
     else break;
   }
-  return best ? best.equity : history[0].equity;
+  return best || history[0]; // { ts, equity }
 }
 
-export function PeriodReturnsCard({ equity, breaker = {}, netFlows = null, isMobile = false }) {
+// KST(UTC+9) 경계 — 백엔드 period-returns.js 와 동일 공식 (일/주 reset 시점 정합)
+const _KST = 9 * 60 * 60 * 1000;
+function kstDayStartTs(now) { const d = 24 * 60 * 60 * 1000; return Math.floor((now + _KST) / d) * d - _KST; }
+function kstWeekStartTs(now) {
+  const d = 24 * 60 * 60 * 1000;
+  const day = kstDayStartTs(now);
+  const dow = new Date(day + _KST).getUTCDay(); // 0=일 … 6=토
+  return day - ((dow + 6) % 7) * d; // 월=0
+}
+
+export function PeriodReturnsCard({ equity, breaker = {}, transfers = null, isMobile = false }) {
   const periods = useMemo(() => {
     if (!equity || equity <= 0) return [];
     const now = Date.now();
     const dayMs = 24 * 60 * 60 * 1000;
     const history = Array.isArray(breaker.equityHistory) ? breaker.equityHistory : [];
 
-    // 일: breaker.dayStartEquity 우선 (정확한 KST 자정 reset 기반)
-    const dayStartReal = breaker.dayStartEquity || equityAt(history, now - dayMs);
-    const weekStartReal = breaker.weekStartEquity || equityAt(history, now - 7 * dayMs);
-    const monthStartReal = equityAt(history, now - 30 * dayMs);
-    // 누적: equityHistory 의 가장 오래된 sample = 봇 시작 시점 근사
-    const allStartReal = history.length > 0 ? history[0].equity : null;
-
     // ★ 2026-06-03: 입금 부풀림 제거. equity(=totalWalletBalance)는 입금 시 점프하므로
-    //   (자산변화 − 순입출금) 이 순수 실현 매매손익. netFlow 는 백엔드(period-returns)가 KST 경계로 계산.
-    //   netFlow 미도착(null)이면 0 으로 보정 생략(기존 동작) → 화면이 깨지지 않음.
-    const nf = netFlows || {};
-    const mk = (label, startReal, flow, hint) => {
-      const real = startReal != null && startReal > 0;
-      const start = real ? startReal : equity;
-      // 실제 시작점이 없으면(데이터 부족) 보정 불가 → change 0, flow 미적용.
-      const change = real ? (equity - start) - (Number(flow) || 0) : 0;
-      const pct = real && start > 0 ? (change / start) * 100 : 0;
-      return { label, start, change, pct, hint };
-    };
+    //   (자산변화 − 그 시작점 이후 순입출금) = 순수 실현 매매손익.
+    //   ★ 핵심: netFlow 윈도우는 반드시 "시작자산 샘플의 timestamp" 와 일치해야 한다.
+    //     (월/누적은 30/40일 고정이 아니라 실제 샘플 시점 기준 — 안 그러면 시작 이전 입금까지
+    //      빼서 수익률이 음수로 깨짐.) transfer 미도착이면 보정 생략(기존 동작).
+    const tx = Array.isArray(transfers) ? transfers : null;
+    const netFlowSince = (boundaryTs) =>
+      tx ? tx.reduce((s, t) => ((Number(t.time) || 0) >= boundaryTs ? s + (Number(t.amount) || 0) : s), 0) : 0;
 
-    return [
-      mk("오늘", dayStartReal, nf.day, "KST 자정 기준 · 입출금 제외"),
-      mk("이번 주", weekStartReal, nf.week, "월요일 KST 기준 · 입출금 제외"),
-      mk("이번 달", monthStartReal, nf.month, "최근 30일 · 입출금 제외"),
-      mk("누적", allStartReal, nf.all, "봇 시작 이후 · 입출금 제외"),
+    // 각 기간: { startEquity, boundaryTs }. 일/주는 breaker reset(=KST 경계)과 정합, 월/누적은 샘플 ts 사용.
+    const monthSample = equitySampleAt(history, now - 30 * dayMs);
+    const allSample = history.length > 0 ? history[0] : null;
+    const specs = [
+      { label: "오늘",   start: breaker.dayStartEquity ?? equitySampleAt(history, now - dayMs)?.equity ?? null,        bTs: kstDayStartTs(now),  hint: "KST 자정 기준 · 입출금 제외" },
+      { label: "이번 주", start: breaker.weekStartEquity ?? equitySampleAt(history, now - 7 * dayMs)?.equity ?? null,    bTs: kstWeekStartTs(now), hint: "월요일 KST 기준 · 입출금 제외" },
+      { label: "이번 달", start: monthSample?.equity ?? null,  bTs: monthSample?.ts ?? (now - 30 * dayMs),  hint: "최근 30일 · 입출금 제외" },
+      { label: "누적",   start: allSample?.equity ?? null,    bTs: allSample?.ts ?? 0,                      hint: "봇 시작 이후 · 입출금 제외" },
     ];
-  }, [equity, breaker, netFlows]);
+
+    return specs.map(({ label, start, bTs, hint }) => {
+      const real = start != null && start > 0;
+      const base = real ? start : equity;
+      const change = real ? (equity - base) - netFlowSince(bTs) : 0;
+      const pct = real && base > 0 ? (change / base) * 100 : 0;
+      return { label, start: base, change, pct, hint };
+    });
+  }, [equity, breaker, transfers]);
 
   if (periods.length === 0) {
     return (
