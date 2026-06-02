@@ -14,7 +14,7 @@
 
 import { computeIndicatorBundle, gradeConfidence, scaleScore, refineSignalScore } from "./_indicators.js";
 
-const FAMILY = "momentum";
+const FAMILY = "defi-momentum"; // ★ 2026-06-02 "momentum"→canonical (momentum-rotation 으로 흡수되던 것 분리)
 const MIN_BARS = 60;
 
 export function runDefiMomentum({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null }) {

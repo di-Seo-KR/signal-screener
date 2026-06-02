@@ -14,7 +14,7 @@
 
 import { computeIndicatorBundle, gradeConfidence, scaleScore, refineSignalScore } from "./_indicators.js";
 
-const FAMILY = "trend";
+const FAMILY = "trend-follow"; // ★ 2026-06-02 "trend"→canonical (hurst-trend 와 family 충돌 해소)
 const MIN_BARS = 60;
 
 export function runTrendFollow({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null }) {
