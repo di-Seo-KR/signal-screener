@@ -670,7 +670,11 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
         //   대표 관찰: "계속 숏만 잡는다". 약세 알트 + 혼조 레짐이면 전 종목이 한 방향으로
         //   쏠려 진입 → 시장 반전 시 동반 손실. env ZEPTA_MAX_PER_SIDE (기본 0=비활성).
         //   예: 4 로 두면 같은 방향 4개까지만, 5번째부터 차단 → 자연스레 방향 분산 유도.
-        const maxPerSide = Number(process.env.ZEPTA_MAX_PER_SIDE) || 0;
+        // ★ 2026-06-02 (대표 지시 "부족한 부분 다 보완") — 기본 활성화(0→5).
+        //   안전 ceiling: 같은 방향 5개까지 허용(추세 추종 충분), 6번째부터 차단 → 극단
+        //   한 방향 쏠림(−47% 의 한 축) 방지. 현 자본/5x 에선 거의 안 걸리고 자본 커질 때 보호.
+        //   더 강하게 분산하려면 env ZEPTA_MAX_PER_SIDE=3~4 로 조이면 됨.
+        const maxPerSide = Number(process.env.ZEPTA_MAX_PER_SIDE) || 5;
         if (maxPerSide > 0 && Array.isArray(liveOpenPositions) && liveOpenPositions.length) {
           const sameSideCount = liveOpenPositions.filter((pos) => {
             const amt = parseFloat(pos.positionAmt || 0);

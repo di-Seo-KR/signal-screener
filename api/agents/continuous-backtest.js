@@ -44,6 +44,13 @@ const TOP_SYMBOLS = [
 const SYMBOLS_PER_RUN = 6; // ★ 2026-06-02 4→6 (timeout 300초 상향으로 교차검증 심볼 확대)
 const SYMBOL_CURSOR_KEY = "di:continuous-backtest:symbol-cursor";
 
+// ★ 2026-06-02 (churn 수정) — 검증(주입 게이트 + 재검증)은 *고정* 심볼셋으로만.
+//   문제: 발굴/검증이 회전하는 6심볼로 돌아 → 한 회차 통과 파라미터가 다음 회차
+//   다른 심볼셋에서 실패 → 주입↔제거 반복(churn) → active 파라미터가 안 붙음.
+//   해결: 검증 앵커를 고정. 발굴(scan)은 회전+앵커로 폭넓게 하되, 주입/재검증은
+//   *항상 같은* 이 6개 메이저로 판정 → 진짜 일반화된 것만 통과하고, 한번 붙으면 안 빠짐.
+const VALIDATION_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "AVAXUSDT", "LINKUSDT"];
+
 // ★ 2026-05-20 추가 완화 — 대표 지시 "전략 다양화 멈춰있는 거 아니냐":
 //   기존 1.5 / 30 sample → MATICUSDT + ARBUSDT 만 통과 (35건 모두 2개 자산).
 //   - minSharpe 1.5 → 1.0: BTC/ETH/SOL 등 메이저 자산도 통과 가능
@@ -364,8 +371,10 @@ export async function runDiscoveryCycle({ budgetMs = 280_000, symbolsPerRun = SY
     const t0Scan = Date.now();
     const TIMEOUT_BUDGET_MS = budgetMs; // Vercel=280s / Hetzner 워커=무제한(큰 값)
 
-    // 3a) 대상 심볼 OHLC 일괄 확보 (교차심볼 발굴/검증 공용 캐시)
-    for (const symbol of targetSymbols) {
+    // 3a) 대상 심볼 OHLC 일괄 확보 — 회전 심볼(발굴 폭) + 고정 검증 앵커(VALIDATION_SYMBOLS).
+    //   앵커를 항상 캐시에 넣어, 주입/재검증이 매 회차 *동일* 셋으로 판정되게 (churn 방지).
+    const fetchList = [...new Set([...targetSymbols, ...VALIDATION_SYMBOLS])];
+    for (const symbol of fetchList) {
       if (Date.now() - t0Scan > TIMEOUT_BUDGET_MS) { L(`⏱️ timeout — OHLC fetch 중단`); break; }
       try {
         const ohlc = await fetchOhlc(symbol);
@@ -374,6 +383,9 @@ export async function runDiscoveryCycle({ budgetMs = 280_000, symbolsPerRun = SY
       } catch (e) { L(`[${symbol}] OHLC fetch failed: ${e?.message}`); }
     }
     const cachedSymbols = Object.keys(ohlcCache);
+    // 검증 전용 캐시 — 고정 앵커 심볼만 (주입/재검증은 이걸로 → 회차 무관 일관성)
+    const validationCache = {};
+    for (const sym of VALIDATION_SYMBOLS) { if (ohlcCache[sym]) validationCache[sym] = ohlcCache[sym]; }
     const MIN_SYMS = Math.min(VALIDATE_THRESHOLD.minSymbols, cachedSymbols.length || 1);
     L(`★ 교차심볼 발굴 대상: ${cachedSymbols.length}개 (${cachedSymbols.join(", ")})`);
 
@@ -485,7 +497,7 @@ export async function runDiscoveryCycle({ budgetMs = 280_000, symbolsPerRun = SY
     // 4.5) ★ 기존 적재 파라미터 재검증 — 과적합/성능붕괴면 default 복귀 (실거래 정리)
     let revalidated = { cleared: [], refreshed: [] };
     if (!dryRun) {
-      try { revalidated = await revalidateStoredParams(kv, ohlcCache, L); }
+      try { revalidated = await revalidateStoredParams(kv, validationCache, L); }
       catch (e) { L(`[revalidate] 실패: ${e?.message}`); }
     }
 
@@ -493,7 +505,7 @@ export async function runDiscoveryCycle({ budgetMs = 280_000, symbolsPerRun = SY
     let injected = [];
     let injectRejected = [];
     if (newCandidates.length > 0 && !dryRun) {
-      const out = await injectWinningParams(kv, newCandidates, ohlcCache, L);
+      const out = await injectWinningParams(kv, newCandidates, validationCache, L);
       injected = out.injected;
       injectRejected = out.rejected;
       if (injected.length > 0) {
