@@ -67,8 +67,9 @@ export default async function handler(req, res) {
     const now = Date.now();
     const cutoff = now - WINDOW_MS;
 
-    // 코인별로 가장 강한(최고 score) 신호 1개로 집계.
-    //   같은 코인이 여러 타임프레임/시각으로 들어올 수 있으므로 최고 점수를 대표로.
+    // 코인별로 가장 *최근* 신호 1개로 집계 (현재 방향·점수를 즉시 반영).
+    //   이전엔 4h 윈도우 내 최고점수를 썼는데, 점수 정제(하향) 후에도 옛 고점
+    //   엔트리가 남아 과거 값이 표시되는 문제 → 최신 ts 우선으로 변경.
     const byAsset = new Map();
     for (const e of pool) {
       if (!e || (e.ts || 0) < cutoff) continue;
@@ -78,7 +79,7 @@ export default async function handler(req, res) {
       if (!ticker) continue;
       const score = parseFloat(e.score || 0) || 0;
       const prev = byAsset.get(ticker);
-      if (!prev || score > prev.score || (score === prev.score && (e.ts || 0) > prev.ts)) {
+      if (!prev || (e.ts || 0) > prev.ts) {
         byAsset.set(ticker, {
           asset: ticker,
           symbol: `${ticker}USDT`,
