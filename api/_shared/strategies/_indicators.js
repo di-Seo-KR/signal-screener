@@ -223,3 +223,117 @@ export function scaleScore(absNet) {
   const base = 50 + Math.min(absNet, 8) * 6;
   return Math.min(95, Math.max(50, base));
 }
+
+// ════════════════════════════════════════════════════════
+// 알파 정제 레이어 (2026-06-02) — 스코어 결정요인 고도화
+// ────────────────────────────────────────────────────────
+// 문제(대표 관찰): RSI 30 이하인데도 trend-follow 가 숏 95 를 냄.
+//   원인 = (1) 상관된 추세 지표(EMA배열·MACD·데드크로스·EMA200)가 같은 신호를
+//   여러 번 세서 확신도 인플레, (2) 추세장에 반전·과열·소진 감지가 전무.
+// 해결(전부 dampening-우세 = 과신 축소 방향이라 안전):
+//   ① 과확장 페널티  ② 다이버전스(추세 반대)  ③ 극단 RSI 소진
+//   ④ 거래량 페이드  ⑤ 독립 확인 폭(breadth) 기반 점수 캡 (상관 인플레 차단)
+// ════════════════════════════════════════════════════════
+
+// 가격 ↔ 지표 다이버전스. 윈도우를 절반으로 나눠 직전/현재 극값 비교.
+//   bullish: 가격 더 낮은 저점 + 지표 더 높은 저점 → 하락 소진(숏 약화 근거)
+//   bearish: 가격 더 높은 고점 + 지표 더 낮은 고점 → 상승 소진(롱 약화 근거)
+export function detectDivergence(price, series, L, lookback = 12) {
+  if (!price || !series || L < lookback + 1) return { bullish: false, bearish: false };
+  const half = Math.floor(lookback / 2);
+  let pMinNow = Infinity, pMaxNow = -Infinity, sMinNow = Infinity, sMaxNow = -Infinity;
+  let pMinPrev = Infinity, pMaxPrev = -Infinity, sMinPrev = Infinity, sMaxPrev = -Infinity;
+  for (let i = L - half + 1; i <= L; i++) {
+    if (price[i] == null || series[i] == null) continue;
+    pMinNow = Math.min(pMinNow, price[i]); pMaxNow = Math.max(pMaxNow, price[i]);
+    sMinNow = Math.min(sMinNow, series[i]); sMaxNow = Math.max(sMaxNow, series[i]);
+  }
+  for (let i = L - lookback + 1; i <= L - half; i++) {
+    if (price[i] == null || series[i] == null) continue;
+    pMinPrev = Math.min(pMinPrev, price[i]); pMaxPrev = Math.max(pMaxPrev, price[i]);
+    sMinPrev = Math.min(sMinPrev, series[i]); sMaxPrev = Math.max(sMaxPrev, series[i]);
+  }
+  if (!isFinite(pMinPrev) || !isFinite(pMinNow)) return { bullish: false, bearish: false };
+  return {
+    bullish: pMinNow < pMinPrev && sMinNow > sMinPrev,
+    bearish: pMaxNow > pMaxPrev && sMaxNow < sMaxPrev,
+  };
+}
+
+// 원시 buy/sell 표 → 정제된 net/score/confidence.
+//   strategy 들이 net 계산 직전에 호출. dampening 우세이며, 정상 추세(과확장·
+//   다이버전스·극단·거래량부진 없음)에선 표 변화 0 → 기존과 동일 신호.
+export function refineSignalScore({ buy, sell, ind, closes, volumes, L, extensionPenalty = true }) {
+  let adjBuy = buy, adjSell = sell;
+  const notes = [];
+  const price = closes?.[L];
+  const atr = ind.atr?.[L];
+  const ema21 = ind.ema21?.[L];
+  const ema55 = ind.ema55?.[L];
+  const rsi = ind.rsi?.[L];
+
+  const side = (buy - sell) >= 0 ? "LONG" : "SHORT";
+
+  // ① 과확장 페널티 — 가격이 EMA21 에서 ATR 3배 이상 벌어지면 되돌림 위험
+  //   (breakout 처럼 확장이 본질인 전략은 extensionPenalty=false 로 건너뜀)
+  if (extensionPenalty && atr && ema21 && atr > 0 && price != null) {
+    const ext = (price - ema21) / atr;
+    if (ext > 3 && side === "LONG") { adjBuy = Math.max(0, adjBuy - 2); notes.push(`과확장↑${ext.toFixed(1)}ATR`); }
+    if (ext < -3 && side === "SHORT") { adjSell = Math.max(0, adjSell - 2); notes.push(`과확장↓${ext.toFixed(1)}ATR`); }
+  }
+
+  // ② 다이버전스 — 추세 반대 신호면 dampening
+  const divRsi = detectDivergence(closes, ind.rsi, L, 12);
+  const divMacd = detectDivergence(closes, ind.histogram, L, 12);
+  if (side === "SHORT" && (divRsi.bullish || divMacd.bullish)) { adjSell = Math.max(0, adjSell - 2); notes.push("강세다이버전스"); }
+  if (side === "LONG" && (divRsi.bearish || divMacd.bearish)) { adjBuy = Math.max(0, adjBuy - 2); notes.push("약세다이버전스"); }
+
+  // ③ 극단 RSI 소진 — 추세 모멘텀이 과매도/과매수 극단이면 지속 확신 ↓
+  if (rsi != null) {
+    if (side === "SHORT" && rsi < 25) { adjSell = Math.max(0, adjSell - 1); notes.push(`RSI${rsi.toFixed(0)}과매도소진`); }
+    if (side === "LONG" && rsi > 75) { adjBuy = Math.max(0, adjBuy - 1); notes.push(`RSI${rsi.toFixed(0)}과매수소진`); }
+  }
+
+  // ④ 거래량 페이드 — 추세가 거래량 빠지며 진행되면 확신 ↓
+  const volMult = (ind.volSMA?.[L] > 0 && volumes && volumes[L] != null) ? volumes[L] / ind.volSMA[L] : 1;
+  if (volMult < 0.7) {
+    if (side === "LONG") adjBuy = Math.max(0, adjBuy - 1); else adjSell = Math.max(0, adjSell - 1);
+    notes.push(`거래량부진${volMult.toFixed(1)}x`);
+  }
+
+  // dampening 이 부호를 뒤집지 않도록 중립까지만 (whipsaw 방지)
+  if (side === "SHORT") adjSell = Math.max(adjSell, adjBuy);
+  else adjBuy = Math.max(adjBuy, adjSell);
+
+  const net = adjBuy - adjSell;
+  const absNet = Math.abs(net);
+  const finalSide = net >= 0 ? "LONG" : "SHORT";
+  const fdir = finalSide === "LONG" ? 1 : -1;
+
+  // ⑤ 독립 확인 폭(breadth) — 상관 요인 인플레 차단. 추세/모멘텀/거래량 3 카테고리.
+  let confirms = 0;
+  const macd = ind.macdLine?.[L], macdSig = ind.macdSig?.[L];
+  if (ema21 != null && ema55 != null && macd != null && macdSig != null) {
+    const trendDir = ema21 > ema55 ? 1 : -1;
+    const macdDir = macd > macdSig ? 1 : -1;
+    if (trendDir === fdir && macdDir === fdir) confirms++;           // 추세 카테고리
+  }
+  if (rsi != null) {                                                  // 모멘텀 — '건강한' 구간만 (극단은 비확인)
+    if (fdir > 0 && rsi > 50 && rsi <= 72) confirms++;
+    if (fdir < 0 && rsi < 50 && rsi >= 28) confirms++;
+  }
+  const obvNow = ind.obv?.[L], obvPast = ind.obv?.[L - 5];
+  if (obvNow != null && obvPast != null && volMult >= 0.9) {          // 거래량 카테고리 — OBV 기울기 동의
+    if ((obvNow > obvPast ? 1 : -1) === fdir) confirms++;
+  }
+
+  // breadth 캡: 0→55, 1→68, 2→82, 3→95 (상관 요인만으론 95 불가)
+  const breadthCap = [55, 68, 82, 95][Math.min(confirms, 3)];
+  const score = Math.min(scaleScore(absNet), breadthCap);
+
+  // confidence: A 는 독립확인 2개+ AND absNet 6+ 일 때만
+  let confidence = gradeConfidence(absNet);
+  if (confidence === "A" && confirms < 2) confidence = "B";
+
+  return { side: finalSide, net, absNet, score, confidence, confirms, notes };
+}

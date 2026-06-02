@@ -12,7 +12,7 @@
 //   SHORT — OBV 하락추세 + 14일 수익률<-3% + EMA21<55 + RSI 30~50
 // ════════════════════════════════════════════════════════
 
-import { computeIndicatorBundle, gradeConfidence, scaleScore } from "./_indicators.js";
+import { computeIndicatorBundle, gradeConfidence, scaleScore, refineSignalScore } from "./_indicators.js";
 
 const FAMILY = "momentum";
 const MIN_BARS = 60;
@@ -79,21 +79,23 @@ export function runDefiMomentum({ closes, highs, lows, volumes, asset, timeframe
     }
   }
 
-  const netScore = buy - sell;
-  const absNet = Math.abs(netScore);
-  if (absNet < MIN_ABS_NET) return null;
+  // ★ 2026-06-02 — 알파 정제 레이어 (과확장·다이버전스·극단RSI·거래량·breadth 캡)
+  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L });
+  if (refined.absNet < MIN_ABS_NET) return null;
+  if (refined.notes.length) reasons.push(...refined.notes);
 
-  const side = netScore > 0 ? "LONG" : "SHORT";
+  const side = refined.side;
+  const sz = Math.max(0.35, Math.min(0.8, refined.absNet / 9));
   return {
     side,
-    score: scaleScore(absNet),
-    confidence: gradeConfidence(absNet),
+    score: refined.score,
+    confidence: refined.confidence,
     family: FAMILY,
     timeframe,
     reason: `[${timeframe}|defi-momentum] ` + reasons.join(" + "),
-    sizeHint: Math.max(0.35, Math.min(0.8, absNet / 9)),
+    sizeHint: sz,
     type: side === "LONG" ? "BUY" : "SELL",
-    positionSize: Math.max(0.35, Math.min(0.8, absNet / 9)),
+    positionSize: sz,
   };
 }
 

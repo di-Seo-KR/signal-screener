@@ -12,7 +12,7 @@
 //   ADX 약하면 시그널 안 냄 (필터)
 // ════════════════════════════════════════════════════════
 
-import { computeIndicatorBundle, gradeConfidence, scaleScore } from "./_indicators.js";
+import { computeIndicatorBundle, gradeConfidence, scaleScore, refineSignalScore } from "./_indicators.js";
 
 const FAMILY = "trend";
 const MIN_BARS = 60;
@@ -91,22 +91,25 @@ export function runTrendFollow({ closes, highs, lows, volumes, asset, timeframe 
     }
   }
 
-  const net = buy - sell;
-  const absNet = Math.abs(net);
-  if (absNet < MIN_ABS_NET) return null; // 추세장 약한 합의는 매매 안 함
+  // ★ 2026-06-02 — 알파 정제 레이어: 과확장·다이버전스·극단RSI소진·거래량페이드
+  //   dampening + 독립확인 폭(breadth) 점수 캡. 정상 추세면 표 변화 0(기존과 동일).
+  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L });
+  if (refined.absNet < MIN_ABS_NET) return null; // 추세장 약한 합의는 매매 안 함
+  if (refined.notes.length) reasons.push(...refined.notes);
 
-  const side = net > 0 ? "LONG" : "SHORT";
+  const side = refined.side;
+  const sz = Math.max(0.3, Math.min(0.9, refined.absNet / 10));
   return {
     side,
-    score: scaleScore(absNet),
-    confidence: gradeConfidence(absNet),
+    score: refined.score,
+    confidence: refined.confidence,
     family: FAMILY,
     timeframe,
     reason: `[${timeframe}|trend-follow] ` + reasons.join(" + "),
-    sizeHint: Math.max(0.3, Math.min(0.9, absNet / 10)),
+    sizeHint: sz,
     // btc-cron 호환 필드
     type: side === "LONG" ? "BUY" : "SELL",
-    positionSize: Math.max(0.3, Math.min(0.9, absNet / 10)),
+    positionSize: sz,
   };
 }
 
