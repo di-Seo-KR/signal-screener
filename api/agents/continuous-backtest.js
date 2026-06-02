@@ -272,18 +272,19 @@ async function fetchOhlc(symbol = "BTCUSDT") {
 
 // ★ 심볼 rotation — KV 커서 기반으로 cron 마다 다음 N 심볼 선택.
 //   13 symbols × 매 4시간 × 4 symbols/run = 약 13시간 안에 모든 심볼 cycle 완료.
-async function pickRotatingSymbols(kv) {
+async function pickRotatingSymbols(kv, symbolsPerRun = SYMBOLS_PER_RUN) {
   let cursor = 0;
   try {
     const raw = await kv.get(SYMBOL_CURSOR_KEY);
     cursor = typeof raw === "number" ? raw : (parseInt(raw, 10) || 0);
     if (!Number.isFinite(cursor) || cursor < 0) cursor = 0;
   } catch { cursor = 0; }
+  const n = Math.min(symbolsPerRun, TOP_SYMBOLS.length);
   const selected = [];
-  for (let i = 0; i < SYMBOLS_PER_RUN; i += 1) {
+  for (let i = 0; i < n; i += 1) {
     selected.push(TOP_SYMBOLS[(cursor + i) % TOP_SYMBOLS.length]);
   }
-  const nextCursor = (cursor + SYMBOLS_PER_RUN) % TOP_SYMBOLS.length;
+  const nextCursor = (cursor + n) % TOP_SYMBOLS.length;
   try { await kv.set(SYMBOL_CURSOR_KEY, nextCursor); } catch {}
   return { selected, cursor, nextCursor };
 }
@@ -326,12 +327,16 @@ async function evaluateExistingCandidates(kv, leaderboard) {
   return { promoted, remaining: kept.length };
 }
 
-export default async function handler(req, res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+// ════════════════════════════════════════════════════════════════════
+// ★ 2026-06-02 (P4) 발굴 사이클 추출 — Vercel cron 핸들러 + Hetzner 워커 공유.
+//   동일 로직을 두 실행 환경이 함께 쓴다 (로직 분기 방지).
+//   - Vercel cron: budgetMs=280s (300초 timeout 안전 마진)
+//   - Hetzner 워커: budgetMs 무제한(큰 값) + symbolsPerRun 확대 가능 → 연속·전수 발굴
+// ════════════════════════════════════════════════════════════════════
+export async function runDiscoveryCycle({ budgetMs = 280_000, symbolsPerRun = SYMBOLS_PER_RUN, dryRun = false } = {}) {
   const t0 = Date.now();
   const log = [];
-  const L = (m) => { log.push(m); console.log("[continuous-backtest]", m); };
-  const dryRun = req.query?.dryRun === "1" || req.query?.dryRun === "true";
+  const L = (m) => { log.push(m); console.log("[discovery]", m); };
 
   try {
     const kv = await getKv();
@@ -342,7 +347,7 @@ export default async function handler(req, res) {
     L(`existing candidates: ${remaining + promoted.length} (promoted ${promoted.length})`);
 
     // 2) 심볼 rotation — 매 cron 마다 다음 SYMBOLS_PER_RUN 개 심볼 처리
-    const { selected: targetSymbols, cursor, nextCursor } = await pickRotatingSymbols(kv);
+    const { selected: targetSymbols, cursor, nextCursor } = await pickRotatingSymbols(kv, symbolsPerRun);
     L(`symbol rotation: cursor ${cursor} → ${nextCursor}, selected: ${targetSymbols.join(", ")}`);
 
     // ★ family 별 발굴 통계 + quota 카운터 초기화 (이번 cron 한정)
@@ -357,7 +362,7 @@ export default async function handler(req, res) {
     const scanResults = {};       // { [symbol]: { [strategyId]: {...} } }
     const ohlcCache = {};         // { [symbol]: ohlc } — 주입 시 교차검증 재사용 (과적합 가드)
     const t0Scan = Date.now();
-    const TIMEOUT_BUDGET_MS = 280_000; // 300초 maxDuration 중 280초 limit (안전 마진)
+    const TIMEOUT_BUDGET_MS = budgetMs; // Vercel=280s / Hetzner 워커=무제한(큰 값)
 
     // 3a) 대상 심볼 OHLC 일괄 확보 (교차심볼 발굴/검증 공용 캐시)
     for (const symbol of targetSymbols) {
@@ -498,7 +503,7 @@ export default async function handler(req, res) {
       }
     }
 
-    return res.status(200).json({
+    return {
       ok: true,
       durationMs: Date.now() - t0,
       promoted,
@@ -512,9 +517,17 @@ export default async function handler(req, res) {
       scanResults,
       dryRun,
       log,
-    });
+    };
   } catch (err) {
-    console.error("[continuous-backtest] fatal:", err);
-    return res.status(200).json({ ok: false, error: err?.message || String(err), log });
+    console.error("[discovery] fatal:", err);
+    return { ok: false, error: err?.message || String(err), log };
   }
+}
+
+// Vercel cron 핸들러 — 추출된 runDiscoveryCycle 을 280초 예산으로 호출 (얇은 래퍼).
+export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  const dryRun = req.query?.dryRun === "1" || req.query?.dryRun === "true";
+  const result = await runDiscoveryCycle({ budgetMs: 280_000, symbolsPerRun: SYMBOLS_PER_RUN, dryRun });
+  return res.status(200).json(result);
 }
