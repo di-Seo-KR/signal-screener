@@ -118,6 +118,8 @@ function RealTradingInner() {
   const [lastRefresh, setLastRefresh] = useState(null);
   // ★ 2026-06-01: 코인별 롱숏 점수 (시그널 풀 양방향 집계 — 60s 주기)
   const [coinScores, setCoinScores] = useState({ coins: [], counts: {}, loading: false });
+  // ★ 2026-06-03: 포지션별 봇 plan (익절/손절가) — 심볼별 맵 (60s 주기)
+  const [posPlans, setPosPlans] = useState({});
   // ★ SSOT — useBreakpoint. 이전엔 768 미만을 "isMobile" 로 봤음 (iPad 세로 포함).
   // 그 동작 유지하려면 isSmall (< 1024) 을 isMobile 로 매핑.
   const { isSmall } = useBreakpoint();
@@ -166,13 +168,20 @@ function RealTradingInner() {
   const refreshWatchlist = useCallback(async () => {
     if (!userId) return;
     setCoinScores((prev) => ({ ...prev, loading: true }));
-    try {
-      const c = await jget(`/api/real-trading/coin-scores?limit=30`);
-      setCoinScores(c?.ok
-        ? { coins: c.coins || [], counts: c.counts || {}, loading: false }
-        : { coins: [], counts: {}, loading: false });
-    } catch {
-      setCoinScores((prev) => ({ ...prev, loading: false }));
+    // 코인 롱숏 점수 + 포지션 plan(익절/손절) 병렬 조회
+    const [cs, pp] = await Promise.allSettled([
+      jget(`/api/real-trading/coin-scores?limit=30`),
+      jget(`/api/real-trading/position-plans?userId=${encodeURIComponent(userId)}`),
+    ]);
+    const c = cs.status === "fulfilled" ? cs.value : null;
+    setCoinScores(c?.ok
+      ? { coins: c.coins || [], counts: c.counts || {}, loading: false }
+      : { coins: [], counts: {}, loading: false });
+    const pl = pp.status === "fulfilled" ? pp.value : null;
+    if (pl?.ok && Array.isArray(pl.positions)) {
+      const map = {};
+      for (const x of pl.positions) map[x.symbol] = x;
+      setPosPlans(map);
     }
   }, [userId]);
 
@@ -950,6 +959,37 @@ function RealTradingInner() {
             </div>
           </div>
         </div>
+
+        {/* ★ 2026-06-03 익절/손절 (봇 plan) — 진입 시 저장된 실제 TP/SL */}
+        {(() => {
+          const plan = posPlans[p.symbol];
+          if (!plan) return null;
+          if (!plan.hasPlan) {
+            return (
+              <div style={{ paddingTop: 10, borderTop: "1px solid var(--z-border)", fontSize: 12, color: "var(--z-text-3)" }}>
+                수동 포지션 · 봇 익절/손절 관리 밖
+              </div>
+            );
+          }
+          return (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, paddingTop: 10, borderTop: "1px solid var(--z-border)" }}>
+              <div>
+                <div style={{ fontSize: 12, color: "var(--z-text-3)", marginBottom: 2 }}>익절 (TP)</div>
+                <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)", color: "var(--z-green-hi)" }}>
+                  {fmtUsd(plan.tpPrice)}
+                  {plan.distToTpPct != null && <span style={{ fontSize: 11, color: "var(--z-text-3)", marginLeft: 4 }}>{Math.abs(plan.distToTpPct)}%</span>}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: "var(--z-text-3)", marginBottom: 2 }}>손절 (SL)</div>
+                <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)", color: "var(--z-red-hi)" }}>
+                  {fmtUsd(plan.slPrice)}
+                  {plan.distToSlPct != null && <span style={{ fontSize: 11, color: "var(--z-text-3)", marginLeft: 4 }}>{Math.abs(plan.distToSlPct)}%</span>}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   };
@@ -1017,6 +1057,19 @@ function RealTradingInner() {
                   {fmtUsd(p.unRealizedProfit)}
                 </span>
               )
+            },
+            { key: "tpsl", label: "익절 / 손절", align: "right",
+              render: (p) => {
+                const plan = posPlans[p.symbol];
+                if (!plan) return "—";
+                if (!plan.hasPlan) return <span style={{ color: "var(--z-text-3)", fontSize: 12 }}>수동</span>;
+                return (
+                  <div style={{ fontFamily: "var(--z-font-mono)", fontSize: 12, lineHeight: 1.5 }}>
+                    <div style={{ color: "var(--z-green-hi)" }}>{fmtUsd(plan.tpPrice)}</div>
+                    <div style={{ color: "var(--z-red-hi)" }}>{fmtUsd(plan.slPrice)}</div>
+                  </div>
+                );
+              }
             },
           ]}
           rows={positions}
