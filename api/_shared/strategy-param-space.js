@@ -55,6 +55,11 @@ export const PARAM_SPACE = {
     CONSENSUS_MIN: [2, 3],
     MIN_ABS_NET: [3, 4],
   },
+  "supertrend": {
+    ATR_PERIOD: [7, 10, 14],
+    ST_MULT: [2.0, 3.0, 4.0],
+    MIN_ABS_NET: [2, 3],
+  },
 };
 
 /**
@@ -111,6 +116,12 @@ export const WIDE_PARAM_SPACE = {
   "ensemble": {
     CONSENSUS_MIN: [2, 3, 4],
     MIN_ABS_NET: [2, 3, 4, 5, 6],
+  },
+  "supertrend": {
+    ATR_PERIOD: [7, 10, 14, 20],
+    ST_MULT: [1.5, 2.0, 2.5, 3.0, 3.5, 4.0],
+    ADX_MIN: [12, 18, 24, 30],
+    MIN_ABS_NET: [1, 2, 3, 4],
   },
 };
 
