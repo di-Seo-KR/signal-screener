@@ -56,7 +56,7 @@ export default async function handler(req, res) {
     const { userId, reason = "user_triggered" } = body;
     if (!userId) return res.status(400).json({ error: "userId required" });
 
-    const { apiKey, apiSecret, testnet } = await loadUserCredentials(userId);
+    const { apiKey, apiSecret, testnet } = await loadUserCredentials(userId, req);
 
     // === 1) 전 심볼 오픈 포지션 조회 ===
     const risks = await getPositionRisk({ apiKey, apiSecret, testnet });

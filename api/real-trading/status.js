@@ -51,7 +51,7 @@ export default async function handler(req, res) {
     let openPositions = [];
     let binanceOk = true;
     try {
-      const creds = await loadUserCredentials(userId);
+      const creds = await loadUserCredentials(userId, req);
       const [acct, positions] = await Promise.all([
         getAccountInfo(creds),
         getPositionRisk(creds),

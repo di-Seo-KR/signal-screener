@@ -20,6 +20,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ga } from "../lib/analytics.js";
+import { supabase } from "../supabaseClient.js";
 
 const colors = {
   dark: {
@@ -37,14 +38,21 @@ const colors = {
   },
 };
 
+async function authHeaders() {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const t = data?.session?.access_token;
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  } catch { return {}; }
+}
 async function jget(url) {
-  const r = await fetch(url, { credentials: "same-origin" });
+  const r = await fetch(url, { credentials: "same-origin", headers: { ...(await authHeaders()) } });
   return r.json();
 }
 async function jpost(url, body) {
   const r = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify(body || {}),
   });
   return r.json();

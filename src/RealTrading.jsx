@@ -8,6 +8,7 @@
 // ══════════════════════════════════════════════════════════════════
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "./AuthProvider.jsx";
+import { supabase } from "./supabaseClient.js";
 import { ga } from "./lib/analytics.js";
 import {
   Button, Card, Badge, Stat, Tabs, Dialog, Tooltip, Skeleton, Switch, Segmented,
@@ -62,14 +63,22 @@ const fmtQty = (v) => {
 const fmtTime = (t) => t ? new Date(t).toLocaleTimeString("ko-KR", { hour12: false }) : "—";
 const fmtDT = (t) => t ? new Date(t).toLocaleString("ko-KR", { hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
 
+// ★ 2026-06-02 — Supabase 세션 토큰을 Authorization 으로 첨부 (서버 인증 게이트용).
+async function authHeaders() {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const t = data?.session?.access_token;
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  } catch { return {}; }
+}
 async function jget(url) {
-  const r = await fetch(url, { credentials: "same-origin" });
+  const r = await fetch(url, { credentials: "same-origin", headers: { ...(await authHeaders()) } });
   return r.json();
 }
 async function jpost(url, body) {
   const r = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeaders()) },
     body: JSON.stringify(body || {}),
   });
   return r.json();

@@ -47,7 +47,7 @@ export default async function handler(req, res) {
     if (!symbol) return res.status(400).json({ error: "symbol required" });
     if (percent <= 0 || percent > 100) return res.status(400).json({ error: "percent must be 0~100" });
 
-    const { apiKey, apiSecret, testnet } = await loadUserCredentials(userId);
+    const { apiKey, apiSecret, testnet } = await loadUserCredentials(userId, req);
 
     const risks = await getPositionRisk({ apiKey, apiSecret, symbol, testnet });
     const pos = (risks || []).find(p => parseFloat(p.positionAmt || 0) !== 0);
