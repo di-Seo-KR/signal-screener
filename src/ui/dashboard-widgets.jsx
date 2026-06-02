@@ -240,7 +240,7 @@ function equityAt(history, targetTs) {
   return best ? best.equity : history[0].equity;
 }
 
-export function PeriodReturnsCard({ equity, breaker = {}, isMobile = false }) {
+export function PeriodReturnsCard({ equity, breaker = {}, netFlows = null, isMobile = false }) {
   const periods = useMemo(() => {
     if (!equity || equity <= 0) return [];
     const now = Date.now();
@@ -248,25 +248,32 @@ export function PeriodReturnsCard({ equity, breaker = {}, isMobile = false }) {
     const history = Array.isArray(breaker.equityHistory) ? breaker.equityHistory : [];
 
     // 일: breaker.dayStartEquity 우선 (정확한 KST 자정 reset 기반)
-    const dayStart = breaker.dayStartEquity || equityAt(history, now - dayMs) || equity;
-    const weekStart = breaker.weekStartEquity || equityAt(history, now - 7 * dayMs) || equity;
-    const monthStart = equityAt(history, now - 30 * dayMs) || equity;
+    const dayStartReal = breaker.dayStartEquity || equityAt(history, now - dayMs);
+    const weekStartReal = breaker.weekStartEquity || equityAt(history, now - 7 * dayMs);
+    const monthStartReal = equityAt(history, now - 30 * dayMs);
     // 누적: equityHistory 의 가장 오래된 sample = 봇 시작 시점 근사
-    const allStart = history.length > 0 ? history[0].equity : equity;
+    const allStartReal = history.length > 0 ? history[0].equity : null;
 
-    const mk = (label, start, hint) => {
-      const change = equity - start;
-      const pct = start > 0 ? (change / start) * 100 : 0;
+    // ★ 2026-06-03: 입금 부풀림 제거. equity(=totalWalletBalance)는 입금 시 점프하므로
+    //   (자산변화 − 순입출금) 이 순수 실현 매매손익. netFlow 는 백엔드(period-returns)가 KST 경계로 계산.
+    //   netFlow 미도착(null)이면 0 으로 보정 생략(기존 동작) → 화면이 깨지지 않음.
+    const nf = netFlows || {};
+    const mk = (label, startReal, flow, hint) => {
+      const real = startReal != null && startReal > 0;
+      const start = real ? startReal : equity;
+      // 실제 시작점이 없으면(데이터 부족) 보정 불가 → change 0, flow 미적용.
+      const change = real ? (equity - start) - (Number(flow) || 0) : 0;
+      const pct = real && start > 0 ? (change / start) * 100 : 0;
       return { label, start, change, pct, hint };
     };
 
     return [
-      mk("오늘", dayStart, "KST 자정 reset 기준"),
-      mk("이번 주", weekStart, "월요일 KST 자정 기준"),
-      mk("이번 달", monthStart, "최근 30일 시작"),
-      mk("누적", allStart, "봇 시작 이후"),
+      mk("오늘", dayStartReal, nf.day, "KST 자정 기준 · 입출금 제외"),
+      mk("이번 주", weekStartReal, nf.week, "월요일 KST 기준 · 입출금 제외"),
+      mk("이번 달", monthStartReal, nf.month, "최근 30일 · 입출금 제외"),
+      mk("누적", allStartReal, nf.all, "봇 시작 이후 · 입출금 제외"),
     ];
-  }, [equity, breaker]);
+  }, [equity, breaker, netFlows]);
 
   if (periods.length === 0) {
     return (
