@@ -7,6 +7,7 @@
 import { sendCards, buildCard, fmtKSTShort } from "./_shared/telegram.js";
 import { runStrategyForBot, getStrategyNameForBot } from "./_shared/strategies/index.js";
 import { getAllStoredStrategyParams } from "./_shared/dynamic-config.js";
+import { getFundingRates } from "./_shared/binance-client.js";
 
 export const config = { maxDuration: 120 };
 
@@ -319,6 +320,15 @@ export default async function handler(req, res) {
       addLog(`⚠️ 전략 파라미터 로드 실패 (baseline 사용): ${e?.message}`);
     }
 
+    // ★ 2026-06-02 (P3) 펀딩비 1회 batch 조회 — 숏/롱 과밀(스퀴즈) 신호 dampening 용.
+    //   실패해도 {} → dampening 스킵, cron 영향 0 (안전).
+    let fundingMap = {};
+    try {
+      fundingMap = await getFundingRates();
+      const n = Object.keys(fundingMap).length;
+      if (n > 0) addLog(`💸 펀딩비 ${n}개 심볼 로드`);
+    } catch { /* 무시 */ }
+
     for (const asset of CRYPTO_ASSETS) {
       addLog(`\n📊 ${asset} 스캔 중...`);
       const ccSymbol = CC_SYMBOLS[asset];
@@ -506,6 +516,38 @@ export default async function handler(req, res) {
         assetResults.push({ asset, ok: true, action: "wait", signal: null });
         continue;
       }
+
+      // ★ 2026-06-02 (P3) MTF 정합 + 펀딩비 dampening — 최종 신호 확신 보정 (전부 하향=안전).
+      try {
+        const sSide = latestSignal.side;
+        // (a) MTF: 4h 추세(EMA21 vs EMA55)가 신호와 충돌하면 확신 하향
+        if (sSide && Array.isArray(candles4h) && candles4h.length >= 61) {
+          const c4 = candles4h.map(c => c.close);
+          const e21 = calcEMA(c4, 21), e55 = calcEMA(c4, 55);
+          const L4 = c4.length - 1;
+          if (e21[L4] != null && e55[L4] != null) {
+            const tf4Dir = e21[L4] > e55[L4] ? "LONG" : "SHORT";
+            if (tf4Dir !== sSide) {
+              latestSignal.score = Math.max(50, Math.round((latestSignal.score || 60) * 0.85));
+              if (latestSignal.confidence === "A") latestSignal.confidence = "B";
+              latestSignal.reason = (latestSignal.reason || "") + " +MTF충돌(4h역방향)";
+              addLog(`  ↘ ${asset} MTF 충돌(4h ${tf4Dir} vs ${sSide}) → 확신 하향`);
+            }
+          }
+        }
+        // (b) 펀딩비: 신호 방향으로 과밀(스퀴즈 위험)이면 확신 하향
+        const sym = asset.includes("USDT") ? asset : `${asset}USDT`;
+        const fr = fundingMap[sym];
+        if (Number.isFinite(fr) && sSide) {
+          const crowded = (sSide === "SHORT" && fr < -0.0003) || (sSide === "LONG" && fr > 0.0003);
+          if (crowded) {
+            latestSignal.score = Math.max(50, Math.round((latestSignal.score || 60) * 0.85));
+            if (latestSignal.confidence === "A") latestSignal.confidence = "B";
+            latestSignal.reason = (latestSignal.reason || "") + ` +펀딩과밀(${(fr * 100).toFixed(3)}%)`;
+            addLog(`  ↘ ${asset} 펀딩 과밀(${(fr * 100).toFixed(3)}%, ${sSide}) → 확신 하향`);
+          }
+        }
+      } catch (e) { addLog(`⚠️ ${asset} MTF/펀딩 보정 실패: ${e?.message}`); }
 
       addLog(`🎯 ${asset} 시그널: ${latestSignal.type} | ${latestSignal.confidence}급 | ${latestSignal.score}pt`);
 
