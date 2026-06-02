@@ -11,7 +11,7 @@
 //   극단(RSI>80, <20) 은 회피 (이미 늦은 추격 위험)
 // ════════════════════════════════════════════════════════
 
-import { computeIndicatorBundle, gradeConfidence, scaleScore } from "./_indicators.js";
+import { computeIndicatorBundle, gradeConfidence, scaleScore, refineSignalScore } from "./_indicators.js";
 
 const FAMILY = "momentum";
 const MIN_BARS = 60;
@@ -74,21 +74,23 @@ export function runMomentumRotation({ closes, highs, lows, volumes, asset, timef
     else { sell += 1; reasons.push(`ER${curER.toFixed(2)} 효율↓`); }
   }
 
-  const netScore = buy - sell;
-  const absNet = Math.abs(netScore);
-  if (absNet < MIN_ABS_NET) return null; // 회전 전략은 명확한 모멘텀 필요
+  // ★ 2026-06-02 — 알파 정제 레이어 (과확장·다이버전스·극단RSI·거래량·breadth 캡)
+  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L });
+  if (refined.absNet < MIN_ABS_NET) return null; // 회전 전략은 명확한 모멘텀 필요
+  if (refined.notes.length) reasons.push(...refined.notes);
 
-  const side = netScore > 0 ? "LONG" : "SHORT";
+  const side = refined.side;
+  const sz = Math.max(0.3, Math.min(0.8, refined.absNet / 9));
   return {
     side,
-    score: scaleScore(absNet),
-    confidence: gradeConfidence(absNet),
+    score: refined.score,
+    confidence: refined.confidence,
     family: FAMILY,
     timeframe,
     reason: `[${timeframe}|momentum-rotation] ` + reasons.join(" + "),
-    sizeHint: Math.max(0.3, Math.min(0.8, absNet / 9)),
+    sizeHint: sz,
     type: side === "LONG" ? "BUY" : "SELL",
-    positionSize: Math.max(0.3, Math.min(0.8, absNet / 9)),
+    positionSize: sz,
   };
 }
 

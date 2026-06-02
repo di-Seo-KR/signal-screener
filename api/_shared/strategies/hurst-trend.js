@@ -12,7 +12,7 @@
 //   Hurst < 0.5 (회귀장) 에서는 진입 안 함.
 // ════════════════════════════════════════════════════════
 
-import { computeIndicatorBundle, gradeConfidence, scaleScore } from "./_indicators.js";
+import { computeIndicatorBundle, gradeConfidence, scaleScore, refineSignalScore } from "./_indicators.js";
 
 const FAMILY = "trend";
 const MIN_BARS = 80;
@@ -79,21 +79,23 @@ export function runHurstTrend({ closes, highs, lows, volumes, asset, timeframe =
     else { sell += 1; reasons.push("MACD bearish"); }
   }
 
-  const netScore = buy - sell;
-  const absNet = Math.abs(netScore);
-  if (absNet < MIN_ABS_NET) return null;
+  // ★ 2026-06-02 — 알파 정제 레이어 (과확장·다이버전스·극단RSI·거래량·breadth 캡)
+  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L });
+  if (refined.absNet < MIN_ABS_NET) return null;
+  if (refined.notes.length) reasons.push(...refined.notes);
 
-  const side = netScore > 0 ? "LONG" : "SHORT";
+  const side = refined.side;
+  const sz = Math.max(0.4, Math.min(0.9, refined.absNet / 9));
   return {
     side,
-    score: scaleScore(absNet),
-    confidence: gradeConfidence(absNet),
+    score: refined.score,
+    confidence: refined.confidence,
     family: FAMILY,
     timeframe,
     reason: `[${timeframe}|hurst-trend] ` + reasons.join(" + "),
-    sizeHint: Math.max(0.4, Math.min(0.9, absNet / 9)),
+    sizeHint: sz,
     type: side === "LONG" ? "BUY" : "SELL",
-    positionSize: Math.max(0.4, Math.min(0.9, absNet / 9)),
+    positionSize: sz,
   };
 }
 
