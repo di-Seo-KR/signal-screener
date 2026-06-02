@@ -22,7 +22,7 @@ import {
   getTrialDaysLeft,
   // requestUpgrade — 베타 단계에서는 호출하지 않음. 정식 결제 오픈 시 재활성화.
 } from "./lib/subscription.js";
-import { ga } from "./lib/analytics.js";
+import { ga, trackEvent } from "./lib/analytics.js";
 
 // ── Tier feature matrix (UI 출력용) ───────────────────────────────
 const FEATURE_MATRIX = [
@@ -549,7 +549,7 @@ export default function Pricing({ onRequestLogin } = {}) {
       return;
     }
     // 베타 단계 — 실제 결제 호출 (requestUpgrade) 차단, 안내 모달만 표시
-    try { ga.event("subscription_beta_blocked", { tier: targetTier, trial: useTrial }); } catch {}
+    try { trackEvent("subscription_beta_blocked", { tier: targetTier, trial: useTrial }); } catch {}
     setBetaModal({ targetTier, useTrial });
   }, [user, onRequestLogin, showToast]);
 
@@ -584,7 +584,7 @@ export default function Pricing({ onRequestLogin } = {}) {
         // eslint-disable-next-line no-console
         console.info("[beta-waitlist] server未연결, localStorage 만 저장됨", e?.message);
       }
-      try { ga.event("subscription_beta_waitlist", { tier: betaModal.targetTier }); } catch {}
+      try { trackEvent("subscription_beta_waitlist", { tier: betaModal.targetTier }); } catch {}
       showToast("베타 알림 신청 완료! 정식 결제가 열리면 가장 먼저 알려드릴게요.", "success");
       setBetaModal(null);
     } catch (e) {
