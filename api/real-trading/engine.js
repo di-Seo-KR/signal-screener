@@ -334,7 +334,8 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   // 최저 원금 하한선 — env ZEPTA_MIN_EQUITY (기본 $50, 대표 지시로 $200→$50 하향).
   //   실거래 가능 최소치 근처. 이 아래에선 minNotional 대비 사이징이 의미 없어 진입 안 함.
   //   개별 종목 affordability(minNotional) 체크가 추가 backstop 으로 동작.
-  const MIN_EQUITY = parseFloat(process.env.ZEPTA_MIN_EQUITY) || 50;
+  const _minEq = parseFloat(process.env.ZEPTA_MIN_EQUITY);
+  const MIN_EQUITY = Number.isFinite(_minEq) ? _minEq : 50; // =0 도 허용(|| 안티패턴 수정)
   if (equity < MIN_EQUITY && !forceDryRun) {
     S(`equity < $${MIN_EQUITY} — skip (min equity)`);
     return { ok: true, userId, ran: false, reason: `insufficient equity (min $${MIN_EQUITY})`, equity, steps };
@@ -674,7 +675,8 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
         //   안전 ceiling: 같은 방향 5개까지 허용(추세 추종 충분), 6번째부터 차단 → 극단
         //   한 방향 쏠림(−47% 의 한 축) 방지. 현 자본/5x 에선 거의 안 걸리고 자본 커질 때 보호.
         //   더 강하게 분산하려면 env ZEPTA_MAX_PER_SIDE=3~4 로 조이면 됨.
-        const maxPerSide = Number(process.env.ZEPTA_MAX_PER_SIDE) || 5;
+        const _mps = Number(process.env.ZEPTA_MAX_PER_SIDE);
+        const maxPerSide = Number.isFinite(_mps) ? _mps : 5; // =0 이면 비활성(|| 안티패턴 수정)
         if (maxPerSide > 0 && Array.isArray(liveOpenPositions) && liveOpenPositions.length) {
           const sameSideCount = liveOpenPositions.filter((pos) => {
             const amt = parseFloat(pos.positionAmt || 0);

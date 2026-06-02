@@ -42,8 +42,13 @@ export async function getOIChangeMap(kv, symbols) {
     }
   });
 
-  // 이번 OI 스냅샷 저장 (다음 회차 비교용). 이번에 못 받은 심볼은 직전 값 유지.
-  try { await kv.set(SNAPSHOT_KEY, { ...prev, ...next }); } catch { /* 무시 */ }
+  // 이번 OI 스냅샷 저장 (다음 회차 비교용). 못 받은 심볼은 직전 값 유지하되,
+  //   MAX_AGE 초과한 stale 키는 정리 → KV 객체 무한 누적 방지.
+  const merged = { ...prev, ...next };
+  for (const k of Object.keys(merged)) {
+    if (!next[k] && (now - (merged[k]?.ts || 0)) > MAX_AGE_MS) delete merged[k];
+  }
+  try { await kv.set(SNAPSHOT_KEY, merged); } catch { /* 무시 */ }
 
   return { changeMap, fetched };
 }

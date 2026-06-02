@@ -71,7 +71,7 @@ export function runDefiMomentum({ closes, highs, lows, volumes, asset, timeframe
 
   // 거래량 확인 (1점)
   const volAvg = ind.volSMA[L];
-  if (volAvg && volAvg > 0) {
+  if (volAvg && volAvg > 0 && volumes[L] != null) {
     const volMult = volumes[L] / volAvg;
     if (volMult > 1.4) {
       if (price > closes[L - 1]) { buy += 1; reasons.push(`거래량 ${volMult.toFixed(1)}x`); }

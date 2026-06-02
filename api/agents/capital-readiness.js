@@ -72,13 +72,15 @@ export default async function handler(req, res) {
     const isInit = state.baseline == null; // 최초 실행(또는 baseline 미설정 마이그레이션)
 
     const baseline = state.baseline || { trades: allTrades, wins: allWins, netPnL: allNetPnL };
-    const startedAtMs = (state.baseline != null && state.startedAtMs) ? state.startedAtMs : nowMs;
+    // baseline 필드 NaN 가드 (옛 부분 저장 상태 방어) — 누락 시 0으로.
+    const bTrades = Number(baseline.trades) || 0, bWins = Number(baseline.wins) || 0, bNet = Number(baseline.netPnL) || 0;
+    const startedAtMs = Number.isFinite(state.startedAtMs) ? state.startedAtMs : nowMs;
     const daysElapsed = Math.floor((nowMs - startedAtMs) / 86400000);
 
     // 증분 — 트래킹 시작 이후
-    const trades = Math.max(0, allTrades - baseline.trades);
-    const wins = Math.max(0, allWins - baseline.wins);
-    const netPnL = allNetPnL - baseline.netPnL;
+    const trades = Math.max(0, allTrades - bTrades);
+    const wins = Math.max(0, allWins - bWins);
+    const netPnL = allNetPnL - bNet;
     const winRate = trades > 0 ? wins / trades : 0;
 
     // ── 3) 기준 평가 (전부 충족해야 ✅) ──────────────────────────────

@@ -98,6 +98,12 @@ export const DEFAULT_STRATEGY_PARAMS = {
     CONSENSUS_MIN: 2, // 최소 2개 sub-strategy 합의
     MIN_ABS_NET: 3,
   },
+  // ★ 2026-06-02 — supertrend 등록 누락 수정. 없으면 getAllStoredStrategyParams 가
+  //   di:alpha:params:supertrend 를 안 읽어 발굴·검증된 튜닝이 실거래(l2-emerging)에
+  //   영원히 반영 안 됨. supertrend.js 내부 default 와 일치.
+  "supertrend": {
+    ATR_PERIOD: 10, ST_MULT: 3.0, ADX_MIN: 18, MIN_ABS_NET: 2,
+  },
 };
 
 /**
@@ -182,7 +188,7 @@ export function getStrategyParamsSync(strategyId) {
 export const DEFAULT_STRATEGY_WEIGHTS = {
   "trend-follow": 1.0, "mean-revert": 1.0, "breakout": 1.0,
   "momentum-rotation": 1.0, "volatility-arb": 1.0, "hurst-trend": 1.0,
-  "defi-momentum": 1.0, "ensemble": 1.0,
+  "defi-momentum": 1.0, "ensemble": 1.0, "supertrend": 1.0,
 };
 
 /**
