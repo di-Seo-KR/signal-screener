@@ -7,7 +7,14 @@
 import { sendCards, buildCard, fmtKSTShort } from "./_shared/telegram.js";
 import { runStrategyForBot, getStrategyNameForBot } from "./_shared/strategies/index.js";
 import { getAllStoredStrategyParams } from "./_shared/dynamic-config.js";
-import { getFundingRates } from "./_shared/binance-client.js";
+import { getMarketContext } from "./_shared/binance-client.js";
+import { getOIChangeMap } from "./_shared/oi-tracker.js";
+
+// asset("BTC/USD" | "BTC") → 바이낸스 심볼("BTCUSDT"). 펀딩/OI/베이시스 맵 조회 키.
+function assetToBinanceSymbol(asset) {
+  const base = String(asset || "").toUpperCase().split("/")[0].replace(/USDT?$/, "");
+  return base ? `${base}USDT` : "";
+}
 
 export const config = { maxDuration: 120 };
 
@@ -320,13 +327,20 @@ export default async function handler(req, res) {
       addLog(`⚠️ 전략 파라미터 로드 실패 (baseline 사용): ${e?.message}`);
     }
 
-    // ★ 2026-06-02 (P3) 펀딩비 1회 batch 조회 — 숏/롱 과밀(스퀴즈) 신호 dampening 용.
-    //   실패해도 {} → dampening 스킵, cron 영향 0 (안전).
-    let fundingMap = {};
+    // ★ 2026-06-02 (P3+OI) 선물 컨텍스트 batch 조회 — 펀딩/베이시스(premiumIndex 1회) + OI 변화.
+    //   전부 신호 확신 보정용(방향 안 바꿈). 실패해도 빈 맵 → 보정 스킵, cron 영향 0.
+    let fundingMap = {}, basisMap = {}, oiChangeMap = {};
     try {
-      fundingMap = await getFundingRates();
-      const n = Object.keys(fundingMap).length;
-      if (n > 0) addLog(`💸 펀딩비 ${n}개 심볼 로드`);
+      const ctx = await getMarketContext();
+      fundingMap = ctx.funding || {};
+      basisMap = ctx.basis || {};
+      if (Object.keys(fundingMap).length) addLog(`💸 펀딩/베이시스 ${Object.keys(fundingMap).length}심볼 로드`);
+    } catch { /* 무시 */ }
+    try {
+      const binSymbols = CRYPTO_ASSETS.map(assetToBinanceSymbol).filter(Boolean);
+      const oi = await getOIChangeMap(kv, binSymbols);
+      oiChangeMap = oi.changeMap || {};
+      if (oi.fetched > 0) addLog(`📈 OI ${oi.fetched}심볼 조회, 변화 비교 ${Object.keys(oiChangeMap).length}건`);
     } catch { /* 무시 */ }
 
     for (const asset of CRYPTO_ASSETS) {
@@ -517,7 +531,7 @@ export default async function handler(req, res) {
         continue;
       }
 
-      // ★ 2026-06-02 (P3) MTF 정합 + 펀딩비 dampening — 최종 신호 확신 보정 (전부 하향=안전).
+      // ★ 2026-06-02 MTF + 펀딩 + OI + 베이시스 — 최종 신호 확신 보정 (bounded, 방향 불변).
       try {
         const sSide = latestSignal.side;
         // (a) MTF: 4h 추세(EMA21 vs EMA55)가 신호와 충돌하면 확신 하향
@@ -535,8 +549,9 @@ export default async function handler(req, res) {
             }
           }
         }
+        // 심볼 키 정정 — asset 은 "BTC/USD" 형식이라 baseTicker 매핑 필요 (P3 버그 수정).
+        const sym = assetToBinanceSymbol(asset);
         // (b) 펀딩비: 신호 방향으로 과밀(스퀴즈 위험)이면 확신 하향
-        const sym = asset.includes("USDT") ? asset : `${asset}USDT`;
         const fr = fundingMap[sym];
         if (Number.isFinite(fr) && sSide) {
           const crowded = (sSide === "SHORT" && fr < -0.0003) || (sSide === "LONG" && fr > 0.0003);
@@ -547,7 +562,31 @@ export default async function handler(req, res) {
             addLog(`  ↘ ${asset} 펀딩 과밀(${(fr * 100).toFixed(3)}%, ${sSide}) → 확신 하향`);
           }
         }
-      } catch (e) { addLog(`⚠️ ${asset} MTF/펀딩 보정 실패: ${e?.message}`); }
+        // (c) ★ OI 확인/발산 (신규 알파) — OI↑ = 새 자금 유입(추세 확인, 소폭↑),
+        //     OI↓ = 청산/커버(추세 소진, 하향). bounded(방향 불변, 점수 ±소폭).
+        const oiCh = oiChangeMap[sym];
+        if (Number.isFinite(oiCh) && sSide) {
+          if (oiCh >= 0.03) {
+            latestSignal.score = Math.min(95, (latestSignal.score || 60) + 3);
+            latestSignal.reason = (latestSignal.reason || "") + ` +OI확인(+${(oiCh * 100).toFixed(1)}%)`;
+            addLog(`  ↗ ${asset} OI +${(oiCh * 100).toFixed(1)}% → 추세 확인(확신↑)`);
+          } else if (oiCh <= -0.03) {
+            latestSignal.score = Math.max(50, Math.round((latestSignal.score || 60) * 0.9));
+            if (latestSignal.confidence === "A") latestSignal.confidence = "B";
+            latestSignal.reason = (latestSignal.reason || "") + ` +OI발산(${(oiCh * 100).toFixed(1)}%)`;
+            addLog(`  ↘ ${asset} OI ${(oiCh * 100).toFixed(1)}% → 소진 위험(확신↓)`);
+          }
+        }
+        // (d) 베이시스 극단 — 퍼프에선 펀딩과 상당 중복이라 보조. 진짜 극단(±0.1%)만 가볍게 하향.
+        const bs = basisMap[sym];
+        if (Number.isFinite(bs) && sSide) {
+          const extreme = (sSide === "SHORT" && bs < -0.001) || (sSide === "LONG" && bs > 0.001);
+          if (extreme) {
+            latestSignal.score = Math.max(50, Math.round((latestSignal.score || 60) * 0.95));
+            latestSignal.reason = (latestSignal.reason || "") + ` +베이시스극단(${(bs * 100).toFixed(2)}%)`;
+          }
+        }
+      } catch (e) { addLog(`⚠️ ${asset} 선물컨텍스트 보정 실패: ${e?.message}`); }
 
       addLog(`🎯 ${asset} 시그널: ${latestSignal.type} | ${latestSignal.confidence}급 | ${latestSignal.score}pt`);
 
