@@ -617,8 +617,9 @@ function CandidatesPanel({ data }) {
         <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>새로 발굴 중인 전략 후보</div>
         <Badge kind="info">{candidates.length}건 관찰중</Badge>
       </div>
-      <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 8 }}>
-        백테스트 엔진이 2시간마다 새 변형을 시뮬레이션해 유망한 후보를 찾아냅니다. 충분히 우수한 후보는 자동매매에 즉시 반영됩니다.
+      <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 8, lineHeight: 1.5 }}>
+        백테스트 엔진이 새 변형을 시뮬레이션해 후보를 찾습니다. 아래 수치는 <b style={{ color: C.text2 }}>단일 종목 관찰치</b>로,
+        실제보다 부풀려질 수 있습니다(과적합). <b style={{ color: C.text2 }}>여러 종목 + 미학습 구간(OOS) 교차검증을 통과한 것만</b> 실거래에 반영됩니다.
       </div>
       {candidates.length === 0 ? (
         <div style={{ fontSize: FONT.sm, color: C.text3, padding: "16px 0", textAlign: "center" }}>
@@ -647,10 +648,11 @@ function CandidatesPanel({ data }) {
                   </div>
                   <span style={{ fontSize: FONT.xs, color: C.text3, whiteSpace: "nowrap" }}>{fmtAgo(c.createdAt)}</span>
                 </div>
-                {/* 핵심 지표 — 안정성 크게 */}
+                {/* 핵심 지표 — 단일심볼 관찰치(교차검증 전이라 과적합 가능, 라벨 명시) */}
                 <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 6 }}>
                   <span style={{ fontSize: 18, fontWeight: 800, color: sharpeColor }}>{g.grade}</span>
-                  <span style={{ fontSize: FONT.xs, color: C.text3 }}>안정성 {fmtNum(br.sharpe, 2)}</span>
+                  <span style={{ fontSize: FONT.xs, color: C.text3 }}>단일심볼 {fmtNum(br.sharpe, 2)}</span>
+                  <span style={{ fontSize: 10, color: C.text3, border: `1px solid ${C.border}`, borderRadius: 4, padding: "1px 5px" }}>교차검증 전</span>
                 </div>
                 <div style={{ display: "flex", gap: 10, marginTop: 6, flexWrap: "wrap", fontSize: FONT.xs, color: C.text2 }}>
                   <span>승률 <b style={{ color: C.text1 }}>{fmtPct(br.winRate)}</b></span>
