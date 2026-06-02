@@ -257,6 +257,56 @@ export async function getFundingRates({ testnet = false } = {}) {
   }
 }
 
+/** 선물 시장 컨텍스트 — premiumIndex 1회로 {funding, basis} 동시 반환.
+ *  basis = (markPrice - indexPrice)/indexPrice (퍼프 프리미엄; 펀딩과 관련). 실패 시 빈 맵. */
+export async function getMarketContext({ testnet = false } = {}) {
+  const funding = {}, basis = {};
+  try {
+    let arr;
+    if (isProxyMode()) {
+      arr = await viaProxy({ method: "GET", path: "/fapi/v1/premiumIndex", params: {}, testnet, signed: false });
+    } else {
+      const base = testnet ? BINANCE_FAPI_TESTNET : BINANCE_FAPI;
+      const resp = await fetch(`${base}/fapi/v1/premiumIndex`, {
+        signal: AbortSignal.timeout(15000),
+        headers: { "User-Agent": "Zepta/1.0", "Accept": "application/json" },
+      });
+      if (!resp.ok) return { funding, basis };
+      arr = await resp.json();
+    }
+    if (Array.isArray(arr)) {
+      for (const e of arr) {
+        if (!e.symbol) continue;
+        const f = parseFloat(e.lastFundingRate);
+        if (Number.isFinite(f)) funding[e.symbol] = f;
+        const mark = parseFloat(e.markPrice), idx = parseFloat(e.indexPrice);
+        if (Number.isFinite(mark) && Number.isFinite(idx) && idx > 0) basis[e.symbol] = (mark - idx) / idx;
+      }
+    }
+  } catch { /* 무시 → 빈 맵 */ }
+  return { funding, basis };
+}
+
+/** 단일 심볼 미결제약정(OI) — GET /fapi/v1/openInterest. 실패 시 null. */
+export async function getOpenInterest({ symbol, testnet = false }) {
+  try {
+    let data;
+    if (isProxyMode()) {
+      data = await viaProxy({ method: "GET", path: "/fapi/v1/openInterest", params: { symbol }, testnet, signed: false });
+    } else {
+      const base = testnet ? BINANCE_FAPI_TESTNET : BINANCE_FAPI;
+      const resp = await fetch(`${base}/fapi/v1/openInterest?symbol=${symbol}`, {
+        signal: AbortSignal.timeout(10000),
+        headers: { "User-Agent": "Zepta/1.0", "Accept": "application/json" },
+      });
+      if (!resp.ok) return null;
+      data = await resp.json();
+    }
+    const oi = parseFloat(data?.openInterest);
+    return Number.isFinite(oi) ? oi : null;
+  } catch { return null; }
+}
+
 /** 최근 체결 내역 — GET /fapi/v1/userTrades */
 export function getUserTrades({ apiKey, apiSecret, symbol, startTime, limit = 50, testnet = false }) {
   const params = { symbol, limit };
