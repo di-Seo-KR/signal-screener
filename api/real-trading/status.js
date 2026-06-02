@@ -48,6 +48,9 @@ export default async function handler(req, res) {
     ]);
 
     let equity = null;
+    let marginBalance = null;     // 지갑잔고 + 미실현손익 = 바이낸스 '마진 잔고'(메인 표기와 일치)
+    let unrealizedPnl = null;     // 열린 포지션 평가손익 합계
+    let availableBalance = null;  // 신규 진입 가용 잔고
     let openPositions = [];
     let binanceOk = true;
     try {
@@ -56,7 +59,14 @@ export default async function handler(req, res) {
         getAccountInfo(creds),
         getPositionRisk(creds),
       ]);
+      // ★ equity 는 totalWalletBalance(미실현 제외) — 수익률/브레이커/증거금% 의 SSOT 로 유지(불변).
+      //   화면 헤드라인은 바이낸스와 맞추기 위해 marginBalance(지갑+미실현)를 별도로 내려줌.
       equity = parseFloat(acct.totalWalletBalance || "0");
+      unrealizedPnl = parseFloat(acct.totalUnrealizedProfit || "0");
+      marginBalance = acct.totalMarginBalance != null
+        ? parseFloat(acct.totalMarginBalance)
+        : equity + unrealizedPnl;
+      availableBalance = parseFloat(acct.availableBalance || "0");
       openPositions = (positions || [])
         .filter((p) => Math.abs(parseFloat(p.positionAmt || 0)) > 0)
         .map((p) => ({
@@ -97,7 +107,10 @@ export default async function handler(req, res) {
       killswitchOn: killed,
       halted: !!breaker?.halted,
       haltedReason: breaker?.haltedReason || null,
-      equity,
+      equity,                 // 지갑잔고(미실현 제외) — 내부 계산 SSOT
+      marginBalance,          // 지갑+미실현 = 바이낸스 '마진 잔고'
+      unrealizedPnl,          // 미실현손익 합계
+      availableBalance,       // 가용 잔고
       openPositions,
       recentEngineLog: (engineLog || []).slice(0, 20),
       recentOrders: (orders || []).slice(0, 10),
