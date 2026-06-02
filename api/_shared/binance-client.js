@@ -288,6 +288,23 @@ export function getUserTrades({ apiKey, apiSecret, symbol, startTime, limit = 50
   });
 }
 
+/**
+ * 손익 기록 — GET /fapi/v1/income
+ *   incomeType 예: REALIZED_PNL · FUNDING_FEE · COMMISSION · TRANSFER · (생략 시 전체)
+ *   TRANSFER = 현물↔선물 지갑 이동(입출금) → 수익률 계산 시 반드시 제외해야 함.
+ *   한 번에 최대 1000건. 기간(startTime~endTime)으로 좁혀 호출.
+ */
+export function getIncome({ apiKey, apiSecret, incomeType, startTime, endTime, limit = 1000, testnet = false }) {
+  const params = { limit };
+  if (incomeType) params.incomeType = incomeType;
+  if (startTime) params.startTime = startTime;
+  if (endTime) params.endTime = endTime;
+  return binanceSignedRequest({
+    apiKey, apiSecret, method: "GET", path: "/fapi/v1/income",
+    params, testnet,
+  });
+}
+
 /** 레버리지 변경 — POST /fapi/v1/leverage */
 export function changeLeverage({ apiKey, apiSecret, symbol, leverage, testnet = false }) {
   return binanceSignedRequest({
