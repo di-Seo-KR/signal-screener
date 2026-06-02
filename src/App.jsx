@@ -12218,7 +12218,7 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 개발/QA 대시보드 (zepta.app/dev)
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "dev" && (
+        {tab === "dev" && isOwner && (
           <Suspense fallback={<LazyTabFallback />}><DevDashboard theme={themeMode} /></Suspense>
         )}
 

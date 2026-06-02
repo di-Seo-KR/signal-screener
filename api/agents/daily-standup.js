@@ -66,7 +66,10 @@ async function readShadowLedger(kv, days = 7) {
 
 // 전략 가중치 / 패밀리별 성과 요약
 async function readWeights(kv) {
-  return (await kv.get("di:real:strategy-weights")) || {};
+  // ★ 2026-06-02 버그수정: 잘못된 키 di:real:strategy-weights(미존재) → di:alpha:strategy-weights.
+  //   저장 형식 { weights:{...}, regime, updatedAt } 이라 .weights 추출. (보고 입력이 늘 빈값이던 것)
+  const stored = await kv.get("di:alpha:strategy-weights");
+  return stored?.weights || {};
 }
 
 // shadow-monitor 가 만들어두는 누적 요약 (있으면 활용)
