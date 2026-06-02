@@ -8,7 +8,7 @@
 //   btc-alpha          → hurst-trend (BTC 단일, Hurst 기반)
 //   highcap-momentum   → trend-follow (EMA+MACD+ADX 추세)
 //   defi-infra         → defi-momentum (OBV+모멘텀+EMA)
-//   l2-emerging        → breakout (20일 돌파+거래량)
+//   l2-emerging        → supertrend (ATR밴드 추세; breakout 손실로 2026-06 교체)
 //   meme-trend         → ensemble (다전략 합의, 보수적)
 //   crypto-diversity   → momentum-rotation (다자산 상대강도)
 //   crypto-swing       → volatility-arb (ATR 압축-폭발)
@@ -23,19 +23,25 @@ import { runVolatilityArb } from "./volatility-arb.js";
 import { runHurstTrend } from "./hurst-trend.js";
 import { runDefiMomentum } from "./defi-momentum.js";
 import { runEnsemble } from "./ensemble.js";
+import { runSupertrend } from "./supertrend.js";
 
 // 봇 ID → strategy 함수 매핑
+//   ★ 2026-06-02 l2-emerging: breakout(백테스트 PF<1 손실) → supertrend(검증 OOS 3.69) 교체.
+//     검증된 승자로 손실 전략 대체 + 실거래 전략 다양화. breakout 은 발굴 풀엔 유지(params 개선 시 복귀 가능).
 export const BOT_STRATEGY_MAP = {
   "btc-alpha":        runHurstTrend,
   "highcap-momentum": runTrendFollow,
   "defi-infra":       runDefiMomentum,
-  "l2-emerging":      runBreakout,
+  "l2-emerging":      runSupertrend,
   "meme-trend":       runEnsemble,
   "crypto-diversity": runMomentumRotation,
   "crypto-swing":     runVolatilityArb,
 };
 
-// 모든 strategy 함수 (cron 진단/디버깅용)
+// 모든 strategy 함수 (발굴 대상 + cron 진단).
+//   ★ 2026-06-02 supertrend 추가 — 백테스트(full Sharpe1.80/OOS 3.69) 검증 후 발굴 풀 편입.
+//   (donchian-revert 는 OOS Sharpe -6.61 과적합으로 채택 보류.)
+//   BOT_STRATEGY_MAP 에는 아직 미배정 → 교차심볼+OOS 검증 통과 후 실거래 배정 예정.
 export const ALL_STRATEGIES = {
   "trend-follow":       runTrendFollow,
   "mean-revert":        runMeanRevert,
@@ -45,6 +51,7 @@ export const ALL_STRATEGIES = {
   "hurst-trend":        runHurstTrend,
   "defi-momentum":      runDefiMomentum,
   "ensemble":           runEnsemble,
+  "supertrend":         runSupertrend,
 };
 
 /**
@@ -77,7 +84,7 @@ export function getStrategyNameForBot(botId) {
     "btc-alpha":        "hurst-trend",
     "highcap-momentum": "trend-follow",
     "defi-infra":       "defi-momentum",
-    "l2-emerging":      "breakout",
+    "l2-emerging":      "supertrend",
     "meme-trend":       "ensemble",
     "crypto-diversity": "momentum-rotation",
     "crypto-swing":     "volatility-arb",
