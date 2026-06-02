@@ -610,6 +610,14 @@ function SymbolTimeframePanel({ data }) {
 function CandidatesPanel({ data }) {
   const C = useThemeTokens();
   const candidates = data?.candidates || [];
+  // ★ 2026-06-03 정보밀도: 기본 6개만 노출(모바일 스크롤 과다 방지), 나머지는 '더보기'로 펼침.
+  const [showAll, setShowAll] = useState(false);
+  const COLLAPSED = 6;
+  const sorted = useMemo(
+    () => [...candidates].sort((a, b) => (b.backtestResult?.sharpe || 0) - (a.backtestResult?.sharpe || 0)),
+    [candidates]
+  );
+  const visible = showAll ? sorted.slice(0, 24) : sorted.slice(0, COLLAPSED);
 
   return (
     <Card>
@@ -627,9 +635,7 @@ function CandidatesPanel({ data }) {
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 8 }}>
-          {[...candidates]
-            .sort((a, b) => (b.backtestResult?.sharpe || 0) - (a.backtestResult?.sharpe || 0))
-            .slice(0, 12).map((c) => {
+          {visible.map((c) => {
             const br = c.backtestResult || {};
             const g = sharpeToGrade(br.sharpe);
             const sym = (c.symbol || "").replace("USDT", "");
@@ -668,6 +674,19 @@ function CandidatesPanel({ data }) {
               </div>
             );
           })}
+        </div>
+      )}
+      {candidates.length > COLLAPSED && (
+        <div style={{ textAlign: "center", marginTop: 10 }}>
+          <button
+            onClick={() => setShowAll((v) => !v)}
+            style={{
+              background: "transparent", border: `1px solid ${C.border}`, borderRadius: RADIUS.sm,
+              color: C.text2, fontSize: FONT.xs, fontWeight: 600, padding: "6px 14px", cursor: "pointer",
+            }}
+          >
+            {showAll ? "접기" : `더보기 (상위 ${Math.min(24, candidates.length)}개)`}
+          </button>
         </div>
       )}
     </Card>
