@@ -60,7 +60,8 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const limit = Math.min(parseInt(req.query?.limit || "30", 10), 60);
+    const _lim = parseInt(req.query?.limit, 10);
+    const limit = Math.min(Number.isFinite(_lim) && _lim > 0 ? _lim : 30, 60); // NaN/잘못된 입력 방어
     const kv = await getKv();
     const pool = (await kv.get(POOL_KEY)) || [];
 

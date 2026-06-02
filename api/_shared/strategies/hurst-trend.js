@@ -34,8 +34,10 @@ export function runHurstTrend({ closes, highs, lows, volumes, asset, timeframe =
   const ema21 = ind.ema21[L];
   const ema55 = ind.ema55[L];
 
-  // Hurst 회귀장은 이 전략의 본령이 아님 → 보류
-  if (hurst < HURST_REVERT_MAX) {
+  // ★ 2026-06-02 게이트 갭 수정: 기존 HURST_REVERT_MAX(0.50) 게이트는 [0.50,0.55]
+  //   전환구간을 통과시키는데 정작 Hurst 점수는 >0.55 부터라, 그 구간은 Hurst 우위
+  //   없이 신호가 났음. 추세 우위(≥HURST_TREND_MIN)에서만 진입하도록 게이트 상향.
+  if (hurst < HURST_TREND_MIN) {
     return null;
   }
 

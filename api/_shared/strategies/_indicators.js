@@ -331,9 +331,11 @@ export function refineSignalScore({ buy, sell, ind, closes, volumes, L, extensio
   const breadthCap = [55, 68, 82, 95][Math.min(confirms, 3)];
   const score = Math.min(scaleScore(absNet), breadthCap);
 
-  // confidence: A 는 독립확인 2개+ AND absNet 6+ 일 때만
+  // confidence 도 breadth(독립확인)로 캡 — score 의 breadthCap 과 정합.
+  //   confirms 0 → 최대 C, 1 → 최대 B, 2+ → A 가능. (점수55인데 등급B 같은 불일치 제거)
   let confidence = gradeConfidence(absNet);
-  if (confidence === "A" && confirms < 2) confidence = "B";
+  if (confirms < 1) { if (confidence !== "C") confidence = "C"; }
+  else if (confirms < 2) { if (confidence === "A") confidence = "B"; }
 
   return { side: finalSide, net, absNet, score, confidence, confirms, notes };
 }

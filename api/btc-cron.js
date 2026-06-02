@@ -10,10 +10,19 @@ import { getAllStoredStrategyParams } from "./_shared/dynamic-config.js";
 import { getMarketContext } from "./_shared/binance-client.js";
 import { getOIChangeMap } from "./_shared/oi-tracker.js";
 
-// asset("BTC/USD" | "BTC") → 바이낸스 심볼("BTCUSDT"). 펀딩/OI/베이시스 맵 조회 키.
+// asset → 바이낸스 *선물(USDⓈ-M, fapi)* 심볼. 펀딩/OI/베이시스 맵 조회 키.
+//   ★ 2026-06-02 버그수정: 선물은 저가 밈코인을 1000배 묶음(1000SHIB/1000PEPE)으로,
+//   MATIC 은 POL 로 상장한다. 현물 규칙({BASE}USDT)으로 추론하면 SHIB/PEPE/MATIC 이
+//   빗나가 보정이 조용히 스킵됐음(라이브 확인). 명시 룩업으로 정정.
+const FUTURES_SYMBOLS = {
+  "BTC/USD": "BTCUSDT", "ETH/USD": "ETHUSDT", "SOL/USD": "SOLUSDT", "XRP/USD": "XRPUSDT",
+  "ADA/USD": "ADAUSDT", "AVAX/USD": "AVAXUSDT", "LINK/USD": "LINKUSDT", "UNI/USD": "UNIUSDT",
+  "AAVE/USD": "AAVEUSDT", "DOT/USD": "DOTUSDT", "DOGE/USD": "DOGEUSDT",
+  "SHIB/USD": "1000SHIBUSDT", "PEPE/USD": "1000PEPEUSDT",
+  "ARB/USD": "ARBUSDT", "OP/USD": "OPUSDT", "MATIC/USD": "POLUSDT",
+};
 function assetToBinanceSymbol(asset) {
-  const base = String(asset || "").toUpperCase().split("/")[0].replace(/USDT?$/, "");
-  return base ? `${base}USDT` : "";
+  return FUTURES_SYMBOLS[asset] || "";
 }
 
 export const config = { maxDuration: 120 };

@@ -228,35 +228,6 @@ export async function getKlines({ symbol, interval = "4h", limit = 100, startTim
   return await resp.json();
 }
 
-/** 전 심볼 펀딩비 — GET /fapi/v1/premiumIndex (symbol 없이 = 전체).
- *  반환: { SYMBOL: lastFundingRate(number) }. 실패 시 {} (호출부에서 무시 → cron 안전). */
-export async function getFundingRates({ testnet = false } = {}) {
-  try {
-    let arr;
-    if (isProxyMode()) {
-      arr = await viaProxy({ method: "GET", path: "/fapi/v1/premiumIndex", params: {}, testnet, signed: false });
-    } else {
-      const base = testnet ? BINANCE_FAPI_TESTNET : BINANCE_FAPI;
-      const resp = await fetch(`${base}/fapi/v1/premiumIndex`, {
-        signal: AbortSignal.timeout(15000),
-        headers: { "User-Agent": "Zepta/1.0", "Accept": "application/json" },
-      });
-      if (!resp.ok) return {};
-      arr = await resp.json();
-    }
-    const map = {};
-    if (Array.isArray(arr)) {
-      for (const e of arr) {
-        const r = parseFloat(e.lastFundingRate);
-        if (e.symbol && Number.isFinite(r)) map[e.symbol] = r;
-      }
-    }
-    return map;
-  } catch {
-    return {};
-  }
-}
-
 /** 선물 시장 컨텍스트 — premiumIndex 1회로 {funding, basis} 동시 반환.
  *  basis = (markPrice - indexPrice)/indexPrice (퍼프 프리미엄; 펀딩과 관련). 실패 시 빈 맵. */
 export async function getMarketContext({ testnet = false } = {}) {
