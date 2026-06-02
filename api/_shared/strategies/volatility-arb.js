@@ -13,7 +13,7 @@
 
 import { computeIndicatorBundle, gradeConfidence, scaleScore, calcSMA } from "./_indicators.js";
 
-const FAMILY = "volatility";
+const FAMILY = "volatility-arb"; // ★ 2026-06-02 "volatility"→canonical
 const MIN_BARS = 60;
 
 export function runVolatilityArb({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null }) {

@@ -14,7 +14,7 @@
 
 import { computeIndicatorBundle, gradeConfidence, scaleScore, refineSignalScore } from "./_indicators.js";
 
-const FAMILY = "trend";
+const FAMILY = "hurst-trend"; // ★ 2026-06-02 "trend"→canonical (trend-follow 로 흡수되던 것 분리)
 const MIN_BARS = 80;
 
 export function runHurstTrend({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null }) {
