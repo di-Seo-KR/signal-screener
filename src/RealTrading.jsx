@@ -285,6 +285,10 @@ function RealTradingInner() {
   const killOn = !!status?.killswitchOn;
   const halted = !!status?.halted;
   const equity = status?.equity;
+  // ★ 2026-06-03: 헤드라인 '보유 자산'은 바이낸스 메인과 동일하게 마진잔고(지갑+미실현)로 표기.
+  //   equity(지갑잔고)는 내부 계산용으로 그대로 유지 — 둘을 분해해 투명하게 보여준다.
+  const unrealizedPnl = status?.unrealizedPnl ?? null;
+  const marginBalance = status?.marginBalance ?? (equity != null && unrealizedPnl != null ? equity + unrealizedPnl : equity);
   const positions = status?.openPositions || [];
   const engineLog = status?.recentEngineLog || [];
   const orders = status?.recentOrders || [];
@@ -498,15 +502,24 @@ function RealTradingInner() {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 14, color: "var(--z-text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
-            보유 자산
+            보유 자산 <span style={{ textTransform: "none", fontWeight: 500, fontSize: 11.5, opacity: 0.8 }}>· 마진 잔고</span>
           </div>
           <div style={{ fontSize: isMobile ? 28 : 40, fontWeight: 900, marginTop: 4, lineHeight: 1, fontFamily: "var(--z-font-mono)", letterSpacing: "-0.02em" }}>
-            {loading && equity == null ? (
+            {loading && marginBalance == null ? (
               <Skeleton width={140} height={isMobile ? 28 : 40} />
             ) : (
-              fmtUsd(equity)
+              fmtUsd(marginBalance)
             )}
           </div>
+          {/* 바이낸스 '마진 잔고' = 지갑잔고 + 미실현. 안 맞아 보이던 차이를 분해해 투명하게 표시 */}
+          {marginBalance != null && unrealizedPnl != null && (
+            <div style={{ fontSize: 11.5, color: "var(--z-text-3)", marginTop: 5, lineHeight: 1.3 }}>
+              지갑 {fmtUsd(equity, 2)}
+              <span style={{ color: unrealizedPnl > 0 ? "var(--z-green-hi)" : unrealizedPnl < 0 ? "var(--z-red-hi)" : "var(--z-text-3)" }}>
+                {" "}· 미실현 {unrealizedPnl >= 0 ? "+" : ""}{fmtUsd(unrealizedPnl, 2)}
+              </span>
+            </div>
+          )}
         </div>
         {/* 모바일: 일손익을 hero 우측에 inline 표시 (스크롤 없이 한눈에) */}
         {isMobile && (
