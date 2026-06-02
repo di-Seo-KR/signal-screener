@@ -157,12 +157,16 @@ export const RISK_CONFIG = {
 
   // 레버리지 — 2026-05-09 대표님 지시로 고정 10x 로 변경.
   // 이전 (3~10x 가변, conf 기반) 방식에선 conf 0.7 시그널이 약 6x 로 진입 →
-  // 사용자 의지 (항상 10x) 와 불일치. min=max=10 으로 통일.
-  // ROI -40% cap 으로 SL 거리는 4% 로 자동 제한됨 (10x × 4% = ROI 40%).
+  // ★ 2026-06-02 대표 지시 — 안정성 위해 10x → 5x.
+  //   효과: (1) 청산거리 ~2배(약 -9% → -18%)로 멀어져 변동성 꼬리에 강제청산 안 당함.
+  //   (2) 청산안전 SL 캡이 ~6.3% → ~12.6% 로 풀려, 동적 SL 상한이 dynamicSLCeilPct
+  //       8% 로 결정됨 → 전략 ATR SL(보통 2.5~6%)이 안 잘리고 그대로 작동(=대부분 수용).
+  //   (3) 거래당 위험(riskPerTradePct 10%)은 SL 거리에 맞춰 노셔널 자동 조절 → 불변.
+  //   마진 효율은 낮아짐(같은 노셔널에 마진 2배) → 동시 포지션 수는 자연 감소.
   // ★ audit M3/N4: leverageBias 객체 + 가변 lev 로직 모두 제거 (dead code).
-  //   복원 시 minLeverage 와 maxLeverage 를 다르게 두면 됨.
-  minLeverage: 10,
-  maxLeverage: 10,
+  //   복원/조정 시 minLeverage 와 maxLeverage 를 다르게 두면 신뢰도 비례 가변 lev.
+  minLeverage: 5,
+  maxLeverage: 5,
 
   // 청산거리 안전 버퍼
   //  SL 거리 ≤ 청산거리 × liqSafetyRatio 강제.
