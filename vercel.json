@@ -178,6 +178,10 @@
     {
       "path": "/api/agents/capital-readiness",
       "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/agents/daily-health-check",
+      "schedule": "30 22 * * *"
     }
   ]
 }
