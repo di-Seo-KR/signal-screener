@@ -23,7 +23,10 @@ import { sampleRandomParams } from "../_shared/strategy-param-space.js";
 import { ALL_STRATEGIES } from "../_shared/strategies/index.js";
 import { setStrategyStatus, setStrategyParams, STRATEGY_STATUS } from "../_shared/dynamic-config.js";
 
-export const config = { maxDuration: 60 };
+// ★ 2026-06-02 — 발굴 throughput 개선 (Pro 플랜 한도 활용).
+//   기존 60초로는 8전략 × 50샘플 × 4심볼(≈120초어치)을 다 못 돌아 truncate 됐음.
+//   300초로 상향 → 전 전략 완주 + 심볼 6개로 교차검증 강화. (btc-cron 이미 120초 = Pro 확인)
+export const config = { maxDuration: 300 };
 
 // 60일 = 4h 봉 360개 (binance limit 1500 이내)
 const KLINE_INTERVAL = "4h";
@@ -38,7 +41,7 @@ const TOP_SYMBOLS = [
   "AVAXUSDT", "LINKUSDT", "UNIUSDT", "AAVEUSDT", "DOTUSDT",
   "DOGEUSDT", "MATICUSDT", "ARBUSDT",
 ];
-const SYMBOLS_PER_RUN = 4;
+const SYMBOLS_PER_RUN = 6; // ★ 2026-06-02 4→6 (timeout 300초 상향으로 교차검증 심볼 확대)
 const SYMBOL_CURSOR_KEY = "di:continuous-backtest:symbol-cursor";
 
 // ★ 2026-05-20 추가 완화 — 대표 지시 "전략 다양화 멈춰있는 거 아니냐":
@@ -354,7 +357,7 @@ export default async function handler(req, res) {
     const scanResults = {};       // { [symbol]: { [strategyId]: {...} } }
     const ohlcCache = {};         // { [symbol]: ohlc } — 주입 시 교차검증 재사용 (과적합 가드)
     const t0Scan = Date.now();
-    const TIMEOUT_BUDGET_MS = 50_000; // 60초 maxDuration 중 50초 limit (안전 마진)
+    const TIMEOUT_BUDGET_MS = 280_000; // 300초 maxDuration 중 280초 limit (안전 마진)
 
     // 3a) 대상 심볼 OHLC 일괄 확보 (교차심볼 발굴/검증 공용 캐시)
     for (const symbol of targetSymbols) {
