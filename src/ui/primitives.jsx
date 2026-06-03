@@ -99,18 +99,16 @@ export function Card({ children, title, subtitle, actions, icon, tone, pad = 18,
   const toneBorder = tone
     ? { danger: "var(--z-red)", warn: "var(--z-yellow)", success: "var(--z-green)", info: "var(--z-blue)" }[tone]
     : "var(--z-border)";
-  // Shadcn Card 와 동일한 ring-1 ring-foreground/10 효과를 inset shadow 로 재현
-  const ringShadow = tone
-    ? `inset 0 0 0 1px ${toneBorder}66`
-    : `inset 0 0 0 1px color-mix(in oklab, var(--z-text) 10%, transparent)`;
+  // ★ 2026-06 대개편(미니멀): 카드는 헤어라인 보더 + 절제된 그림자로 구분(Linear 스타일).
+  //   tone 카드만 색 보더로 강조.
   return (
     <section
       onClick={onClick}
       style={{
         background: "var(--z-card)",
-        border: noBorder ? "none" : "1px solid transparent",
+        border: noBorder ? "none" : `1px solid ${tone ? `${toneBorder}66` : "var(--z-border)"}`,
         borderRadius: "var(--z-r-xl)",
-        boxShadow: noBorder ? "var(--z-sh-sm)" : `${ringShadow}, var(--z-sh-sm)`,
+        boxShadow: noBorder ? "none" : "var(--z-sh-sm)",
         transition: "border-color var(--z-dur) var(--z-ease), transform var(--z-dur) var(--z-ease), box-shadow var(--z-dur) var(--z-ease)",
         cursor: onClick ? "pointer" : "default",
         ...style,
