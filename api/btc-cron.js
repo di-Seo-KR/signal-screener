@@ -607,61 +607,13 @@ export default async function handler(req, res) {
             }
           }
         }
-        // 심볼 키 정정 — asset 은 "BTC/USD" 형식이라 baseTicker 매핑 필요 (P3 버그 수정).
+        // (b)(c)(d) 펀딩·OI·베이시스 — 그래디언트 보정(임계↓·점진·bounded). 1d 신호 + 종합에 동일 적용.
+        //   ★ 2026-06-03(대표 지시): 극단-only → 더 자주·점진적으로 알파 기여. 방향은 검증된 것만.
         const sym = assetToBinanceSymbol(asset);
-        // (b) 펀딩비: 신호 방향으로 과밀(스퀴즈 위험)이면 확신 하향
-        const fr = fundingMap[sym];
-        if (Number.isFinite(fr) && sSide) {
-          const crowded = (sSide === "SHORT" && fr < -0.0003) || (sSide === "LONG" && fr > 0.0003);
-          if (crowded) {
-            latestSignal.score = Math.max(50, Math.round((latestSignal.score || 60) * 0.85));
-            if (latestSignal.confidence === "A") latestSignal.confidence = "B";
-            latestSignal.reason = (latestSignal.reason || "") + ` +펀딩과밀(${(fr * 100).toFixed(3)}%)`;
-            addLog(`  ↘ ${asset} 펀딩 과밀(${(fr * 100).toFixed(3)}%, ${sSide}) → 확신 하향`);
-          }
-        }
-        // (c) ★ OI 확인/발산 (신규 알파) — OI↑ = 새 자금 유입(추세 확인, 소폭↑),
-        //     OI↓ = 청산/커버(추세 소진, 하향). bounded(방향 불변, 점수 ±소폭).
-        const oiCh = oiChangeMap[sym];
-        if (Number.isFinite(oiCh) && sSide) {
-          if (oiCh >= 0.03) {
-            latestSignal.score = Math.min(95, (latestSignal.score || 60) + 3);
-            latestSignal.reason = (latestSignal.reason || "") + ` +OI확인(+${(oiCh * 100).toFixed(1)}%)`;
-            addLog(`  ↗ ${asset} OI +${(oiCh * 100).toFixed(1)}% → 추세 확인(확신↑)`);
-          } else if (oiCh <= -0.03) {
-            latestSignal.score = Math.max(50, Math.round((latestSignal.score || 60) * 0.9));
-            if (latestSignal.confidence === "A") latestSignal.confidence = "B";
-            latestSignal.reason = (latestSignal.reason || "") + ` +OI발산(${(oiCh * 100).toFixed(1)}%)`;
-            addLog(`  ↘ ${asset} OI ${(oiCh * 100).toFixed(1)}% → 소진 위험(확신↓)`);
-          }
-        }
-        // (d) 베이시스 극단 — 퍼프에선 펀딩과 상당 중복이라 보조. 진짜 극단(±0.1%)만 가볍게 하향.
-        const bs = basisMap[sym];
-        if (Number.isFinite(bs) && sSide) {
-          const extreme = (sSide === "SHORT" && bs < -0.001) || (sSide === "LONG" && bs > 0.001);
-          if (extreme) {
-            latestSignal.score = Math.max(50, Math.round((latestSignal.score || 60) * 0.95));
-            latestSignal.reason = (latestSignal.reason || "") + ` +베이시스극단(${(bs * 100).toFixed(2)}%)`;
-          }
-        }
-
-        // ★ 2026-06-03: 종합 스코어에도 동일 펀딩/OI/베이시스 댐프닝 적용(실거래 시 1d 와 동일 보수성).
-        //   MTF충돌은 종합에 이미 4h 성분으로 반영돼 있어 제외. compositeSignal.side 기준.
-        if (compositeSignal && compositeSignal.side) {
-          const cs = compositeSignal.side;
-          if (Number.isFinite(fr) && ((cs === "SHORT" && fr < -0.0003) || (cs === "LONG" && fr > 0.0003))) {
-            compositeSignal.score = Math.max(40, Math.round((compositeSignal.score || 60) * 0.85));
-            compositeSignal.reason += ` +펀딩과밀`;
-          }
-          if (Number.isFinite(oiCh)) {
-            if (oiCh >= 0.03) compositeSignal.score = Math.min(95, (compositeSignal.score || 60) + 3);
-            else if (oiCh <= -0.03) compositeSignal.score = Math.max(40, Math.round((compositeSignal.score || 60) * 0.9));
-          }
-          if (Number.isFinite(bs) && ((cs === "SHORT" && bs < -0.001) || (cs === "LONG" && bs > 0.001))) {
-            compositeSignal.score = Math.max(40, Math.round((compositeSignal.score || 60) * 0.95));
-          }
-          compositeSignal.confidence = compositeSignal.score >= 80 ? "A" : compositeSignal.score >= 60 ? "B" : "C";
-        }
+        const fr = fundingMap[sym], oiCh = oiChangeMap[sym], bs = basisMap[sym];
+        const n1 = applyFuturesContext(latestSignal, { fr, oiCh, bs });
+        if (n1 && n1.length) addLog(`  ⚙ ${asset} 선물보정(${latestSignal.side}): ${n1.join("·")} → ${latestSignal.score}pt`);
+        applyFuturesContext(compositeSignal, { fr, oiCh, bs }); // 종합 스코어에도 동일
       } catch (e) { addLog(`⚠️ ${asset} 선물컨텍스트 보정 실패: ${e?.message}`); }
 
       addLog(`🎯 ${asset} 시그널: ${latestSignal.type} | ${latestSignal.confidence}급 | ${latestSignal.score}pt`);
@@ -1212,6 +1164,40 @@ function pickTopBotSignal(botSignals) {
   const top = sorted[0].signal;
   if (!top.type) top.type = top.side === "LONG" ? "BUY" : (top.side === "SHORT" ? "SELL" : "BUY");
   return top;
+}
+
+// ════════════════════════════════════════════════════════
+// 선물 컨텍스트 그래디언트 보정 (펀딩·OI·베이시스) — 대표 지시 2026-06-03
+//   극단-only(이전) → 임계값↓ + 그래디언트 + bounded 로 '더 자주·점진적' 알파 기여.
+//   ★ 방향은 검증된 것만: 펀딩과밀=감점 / OI증가=확인 가점 / OI감소=소진 감점 / 베이시스극단=감점.
+//   투기적 새 방향 베팅 없음. 전체 보정폭 ±는 0.65~1.15 로 bounded(신호 방향 절대 불변).
+//   sig 를 in-place 보정. 적용된 요인명 배열 반환(로깅용).
+// ════════════════════════════════════════════════════════
+function applyFuturesContext(sig, { fr, oiCh, bs }) {
+  if (!sig || !sig.side) return null;
+  const side = sig.side;
+  let mult = 1.0;
+  const notes = [];
+  // (b) 펀딩 과밀(신호 방향으로 군중 쏠림 → 스퀴즈 위험) — 임계 0.01%, 그래디언트 최대 -15%
+  if (Number.isFinite(fr)) {
+    const crowd = side === "SHORT" ? -fr : fr; // >0 = 신호방향 과밀
+    if (crowd > 0.0001) { mult *= 1 - Math.min(0.15, crowd * 250); notes.push("펀딩과밀"); }
+  }
+  // (c) OI 증가 = 추세 확인(가점), 감소 = 소진(감점) — 임계 1%, 그래디언트
+  if (Number.isFinite(oiCh)) {
+    if (oiCh > 0.01) { mult *= 1 + Math.min(0.10, (oiCh - 0.01) * 2.5 + 0.02); notes.push("OI확인"); }
+    else if (oiCh < -0.01) { mult *= 1 - Math.min(0.12, (-oiCh - 0.01) * 2.5 + 0.02); notes.push("OI발산"); }
+  }
+  // (d) 베이시스 극단(마크-인덱스 괴리가 신호 방향) — 임계 0.04%, 그래디언트 최대 -8%
+  if (Number.isFinite(bs)) {
+    const ext = side === "SHORT" ? -bs : bs;
+    if (ext > 0.0004) { mult *= 1 - Math.min(0.08, ext * 50); notes.push("베이시스극단"); }
+  }
+  mult = Math.max(0.65, Math.min(1.15, mult)); // bounded — 방향 불변
+  sig.score = Math.max(40, Math.min(98, Math.round((sig.score || 60) * mult)));
+  if (notes.length) sig.reason = ((sig.reason || "") + " +" + notes.join("·")).slice(0, 200);
+  sig.confidence = sig.score >= 80 ? "A" : sig.score >= 60 ? "B" : "C";
+  return notes;
 }
 
 // ════════════════════════════════════════════════════════
