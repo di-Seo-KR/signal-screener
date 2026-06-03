@@ -1614,12 +1614,9 @@ function RealTradingInner() {
                   </div>
                 </Card>
 
+                {/* ★ 2026-06-03 군더더기 정리(대표 지시): 포트폴리오 분산(도넛)·일별 손익 히트맵 제거. */}
                 <div style={{ display: "grid", gap: 14, gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)" }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    <Card title="포트폴리오 분산" icon={<Wallet size={16} />}
-                      subtitle={`${positions.length}개 포지션 · 자산 ${fmtUsd(equity)}`}>
-                      <PositionDonutChart positions={positions} equity={equity || 0} isMobile={isMobile} />
-                    </Card>
                     <Card title="최근 거래" icon={<Activity size={16} />}
                       subtitle="최근 10건 (체결·미체결·청산 포함)">
                       <TradeHistoryTable orders={orders || []} maxRows={10} isMobile={isMobile} />
@@ -1629,11 +1626,6 @@ function RealTradingInner() {
                     {breakerCard}
                   </div>
                 </div>
-
-                <Card title="일별 손익 히트맵" icon={<Gauge size={16} />}
-                  subtitle="최근 30일 일자별 실현손익 강도 — 잘 한 날 vs 잃은 날 한눈에">
-                  <DailyPnLHeatmap orders={orders || []} days={30} isMobile={isMobile} />
-                </Card>
               </>
             )}
           </div>
@@ -1652,17 +1644,10 @@ function RealTradingInner() {
                 <LiveMetricsRow orders={orders || []} isMobile={isMobile} />
               </div>
             </Card>
-            <Card title="포트폴리오 분산" icon={<Wallet size={16} />}
-              subtitle={`${positions.length}개 포지션 · 자산 ${fmtUsd(equity)}`}>
-              <PositionDonutChart positions={positions} equity={equity || 0} isMobile={isMobile} />
-            </Card>
+            {/* ★ 2026-06-03 군더더기 정리: 분산(도넛)·히트맵 제거, 자산곡선·최근거래만 유지. */}
             <Card title="최근 거래" icon={<Activity size={16} />}
               subtitle="최근 10건 (체결·미체결·청산 포함)">
               <TradeHistoryTable orders={orders || []} maxRows={10} isMobile={isMobile} />
-            </Card>
-            <Card title="일별 손익 히트맵" icon={<Gauge size={16} />}
-              subtitle="최근 30일 일자별 실현손익 강도">
-              <DailyPnLHeatmap orders={orders || []} days={30} isMobile={isMobile} />
             </Card>
           </div>
         )}
@@ -1689,17 +1674,8 @@ function RealTradingInner() {
             )}
           </div>
         )}
-        {section === "shadow" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {shadowCard}
-          </div>
-        )}
-        {section === "engine" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {engineLogCard}
-            {reconcileCard}
-          </div>
-        )}
+        {/* ★ 2026-06-03 군더더기 정리(대표 지시): 기술/운영 로그류(Shadow·엔진로그·Reconcile)
+           섹션 제거 — 탭/진입로가 없어 이미 비노출이던 죽은 코드. */}
         {section === "config" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {riskPresetCard}
