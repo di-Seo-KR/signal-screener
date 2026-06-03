@@ -495,6 +495,7 @@ function RealTradingInner() {
     <div style={{
       position: "relative", overflow: "hidden",
       background: "var(--z-card)",
+      backdropFilter: "var(--z-card-blur, none)", WebkitBackdropFilter: "var(--z-card-blur, none)",
       border: "1px solid var(--z-border)",
       borderRadius: "var(--z-r-lg)",
       padding: isMobile ? "16px 16px 16px 18px" : "22px 24px 22px 26px",
@@ -586,6 +587,7 @@ function RealTradingInner() {
     <div title={tip || undefined} style={{
       position: "relative", overflow: "hidden",
       background: "var(--z-card)",
+      backdropFilter: "var(--z-card-blur, none)", WebkitBackdropFilter: "var(--z-card-blur, none)",
       border: "1px solid var(--z-border)",
       borderRadius: "var(--z-r-lg)",
       padding: isMobile ? "15px 15px 15px 17px" : "18px 18px 18px 20px",
@@ -676,7 +678,8 @@ function RealTradingInner() {
     <div style={{
       borderRadius: 22, padding: "22px 20px",
       background: "linear-gradient(165deg, var(--z-card) 0%, var(--z-card-2) 120%)",
-      border: "1px solid var(--z-border)", boxShadow: "0 10px 30px rgba(0,0,0,0.20)",
+      backdropFilter: "var(--z-card-blur, none)", WebkitBackdropFilter: "var(--z-card-blur, none)",
+      border: "1px solid var(--z-border)", boxShadow: "0 10px 30px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.05)",
       display: "flex", flexDirection: "column", gap: 16,
     }}>
       {/* 보유 자산 */}
@@ -1545,11 +1548,11 @@ function RealTradingInner() {
 
   return (
     <div style={{
-      background: "var(--z-bg)", minHeight: "100vh",
+      minHeight: "100vh",
       padding: "20px 16px 80px",
       color: "var(--z-text)",
       fontFamily: "var(--z-font-sans)",
-    }} className="z-anim-in">
+    }} className="z-anim-in z-glass-scope">
       <div style={{ maxWidth: 1280, margin: "0 auto" }}>
         {header}
 
