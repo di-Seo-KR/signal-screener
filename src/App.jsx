@@ -222,7 +222,24 @@ function addXp(userId, amount, reason, syncFn) {
 class ErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
-  componentDidCatch(error, info) { console.error("[Zepta ErrorBoundary]", error, info.componentStack); }
+  componentDidCatch(error, info) {
+    console.error("[Zepta ErrorBoundary]", error, info?.componentStack);
+    // ★ 2026-06-03: 청크 로드 실패(배포로 해시 바뀌어 stale 캐시가 옛 청크 못 부름) → 1회 자동 새로고침.
+    //   "Importing a module script failed" / "Failed to fetch dynamically imported module" / ChunkLoadError.
+    const msg = String(error?.message || error || "");
+    const isChunkError = /Importing a module script failed|Failed to fetch dynamically imported module|error loading dynamically imported module|ChunkLoadError|Loading (?:CSS )?chunk .* failed/i.test(msg);
+    if (isChunkError) {
+      try {
+        const KEY = "zepta:chunk-reload-at";
+        const last = Number(sessionStorage.getItem(KEY) || 0);
+        // 30초 내 중복 reload 차단(무한 루프 방지). 처음이면 즉시 최신 청크 받으러 새로고침.
+        if (Date.now() - last > 30000) {
+          sessionStorage.setItem(KEY, String(Date.now()));
+          window.location.reload();
+        }
+      } catch { /* sessionStorage 불가 환경 — 수동 새로고침 버튼으로 폴백 */ }
+    }
+  }
   render() {
     if (this.state.hasError) {
       return (
