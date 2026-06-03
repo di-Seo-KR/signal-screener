@@ -302,6 +302,17 @@ function RealTradingInner() {
     ? ((equity - breaker.dayStartEquity) / breaker.dayStartEquity) * 100 : 0;
   const weekLossPct = breaker.weekStartEquity && equity
     ? ((equity - breaker.weekStartEquity) / breaker.weekStartEquity) * 100 : 0;
+
+  // ★ 2026-06-03: 오늘 '순수 매매손익'(입금 제외) — Toss 히어로/요약용.
+  //   dayLossPct 는 입금을 수익으로 잡아 부풀려지므로(예 +184%), period-returns 와 동일하게
+  //   당일 순입출금을 차감한다. transfers 미도착 시엔 집계 보류(잘못된 큰 숫자 방지).
+  const _kstDayStartTs = (() => { const d = 864e5, K = 9 * 36e5, n = Date.now(); return Math.floor((n + K) / d) * d - K; })();
+  const _flowsReady = Array.isArray(transfers);
+  const _todayNetFlow = _flowsReady ? transfers.reduce((s, t) => ((Number(t.time) || 0) >= _kstDayStartTs ? s + (Number(t.amount) || 0) : s), 0) : 0;
+  const todayPnlUsd = (_flowsReady && equity != null && breaker.dayStartEquity)
+    ? (equity - breaker.dayStartEquity) - _todayNetFlow : null;
+  const todayPnlPct = (todayPnlUsd != null && breaker.dayStartEquity > 0)
+    ? (todayPnlUsd / breaker.dayStartEquity) * 100 : null;
   // ★ 2026-05-09: MDD 기준점 — 30일 rolling peak 우선, 폴백은 all-time equityHigh
   //   이전: all-time equityHigh 만 사용 → 큰 상승 후엔 정상 조정도 -50% 트리거 위험
   //   이후: 서버가 주는 equityHigh30d 사용 (없으면 equityHigh 로 폴백)
@@ -648,6 +659,67 @@ function RealTradingInner() {
     },
   ].filter(m => m.el);
 
+  // ═════════════════════════════════════════════════════════
+  // ★ 2026-06-03: Toss형 히어로 (모바일) — 큰 카드·여백·핵심만 (대표 지시: 획기적 개편)
+  //   보유자산 + 오늘 매매손익(입금 제외) + 상태칩 1줄. 4개 보조카드는 운영메트릭/수익카드로 이관.
+  // ═════════════════════════════════════════════════════════
+  const sigShort = coinScores?.counts?.short ?? 0;
+  const sigLong = coinScores?.counts?.long ?? 0;
+  const tossChipStyle = {
+    fontSize: 12.5, fontWeight: 700, padding: "7px 12px", borderRadius: 999,
+    background: "var(--z-card-2)", border: "1px solid var(--z-border)", color: "var(--z-text-2)",
+    whiteSpace: "nowrap",
+  };
+  const tossHero = (
+    <div style={{
+      borderRadius: 22, padding: "22px 20px",
+      background: "linear-gradient(165deg, var(--z-card) 0%, var(--z-card-2) 120%)",
+      border: "1px solid var(--z-border)", boxShadow: "0 10px 30px rgba(0,0,0,0.20)",
+      display: "flex", flexDirection: "column", gap: 16,
+    }}>
+      {/* 보유 자산 */}
+      <div>
+        <div style={{ fontSize: 13, color: "var(--z-text-3)", fontWeight: 600 }}>보유 자산 · 마진 잔고</div>
+        <div style={{ fontSize: 40, fontWeight: 900, lineHeight: 1.02, fontFamily: "var(--z-font-mono)", letterSpacing: "-0.025em", marginTop: 3 }}>
+          {marginBalance == null ? <Skeleton width={170} height={40} /> : fmtUsd(marginBalance)}
+        </div>
+        {marginBalance != null && unrealizedPnl != null && (
+          <div style={{ fontSize: 12.5, color: "var(--z-text-3)", marginTop: 7 }}>
+            지갑 {fmtUsd(equity, 2)}
+            <span style={{ color: unrealizedPnl > 0 ? "var(--z-green-hi)" : unrealizedPnl < 0 ? "var(--z-red-hi)" : "var(--z-text-3)" }}>
+              {" "}· 미실현 {unrealizedPnl >= 0 ? "+" : ""}{fmtUsd(unrealizedPnl, 2)}
+            </span>
+          </div>
+        )}
+      </div>
+      {/* 오늘 매매손익 — 입금 제외 (강조 pill) */}
+      <div style={{
+        borderRadius: 16, padding: "15px 17px",
+        background: todayPnlUsd == null ? "var(--z-card-2)"
+          : todayPnlUsd >= 0 ? "rgba(16,216,132,0.10)" : "rgba(255,77,100,0.10)",
+        border: `1px solid ${todayPnlUsd == null ? "var(--z-border)" : todayPnlUsd >= 0 ? "rgba(16,216,132,0.25)" : "rgba(255,77,100,0.25)"}`,
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+      }}>
+        <span style={{ fontSize: 14, color: "var(--z-text-2)", fontWeight: 700 }}>오늘 매매손익 <span style={{ fontSize: 11, color: "var(--z-text-3)", fontWeight: 500 }}>입금 제외</span></span>
+        <span style={{
+          fontSize: 22, fontWeight: 900, fontFamily: "var(--z-font-mono)", letterSpacing: "-0.01em",
+          color: todayPnlUsd == null ? "var(--z-text-3)" : todayPnlUsd >= 0 ? "var(--z-green-hi)" : "var(--z-red-hi)",
+        }}>
+          {todayPnlUsd == null ? "집계 중" : `${todayPnlUsd >= 0 ? "▲ +" : "▼ −"}${fmtUsd(Math.abs(todayPnlUsd), 1)}`}
+          {todayPnlPct != null && <span style={{ fontSize: 13, marginLeft: 7, opacity: 0.9 }}>{todayPnlPct >= 0 ? "+" : ""}{todayPnlPct.toFixed(1)}%</span>}
+        </span>
+      </div>
+      {/* 상태 칩 1줄 */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ ...tossChipStyle, color: trulyLive ? "var(--z-green-hi)" : killOn ? "var(--z-text-2)" : "var(--z-yellow-hi)" }}>
+          {trulyLive ? "🟢 가동중" : killOn ? "⊙ 대기" : "⚡ 정지"}
+        </span>
+        <span style={tossChipStyle}>📉 신호 {sigShort}숏{sigLong > 0 ? ` · ${sigLong}롱` : ""}</span>
+        <span style={tossChipStyle}>💼 포지션 {positions.length}개</span>
+      </div>
+    </div>
+  );
+
   const kpiBar = (
     <div style={{ marginBottom: 20 }}>
       {/* hero */}
@@ -661,13 +733,8 @@ function RealTradingInner() {
             {metricCards.find(m => m.key === "loss")?.el}
           </div>
         ) : (
-          <>
-            {heroEquity}
-            {/* 모바일: 3열은 빡빡 → 2열 (각 카드 폭 ↑, hint 줄바꿈·잘림 해소) */}
-            <div style={{ marginTop: 10, display: "grid", gap: 10, gridTemplateColumns: "repeat(2, 1fr)" }}>
-              {metricCards.map(m => <React.Fragment key={m.key}>{m.el}</React.Fragment>)}
-            </div>
-          </>
+          // 모바일: Toss형 단일 히어로 카드 (큰 숫자·여백·상태칩) — 4개 보조카드 그리드 폐지
+          tossHero
         )}
       </div>
     </div>
