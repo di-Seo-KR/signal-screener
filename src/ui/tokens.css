@@ -522,6 +522,9 @@ main, [class*="panel"], [class*="dashboard"] {
   }
   body {
     @apply bg-background text-foreground;
+    /* ★ 2026-06-03: 한글 단어 중간 줄바꿈 금지(세로 글자깨짐 방지). 긴 영문/URL/숫자는 끊김 허용. */
+    word-break: keep-all;
+    overflow-wrap: break-word;
   }
   html {
     @apply font-sans;
