@@ -31,8 +31,9 @@ import { fetchGA4DailySummary } from "../_shared/ga4.js";
 import { fetchSentryDailySummary } from "../_shared/sentry.js";
 import { batchBacktest } from "../_shared/ohlc-backtest.js";
 
-// 7 명 에이전트 + OHLC 백테스트 — 약 30~60초 소요. Vercel 기본 10s 한도 회피.
-export const config = { maxDuration: 60 };
+// 7 명 에이전트 + OHLC 백테스트 + LLM 2회(QUANT-RES, QUANT-PLAN) — 60s 초과로 매일 타임아웃.
+// ★ 2026-06-03: maxDuration 60 → 300 (continuous-backtest 와 동일). 완주 보장.
+export const config = { maxDuration: 300 };
 
 const MODEL = "claude-sonnet-4-6";
 const PROBE_USER = "__zepta_global_probe__";
