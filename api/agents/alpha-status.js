@@ -24,11 +24,12 @@ export default async function handler(req, res) {
     const kv = await getKv();
     const strategyIds = Object.keys(DEFAULT_STRATEGY_WEIGHTS);
 
-    const [leaderboard, hist, candidates, weights, ...statusPairs] = await Promise.all([
+    const [leaderboard, hist, candidates, weights, regime, ...statusPairs] = await Promise.all([
       kv.get("di:alpha:leaderboard"),
       kv.get("di:alpha:leaderboard:hist"),
       kv.get("di:alpha:strategy-candidates"),
       kv.get("di:alpha:strategy-weights"),
+      kv.get("di:market:regime"),  // ★ 2026-06-03: 마켓 레짐 노출(이전엔 누락 → AlphaLab 레짐 패널 빈 값)
       ...strategyIds.map((id) => kv.get(`di:alpha:strategy-status:${id}`).then((v) => ({ id, status: v }))),
       ...strategyIds.map((id) => kv.get(`di:alpha:params:${id}`).then((v) => ({ id, params: v }))),
     ]);
@@ -48,6 +49,7 @@ export default async function handler(req, res) {
       historyTail: Array.isArray(hist) ? hist.slice(-24) : [], // 최근 24시간만 UI 차트
       candidates: Array.isArray(candidates) ? candidates : [],
       weights: weights || null,
+      regime: regime || null,  // ★ { regime: "trending"|"mean_reverting"|"transitional", avgHurst, avgER, ... }
       statuses,
       params,
     });
