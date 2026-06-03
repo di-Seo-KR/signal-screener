@@ -15,24 +15,26 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* ── 색상 (Dark default — Zepta 네이비 베이스) ── */
-  --z-bg:        #070B14;
-  --z-bg-elev:   #0C1321;
-  --z-card:      #101828;
-  --z-card-2:    #161F33;
-  --z-card-hi:   #1B2740;
-  --z-border:    #1E2A42;
-  --z-border-2:  #2A3A58;
-  --z-border-hi: #3B4D6D;
+  /* ── 색상 (Dark default — 2026 대개편: 모던 핀테크 미니멀 / Toss·Linear)
+     네이비 → 뉴트럴 근접-블랙 + 헤어라인 보더 + 선명한 단일 블루 강조.
+     녹/적(P&L 시맨틱)은 트레이딩 필수라 선명하게 유지. ── */
+  --z-bg:        #0A0B0F;
+  --z-bg-elev:   #111219;
+  --z-card:      #14151B;
+  --z-card-2:    #1B1D25;
+  --z-card-hi:   #23252F;
+  --z-border:    #23262F;   /* 헤어라인 — 미묘하지만 보임 */
+  --z-border-2:  #2E313C;
+  --z-border-hi: #3C414E;
 
-  --z-text:      #F1F5FB;
-  --z-text-2:    #9AA7BD;
-  --z-text-3:    #64728C;
-  --z-text-4:    #3F4C66;
+  --z-text:      #F4F5F7;
+  --z-text-2:    #A1A6B2;
+  --z-text-3:    #6E7585;
+  --z-text-4:    #474C5A;
 
-  --z-blue:      #3B82F6;
-  --z-blue-hi:   #60A5FA;
-  --z-blue-bg:   rgba(59, 130, 246, 0.12);
+  --z-blue:      #4D7CFF;   /* 일렉트릭 블루 — 유일한 주 강조색 */
+  --z-blue-hi:   #6E92FF;
+  --z-blue-bg:   rgba(77, 124, 255, 0.14);
 
   --z-green:     #10D884;
   --z-green-hi:  #34E89A;
@@ -68,11 +70,11 @@
   --z-r-2xl: 24px;
   --z-r-full: 9999px;
 
-  /* ── Shadow ── */
-  --z-sh-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --z-sh:    0 4px 12px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
-  --z-sh-lg: 0 12px 32px rgba(0, 0, 0, 0.45), 0 2px 8px rgba(0, 0, 0, 0.3);
-  --z-sh-glow-blue:  0 0 0 3px rgba(59, 130, 246, 0.22);
+  /* ── Shadow (미니멀 — 카드는 헤어라인 보더로 구분, 그림자는 절제) ── */
+  --z-sh-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --z-sh:    0 6px 18px rgba(0, 0, 0, 0.38);
+  --z-sh-lg: 0 16px 40px rgba(0, 0, 0, 0.50);
+  --z-sh-glow-blue:  0 0 0 3px rgba(77, 124, 255, 0.25);
   --z-sh-glow-red:   0 0 0 3px rgba(255, 77, 100, 0.22);
   --z-sh-glow-green: 0 0 0 3px rgba(16, 216, 132, 0.22);
 
@@ -507,28 +509,11 @@ main, [class*="panel"], [class*="dashboard"] {
 }
 
 /* ════════════════════════════════════════════════════════════
-   Bento/Elevation scope — 2026 트렌드 반영 (실전매매/알파랩)
-   대표 지시(2026-06-03): 최신 UI/UX 트렌드 제대로 반영.
-   적용: ① OLED 다크 + 미묘한 코너 액센트 그라데이션 배경
-        ② 떠있는(elevation) 불투명 카드 — 부드러운 그림자 + 상단 하이라이트
-        ③ bold 데이터 타이포(컴포넌트에서)
-   ★ backdrop-filter(blur) 미사용 — 지난 글래스 겹침의 원인이라 의도적으로 배제.
-     그라데이션 배경 + box-shadow 는 stacking context 를 안 만들어 100% 안전.
-   dark 모드에만 적용(라이트 보호).
+   .z-bento-scope — 2026-06 대개편(모던 핀테크 미니멀)에서 플랫화.
+   이전의 그라데이션/elevation 오버라이드 제거 → 실전매매·알파랩도 앱 전체와
+   동일한 깨끗한 단일톤 파운데이션(--z-bg/card/border)을 사용해 일관성 확보.
+   (Toss/Linear 미감은 플랫 단일톤이라 페이지 배경 그라데이션을 두지 않음.)
    ════════════════════════════════════════════════════════════ */
-[data-theme="dark"] .z-bento-scope {
-  background:
-    radial-gradient(1000px 540px at 4% -8%, rgba(99, 102, 241, 0.20), transparent 56%),
-    radial-gradient(880px 500px at 106% 0%, rgba(16, 185, 169, 0.14), transparent 54%),
-    radial-gradient(700px 620px at 50% 116%, rgba(59, 130, 246, 0.10), transparent 60%),
-    linear-gradient(180deg, #06070e 0%, #090b15 58%, #06070e 100%);
-  /* 카드를 배경보다 살짝 밝은 불투명색으로 → 그라데이션 위에 '떠 있는' 느낌(elevation) */
-  --z-card: #121A2E;
-  --z-card-2: #1A2640;
-  --z-border: #243352;
-  /* 부드러운 그림자 + 상단 1px 하이라이트(유리 아님, 솔리드) */
-  --z-sh-sm: 0 8px 24px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.045);
-}
 .z-bento-scope { min-height: 100vh; }
 
 @layer base {
