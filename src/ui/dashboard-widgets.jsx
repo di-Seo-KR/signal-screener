@@ -126,18 +126,29 @@ export function EquityCurveChart({ history = [], currentEquity, peakEquity, isMo
 // Widget 2 — 라이브 성과 메트릭 행
 // recentOrders + recentEngineLog 에서 라이브 계산
 // ═══════════════════════════════════════════════════════════════════
-function computeLiveMetrics(orders) {
-  // orders: [{ symbol, side, qty, price, pnl?, time, status, ... }]
-  if (!Array.isArray(orders) || orders.length === 0) {
-    return { totalTrades: 0, closedTrades: 0, winRate: 0, profitFactor: 0, avgWin: 0, avgLoss: 0, totalPnL: 0, sharpeApprox: 0 };
+function computeLiveMetrics(orders, realized) {
+  // ★ 2026-06-03: 청산 손익은 'realized'(바이낸스 REALIZED_PNL income) 를 우선 사용.
+  //   orders 는 진입주문만 기록돼 pnl 이 없어 승률/손익비가 안 잡혔음 → realized 로 정확 집계.
+  //   realized: [{ symbol, pnl, time }]. 없으면 기존 orders 폴백.
+  const pnls = [];
+  if (Array.isArray(realized) && realized.length > 0) {
+    for (const t of realized) {
+      const pnl = parseFloat(t.pnl);
+      if (isFinite(pnl) && pnl !== 0) pnls.push(pnl);
+    }
+  } else if (Array.isArray(orders)) {
+    for (const o of orders) {
+      const pnl = parseFloat(o.pnl || o.realizedPnl || 0);
+      const isClose = (o.side === "SELL" || o.reduceOnly === true || o.closing === true) && isFinite(pnl) && pnl !== 0;
+      if (isClose) pnls.push(pnl);
+    }
+  }
+  const totalTrades = (Array.isArray(orders) ? orders.length : 0) || pnls.length;
+  if (pnls.length === 0) {
+    return { totalTrades, closedTrades: 0, wins: 0, losses: 0, winRate: 0, profitFactor: 0, avgWin: 0, avgLoss: 0, totalPnL: 0, sharpeApprox: 0 };
   }
   let wins = 0, losses = 0, grossWin = 0, grossLoss = 0, totalPnL = 0;
-  const pnls = [];
-  for (const o of orders) {
-    const pnl = parseFloat(o.pnl || o.realizedPnl || 0);
-    const isClose = (o.side === "SELL" || o.reduceOnly === true || o.closing === true) && isFinite(pnl) && pnl !== 0;
-    if (!isClose) continue;
-    pnls.push(pnl);
+  for (const pnl of pnls) {
     totalPnL += pnl;
     if (pnl > 0) { wins++; grossWin += pnl; }
     else if (pnl < 0) { losses++; grossLoss += Math.abs(pnl); }
@@ -156,7 +167,7 @@ function computeLiveMetrics(orders) {
     sharpeApprox = std > 0 ? (mean / std) * Math.sqrt(pnls.length) : 0;
   }
   return {
-    totalTrades: orders.length, closedTrades, wins, losses,
+    totalTrades, closedTrades, wins, losses,
     winRate, profitFactor, avgWin, avgLoss, totalPnL, sharpeApprox,
   };
 }
@@ -172,8 +183,8 @@ function sharpeGrade(s) {
   return { label: "주의", grade: "E", color: "var(--z-red-hi)" };
 }
 
-export function LiveMetricsRow({ orders = [], isMobile = false }) {
-  const m = useMemo(() => computeLiveMetrics(orders), [orders]);
+export function LiveMetricsRow({ orders = [], realized = null, isMobile = false }) {
+  const m = useMemo(() => computeLiveMetrics(orders, realized), [orders, realized]);
   const sg = sharpeGrade(m.sharpeApprox);
   const pfStr = m.profitFactor === Infinity ? "∞" : m.profitFactor > 0 ? m.profitFactor.toFixed(2) : "--";
   const pfColor = m.profitFactor === Infinity ? "var(--z-green-hi)"

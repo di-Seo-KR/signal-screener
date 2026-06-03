@@ -123,6 +123,8 @@ function RealTradingInner() {
   // ★ 2026-06-03: 입출금(transfer) 원시 내역 — 수익률에서 입금 부풀림 제거용 (60s 주기)
   //   netFlow 는 카드가 시작자산 샘플 ts 에 맞춰 직접 합산(윈도우 정합 필수).
   const [transfers, setTransfers] = useState(null);
+  // ★ 2026-06-03: 청산(실현) 거래 — 승률·손익비·Sharpe 집계용 (orders 엔 pnl 없어 income 사용)
+  const [closedTrades, setClosedTrades] = useState(null);
   // ★ SSOT — useBreakpoint. 이전엔 768 미만을 "isMobile" 로 봤음 (iPad 세로 포함).
   // 그 동작 유지하려면 isSmall (< 1024) 을 isMobile 로 매핑.
   const { isSmall } = useBreakpoint();
@@ -171,11 +173,12 @@ function RealTradingInner() {
   const refreshWatchlist = useCallback(async () => {
     if (!userId) return;
     setCoinScores((prev) => ({ ...prev, loading: true }));
-    // 코인 롱숏 점수 + 포지션 plan(익절/손절) + 기간별 순입출금 병렬 조회
-    const [cs, pp, pf] = await Promise.allSettled([
+    // 코인 점수 + 포지션 plan + 순입출금 + 청산(실현) 거래 병렬 조회
+    const [cs, pp, pf, ct] = await Promise.allSettled([
       jget(`/api/real-trading/coin-scores?limit=30`),
       jget(`/api/real-trading/position-plans?userId=${encodeURIComponent(userId)}`),
       jget(`/api/real-trading/period-returns?userId=${encodeURIComponent(userId)}`),
+      jget(`/api/real-trading/closed-trades?userId=${encodeURIComponent(userId)}`),
     ]);
     const c = cs.status === "fulfilled" ? cs.value : null;
     setCoinScores(c?.ok
@@ -189,6 +192,8 @@ function RealTradingInner() {
     }
     const fl = pf.status === "fulfilled" ? pf.value : null;
     if (fl?.ok && Array.isArray(fl.transfers)) setTransfers(fl.transfers);
+    const cl = ct.status === "fulfilled" ? ct.value : null;
+    if (cl?.ok && Array.isArray(cl.trades)) setClosedTrades(cl.trades);
   }, [userId]);
 
   useEffect(() => {
@@ -1615,7 +1620,7 @@ function RealTradingInner() {
                     isMobile={isMobile}
                   />
                   <div style={{ marginTop: 14 }}>
-                    <LiveMetricsRow orders={orders || []} isMobile={isMobile} />
+                    <LiveMetricsRow orders={orders || []} realized={closedTrades} isMobile={isMobile} />
                   </div>
                 </Card>
 
@@ -1646,7 +1651,7 @@ function RealTradingInner() {
                 isMobile={isMobile}
               />
               <div style={{ marginTop: 14 }}>
-                <LiveMetricsRow orders={orders || []} isMobile={isMobile} />
+                <LiveMetricsRow orders={orders || []} realized={closedTrades} isMobile={isMobile} />
               </div>
             </Card>
             {/* ★ 2026-06-03 군더더기 정리: 분산(도넛)·히트맵 제거, 자산곡선·최근거래만 유지. */}
