@@ -105,10 +105,12 @@ const fmtAgo = (iso) => {
 // ────────────────────────────────────────────────
 // 작은 UI 컴포넌트
 // ────────────────────────────────────────────────
-function Card({ children, style, ...rest }) {
+function Card({ children, style, className, ...rest }) {
   const C = useThemeTokens();
   return (
     <div
+      // ★ 글래스 스코프(dark)에서 z-glass-card 가 배경/블러를 덮어씀(!important). 밖에선 inline hex 유지.
+      className={`z-glass-card${className ? " " + className : ""}`}
       style={{
         background: C.card,
         border: `1px solid ${C.border}`,
@@ -1059,7 +1061,7 @@ export default function AlphaLab({ onRequestLogin }) {
   if (loading && !data) {
     // 2026-05-12 — Skeleton 표준화 (LoadingBlock)
     return (
-      <div style={{ padding: "14px 14px", maxWidth: 1200, margin: "0 auto" }}>
+      <div className="z-glass-scope" style={{ padding: "14px 14px", maxWidth: 1200, margin: "0 auto" }}>
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, letterSpacing: "-0.02em" }}>알파 랩</div>
           <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4 }}>검증된 33개 전략을 한 자리에서 비교하세요</div>
@@ -1072,7 +1074,7 @@ export default function AlphaLab({ onRequestLogin }) {
   // ── 비로그인 view (Public Mode) ──────────────────
   if (isPublic) {
     return (
-      <div style={{ padding: "14px 14px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 1200, margin: "0 auto" }}>
+      <div className="z-glass-scope" style={{ padding: "14px 14px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 1200, margin: "0 auto" }}>
         <div>
           <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, letterSpacing: "-0.02em" }}>알파 랩</div>
           <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4, lineHeight: 1.55 }}>
@@ -1107,7 +1109,7 @@ export default function AlphaLab({ onRequestLogin }) {
 
   // ── 로그인 view (전체 정보) ──────────────────
   return (
-    <div style={{ padding: "14px 14px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 1200, margin: "0 auto" }}>
+    <div className="z-glass-scope" style={{ padding: "14px 14px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 1200, margin: "0 auto" }}>
       <div>
         <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, letterSpacing: "-0.02em" }}>알파 랩</div>
         <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4, lineHeight: 1.55 }}>
