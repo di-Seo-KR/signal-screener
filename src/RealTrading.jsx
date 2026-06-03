@@ -618,12 +618,15 @@ function RealTradingInner() {
   const metricCards = [
     {
       key: "pnl",
+      // ★ 2026-06-03: 입금 부풀림 제거 — dayLossPct(raw) 대신 todayPnlPct(투입자본 기준, 입출금 제외).
       el: !isMobile ? renderMetricCard({
-        label: "오늘 손익", value: fmtPct(dayLossPct),
-        tip: "오늘 시작 잔고 대비 지금까지의 손익률입니다.",
-        color: dayLossPct < 0 ? "var(--z-red-hi)" : dayLossPct > 0 ? "var(--z-green-hi)" : "var(--z-text)",
-        hint: <>하루 손실 한도 <span style={{ fontWeight: 700 }}>-{dayLimitPct.toFixed(0)}%</span></>,
-        accent: dayLossPct < 0 ? "var(--z-red)" : dayLossPct > 0 ? "var(--z-green)" : "var(--z-text-3)",
+        label: "오늘 손익", value: todayPnlPct != null ? fmtPct(todayPnlPct) : "집계 중",
+        tip: "오늘 시작 잔고 대비 순수 매매손익(입금/출금 제외)입니다.",
+        color: todayPnlUsd == null ? "var(--z-text)" : todayPnlUsd > 0 ? "var(--z-green-hi)" : todayPnlUsd < 0 ? "var(--z-red-hi)" : "var(--z-text)",
+        hint: todayPnlUsd != null
+          ? <>{todayPnlUsd >= 0 ? "+" : ""}{fmtUsd(todayPnlUsd, 1)} · 입금 제외</>
+          : "입금 내역 집계 중",
+        accent: todayPnlUsd == null ? "var(--z-text-3)" : todayPnlUsd > 0 ? "var(--z-green)" : todayPnlUsd < 0 ? "var(--z-red)" : "var(--z-text-3)",
       }) : null, // 모바일에선 hero 안에 흡수됨
     },
     {

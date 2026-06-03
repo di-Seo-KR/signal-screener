@@ -518,9 +518,10 @@ main, [class*="panel"], [class*="dashboard"] {
    ════════════════════════════════════════════════════════════ */
 [data-theme="dark"] .z-bento-scope {
   background:
-    radial-gradient(1000px 520px at 6% -8%, rgba(99, 102, 241, 0.14), transparent 58%),
-    radial-gradient(840px 480px at 104% 2%, rgba(16, 185, 169, 0.10), transparent 55%),
-    linear-gradient(180deg, #06070d 0%, #080a12 60%, #06070d 100%);
+    radial-gradient(1000px 540px at 4% -8%, rgba(99, 102, 241, 0.20), transparent 56%),
+    radial-gradient(880px 500px at 106% 0%, rgba(16, 185, 169, 0.14), transparent 54%),
+    radial-gradient(700px 620px at 50% 116%, rgba(59, 130, 246, 0.10), transparent 60%),
+    linear-gradient(180deg, #06070e 0%, #090b15 58%, #06070e 100%);
   /* 카드를 배경보다 살짝 밝은 불투명색으로 → 그라데이션 위에 '떠 있는' 느낌(elevation) */
   --z-card: #121A2E;
   --z-card-2: #1A2640;
