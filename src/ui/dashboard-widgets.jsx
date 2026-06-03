@@ -856,7 +856,7 @@ export function CoinDirectionScores({ coins = [], counts = {}, loading = false, 
         padding: 24, textAlign: "center", fontSize: 14,
         color: "var(--z-text-3)", border: "1px dashed var(--z-border)", borderRadius: "var(--z-r-md)",
       }}>
-        현재 집계된 코인 신호가 없어요. 15분마다 갱신됩니다.
+        현재 집계된 코인 신호가 없어요. 10분마다 갱신됩니다.
       </div>
     );
   }
