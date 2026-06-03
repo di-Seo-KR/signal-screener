@@ -1030,7 +1030,7 @@ function RealTradingInner() {
               fontSize: 14, fontWeight: 700, marginTop: 2,
               color: pnl >= 0 ? "var(--z-green-hi)" : "var(--z-red-hi)",
             }}>
-              {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%
+              {isFinite(pnlPct) ? `${pnlPct >= 0 ? "+" : ""}${pnlPct.toFixed(2)}%` : "—"}
             </div>
           </div>
         </div>
@@ -1338,7 +1338,7 @@ function RealTradingInner() {
               {e.plan && (
                 <div style={{ color: "var(--z-text-2)", fontSize: 14, fontFamily: "var(--z-font-mono)" }}>
                   qty {fmtQty(e.plan.qty)} · {e.plan.leverage}× · SL {fmtUsd(e.plan.slPrice)} · TP {fmtUsd(e.plan.tpPrice)}{e.plan.bumpedToMin ? " · bumped" : ""}
-                  {e.plan.effectiveRR && <> · RR {e.plan.effectiveRR.toFixed(2)}</>}
+                  {e.plan.effectiveRR && isFinite(e.plan.effectiveRR) && <> · RR {e.plan.effectiveRR.toFixed(2)}</>}
                 </div>
               )}
               {e.result?.orderId && (
@@ -1390,7 +1390,7 @@ function RealTradingInner() {
               tone={(shadow.summary.netPnL || 0) >= 0 ? "success" : "danger"} />
             <Stat compact label="평균 R"
               value={shadow.summary.trades > 0
-                ? (shadow.summary.avgR != null
+                ? ((shadow.summary.avgR != null && isFinite(shadow.summary.avgR))
                     ? shadow.summary.avgR.toFixed(2) + "R"
                     : ((shadow.summary.totalRR || 0) / shadow.summary.trades).toFixed(2) + "R")
                 : "—"} />
@@ -1434,7 +1434,7 @@ function RealTradingInner() {
                   <div key={fam} style={{ display: "flex", gap: 4, alignItems: "center" }}>
                     <Badge tone="blue" size="sm">{fam}</Badge>
                     <span style={{ fontFamily: "var(--z-font-mono)", color: (st.netPnL || 0) >= 0 ? "var(--z-green-hi)" : "var(--z-red-hi)" }}>
-                      {fmtUsd(st.netPnL)} · {st.wins}/{st.trades}
+                      {fmtUsd(st.netPnL)} · {(st.trades || 0) > 0 ? `${st.wins || 0}/${st.trades}` : "—"}
                     </span>
                   </div>
                 ))}
