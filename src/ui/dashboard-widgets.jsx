@@ -908,13 +908,27 @@ export function CoinDirectionScores({ coins = [], counts = {}, loading = false, 
                   fontSize: 10, fontWeight: 800, padding: "1px 6px", borderRadius: "var(--z-r-full)",
                   background: accentBg, color: accent, whiteSpace: "nowrap",
                 }}>{isLong ? "롱" : "숏"}</span>
+                {/* 모바일: 4h 보조 (초소형) */}
+                {isMobile && c.tf4h && (
+                  <span style={{ fontSize: 9, fontWeight: 700, whiteSpace: "nowrap",
+                    color: c.tf4h.side === "LONG" ? "var(--z-green-hi)" : "var(--z-red-hi)" }}>
+                    4h{c.tf4h.side === "LONG" ? "▲" : "▼"}{Math.round(c.tf4h.score)}
+                  </span>
+                )}
               </div>
 
-              {/* 데스크톱: 타임프레임/전략 */}
+              {/* 데스크톱: 4h 보조 신호 (있으면 색상 표시, 없으면 타임프레임) */}
               {!isMobile && (
-                <span style={{ fontSize: 11, color: "var(--z-text-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                  {c.timeframe || c.family || "—"}
-                </span>
+                c.tf4h ? (
+                  <span style={{ fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",
+                    color: c.tf4h.side === "LONG" ? "var(--z-green-hi)" : "var(--z-red-hi)" }}>
+                    4h {c.tf4h.side === "LONG" ? "▲" : "▼"}{Math.round(c.tf4h.score)}
+                  </span>
+                ) : (
+                  <span style={{ fontSize: 11, color: "var(--z-text-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {c.timeframe || c.family || "1d"}
+                  </span>
+                )
               )}
 
               {/* 점수 막대 */}
