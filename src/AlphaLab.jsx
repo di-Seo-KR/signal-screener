@@ -604,6 +604,153 @@ function SymbolTimeframePanel({ data }) {
   );
 }
 
+// ════════════════════════════════════════════════════════════════════
+// PipelineBoard — 전략 파이프라인 (발굴 → 검증 → 실거래) 통합 평가 칸반
+//   대표 지시(2026-06-03): 발굴 후보와 기존 8개 전략을 "같은 잣대"로 한 줄에 세움.
+//   3개 레인으로 깔때기 전체를 한눈에. 핵심: 화려한 단일심볼 백테스트(왼쪽)가
+//   실거래 성과(오른쪽)로 이어지는지 직접 비교 → "백테스트 ≠ 실거래" 체감.
+// ════════════════════════════════════════════════════════════════════
+const LANE = {
+  observe: { key: "observe", title: "관찰중", emoji: "🔬", desc: "발굴된 후보 · 단일심볼 관찰치(미검증)", accent: "text3" },
+  validated: { key: "validated", title: "검증 통과", emoji: "✅", desc: "여러 종목 + 미학습 구간(OOS) 통과", accent: "blue" },
+  live: { key: "live", title: "실거래", emoji: "🟢", desc: "실제 매매 중 · 진짜 돈 성과 기준", accent: "green" },
+};
+
+function PipelineCard({ children, accent, C }) {
+  return (
+    <div style={{
+      background: C.card2, border: `1px solid ${C.border}`, borderLeft: `3px solid ${accent}`,
+      borderRadius: RADIUS.sm, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 5,
+    }}>{children}</div>
+  );
+}
+
+function PipelineBoard({ data }) {
+  const C = useThemeTokens();
+  const isMobile = useIsMobile();
+  const strategies = data?.leaderboard?.strategies || {};
+  const params = data?.params || {};
+  const candidates = data?.candidates || [];
+
+  // 레인1 — 관찰중: 발굴 후보, 단일심볼 Sharpe 상위
+  const observing = useMemo(() => [...candidates]
+    .sort((a, b) => (b.backtestResult?.sharpe || 0) - (a.backtestResult?.sharpe || 0))
+    .slice(0, 8).map((c) => ({
+      id: c.id, name: strategyLabel(c.parentStrategy),
+      symbol: (c.symbol || "").replace("USDT", ""),
+      sharpe: c.backtestResult?.sharpe, win: c.backtestResult?.winRate,
+    })), [candidates]);
+
+  // 레인2 — 검증통과: 주입된 파라미터(교차심볼+OOS 통과분)
+  const validated = useMemo(() => Object.entries(params).filter(([, v]) => v && Number.isFinite(v.sharpe))
+    .map(([id, v]) => ({ id, name: strategyLabel(id), sharpe: v.sharpe, oos: v.oosSharpe, symbol: (v.symbol || "").replace("USDT", "") }))
+    .sort((a, b) => (b.sharpe || 0) - (a.sharpe || 0)), [params]);
+
+  // 레인3 — 실거래: 8개 전략, 실거래 누적손익 기준 정렬
+  const live = useMemo(() => Object.entries(strategies).map(([id, s]) => {
+    const lv = s.live || {};
+    return {
+      id, name: strategyLabel(id),
+      pnl: lv.netPnLUsd ?? null, trades: lv.trades || 0, winRate: lv.winRate ?? null,
+      injected: !!params[id],
+    };
+  }).sort((a, b) => (b.pnl ?? -1e9) - (a.pnl ?? -1e9)), [strategies, params]);
+
+  const sampleTag = (n) => n >= 20 ? { t: "📊 표본충분", c: C.text2 } : n >= 5 ? { t: "표본보통", c: C.text3 } : { t: "⚠ 표본부족", c: C.text3 };
+
+  const laneHead = (lane, count) => (
+    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
+      <div style={{ fontSize: FONT.sm, fontWeight: 800, color: C[lane.accent] || C.text1 }}>{lane.emoji} {lane.title}</div>
+      <span style={{ fontSize: FONT.xs, color: C.text3 }}>{count}건</span>
+    </div>
+  );
+
+  const Lane = ({ lane, count, children }) => (
+    <div style={{ background: C.card2, border: `1px solid ${C.border}`, borderRadius: RADIUS.md, padding: 12, minWidth: 0 }}>
+      {laneHead(lane, count)}
+      <div style={{ fontSize: 11, color: C.text3, marginBottom: 10, lineHeight: 1.4, minHeight: isMobile ? 0 : 30 }}>{lane.desc}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: isMobile ? 280 : 420, overflowY: "auto" }}>
+        {children}
+      </div>
+    </div>
+  );
+
+  return (
+    <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>전략 파이프라인</div>
+        <span style={{ fontSize: FONT.xs, color: C.text3 }}>발굴 → 검증 → 실거래</span>
+      </div>
+      <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 12, lineHeight: 1.5 }}>
+        발굴 후보부터 실거래 전략까지 <b style={{ color: C.text2 }}>같은 화면에서</b> 비교합니다.
+        왼쪽의 화려한 단일심볼 백테스트가 오른쪽 <b style={{ color: C.text2 }}>실거래 성과</b>로 이어지는지가 진짜 실력입니다.
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 12 }}>
+        {/* 관찰중 */}
+        <Lane lane={LANE.observe} count={candidates.length}>
+          {observing.length === 0 ? <div style={{ fontSize: FONT.xs, color: C.text3 }}>발굴 중…</div> :
+            observing.map((c) => {
+              const g = sharpeToGrade(c.sharpe);
+              return (
+                <PipelineCard key={c.id} accent={C.border} C={C}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
+                    <span style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>{c.name}</span>
+                    <span style={{ fontSize: 10, color: C.text3, border: `1px solid ${C.border}`, borderRadius: 4, padding: "1px 5px", whiteSpace: "nowrap" }}>미검증</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                    <span style={{ fontSize: 17, fontWeight: 800, color: C.text2 }}>{g.grade}</span>
+                    <span style={{ fontSize: FONT.xs, color: C.text3 }}>{c.symbol} · 단일심볼 {fmtNum(c.sharpe, 1)}</span>
+                  </div>
+                  <span style={{ fontSize: FONT.xs, color: C.text3 }}>승률 {fmtPct(c.win, 0)}</span>
+                </PipelineCard>
+              );
+            })}
+        </Lane>
+        {/* 검증통과 */}
+        <Lane lane={LANE.validated} count={validated.length}>
+          {validated.length === 0 ? <div style={{ fontSize: FONT.xs, color: C.text3, lineHeight: 1.5 }}>아직 교차검증을 통과한 후보가 없습니다. 엄격한 게이트(여러 종목+OOS)를 넘어야 여기로 올라옵니다.</div> :
+            validated.map((v) => (
+              <PipelineCard key={v.id} accent={C.blue} C={C}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
+                  <span style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>{v.name}</span>
+                  <span style={{ fontSize: 10, color: C.green, border: `1px solid ${C.green}`, borderRadius: 4, padding: "1px 5px", whiteSpace: "nowrap" }}>🧬 반영중</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                  <span style={{ fontSize: 17, fontWeight: 800, color: C.blue }}>{fmtNum(v.sharpe, 2)}</span>
+                  <span style={{ fontSize: FONT.xs, color: C.text3 }}>교차검증 Sharpe</span>
+                </div>
+                <span style={{ fontSize: FONT.xs, color: C.text3 }}>OOS {fmtNum(v.oos, 2)} · 여러 종목 통과</span>
+              </PipelineCard>
+            ))}
+        </Lane>
+        {/* 실거래 */}
+        <Lane lane={LANE.live} count={live.length}>
+          {live.map((s) => {
+            const hasData = s.pnl != null && s.trades > 0;
+            const pnlColor = !hasData ? C.text3 : s.pnl > 0 ? C.green : s.pnl < 0 ? C.red : C.text2;
+            const tag = sampleTag(s.trades);
+            return (
+              <PipelineCard key={s.id} accent={C.green} C={C}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
+                  <span style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>{s.name}{s.injected ? " 🧬" : ""}</span>
+                  <span style={{ fontSize: 10, color: tag.c, whiteSpace: "nowrap" }}>{tag.t}</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                  <span style={{ fontSize: 17, fontWeight: 800, color: pnlColor }}>
+                    {hasData ? `${s.pnl > 0 ? "+" : ""}$${fmtNum(s.pnl, 1)}` : "거래 없음"}
+                  </span>
+                  <span style={{ fontSize: FONT.xs, color: C.text3 }}>실거래 누적</span>
+                </div>
+                <span style={{ fontSize: FONT.xs, color: C.text3 }}>{s.trades}건{s.winRate != null ? ` · 승률 ${fmtNum(s.winRate, 0)}%` : ""}</span>
+              </PipelineCard>
+            );
+          })}
+        </Lane>
+      </div>
+    </Card>
+  );
+}
+
 // ────────────────────────────────────────────────
 // 새 후보 strategy 패널
 // ────────────────────────────────────────────────
@@ -971,6 +1118,12 @@ export default function AlphaLab({ onRequestLogin }) {
 
       <LiveTuningBanner data={data} />
       <RegimePanel data={data} />
+
+      {/* ★ 2026-06-03: 통합 평가 칸반 — 발굴·기존 8개를 '같은 잣대'로 (대표 지시). 이 화면의 중심. */}
+      <PipelineBoard data={data} />
+
+      {/* ── 자세히 보기 ── */}
+      <div style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text3, marginTop: 6, marginBottom: -4 }}>자세히 보기</div>
       <LeaderboardTable data={data} />
       <SharpeHistoryChart data={data} />
       <SymbolTimeframePanel data={data} />
