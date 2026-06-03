@@ -1588,8 +1588,8 @@ function RealTradingInner() {
             </Card>
 
             {/* ★ 2026-06-01: 코인별 롱숏 점수 — 엔진이 보는 양방향 신호를 한눈에 (대표 지시) */}
-            <Card title="코인별 롱숏 점수" icon={<Target size={16} />}
-              subtitle="엔진이 보는 시그널 — 코인별 롱(초록)·숏(빨강) 방향과 강도 (60초 갱신)">
+            <Card title="코인별 종합 스코어" icon={<Target size={16} />}
+              subtitle="주봉·일봉·4h·1h 가중 종합 — 전 봉 합의 시 점수↑ · 화살표는 봉별 방향 (60초 갱신)">
               <CoinDirectionScores coins={coinScores.coins} counts={coinScores.counts} loading={coinScores.loading} isMobile={isMobile} />
             </Card>
 

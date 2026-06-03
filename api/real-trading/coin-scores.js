@@ -20,7 +20,7 @@ async function getKv() {
 }
 
 const POOL_KEY = "di:signals:realtime-pool";
-const POOL_KEY_4H = "di:signals:realtime-pool-4h"; // ★ 2026-06-03: 4h 표시 전용 풀
+const POOL_KEY_MTF = "di:signals:realtime-pool-mtf"; // ★ 2026-06-03: 멀티TF 종합 스코어 풀(주·일·4h·1h)
 const WINDOW_MS = 4 * 60 * 60 * 1000; // 풀 유지 윈도우와 동일
 
 // confidence 정규화 → 0~1
@@ -64,58 +64,69 @@ export default async function handler(req, res) {
     const _lim = parseInt(req.query?.limit, 10);
     const limit = Math.min(Number.isFinite(_lim) && _lim > 0 ? _lim : 30, 60); // NaN/잘못된 입력 방어
     const kv = await getKv();
-    const [pool, pool4h] = await Promise.all([
+    const [pool, poolMtf] = await Promise.all([
       kv.get(POOL_KEY).then((p) => p || []),
-      kv.get(POOL_KEY_4H).then((p) => p || []),
+      kv.get(POOL_KEY_MTF).then((p) => p || []),
     ]);
 
     const now = Date.now();
     const cutoff = now - WINDOW_MS;
 
-    // ── 4h 보조 맵: 티커 → { side, score } (최신 ts 우선) ──
-    const map4h = new Map();
-    for (const e of (Array.isArray(pool4h) ? pool4h : [])) {
-      if (!e || (e.ts || 0) < cutoff) continue;
-      const side = normSide(e);
-      if (!side) continue;
-      const ticker = baseTicker(e.asset);
-      if (!ticker) continue;
-      const prev = map4h.get(ticker);
-      if (!prev || (e.ts || 0) > prev.ts) {
-        map4h.set(ticker, { side, score: parseFloat(e.score || 0) || 0, ts: e.ts || 0 });
+    // breakdown(주·일·4h·1h) 의 {type,score} → {side, score} 변환
+    const normBreakdown = (bd) => {
+      if (!bd || typeof bd !== "object") return null;
+      const out = {};
+      for (const tf of ["1w", "1d", "4h", "1h"]) {
+        const x = bd[tf];
+        out[tf] = x && x.type ? { side: x.type === "BUY" ? "LONG" : "SHORT", score: Math.round(parseFloat(x.score) || 0) } : null;
       }
-    }
+      return out;
+    };
 
-    // 코인별로 가장 *최근* 신호 1개로 집계 (현재 방향·점수를 즉시 반영).
-    //   주(主) 표시는 일봉(1d) 기준 — 메인 풀에 4h 거래 엔트리가 섞여도(플래그 ON 시)
-    //   1d 를 우선으로 본다. (4h 는 보조 tf4h 로 별도 표시.)
+    // ── 주 소스: 종합(MTF) 풀. 코인별 최신 1개. ──
     const byAsset = new Map();
-    for (const e of pool) {
+    const mtfArr = Array.isArray(poolMtf) ? poolMtf : [];
+    for (const e of mtfArr) {
       if (!e || (e.ts || 0) < cutoff) continue;
-      if (e.timeframe === "4h" || e.timeframe === "1h") continue; // 주 표시는 1d
       const side = normSide(e);
       if (!side) continue;
       const ticker = baseTicker(e.asset);
       if (!ticker) continue;
-      const score = parseFloat(e.score || 0) || 0;
       const prev = byAsset.get(ticker);
       if (!prev || (e.ts || 0) > prev.ts) {
         byAsset.set(ticker, {
-          asset: ticker,
-          symbol: `${ticker}USDT`,
-          side,
+          asset: ticker, symbol: `${ticker}USDT`, side,
           type: String(e.type || (side === "LONG" ? "BUY" : "SELL")).toUpperCase(),
-          score,                                  // 0~100 (풀 원본 스케일)
+          score: parseFloat(e.score || 0) || 0,   // 종합 스코어 0~100
           confidence: normConfidence(e.confidence),
-          family: e.family || null,
-          timeframe: e.timeframe || "1d",
-          reason: (e.reason || "").slice(0, 120),
+          family: "composite", timeframe: "MTF",
+          reason: (e.reason || "").slice(0, 140),
           ts: e.ts || 0,
-          // ★ 4h 보조 신호 (있으면) — 코인 카드에서 1d 옆에 함께 표시
-          tf4h: map4h.has(ticker)
-            ? { side: map4h.get(ticker).side, score: map4h.get(ticker).score }
-            : null,
+          breakdown: normBreakdown(e.breakdown), // { 1w,1d,4h,1h: {side,score}|null }
         });
+      }
+    }
+
+    // ── 폴백: MTF 풀이 아직 안 찼으면 기존 1d 풀로 (하위호환) ──
+    if (byAsset.size === 0) {
+      for (const e of (Array.isArray(pool) ? pool : [])) {
+        if (!e || (e.ts || 0) < cutoff) continue;
+        if (e.timeframe === "4h" || e.timeframe === "1h" || e.timeframe === "MTF") continue;
+        const side = normSide(e);
+        if (!side) continue;
+        const ticker = baseTicker(e.asset);
+        if (!ticker) continue;
+        const prev = byAsset.get(ticker);
+        if (!prev || (e.ts || 0) > prev.ts) {
+          byAsset.set(ticker, {
+            asset: ticker, symbol: `${ticker}USDT`, side,
+            type: String(e.type || (side === "LONG" ? "BUY" : "SELL")).toUpperCase(),
+            score: parseFloat(e.score || 0) || 0,
+            confidence: normConfidence(e.confidence),
+            family: e.family || null, timeframe: e.timeframe || "1d",
+            reason: (e.reason || "").slice(0, 140), ts: e.ts || 0, breakdown: null,
+          });
+        }
       }
     }
 

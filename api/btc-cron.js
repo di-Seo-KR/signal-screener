@@ -68,9 +68,11 @@ const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
 // CryptoCompare OHLCV 캔들 로드 헬퍼 (미국 접근 가능)
 async function fetchCCKlines(symbol, interval, limit) {
-  // interval: "1d" → histoday, "4h" → histohour (aggregate=4), "1h" → histohour
+  // interval: "1w" → histoday aggregate=7, "1d" → histoday, "4h" → histohour (aggregate=4), "1h" → histohour
   let url;
-  if (interval === "1d") {
+  if (interval === "1w") {
+    url = `https://min-api.cryptocompare.com/data/v2/histoday?fsym=${symbol}&tsym=USD&limit=${Math.min(limit, 2000)}&aggregate=7`;
+  } else if (interval === "1d") {
     url = `https://min-api.cryptocompare.com/data/v2/histoday?fsym=${symbol}&tsym=USD&limit=${Math.min(limit, 2000)}`;
   } else if (interval === "4h") {
     // CryptoCompare histohour → 4시간 단위로 리샘플링
@@ -391,16 +393,27 @@ export default async function handler(req, res) {
         try { candles1h = await fetchCCKlines(ccSymbol, "1h", 500); } catch { /* skip */ }
       }
 
-      // ★ 2026-06-03 (대표 지시): 4h 신호를 *항상* 계산 — 코인 점수 카드 표시용(+선택적 거래).
-      //   기존 4h '폴백'(1d 빌 때만)과 별개로, 모든 코인에 대해 4h 방향/점수를 산출해 노출한다.
-      let tf4hSignal = null;
-      if (candles4h.length >= 61) {
-        try {
-          const cl4 = candles4h.map(c => c.close), hi4 = candles4h.map(c => c.high),
-                lo4 = candles4h.map(c => c.low), vo4 = candles4h.map(c => c.volume || 0);
-          tf4hSignal = pickTopBotSignal(computeBotSignals({ asset, closes: cl4, highs: hi4, lows: lo4, volumes: vo4, timeframe: "4h", paramsByStrategy }));
-        } catch { /* skip */ }
+      // 주봉 로드 (CryptoCompare histoday aggregate=7) — 종합 스코어용
+      let candles1w = [];
+      await delay(700);
+      if (ccSymbol) {
+        try { candles1w = await fetchCCKlines(ccSymbol, "1w", 120); } catch { /* skip */ }
       }
+
+      // ★ 2026-06-03 (대표 지시): 멀티 타임프레임 종합 스코어용 — 각 TF 신호를 *항상* 계산.
+      //   (기존 4h/1h '폴백'과 별개. 주봉·일봉·4h·1h 를 가중합산해 단일 종합 스코어 산출.)
+      const sigForTF = (arr, tf) => {
+        if (!Array.isArray(arr) || arr.length < 61) return null;
+        try {
+          return pickTopBotSignal(computeBotSignals({
+            asset, closes: arr.map(c => c.close), highs: arr.map(c => c.high),
+            lows: arr.map(c => c.low), volumes: arr.map(c => c.volume || 0), timeframe: tf, paramsByStrategy,
+          }));
+        } catch { return null; }
+      };
+      const tf1wSignal = sigForTF(candles1w, "1w");
+      const tf4hSignal = sigForTF(candles4h, "4h");
+      const tf1hSignal = sigForTF(candles1h, "1h");
 
       // 다음 자산 전 rate limit 방지 딜레이
       await delay(500);
@@ -447,6 +460,29 @@ export default async function handler(req, res) {
 
       // 일봉 단계 — 봇별 strategy 결과 중 가장 점수 높은 1개를 우선 시그널로
       let latestSignal = pickTopBotSignal(botSignals);
+      const sig1d = latestSignal; // ★ 순수 1d 신호 캡처(이후 폴백이 latestSignal 을 덮어써도 보존)
+
+      // ★ 2026-06-03 (대표 지시): 멀티 타임프레임 종합 스코어.
+      //   주25·일30·4h25·1h20 부호 가중합 → 전 봉 합의 시 점수↑, 갈리면 상쇄(자동 컨플루언스).
+      const _signed = (s) => !s ? 0 : ((s.type === "BUY" ? 1 : s.type === "SELL" ? -1 : 0) * (parseFloat(s.score) || 0));
+      const _compRaw = 0.25 * _signed(tf1wSignal) + 0.30 * _signed(sig1d) + 0.25 * _signed(tf4hSignal) + 0.20 * _signed(tf1hSignal);
+      const _compScore = Math.round(Math.min(100, Math.abs(_compRaw)));
+      const _compType = _compRaw > 0.5 ? "BUY" : _compRaw < -0.5 ? "SELL" : null;
+      const _tfTag = (s) => !s ? "—" : `${s.type === "BUY" ? "롱" : "숏"}${Math.round(s.score)}`;
+      const _breakdown = {
+        "1w": tf1wSignal ? { type: tf1wSignal.type, score: Math.round(tf1wSignal.score) } : null,
+        "1d": sig1d ? { type: sig1d.type, score: Math.round(sig1d.score) } : null,
+        "4h": tf4hSignal ? { type: tf4hSignal.type, score: Math.round(tf4hSignal.score) } : null,
+        "1h": tf1hSignal ? { type: tf1hSignal.type, score: Math.round(tf1hSignal.score) } : null,
+      };
+      const compositeSignal = _compType ? {
+        type: _compType, side: _compType === "BUY" ? "LONG" : "SHORT", score: _compScore,
+        timeframe: "MTF", family: "composite",
+        confidence: _compScore >= 80 ? "A" : _compScore >= 60 ? "B" : "C",
+        reason: `종합 ${_compScore} (주${_tfTag(tf1wSignal)}·일${_tfTag(sig1d)}·4h${_tfTag(tf4hSignal)}·1h${_tfTag(tf1hSignal)})`,
+        breakdown: _breakdown,
+        positionSize: 0.5,
+      } : null;
 
       // 봇별 strategy 가 아무도 시그널 안 내면 기존 단일 analyzeLatest 로 fallback
       // (백워드 호환: 봇 매핑 안 된 자산이나 활성 봇 없는 케이스 처리)
@@ -615,59 +651,36 @@ export default async function handler(req, res) {
       //   가상 포트폴리오 한도 / cron 중단 / skip 여부와 완전 독립적으로 작동.
       //   대표 지시: "다시는 실제매매 쪽이 이런 이슈들로 영향받지 않게"
       try {
+        const cutoffMs = Date.now() - 4 * 60 * 60 * 1000;
+
+        // ── 거래 신호: 종합 스코어 플래그(ZEPTA_TRADE_COMPOSITE=1) ON 이면 종합, 아니면 1d/캐스케이드 ──
+        //   기본 OFF — 봇 '매매 심장' 교체라 돈 직결. shadow 검증 후 ON 권장.
+        const tradeSignal = (process.env.ZEPTA_TRADE_COMPOSITE === "1" && compositeSignal) ? compositeSignal : latestSignal;
         const poolKey = "di:signals:realtime-pool";
         const existingPool = (await kv.get(poolKey)) || [];
         const newEntry = {
-          ts: Date.now(),
-          time: new Date().toISOString(),
-          asset,
-          type: latestSignal.type,
-          confidence: latestSignal.confidence,
-          score: latestSignal.score,
-          family: latestSignal.family,
-          timeframe: latestSignal.timeframe,
-          side: latestSignal.side,
-          reason: (latestSignal.reason || "").slice(0, 200),
-          positionSize: latestSignal.positionSize || 0.5,
-          source: "btc-cron",
+          ts: Date.now(), time: new Date().toISOString(), asset,
+          type: tradeSignal.type, confidence: tradeSignal.confidence, score: tradeSignal.score,
+          family: tradeSignal.family, timeframe: tradeSignal.timeframe, side: tradeSignal.side,
+          reason: (tradeSignal.reason || "").slice(0, 200),
+          positionSize: tradeSignal.positionSize || 0.5, source: "btc-cron",
         };
-        // 최근 4시간 윈도우만 유지 + 최대 200건 cap
-        const cutoffMs = Date.now() - 4 * 60 * 60 * 1000;
         const updatedPool = [newEntry, ...existingPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200);
         await kv.set(poolKey, updatedPool);
 
-        // ★ 2026-06-03: 4h 표시 전용 풀 (엔진 미사용 — 코인 카드에서 4h 점수 노출용).
-        if (tf4hSignal) {
+        // ── 종합 스코어 표시 풀 (코인 카드용 — 엔진 거래와 별개로 항상 적재) ──
+        if (compositeSignal) {
           try {
-            const dKey = "di:signals:realtime-pool-4h";
-            const dPool = (await kv.get(dKey)) || [];
-            const dEntry = {
+            const mKey = "di:signals:realtime-pool-mtf";
+            const mPool = (await kv.get(mKey)) || [];
+            const mEntry = {
               ts: Date.now(), time: new Date().toISOString(), asset,
-              type: tf4hSignal.type, side: tf4hSignal.side, score: tf4hSignal.score,
-              confidence: tf4hSignal.confidence, family: tf4hSignal.family, timeframe: "4h",
-              reason: (tf4hSignal.reason || "").slice(0, 200), source: "btc-cron-4h",
+              type: compositeSignal.type, side: compositeSignal.side, score: compositeSignal.score,
+              confidence: compositeSignal.confidence, family: "composite", timeframe: "MTF",
+              breakdown: compositeSignal.breakdown, reason: compositeSignal.reason, source: "btc-cron-mtf",
             };
-            await kv.set(dKey, [dEntry, ...dPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200));
+            await kv.set(mKey, [mEntry, ...mPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200));
           } catch { /* 표시용 — 실패해도 무시 */ }
-        }
-
-        // ★ 2026-06-03: 4h '거래' — env 플래그(ZEPTA_TRADE_4H=1)일 때만, 1d 와 충돌 안 할 때만 메인 풀에 추가.
-        //   충돌(같은 코인 반대방향) 시 헤지 포지션 위험 → 절대 추가 안 함. 같은 방향이면 엔진이 dedup.
-        //   기본 OFF — 켜면 1d 가 중립인 코인에 4h 진입 기회 추가(사이즈 절반). 돈 직결이라 안전 롤아웃.
-        if (process.env.ZEPTA_TRADE_4H === "1" && tf4hSignal && (tf4hSignal.type === "BUY" || tf4hSignal.type === "SELL")) {
-          const conflict = (latestSignal.type === "BUY" && tf4hSignal.type === "SELL")
-                        || (latestSignal.type === "SELL" && tf4hSignal.type === "BUY");
-          if (!conflict) {
-            const t4Entry = {
-              ts: Date.now(), time: new Date().toISOString(), asset,
-              type: tf4hSignal.type, side: tf4hSignal.side, score: tf4hSignal.score,
-              confidence: tf4hSignal.confidence, family: tf4hSignal.family, timeframe: "4h",
-              reason: `[4h] ${(tf4hSignal.reason || "").slice(0, 190)}`,
-              positionSize: (tf4hSignal.positionSize || 0.5) * 0.5, source: "btc-cron-4h-trade",
-            };
-            const p2 = (await kv.get(poolKey)) || [];
-            await kv.set(poolKey, [t4Entry, ...p2.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200));
-          }
         }
       } catch (poolErr) {
         addLog(`⚠️ ${asset} 시그널 풀 적재 실패: ${poolErr.message}`);

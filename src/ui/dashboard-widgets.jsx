@@ -908,21 +908,27 @@ export function CoinDirectionScores({ coins = [], counts = {}, loading = false, 
                   fontSize: 10, fontWeight: 800, padding: "1px 6px", borderRadius: "var(--z-r-full)",
                   background: accentBg, color: accent, whiteSpace: "nowrap",
                 }}>{isLong ? "롱" : "숏"}</span>
-                {/* 모바일: 4h 보조 (초소형) */}
-                {isMobile && c.tf4h && (
-                  <span style={{ fontSize: 9, fontWeight: 700, whiteSpace: "nowrap",
-                    color: c.tf4h.side === "LONG" ? "var(--z-green-hi)" : "var(--z-red-hi)" }}>
-                    4h{c.tf4h.side === "LONG" ? "▲" : "▼"}{Math.round(c.tf4h.score)}
+                {/* 모바일: TF 분해 미니 (주·일·4h·1h 화살표) */}
+                {isMobile && c.breakdown && (
+                  <span style={{ display: "inline-flex", gap: 3, fontSize: 9, fontWeight: 700, whiteSpace: "nowrap" }}>
+                    {["1w", "1d", "4h", "1h"].map((k) => {
+                      const b = c.breakdown[k];
+                      const col = !b ? "var(--z-text-4)" : b.side === "LONG" ? "var(--z-green-hi)" : "var(--z-red-hi)";
+                      return <span key={k} style={{ color: col }}>{b ? (b.side === "LONG" ? "↑" : "↓") : "·"}</span>;
+                    })}
                   </span>
                 )}
               </div>
 
-              {/* 데스크톱: 4h 보조 신호 (있으면 색상 표시, 없으면 타임프레임) */}
+              {/* 데스크톱: TF 분해 (주·일·4h·1h) — 종합 스코어의 근거 */}
               {!isMobile && (
-                c.tf4h ? (
-                  <span style={{ fontSize: 11, fontWeight: 700, whiteSpace: "nowrap",
-                    color: c.tf4h.side === "LONG" ? "var(--z-green-hi)" : "var(--z-red-hi)" }}>
-                    4h {c.tf4h.side === "LONG" ? "▲" : "▼"}{Math.round(c.tf4h.score)}
+                c.breakdown ? (
+                  <span style={{ display: "inline-flex", gap: 5, whiteSpace: "nowrap", fontSize: 10, fontWeight: 700 }}>
+                    {[["1w", "주"], ["1d", "일"], ["4h", "4h"], ["1h", "1h"]].map(([k, label]) => {
+                      const b = c.breakdown[k];
+                      const col = !b ? "var(--z-text-4)" : b.side === "LONG" ? "var(--z-green-hi)" : "var(--z-red-hi)";
+                      return <span key={k} style={{ color: col }}>{label}{b ? (b.side === "LONG" ? "↑" : "↓") : "·"}</span>;
+                    })}
                   </span>
                 ) : (
                   <span style={{ fontSize: 11, color: "var(--z-text-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
