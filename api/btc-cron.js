@@ -391,6 +391,17 @@ export default async function handler(req, res) {
         try { candles1h = await fetchCCKlines(ccSymbol, "1h", 500); } catch { /* skip */ }
       }
 
+      // ★ 2026-06-03 (대표 지시): 4h 신호를 *항상* 계산 — 코인 점수 카드 표시용(+선택적 거래).
+      //   기존 4h '폴백'(1d 빌 때만)과 별개로, 모든 코인에 대해 4h 방향/점수를 산출해 노출한다.
+      let tf4hSignal = null;
+      if (candles4h.length >= 61) {
+        try {
+          const cl4 = candles4h.map(c => c.close), hi4 = candles4h.map(c => c.high),
+                lo4 = candles4h.map(c => c.low), vo4 = candles4h.map(c => c.volume || 0);
+          tf4hSignal = pickTopBotSignal(computeBotSignals({ asset, closes: cl4, highs: hi4, lows: lo4, volumes: vo4, timeframe: "4h", paramsByStrategy }));
+        } catch { /* skip */ }
+      }
+
       // 다음 자산 전 rate limit 방지 딜레이
       await delay(500);
 
@@ -624,6 +635,40 @@ export default async function handler(req, res) {
         const cutoffMs = Date.now() - 4 * 60 * 60 * 1000;
         const updatedPool = [newEntry, ...existingPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200);
         await kv.set(poolKey, updatedPool);
+
+        // ★ 2026-06-03: 4h 표시 전용 풀 (엔진 미사용 — 코인 카드에서 4h 점수 노출용).
+        if (tf4hSignal) {
+          try {
+            const dKey = "di:signals:realtime-pool-4h";
+            const dPool = (await kv.get(dKey)) || [];
+            const dEntry = {
+              ts: Date.now(), time: new Date().toISOString(), asset,
+              type: tf4hSignal.type, side: tf4hSignal.side, score: tf4hSignal.score,
+              confidence: tf4hSignal.confidence, family: tf4hSignal.family, timeframe: "4h",
+              reason: (tf4hSignal.reason || "").slice(0, 200), source: "btc-cron-4h",
+            };
+            await kv.set(dKey, [dEntry, ...dPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200));
+          } catch { /* 표시용 — 실패해도 무시 */ }
+        }
+
+        // ★ 2026-06-03: 4h '거래' — env 플래그(ZEPTA_TRADE_4H=1)일 때만, 1d 와 충돌 안 할 때만 메인 풀에 추가.
+        //   충돌(같은 코인 반대방향) 시 헤지 포지션 위험 → 절대 추가 안 함. 같은 방향이면 엔진이 dedup.
+        //   기본 OFF — 켜면 1d 가 중립인 코인에 4h 진입 기회 추가(사이즈 절반). 돈 직결이라 안전 롤아웃.
+        if (process.env.ZEPTA_TRADE_4H === "1" && tf4hSignal && (tf4hSignal.type === "BUY" || tf4hSignal.type === "SELL")) {
+          const conflict = (latestSignal.type === "BUY" && tf4hSignal.type === "SELL")
+                        || (latestSignal.type === "SELL" && tf4hSignal.type === "BUY");
+          if (!conflict) {
+            const t4Entry = {
+              ts: Date.now(), time: new Date().toISOString(), asset,
+              type: tf4hSignal.type, side: tf4hSignal.side, score: tf4hSignal.score,
+              confidence: tf4hSignal.confidence, family: tf4hSignal.family, timeframe: "4h",
+              reason: `[4h] ${(tf4hSignal.reason || "").slice(0, 190)}`,
+              positionSize: (tf4hSignal.positionSize || 0.5) * 0.5, source: "btc-cron-4h-trade",
+            };
+            const p2 = (await kv.get(poolKey)) || [];
+            await kv.set(poolKey, [t4Entry, ...p2.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200));
+          }
+        }
       } catch (poolErr) {
         addLog(`⚠️ ${asset} 시그널 풀 적재 실패: ${poolErr.message}`);
       }
