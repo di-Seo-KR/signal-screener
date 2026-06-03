@@ -108,9 +108,6 @@ export function Card({ children, title, subtitle, actions, icon, tone, pad = 18,
       onClick={onClick}
       style={{
         background: "var(--z-card)",
-        // ★ 글래스 스코프 안에서만 블러(밖에선 none → 무영향). 유리 카드 효과.
-        backdropFilter: "var(--z-card-blur, none)",
-        WebkitBackdropFilter: "var(--z-card-blur, none)",
         border: noBorder ? "none" : "1px solid transparent",
         borderRadius: "var(--z-r-xl)",
         boxShadow: noBorder ? "var(--z-sh-sm)" : `${ringShadow}, var(--z-sh-sm)`,

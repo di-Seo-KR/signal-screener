@@ -506,37 +506,6 @@ main, [class*="panel"], [class*="dashboard"] {
   --input:  var(--z-border-2);
 }
 
-/* ════════════════════════════════════════════════════════════
-   Glassmorphism scope — 핵심 화면(실전매매/알파랩) 전용 비주얼 테마
-   대표 지시(2026-06-03): 보라-청록 그라데이션 배경 + 반투명 유리 카드 + 블러.
-   스코프 안에서 --z-card/-2/border 를 반투명으로 오버라이드 → 기존 var() 카드가
-   자동으로 '유리'가 된다. --z-card-blur 를 카드가 backdrop-filter 로 읽어 블러 적용.
-   dark 모드에만 적용(라이트 모드 가독성 보호).
-   ════════════════════════════════════════════════════════════ */
-[data-theme="dark"] .z-glass-scope {
-  background:
-    radial-gradient(1100px 560px at 4% -10%, rgba(124, 77, 255, 0.22), transparent 60%),
-    radial-gradient(920px 540px at 104% 0%, rgba(16, 185, 169, 0.18), transparent 55%),
-    radial-gradient(700px 700px at 50% 120%, rgba(59, 130, 246, 0.10), transparent 60%),
-    linear-gradient(180deg, #07080f 0%, #0a0c17 55%, #08090f 100%);
-  --z-card: rgba(28, 33, 54, 0.55);
-  --z-card-2: rgba(255, 255, 255, 0.055);
-  --z-card-hi: rgba(255, 255, 255, 0.09);
-  --z-border: rgba(255, 255, 255, 0.11);
-  --z-border-2: rgba(255, 255, 255, 0.16);
-  --z-card-blur: blur(16px) saturate(135%);
-  --z-card-shadow: 0 10px 34px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-}
-.z-glass-scope { min-height: 100vh; }
-/* 유리 카드를 직접 지정(hex 기반 컴포넌트용) */
-[data-theme="dark"] .z-glass-card {
-  background: rgba(28, 33, 54, 0.55) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(135%);
-  backdrop-filter: blur(16px) saturate(135%);
-  border: 1px solid rgba(255, 255, 255, 0.11) !important;
-  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
-}
-
 @layer base {
   * {
     @apply border-border outline-ring/50;
