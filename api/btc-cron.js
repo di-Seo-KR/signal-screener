@@ -15,29 +15,36 @@ import { getOIChangeMap } from "./_shared/oi-tracker.js";
 //   MATIC 은 POL 로 상장한다. 현물 규칙({BASE}USDT)으로 추론하면 SHIB/PEPE/MATIC 이
 //   빗나가 보정이 조용히 스킵됐음(라이브 확인). 명시 룩업으로 정정.
 const FUTURES_SYMBOLS = {
-  "BTC/USD": "BTCUSDT", "ETH/USD": "ETHUSDT", "SOL/USD": "SOLUSDT", "XRP/USD": "XRPUSDT",
-  "ADA/USD": "ADAUSDT", "AVAX/USD": "AVAXUSDT", "LINK/USD": "LINKUSDT", "UNI/USD": "UNIUSDT",
-  "AAVE/USD": "AAVEUSDT", "DOT/USD": "DOTUSDT", "DOGE/USD": "DOGEUSDT",
-  "SHIB/USD": "1000SHIBUSDT", "PEPE/USD": "1000PEPEUSDT",
+  "BTC/USD": "BTCUSDT", "ETH/USD": "ETHUSDT", "BNB/USD": "BNBUSDT", "SOL/USD": "SOLUSDT",
+  "XRP/USD": "XRPUSDT", "ADA/USD": "ADAUSDT", "AVAX/USD": "AVAXUSDT", "TRX/USD": "TRXUSDT",
+  "LINK/USD": "LINKUSDT", "DOT/USD": "DOTUSDT", "ATOM/USD": "ATOMUSDT", "NEAR/USD": "NEARUSDT",
+  "APT/USD": "APTUSDT", "SUI/USD": "SUIUSDT", "ICP/USD": "ICPUSDT", "HBAR/USD": "HBARUSDT",
+  "UNI/USD": "UNIUSDT", "AAVE/USD": "AAVEUSDT", "INJ/USD": "INJUSDT", "FIL/USD": "FILUSDT",
+  "LTC/USD": "LTCUSDT", "BCH/USD": "BCHUSDT", "ETC/USD": "ETCUSDT", "TON/USD": "TONUSDT",
+  "DOGE/USD": "DOGEUSDT", "SHIB/USD": "1000SHIBUSDT", "PEPE/USD": "1000PEPEUSDT",
   "ARB/USD": "ARBUSDT", "OP/USD": "OPUSDT", "MATIC/USD": "POLUSDT",
 };
 function assetToBinanceSymbol(asset) {
   return FUTURES_SYMBOLS[asset] || "";
 }
 
-export const config = { maxDuration: 120 };
+export const config = { maxDuration: 240 }; // ★ 2026-06-03: 30종 + 4개봉 fetch (~100s+) → 120→240 헤드룸
 
 // 코인 유니버스: 하이캡 + 미드캡 + DeFi + 밈 (Binance 상장 기준)
 const CRYPTO_ASSETS = [
-  // 하이캡 (Top 10)
-  "BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD", "ADA/USD", "AVAX/USD",
-  // DeFi / 인프라
-  "LINK/USD", "UNI/USD", "AAVE/USD", "DOT/USD",
+  // 하이캡 (Top)
+  "BTC/USD", "ETH/USD", "BNB/USD", "SOL/USD", "XRP/USD", "ADA/USD", "AVAX/USD", "TRX/USD",
+  // L1 / 인프라
+  "LINK/USD", "DOT/USD", "ATOM/USD", "NEAR/USD", "APT/USD", "SUI/USD", "ICP/USD", "HBAR/USD",
+  // DeFi
+  "UNI/USD", "AAVE/USD", "INJ/USD", "FIL/USD",
+  // 레거시 / 페이먼트
+  "LTC/USD", "BCH/USD", "ETC/USD", "TON/USD",
   // 밈 / 트렌드
   "DOGE/USD", "SHIB/USD", "PEPE/USD",
   // Layer2 / 신흥
   "ARB/USD", "OP/USD", "MATIC/USD",
-];
+]; // ★ 2026-06-03 대표 지시: 메이저 30종 (16→30, 전부 바이낸스 USDM 검증)
 const BINANCE_SYMBOLS = {
   "BTC/USD": "BTCUSDT", "ETH/USD": "ETHUSDT", "SOL/USD": "SOLUSDT",
   "XRP/USD": "XRPUSDT", "ADA/USD": "ADAUSDT", "AVAX/USD": "AVAXUSDT",
@@ -55,12 +62,14 @@ const MAX_TOTAL_CRYPTO_EXPOSURE = 0.95;  // 0.80 → 0.95
 
 // CryptoCompare 심볼 매핑 (Binance/Bybit 미국 차단 우회)
 const CC_SYMBOLS = {
-  "BTC/USD": "BTC", "ETH/USD": "ETH", "SOL/USD": "SOL",
-  "XRP/USD": "XRP", "ADA/USD": "ADA", "AVAX/USD": "AVAX",
-  "LINK/USD": "LINK", "UNI/USD": "UNI", "AAVE/USD": "AAVE",
-  "DOT/USD": "DOT", "DOGE/USD": "DOGE", "SHIB/USD": "SHIB",
-  "PEPE/USD": "PEPE", "ARB/USD": "ARB", "OP/USD": "OP",
-  "MATIC/USD": "MATIC",
+  "BTC/USD": "BTC", "ETH/USD": "ETH", "BNB/USD": "BNB", "SOL/USD": "SOL",
+  "XRP/USD": "XRP", "ADA/USD": "ADA", "AVAX/USD": "AVAX", "TRX/USD": "TRX",
+  "LINK/USD": "LINK", "DOT/USD": "DOT", "ATOM/USD": "ATOM", "NEAR/USD": "NEAR",
+  "APT/USD": "APT", "SUI/USD": "SUI", "ICP/USD": "ICP", "HBAR/USD": "HBAR",
+  "UNI/USD": "UNI", "AAVE/USD": "AAVE", "INJ/USD": "INJ", "FIL/USD": "FIL",
+  "LTC/USD": "LTC", "BCH/USD": "BCH", "ETC/USD": "ETC", "TON/USD": "TON",
+  "DOGE/USD": "DOGE", "SHIB/USD": "SHIB", "PEPE/USD": "PEPE",
+  "ARB/USD": "ARB", "OP/USD": "OP", "MATIC/USD": "MATIC",
 };
 
 // 딜레이 헬퍼 (CryptoCompare rate limit 우회)
