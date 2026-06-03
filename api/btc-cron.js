@@ -482,7 +482,8 @@ export default async function handler(req, res) {
         confidence: _compScore >= 80 ? "A" : _compScore >= 60 ? "B" : "C",
         reason: `종합 ${_compScore} (주${_tfTag(tf1wSignal)}·일${_tfTag(sig1d)}·4h${_tfTag(tf4hSignal)}·1h${_tfTag(tf1hSignal)})`,
         breakdown: _breakdown,
-        positionSize: 0.5,
+        // 점수 비례 사이즈(고정 0.5 → 0.3~0.7): 합의 강할수록 크게
+        positionSize: Math.round((0.3 + Math.min(1, _compScore / 100) * 0.4) * 100) / 100,
       } : null;
 
       // 봇별 strategy 가 아무도 시그널 안 내면 기존 단일 analyzeLatest 로 fallback
@@ -642,6 +643,24 @@ export default async function handler(req, res) {
             latestSignal.score = Math.max(50, Math.round((latestSignal.score || 60) * 0.95));
             latestSignal.reason = (latestSignal.reason || "") + ` +베이시스극단(${(bs * 100).toFixed(2)}%)`;
           }
+        }
+
+        // ★ 2026-06-03: 종합 스코어에도 동일 펀딩/OI/베이시스 댐프닝 적용(실거래 시 1d 와 동일 보수성).
+        //   MTF충돌은 종합에 이미 4h 성분으로 반영돼 있어 제외. compositeSignal.side 기준.
+        if (compositeSignal && compositeSignal.side) {
+          const cs = compositeSignal.side;
+          if (Number.isFinite(fr) && ((cs === "SHORT" && fr < -0.0003) || (cs === "LONG" && fr > 0.0003))) {
+            compositeSignal.score = Math.max(40, Math.round((compositeSignal.score || 60) * 0.85));
+            compositeSignal.reason += ` +펀딩과밀`;
+          }
+          if (Number.isFinite(oiCh)) {
+            if (oiCh >= 0.03) compositeSignal.score = Math.min(95, (compositeSignal.score || 60) + 3);
+            else if (oiCh <= -0.03) compositeSignal.score = Math.max(40, Math.round((compositeSignal.score || 60) * 0.9));
+          }
+          if (Number.isFinite(bs) && ((cs === "SHORT" && bs < -0.001) || (cs === "LONG" && bs > 0.001))) {
+            compositeSignal.score = Math.max(40, Math.round((compositeSignal.score || 60) * 0.95));
+          }
+          compositeSignal.confidence = compositeSignal.score >= 80 ? "A" : compositeSignal.score >= 60 ? "B" : "C";
         }
       } catch (e) { addLog(`⚠️ ${asset} 선물컨텍스트 보정 실패: ${e?.message}`); }
 
