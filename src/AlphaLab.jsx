@@ -169,7 +169,7 @@ function Stat({ label, value, sub, color, tip }) {
 // ────────────────────────────────────────────────
 function RegimePanel({ data }) {
   const C = useThemeTokens();
-  const regime = data?.leaderboard?.regime || null;
+  const regime = data?.regime || data?.leaderboard?.regime || null;
   const weights = data?.weights?.weights || {};
   const updatedAt = data?.weights?.updatedAt;
 
