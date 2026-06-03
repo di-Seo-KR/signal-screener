@@ -502,10 +502,10 @@ function SharpeHistoryChart({ data }) {
 
   const W = 600, H = 160, P = 16;
   const series = top4.map((sid, idx) => {
-    const points = hist.map((h, i) => ({
-      i,
-      v: h.strategies?.[sid]?.sharpe ?? 0,
-    }));
+    const points = hist.map((h, i) => {
+      const sv = h.strategies?.[sid]?.sharpe;
+      return { i, v: Number.isFinite(sv) ? sv : 0 };
+    });
     return { sid, points };
   });
   const allV = series.flatMap((s) => s.points.map((p) => p.v));
@@ -815,7 +815,7 @@ function CandidatesPanel({ data }) {
                 <div style={{ display: "flex", gap: 10, marginTop: 6, flexWrap: "wrap", fontSize: FONT.xs, color: C.text2 }}>
                   <span>승률 <b style={{ color: C.text1 }}>{fmtPct(br.winRate)}</b></span>
                   <span>손익비 <b style={{ color: C.text1 }}>{br.profitFactor == null ? "—" : fmtNum(br.profitFactor, 2)}</b></span>
-                  <span>거래 <b style={{ color: C.text1 }}>{br.trades}</b></span>
+                  <span>거래 <b style={{ color: C.text1 }}>{fmtInt(br.trades)}</b></span>
                 </div>
                 <details style={{ marginTop: 8 }}>
                   <summary style={{ fontSize: FONT.xs, color: C.text3, cursor: "pointer" }}>상세 파라미터 보기</summary>
