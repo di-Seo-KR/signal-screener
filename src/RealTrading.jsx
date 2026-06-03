@@ -675,8 +675,10 @@ function RealTradingInner() {
   const tossHero = (
     <div style={{
       borderRadius: 22, padding: "22px 20px",
-      background: "linear-gradient(165deg, var(--z-card) 0%, var(--z-card-2) 120%)",
-      border: "1px solid var(--z-border)", boxShadow: "0 10px 30px rgba(0,0,0,0.20)",
+      // ★ bento '주요 타일' — 미묘한 블루 액센트 글로우(배경 그라데이션, blur 아님 → 안전)
+      background: "radial-gradient(130% 110% at 0% 0%, rgba(59,130,246,0.16), transparent 52%), linear-gradient(165deg, var(--z-card) 0%, var(--z-card-2) 120%)",
+      border: "1px solid var(--z-border)",
+      boxShadow: "0 12px 32px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.06)",
       display: "flex", flexDirection: "column", gap: 16,
     }}>
       {/* 보유 자산 */}
@@ -1545,11 +1547,11 @@ function RealTradingInner() {
 
   return (
     <div style={{
-      background: "var(--z-bg)", minHeight: "100vh",
+      minHeight: "100vh",
       padding: "20px 16px 80px",
       color: "var(--z-text)",
       fontFamily: "var(--z-font-sans)",
-    }} className="z-anim-in">
+    }} className="z-anim-in z-bento-scope">
       <div style={{ maxWidth: 1280, margin: "0 auto" }}>
         {header}
 
