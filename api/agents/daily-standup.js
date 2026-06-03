@@ -386,9 +386,20 @@ function buildAlphaLabCard(leaderboard, candidates) {
 // ── 안전 JSON 파싱 (Claude 응답에서 마크다운 코드블록 제거) ──
 function safeJSONParse(text) {
   if (!text) return null;
+  // ★ 2026-06-03: 견고화 — 코드블록 / raw / 첫{~마지막} 추출을 차례로 시도(산문 혼입·truncation 대비).
+  const candidates = [];
   const m = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const raw = m ? m[1] : text;
-  try { return JSON.parse(raw.trim()); } catch { return null; }
+  if (m) candidates.push(m[1]);
+  candidates.push(text);
+  const fi = text.indexOf("{"), li = text.lastIndexOf("}");
+  if (fi >= 0 && li > fi) candidates.push(text.slice(fi, li + 1));
+  for (const c of candidates) {
+    try {
+      const v = JSON.parse(String(c).trim());
+      if (v && typeof v === "object") return v;
+    } catch { /* 다음 후보 */ }
+  }
+  return null;
 }
 
 // ── QUANT-RES — 알파 리서처 ──
@@ -609,7 +620,7 @@ ${JSON.stringify(weights).slice(0, 400)}
 
   const resp = await client.messages.create({
     model: MODEL,
-    max_tokens: 1200,
+    max_tokens: 2000, // ★ 2026-06-03: 1200→2000 (promote/demote/weight_changes 배열로 길어져 truncation 발생)
     system: sys,
     messages: [{ role: "user", content: user }],
   });
