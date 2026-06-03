@@ -24,6 +24,20 @@ export const RISK_CONFIG = {
   //   - 매우 보수적으로 돌리고 싶을 땐 0.02~0.04 로 다시 낮출 것.
   riskPerTradePct: 0.10, // 10% (이전 4%)
 
+  // ★ 2026-06-03 (대표 지시): 확신도 기반 동적 사이징.
+  //   "애매하면 진입금액 적게, 확실해지면 추가 진입" → riskAmount 를 신호 종합점수에 비례.
+  //   점수 minScore 이하 = minFactor(소량), maxScore 이상 = maxFactor(최대). 그 사이 선형.
+  //   이것 + 기존 피라미드(pyramidMinR 0=자유, sameSymbolMaxNotionalPct 30%) 결합 →
+  //     낮은 확신=소량 진입 → 점수 오르면 추가 진입(스케일인) → 상한(자본30%)까지.
+  //   기본 ON. env ZEPTA_CONVICTION_SIZING=0 으로 비활성(고정 사이징 복원).
+  convictionSizing: {
+    enabled: true,
+    minScore: 55,    // 이하면 소량
+    maxScore: 88,    // 이상이면 최대
+    minFactor: 0.40, // riskAmount × 0.40
+    maxFactor: 1.0,  // riskAmount × 1.0
+  },
+
   // 한 포지션 최대 증거금 비중 — 자본 대비 마진 상한 (lev 별 차이 흡수)
   // 자본 $325 × 0.5 = $163 마진 상한 (8x lev 면 노출 $1,300 → 한도 300 에서 잘림)
   maxMarginPct: 0.5,
@@ -591,8 +605,23 @@ export function planTrade({ signal, equity, price, atr, filter, regime = null, c
   }
 
   // 3) 리스크 금액 (SL 까지 맞았을 때 잃는 순손실 한도)
-  const riskAmount = equity * cfg.riskPerTradePct;
-  push(`riskAmount=$${riskAmount.toFixed(3)} (${(cfg.riskPerTradePct * 100).toFixed(2)}% of $${equity.toFixed(2)})`);
+  //    ★ 2026-06-03: 확신도 비례 사이징 — 종합점수↑면 크게, 애매하면 소량(스케일인과 결합).
+  const csz = cfg.convictionSizing || {};
+  let convFactor = 1.0;
+  if (csz.enabled !== false && process.env.ZEPTA_CONVICTION_SIZING !== "0") {
+    const sc = Number(signal.score);
+    if (Number.isFinite(sc)) {
+      const lo = csz.minScore ?? 55, hi = csz.maxScore ?? 88;
+      const fLo = csz.minFactor ?? 0.4, fHi = csz.maxFactor ?? 1.0;
+      const t = hi > lo ? Math.max(0, Math.min(1, (sc - lo) / (hi - lo))) : 1;
+      convFactor = fLo + t * (fHi - fLo);
+    } else {
+      // 점수 없으면 confidence 등급 폴백
+      convFactor = ({ A: 1.0, B: 0.72, C: 0.5 })[signal.confidence] ?? 0.6;
+    }
+  }
+  const riskAmount = equity * cfg.riskPerTradePct * convFactor;
+  push(`riskAmount=$${riskAmount.toFixed(3)} (${(cfg.riskPerTradePct * 100).toFixed(2)}% × 확신${convFactor.toFixed(2)} of $${equity.toFixed(2)}, score=${signal.score ?? "-"})`);
 
   // 4) 효과적 loss 거리 = stopDist + cost (수수료 내기 위해 실제로는 더 많이 움직여야 같은 손실)
   const effLossPct = stopDistPct + costPct;

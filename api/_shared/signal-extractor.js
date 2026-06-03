@@ -53,6 +53,10 @@ export const ASSET_TO_SYMBOL = {
   AAVE: "AAVEUSDT",   // defi-infra
   ARB: "ARBUSDT",     // l2-emerging
   OP: "OPUSDT",       // l2-emerging
+  // ★ 2026-06-03 대표 지시: 메이저 30종 확장 — 13종 추가(전부 바이낸스 USDM PERPETUAL 검증).
+  TRX: "TRXUSDT", ATOM: "ATOMUSDT", NEAR: "NEARUSDT", APT: "APTUSDT",
+  SUI: "SUIUSDT", ICP: "ICPUSDT", HBAR: "HBARUSDT", INJ: "INJUSDT",
+  FIL: "FILUSDT", LTC: "LTCUSDT", BCH: "BCHUSDT", ETC: "ETCUSDT", TON: "TONUSDT",
   // SHIB / PEPE 는 1000-단위 페어 (1000SHIBUSDT, 1000PEPEUSDT) 라 추후 별도 처리.
 };
 
@@ -75,6 +79,9 @@ export const PHASE1_ALLOWED_SYMBOLS = new Set([
   "AAVEUSDT",  // ★ 추가
   "ARBUSDT",   // ★ 추가
   "OPUSDT",    // ★ 추가
+  // ★ 2026-06-03 대표 지시: 메이저 30종 — 13종 추가
+  "TRXUSDT", "ATOMUSDT", "NEARUSDT", "APTUSDT", "SUIUSDT", "ICPUSDT", "HBARUSDT",
+  "INJUSDT", "FILUSDT", "LTCUSDT", "BCHUSDT", "ETCUSDT", "TONUSDT",
 ]);
 
 // 전략명(reason 안에 들어있거나, 별도 strategy 필드로 올 경우) 을 family 로 분류.
