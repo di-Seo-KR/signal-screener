@@ -1127,12 +1127,11 @@ export default function AlphaLab({ onRequestLogin }) {
       {/* ★ 2026-06-03: 통합 평가 칸반 — 발굴·기존 8개를 '같은 잣대'로 (대표 지시). 이 화면의 중심. */}
       <PipelineBoard data={data} />
 
-      {/* ── 자세히 보기 ── */}
+      {/* ── 자세히 보기 (전략 순위표) ── */}
+      {/* ★ 2026-06-03 군더더기 정리(대표 지시): Sharpe추이·종목/시간대별·후보패널 숨김.
+         발굴 후보는 파이프라인 '관찰중' 레인이 대체. 순위표만 상세로 유지. */}
       <div style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text3, marginTop: 6, marginBottom: -4 }}>자세히 보기</div>
       <LeaderboardTable data={data} />
-      <SharpeHistoryChart data={data} />
-      <SymbolTimeframePanel data={data} />
-      <CandidatesPanel data={data} />
 
       <div style={{ fontSize: FONT.xs, color: C.text3, textAlign: "center", padding: "16px 0", lineHeight: 1.6 }}>
         매시 정각 순위 갱신 · 새 전략 발굴 2시간 주기 · 파라미터 튜닝 3시간 주기 · 우수 전략은 자동매매에 자동 반영 (KST)<br/>
