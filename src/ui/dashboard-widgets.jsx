@@ -908,33 +908,13 @@ export function CoinDirectionScores({ coins = [], counts = {}, loading = false, 
                   fontSize: 10, fontWeight: 800, padding: "1px 6px", borderRadius: "var(--z-r-full)",
                   background: accentBg, color: accent, whiteSpace: "nowrap",
                 }}>{isLong ? "롱" : "숏"}</span>
-                {/* 모바일: TF 분해 미니 (주·일·4h·1h 화살표) */}
-                {isMobile && c.breakdown && (
-                  <span style={{ display: "inline-flex", gap: 3, fontSize: 9, fontWeight: 700, whiteSpace: "nowrap" }}>
-                    {["1w", "1d", "4h", "1h"].map((k) => {
-                      const b = c.breakdown[k];
-                      const col = !b ? "var(--z-text-4)" : b.side === "LONG" ? "var(--z-green-hi)" : "var(--z-red-hi)";
-                      return <span key={k} style={{ color: col }}>{b ? (b.side === "LONG" ? "↑" : "↓") : "·"}</span>;
-                    })}
-                  </span>
-                )}
               </div>
 
-              {/* 데스크톱: TF 분해 (주·일·4h·1h) — 종합 스코어의 근거 */}
+              {/* 데스크톱: 종합 스코어 라벨 (화살표 제거 — 깔끔) */}
               {!isMobile && (
-                c.breakdown ? (
-                  <span style={{ display: "inline-flex", gap: 5, whiteSpace: "nowrap", fontSize: 10, fontWeight: 700 }}>
-                    {[["1w", "주"], ["1d", "일"], ["4h", "4h"], ["1h", "1h"]].map(([k, label]) => {
-                      const b = c.breakdown[k];
-                      const col = !b ? "var(--z-text-4)" : b.side === "LONG" ? "var(--z-green-hi)" : "var(--z-red-hi)";
-                      return <span key={k} style={{ color: col }}>{label}{b ? (b.side === "LONG" ? "↑" : "↓") : "·"}</span>;
-                    })}
-                  </span>
-                ) : (
-                  <span style={{ fontSize: 11, color: "var(--z-text-3)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                    {c.timeframe || c.family || "1d"}
-                  </span>
-                )
+                <span style={{ fontSize: 11, color: "var(--z-text-3)", whiteSpace: "nowrap" }}>
+                  {c.timeframe === "MTF" ? "종합" : (c.timeframe || c.family || "1d")}
+                </span>
               )}
 
               {/* 점수 막대 */}

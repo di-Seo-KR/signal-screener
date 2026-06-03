@@ -465,7 +465,8 @@ export default async function handler(req, res) {
       // ★ 2026-06-03 (대표 지시): 멀티 타임프레임 종합 스코어.
       //   주25·일30·4h25·1h20 부호 가중합 → 전 봉 합의 시 점수↑, 갈리면 상쇄(자동 컨플루언스).
       const _signed = (s) => !s ? 0 : ((s.type === "BUY" ? 1 : s.type === "SELL" ? -1 : 0) * (parseFloat(s.score) || 0));
-      const _compRaw = 0.25 * _signed(tf1wSignal) + 0.30 * _signed(sig1d) + 0.25 * _signed(tf4hSignal) + 0.20 * _signed(tf1hSignal);
+      // 가중치(대표 지시 2026-06-03): 주30 · 일25 · 4h25 · 1h20
+      const _compRaw = 0.30 * _signed(tf1wSignal) + 0.25 * _signed(sig1d) + 0.25 * _signed(tf4hSignal) + 0.20 * _signed(tf1hSignal);
       const _compScore = Math.round(Math.min(100, Math.abs(_compRaw)));
       const _compType = _compRaw > 0.5 ? "BUY" : _compRaw < -0.5 ? "SELL" : null;
       const _tfTag = (s) => !s ? "—" : `${s.type === "BUY" ? "롱" : "숏"}${Math.round(s.score)}`;
