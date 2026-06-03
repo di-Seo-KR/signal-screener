@@ -278,13 +278,17 @@ export function PeriodReturnsCard({ equity, breaker = {}, transfers = null, isMo
 
     return specs.map(({ label, start, bTs, hint }) => {
       const real = start != null && start > 0;
-      const base = real ? start : equity;
-      const change = real ? (equity - base) - netFlowSince(bTs) : 0;
-      const pct = real && base > 0 ? (change / base) * 100 : 0;
-      return { label, start: base, change, pct, hint };
+      const flow = real ? netFlowSince(bTs) : 0;
+      const change = real ? (equity - start) - flow : 0;
+      // ★ 2026-06-03: 분모는 '투입 자본'(시작자본 + 입금). 시작자본만 쓰면 입금으로 자본이
+      //   커졌는데도 작은 시작값으로 나눠 +124% 처럼 %가 폭발함. 투입 기준이 직관적.
+      const deployed = real ? Math.max(start + flow, 1) : equity;
+      const pct = real && deployed > 0 ? (change / deployed) * 100 : 0;
+      return { label, change, pct, deployed, hint, real };
     });
   }, [equity, breaker, transfers]);
 
+  const [sel, setSel] = useState(0); // 0=오늘
   if (periods.length === 0) {
     return (
       <div style={{
@@ -297,45 +301,43 @@ export function PeriodReturnsCard({ equity, breaker = {}, transfers = null, isMo
     );
   }
 
+  const p = periods[Math.min(sel, periods.length - 1)] || periods[0];
+  const isUp = p.change >= 0;
+  const color = !p.real ? "var(--z-text-3)" : isUp ? "var(--z-green-hi)" : "var(--z-red-hi)";
+
   return (
-    <div style={{
-      display: "grid",
-      gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)",
-      gap: 8,
-    }}>
-      {periods.map((p, i) => {
-        const isUp = p.change >= 0;
-        const color = isUp ? "var(--z-green-hi)" : "var(--z-red-hi)";
-        const accent = isUp ? "var(--z-green)" : "var(--z-red)";
-        return (
-          <div key={i} style={{
-            position: "relative", overflow: "hidden",
-            background: "var(--z-card)", border: "1px solid var(--z-border)",
-            borderRadius: "var(--z-r-lg)", padding: isMobile ? "14px 14px 14px 16px" : "16px 16px 16px 18px",
-            display: "flex", flexDirection: "column", gap: 4,
-            minHeight: isMobile ? 86 : 96,
-          }}>
-            <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: accent }} />
-            <div style={{ fontSize: 13, color: "var(--z-text-3)", fontWeight: 600, letterSpacing: 0.1 }}>
-              {p.label} 수익
-            </div>
-            <div style={{
-              fontSize: isMobile ? 19 : 22, fontWeight: 800, color,
-              fontFamily: "var(--z-font-mono)", lineHeight: 1.0, letterSpacing: "-0.015em",
-            }}>
-              {isUp ? "+" : ""}{p.pct.toFixed(2)}%
-            </div>
-            <div style={{
-              fontSize: 13, color, fontWeight: 700, fontFamily: "var(--z-font-mono)", lineHeight: 1.2,
-            }}>
-              {isUp ? "+" : ""}{fmtUsd(p.change, 2)}
-            </div>
-            <div style={{ fontSize: 11.5, color: "var(--z-text-3)", marginTop: 1, lineHeight: 1.3 }}>
-              시작 {fmtUsd(p.start, 0)} · {p.hint}
-            </div>
-          </div>
-        );
-      })}
+    <div>
+      {/* 세그먼트 선택기 (오늘/주/월/누적) */}
+      <div style={{ display: "flex", gap: 4, background: "var(--z-card-2)", borderRadius: 12, padding: 4 }}>
+        {periods.map((x, i) => {
+          const active = i === Math.min(sel, periods.length - 1);
+          return (
+            <button key={i} onClick={() => setSel(i)} style={{
+              flex: 1, border: "none", cursor: "pointer",
+              background: active ? "var(--z-card)" : "transparent",
+              color: active ? "var(--z-text-1)" : "var(--z-text-3)",
+              fontWeight: active ? 800 : 600, fontSize: 12.5, padding: "8px 4px",
+              borderRadius: 9, transition: "all .15s",
+              boxShadow: active ? "0 2px 8px rgba(0,0,0,0.25)" : "none",
+            }}>{x.label}</button>
+          );
+        })}
+      </div>
+      {/* 선택 기간 큰 표시 */}
+      <div style={{ padding: "20px 4px 6px", textAlign: "center" }}>
+        <div style={{
+          fontSize: 44, fontWeight: 900, color, lineHeight: 1.0,
+          fontFamily: "var(--z-font-mono)", letterSpacing: "-0.03em",
+        }}>
+          {!p.real ? "—" : `${isUp ? "+" : ""}${p.pct.toFixed(1)}%`}
+        </div>
+        <div style={{ fontSize: 18, fontWeight: 800, color, marginTop: 8, fontFamily: "var(--z-font-mono)" }}>
+          {!p.real ? "데이터 모으는 중" : `${isUp ? "+" : ""}${fmtUsd(p.change, 1)}`}
+        </div>
+        <div style={{ fontSize: 11.5, color: "var(--z-text-3)", marginTop: 10, lineHeight: 1.4 }}>
+          {p.real ? `투입 ${fmtUsd(p.deployed, 0)} 기준 · ${p.hint}` : p.hint}
+        </div>
+      </div>
     </div>
   );
 }
