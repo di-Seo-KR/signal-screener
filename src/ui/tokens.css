@@ -506,6 +506,30 @@ main, [class*="panel"], [class*="dashboard"] {
   --input:  var(--z-border-2);
 }
 
+/* ════════════════════════════════════════════════════════════
+   Bento/Elevation scope — 2026 트렌드 반영 (실전매매/알파랩)
+   대표 지시(2026-06-03): 최신 UI/UX 트렌드 제대로 반영.
+   적용: ① OLED 다크 + 미묘한 코너 액센트 그라데이션 배경
+        ② 떠있는(elevation) 불투명 카드 — 부드러운 그림자 + 상단 하이라이트
+        ③ bold 데이터 타이포(컴포넌트에서)
+   ★ backdrop-filter(blur) 미사용 — 지난 글래스 겹침의 원인이라 의도적으로 배제.
+     그라데이션 배경 + box-shadow 는 stacking context 를 안 만들어 100% 안전.
+   dark 모드에만 적용(라이트 보호).
+   ════════════════════════════════════════════════════════════ */
+[data-theme="dark"] .z-bento-scope {
+  background:
+    radial-gradient(1000px 520px at 6% -8%, rgba(99, 102, 241, 0.14), transparent 58%),
+    radial-gradient(840px 480px at 104% 2%, rgba(16, 185, 169, 0.10), transparent 55%),
+    linear-gradient(180deg, #06070d 0%, #080a12 60%, #06070d 100%);
+  /* 카드를 배경보다 살짝 밝은 불투명색으로 → 그라데이션 위에 '떠 있는' 느낌(elevation) */
+  --z-card: #121A2E;
+  --z-card-2: #1A2640;
+  --z-border: #243352;
+  /* 부드러운 그림자 + 상단 1px 하이라이트(유리 아님, 솔리드) */
+  --z-sh-sm: 0 8px 24px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.045);
+}
+.z-bento-scope { min-height: 100vh; }
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
