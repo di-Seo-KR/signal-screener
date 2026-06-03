@@ -2714,11 +2714,11 @@ function AssetCard({ asset, onChart, isMobile = false }) {
                       color: diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow,
                     }}>{diag.opinion}</span>
                   </div>
-                  {/* 카테고리 미니 바 */}
-                  <div style={{ display: "grid", gridTemplateColumns: diag.categories.length > 5 ? "1fr 1fr 1fr" : "1fr 1fr", gap: "4px" }}>
+                  {/* 카테고리 미니 바 — auto-fit 으로 폭 따라 자동 열수(넘침 방지) */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "6px" }}>
                     {diag.categories.map(cat => (
-                      <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ fontSize: "14px", color: C.text3, width: "36px" }}>{cat.name}</span>
+                      <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+                        <span style={{ fontSize: "14px", color: C.text3, width: "36px", flexShrink: 0 }}>{cat.name}</span>
                         <div style={{ flex: 1, height: "4px", background: C.border, borderRadius: "4px", overflow: "hidden" }}>
                           <div style={{
                             height: "100%", borderRadius: "4px",
@@ -3412,10 +3412,10 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                     </span>
                     <span style={{ fontSize: "15px", color: C.text3 }}>{diag.rationale}</span>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: diag.categories.length > 5 ? "1fr 1fr 1fr" : "1fr 1fr", gap: "5px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(124px, 1fr))", gap: "6px" }}>
                     {diag.categories.map(cat => (
-                      <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <span style={{ fontSize: "15px", color: C.text3, width: "36px" }}>{cat.name}</span>
+                      <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
+                        <span style={{ fontSize: "15px", color: C.text3, width: "36px", flexShrink: 0 }}>{cat.name}</span>
                         <div style={{ flex: 1, height: "5px", background: C.border, borderRadius: "4px", overflow: "hidden" }}>
                           <div style={{
                             height: "100%", borderRadius: "4px",
@@ -3642,7 +3642,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             {(per != null || pbr != null || psr != null || evEbitda != null) && (
               <div style={{ background: C.card, borderRadius: "12px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
                 <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>밸류에이션</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0" }}>
                   {[
                     { label: "PER", value: per, desc: per ? (per < 15 ? "저평가" : per < 25 ? "적정" : per < 40 ? "고평가" : "매우 고평가") : null,
                       color: per ? (per < 15 ? C.green : per < 25 ? C.text1 : per < 40 ? C.yellow : C.red) : C.text3 },
@@ -3950,7 +3950,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 </div>
 
                 {/* 목표가 + 손절가 (근거 표시) */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "8px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "6px", marginBottom: "8px" }}>
                   <div style={{ background: C.card, borderRadius: "8px", padding: "10px" }}>
                     <div style={{ fontSize: "14px", color: C.text3, marginBottom: "3px" }}>목표가</div>
                     <div style={{ fontSize: "18px", fontWeight: 800, color: C.green }}>{fmtP(targetPrice || techData.analystTarget)}</div>
@@ -3966,7 +3966,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 </div>
 
                 {/* 지지선 + 저항선 (다중 레벨, 근거 표시) */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", marginBottom: "10px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "6px", marginBottom: "10px" }}>
                   <div style={{ background: C.card, borderRadius: "8px", padding: "10px" }}>
                     <div style={{ fontSize: "14px", color: C.text3, marginBottom: "5px" }}>지지선</div>
                     {sup1 ? (
@@ -4068,7 +4068,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           <div style={{ padding: "0 20px 16px" }}>
             <div style={{ background: C.card, borderRadius: "12px", padding: "16px", border: `1px solid ${C.border}` }}>
               <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>기술적 지표</div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: "6px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))", gap: "6px" }}>
                 {[
                   { label: "RSI(14)", value: techData.rsi, color: techData.rsi <= 30 ? C.purple : techData.rsi >= 70 ? C.red : C.text2 },
                   { label: "200일선 괴리", value: techData.ma200Dist != null ? `${techData.ma200Dist > 0 ? "+" : ""}${techData.ma200Dist}%` : "—", color: techData.ma200Dist > 10 ? C.red : techData.ma200Dist < -10 ? C.green : C.text2 },
@@ -9016,11 +9016,11 @@ function AppInner() {
                         {/* 4축 미니 바 + 매수 타점 */}
                         <div style={{ padding: "6px 12px 10px", display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-start" }}>
                           {/* 4축 진단 미니바 */}
-                          <div style={{ display: "flex", gap: "6px", flex: "1 1 auto", minWidth: "140px" }}>
+                          <div style={{ display: "flex", gap: "6px", flex: "1 1 160px", minWidth: 0 }}>
                             {d.categories.map(c => {
                               const catColor = c.score >= 60 ? C.green : c.score >= 40 ? C.yellow : C.red;
                               return (
-                                <div key={c.name} style={{ flex: 1, textAlign: "center" }}>
+                                <div key={c.name} style={{ flex: 1, minWidth: 0, textAlign: "center" }}>
                                   <div style={{ fontSize: "15px", color: C.text3, marginBottom: "3px" }}>{c.name}</div>
                                   <div style={{ height: "4px", borderRadius: "4px", background: `${C.border}40`, overflow: "hidden" }}>
                                     <div style={{ height: "100%", width: `${c.score}%`, background: catColor, borderRadius: "4px", transition: "width .5s" }} />
@@ -9033,13 +9033,13 @@ function AppInner() {
 
                           {/* 매수 타점 3단계 */}
                           {bl.levels.length > 0 && (
-                            <div style={{ display: "flex", gap: "4px", flex: "0 0 auto" }}>
+                            <div style={{ display: "flex", gap: "4px", flex: "1 1 auto", flexWrap: "wrap", justifyContent: "flex-end" }}>
                               {bl.levels.map((lv, li) => {
                                 const lvColor = li === 0 ? C.blue : li === 1 ? C.purple : C.green;
                                 return (
                                   <div key={li} style={{
                                     padding: "4px 8px", borderRadius: "8px",
-                                    background: `${lvColor}15`, textAlign: "center", minWidth: "58px",
+                                    background: `${lvColor}15`, textAlign: "center", minWidth: "58px", flex: "1 1 58px",
                                   }}>
                                     <div style={{ fontSize: "14px", color: lvColor, fontWeight: 700 }}>{lv.label}</div>
                                     <div style={{ fontSize: "16px", fontWeight: 800, color: C.text1, marginTop: "1px" }}>
@@ -13330,7 +13330,7 @@ function AppInner() {
               {/* 인기 종목 */}
               <div style={{ padding: "16px 20px 8px" }}>
                 <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px", letterSpacing: "0.5px", textTransform: "uppercase" }}>인기 종목</div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "6px" }}>
                   {popularStocks.map(s => {
                     const asset = ALL_ASSETS.find(a => a.symbol === s.symbol);
                     return (
