@@ -217,10 +217,11 @@ async function getEquityUsdt(creds) {
   try {
     const acct = await getAccountInfo(creds);
     const v = parseFloat(acct.totalWalletBalance || "0");
-    return Number.isFinite(v) ? v : 0;
+    const avail = parseFloat(acct.availableBalance || "0"); // ★ 신규 진입 가용 마진
+    return { equity: Number.isFinite(v) ? v : 0, available: Number.isFinite(avail) ? avail : 0 };
   } catch (e) {
     console.warn("[engine] equity fetch failed:", e?.message);
-    return 0;
+    return { equity: 0, available: 0 };
   }
 }
 
@@ -325,9 +326,11 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
 
   // 3) 에쿼티 — creds 있으면 진짜 조회, 없으면 $100 fallback (dry run)
   let equity = 0;
+  let availMargin = 0; // ★ 2026-06-03: 가용 마진(신규 진입 한도) — planTrade 가 이 안으로 사이징
   if (creds) {
-    equity = await getEquityUsdt(creds);
-    S(`equity=$${equity.toFixed(2)}`);
+    const acc = await getEquityUsdt(creds);
+    equity = acc.equity; availMargin = acc.available;
+    S(`equity=$${equity.toFixed(2)} available=$${availMargin.toFixed(2)}`);
   } else {
     S(`dry-run: skipping equity fetch (no creds)`);
   }
@@ -650,7 +653,7 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       }
       // ★ 2026-05-17 (QUANT-RES): regime 을 planTrade 로 전달 — 동적 SL/TP 보정.
       //   trending 시 TP +30%, mean_reverting 시 양쪽 -20% 자동 적용.
-      const p = planTrade({ signal: cand, equity: effectiveEquity, price: pr, atr: a, filter: f, regime: regimeSnapshot, cfg: RISK_CONFIG });
+      const p = planTrade({ signal: cand, equity: effectiveEquity, price: pr, atr: a, filter: f, regime: regimeSnapshot, availableMargin: availMargin, cfg: RISK_CONFIG });
       if (!p.ok) {
         S(`  ↳ risk reject: ${p.reason}`);
         tried.push({ symbol: cand.symbol, reason: p.reason });
@@ -690,7 +693,7 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
           }
         }
         const aggCheck = checkAggregateExposure({
-          plan: p.plan, openPositions: liveOpenPositions, equity: effectiveEquity, cfg: RISK_CONFIG,
+          plan: p.plan, openPositions: liveOpenPositions, equity: effectiveEquity, availableMargin: availMargin, cfg: RISK_CONFIG,
         });
         if (!aggCheck.ok) {
           S(`  ↳ 합산 노출 reject: ${aggCheck.reason}`);
