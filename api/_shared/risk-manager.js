@@ -218,6 +218,11 @@ export const RISK_CONFIG = {
   absoluteMaxMarginPct: 0.20,        // 자본의 20% (한 거래 마진 최대)
   absoluteMaxMarginFloor: 50,        // 최소 $50 (작은 자본 구제)
   absoluteMaxMarginCeiling: 2000,    // 최대 $2,000 (큰 자본도 슬리피지 위험 차단)
+  // ★ 2026-06-03 (대표 지시 "있는대로 잡으면 되지, 하한은 둘 필요 없잖아"):
+  //   상한(absoluteMaxMargin*)은 유지하되, 신규 진입 마진은 실제 가용잔고(availableBalance)
+  //   안으로 자동 축소(shrink-to-fit). 가용의 이 비율까지만 사용 → 슬리피지/수수료 버퍼 확보.
+  //   인위적 하한은 없음. 진짜 하한은 거래소 minNotional 뿐(그 아래는 주문 자체가 거부됨).
+  availableMarginBudgetPct: 0.90,    // 가용잔고의 90% 까지 한 거래에 투입 허용
   minMarginPct: 0.05,                // 자본의 5% (포지션 최소 마진)
   minMarginFloor: 20,                // 최소 $20 (거래소 minNotional 안전)
   // ★ deprecated (자본 비례 시 무시) — 하위 호환 보존만
@@ -287,7 +292,7 @@ export function pickLeverage(confidence, family, cfg = RISK_CONFIG) {
  * @param {object} [args.cfg=RISK_CONFIG]
  * @returns {{ ok: boolean, reason?: string, sumNotional, sumMargin, log: string[] }}
  */
-export function checkAggregateExposure({ plan, openPositions, equity, cfg = RISK_CONFIG }) {
+export function checkAggregateExposure({ plan, openPositions, equity, availableMargin = null, cfg = RISK_CONFIG }) {
   const log = [];
   const push = (m) => log.push(m);
   if (!plan || !plan.notional) return { ok: false, reason: "invalid plan", log };
@@ -322,6 +327,32 @@ export function checkAggregateExposure({ plan, openPositions, equity, cfg = RISK
       sumNotional, sumMargin, log,
     };
   }
+
+  // ★ 2026-06-03 (대표 지시 "있는대로 잡으면 되지"): 가용잔고(availableBalance)가 주어지면
+  //   그게 진짜 진입 가능 한도다 — equity×ratio 소프트 가드 대신 "신규 마진 ≤ 가용×budget"
+  //   으로 판정한다. 수동 포지션이 자본의 95% 를 차지해도, 남은 가용 안에서는 봇이 진입.
+  //   (equity 비례 가드는 all-bot 계정 가정이라 대표의 수동 롱/숏이 사용률을 부풀려 봇을 막던 문제)
+  //   env ZEPTA_AGG_USE_AVAILABLE=0 으로 옛 strict(equity 비례) 동작 복원 가능.
+  const useAvail = Number.isFinite(availableMargin) && availableMargin > 0
+    && process.env.ZEPTA_AGG_USE_AVAILABLE !== "0";
+  const newMargin = plan.marginRequired || (plan.notional / (plan.leverage || 10));
+
+  if (useAvail) {
+    const availBudgetPct = cfg.availableMarginBudgetPct ?? 0.90;
+    const availCap = availableMargin * availBudgetPct;
+    push(`가용 기준 판정: 신규 마진 $${newMargin.toFixed(2)} vs 가용한도 $${availCap.toFixed(2)} (가용 $${availableMargin.toFixed(2)} × ${(availBudgetPct*100).toFixed(0)}%)`);
+    if (newMargin > availCap + 0.01) {
+      return {
+        ok: false,
+        reason: `신규 마진 $${newMargin.toFixed(2)} > 가용 한도 $${availCap.toFixed(2)} (가용 $${availableMargin.toFixed(2)}의 ${(availBudgetPct*100).toFixed(0)}%)`,
+        sumNotional, sumMargin, log,
+      };
+    }
+    // 가용 경로에선 품질을 conviction sizing(약한 시그널→소량) + 엔진 랭킹/스코어 임계가 담당.
+    return { ok: true, sumNotional, sumMargin, log };
+  }
+
+  // ── 이하 equity 비례 strict 경로 (가용잔고 미제공 또는 ZEPTA_AGG_USE_AVAILABLE=0) ──
   if (newSumMargin > marginCap) {
     return {
       ok: false,
@@ -548,7 +579,7 @@ export function inSameCorrelationGroup(symbol, openSymbols, cfg = RISK_CONFIG) {
  * ★ 2026-05-17 (QUANT-RES): regime 파라미터 추가. signal.regime 또는 args.regime
  *   로 전달 가능. 동적 SL/TP 가 regime 보정 자동 적용.
  */
-export function planTrade({ signal, equity, price, atr, filter, regime = null, cfg = RISK_CONFIG }) {
+export function planTrade({ signal, equity, price, atr, filter, regime = null, availableMargin = null, cfg = RISK_CONFIG }) {
   const log = [];
   const push = (m) => log.push(m);
 
@@ -634,15 +665,25 @@ export function planTrade({ signal, equity, price, atr, filter, regime = null, c
   const previewLevForCap = cfg.maxLeverage || 10;
   // ★ 2026-05-12: 자본 비례 maxMargin 산출 (자본 변경 시 자동 조정).
   //   기존 absoluteMaxMarginUsd 절대값 → equity × absoluteMaxMarginPct + floor/ceiling.
-  const effMaxMargin = clamp(
+  let effMaxMargin = clamp(
     equity * (cfg.absoluteMaxMarginPct || 0.20),
     cfg.absoluteMaxMarginFloor || 50,
     cfg.absoluteMaxMarginCeiling || 2000,
   );
+  // ★ 2026-06-03 (대표 지시): 신규 진입 마진을 실제 가용잔고 안으로 자동 축소.
+  //   가용($198)이 자본비례 상한($481)보다 작으면 → 가용×90% 로 줄여 잡음(reject 대신 shrink).
+  //   인위적 하한 없음 — 가용이 minNotional 도 못 채우면 그때만 minNotional 로직이 거른다.
+  if (Number.isFinite(availableMargin) && availableMargin > 0) {
+    const availCap = availableMargin * (cfg.availableMarginBudgetPct ?? 0.90);
+    if (availCap < effMaxMargin) {
+      effMaxMargin = availCap;
+      push(`shrink-to-fit: 가용 $${availableMargin.toFixed(0)} × ${((cfg.availableMarginBudgetPct ?? 0.90)*100).toFixed(0)}% = maxMargin $${effMaxMargin.toFixed(0)}`);
+    }
+  }
   const maxNotionalCap = effMaxMargin * previewLevForCap;
   if (notional > maxNotionalCap) {
     notional = maxNotionalCap;
-    push(`capped by effMaxMargin=$${effMaxMargin.toFixed(0)} (equity ${(cfg.absoluteMaxMarginPct*100).toFixed(0)}%) × lev ${previewLevForCap} = noSi $${maxNotionalCap.toFixed(0)}`);
+    push(`capped by effMaxMargin=$${effMaxMargin.toFixed(0)} × lev ${previewLevForCap} = noSi $${maxNotionalCap.toFixed(0)}`);
   }
 
   // 5) 레버리지
@@ -681,10 +722,14 @@ export function planTrade({ signal, equity, price, atr, filter, regime = null, c
   // 8.5) ★ 2026-05-12 자본 비례 최소 마진 강제 (이전: absoluteValue $50).
   //   minMargin = max(equity × minMarginPct, minMarginFloor)
   //   자본 $500 → $25, 자본 $5,000 → $250, 자본 $50,000 → $2,500.
-  const minMarginUsd = Math.max(
+  let minMarginUsd = Math.max(
     equity * (cfg.minMarginPct || 0.05),
     cfg.minMarginFloor || 20,
   );
+  // ★ 2026-06-03 (대표 지시 "하한은 둘 필요 없잖아"): 인위적 5% 하한이 가용 상한(effMaxMargin,
+  //   가용잔고 반영됨)을 넘지 못하게 묶는다. 가용이 작으면 하한도 함께 내려가 "있는대로" 진입.
+  //   진짜 하한은 아래 9)~10) 거래소 minNotional 뿐.
+  if (effMaxMargin < minMarginUsd) minMarginUsd = effMaxMargin;
   if (minMarginUsd > 0) {
     const minMarginNotional = minMarginUsd * finalLev;
     if (notional < minMarginNotional) {
