@@ -311,8 +311,10 @@ function RealTradingInner() {
   const _todayNetFlow = _flowsReady ? transfers.reduce((s, t) => ((Number(t.time) || 0) >= _kstDayStartTs ? s + (Number(t.amount) || 0) : s), 0) : 0;
   const todayPnlUsd = (_flowsReady && equity != null && breaker.dayStartEquity)
     ? (equity - breaker.dayStartEquity) - _todayNetFlow : null;
-  const todayPnlPct = (todayPnlUsd != null && breaker.dayStartEquity > 0)
-    ? (todayPnlUsd / breaker.dayStartEquity) * 100 : null;
+  // %는 '투입 자본'(시작 + 오늘 입금) 기준 — 시작자본만 쓰면 입금으로 %가 폭발(기간카드와 동일 규칙).
+  const _todayDeployed = breaker.dayStartEquity ? Math.max(breaker.dayStartEquity + _todayNetFlow, 1) : null;
+  const todayPnlPct = (todayPnlUsd != null && _todayDeployed)
+    ? (todayPnlUsd / _todayDeployed) * 100 : null;
   // ★ 2026-05-09: MDD 기준점 — 30일 rolling peak 우선, 폴백은 all-time equityHigh
   //   이전: all-time equityHigh 만 사용 → 큰 상승 후엔 정상 조정도 -50% 트리거 위험
   //   이후: 서버가 주는 equityHigh30d 사용 (없으면 equityHigh 로 폴백)
@@ -698,16 +700,26 @@ function RealTradingInner() {
         background: todayPnlUsd == null ? "var(--z-card-2)"
           : todayPnlUsd >= 0 ? "rgba(16,216,132,0.10)" : "rgba(255,77,100,0.10)",
         border: `1px solid ${todayPnlUsd == null ? "var(--z-border)" : todayPnlUsd >= 0 ? "rgba(16,216,132,0.25)" : "rgba(255,77,100,0.25)"}`,
-        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10,
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
       }}>
-        <span style={{ fontSize: 14, color: "var(--z-text-2)", fontWeight: 700 }}>오늘 매매손익 <span style={{ fontSize: 11, color: "var(--z-text-3)", fontWeight: 500 }}>입금 제외</span></span>
-        <span style={{
-          fontSize: 22, fontWeight: 900, fontFamily: "var(--z-font-mono)", letterSpacing: "-0.01em",
-          color: todayPnlUsd == null ? "var(--z-text-3)" : todayPnlUsd >= 0 ? "var(--z-green-hi)" : "var(--z-red-hi)",
-        }}>
-          {todayPnlUsd == null ? "집계 중" : `${todayPnlUsd >= 0 ? "▲ +" : "▼ −"}${fmtUsd(Math.abs(todayPnlUsd), 1)}`}
-          {todayPnlPct != null && <span style={{ fontSize: 13, marginLeft: 7, opacity: 0.9 }}>{todayPnlPct >= 0 ? "+" : ""}{todayPnlPct.toFixed(1)}%</span>}
-        </span>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 14, color: "var(--z-text-2)", fontWeight: 700 }}>오늘 매매손익</div>
+          <div style={{ fontSize: 10.5, color: "var(--z-text-3)", marginTop: 2 }}>입금 제외 · 실현 기준</div>
+        </div>
+        <div style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 0 }}>
+          <div style={{
+            fontSize: 23, fontWeight: 900, fontFamily: "var(--z-font-mono)", letterSpacing: "-0.01em", lineHeight: 1.05,
+            color: todayPnlUsd == null ? "var(--z-text-3)" : todayPnlUsd >= 0 ? "var(--z-green-hi)" : "var(--z-red-hi)",
+          }}>
+            {todayPnlUsd == null ? "집계 중" : `${todayPnlUsd >= 0 ? "▲ +" : "▼ −"}${fmtUsd(Math.abs(todayPnlUsd), 1)}`}
+          </div>
+          {todayPnlPct != null && (
+            <div style={{ fontSize: 12.5, fontWeight: 700, marginTop: 2, fontFamily: "var(--z-font-mono)",
+              color: todayPnlUsd >= 0 ? "var(--z-green-hi)" : "var(--z-red-hi)", opacity: 0.85 }}>
+              {todayPnlPct >= 0 ? "+" : ""}{todayPnlPct.toFixed(1)}%
+            </div>
+          )}
+        </div>
       </div>
       {/* 상태 칩 1줄 */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>

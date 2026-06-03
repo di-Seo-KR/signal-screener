@@ -174,13 +174,17 @@ function RegimePanel({ data }) {
   const updatedAt = data?.weights?.updatedAt;
 
   const regimeKey = regime?.regime || "unknown";
-  const volKey = regime?.volRegime || "unknown";
+  // di:market:regime 실제 shape: { regime, efficiency, avgHurst, avgER, activeTickers, t }
+  const hurst = regime?.avgHurst ?? regime?.hurst ?? null;
+  const er = regime?.avgER ?? null;
+  const effKey = regime?.efficiency || "unknown";
+  const EFF_LABEL = { directional: "방향성 뚜렷", noisy: "노이즈 많음", mixed: "혼재", unknown: "—" };
 
   return (
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
         <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>지금 시장 흐름 & 전략 가중치</div>
-        <span style={{ fontSize: FONT.xs, color: C.text3 }}>{updatedAt ? fmtAgo(updatedAt) + " 갱신" : "데이터 없음"}</span>
+        <span style={{ fontSize: FONT.xs, color: C.text3 }}>{regime?.t ? fmtAgo(new Date(regime.t).toISOString()) + " 갱신" : updatedAt ? fmtAgo(updatedAt) + " 갱신" : "데이터 없음"}</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 16 }}>
         <Stat
@@ -190,19 +194,20 @@ function RegimePanel({ data }) {
           color={regimeKey === "trending" ? C.green : regimeKey === "mean_reverting" ? C.purple : C.text1}
         />
         <Stat
-          label="추세 강도"
-          value={fmtNum(regime?.hurst, 3)}
-          sub={regime?.hurst > 0.55 ? "한쪽 방향 흐름 강함" : regime?.hurst < 0.45 ? "박스권 회귀 성격" : "방향성 약함"}
+          label="추세 강도 (Hurst)"
+          value={hurst != null ? fmtNum(hurst, 2) : "—"}
+          sub={hurst == null ? "산출 중" : hurst > 0.55 ? "한쪽 방향 흐름 강함" : hurst < 0.45 ? "박스권 회귀 성격" : "방향성 약함"}
+          color={hurst == null ? C.text1 : hurst > 0.55 ? C.green : hurst < 0.45 ? C.purple : C.text1}
           tip={METRIC_TOOLTIP.hurst}
         />
         <Stat
-          label="변동성"
-          value={VOL_LABEL[volKey] || volKey}
-          sub={`평소 대비 ${fmtNum(regime?.atrRatio, 2)}배`}
-          color={volKey === "vol_explosive" ? C.red : volKey === "vol_compressed" ? C.blue : C.text1}
-          tip={METRIC_TOOLTIP.atrRatio}
+          label="시장 효율성 (ER)"
+          value={er != null ? fmtNum(er, 2) : "—"}
+          sub={EFF_LABEL[effKey] || effKey}
+          color={effKey === "directional" ? C.green : effKey === "noisy" ? C.red : C.text1}
+          tip="가격 움직임이 한 방향으로 효율적인지(높을수록 추세적), 노이즈가 많은지(낮을수록 횡보)를 0~1로 나타낸 지표예요."
         />
-        <Stat label="BTC 시세" value={regime?.btcPrice ? `$${fmtInt(regime.btcPrice)}` : "—"} />
+        <Stat label="분석 종목" value={regime?.activeTickers != null ? `${regime.activeTickers}개` : "—"} sub="레짐 판정에 쓰인 종목 수" />
       </div>
       <div style={{ fontSize: FONT.sm, color: C.text2, marginBottom: 8 }}>전략별 가중치 — 시장 흐름에 맞춰 자동 조정됩니다:</div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
