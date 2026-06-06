@@ -547,12 +547,14 @@ function RealTradingInner() {
             borderLeft: "1px solid rgba(59, 130, 246, 0.15)",
           }}>
             <div style={{ fontSize: 14, color: "var(--z-text-3)", fontWeight: 600 }}>오늘</div>
+            {/* ★ 2026-06-06: 입금 부풀림 제거 — 메인 hero(todayPnlPct)와 동일하게 입출금 제외값 사용.
+                 이전엔 raw dayLossPct 라 입금이 수익으로 잡혀 모바일만 +79% 식으로 오도됨. */}
             <div style={{
               fontSize: 16, fontWeight: 800, lineHeight: 1.2,
-              color: dayLossPct < 0 ? "var(--z-red-hi)" : dayLossPct > 0 ? "var(--z-green-hi)" : "var(--z-text)",
+              color: todayPnlUsd == null ? "var(--z-text)" : todayPnlUsd < 0 ? "var(--z-red-hi)" : todayPnlUsd > 0 ? "var(--z-green-hi)" : "var(--z-text)",
               fontFamily: "var(--z-font-mono)",
             }}>
-              {fmtPct(dayLossPct)}
+              {todayPnlPct != null ? fmtPct(todayPnlPct) : "집계 중"}
             </div>
           </div>
         )}
