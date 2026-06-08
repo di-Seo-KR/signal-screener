@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && node scripts/generate-spa-route-htmls.mjs",
+    "build": "vite build && node scripts/generate-spa-route-htmls.mjs && node scripts/generate-coin-pages.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

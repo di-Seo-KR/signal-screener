@@ -623,6 +623,7 @@ const HOME = {
     "경제 캘린더·뉴스 — FOMC·CPI 일정과 AI 요약 시장 뉴스",
   ],
   guides: [
+    { href: "/coin", title: "코인별 실시간 롱숏 스코어 — 메이저 30종" },
     { href: "/blog/ai-trading-guide", title: "AI 자동매매 입문자 가이드" },
     { href: "/blog/bitcoin-auto-trading-5-steps", title: "비트코인 자동매매 5단계로 시작하기" },
     { href: "/blog/quant-strategies", title: "퀀트 전략 33가지 정리" },
