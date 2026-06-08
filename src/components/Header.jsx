@@ -23,6 +23,7 @@ import {
   LayoutDashboard, TrendingUp, Activity, BookOpen,
   // ★ 2026-05-11: 신규 페이지 아이콘
   Sparkles, Trophy, Share2, GitCompare, PieChart, Save, Crown,
+  Coins, // ★ 2026-06-08: 코인별 분석 페이지(/coin)
 } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -92,6 +93,7 @@ const getNavCategories = (t) => [
     id: "analysis", label: t("nav.analysis"), catId: "analysis", icon: BarChart3,
     items: [
       { id: "screener", label: t("nav.screener"), icon: Search },
+      { id: "/coin", label: "코인 분석", icon: Coins },                 // ★ 2026-06-08: 종목별 공개 분석 페이지
       { id: "saved-screeners", label: "저장한 조건", icon: Save },     // ★ 신규
       { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
       { id: "strategy", label: t("nav.strategy"), icon: Target },
@@ -147,6 +149,7 @@ const getMobileMenuSections = (isOwner, t) => [
   {
     section: t("nav.analysis"), items: [
       { id: "screener", label: t("nav.screener"), icon: Search },
+      { id: "/coin", label: "코인 분석", icon: Coins },
       { id: "saved-screeners", label: "저장한 조건", icon: Save },
       { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
       { id: "strategy", label: t("nav.strategy"), icon: Target },
