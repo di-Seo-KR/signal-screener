@@ -561,19 +561,19 @@ function buildPrerenderBody(route) {
     .map(({ q, a }) => `<div><h3>${escapeText(q)}</h3><p>${escapeText(a)}</p></div>`)
     .join("");
   return `
-    <section class="seo-prerender" style="display:block;padding:24px;max-width:800px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#F1F5FB;background:#060a12;line-height:1.7;">
-      <h1 style="font-size:26px;font-weight:800;color:#F1F5FB;margin:0 0 16px;">${escapeText(route.h1)}</h1>
-      <p style="font-size:17px;color:#9AA7BD;margin:0 0 24px;">${escapeText(route.intro)}</p>
-      <h2 style="font-size:20px;font-weight:700;color:#F1F5FB;margin:24px 0 12px;">주요 기능</h2>
-      <ul style="padding-left:20px;color:#9AA7BD;">${featuresHtml}</ul>
-      <h2 style="font-size:20px;font-weight:700;color:#F1F5FB;margin:24px 0 12px;">자주 묻는 질문</h2>
+    <section class="seo-prerender" style="display:block;padding:24px;max-width:800px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#F4F5F7;background:#0A0B0F;line-height:1.7;">
+      <h1 style="font-size:26px;font-weight:800;color:#F4F5F7;margin:0 0 16px;">${escapeText(route.h1)}</h1>
+      <p style="font-size:17px;color:#A1A6B2;margin:0 0 24px;">${escapeText(route.intro)}</p>
+      <h2 style="font-size:20px;font-weight:700;color:#F4F5F7;margin:24px 0 12px;">주요 기능</h2>
+      <ul style="padding-left:20px;color:#A1A6B2;">${featuresHtml}</ul>
+      <h2 style="font-size:20px;font-weight:700;color:#F4F5F7;margin:24px 0 12px;">자주 묻는 질문</h2>
       ${faqHtml}
-      <nav style="margin-top:32px;padding-top:16px;border-top:1px solid #1E2A42;font-size:14px;color:#9AA7BD;">
-        <a href="/" style="color:#60A5FA;margin-right:12px;">홈</a>
-        <a href="/screener" style="color:#60A5FA;margin-right:12px;">스크리너</a>
-        <a href="/auto-trading" style="color:#60A5FA;margin-right:12px;">자동매매</a>
-        <a href="/portfolio" style="color:#60A5FA;margin-right:12px;">포트폴리오</a>
-        <a href="/pricing" style="color:#60A5FA;">요금제</a>
+      <nav style="margin-top:32px;padding-top:16px;border-top:1px solid #23262F;font-size:14px;color:#A1A6B2;">
+        <a href="/" style="color:#6E92FF;margin-right:12px;">홈</a>
+        <a href="/screener" style="color:#6E92FF;margin-right:12px;">스크리너</a>
+        <a href="/auto-trading" style="color:#6E92FF;margin-right:12px;">자동매매</a>
+        <a href="/portfolio" style="color:#6E92FF;margin-right:12px;">포트폴리오</a>
+        <a href="/pricing" style="color:#6E92FF;">요금제</a>
       </nav>
     </section>
   `;
@@ -622,28 +622,28 @@ const HOME = {
 };
 
 function buildHomePrerender(h) {
-  const intros = h.intros.map((p) => `<p style="font-size:16px;color:#9AA7BD;margin:0 0 16px;">${escapeText(p)}</p>`).join("");
+  const intros = h.intros.map((p) => `<p style="font-size:16px;color:#A1A6B2;margin:0 0 16px;">${escapeText(p)}</p>`).join("");
   const modules = h.modules.map((m) => `<li style="margin-bottom:8px;">${escapeText(m)}</li>`).join("");
-  const guides = h.guides.map((g) => `<li style="margin-bottom:6px;"><a href="${escapeAttr(g.href)}" style="color:#60A5FA;">${escapeText(g.title)}</a></li>`).join("");
-  const faqHtml = h.faq.map(({ q, a }) => `<div style="margin-bottom:12px;"><h3 style="font-size:16px;color:#F1F5FB;margin:0 0 4px;">${escapeText(q)}</h3><p style="margin:0;color:#9AA7BD;">${escapeText(a)}</p></div>`).join("");
+  const guides = h.guides.map((g) => `<li style="margin-bottom:6px;"><a href="${escapeAttr(g.href)}" style="color:#6E92FF;">${escapeText(g.title)}</a></li>`).join("");
+  const faqHtml = h.faq.map(({ q, a }) => `<div style="margin-bottom:12px;"><h3 style="font-size:16px;color:#F4F5F7;margin:0 0 4px;">${escapeText(q)}</h3><p style="margin:0;color:#A1A6B2;">${escapeText(a)}</p></div>`).join("");
   return `
-    <section class="seo-prerender" style="display:block;padding:24px;max-width:860px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#F1F5FB;background:#060a12;line-height:1.7;">
+    <section class="seo-prerender" style="display:block;padding:24px;max-width:860px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#F4F5F7;background:#0A0B0F;line-height:1.7;">
       <h1 style="font-size:28px;font-weight:800;margin:0 0 16px;">${escapeText(h.h1)}</h1>
       ${intros}
       <h2 style="font-size:20px;font-weight:700;margin:28px 0 12px;">Zepta가 제공하는 것</h2>
-      <ul style="padding-left:20px;color:#9AA7BD;">${modules}</ul>
+      <ul style="padding-left:20px;color:#A1A6B2;">${modules}</ul>
       <h2 style="font-size:20px;font-weight:700;margin:28px 0 12px;">투자 가이드</h2>
       <ul style="padding-left:20px;">${guides}</ul>
       <h2 style="font-size:20px;font-weight:700;margin:28px 0 12px;">자주 묻는 질문</h2>
       ${faqHtml}
-      <p style="font-size:13px;color:#64728C;margin-top:24px;border-top:1px solid #1E2A42;padding-top:16px;">⚠ Zepta는 투자 분석·자동화 도구이며 투자 자문이 아닙니다. 모든 수치는 과거 시뮬레이션 결과로 미래 수익을 보장하지 않으며, 투자에는 원금 손실 위험이 따릅니다. 최종 투자 결정과 책임은 본인에게 있습니다.</p>
+      <p style="font-size:13px;color:#6E7585;margin-top:24px;border-top:1px solid #23262F;padding-top:16px;">⚠ Zepta는 투자 분석·자동화 도구이며 투자 자문이 아닙니다. 모든 수치는 과거 시뮬레이션 결과로 미래 수익을 보장하지 않으며, 투자에는 원금 손실 위험이 따릅니다. 최종 투자 결정과 책임은 본인에게 있습니다.</p>
       <nav style="margin-top:24px;font-size:14px;">
-        <a href="/screener" style="color:#60A5FA;margin-right:12px;">스크리너</a>
-        <a href="/auto-trading" style="color:#60A5FA;margin-right:12px;">자동매매</a>
-        <a href="/alpha-lab" style="color:#60A5FA;margin-right:12px;">Alpha Lab</a>
-        <a href="/backtest" style="color:#60A5FA;margin-right:12px;">백테스트</a>
-        <a href="/blog" style="color:#60A5FA;margin-right:12px;">블로그</a>
-        <a href="/pricing" style="color:#60A5FA;">요금제</a>
+        <a href="/screener" style="color:#6E92FF;margin-right:12px;">스크리너</a>
+        <a href="/auto-trading" style="color:#6E92FF;margin-right:12px;">자동매매</a>
+        <a href="/alpha-lab" style="color:#6E92FF;margin-right:12px;">Alpha Lab</a>
+        <a href="/backtest" style="color:#6E92FF;margin-right:12px;">백테스트</a>
+        <a href="/blog" style="color:#6E92FF;margin-right:12px;">블로그</a>
+        <a href="/pricing" style="color:#6E92FF;">요금제</a>
       </nav>
     </section>`;
 }
