@@ -22,6 +22,7 @@ import {
 import { useTheme } from "./ui/theme.jsx";
 import { useBreakpoint } from "./ui/useBreakpoint.jsx";
 import BinanceConnect from "./components/BinanceConnect.jsx";
+import TradingModeSwitch from "./components/TradingModeSwitch.jsx"; // ★ 트레이딩 일원화 (모의↔실전)
 // ★ 2026-05-09: 옵션 D — 대시보드 강화 7개 위젯
 // ★ 2026-05-11: PeriodReturnsCard + OperationalMetrics 추가 (대표 지시: 일/주/월 수익 + 운영 메트릭)
 import {
@@ -98,7 +99,7 @@ export default function RealTrading(props) {
 // ═══════════════════════════════════════════════════════════════════
 // Inner
 // ═══════════════════════════════════════════════════════════════════
-function RealTradingInner() {
+function RealTradingInner({ onNavigate }) {
   const { user } = useAuth();
   const userId = user?.id;
   const { theme, toggle: toggleTheme } = useTheme();
@@ -1563,6 +1564,8 @@ function RealTradingInner() {
       fontFamily: "var(--z-font-sans)",
     }} className="z-anim-in z-bento-scope">
       <div style={{ maxWidth: 1280, margin: "0 auto" }}>
+        {/* ★ 2026-06-08 트레이딩 일원화 — 모의↔실전 모드 스위치 (대표 지시) */}
+        <TradingModeSwitch mode="live" onNavigate={onNavigate} isOwner={true} theme={theme} compact={isMobile} />
         {header}
 
         {/* 바이낸스 키 등록 — 미연결 시 최상단에 강조 노출. 연결됨이면 작은 상태 카드 */}

@@ -19,21 +19,22 @@
   "nav": {
     "home": "홈",
     "aiQuant": "자동매매",
-    "analysis": "분석",
+    "analysis": "마켓",
     "screener": "스크리너",
     "anomaly": "이상 탐지",
     "strategy": "전략 분석",
     "report": "퀀트 리포트",
     "backtest": "백테스트",
-    "management": "운용",
+    "management": "포트폴리오",
     "trading": "포트폴리오 운용",
     "riskMap": "리스크맵",
     "portfolio": "포트폴리오",
-    "info": "정보",
+    "info": "더보기",
     "news": "뉴스",
     "sentiment": "시장 심리",
     "econ": "경제 일정",
-    "alerts": "알림"
+    "alerts": "알림",
+    "tradingCat": "트레이딩"
   },
   "header": {
     "login": "로그인",
@@ -362,7 +363,15 @@
     "title": "경제 캘린더",
     "thisWeek": "이번주",
     "yearMonth": "{{year}}년 {{month}}",
-    "weekDays": ["월", "화", "수", "목", "금", "토", "일"],
+    "weekDays": [
+      "월",
+      "화",
+      "수",
+      "목",
+      "금",
+      "토",
+      "일"
+    ],
     "todayEvents": "오늘의 경제 이벤트",
     "weekSummary": "이번주 AI 요약",
     "viewMore": "자세히 보기",

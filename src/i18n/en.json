@@ -19,21 +19,22 @@
   "nav": {
     "home": "Home",
     "aiQuant": "AI Quant",
-    "analysis": "Analysis",
+    "analysis": "Markets",
     "screener": "Stock Screener",
     "anomaly": "Anomaly Detection",
     "strategy": "Quant Strategy",
     "report": "Quant Report",
     "backtest": "Backtest",
-    "management": "Management",
+    "management": "Portfolio",
     "trading": "Strategy Management",
     "riskMap": "Risk Map",
     "portfolio": "Portfolio",
-    "info": "Information",
+    "info": "More",
     "news": "Market News",
     "sentiment": "Sentiment",
     "econ": "Economic Calendar",
-    "alerts": "Alert Settings"
+    "alerts": "Alert Settings",
+    "tradingCat": "Trading"
   },
   "header": {
     "login": "Login",
@@ -362,7 +363,15 @@
     "title": "Economic Calendar",
     "thisWeek": "This Week",
     "yearMonth": "{{year}} {{month}}",
-    "weekDays": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+    "weekDays": [
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun"
+    ],
     "todayEvents": "Today's Economic Events",
     "weekSummary": "This Week's AI Summary",
     "viewMore": "View More",

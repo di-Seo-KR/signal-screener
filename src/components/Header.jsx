@@ -86,50 +86,52 @@ function CssDropdownItem({ children, onClick, className, variant }) {
 }
 
 /* ── 네비게이션 데이터 정의 (다국어 대응 — t 함수 주입) ── */
+/* ★ 2026-06-08 IA 재설계 (대표 지시 — 전면 개편 스프린트):
+   사용자 멘탈모델 기준 4축 — 마켓(시장을 본다) / 트레이딩(매매한다) /
+   포트폴리오(자산을 관리한다) / 더보기(부가 기능).
+   '모의(자동매매)·실전매매'는 트레이딩 카테고리 + 화면 내 모드 스위치로 일원화. */
 const getNavCategories = (t) => [
   { id: "home", label: t("nav.home"), catId: "home", icon: LayoutDashboard, directTab: "home" },
-  // ★ 2026-05-11: ai-quant 는 아래 items 있는 형태로 변경됨 (이전 directTab 제거)
   {
     id: "analysis", label: t("nav.analysis"), catId: "analysis", icon: BarChart3,
     items: [
       { id: "screener", label: t("nav.screener"), icon: Search },
-      { id: "/coin", label: "코인 분석", icon: Coins },                 // ★ 2026-06-08: 종목별 공개 분석 페이지
-      { id: "saved-screeners", label: "저장한 조건", icon: Save },     // ★ 신규
+      { id: "/coin", label: "코인 분석", icon: Coins },
       { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
-      { id: "alpha-lab", label: "🧬 알파 랩", icon: Sparkles },           // ★ 신규 (전략분석 흡수)
+      { id: "news", label: t("nav.news"), icon: Newspaper },
+      { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
+      { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
       { id: "quant-report", label: t("nav.report"), icon: FileText },
+    ],
+  },
+  {
+    id: "ai-quant", label: t("nav.tradingCat"), catId: "ai-quant", icon: Bot,
+    items: [
+      { id: "auto-trading", label: "모의투자 (AI 자동매매)", icon: Bot },
+      { id: "real-trading", label: "실전투자", icon: Activity, ownerOnly: true },
+      { id: "alpha-lab", label: "🧬 알파 랩", icon: Sparkles },
       { id: "backtest", label: t("nav.backtest"), icon: LineChart },
-      { id: "backtest-compare", label: "전략 비교", icon: GitCompare },     // ★ 신규
+      { id: "backtest-compare", label: "전략 비교", icon: GitCompare },
+      { id: "leaderboard", label: "🏆 봇 랭킹", icon: Trophy },
+      { id: "copy-trading", label: "카피트레이딩", icon: Share2 },
+      { id: "reports", label: "봇 리포트", icon: FileText },
     ],
   },
   {
     id: "management", label: t("nav.management"), catId: "management", icon: Briefcase,
     items: [
+      { id: "portfolio", label: t("nav.portfolio"), icon: Briefcase },
+      { id: "portfolio-analysis", label: "자산 분석", icon: PieChart },
       { id: "quant-port", label: t("nav.trading"), icon: TrendingUp },
       { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
-      { id: "portfolio", label: t("nav.portfolio"), icon: Briefcase },
-      { id: "portfolio-analysis", label: "자산 분석", icon: PieChart }, // ★ 신규
-    ],
-  },
-  {
-    id: "ai-quant", label: t("nav.aiQuant"), catId: "ai-quant", icon: Bot,
-    // ★ 2026-05-11: 자동매매 카테고리로 변경 (이전 directTab) — 하위 메뉴 추가
-    items: [
-      { id: "auto-trading", label: t("nav.aiQuant"), icon: Bot },
-      { id: "real-trading", label: "실전매매", icon: Activity, ownerOnly: true },
-      { id: "copy-trading", label: "카피트레이딩", icon: Share2 },
-      { id: "leaderboard", label: "🏆 봇 랭킹", icon: Trophy },
-      { id: "reports", label: "봇 리포트", icon: FileText },
     ],
   },
   {
     id: "info", label: t("nav.info"), catId: "info", icon: Newspaper,
     items: [
-      { id: "news", label: t("nav.news"), icon: Newspaper },
-      { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
-      { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
-      { id: "/blog", label: "블로그", icon: BookOpen },
+      { id: "saved-screeners", label: "저장한 조건", icon: Save },
       { id: "notifications", label: "🔔 알림", icon: Bell },
+      { id: "/blog", label: "블로그", icon: BookOpen },
       { id: "pricing", label: "👑 멤버십", icon: Crown },
     ],
   },
@@ -139,47 +141,41 @@ const getNavCategories = (t) => [
    ★ real-trading 은 owner 전용 큰 배너로 분리 (Sheet 상단) — 여기 셀에서는 제외 */
 const getMobileMenuSections = (isOwner, t) => [
   {
-    section: t("nav.home"), items: [
-      { id: "home", label: t("nav.home"), icon: LayoutDashboard },
-      { id: "auto-trading", label: t("nav.aiQuant"), icon: Bot },
-    ],
-  },
-  {
     section: t("nav.analysis"), items: [
       { id: "screener", label: t("nav.screener"), icon: Search },
       { id: "/coin", label: "코인 분석", icon: Coins },
-      { id: "saved-screeners", label: "저장한 조건", icon: Save },
       { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
-      { id: "alpha-lab", label: "🧬 알파 랩", icon: Sparkles },
+      { id: "news", label: t("nav.news"), icon: Newspaper },
+      { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
+      { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
       { id: "quant-report", label: t("nav.report"), icon: FileText },
+    ],
+  },
+  {
+    section: t("nav.tradingCat"), items: [
+      { id: "auto-trading", label: "모의투자", icon: Bot },
+      ...(isOwner ? [{ id: "real-trading", label: "실전투자", icon: Activity }] : []),
+      { id: "alpha-lab", label: "🧬 알파 랩", icon: Sparkles },
       { id: "backtest", label: t("nav.backtest"), icon: LineChart },
       { id: "backtest-compare", label: "전략 비교", icon: GitCompare },
-    ],
-  },
-  {
-    section: t("nav.management"), items: [
-      { id: "quant-port", label: t("nav.trading"), icon: TrendingUp },
-      { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
-      { id: "portfolio", label: t("nav.portfolio"), icon: Briefcase },
-      { id: "portfolio-analysis", label: "자산 분석", icon: PieChart },
-    ],
-  },
-  {
-    section: "자동매매", items: [
-      { id: "auto-trading", label: t("nav.aiQuant"), icon: Bot },
-      ...(isOwner ? [{ id: "real-trading", label: "실전매매", icon: Activity }] : []),
-      { id: "copy-trading", label: "카피트레이딩", icon: Share2 },
       { id: "leaderboard", label: "🏆 봇 랭킹", icon: Trophy },
+      { id: "copy-trading", label: "카피트레이딩", icon: Share2 },
       { id: "reports", label: "봇 리포트", icon: FileText },
     ],
   },
   {
+    section: t("nav.management"), items: [
+      { id: "portfolio", label: t("nav.portfolio"), icon: Briefcase },
+      { id: "portfolio-analysis", label: "자산 분석", icon: PieChart },
+      { id: "quant-port", label: t("nav.trading"), icon: TrendingUp },
+      { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
+    ],
+  },
+  {
     section: t("nav.info"), items: [
-      { id: "news", label: t("nav.news"), icon: Newspaper },
-      { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
-      { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
-      { id: "/blog", label: "블로그", icon: BookOpen },
+      { id: "saved-screeners", label: "저장한 조건", icon: Save },
       { id: "notifications", label: "🔔 알림", icon: Bell },
+      { id: "/blog", label: "블로그", icon: BookOpen },
       { id: "pricing", label: "👑 멤버십", icon: Crown },
     ],
   },
@@ -188,18 +184,19 @@ const getMobileMenuSections = (isOwner, t) => [
 /* ── GNB 카테고리 매핑 ── */
 const gnbCategoryMap = {
   home: "home",
-  // 분석
+  // 마켓 (시장을 본다)
   screener: "analysis", anomaly: "analysis", strategy: "analysis",
-  "quant-report": "analysis", backtest: "analysis",
-  "backtest-compare": "analysis", "alpha-lab": "analysis", "saved-screeners": "analysis",
-  // 운용
+  "quant-report": "analysis", news: "analysis", sentiment: "analysis",
+  "econ-calendar": "analysis",
+  // 트레이딩 (매매한다) — 모의·실전 일원화 + 전략 검증 도구
+  "auto-trading": "ai-quant", "real-trading": "ai-quant",
+  "alpha-lab": "ai-quant", backtest: "ai-quant", "backtest-compare": "ai-quant",
+  "copy-trading": "ai-quant", "leaderboard": "ai-quant", "reports": "ai-quant",
+  // 포트폴리오 (자산을 관리한다)
   "quant-port": "management", "risk-map": "management", portfolio: "management",
   "portfolio-analysis": "management",
-  // AI 퀀트 (자동매매)
-  "auto-trading": "ai-quant", "real-trading": "ai-quant",
-  "copy-trading": "ai-quant", "leaderboard": "ai-quant", "reports": "ai-quant",
-  // 정보
-  news: "info", sentiment: "info", alerts: "info", "econ-calendar": "info",
+  // 더보기
+  "saved-screeners": "info", alerts: "info",
   "notifications": "info", "pricing": "info",
 };
 
@@ -213,6 +210,13 @@ export default memo(function Header({
   const activeCategory = gnbCategoryMap[tab] || "home";
   const NAV_CATEGORIES = getNavCategories(t);
   const mobileMenuSections = getMobileMenuSections(isOwner, t);
+
+  // ★ 2026-06-08: 모바일 하단 탭바의 '메뉴' 버튼이 이 시트를 열도록 — 커스텀 이벤트 수신
+  useEffect(() => {
+    const open = () => setMobileOpen(true);
+    window.addEventListener("zepta:open-mobile-menu", open);
+    return () => window.removeEventListener("zepta:open-mobile-menu", open);
+  }, []);
 
   const navigate = useCallback((tabId) => {
     // 외부 path (블로그처럼 정적 HTML) — 새 페이지로 이동
