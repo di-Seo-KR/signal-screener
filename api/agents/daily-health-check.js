@@ -53,6 +53,14 @@ export default async function handler(req, res) {
       else if (m > 40) add("warn", "시그널", `최신 신호 ${m}분 전 — btc-cron 지연 의심`);
     } catch (e) { add("warn", "시그널", `확인 실패: ${e?.message}`); }
 
+    // ── [실전매매] 동적 유니버스 freshness (btc-cron 6시간 주기 갱신) ──
+    try {
+      const uni = await kv.get("di:signals:futures-universe");
+      const m = uni?.generatedAt ? minsAgo(uni.generatedAt) : null;
+      if (m == null) add("warn", "유니버스", "동적 유니버스 없음 — 정적 30종 폴백으로 동작 중");
+      else if (m > 24 * 60) add("warn", "유니버스", `유니버스 ${Math.round(m / 60)}시간 전 갱신 — 거래소 메타 fetch 점검`);
+    } catch (e) { add("warn", "유니버스", `확인 실패: ${e?.message}`); }
+
     // ── [실전매매] 측정 루프 ──
     try {
       const live = await kv.get(`di:real:user:${OWNER}:live-summary`);

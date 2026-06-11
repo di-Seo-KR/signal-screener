@@ -46,7 +46,7 @@ export const ASSET_TO_SYMBOL = {
   ADA: "ADAUSDT",
   AVAX: "AVAXUSDT",
   LINK: "LINKUSDT",
-  MATIC: "MATICUSDT",
+  MATIC: "POLUSDT", // ★ 2026-06-11: MATIC→POL 리브랜딩 — MATICUSDT 선물 폐지, POLUSDT 로 정정
   DOT: "DOTUSDT",
   // ★ 2026-05-08 추가 — 봇 universe 와 동기화
   UNI: "UNIUSDT",     // defi-infra
@@ -57,7 +57,9 @@ export const ASSET_TO_SYMBOL = {
   TRX: "TRXUSDT", ATOM: "ATOMUSDT", NEAR: "NEARUSDT", APT: "APTUSDT",
   SUI: "SUIUSDT", ICP: "ICPUSDT", HBAR: "HBARUSDT", INJ: "INJUSDT",
   FIL: "FILUSDT", LTC: "LTCUSDT", BCH: "BCHUSDT", ETC: "ETCUSDT", TON: "TONUSDT",
-  // SHIB / PEPE 는 1000-단위 페어 (1000SHIBUSDT, 1000PEPEUSDT) 라 추후 별도 처리.
+  // ★ 2026-06-11: 1000-단위 페어(1000SHIB 등)와 신규 종목은 동적 유니버스
+  //   (di:signals:futures-universe → extractSignal opts.symbolMap)로 자동 커버.
+  //   이 정적 맵은 유니버스 KV 미존재 시의 폴백.
 };
 
 // Phase 1 허용 심볼 (Binance Futures minNotional 부담 없는 종목)
@@ -73,7 +75,6 @@ export const PHASE1_ALLOWED_SYMBOLS = new Set([
   "ADAUSDT",
   "AVAXUSDT",
   "LINKUSDT",
-  "MATICUSDT",
   "DOTUSDT",   // ★ 추가
   "UNIUSDT",   // ★ 추가
   "AAVEUSDT",  // ★ 추가
@@ -82,6 +83,7 @@ export const PHASE1_ALLOWED_SYMBOLS = new Set([
   // ★ 2026-06-03 대표 지시: 메이저 30종 — 13종 추가
   "TRXUSDT", "ATOMUSDT", "NEARUSDT", "APTUSDT", "SUIUSDT", "ICPUSDT", "HBARUSDT",
   "INJUSDT", "FILUSDT", "LTCUSDT", "BCHUSDT", "ETCUSDT", "TONUSDT",
+  "POLUSDT", // ★ 2026-06-11: MATICUSDT(폐지) → POLUSDT 교체
 ]);
 
 // 전략명(reason 안에 들어있거나, 별도 strategy 필드로 올 경우) 을 family 로 분류.
@@ -146,22 +148,24 @@ function hash(str) {
  *   "BTC-USD"    → "BTC"
  *   "btc"        → "BTC"
  */
-export function normalizeAssetKey(asset) {
+export function normalizeAssetKey(asset, extraMap) {
   if (!asset) return null;
   let a = String(asset).toUpperCase().trim();
   // slash / dash quote 구분자 제거 (BTC/USD, BTC-USD)
   if (a.includes("/")) a = a.split("/")[0];
   if (a.includes("-")) a = a.split("-")[0];
+  // ★ 2026-06-11: 동적 유니버스 맵(extraMap)도 인정 — 정적 30종 외 신규 종목 커버
+  const known = (k) => !!(ASSET_TO_SYMBOL[k] || (extraMap && extraMap[k]));
   // 이미 짧은 티커면 바로 리턴
-  if (ASSET_TO_SYMBOL[a]) return a;
+  if (known(a)) return a;
   // full symbol (BTCUSDT, ETHUSDT) 인 경우 USDT/USD 접미어 제거
   if (a.endsWith("USDT")) {
     const s = a.slice(0, -4);
-    if (ASSET_TO_SYMBOL[s]) return s;
+    if (known(s)) return s;
   }
   if (a.endsWith("USD")) {
     const s = a.slice(0, -3);
-    if (ASSET_TO_SYMBOL[s]) return s;
+    if (known(s)) return s;
   }
   return null;
 }
@@ -178,17 +182,24 @@ export function extractSignal({ asset, signal, source, stratName }, opts = {}) {
     return null;
   }
 
-  const key = normalizeAssetKey(asset);
+  // ★ 2026-06-11 (대표 승인 2안): 동적 유니버스 주입 지원.
+  //   opts.symbolMap     — { BASE: SYMBOL } (di:signals:futures-universe 기반, 동적 우선)
+  //   opts.allowedSymbols — Set<SYMBOL> (유니버스 심볼 허용셋, 정적 PHASE1 과 합집합으로 판정)
+  //   둘 다 없으면 기존 정적 30종과 100% 동일하게 동작 (fail-safe).
+  const key = normalizeAssetKey(asset, opts.symbolMap);
   if (!key) {
     if (rs) rs.unknownAsset = (rs.unknownAsset || 0) + 1;
     return null;
   }
-  const symbol = ASSET_TO_SYMBOL[key];
+  const symbol = (opts.symbolMap && opts.symbolMap[key]) || ASSET_TO_SYMBOL[key];
   if (!symbol) {
     if (rs) rs.noSymbolMap = (rs.noSymbolMap || 0) + 1;
     return null;
   }
-  if (opts.strict !== false && !PHASE1_ALLOWED_SYMBOLS.has(symbol)) {
+  const allowed =
+    PHASE1_ALLOWED_SYMBOLS.has(symbol) ||
+    (opts.allowedSymbols instanceof Set && opts.allowedSymbols.has(symbol));
+  if (opts.strict !== false && !allowed) {
     if (rs) {
       rs.notAllowed = (rs.notAllowed || 0) + 1;
       rs.notAllowedSymbols = rs.notAllowedSymbols || new Set();

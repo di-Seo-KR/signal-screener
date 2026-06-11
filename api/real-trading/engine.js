@@ -29,6 +29,7 @@ import { planTrade, RISK_CONFIG, checkAggregateExposure, checkPyramidGuard, chec
 import { preTradeCheck } from "../_shared/circuit-breaker.js";
 import { getSymbolFilter, isSymbolAffordable } from "../_shared/exchange-info.js";
 import { getTickerPrice, getAccountInfo, getKlines, getPositionRisk } from "../_shared/binance-client.js";
+import { UNIVERSE_KV_KEY } from "../_shared/futures-universe.js";
 import { executeOrderPlan } from "../binance/order.js";
 
 export const config = { maxDuration: 60 };
@@ -388,9 +389,24 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
 
   // 6) canonical — dry run 은 strict 해제 (더 많은 심볼 통과)
   // rejectStats 로 시그널이 떨어진 원인 카운트 (디버깅 + engine-log 노출)
+  // ★ 2026-06-11 (대표 승인 2안): 동적 유니버스(유동성 상위 50종) 심볼맵/허용셋 주입.
+  //   KV 미존재·읽기 실패 시 null → 기존 정적 30종과 동일 동작 (fail-safe).
+  let dynSymbolMap = null, dynAllowed = null;
+  try {
+    const kvU = await getKv();
+    const uni = await kvU.get(UNIVERSE_KV_KEY);
+    if (Array.isArray(uni?.entries) && uni.entries.length) {
+      dynSymbolMap = {};
+      dynAllowed = new Set();
+      for (const e of uni.entries) {
+        if (e?.base && e?.symbol) { dynSymbolMap[e.base] = e.symbol; dynAllowed.add(e.symbol); }
+      }
+      S(`dynamic universe loaded: ${dynAllowed.size} symbols`);
+    }
+  } catch { /* 정적 폴백 */ }
   const rejectStats = {};
   const canonical = rawSignals
-    .map((r) => extractSignal(r, { strict: !forceDryRun, rejectStats }))
+    .map((r) => extractSignal(r, { strict: !forceDryRun, rejectStats, symbolMap: dynSymbolMap, allowedSymbols: dynAllowed }))
     .filter(Boolean);
   // reject 사유 요약 (notAllowedSymbols 는 Set 이라 toArray)
   const rejectSummary = (() => {

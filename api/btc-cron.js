@@ -1,14 +1,19 @@
 // Zepta Cron — 멀티 자산 암호화폐 자동매매 서버사이드 엔진
-// 15분마다 실행: Binance 캔들 → 전략 시그널 → KV 가상 포트폴리오 매매
-// 자체 가상매매 엔진 (Binance 실시간 가격 기반)
+// 10분마다 실행: 바이낸스 선물 캔들 → 전략 시그널 → KV 가상 포트폴리오 매매 + 시그널 풀 적재
 // 환경변수: TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID (선택)
 // 텔레그램 알림: api/_shared/telegram.js 의 buildCard/sendCards (사용자 친화 평어)
+//
+// ★ 2026-06-11 (대표 승인 2안): 캔들 소스 CryptoCompare → 바이낸스 선물(proxy-aware) 전환.
+//   - CryptoCompare(현 CoinDesk)가 키리스 무료 호출 폐지(401) → 신호 생성 전면 중단됐었음.
+//   - getKlines 는 Fly.io 프록시 자동 경유 → Vercel IP 차단(451) 무관 (alpha-lab 검증 경로).
+//   - 유니버스: 하드코딩 30종 → 유동성(24h 거래대금) 상위 50종 동적 선별 + 폐지 심볼 자동 제외.
 
 import { sendCards, buildCard, fmtKSTShort } from "./_shared/telegram.js";
 import { runStrategyForBot, getStrategyNameForBot } from "./_shared/strategies/index.js";
 import { getAllStoredStrategyParams } from "./_shared/dynamic-config.js";
-import { getMarketContext } from "./_shared/binance-client.js";
+import { getMarketContext, getKlines, getTickerPrice } from "./_shared/binance-client.js";
 import { getOIChangeMap } from "./_shared/oi-tracker.js";
+import { loadUniverse, universeSymbolMap } from "./_shared/futures-universe.js";
 
 // asset → 바이낸스 *선물(USDⓈ-M, fapi)* 심볼. 펀딩/OI/베이시스 맵 조회 키.
 //   ★ 2026-06-02 버그수정: 선물은 저가 밈코인을 1000배 묶음(1000SHIB/1000PEPE)으로,
@@ -24,13 +29,16 @@ const FUTURES_SYMBOLS = {
   "DOGE/USD": "DOGEUSDT", "SHIB/USD": "1000SHIBUSDT", "PEPE/USD": "1000PEPEUSDT",
   "ARB/USD": "ARBUSDT", "OP/USD": "OPUSDT", "MATIC/USD": "POLUSDT",
 };
-function assetToBinanceSymbol(asset) {
+// ★ 2026-06-11: 동적 유니버스 맵(BASE→SYMBOL) 우선, 정적 FUTURES_SYMBOLS 폴백.
+function assetToBinanceSymbol(asset, dynMap) {
+  const base = String(asset || "").split("/")[0];
+  if (dynMap && dynMap[base]) return dynMap[base];
   return FUTURES_SYMBOLS[asset] || "";
 }
 
-export const config = { maxDuration: 240 }; // ★ 2026-06-03: 30종 + 4개봉 fetch (~100s+) → 120→240 헤드룸
+export const config = { maxDuration: 300 }; // ★ 2026-06-11: 50종 동적 유니버스 (TF 4개 병렬 fetch) 헤드룸
 
-// 코인 유니버스: 하이캡 + 미드캡 + DeFi + 밈 (Binance 상장 기준)
+// 정적 폴백 유니버스 — 동적 유니버스(di:signals:futures-universe) 로드 실패 시에만 사용.
 const CRYPTO_ASSETS = [
   // 하이캡 (Top)
   "BTC/USD", "ETH/USD", "BNB/USD", "SOL/USD", "XRP/USD", "ADA/USD", "AVAX/USD", "TRX/USD",
@@ -44,15 +52,7 @@ const CRYPTO_ASSETS = [
   "DOGE/USD", "SHIB/USD", "PEPE/USD",
   // Layer2 / 신흥
   "ARB/USD", "OP/USD", "MATIC/USD",
-]; // ★ 2026-06-03 대표 지시: 메이저 30종 (16→30, 전부 바이낸스 USDM 검증)
-const BINANCE_SYMBOLS = {
-  "BTC/USD": "BTCUSDT", "ETH/USD": "ETHUSDT", "SOL/USD": "SOLUSDT",
-  "XRP/USD": "XRPUSDT", "ADA/USD": "ADAUSDT", "AVAX/USD": "AVAXUSDT",
-  "LINK/USD": "LINKUSDT", "UNI/USD": "UNIUSDT", "AAVE/USD": "AAVEUSDT",
-  "DOT/USD": "DOTUSDT", "DOGE/USD": "DOGEUSDT", "SHIB/USD": "SHIBUSDT",
-  "PEPE/USD": "PEPEUSDT", "ARB/USD": "ARBUSDT", "OP/USD": "OPUSDT",
-  "MATIC/USD": "MATICUSDT",
-};
+]; // ★ 2026-06-03 대표 지시: 메이저 30종 (16→30) → 2026-06-11 동적 유니버스의 정적 폴백으로 전환
 // ★ 2026-05-11: 가상 포트폴리오 노출 한도 임시 완화.
 //   80% 도달 후 매수 SKIP 되어 perf.trades 에 BUY 기록 안 됨 → engine 시그널 풀 빔.
 //   95% 로 완화해 새 BUY 가 perf.trades 에 흘러 들어가도록.
@@ -60,64 +60,44 @@ const BINANCE_SYMBOLS = {
 const MAX_POSITION_PER_ASSET = 0.35;     // 0.30 → 0.35
 const MAX_TOTAL_CRYPTO_EXPOSURE = 0.95;  // 0.80 → 0.95
 
-// CryptoCompare 심볼 매핑 (Binance/Bybit 미국 차단 우회)
-const CC_SYMBOLS = {
-  "BTC/USD": "BTC", "ETH/USD": "ETH", "BNB/USD": "BNB", "SOL/USD": "SOL",
-  "XRP/USD": "XRP", "ADA/USD": "ADA", "AVAX/USD": "AVAX", "TRX/USD": "TRX",
-  "LINK/USD": "LINK", "DOT/USD": "DOT", "ATOM/USD": "ATOM", "NEAR/USD": "NEAR",
-  "APT/USD": "APT", "SUI/USD": "SUI", "ICP/USD": "ICP", "HBAR/USD": "HBAR",
-  "UNI/USD": "UNI", "AAVE/USD": "AAVE", "INJ/USD": "INJ", "FIL/USD": "FIL",
-  "LTC/USD": "LTC", "BCH/USD": "BCH", "ETC/USD": "ETC", "TON/USD": "TON",
-  "DOGE/USD": "DOGE", "SHIB/USD": "SHIB", "PEPE/USD": "PEPE",
-  "ARB/USD": "ARB", "OP/USD": "OP", "MATIC/USD": "MATIC",
-};
-
-// 딜레이 헬퍼 (CryptoCompare rate limit 우회)
+// 딜레이 헬퍼 (프록시 부하 분산용 소량 딜레이)
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
-// CryptoCompare OHLCV 캔들 로드 헬퍼 (미국 접근 가능)
-async function fetchCCKlines(symbol, interval, limit) {
-  // interval: "1w" → histoday aggregate=7, "1d" → histoday, "4h" → histohour (aggregate=4), "1h" → histohour
-  let url;
-  if (interval === "1w") {
-    url = `https://min-api.cryptocompare.com/data/v2/histoday?fsym=${symbol}&tsym=USD&limit=${Math.min(limit, 2000)}&aggregate=7`;
-  } else if (interval === "1d") {
-    url = `https://min-api.cryptocompare.com/data/v2/histoday?fsym=${symbol}&tsym=USD&limit=${Math.min(limit, 2000)}`;
-  } else if (interval === "4h") {
-    // CryptoCompare histohour → 4시간 단위로 리샘플링
-    url = `https://min-api.cryptocompare.com/data/v2/histohour?fsym=${symbol}&tsym=USD&limit=${Math.min(limit * 4, 2000)}&aggregate=4`;
-  } else {
-    url = `https://min-api.cryptocompare.com/data/v2/histohour?fsym=${symbol}&tsym=USD&limit=${Math.min(limit, 2000)}`;
-  }
-  const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
-  if (!resp.ok) throw new Error(`CC HTTP ${resp.status}`);
-  const json = await resp.json();
-  if (json.Response !== "Success" || !json.Data?.Data) throw new Error(json.Message || "No data");
-  return json.Data.Data.map(k => ({
-    time: k.time,
-    open: k.open,
-    high: k.high,
-    low: k.low,
-    close: k.close,
-    volume: k.volumefrom || 0,
+// 바이낸스 USDⓈ-M 선물 OHLCV 캔들 로드 (proxy-aware getKlines 경유 — Vercel IP 차단 무관)
+//   ★ 2026-06-11: CryptoCompare 키 의무화(401)로 전환. 실제 매매 거래소 가격으로
+//   신호를 만들어 집행 가격과의 정합성도 개선. interval 은 바이낸스 네이티브(1w/1d/4h/1h).
+async function fetchFuturesCandles(symbol, interval, limit) {
+  const kl = await getKlines({ symbol, interval, limit: Math.min(limit, 1500) });
+  if (!Array.isArray(kl)) throw new Error("klines not array");
+  return kl.map(k => ({
+    time: Math.floor((k[0] || 0) / 1000), // CC 하위호환: 초 단위 (resampleWeekly 등에서 사용)
+    open: parseFloat(k[1]),
+    high: parseFloat(k[2]),
+    low: parseFloat(k[3]),
+    close: parseFloat(k[4]),
+    volume: parseFloat(k[5]) || 0,
   })).filter(c => c.close > 0 && c.high > 0 && c.low > 0);
 }
 
 // ── 봇별 자산 매핑 (AutoTrading.jsx의 CRYPTO_BOTS와 동기화) ──
+//   ★ 2026-06-11: "ALL" = 동적 유니버스 전체 (crypto-diversity / crypto-swing).
+//   정적 리스트 봇은 유지 — 동적 유니버스의 1000-단위 자산(1000SHIB/USD)도
+//   getBotsForAsset 의 prefix 정규화로 기존 매핑(SHIB/USD)과 매칭됨.
 const BOT_ASSET_MAP = {
   "btc-alpha": ["BTC/USD"],
   "highcap-momentum": ["BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD", "ADA/USD", "AVAX/USD"],
   "defi-infra": ["LINK/USD", "UNI/USD", "AAVE/USD", "DOT/USD"],
   "meme-trend": ["DOGE/USD", "SHIB/USD", "PEPE/USD"],
   "l2-emerging": ["ARB/USD", "OP/USD", "MATIC/USD"],
-  "crypto-diversity": CRYPTO_ASSETS, // 전체
-  "crypto-swing": CRYPTO_ASSETS, // 전체
+  "crypto-diversity": "ALL", // 동적 유니버스 전체
+  "crypto-swing": "ALL", // 동적 유니버스 전체
 };
 
 // 자산 → 해당 자산을 다루는 봇 목록
 function getBotsForAsset(asset) {
+  const plain = String(asset || "").replace(/^1000/, ""); // 1000SHIB/USD ↔ SHIB/USD 매칭
   return Object.entries(BOT_ASSET_MAP)
-    .filter(([, assets]) => assets.includes(asset))
+    .filter(([, assets]) => assets === "ALL" || assets.includes(asset) || assets.includes(plain))
     .map(([botId]) => botId);
 }
 
@@ -177,15 +157,34 @@ export default async function handler(req, res) {
       addLog(`🆕 가상 포트폴리오 생성: $${INITIAL_CASH.toLocaleString()}`);
     }
 
+    // ── ★ 2026-06-11 (대표 승인 2안): 동적 유니버스 로드 — 유동성 상위 50종 자동 선별 ──
+    //   6시간 주기 갱신(거래소 exchangeInfo + 24h 거래대금). 실패 시 stale 캐시 →
+    //   그것도 없으면 정적 30종(CRYPTO_ASSETS) 폴백. 어떤 경우에도 cron 은 멈추지 않음.
+    let dynSymbolMap = null;
+    let ASSETS = CRYPTO_ASSETS;
+    try {
+      const universe = await loadUniverse(kv);
+      if (universe?.entries?.length) {
+        dynSymbolMap = universeSymbolMap(universe);
+        ASSETS = universe.entries.map((e) => e.asset);
+        addLog(`🌐 동적 유니버스: 유동성 상위 ${ASSETS.length}종 (${universe.generatedAt} 기준)`);
+      } else {
+        addLog(`🌐 동적 유니버스 미가용 — 정적 ${ASSETS.length}종 폴백`);
+      }
+    } catch (e) {
+      addLog(`⚠️ 유니버스 로드 실패(${e?.message}) — 정적 ${ASSETS.length}종 폴백`);
+    }
+
     // ── 활성 봇 확인 → 매매 대상 자산 필터링 + 자산별 배분금액 한도 ──
-    let activeAssets = new Set(CRYPTO_ASSETS); // 기본: 전체
+    let activeAssets = new Set(ASSETS); // 기본: 전체
     const assetAllocationMap = {}; // { "BTC/USD": 총 배분금액 }  — 봇별 배분금액 합산
     try {
       const activeBots = await kv.get("di:active-bots");
       if (Array.isArray(activeBots) && activeBots.length > 0) {
         activeAssets = new Set();
         for (const ab of activeBots) {
-          const botAssets = BOT_ASSET_MAP[ab.botId];
+          const mapped = BOT_ASSET_MAP[ab.botId];
+          const botAssets = mapped === "ALL" ? ASSETS : mapped;
           const allocation = ab.allocation || 0;
           if (botAssets && allocation > 0) {
             const perAsset = allocation / botAssets.length; // 봇 배분금액을 자산 수로 균등 분배
@@ -204,30 +203,37 @@ export default async function handler(req, res) {
       }
     } catch (e) {
       addLog(`⚠️ 활성 봇 조회 실패: ${e.message} — 전체 자산 스캔`);
-      activeAssets = new Set(CRYPTO_ASSETS);
+      activeAssets = new Set(ASSETS);
     }
 
-    // ── 실시간 가격 조회 (Binance → CoinGecko 폴백) ──
+    // ── 실시간 가격 조회 (바이낸스 선물 전 심볼 1콜 → CoinGecko 폴백) ──
+    //   ★ 2026-06-11: 현물 직접호출 제거 — proxy-aware 선물 티커로 통일 (Vercel IP 차단 무관,
+    //   실제 매매 거래소 가격과 일치). 보유 중인 구 유니버스 자산도 정적 맵으로 가격 보전.
     const priceMap = {};
     let priceSource = "none";
+    const priceAssets = new Set([...ASSETS, ...Object.keys(portfolio.positions || {})]);
 
-    // 1차: Binance
+    // 1차: 바이낸스 선물 전 심볼 티커 (프록시 경유)
     try {
-      const tickerRes = await fetch("https://api.binance.com/api/v3/ticker/price", { signal: AbortSignal.timeout(5000) });
-      const tickers = await tickerRes.json();
-      if (Array.isArray(tickers)) {
-        for (const asset of CRYPTO_ASSETS) {
-          const binSym = BINANCE_SYMBOLS[asset];
-          const ticker = tickers.find(t => t.symbol === binSym);
-          if (ticker) priceMap[asset] = parseFloat(ticker.price);
-        }
-        if (Object.keys(priceMap).length > 0) priceSource = "binance";
-        addLog(`📡 Binance 가격: ${Object.keys(priceMap).length}종목 로드`);
-      } else {
-        addLog(`⚠️ Binance 응답이 배열 아님: ${JSON.stringify(tickers).slice(0, 100)}`);
+      const tickers = await getTickerPrice({});
+      const bySym = {};
+      for (const t of (Array.isArray(tickers) ? tickers : [])) {
+        if (t?.symbol) bySym[t.symbol] = parseFloat(t.price);
       }
+      for (const asset of priceAssets) {
+        const sym = assetToBinanceSymbol(asset, dynSymbolMap);
+        if (!sym) continue;
+        let p = bySym[sym];
+        if (!Number.isFinite(p) || p <= 0) continue;
+        // 레거시 자산(SHIB/USD 등)이 1000-단위 선물(1000SHIBUSDT)에 매핑되면 가상 포트폴리오
+        // 가격 스케일(현물 기준)에 맞춰 환산. 동적 유니버스 자산(1000SHIB/USD)은 그대로.
+        if (sym.startsWith("1000") && !String(asset).startsWith("1000")) p = p / 1000;
+        priceMap[asset] = p;
+      }
+      if (Object.keys(priceMap).length > 0) priceSource = "binance-futures";
+      addLog(`📡 바이낸스 선물 가격: ${Object.keys(priceMap).length}종목 로드`);
     } catch (e) {
-      addLog(`⚠️ Binance 가격 실패: ${e.message}`);
+      addLog(`⚠️ 선물 가격 실패: ${e.message}`);
     }
 
     // 2차: CoinGecko 폴백 (Binance 실패 시)
@@ -255,21 +261,6 @@ export default async function handler(req, res) {
       } catch (e) {
         addLog(`⚠️ CoinGecko도 실패: ${e.message}`);
       }
-    }
-
-    // 3차: Binance 개별 조회 폴백 (여전히 부족하면)
-    if (Object.keys(priceMap).length < 5) {
-      addLog(`🔄 개별 Binance 가격 조회 시도...`);
-      for (const asset of CRYPTO_ASSETS) {
-        if (priceMap[asset]) continue;
-        try {
-          const binSym = BINANCE_SYMBOLS[asset];
-          const r = await fetch(`https://api.binance.com/api/v3/ticker/price?symbol=${binSym}`, { signal: AbortSignal.timeout(3000) });
-          const d = await r.json();
-          if (d.price) { priceMap[asset] = parseFloat(d.price); priceSource = "binance-individual"; }
-        } catch { /* skip */ }
-      }
-      addLog(`📡 개별 조회 후: ${Object.keys(priceMap).length}종목`);
     }
 
     if (Object.keys(priceMap).length === 0) {
@@ -357,56 +348,41 @@ export default async function handler(req, res) {
       if (Object.keys(fundingMap).length) addLog(`💸 펀딩/베이시스 ${Object.keys(fundingMap).length}심볼 로드`);
     } catch { /* 무시 */ }
     try {
-      const binSymbols = CRYPTO_ASSETS.map(assetToBinanceSymbol).filter(Boolean);
+      const binSymbols = ASSETS.map((a) => assetToBinanceSymbol(a, dynSymbolMap)).filter(Boolean);
       const oi = await getOIChangeMap(kv, binSymbols);
       oiChangeMap = oi.changeMap || {};
       if (oi.fetched > 0) addLog(`📈 OI ${oi.fetched}심볼 조회, 변화 비교 ${Object.keys(oiChangeMap).length}건`);
     } catch { /* 무시 */ }
 
-    for (const asset of CRYPTO_ASSETS) {
+    for (const asset of ASSETS) {
       addLog(`\n📊 ${asset} 스캔 중...`);
-      const ccSymbol = CC_SYMBOLS[asset];
-
-      // ── 캔들 데이터 로드 (CryptoCompare — Binance/Bybit 미국 차단) ──
-      let candles = [];
-      let candleSource = "none";
-
-      // 일봉: CryptoCompare (rate limit 우회 딜레이 포함)
-      if (ccSymbol) {
-        try {
-          candles = await fetchCCKlines(ccSymbol, "1d", 365);
-          if (candles.length > 50) candleSource = "cryptocompare";
-        } catch (e) {
-          addLog(`⚠️ ${asset} CryptoCompare 일봉 실패: ${e.message}`);
-        }
-      }
-
-      if (candles.length < 100) {
-        addLog(`❌ ${asset} 캔들 부족 (${candles.length}개 < 100개) — 스킵`);
-        assetResults.push({ asset, ok: false, error: "Insufficient candle data" });
-        await delay(1500); // rate limit 방지 (실패 후 길게 대기)
+      const futSymbol = assetToBinanceSymbol(asset, dynSymbolMap);
+      if (!futSymbol) {
+        addLog(`⏭️ ${asset} 선물 심볼 매핑 없음 — 스킵`);
+        assetResults.push({ asset, ok: false, error: "No futures symbol" });
         continue;
       }
 
-      // 4시간봉 로드 (CryptoCompare)
-      let candles4h = [];
-      await delay(700); // rate limit 방지
-      if (ccSymbol) {
-        try { candles4h = await fetchCCKlines(ccSymbol, "4h", 500); } catch { /* skip */ }
-      }
+      // ── 캔들 데이터 로드 (바이낸스 선물 proxy-aware — 4개 TF 병렬) ──
+      let candles = [], candles4h = [], candles1h = [], candles1w = [];
+      let candleSource = "none";
+      const [r1d, r4h, r1h, r1w] = await Promise.allSettled([
+        fetchFuturesCandles(futSymbol, "1d", 365),
+        fetchFuturesCandles(futSymbol, "4h", 500),
+        fetchFuturesCandles(futSymbol, "1h", 500),
+        fetchFuturesCandles(futSymbol, "1w", 120),
+      ]);
+      if (r1d.status === "fulfilled") candles = r1d.value;
+      else addLog(`⚠️ ${asset}(${futSymbol}) 일봉 실패: ${r1d.reason?.message}`);
+      if (r4h.status === "fulfilled") candles4h = r4h.value;
+      if (r1h.status === "fulfilled") candles1h = r1h.value;
+      if (r1w.status === "fulfilled") candles1w = r1w.value;
+      if (candles.length > 50) candleSource = "binance-futures";
 
-      // 1시간봉 로드 (CryptoCompare)
-      let candles1h = [];
-      await delay(700); // rate limit 방지
-      if (ccSymbol) {
-        try { candles1h = await fetchCCKlines(ccSymbol, "1h", 500); } catch { /* skip */ }
-      }
-
-      // 주봉 로드 (CryptoCompare histoday aggregate=7) — 종합 스코어용
-      let candles1w = [];
-      await delay(700);
-      if (ccSymbol) {
-        try { candles1w = await fetchCCKlines(ccSymbol, "1w", 120); } catch { /* skip */ }
+      if (candles.length < 100) {
+        addLog(`❌ ${asset} 캔들 부족 (${candles.length}개 < 100개) — 스킵 (신규상장/일시오류)`);
+        assetResults.push({ asset, ok: false, error: "Insufficient candle data" });
+        continue;
       }
 
       // ★ 2026-06-03 (대표 지시): 멀티 타임프레임 종합 스코어용 — 각 TF 신호를 *항상* 계산.
@@ -424,8 +400,8 @@ export default async function handler(req, res) {
       const tf4hSignal = sigForTF(candles4h, "4h");
       const tf1hSignal = sigForTF(candles1h, "1h");
 
-      // 다음 자산 전 rate limit 방지 딜레이
-      await delay(500);
+      // 다음 자산 전 소량 딜레이 — 프록시 부하 분산 (바이낸스 한도는 여유)
+      await delay(150);
 
       addLog(`✅ ${asset} [${candleSource}]: 일봉 ${candles.length}개 + 4h ${candles4h.length}개 + 1h ${candles1h.length}개 (최신: $${candles[candles.length - 1]?.close?.toFixed(0)})`);
 
@@ -458,7 +434,7 @@ export default async function handler(req, res) {
 
       // 최근 시그널 분석 (market-monitor 레짐 연동)
       // monitorAlerts에서 현재 자산 관련 알림 추출
-      const binSymbol = BINANCE_SYMBOLS[asset] || asset;
+      const binSymbol = futSymbol || asset;
       const assetAlerts = monitorAlerts.filter(a => a.ticker === binSymbol || a.ticker === asset);
 
       // ★ 2026-05-11: 봇별 strategy dispatcher 도입
@@ -618,7 +594,7 @@ export default async function handler(req, res) {
         }
         // (b)(c)(d) 펀딩·OI·베이시스 — 그래디언트 보정(임계↓·점진·bounded). 1d 신호 + 종합에 동일 적용.
         //   ★ 2026-06-03(대표 지시): 극단-only → 더 자주·점진적으로 알파 기여. 방향은 검증된 것만.
-        const sym = assetToBinanceSymbol(asset);
+        const sym = futSymbol;
         const fr = fundingMap[sym], oiCh = oiChangeMap[sym], bs = basisMap[sym];
         const n1 = applyFuturesContext(latestSignal, { fr, oiCh, bs });
         if (n1 && n1.length) addLog(`  ⚙ ${asset} 선물보정(${latestSignal.side}): ${n1.join("·")} → ${latestSignal.score}pt`);
@@ -1076,7 +1052,7 @@ function buildTelegramCards(assetResults, positionMap, equity, cash, duration, f
     `계좌 자산 $${equity.toFixed(0)}, 현금 비중 ${cashPct.toFixed(0)}%`,
   ];
   let totalValue = 0, totalPnL = 0;
-  for (const asset of CRYPTO_ASSETS) {
+  for (const asset of Object.keys(positionMap)) { // ★ 2026-06-11: 동적 유니버스 — 보유 포지션 기준 순회
     const pos = positionMap[asset];
     if (!pos) continue;
     const mv = parseFloat(pos.market_value || 0);
