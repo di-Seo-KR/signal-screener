@@ -96,8 +96,7 @@ const getNavCategories = (t) => [
       { id: "/coin", label: "코인 분석", icon: Coins },                 // ★ 2026-06-08: 종목별 공개 분석 페이지
       { id: "saved-screeners", label: "저장한 조건", icon: Save },     // ★ 신규
       { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
-      { id: "strategy", label: t("nav.strategy"), icon: Target },
-      { id: "alpha-lab", label: "🧬 알파 랩", icon: Sparkles },           // ★ 신규
+      { id: "alpha-lab", label: "🧬 알파 랩", icon: Sparkles },           // ★ 신규 (전략분석 흡수)
       { id: "quant-report", label: t("nav.report"), icon: FileText },
       { id: "backtest", label: t("nav.backtest"), icon: LineChart },
       { id: "backtest-compare", label: "전략 비교", icon: GitCompare },     // ★ 신규
@@ -130,7 +129,6 @@ const getNavCategories = (t) => [
       { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
       { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
       { id: "/blog", label: "블로그", icon: BookOpen },
-      { id: "alerts", label: t("nav.alerts"), icon: Bell, locked: true },
       { id: "notifications", label: "🔔 알림", icon: Bell },
       { id: "pricing", label: "👑 멤버십", icon: Crown },
     ],
@@ -152,7 +150,6 @@ const getMobileMenuSections = (isOwner, t) => [
       { id: "/coin", label: "코인 분석", icon: Coins },
       { id: "saved-screeners", label: "저장한 조건", icon: Save },
       { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
-      { id: "strategy", label: t("nav.strategy"), icon: Target },
       { id: "alpha-lab", label: "🧬 알파 랩", icon: Sparkles },
       { id: "quant-report", label: t("nav.report"), icon: FileText },
       { id: "backtest", label: t("nav.backtest"), icon: LineChart },
@@ -183,7 +180,6 @@ const getMobileMenuSections = (isOwner, t) => [
       { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
       { id: "/blog", label: "블로그", icon: BookOpen },
       { id: "notifications", label: "🔔 알림", icon: Bell },
-      { id: "alerts", label: t("nav.alerts"), icon: Bell, locked: true },
       { id: "pricing", label: "👑 멤버십", icon: Crown },
     ],
   },
@@ -198,7 +194,7 @@ const gnbCategoryMap = {
   "backtest-compare": "analysis", "alpha-lab": "analysis", "saved-screeners": "analysis",
   // 운용
   "quant-port": "management", "risk-map": "management", portfolio: "management",
-  "portfolio-analysis": "management", "sector-flow": "management",
+  "portfolio-analysis": "management",
   // AI 퀀트 (자동매매)
   "auto-trading": "ai-quant", "real-trading": "ai-quant",
   "copy-trading": "ai-quant", "leaderboard": "ai-quant", "reports": "ai-quant",
