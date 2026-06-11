@@ -22,53 +22,53 @@ const jstr = (s) => JSON.stringify(String(s)); // JSON-LD 안전 문자열
 
 const STYLE = `
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#070B14;color:#9AA7BD;line-height:1.85;word-break:keep-all;overflow-wrap:break-word}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#0A0B0F;color:#A1A6B2;line-height:1.85;word-break:keep-all;overflow-wrap:break-word}
 .wrap{max-width:820px;margin:0 auto;padding:40px 20px}
-nav{background:#101828;border-bottom:1px solid #1E2A42;padding:14px 20px;text-align:center}
-nav a{margin:0 10px;font-size:15px;color:#9AA7BD;text-decoration:none}
-nav a:hover{color:#F1F5FB}
-.breadcrumb{font-size:13px;color:#64728C;margin-bottom:18px}
-.breadcrumb a{color:#60A5FA;text-decoration:none}
-h1{font-size:30px;font-weight:800;color:#F1F5FB;margin-bottom:10px;letter-spacing:-0.02em;line-height:1.3}
-.meta-row{font-size:13px;color:#64728C;margin-bottom:24px}
-h2{font-size:21px;font-weight:700;color:#F1F5FB;margin:36px 0 14px;letter-spacing:-0.01em}
+nav{background:#14151B;border-bottom:1px solid #23262F;padding:14px 20px;text-align:center}
+nav a{margin:0 10px;font-size:15px;color:#A1A6B2;text-decoration:none}
+nav a:hover{color:#F4F5F7}
+.breadcrumb{font-size:13px;color:#6E7585;margin-bottom:18px}
+.breadcrumb a{color:#6E92FF;text-decoration:none}
+h1{font-size:30px;font-weight:800;color:#F4F5F7;margin-bottom:10px;letter-spacing:-0.02em;line-height:1.3}
+.meta-row{font-size:13px;color:#6E7585;margin-bottom:24px}
+h2{font-size:21px;font-weight:700;color:#F4F5F7;margin:36px 0 14px;letter-spacing:-0.01em}
 p{font-size:16px;margin-bottom:14px}
-strong{color:#F1F5FB}
-a{color:#60A5FA;text-decoration:none}a:hover{text-decoration:underline}
-.callout{background:#0F1F3D;border-left:3px solid #3B82F6;padding:14px 18px;margin:18px 0;border-radius:6px;font-size:15px}
+strong{color:#F4F5F7}
+a{color:#6E92FF;text-decoration:none}a:hover{text-decoration:underline}
+.callout{background:#131B31;border-left:3px solid #4D7CFF;padding:14px 18px;margin:18px 0;border-radius:6px;font-size:15px}
 .disc{background:#1a1206;border-left:3px solid #FFB020;padding:12px 16px;margin:22px 0;border-radius:6px;font-size:13px;color:#C9B68C}
-.facts{background:#101828;border:1px solid #1E2A42;border-radius:12px;padding:4px 0;margin:18px 0;overflow:hidden}
-.facts .row{display:grid;grid-template-columns:130px 1fr;border-bottom:1px solid #1E2A42;padding:11px 18px;font-size:15px}
+.facts{background:#14151B;border:1px solid #23262F;border-radius:12px;padding:4px 0;margin:18px 0;overflow:hidden}
+.facts .row{display:grid;grid-template-columns:130px 1fr;border-bottom:1px solid #23262F;padding:11px 18px;font-size:15px}
 .facts .row:last-child{border-bottom:none}
-.facts .row span{color:#64728C}
-.facts .row b{color:#F1F5FB;font-weight:600}
-.signal{background:linear-gradient(135deg,#0F1F3D 0%,#0a1530 100%);border:1px solid #3B82F640;border-radius:14px;padding:20px;margin:8px 0 26px}
-.signal-loading,.signal-na{color:#9AA7BD;font-size:15px;text-align:center;padding:8px 0}
+.facts .row span{color:#6E7585}
+.facts .row b{color:#F4F5F7;font-weight:600}
+.signal{background:linear-gradient(135deg,#131B31 0%,#0a1530 100%);border:1px solid #4D7CFF40;border-radius:14px;padding:20px;margin:8px 0 26px}
+.signal-loading,.signal-na{color:#A1A6B2;font-size:15px;text-align:center;padding:8px 0}
 .signal-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px}
-.signal-label{font-size:13px;color:#9AA7BD}
+.signal-label{font-size:13px;color:#A1A6B2}
 .signal-score{font-size:22px;font-weight:800}
 .tf-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-.tf{background:#0b1322;border:1px solid #1E2A42;border-radius:10px;padding:10px 6px;text-align:center}
-.tf span{display:block;font-size:12px;color:#64728C;margin-bottom:4px}
-.tf b{font-size:15px;color:#F1F5FB;font-weight:700}
-.signal-note{font-size:12px;color:#64728C;margin-top:12px}
+.tf{background:#0b1322;border:1px solid #23262F;border-radius:10px;padding:10px 6px;text-align:center}
+.tf span{display:block;font-size:12px;color:#6E7585;margin-bottom:4px}
+.tf b{font-size:15px;color:#F4F5F7;font-weight:700}
+.signal-note{font-size:12px;color:#6E7585;margin-top:12px}
 .green{color:#10D884}.red{color:#FF7B91}.yellow{color:#FFB020}
 ul{margin:0 0 16px 22px}li{margin-bottom:8px;font-size:16px}
-.related{background:#101828;border:1px solid #1E2A42;border-radius:12px;padding:20px;margin-top:44px}
-.related h3{font-size:16px;color:#F1F5FB;margin-bottom:12px}
-.related a{display:block;padding:8px 0;font-size:15px;border-top:1px solid #1E2A42;color:#9AA7BD}
+.related{background:#14151B;border:1px solid #23262F;border-radius:12px;padding:20px;margin-top:44px}
+.related h3{font-size:16px;color:#F4F5F7;margin-bottom:12px}
+.related a{display:block;padding:8px 0;font-size:15px;border-top:1px solid #23262F;color:#A1A6B2}
 .related a:first-of-type{border-top:none}
-.cta{background:linear-gradient(135deg,#0F1F3D 0%,#0a1530 100%);border:1px solid #3B82F640;border-radius:14px;padding:24px;text-align:center;margin:34px 0}
-.cta a{display:inline-block;background:#3B82F6;color:#fff;padding:11px 22px;border-radius:8px;font-weight:700;margin-top:8px}
+.cta{background:linear-gradient(135deg,#131B31 0%,#0a1530 100%);border:1px solid #4D7CFF40;border-radius:14px;padding:24px;text-align:center;margin:34px 0}
+.cta a{display:inline-block;background:#4D7CFF;color:#fff;padding:11px 22px;border-radius:8px;font-weight:700;margin-top:8px}
 .coin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:24px 0}
-.coin-card{background:#101828;border:1px solid #1E2A42;border-radius:12px;padding:16px;transition:border-color .2s,transform .2s}
-.coin-card:hover{border-color:#3B82F6;transform:translateY(-2px)}
+.coin-card{background:#14151B;border:1px solid #23262F;border-radius:12px;padding:16px;transition:border-color .2s,transform .2s}
+.coin-card:hover{border-color:#4D7CFF;transform:translateY(-2px)}
 .coin-card a{display:block;color:inherit}
-.coin-card .c-sym{font-size:16px;font-weight:700;color:#F1F5FB}
-.coin-card .c-ko{font-size:13px;color:#9AA7BD}
-.coin-card .c-score{font-size:14px;font-weight:700;margin-top:8px;color:#64728C}
-footer{text-align:center;padding:40px 20px;color:#64728C;font-size:14px;border-top:1px solid #1E2A42;margin-top:60px}
-footer a{color:#60A5FA;text-decoration:none;margin:0 6px}
+.coin-card .c-sym{font-size:16px;font-weight:700;color:#F4F5F7}
+.coin-card .c-ko{font-size:13px;color:#A1A6B2}
+.coin-card .c-score{font-size:14px;font-weight:700;margin-top:8px;color:#6E7585}
+footer{text-align:center;padding:40px 20px;color:#6E7585;font-size:14px;border-top:1px solid #23262F;margin-top:60px}
+footer a{color:#6E92FF;text-decoration:none;margin:0 6px}
 @media(max-width:640px){h1{font-size:24px}.wrap{padding:24px 16px}p,li{font-size:15px}.facts .row{grid-template-columns:100px 1fr;font-size:14px}}
 `;
 
@@ -85,7 +85,7 @@ const NAV = `
 const FOOTER = `
   <footer>
     <p>© 2026 Zepta — <a href="/">홈</a> · <a href="/coin">코인 분석</a> · <a href="/blog">블로그</a> · <a href="/about">소개</a> · <a href="/contact">문의</a></p>
-    <p style="margin-top:8px;font-size:12px;color:#3A455C">본 페이지의 정보는 투자 조언이 아니며 참고용입니다. 모든 투자의 책임은 본인에게 있습니다.</p>
+    <p style="margin-top:8px;font-size:12px;color:#474C5A">본 페이지의 정보는 투자 조언이 아니며 참고용입니다. 모든 투자의 책임은 본인에게 있습니다.</p>
   </footer>`;
 
 const GA_SNIPPET = `
@@ -157,7 +157,7 @@ function buildCoinPage(coin, idx) {
     + `\n      <a href="/blog/ai-trading-guide">AI 자동매매란? 시작 전에 꼭 알아야 할 것들</a>`
     + `\n      <a href="/blog/leverage-risk-guide">암호화폐 레버리지 매매 위험과 안전한 사용법</a>`;
 
-  const faqHtml = faq.map((f) => `    <h3 style="font-size:16px;color:#F1F5FB;margin:20px 0 6px">${escH(f.q)}</h3>\n    <p>${escH(f.a)}</p>`).join("\n");
+  const faqHtml = faq.map((f) => `    <h3 style="font-size:16px;color:#F4F5F7;margin:20px 0 6px">${escH(f.q)}</h3>\n    <p>${escH(f.a)}</p>`).join("\n");
 
   return `<!DOCTYPE html>
 <html lang="ko">

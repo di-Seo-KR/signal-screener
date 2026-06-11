@@ -11,19 +11,25 @@ const ThemeContext = createContext({ theme: "dark", setTheme: () => {}, toggle: 
 // tokens.css 의 --z-* CSS 변수와 1:1 동기화. hex 그대로 둔 이유는
 // 알파 합성 패턴 (e.g. `${C.blue}22`) 이 var() 와 호환 안 되기 때문.
 // 라이트 모드 text3 는 WCAG AA 통과 (#F6F8FC bg 대비 5.4:1).
+// ★ 2026-06-08 디자인 동기화 (대표 지시 — "디자인도 포함"):
+//   tokens.css 는 이미 '모던 핀테크 미니멀(Toss·Linear)' 팔레트(#0A0B0F·#4D7CFF)로
+//   개편됐는데 이 객체는 옛 네이비(#070B14·#3B82F6)에 머물러 있어, CSS 변수를 쓰는
+//   화면과 인라인 스타일(C.*) 1,500곳이 서로 다른 팔레트로 렌더되고 있었음.
+//   → 다크 토큰을 tokens.css :root 값과 1:1 재동기화. *Bg 계열은 알파 tint 를
+//   bg(#0A0B0F) 위에 합성한 솔리드 hex (인라인에서 단색으로 쓰이기 때문).
 export const THEME_TOKENS = {
   dark: {
-    bg: "#070B14", card: "#101828", card2: "#161F33",
-    border: "#1E2A42", border2: "#2A3A58",
-    blue: "#3B82F6", blueL: "#60A5FA", blueBg: "#0F1F3D",
-    red: "#FF4D64", redBg: "#2C1520",
-    green: "#10D884", greenBg: "#0B2E1E",
-    yellow: "#FFB020", yellowBg: "#2B2100",
-    purple: "#9B6FFF", purpleBg: "#201840",
-    orange: "#FF6B2C", orangeBg: "#2A1A0A",
-    text1: "#F1F5FB", text2: "#9AA7BD", text3: "#64728C", text4: "#3A455C",
+    bg: "#0A0B0F", card: "#14151B", card2: "#1B1D25",
+    border: "#23262F", border2: "#2E313C",
+    blue: "#4D7CFF", blueL: "#6E92FF", blueBg: "#131B31",
+    red: "#FF4D64", redBg: "#271319",
+    green: "#10D884", greenBg: "#0B241D",
+    yellow: "#FFB020", yellowBg: "#271F11",
+    purple: "#9B6FFF", purpleBg: "#1B172C",
+    orange: "#FF6B2C", orangeBg: "#271713",
+    text1: "#F4F5F7", text2: "#A1A6B2", text3: "#6E7585", text4: "#474C5A",
     isDark: true,
-    cardShadow: "0 4px 16px rgba(0,0,0,.32), 0 1px 3px rgba(0,0,0,.16)",
+    cardShadow: "0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.28)",
   },
   light: {
     bg: "#F6F8FC", card: "#FFFFFF", card2: "#F1F4F9",
