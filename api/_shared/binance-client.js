@@ -193,6 +193,28 @@ export async function getTickerPrice({ symbol, testnet = false }) {
   return await resp.json();
 }
 
+/** 24시간 티커 통계(전 심볼) — GET /fapi/v1/ticker/24hr (무서명).
+ *  동적 유니버스의 유동성(quoteVolume) 랭킹용. 프록시 모드면 프록시 경유.
+ */
+export async function get24hrTickers({ testnet = false } = {}) {
+  if (isProxyMode()) {
+    return await viaProxy({
+      method: "GET",
+      path: "/fapi/v1/ticker/24hr",
+      params: {},
+      testnet,
+      signed: false,
+    });
+  }
+  const base = testnet ? BINANCE_FAPI_TESTNET : BINANCE_FAPI;
+  const resp = await fetch(`${base}/fapi/v1/ticker/24hr`, {
+    signal: AbortSignal.timeout(15000),
+    headers: { "User-Agent": "Zepta/1.0", "Accept": "application/json" },
+  });
+  if (!resp.ok) throw new Error(`ticker/24hr ${resp.status}`);
+  return await resp.json();
+}
+
 /**
  * 캔들 데이터 — GET /fapi/v1/klines (무서명, 프록시 필수)
  * @param {object} opts
