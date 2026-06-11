@@ -10,6 +10,7 @@ import { LanguageProvider, useLanguage } from "./i18n/LanguageContext.jsx";
 import AuthPage from "./AuthPage.jsx";
 import { GoogleAd } from "./AdBanner.jsx";
 import Header from "./components/Header.jsx";
+import SectionTabs from "./components/SectionTabs.jsx";
 import PortfolioTab from "./components/PortfolioTab.jsx";
 import { supabase } from "./supabaseClient.js";
 import { THEME_TOKENS } from "./ui/theme.jsx";
@@ -9934,6 +9935,19 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 포트폴리오
         ═══════════════════════════════════════════════════════════ */}
+        {/* ★ 2026-06-08 포트폴리오 허브 — 흩어져 있던 3탭(내 자산·자산 분석·퀀트 포트)을
+            세그먼트로 통합. 라우트·데이터 흐름은 그대로, 상단 내비만 공유 (대표 지시). */}
+        {(tab === "portfolio" || tab === "portfolio-analysis" || tab === "quant-port") && (
+          <SectionTabs
+            title="포트폴리오"
+            items={[
+              { tab: "portfolio", label: "내 자산" },
+              { tab: "portfolio-analysis", label: "자산 분석" },
+              { tab: "quant-port", label: "퀀트 포트폴리오" },
+            ]}
+            active={tab} onNavigate={setTab} theme={themeMode}
+          />
+        )}
         {tab === "portfolio" && (
           <PortfolioTab
             C={C}

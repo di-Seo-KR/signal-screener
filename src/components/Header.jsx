@@ -119,10 +119,10 @@ const getNavCategories = (t) => [
   },
   {
     id: "management", label: t("nav.management"), catId: "management", icon: Briefcase,
+    // ★ 2026-06-08 포트폴리오 허브 통합 — 자산분석·퀀트포트는 포트폴리오 화면 안
+    //   세그먼트로 진입 (3중복 메뉴 정리). 리스크맵만 별도 화면 유지.
     items: [
       { id: "portfolio", label: t("nav.portfolio"), icon: Briefcase },
-      { id: "portfolio-analysis", label: "자산 분석", icon: PieChart },
-      { id: "quant-port", label: t("nav.trading"), icon: TrendingUp },
       { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
     ],
   },
@@ -166,8 +166,6 @@ const getMobileMenuSections = (isOwner, t) => [
   {
     section: t("nav.management"), items: [
       { id: "portfolio", label: t("nav.portfolio"), icon: Briefcase },
-      { id: "portfolio-analysis", label: "자산 분석", icon: PieChart },
-      { id: "quant-port", label: t("nav.trading"), icon: TrendingUp },
       { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
     ],
   },
