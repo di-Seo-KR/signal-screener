@@ -7869,6 +7869,65 @@ function AppInner() {
               );
             })()}
 
+            {/* ── AI 퀀트 전략 하이라이트 (핵심 기능 → 최상단) ─── */}
+            <div onClick={() => { setTab("auto-trading"); }} className="ui-card-premium" style={{
+              cursor: "pointer", transition: "all .2s",
+              position: "relative", overflow: "hidden",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = `0 12px 40px ${C.purple}25`; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = ""; }}>
+              <div style={{ position: "absolute", top: "-20px", right: "-10px", fontSize: "80px", opacity: 0.06 }}>🤖</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                <div style={{
+                  width: "48px", height: "48px", borderRadius: "12px",
+                  background: `linear-gradient(135deg, ${C.purple}, #6D28D9)`,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", flexShrink: 0,
+                }}>🤖</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 800, fontSize: "18px", color: C.text1, marginBottom: "4px" }}>AI 퀀트 전략</div>
+                  <div style={{ fontSize: "16px", color: C.text3, lineHeight: 1.4 }}>
+                    AI 기반 자동매매 · 주식/크립토 통합 · 실시간 시그널
+                  </div>
+                </div>
+                <div style={{
+                  padding: "8px 16px", borderRadius: "10px", fontSize: "16px", fontWeight: 700,
+                  background: `${C.purple}20`, color: C.purple, flexShrink: 0,
+                }}>바로가기 →</div>
+              </div>
+            </div>
+
+            {/* ── 전략 운용 + 리스크 바로가기 위젯 ─── */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              <div onClick={() => { setTab("quant-port"); }} style={{
+                background: `linear-gradient(135deg, ${C.card} 0%, ${C.greenBg} 100%)`,
+                borderRadius: "16px", padding: "20px", cursor: "pointer", transition: "all .2s",
+                border: `1px solid ${C.border}20`,
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+              onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
+                <div style={{ fontSize: "24px", marginBottom: "8px" }}>📊</div>
+                <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "5px", color: C.text1 }}>전략 운용</div>
+                <div style={{ fontSize: "16px", color: C.text3 }}>33개 전략 포트폴리오</div>
+                <div style={{ fontSize: "16px", color: C.green, fontWeight: 600, marginTop: "6px" }}>
+                  실시간 수익률 추적 →
+                </div>
+              </div>
+              <div onClick={() => { setTab("risk-map"); }} style={{
+                background: `linear-gradient(135deg, ${C.card} 0%, ${C.redBg} 100%)`,
+                borderRadius: "16px", padding: "20px", cursor: "pointer", transition: "all .2s",
+                border: `1px solid ${C.border}20`,
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+              onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
+                <div style={{ fontSize: "24px", marginBottom: "8px" }}>🛡️</div>
+                <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "5px", color: C.text1 }}>리스크 관리</div>
+                <div style={{ fontSize: "16px", color: C.text3 }}>8-Point 히트맵</div>
+                <div style={{ fontSize: "16px", color: C.red, fontWeight: 600, marginTop: "6px" }}>
+                  위험 수준 확인 →
+                </div>
+              </div>
+            </div>
+
             {/* ── AI 시장 한줄 인사이트 (공유 유도 → 바이럴 유입) ─── */}
             {marketIndices.length > 0 && (() => {
               const sp = marketIndices.find(i => i.symbol === "^GSPC");
@@ -8497,56 +8556,6 @@ function AppInner() {
               );
             })()}
 
-            {/* ── 투자 뱃지 ─── */}
-            {(() => {
-              const streakData = (() => { try { return JSON.parse(localStorage.getItem("zepta:streak") || "{}"); } catch { return {}; } })();
-              const predStats = (() => { try { return JSON.parse(localStorage.getItem("zepta:pred:stats") || '{"total":0,"correct":0}'); } catch { return { total: 0, correct: 0 }; } })();
-              const quizStatsLocal = (() => { try { return JSON.parse(localStorage.getItem("zepta:quiz:stats") || '{"total":0,"correct":0}'); } catch { return { total: 0, correct: 0 }; } })();
-
-              const badges = [
-                { icon: "🔥", name: t("tabs.home.badgeStreak3") || "3일 연속", earned: (streakData.count || 0) >= 3, progress: Math.min(streakData.count || 0, 3), target: 3 },
-                { icon: "⚡", name: t("tabs.home.badgeStreak7") || "7일 연속", earned: (streakData.count || 0) >= 7, progress: Math.min(streakData.count || 0, 7), target: 7 },
-                { icon: "🎯", name: t("tabs.home.badgePredictor") || "예측 5회", earned: predStats.total >= 5, progress: Math.min(predStats.total, 5), target: 5 },
-                { icon: "🧠", name: t("tabs.home.badgeScholar") || "퀴즈 마스터", earned: quizStatsLocal.correct >= 5, progress: Math.min(quizStatsLocal.correct, 5), target: 5 },
-                { icon: "📊", name: t("tabs.home.badgeAnalyst") || "분석가", earned: watchlist.length >= 5, progress: Math.min(watchlist.length, 5), target: 5 },
-                { icon: "🏆", name: t("tabs.home.badgeChampion") || "챔피언", earned: predStats.total >= 10 && (predStats.correct / Math.max(predStats.total, 1)) >= 0.7, progress: predStats.correct, target: 7 },
-              ];
-
-              const earnedCount = badges.filter(b => b.earned).length;
-
-              return (
-                <div style={{ background: C.card, borderRadius: "16px", padding: "18px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ fontSize: "16px" }}>🏆</span>
-                      <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>{t("tabs.home.investBadges") || "투자 뱃지"}</span>
-                    </div>
-                    <span style={{ fontSize: "12px", color: C.blue, fontWeight: 600 }}>{earnedCount}/{badges.length}</span>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "8px" }}>
-                    {badges.map((b, i) => (
-                      <div key={i} style={{
-                        padding: "12px 8px", borderRadius: "12px", textAlign: "center",
-                        background: b.earned ? `${C.blue}08` : `${C.card2}30`,
-                        border: `1px solid ${b.earned ? C.blue + '20' : C.border + '10'}`,
-                        opacity: b.earned ? 1 : 0.6,
-                        transition: "all .2s",
-                        boxShadow: b.earned ? `0 0 12px ${C.blue}20` : "none",
-                      }}>
-                        <div style={{ fontSize: "28px", marginBottom: "4px", filter: b.earned ? "none" : "grayscale(1)" }}>{b.icon}</div>
-                        <div style={{ fontSize: "12px", fontWeight: 600, color: b.earned ? C.text1 : C.text3, lineHeight: 1.2 }}>{b.name}</div>
-                        {!b.earned && (
-                          <div style={{ marginTop: "4px", height: "5px", borderRadius: "4px", background: C.card2, overflow: "hidden" }}>
-                            <div style={{ width: `${(b.progress / b.target) * 100}%`, height: "100%", background: C.blue, borderRadius: "4px", transition: "width .3s" }} />
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })()}
-
             {/* ── 관심종목 (v10.3 유저별 격리) ─── */}
             <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: watchlist.length > 0 ? "14px" : "0" }}>
@@ -9156,65 +9165,6 @@ function AppInner() {
             {/* 홈 하단 광고 제거 — 다른 탭으로 분산 배치 */}
 
             {/* ═══ 하단 전체너비 섹션 (그리드 밖) ═══ */}
-
-            {/* ── AI 퀀트 전략 하이라이트 (핵심 기능 → 최상단) ─── */}
-            <div onClick={() => { setTab("auto-trading"); }} className="ui-card-premium" style={{
-              cursor: "pointer", transition: "all .2s",
-              position: "relative", overflow: "hidden",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = `0 12px 40px ${C.purple}25`; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = ""; }}>
-              <div style={{ position: "absolute", top: "-20px", right: "-10px", fontSize: "80px", opacity: 0.06 }}>🤖</div>
-              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                <div style={{
-                  width: "48px", height: "48px", borderRadius: "12px",
-                  background: `linear-gradient(135deg, ${C.purple}, #6D28D9)`,
-                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", flexShrink: 0,
-                }}>🤖</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 800, fontSize: "18px", color: C.text1, marginBottom: "4px" }}>AI 퀀트 전략</div>
-                  <div style={{ fontSize: "16px", color: C.text3, lineHeight: 1.4 }}>
-                    AI 기반 자동매매 · 주식/크립토 통합 · 실시간 시그널
-                  </div>
-                </div>
-                <div style={{
-                  padding: "8px 16px", borderRadius: "10px", fontSize: "16px", fontWeight: 700,
-                  background: `${C.purple}20`, color: C.purple, flexShrink: 0,
-                }}>바로가기 →</div>
-              </div>
-            </div>
-
-            {/* ── 전략 운용 + 리스크 바로가기 위젯 ─── */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-              <div onClick={() => { setTab("quant-port"); }} style={{
-                background: `linear-gradient(135deg, ${C.card} 0%, ${C.greenBg} 100%)`,
-                borderRadius: "16px", padding: "20px", cursor: "pointer", transition: "all .2s",
-                border: `1px solid ${C.border}20`,
-              }}
-              onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
-              onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
-                <div style={{ fontSize: "24px", marginBottom: "8px" }}>📊</div>
-                <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "5px", color: C.text1 }}>전략 운용</div>
-                <div style={{ fontSize: "16px", color: C.text3 }}>33개 전략 포트폴리오</div>
-                <div style={{ fontSize: "16px", color: C.green, fontWeight: 600, marginTop: "6px" }}>
-                  실시간 수익률 추적 →
-                </div>
-              </div>
-              <div onClick={() => { setTab("risk-map"); }} style={{
-                background: `linear-gradient(135deg, ${C.card} 0%, ${C.redBg} 100%)`,
-                borderRadius: "16px", padding: "20px", cursor: "pointer", transition: "all .2s",
-                border: `1px solid ${C.border}20`,
-              }}
-              onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
-              onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
-                <div style={{ fontSize: "24px", marginBottom: "8px" }}>🛡️</div>
-                <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "5px", color: C.text1 }}>리스크 관리</div>
-                <div style={{ fontSize: "16px", color: C.text3 }}>8-Point 히트맵</div>
-                <div style={{ fontSize: "16px", color: C.red, fontWeight: 600, marginTop: "6px" }}>
-                  위험 수준 확인 →
-                </div>
-              </div>
-            </div>
 
             {/* ── 섹터 히트맵 (접기/펼치기) ─── */}
             {sectorPerf.length > 0 && (
