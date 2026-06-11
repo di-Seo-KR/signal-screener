@@ -51,7 +51,6 @@
     { "source": "/news", "destination": "/news.html" },
     { "source": "/anomaly", "destination": "/anomaly.html" },
     { "source": "/alerts", "destination": "/alerts.html" },
-    { "source": "/sector-flow", "destination": "/sector-flow.html" },
     { "source": "/quant-portfolio", "destination": "/quant-portfolio.html" },
     { "source": "/quant-port", "destination": "/quant-port.html" },
     { "source": "/quant-report", "destination": "/quant-report.html" },
@@ -66,7 +65,7 @@
     { "source": "/pricing", "destination": "/pricing.html" },
     { "source": "/coin", "destination": "/coin/index.html" },
     { "source": "/coin/:symbol", "destination": "/coin/:symbol.html" },
-    { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon)(?!about)(?!guide)(?!privacy)(?!terms)(?!contact)(?!blog)(?!coin)(?!screener)(?!auto-trading)(?!real-trading)(?!alpha-lab)(?!portfolio-analysis)(?!portfolio)(?!backtest-compare)(?!backtest)(?!strategy)(?!risk-map)(?!sentiment)(?!econ-calendar)(?!news)(?!anomaly)(?!alerts)(?!sector-flow)(?!quant-portfolio)(?!quant-port)(?!quant-report)(?!notifications)(?!saved-screeners)(?!leaderboard)(?!reports)(?!copy-trading)(?!pricing)(?!profile).*)", "destination": "/index.html" }
+    { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon)(?!about)(?!guide)(?!privacy)(?!terms)(?!contact)(?!blog)(?!coin)(?!screener)(?!auto-trading)(?!real-trading)(?!alpha-lab)(?!portfolio-analysis)(?!portfolio)(?!backtest-compare)(?!backtest)(?!strategy)(?!risk-map)(?!sentiment)(?!econ-calendar)(?!news)(?!anomaly)(?!alerts)(?!quant-portfolio)(?!quant-port)(?!quant-report)(?!notifications)(?!saved-screeners)(?!leaderboard)(?!reports)(?!copy-trading)(?!pricing)(?!profile).*)", "destination": "/index.html" }
   ],
   "headers": [
     {

@@ -8,7 +8,7 @@ import { useState, useEffect, useCallback, useRef, useMemo, Component, lazy, Sus
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
 import { LanguageProvider, useLanguage } from "./i18n/LanguageContext.jsx";
 import AuthPage from "./AuthPage.jsx";
-import { CoupangOfficialBanner, CoupangSearchWidget, CoupangInterstitial, GoogleAd, GoogleAdInterstitial } from "./AdBanner.jsx";
+import { GoogleAd } from "./AdBanner.jsx";
 import Header from "./components/Header.jsx";
 import PortfolioTab from "./components/PortfolioTab.jsx";
 import { supabase } from "./supabaseClient.js";
@@ -4237,9 +4237,6 @@ function AppInner() {
   const { user, loading: authLoading, signOut, refreshUser } = useAuth();
   const isOwner = (user?.email || "").toLowerCase() === OWNER_EMAIL;
   const [themeMode, setThemeMode] = useState(loadTheme);
-  const [showCoupangCTA, setShowCoupangCTA] = useState(false);
-  const [showGoogleCTA, setShowGoogleCTA] = useState(false);
-  const ctaCountRef = useRef(0); // 쿠팡/구글 번갈아 표시
   C = themeMode === "dark" ? DARK : LIGHT;
 
 
@@ -4330,7 +4327,7 @@ function AppInner() {
     });
   }, []);
 
-  const validTabs = ["home","auto-trading","real-trading","alpha-lab","portfolio","portfolio-analysis","screener","alerts","notifications","saved-screeners","news","quant-portfolio","quant-port","risk-map","sector-flow","backtest","backtest-compare","copy-trading","sentiment","strategy","anomaly","quant-report","econ-calendar","leaderboard","reports","bot-report","profile","dev","pricing","about","privacy","terms","contact"];
+  const validTabs = ["home","auto-trading","real-trading","alpha-lab","portfolio","portfolio-analysis","screener","alerts","notifications","saved-screeners","news","quant-portfolio","quant-port","risk-map","backtest","backtest-compare","copy-trading","sentiment","strategy","anomaly","quant-report","econ-calendar","leaderboard","reports","bot-report","profile","dev","pricing","about","privacy","terms","contact"];
 
   // ── 경로 → tab 변환 ──
   //   /reports             → "reports"
@@ -4446,7 +4443,6 @@ function AppInner() {
     "risk-map": "management",
     "portfolio": "management",
     "portfolio-analysis": "management",  // ★ 신규
-    "sector-flow": "management",         // ★ 신규
     // AI 퀀트 (자동매매)
     "auto-trading": "ai-quant",
     "real-trading": "ai-quant",
@@ -8090,7 +8086,7 @@ function AppInner() {
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                     {anomalies.slice(0, 3).map((a, i) => (
-                      <div key={a.symbol} onClick={() => { setSelectedAsset(a); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
+                      <div key={a.symbol} onClick={() => { setSelectedAsset(a); }} style={{
                         display: "flex", alignItems: "center", justifyContent: "space-between",
                         padding: "12px", cursor: "pointer", borderRadius: "12px",
                         transition: "all .2s", background: `${C.card2}30`,
@@ -8137,7 +8133,7 @@ function AppInner() {
 
             {/* ── 포트폴리오 벤치마킹 ─── */}
             {benchmarkData && (
-              <div onClick={() => { setTab("portfolio"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
+              <div onClick={() => { setTab("portfolio"); }} style={{
                 background: C.card, borderRadius: "16px", padding: "18px 20px", cursor: "pointer",
                 border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`, transition: "transform .15s",
               }}
@@ -8337,7 +8333,7 @@ function AppInner() {
                       const isPos = pick.change >= 0;
                       const isTop3 = i < 3;
                       return (
-                        <div key={pick.symbol} onClick={() => { setSelectedAsset(pick); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }}
+                        <div key={pick.symbol} onClick={() => { setSelectedAsset(pick); }}
                           style={{
                             display: "flex", alignItems: "center", justifyContent: "space-between",
                             padding: "12px", cursor: "pointer", borderRadius: "12px",
@@ -8453,7 +8449,7 @@ function AppInner() {
                       const isPos = asset.change >= 0;
                       const ext = extendedHours[asset.symbolRaw || asset.symbol];
                       return (
-                        <div key={asset.symbol} onClick={() => { setSelectedAsset(asset); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }}
+                        <div key={asset.symbol} onClick={() => { setSelectedAsset(asset); }}
                           style={{
                             display: "flex", alignItems: "center", justifyContent: "space-between",
                             padding: "12px 8px", cursor: "pointer", borderRadius: "10px",
@@ -8499,11 +8495,6 @@ function AppInner() {
                 </div>
               );
             })()}
-
-            {/* 쿠팡 파트너스 배너 — 홈 중간 */}
-            <div style={{ minHeight: 0, overflow: "hidden" }}>
-              <CoupangOfficialBanner width="728" height="90" bannerId={975392} style={{ margin: "4px 0", borderRadius: "12px", overflow: "hidden" }} />
-            </div>
 
             </div>{/* end home-left */}
             <div className="home-right" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -8802,8 +8793,7 @@ function AppInner() {
                 {user && <SearchBar compact placeholder={t("tabs.home.addAssetPlaceholder")} onSelect={(asset) => {
                   if (!watchlist.some(w => w.symbol === asset.symbol)) {
                     setWatchlist(prev => [...prev, { symbol: asset.symbol, name: asset.name, market: asset.market, symbolRaw: asset.symbolRaw || asset.symbol, id: asset.id }]);
-                    if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); };
-                  }
+                                     }
                 }} />}
               </div>
               {!user ? (
@@ -8851,8 +8841,7 @@ function AppInner() {
                           key={s}
                           onClick={() => {
                             setWatchlist(prev => [...prev, { symbol: a.symbol, name: a.name, market: a.market, symbolRaw: a.symbolRaw || a.symbol }]);
-                            if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); };
-                            showToast(`${a.name} 추가됨`, "success");
+                                                       showToast(`${a.name} 추가됨`, "success");
                           }}
                           style={{
                             padding: "8px 16px",
@@ -8902,7 +8891,7 @@ function AppInner() {
                     const diag = hot ? quickDiagnosis(hot) : null;
                     const diagColor = diag ? (diag.score >= 60 ? C.green : diag.score >= 40 ? C.yellow : C.red) : C.text3;
                     return (
-                      <div key={w.symbol} onClick={() => { setSelectedAsset(w); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }}
+                      <div key={w.symbol} onClick={() => { setSelectedAsset(w); }}
                         style={{
                           display: "flex", alignItems: "center", justifyContent: "space-between",
                           padding: "12px 8px", cursor: "pointer", borderRadius: "10px",
@@ -9092,7 +9081,7 @@ function AppInner() {
               const reportTime = now.toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit" });
 
               return (
-                <div onClick={() => { setTab("quant-report"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`, borderRadius: "16px", padding: "20px", cursor: "pointer", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+                <div onClick={() => { setTab("quant-report"); }} style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`, borderRadius: "16px", padding: "20px", cursor: "pointer", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
                     <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{t("tabs.home.quantReport")}</span>
                     <span style={{ fontSize: mf(11), color: C.text3 }}>{reportTime} {t("tabs.home.asOf")} →</span>
@@ -9164,7 +9153,7 @@ function AppInner() {
               const pnl = totalCost > 0 ? ((totalValue - totalCost) / totalCost * 100) : 0;
               const pnlAmt = totalValue - totalCost;
               return (
-                <div onClick={() => { setTab("portfolio"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
+                <div onClick={() => { setTab("portfolio"); }} style={{
                   background: C.card, borderRadius: "16px", padding: "20px 22px", cursor: "pointer",
                   transition: "transform .15s", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`,
                 }}
@@ -9397,9 +9386,6 @@ function AppInner() {
               );
             })()}
 
-            {/* 쿠팡 파트너스 배너 — 사이드바 */}
-            <CoupangOfficialBanner width="320" height="100" bannerId={975393} style={{ margin: "4px 0", borderRadius: "12px", overflow: "hidden" }} />
-
             </div>{/* end home-right */}
             </div>{/* end home-grid */}
 
@@ -9408,7 +9394,7 @@ function AppInner() {
             {/* ═══ 하단 전체너비 섹션 (그리드 밖) ═══ */}
 
             {/* ── AI 퀀트 전략 하이라이트 (핵심 기능 → 최상단) ─── */}
-            <div onClick={() => { setTab("auto-trading"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} className="ui-card-premium" style={{
+            <div onClick={() => { setTab("auto-trading"); }} className="ui-card-premium" style={{
               cursor: "pointer", transition: "all .2s",
               position: "relative", overflow: "hidden",
             }}
@@ -9436,7 +9422,7 @@ function AppInner() {
 
             {/* ── 전략 운용 + 리스크 바로가기 위젯 ─── */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-              <div onClick={() => { setTab("quant-port"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
+              <div onClick={() => { setTab("quant-port"); }} style={{
                 background: `linear-gradient(135deg, ${C.card} 0%, ${C.greenBg} 100%)`,
                 borderRadius: "16px", padding: "20px", cursor: "pointer", transition: "all .2s",
                 border: `1px solid ${C.border}20`,
@@ -9450,7 +9436,7 @@ function AppInner() {
                   실시간 수익률 추적 →
                 </div>
               </div>
-              <div onClick={() => { setTab("risk-map"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
+              <div onClick={() => { setTab("risk-map"); }} style={{
                 background: `linear-gradient(135deg, ${C.card} 0%, ${C.redBg} 100%)`,
                 borderRadius: "16px", padding: "20px", cursor: "pointer", transition: "all .2s",
                 border: `1px solid ${C.border}20`,
@@ -9530,7 +9516,7 @@ function AppInner() {
                       return (
                         <div key={`${asset.symbol}-${i}`}
                           onTouchStart={onTouchCardStart} onTouchMove={onTouchCardMove}
-                          onClick={() => { if (isTouchTap()) { setSelectedAsset(asset); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; } }}
+                          onClick={() => { if (isTouchTap()) { setSelectedAsset(asset); } }}
                           style={{
                             padding: "8px 10px", borderRadius: "8px", cursor: "pointer",
                             display: "flex", alignItems: "center", gap: "6px", transition: "background .15s",
@@ -9548,9 +9534,6 @@ function AppInner() {
                 </>
               )}
             </div>
-
-            {/* 쿠팡 검색 위젯 — 홈 하단 */}
-            <CoupangSearchWidget style={{ margin: "12px 0" }} />
 
             {/* ★ 2026-05-09 — 홈 안 푸터 제거. 글로벌 footer (line ~12550)
                 만 유지. 이전엔 홈 페이지에서 푸터가 두 번 그려져 중복. */}
@@ -10096,7 +10079,7 @@ function AppInner() {
                     const scoreColor = s.score >= 80 ? C.green : s.score >= 65 ? C.blue : C.yellow;
                     const scoreLabel = s.score >= 80 ? "강력 저평가" : s.score >= 70 ? "저평가" : s.score >= 60 ? "저평가 가능성" : "주의 관찰";
                     return (
-                      <div key={s.symbol} onClick={() => { setSelectedAsset({ symbol: s.symbol, name: s.name }); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
+                      <div key={s.symbol} onClick={() => { setSelectedAsset({ symbol: s.symbol, name: s.name }); }} style={{
                         background: C.card2, borderRadius: "12px", padding: isMobile ? "12px 12px" : "12px 14px",
                         border: `1px solid ${C.border}`, cursor: "pointer", transition: "all .15s",
                       }}>
@@ -10490,8 +10473,7 @@ function AppInner() {
             display: "flex", flexDirection: "column", gap: "12px"
           }}>
             <Suspense fallback={<LazyTabFallback />}><StrategyPanel onRunBacktest={(strategy, symbol) => {
-              setBtStrategy(strategy); setBtSymbol(symbol); setTab("backtest"); if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); };
-            }} /></Suspense>
+              setBtStrategy(strategy); setBtSymbol(symbol); setTab("backtest");            }} /></Suspense>
           </div>
         )}
 
@@ -11101,7 +11083,7 @@ function AppInner() {
                     return `${Math.floor(hrs / 24)}일 전`;
                   })();
                   return (<>
-                    <a key={i} href={news.url || news.link || "#"} target="_blank" rel="noopener" onClick={() => { if (Math.random() < 0.5) { ctaCountRef.current++; if (ctaCountRef.current % 3 === 0) setShowGoogleCTA(true); else setShowCoupangCTA(true); }; }} style={{
+                    <a key={i} href={news.url || news.link || "#"} target="_blank" rel="noopener" onClick={() => { }} style={{
                       background: C.card, border: `1px solid ${C.border}20`, borderRadius: "16px", padding: isMobile ? "14px" : "16px 18px",
                       textDecoration: "none", color: "inherit", display: "block", transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
                       borderLeft: `4px solid ${sentColor}`,
@@ -11142,8 +11124,6 @@ function AppInner() {
               </div>
             )}
 
-            {/* 뉴스 하단 — 쿠팡 공식 배너 */}
-            <CoupangOfficialBanner width="728" height="90" bannerId={975393} style={{ margin: "12px 0" }} />
           </div>
         )}
 
@@ -13429,12 +13409,6 @@ function AppInner() {
           />
         </Suspense>
       )}
-
-      {/* ── CTA 광고 (쿠팡 인터스티셜) ── */}
-      {showCoupangCTA && <CoupangInterstitial theme={themeMode} onClose={() => setShowCoupangCTA(false)} featureName="이 기능" />}
-
-      {/* ── CTA 광고 (구글 애드센스 인터스티셜) ── */}
-      {showGoogleCTA && <GoogleAdInterstitial onClose={() => setShowGoogleCTA(false)} />}
 
       {/* ── 토스트 알림 (향상된 시각) ── */}
       {/* ★ 2026-05-12 PLAN-SVC J: 위치를 헤더 아래로 명확히 + max-width 키움 (다이내믹 아일랜드 비간섭 + 가독성) */}
