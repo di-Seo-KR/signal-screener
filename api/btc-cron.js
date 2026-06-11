@@ -885,8 +885,9 @@ export default async function handler(req, res) {
       const activeBotsList = (await kv.get("di:active-bots")) || [];
       for (const ab of activeBotsList) {
         const botId = ab.botId;
-        const assets = BOT_ASSET_MAP[botId];
-        if (!assets) continue; // 알 수 없는 봇 ID 스킵
+        const mapped = BOT_ASSET_MAP[botId];
+        if (!mapped) continue; // 알 수 없는 봇 ID 스킵
+        const assets = mapped === "ALL" ? ASSETS : mapped; // ★ 2026-06-11: 동적 유니버스 봇
 
         // ── 기존 포지션 백필: 포지션 있는데 거래 기록이 0이면 초기 진입으로 기록 ──
         const botPositionsForBackfill = assets.map(a => positionMap[a]).filter(Boolean);
