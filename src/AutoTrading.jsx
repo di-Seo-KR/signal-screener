@@ -6,6 +6,7 @@ import { useAuth } from "./AuthProvider.jsx";
 import { useLanguage } from "./i18n/LanguageContext.jsx";
 import { supabase } from "./supabaseClient.js";
 import { THEME_TOKENS } from "./ui/theme.jsx";
+import TradingModeSwitch from "./components/TradingModeSwitch.jsx"; // ★ 트레이딩 일원화 (모의↔실전)
 import { useIsMobile } from "./ui/useBreakpoint.jsx";
 import { MetricInfo } from "./ui/primitives.jsx";
 import { BottomSheet } from "./ui/bottom-sheet.jsx";
@@ -2015,6 +2016,10 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
       }}
     >
       <div style={{ maxWidth: "1100px", margin: "0 auto", display: "flex", flexDirection: "column", gap: isMobile ? "16px" : "24px" }}>
+        {/* ★ 2026-06-08 트레이딩 일원화 — 모의↔실전 모드 스위치 (대표 지시) */}
+        <div style={{ marginBottom: isMobile ? "-8px" : "-12px" }}>
+          <TradingModeSwitch mode="paper" onNavigate={onNavigate} isOwner={isOwner} theme={theme} compact={isMobile} />
+        </div>
         {/* ★ Owner 전용 실전매매 진입 카드 (모바일/PC 양쪽 — 라이브 상태 요약 + 실전매매 페이지 진입)
             이전: 모바일 햄버거 작은 셀에만 있어서 잘 안 보임.
             현재: AI매매 진입 시 첫 카드로 노출 → 한눈에 라이브 상태 파악 + 한 탭에 진입. */}

@@ -4433,29 +4433,30 @@ function AppInner() {
     "anomaly": "analysis",
     "strategy": "analysis",
     "quant-report": "analysis",
-    "backtest": "analysis",
-    "backtest-compare": "analysis",      // ★ 신규
-    "alpha-lab": "analysis",             // ★ AlphaLab GNB 노출
-    "saved-screeners": "analysis",       // ★ 신규
-    // 운용/포트폴리오
+    // ★ 2026-06-08 IA 재설계: 마켓 / 트레이딩 / 포트폴리오 / 더보기
+    "backtest": "ai-quant",
+    "backtest-compare": "ai-quant",
+    "alpha-lab": "ai-quant",
+    "saved-screeners": "info",
+    // 포트폴리오 (자산을 관리한다)
     "quant-port": "management",
     "quant-portfolio": "management",
     "risk-map": "management",
     "portfolio": "management",
-    "portfolio-analysis": "management",  // ★ 신규
-    // AI 퀀트 (자동매매)
+    "portfolio-analysis": "management",
+    // 트레이딩 (매매한다) — 모의·실전 일원화
     "auto-trading": "ai-quant",
     "real-trading": "ai-quant",
-    "copy-trading": "ai-quant",          // ★ 신규
-    "leaderboard": "ai-quant",           // ★ 신규
-    "reports": "ai-quant",               // ★ 신규
+    "copy-trading": "ai-quant",
+    "leaderboard": "ai-quant",
+    "reports": "ai-quant",
     "bot-report": "ai-quant",
-    // 정보
-    "news": "info",
-    "sentiment": "info",
+    // 마켓 (시장을 본다)
+    "news": "analysis",
+    "sentiment": "analysis",
     "alerts": "info",
-    "notifications": "info",             // ★ 신규
-    "econ-calendar": "info",
+    "notifications": "info",
+    "econ-calendar": "analysis",
   };
   const [gnbCategory, setGnbCategory] = useState(() => gnbCategoryMap[tab] || "home");
 
@@ -12113,7 +12114,7 @@ function AppInner() {
             TAB: 실전매매 (Phase 1 — 단일 사용자 Binance Futures)
         ═══════════════════════════════════════════════════════════ */}
         {tab === "real-trading" && isOwner && (
-          <Suspense fallback={<LazyTabFallback />}><RealTrading theme={themeMode} /></Suspense>
+          <Suspense fallback={<LazyTabFallback />}><RealTrading theme={themeMode} onNavigate={setTab} /></Suspense>
         )}
         {tab === "real-trading" && !isOwner && (
           <div style={{ maxWidth: 720, margin: "80px auto", padding: "40px 24px", textAlign: "center", color: C.text2 }}>
@@ -13106,20 +13107,23 @@ function AppInner() {
           paddingTop: "6px",
           zIndex: 10000,
         }}>
+          {/* ★ 2026-06-08 IA 재설계: 홈/마켓/트레이딩/포트폴리오/메뉴 — GNB 4축과 동기화.
+              활성 판정은 탭 정확일치 → 카테고리 일치로 변경 (마켓 하위 화면에서도 '마켓' 점등).
+              '메뉴'는 profile 이동(버그) → 실제 메뉴 시트 열기로 수정. */}
           {[
-            { id: "home", label: "홈", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><path d={active ? "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10.5z" : "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-4.5v-6h-3v6H4a1 1 0 0 1-1-1V10.5z"} />{active && <rect x="9" y="14" width="6" height="7" rx="0.5" fill={C.isDark ? C.bg : "#fff"} />}</svg> },
-            { id: "screener", label: "스크리너", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1}/><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg> },
-            { id: "auto-trading", label: "자동매매", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="3" fill={active ? "currentColor" : "none"} /><path d="M8 12l3 3 5-6" stroke={active ? (C.isDark ? C.bg : "#fff") : "currentColor"} strokeWidth="2" fill="none" />{active && <circle cx="18" cy="6" r="3.5" fill={C.green} stroke="none" />}</svg> },
-            { id: "portfolio", label: "자산", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" fill="none" stroke={active ? (C.isDark ? C.bg : "#fff") : "currentColor"} strokeWidth="1.8" /></svg> },
-            { id: "more", label: "메뉴", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg> },
+            { id: "home", cat: "home", label: "홈", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><path d={active ? "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10.5z" : "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-4.5v-6h-3v6H4a1 1 0 0 1-1-1V10.5z"} />{active && <rect x="9" y="14" width="6" height="7" rx="0.5" fill={C.isDark ? C.bg : "#fff"} />}</svg> },
+            { id: "screener", cat: "analysis", label: "마켓", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1}/><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg> },
+            { id: "auto-trading", cat: "ai-quant", label: "트레이딩", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="3" fill={active ? "currentColor" : "none"} /><path d="M8 12l3 3 5-6" stroke={active ? (C.isDark ? C.bg : "#fff") : "currentColor"} strokeWidth="2" fill="none" />{active && <circle cx="18" cy="6" r="3.5" fill={C.green} stroke="none" />}</svg> },
+            { id: "portfolio", cat: "management", label: "포트폴리오", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" fill="none" stroke={active ? (C.isDark ? C.bg : "#fff") : "currentColor"} strokeWidth="1.8" /></svg> },
+            { id: "more", cat: "info", label: "메뉴", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg> },
           ].map(item => {
             const isActive = item.id === "more"
-              ? !["home","screener","auto-trading","portfolio"].includes(tab)
-              : tab === item.id;
+              ? gnbCategory === "info"
+              : item.cat === gnbCategory;
             return (
               <button key={item.id} onClick={() => {
                 if (item.id === "more") {
-                  setTab("profile");
+                  try { window.dispatchEvent(new CustomEvent("zepta:open-mobile-menu")); } catch {}
                 } else {
                   setTab(item.id);
                 }
