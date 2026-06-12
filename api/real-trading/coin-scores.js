@@ -56,13 +56,18 @@ function toSymbol(asset) {
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
+  // ★ 2026-06-12: 홈/코인페이지 공개 노출 대비 CDN 캐시 — 생성 주기 10분이라 60s 캐시 무손실,
+  //   KV 읽기 비용을 엣지가 흡수. stale-while-revalidate 로 갱신 중에도 즉시 응답.
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   try {
     const _lim = parseInt(req.query?.limit, 10);
-    const limit = Math.min(Number.isFinite(_lim) && _lim > 0 ? _lim : 30, 60); // NaN/잘못된 입력 방어
+    // ★ 2026-06-12 (대표 제보): 동적 유니버스(유동성 상위 ~50종) 전환 후에도 기본 30 캡이
+    //   남아 48종 신호 중 30종만 표시되던 버그 → 기본 60 (풀 전체 커버).
+    const limit = Math.min(Number.isFinite(_lim) && _lim > 0 ? _lim : 60, 60); // NaN/잘못된 입력 방어
     const kv = await getKv();
     const [pool, poolMtf] = await Promise.all([
       kv.get(POOL_KEY).then((p) => p || []),
@@ -103,6 +108,7 @@ export default async function handler(req, res) {
           reason: (e.reason || "").slice(0, 140),
           ts: e.ts || 0,
           breakdown: normBreakdown(e.breakdown), // { 1w,1d,4h,1h: {side,score}|null }
+          sr: e.sr || null, // ★ 지지·저항 { s:[{p,t,d}], r:[{p,t,d}], piv, px, m } | null
         });
       }
     }
@@ -125,6 +131,7 @@ export default async function handler(req, res) {
             confidence: normConfidence(e.confidence),
             family: e.family || null, timeframe: e.timeframe || "1d",
             reason: (e.reason || "").slice(0, 140), ts: e.ts || 0, breakdown: null,
+            sr: e.sr || null, // ★ 지지·저항 (1d 폴백 풀에도 동일 주입됨)
           });
         }
       }

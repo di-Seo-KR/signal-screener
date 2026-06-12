@@ -28,8 +28,9 @@ import TradingModeSwitch from "./components/TradingModeSwitch.jsx"; // ★ 트�
 import {
   EquityCurveChart, LiveMetricsRow, PositionDonutChart,
   TradeHistoryTable, DailyPnLHeatmap, SystemStatusIndicator,
-  PeriodReturnsCard, OperationalMetrics, CoinDirectionScores,
+  PeriodReturnsCard, OperationalMetrics,
 } from "./ui/dashboard-widgets.jsx";
+import { SignalCoinBoard } from "./ui/signal-cards.jsx"; // ★ 리뉴얼 V2 — 시그널 카드+매물대
 
 // ═══════════════════════════════════════════════════════════════════
 // Custom Styles for RealTrading Dashboard
@@ -176,7 +177,7 @@ function RealTradingInner({ onNavigate }) {
     setCoinScores((prev) => ({ ...prev, loading: true }));
     // 코인 점수 + 포지션 plan + 순입출금 + 청산(실현) 거래 병렬 조회
     const [cs, pp, pf, ct] = await Promise.allSettled([
-      jget(`/api/real-trading/coin-scores?limit=30`),
+      jget(`/api/real-trading/coin-scores?limit=60`), // ★ 동적 유니버스 ~50종 전체 표시 (30 캡 버그 수정)
       jget(`/api/real-trading/position-plans?userId=${encodeURIComponent(userId)}`),
       jget(`/api/real-trading/period-returns?userId=${encodeURIComponent(userId)}`),
       jget(`/api/real-trading/closed-trades?userId=${encodeURIComponent(userId)}`),
@@ -1597,10 +1598,10 @@ function RealTradingInner({ onNavigate }) {
               <PeriodReturnsCard equity={equity} breaker={breaker} transfers={transfers} isMobile={isMobile} />
             </Card>
 
-            {/* ★ 2026-06-01: 코인별 롱숏 점수 — 엔진이 보는 양방향 신호를 한눈에 (대표 지시) */}
+            {/* ★ 2026-06-12 리뉴얼 V2: 시그널 종목 카드 — 종합 스코어 + 매물대(지지·저항) (대표 지시) */}
             <Card title="코인별 종합 스코어" icon={<Target size={16} />}
-              subtitle="주봉·일봉·4h·1h 가중 종합 — 전 봉 합의 시 점수↑ · 화살표는 봉별 방향 (60초 갱신)">
-              <CoinDirectionScores coins={coinScores.coins} counts={coinScores.counts} loading={coinScores.loading} isMobile={isMobile} />
+              subtitle="주·일·4h·1h 가중 종합 + 최근 60일 매물대 — 10분 갱신 · 카드 탭하면 상세">
+              <SignalCoinBoard coins={coinScores.coins} counts={coinScores.counts} loading={coinScores.loading} isMobile={isMobile} variant="full" />
             </Card>
 
             {/* ★ 2026-05-11: 운영 메트릭 (평균 보유, 24h 거래, 마진 사용률, 노출, 미실현 손익) */}

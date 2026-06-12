@@ -11,6 +11,7 @@ import AuthPage from "./AuthPage.jsx";
 import { GoogleAd } from "./AdBanner.jsx";
 import Header from "./components/Header.jsx";
 import SectionTabs from "./components/SectionTabs.jsx";
+import { HomeSignalBoard } from "./ui/signal-cards.jsx"; // ★ 리뉴얼 V2 — 홈 라이브 시그널 보드
 import PortfolioTab from "./components/PortfolioTab.jsx";
 import { supabase } from "./supabaseClient.js";
 import { THEME_TOKENS } from "./ui/theme.jsx";
@@ -7633,6 +7634,9 @@ function AppInner() {
                 ))}
               </div>
             )}
+
+            {/* ★ 2026-06-12 리뉴얼 V2 — 라이브 시그널 보드 (홈의 주인공, Zepta 고유 데이터) */}
+            <HomeSignalBoard isMobile={isMobile} onNavigate={isOwner ? setTab : null} />
 
             {/* ── 마켓 브리핑 (3×2 그리드 — 6개 지수 동등 표시) ─── */}
             {(() => {
