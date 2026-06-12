@@ -7727,10 +7727,7 @@ function AppInner() {
               </div>
             )}
 
-            {/* ★ 2026-06-12 리뉴얼 V2 — 라이브 시그널 보드 (홈의 주인공, Zepta 고유 데이터) */}
-            <HomeSignalBoard isMobile={isMobile} onNavigate={isOwner ? setTab : null} />
-
-            {/* ── 마켓 브리핑 (3×2 그리드 — 6개 지수 동등 표시) ─── */}
+            {/* ── 마켓 브리핑 (3×2 그리드 — 6개 지수 동등 표시) · 2026-06-12 대표 지시: 최상단 ─── */}
             {(() => {
               const sp = marketIndices.find(i => i.symbol === "^GSPC");
               const nq = marketIndices.find(i => i.symbol === "^IXIC");
@@ -7967,6 +7964,9 @@ function AppInner() {
                 </div>
               );
             })()}
+
+            {/* ★ 리뉴얼 V2 — 라이브 시그널 보드 (2026-06-12 대표 지시: 마켓 브리핑 아래로) */}
+            <HomeSignalBoard isMobile={isMobile} onNavigate={isOwner ? setTab : null} />
 
             {/* ── AI 퀀트 전략 하이라이트 (핵심 기능 → 최상단) ─── */}
             <div onClick={() => { setTab("auto-trading"); }} className="ui-card-premium" style={{
