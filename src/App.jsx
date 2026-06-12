@@ -1564,9 +1564,11 @@ function SignalTag({ triggerKey, asset }) {
   }
   return (
     <span title={meta.desc} style={{
-      padding: "2px 7px", borderRadius: "6px", fontSize: "15px", fontWeight: 700,
+      // ★ 2026-06-12 (대표 피드백 — 종목 카드 정돈): 시그널 태그 15px 는 본문급이라
+      //   카드가 시끄러웠음 → 보조 배지 위계(11px)로 정리
+      padding: "2px 7px", borderRadius: "6px", fontSize: "11px", fontWeight: 700,
       background: `${color}22`, color, border: `1px solid ${color}44`, whiteSpace: "nowrap",
-      cursor: "help",
+      cursor: "help", lineHeight: 1.6,
     }}>{icon} {label}</span>
   );
 }
@@ -2622,56 +2624,58 @@ function AssetCard({ asset, onChart, isMobile = false }) {
     }}
     onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 8px 16px ${borderColor}25`; }}
     onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}>
+      {/* ★ 2026-06-12 (대표 피드백 — "종목 카드 간격 개판"): 헤더 8pt 리듬 정돈 —
+          이름 15/17 · 티커 12 보조 · 등락 13/14(이전 18px 과대) · 배지류 11~12px 통일 */}
       <div onClick={() => setExpanded(!expanded)}
-        style={{ display: "flex", alignItems: "center", padding: isMobile ? "10px 12px" : "14px 18px", cursor: "pointer", gap: isMobile ? "8px" : "12px" }}>
+        style={{ display: "flex", alignItems: "center", padding: isMobile ? "12px 14px" : "14px 16px", cursor: "pointer", gap: isMobile ? "10px" : "12px" }}>
         <div style={{
-          width: isMobile ? "36px" : "42px", height: isMobile ? "36px" : "42px", borderRadius: "12px", background: mcBg, flexShrink: 0,
+          width: isMobile ? "38px" : "42px", height: isMobile ? "38px" : "42px", borderRadius: "12px", background: mcBg, flexShrink: 0,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontWeight: 800, fontSize: isMobile ? "12px" : "15px", color: mcColor, letterSpacing: "-0.5px",
+          fontWeight: 800, fontSize: isMobile ? "12px" : "14px", color: mcColor, letterSpacing: "-0.5px",
         }}>
           {asset.symbol.length <= 4 ? asset.symbol : asset.symbol.slice(0, 4)}
         </div>
         <div style={{ flex: 1, minWidth: 0, overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "4px" : "8px", marginBottom: "4px", flexWrap: "nowrap" }}>
-            <span style={{ fontWeight: 700, fontSize: isMobile ? "14px" : "18px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: isMobile ? "80px" : "none" }}>{asset.name}</span>
-            {!isMobile && <span style={{ fontSize: "16px", color: C.text3 }}>{asset.symbol}</span>}
+          <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "6px" : "8px", marginBottom: "5px", flexWrap: "nowrap" }}>
+            <span style={{ fontWeight: 700, fontSize: isMobile ? "15px" : "17px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: isMobile ? "110px" : "none" }}>{asset.name}</span>
+            {!isMobile && <span style={{ fontSize: "12px", color: C.text4, fontWeight: 600 }}>{asset.symbol}</span>}
             {diag && (
               <span style={{
-                fontSize: isMobile ? "12px" : "15px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", marginLeft: "auto", whiteSpace: "nowrap", flexShrink: 0,
+                fontSize: isMobile ? "11px" : "12px", fontWeight: 800, padding: "3px 8px", borderRadius: "var(--z-r-full)", marginLeft: "auto", whiteSpace: "nowrap", flexShrink: 0,
                 background: diag.score >= 68 ? `${C.green}20` : diag.score >= 42 ? `${C.yellow}20` : `${C.red}20`,
                 color: diag.score >= 68 ? C.green : diag.score >= 42 ? C.yellow : C.red,
               }}>{diag.score}점 {diag.opinion}</span>
             )}
           </div>
-          <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", alignItems: "center" }}>
             {asset.triggers.map(t => <SignalTag key={t} triggerKey={t} asset={asset} />)}
             {/* v6.9.1: 복합 다이버전스 뱃지 */}
             {(() => {
               const bd = [asset.macdDivType === "bullish", asset.rsiDivType === "bullish", asset.obvDivType === "bullish"].filter(Boolean).length;
               const sd = [asset.macdDivType === "bearish", asset.rsiDivType === "bearish", asset.obvDivType === "bearish"].filter(Boolean).length;
-              if (bd >= 2) return <span style={{ fontSize: "14px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: `${C.green}28`, color: C.green, border: `1px solid ${C.green}44` }}>{bd === 3 ? "⚡3중 강세" : "복합 강세"}</span>;
-              if (sd >= 2) return <span style={{ fontSize: "14px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: `${C.red}28`, color: C.red, border: `1px solid ${C.red}44` }}>{sd === 3 ? "⚡3중 약세" : "복합 약세"}</span>;
+              if (bd >= 2) return <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: `${C.green}28`, color: C.green, border: `1px solid ${C.green}44`, lineHeight: 1.6 }}>{bd === 3 ? "⚡3중 강세" : "복합 강세"}</span>;
+              if (sd >= 2) return <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: `${C.red}28`, color: C.red, border: `1px solid ${C.red}44`, lineHeight: 1.6 }}>{sd === 3 ? "⚡3중 약세" : "복합 약세"}</span>;
               return null;
             })()}
           </div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: isMobile ? "15px" : "18px", color: C.text1 }}>{fmtPrice(asset.price, asset.market)}</div>
-          <div style={{ fontSize: isMobile ? "14px" : "18px", fontWeight: 600, color: isPos ? C.green : C.red }}>
+          <div className="z-num" style={{ fontWeight: 700, fontSize: isMobile ? "15px" : "17px", color: C.text1, fontVariantNumeric: "tabular-nums" }}>{fmtPrice(asset.price, asset.market)}</div>
+          <div className="z-num" style={{ fontSize: isMobile ? "13px" : "14px", fontWeight: 700, color: isPos ? C.green : C.red, marginTop: "1px" }}>
             {isPos ? "▲" : "▼"} {Math.abs(asset.weekChange)}%
           </div>
           {/* 수급 미니 인디케이터 (CMF/MFI) */}
-          <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end", marginTop: "3px" }}>
+          <div style={{ display: "flex", gap: "4px", justifyContent: "flex-end", marginTop: "4px" }}>
             {asset.cmf != null && (Math.abs(asset.cmf) > 0.05) && (
               <span title={`CMF: ${asset.cmf > 0 ? "+" : ""}${asset.cmf.toFixed(3)}`} style={{
-                fontSize: "14px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px",
+                fontSize: "11px", fontWeight: 700, padding: "1px 6px", borderRadius: "4px", lineHeight: 1.6,
                 background: asset.cmf > 0.1 ? `${C.green}22` : asset.cmf < -0.1 ? `${C.red}22` : `${C.yellow}18`,
                 color: asset.cmf > 0.1 ? C.green : asset.cmf < -0.1 ? C.red : C.yellow,
               }}>{asset.cmf > 0 ? "매집" : "분산"}</span>
             )}
             {asset.mfi != null && (asset.mfi < 25 || asset.mfi > 75) && (
               <span title={`MFI: ${asset.mfi}`} style={{
-                fontSize: "14px", fontWeight: 700, padding: "1px 5px", borderRadius: "4px",
+                fontSize: "11px", fontWeight: 700, padding: "1px 6px", borderRadius: "4px", lineHeight: 1.6,
                 background: asset.mfi < 20 ? `${C.purple}22` : asset.mfi < 25 ? `${C.green}18` : asset.mfi > 80 ? `${C.red}22` : `${C.yellow}18`,
                 color: asset.mfi < 20 ? C.purple : asset.mfi < 25 ? C.green : asset.mfi > 80 ? C.red : C.yellow,
               }}>{asset.mfi < 25 ? "수급▲" : "수급▼"}</span>
