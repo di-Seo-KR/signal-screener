@@ -2720,11 +2720,12 @@ function AssetCard({ asset, onChart, isMobile = false }) {
                       color: diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow,
                     }}>{diag.opinion}</span>
                   </div>
-                  {/* 카테고리 미니 바 — auto-fit 으로 폭 따라 자동 열수(넘침 방지) */}
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: "6px" }}>
+                  {/* 카테고리 미니 바 — ★ 2026-06-12 (대표 피드백): 라벨 폭 36→50px + 줄바꿈 방지
+                      (모멘텀·펀더멘털이 '모멘↵텀'으로 깨지던 문제) */}
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "8px 10px" }}>
                     {diag.categories.map(cat => (
-                      <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
-                        <span style={{ fontSize: "14px", color: C.text3, width: "36px", flexShrink: 0 }}>{cat.name}</span>
+                      <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                        <span style={{ fontSize: "13px", color: C.text3, width: "50px", flexShrink: 0, whiteSpace: "nowrap", wordBreak: "keep-all" }}>{cat.name}</span>
                         <div style={{ flex: 1, height: "4px", background: C.border, borderRadius: "4px", overflow: "hidden" }}>
                           <div style={{
                             height: "100%", borderRadius: "4px",
@@ -3418,10 +3419,10 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                     </span>
                     <span style={{ fontSize: "15px", color: C.text3 }}>{diag.rationale}</span>
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(124px, 1fr))", gap: "6px" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(134px, 1fr))", gap: "9px 12px" }}>
                     {diag.categories.map(cat => (
-                      <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
-                        <span style={{ fontSize: "15px", color: C.text3, width: "36px", flexShrink: 0 }}>{cat.name}</span>
+                      <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+                        <span style={{ fontSize: "13px", color: C.text3, width: "52px", flexShrink: 0, whiteSpace: "nowrap", wordBreak: "keep-all" }}>{cat.name}</span>
                         <div style={{ flex: 1, height: "5px", background: C.border, borderRadius: "4px", overflow: "hidden" }}>
                           <div style={{
                             height: "100%", borderRadius: "4px",

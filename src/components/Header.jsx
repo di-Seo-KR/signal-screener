@@ -278,7 +278,7 @@ export default memo(function Header({
                     </div>
                   ) : (
                     <div className="flex items-center justify-between">
-                      <SheetTitle className="text-primary font-extrabold">Zepta</SheetTitle>
+                      <SheetTitle className="font-extrabold"><span style={{ color: "var(--z-blue)" }}>Z</span>epta</SheetTitle>
                       <Button size="sm" onClick={() => { setShowAuthModal(true); setMobileOpen(false); }}>
                         로그인
                       </Button>
@@ -382,10 +382,12 @@ export default memo(function Header({
               </SheetContent>
             </Sheet>
 
-            {/* 로고 */}
-            <div onClick={() => navigate("home")} className="flex cursor-pointer select-none items-center gap-2 lg:ml-6">
-              <img src="/zepta-icon-192.png" alt="Zepta 로고" width="36" height="36" className="size-7 sm:size-8 lg:size-9 shrink-0" />
-              <span className="text-base font-extrabold tracking-tight text-foreground sm:text-lg lg:text-xl">Zepta</span>
+            {/* 로고 — ★ 2026-06-12 (대표 피드백): 블로그/정적페이지 텍스트 로고(Z 일렉트릭 블루
+                강조)로 통일. 아이콘 이미지 제거, 트렌디·깔끔 */}
+            <div onClick={() => navigate("home")} className="flex cursor-pointer select-none items-center lg:ml-6">
+              <span className="text-lg font-extrabold tracking-tight text-foreground sm:text-xl" style={{ letterSpacing: "-0.02em" }}>
+                <span style={{ color: "var(--z-blue)" }}>Z</span>epta
+              </span>
             </div>
           </div>
 
