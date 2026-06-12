@@ -432,36 +432,3 @@ export function placeStopOrder({
     params, testnet,
   });
 }
-
-/**
- * 조건부 주문 검증(미체결) — POST /fapi/v1/order/test
- * 실제 주문을 생성하지 않고 거래소가 해당 주문(타입·파라미터·계정 권한)을
- * 수용하는지만 검증한다. 자금·포지션에 일절 영향 없음.
- * ★ 2026-06-12 (대표 승인 B-2 1단계): bracket SL 재활성 결정 근거 수집용 dry-run 프로브.
- *   과거(2026-05-11) STOP_MARKET reject("use Algo Order API")가 현재도 재현되는지 실측.
- * 파라미터는 placeStopOrder 와 동일.
- */
-export function testStopOrder({
-  apiKey, apiSecret, symbol, type, side, stopPrice,
-  quantity, closePosition = false, workingType = "MARK_PRICE",
-  price, timeInForce, testnet = false,
-}) {
-  const params = {
-    symbol, side, type, stopPrice, workingType,
-    newOrderRespType: "RESULT",
-  };
-  if (closePosition) {
-    params.closePosition = true;
-  } else {
-    params.quantity = quantity;
-    params.reduceOnly = true;
-  }
-  if (price != null && (type === "STOP" || type === "TAKE_PROFIT")) {
-    params.price = price;
-    params.timeInForce = timeInForce || "GTC";
-  }
-  return binanceSignedRequest({
-    apiKey, apiSecret, method: "POST", path: "/fapi/v1/order/test",
-    params, testnet,
-  });
-}

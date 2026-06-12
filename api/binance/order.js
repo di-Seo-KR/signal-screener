@@ -31,7 +31,6 @@ import {
   getTickerPrice,
   placeOrder,
   placeStopOrder,
-  testStopOrder,
 } from "../_shared/binance-client.js";
 
 // 심볼 정보 캐시 (Lambda warm 동안 유지)
@@ -186,53 +185,6 @@ export async function executeOrderPlan(opts) {
       skipped: true,
       reason: "bracket attach disabled — bot mark-price monitoring (plan.slPrice/tpPrice) only",
     };
-
-    // ★ 2026-06-12 (대표 승인 B-2 1단계): bracket 수용 여부 dry-run 프로브.
-    //   /fapi/v1/order/test 는 주문을 생성하지 않고 검증만 한다 — 자금·포지션·실주문 무영향.
-    //   실제 attach 직전과 동일 조건(진입 체결 직후, 실 SL 가격·실 포지션 상태)에서
-    //   STOP_MARKET 이 수용되는지 실측해, 재활성(ZEPTA_TRY_BRACKET=1) 결정 근거를 모은다.
-    //   결과는 di:rt:bracket-dryrun (최근 100건) + 응답 bracketResults.dryRunProbe.
-    //   ZEPTA_BRACKET_DRYRUN=0 으로 즉시 비활성. 실패해도 진입 플로우에 영향 없음(best-effort).
-    if (process.env.ZEPTA_BRACKET_DRYRUN !== "0" && stopLossPrice && Number.isFinite(stopLossPrice)) {
-      const probe = { ts: new Date().toISOString(), symbol, side, slPrice: stopLossPrice };
-      try {
-        await sleep(300); // 실제 attach 와 동일한 mark-price stabilize 대기
-        try {
-          await testStopOrder({
-            apiKey, apiSecret, symbol, type: "STOP_MARKET", side: closeSide,
-            stopPrice: stopLossPrice, closePosition: true, testnet,
-          });
-          probe.closePos = { ok: true };
-        } catch (e) {
-          probe.closePos = { ok: false, code: e?.data?.code ?? e?.code ?? null, msg: String(e?.data?.msg || e?.message || "").slice(0, 140) };
-        }
-        // 1차(closePosition) 거부 시에만 2차 변형(quantity+reduceOnly) 확인 — 실제 fallback 경로와 동일
-        if (!probe.closePos.ok) {
-          try {
-            await testStopOrder({
-              apiKey, apiSecret, symbol, type: "STOP_MARKET", side: closeSide,
-              stopPrice: stopLossPrice, quantity: qty, testnet,
-            });
-            probe.qtyRO = { ok: true };
-          } catch (e) {
-            probe.qtyRO = { ok: false, code: e?.data?.code ?? e?.code ?? null, msg: String(e?.data?.msg || e?.message || "").slice(0, 140) };
-          }
-        }
-        probe.accepted = !!(probe.closePos.ok || probe.qtyRO?.ok);
-        bracketResults.dryRunProbe = probe;
-        try {
-          const { kv } = await import("@vercel/kv");
-          const key = "di:rt:bracket-dryrun";
-          const list = (await kv.get(key)) || [];
-          const arr = Array.isArray(list) ? list : [];
-          arr.unshift(probe);
-          await kv.set(key, arr.slice(0, 100));
-        } catch {}
-      } catch (e) {
-        // 프로브 자체 실패(타임아웃 등)도 진입에 영향 주지 않음
-        bracketResults.dryRunProbe = { ts: probe.ts, symbol, error: String(e?.message || e).slice(0, 140) };
-      }
-    }
   } else if (stopLossPrice || takeProfitPrice) {
     // ★ 진입 직후 mark price stabilize 시간 (300ms). binance 가 진입 직후의
     //   mark price 일시 swing 으로 STOP_MARKET 을 "would immediately trigger"
