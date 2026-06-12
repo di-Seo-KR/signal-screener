@@ -336,6 +336,7 @@ const ROUTES = [
   },
   {
     path: "notifications",
+    noindex: true, // 로그인 전용 알림 설정 — 공개 색인 가치 없음
     title: "Zepta 알림 센터 — 가격·시그널·뉴스·포트폴리오 통합",
     desc: "모든 알림을 한 곳에서 — 가격 변동, 시그널 발생, 뉴스 영향도, 포트폴리오 임계값. 채널 별 설정.",
     h1: "Zepta 알림 센터 — 모든 알림을 한 곳에서",
@@ -355,6 +356,7 @@ const ROUTES = [
   },
   {
     path: "saved-screeners",
+    noindex: true, // 로그인 전용 저장 조건 — 공개 색인 가치 없음
     title: "Zepta 저장한 스크리너 — 관심 조건 자동 매칭 알림",
     desc: "RSI 과매도, 골든크로스, 볼린저밴드, ATR 폭발 등 저장한 조건이 시장에서 매칭되면 알림 전송.",
     h1: "Zepta 저장한 스크리너 — 관심 조건을 자동 매칭",
@@ -393,6 +395,7 @@ const ROUTES = [
   },
   {
     path: "reports",
+    noindex: true, // /reports/<botId> 사용자별 동적 — 공개 색인 가치 없음
     title: "Zepta 봇 리포트 — 봇별 누적 성과·에쿼티 커브",
     desc: "13개 자동매매 봇의 누적 수익, 승률, PF, MDD, 최근 30일 에쿼티 커브와 거래 내역을 한 곳에서 확인.",
     h1: "Zepta 봇 리포트 — 봇별 누적 성과와 거래 내역",
@@ -469,6 +472,7 @@ const ROUTES = [
   },
   {
     path: "quant-port",
+    canonicalPath: "quant-portfolio", // quant-portfolio 의 별칭 — 정본으로 canonical 통일(중복 제거)
     // 'quant-portfolio' 의 짧은 별칭 (sitemap.xml 에 등록됨). 동일 콘텐츠 prerender.
     title: "Zepta 퀀트 포트폴리오 — 다중 알고리즘 최적화",
     desc: "켈리·평균분산·블랙리터만 다중 알고리즘. 자동 리밸런싱, 리스크 패리티.",
@@ -489,6 +493,7 @@ const ROUTES = [
   },
   {
     path: "profile",
+    noindex: true, // 계정·API키 관리 화면 — 공개 색인 금지
     title: "Zepta 프로필 — 계정·알림 채널·API 키 관리",
     desc: "사용자 프로필, 알림 채널(텔레그램·이메일), Binance API 키, 구독 플랜, 보안 설정을 한 곳에서 관리.",
     h1: "Zepta 프로필 — 계정과 연동을 한 곳에서 관리",
@@ -648,8 +653,16 @@ function buildHomePrerender(h) {
     </section>`;
 }
 
+// base index.html 에 박힌 FAQPage JSON-LD 블록 1건을 제거(페이지별 FAQ 주입 전).
+//   tempered-dot 으로 </script> 경계를 넘지 않아 FAQPage 가 든 단일 블록만 안전 제거.
+//   (2026-06-12 전수감사: 모든 라우트·홈에 base 12문항 + 주입본이 공존해 페이지당 FAQPage 2개 중복이던 결함 수정)
+const FAQ_LD_RE = /\s*<script type="application\/ld\+json">(?:(?!<\/script>)[\s\S])*?"@type":\s*"FAQPage"(?:(?!<\/script>)[\s\S])*?<\/script>/gi;
+function stripBaseFaq(html) {
+  return html.replace(FAQ_LD_RE, "");
+}
+
 function transformHomeHtml(baseHtml, h) {
-  let html = baseHtml;
+  let html = stripBaseFaq(baseHtml);
   const url = "https://zepta.app/";
   html = html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeText(h.title)}</title>`);
   html = html.replace(/(<link\s+rel="canonical"[^>]*href=")[^"]+(")/i, `$1${url}$2`);
@@ -667,17 +680,25 @@ function transformHomeHtml(baseHtml, h) {
 
 function transformHtml(baseHtml, route) {
   const url = `https://zepta.app/${route.path}`;
-  let html = baseHtml;
+  // 별칭 라우트(예: quant-port)는 정본 URL 로 canonical 고정 — 자기참조 중복 방지.
+  const canonicalUrl = `https://zepta.app/${route.canonicalPath || route.path}`;
+  let html = stripBaseFaq(baseHtml);
 
   // 1) head 메타 교체
   html = html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeText(route.title)}</title>`);
-  html = html.replace(/(<link\s+rel="canonical"[^>]*href=")[^"]+(")/i, `$1${url}$2`);
+  html = html.replace(/(<link\s+rel="canonical"[^>]*href=")[^"]+(")/i, `$1${canonicalUrl}$2`);
   html = replaceMetaTag(html, "name", "description", "content", route.desc);
   html = replaceMetaTag(html, "property", "og:title", "content", route.title);
   html = replaceMetaTag(html, "property", "og:description", "content", route.desc);
-  html = replaceMetaTag(html, "property", "og:url", "content", url);
+  html = replaceMetaTag(html, "property", "og:url", "content", canonicalUrl);
   html = replaceMetaTag(html, "name", "twitter:title", "content", route.title);
   html = replaceMetaTag(html, "name", "twitter:description", "content", route.desc);
+
+  // 1.5) 앱 전용/계정 thin 라우트는 noindex,follow 로 — 색인 잡음·thin-content 평가 차단.
+  if (route.noindex) {
+    html = replaceMetaTag(html, "name", "robots", "content", "noindex, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1");
+    html = replaceMetaTag(html, "name", "googlebot", "content", "noindex, follow");
+  }
 
   // 2) FAQPage JSON-LD 주입 (</head> 직전)
   if (Array.isArray(route.faq) && route.faq.length > 0) {

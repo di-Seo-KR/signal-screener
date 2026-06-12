@@ -4363,6 +4363,8 @@ function AppInner() {
       const p = new URLSearchParams(window.location.search);
       const t = p.get("tab");
       if (t && validTabs.includes(t)) return t;
+      // 사이트링크 검색박스(?q=) 진입 → 스크리너로 (검색어는 assetQuery 가 시드)
+      if (p.get("q")) return "screener";
       // 3순위: sessionStorage (새로고침 시 복원)
       const saved = sessionStorage.getItem("zepta_tab");
       if (saved && validTabs.includes(saved)) return saved;
@@ -4640,6 +4642,13 @@ function AppInner() {
   const [chartAsset, setChartAsset]   = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null); // 종목 상세 팝업
   const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
+  // ── 스크리너 종목 빠른 검색 — 사이트링크 검색박스(?q=) 실연동 ──
+  //   구조화데이터 WebSite.SearchAction(target /screener?q=)이 선언만 하고 미동작이던 것을 실배선.
+  //   진입 시 ?q 를 읽어 시드(최대 40자, XSS 방지 위해 표시 외 용도 없음).
+  const [assetQuery, setAssetQuery] = useState(() => {
+    try { return (new URLSearchParams(window.location.search).get("q") || "").slice(0, 40); }
+    catch { return ""; }
+  });
 
   // ── 저평가 종목 스캔 ──
   const [valueResults, setValueResults] = useState([]);
@@ -9323,6 +9332,62 @@ function AppInner() {
             }}>
               <div style={{ fontWeight: 800, fontSize: isMobile ? 19 : 24, color: C.text1 }}>{t("tabs.screener.title")}</div>
               <div style={{ fontSize: mf(14), color: C.text3, marginTop: "4px" }}>{t("tabs.screener.subtitle")}</div>
+            </div>
+
+            {/* ── 종목 빠른 검색 — 사이트링크 검색박스(?q=) 실연동 진입점 ── */}
+            <div style={{ marginBottom: "16px" }}>
+              <div style={{ position: "relative" }}>
+                <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", fontSize: 16, color: C.text3, pointerEvents: "none" }}>🔍</span>
+                <input
+                  value={assetQuery}
+                  onChange={(e) => setAssetQuery(e.target.value.slice(0, 40))}
+                  placeholder="종목 검색 (예: 비트코인, NVDA, 삼성전자)"
+                  aria-label="종목 검색"
+                  style={{
+                    width: "100%", boxSizing: "border-box", padding: "12px 38px 12px 40px", borderRadius: 12,
+                    background: C.card, border: `1px solid ${C.border}`, color: C.text1, fontSize: mf(15), outline: "none",
+                  }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = C.blue; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = C.border; }}
+                />
+                {assetQuery && (
+                  <button onClick={() => setAssetQuery("")} aria-label="검색어 지우기" style={{
+                    position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                    background: "none", border: "none", color: C.text3, fontSize: 18, cursor: "pointer", lineHeight: 1, padding: 4,
+                  }}>✕</button>
+                )}
+              </div>
+              {assetQuery.trim() && (() => {
+                const q = assetQuery.toLowerCase().trim();
+                const matches = ALL_ASSETS.filter((a) => a.searchKey.includes(q)).slice(0, 24);
+                if (matches.length === 0) {
+                  return <div style={{ marginTop: 10, padding: "14px", textAlign: "center", fontSize: mf(14), color: C.text3, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }}>
+                    '{assetQuery}' 와 일치하는 종목이 없어요
+                  </div>;
+                }
+                const marketLabel = { us: "미국", kr: "한국", crypto: "코인" };
+                return (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: mf(13), color: C.text3, marginBottom: 8 }}>'{assetQuery}' 검색 결과 {matches.length}종목 · 종목을 누르면 상세 분석이 열려요</div>
+                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(220px, 1fr))", gap: 8 }}>
+                      {matches.map((a) => (
+                        <button key={`${a.market}-${a.symbol}`} onClick={() => setSelectedAsset(a)} style={{
+                          display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", textAlign: "left",
+                          background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, cursor: "pointer", minHeight: 48,
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.blue; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 6, background: C.card2, color: C.text3, flexShrink: 0 }}>{marketLabel[a.market] || a.market}</span>
+                          <span style={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                            <span style={{ fontSize: mf(14), fontWeight: 700, color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.symbol}</span>
+                            <span style={{ fontSize: mf(12), color: C.text3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{a.koName || a.name}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* ── 스크리너 프리셋 (토스 스타일) ── */}
