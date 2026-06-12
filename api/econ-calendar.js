@@ -99,7 +99,9 @@ export default async function handler(req, res) {
   // ── 소스별 결과 정리 ──
   const finnhubEvents = finnhubResult.status === "fulfilled" ? finnhubResult.value : [];
   const fmpEvents     = fmpResult.status === "fulfilled" ? fmpResult.value : [];
-  const blsActuals    = blsResult.status === "fulfilled" ? blsResult.value : {};
+  const blsOut        = blsResult.status === "fulfilled" ? (blsResult.value || {}) : {};
+  const blsActuals    = blsOut.actuals || {};
+  const blsByName     = blsOut.byName || {}; // curated 외 이벤트(MoM 행 등) 이름 폴백
   const fredActuals   = fredResult.status === "fulfilled" ? fredResult.value : {};
   const ffEvents      = ffResult.status === "fulfilled" ? ffResult.value : [];
 
@@ -192,8 +194,19 @@ export default async function handler(req, res) {
     return e;
   });
 
+  // ── BLS 이름 폴백 적용 — curated 에 없는 행(FF 런타임 추가 MoM 등)의 '발표 대기' 해소 ──
+  const byNameKeyed = {};
+  for (const [name, val] of Object.entries(blsByName)) {
+    const cands = finalEvents.filter(e => e.event === name && e.actual == null && e.date <= todayStr);
+    if (cands.length > 0) {
+      const target = cands[cands.length - 1]; // 가장 최근 과거 이벤트
+      target.actual = val;
+      byNameKeyed[`${target.date}::${target.event}`] = val;
+    }
+  }
+
   // ── KV에 새로운 actual 저장 ──
-  await saveActualsToKV({ ...apiSourceActuals, ...fredActuals, ...blsActuals });
+  await saveActualsToKV({ ...apiSourceActuals, ...fredActuals, ...blsActuals, ...byNameKeyed });
 
   const sourceList = [
     source,
@@ -279,12 +292,16 @@ async function fetchFMP(from, to) {
 // ══════════════════════════════════════════════════════════════
 async function fetchBLSActuals() {
   const actuals = {};
+  const byName = {}; // curated 에 없는 이벤트(런타임 추가 MoM 행 등) 이름 기반 폴백
   const blsKey = process.env.BLS_API_KEY;
 
-  // BLS 시리즈: CPI, Core CPI, 실업률, NFP
+  // BLS 시리즈: CPI(전년/전월), Core CPI(전년/전월), 실업률, NFP
+  //   ★ 2026-06-12 (대표 제보): FF 가 추가한 MoM 행이 '발표 대기'로 남던 것 — 전월비도 산출
   const series = [
     { id: "CUSR0000SA0",    match: "CPI (YoY)",        calc: "yoy" },    // CPI-U All Items (SA)
+    { id: "CUSR0000SA0",    match: "CPI (MoM)",        calc: "mom" },
     { id: "CUSR0000SA0L1E", match: "Core CPI (YoY)",   calc: "yoy" },    // CPI-U Less Food & Energy (SA)
+    { id: "CUSR0000SA0L1E", match: "Core CPI (MoM)",   calc: "mom" },
     { id: "LNS14000000",    match: "Unemployment Rate", calc: "direct" }, // Civilian Unemployment Rate (SA)
     { id: "CES0000000001",  match: "Nonfarm Payrolls",  calc: "diff" },   // Total Nonfarm (SA, thousands)
   ];
@@ -296,7 +313,7 @@ async function fetchBLSActuals() {
     // BLS API v2 POST: startyear/endyear 필수, latest는 GET 전용
     // YoY 계산을 위해 작년~올해 2년치 요청 (최소 13개월 필요)
     const body = {
-      seriesid: series.map(s => s.id),
+      seriesid: [...new Set(series.map(s => s.id))], // 같은 시리즈로 YoY/MoM 양쪽 산출 — 중복 요청 제거
       startyear: String(curYear - 1),
       endyear: String(curYear),
     };
@@ -315,17 +332,20 @@ async function fetchBLSActuals() {
       signal: AbortSignal.timeout(10000),
     });
 
-    if (!resp.ok) return actuals;
+    if (!resp.ok) return { actuals, byName };
     const json = await resp.json();
-    if (json.status !== "REQUEST_SUCCEEDED") return actuals;
+    if (json.status !== "REQUEST_SUCCEEDED") return { actuals, byName };
 
     const curatedEvents = getCuratedEvents2026();
     const todayStr = `${curYear}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
 
-    for (const seriesData of (json.Results?.series || [])) {
-      const sid = seriesData.seriesID;
-      const config = series.find(s => s.id === sid);
-      if (!config) continue;
+    // 응답을 시리즈 ID 로 색인 — 같은 시리즈에서 YoY/MoM 두 config 가 읽도록
+    const byId = {};
+    for (const sd of (json.Results?.series || [])) byId[sd.seriesID] = sd;
+
+    for (const config of series) {
+      const seriesData = byId[config.id];
+      if (!seriesData) continue;
 
       // BLS 데이터: 최신 → 오래된 순 (year desc, period desc)
       const rawData = (seriesData.data || [])
@@ -364,6 +384,10 @@ async function fetchBLSActuals() {
         const prev12Val = parseFloat(prev12Entry.value);
         if (isNaN(prev12Val) || prev12Val <= 0) continue;
         actual = Math.round(((latestVal - prev12Val) / prev12Val) * 1000) / 10;
+      } else if (config.calc === "mom") {
+        // 전월비 % — FF 가 추가하는 'CPI (MoM)'/'Core CPI (MoM)' 행의 발표치
+        if (!(prevVal > 0)) continue;
+        actual = Math.round(((latestVal - prevVal) / prevVal) * 1000) / 10;
       }
 
       if (actual == null || isNaN(actual)) continue;
@@ -375,11 +399,14 @@ async function fetchBLSActuals() {
       if (matching.length > 0) {
         const target = matching[matching.length - 1];
         actuals[`${target.date}::${target.event}`] = actual;
+      } else {
+        // curated 에 없는 이벤트(FF 가 런타임 추가하는 MoM 행 등) — 이름 기반 폴백
+        byName[config.match] = actual;
       }
     }
   } catch { /* BLS 실패 무시 */ }
 
-  return actuals;
+  return { actuals, byName };
 }
 
 // ══════════════════════════════════════════════════════════════
