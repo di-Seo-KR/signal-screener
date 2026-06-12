@@ -35,8 +35,9 @@ function pivotOnly(candles, refPrice) {
   const piv = classicPivot(candles);
   if (!piv || !(refPrice > 0)) return null;
   const mk = (p) => ({ p: round5(p), t: 0, d: round1((p / refPrice - 1) * 100) });
-  const s = [piv.S1, piv.S2].filter((p) => p > 0 && p < refPrice * 0.998).map(mk);
-  const r = [piv.R1, piv.R2].filter((p) => p > refPrice * 1.002).map(mk);
+  // ★ 거리 캡 ±25% — 초변동 코인(신규상장 등)의 피봇 폭주 차단 (2026-06-12 라이브 실측 보강)
+  const s = [piv.S1, piv.S2].filter((p) => p > 0 && p < refPrice * 0.998 && p > refPrice * 0.75).map(mk);
+  const r = [piv.R1, piv.R2].filter((p) => p > refPrice * 1.002 && p < refPrice * 1.25).map(mk);
   if (s.length === 0 && r.length === 0) return null;
   return { s, r, piv: round5(piv.P), px: round5(refPrice), m: "pivot" };
 }
@@ -110,10 +111,11 @@ export function computeSRLevels(dailyCandles, refPrice, { N = 60, k = 2, tol = 0
     let usedPivotFill = false;
     if (piv) {
       const mkFill = (p) => ({ p: round5(p), t: 0, d: round1((p / refPrice - 1) * 100) });
+      // ★ 보충 후보도 거리 캡 ±25% 적용 — 초변동 코인의 피봇 폭주 차단 (라이브 실측 보강)
       if (s.length < 2) {
         for (const cand of [piv.S1, piv.S2]) {
           if (s.length >= 2) break;
-          if (cand > 0 && cand < refPrice * 0.998 && !s.some((x) => Math.abs(x.p - cand) / cand < tol)) {
+          if (cand > 0 && cand < refPrice * 0.998 && cand > refPrice * 0.75 && !s.some((x) => Math.abs(x.p - cand) / cand < tol)) {
             s.push(mkFill(cand)); usedPivotFill = true;
           }
         }
@@ -122,7 +124,7 @@ export function computeSRLevels(dailyCandles, refPrice, { N = 60, k = 2, tol = 0
       if (r.length < 2) {
         for (const cand of [piv.R1, piv.R2]) {
           if (r.length >= 2) break;
-          if (cand > refPrice * 1.002 && !r.some((x) => Math.abs(x.p - cand) / cand < tol)) {
+          if (cand > refPrice * 1.002 && cand < refPrice * 1.25 && !r.some((x) => Math.abs(x.p - cand) / cand < tol)) {
             r.push(mkFill(cand)); usedPivotFill = true;
           }
         }
