@@ -473,7 +473,7 @@ function SuggestedModal({ C, isMobile, suggested, remaining, onClose, onAdd }) {
         onClose={onClose}
         title="✨ 추천 스크리너"
         description={`검증된 4개 패턴 · 남은 슬롯 ${remaining}개`}
-        maxHeight="88vh"
+        maxHeight="88dvh"
       >
         {body}
       </BottomSheet>
@@ -487,7 +487,7 @@ function SuggestedModal({ C, isMobile, suggested, remaining, onClose, onAdd }) {
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         background: C.card, border: `1px solid ${C.border}`, borderRadius: RADIUS["2xl"],
-        padding: 24, maxWidth: 560, width: "100%", maxHeight: "90vh", overflow: "auto",
+        padding: 24, maxWidth: 560, width: "100%", maxHeight: "90dvh", overflow: "auto",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div>
@@ -526,7 +526,9 @@ function ConfirmModal({ C, isMobile, title, desc, confirmLabel = "확인", cance
       aria-modal="true"
       aria-label={title}
       style={{
-        position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 10000,
+        // ★ 2026-06-12 모달 전수감사 P6: z10000(탭바 동률·DOM 순서로 패배) → 11000,
+        //   모바일 바닥 시트의 '취소' 버튼이 탭바(82px)에 가려지던 것 → safe-area+탭바 패딩
+        position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 11000,
         display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center",
         padding: isMobile ? 0 : 16,
       }}
@@ -535,6 +537,7 @@ function ConfirmModal({ C, isMobile, title, desc, confirmLabel = "확인", cance
         background: C.card, border: `1px solid ${C.border}`,
         borderRadius: isMobile ? `${RADIUS.xl} ${RADIUS.xl} 0 0` : RADIUS["2xl"],
         padding: 24, maxWidth: 420, width: "100%",
+        paddingBottom: isMobile ? "calc(24px + env(safe-area-inset-bottom, 0px) + 82px)" : 24,
         boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
       }}>
         <div style={{ fontSize: FONT.lg, fontWeight: 800, color: C.text1, marginBottom: 8 }}>

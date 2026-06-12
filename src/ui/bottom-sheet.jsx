@@ -42,7 +42,7 @@ export function BottomSheet({
   description,
   children,
   footer,
-  maxHeight = "85vh",
+  maxHeight = "85dvh", // dvh (P9)
   draggable = true,
   dismissOnBackdrop = true,
 }) {

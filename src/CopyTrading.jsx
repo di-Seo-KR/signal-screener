@@ -218,7 +218,7 @@ function DisclaimerModal({ open, targetBot, mode, setMode, onCancel, onConfirm, 
         description="⚠️ 카피트레이딩 면책 동의"
         footer={footer}
         dismissOnBackdrop={false}
-        maxHeight="92vh"
+        maxHeight="92dvh"
       >
         {body}
       </BottomSheet>
@@ -243,7 +243,7 @@ function DisclaimerModal({ open, targetBot, mode, setMode, onCancel, onConfirm, 
       <div style={{
         background: C.card, borderRadius: RADIUS.xl,
         maxWidth: 520, width: "100%",
-        maxHeight: "90vh", overflowY: "auto",
+        maxHeight: "90dvh", overflowY: "auto",
         border: `1px solid ${C.border}`,
         boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
       }}>

@@ -417,7 +417,7 @@ export function Dialog({ open, onClose, title, description, children, footer, ma
           borderRadius: "var(--z-r-xl)",
           boxShadow: "var(--z-sh-lg)",
           padding: 0, width: "100%", maxWidth,
-          maxHeight: "calc(100vh - 32px)", overflow: "auto",
+          maxHeight: "calc(100dvh - 32px)", overflow: "auto", // dvh — iOS 주소창 보정 (P11)
         }}
       >
         <div style={{ padding: "20px 22px 8px", display: "flex", alignItems: "flex-start", gap: 12 }}>
@@ -783,8 +783,12 @@ export function ToastProvider({ children }) {
         }
       `}</style>
       <div style={{
-        position: "fixed", bottom: 24, right: 24, left: "auto", transform: "none",
-        display: "flex", flexDirection: "column", gap: 8, zIndex: 2000,
+        // ★ 2026-06-12 모달 전수감사 P5: z2000 이라 모바일 탭바(z10000) 뒤에 숨어 주문/긴급정지
+        //   피드백이 안 보이던 문제 — z 정책(토스트 99999 > 모달 11000 > 탭바 10000) 정렬 + 모바일은 탭바 위로.
+        position: "fixed",
+        bottom: typeof window !== "undefined" && window.innerWidth <= 640 ? "calc(94px + env(safe-area-inset-bottom, 0px))" : 24,
+        right: 24, left: "auto", transform: "none",
+        display: "flex", flexDirection: "column", gap: 8, zIndex: 99999,
         pointerEvents: "none", maxWidth: "calc(100vw - 32px)",
       }}>
         {toasts.map((t) => {

@@ -1721,7 +1721,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
   // ── Full-page layout ───────────────────────────────────────────
   return (
     <div style={{
-      position: "fixed", inset: 0, zIndex: 1000,
+      position: "fixed", inset: 0, zIndex: 11000, // E-4 정책: Modal 11000 > 탭바 10000 (모달 전수감사 P2)
       background: CC.bg, display: "flex", flexDirection: "column",
       overflow: "hidden",
       /* iOS 세이프 에어리어 (노치/다이나믹 아일랜드) 대응 */

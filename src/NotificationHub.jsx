@@ -438,7 +438,7 @@ function SettingsModal({ C, uid, isMobile, onClose }) {
         onClose={onClose}
         title="⚙️ 알림 설정"
         footer={footer}
-        maxHeight="92vh"
+        maxHeight="92dvh"
       >
         {body}
       </BottomSheet>
@@ -452,7 +452,7 @@ function SettingsModal({ C, uid, isMobile, onClose }) {
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         background: C.card, border: `1px solid ${C.border}`, borderRadius: RADIUS["2xl"],
-        padding: 24, maxWidth: 520, width: "100%", maxHeight: "90vh", overflow: "auto",
+        padding: 24, maxWidth: 520, width: "100%", maxHeight: "90dvh", overflow: "auto",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <div style={{ fontSize: FONT.xl, fontWeight: 800, color: C.text1 }}>⚙️ 알림 설정</div>
