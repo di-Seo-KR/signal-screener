@@ -2218,6 +2218,19 @@ function calcBuyLevels(asset) {
     });
   }
 
+  // ── 정렬·중복 정리 (2026-06-12 대표 피드백) ──
+  //   방법론 순서(L1/L2/L3)로만 push 하면 '3차'가 '1차'보다 현재가에 가까운 역전이 생김
+  //   (예: 피보 61.8% -2.4% < 52주저점 -3%). 현재가에 가까운 순(할인율 오름차순)으로
+  //   정렬하고, 0.8%p 이내로 붙은 레벨은 신뢰도 높은 쪽만 남긴 뒤 1·2·3차 재라벨링.
+  levels.sort((a, b) => a.discount - b.discount);
+  for (let i = levels.length - 1; i > 0; i--) {
+    if (Math.abs(levels[i].discount - levels[i - 1].discount) < 0.8) {
+      const keep = levels[i].confidence >= levels[i - 1].confidence ? levels[i] : levels[i - 1];
+      levels.splice(i - 1, 2, keep);
+    }
+  }
+  levels.forEach((lv, i) => { lv.label = `${i + 1}차 매수`; });
+
   // ── 요약 문구 생성 ──
   let summary = "";
   if (levels.length === 3) {
@@ -3449,29 +3462,52 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 </div>
               )}
 
-              {/* 매수 추천가 3단계 */}
+              {/* 매수 추천가 3단계 — 모바일: 가로 3열이 세로로 깨지던 문제 → 행(row) 카드 스택 (대표 피드백 2026-06-12) */}
               {buyLevels.levels.length > 0 && (
-                <div style={{ marginTop: "12px", padding: "14px", borderRadius: "12px", background: `${C.blueBg}60`, border: `1px solid ${C.blue}20` }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                    <span style={{ fontSize: "18px", fontWeight: 700, color: C.text1 }}>🎯 매수 추천가</span>
-                    <span style={{ fontSize: "15px", color: C.text3 }}>{buyLevels.summary}</span>
+                <div style={{ marginTop: "12px", padding: isMobile ? "12px" : "14px", borderRadius: "12px", background: `${C.blueBg}60`, border: `1px solid ${C.blue}20` }}>
+                  <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", gap: isMobile ? 2 : 8, marginBottom: "10px" }}>
+                    <span style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, whiteSpace: "nowrap" }}>🎯 매수 추천가</span>
+                    <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, wordBreak: "keep-all", lineHeight: 1.4 }}>{buyLevels.summary}</span>
                   </div>
-                  <div style={{ display: "flex", gap: "8px" }}>
+                  <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: "8px" }}>
                     {buyLevels.levels.map((lv, li) => {
                       const lvColors = [C.blue, C.purple, C.green];
                       const lvIcons = ["1️⃣", "2️⃣", "3️⃣"];
+                      const priceText = asset.market === "kr" ? `₩${Math.round(lv.price).toLocaleString()}` : `$${lv.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+                      if (isMobile) {
+                        // 모바일: 좌(차수·가격·할인) + 우(근거·신뢰도) 가로 행 — 세로 깨짐 없음
+                        return (
+                          <div key={li} style={{
+                            display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", borderRadius: "12px",
+                            background: `${lvColors[li]}12`, border: `1px solid ${lvColors[li]}20`,
+                          }}>
+                            <div style={{ flexShrink: 0, minWidth: 92 }}>
+                              <div style={{ fontSize: "13px", fontWeight: 700, color: lvColors[li], whiteSpace: "nowrap" }}>{lvIcons[li]} {lv.label}</div>
+                              <div className="z-num" style={{ fontSize: "16px", fontWeight: 800, color: C.text1, marginTop: 2, fontVariantNumeric: "tabular-nums" }}>{priceText}</div>
+                              <div style={{ fontSize: "13px", fontWeight: 700, color: C.red }}>-{lv.discount}%</div>
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: "13px", color: C.text3, lineHeight: 1.45, wordBreak: "keep-all" }}>{lv.rationale}</div>
+                              <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                                <div style={{ flex: 1, height: "3px", borderRadius: "4px", background: `${C.border}40`, overflow: "hidden" }}>
+                                  <div style={{ height: "100%", width: `${lv.confidence}%`, background: lvColors[li], borderRadius: "4px" }} />
+                                </div>
+                                <span style={{ fontSize: "12px", color: C.text3, whiteSpace: "nowrap" }}>신뢰도 {lv.confidence}%</span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
                       return (
                         <div key={li} style={{
                           flex: 1, padding: "10px 8px", borderRadius: "12px",
                           background: `${lvColors[li]}12`, textAlign: "center",
                           border: `1px solid ${lvColors[li]}20`,
                         }}>
-                          <div style={{ fontSize: "16px", fontWeight: 700, color: lvColors[li], marginBottom: "4px" }}>{lvIcons[li]} {lv.label}</div>
-                          <div style={{ fontSize: "18px", fontWeight: 800, color: C.text1 }}>
-                            {asset.market === "kr" ? `₩${Math.round(lv.price).toLocaleString()}` : `$${lv.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`}
-                          </div>
+                          <div style={{ fontSize: "16px", fontWeight: 700, color: lvColors[li], marginBottom: "4px", whiteSpace: "nowrap" }}>{lvIcons[li]} {lv.label}</div>
+                          <div style={{ fontSize: "18px", fontWeight: 800, color: C.text1 }}>{priceText}</div>
                           <div style={{ fontSize: "16px", fontWeight: 700, color: C.red, marginTop: "2px" }}>-{lv.discount}%</div>
-                          <div style={{ fontSize: "14px", color: C.text3, marginTop: "4px", lineHeight: 1.3 }}>{lv.rationale}</div>
+                          <div style={{ fontSize: "14px", color: C.text3, marginTop: "4px", lineHeight: 1.3, wordBreak: "keep-all" }}>{lv.rationale}</div>
                           <div style={{ marginTop: "4px" }}>
                             <div style={{ height: "3px", borderRadius: "4px", background: `${C.border}40`, overflow: "hidden" }}>
                               <div style={{ height: "100%", width: `${lv.confidence}%`, background: lvColors[li], borderRadius: "4px" }} />
