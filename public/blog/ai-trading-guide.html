@@ -81,14 +81,15 @@ body.znav-open #znav-drawer{transform:translateX(0)}
     .ad-slot{margin:28px 0;padding:14px;background:#0A1220;border:1px solid #23262F;border-radius:10px;text-align:center;font-size:12px;color:#6E7585}
     @media(max-width:640px){h1{font-size:24px}.wrap{padding:24px 16px}p,li{font-size:15px}}
   </style>
-  <script async src="https://www.googletagmanager.com/gtag/js?id=G-BMP34JQ649"></script>
   <script>
-    window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
-    gtag('js',new Date());gtag('config','G-BMP34JQ649',{page_path:'/blog/ai-trading-guide'});
-    let _s75=false;window.addEventListener('scroll',()=>{
-      const sp=(window.scrollY+window.innerHeight)/document.body.scrollHeight;
-      if(sp>=0.75&&!_s75){_s75=true;gtag('event','blog_post_read',{post:'ai-trading-guide',depth:75});}
-    },{passive:true});
+    /* Zepta 자체 애널리틱스 (GA 대체, 2026-06-12) — 무쿠키·익명, /api/track 집계 */
+    (function(){
+      function vid(){try{var v=localStorage.getItem("z_vid");if(!v){v=Date.now()+"-"+Math.random().toString(36).slice(2,10);localStorage.setItem("z_vid",v)}return v}catch(e){return null}}
+      function send(p){try{var b=JSON.stringify(p);if(navigator.sendBeacon){navigator.sendBeacon("/api/track",new Blob([b],{type:"application/json"}))}else{fetch("/api/track",{method:"POST",body:b,keepalive:true,headers:{"Content-Type":"application/json"}})}}catch(e){}}
+      var u=null;try{u=new URLSearchParams(location.search).get("utm_source")}catch(e){}
+      send({t:"pv",path:"/blog/ai-trading-guide",vid:vid(),dev:innerWidth<=640?"m":"d",ref:document.referrer||null,utm:u});
+      var s75=false;addEventListener("scroll",function(){var sp=(scrollY+innerHeight)/document.body.scrollHeight;if(sp>=0.75&&!s75){s75=true;send({t:"ev",ev:"blog_post_read",label:"ai-trading-guide"})}},{passive:true});
+    })();
   </script>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5897295133273451" crossorigin="anonymous"></script>
 </head>

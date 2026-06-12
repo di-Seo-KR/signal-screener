@@ -17,6 +17,7 @@ import { supabase } from "./supabaseClient.js";
 import { THEME_TOKENS } from "./ui/theme.jsx";
 import { useIsMobile } from "./ui/useBreakpoint.jsx";
 import { BottomSheet, ActionSheet } from "./ui/bottom-sheet.jsx";
+import { ga } from "./lib/analytics.js"; // ★ 자체 애널리틱스 (GA 대체)
 import { PageHeader } from "./ui/primitives.jsx";
 // 기술 지표 (App.jsx 분리 1단계 — 순수 유틸)
 import {
@@ -282,6 +283,7 @@ const RealTrading = lazy(() => import("./RealTrading.jsx"));
 const AlphaLab = lazy(() => import("./AlphaLab.jsx"));
 const NotificationHub = lazy(() => import("./NotificationHub.jsx"));
 const SavedScreeners = lazy(() => import("./SavedScreeners.jsx"));
+const MarketingDashboard = lazy(() => import("./MarketingDashboard.jsx")); // ★ 자체 애널리틱스 (GA 대체)
 const BotLeaderboard = lazy(() => import("./BotLeaderboard.jsx"));
 const BotReport = lazy(() => import("./BotReport.jsx"));
 const BacktestCompare = lazy(() => import("./BacktestCompare.jsx"));
@@ -4426,7 +4428,7 @@ function AppInner() {
     });
   }, []);
 
-  const validTabs = ["home","auto-trading","real-trading","alpha-lab","portfolio","portfolio-analysis","screener","alerts","notifications","saved-screeners","news","quant-portfolio","quant-port","risk-map","backtest","backtest-compare","copy-trading","sentiment","strategy","anomaly","quant-report","econ-calendar","leaderboard","reports","bot-report","profile","dev","pricing","about","privacy","terms","contact"];
+  const validTabs = ["home","auto-trading","real-trading","alpha-lab","portfolio","portfolio-analysis","screener","alerts","notifications","saved-screeners","news","quant-portfolio","quant-port","risk-map","backtest","backtest-compare","copy-trading","sentiment","strategy","anomaly","quant-report","econ-calendar","leaderboard","reports","bot-report","profile","dev","pricing","about","privacy","terms","contact","marketing"];
 
   // ── 경로 → tab 변환 ──
   //   /reports             → "reports"
@@ -4880,6 +4882,11 @@ function AppInner() {
       }
     }
   }, [watchlist, watchlistKey, user]);
+
+  // ── 자체 애널리틱스: SPA 라우트 전환 페이지뷰 (GA 대체) ──
+  useEffect(() => {
+    ga.pageView(tab === "home" ? "/" : `/${tab}`);
+  }, [tab]);
 
   // ── 탭 타이틀 및 메타태그 실시간 업데이트 (토스증권 스타일 + SEO) ──
   useEffect(() => {
@@ -11793,6 +11800,15 @@ function AppInner() {
         {tab === "saved-screeners" && (
           <Suspense fallback={<LazyTabFallback />}>
             <SavedScreeners onNavigate={setTab} onOpenScreener={(keys) => { setPendingScreenerKeys(keys); setTab("screener"); }} />
+          </Suspense>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 마케팅 대시보드 (/marketing — 오너 전용, 자체 애널리틱스)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "marketing" && (
+          <Suspense fallback={<LazyTabFallback />}>
+            <MarketingDashboard />
           </Suspense>
         )}
 

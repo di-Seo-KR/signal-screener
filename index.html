@@ -378,22 +378,10 @@
     <!-- ▼ 3rd-party 스크립트 지연 로드 — 첫 페인트 후 main thread 회수 (200~600ms) -->
     <script>
       (function () {
-        // gtag stub: 페이지 초기 이벤트가 분실되지 않도록 큐에 쌓아둠
-        window.dataLayer = window.dataLayer || [];
-        window.gtag = function () { window.dataLayer.push(arguments); };
-        window.gtag('js', new Date());
-        // ★ 2026-05-09: GA4 측정 ID 교체
-        //   이전 G-C78LMNP87P (구속성) → G-BMP34JQ649 (zepta.app 새 속성)
-        //   zepta.app 도메인 마이그레이션과 함께 새 GA4 속성으로 통합.
-        window.gtag('config', 'G-BMP34JQ649');
-
+        // ★ 2026-06-12 (대표 결정): GA4 제거 — 자체 퍼스트파티 애널리틱스(/api/track)로 전환.
+        //   수집은 src/lib/analytics.js 의 beacon 이 담당 (무쿠키·익명 vid·PII 없음).
         function loadDeferred() {
-          // GA
-          var ga = document.createElement('script');
-          ga.async = true;
-          ga.src = 'https://www.googletagmanager.com/gtag/js?id=G-BMP34JQ649';
-          document.head.appendChild(ga);
-          // AdSense
+          // AdSense (유지 — 수익화 주축)
           var ads = document.createElement('script');
           ads.async = true;
           ads.crossOrigin = 'anonymous';
