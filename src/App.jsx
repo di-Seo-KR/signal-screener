@@ -7734,7 +7734,10 @@ function AppInner() {
                       msOverflowStyle: "none",
                       marginBottom: "14px",
                     }} className="hscroll">
-                      {marketLoading ? (
+                      {/* ★ 2026-06-12 (대표 피드백): 갱신 때마다 스켈레톤으로 갈아끼워 숫자가
+                          사라졌다 나타나던 깜빡임 제거 — 데이터가 이미 있으면 유지한 채 값만
+                          제자리 교체(거래앱처럼). 스켈레톤은 최초 로드(데이터 0)에만. */}
+                      {marketLoading && marketIndices.length === 0 ? (
                         // 스켈레톤 로더 표시
                         Array.from({ length: 6 }).map((_, i) => (
                           <div key={`skeleton-${i}`} style={{
@@ -12702,27 +12705,7 @@ function AppInner() {
       </main>
       </PullToRefresh>
 
-      {/* ── 하단 실시간 티커 바 (모바일: 탭바 위, 데스크톱: 바닥) ── */}
-      {marketIndices.length > 0 && (
-        <div style={{
-          position: "fixed", bottom: isMobile ? "82px" : 0, left: 0, right: 0, zIndex: 90,
-          background: `${C.bg}F0`, borderTop: `1px solid ${C.border}${C.isDark ? '30' : '50'}`,
-          backdropFilter: "blur(8px)", padding: "6px 0", overflow: "hidden",
-        }}>
-          <div style={{
-            display: "flex", gap: "24px", animation: "tickerScroll 30s linear infinite",
-            whiteSpace: "nowrap", paddingLeft: "100%",
-          }}>
-            {[...marketIndices, ...marketIndices].map((idx, i) => (
-              <span key={`${idx.symbol}-${i}`} style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "16px", flexShrink: 0 }}>
-                <span style={{ color: C.text3, fontWeight: 500 }}>{idx.flag} {idx.name}</span>
-                <span style={{ color: C.text1, fontWeight: 700 }}>{idx.price?.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                <span style={{ color: idx.change >= 0 ? C.green : C.red, fontWeight: 600 }}>{idx.change >= 0 ? "+" : ""}{idx.change}%</span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* ★ 2026-06-12 (대표 지시): 하단 실시간 티커 띠배너 제거 */}
 
       </div>{/* di-main-wrap */}
 

@@ -20,41 +20,46 @@ const fmtTime = (ts) => {
   try { const d = new Date(ts); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; } catch { return ""; }
 };
 
-/* ── 매물대 미니 레벨바 — 트랙 + S/R 틱 + 현재가 도트 (순수 DOM 6노드) ── */
-function LevelBar({ sr, accent }) {
-  if (!sr || (!sr.s?.length && !sr.r?.length)) return null;
-  const px = sr.px;
-  if (!(px > 0)) return null;
-  const levels = [...(sr.s || []), ...(sr.r || [])].map((x) => x.p).filter((p) => p > 0);
-  const lo = Math.min(...levels, px * 0.97);
-  const hi = Math.max(...levels, px * 1.03);
-  const span = hi - lo || 1;
-  const pos = (p) => Math.max(2, Math.min(98, ((p - lo) / span) * 100));
-  const near = (d) => Math.abs(d) <= 1; // 1% 이내 근접 — 경고색
+/* ── 매물대 표시 — 지지·저항 3분할 + 현재가 위치 바 ──
+   ★ 2026-06-12 (대표 피드백 "매물대가 보기 불편"): 작은 틱 4개+도트 → 가장 가까운
+   지지·저항 1쌍을 큰 글씨 3분할로, 가운데 바는 '현재가가 그 사이 어디인지'만 표현.
+   S2·R2 등 전체 레벨은 카드 펼침 상세에서. */
+function SRBand({ sr, accent }) {
+  if (!sr || !(sr.px > 0)) return null;
+  const s1 = sr.s?.[0], r1 = sr.r?.[0];
+  if (!s1 && !r1) return null;
+  const near = (x) => x && Math.abs(x.d) <= 1; // 1% 이내 근접 — 경고색
+  // 현재가 위치: S1~R1 구간 선형 보간 (한쪽 없으면 끝단 고정)
+  let posPct = 50;
+  if (s1 && r1 && r1.p > s1.p) posPct = Math.max(4, Math.min(96, ((sr.px - s1.p) / (r1.p - s1.p)) * 100));
+  else if (s1 && !r1) posPct = 92;
+  else if (!s1 && r1) posPct = 8;
+  const cell = (x, label, color) => (
+    <div style={{ minWidth: 0, textAlign: label === "지지" ? "left" : "right" }}>
+      <div style={{ fontSize: 10, color: near(x) ? "var(--z-yellow-hi)" : "var(--z-text-3)", fontWeight: 700 }}>
+        {label}{near(x) ? " · 근접" : ""}
+      </div>
+      <div className="z-num" style={{ fontSize: 13, fontWeight: 800, fontFamily: "var(--z-font-mono)", color: near(x) ? "var(--z-yellow-hi)" : color, lineHeight: 1.3 }}>
+        {x ? fmtPrice(x.p) : "—"}
+      </div>
+      <div className="z-num" style={{ fontSize: 10, color: "var(--z-text-4)", fontFamily: "var(--z-font-mono)" }}>
+        {x ? `${x.d > 0 ? "+" : ""}${x.d}%` : ""}
+      </div>
+    </div>
+  );
   return (
-    <div style={{ position: "relative", height: 14, margin: "2px 0" }} aria-hidden="true">
-      <div style={{ position: "absolute", top: 5, left: 2, right: 2, height: 4, background: "var(--z-card-hi)", borderRadius: "var(--z-r-full)" }} />
-      {(sr.s || []).map((x, i) => (
-        <div key={`s${i}`} style={{
-          position: "absolute", top: 2, width: 2, height: 10, borderRadius: 1,
-          left: `${pos(x.p)}%`,
-          background: near(x.d) ? "var(--z-yellow)" : "var(--z-green)",
-          opacity: i === 0 ? 1 : 0.45,
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(64px,auto) 1fr minmax(64px,auto)", gap: 10, alignItems: "center", margin: "4px 0 2px" }}>
+      {cell(s1, "지지", "var(--z-green-hi)")}
+      <div style={{ position: "relative", height: 16 }} aria-hidden="true">
+        <div style={{ position: "absolute", top: 6, left: 0, right: 0, height: 4, borderRadius: "var(--z-r-full)",
+          background: "linear-gradient(90deg, var(--z-green-bg), var(--z-card-hi) 35%, var(--z-card-hi) 65%, var(--z-red-bg))" }} />
+        <div style={{
+          position: "absolute", top: 3, width: 10, height: 10, borderRadius: "50%",
+          left: `calc(${posPct}% - 5px)`, background: accent,
+          boxShadow: "0 0 0 2px var(--z-card)", transition: "left var(--z-dur) var(--z-ease)",
         }} />
-      ))}
-      {(sr.r || []).map((x, i) => (
-        <div key={`r${i}`} style={{
-          position: "absolute", top: 2, width: 2, height: 10, borderRadius: 1,
-          left: `${pos(x.p)}%`,
-          background: near(x.d) ? "var(--z-yellow)" : "var(--z-red)",
-          opacity: i === 0 ? 1 : 0.45,
-        }} />
-      ))}
-      <div style={{
-        position: "absolute", top: 3, width: 8, height: 8, borderRadius: "50%",
-        left: `calc(${pos(px)}% - 4px)`, background: accent,
-        boxShadow: "0 0 0 2px var(--z-card)", transition: "left var(--z-dur) var(--z-ease)",
-      }} />
+      </div>
+      {cell(r1, "저항", "var(--z-red-hi)")}
     </div>
   );
 }
@@ -180,22 +185,14 @@ export const SignalCoinCard = React.memo(function SignalCoinCard({ coin, variant
         })}
       </div>
 
-      {/* Row 3 — 매물대 레벨바 (sr 없으면 통째로 숨김 — null 가드) */}
+      {/* Row 3 — 매물대 (sr 없으면 통째로 숨김 — null 가드) */}
       {sr && (s1 || r1) && (
         <>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: 10, color: "var(--z-text-4)" }}>매물대</span>
-            <span className="z-num" style={{ fontSize: 12, fontFamily: "var(--z-font-mono)", color: "var(--z-text)" }}>{fmtPrice(sr.px)}</span>
+            <span style={{ fontSize: 10, color: "var(--z-text-4)" }}>매물대 (최근 60일)</span>
+            <span className="z-num" style={{ fontSize: 12, fontFamily: "var(--z-font-mono)", color: "var(--z-text)" }}>현재 {fmtPrice(sr.px)}</span>
           </div>
-          <LevelBar sr={sr} accent={accentHi} />
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11 }}>
-            <span className="z-num" style={{ fontFamily: "var(--z-font-mono)", color: s1 && Math.abs(s1.d) <= 1 ? "var(--z-yellow-hi)" : "var(--z-text-2)" }}>
-              {s1 ? `지지 ${fmtPrice(s1.p)} (${s1.d}%)` : "지지 —"}
-            </span>
-            <span className="z-num" style={{ fontFamily: "var(--z-font-mono)", color: r1 && Math.abs(r1.d) <= 1 ? "var(--z-yellow-hi)" : "var(--z-text-2)" }}>
-              {r1 ? `저항 ${fmtPrice(r1.p)} (+${r1.d}%)` : "저항 —"}
-            </span>
-          </div>
+          <SRBand sr={sr} accent={accentHi} />
         </>
       )}
 

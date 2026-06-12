@@ -63,12 +63,14 @@ export default async function handler(req, res) {
         // 주식 봇
         "stable-quant", "balanced-quant", "aggressive-quant", "trend-follow", "mean-reversion", "ensemble-signal",
       ];
+      // ★ 2026-06-12 성능: 13봇 직렬 루프(N+1, 왕복 13회 ≈ 0.8~1.0s) → mget 1회 왕복.
+      //   mget 은 누락 키에 null 반환 — 기존 if(perf||snapshot) 분기 그대로 동작.
+      const keys = botIds.flatMap((id) => [`di:bot:${id}:perf`, `di:bot:${id}:snapshot`]);
+      const vals = await kv.mget(...keys);
       const results = {};
-      for (const id of botIds) {
-        const [perf, snapshot] = await Promise.all([
-          kv.get(`di:bot:${id}:perf`),
-          kv.get(`di:bot:${id}:snapshot`),
-        ]);
+      botIds.forEach((id, i) => {
+        const perf = vals[i * 2];
+        const snapshot = vals[i * 2 + 1];
         if (perf || snapshot) {
           const hist = snapshot?.history || [];
           const alloc = snapshot?.botAllocation || 0;
@@ -77,7 +79,9 @@ export default async function handler(req, res) {
           const snapClean = snapshot ? { ...snapshot, history: undefined, historyLength: hist.length } : null;
           results[id] = { perf: perf || null, snapshot: snapClean, equityCurve, pnlCurve, dayLabels };
         }
-      }
+      });
+      // ★ 전역 cron 산출물 — CDN 캐시 (coin-scores 패턴)
+      res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
       return res.status(200).json({ ok: true, bots: results });
     }
 
