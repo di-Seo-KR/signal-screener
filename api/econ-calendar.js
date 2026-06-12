@@ -302,6 +302,11 @@ async function fetchBLSActuals() {
     { id: "CUSR0000SA0",    match: "CPI (MoM)",        calc: "mom" },
     { id: "CUSR0000SA0L1E", match: "Core CPI (YoY)",   calc: "yoy" },    // CPI-U Less Food & Energy (SA)
     { id: "CUSR0000SA0L1E", match: "Core CPI (MoM)",   calc: "mom" },
+    // ★ 2026-06-12 (대표 제보 2차): 6/11 PPI 가 '발표 대기'로 남음 — PPI 전월비 배선.
+    //   시리즈 ID 는 BLS API 실측으로 확정 (WPS=SA): WPSFD4=Final Demand(헤드라인),
+    //   WPSFD49104=Less Foods & Energy(코어). 2026-M05 데이터 수신 확인.
+    { id: "WPSFD4",         match: "PPI (MoM)",        calc: "mom" },
+    { id: "WPSFD49104",     match: "Core PPI (MoM)",   calc: "mom" },
     { id: "LNS14000000",    match: "Unemployment Rate", calc: "direct" }, // Civilian Unemployment Rate (SA)
     { id: "CES0000000001",  match: "Nonfarm Payrolls",  calc: "diff" },   // Total Nonfarm (SA, thousands)
   ];
