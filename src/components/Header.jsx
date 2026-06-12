@@ -286,7 +286,9 @@ export default memo(function Header({
                   )}
                 </SheetHeader>
 
-                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-[max(20px,env(safe-area-inset-bottom))]">
+                {/* ★ 2026-06-12 (대표 재제보): 하단 탭바(82px, z10000)가 시트(z50) 위를 덮어
+                    마지막 줄(내정보·로그아웃)이 가려짐 → 스크롤 패딩을 탭바+세이프에어리어만큼 확보 */}
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-[calc(env(safe-area-inset-bottom,0px)+96px)]">
                 {/* ★ Owner 전용 실전매매 빠른 진입 배너 (모바일 햄버거 상단)
                     이전엔 햄버거 → 홈 섹션의 3분할 셀로 들어가 있어서 잘 안 보임. */}
                 {user && isOwner && (
