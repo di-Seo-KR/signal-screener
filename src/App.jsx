@@ -12071,6 +12071,22 @@ function AppInner() {
                       )}
                     </div>
                   )}
+
+                  {/* 마케팅 대시보드 진입점 (오너 전용) — 2026-06-12 대표 "어디서 봐?" */}
+                  {isOwner && user && (
+                    <div onClick={() => setTab("marketing")} style={{
+                      background: C.card, borderRadius: "16px", padding: "14px 20px",
+                      border: `1px solid ${C.blue}25`, marginBottom: "16px", cursor: "pointer",
+                      display: "flex", alignItems: "center", gap: 12,
+                    }}>
+                      <span style={{ fontSize: 20 }}>📊</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: "14px", fontWeight: 800, color: C.text1 }}>마케팅 대시보드</div>
+                        <div style={{ fontSize: "12px", color: C.text3 }}>방문·유입·전환 지표 (자체 수집, GA 대체)</div>
+                      </div>
+                      <span style={{ fontSize: "14px", color: C.text3 }}>›</span>
+                    </div>
+                  )}
                 </>
               );
             })()}
