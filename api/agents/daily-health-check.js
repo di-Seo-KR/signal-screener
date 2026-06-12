@@ -102,13 +102,35 @@ export default async function handler(req, res) {
       if (!Array.isArray(cands) || cands.length === 0) add("warn", "후보", "후보 풀 비어있음 — 발굴 엔진 점검");
     } catch (e) { add("warn", "후보", `확인 실패: ${e?.message}`); }
 
+    // ── [B-2] bracket SL dry-run 프로브 집계 (2026-06-12 대표 승인) ──
+    //   order/test 프로브 수용률을 매일 보고 — ZEPTA_TRY_BRACKET=1 재활성 결정 근거.
+    try {
+      const probes = (await kv.get("di:rt:bracket-dryrun")) || [];
+      if (Array.isArray(probes) && probes.length > 0) {
+        const recent = probes.slice(0, 50);
+        const accepted = recent.filter((p) => p.accepted).length;
+        const rejected = recent.length - accepted;
+        const lastReject = recent.find((p) => !p.accepted);
+        const rate = Math.round((accepted / recent.length) * 100);
+        // 정보성 보고 (warn 아님 — 단, 표본 5건+ 에서 거부율 100% 면 warn 으로 명시)
+        if (recent.length >= 5 && accepted === 0) {
+          add("warn", "bracket", `SL dry-run 전건 거부 (${recent.length}건) — 거래소 미지원 지속: ${lastReject?.closePos?.msg || "?"}`);
+        } else {
+          add("info", "bracket", `SL dry-run 수용률 ${rate}% (${accepted}/${recent.length})${lastReject ? ` · 최근 거부: ${(lastReject.closePos?.msg || "").slice(0, 60)}` : ""}`);
+        }
+      }
+    } catch (e) { add("warn", "bracket", `dry-run 집계 실패: ${e?.message}`); }
+
     const fails = findings.filter((f) => f.level === "fail");
     const warns = findings.filter((f) => f.level === "warn");
+    const infos = findings.filter((f) => f.level === "info"); // B-2 bracket dry-run 관찰치 등
     const total = fails.length + warns.length;
 
-    if (total > 0) {
-      const lines = [...fails, ...warns].map((f) => `${f.level === "fail" ? "🔴" : "⚠️"} [${f.area}] ${f.msg}`);
-      try { await sendTelegram({ text: `🩺 Zepta 일일 점검 — ${total}건 발견\n` + lines.join("\n") }); } catch {}
+    if (total > 0 || infos.length > 0) {
+      const lines = [...fails, ...warns, ...infos].map((f) =>
+        `${f.level === "fail" ? "🔴" : f.level === "warn" ? "⚠️" : "ℹ️"} [${f.area}] ${f.msg}`);
+      const head = total > 0 ? `🩺 Zepta 일일 점검 — ${total}건 발견` : "🩺 Zepta 일일 점검 — 이상 없음";
+      try { await sendTelegram({ text: `${head}\n` + lines.join("\n") }); } catch {}
     }
 
     return res.status(200).json({
