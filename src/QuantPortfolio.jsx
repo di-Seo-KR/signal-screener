@@ -68,7 +68,7 @@ const SYM_NAMES = {
 const getName = (sym) => SYM_NAMES[sym] || sym.replace(".KS", "").replace("-USD", "");
 
 // ══════════════════════════════════════════════════════════════
-// 전략별 포트폴리오 (33개 전략 × 다양한 종목 구성)
+// 전략별 포트폴리오 (전략별 다양한 종목 구성)
 // ══════════════════════════════════════════════════════════════
 export const STRATEGY_PORTFOLIOS = {
   "RSI 반전 전략": [
@@ -814,7 +814,7 @@ function LoadingSkeleton({ progress }) {
           <style>{`@keyframes qpSpin { to { transform: rotate(360deg); } }`}</style>
           <div style={{ fontWeight: 800, fontSize: "18px", marginBottom: "8px" }}>실시간 데이터 로딩 중</div>
           <div style={{ color: C.text3, fontSize: "15px", marginBottom: "16px" }}>
-            {collectAllSymbols().length}개 종목 시세 수신 + 33개 전략 백테스트 실행
+            {collectAllSymbols().length}개 종목 시세 수신 + 41개 전략 백테스트 실행
           </div>
         </div>
         <div style={{ maxWidth: "300px", margin: "0 auto" }}>
@@ -1071,7 +1071,7 @@ export default function QuantPortfolio({ theme = "dark" }) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
               <div>
                 <div style={{ fontWeight: 700 }}>매매기록 ({s.tradeHistory.length}건)</div>
-                <div style={{ fontSize: "14px", color: C.green, marginTop: "2px" }}>33개 전략 백테스트 시뮬레이션 — 가상 $100,000 기준</div>
+                <div style={{ fontSize: "14px", color: C.green, marginTop: "2px" }}>41개 전략 백테스트 시뮬레이션 — 가상 $100,000 기준</div>
               </div>
               <span style={{ fontSize: "14px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>시뮬레이션</span>
             </div>

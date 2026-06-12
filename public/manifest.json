@@ -1,7 +1,7 @@
 {
   "name": "Zepta — AI 퀀트 투자 플랫폼",
   "short_name": "Zepta",
-  "description": "AI 퀀트 투자 플랫폼 — 실시간 스크리너, 33개 자동매매 전략, 포트폴리오 관리, 리스크 분석",
+  "description": "AI 퀀트 투자 플랫폼 — 실시간 스크리너, 9개 자동매매 전략, 포트폴리오 관리, 리스크 분석",
   "id": "/",
   "scope": "/",
   "start_url": "/",
@@ -77,7 +77,7 @@
     {
       "name": "AI 자동매매",
       "short_name": "AI매매",
-      "description": "33개 퀀트 전략 자동매매 봇",
+      "description": "9개 퀀트 전략 자동매매 봇",
       "url": "/auto-trading",
       "icons": [
         {
