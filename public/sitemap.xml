@@ -4,11 +4,9 @@
   <!-- 홈페이지 (최우선) -->
   <url>
     <loc>https://zepta.app/</loc>
-    <lastmod>2026-05-01</lastmod>
+    <lastmod>2026-06-12</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="ko" href="https://zepta.app/" />
-    <xhtml:link rel="alternate" hreflang="en" href="https://zepta.app/" />
   </url>
 
   <!-- 핵심 기능 페이지들 (높은 우선순위) -->
@@ -76,12 +74,7 @@
     <priority>0.8</priority>
   </url>
 
-  <url>
-    <loc>https://zepta.app/quant-port</loc>
-    <lastmod>2026-05-01</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.8</priority>
-  </url>
+  <!-- quant-port 제거(2026-06-12): quant-portfolio 의 별칭 — canonical 통일로 중복 제거 -->
 
   <!-- 2026-05-11 추가: 실거래 + Alpha Lab + 누락된 SPA 경로 -->
   <url>
@@ -126,13 +119,38 @@
     <priority>0.7</priority>
   </url>
 
-  <!-- 정보 및 참고 페이지들 -->
+  <!-- profile 제거(2026-06-12): 계정·API키 관리 화면 — noindex 처리, 공개 색인 가치 없음 -->
+
+  <!-- 2026-06-12 추가: 색인 가치 있는데 누락됐던 공개 콘텐츠 라우트 (전수감사 P3) -->
   <url>
-    <loc>https://zepta.app/profile</loc>
-    <lastmod>2026-05-01</lastmod>
+    <loc>https://zepta.app/guide</loc>
+    <lastmod>2026-06-12</lastmod>
     <changefreq>monthly</changefreq>
-    <priority>0.65</priority>
+    <priority>0.8</priority>
   </url>
+
+  <url>
+    <loc>https://zepta.app/portfolio-analysis</loc>
+    <lastmod>2026-06-12</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.75</priority>
+  </url>
+
+  <url>
+    <loc>https://zepta.app/backtest-compare</loc>
+    <lastmod>2026-06-12</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <url>
+    <loc>https://zepta.app/leaderboard</loc>
+    <lastmod>2026-06-12</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+
+  <!-- 정보 및 참고 페이지들 -->
 
   <!-- 법률 및 정보 페이지들 (낮은 우선순위) -->
   <url>

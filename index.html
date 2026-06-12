@@ -8,13 +8,10 @@
     <meta name="naver-site-verification" content="e93a3d6bb6905c370ad45875032ad7d1049e38f8" />
     <meta name="google-adsense-account" content="ca-pub-5897295133273451" />
     <meta name="description" content="Zepta — AI 퀀트 투자 플랫폼. 실시간 주식/코인 스크리너, 33개 알파 전략 자동매매, 포트폴리오 리밸런싱. 무료로 시작하세요." />
-    <meta name="description-en" content="Zepta - AI-powered quant trading platform with real-time stock & crypto screener, 33 alpha strategies, automated portfolio rebalancing. Get started free." />
     <meta name="keywords" content="주식, 코인, 투자, 퀀트, 자동매매, 스크리너, AI, 비트코인, 포트폴리오, 트레이딩, 투자 플랫폼, 실시간 데이터, 알파 전략, 백테스트, 리스크 관리, 이더리움, 솔라나, 미국주식, 한국주식, 퀀트 전략, 페이퍼 트레이딩" />
-    <meta name="keywords-en" content="quant trading, stock screener, crypto trading, automated trading, algorithmic trading, portfolio rebalancing, backtesting, risk management, alpha strategies, AI trading, momentum strategy, value investing, volatility clustering, trading platform, free trading tools" />
     <link rel="canonical" href="https://zepta.app/" />
-    <link rel="alternate" hreflang="ko" href="https://zepta.app/" />
-    <link rel="alternate" hreflang="en" href="https://zepta.app/" />
-    <link rel="alternate" hreflang="x-default" href="https://zepta.app/" />
+    <!-- hreflang 제거(2026-06-12): 언어별 분리 URL 부재 + canonical 자기참조와 충돌(ko/en/x-default 전부 / 지목)로
+         비상호참조 신호만 발생. 영어권 SEO 시 /en/<path> 분리 라우트 신설 후 상호 hreflang 재도입. -->
     <!-- Privacy Policy / Terms — Google OAuth Verification 인식용 -->
     <link rel="privacy-policy" href="https://zepta.app/privacy" />
     <link rel="terms-of-service" href="https://zepta.app/terms" />
@@ -32,14 +29,9 @@
     <meta property="og:locale" content="ko_KR" />
     <meta property="og:locale:alternate" content="en_US" />
     <meta property="og:site_name" content="Zepta" />
-    <!-- Open Graph / SNS 공유 (English) -->
-    <meta property="og:title:en" content="Zepta — AI-Powered Quant Trading with 33 Alpha Strategies" />
-    <meta property="og:description:en" content="Real-time stock & crypto screener, AI quant automated trading, portfolio rebalancing. Free to start." />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Zepta — AI가 찾아주는 매수 타점, 33개 퀀트 전략 자동매매" />
-    <meta name="twitter:title:en" content="Zepta — AI-Powered Quant Trading Platform" />
     <meta name="twitter:description" content="주식/코인 실시간 스크리닝, AI 퀀트 자동매매, 포트폴리오 리밸런싱까지. 가입만 하면 무료." />
-    <meta name="twitter:description:en" content="Real-time stock & crypto screener, AI quant automated trading, portfolio rebalancing. Free to start." />
     <meta name="twitter:image" content="https://zepta.app/og-image.png" />
     <!-- PWA -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -54,6 +46,7 @@
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
+      "@id": "https://zepta.app/#software",
       "@type": ["SoftwareApplication", "FinancialService", "WebApplication"],
       "name": "Zepta",
       "alternateName": ["젭타", "Zepta AI Trading"],
@@ -73,13 +66,6 @@
           "name": "Free Plan"
         }
       ],
-      "aggregateRating": {
-        "@type": "AggregateRating",
-        "ratingValue": "4.5",
-        "ratingCount": "127",
-        "bestRating": "5",
-        "worstRating": "1"
-      },
       "featureList": [
         "AI Quant Automated Trading",
         "Real-time Stock Screener",
@@ -358,7 +344,7 @@
       "@type": "Blog",
       "name": "Zepta 블로그",
       "url": "https://zepta.app/blog",
-      "description": "AI 자동매매와 퀀트 전략 입문자 가이드. 19편의 한국어 블로그 글.",
+      "description": "AI 자동매매와 퀀트 전략 입문자를 위한 한국어 가이드 블로그.",
       "publisher": { "@type": "Organization", "name": "Zepta", "url": "https://zepta.app/" },
       "inLanguage": "ko"
     }
@@ -371,11 +357,7 @@
       "name": "Zepta - AI Quant Trading Platform",
       "description": "AI-powered quant trading platform with real-time stock & crypto screeners, 33+ alpha strategies, automated trading, and portfolio rebalancing tools.",
       "url": "https://zepta.app/",
-      "mainEntity": {
-        "@type": "SoftwareApplication",
-        "name": "Zepta",
-        "url": "https://zepta.app/"
-      },
+      "mainEntity": { "@id": "https://zepta.app/#software" },
       "datePublished": "2025-04-12",
       "dateModified": "2026-04-12",
       "publisher": {
