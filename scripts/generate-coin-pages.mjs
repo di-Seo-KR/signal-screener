@@ -27,10 +27,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica N
 nav{position:sticky;top:0;z-index:50;background:rgba(10,11,15,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid #23262F;padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;gap:16px}
 nav .brand{font-weight:800;font-size:18px;color:#F4F5F7;text-decoration:none;letter-spacing:-0.02em}
 nav .brand b{color:#4D7CFF;font-weight:800}
-nav .links{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
-nav .links::-webkit-scrollbar{display:none}
+nav .nav-right{display:flex;align-items:center;gap:6px}
+nav .links{display:flex;gap:4px}
 nav .links a{padding:7px 11px;border-radius:9px;font-size:14px;font-weight:600;color:#A1A6B2;text-decoration:none;white-space:nowrap;transition:color .15s,background .15s}
 nav .links a:hover{color:#F4F5F7;background:#1B1D25}
+.znav-burger{width:40px;height:40px;border:1px solid #23262F;border-radius:10px;background:transparent;color:#F4F5F7;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.znav-burger:hover{background:#1B1D25}
+#znav-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .2s;z-index:98}
+#znav-drawer{position:fixed;top:0;right:0;bottom:0;width:300px;max-width:85vw;background:#0F1014;border-left:1px solid #23262F;transform:translateX(102%);transition:transform .22s cubic-bezier(.2,.8,.2,1);z-index:99;overflow-y:auto;padding:0 16px 28px}
+body.znav-open #znav-overlay{opacity:1;pointer-events:auto}
+body.znav-open #znav-drawer{transform:translateX(0)}
+.znav-head{display:flex;align-items:center;justify-content:space-between;height:56px;border-bottom:1px solid #23262F;margin-bottom:10px}
+.znav-head .brand{font-weight:800;font-size:18px;color:#F4F5F7;text-decoration:none}
+.znav-head .brand b{color:#4D7CFF}
+.znav-head button{width:36px;height:36px;border:none;border-radius:9px;background:transparent;color:#A1A6B2;font-size:16px;cursor:pointer}
+.znav-head button:hover{background:#1B1D25;color:#F4F5F7}
+.znav-group{margin:14px 0}
+.znav-title{font-size:11px;font-weight:800;color:#6E7585;letter-spacing:.06em;margin:0 10px 6px}
+.znav-group a{display:block;padding:10px 10px;border-radius:10px;font-size:15px;font-weight:600;color:#A1A6B2;text-decoration:none}
+.znav-group a:hover{color:#F4F5F7;background:#1B1D25}
+@media(max-width:640px){nav .links{display:none}}
 .breadcrumb{font-size:13px;color:#6E7585;margin-bottom:18px}
 .breadcrumb a{color:#6E92FF;text-decoration:none}
 h1{font-size:30px;font-weight:800;color:#F4F5F7;margin-bottom:10px;letter-spacing:-0.02em;line-height:1.3}
@@ -79,15 +95,17 @@ footer a{color:#6E92FF;text-decoration:none;margin:0 6px}
 const NAV = `
   <nav>
     <a class="brand" href="/"><b>Z</b>epta</a>
-    <div class="links">
-      <a href="/">홈</a>
-      <a href="/screener">스크리너</a>
-      <a href="/coin">코인 분석</a>
-      <a href="/auto-trading">AI 매매</a>
-      <a href="/blog">블로그</a>
-      <a href="/about">소개</a>
+    <div class="nav-right">
+      <div class="links">
+        <a href="/">홈</a>
+        <a href="/coin">코인 분석</a>
+        <a href="/blog">블로그</a>
+      </div>
+      <button class="znav-burger" onclick="zNavOpen()" aria-label="전체 메뉴">☰</button>
     </div>
   </nav>`;
+
+const DRAWER = `<div id="znav-overlay" onclick="zNavClose()"></div>\n  <aside id="znav-drawer" aria-label="전체 메뉴">\n    <div class="znav-head"><a class="brand" href="/"><b>Z</b>epta</a><button onclick="zNavClose()" aria-label="닫기">✕</button></div>\n    <div class="znav-group"><div class="znav-title">마켓</div><a href="/screener">스크리너</a><a href="/coin">코인 분석</a><a href="/news">뉴스</a><a href="/sentiment">시장 심리</a><a href="/econ-calendar">경제 일정</a></div>\n    <div class="znav-group"><div class="znav-title">트레이딩</div><a href="/auto-trading">모의투자 (AI 자동매매)</a><a href="/alpha-lab">알파 랩</a><a href="/backtest">백테스트</a><a href="/leaderboard">봇 랭킹</a></div>\n    <div class="znav-group"><div class="znav-title">포트폴리오</div><a href="/portfolio">포트폴리오</a><a href="/risk-map">리스크맵</a></div>\n    <div class="znav-group"><div class="znav-title">더보기</div><a href="/blog">블로그</a><a href="/about">소개</a><a href="/guide">투자 가이드</a><a href="/contact">문의</a></div>\n  </aside>\n  <script>function zNavOpen(){document.body.classList.add("znav-open")}function zNavClose(){document.body.classList.remove("znav-open")}document.addEventListener("keydown",function(e){if(e.key==="Escape")zNavClose()})</script>`;
 
 const FOOTER = `
   <footer>
@@ -236,7 +254,7 @@ ${faqHtml}
       <h3>다른 코인·가이드 보기</h3>
       ${related}
     </div>
-  </main>${FOOTER}${liveScript(sym)}
+  </main>${FOOTER}${DRAWER}${liveScript(sym)}
 </body>
 </html>
 `;
@@ -305,7 +323,7 @@ ${cards}
       <p>30종 전체를 AI가 자동으로 분석하고, 원하면 자동매매까지 맡길 수 있습니다.</p>
       <a href="/auto-trading">AI 자동매매 살펴보기 →</a>
     </div>
-  </main>${FOOTER}
+  </main>${FOOTER}${DRAWER}
   <script>
   (function(){
     fetch('/api/real-trading/coin-scores').then(function(r){return r.json()}).then(function(d){
