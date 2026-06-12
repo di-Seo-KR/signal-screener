@@ -3763,8 +3763,11 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 {/* 추가 지표 한 줄 */}
                 <div style={{ display: "flex", gap: "0", marginTop: "8px", borderTop: `1px solid ${C.border}40`, paddingTop: "8px" }}>
                   {[
-                    { label: "EPS", value: eps, fmt: v => `$${v.toFixed(2)}` },
-                    { label: "시총", value: mcap, fmt: v => v >= 1e12 ? `$${(v/1e12).toFixed(1)}T` : v >= 1e9 ? `$${(v/1e9).toFixed(0)}B` : `$${(v/1e6).toFixed(0)}M` },
+                    // ★ 2026-06-12 (대표 제보): KR 종목은 야후가 ₩값을 주는데 $로 표기되던 버그 — 시장별 통화
+                    { label: "EPS", value: eps, fmt: v => asset.market === "kr" ? `₩${Math.round(v).toLocaleString()}` : `$${v.toFixed(2)}` },
+                    { label: "시총", value: mcap, fmt: v => asset.market === "kr"
+                        ? (v >= 1e12 ? `${(v/1e12).toFixed(1)}조` : `${(v/1e8).toFixed(0)}억`)
+                        : (v >= 1e12 ? `$${(v/1e12).toFixed(1)}T` : v >= 1e9 ? `$${(v/1e9).toFixed(0)}B` : `$${(v/1e6).toFixed(0)}M`) },
                     { label: "배당률", value: divYield, fmt: v => `${(v * 100).toFixed(2)}%` },
                     { label: "베타", value: beta, fmt: v => v.toFixed(2) },
                   ].filter(v => v.value != null).map(item => (
@@ -3933,13 +3936,15 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               const fp = techData.fairPremium;
               const curP = techData.price;
               const models = techData.models || [];
+              // ★ 2026-06-12 (대표 제보): 한국 종목이 $247941.88 처럼 달러로 표기되던 버그 — 시장별 통화 포맷
+              const fmtFv = (v) => asset.market === "kr" ? `₩${Math.round(v).toLocaleString()}` : `$${v.toFixed(2)}`;
               return (
               <div style={{ background: C.card, borderRadius: "12px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
                 <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>적정주가 분석</div>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px" }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: "15px", color: C.text3 }}>종합 적정주가</div>
-                    <div style={{ fontSize: "20px", fontWeight: 800, color: C.text1 }}>${fv.toFixed(2)}</div>
+                    <div style={{ fontSize: "20px", fontWeight: 800, color: C.text1 }}>{fmtFv(fv)}</div>
                   </div>
                   <div style={{
                     padding: "6px 14px", borderRadius: "10px", textAlign: "center",
@@ -3967,7 +3972,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                         <div key={m.name} style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "15px" }}>
                           <span style={{ width: "14px" }}>{m.icon}</span>
                           <span style={{ color: C.text3, flex: 1 }}>{m.name}</span>
-                          <span style={{ fontWeight: 700, color: C.text1 }}>${m.value.toFixed(2)}</span>
+                          <span style={{ fontWeight: 700, color: C.text1 }}>{fmtFv(m.value)}</span>
                           <span style={{
                             fontWeight: 700, width: "42px", textAlign: "right",
                             color: diff > 5 ? C.red : diff < -5 ? C.green : C.text3,
@@ -4815,10 +4820,6 @@ function AppInner() {
   const [benchmarkData, setBenchmarkData] = useState(null);
 
   // ── AI 투자 어시스턴트 ──
-  const [aiChatOpen, setAiChatOpen] = useState(false);
-  const [aiMessages, setAiMessages] = useState([]);
-  const [aiInput, setAiInput] = useState("");
-  const [aiLoading, setAiLoading] = useState(false);
 
   useEffect(() => { saveSettings({ botToken: settings.botToken, chatId: settings.chatId, autoSend: settings.autoSend, strategyAlerts: settings.strategyAlerts, autoScanEnabled: settings.autoScanEnabled, autoScanInterval: settings.autoScanInterval, syncPin }); }, [settings, syncPin]);
   useEffect(() => { savePortfolio(portfolio); }, [portfolio]);
@@ -4983,396 +4984,6 @@ function AppInner() {
       beatsKS: ks ? myReturn > ks.change : null,
     });
   }, [portfolio, portfolioPrices, marketIndices]);
-
-  // ── AI 투자 어시스턴트 ──
-  const handleAiChat = useCallback((userMsg) => {
-    if (!userMsg.trim()) return;
-    const msg = userMsg.trim();
-    setAiMessages(prev => [...prev, { role: "user", text: msg }]);
-    setAiInput("");
-    setAiLoading(true);
-
-    // v9.1 — 고도화된 로컬 퀀트 데이터 기반 응답
-    setTimeout(() => {
-      let reply = "";
-      const msgLow = msg.toLowerCase();
-      // 종목 검색 (더 넓은 매칭)
-      const matchedAsset = hotAssets.find(a =>
-        msgLow.includes(a.name.toLowerCase()) || msgLow.includes(a.symbol.toLowerCase().replace(".ks",""))
-      ) || watchlist.find(w => msgLow.includes(w.name?.toLowerCase()) || msgLow.includes(w.symbol.toLowerCase().replace(".ks","")));
-
-      if (matchedAsset) {
-        const hot = hotAssets.find(h => h.symbol === matchedAsset.symbol || h.symbol === matchedAsset.symbolRaw);
-        const diag = hot ? quickDiagnosis(hot) : null;
-        const buyLvls = hot ? calcBuyLevels(hot) : null;
-        const pick = dailyPicks.find(p => p.symbol === matchedAsset.symbol);
-        const ext = extendedHours[matchedAsset.symbolRaw || matchedAsset.symbol];
-        reply = `📊 ${matchedAsset.name} (${matchedAsset.symbol.replace(".KS","")}) 분석\n\n`;
-        if (hot) {
-          reply += `현재가: ${fmtPrice(hot.price, matchedAsset.market)} (${hot.change >= 0 ? "+" : ""}${hot.change}%)\n`;
-          if (ext) reply += `${ext.isPreMarket ? "프리마켓" : "애프터마켓"}: ${ext.price ? fmtPrice(ext.price, matchedAsset.market) : ""} ${ext.change != null ? `(${ext.change >= 0 ? "+" : ""}${ext.change.toFixed(1)}%)` : ""}\n`;
-        }
-        if (diag) {
-          reply += `\n퀀트 점수: ${diag.score}/100 → ${diag.opinion}\n`;
-          if (diag.categories) {
-            reply += `${diag.categories.map(c => `${c.name}: ${c.score}점`).join(" | ")}\n`;
-          }
-          reply += `분석: ${diag.rationale}\n`;
-        }
-        if (buyLvls?.levels?.length > 0) {
-          reply += `\n🎯 분할 매수 타점:\n`;
-          buyLvls.levels.forEach(lv => {
-            reply += `  ${lv.label}: ${matchedAsset.market === "kr" ? "₩" : "$"}${lv.price < 1 ? lv.price.toFixed(4) : lv.price.toLocaleString()} (-${lv.discount}%)\n`;
-          });
-        }
-        if (pick) {
-          reply += `\n추천 순위: ${dailyPicks.indexOf(pick) + 1}위 — ${pick.reason}\n`;
-        }
-        const anomaly = anomalies.find(a => a.symbol === matchedAsset.symbol);
-        if (anomaly) {
-          reply += `\n⚠️ 이상 탐지: ${anomaly.anomalyReasons.join(", ")}\n`;
-        }
-        // 전략적 제안
-        if (diag) {
-          reply += `\n💡 `;
-          if (diag.score >= 68) {
-            reply += "매수 시그널이 우세합니다. 1차 매수 타점에서 분할 진입을 고려해보세요. 목표가까지 2~3차에 걸쳐 비중을 확대하는 전략이 유효합니다.";
-          } else if (diag.score >= 50) {
-            reply += "혼조 구간입니다. 현재가보다는 2차 매수 타점까지 기다리며, 거래량 변화와 추세 전환 신호를 확인한 후 진입하세요.";
-          } else if (diag.score >= 35) {
-            reply += "약세 신호가 우세합니다. 신규 진입보다는 관망하세요. 3차 매수 타점까지 하락 시 소량 분할 매수를 검토할 수 있습니다.";
-          } else {
-            reply += "강한 하락 신호입니다. 보유 중이라면 손절선 준수, 미보유라면 반등 확인 전까지 관망을 권합니다.";
-          }
-        }
-      } else if (msgLow.includes("시장") || msgLow.includes("마켓") || msgLow.includes("현황") || msgLow.includes("오늘")) {
-        const sp = marketIndices.find(i => i.symbol === "^GSPC");
-        const nq = marketIndices.find(i => i.symbol === "^IXIC");
-        const ks = marketIndices.find(i => i.symbol === "^KS11");
-        const vix = marketIndices.find(i => i.symbol === "^VIX");
-        const fg = fearGreed.stock?.value;
-        const upCnt = hotAssets.filter(a => a.change > 0).length;
-        const dnCnt = hotAssets.filter(a => a.change < 0).length;
-        reply = `📈 시장 현황 요약\n\n`;
-        if (sp) reply += `S&P 500: ${sp.price?.toLocaleString(undefined, {maximumFractionDigits: 0})} (${sp.change >= 0 ? "+" : ""}${sp.change}%)\n`;
-        if (nq) reply += `나스닥: ${nq.price?.toLocaleString(undefined, {maximumFractionDigits: 0})} (${nq.change >= 0 ? "+" : ""}${nq.change}%)\n`;
-        if (ks) reply += `코스피: ${ks.price?.toLocaleString(undefined, {maximumFractionDigits: 0})} (${ks.change >= 0 ? "+" : ""}${ks.change}%)\n`;
-        if (vix) reply += `VIX: ${vix.price?.toFixed(1)} (${vix.price > 30 ? "고변동" : vix.price > 20 ? "보통" : "안정"})\n`;
-        if (fg) reply += `공포탐욕: ${fg} (${fg <= 25 ? "극도의 공포" : fg <= 40 ? "공포" : fg <= 60 ? "중립" : fg <= 75 ? "탐욕" : "극도의 탐욕"})\n`;
-        reply += `\n등락: 상승 ${upCnt} / 하락 ${dnCnt} (${hotAssets.length > 0 ? `상승률 ${(upCnt / hotAssets.length * 100).toFixed(0)}%` : ""})`;
-        if (anomalies.length > 0) reply += `\n\n⚡ 이상 탐지 ${anomalies.length}건:\n${anomalies.slice(0, 3).map(a => `  ${a.name} ${a.change >= 0 ? "+" : ""}${a.change}%`).join("\n")}`;
-        // 종합 판단
-        let mktScore = 50;
-        if (sp) mktScore += sp.change > 1 ? 10 : sp.change > 0.3 ? 5 : sp.change > -0.3 ? 0 : -5;
-        if (fg) mktScore += fg > 55 ? 5 : fg > 40 ? 0 : -5;
-        mktScore += (upCnt / Math.max(upCnt + dnCnt, 1)) > 0.55 ? 5 : -5;
-        mktScore = Math.max(0, Math.min(100, mktScore));
-        reply += `\n\n💡 ${mktScore >= 60 ? "매수 우위 장세입니다. 관심종목 1차 진입을 검토하세요." : mktScore >= 45 ? "혼조 장세입니다. 방향성 확인 후 접근하세요." : "약세 장세입니다. 비중 축소와 현금 확보를 권합니다."}`;
-      } else if (msgLow.includes("추천") || msgLow.includes("뭐 살") || msgLow.includes("매수") || msgLow.includes("top") || msgLow.includes("best")) {
-        const top5 = dailyPicks.slice(0, 5);
-        reply = `🎯 오늘의 추천 TOP ${Math.min(5, top5.length)}\n\n`;
-        top5.forEach((p, i) => {
-          const hot = hotAssets.find(h => h.symbol === p.symbol);
-          const d = hot ? quickDiagnosis(hot) : null;
-          reply += `${i + 1}. ${p.name} — ${p.reason}\n`;
-          reply += `   ${p.change >= 0 ? "+" : ""}${p.change}%${d ? ` · 퀀트 ${d.score}점 (${d.opinion})` : ""}\n`;
-        });
-        reply += `\n총 ${dailyPicks.length}개 분석 완료. 상세 분석은 종목명을 물어봐주세요.`;
-      } else if (msgLow.includes("포트폴리오") || msgLow.includes("내 자산") || msgLow.includes("수익") || msgLow.includes("성과")) {
-        if (portfolio.length > 0 && benchmarkData) {
-          reply = `💼 포트폴리오 현황\n\n`;
-          reply += `보유 종목: ${portfolio.length}개\n`;
-          reply += `총 수익률: ${benchmarkData.myReturn >= 0 ? "+" : ""}${benchmarkData.myReturn.toFixed(2)}%\n`;
-          if (benchmarkData.spReturn != null) reply += `vs S&P 500: ${benchmarkData.alpha >= 0 ? "+" : ""}${benchmarkData.alpha.toFixed(2)}% ${benchmarkData.beatsSP ? "(아웃퍼폼)" : "(언더퍼폼)"}\n`;
-          // 관심종목 진단 요약
-          if (watchlist.length > 0) {
-            const wDiags = watchlist.map(w => {
-              const h = hotAssets.find(x => x.symbol === w.symbol || x.symbol === w.symbolRaw);
-              return h ? { name: w.name, ...quickDiagnosis(h) } : null;
-            }).filter(Boolean);
-            if (wDiags.length > 0) {
-              const avgScore = Math.round(wDiags.reduce((s, d) => s + d.score, 0) / wDiags.length);
-              reply += `\n관심종목 평균 퀀트 점수: ${avgScore}/100\n`;
-              const best = wDiags.sort((a, b) => b.score - a.score)[0];
-              const worst = wDiags.sort((a, b) => a.score - b.score)[0];
-              if (best) reply += `최고: ${best.name} ${best.score}점 (${best.opinion})\n`;
-              if (worst && worst.name !== best?.name) reply += `최저: ${worst.name} ${worst.score}점 (${worst.opinion})\n`;
-            }
-          }
-          reply += `\n💡 ${benchmarkData.myReturn >= 5 ? "좋은 성과입니다! 수익 구간에서 일부 차익실현을 고려해보세요." : benchmarkData.myReturn >= 0 ? "양호합니다. 리밸런싱 시점을 확인해보세요." : "손실 구간입니다. 손절선을 점검하고 비중 조절을 고려하세요."}`;
-        } else if (portfolio.length > 0) {
-          reply = "포트폴리오가 있지만 벤치마크 데이터가 아직 로딩 중입니다. 잠시 후 다시 물어봐주세요.";
-        } else {
-          reply = "포트폴리오에 종목을 추가하면 수익률 분석, 벤치마킹, 리밸런싱 제안을 해드릴게요.\n\n홈 화면 > 포트폴리오 탭에서 종목을 추가할 수 있어요.";
-        }
-      } else if (msgLow.includes("이상") || msgLow.includes("anomaly") || msgLow.includes("비정상") || msgLow.includes("급등") || msgLow.includes("급락")) {
-        if (anomalies.length > 0) {
-          reply = `⚡ 이상 탐지 현황 (${anomalies.length}건)\n\n`;
-          anomalies.slice(0, 5).forEach((a, i) => {
-            const d = quickDiagnosis(a);
-            reply += `${i + 1}. ${a.name} ${a.change >= 0 ? "+" : ""}${a.change}%\n`;
-            reply += `   사유: ${a.anomalyReasons.join(", ")}\n`;
-            reply += `   퀀트: ${d.score}점 (${d.opinion})\n\n`;
-          });
-          reply += `💡 이상 변동이 감지된 종목은 추가 조사 후 진입을 결정하세요. 급등 종목은 추격 매수보다 눌림목을 기다리는 것이 유리합니다.`;
-        } else {
-          reply = "현재 이상 탐지된 종목이 없습니다. 시장이 비교적 안정적인 상태예요.";
-        }
-      } else if (msgLow.includes("관심") || msgLow.includes("워치") || msgLow.includes("watch")) {
-        if (watchlist.length > 0) {
-          reply = `📌 관심종목 현황 (${watchlist.length}개)\n\n`;
-          watchlist.forEach((w, i) => {
-            const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
-            const d = hot ? quickDiagnosis(hot) : null;
-            reply += `${i + 1}. ${w.name} — ${hot ? `${hot.change >= 0 ? "+" : ""}${hot.change}%` : "데이터 없음"}`;
-            if (d) reply += ` · ${d.score}점 (${d.opinion})`;
-            reply += "\n";
-          });
-          const avgScore = watchlist.reduce((s, w) => {
-            const h = hotAssets.find(x => x.symbol === w.symbol || x.symbol === w.symbolRaw);
-            return h ? s + quickDiagnosis(h).score : s;
-          }, 0) / Math.max(watchlist.filter(w => hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw)).length, 1);
-          reply += `\n평균 퀀트 점수: ${Math.round(avgScore)}/100`;
-        } else {
-          reply = "관심종목이 비어있어요. 홈 화면에서 종목을 추가해보세요!";
-        }
-      } else if (msgLow.includes("리스크") || msgLow.includes("위험") || msgLow.includes("risk")) {
-        const vix = marketIndices.find(i => i.symbol === "^VIX");
-        const fg = fearGreed.stock?.value;
-        reply = `🛡️ 리스크 점검\n\n`;
-        if (vix) reply += `VIX: ${vix.price?.toFixed(1)} — ${vix.price > 30 ? "⚠️ 고변동성 경고" : vix.price > 20 ? "보통 수준" : "안정적"}\n`;
-        if (fg) reply += `공포탐욕: ${fg} — ${fg <= 25 ? "극도의 공포 (역발상 매수 고려)" : fg <= 40 ? "공포 (저가 매수 기회 탐색)" : fg >= 75 ? "극도의 탐욕 (과열 경고)" : fg >= 60 ? "탐욕 (차익실현 고려)" : "중립"}\n`;
-        const anomCnt = anomalies.length;
-        reply += `이상 탐지: ${anomCnt}건\n`;
-        if (portfolio.length > 0 && benchmarkData) {
-          reply += `포트폴리오: ${benchmarkData.myReturn >= 0 ? "+" : ""}${benchmarkData.myReturn.toFixed(2)}%\n`;
-        }
-        let riskLevel = "보통";
-        if ((vix?.price > 25) || (fg && fg <= 30) || anomCnt > 3) riskLevel = "높음";
-        else if ((vix?.price < 15) && (fg && fg > 40 && fg < 70) && anomCnt === 0) riskLevel = "낮음";
-        reply += `\n종합 리스크: ${riskLevel === "높음" ? "🔴" : riskLevel === "낮음" ? "🟢" : "🟡"} ${riskLevel}\n`;
-        reply += `\n💡 ${riskLevel === "높음" ? "현금 비중을 확대하고 보유 종목의 손절선을 재점검하세요." : riskLevel === "낮음" ? "시장이 안정적입니다. 계획대로 투자를 이어가세요." : "일반적 리스크 수준입니다. 포지션 사이즈를 적절히 관리하세요."}`;
-      } else if (msgLow.includes("비교") || msgLow.includes("compare") || msgLow.includes("vs")) {
-        // 두 종목 비교
-        const tokens = msgLow.replace(/vs|비교|와|과|,/g, " ").split(/\s+/).filter(Boolean);
-        const found = tokens.map(t => hotAssets.find(a => a.name.toLowerCase() === t || a.symbol.toLowerCase().replace(".ks","") === t)).filter(Boolean);
-        if (found.length >= 2) {
-          const [a, b] = found;
-          const da = quickDiagnosis(a), db = quickDiagnosis(b);
-          reply = `⚖️ ${a.name} vs ${b.name}\n\n`;
-          reply += `변동률: ${a.change >= 0 ? "+" : ""}${a.change}% vs ${b.change >= 0 ? "+" : ""}${b.change}%\n`;
-          reply += `퀀트: ${da.score}점 (${da.opinion}) vs ${db.score}점 (${db.opinion})\n`;
-          if (da.categories && db.categories) {
-            da.categories.forEach((c, i) => {
-              const bc = db.categories[i];
-              if (bc) reply += `${c.name}: ${c.score} vs ${bc.score}\n`;
-            });
-          }
-          const winner = da.score > db.score ? a : b;
-          reply += `\n💡 퀀트 기준 ${winner.name}이(가) 더 유리한 상황입니다.`;
-        } else {
-          reply = "두 종목을 비교하려면 'AAPL vs MSFT' 또는 'Apple 비교 Microsoft'처럼 입력해주세요.";
-        }
-      } else if (msgLow.includes("섹터") || msgLow.includes("업종") || msgLow.includes("산업") || msgLow.includes("sector") || msgLow.includes("industry")) {
-        // 섹터 분석
-        reply = `🏭 섹터 분석\n\n`;
-        const sectorMap = {};
-        hotAssets.forEach(a => {
-          const sector = a.sector || "기타";
-          if (!sectorMap[sector]) sectorMap[sector] = [];
-          sectorMap[sector].push(a);
-        });
-        const sectorStats = Object.entries(sectorMap).map(([sector, assets]) => {
-          const avgChange = assets.reduce((s, a) => s + a.change, 0) / assets.length;
-          const bestAsset = assets.sort((a, b) => b.change - a.change)[0];
-          const worstAsset = assets.sort((a, b) => a.change - b.change)[0];
-          return { sector, assets: assets.length, avgChange, best: bestAsset, worst: worstAsset };
-        }).sort((a, b) => b.avgChange - a.avgChange);
-
-        sectorStats.forEach((s, i) => {
-          const emoji = s.avgChange >= 0 ? "📈" : "📉";
-          reply += `${emoji} ${s.sector} (${s.assets}개) — 평균 ${s.avgChange >= 0 ? "+" : ""}${s.avgChange.toFixed(2)}%\n`;
-          if (s.best) reply += `  최고: ${s.best.name} +${s.best.change}%\n`;
-          if (s.worst && s.worst.symbol !== s.best.symbol) reply += `  최저: ${s.worst.name} ${s.worst.change}%\n`;
-        });
-        const topSector = sectorStats[0];
-        const bottomSector = sectorStats[sectorStats.length - 1];
-        reply += `\n💡 ${topSector.sector}이(가) 강세이고 ${bottomSector.sector}이(가) 약세입니다. 섹터 로테이션 기회를 살펴보세요.`;
-        reply += `\n\n💬 이어서 물어보기: "기술주 추천" · "금융주 분석" · "에너지 업종"`;
-      } else if (msgLow.includes("타이밍") || msgLow.includes("매매 시점") || msgLow.includes("언제 사") || msgLow.includes("entry") || msgLow.includes("timing")) {
-        // 매매 타이밍 분석
-        const vix = marketIndices.find(i => i.symbol === "^VIX");
-        const fg = fearGreed.stock?.value;
-        const sp = marketIndices.find(i => i.symbol === "^GSPC");
-        const upCnt = hotAssets.filter(a => a.change > 0).length;
-        const dnCnt = hotAssets.filter(a => a.change < 0).length;
-
-        let timingScore = 50;
-        if (vix) timingScore += vix.price > 30 ? 10 : vix.price > 20 ? 0 : -5;
-        if (fg) timingScore += fg <= 30 ? 15 : fg <= 45 ? 10 : fg >= 75 ? -10 : 0;
-        if (sp) timingScore += sp.change > 1 ? 5 : sp.change < -1 ? -5 : 0;
-        timingScore += (upCnt / (upCnt + dnCnt)) > 0.6 ? 5 : (upCnt / (upCnt + dnCnt)) < 0.4 ? -5 : 0;
-        timingScore = Math.max(0, Math.min(100, timingScore));
-
-        reply = `⏰ 매매 타이밍 분석\n\n`;
-        reply += `VIX: ${vix?.price?.toFixed(1)} — ${vix?.price > 30 ? "고변동 (역발상 기회)" : vix?.price > 20 ? "중간" : "안정"}\n`;
-        reply += `공포탐욕: ${fg} — ${fg <= 30 ? "극도 공포 (매수 기회!)" : fg <= 45 ? "공포 (저가 매수)" : fg >= 75 ? "극도 탐욕 (조심)" : "중립"}\n`;
-        reply += `시장 방향: S&P 500 ${sp?.change >= 0 ? "+" : ""}${sp?.change}% | 상승 ${upCnt} 하락 ${dnCnt}\n`;
-        reply += `\n타이밍 점수: ${timingScore}/100\n`;
-        reply += `\n💡 `;
-        if (timingScore >= 70) {
-          reply += "매수 신호가 강합니다! 관심종목 1차 진입을 시작하기 좋은 시점입니다.";
-        } else if (timingScore >= 50) {
-          reply += "혼합 신호입니다. 분할 매수 전략으로 진입을 시작하세요.";
-        } else if (timingScore >= 30) {
-          reply += "약세 신호가 우세합니다. 추가 조정을 기다리거나 매우 제한적으로 진입하세요.";
-        } else {
-          reply += "매도 신호가 강합니다. 기존 포지션을 정리하고 관망하세요.";
-        }
-        reply += `\n\n💬 이어서 물어보기: "추천 종목" · "섹터 분석" · "리스크 점검"`;
-      } else if (msgLow.includes("최적화") || msgLow.includes("리밸런싱") || msgLow.includes("rebalance") || msgLow.includes("optimize")) {
-        // 포트폴리오 최적화 제안
-        if (portfolio.length === 0) {
-          reply = "포트폴리오에 종목이 없어서 최적화 제안을 드릴 수 없습니다. 먼저 종목을 추가해주세요.";
-        } else {
-          reply = `🎯 포트폴리오 최적화 제안\n\n`;
-          const sectorConc = {};
-          let totalBuySignals = 0, totalSellSignals = 0;
-          portfolio.forEach(item => {
-            const hot = hotAssets.find(h => h.symbol === item.symbol || h.symbol === item.symbolRaw);
-            if (hot) {
-              const sector = hot.sector || "기타";
-              sectorConc[sector] = (sectorConc[sector] || 0) + 1;
-              const diag = quickDiagnosis(hot);
-              if (diag.score >= 60) totalBuySignals++;
-              else if (diag.score < 40) totalSellSignals++;
-            }
-          });
-
-          reply += `현재 구성: ${portfolio.length}개\n`;
-          Object.entries(sectorConc).forEach(([sector, count]) => {
-            const pct = (count / portfolio.length * 100).toFixed(0);
-            reply += `  ${sector}: ${count}개 (${pct}%)\n`;
-          });
-
-          const maxSectorPct = Math.max(...Object.values(sectorConc).map(c => c / portfolio.length));
-          if (maxSectorPct > 0.4) {
-            reply += `\n⚠️ ${Object.entries(sectorConc).find(([, c]) => c / portfolio.length === maxSectorPct)[0]} 집중도가 높습니다. 분산을 권장합니다.\n`;
-          }
-
-          reply += `\n강한 신호: ${totalBuySignals}개 매수신호, ${totalSellSignals}개 약세신호\n`;
-          reply += `\n💡 `;
-          if (totalSellSignals > portfolio.length * 0.3) {
-            reply += "약세 신호가 많습니다. 약한 종목부터 정리하고 신규 종목으로 교체를 고려하세요.";
-          } else if (totalBuySignals > portfolio.length * 0.6) {
-            reply += "강한 매수신호가 많습니다. 현재 포지션을 유지하거나 강한 종목에 비중을 확대하세요.";
-          } else {
-            reply += "포트폴리오가 균형 상태입니다. 분기별 리밸런싱으로 섹터 가중치를 조정하세요.";
-          }
-          reply += `\n\n💬 이어서 물어보기: "포트폴리오 현황" · "리스크 점검" · "추천 종목"`;
-        }
-      } else if (msgLow.includes("모멘텀") || msgLow.includes("추세") || msgLow.includes("momentum") || msgLow.includes("trend")) {
-        // 모멘텀 분석
-        reply = `🚀 모멘텀 분석\n\n`;
-        const sorted = [...hotAssets].sort((a, b) => b.change - a.change);
-        const gainers = sorted.slice(0, 5);
-        const losers = sorted.slice(-5).reverse();
-
-        reply += `📈 강한 모멘텀 (TOP 5 상승주)\n`;
-        gainers.forEach((g, i) => {
-          const diag = quickDiagnosis(g);
-          reply += `${i + 1}. ${g.name} +${g.change}% (퀀트: ${diag.score}점)\n`;
-          if (g.volRatio) reply += `   거래량: ${g.volRatio.toFixed(1)}배\n`;
-        });
-
-        reply += `\n📉 약한 모멘텀 (TOP 5 하락주)\n`;
-        losers.forEach((l, i) => {
-          const diag = quickDiagnosis(l);
-          reply += `${i + 1}. ${l.name} ${l.change}% (퀀트: ${diag.score}점)\n`;
-          if (l.volRatio) reply += `   거래량: ${l.volRatio.toFixed(1)}배\n`;
-        });
-
-        const momentumStrength = gainers.reduce((s, g) => s + g.change, 0) / gainers.length;
-        reply += `\n💡 `;
-        if (momentumStrength > 5) {
-          reply += "상승 모멘텀이 강합니다. 하지만 추격 매수는 피하고, 조정 후 진입을 권합니다.";
-        } else if (momentumStrength < -2) {
-          reply += "하락 모멘텀이 우세입니다. 저점 테스트까지 기다리세요.";
-        } else {
-          reply += "모멘텀이 약세 상태입니다. 추세 전환 신호를 확인 후 진입하세요.";
-        }
-        reply += `\n\n💬 이어서 물어보기: "매매 타이밍" · "섹터 분석" · "시장 현황"`;
-      } else if (msgLow.includes("배당") || msgLow.includes("가치주") || msgLow.includes("dividend") || msgLow.includes("value")) {
-        // 배당/가치 분석
-        reply = `💰 배당/가치주 분석\n\n`;
-        const valueAssets = hotAssets.filter(a => {
-          const diag = quickDiagnosis(a);
-          return diag.score > 55 && a.change < 5 && a.pe && a.pe < 20;
-        }).slice(0, 10);
-
-        if (valueAssets.length > 0) {
-          reply += `가치주 후보 (${valueAssets.length}개)\n`;
-          valueAssets.forEach((v, i) => {
-            const diag = quickDiagnosis(v);
-            reply += `${i + 1}. ${v.name}\n`;
-            reply += `   가격: ${fmtPrice(v.price, v.market)} | 변동: ${v.change >= 0 ? "+" : ""}${v.change}%\n`;
-            if (v.pe) reply += `   PER: ${v.pe.toFixed(1)}배 | 퀀트: ${diag.score}점\n`;
-          });
-          reply += `\n💡 저평가 구간의 안정적인 종목들입니다. 배당 재투자로 복리 효과를 극대화하세요.`;
-        } else {
-          reply += `현재 저평가 가치주 후보가 부족합니다.\n시장 조정 시점까지 기다리거나, 특정 섹터의 방어주를 검토하세요.`;
-        }
-        reply += `\n\n💬 이어서 물어보기: "섹터 분석" · "추천 종목" · "매매 타이밍"`;
-      } else if (msgLow.includes("종합") || msgLow.includes("전체분석") || msgLow.includes("overview") || msgLow.includes("진단")) {
-        // 종합 진단
-        const sp = marketIndices.find(i => i.symbol === "^GSPC");
-        const ks = marketIndices.find(i => i.symbol === "^KS11");
-        const vix = marketIndices.find(i => i.symbol === "^VIX");
-        const fg = fearGreed.stock?.value;
-        const upCnt = hotAssets.filter(a => a.change > 0).length;
-        const dnCnt = hotAssets.filter(a => a.change < 0).length;
-
-        reply = `🔍 시장 & 포트폴리오 종합 진단\n\n`;
-        reply += `── 시장 상황 ──\n`;
-        reply += `S&P 500: ${sp?.price?.toLocaleString()} (${sp?.change >= 0 ? "+" : ""}${sp?.change}%)\n`;
-        reply += `코스피: ${ks?.price?.toLocaleString()} (${ks?.change >= 0 ? "+" : ""}${ks?.change}%)\n`;
-        reply += `VIX: ${vix?.price?.toFixed(1)} (${vix?.price > 30 ? "고변동" : vix?.price > 20 ? "중간" : "안정"})\n`;
-        reply += `공포탐욕: ${fg} (${fg <= 30 ? "극도 공포" : fg >= 75 ? "극도 탐욕" : "중립"})\n`;
-        reply += `상승/하락: ${upCnt} / ${dnCnt}\n`;
-
-        reply += `\n── 포트폴리오 상황 ──\n`;
-        if (portfolio.length > 0 && benchmarkData) {
-          reply += `수익률: ${benchmarkData.myReturn >= 0 ? "+" : ""}${benchmarkData.myReturn.toFixed(2)}%\n`;
-          if (benchmarkData.spReturn != null) reply += `vs S&P: ${benchmarkData.alpha >= 0 ? "+" : ""}${benchmarkData.alpha.toFixed(2)}% (${benchmarkData.beatsSP ? "아웃퍼폼" : "언더퍼폼"})\n`;
-        } else {
-          reply += `포트폴리오가 비어있거나 로딩 중입니다.\n`;
-        }
-
-        reply += `\n── 리스크 평가 ──\n`;
-        let riskLevel = "보통";
-        if ((vix?.price > 25) || (fg && fg <= 30) || anomalies.length > 3) riskLevel = "높음";
-        else if ((vix?.price < 15) && (fg && fg > 40 && fg < 70) && anomalies.length === 0) riskLevel = "낮음";
-        reply += `종합 리스크: ${riskLevel === "높음" ? "🔴" : riskLevel === "낮음" ? "🟢" : "🟡"} ${riskLevel}\n`;
-        reply += `이상 탐지: ${anomalies.length}건\n`;
-
-        reply += `\n── 전략 제안 ──\n`;
-        let strategyMsg = "";
-        if (riskLevel === "높음") {
-          strategyMsg = "• 현금 비중 확대\n• 강한 종목에 집중\n• 손절선 재점검";
-        } else if (riskLevel === "낮음") {
-          strategyMsg = "• 신규 진입 기회 활용\n• 적극적 리밸런싱\n• 성장주 비중 확대";
-        } else {
-          strategyMsg = "• 분할 매수 지속\n• 섹터 로테이션 검토\n• 분산투자 유지";
-        }
-        reply += strategyMsg;
-        reply += `\n\n💬 이어서 물어보기: "추천 종목" · "리스크 점검" · "포트폴리오 현황"`;
-      } else {
-        reply = `안녕하세요! Zepta AI 어시스턴트입니다.\n\n이런 것들을 물어보세요:\n\n── 기본 분석 ──\n• 종목명 → "NVDA 분석해줘", "삼성전자 어때?"\n• 시장 현황 → "시장 현황", "오늘 마켓"\n• 추천 종목 → "뭐 살까?", "오늘 TOP"\n\n── 고도화 기능 ──\n• 섹터 분석 → "섹터 분석", "tech sector"\n• 매매 타이밍 → "언제 사?", "진입 타이밍"\n• 포트폴리오 최적화 → "최적화", "리밸런싱"\n• 모멘텀 분석 → "모멘텀", "추세"\n• 가치주/배당 → "가치주", "배당"\n• 종합 진단 → "종합분석", "전체 진단"\n\n── 기타 ──\n• 포트폴리오 → "내 자산", "수익률"\n• 이상 탐지 → "급등락", "비정상"\n• 관심종목 → "관심종목"\n• 리스크 점검 → "리스크", "위험도"\n• 종목 비교 → "AAPL vs MSFT"`;
-      }
-      setAiMessages(prev => [...prev, { role: "ai", text: reply }]);
-      setAiLoading(false);
-    }, 500);
-  }, [hotAssets, watchlist, dailyPicks, marketIndices, fearGreed, anomalies, benchmarkData, portfolio, extendedHours]);
 
   // ── useMemo: 경제 캘린더 필터/정렬 결과 ──
   const filteredEconEvents = useMemo(() => {
@@ -7217,7 +6828,6 @@ function AppInner() {
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
         @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
         @keyframes streakPulse { 0%,100%{box-shadow:0 0 12px rgba(255,107,53,0.3)} 50%{box-shadow:0 0 24px rgba(255,107,53,0.6)} }
-        @keyframes fabPulse { 0%,100%{box-shadow:0 4px 20px rgba(59,130,246,0.4)} 50%{box-shadow:0 4px 28px rgba(59,130,246,0.7)} }
         @keyframes toastSlideIn { from{opacity:0;transform:translateY(-20px)} to{opacity:1;transform:translateY(0)} }
         /* 모바일 앱처럼 전체 화면 확대/축소 방지 */
         html, body { touch-action: manipulation; -ms-touch-action: manipulation; }
@@ -13091,180 +12701,79 @@ function AppInner() {
         </nav>
       )}
 
-      {/* FAB 버튼 */}
-      <button onClick={() => setAiChatOpen(!aiChatOpen)} style={{
-        position: "fixed", bottom: isMobile ? "100px" : "28px", right: isMobile ? "16px" : "28px",
-        width: "56px", height: "56px", borderRadius: "16px", border: "none",
-        background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`,
-        color: "#fff", fontSize: "24px", cursor: "pointer",
-        boxShadow: "0 4px 20px rgba(59,130,246,0.4)",
-        zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center",
-        transition: "transform .2s, box-shadow .2s",
-        animation: aiChatOpen ? "none" : "fabPulse 2s ease-in-out infinite",
-      }}
-      onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.boxShadow = "0 6px 28px rgba(59,130,246,0.5)"; }}
-      onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(59,130,246,0.4)"; }}>
-        {aiChatOpen ? "✕" : "🤖"}
-      </button>
-
-      {/* 채팅 패널 */}
-      {aiChatOpen && (
-        <div style={{
-          position: "fixed", bottom: "90px", right: "28px",
-          width: isMobile ? "calc(100vw - 56px)" : "400px", maxHeight: isMobile ? "calc(100vh - 200px)" : "540px",
-          background: C.card, borderRadius: "20px", border: `1px solid ${C.border}`,
-          boxShadow: `0 12px 48px ${C.isDark ? "rgba(0,0,0,0.5)" : "rgba(0,0,0,0.15)"}`,
-          zIndex: 9999, display: "flex", flexDirection: "column", overflow: "hidden",
-          maxWidth: "100vw",
-        }}>
-          {/* 헤더 */}
-          <div style={{
-            padding: "16px 20px", borderBottom: `1px solid ${C.border}20`,
-            background: `linear-gradient(135deg, ${C.card} 0%, ${C.blueBg} 100%)`,
-          }}>
-            {/* ★ 2026-06-12 (전수 감사 — 컴플라이언스): 'AI 어시스턴트·실시간 분석' 과대 표기 정정
-                (LLM 아닌 키워드 매칭) + 면책 명시 */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>🤖 퀀트 도우미</div>
-                <div style={{ fontSize: "12px", color: C.text3, marginTop: "2px" }}>지표 데이터 기반 도우미 · 분석 참고용, 투자 권유 아님</div>
-              </div>
-              <button onClick={() => setAiChatOpen(false)} aria-label="닫기" style={{
-                width: 32, height: 32, border: "none", borderRadius: 8, background: "transparent",
-                color: C.text3, fontSize: 15, cursor: "pointer", flexShrink: 0,
-              }}>✕</button>
-            </div>
-          </div>
-
-          {/* 메시지 영역 */}
-          <div style={{ flex: 1, overflow: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: "12px", minHeight: "200px" }}>
-            {aiMessages.length === 0 && (
-              <div style={{ textAlign: "center", padding: "16px 0", color: C.text3, fontSize: "18px" }}>
-                <div style={{ fontSize: "28px", marginBottom: "8px" }}>👋</div>
-                <div style={{ fontWeight: 600, color: C.text1, marginBottom: "4px" }}>무엇이든 물어보세요</div>
-                <div style={{ fontSize: "16px", marginBottom: "14px" }}>종목 분석, 시장 현황, 리스크 점검까지</div>
-                <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                  {[["시장 현황 요약", "📈"], ["추천 종목 TOP 5", "🎯"], ["리스크 점검", "🛡️"], ["관심종목 진단", "📌"], ["이상 탐지 현황", "⚡"]].map(([q, icon]) => (
-                    <button key={q} onClick={() => handleAiChat(q)} style={{
-                      padding: "8px 14px", borderRadius: "10px", fontSize: "16px", fontWeight: 600,
-                      background: C.card2, color: C.text1, border: `1px solid ${C.border2}`, cursor: "pointer",
-                      display: "flex", alignItems: "center", gap: "8px", textAlign: "left", transition: "all .15s",
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = C.blueBg; e.currentTarget.style.borderColor = C.blue + "40"; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = C.card2; e.currentTarget.style.borderColor = C.border2; }}>
-                      <span>{icon}</span>
-                      <span>{q}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {aiMessages.map((m, i) => (
-              <div key={i} style={{
-                alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-                maxWidth: "85%",
-                padding: "10px 14px", borderRadius: m.role === "user" ? "14px 14px 4px 14px" : "14px 14px 14px 4px",
-                background: m.role === "user" ? C.blue : C.card2,
-                color: m.role === "user" ? "#fff" : C.text1,
-                fontSize: "18px", lineHeight: 1.6, whiteSpace: "pre-wrap",
-              }}>
-                {m.text}
-              </div>
-            ))}
-            {aiLoading && (
-              <div style={{ alignSelf: "flex-start", padding: "10px 14px", borderRadius: "12px 14px 14px 4px", background: C.card2 }}>
-                <span style={{ animation: "pulse 1s infinite", fontSize: "18px", color: C.text3 }}>분석 중...</span>
-              </div>
-            )}
-          </div>
-
-          {/* 입력 */}
-          <div style={{ padding: "12px 16px", borderTop: `1px solid ${C.border}20`, display: "flex", gap: "8px" }}>
-            <input
-              value={aiInput}
-              onChange={e => setAiInput(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleAiChat(aiInput); } }}
-              placeholder="종목명이나 질문을 입력하세요..."
-              style={{
-                flex: 1, padding: "10px 14px", borderRadius: "12px", fontSize: "18px",
-                background: C.bg, border: `1px solid ${C.border2}`, color: C.text1,
-                outline: "none", minHeight: "40px",
-              }}
-            />
-            <button onClick={() => handleAiChat(aiInput)} disabled={aiLoading || !aiInput.trim()} style={{
-              padding: "10px 18px", borderRadius: "12px", fontSize: "18px", fontWeight: 700,
-              background: aiInput.trim() ? C.blue : C.card2,
-              color: aiInput.trim() ? "#fff" : C.text3,
-              border: "none", cursor: aiInput.trim() ? "pointer" : "default", whiteSpace: "nowrap",
-              minHeight: "40px", display: "flex", alignItems: "center",
-            }}>전송</button>
-          </div>
-        </div>
-      )}
 
       </div>{/* di-app-body */}
 
-      {/* ── 글로벌 검색 (/ 단축키) ── */}
+      {/* ── 글로벌 검색 (/ 단축키) — 2026-06-12 대표 피드백: 모바일 UI 정돈 ── */}
       {globalSearchOpen && (() => {
         const popularStocks = [
-          { symbol: "NVDA", name: "NVIDIA", market: "us", icon: "🟢" },
-          { symbol: "AAPL", name: "Apple", market: "us", icon: "🍎" },
-          { symbol: "TSLA", name: "Tesla", market: "us", icon: "⚡" },
-          { symbol: "MSFT", name: "Microsoft", market: "us", icon: "🪟" },
-          { symbol: "GOOG", name: "Alphabet", market: "us", icon: "🔍" },
-          { symbol: "AMZN", name: "Amazon", market: "us", icon: "📦" },
+          { symbol: "NVDA", name: "NVIDIA", flag: "🇺🇸" },
+          { symbol: "AAPL", name: "Apple", flag: "🇺🇸" },
+          { symbol: "TSLA", name: "Tesla", flag: "🇺🇸" },
+          { symbol: "MSFT", name: "Microsoft", flag: "🇺🇸" },
+          { symbol: "005930", name: "삼성전자", flag: "🇰🇷" },
+          { symbol: "000660", name: "SK하이닉스", flag: "🇰🇷" },
         ];
         const cryptoQuick = [
-          { symbol: "BTC-USD", name: "Bitcoin", market: "crypto", icon: "₿" },
-          { symbol: "ETH-USD", name: "Ethereum", market: "crypto", icon: "Ξ" },
-          { symbol: "SOL-USD", name: "Solana", market: "crypto", icon: "◎" },
+          { symbol: "BTC-USD", name: "비트코인", icon: "₿" },
+          { symbol: "ETH-USD", name: "이더리움", icon: "Ξ" },
+          { symbol: "SOL-USD", name: "솔라나", icon: "◎" },
         ];
         const categories = [
-          { label: "AI/반도체", tab: "screener", icon: "🧠" },
-          { label: "배당주", tab: "screener", icon: "💰" },
-          { label: "성장주", tab: "screener", icon: "📈" },
-          { label: "크립토", tab: "auto-trading", icon: "₿" },
+          { label: "스크리너", tab: "screener", icon: "🔍" },
+          { label: "시그널 보드", tab: "real-trading", icon: "📡" },
+          { label: "코인 분석", href: "/coin", icon: "🪙" },
+          { label: "경제 일정", tab: "econ-calendar", icon: "📅" },
         ];
         return (
-          <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "12vh" }}
+          <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: isMobile ? "5vh" : "12vh" }}
             onClick={(e) => { if (e.target === e.currentTarget) setGlobalSearchOpen(false); }}>
-            <div style={{ width: "560px", maxWidth: "92vw", background: C.card, borderRadius: "20px", border: `1px solid ${C.border}`, boxShadow: "0 24px 80px rgba(0,0,0,0.5)", overflow: "hidden" }}>
-              {/* 검색 헤더 */}
-              <div style={{ padding: "16px 20px 12px" }}>
-                <SearchBar onSelect={(asset) => { setSelectedAsset(asset); setGlobalSearchOpen(false); }} placeholder="종목명 또는 티커 입력 (예: NVDA, 삼성전자)" />
+            <div style={{ width: "560px", maxWidth: "94vw", maxHeight: isMobile ? "85dvh" : "80vh", overflowY: "auto", background: C.card, borderRadius: "20px", border: `1px solid ${C.border}`, boxShadow: "0 24px 80px rgba(0,0,0,0.5)" }}>
+              {/* 검색 헤더 + 닫기 */}
+              <div style={{ padding: "14px 16px 10px", display: "flex", alignItems: "center", gap: 8 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <SearchBar onSelect={(asset) => { setSelectedAsset(asset); setGlobalSearchOpen(false); }} placeholder={isMobile ? "종목명·티커 검색" : "종목명 또는 티커 입력 (예: NVDA, 삼성전자)"} />
+                </div>
+                <button onClick={() => setGlobalSearchOpen(false)} aria-label="검색 닫기" style={{
+                  flexShrink: 0, width: 36, height: 36, borderRadius: 10, border: `1px solid ${C.border}40`,
+                  background: C.card2, color: C.text3, fontSize: 16, cursor: "pointer", lineHeight: 1,
+                }}>✕</button>
               </div>
 
-              {/* 빠른 카테고리 */}
-              <div style={{ padding: "0 20px 12px", display: "flex", gap: "8px" }}>
+              {/* 빠른 이동 — 가로 스크롤 칩 (모바일 잘림 제거, 실제 기능 페이지로 연결) */}
+              <div className="hscroll" style={{ padding: "0 16px 12px", display: "flex", gap: "8px", overflowX: "auto", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
                 {categories.map(cat => (
-                  <button key={cat.label} onClick={() => { setTab(cat.tab); setGlobalSearchOpen(false); }} style={{
-                    padding: "6px 14px", borderRadius: "20px", fontSize: "16px", fontWeight: 600,
+                  <button key={cat.label} onClick={() => {
+                    if (cat.href) { window.location.href = cat.href; return; }
+                    setTab(cat.tab); setGlobalSearchOpen(false);
+                  }} style={{
+                    padding: "8px 14px", borderRadius: "20px", fontSize: "14px", fontWeight: 700, whiteSpace: "nowrap", flexShrink: 0,
                     background: C.card2, color: C.text2, border: `1px solid ${C.border}${C.isDark ? '30' : '50'}`, cursor: "pointer",
-                    transition: "all 0.15s", display: "flex", alignItems: "center", gap: "4px",
+                    transition: "all 0.15s", display: "inline-flex", alignItems: "center", gap: "5px", minHeight: 36,
                   }}
                   onMouseEnter={e => { e.currentTarget.style.background = C.blueBg; e.currentTarget.style.color = C.blue; }}
                   onMouseLeave={e => { e.currentTarget.style.background = C.card2; e.currentTarget.style.color = C.text2; }}
                   >
-                    <span style={{ fontSize: "16px" }}>{cat.icon}</span>
+                    <span style={{ fontSize: "14px" }}>{cat.icon}</span>
                     {cat.label}
                   </button>
                 ))}
-                <span style={{ marginLeft: "auto", fontSize: "16px", color: C.text3, background: C.card2, padding: "6px 10px", borderRadius: "6px", alignSelf: "center" }}>ESC</span>
+                {!isMobile && <span style={{ marginLeft: "auto", fontSize: "13px", color: C.text3, background: C.card2, padding: "6px 10px", borderRadius: "6px", alignSelf: "center", flexShrink: 0 }}>ESC</span>}
               </div>
 
               <div style={{ height: "1px", background: `${C.border}${C.isDark ? '30' : '50'}` }} />
 
-              {/* 인기 종목 */}
-              <div style={{ padding: "16px 20px 8px" }}>
-                <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px", letterSpacing: "0.5px", textTransform: "uppercase" }}>인기 종목</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "6px" }}>
+              {/* 인기 종목 — 미국 + 한국 */}
+              <div style={{ padding: "14px 16px 6px" }}>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: C.text3, marginBottom: "8px", letterSpacing: "0.5px" }}>인기 종목</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "4px" }}>
                   {popularStocks.map(s => {
                     const asset = ALL_ASSETS.find(a => a.symbol === s.symbol);
                     return (
                       <button key={s.symbol} onClick={() => { if (asset) { setSelectedAsset(asset); setGlobalSearchOpen(false); }}} style={{
-                        display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px",
+                        display: "flex", alignItems: "center", gap: "10px", padding: "9px 10px",
                         borderRadius: "10px", background: "transparent", border: "none", cursor: "pointer",
-                        transition: "all 0.12s", textAlign: "left", width: "100%",
+                        transition: "all 0.12s", textAlign: "left", width: "100%", minHeight: 48,
                       }}
                       onMouseEnter={e => e.currentTarget.style.background = C.card2}
                       onMouseLeave={e => e.currentTarget.style.background = "transparent"}
@@ -13272,11 +12781,11 @@ function AppInner() {
                         <div style={{
                           width: "32px", height: "32px", borderRadius: "8px", flexShrink: 0,
                           background: "#1A2C4F", display: "flex", alignItems: "center", justifyContent: "center",
-                          fontWeight: 800, fontSize: "14px", color: C.blue,
-                        }}>{s.symbol.slice(0, 4)}</div>
+                          fontWeight: 800, fontSize: s.symbol.length > 4 ? "10px" : "12px", color: C.blue,
+                        }}>{s.flag === "🇰🇷" ? s.name.slice(0, 2) : s.symbol.slice(0, 4)}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: "18px", color: C.text1 }}>{s.name}</div>
-                          <div style={{ fontSize: "16px", color: C.text3 }}>🇺🇸 {s.symbol}</div>
+                          <div style={{ fontWeight: 700, fontSize: "15px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                          <div style={{ fontSize: "12px", color: C.text3 }}>{s.flag} {s.symbol}</div>
                         </div>
                       </button>
                     );
@@ -13285,25 +12794,22 @@ function AppInner() {
               </div>
 
               {/* 크립토 바로가기 */}
-              <div style={{ padding: "8px 20px 16px" }}>
-                <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px", letterSpacing: "0.5px", textTransform: "uppercase" }}>크립토</div>
-                <div style={{ display: "flex", gap: "8px" }}>
+              <div style={{ padding: "6px 16px 16px" }}>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: C.text3, marginBottom: "8px", letterSpacing: "0.5px" }}>크립토</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "6px" }}>
                   {cryptoQuick.map(c => {
                     const asset = ALL_ASSETS.find(a => a.symbol === c.symbol || a.symbol === c.symbol.replace("-USD", "/USD"));
                     return (
-                      <button key={c.symbol} onClick={() => { if (asset) { setSelectedAsset(asset); setGlobalSearchOpen(false); } else { setTab("auto-trading"); setGlobalSearchOpen(false); }}} style={{
-                        flex: 1, display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px",
+                      <button key={c.symbol} onClick={() => { if (asset) { setSelectedAsset(asset); setGlobalSearchOpen(false); } else { window.location.href = "/coin"; }}} style={{
+                        display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "10px 6px",
                         borderRadius: "10px", background: C.card2, border: `1px solid ${C.border}20`, cursor: "pointer",
-                        transition: "all 0.12s",
+                        transition: "all 0.12s", minWidth: 0, minHeight: 64,
                       }}
                       onMouseEnter={e => { e.currentTarget.style.borderColor = C.purple + "40"; e.currentTarget.style.background = `${C.purple}10`; }}
                       onMouseLeave={e => { e.currentTarget.style.borderColor = C.border + "20"; e.currentTarget.style.background = C.card2; }}
                       >
-                        <span style={{ fontSize: "18px", fontWeight: 800, color: C.purple }}>{c.icon}</span>
-                        <div>
-                          <div style={{ fontWeight: 600, fontSize: "16px", color: C.text1 }}>{c.name}</div>
-                          <div style={{ fontSize: "15px", color: C.text3 }}>{c.symbol}</div>
-                        </div>
+                        <span style={{ fontSize: "18px", fontWeight: 800, color: C.purple, lineHeight: 1 }}>{c.icon}</span>
+                        <span style={{ fontWeight: 700, fontSize: "13px", color: C.text1, whiteSpace: "nowrap" }}>{c.name}</span>
                       </button>
                     );
                   })}
