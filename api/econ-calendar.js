@@ -102,7 +102,9 @@ export default async function handler(req, res) {
   const blsOut        = blsResult.status === "fulfilled" ? (blsResult.value || {}) : {};
   const blsActuals    = blsOut.actuals || {};
   const blsByName     = blsOut.byName || {}; // curated 외 이벤트(MoM 행 등) 이름 폴백
-  const fredActuals   = fredResult.status === "fulfilled" ? fredResult.value : {};
+  const fredOut       = fredResult.status === "fulfilled" ? (fredResult.value || {}) : {};
+  const fredActuals   = fredOut.actuals || {};
+  const fredByName    = fredOut.byName || {};
   const ffEvents      = ffResult.status === "fulfilled" ? ffResult.value : [];
 
   // ── 풀 캘린더 소스 선택 (Finnhub > FMP > Curated) ──
@@ -149,6 +151,25 @@ export default async function handler(req, res) {
       newEstimates[`${f.date}::${f.event}`] = { e: f.estimate ?? null, p: f.previous ?? null, dt: f.dt };
     }
   }
+  // ── FF previous 역산 백필 (2026-06-12 대표 질문 "다른 지표들은 어떻게?") ──
+  //   FF 의 previous = 직전 회차의 실제 발표치. 이걸로 지난 이벤트의 actual 을
+  //   역산해 채우면 ISM·소비자심리 등 BLS/FRED 에 없는 민간지표까지 무키로 커버
+  //   (한 발표 사이클 지연). 채운 값은 di:econ:actuals 에 영구 저장돼 누적된다.
+  const ffBackfill = {};
+  const CYCLE_MAX = 45 * 86400000; // 직전 회차 가드 — 주간·월간만 (한 사이클 건너뛴 오귀속 방지)
+  for (const f of ffEvents) {
+    if (f.previous == null) continue;
+    const prior = baseEvents.filter(e =>
+      e.event === f.event && e.actual == null &&
+      Date.parse(e.date) < Date.parse(f.date) - D3 &&
+      Date.parse(f.date) - Date.parse(e.date) <= CYCLE_MAX);
+    if (prior.length > 0) {
+      const t = prior[prior.length - 1]; // 직전 회차
+      t.actual = f.previous;
+      ffBackfill[`${t.date}::${t.event}`] = f.previous;
+    }
+  }
+
   // 관측 컨센서스 영구 저장 (best-effort)
   if (kv && Object.keys(newEstimates).length > 0) {
     try {
@@ -194,19 +215,22 @@ export default async function handler(req, res) {
     return e;
   });
 
-  // ── BLS 이름 폴백 적용 — curated 에 없는 행(FF 런타임 추가 MoM 등)의 '발표 대기' 해소 ──
+  // ── 이름 폴백 적용 — curated 에 없는 행(FF 런타임 추가 등)의 '발표 대기' 해소 ──
+  //   FRED 먼저, BLS 가 나중(BLS 가 더 정확 — 같은 이벤트면 BLS 가 덮어씀)
   const byNameKeyed = {};
-  for (const [name, val] of Object.entries(blsByName)) {
-    const cands = finalEvents.filter(e => e.event === name && e.actual == null && e.date <= todayStr);
-    if (cands.length > 0) {
-      const target = cands[cands.length - 1]; // 가장 최근 과거 이벤트
-      target.actual = val;
-      byNameKeyed[`${target.date}::${target.event}`] = val;
+  for (const dict of [fredByName, blsByName]) {
+    for (const [name, val] of Object.entries(dict)) {
+      const cands = finalEvents.filter(e => e.event === name && (e.actual == null || dict === blsByName) && e.date <= todayStr);
+      if (cands.length > 0) {
+        const target = cands[cands.length - 1]; // 가장 최근 과거 이벤트
+        target.actual = val;
+        byNameKeyed[`${target.date}::${target.event}`] = val;
+      }
     }
   }
 
-  // ── KV에 새로운 actual 저장 ──
-  await saveActualsToKV({ ...apiSourceActuals, ...fredActuals, ...blsActuals, ...byNameKeyed });
+  // ── KV에 새로운 actual 저장 (FF 역산 백필 포함) ──
+  await saveActualsToKV({ ...apiSourceActuals, ...fredActuals, ...blsActuals, ...byNameKeyed, ...ffBackfill });
 
   const sourceList = [
     source,
@@ -217,12 +241,25 @@ export default async function handler(req, res) {
     ffEvents.length > 0 ? "ff" : null,
   ].filter(Boolean);
 
-  return res.status(200).json({
+  const payload = {
     events: finalEvents,
     source: sourceList.join("+"),
     updatedAt: now.toISOString(),
     actualsCount: Object.keys(allActuals).length,
-  });
+  };
+  // ?debug=1 — 소스별 기여·오류 진단 (FRED 키 재설정 시 1분 검증용)
+  if (req.query?.debug === "1") {
+    payload.debug = {
+      finnhub: finnhubEvents.length,
+      fmp: fmpEvents.length,
+      bls: { keyed: Object.keys(blsActuals).length, byName: Object.keys(blsByName).length },
+      fred: { keyed: Object.keys(fredActuals).length, byName: Object.keys(fredByName).length, error: fredOut.error || null },
+      ff: ffEvents.length,
+      ffBackfill: Object.keys(ffBackfill).length,
+      kvActualsTotal: Object.keys(kvActuals).length,
+    };
+  }
+  return res.status(200).json(payload);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -416,29 +453,61 @@ async function fetchBLSActuals() {
 
 // ══════════════════════════════════════════════════════════════
 // 데이터 소스: FRED (Federal Reserve) — 추가 actual 보완
+//   ★ 2026-06-12 확장 (대표 질문 "다른 지표들은 어떻게?"):
+//   - 커버리지 7→14 시리즈 (전월비·코어 PCE·실업수당·산업생산·기준금리 추가)
+//   - BLS 와 동일한 byName 폴백 — FF 가 런타임 추가한 행도 매칭
+//   - error 캡처 반환 — ?debug=1 로 키 문제를 1분 안에 진단 가능
+//     (이전에 "키 넣어도 안 되던" 원인: 당시 큐레이션에 발표치가 하드코딩돼
+//      있어 채울 빈칸이 없었고, 이름 완전일치 매칭이라 효과가 안 보였음)
 // ══════════════════════════════════════════════════════════════
 async function fetchFREDActuals(todayStr, curated) {
   const actuals = {};
+  const byName = {};
   const fredKey = process.env.FRED_API_KEY;
-  if (!fredKey) return actuals;
+  if (!fredKey) return { actuals, byName, error: "FRED_API_KEY 미설정" };
+  let firstError = null;
 
   const fredSeries = [
-    { id: "CPIAUCSL",         eventMatch: "CPI (YoY)",                   yoy: true },
-    { id: "CPILFESL",         eventMatch: "Core CPI (YoY)",              yoy: true },
-    { id: "PAYEMS",           eventMatch: "Nonfarm Payrolls",            diff: true },
-    { id: "UNRATE",           eventMatch: "Unemployment Rate",           direct: true },
-    { id: "A191RL1Q225SBEA",  eventMatch: "GDP Growth Rate",             direct: true },
-    { id: "PCEPI",            eventMatch: "PCE Price Index (YoY)",       yoy: true },
-    { id: "RSAFS",            eventMatch: "Retail Sales (MoM)",          mom: true },
+    // 물가 (BLS 가 1순위 — FRED 는 백업)
+    { id: "CPIAUCSL",         eventMatch: "CPI (YoY)",                yoy: true },
+    { id: "CPIAUCSL",         eventMatch: "CPI (MoM)",                mom: true },
+    { id: "CPILFESL",         eventMatch: "Core CPI (YoY)",           yoy: true },
+    { id: "CPILFESL",         eventMatch: "Core CPI (MoM)",           mom: true },
+    // 고용
+    { id: "PAYEMS",           eventMatch: "Nonfarm Payrolls",         diff: true },
+    { id: "UNRATE",           eventMatch: "Unemployment Rate",        direct: true },
+    { id: "ICSA",             eventMatch: "Initial Jobless Claims",   directK: true }, // 주간 신규 청구(명) → K
+    // 성장·소비
+    { id: "A191RL1Q225SBEA",  eventMatch: "GDP Growth Rate",          direct: true, gdpPrefix: true },
+    { id: "RSAFS",            eventMatch: "Retail Sales (MoM)",       mom: true },
+    { id: "INDPRO",           eventMatch: "Industrial Production (MoM)", mom: true },
+    // PCE (연준 선호 물가)
+    { id: "PCEPI",            eventMatch: "PCE Price Index (YoY)",    yoy: true },
+    { id: "PCEPILFE",         eventMatch: "Core PCE (YoY)",           yoy: true },
+    { id: "PCEPILFE",         eventMatch: "Core PCE (MoM)",           mom: true },
+    // 금리 (FOMC 결정 후 상단 목표)
+    { id: "DFEDTARU",         eventMatch: "FOMC Rate Decision",       direct: true },
   ];
+
+  // 같은 시리즈 중복 호출 제거 — 관측치 캐시
+  const obsCache = {};
+  const fetchObs = async (id) => {
+    if (obsCache[id]) return obsCache[id];
+    const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${id}&sort_order=desc&limit=16&api_key=${fredKey}&file_type=json`;
+    const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!resp.ok) {
+      const t = await resp.text().catch(() => "");
+      throw new Error(`${id} HTTP ${resp.status}${t ? ` — ${t.slice(0, 80)}` : ""}`);
+    }
+    const json = await resp.json();
+    const obs = (json?.observations || []).filter(o => o.value !== ".");
+    obsCache[id] = obs;
+    return obs;
+  };
 
   const fetches = fredSeries.map(async (series) => {
     try {
-      const url = `https://api.stlouisfed.org/fred/series/observations?series_id=${series.id}&sort_order=desc&limit=14&api_key=${fredKey}&file_type=json`;
-      const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
-      if (!resp.ok) return;
-      const json = await resp.json();
-      const obs = json?.observations?.filter(o => o.value !== ".");
+      const obs = await fetchObs(series.id);
       if (!obs || obs.length < 2) return;
 
       const latest = parseFloat(obs[0].value);
@@ -447,6 +516,7 @@ async function fetchFREDActuals(todayStr, curated) {
 
       let actual;
       if (series.direct) actual = latest;
+      else if (series.directK) actual = Math.round(latest / 1000); // 명 → K
       else if (series.diff) actual = latest - prev;
       else if (series.yoy) {
         const obs12 = obs.length >= 13 ? parseFloat(obs[12].value) : null;
@@ -459,23 +529,25 @@ async function fetchFREDActuals(todayStr, curated) {
 
       if (actual == null || isNaN(actual)) return;
 
-      // GDP는 부분 매칭 (Q1 Advance, Q4 Final 등)
+      // ① curated 이름 매칭 (GDP 는 접두 매칭 — Q1 Advance 등)
       const matchingEvents = curated.filter(e =>
-        (series.id === "A191RL1Q225SBEA"
-          ? e.event.startsWith("GDP Growth Rate")
-          : e.event === series.eventMatch)
+        (series.gdpPrefix ? e.event.startsWith("GDP Growth Rate") : e.event === series.eventMatch)
         && e.actual == null && e.date <= todayStr
       );
-
       if (matchingEvents.length > 0) {
         const target = matchingEvents[matchingEvents.length - 1];
         actuals[`${target.date}::${target.event}`] = actual;
+      } else {
+        // ② 이름 폴백 — FF 런타임 행(curated 에 없음)도 핸들러에서 귀속
+        byName[series.eventMatch] = actual;
       }
-    } catch { /* 개별 시리즈 실패 무시 */ }
+    } catch (e) {
+      if (!firstError) firstError = e?.message || String(e);
+    }
   });
 
   await Promise.allSettled(fetches);
-  return actuals;
+  return { actuals, byName, error: firstError };
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -500,6 +572,7 @@ const FF_MAP = [
   { re: /^ISM Services PMI$/i,          event: "ISM Services PMI",        type: "경제지표", unit: "" },
   { re: /^Unemployment Claims$/i,       event: "Initial Jobless Claims",  type: "경제지표", unit: "K" },
   { re: /^Core PCE Price Index m\/m$/i, event: "Core PCE (MoM)",          type: "PCE",      unit: "%" },
+  { re: /^Industrial Production m\/m$/i, event: "Industrial Production (MoM)", type: "경제지표", unit: "%" },
 ];
 
 function parseFFNum(s) {
