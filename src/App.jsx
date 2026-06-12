@@ -4758,6 +4758,9 @@ function AppInner() {
     if (!watchlistKey) return [];
     try { return JSON.parse(localStorage.getItem(watchlistKey) || "[]"); } catch { return []; }
   });
+  // ★ 2026-06-12 (대표 지시): 내 정보 — 운용 중 모의봇/실전 실적 요약 데이터
+  const [profilePerf, setProfilePerf] = useState({ bots: null, real: null, loading: false });
+
   // ★ 2026-06-12 (대표 아이디어): 트레이딩뷰식 우측 왓치리스트 도크 (데스크톱 전용)
   const [watchDockOpen, setWatchDockOpen] = useState(() => {
     try { return localStorage.getItem("zepta_watchdock") === "1"; } catch { return false; }
@@ -4887,6 +4890,28 @@ function AppInner() {
   useEffect(() => {
     ga.pageView(tab === "home" ? "/" : `/${tab}`);
   }, [tab]);
+
+  // ── 내 정보: 운용 현황 요약 로드 (모의봇 + 실전, 진입 시 1회) ──
+  useEffect(() => {
+    if (tab !== "profile" || profilePerf.loading || profilePerf.bots) return;
+    setProfilePerf(p => ({ ...p, loading: true }));
+    (async () => {
+      let bots = null, real = null;
+      try {
+        const r = await fetch("/api/bot-performance?all=1");
+        const j = await r.json();
+        if (j?.ok && j.bots) bots = j.bots;
+      } catch {}
+      if (isOwner && user?.id) {
+        try {
+          const r2 = await fetch(`/api/real-trading/status?userId=${encodeURIComponent(user.id)}`);
+          const j2 = await r2.json();
+          if (j2?.ok) real = { equity: j2.equity, unrealizedPnl: j2.unrealizedPnl, positions: (j2.openPositions || []).length };
+        } catch {}
+      }
+      setProfilePerf({ bots, real, loading: false });
+    })();
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 탭 타이틀 및 메타태그 실시간 업데이트 (토스증권 스타일 + SEO) ──
   useEffect(() => {
@@ -5581,7 +5606,14 @@ function AppInner() {
         const nowDay = Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate());
         const evtDay = Date.UTC(kstEvt.getUTCFullYear(), kstEvt.getUTCMonth(), kstEvt.getUTCDate());
         const diff = Math.floor((evtDay - nowDay) / 86400000);
-        const evtName = e.event.replace(/\(.*?\)\s*/g, "").trim();
+        // ★ 2026-06-12 (대표 제보): (YoY)/(MoM) 을 전부 떼면 'CPI' 가 중복으로 보임
+        //   → 전년/전월 한글 구분 유지, 그 외 괄호(분기 표기 등)만 제거
+        const evtName = e.event
+          .replace(/\s*\(YoY\)/i, " · 전년")
+          .replace(/\s*\(MoM\)/i, " · 전월")
+          .replace(/\s*\(QoQ\)/i, " · 전분기")
+          .replace(/\(.*?\)\s*/g, "")
+          .trim();
         let icon = "📊";
         let type = "OTHER";
         if (/FOMC|Fed.*Rate|Interest Rate/i.test(e.event)) { icon = "🏛️"; type = "FOMC"; }
@@ -10730,6 +10762,10 @@ function AppInner() {
               return e.type === econFilter;
             });
           }
+          // ★ 날짜 필터 적용 '전' 목록 보존 — 미니캘린더 점/클릭 가능 판정용
+          //   (대표 제보: 10일 선택 중엔 11일이 클릭 불가였던 버그 — eventDates 가
+          //    날짜 필터 후 목록으로 계산돼 다른 날짜의 hasEvent 가 사라졌음)
+          const calEventsAllDays = calEvents;
           // ★ 2026-06-12 (대표 지시): 날짜 선택 시 해당일 이벤트만 — 전체 주차 나열·과스크롤 제거
           if (calSelectedDay != null) {
             calEvents = calEvents.filter(e => {
@@ -10770,9 +10806,9 @@ function AppInner() {
           const thisWeekEvents = econEvents.filter(e => e.daysUntil >= 0 && e.daysUntil <= 7);
           const importantThisWeek = thisWeekEvents.filter(e => /FOMC|CPI|NFP|GDP|PCE|ISM|PMI/i.test(e.name)).slice(0, 3);
 
-          // 이벤트가 있는 날짜 세트
+          // 이벤트가 있는 날짜 세트 — 날짜 필터 '전' 목록 기준 (다른 날짜 직접 전환 가능)
           const eventDates = new Set();
-          calEvents.forEach(evt => {
+          calEventsAllDays.forEach(evt => {
             const k = kstParts(evt.date);
             if (k.valid && k.month === calMonth && k.year === calYear) {
               eventDates.add(k.date);
@@ -10801,7 +10837,7 @@ function AppInner() {
                 }}>세계 주요 경제 지표와 이벤트를 한눈에 파악하세요</div>
               </div>
 
-              <div className="grid gap-5 grid-cols-1 lg:grid-cols-[280px_1fr] items-start">
+              <div className="grid gap-7 grid-cols-1 lg:grid-cols-[280px_1fr] items-start">
 
                 {/* ── 좌측: 미니 캘린더 + AI 요약 ── */}
                 <div className="flex flex-col gap-4 lg:sticky lg:top-20">
@@ -10930,7 +10966,7 @@ function AppInner() {
                 {/* ── 우측: 이벤트 목록 ── */}
                 <div>
                   {/* 필터 탭 — 모바일에서 수평 스크롤 가능 | 극적인 디자인 강화 */}
-                  <div className={`flex gap-1.5 mb-5 ${isMobile ? "hscroll overflow-x-auto" : "flex-wrap"}`} style={{ WebkitOverflowScrolling: "touch" }}>
+                  <div className={`flex gap-1.5 mb-6 ${isMobile ? "hscroll overflow-x-auto" : "flex-wrap"}`} style={{ WebkitOverflowScrolling: "touch" }}>
                     {calFilterTabs.map(ft => (
                       <button key={ft.key} onClick={() => setEconFilter(ft.key)} className="px-4 py-2 rounded-[12px] text-base font-semibold cursor-pointer transition-all flex-shrink-0" style={{
                         background: econFilter === ft.key ? `linear-gradient(135deg, ${C.yellow}60 0%, ${C.yellow}40 100%)` : C.card2,
@@ -10969,7 +11005,7 @@ function AppInner() {
                     const firstEvtDate = group.events[0]?.date ? new Date(group.events[0].date.toLocaleString("en-US", { timeZone: "Asia/Seoul" })) : null;
                     const weekId = firstEvtDate ? `econ-week-${firstEvtDate.getFullYear()}-${String(firstEvtDate.getMonth()+1).padStart(2,"0")}-W${Math.ceil((firstEvtDate.getDate() + new Date(firstEvtDate.getFullYear(), firstEvtDate.getMonth(), 1).getDay()) / 7)}` : `econ-week-${gi}`;
                     return (
-                    <div key={gi} id={weekId} className="mb-6" style={{ scrollMarginTop: "80px" }}>
+                    <div key={gi} id={weekId} className="mb-9" style={{ scrollMarginTop: "80px" }}>{/* 간격 보강 (대표 피드백) */}
                       {/* 주차 헤더 */}
                       <div className="text-base font-bold text-foreground mb-3 px-1" style={{color: C.text1}}>
                         {group.monthLabel} {group.weekLabel}
@@ -11912,9 +11948,8 @@ function AppInner() {
                     <div style={{ fontSize: "18px", fontWeight: 800, color: C.text1 }}>
                       {user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User"}
                     </div>
-                    <div style={{ fontSize: "12px", color: C.text3 }}>
-                      {(() => { const uid = user?.id?.slice(0,8) || "anon"; const xi = getXpInfo(readTotalXp(uid).total); return `${xi.tier.icon} ${xi.tier.name} · Lv.${xi.level}`; })()}
-                    </div>
+                    {/* ★ 2026-06-12 (대표 지시): 레벨/티어 표기 제거 — 이메일로 대체 */}
+                    <div style={{ fontSize: "12px", color: C.text3 }}>{user?.email || ""}</div>
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: "8px" }}>
@@ -11937,7 +11972,7 @@ function AppInner() {
               }}>
                 <div>
                   <div style={{ fontSize: "16px", fontWeight: 800, color: C.text1, marginBottom: "4px" }}>로그인하고 시작하세요</div>
-                  <div style={{ fontSize: "12px", color: C.text3 }}>XP 적립, 랭킹, 관심종목 동기화까지</div>
+                  <div style={{ fontSize: "12px", color: C.text3 }}>관심종목·포트폴리오 동기화, 봇 운용 현황까지</div>
                 </div>
                 <button onClick={() => setShowAuthModal(true)} style={{
                   padding: "10px 20px", borderRadius: "12px", fontSize: "14px", fontWeight: 700,
@@ -11947,128 +11982,98 @@ function AppInner() {
               </div>
             )}
 
-            {/* ── 서비스 그리드 (토스 스타일 아이콘 그리드) ── */}
-            <div style={{
-              background: C.card, borderRadius: "20px", padding: "20px 16px",
-              border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`,
-              marginBottom: "16px",
-            }}>
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(4, 1fr)",
-                gap: "4px",
-              }}>
-                {[
-                  // ★ 2026-05-12 v2 — 한국 핀테크 컨벤션 재정비 (토스/카카오/미래에셋 reference)
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="1.8"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg>, label: "스크리너", tab: "screener" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.purple} strokeWidth="1.8"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M8 12l3 3 5-6" strokeWidth="2"/></svg>, label: "자동매매", tab: "auto-trading" },
-                  ...(isOwner ? [{ icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.red || "#ef4444"} strokeWidth="1.8"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/></svg>, label: "실전매매", tab: "real-trading" }] : []),
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#A855F7" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>, label: "알파 랩", tab: "alpha-lab" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFD700" strokeWidth="1.8"><path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7L12 16.4 5.7 21l2.3-7L2 9.4h7.6z"/></svg>, label: "봇 랭킹", tab: "leaderboard" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="1.8"><path d="M14 9V5a3 3 0 0 0-6 0v4"/><rect x="3" y="9" width="18" height="12" rx="2"/></svg>, label: "카피트레이딩", tab: "copy-trading" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="1.8"><path d="M3 3v18h18"/><path d="M7 16l4-6 4 3 5-7"/></svg>, label: "전략 분석", tab: "strategy" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.purple} strokeWidth="1.8"><path d="M3 12l3-9 6 18 4-12 5 9"/></svg>, label: "백테스트", tab: "backtest" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#06B6D4" strokeWidth="1.8"><path d="M9 19V6l-7 4 7 4"/><path d="M15 5v13l7-4-7-4"/></svg>, label: "전략 비교", tab: "backtest-compare" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="1.8"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" fill="none"/></svg>, label: "포트폴리오", tab: "portfolio" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0EA5E9" strokeWidth="1.8"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/></svg>, label: "자산 분석", tab: "portfolio-analysis" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FF6B2C" strokeWidth="1.8"><path d="M12 2 2 22h20L12 2zm0 5 6 13H6l6-13z"/><circle cx="12" cy="17" r="1"/></svg>, label: "리스크맵", tab: "risk-map" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.purple} strokeWidth="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2h-4"/><path d="M9 13h6M9 17h4"/></svg>, label: "저장한 조건", tab: "saved-screeners" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="1.8"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>, label: "알림", tab: "notifications" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="1.8"><circle cx="12" cy="8" r="6"/><path d="M15.5 12.5L17 22l-5-3-5 3 1.5-9.5"/></svg>, label: "멤버십", tab: "pricing" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E67E22" strokeWidth="1.8"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 7h8M8 11h5M8 15h7"/></svg>, label: "뉴스", tab: "news" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.red || "#ef4444"} strokeWidth="1.8"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>, label: "경제 일정", tab: "econ-calendar" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9B6FFF" strokeWidth="1.8"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></svg>, label: "시장 심리", tab: "sentiment" },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="1.8"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>, label: "블로그", action: () => { window.location.href = "/blog"; } },
-                  { icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.text3} strokeWidth="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>, label: "내 정보", tab: "mypage" },
-                ].map((item, i) => (
-                  <button key={i} onClick={() => item.action ? item.action() : setTab(item.tab)} style={{
-                    display: "flex", flexDirection: "column", alignItems: "center", gap: "6px",
-                    padding: "12px 4px", borderRadius: "12px", border: "none",
-                    background: "transparent", cursor: "pointer",
-                    transition: "background .15s",
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = `${C.border}15`}
-                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                  >
-                    <div style={{
-                      width: "52px", height: "52px", borderRadius: "16px",
-                      background: `${C.isDark ? '#1a2235' : '#f0f4ff'}`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}>{item.icon}</div>
-                    <span style={{ fontSize: "12px", fontWeight: 600, color: C.text2, lineHeight: 1.2 }}>{item.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* ── XP 레벨 미니 카드 (로그인 시) ── */}
-            {user && (() => {
-              const uid = user?.id?.slice(0, 8) || "anon";
-              const xpData = readTotalXp(uid);
-              const xpInfo = getXpInfo(xpData.total);
+            {/* ── 운용 현황 (2026-06-12 대표 지시: 그리드 메뉴·레벨·투자서비스 대신
+                 모의투자 봇·실전매매 실적을 간단 구분 표시 — 메뉴는 햄버거 사이드바로 일원화) ── */}
+            {(() => {
+              const botsObj = profilePerf.bots;
+              const botRows = botsObj ? Object.entries(botsObj).map(([id, b]) => ({
+                id,
+                pl: Number(b?.perf?.realizedPL || 0) + Number(b?.snapshot?.unrealizedPL || 0),
+                positions: Number(b?.snapshot?.positionCount || 0),
+                trades: Number(b?.perf?.tradeCount || 0),
+              })) : [];
+              const totalPl = botRows.reduce((a, r) => a + r.pl, 0);
+              const totalPos = botRows.reduce((a, r) => a + r.positions, 0);
+              const top = [...botRows].sort((a, b) => b.pl - a.pl).slice(0, 3);
+              const nameKo = (id) => ({
+                "btc-alpha": "BTC 알파", "highcap-momentum": "대형주 모멘텀", "defi-infra": "DeFi 인프라",
+                "meme-trend": "밈 트렌드", "l2-emerging": "L2 신흥", "crypto-diversity": "크립토 분산",
+                "crypto-swing": "크립토 스윙", "balanced-quant": "밸런스 퀀트", "aggressive-quant": "공격형 퀀트",
+              }[id] || id);
               return (
-                <div onClick={() => setTab("mypage")} style={{
-                  background: C.card, borderRadius: "16px", padding: "16px",
-                  border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`,
-                  marginBottom: "16px", cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: "14px",
-                }}>
-                  <div style={{
-                    width: "48px", height: "48px", borderRadius: "12px",
-                    background: `${xpInfo.tier.color}15`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: "24px",
-                  }}>{xpInfo.tier.icon}</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: "6px", marginBottom: "6px" }}>
-                      <span style={{ fontSize: "16px", fontWeight: 800, color: xpInfo.tier.color }}>Lv.{xpInfo.level}</span>
-                      <span style={{ fontSize: "12px", color: C.text3 }}>{xpInfo.tier.name}</span>
-                      <span style={{ fontSize: "14px", fontWeight: 700, color: C.blue, marginLeft: "auto" }}>{xpData.total.toLocaleString()} XP</span>
+                <>
+                  {/* 모의투자 봇 운용 현황 */}
+                  <div onClick={() => setTab("auto-trading")} style={{
+                    background: C.card, borderRadius: "16px", padding: "16px 20px",
+                    border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`, marginBottom: "12px", cursor: "pointer",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                      <span style={{ fontSize: "14px", fontWeight: 800, color: C.text1 }}>🤖 모의투자 봇 운용 현황</span>
+                      <span style={{ fontSize: "11px", fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: `${C.yellow}15`, color: C.yellow }}>시뮬레이션</span>
                     </div>
-                    <div style={{ height: "4px", borderRadius: "4px", background: `${C.border}30`, overflow: "hidden" }}>
-                      <div style={{
-                        height: "100%", width: `${Math.round(xpInfo.progress * 100)}%`,
-                        borderRadius: "4px",
-                        background: `linear-gradient(90deg, ${xpInfo.tier.color}, ${C.blue})`,
-                      }} />
-                    </div>
+                    {!botsObj ? (
+                      <div style={{ fontSize: "13px", color: C.text3, padding: "6px 0" }}>{profilePerf.loading ? "불러오는 중…" : "데이터 없음"}</div>
+                    ) : (
+                      <>
+                        <div style={{ display: "flex", gap: 16, marginBottom: 10 }}>
+                          <div><span className="z-num" style={{ fontSize: 18, fontWeight: 800, color: C.text1 }}>{botRows.length}</span><span style={{ fontSize: 12, color: C.text3 }}> 봇</span></div>
+                          <div><span className="z-num" style={{ fontSize: 18, fontWeight: 800, color: C.text1 }}>{totalPos}</span><span style={{ fontSize: 12, color: C.text3 }}> 포지션</span></div>
+                          <div style={{ marginLeft: "auto", textAlign: "right" }}>
+                            <span className="z-num" style={{ fontSize: 18, fontWeight: 800, color: totalPl >= 0 ? C.green : C.red, fontVariantNumeric: "tabular-nums" }}>
+                              {totalPl >= 0 ? "+" : ""}${Math.round(totalPl).toLocaleString()}
+                            </span>
+                            <div style={{ fontSize: 11, color: C.text3 }}>누적 손익(실현+평가)</div>
+                          </div>
+                        </div>
+                        {top.map(r => (
+                          <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${C.border}12` }}>
+                            <span style={{ fontSize: 13, fontWeight: 600, color: C.text2, flex: 1 }}>{nameKo(r.id)}</span>
+                            <span style={{ fontSize: 11, color: C.text3 }}>{r.trades}회</span>
+                            <span className="z-num" style={{ fontSize: 13, fontWeight: 700, color: r.pl >= 0 ? C.green : C.red, minWidth: 70, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                              {r.pl >= 0 ? "+" : ""}${Math.round(r.pl).toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                        <div style={{ fontSize: 11, color: C.text3, marginTop: 8 }}>가상 자금 기준 시뮬레이션 · 누르면 자동매매로 이동</div>
+                      </>
+                    )}
                   </div>
-                  <span style={{ fontSize: "14px", color: C.text3 }}>›</span>
-                </div>
+
+                  {/* 실전매매 실적 (오너 전용) */}
+                  {isOwner && user && (
+                    <div onClick={() => setTab("real-trading")} style={{
+                      background: C.card, borderRadius: "16px", padding: "16px 20px",
+                      border: `1px solid ${C.red}25`, marginBottom: "16px", cursor: "pointer",
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                        <span style={{ fontSize: "14px", fontWeight: 800, color: C.text1 }}>⚡ 실전매매 실적</span>
+                        <span style={{ fontSize: "11px", fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: `${C.red}15`, color: C.red }}>실거래</span>
+                      </div>
+                      {!profilePerf.real ? (
+                        <div style={{ fontSize: "13px", color: C.text3, padding: "6px 0" }}>{profilePerf.loading ? "불러오는 중…" : "연결 안 됨"}</div>
+                      ) : (
+                        <div style={{ display: "flex", gap: 16 }}>
+                          <div>
+                            <div className="z-num" style={{ fontSize: 18, fontWeight: 800, color: C.text1, fontVariantNumeric: "tabular-nums" }}>${Number(profilePerf.real.equity || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                            <div style={{ fontSize: 11, color: C.text3 }}>잔고</div>
+                          </div>
+                          <div>
+                            <div className="z-num" style={{ fontSize: 18, fontWeight: 800, color: (profilePerf.real.unrealizedPnl || 0) >= 0 ? C.green : C.red, fontVariantNumeric: "tabular-nums" }}>
+                              {(profilePerf.real.unrealizedPnl || 0) >= 0 ? "+" : ""}${Number(profilePerf.real.unrealizedPnl || 0).toFixed(1)}
+                            </div>
+                            <div style={{ fontSize: 11, color: C.text3 }}>미실현 손익</div>
+                          </div>
+                          <div style={{ marginLeft: "auto", textAlign: "right" }}>
+                            <div className="z-num" style={{ fontSize: 18, fontWeight: 800, color: C.text1 }}>{profilePerf.real.positions}</div>
+                            <div style={{ fontSize: 11, color: C.text3 }}>포지션</div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
               );
             })()}
-
-            {/* ── 투자 서비스 리스트 ── */}
-            <div style={{
-              background: C.card, borderRadius: "16px", overflow: "hidden",
-              border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`,
-              marginBottom: "16px",
-            }}>
-              <div style={{ padding: "14px 20px", fontSize: "14px", fontWeight: 800, color: C.text1 }}>투자 서비스</div>
-              {[
-                { icon: "📊", label: "마켓 브리핑", desc: "실시간 시장 현황", tab: "home" },
-                { icon: "🎯", label: "오늘의 예측", desc: "내일 S&P 500 방향 맞추기", tab: "home" },
-                { icon: "🧠", label: "퀀트 전략", desc: "41개 AI 전략 시그널", tab: "strategy" },
-                { icon: "🤖", label: "AI 자동매매", desc: "봇 기반 퀀트 트레이딩", tab: "auto-trading" },
-                { icon: "📰", label: "투자 뉴스", desc: "실시간 글로벌 뉴스", tab: "news" },
-              ].map((item, i) => (
-                <div key={i} onClick={() => setTab(item.tab)} style={{
-                  display: "flex", alignItems: "center", gap: "14px",
-                  padding: "14px 20px", borderTop: `1px solid ${C.border}15`, cursor: "pointer",
-                  transition: "background .1s",
-                }}
-                onMouseEnter={e => e.currentTarget.style.background = `${C.border}10`}
-                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                >
-                  <span style={{ fontSize: "20px", width: "28px", textAlign: "center" }}>{item.icon}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: "15px", fontWeight: 700, color: C.text1 }}>{item.label}</div>
-                    <div style={{ fontSize: "12px", color: C.text3 }}>{item.desc}</div>
-                  </div>
-                  <span style={{ fontSize: "14px", color: C.text3 }}>›</span>
-                </div>
-              ))}
-            </div>
 
             {/* ── 고객지원 / 정보 ── */}
             <div style={{
