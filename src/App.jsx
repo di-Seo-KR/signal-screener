@@ -2077,6 +2077,57 @@ function quickDiagnosis(asset) {
 // ════════════════════════════════════════════════════════════════════
 // 매수 진입 가격 레벨 계산 (3단계 진입 전략)
 // ════════════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════════════
+// 경제지표 해석 가이드 (2026-06-12 대표 지시 — "그래서 호재야 악재야?" 명확한 해석)
+//   방향성 결론은 명확히, 권유 어휘는 금지(참고용 면책 동반) — 컴플라이언스 정합.
+// ════════════════════════════════════════════════════════════════════
+const ECON_GUIDE = {
+  CPI:   { ko: "소비자물가지수", desc: "미국 소비자가 체감하는 물가 상승률. 연준 금리 결정의 핵심 근거가 되는 인플레이션 대표 지표예요.", inverted: true,
+           high: "물가가 예상보다 뜨겁다 → 금리 인하가 멀어진다 → 주식·코인에 통상 악재", low: "물가 둔화 → 금리 인하 기대 강화 → 통상 호재" },
+  PCE:   { ko: "개인소비지출 물가", desc: "연준이 공식적으로 가장 중시하는 물가 지표. CPI와 같은 인플레이션 계열이에요.", inverted: true,
+           high: "물가 압력 지속 → 긴축 우려 → 통상 악재", low: "물가 둔화 → 금리 인하 기대 → 통상 호재" },
+  PPI:   { ko: "생산자물가지수", desc: "기업이 받는 도매 물가. 소비자물가(CPI)의 선행 지표로 읽혀요.", inverted: true,
+           high: "생산 단계 물가 상승 → 인플레 재점화 우려 → 통상 악재", low: "물가 압력 완화 → 통상 호재" },
+  FOMC:  { ko: "연준 금리 결정", desc: "미국 중앙은행(연준)의 기준금리 결정. 글로벌 자산시장 방향을 좌우하는 최대 이벤트예요.", inverted: true,
+           high: "예상보다 높은 금리(매파) → 유동성 축소 → 통상 악재", low: "예상보다 낮은 금리·인하(비둘기) → 유동성 확대 → 통상 호재",
+           note: "예상에 부합하면 금리 자체보다 성명서·점도표(향후 경로)가 시장을 움직여요." },
+  NFP:   { ko: "비농업 고용", desc: "미국에서 한 달간 늘어난 일자리 수. 경기 체력을 보여주는 대표 고용 지표예요.",
+           high: "고용 호조 → 경기 탄탄 → 통상 호재", low: "고용 둔화 → 경기 침체 우려 → 통상 악재",
+           note: "단, 지나친 호조는 '금리 인하 지연' 우려로 반대로 움직일 때도 있어요." },
+  GDP:   { ko: "국내총생산", desc: "미국 경제 전체의 성장률. 경기 방향의 종합 성적표예요.",
+           high: "성장 견조 → 기업 실적 기대 → 통상 호재", low: "성장 둔화 → 침체 우려 → 통상 악재",
+           note: "과열 수준의 서프라이즈는 금리 부담으로 해석되기도 해요." },
+  RETAIL:{ ko: "소매판매", desc: "미국 소비자들의 지출 규모. 미국 경제의 70%를 차지하는 소비 경기를 직접 보여줘요.",
+           high: "소비 견조 → 경기 호조 → 통상 호재", low: "소비 위축 → 경기 둔화 우려 → 통상 악재",
+           note: "인플레 국면에선 '소비 과열 → 금리 부담'으로 반대 해석될 수 있어요." },
+  ISM:   { ko: "ISM 제조업 지수", desc: "제조업 구매관리자들의 체감 경기. 50 위면 확장, 아래면 위축이에요.",
+           high: "제조업 확장 → 경기 호조 → 통상 호재", low: "제조업 위축 → 경기 둔화 → 통상 악재" },
+  UNEMP: { ko: "실업률", desc: "일자리를 구하지 못한 사람의 비율. 낮을수록 고용시장이 튼튼하다는 뜻이에요.", inverted: true,
+           high: "실업 증가 → 경기 둔화 우려 → 통상 악재", low: "고용 탄탄 → 경기 호조 → 통상 호재" },
+  CLAIMS:{ ko: "신규 실업수당 청구", desc: "한 주간 새로 실업수당을 신청한 사람 수. 고용시장의 주간 속보예요.", inverted: true,
+           high: "실업 신청 증가 → 고용 악화 신호 → 통상 악재", low: "실업 신청 감소 → 고용 탄탄 → 통상 호재" },
+  OTHER: { ko: "경제지표", desc: "미국 주요 경제지표예요. 예상치와의 차이(서프라이즈)가 시장을 움직여요.",
+           high: "예상 상회 → 경기 호조 신호 → 통상 호재", low: "예상 하회 → 경기 둔화 신호 → 통상 악재" },
+};
+
+// 발표 후: 발표치 vs 예측치 → 위험자산 관점 결론 (호재/악재/중립)
+function econVerdict(evt) {
+  const g = ECON_GUIDE[evt.type] || ECON_GUIDE.OTHER;
+  if (evt.actual == null || evt.estimate == null) return null;
+  // 동일(또는 ±0.5% 이내) → 예상 부합
+  const base = Math.abs(evt.estimate) > 1e-9 ? Math.abs(evt.estimate) : 1;
+  const surprise = (evt.actual - evt.estimate) / base;
+  if (Math.abs(surprise) < 0.005) return { dir: "중립", emoji: "⚖️", reason: "예상치에 부합 — 서프라이즈 없음" + (g.note ? `. ${g.note}` : "") };
+  const higher = evt.actual > evt.estimate;
+  const good = g.inverted ? !higher : higher;
+  return {
+    dir: good ? "통상 호재" : "통상 악재",
+    emoji: good ? "📈" : "📉",
+    reason: higher ? g.high : g.low,
+    note: g.note || null,
+  };
+}
+
 function calcBuyLevels(asset) {
   // 필요한 데이터 추출
   const currentPrice = asset.price || 0;
@@ -4566,6 +4617,7 @@ function AppInner() {
   const [calYear, setCalYear] = useState(() => new Date().getFullYear());
   const [calMonth, setCalMonth] = useState(() => new Date().getMonth());
   const [calSelectedDay, setCalSelectedDay] = useState(null); // 경제캘린더 선택된 날짜
+  const [econExpandedKey, setEconExpandedKey] = useState(null); // 경제캘린더 해석 펼침 행
   const [predictionState, setPredictionState] = useState(() => {
     try {
       const todayKey = new Date().toISOString().slice(0, 10);
@@ -11051,6 +11103,13 @@ function AppInner() {
               return e.type === econFilter;
             });
           }
+          // ★ 2026-06-12 (대표 지시): 날짜 선택 시 해당일 이벤트만 — 전체 주차 나열·과스크롤 제거
+          if (calSelectedDay != null) {
+            calEvents = calEvents.filter(e => {
+              const k = kstParts(e.date);
+              return k.valid && k.year === calYear && k.month === calMonth && k.date === calSelectedDay;
+            });
+          }
 
           // 주차 계산용 헬퍼 (KST 기준 — kstParts 결과 사용)
           const kstWeekOf = (k) => {
@@ -11128,10 +11187,10 @@ function AppInner() {
                     boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
                   }} className="rounded-[16px] p-5">
                     <div className="flex items-center justify-between mb-4">
-                      <button onClick={() => { if (calMonth === 0) { setCalMonth(11); setCalYear(y => y-1); } else setCalMonth(m => m-1); }}
+                      <button onClick={() => { setCalSelectedDay(null); if (calMonth === 0) { setCalMonth(11); setCalYear(y => y-1); } else setCalMonth(m => m-1); }}
                         className="bg-transparent border-none text-lg cursor-pointer p-1" style={{color: C.text2}}>‹</button>
                       <span className="font-bold text-base text-foreground">{calYear}년 {monthNames[calMonth]}</span>
-                      <button onClick={() => { if (calMonth === 11) { setCalMonth(0); setCalYear(y => y+1); } else setCalMonth(m => m+1); }}
+                      <button onClick={() => { setCalSelectedDay(null); if (calMonth === 11) { setCalMonth(0); setCalYear(y => y+1); } else setCalMonth(m => m+1); }}
                         className="bg-transparent border-none text-lg cursor-pointer p-1" style={{color: C.text2}}>›</button>
                     </div>
                     {/* 요일 헤더 */}
@@ -11151,15 +11210,8 @@ function AppInner() {
                         const isSelected = calSelectedDay === day && !isToday;
                         return (
                           <div key={day} onClick={() => {
-                            if (hasEvent) {
-                              setCalSelectedDay(day);
-                              // 해당 날짜의 주차로 스크롤
-                              const clickedDate = new Date(calYear, calMonth, day);
-                              const weekNum = Math.ceil((clickedDate.getDate() + new Date(clickedDate.getFullYear(), clickedDate.getMonth(), 1).getDay()) / 7);
-                              const weekId = `econ-week-${calYear}-${String(calMonth+1).padStart(2,"0")}-W${weekNum}`;
-                              const el = document.getElementById(weekId);
-                              if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-                            }
+                            // ★ 2026-06-12 (대표 지시): 날짜 클릭 = 해당일만 필터 (스크롤 이동 → 필터 토글)
+                            if (hasEvent) setCalSelectedDay(prev => prev === day ? null : day);
                           }} style={{
                             textAlign: "center", padding: "6px 0", borderRadius: "8px",
                             fontSize: "15px", fontWeight: isToday || isSelected ? 800 : 500, position: "relative",
@@ -11263,11 +11315,27 @@ function AppInner() {
                     ))}
                   </div>
 
+                  {/* 선택일 필터 안내 칩 */}
+                  {calSelectedDay != null && (
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 8, marginBottom: 12,
+                      padding: "10px 14px", borderRadius: 12, background: C.blueBg, border: `1px solid ${C.blue}30`,
+                    }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: C.blue }}>
+                        📌 {calMonth + 1}월 {calSelectedDay}일 일정만 보는 중
+                      </span>
+                      <button onClick={() => setCalSelectedDay(null)} style={{
+                        marginLeft: "auto", padding: "6px 12px", borderRadius: 8, border: `1px solid ${C.blue}40`,
+                        background: "transparent", color: C.blue, fontSize: 13, fontWeight: 700, cursor: "pointer", minHeight: 32,
+                      }}>전체 보기 ✕</button>
+                    </div>
+                  )}
+
                   {/* 주차별 이벤트 그룹 */}
                   {weekGroups.length === 0 ? (
                     <div style={{ textAlign: "center", padding: "60px 24px", color: C.text3 }}>
                       <div style={{ fontSize: "32px", marginBottom: "12px" }}>📅</div>
-                      <div style={{ fontSize: "18px" }}>해당 필터에 맞는 이벤트가 없습니다</div>
+                      <div style={{ fontSize: "18px" }}>{calSelectedDay != null ? "선택한 날짜에 일정이 없습니다" : "해당 필터에 맞는 이벤트가 없습니다"}</div>
                     </div>
                   ) : weekGroups.map((group, gi) => {
                     // 주차별 ID 생성 (날짜 클릭 → 스크롤 대상)
@@ -11282,12 +11350,12 @@ function AppInner() {
 
                       {/* 테이블 헤더 */}
                       <div className="grid gap-1 py-2 px-4 text-base font-bold text-muted-foreground rounded-t-[12px] border border-b-0" style={{
-                        gridTemplateColumns: isMobile ? "40px 1fr 70px" : "60px 1fr 80px 80px 80px",
+                        gridTemplateColumns: isMobile ? "40px 1fr 92px" : "60px 1fr 80px 80px 80px",
                         background: C.card, borderColor: `${C.border}20`
                       }}>
                         <span></span>
                         <span></span>
-                        <span style={{ textAlign: "right" }}>발표</span>
+                        <span style={{ textAlign: "right" }}>{isMobile ? "발표 · 예측" : "발표"}</span>
                         {!isMobile && <span style={{ textAlign: "right" }}>예측</span>}
                         {!isMobile && <span style={{ textAlign: "right" }}>이전</span>}
                       </div>
@@ -11301,7 +11369,7 @@ function AppInner() {
                           const k = kstParts(evt.date);
                           const d = k.valid ? k.date : "—";
                           const dayName = k.valid ? ["일","월","화","수","목","금","토"][k.day] : "";
-                          const invertedIndicator = /CPI|PCE|PPI|Unemployment/i.test(evt.event);
+                          const invertedIndicator = /CPI|PCE|PPI|Unemployment|Jobless/i.test(evt.event); // 낮을수록 호재 계열
                           const hasActual = evt.actual != null && evt.estimate != null;
                           const beat = hasActual ? (invertedIndicator ? evt.actual < evt.estimate : evt.actual > evt.estimate) : null;
                           const miss = hasActual ? (invertedIndicator ? evt.actual > evt.estimate : evt.actual < evt.estimate) : null;
@@ -11311,17 +11379,25 @@ function AppInner() {
                           const kstMin = k.valid ? String(k.min).padStart(2, "0") : "--";
 
                           const importanceColor = evt.importance === "high" ? C.red : evt.importance === "medium" ? C.yellow : C.green;
+                          // ★ 2026-06-12 (대표 지시): 행 클릭 → 지표 해석 펼침 ("그래서 호재야 악재야?")
+                          const guide = ECON_GUIDE[evt.type] || ECON_GUIDE.OTHER;
+                          const verdict = econVerdict(evt);
+                          const rowKey = `${evt.event}-${evt.date?.getTime?.() ?? i}`;
+                          const expanded = econExpandedKey === rowKey;
+                          const verdictColor = verdict ? (verdict.dir === "통상 호재" ? C.green : verdict.dir === "통상 악재" ? C.red : C.yellow) : C.text3;
                           return (
-                            <div key={`${evt.event}-${i}`} className="grid items-center py-3.5 px-4 transition-all" style={{
-                              gridTemplateColumns: isMobile ? "40px 1fr 70px" : "60px 1fr 80px 80px 80px",
+                            <div key={rowKey} style={{ borderBottom: i < group.events.length - 1 ? `1px solid ${C.border}10` : "none" }}>
+                            <div className="grid items-center py-3.5 px-4 transition-all" style={{
+                              gridTemplateColumns: isMobile ? "40px 1fr 92px" : "60px 1fr 80px 80px 80px",
                               gap: "1px",
-                              borderBottom: i < group.events.length - 1 ? `1px solid ${C.border}10` : "none",
                               borderLeft: `4px solid ${importanceColor}`,
-                              opacity: isPast ? 0.6 : 1,
-                              background: isToday ? `${C.blue}08` : "transparent",
+                              opacity: isPast && !expanded ? 0.6 : 1,
+                              background: expanded ? `${C.blue}0C` : isToday ? `${C.blue}08` : "transparent",
+                              cursor: "pointer",
                             }}
-                            onMouseEnter={e => { if (!isToday) { e.currentTarget.style.background = `${importanceColor}15`; e.currentTarget.style.paddingLeft = "12px"; } }}
-                            onMouseLeave={e => { if (!isToday) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.paddingLeft = "16px"; } }}
+                            onClick={() => setEconExpandedKey(prev => prev === rowKey ? null : rowKey)}
+                            onMouseEnter={e => { if (!isToday && !expanded) e.currentTarget.style.background = `${importanceColor}15`; }}
+                            onMouseLeave={e => { if (!isToday && !expanded) e.currentTarget.style.background = "transparent"; }}
                             >
                               {/* 날짜 */}
                               <div>
@@ -11335,7 +11411,7 @@ function AppInner() {
                                 <span className="text-base flex-shrink-0">{evt.icon}</span>
                                 <div className="min-w-0">
                                   <div className="font-semibold text-[15px] text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
-                                    {evt.name}
+                                    {evt.name} <span style={{ fontSize: 12, color: C.text3, fontWeight: 500 }}>{expanded ? "▲" : "▼ 해석"}</span>
                                   </div>
                                   {evt.daysUntil >= 0 && (
                                     <div className="text-base text-muted-foreground">
@@ -11345,7 +11421,7 @@ function AppInner() {
                                 </div>
                               </div>
 
-                              {/* 발표 */}
+                              {/* 발표 (+모바일: 예측 같이 표기) */}
                               <div className="text-right">
                                 {evt.actual != null ? (
                                   <span className="text-[15px] font-bold" style={{ color: beat ? C.green : miss ? C.red : C.text1, fontVariantNumeric: "tabular-nums" }}>
@@ -11355,6 +11431,11 @@ function AppInner() {
                                   <span className="text-sm text-muted-foreground" style={{fontVariantNumeric: "tabular-nums"}}>
                                     {isPast ? "발표 대기" : `${kstHour}시 예정`}
                                   </span>
+                                )}
+                                {isMobile && evt.estimate != null && (
+                                  <div className="text-[12px]" style={{ color: C.text3, fontVariantNumeric: "tabular-nums", marginTop: 1 }}>
+                                    예측 {evt.estimate}{evt.unit}
+                                  </div>
                                 )}
                               </div>
 
@@ -11371,6 +11452,44 @@ function AppInner() {
                                   {evt.previous != null ? `${evt.previous}${evt.unit}` : "—"}
                                 </span>
                               </div>}
+                            </div>
+
+                            {/* ── 해석 패널 (펼침) ── */}
+                            {expanded && (
+                              <div style={{ padding: "12px 16px 14px", background: `${C.blue}06`, borderLeft: `4px solid ${importanceColor}` }}>
+                                {/* 지표 설명 */}
+                                <div style={{ fontSize: 13, fontWeight: 700, color: C.text1, marginBottom: 4 }}>{guide.ko} — 이게 뭐예요?</div>
+                                <div style={{ fontSize: 13, color: C.text2, lineHeight: 1.55, wordBreak: "keep-all" }}>{guide.desc}</div>
+
+                                {verdict ? (
+                                  /* 발표 후 — 명확한 결론 */
+                                  <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 10, background: `${verdictColor}12`, border: `1px solid ${verdictColor}30` }}>
+                                    <div style={{ fontSize: 14, fontWeight: 800, color: verdictColor }}>
+                                      {verdict.emoji} 위험자산(주식·코인)에 {verdict.dir}
+                                    </div>
+                                    <div style={{ fontSize: 13, color: C.text2, marginTop: 4, lineHeight: 1.5, wordBreak: "keep-all" }}>
+                                      발표 {evt.actual}{evt.unit} vs 예측 {evt.estimate}{evt.unit}{evt.previous != null ? ` (이전 ${evt.previous}${evt.unit})` : ""} — {verdict.reason}
+                                    </div>
+                                    {verdict.note && <div style={{ fontSize: 12, color: C.text3, marginTop: 4, lineHeight: 1.5, wordBreak: "keep-all" }}>💡 {verdict.note}</div>}
+                                  </div>
+                                ) : (
+                                  /* 발표 전 — 방향 가이드 */
+                                  <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                                    <div style={{ fontSize: 13, lineHeight: 1.5, wordBreak: "keep-all" }}>
+                                      <span style={{ fontWeight: 800, color: C.red }}>예상보다 높으면</span>
+                                      <span style={{ color: C.text2 }}> → {guide.high}</span>
+                                    </div>
+                                    <div style={{ fontSize: 13, lineHeight: 1.5, wordBreak: "keep-all" }}>
+                                      <span style={{ fontWeight: 800, color: C.green }}>예상보다 낮으면</span>
+                                      <span style={{ color: C.text2 }}> → {guide.low}</span>
+                                    </div>
+                                    {guide.note && <div style={{ fontSize: 12, color: C.text3, lineHeight: 1.5, wordBreak: "keep-all" }}>💡 {guide.note}</div>}
+                                  </div>
+                                )}
+
+                                <div style={{ fontSize: 11, color: C.text3, marginTop: 8 }}>일반적인 시장 해석 · 참고용이며 투자 권유가 아닙니다</div>
+                              </div>
+                            )}
                             </div>
                           );
                         })}
