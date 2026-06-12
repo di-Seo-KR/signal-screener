@@ -13,7 +13,6 @@ import { COINS } from "./coin-data.mjs";
 
 const DIST = "dist";
 const SITE = "https://zepta.app";
-const GA = "G-BMP34JQ649";
 const BUILD_DATE = new Date().toISOString().slice(0, 10);
 
 const escA = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -125,9 +124,17 @@ const FOOTER = `
     <p style="margin-top:8px;font-size:12px;color:#474C5A">본 페이지의 정보는 투자 조언이 아니며 참고용입니다. 모든 투자의 책임은 본인에게 있습니다.</p>
   </footer>`;
 
+// ★ 2026-06-12 (대표 결정): GA4 제거 — 자체 퍼스트파티 비콘(/api/track)으로 교체.
+//   무쿠키·익명 vid, 경로는 런타임 location.pathname (허브/코인 페이지 공용).
 const GA_SNIPPET = `
-  <script async src="https://www.googletagmanager.com/gtag/js?id=${GA}"></script>
-  <script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','${GA}')</script>`;
+  <script>
+  (function(){
+    function vid(){try{var v=localStorage.getItem("z_vid");if(!v){v=Date.now()+"-"+Math.random().toString(36).slice(2,10);localStorage.setItem("z_vid",v)}return v}catch(e){return null}}
+    function send(p){try{var b=JSON.stringify(p);if(navigator.sendBeacon){navigator.sendBeacon("/api/track",new Blob([b],{type:"application/json"}))}else{fetch("/api/track",{method:"POST",body:b,keepalive:true,headers:{"Content-Type":"application/json"}})}}catch(e){}}
+    var u=null;try{u=new URLSearchParams(location.search).get("utm_source")}catch(e){}
+    send({t:"pv",path:location.pathname,vid:vid(),dev:innerWidth<=640?"m":"d",ref:document.referrer||null,utm:u});
+  })();
+  </script>`;
 
 // 라이브 시그널 위젯 스크립트 (코인별 asset 매칭)
 function liveScript(sym) {
