@@ -42,6 +42,10 @@ export default async function handler(req, res) {
     statusPairs.slice(0, half).forEach((p) => { statuses[p.id] = p.status; });
     statusPairs.slice(half).forEach((p) => { params[p.id] = p.params; });
 
+    // ★ 2026-06-12 (전수조사): 알파 수명주기 이벤트 — 승급/주입/제거 이력 타임라인 근거.
+    let events = [];
+    try { const ev = await kv.get("di:alpha:events"); events = Array.isArray(ev) ? ev.slice(0, 30) : []; } catch {}
+
     return res.status(200).json({
       ok: true,
       generatedAt: leaderboard?.generatedAt || null,
@@ -53,6 +57,7 @@ export default async function handler(req, res) {
       regime: regime || null,  // ★ { regime: "trending"|"mean_reverting"|"transitional", avgHurst, avgER, ... }
       statuses,
       params,
+      events,  // 알파 수명주기 이벤트(최근 30, newest first)
     });
   } catch (err) {
     console.error("[alpha-status] fatal:", err);

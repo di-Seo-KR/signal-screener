@@ -289,6 +289,14 @@ export async function setStrategyParams(strategyId, params, meta = {}) {
       version: (meta.version || 1),
       sharpe: meta.sharpe ?? null,
       trades: meta.trades ?? null,
+      // ★ 2026-06-12 (전수조사): 검증 메타 영속화 — 알파랩 '검증통과' 레인이 빈 값('—')으로
+      //   뜨던 결함 수정. continuous-backtest 가 이미 계산·전달하던 값을 버리지 않고 저장.
+      //   reader(AlphaLab)는 미지 필드를 무시하므로 하위호환 안전.
+      oosSharpe: meta.oosSharpe ?? null,
+      inSampleSharpe: meta.inSampleSharpe ?? null,
+      symbolsValidated: meta.symbolsValidated ?? null,
+      posFrac: meta.posFrac ?? null,
+      symbol: meta.symbol ?? null,
       tunedAt: new Date().toISOString(),
     };
     await kv.set(`di:alpha:params:${strategyId}`, payload);

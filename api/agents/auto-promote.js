@@ -20,6 +20,7 @@ import {
   DEFAULT_STRATEGY_WEIGHTS,
 } from "../_shared/dynamic-config.js";
 import { sendCards, buildCard } from "../_shared/telegram.js";
+import { archiveAlphaLifecycleEvent } from "../_shared/strategy-archive.js";
 
 export const config = { maxDuration: 30 };
 
@@ -104,6 +105,10 @@ export default async function handler(req, res) {
       if (!dryRun) {
         const r = await setStrategyStatus(strategyId, decision.next, decision.reason);
         L(`${strategyId}: ${currentStatus} → ${decision.next} (${decision.reason})`);
+        try {
+          const evType = decision.next === STRATEGY_STATUS.ACTIVE ? "promote" : decision.next === STRATEGY_STATUS.DISABLED ? "demote" : "status";
+          await archiveAlphaLifecycleEvent({ type: evType, family: strategyId, from: currentStatus, to: decision.next, reason: decision.reason });
+        } catch {}
         changes.push({ strategyId, from: currentStatus, to: decision.next, reason: decision.reason, kvResult: r });
       } else {
         L(`[dryRun] ${strategyId}: ${currentStatus} → ${decision.next}`);

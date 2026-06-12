@@ -22,6 +22,7 @@ import { backtestStrategy, klinesToOhlc } from "../_shared/strategy-backtester.j
 import { sampleRandomParams } from "../_shared/strategy-param-space.js";
 import { ALL_STRATEGIES } from "../_shared/strategies/index.js";
 import { setStrategyStatus, setStrategyParams, STRATEGY_STATUS } from "../_shared/dynamic-config.js";
+import { archiveAlphaLifecycleEvent } from "../_shared/strategy-archive.js";
 
 // ★ 2026-06-02 — 발굴 throughput 개선 (Pro 플랜 한도 활용).
 //   기존 60초로는 8전략 × 50샘플 × 4심볼(≈120초어치)을 다 못 돌아 truncate 됐음.
@@ -178,11 +179,13 @@ async function injectWinningParams(kv, newCandidates, ohlcCache, L) {
       oosSharpe: Number(v.medianOosSharpe.toFixed(2)),
       symbolsValidated: v.symbolsTested,
       posFrac: Number(v.posFrac.toFixed(2)),
+      symbol: c.symbol,                   // 검증통과 레인에 발굴 심볼 표시용
       trades: r.trades,
       version: Math.floor(Date.now() / 1000),
     });
     if (ok) {
       try { await setStrategyStatus(family, STRATEGY_STATUS.ACTIVE, `param-inject ${c.symbol} 검증Sharpe ${validatedSharpe} (OOS ${v.medianOosSharpe.toFixed(2)})`); } catch {}
+      try { await archiveAlphaLifecycleEvent({ type: "inject", family, symbol: c.symbol, sharpe: validatedSharpe, oosSharpe: Number(v.medianOosSharpe.toFixed(2)), symbolsValidated: v.symbolsTested, reason: "교차검증+OOS 통과 → 실거래 반영" }); } catch {}
       injected.push({ family, symbol: c.symbol, validatedSharpe, oosSharpe: Number(v.medianOosSharpe.toFixed(2)), inSampleSharpe: Number((r.sharpe || 0).toFixed(2)), symbolsValidated: v.symbolsTested });
       L(`[inject] ✅ ${family} ← ${c.symbol} | in-sample ${(r.sharpe || 0).toFixed(1)} → 검증 중앙 ${validatedSharpe} (${v.symbolsTested}심볼, +${(v.posFrac * 100).toFixed(0)}%), OOS ${v.medianOosSharpe.toFixed(2)} → 실거래 반영`);
     }
@@ -210,6 +213,7 @@ async function revalidateStoredParams(kv, ohlcCache, L) {
       v.medianOosSharpe >= V.minOosSharpe && v.oosPosFrac >= V.minOosPosFrac;
     if (!robust) {
       try { await kv.del(`di:alpha:params:${family}`); } catch {}
+      try { await archiveAlphaLifecycleEvent({ type: "revoke", family, sharpe: Number(v.medianSharpe.toFixed(2)), oosSharpe: Number(v.medianOosSharpe.toFixed(2)), symbolsValidated: v.symbolsTested, reason: "실거래 파라미터 재검증 실패 → default 복귀(제거)" }); } catch {}
       cleared.push({ family, medianSharpe: Number(v.medianSharpe.toFixed(2)), oosSharpe: Number(v.medianOosSharpe.toFixed(2)) });
       L(`[revalidate] ${family} ✗ 실거래 파라미터 검증 실패 (교차중앙 ${v.medianSharpe.toFixed(2)}, OOS ${v.medianOosSharpe.toFixed(2)}, +${(v.posFrac * 100).toFixed(0)}%) → default 복귀(제거)`);
     } else {
@@ -219,6 +223,7 @@ async function revalidateStoredParams(kv, ohlcCache, L) {
           await setStrategyParams(family, stored.params, {
             sharpe: validatedSharpe, oosSharpe: Number(v.medianOosSharpe.toFixed(2)),
             symbolsValidated: v.symbolsTested, posFrac: Number(v.posFrac.toFixed(2)),
+            symbol: stored.symbol, inSampleSharpe: stored.inSampleSharpe, // 재검증 시 발굴 메타 보존
             trades: stored.trades, version: Math.floor(Date.now() / 1000),
           });
           refreshed.push({ family, from: stored.sharpe, to: validatedSharpe });
