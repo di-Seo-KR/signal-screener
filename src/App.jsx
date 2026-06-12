@@ -5149,7 +5149,7 @@ function AppInner() {
             }
           });
 
-          reply += `현재 구성: ${portfolio.length}{t("tabs.home.items")}\n`;
+          reply += `현재 구성: ${portfolio.length}개\n`;
           Object.entries(sectorConc).forEach(([sector, count]) => {
             const pct = (count / portfolio.length * 100).toFixed(0);
             reply += `  ${sector}: ${count}개 (${pct}%)\n`;
@@ -5904,6 +5904,13 @@ function AppInner() {
       document.removeEventListener("touchend", preventDoubleTap);
     };
   }, []);
+
+  // ★ 2026-06-12 (전수 감사): anomaly·quant-report·risk-map 딥링크 직행 시 hotAssets/지수가
+  //   영원히 비어 '이상 없음' 같은 거짓 화면이 렌더되던 문제 — 진입 시 1회 로드.
+  useEffect(() => {
+    if (!["anomaly", "quant-report", "risk-map"].includes(tab)) return;
+    if (marketIndices.length === 0 && !marketLoading) fetchMarketOverview();
+  }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 홈 탭 진입 시 즉시 로드 + 30초 간격 자동 갱신
   // ★ 백그라운드 탭 가드 — document.hidden 일 땐 fetch 건너뜀 (모바일 배터리·데이터 절약)
@@ -7006,15 +7013,21 @@ function AppInner() {
     return `$${val.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
   };
 
-  const filtered = results.filter(a => filterMarket === "all" || a.market === filterMarket);
+  // ★ 2026-06-12 (전수 감사): 정렬 버튼이 한 번도 동작한 적 없던 버그 — sortedResults 가
+  //   계산만 되고 raw results 를 렌더하고 있었음 → 정렬 결과 기반으로 필터.
+  const filtered = sortedResults.filter(a => filterMarket === "all" || a.market === filterMarket);
 
+  // ★ 2026-06-12 (전수 감사 — 치명 버그): KR 종목(₩ 단위)과 US/크립토($ 단위)를 환산 없이
+  //   합산해 혼합 보유 시 총액이 수백 배 틀리던 문제 → KR 은 USD 로 정규화 후 합산.
+  //   (표시부 PortfolioTab 은 pStats 를 USD 로 가정하고 KRW 표시 시 ×krwRate — 기존 그대로)
   const pStats = portfolio.reduce((acc, item) => {
     const cur = portfolioPrices[item.symbol];
-    const invested = item.qty * item.avgPrice;
+    const fx = item.market === "kr" && krwRate > 0 ? 1 / krwRate : 1;
+    const invested = item.qty * item.avgPrice * fx;
     return {
       invested: acc.invested + invested,
-      current:  acc.current + (cur ? item.qty * cur : 0),
-      pnl:      acc.pnl    + (cur ? item.qty * cur - invested : 0),
+      current:  acc.current + (cur ? item.qty * cur * fx : 0),
+      pnl:      acc.pnl    + (cur ? item.qty * cur * fx - invested : 0),
       hasPrices: acc.hasPrices || !!cur,
     };
   }, { invested: 0, current: 0, pnl: 0, hasPrices: false });
@@ -9898,7 +9911,7 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {/* ★ 2026-06-08 포트폴리오 허브 — 흩어져 있던 3탭(내 자산·자산 분석·퀀트 포트)을
             세그먼트로 통합. 라우트·데이터 흐름은 그대로, 상단 내비만 공유 (대표 지시). */}
-        {(tab === "portfolio" || tab === "portfolio-analysis" || tab === "quant-port") && (
+        {(tab === "portfolio" || tab === "portfolio-analysis" || tab === "quant-port" || tab === "quant-portfolio") && (
           <SectionTabs
             title="포트폴리오"
             items={[
@@ -10074,7 +10087,8 @@ function AppInner() {
                               {a.change >= 0 ? "+" : ""}{a.change?.toFixed(2)}%
                             </div>
                             <div style={{ fontSize: "16px", color: C.text3 }}>
-                              ${a.price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              {/* ★ 전수 감사: KR 종목에 $ 하드코딩 → ₩ 분기 (삼성전자 '$60,000' 표기 버그) */}
+                              {a.market === "kr" ? `₩${Math.round(a.price || 0).toLocaleString()}` : `$${a.price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                             </div>
                           </div>
                           <div style={{
@@ -10218,7 +10232,7 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 전략 운용 (퀀트 포트폴리오)
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "quant-port" && (
+        {(tab === "quant-port" || tab === "quant-portfolio") && (
           <div style={{
             background: `linear-gradient(135deg, ${C.purpleBg} 0%, ${C.blueBg} 100%)`,
             borderRadius: "24px", padding: "24px",
@@ -12162,12 +12176,12 @@ function AppInner() {
               <div style={{ padding: "14px 20px", fontSize: "14px", fontWeight: 800, color: C.text1 }}>고객지원</div>
               {[
                 { icon: "📋", label: "서비스 소개", tab: "about" },
-                { icon: "📖", label: "투자 가이드", tab: "guide" },
+                { icon: "📖", label: "투자 가이드", href: "/guide" }, // ★ guide 는 정적 페이지 — setTab 하면 빈 화면이던 죽은 링크 수정
                 { icon: "🔒", label: "개인정보 처리방침", tab: "privacy" },
                 { icon: "📄", label: "이용약관", tab: "terms" },
                 { icon: "✉️", label: "문의하기", tab: "contact" },
               ].map((item, i) => (
-                <div key={i} onClick={() => setTab(item.tab)} style={{
+                <div key={i} onClick={() => { if (item.href) window.location.href = item.href; else setTab(item.tab); }} style={{
                   display: "flex", alignItems: "center", gap: "14px",
                   padding: "14px 20px", borderTop: `1px solid ${C.border}15`, cursor: "pointer",
                   transition: "background .1s",
@@ -12847,8 +12861,18 @@ function AppInner() {
             padding: "16px 20px", borderBottom: `1px solid ${C.border}20`,
             background: `linear-gradient(135deg, ${C.card} 0%, ${C.blueBg} 100%)`,
           }}>
-            <div style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>🤖 AI 투자 어시스턴트</div>
-            <div style={{ fontSize: "16px", color: C.text3, marginTop: "2px" }}>퀀트 데이터 기반 실시간 분석</div>
+            {/* ★ 2026-06-12 (전수 감사 — 컴플라이언스): 'AI 어시스턴트·실시간 분석' 과대 표기 정정
+                (LLM 아닌 키워드 매칭) + 면책 명시 */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>🤖 퀀트 도우미</div>
+                <div style={{ fontSize: "12px", color: C.text3, marginTop: "2px" }}>지표 데이터 기반 도우미 · 분석 참고용, 투자 권유 아님</div>
+              </div>
+              <button onClick={() => setAiChatOpen(false)} aria-label="닫기" style={{
+                width: 32, height: 32, border: "none", borderRadius: 8, background: "transparent",
+                color: C.text3, fontSize: 15, cursor: "pointer", flexShrink: 0,
+              }}>✕</button>
+            </div>
           </div>
 
           {/* 메시지 영역 */}

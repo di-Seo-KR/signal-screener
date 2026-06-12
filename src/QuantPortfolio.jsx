@@ -934,7 +934,8 @@ export default function QuantPortfolio({ theme = "dark" }) {
   const topPerformers = useMemo(() => [...strategyData].sort((a, b) => b.cumReturn - a.cumReturn).slice(0, 5), [strategyData]);
 
   // 로딩 중
-  if (loading) return <LoadingSkeleton progress={progress} />;
+  // ★ 2026-06-12 (전수 감사): 5분 자동 갱신마다 보던 화면이 스켈레톤으로 덮이던 문제 — 최초 로드만 스켈레톤
+  if (loading && strategyData.length === 0) return <LoadingSkeleton progress={progress} />;
 
   // ═══ 상세 뷰 ═══
   if (selectedStrategy) {
@@ -1070,9 +1071,9 @@ export default function QuantPortfolio({ theme = "dark" }) {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
               <div>
                 <div style={{ fontWeight: 700 }}>매매기록 ({s.tradeHistory.length}건)</div>
-                <div style={{ fontSize: "14px", color: C.green, marginTop: "2px" }}>전략 generate() 실제 시그널 기반</div>
+                <div style={{ fontSize: "14px", color: C.green, marginTop: "2px" }}>33개 전략 백테스트 시뮬레이션 — 가상 $100,000 기준</div>
               </div>
-              <span style={{ fontSize: "14px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>REAL</span>
+              <span style={{ fontSize: "14px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>시뮬레이션</span>
             </div>
             {s.tradeHistory.length === 0 ? (
               <div style={{ textAlign: "center", padding: "40px 0", color: C.text3 }}>
@@ -1133,7 +1134,7 @@ export default function QuantPortfolio({ theme = "dark" }) {
           <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "20px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
               <div style={{ fontWeight: 700 }}>리밸런싱 이력</div>
-              <span style={{ fontSize: "14px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>실제 비중 드리프트</span>
+              <span style={{ fontSize: "14px", color: C.green, padding: "2px 8px", borderRadius: "4px", background: C.greenBg }}>시뮬레이션 비중 드리프트</span>
             </div>
             {s.rebalanceHistory.length === 0 ? (
               // 2026-05-12 — 빈 상태 친절 카피 + 다음 액션 가이드

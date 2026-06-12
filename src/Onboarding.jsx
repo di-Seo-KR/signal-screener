@@ -55,7 +55,6 @@ const RISK_PROFILES = [
     desc: "원금 보전이 1순위. 큰 손실 없이 꾸준한 수익을 선호해요.",
     botRecommend: "stable-dca",
     botLabel: "안정 DCA — 분할 매수로 변동성 흡수",
-    expectedAnnual: "연 8~15%",
     drawdownGuide: "예상 최대 손실: 10% 이내",
   },
   {
@@ -63,7 +62,6 @@ const RISK_PROFILES = [
     desc: "어느 정도 변동성은 감수. 시장 평균보다 나은 수익을 원해요.",
     botRecommend: "trend-momentum",
     botLabel: "추세 모멘텀 — 시장 흐름 따라 매매",
-    expectedAnnual: "연 15~30%",
     drawdownGuide: "예상 최대 손실: 15~20%",
   },
   {
@@ -71,7 +69,6 @@ const RISK_PROFILES = [
     desc: "큰 손실도 감내할 수 있음. 높은 수익률을 추구해요.",
     botRecommend: "breakout-leverage",
     botLabel: "돌파 매매 — 강한 신호에 집중 베팅",
-    expectedAnnual: "연 30~60%",
     drawdownGuide: "예상 최대 손실: 25~40%",
   },
 ];
@@ -317,7 +314,7 @@ export default function Onboarding({ onClose, onNavigate }) {
                 emoji={p.emoji}
                 label={p.label}
                 desc={p.desc}
-                sub={`추천 봇: ${p.botLabel} · ${p.expectedAnnual} · ${p.drawdownGuide}`}
+                sub={`추천 봇: ${p.botLabel} · ${p.drawdownGuide}`}
                 C={C}
               />
             ))}
@@ -407,7 +404,7 @@ export default function Onboarding({ onClose, onNavigate }) {
               {profile.desc}
             </div>
             <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
-              <span style={{ fontSize: FONT.xs, color: C.text3 }}>예상 연 수익: <b style={{ color: C.green }}>{profile.expectedAnnual}</b></span>
+              <span style={{ fontSize: FONT.xs, color: C.text3 }}>백테스트 기준 {profile.drawdownGuide}</span>
               <span style={{ fontSize: FONT.xs, color: C.text3 }}>{profile.drawdownGuide}</span>
             </div>
           </div>
