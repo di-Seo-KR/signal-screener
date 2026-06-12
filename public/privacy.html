@@ -23,20 +23,27 @@
     .date{font-size:16px;color:#6E7585;margin-bottom:24px}
     a{color:#6E92FF;text-decoration:none}
     a:hover{text-decoration:underline}
-    nav{background:#14151B;border-bottom:1px solid #23262F;padding:12px 20px;text-align:center}
-    nav a{margin:0 12px;font-size:15px;color:#A1A6B2}
-    nav a:hover{color:#F4F5F7}
+    nav{position:sticky;top:0;z-index:50;background:rgba(10,11,15,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid #23262F;padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+nav .brand{font-weight:800;font-size:18px;color:#F4F5F7;text-decoration:none;letter-spacing:-0.02em}
+nav .brand b{color:#4D7CFF;font-weight:800}
+nav .links{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none}
+nav .links::-webkit-scrollbar{display:none}
+nav .links a{padding:7px 11px;border-radius:9px;font-size:14px;font-weight:600;color:#A1A6B2;text-decoration:none;white-space:nowrap;transition:color .15s,background .15s}
+nav .links a:hover{color:#F4F5F7;background:#1B1D25}
     footer{text-align:center;padding:40px 20px;color:#6E7585;font-size:14px;border-top:1px solid #23262F;margin-top:40px}
   </style>
 </head>
 <body>
   <nav>
-    <a href="/">홈</a>
-    <a href="/about">소개</a>
-    <a href="/guide">투자 가이드</a>
-    <a href="/privacy">개인정보처리방침</a>
-    <a href="/terms">이용약관</a>
-    <a href="/contact">문의하기</a>
+    <a class="brand" href="/"><b>Z</b>epta</a>
+    <div class="links">
+      <a href="/">홈</a>
+      <a href="/screener">스크리너</a>
+      <a href="/coin">코인 분석</a>
+      <a href="/auto-trading">AI 매매</a>
+      <a href="/blog">블로그</a>
+      <a href="/about">소개</a>
+    </div>
   </nav>
   <div class="wrap">
     <h1>개인정보처리방침</h1>

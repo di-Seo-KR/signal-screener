@@ -11,6 +11,7 @@ async function getKv() { return (await import("@vercel/kv")).kv; }
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Cache-Control", "private, no-store"); // ★ 사용자 자산 데이터 — 캐시 원천 차단
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
@@ -22,14 +23,19 @@ export default async function handler(req, res) {
     const kv = await getKv();
 
     const open = (raw || []).filter((p) => parseFloat(p.positionAmt || 0) !== 0);
+    // ★ 2026-06-12 성능: 포지션별 직렬 kv.get(N+1) → mget 1회 왕복 (N=8이면 ~0.5s 단축)
+    let plans = [];
+    try {
+      plans = open.length ? await kv.mget(...open.map((p) => `di:real:user:${userId}:plan:${p.symbol}`)) : [];
+    } catch { plans = open.map(() => null); }
     const positions = [];
-    for (const p of open) {
+    for (let i = 0; i < open.length; i++) {
+      const p = open[i];
       const amt = parseFloat(p.positionAmt);
       const side = amt > 0 ? "LONG" : "SHORT";
       const entry = parseFloat(p.entryPrice || 0);
       const mark = parseFloat(p.markPrice || 0);
-      let plan = null;
-      try { plan = await kv.get(`di:real:user:${userId}:plan:${p.symbol}`); } catch {}
+      const plan = plans[i] || null;
       const tpPrice = plan?.tpPrice != null ? Number(plan.tpPrice) : null;
       const slPrice = plan?.slPrice != null ? Number(plan.slPrice) : null;
 

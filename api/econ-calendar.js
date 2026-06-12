@@ -14,7 +14,8 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
 
   // 발표 시간대(미국 8:30AM ET = 한국 21:30~22:30)에는 30초 캐시로 단축
-  const hourKST = new Date().getUTCHours() + 9;
+  // ★ 2026-06-12 fix: %24 정규화 — 이전엔 9~32 범위라 (hourKST>=0 && <=2) 분기가 영원히 false
+  const hourKST = (new Date().getUTCHours() + 9) % 24;
   const isAnnouncementWindow = (hourKST >= 21 && hourKST <= 24) || (hourKST >= 0 && hourKST <= 2);
   const cacheSeconds = isAnnouncementWindow ? 30 : 600;
   res.setHeader("Cache-Control", `s-maxage=${cacheSeconds}, stale-while-revalidate=${Math.floor(cacheSeconds * 1.5)}`);

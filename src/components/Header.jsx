@@ -264,8 +264,10 @@ export default memo(function Header({
               </SheetTrigger>
 
               {/* ── 모바일 Sheet 드로어 ── */}
-              <SheetContent side="left" showCloseButton={false} className="w-[300px] p-0 overflow-y-auto">
-                <SheetHeader className="border-b border-border/30 px-4 py-3">
+              {/* ★ 2026-06-12 (대표 제보): 사이드바 맨 아래(로그아웃)까지 스크롤이 안 내려가던 문제 —
+                  루트 overflow 대신 '고정 헤더 + flex-1 내부 스크롤 영역' 표준 구조로 재구성 */}
+              <SheetContent side="left" showCloseButton={false} className="w-[300px] p-0 flex flex-col">
+                <SheetHeader className="shrink-0 border-b border-border/30 px-4 py-3">
                   {user ? (
                     <div className="flex items-center gap-3">
                       <Avatar size={36} />
@@ -284,6 +286,7 @@ export default memo(function Header({
                   )}
                 </SheetHeader>
 
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-[max(20px,env(safe-area-inset-bottom))]">
                 {/* ★ Owner 전용 실전매매 빠른 진입 배너 (모바일 햄버거 상단)
                     이전엔 햄버거 → 홈 섹션의 3분할 셀로 들어가 있어서 잘 안 보임. */}
                 {user && isOwner && (
@@ -375,6 +378,7 @@ export default memo(function Header({
                     )}
                   </div>
                 </div>
+                </div>{/* ★ 내부 스크롤 영역 닫기 */}
               </SheetContent>
             </Sheet>
 

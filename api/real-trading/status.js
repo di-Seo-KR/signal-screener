@@ -25,6 +25,7 @@ async function getKv() {
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Cache-Control", "private, no-store"); // ★ 사용자 자산·포지션 데이터 — 캐시 원천 차단
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
@@ -34,7 +35,9 @@ export default async function handler(req, res) {
     if (!userId) return res.status(400).json({ error: "userId required" });
 
     const kv = await getKv();
-    const [killed, phase1, shadowEnrolled, breaker, engineLog, engineHeartbeat, orders, shadowSummary, shadowLedger, reconcileLog] = await Promise.all([
+    // ★ 2026-06-12 성능: loadUserCredentials(KV 1회)를 직렬로 기다리던 것을 첫 병렬 묶음에 편입
+    //   (실패는 아래 catch 와 동일하게 binanceOk=false 로 흡수 — 동작 불변, ~100ms 단축)
+    const [killed, phase1, shadowEnrolled, breaker, engineLog, engineHeartbeat, orders, shadowSummary, shadowLedger, reconcileLog, credsOrNull] = await Promise.all([
       isKillSwitchEnabled(userId),
       kv.get(`di:real:user:${userId}:phase1_enabled`),
       kv.get(`di:real:user:${userId}:shadow_enabled`),
@@ -45,6 +48,7 @@ export default async function handler(req, res) {
       kv.get(`di:real:user:${userId}:shadow-summary`),
       kv.get(`di:real:user:${userId}:shadow-ledger`),
       kv.get(`di:real:user:${userId}:reconcile-log`),
+      loadUserCredentials(userId, req).catch(() => null),
     ]);
 
     let equity = null;
@@ -54,7 +58,8 @@ export default async function handler(req, res) {
     let openPositions = [];
     let binanceOk = true;
     try {
-      const creds = await loadUserCredentials(userId, req);
+      const creds = credsOrNull;
+      if (!creds) throw new Error("credentials unavailable");
       const [acct, positions] = await Promise.all([
         getAccountInfo(creds),
         getPositionRisk(creds),

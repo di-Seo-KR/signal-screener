@@ -19,7 +19,8 @@ async function getKv() {
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
-  res.setHeader("Cache-Control", "no-store");
+  // ★ 2026-06-12 성능: 전역 read-only 집계 — no-store → CDN 캐시 (coin-scores 패턴)
+  res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
   try {
     const kv = await getKv();
     const strategyIds = Object.keys(DEFAULT_STRATEGY_WEIGHTS);
