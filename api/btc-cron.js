@@ -14,6 +14,7 @@ import { getAllStoredStrategyParams } from "./_shared/dynamic-config.js";
 import { getMarketContext, getKlines, getTickerPrice } from "./_shared/binance-client.js";
 import { getOIChangeMap } from "./_shared/oi-tracker.js";
 import { loadUniverse, universeSymbolMap } from "./_shared/futures-universe.js";
+import { computeSRLevels, scaleSR } from "./_shared/sr-levels.js"; // ★ 지지·저항(매물대) — 표시 전용
 
 // asset → 바이낸스 *선물(USDⓈ-M, fapi)* 심볼. 펀딩/OI/베이시스 맵 조회 키.
 //   ★ 2026-06-02 버그수정: 선물은 저가 밈코인을 1000배 묶음(1000SHIB/1000PEPE)으로,
@@ -411,6 +412,18 @@ export default async function handler(req, res) {
       const lows = candles.map(c => c.low);
       const volumes = candles.map(c => c.volume || 0);
 
+      // ★ 2026-06-12 (대표 지시): 지지·저항(매물대) 레벨 — 일봉 재활용, 추가 API 0회.
+      //   refPrice 는 priceMap 이 아닌 *일봉 마지막 종가* (캔들·기준가 스케일 일치 필수).
+      //   레거시 자산(SHIB/USD 등)이 1000-단위 선물 캔들로 계산되면 priceMap(230행)과
+      //   동일 규칙으로 1/1000 환산. 어떤 실패도 cron 을 막지 않음(표시 전용).
+      let srLevels = null;
+      try {
+        srLevels = computeSRLevels(candles, candles[candles.length - 1]?.close);
+        if (srLevels && String(futSymbol || "").startsWith("1000") && !String(asset).startsWith("1000")) {
+          srLevels = scaleSR(srLevels, 1 / 1000);
+        }
+      } catch { srLevels = null; }
+
       const rsi = calcRSI(closes, 14);
       const bb = calcBB(closes, 20, 2.0); // BB multiplier 2.0으로 변경
       const ema21 = calcEMA(closes, 21);
@@ -621,6 +634,7 @@ export default async function handler(req, res) {
           family: tradeSignal.family, timeframe: tradeSignal.timeframe, side: tradeSignal.side,
           reason: (tradeSignal.reason || "").slice(0, 200),
           positionSize: tradeSignal.positionSize || 0.5, source: "btc-cron",
+          sr: srLevels, // ★ 지지·저항 — 표시 전용 (engine 은 이 필드를 읽지 않음, additive-safe)
         };
         const updatedPool = [newEntry, ...existingPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200);
         await kv.set(poolKey, updatedPool);
@@ -635,6 +649,7 @@ export default async function handler(req, res) {
               type: compositeSignal.type, side: compositeSignal.side, score: compositeSignal.score,
               confidence: compositeSignal.confidence, family: "composite", timeframe: "MTF",
               breakdown: compositeSignal.breakdown, reason: compositeSignal.reason, source: "btc-cron-mtf",
+              sr: srLevels, // ★ 지지·저항 — 코인 카드 매물대 표시용
             };
             await kv.set(mKey, [mEntry, ...mPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200));
           } catch { /* 표시용 — 실패해도 무시 */ }
