@@ -87,6 +87,18 @@ ul{margin:0 0 16px 22px}li{margin-bottom:8px;font-size:16px}
 .coin-card .c-sym{font-size:16px;font-weight:700;color:#F4F5F7}
 .coin-card .c-ko{font-size:13px;color:#A1A6B2}
 .coin-card .c-score{font-size:14px;font-weight:700;margin-top:8px;color:#6E7585}
+.dash-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:20px 0}
+.dash-stat{background:#14151B;border:1px solid #23262F;border-radius:12px;padding:14px 10px;text-align:center}
+.dash-stat .v{font-size:22px;font-weight:800;color:#F4F5F7;line-height:1.2}
+.dash-stat .l{font-size:12px;color:#6E7585;margin-top:2px}
+.top-sigs{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 4px}
+.sig-pill{display:inline-flex;align-items:center;gap:6px;background:#14151B;border:1px solid #23262F;border-radius:999px;padding:8px 14px;font-size:14px;font-weight:700;color:#F4F5F7;text-decoration:none}
+.sig-pill b{font-weight:800}
+.c-side{display:inline-block;font-size:11px;font-weight:800;padding:1px 7px;border-radius:6px;margin-top:6px}
+.side-long{background:rgba(16,216,132,.12);color:#10D884}
+.side-short{background:rgba(255,77,100,.14);color:#FF7B91}
+.c-bar{height:4px;border-radius:4px;background:#23262F;overflow:hidden;margin-top:8px}
+.c-bar i{display:block;height:100%;border-radius:4px}
 footer{text-align:center;padding:40px 20px;color:#6E7585;font-size:14px;border-top:1px solid #23262F;margin-top:60px}
 footer a{color:#6E92FF;text-decoration:none;margin:0 6px}
 @media(max-width:640px){h1{font-size:24px}.wrap{padding:24px 16px}p,li{font-size:15px}.facts .row{grid-template-columns:100px 1fr;font-size:14px}}
@@ -246,7 +258,7 @@ function buildCoinPage(coin, idx) {
 ${faqHtml}
 
     <div class="cta">
-      <p>${escH(ko)}를 포함한 30개 메이저 코인을 AI가 자동으로 분석·매매합니다.</p>
+      <p>${escH(ko)}를 포함한 유동성 상위 코인 전체를 AI가 자동으로 분석·매매합니다.</p>
       <a href="/auto-trading">AI 자동매매 살펴보기 →</a>
     </div>
 
@@ -262,8 +274,8 @@ ${faqHtml}
 
 function buildHub() {
   const url = `${SITE}/coin`;
-  const title = "코인별 실시간 롱숏 스코어 — 메이저 30종 AI 분석 | Zepta";
-  const metaDesc = "비트코인·이더리움·솔라나 등 메이저 30개 코인의 실시간 종합 롱숏 스코어. 주봉·일봉·4시간·1시간을 종합해 10분마다 자동 분석합니다.";
+  const title = "코인 라이브 대시보드 — 실시간 롱숏 스코어 AI 분석 | Zepta";
+  const metaDesc = "비트코인·이더리움을 포함한 유동성 상위 코인 전체의 실시간 종합 롱숏 스코어 대시보드. 주봉·일봉·4시간·1시간을 종합해 10분마다 자동 분석합니다.";
   const cards = COINS.map((c) => `      <div class="coin-card"><a href="/coin/${c.sym.toLowerCase()}"><div class="c-sym">${c.sym}</div><div class="c-ko">${escH(c.ko)}</div><div class="c-score" data-sym="${escA(c.sym)}">로딩…</div></a></div>`).join("\n");
   const listText = COINS.map((c) => `${escH(c.ko)}(${c.sym})`).join(", ");
   const crumbLd = {
@@ -302,36 +314,75 @@ function buildHub() {
 <body>${NAV}
   <main class="wrap">
     <div class="breadcrumb"><a href="/">홈</a> › 코인 분석</div>
-    <h1>코인별 실시간 롱숏 스코어</h1>
-    <div class="meta-row">메이저 30종 · 주봉·일봉·4시간·1시간 종합 · 10분마다 자동 갱신 · 최종 갱신 ${BUILD_DATE}</div>
+    <h1>코인 라이브 대시보드</h1>
+    <div class="meta-row">유동성 상위 코인 자동 선별 · 주봉·일봉·4시간·1시간 종합 · 10분마다 자동 갱신 · 최종 갱신 ${BUILD_DATE}</div>
 
-    <p>Zepta는 비트코인을 비롯한 메이저 암호화폐 <strong>30종</strong>을 각각 네 개의 시간대(주봉·일봉·4시간·1시간)로 동시에 분석해, 지금 롱(매수)과 숏(매도) 중 어느 쪽 우위인지 하나의 <strong>종합 스코어</strong>로 보여줍니다. 아래에서 종목을 선택하면 코인별 상세 분석과 실시간 시그널을 확인할 수 있습니다.</p>
+    <p>Zepta는 바이낸스 선물에서 <strong>유동성 상위 코인 전체</strong>(약 50종, 자동 선별)를 네 개의 시간대(주봉·일봉·4시간·1시간)로 동시에 분석해, 지금 롱(매수)과 숏(매도) 중 어느 쪽 우위인지 하나의 <strong>종합 스코어</strong>로 보여줍니다.</p>
 
-    <div class="coin-grid">
+    <!-- 라이브 요약 스트립 -->
+    <div class="dash-strip" id="dash-strip">
+      <div class="dash-stat"><div class="v" id="st-total">—</div><div class="l">분석 종목</div></div>
+      <div class="dash-stat"><div class="v" id="st-long" style="color:#10D884">—</div><div class="l">롱 우위</div></div>
+      <div class="dash-stat"><div class="v" id="st-short" style="color:#FF7B91">—</div><div class="l">숏 우위</div></div>
+      <div class="dash-stat"><div class="v" id="st-avg">—</div><div class="l">평균 스코어</div></div>
+    </div>
+
+    <!-- 지금 가장 강한 시그널 -->
+    <div class="top-sigs" id="top-sigs" style="display:none"></div>
+
+    <div class="coin-grid" id="coin-grid">
 ${cards}
     </div>
 
     <h2>종합 스코어는 어떻게 계산되나요?</h2>
-    <p>각 코인의 주봉(30%)·일봉(25%)·4시간(25%)·1시간(20%) 신호를 방향 가중합해 산출합니다. 여러 시간대가 같은 방향으로 모이면 확신도가 높아지고, 엇갈리면 점수가 낮아져 신중해집니다. 여기에 펀딩비·미결제약정(OI)·베이시스 같은 선물 지표를 더해 과열·쏠림을 보정합니다. 모든 값은 10분마다 다시 계산됩니다.</p>
+    <p>각 코인의 주봉(30%)·일봉(25%)·4시간(25%)·1시간(20%) 신호를 방향 가중합해 산출합니다. 여러 시간대가 같은 방향으로 모이면 확신도가 높아지고, 엇갈리면 점수가 낮아져 신중해집니다. 여기에 펀딩비·미결제약정(OI)·베이시스 같은 선물 지표를 더해 과열·쏠림을 보정합니다. 모든 값은 10분마다 다시 계산되며, 분석 대상은 거래대금 기준 상위 코인으로 자동 교체됩니다.</p>
 
-    <h2>분석 대상 30종</h2>
-    <p>${listText}.</p>
+    <h2>상세 분석 페이지 제공 코인</h2>
+    <p>${listText} — 메이저 30종은 코인별 정체·합의 방식·매매 시 주의점까지 담은 상세 페이지를 제공합니다. 그 외 유동성 상위 신규 코인은 위 대시보드에서 실시간 스코어로 확인할 수 있습니다.</p>
 
     <div class="disc">⚠️ 본 페이지의 스코어는 알고리즘 산출 참고 정보이며 투자 조언이 아닙니다. 암호화폐 선물은 원금 손실 위험이 크며, 투자 판단과 책임은 본인에게 있습니다.</div>
 
     <div class="cta">
-      <p>30종 전체를 AI가 자동으로 분석하고, 원하면 자동매매까지 맡길 수 있습니다.</p>
+      <p>유동성 상위 코인 전체를 AI가 자동으로 분석하고, 원하면 자동매매까지 맡길 수 있습니다.</p>
       <a href="/auto-trading">AI 자동매매 살펴보기 →</a>
     </div>
   </main>${FOOTER}${DRAWER}
   <script>
   (function(){
-    fetch('/api/real-trading/coin-scores').then(function(r){return r.json()}).then(function(d){
-      var list=(d&&d.coins)||[],map={},i;
-      for(i=0;i<list.length;i++){map[list[i].asset]=list[i]}
-      var cells=document.querySelectorAll('.c-score[data-sym]');
-      for(i=0;i<cells.length;i++){(function(el){var c=map[el.getAttribute('data-sym')];if(!c){el.textContent='집계 중';return}var isLong=c.side==='LONG';el.textContent=(isLong?'롱 ':'숏 ')+Math.round(c.score);el.style.color=isLong?'#10D884':'#FF7B91'})(cells[i])}
-    }).catch(function(){});
+    // 상세 페이지 보유 코인 — sym/선물심볼 모두 매핑
+    var PAGES={${COINS.map((c) => `"${c.sym}":"/coin/${c.sym.toLowerCase()}","${c.fut}":"/coin/${c.sym.toLowerCase()}"`).join(",")}};
+    function esc(s){return String(s).replace(/[&<>"]/g,function(ch){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]})}
+    function render(list){
+      var i,longN=0,shortN=0,sum=0;
+      for(i=0;i<list.length;i++){if(list[i].side==='LONG')longN++;else shortN++;sum+=list[i].score||0}
+      document.getElementById('st-total').textContent=list.length;
+      document.getElementById('st-long').textContent=longN;
+      document.getElementById('st-short').textContent=shortN;
+      document.getElementById('st-avg').textContent=list.length?Math.round(sum/list.length):'—';
+      // 강한 시그널 TOP 3
+      var sorted=list.slice().sort(function(a,b){return (b.score||0)-(a.score||0)});
+      var top=sorted.slice(0,3),pills='';
+      for(i=0;i<top.length;i++){var t=top[i],nm=esc(String(t.asset||'').replace(/^1000/,'')),lg=t.side==='LONG';
+        pills+='<span class="sig-pill">🔥 '+nm+' <b style="color:'+(lg?'#10D884':'#FF7B91')+'">'+(lg?'롱':'숏')+' '+Math.round(t.score)+'</b></span>'}
+      var ts=document.getElementById('top-sigs');ts.innerHTML=pills;ts.style.display=pills?'flex':'none';
+      // 그리드 전체를 라이브 유니버스로 재구성 (스코어 내림차순, 상세페이지 보유 시 링크)
+      var html='';
+      for(i=0;i<sorted.length;i++){var c=sorted[i],a=String(c.asset||''),nm2=esc(a.replace(/^1000/,'')),lg2=c.side==='LONG';
+        var page=PAGES[a]||PAGES[c.symbol]||null;
+        var inner='<div class="c-sym">'+nm2+'</div>'
+          +'<span class="c-side '+(lg2?'side-long':'side-short')+'">'+(lg2?'롱 우위':'숏 우위')+'</span>'
+          +'<div class="c-score" style="color:'+(lg2?'#10D884':'#FF7B91')+'">'+Math.round(c.score)+'점</div>'
+          +'<div class="c-bar"><i style="width:'+Math.max(4,Math.min(100,Math.round(c.score)))+'%;background:'+(lg2?'#10D884':'#FF7B91')+'"></i></div>';
+        html+='<div class="coin-card">'+(page?'<a href="'+page+'" style="text-decoration:none">'+inner+'</a>':inner)+'</div>'}
+      if(html)document.getElementById('coin-grid').innerHTML=html;
+    }
+    function load(){
+      fetch('/api/real-trading/coin-scores?limit=60').then(function(r){return r.json()}).then(function(d){
+        var list=(d&&d.coins)||[];if(list.length)render(list);
+      }).catch(function(){});
+    }
+    load();
+    setInterval(load,5*60*1000); // 5분마다 자동 갱신
   })();
   </script>
 </body>
