@@ -1,14 +1,19 @@
-// Vercel Serverless — 경제 캘린더 API (v2: 병렬 멀티소스 + BLS 실시간 + KV 캐싱)
+// Vercel Serverless — 경제 캘린더 API (v3: ForexFactory 실 컨센서스 + 병렬 멀티소스)
 // GET /api/econ-calendar
 //
 // 데이터 소스 (병렬 실행):
-//   A. Finnhub   — 전체 경제 캘린더 (actual 포함)
-//   B. FMP       — 전체 경제 캘린더 (actual 포함)
-//   C. BLS API   — CPI/고용 실시간 actual (발표 즉시 반영)
-//   D. FRED API  — 추가 actual 보완
+//   A. Finnhub      — 전체 경제 캘린더 (actual 포함, 키 필요)
+//   B. FMP          — 전체 경제 캘린더 (actual 포함, 키 필요)
+//   C. BLS API      — CPI/고용 실시간 actual (발표 즉시 반영)
+//   D. FRED API     — 추가 actual 보완
+//   E. ForexFactory — 이번 주 실제 컨센서스(forecast)·정확한 발표시각 (무키)
+//      ★ 2026-06-12 (대표 제보): 큐레이션 추측치(CPI 6/11·est 2.6%)가 실제
+//        (6/10 21:30 KST·컨센서스 4.2%, 트레이딩뷰 동일)와 어긋남 → FF 주간
+//        JSON 으로 이번 주 이벤트의 날짜·시각·예측·이전치를 실값으로 보정.
 //
-// 전략: 모든 소스를 병렬 호출 → actual 값이 있는 소스 우선 → curated 이벤트에 병합
-// KV 키: di:econ:actuals — 발표된 수치를 영구 저장
+// 전략: curated 골격(±30일) + FF 가 이번 주 실값 덮어쓰기 + actual 은 BLS/FRED/API.
+// KV 키: di:econ:actuals — 발표 수치 영구 저장
+//        di:econ:estimates — FF 에서 한 번 관측한 컨센서스 영구 저장(주 경과 후에도 유지)
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -56,10 +61,16 @@ export default async function handler(req, res) {
   // ── KV 연결 ──
   let kv = null;
   let kvActuals = {};
+  let kvEstimates = {};
   try {
     const kvModule = await import("@vercel/kv");
     kv = kvModule.kv;
-    kvActuals = (await kv.get("di:econ:actuals")) || {};
+    const [a, est] = await Promise.all([
+      kv.get("di:econ:actuals"),
+      kv.get("di:econ:estimates"),
+    ]);
+    kvActuals = a || {};
+    kvEstimates = est || {};
   } catch { /* KV 없으면 캐싱 없이 진행 */ }
 
   const saveActualsToKV = async (newActuals) => {
@@ -77,11 +88,12 @@ export default async function handler(req, res) {
   // ══════════════════════════════════════════════════════════════
   // 모든 소스를 병렬로 호출
   // ══════════════════════════════════════════════════════════════
-  const [finnhubResult, fmpResult, blsResult, fredResult] = await Promise.allSettled([
+  const [finnhubResult, fmpResult, blsResult, fredResult, ffResult] = await Promise.allSettled([
     fetchFinnhub(fmtDate(from), fmtDate(to)),
     fetchFMP(fmtDate(from), fmtDate(to)),
     fetchBLSActuals(),
     fetchFREDActuals(todayStr, getCuratedEvents2026()),
+    fetchForexFactory(),
   ]);
 
   // ── 소스별 결과 정리 ──
@@ -89,6 +101,7 @@ export default async function handler(req, res) {
   const fmpEvents     = fmpResult.status === "fulfilled" ? fmpResult.value : [];
   const blsActuals    = blsResult.status === "fulfilled" ? blsResult.value : {};
   const fredActuals   = fredResult.status === "fulfilled" ? fredResult.value : {};
+  const ffEvents      = ffResult.status === "fulfilled" ? ffResult.value : [];
 
   // ── 풀 캘린더 소스 선택 (Finnhub > FMP > Curated) ──
   let baseEvents;
@@ -102,6 +115,48 @@ export default async function handler(req, res) {
   } else {
     baseEvents = getCuratedEvents2026();
     source = "curated";
+  }
+
+  // ── ForexFactory 보정: 이번 주 이벤트의 컨센서스·정확한 발표시각(dt)·이전치 덮어쓰기 ──
+  //   ① KV 에 저장된 과거 관측 컨센서스 먼저 적용(주 경과 후에도 예측치 유지)
+  //   ② FF 라이브가 최우선 — 같은 canonical 이벤트(±3일)에 estimate/previous/dt 주입
+  //   ③ curated 에 없는 이번 주 High/Medium 이벤트(근원 CPI·PPI·실업수당 등)는 추가
+  const newEstimates = {};
+  for (const e of baseEvents) {
+    const k = `${e.date}::${e.event}`;
+    const saved = kvEstimates[k];
+    if (saved) {
+      if (e.estimate == null && saved.e != null) e.estimate = saved.e;
+      if (e.previous == null && saved.p != null) e.previous = saved.p;
+      if (!e.dt && saved.dt) e.dt = saved.dt;
+    }
+  }
+  const D3 = 3 * 86400000;
+  for (const f of ffEvents) {
+    const match = baseEvents.find(e =>
+      e.event === f.event && Math.abs(Date.parse(e.date) - Date.parse(f.date)) <= D3);
+    if (match) {
+      if (f.estimate != null) match.estimate = f.estimate;
+      if (f.previous != null) match.previous = f.previous;
+      match.dt = f.dt;
+      // 날짜가 다르면 FF(실제 발표일)가 진실 — curated 추측 날짜 교정
+      if (match.date !== f.date) match.date = f.date;
+      newEstimates[`${f.date}::${f.event}`] = { e: f.estimate ?? null, p: f.previous ?? null, dt: f.dt };
+    } else if (f.impact === "High" || f.impact === "Medium") {
+      baseEvents.push(f);
+      newEstimates[`${f.date}::${f.event}`] = { e: f.estimate ?? null, p: f.previous ?? null, dt: f.dt };
+    }
+  }
+  // 관측 컨센서스 영구 저장 (best-effort)
+  if (kv && Object.keys(newEstimates).length > 0) {
+    try {
+      let changed = false;
+      for (const [k, v] of Object.entries(newEstimates)) {
+        const old = kvEstimates[k];
+        if (!old || old.e !== v.e || old.p !== v.p) { kvEstimates[k] = v; changed = true; }
+      }
+      if (changed) await kv.set("di:econ:estimates", kvEstimates);
+    } catch {}
   }
 
   // ── 모든 actual 값 통합: BLS → FRED → KV → API 소스 순으로 우선순위 ──
@@ -146,6 +201,7 @@ export default async function handler(req, res) {
     fmpEvents.length > 0 ? "fmp" : null,
     Object.keys(blsActuals).length > 0 ? "bls" : null,
     Object.keys(fredActuals).length > 0 ? "fred" : null,
+    ffEvents.length > 0 ? "ff" : null,
   ].filter(Boolean);
 
   return res.status(200).json({
@@ -391,6 +447,69 @@ async function fetchFREDActuals(todayStr, curated) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// 데이터 소스: ForexFactory 주간 캘린더 (무키, 이번 주만)
+//   실제 컨센서스(트레이딩뷰와 동일 계열)·정확한 발표시각(TZ 포함)을 제공.
+//   nextweek 엔드포인트는 404 — thisweek 만 존재 (2026-06-12 curl 실측).
+// ══════════════════════════════════════════════════════════════
+const FF_MAP = [
+  { re: /^CPI y\/y$/i,                  event: "CPI (YoY)",               type: "CPI",      unit: "%" },
+  { re: /^Core CPI y\/y$/i,             event: "Core CPI (YoY)",          type: "CPI",      unit: "%" },
+  { re: /^CPI m\/m$/i,                  event: "CPI (MoM)",               type: "CPI",      unit: "%" },
+  { re: /^Core CPI m\/m$/i,             event: "Core CPI (MoM)",          type: "CPI",      unit: "%" },
+  { re: /^PPI m\/m$/i,                  event: "PPI (MoM)",               type: "경제지표", unit: "%" },
+  { re: /^Core PPI m\/m$/i,             event: "Core PPI (MoM)",          type: "경제지표", unit: "%" },
+  { re: /^Non-Farm Employment Change$/i, event: "Nonfarm Payrolls",       type: "NFP",      unit: "K" },
+  { re: /^Unemployment Rate$/i,         event: "Unemployment Rate",       type: "NFP",      unit: "%" },
+  { re: /^Federal Funds Rate$/i,        event: "FOMC Rate Decision",      type: "FOMC",     unit: "%" },
+  { re: /^Retail Sales m\/m$/i,         event: "Retail Sales (MoM)",      type: "경제지표", unit: "%" },
+  { re: /^Core Retail Sales m\/m$/i,    event: "Core Retail Sales (MoM)", type: "경제지표", unit: "%" },
+  { re: /GDP q\/q$/i,                   event: "GDP Growth Rate (QoQ)",   type: "GDP",      unit: "%" },
+  { re: /^ISM Manufacturing PMI$/i,     event: "ISM Manufacturing PMI",   type: "경제지표", unit: "" },
+  { re: /^ISM Services PMI$/i,          event: "ISM Services PMI",        type: "경제지표", unit: "" },
+  { re: /^Unemployment Claims$/i,       event: "Initial Jobless Claims",  type: "경제지표", unit: "K" },
+  { re: /^Core PCE Price Index m\/m$/i, event: "Core PCE (MoM)",          type: "PCE",      unit: "%" },
+];
+
+function parseFFNum(s) {
+  if (s == null || s === "") return null;
+  const m = String(s).match(/-?\d+(\.\d+)?/);
+  return m ? parseFloat(m[0]) : null;
+}
+
+async function fetchForexFactory() {
+  try {
+    const resp = await fetch("https://nfs.faireconomy.media/ff_calendar_thisweek.json", {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; ZeptaBot/1.0)" },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    if (!Array.isArray(data)) return [];
+    const out = [];
+    for (const e of data) {
+      if (e.country !== "USD") continue;
+      const map = FF_MAP.find(m => m.re.test(e.title || ""));
+      if (!map) continue;
+      const dt = e.date; // ISO + TZ (예: 2026-06-10T08:30:00-04:00)
+      if (!dt) continue;
+      out.push({
+        date: String(dt).slice(0, 10),
+        dt,
+        event: map.event,
+        actual: null,
+        estimate: parseFFNum(e.forecast),
+        previous: parseFFNum(e.previous),
+        impact: e.impact || "Medium",
+        country: "US",
+        unit: map.unit,
+        type: map.type,
+      });
+    }
+    return out;
+  } catch { return []; }
+}
+
+// ══════════════════════════════════════════════════════════════
 // 유틸리티 (모듈 레벨)
 // ══════════════════════════════════════════════════════════════
 const _majorKW = [
@@ -476,10 +595,14 @@ function getCuratedEvents2026() {
     { date: "2026-05-30", event: "PCE Price Index (YoY)", actual: null, estimate: 2.4, previous: null, impact: "High", unit: "%", type: "PCE" },
 
     // ── June 2026 ──
+    // ★ 2026-06-12 (대표 제보): CPI 날짜 06-11(추측) → 06-10(실제, ET 8:30 = KST 21:30)로 정정.
+    //   미래 이벤트의 손으로 적은 추측 예측치는 제거(null) — 실제 컨센서스는 발표 주에
+    //   ForexFactory 가 공급하고 di:econ:estimates 에 영구 보존됨 (추측치 노출 금지).
     { date: "2026-06-05", event: "Nonfarm Payrolls", actual: null, estimate: 155, previous: null, impact: "High", unit: "K", type: "NFP" },
-    { date: "2026-06-11", event: "CPI (YoY)", actual: null, estimate: 2.6, previous: null, impact: "High", unit: "%", type: "CPI" },
-    { date: "2026-06-17", event: "FOMC Rate Decision", actual: null, estimate: 4.25, previous: null, impact: "High", unit: "%", type: "FOMC" },
-    { date: "2026-06-17", event: "Retail Sales (MoM)", actual: null, estimate: 0.3, previous: null, impact: "High", unit: "%", type: "경제지표" },
-    { date: "2026-06-27", event: "PCE Price Index (YoY)", actual: null, estimate: 2.3, previous: null, impact: "High", unit: "%", type: "PCE" },
+    { date: "2026-06-10", event: "CPI (YoY)", actual: null, estimate: null, previous: null, impact: "High", unit: "%", type: "CPI" },
+    { date: "2026-06-10", event: "Core CPI (YoY)", actual: null, estimate: null, previous: null, impact: "High", unit: "%", type: "CPI" },
+    { date: "2026-06-17", event: "FOMC Rate Decision", actual: null, estimate: null, previous: null, impact: "High", unit: "%", type: "FOMC" },
+    { date: "2026-06-17", event: "Retail Sales (MoM)", actual: null, estimate: null, previous: null, impact: "High", unit: "%", type: "경제지표" },
+    { date: "2026-06-27", event: "PCE Price Index (YoY)", actual: null, estimate: null, previous: null, impact: "High", unit: "%", type: "PCE" },
   ];
 }

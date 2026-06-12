@@ -5535,13 +5535,16 @@ function AppInner() {
         const isForFed = /FOMC|Fed.*Rate|Interest Rate/i.test(e.event);
         const etHour = isForFed ? 14 : 8;
         const etMin = isForFed ? 0 : 30;
-        const rawDate = String(e.date || "");
+        // ★ 2026-06-12: dt(ForexFactory 실제 발표시각, TZ 포함) 우선 — ET 합성 추정보다 정확
+        const rawDate = String(e.dt || e.date || "");
         const dateOnly = rawDate.slice(0, 10); // "YYYY-MM-DD"
         const hasTime = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(rawDate);
         let d = null;
         if (hasTime) {
           // API 시간 정보 활용 — 공백을 T 로 치환 + UTC 표시 Z 추가
-          const iso = rawDate.replace(" ", "T") + (rawDate.endsWith("Z") ? "" : "Z");
+          // TZ 오프셋(+09:00/-04:00) 또는 Z 가 이미 있으면 그대로, 없으면 UTC 로 간주해 Z 부착
+          const hasTz = /(?:Z|[+-]\d{2}:?\d{2})$/.test(rawDate);
+          const iso = rawDate.replace(" ", "T") + (hasTz ? "" : "Z");
           d = new Date(iso);
         }
         if (!d || isNaN(d.getTime())) {
@@ -11027,8 +11030,14 @@ function AppInner() {
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className="text-base flex-shrink-0">{evt.icon}</span>
                                 <div className="min-w-0">
-                                  <div className="font-semibold text-[15px] text-foreground whitespace-nowrap overflow-hidden text-ellipsis">
-                                    {evt.name} <span style={{ fontSize: 12, color: C.text3, fontWeight: 500 }}>{expanded ? "▲" : "▼ 해석"}</span>
+                                  <div className="font-semibold text-[15px] text-foreground flex items-center gap-1.5 min-w-0">
+                                    <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{evt.name}</span>
+                                    {/* ★ 2026-06-12 (대표 피드백): 해석 토글이 안 보임 → 명확한 칩 버튼 */}
+                                    <span style={{
+                                      flexShrink: 0, fontSize: 11, fontWeight: 800, padding: "3px 9px", borderRadius: 999,
+                                      background: expanded ? C.blue : `${C.blue}16`, color: expanded ? "#fff" : C.blue,
+                                      border: `1px solid ${C.blue}${expanded ? "" : "40"}`, whiteSpace: "nowrap", lineHeight: 1.2,
+                                    }}>{expanded ? "닫기 ▲" : "💡 해석"}</span>
                                   </div>
                                   {evt.daysUntil >= 0 && (
                                     <div className="text-base text-muted-foreground">
