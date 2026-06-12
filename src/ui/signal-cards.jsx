@@ -297,12 +297,15 @@ export function SignalCoinBoard({ coins = [], counts = {}, loading = false, vari
         </div>
       </div>
 
-      {/* 카드 목록 — compact=가로 스냅 캐러셀 / full=반응형 그리드 */}
+      {/* 카드 목록 — compact=가로 스냅 캐러셀 / full=반응형 그리드.
+          ★ 2026-06-12 (대표 피드백): alignItems start — 한 카드를 펼쳐도 같은 행/줄의
+          다른 카드가 따라 늘어나지 않게(stretch 기본값 제거). 펼친 카드만 커진다. */}
       <div style={variant === "compact" ? {
         display: "flex", gap: 10, overflowX: "auto", scrollSnapType: "x mandatory",
-        paddingBottom: 4, WebkitOverflowScrolling: "touch",
+        paddingBottom: 4, WebkitOverflowScrolling: "touch", alignItems: "flex-start",
       } : {
         display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))", gap: 10,
+        alignItems: "start",
       }}>
         {shown.map((c) => {
           const key = `${c.asset}:${c.side}`;
