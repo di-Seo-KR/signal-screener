@@ -45,6 +45,10 @@ function sanitizeScreener(s) {
     id: s.id || newId(),
     name: String(s.name || "이름 없음").slice(0, 80),
     conditions: typeof s.conditions === "object" && s.conditions ? s.conditions : {},
+    // ★ 2026-06-12 (전수 감사): 스크리너 UI 의 조건 키 배열 — 저장→재실행 루프용.
+    //   기존 conditions(객체, 알림 모니터용)와 병행. 둘 중 하나만 있어도 동작.
+    conditionKeys: Array.isArray(s.conditionKeys) ? s.conditionKeys.slice(0, 24).map(String) : undefined,
+    mode: s.mode === "and" ? "and" : "or",
     alert_enabled: !!s.alert_enabled,
     created_at: s.created_at || new Date().toISOString(),
     last_matched_at: s.last_matched_at || null,

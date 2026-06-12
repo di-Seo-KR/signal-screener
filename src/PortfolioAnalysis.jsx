@@ -126,14 +126,25 @@ function DiversityGauge({ score, label, C }) {
 // ────────────────────────────────────────────────
 // 메인 컴포넌트
 // ────────────────────────────────────────────────
-export default function PortfolioAnalysis() {
+export default function PortfolioAnalysis({ portfolio = [] }) {
   const C = useThemeTokens();
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
-  const [manualHoldings, setManualHoldings] = useState(DEFAULT_HOLDINGS);
+  // ★ 2026-06-12 (전수 감사): 허브 통합 핵심 결함 수정 — '내 자산' 탭 보유종목을
+  //   자산 분석에 자동 반영. 내 자산이 있으면 그걸 매핑해 초기 holdings 로, 비어있으면 예시.
+  const fromPortfolio = (portfolio || [])
+    .map((p) => ({
+      symbol: p.market === "kr" ? (p.symbolRaw || p.symbol) : p.symbol,
+      quantity: Number(p.qty) || 0,
+      type: p.market === "crypto" ? "crypto" : "stock",
+    }))
+    .filter((h) => h.symbol && h.quantity > 0);
+  const initialHoldings = fromPortfolio.length > 0 ? fromPortfolio : DEFAULT_HOLDINGS;
+  const usingMyAssets = fromPortfolio.length > 0;
+  const [manualHoldings, setManualHoldings] = useState(initialHoldings);
   const [editMode, setEditMode] = useState(false);
   // 사용자가 한 번이라도 holdings 를 수정했는지 추적 (가이드 카드 숨김 조건)
   const [userTouched, setUserTouched] = useState(false);
@@ -301,7 +312,12 @@ export default function PortfolioAnalysis() {
         {/* 입력 영역 — 토글 */}
         <div style={card}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <h2 style={{ margin: 0, fontSize: "16px", color: C.text1, fontWeight: 700 }}>분석 대상 종목</h2>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <h2 style={{ margin: 0, fontSize: "16px", color: C.text1, fontWeight: 700 }}>분석 대상 종목</h2>
+              {usingMyAssets && !userTouched && (
+                <span style={{ fontSize: "11px", fontWeight: 700, padding: "2px 8px", borderRadius: "999px", background: `${C.green}1A`, color: C.green }}>✓ 내 자산 {fromPortfolio.length}종목</span>
+              )}
+            </div>
             <button
               onClick={() => setEditMode(!editMode)}
               style={{

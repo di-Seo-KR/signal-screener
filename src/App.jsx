@@ -4628,6 +4628,8 @@ function AppInner() {
   const [scanProgress, setScanProgress] = useState({ done: 0, total: 0 });
   const [conditions, setConditions]   = useState([]);
   const [mode, setMode]               = useState("or");
+  // ★ 2026-06-12 (전수 감사): 저장한 스크리너 → 조건 주입·자동 스캔 루프용
+  const [pendingScreenerKeys, setPendingScreenerKeys] = useState(null);
   const [filterMarket, setFilterMarket] = useState("all");
   const [sortBy, setSortBy]           = useState("rsi");
   // 모바일 스크리너 — 정렬 ActionSheet open
@@ -6398,6 +6400,33 @@ function AppInner() {
     }
     prevPresetRef.current = activePreset;
   }, [activePreset, conditions, scanning, runScan]);
+
+  // ── 현재 스크리너 조건 저장 (전수 감사 — 저장→재실행 루프 완성) ──
+  const saveCurrentScreener = useCallback(async () => {
+    if (!user?.id) { showToast("로그인 후 조건을 저장할 수 있어요", "info"); return; }
+    if (!conditions.length) { showToast("저장할 조건을 먼저 선택하세요", "info"); return; }
+    const name = `내 조건 ${conditions.length}개 · ${new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}`;
+    try {
+      const r = await fetch("/api/screeners/save", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ uid: user.id, screener: { name, conditions: {}, conditionKeys: conditions, mode } }),
+      });
+      const j = await r.json();
+      if (j?.ok) showToast("조건을 저장했어요 — '저장한 조건'에서 다시 실행할 수 있어요", "success");
+      else showToast(j?.error || "저장 실패", "error");
+    } catch { showToast("저장 실패", "error"); }
+  }, [user, conditions, mode, showToast]);
+
+  // ── 저장한 스크리너 열기 → 조건 주입 후 자동 스캔 (전수 감사 — 저장 루프 완성) ──
+  useEffect(() => {
+    if (tab === "screener" && Array.isArray(pendingScreenerKeys)) {
+      const keys = pendingScreenerKeys;
+      setPendingScreenerKeys(null);
+      setActivePreset(null);
+      setConditions(keys);
+      if (keys.length > 0) setTimeout(() => runScan(), 60);
+    }
+  }, [tab, pendingScreenerKeys]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 자동 스캔 타이머 (30분 간격 등) ──────────────────────────
   const autoScanTimerRef = useRef(null);
@@ -9522,6 +9551,17 @@ function AppInner() {
                       </span>
                     : `🔍 ${ALL_ASSETS.length}종목 스캔 ${conditions.length > 0 ? `(${conditions.length}개 조건)` : ""}`}
                 </button>
+                {conditions.length > 0 && !scanning && (
+                  <button onClick={saveCurrentScreener} title="현재 선택한 조건을 저장하고 '저장한 조건'에서 다시 실행" style={{
+                    padding: isMobile ? "12px 14px" : "11px 18px", borderRadius: "12px", fontSize: mf(16), fontWeight: 700,
+                    background: "transparent", color: C.blue, border: `1px solid ${C.blue}55`, minHeight: "48px", cursor: "pointer",
+                    display: "inline-flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}14`; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+                    💾 조건 저장
+                  </button>
+                )}
                 {scanning && (
                   <div style={{ flex: 1, minWidth: "120px" }}>
                     <div style={{ height: "4px", background: C.border2, borderRadius: "4px", overflow: "hidden" }}>
@@ -11889,7 +11929,7 @@ function AppInner() {
             자산 배분 · 상관관계 · 분산 점수 · 리밸런싱 추천
         ═══════════════════════════════════════════════════════════ */}
         {tab === "portfolio-analysis" && (
-          <Suspense fallback={<LazyTabFallback />}><PortfolioAnalysis /></Suspense>
+          <Suspense fallback={<LazyTabFallback />}><PortfolioAnalysis portfolio={portfolio} /></Suspense>
         )}
 
         {/* ═══════════════════════════════════════════════════════════
@@ -11906,7 +11946,7 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "saved-screeners" && (
           <Suspense fallback={<LazyTabFallback />}>
-            <SavedScreeners onNavigate={setTab} />
+            <SavedScreeners onNavigate={setTab} onOpenScreener={(keys) => { setPendingScreenerKeys(keys); setTab("screener"); }} />
           </Suspense>
         )}
 
