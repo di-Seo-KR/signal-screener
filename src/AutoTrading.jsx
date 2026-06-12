@@ -1847,13 +1847,8 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
       showToast("error", "투입 금액을 올바르게 입력해주세요.");
       return;
     }
-    // 봇 생성 시 이전 KV 데이터 초기화 (이전 거래 기록 제거)
-    try {
-      fetch("/api/reset-bot", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ botId: pendingBot.id }),
-      });
-    } catch {}
+    // ★ 2026-06-12 (전수 감사): 글로벌 봇 성과(di:bot:*)는 공유 자산 — 사용자 활성화가
+    //   이를 리셋하면 타 사용자 리포트·리더보드가 0부터 시작됨 → 리셋 호출 제거.
     setActiveBots(prev => [...prev, {
       botId: pendingBot.id,
       startedAt: Date.now(),
@@ -1968,13 +1963,7 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
       } catch (e) { console.warn("봇 삭제 Supabase 동기화 실패:", e); }
     }
 
-    // 봇 삭제 시 KV 데이터 초기화
-    try {
-      fetch("/api/reset-bot", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ botId }),
-      });
-    } catch {}
+    // ★ 글로벌 봇 데이터 보호 — 삭제 시에도 공유 perf 는 유지 (전수 감사)
 
     if (activeBot?.id === botId) setActiveBot(null);
     setStopBotConfirm(null);
