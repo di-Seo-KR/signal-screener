@@ -3368,11 +3368,11 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
       position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
       background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
       display: "flex", alignItems: "center", justifyContent: "center",
-      zIndex: 9998, padding: "20px", overscrollBehavior: "contain",
+      zIndex: 11000, padding: "20px", overscrollBehavior: "contain",
     }}>
       <div onClick={e => e.stopPropagation()} style={{
         background: C.card, borderRadius: "20px", width: "100%", maxWidth: "420px",
-        maxHeight: "80vh", overflow: "auto", border: `1px solid ${C.border}`,
+        maxHeight: "80dvh", overflow: "auto", border: `1px solid ${C.border}`,
         boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
         overscrollBehavior: "contain", WebkitOverflowScrolling: "touch",
       }}>
@@ -7098,9 +7098,9 @@ function AppInner() {
           .tab-content a { padding: 14px !important; }
           /* 섹터 히트맵 모바일 2열 */
           .sector-heatmap-grid { grid-template-columns: repeat(2, 1fr) !important; }
-          /* 하단 ticker 모바일 최적화 */
-          [style*="position: fixed"][style*="bottom: 0"] { padding: 4px 0 !important; }
-          [style*="position: fixed"][style*="bottom: 0"] span { font-size: 11px !important; gap: 4px !important; }
+          /* (제거됨 2026-06-12 모달 전수감사 P1: 하단 ticker 용 광역 [style*=...] 규칙 2줄 —
+             티커는 이미 삭제됐는데 top/left/right/bottom 개별 지정 fixed 요소 전체(상세 팝업·
+             로그인 모달·탭바·PaperTrading 모달)에 padding 4px·span 11px 를 강제 오염시키던 죽은 규칙) */
           /* v3.7: 스크리너 카드 모바일 가독성 개선 */
           .asset-card { padding: 14px 12px !important; }
           .asset-card .indicator-grid { gap: 6px !important; }
@@ -12955,7 +12955,7 @@ function AppInner() {
           padding: "24px",
         }} onClick={(e) => { if (e.target === e.currentTarget) setShowAuthModal(false); }}>
           <div style={{
-            width: "100%", maxWidth: "440px", maxHeight: "90vh", overflowY: "auto",
+            width: "100%", maxWidth: "440px", maxHeight: "calc(100dvh - 48px)", overflowY: "auto",
             borderRadius: "20px", background: C.card,
             border: `1px solid ${C.border}`,
             boxShadow: C.isDark ? "0 20px 60px rgba(0,0,0,0.5)" : "0 20px 60px rgba(0,0,0,0.15)",

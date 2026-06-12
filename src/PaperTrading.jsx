@@ -947,7 +947,7 @@ function OrderModal({ symbol: initSymbol, side, reason, config, onClose, onOrder
       justifyContent: "center", background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)" }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{
         background: C.card, border: `1px solid ${C.border}`, borderRadius: "20px",
-        padding: "24px", width: "calc(100% - 32px)", maxWidth: "min(90vw, 400px)", boxSizing: "border-box" }}>
+        padding: "24px", width: "calc(100% - 32px)", maxWidth: "min(90vw, 400px)", boxSizing: "border-box", maxHeight: "calc(100dvh - 32px)", overflowY: "auto" }}>{/* P8: 키보드/잘림 대응 */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", minWidth: 0 }}>
           <div style={{ fontWeight: 800, fontSize: "18px" }}>{side === "buy" ? "매수" : "매도"} 주문</div>
           <button onClick={onClose} style={{ background: "none", border: "none", color: C.text3, fontSize: "20px", cursor: "pointer", padding: "4px 8px", minHeight: "32px", minWidth: "32px", flexShrink: 0 }}>×</button>
@@ -1639,7 +1639,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
   const rm = new RiskManager(tradeSettings, account, positions);
 
   return (
-    <div className="tab-content" style={{ display: "grid", gridTemplateColumns: "240px 1fr", gap: "0", minHeight: "100vh" }}>
+    <div className="tab-content" style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "240px 1fr", gap: "0", minHeight: "100vh" }}>{/* P3: 모바일 240px 압착 수정 */}
       {/* ═══════════════════════════════════════════════════════════
           LEFT SIDEBAR: 네비게이션 (토스 스타일) — hidden on mobile
       ═══════════════════════════════════════════════════════════ */}
@@ -1711,7 +1711,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
       {/* ═══════════════════════════════════════════════════════════
           MAIN CONTENT: 우측 패널 (큰 잔액 표시 + 탭 콘텐츠)
       ═══════════════════════════════════════════════════════════ */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "20px", padding: "20px", paddingBottom: "20px", overflowY: "auto" }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: isMobile ? "24px" : "20px", padding: "20px", paddingBottom: isMobile ? "calc(150px + env(safe-area-inset-bottom, 0px))" : "20px", overflowY: "auto" }}>{/* 모바일: 내부탭바56+글로벌탭바82 여백 + 섹션 간격 보강 (대표 피드백) */}
         {orderModal && <OrderModal symbol={orderModal.symbol} side={orderModal.side} reason={orderModal.reason}
           config={config} onClose={() => setOrderModal(null)} onOrderPlaced={handleOrderPlaced} />}
 
@@ -2119,7 +2119,7 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
       {/* ── QR 모달 (생성 / 스캔) ── */}
       {qrModal && (
         <div style={{
-          position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:9999,
+          position:"fixed",top:0,left:0,right:0,bottom:0,zIndex:11000, // P10: E-4 정책
           background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"
         }} onClick={(e)=>{
           if (e.target === e.currentTarget) setQrModal(null);
@@ -2155,10 +2155,12 @@ export default function PaperTrading({ strategyAlerts = [], theme = "dark", user
       ═══════════════════════════════════════════════════════════ */}
       {isMobile && (
         <div style={{
-          position: "fixed", bottom: "0", left: "0", right: "0",
-          background: C.card, borderTop: `1px solid ${C.border}`,
+          // ★ 2026-06-12 모달 전수감사 P4: bottom 0·z100 이라 글로벌 탭바(82px, z10000)에
+          //   완전히 덮여 모바일에서 포지션/시그널/진단 전환이 불가능하던 문제 — 탭바 위로 인양
+          position: "fixed", bottom: "calc(82px + env(safe-area-inset-bottom, 0px))", left: "0", right: "0",
+          background: C.card, borderTop: `1px solid ${C.border}`, borderBottom: `1px solid ${C.border}`,
           display: "flex", justifyContent: "space-around", alignItems: "center",
-          padding: "8px 0", zIndex: 100, maxHeight: "56px",
+          padding: "8px 0", zIndex: 9500, maxHeight: "56px",
         }}>
           {[
             { id: "dashboard", label: "포지션", count: filteredPositions.length },

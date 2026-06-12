@@ -155,7 +155,7 @@ export default memo(function PortfolioTab({
               onClose={() => setShowAddAsset(false)}
               title={`📌 ${t("portfolio.addAsset")}`}
               footer={<div className="flex gap-2 w-full">{footerButtons}</div>}
-              maxHeight="88vh"
+              maxHeight="88dvh"
             >
               {formBody}
             </BottomSheet>
