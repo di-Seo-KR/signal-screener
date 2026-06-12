@@ -345,6 +345,18 @@ function RealTradingInner({ onNavigate }) {
   //   "-99% / 0/9999" 같은 의미 없는 한도 막대 대신 "비활성" 안내를 보여준다.
   const breakerOff = (breakerLimits.consecLossThreshold || 0) >= 1000 || dayLimitPct >= 95 || mddLimitPct >= 95;
 
+  // ★ 2026-06-12 (전수조사): 리스크 프리셋 카드를 실 RISK_CONFIG(status.riskConfig SSOT)에서 렌더
+  //   — 하드코딩이 또 드리프트(레버리지 10×↛5×, 합산마진 60%↛95%)하던 것 차단. 없으면 실값 폴백.
+  const riskCfg = status?.riskConfig || {};
+  const rcRiskPct = (riskCfg.riskPerTradePct ?? 0.10) * 100;
+  const rcMarginSingle = (riskCfg.maxMarginPct ?? 0.5) * 100;
+  const rcMarginTotal = (riskCfg.maxTotalMarginRatio ?? 0.95) * 100;
+  const rcRoiCap = (riskCfg.maxRoiLossPct ?? 0.40) * 100;
+  const rcMinLev = riskCfg.minLeverage ?? 5;
+  const rcMaxLev = riskCfg.maxLeverage ?? 5;
+  const rcLevLabel = rcMinLev === rcMaxLev ? `고정 ${rcMaxLev}×` : `${rcMinLev}~${rcMaxLev}× (확신도 기반)`;
+  const rcMinRR = riskCfg.minNetRR ?? 1.8;
+
   // ═════════════════════════════════════════════════════════
   // HEADER (REDESIGNED) — 모바일은 padding 절반
   // ═════════════════════════════════════════════════════════
@@ -1522,13 +1534,13 @@ function RealTradingInner({ onNavigate }) {
     <Card title="리스크 프리셋 · Option A 절대수익형" icon={<Shield size={16} />}
       subtitle="api/_shared/risk-manager.js::RISK_CONFIG">
       <div style={{ display: "grid", gap: 8, gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(200px, 1fr))" }}>
-        {/* ★ 2026-05-09: 옛 하드코딩 값 (0.8%, 35%, 2×~5×, 최대 2) 정정 — 현재 RISK_CONFIG 일치 */}
-        <KV label="트레이드당 리스크" value="10% equity" />
-        <KV label="최대 증거금 비율" value="50% (단일) · 60% (합산)" />
-        <KV label="레버리지" value="고정 10×" />
-        <KV label="동시 포지션 한도" value="합산 노셔널 1.5× equity 까지 (개수 무제한)" />
-        <KV label="SL/TP 방식" value="ATR(14) + ROI -40% cap" />
-        <KV label="최소 net RR" value="1.8R" />
+        {/* ★ 2026-06-12: 하드코딩 드리프트 차단 — status.riskConfig(실 RISK_CONFIG SSOT)에서 렌더 */}
+        <KV label="트레이드당 리스크" value={`${rcRiskPct.toFixed(0)}% equity`} />
+        <KV label="최대 증거금 비율" value={`${rcMarginSingle.toFixed(0)}% (단일) · ${rcMarginTotal.toFixed(0)}% (합산)`} />
+        <KV label="레버리지" value={rcLevLabel} />
+        <KV label="동시 포지션 한도" value="개수 무제한 · 합산 마진 95%가 실 안전망 (노셔널 가드 비활성)" />
+        <KV label="SL/TP 방식" value={`ATR(14) + ROI -${rcRoiCap.toFixed(0)}% cap`} />
+        <KV label="최소 net RR" value={`${rcMinRR.toFixed(1)}R`} />
         <KV label="최대 보유 시간" value="무제한 (TP/SL 만)" />
         <KV label="청산 안전버퍼" value="0.7 × liqDist" />
         <KV label="비용 가정" value="수수료 0.08% + 슬립 0.05%" />
@@ -1542,7 +1554,7 @@ function RealTradingInner({ onNavigate }) {
         fontSize: 14, color: "var(--z-text-2)", lineHeight: 1.6,
       }}>
         <Badge tone="blue" size="sm" style={{ marginRight: 6 }}>안전장치</Badge>
-        Killswitch fail-closed · Bracket 실패 시 자동 강제청산 · 일일 Reconcile(Binance=진실) · 상관군 제한
+        Killswitch fail-closed · 봇 mark-price 모니터링(2분 주기)으로 SL/TP 청산 · 일일 Reconcile(Binance=진실) · 상관군 제한
       </div>
     </Card>
   );

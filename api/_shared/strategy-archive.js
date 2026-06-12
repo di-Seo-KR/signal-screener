@@ -137,9 +137,63 @@ export async function getStrategyRanking(n = 14) {
   return ranked;
 }
 
+// ════════════════════════════════════════════════════════════════════
+// 알파 수명주기 이벤트 로그 (append-only) — 2026-06-12 전수조사
+// ──────────────────────────────────────────────────────────────────
+// 승급(promote)/주입(inject)/제거(revoke)/재검증(refresh) 이벤트를 영구 보관.
+// 기존엔 cron JSON + 텔레그램으로만 휘발 → 사후 추적·회귀감지·UI 타임라인 근거 소실.
+// best-effort: 실패해도 호출측(발굴/승급 파이프라인)에 절대 영향 없음(throw 안 함).
+// 실거래 주문·자금·게이트 미접촉 — 알파 메타데이터 read/write 만.
+// ════════════════════════════════════════════════════════════════════
+const ALPHA_EVENTS_KEY = "di:alpha:events";
+const MAX_ALPHA_EVENTS = 200;
+
+/**
+ * @param {{type:string, family?:string, reason?:string, sharpe?:number, oosSharpe?:number,
+ *          symbolsValidated?:number, symbol?:string, from?:*, to?:*}} evt
+ */
+export async function archiveAlphaLifecycleEvent(evt = {}) {
+  try {
+    const kv = await getKv();
+    const list = (await kv.get(ALPHA_EVENTS_KEY)) || [];
+    const arr = Array.isArray(list) ? list : [];
+    arr.unshift({
+      ts: new Date().toISOString(),
+      type: String(evt.type || "event").slice(0, 24),
+      family: evt.family ? String(evt.family).slice(0, 40) : null,
+      reason: evt.reason ? String(evt.reason).slice(0, 200) : null,
+      sharpe: Number.isFinite(evt.sharpe) ? Number(evt.sharpe) : null,
+      oosSharpe: Number.isFinite(evt.oosSharpe) ? Number(evt.oosSharpe) : null,
+      symbolsValidated: Number.isFinite(evt.symbolsValidated) ? evt.symbolsValidated : null,
+      symbol: evt.symbol ? String(evt.symbol).slice(0, 20) : null,
+      from: evt.from ?? null,
+      to: evt.to ?? null,
+    });
+    await kv.set(ALPHA_EVENTS_KEY, arr.slice(0, MAX_ALPHA_EVENTS));
+    return true;
+  } catch (e) {
+    console.error("[strategy-archive] archiveAlphaLifecycleEvent 실패:", e?.message);
+    return false;
+  }
+}
+
+/** 최근 n개 알파 수명주기 이벤트 (newest first). */
+export async function getAlphaLifecycleEvents(n = 30) {
+  try {
+    const kv = await getKv();
+    const list = (await kv.get(ALPHA_EVENTS_KEY)) || [];
+    if (!Array.isArray(list)) return [];
+    return list.slice(0, Math.max(1, Math.min(n, MAX_ALPHA_EVENTS)));
+  } catch {
+    return [];
+  }
+}
+
 export default {
   archiveDailyBotSnapshots,
   archiveQuantResearch,
   getBotHistory,
   getStrategyRanking,
+  archiveAlphaLifecycleEvent,
+  getAlphaLifecycleEvents,
 };

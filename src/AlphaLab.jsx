@@ -55,6 +55,7 @@ const STRATEGY_KO = {
   "hurst-trend":       "허스트 추세",
   "defi-momentum":     "DeFi 모멘텀",
   "ensemble":          "앙상블 합의",
+  "supertrend":        "슈퍼트렌드",
 };
 
 // G-1 — 옛 데이터의 raw ID ("trend", "unknown") 만 숨기고, 나머지는 한글 fallback 으로 표시.
@@ -474,140 +475,7 @@ function LeaderboardTable({ data }) {
   );
 }
 
-// ────────────────────────────────────────────────
-// 누적 Sharpe 시계열 라인 (SVG sparkline)
-// ────────────────────────────────────────────────
-function SharpeHistoryChart({ data }) {
-  const C = useThemeTokens();
-  const hist = data?.historyTail || [];
-  const strategies = data?.leaderboard?.strategies || {};
-  const top4 = useMemo(() => {
-    return Object.entries(strategies)
-      .filter(([id]) => isValidStrategyId(id)) // G-1 hotfix — raw ID 만 숨기고 나머지는 fallback 라벨
-      .sort((a, b) => (b[1].sharpe || 0) - (a[1].sharpe || 0))
-      .slice(0, 4)
-      .map(([k]) => k);
-  }, [strategies]);
 
-  if (hist.length < 2 || top4.length === 0) {
-    return (
-      <Card>
-        <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1, marginBottom: 8 }}>안정성 추이 (최근 24시간)</div>
-        <div style={{ fontSize: FONT.sm, color: C.text3, padding: "24px 0", textAlign: "center" }}>
-          데이터를 모으는 중입니다 — 매시간 누적되어 24시간 이후부터 그래프로 보여드려요.
-        </div>
-      </Card>
-    );
-  }
-
-  const W = 600, H = 160, P = 16;
-  const series = top4.map((sid, idx) => {
-    const points = hist.map((h, i) => {
-      const sv = h.strategies?.[sid]?.sharpe;
-      return { i, v: Number.isFinite(sv) ? sv : 0 };
-    });
-    return { sid, points };
-  });
-  const allV = series.flatMap((s) => s.points.map((p) => p.v));
-  const vMin = Math.min(0, ...allV, -1);
-  const vMax = Math.max(1, ...allV);
-  const xStep = (W - 2 * P) / Math.max(1, hist.length - 1);
-  const colors = [C.blue, C.green, C.purple, C.orange];
-
-  const yMap = (v) => H - P - ((v - vMin) / (vMax - vMin || 1)) * (H - 2 * P);
-  const zeroY = yMap(0);
-
-  return (
-    <Card>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }} title={METRIC_TOOLTIP.sharpe}>안정성 추이 (최근 {hist.length}시간)</div>
-      </div>
-      {/* viewBox 로 모바일에서도 가용 폭에 맞춰 비례 축소 (iPhone 16: 393pt → 가용 폭 약 320pt 까지 축소) */}
-      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid meet" style={{ display: "block", width: "100%", height: "auto" }}>
-        <line x1={P} y1={zeroY} x2={W - P} y2={zeroY} stroke={C.border} strokeDasharray="3 3" />
-        {series.map((s, idx) => {
-          const d = s.points.map((p, i) => `${i === 0 ? "M" : "L"} ${P + p.i * xStep} ${yMap(p.v)}`).join(" ");
-          return <path key={s.sid} d={d} stroke={colors[idx]} strokeWidth={2} fill="none" />;
-        })}
-      </svg>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 8 }}>
-        {series.map((s, idx) => (
-          <div key={s.sid} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: FONT.xs, color: C.text2 }}>
-            <span style={{ width: 10, height: 3, background: colors[idx] }} />
-            {strategyLabel(s.sid)}
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-// ────────────────────────────────────────────────
-// 종목·타임프레임 메트릭
-// ────────────────────────────────────────────────
-function SymbolTimeframePanel({ data }) {
-  const C = useThemeTokens();
-  const symbols = data?.leaderboard?.symbols || {};
-  const timeframes = data?.leaderboard?.timeframes || {};
-  const symRows = Object.entries(symbols).sort((a, b) => (b[1].sharpe || 0) - (a[1].sharpe || 0)).slice(0, 8);
-  const tfRows = Object.entries(timeframes).sort((a, b) => (b[1].trades || 0) - (a[1].trades || 0));
-
-  if (symRows.length === 0 && tfRows.length === 0) return null;
-
-  const renderRow = (k, m) => {
-    const pnlColor = m.netPnL > 0 ? C.green : m.netPnL < 0 ? C.red : C.text2;
-    return (
-      <tr key={k}>
-        <td style={{ padding: "8px 6px", fontSize: FONT.sm, color: C.text1, borderBottom: `1px solid ${C.border}40` }}>{k}</td>
-        <td style={{ padding: "8px 6px", fontSize: FONT.sm, color: C.text1, textAlign: "right", borderBottom: `1px solid ${C.border}40` }}>{fmtInt(m.trades)}</td>
-        <td style={{ padding: "8px 6px", fontSize: FONT.sm, color: C.text1, textAlign: "right", borderBottom: `1px solid ${C.border}40` }}>{fmtPct(m.winRate)}</td>
-        <td style={{ padding: "8px 6px", fontSize: FONT.sm, color: C.text1, textAlign: "right", borderBottom: `1px solid ${C.border}40` }}>{fmtNum(m.sharpe, 2)}</td>
-        <td style={{ padding: "8px 6px", fontSize: FONT.sm, textAlign: "right", color: pnlColor, fontWeight: 600, borderBottom: `1px solid ${C.border}40` }}>
-          {m.netPnL > 0 ? "+" : ""}{fmtNum(m.netPnL, 2)}%
-        </td>
-      </tr>
-    );
-  };
-
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 16 }}>
-      {symRows.length > 0 && (
-        <Card>
-          <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1, marginBottom: 8 }}>종목별 성과 (안정성 TOP 8)</div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left", padding: "6px", fontSize: FONT.xs, color: C.text3 }}>종목</th>
-                <th style={{ textAlign: "right", padding: "6px", fontSize: FONT.xs, color: C.text3 }}>거래</th>
-                <th style={{ textAlign: "right", padding: "6px", fontSize: FONT.xs, color: C.text3 }}>승률</th>
-                <th style={{ textAlign: "right", padding: "6px", fontSize: FONT.xs, color: C.text3 }} title={METRIC_TOOLTIP.sharpe}>안정성</th>
-                <th style={{ textAlign: "right", padding: "6px", fontSize: FONT.xs, color: C.text3 }}>수익률</th>
-              </tr>
-            </thead>
-            <tbody>{symRows.map(([k, m]) => renderRow(k, m))}</tbody>
-          </table>
-        </Card>
-      )}
-      {tfRows.length > 0 && (
-        <Card>
-          <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1, marginBottom: 8 }}>시간대별 성과</div>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left", padding: "6px", fontSize: FONT.xs, color: C.text3 }}>시간대</th>
-                <th style={{ textAlign: "right", padding: "6px", fontSize: FONT.xs, color: C.text3 }}>거래</th>
-                <th style={{ textAlign: "right", padding: "6px", fontSize: FONT.xs, color: C.text3 }}>승률</th>
-                <th style={{ textAlign: "right", padding: "6px", fontSize: FONT.xs, color: C.text3 }} title={METRIC_TOOLTIP.sharpe}>안정성</th>
-                <th style={{ textAlign: "right", padding: "6px", fontSize: FONT.xs, color: C.text3 }}>수익률</th>
-              </tr>
-            </thead>
-            <tbody>{tfRows.map(([k, m]) => renderRow(k, m))}</tbody>
-          </table>
-        </Card>
-      )}
-    </div>
-  );
-}
 
 // ════════════════════════════════════════════════════════════════════
 // PipelineBoard — 전략 파이프라인 (발굴 → 검증 → 실거래) 통합 평가 칸반
@@ -756,94 +624,6 @@ function PipelineBoard({ data }) {
   );
 }
 
-// ────────────────────────────────────────────────
-// 새 후보 strategy 패널
-// ────────────────────────────────────────────────
-function CandidatesPanel({ data }) {
-  const C = useThemeTokens();
-  const candidates = data?.candidates || [];
-  // ★ 2026-06-03 정보밀도: 기본 6개만 노출(모바일 스크롤 과다 방지), 나머지는 '더보기'로 펼침.
-  const [showAll, setShowAll] = useState(false);
-  const COLLAPSED = 6;
-  const sorted = useMemo(
-    () => [...candidates].sort((a, b) => (b.backtestResult?.sharpe || 0) - (a.backtestResult?.sharpe || 0)),
-    [candidates]
-  );
-  const visible = showAll ? sorted.slice(0, 24) : sorted.slice(0, COLLAPSED);
-
-  return (
-    <Card>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>새로 발굴 중인 전략 후보</div>
-        <Badge kind="info">{candidates.length}건 관찰중</Badge>
-      </div>
-      <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 8, lineHeight: 1.5 }}>
-        백테스트 엔진이 새 변형을 시뮬레이션해 후보를 찾습니다. 아래 수치는 <b style={{ color: C.text2 }}>단일 종목 관찰치</b>로,
-        실제보다 부풀려질 수 있습니다(과적합). <b style={{ color: C.text2 }}>여러 종목 + 미학습 구간(OOS) 교차검증을 통과한 것만</b> 실거래에 반영됩니다.
-      </div>
-      {candidates.length === 0 ? (
-        <div style={{ fontSize: FONT.sm, color: C.text3, padding: "16px 0", textAlign: "center" }}>
-          현재 관찰중인 후보가 없습니다 — 2시간마다 자동 발굴됩니다.
-        </div>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 8 }}>
-          {visible.map((c) => {
-            const br = c.backtestResult || {};
-            const g = sharpeToGrade(br.sharpe);
-            const sym = (c.symbol || "").replace("USDT", "");
-            const sharpeColor = (br.sharpe || 0) >= 1.5 ? C.green : (br.sharpe || 0) <= 0 ? C.red : C.text1;
-            return (
-              <div key={c.id} style={{
-                padding: 12,
-                background: C.card2,
-                borderRadius: RADIUS.sm,
-                border: `1px solid ${C.border}`,
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6 }}>
-                  <div style={{ minWidth: 0 }}>
-                    <span style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>{strategyLabel(c.parentStrategy)}</span>
-                    {sym && <span style={{ fontSize: FONT.xs, color: C.text3, marginLeft: 6 }}>{sym}</span>}
-                  </div>
-                  <span style={{ fontSize: FONT.xs, color: C.text3, whiteSpace: "nowrap" }}>{fmtAgo(c.createdAt)}</span>
-                </div>
-                {/* 핵심 지표 — 단일심볼 관찰치(교차검증 전이라 과적합 가능, 라벨 명시) */}
-                <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 6 }}>
-                  <span style={{ fontSize: 18, fontWeight: 800, color: sharpeColor }}>{g.grade}</span>
-                  <span style={{ fontSize: FONT.xs, color: C.text3 }}>단일심볼 {fmtNum(br.sharpe, 2)}</span>
-                  <span style={{ fontSize: 10, color: C.text3, border: `1px solid ${C.border}`, borderRadius: 4, padding: "1px 5px" }}>교차검증 전</span>
-                </div>
-                <div style={{ display: "flex", gap: 10, marginTop: 6, flexWrap: "wrap", fontSize: FONT.xs, color: C.text2 }}>
-                  <span>승률 <b style={{ color: C.text1 }}>{fmtPct(br.winRate)}</b></span>
-                  <span>손익비 <b style={{ color: C.text1 }}>{br.profitFactor == null ? "—" : fmtNum(br.profitFactor, 2)}</b></span>
-                  <span>거래 <b style={{ color: C.text1 }}>{fmtInt(br.trades)}</b></span>
-                </div>
-                <details style={{ marginTop: 8 }}>
-                  <summary style={{ fontSize: FONT.xs, color: C.text3, cursor: "pointer" }}>상세 파라미터 보기</summary>
-                  <pre style={{ fontSize: FONT.xs, color: C.text2, margin: "4px 0 0", whiteSpace: "pre-wrap" }}>
-                    {JSON.stringify(c.params || {}, null, 0)}
-                  </pre>
-                </details>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {candidates.length > COLLAPSED && (
-        <div style={{ textAlign: "center", marginTop: 10 }}>
-          <button
-            onClick={() => setShowAll((v) => !v)}
-            style={{
-              background: "transparent", border: `1px solid ${C.border}`, borderRadius: RADIUS.sm,
-              color: C.text2, fontSize: FONT.xs, fontWeight: 600, padding: "6px 14px", cursor: "pointer",
-            }}
-          >
-            {showAll ? "접기" : `더보기 (상위 ${Math.min(24, candidates.length)}개)`}
-          </button>
-        </div>
-      )}
-    </Card>
-  );
-}
 
 // ────────────────────────────────────────────────
 // Public Mode — 비로그인 사용자용 카드 (PLAN-BIZ #1)
@@ -1062,7 +842,7 @@ export default function AlphaLab({ onRequestLogin }) {
       <div className="z-bento-scope" style={{ padding: "14px 14px", maxWidth: 1200, margin: "0 auto" }}>
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, letterSpacing: "-0.02em" }}>알파 랩</div>
-          <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4 }}>검증된 33개 전략을 한 자리에서 비교하세요</div>
+          <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4 }}>검증된 9개 전략을 한 자리에서 비교하세요</div>
         </div>
         <LoadingBlock rows={4} height={84} label="알파 데이터 불러오는 중…" />
       </div>
@@ -1076,7 +856,7 @@ export default function AlphaLab({ onRequestLogin }) {
         <div>
           <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, letterSpacing: "-0.02em" }}>알파 랩</div>
           <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4, lineHeight: 1.55 }}>
-            33개 매매 전략을 24시간 검증합니다. 가장 잘 작동하는 알파를 자동으로 골라냅니다.
+            9개 매매 전략을 24시간 검증합니다. 가장 잘 작동하는 알파를 자동으로 골라냅니다.
           </div>
         </div>
 
@@ -1089,10 +869,10 @@ export default function AlphaLab({ onRequestLogin }) {
         <Card>
           <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1, marginBottom: 8 }}>회원만 볼 수 있는 정보</div>
           <ul style={{ margin: 0, padding: "0 0 0 20px", color: C.text2, fontSize: FONT.sm, lineHeight: 1.8 }}>
-            <li>전체 8개 전략의 실시간 안정성 등급과 손익비</li>
-            <li>최근 24시간 안정성 추이 그래프</li>
-            <li>종목별 · 시간대별 세부 성과</li>
-            <li>새로 발굴 중인 전략 후보 12개와 백테스트 결과</li>
+            <li>전체 9개 전략의 실시간 안정성 등급과 손익비</li>
+            <li>시장 레짐(추세/횡보)별 전략 가중치 실시간 반영</li>
+            <li>발굴 → 검증 → 실거래 주입 파이프라인 현황</li>
+            <li>새로 발굴 중인 전략 후보와 교차검증·OOS 백테스트 결과</li>
             <li>전략별 매매 신호 즉시 알림 (텔레그램)</li>
           </ul>
         </Card>

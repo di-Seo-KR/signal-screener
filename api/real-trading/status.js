@@ -18,6 +18,7 @@
 import { loadUserCredentials, respondError } from "../_shared/binance-auth.js";
 import { getAccountInfo, getPositionRisk } from "../_shared/binance-client.js";
 import { isKillSwitchEnabled, getBreakerState, BREAKER_LIMITS } from "../_shared/circuit-breaker.js";
+import { RISK_CONFIG } from "../_shared/risk-manager.js";
 
 async function getKv() {
   return (await import("@vercel/kv")).kv;
@@ -120,6 +121,19 @@ export default async function handler(req, res) {
       recentEngineLog: (engineLog || []).slice(0, 20),
       recentOrders: (orders || []).slice(0, 10),
       breaker: { ...breaker, limits: BREAKER_LIMITS },  // ★ UI 가 옛 한도 하드코딩 안 하도록 함께 내려줌
+      // ★ 2026-06-12 (전수조사): 리스크 프리셋 카드가 RISK_CONFIG 와 또 드리프트(레버리지·합산마진)
+      //   하던 것 차단 — 실 설정값을 SSOT 로 내려 UI 가 참조하게 함. env override 반영.
+      riskConfig: {
+        riskPerTradePct: RISK_CONFIG.riskPerTradePct,
+        maxMarginPct: RISK_CONFIG.maxMarginPct,
+        maxTotalMarginRatio: Number(process.env.ZEPTA_MAX_TOTAL_MARGIN_RATIO) || RISK_CONFIG.maxTotalMarginRatio,
+        maxTotalNotionalRatio: RISK_CONFIG.maxTotalNotionalRatio,
+        minLeverage: RISK_CONFIG.minLeverage,
+        maxLeverage: RISK_CONFIG.maxLeverage,
+        maxRoiLossPct: RISK_CONFIG.maxRoiLossPct,
+        minNetRR: RISK_CONFIG.minNetRR,
+        maxConcurrentPositions: RISK_CONFIG.maxConcurrentPositions,
+      },
       shadow: {
         summary: shadowSummary || null,
         openCount: (shadowLedger || []).filter((e) => e.status === "OPEN").length,
