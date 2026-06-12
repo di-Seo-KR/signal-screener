@@ -602,7 +602,7 @@ export function EmptyState({ icon, title, description, action, bordered, compact
 //   <PageHeader
 //     icon="🧬"
 //     title="알파 랩"
-//     subtitle="검증된 33개 전략을 한 자리에서 비교하세요"
+//     subtitle="검증된 9개 전략을 한 자리에서 비교하세요"
 //     badge={<Badge tone="purple">베타</Badge>}
 //     action={<Button variant="primary">새 백테스트</Button>}
 //   />
@@ -697,7 +697,7 @@ export function LoadingBlock({ rows = 3, label = "불러오는 중…", height =
 // 사용:
 //   <TrustRow items={[
 //     { icon: "👥", label: "베타 가입자", value: "1,200+" },
-//     { icon: "🧪", label: "검증 전략", value: "33개" },
+//     { icon: "🧪", label: "검증 전략", value: "9개" },
 //     { icon: "📡", label: "데이터", value: "Yahoo · Binance Live" },
 //     { icon: "🔒", label: "보안", value: "TLS 1.3" },
 //   ]} />

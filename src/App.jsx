@@ -1,5 +1,5 @@
 // Zepta v11.3 — 투자 스크리너 + 퀀트 엔진 + 전략 운용 + 리스크 관리 + 스크리너 프리셋
-// Features: 스크리닝, 캔들차트, 33개 전략(BTC 알파 포함), 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
+// Features: 스크리닝, 캔들차트, 41개 전략(BTC 알파 포함), 백테스트, 전략별 포트폴리오, 리스크 히트맵, 뉴스, 실전 전략 매매 알림
 // v11.3: 퀀트 엔진 v4.1 고변동장 전략 최적화 + 투자진단 v2.2 하락추세 감지 강화
 // v11.2: 퀀트 엔진 v3.9 하위전략 2차 안전필터 + 모바일 터치 UX 개선
 // v11.1: 다중 타임프레임 RSI 스크리닝 조건 + 퀀트 엔진 v3.8 하위전략 안전필터
@@ -4276,7 +4276,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           <button onClick={() => {
             const score = techData?.overallScore || 0;
             const verdict = score >= 80 ? "강력매수" : score >= 65 ? "매수" : score >= 50 ? "중립" : score >= 35 ? "주의" : "매도";
-            const shareText = `[Zepta AI 진단] ${asset.name}(${asset.symbol}) — 투자점수 ${score}점 (${verdict})\n\nAI 퀀트 33개 전략 분석 결과입니다.\n무료로 확인해보세요 👉 https://zepta.app`;
+            const shareText = `[Zepta AI 진단] ${asset.name}(${asset.symbol}) — 투자점수 ${score}점 (${verdict})\n\nAI 퀀트 9개 전략 분석 결과입니다.\n무료로 확인해보세요 👉 https://zepta.app`;
             if (navigator.share) {
               navigator.share({ title: `${asset.name} AI 투자 진단`, text: shareText, url: "https://zepta.app" }).catch(() => {});
             } else {
@@ -4507,16 +4507,16 @@ function AppInner() {
 
   // ── 탭별 SEO 메타 정보 (제목, 설명, OG 태그용) ──
   const TAB_META = {
-    home: { title: "Zepta — AI 퀀트 투자 플랫폼", desc: "실시간 주식/코인 스크리너, 33개 알파 전략 자동매매, 백테스트, 리스크 관리" },
+    home: { title: "Zepta — AI 퀀트 투자 플랫폼", desc: "실시간 주식/코인 스크리너, 9개 알파 전략 자동매매, 백테스트, 리스크 관리" },
     screener: { title: "주식 스크리너 | Zepta", desc: "AI 기반 주식 스크리닝 — 모멘텀, 변동성, 수급 조건으로 종목 필터링" },
-    "auto-trading": { title: "AI 자동매매 | Zepta", desc: "33개 퀀트 전략 기반 암호화폐 자동매매 봇" },
+    "auto-trading": { title: "AI 자동매매 | Zepta", desc: "9개 퀀트 전략 기반 암호화폐 자동매매 봇" },
     portfolio: { title: "포트폴리오 | Zepta", desc: "실시간 포트폴리오 추적 및 벤치마크 비교" },
     news: { title: "마켓 뉴스 | Zepta", desc: "AI 센티먼트 분석이 포함된 실시간 글로벌 투자 뉴스" },
     "econ-calendar": { title: "경제 캘린더 | Zepta", desc: "주요 경제 지표 발표 일정 및 영향 분석" },
     sentiment: { title: "소셜 센티먼트 | Zepta", desc: "StockTwits · Reddit 기반 실시간 투자 심리 분석" },
     alerts: { title: "매매 알림 | Zepta", desc: "실시간 AI 매매 신호 알림 및 텔레그램 연동" },
     anomaly: { title: "이상 탐지 | Zepta", desc: "AI 기반 시장 이상 징후 실시간 탐지" },
-    strategy: { title: "전략 분석 | Zepta", desc: "33개 퀀트 전략 상세 분석 및 성과 비교" },
+    strategy: { title: "전략 분석 | Zepta", desc: "41개 퀀트 전략 상세 분석 및 성과 비교" },
     backtest: { title: "백테스트 | Zepta", desc: "전략별 과거 수익률 시뮬레이션" },
     "quant-port": { title: "퀀트 포트폴리오 | Zepta", desc: "전략 기반 포트폴리오 자동 구성" },
     "risk-map": { title: "리스크 맵 | Zepta", desc: "시장 리스크 종합 분석 히트맵" },
@@ -7298,7 +7298,7 @@ function AppInner() {
               }}>
                 <div style={{ position: "absolute", top: "-30px", right: "-20px", fontSize: "100px", opacity: 0.06 }}>🚀</div>
                 <h2 style={{ fontSize: isMobile ? "20px" : "24px", fontWeight: 900, color: C.text1, marginBottom: "8px", letterSpacing: "-0.02em" }}>
-                  퀀트 33개 전략으로 매수 타점을 검증합니다
+                  퀀트 9개 전략으로 매수 타점을 검증합니다
                 </h2>
                 <p style={{ fontSize: "15px", color: C.text2, marginBottom: "16px", lineHeight: 1.55, wordBreak: "keep-all" }}>
                   주식 · 코인 · 외환까지. 무료로 시작하고 검증된 전략을 골라 쓰세요.
@@ -7330,7 +7330,7 @@ function AppInner() {
                   borderTop: `1px solid ${C.purple}25`,
                 }}>
                   {[
-                    { icon: "🧪", label: "검증 전략", value: "33개" },
+                    { icon: "🧪", label: "검증 전략", value: "9개" },
                     { icon: "📡", label: "라이브 데이터", value: "Yahoo · Binance" },
                     { icon: "🔒", label: "보안", value: "TLS 1.3 · Supabase Auth" },
                     // ★ 2026-05-12 MKT-LEAD: 베타 가입자 수 동적 노출 (fail-soft → "베타 무료")
@@ -7678,7 +7678,7 @@ function AppInner() {
               onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
                 <div style={{ fontSize: "24px", marginBottom: "8px" }}>📊</div>
                 <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "5px", color: C.text1 }}>전략 운용</div>
-                <div style={{ fontSize: "16px", color: C.text3 }}>33개 전략 포트폴리오</div>
+                <div style={{ fontSize: "16px", color: C.text3 }}>41개 전략 포트폴리오</div>
                 <div style={{ fontSize: "16px", color: C.green, fontWeight: 600, marginTop: "6px" }}>
                   실시간 수익률 추적 →
                 </div>
@@ -7974,7 +7974,7 @@ function AppInner() {
                   {/* 공유 버튼 */}
                   <button onClick={() => {
                     const top5 = dailyPicks.slice(0, 5).map((p, i) => `${i + 1}. ${p.name} (${p.symbol}) ${p.change >= 0 ? "+" : ""}${p.change}%`).join("\n");
-                    const txt = `[Zepta AI ${t("tabs.home.todayPicks") || "오늘의 추천"}]\n\n${top5}\n\n${t("tabs.home.shareDesc") || "AI 퀀트 33개 전략이 실시간으로 찾아낸 종목입니다"}\n👉 https://zepta.app`;
+                    const txt = `[Zepta AI ${t("tabs.home.todayPicks") || "오늘의 추천"}]\n\n${top5}\n\n${t("tabs.home.shareDesc") || "AI 퀀트 9개 전략이 실시간으로 찾아낸 종목입니다"}\n👉 https://zepta.app`;
                     if (navigator.share) navigator.share({ title: `Zepta AI ${t("tabs.home.todayPicks") || "오늘의 추천"}`, text: txt, url: "https://zepta.app" }).catch(() => {});
                     else navigator.clipboard.writeText(txt).then(() => showToast(t("tabs.home.copied") || "추천 종목이 복사되었습니다!", "success")).catch(() => {});
                   }} style={{
@@ -10130,7 +10130,7 @@ function AppInner() {
                   <span className="font-black text-xl" style={{ color: C.text1 }}>퀀트 리포트</span>
                   <div className="flex items-center gap-2">
                     <button onClick={() => {
-                      const shareText = `[Zepta AI 시장 리포트] ${reportTime}\n\n시장 점수: ${mktScore}/100 (${mktVerdict})\n상승 ${upCount}개 · 하락 ${dnCount}개\n\nAI 퀀트 33개 전략 실시간 분석\n👉 https://zepta.app`;
+                      const shareText = `[Zepta AI 시장 리포트] ${reportTime}\n\n시장 점수: ${mktScore}/100 (${mktVerdict})\n상승 ${upCount}개 · 하락 ${dnCount}개\n\nAI 퀀트 9개 전략 실시간 분석\n👉 https://zepta.app`;
                       if (navigator.share) {
                         navigator.share({ title: "Zepta AI 시장 리포트", text: shareText, url: "https://zepta.app" }).catch(() => {});
                       } else {
@@ -11151,7 +11151,7 @@ function AppInner() {
               <div style={{
                 fontSize: "16px",
                 color: C.text2,
-              }}>33개 퀀트 전략의 시그널을 실시간으로 감지합니다</div>
+              }}>41개 퀀트 전략의 시그널을 실시간으로 감지합니다</div>
             </div>
 
             {/* ── 전략 매매 알림 피드 ── */}
@@ -11167,7 +11167,7 @@ function AppInner() {
                 <div>
                   <div className="font-bold text-lg">🚨 전략 매매 알림</div>
                   <div className="text-base text-muted-foreground mt-0.5">
-                    33개 퀀트 전략의 generate() 함수로 실제 매매 시그널을 감지합니다
+                    41개 퀀트 전략의 generate() 함수로 실제 매매 시그널을 감지합니다
                   </div>
                 </div>
                 {tradeAlerts.length > 0 && (
@@ -11351,7 +11351,7 @@ function AppInner() {
                 <div style={{ textAlign: "center", padding: "40px 24px", color: C.text3 }}>
                   <div style={{ fontSize: "40px", marginBottom: "12px" }}>🔕</div>
                   <div style={{ fontSize: "18px", fontWeight: 600, marginBottom: "4px" }}>아직 전략 매매 알림이 없습니다</div>
-                  <div style={{ fontSize: "16px" }}>스크리너를 실행하면 33개 퀀트 전략이 실제 generate() 시그널을 감지합니다</div>
+                  <div style={{ fontSize: "16px" }}>스크리너를 실행하면 41개 퀀트 전략이 실제 generate() 시그널을 감지합니다</div>
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "520px", overflow: "auto" }}>
@@ -12032,7 +12032,7 @@ function AppInner() {
               {[
                 { icon: "📊", label: "마켓 브리핑", desc: "실시간 시장 현황", tab: "home" },
                 { icon: "🎯", label: "오늘의 예측", desc: "내일 S&P 500 방향 맞추기", tab: "home" },
-                { icon: "🧠", label: "퀀트 전략", desc: "33개 AI 전략 시그널", tab: "strategy" },
+                { icon: "🧠", label: "퀀트 전략", desc: "41개 AI 전략 시그널", tab: "strategy" },
                 { icon: "🤖", label: "AI 자동매매", desc: "봇 기반 퀀트 트레이딩", tab: "auto-trading" },
                 { icon: "📰", label: "투자 뉴스", desc: "실시간 글로벌 뉴스", tab: "news" },
               ].map((item, i) => (
@@ -12246,7 +12246,7 @@ function AppInner() {
                 fontSize: isMobile ? "15px" : "18px", color: C.text2,
                 marginBottom: "0", lineHeight: 1.6, maxWidth: "600px", margin: "0 auto"
               }}>
-                33개 퀀트 전략으로 24/7 자동 분석하고, 최적의 매수 타점을 찾아줍니다.
+                9개 퀀트 전략으로 24/7 자동 분석하고, 최적의 매수 타점을 찾아줍니다.
               </p>
             </div>
 
@@ -12261,7 +12261,7 @@ function AppInner() {
                 gap: "16px", marginBottom: "24px"
               }}>
                 {[
-                  { icon: "🤖", title: "AI 퀀트 자동매매", desc: "33개 알파 전략으로 24/7 자동 매매" },
+                  { icon: "🤖", title: "AI 퀀트 자동매매", desc: "9개 알파 전략으로 24/7 자동 매매" },
                   { icon: "📊", title: "실시간 스크리너", desc: "수백 개 지표로 매수 타점 자동 탐색" },
                   { icon: "🎯", title: "백테스트 엔진", desc: "과거 데이터로 전략 성과 검증" },
                   { icon: "⚡", title: "이상 감지", desc: "통계적 이상치 실시간 모니터링" },

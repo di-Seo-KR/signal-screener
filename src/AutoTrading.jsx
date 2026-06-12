@@ -188,14 +188,14 @@ const STOCK_BOTS = [
     risk: "중간",
     riskColor: "green",
     expectedReturn: "15-30%",
-    description: "33개 전략 앙상블 + 마켓 레짐 적응형 포지션 사이징",
+    description: "멀티 전략 앙상블 + 마켓 레짐 적응형 포지션 사이징",
     tags: ["앙상블", "레짐감지", "ATR사이징"],
     stats: {
       winRate: "62%",
       sharpeRatio: "1.8",
       mdd: "18%",
     },
-    details: "33개 기술적 분석 전략을 앙상블하여 시장 조건에 최적화된 신호를 생성합니다. ATR 기반 동적 포지션 사이징으로 변동성에 대응합니다.",
+    details: "다수의 기술적 분석 전략을 앙상블하여 시장 조건에 최적화된 신호를 생성합니다. ATR 기반 동적 포지션 사이징으로 변동성에 대응합니다.",
   },
   {
     id: "aggressive-quant",
