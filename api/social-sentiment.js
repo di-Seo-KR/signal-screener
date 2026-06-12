@@ -81,7 +81,10 @@ export default async function handler(req, res) {
       const data = await redditRes.json();
       const posts = data?.data?.children || [];
       const relevant = [];
-      let bullWords = 0, bearWords = 0, totalWords = 0;
+      // ★ 2026-06-12 (전수 감사): 종목 언급 포스트(symBull/symBear)와 시장 전체(mktBull/mktBear)를
+      //   분리 집계. 종합 점수엔 '종목 언급분'만 반영하고, 시장 전체 WSB 분위기는 별도 카드로.
+      let symBull = 0, symBear = 0, symTotal = 0;
+      let mktBull = 0, mktBear = 0, mktTotal = 0;
 
       const bullishKeywords = ["moon", "buy", "calls", "bullish", "rocket", "gains", "pump", "long", "yolo", "diamond", "tendies", "squeeze", "rally"];
       const bearishKeywords = ["puts", "short", "bearish", "crash", "dump", "sell", "fear", "recession", "drop", "tank", "loss", "bag"];
@@ -89,39 +92,56 @@ export default async function handler(req, res) {
       for (const p of posts) {
         const d = p.data;
         const text = ((d.title || "") + " " + (d.selftext || "")).toLowerCase();
-        totalWords++;
 
         let postBull = 0, postBear = 0;
         for (const w of bullishKeywords) { if (text.includes(w)) postBull++; }
         for (const w of bearishKeywords) { if (text.includes(w)) postBear++; }
+        const dir = postBull > postBear ? 1 : postBear > postBull ? -1 : 0;
 
-        if (postBull > postBear) bullWords++;
-        else if (postBear > postBull) bearWords++;
+        // 시장 전체
+        mktTotal++;
+        if (dir > 0) mktBull++; else if (dir < 0) mktBear++;
 
-        // 심볼 매칭
+        // 심볼 매칭 — 종목 점수엔 이 포스트만 반영
         const mentionsSymbol = text.includes(symbol.toLowerCase()) || text.includes(`$${symbol.toLowerCase()}`);
+        if (mentionsSymbol) {
+          symTotal++;
+          if (dir > 0) symBull++; else if (dir < 0) symBear++;
+        }
 
         relevant.push({
           title: (d.title || "").slice(0, 150),
           score: d.score || 0,
           comments: d.num_comments || 0,
-          sentiment: postBull > postBear ? "bullish" : postBear > postBull ? "bearish" : "neutral",
+          sentiment: dir > 0 ? "bullish" : dir < 0 ? "bearish" : "neutral",
           mentionsSymbol,
           time: d.created_utc,
           url: `https://reddit.com${d.permalink}`,
         });
       }
 
-      if (totalWords > 0) {
+      // 종목 언급이 2건 이상일 때만 Reddit 을 종목 소스로 반영(표본 부족 시 종합 오염 방지)
+      if (symTotal >= 2) {
         result.sources.push({
           name: "Reddit (WSB)",
-          bullish: Math.round((bullWords / totalWords) * 100),
-          bearish: Math.round((bearWords / totalWords) * 100),
-          neutral: Math.round(((totalWords - bullWords - bearWords) / totalWords) * 100),
-          total: totalWords,
-          posts: relevant.filter(r => r.mentionsSymbol || r.score > 100).slice(0, 8),
-          allPosts: relevant.slice(0, 8),
+          bullish: Math.round((symBull / symTotal) * 100),
+          bearish: Math.round((symBear / symTotal) * 100),
+          neutral: Math.round(((symTotal - symBull - symBear) / symTotal) * 100),
+          total: symTotal,
+          posts: relevant.filter(r => r.mentionsSymbol).slice(0, 8),
+          allPosts: relevant.filter(r => r.mentionsSymbol).slice(0, 8),
         });
+      }
+
+      // 시장 전체 WSB 분위기 — 종합 점수와 무관한 별도 카드용
+      if (mktTotal > 0) {
+        result.marketMood = {
+          name: "WSB 시장 전체",
+          bullish: Math.round((mktBull / mktTotal) * 100),
+          bearish: Math.round((mktBear / mktTotal) * 100),
+          total: mktTotal,
+          topPosts: relevant.filter(r => r.score > 100).slice(0, 5),
+        };
       }
     }
   } catch {}

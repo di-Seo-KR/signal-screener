@@ -42,7 +42,7 @@ function fmtAgo(iso) {
   return `${Math.floor(ms / 86_400_000)}일 전 매칭`;
 }
 
-export default function SavedScreeners({ onNavigate }) {
+export default function SavedScreeners({ onNavigate, onOpenScreener }) {
   const C = useThemeTokens();
   const { isMobile } = useBreakpoint();
   const { user, showToast } = useAuth();
@@ -265,7 +265,11 @@ export default function SavedScreeners({ onNavigate }) {
               isMobile={isMobile}
               onToggleAlert={() => toggleAlert(s.id)}
               onRemove={() => remove(s.id)}
-              onOpen={() => onNavigate && onNavigate("screener")}
+              onOpen={() => {
+                // 저장 시 함께 보관한 조건 키가 있으면 스크리너에 주입하고 자동 스캔
+                if (Array.isArray(s.conditionKeys) && s.conditionKeys.length && onOpenScreener) onOpenScreener(s.conditionKeys);
+                else if (onNavigate) onNavigate("screener");
+              }}
             />
           ))}
         </div>
