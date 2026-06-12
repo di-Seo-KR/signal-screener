@@ -4756,6 +4756,13 @@ function AppInner() {
     if (!watchlistKey) return [];
     try { return JSON.parse(localStorage.getItem(watchlistKey) || "[]"); } catch { return []; }
   });
+  // ★ 2026-06-12 (대표 아이디어): 트레이딩뷰식 우측 왓치리스트 도크 (데스크톱 전용)
+  const [watchDockOpen, setWatchDockOpen] = useState(() => {
+    try { return localStorage.getItem("zepta_watchdock") === "1"; } catch { return false; }
+  });
+  const toggleWatchDock = useCallback(() => {
+    setWatchDockOpen(prev => { try { localStorage.setItem("zepta_watchdock", prev ? "0" : "1"); } catch {} return !prev; });
+  }, []);
 
   // ── 포트폴리오 상태 ───────────────────────────────────────────
   const [portfolio, setPortfolio]         = useState(loadPortfolio);
@@ -12630,6 +12637,100 @@ function AppInner() {
         >
           ↑
         </button>
+      )}
+
+      {/* ═══ 왓치리스트 도크 — 트레이딩뷰식 우측 패널 (데스크톱 전용, 2026-06-12 대표 아이디어) ═══ */}
+      {!isMobile && (
+        <>
+          {/* 가장자리 핸들 — 어느 탭에서든 보임 */}
+          <button onClick={toggleWatchDock} aria-label="관심종목 패널 열기/닫기" style={{
+            position: "fixed", right: watchDockOpen ? "300px" : 0, top: "50%", transform: "translateY(-50%)",
+            width: "28px", height: "92px", borderRadius: "10px 0 0 10px", border: `1px solid ${C.border}`,
+            borderRight: "none", background: C.card, color: watchlist.length ? C.yellow : C.text3,
+            cursor: "pointer", zIndex: 9000, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", gap: "4px",
+            boxShadow: "-4px 0 16px rgba(0,0,0,0.25)", transition: "right .2s ease",
+          }}>
+            <span style={{ fontSize: "14px", lineHeight: 1 }}>{watchDockOpen ? "›" : "⭐"}</span>
+            {!watchDockOpen && watchlist.length > 0 && (
+              <span style={{ fontSize: "11px", fontWeight: 800, color: C.blue }}>{watchlist.length}</span>
+            )}
+          </button>
+
+          {/* 패널 */}
+          {watchDockOpen && (
+            <div style={{
+              position: "fixed", right: 0, top: "72px", bottom: "16px", width: "300px",
+              background: C.card, borderLeft: `1px solid ${C.border}`, borderTop: `1px solid ${C.border}`,
+              borderBottom: `1px solid ${C.border}`, borderRadius: "14px 0 0 14px", zIndex: 9000,
+              display: "flex", flexDirection: "column", boxShadow: "-8px 0 32px rgba(0,0,0,0.35)",
+            }}>
+              <div style={{ padding: "14px 14px 10px", borderBottom: `1px solid ${C.border}30`, flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: user ? 10 : 0 }}>
+                  <span style={{ fontWeight: 800, fontSize: "15px", color: C.text1 }}>⭐ 관심종목 {watchlist.length > 0 && <span style={{ color: C.blue }}>{watchlist.length}</span>}</span>
+                  <button onClick={toggleWatchDock} aria-label="닫기" style={{ background: "none", border: "none", color: C.text3, fontSize: "16px", cursor: "pointer", padding: 4 }}>✕</button>
+                </div>
+                {user && <SearchBar compact placeholder="종목 추가" onSelect={(asset) => {
+                  if (!watchlist.some(w => w.symbol === asset.symbol)) {
+                    setWatchlist(prev => [...prev, { symbol: asset.symbol, name: asset.name, market: asset.market, symbolRaw: asset.symbolRaw || asset.symbol, id: asset.id }]);
+                    showToast(`${asset.name} 추가됨`, "success");
+                  }
+                }} />}
+              </div>
+
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "6px 8px" }}>
+                {!user ? (
+                  <div style={{ textAlign: "center", padding: "32px 14px", color: C.text3, fontSize: "13px", lineHeight: 1.6 }}>
+                    로그인하면 관심종목을<br />어느 화면에서든 볼 수 있어요
+                    <div><button onClick={() => setShowAuthModal(true)} style={{ marginTop: 12, padding: "8px 18px", borderRadius: 9, background: C.blue, color: "#fff", border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>로그인</button></div>
+                  </div>
+                ) : watchlist.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "32px 14px", color: C.text3, fontSize: "13px", lineHeight: 1.6 }}>
+                    📌 위 검색으로 종목을 추가하면<br />실시간 시세와 퀀트 진단이 떠요
+                  </div>
+                ) : watchlist.map(w => {
+                  const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
+                  const diag = hot ? quickDiagnosis(hot) : null;
+                  const diagColor = diag ? (diag.score >= 60 ? C.green : diag.score >= 40 ? C.yellow : C.red) : C.text3;
+                  return (
+                    <div key={w.symbol} onClick={() => setSelectedAsset(w)} style={{
+                      display: "flex", alignItems: "center", gap: 8, padding: "9px 8px",
+                      borderRadius: 10, cursor: "pointer", transition: "background .12s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = `${C.card2}90`}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      <div style={{
+                        width: 28, height: 28, borderRadius: 8, flexShrink: 0, fontSize: 13, fontWeight: 800,
+                        background: `${diagColor}14`, color: diagColor, display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>{diag ? diag.score : (w.market === "us" ? "🇺🇸" : w.market === "kr" ? "🇰🇷" : "₿")}</div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: 13, color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.name || w.symbol}</div>
+                        {diag && <div style={{ fontSize: 11, color: diagColor, fontWeight: 600 }}>{diag.opinion}</div>}
+                      </div>
+                      {hot && (
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <div className="z-num" style={{ fontWeight: 700, fontSize: 13, color: C.text1, fontVariantNumeric: "tabular-nums" }}>{fmtPrice(hot.price, w.market)}</div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: hot.change >= 0 ? C.green : C.red }}>{hot.change >= 0 ? "+" : ""}{hot.change}%</div>
+                        </div>
+                      )}
+                      <button onClick={(e) => { e.stopPropagation(); setWatchlist(prev => prev.filter(x => x.symbol !== w.symbol)); }}
+                        aria-label={`${w.name || w.symbol} 제거`} style={{
+                          width: 20, height: 20, borderRadius: 6, border: "none", background: "transparent",
+                          color: C.text3, fontSize: 10, cursor: "pointer", opacity: 0.35, flexShrink: 0,
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.color = C.red; }}
+                        onMouseLeave={e => { e.currentTarget.style.opacity = "0.35"; e.currentTarget.style.color = C.text3; }}>✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div style={{ padding: "8px 14px", borderTop: `1px solid ${C.border}30`, fontSize: "11px", color: C.text3, flexShrink: 0 }}>
+                종목을 누르면 상세 분석이 열려요 · 참고용, 투자 권유 아님
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* ═══ 모바일 하단 탭 네비게이션 바 (토스 스타일 — SVG 아이콘) ═══ */}
