@@ -197,14 +197,17 @@ function makeChartOptions(height, width, tf, cc) {
       borderColor: cc.gridColor,
       timeVisible: intra,
       secondsVisible: false,
-      fixLeftEdge: true,
-      fixRightEdge: true,
-      rightOffset: 5,
+      // ★ 2026-06-12 (대표 피드백 — 트레이딩뷰 방식): fixRightEdge 가 마지막 봉을 우측 끝에
+      //   고정해 현재가 오른쪽 여백(rightOffset)을 죽이고 있었음 → 해제 + 여백 8봉.
+      fixLeftEdge: false,
+      fixRightEdge: false,
+      rightOffset: 8,
     },
     height,
     width: width || 300,
     handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false, touch: true },
-    handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: true, axisDoubleClickReset: true },
+    // ★ 휠 줌 허용 — 트레이딩뷰와 동일 (모바일은 기존 핀치 유지)
+    handleScale: { mouseWheel: true, pinch: true, axisPressedMouseMove: true, axisDoubleClickReset: true },
     kineticScroll: { mouse: false, touch: true },
   };
 }
@@ -1520,7 +1523,6 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       rsiChart.timeScale().subscribeVisibleLogicalRangeChange(r => {
         if (r && !syncing) { syncing = true; mainChart.timeScale().setVisibleLogicalRange(r); syncing = false; }
       });
-      rsiChart.timeScale().fitContent();
     }
 
     // ── MACD chart ───
@@ -1545,17 +1547,27 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       macdChart.timeScale().subscribeVisibleLogicalRangeChange(r => {
         if (r && !syncing2) { syncing2 = true; mainChart.timeScale().setVisibleLogicalRange(r); syncing2 = false; }
       });
-      macdChart.timeScale().fitContent();
     }
 
-    mainChart.timeScale().fitContent();
+    // ★ 2026-06-12 (대표 피드백): fitContent() 는 전체 데이터를 화면에 욱여넣어
+    //   봉 간격이 뭉개지고 우측 여백이 사라짐 → 트레이딩뷰처럼 '최근 ~110봉 + 우측 8봉 여백'
+    //   가시 범위로 설정. 과거는 드래그/휠로 자유 탐색.
+    const applyTvRange = () => {
+      try {
+        const total = candles.length;
+        const visibleBars = Math.min(total, 110);
+        mainChart.timeScale().setVisibleLogicalRange({ from: total - visibleBars, to: total + 8 });
+      } catch {}
+    };
+    applyTvRange(); // 서브차트(RSI/MACD)는 logical-range 동기화 구독으로 자동 추종
 
     requestAnimationFrame(() => {
       const w = containerRef.current?.clientWidth;
       if (w) {
         Object.values(chartObjs.current).forEach(c => {
-          try { c.applyOptions({ width: w }); c.timeScale().fitContent(); } catch {}
+          try { c.applyOptions({ width: w }); } catch {}
         });
+        applyTvRange();
       }
     });
   }, [fetchData, settings, logScale]);
