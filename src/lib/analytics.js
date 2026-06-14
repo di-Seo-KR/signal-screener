@@ -15,17 +15,28 @@
 //   alpha_lab_viewed / cta_click / blog_post_read / page_view
 // ─────────────────────────────────────────────────────────────────────────────
 
+function uuid() {
+  return (typeof crypto !== "undefined" && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 function getVid() {
   try {
     let v = localStorage.getItem("z_vid");
-    if (!v) {
-      v = (typeof crypto !== "undefined" && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-      localStorage.setItem("z_vid", v);
-    }
+    if (!v) { v = uuid(); localStorage.setItem("z_vid", v); }
     return v;
   } catch { return null; }
+}
+
+// 세션 ID — sessionStorage 기반(탭 닫으면 소멸 = GA4 세션 개념). 세션당 첫 PV 표시(sfirst).
+function getSession() {
+  try {
+    let sid = sessionStorage.getItem("z_sid");
+    let isFirst = false;
+    if (!sid) { sid = uuid(); sessionStorage.setItem("z_sid", sid); isFirst = true; }
+    return { sid, isFirst };
+  } catch { return { sid: null, isFirst: false }; }
 }
 
 // 세션당 1회만 referrer/UTM 전송 (내부 이동을 외부 유입으로 오집계 방지)
@@ -64,11 +75,14 @@ export function trackPageView(path) {
     const p = path || window.location.pathname;
     if (p === _lastPvPath) return;
     _lastPvPath = p;
+    const sess = getSession();
     const payload = {
       t: "pv",
       path: p,
       vid: getVid(),
       dev: window.innerWidth <= 640 ? "m" : "d",
+      sid: sess.sid,            // 세션 단위 집계용
+      sfirst: sess.isFirst ? 1 : 0, // 세션 첫 PV 여부(세션 수·신규/재방문)
     };
     if (!_sessionMetaSent) {
       _sessionMetaSent = true;
