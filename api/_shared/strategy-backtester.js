@@ -104,20 +104,25 @@ export function backtestStrategy({
     }
     if (!signal || !signal.side) { i += 1; continue; }
 
-    const entryBar = ohlc[i];
-    const entryPrice = entryBar.c;
+    // ★ 2026-06-14 (감사 P2): 룩어헤드 바이어스 제거. 신호는 봉 i 종가까지로 계산되지만
+    //   실거래는 봉 i 종료 후(다음 cron) 인지 → 봉 i+1 *시가* 진입이 현실적. 기존 entryBar.c
+    //   (봉 i 종가)는 신호 생성에 쓴 바로 그 가격에 진입하는 낙관편향 → 승급판정 과대평가.
+    const entryIdx = i + 1;
+    if (entryIdx > ohlc.length - 1) break; // 다음 봉 없음 — 마지막 신호는 진입 불가
+    const entryBar = ohlc[entryIdx];
+    const entryPrice = entryBar.o;
     const side = signal.side;
     const slMult = side === "LONG" ? (1 - slPct / 100) : (1 + slPct / 100);
     const tpMult = side === "LONG" ? (1 + tpPct / 100) : (1 - tpPct / 100);
     const slPrice = entryPrice * slMult;
     const tpPrice = entryPrice * tpMult;
 
-    // 청산 탐색
+    // 청산 탐색 — 진입 봉(i+1)부터(시가 진입 후 같은 봉 내 intrabar SL/TP 가능)
     let exitIdx = -1;
     let exitPrice = entryPrice;
     let exitReason = "TIME";
-    const endIdx = Math.min(ohlc.length - 1, i + maxHoldBars);
-    for (let j = i + 1; j <= endIdx; j++) {
+    const endIdx = Math.min(ohlc.length - 1, entryIdx + maxHoldBars);
+    for (let j = entryIdx; j <= endIdx; j++) {
       const bar = ohlc[j];
       if (side === "LONG") {
         // 보수적: 같은 봉에서 SL/TP 둘 다 닿으면 SL 우선
@@ -141,7 +146,7 @@ export function backtestStrategy({
     pnlPct -= FEE_BPS / 10000; // 왕복 0.1%
 
     trades.push({
-      entryIdx: i, entryPrice, side, exitIdx, exitPrice, exitReason,
+      entryIdx, entryPrice, side, exitIdx, exitPrice, exitReason,
       pnlPct, holdMs: (ohlc[exitIdx].ts - entryBar.ts) || 0,
       confidence: signal.confidence, family: signal.family,
     });
