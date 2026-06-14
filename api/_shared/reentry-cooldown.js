@@ -26,11 +26,19 @@ const KEY = (uid, sym) => `di:real:user:${uid}:cooldown:${sym}`;
 export function reentryCfg() {
   const lossMin = Number(process.env.ZEPTA_REENTRY_COOLDOWN_LOSS_MIN);
   const winMin = Number(process.env.ZEPTA_REENTRY_COOLDOWN_WIN_MIN);
+  const pricePct = Number(process.env.ZEPTA_REENTRY_PRICE_PCT);
+  const scoreDelta = Number(process.env.ZEPTA_REENTRY_SCORE_DELTA);
   return {
     enabled: (process.env.ZEPTA_REENTRY_COOLDOWN ?? "1") !== "0",
     lossMin: Number.isFinite(lossMin) ? lossMin : 120, // 손절 후 2시간
     winMin: Number.isFinite(winMin) ? winMin : 45,      // 익절 후 45분
     sameSideOnly: (process.env.ZEPTA_REENTRY_SAME_SIDE_ONLY ?? "1") !== "0",
+    // ★ 품질 게이트 (2026-06-14 대표 지시 — 트레이더 방식): 쿨다운 중이어도 "더 매력적 가격"
+    //   또는 "더 강한 확신"이면 재진입 허용. 손절 후 무조건 시간만 기다리지 않고, 더 나은
+    //   타점이면 들어간다. ZEPTA_REENTRY_QUALITY_GATE=0 으로 끔(순수 시간 쿨다운).
+    qualityGate: (process.env.ZEPTA_REENTRY_QUALITY_GATE ?? "1") !== "0",
+    pricePct: Number.isFinite(pricePct) ? pricePct : 1.0,   // 더 매력적 가격 임계(%)
+    scoreDelta: Number.isFinite(scoreDelta) ? scoreDelta : 8, // 더 강한 신호 임계(점수차)
   };
 }
 
@@ -40,7 +48,7 @@ export function reentryCfg() {
  * @param {string} userId
  * @param {{symbol:string, side?:("LONG"|"SHORT"|null), pnl:number}} info
  */
-export async function recordReentryCooldown(kv, userId, { symbol, side, pnl }) {
+export async function recordReentryCooldown(kv, userId, { symbol, side, pnl, entryPrice, score }) {
   const c = reentryCfg();
   if (!c.enabled || !kv || !symbol) return;
   const realized = Number(pnl) || 0;
@@ -51,6 +59,10 @@ export async function recordReentryCooldown(kv, userId, { symbol, side, pnl }) {
     closedAt: Date.now(),
     pnl: realized,
     cooldownMin: mins,
+    // ★ 품질 게이트용 — 청산된 포지션의 진입가·신호점수. 재진입 시 "더 매력적 가격/더 강한
+    //   신호"인지 비교한다(없으면 게이트 미작동 → 순수 시간 쿨다운, 하위호환).
+    entryPrice: Number.isFinite(Number(entryPrice)) && Number(entryPrice) > 0 ? Number(entryPrice) : null,
+    score: Number.isFinite(Number(score)) ? Number(score) : null,
   };
   try {
     // TTL = 쿨다운 + 1분 여유 → 만료 후 키 자동 제거
@@ -62,7 +74,7 @@ export async function recordReentryCooldown(kv, userId, { symbol, side, pnl }) {
  * 진입 직전 호출 — 이 심볼/방향이 쿨다운 중인지 판정.
  * @returns {Promise<{blocked:boolean, remainMin?:number, reason?:string}>}
  */
-export async function checkReentryCooldown(kv, userId, symbol, side) {
+export async function checkReentryCooldown(kv, userId, symbol, side, opts = {}) {
   const c = reentryCfg();
   if (!c.enabled || !kv || !symbol) return { blocked: false };
   let rec;
@@ -75,6 +87,33 @@ export async function checkReentryCooldown(kv, userId, symbol, side) {
   const elapsedMin = (Date.now() - rec.closedAt) / 60000;
   const windowMin = Number(rec.cooldownMin) || (rec.pnl < 0 ? c.lossMin : c.winMin);
   if (elapsedMin >= windowMin) return { blocked: false };
+
+  // ★ 품질 게이트 (대표 트레이딩 방식): 쿨다운 시간 중이어도 더 나은 타점이면 재진입 허용.
+  //   ① 더 강한 확신 — 새 신호점수가 직전보다 scoreDelta 이상 높음.
+  //   ② 더 매력적 가격 — 롱=더 싸게 / 숏=더 비싸게 pricePct% 이상 + 신호 안 약해짐(knife-catch 방지).
+  //   기록에 entryPrice·score 가 모두 있어야 작동(없으면 순수 시간 쿨다운, 하위호환).
+  if (c.qualityGate && Number.isFinite(rec.entryPrice) && rec.entryPrice > 0 && Number.isFinite(rec.score)) {
+    const recScore = Number(rec.score);
+    const newScore = Number(opts.score);
+    const newPrice = Number(opts.price);
+    const dir = (side || rec.side) === "LONG" ? 1 : (side || rec.side) === "SHORT" ? -1 : 0;
+    const haveScores = Number.isFinite(newScore);
+    const strongerConviction = haveScores && newScore >= recScore + c.scoreDelta;
+    let betterPrice = false, improvePct = 0;
+    if (Number.isFinite(newPrice) && newPrice > 0 && dir !== 0) {
+      improvePct = (dir > 0 ? (rec.entryPrice - newPrice) : (newPrice - rec.entryPrice)) / rec.entryPrice * 100;
+      betterPrice = improvePct >= c.pricePct && haveScores && newScore >= recScore; // 가격 개선 + 신호 안 약해짐
+    }
+    if (strongerConviction || betterPrice) {
+      return {
+        blocked: false,
+        waived: true,
+        reason: strongerConviction
+          ? `재진입 허용 — 더 강한 신호(${recScore}→${newScore}, +${(newScore - recScore).toFixed(0)})`
+          : `재진입 허용 — 더 매력적 타점(${dir > 0 ? "-" : "+"}${improvePct.toFixed(1)}%, 신호 유지)`,
+      };
+    }
+  }
 
   return {
     blocked: true,

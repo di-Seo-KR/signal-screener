@@ -139,7 +139,10 @@ async function checkUser(userId) {
       //   텔레그램 블록 line ~181) 전에 side 를 확보. plan 없으면 side=null(전방향 차단).
       try {
         const planForSide = await kv.get(`di:real:user:${userId}:plan:${sym}`);
-        await recordReentryCooldown(kv, userId, { symbol: sym, side: planForSide?.side, pnl: realizedSafe });
+        await recordReentryCooldown(kv, userId, {
+          symbol: sym, side: planForSide?.side, pnl: realizedSafe,
+          entryPrice: planForSide?.entryPrice, score: planForSide?.score, // ★ 품질 게이트용
+        });
       } catch {}
 
       // ★ 청산 감지 텔레그램 알림 (수동·봇 구분, realized 누락도 fallback)
@@ -228,6 +231,8 @@ async function checkUser(userId) {
       recordReentryCooldown(kv, userId, {
         symbol: sym, side,
         pnl: (markPrice - entryPrice) * parseFloat(p.positionAmt),
+        entryPrice,                 // ★ 재진입 품질 게이트용 — 청산된 포지션 진입가
+        score: plan?.score,         // ★ 진입 시 신호점수 (engine 이 plan 에 저장)
       }).catch(() => {});
 
     // ── highWater 갱신 (LONG=max, SHORT=min) ──
