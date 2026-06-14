@@ -260,6 +260,119 @@ export function detectDivergence(price, series, L, lookback = 12) {
   };
 }
 
+// ════════════════════════════════════════════════════════
+// MTF + 차트구조 진입 정제 (복합 스코어 레벨) — 2026-06-14 대표 지시
+//   "1h·4h·일봉 RSI 가 다 과매수면 추가 진입 안 되게 점수를 낮추거나" + 차트
+//   구조(과확장 추격·S/R 근접·압축 후 돌파/쐐기형)를 종목 시그널 점수에 반영.
+//   기존 refineSignalScore 는 *단일 TF* 정제 — 이건 타임프레임을 *횡단*해서
+//   소진/추격을 감점하고 신선한 돌파를 가점하는 composite 레벨 레이어.
+//   반환 mult(0.45~1.2) 를 composite/trade 시그널 score 에 곱한다(방향은 불변 — 감점만).
+//   ZEPTA_ENTRY_REFINE=0 으로 끔.
+//
+//   perTF: { "1h":{closes,highs,lows}, "4h":{...}, "1d":{...} } (있는 것만)
+//   sr: computeSRLevels 결과 { s:[{p,t}], r:[{p,t}] } (없으면 생략)
+// ════════════════════════════════════════════════════════
+function _last(arr) {
+  if (!Array.isArray(arr)) return null;
+  for (let i = arr.length - 1; i >= 0; i--) if (arr[i] != null) return arr[i];
+  return null;
+}
+
+export function refineCompositeEntry({ side, perTF = {}, sr = null, price = null }) {
+  if (process.env.ZEPTA_ENTRY_REFINE === "0") return { mult: 1, reasons: [] };
+  const dir = side === "LONG" ? 1 : side === "SHORT" ? -1 : 0;
+  if (!dir) return { mult: 1, reasons: [] };
+  const reasons = [];
+  let mult = 1;
+
+  // ── ① MTF RSI 소진 — 여러 타임프레임이 동시에 과매수/과매도면 추가 진입 억제 ──
+  const tfs = ["1h", "4h", "1d"];
+  const rsiVals = {};
+  let obCount = 0, osCount = 0;
+  for (const tf of tfs) {
+    const c = perTF[tf]?.closes;
+    if (!c || c.length < 20) continue;
+    const r = _last(calcRSI(c, 14));
+    if (r == null) continue;
+    rsiVals[tf] = Math.round(r);
+    if (r >= 70) obCount++;
+    if (r <= 30) osCount++;
+  }
+  if (dir > 0 && obCount >= 2) {
+    mult *= obCount >= 3 ? 0.55 : 0.78;
+    reasons.push(`과매수 ${obCount}TF 소진(${tfs.filter(t => rsiVals[t] >= 70).map(t => `${t}:${rsiVals[t]}`).join("·")})`);
+  }
+  if (dir < 0 && osCount >= 2) {
+    mult *= osCount >= 3 ? 0.55 : 0.78;
+    reasons.push(`과매도 ${osCount}TF 소진(${tfs.filter(t => rsiVals[t] <= 30).map(t => `${t}:${rsiVals[t]}`).join("·")})`);
+  }
+
+  // ── ② 과확장(추격) — 일봉 BB %B + 60봉 고저 위치 ──
+  const d = perTF["1d"];
+  if (d?.closes?.length >= 21 && price != null) {
+    const bb = _last(calcBB(d.closes, 20, 2));
+    if (bb && bb.upper > bb.lower) {
+      const pctB = (price - bb.lower) / (bb.upper - bb.lower);
+      if (dir > 0 && pctB > 1.0) { mult *= 0.82; reasons.push(`BB상단 돌파 추격(%B ${pctB.toFixed(2)})`); }
+      if (dir < 0 && pctB < 0.0) { mult *= 0.82; reasons.push(`BB하단 이탈 추격`); }
+    }
+    if (d.highs?.length >= 60 && d.lows?.length >= 60) {
+      const hi = Math.max(...d.highs.slice(-60));
+      const lo = Math.min(...d.lows.slice(-60));
+      if (hi > lo) {
+        const pos = (price - lo) / (hi - lo);
+        if (dir > 0 && pos > 0.92) { mult *= 0.85; reasons.push(`60봉 고점권 ${Math.round(pos * 100)}% 추격`); }
+        if (dir < 0 && pos < 0.08) { mult *= 0.85; reasons.push(`60봉 저점권 ${Math.round(pos * 100)}% 추격`); }
+      }
+    }
+  }
+
+  // ── ③ S/R 근접 — 저항 바로 밑 롱 / 지지 바로 위 숏 = 상승/하락 여력 부족 ──
+  if (sr && price != null) {
+    if (dir > 0 && Array.isArray(sr.r)) {
+      const nearR = sr.r.filter(x => x.p > price).sort((a, b) => a.p - b.p)[0];
+      if (nearR && (nearR.p - price) / price < 0.012 && (nearR.t || 0) >= 2) {
+        mult *= 0.85; reasons.push(`저항 ${((nearR.p - price) / price * 100).toFixed(1)}% 근접(터치${nearR.t})`);
+      }
+    }
+    if (dir < 0 && Array.isArray(sr.s)) {
+      const nearS = sr.s.filter(x => x.p < price).sort((a, b) => b.p - a.p)[0];
+      if (nearS && (price - nearS.p) / price < 0.012 && (nearS.t || 0) >= 2) {
+        mult *= 0.85; reasons.push(`지지 ${((price - nearS.p) / price * 100).toFixed(1)}% 근접 숏(여력부족)`);
+      }
+    }
+  }
+
+  // ── ④ 압축 후 돌파 (쐐기/삼각수렴의 robust 커널) — 신선한 좋은 타점 가점 ──
+  //   변동성(ATR)이 직전 대비 수축 → 직전 봉이 방향대로 직전 10봉 범위 돌파 = 압축해소 돌파.
+  //   하락 추세 후 상방 돌파 = '하락쐐기형', 상승 추세 후 하방 = '상승쐐기형' (방향성 가점 ↑).
+  const f = perTF["4h"]?.closes?.length >= 40 ? perTF["4h"] : (perTF["1d"]?.closes?.length >= 40 ? perTF["1d"] : null);
+  if (f) {
+    const n = f.closes.length;
+    const atrArr = calcATR(f.highs, f.lows, f.closes, 14);
+    const atrNow = _last(atrArr);
+    const atrPast = atrArr[atrArr.length - 11];
+    const lastClose = f.closes[n - 1];
+    if (atrNow != null && atrPast != null && atrPast > 0) {
+      const compressed = atrNow < atrPast * 0.8; // 변동성 20%+ 수축
+      const breakUp = lastClose > Math.max(...f.highs.slice(-11, -1));
+      const breakDn = lastClose < Math.min(...f.lows.slice(-11, -1));
+      const wasDown = f.highs[n - 2] < f.highs[n - 12]; // 직전 고점 하락(하락추세)
+      const wasUp = f.lows[n - 2] > f.lows[n - 12];      // 직전 저점 상승(상승추세)
+      if (compressed && dir > 0 && breakUp) {
+        if (wasDown) { mult *= 1.12; reasons.push("하락쐐기형 상방 돌파(압축해소)"); }
+        else { mult *= 1.06; reasons.push("변동성 압축 후 상방 돌파"); }
+      } else if (compressed && dir < 0 && breakDn) {
+        if (wasUp) { mult *= 1.12; reasons.push("상승쐐기형 하방 돌파(압축해소)"); }
+        else { mult *= 1.06; reasons.push("변동성 압축 후 하방 돌파"); }
+      }
+    }
+  }
+
+  mult = Math.max(0.45, Math.min(1.2, mult));
+  return { mult, reasons };
+}
+
 // 원시 buy/sell 표 → 정제된 net/score/confidence.
 //   strategy 들이 net 계산 직전에 호출. dampening 우세이며, 정상 추세(과확장·
 //   다이버전스·극단·거래량부진 없음)에선 표 변화 0 → 기존과 동일 신호.

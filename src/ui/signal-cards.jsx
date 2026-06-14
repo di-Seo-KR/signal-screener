@@ -110,6 +110,22 @@ function CardDetail({ coin }) {
         })}
       </div>
       {coin.reason && <div style={{ fontSize: 11, color: "var(--z-text-3)", lineHeight: 1.5 }}>{coin.reason}</div>}
+      {/* ★ 2026-06-14 진입 타점 정제 — 점수를 깎거나 올린 차트구조 사유 노출 */}
+      {coin.entryRefine && Array.isArray(coin.entryRefine.reasons) && coin.entryRefine.reasons.length > 0 && (() => {
+        const m = coin.entryRefine.mult || 1;
+        const good = m > 1;
+        const c = good ? "var(--z-green)" : "var(--z-yellow)";
+        return (
+          <div style={{ background: `color-mix(in srgb, ${c} 10%, transparent)`, border: `1px solid color-mix(in srgb, ${c} 30%, transparent)`, borderRadius: 8, padding: "7px 9px" }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: c, marginBottom: 2 }}>
+              {good ? "✓ 좋은 진입 타점" : "⚠ 진입 타점 주의"} · 점수 {coin.entryRefine.before} → {coin.score} ({m.toFixed(2)}×)
+            </div>
+            <div style={{ fontSize: 10.5, color: "var(--z-text-3)", lineHeight: 1.5, wordBreak: "keep-all" }}>
+              {coin.entryRefine.reasons.join(" · ")}
+            </div>
+          </div>
+        );
+      })()}
       <div style={{ fontSize: 10, color: "var(--z-text-4)" }}>투자 판단의 참고 지표이며 매수·매도 권유가 아닙니다.</div>
     </div>
   );

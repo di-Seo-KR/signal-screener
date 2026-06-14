@@ -15,6 +15,7 @@ import { getMarketContext, getKlines, getTickerPrice } from "./_shared/binance-c
 import { getOIChangeMap } from "./_shared/oi-tracker.js";
 import { loadUniverse, universeSymbolMap } from "./_shared/futures-universe.js";
 import { computeSRLevels, scaleSR } from "./_shared/sr-levels.js"; // ★ 지지·저항(매물대) — 표시 전용
+import { refineCompositeEntry } from "./_shared/strategies/_indicators.js"; // ★ MTF 소진·차트구조 진입 정제
 
 // asset → 바이낸스 *선물(USDⓈ-M, fapi)* 심볼. 펀딩/OI/베이시스 맵 조회 키.
 //   ★ 2026-06-02 버그수정: 선물은 저가 밈코인을 1000배 묶음(1000SHIB/1000PEPE)으로,
@@ -614,6 +615,31 @@ export default async function handler(req, res) {
         applyFuturesContext(compositeSignal, { fr, oiCh, bs }); // 종합 스코어에도 동일
       } catch (e) { addLog(`⚠️ ${asset} 선물컨텍스트 보정 실패: ${e?.message}`); }
 
+      // ★ 2026-06-14 (대표 지시): MTF 소진·차트구조 진입 정제 — 1h·4h·1d 다중 과매수면
+      //   롱 점수 감점(반대 과매도→숏 감점) + 과확장 추격·S/R 근접 감점 + 압축 후 돌파/쐐기형 가점.
+      //   "합리적인 좋은 타점" 선별. 방향 불변(감점·가점만). ZEPTA_ENTRY_REFINE=0 으로 끔.
+      try {
+        const _mk = (arr) => (Array.isArray(arr) && arr.length)
+          ? { closes: arr.map(c => c.close), highs: arr.map(c => c.high), lows: arr.map(c => c.low) } : null;
+        const _perTF = { "1h": _mk(candles1h), "4h": _mk(candles4h), "1d": { closes, highs, lows } };
+        const _refSide = compositeSignal?.side || latestSignal?.side;
+        if (_refSide) {
+          const _ref = refineCompositeEntry({ side: _refSide, perTF: _perTF, sr: srLevels, price: closes[closes.length - 1] });
+          if (_ref.mult !== 1) {
+            if (compositeSignal) {
+              compositeSignal.entryRefine = { mult: _ref.mult, reasons: _ref.reasons, before: compositeSignal.score };
+              compositeSignal.score = Math.max(0, Math.min(100, Math.round(compositeSignal.score * _ref.mult)));
+              if (_ref.reasons.length) compositeSignal.reason = (compositeSignal.reason || "") + ` | 진입정제 ${_ref.mult.toFixed(2)}×(${_ref.reasons.join(", ")})`;
+            }
+            if (latestSignal) {
+              latestSignal.entryRefine = { mult: _ref.mult, reasons: _ref.reasons, before: latestSignal.score };
+              latestSignal.score = Math.max(0, Math.min(100, Math.round((latestSignal.score || 60) * _ref.mult)));
+            }
+            addLog(`  🎯 ${asset} 진입정제 ${_ref.mult.toFixed(2)}×: ${_ref.reasons.join(" · ")}`);
+          }
+        }
+      } catch (e) { addLog(`  진입정제 skip: ${e?.message}`); }
+
       addLog(`🎯 ${asset} 시그널: ${latestSignal.type} | ${latestSignal.confidence}급 | ${latestSignal.score}pt`);
 
       // ★ 2026-05-13 architectural fix: 시그널 풀 SSOT 적재.
@@ -649,6 +675,7 @@ export default async function handler(req, res) {
               type: compositeSignal.type, side: compositeSignal.side, score: compositeSignal.score,
               confidence: compositeSignal.confidence, family: "composite", timeframe: "MTF",
               breakdown: compositeSignal.breakdown, reason: compositeSignal.reason, source: "btc-cron-mtf",
+              entryRefine: compositeSignal.entryRefine || null, // ★ MTF 소진·차트구조 정제 사유
               sr: srLevels, // ★ 지지·저항 — 코인 카드 매물대 표시용
             };
             await kv.set(mKey, [mEntry, ...mPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200));

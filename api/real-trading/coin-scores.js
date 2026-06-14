@@ -105,9 +105,10 @@ export default async function handler(req, res) {
           score: parseFloat(e.score || 0) || 0,   // 종합 스코어 0~100
           confidence: normConfidence(e.confidence),
           family: "composite", timeframe: "MTF",
-          reason: (e.reason || "").slice(0, 140),
+          reason: (e.reason || "").slice(0, 180),
           ts: e.ts || 0,
           breakdown: normBreakdown(e.breakdown), // { 1w,1d,4h,1h: {side,score}|null }
+          entryRefine: e.entryRefine || null, // ★ MTF 소진·차트구조 정제 { mult, reasons, before }
           sr: e.sr || null, // ★ 지지·저항 { s:[{p,t,d}], r:[{p,t,d}], piv, px, m } | null
         });
       }
