@@ -278,12 +278,64 @@ function _last(arr) {
   return null;
 }
 
+// ── 차트 TA 리서치(2026-06-14, 워크플로우 w31s376lk) 헬퍼 ──
+function _mean(arr) {
+  if (!Array.isArray(arr) || !arr.length) return null;
+  let s = 0, n = 0;
+  for (const v of arr) if (v != null && isFinite(v)) { s += v; n++; }
+  return n ? s / n : null;
+}
+function _std(arr, m = null) {
+  if (!Array.isArray(arr) || arr.length < 2) return null;
+  const mu = m == null ? _mean(arr) : m;
+  if (mu == null) return null;
+  let s = 0, n = 0;
+  for (const v of arr) if (v != null && isFinite(v)) { s += (v - mu) ** 2; n++; }
+  return n > 1 ? Math.sqrt(s / (n - 1)) : null;
+}
+// 스윙 고저점 추출 — computeSRLevels 와 동일 fractal(좌우 k봉보다 strict 극값).
+//   우측 k봉 확정이라 진행 중인 마지막 봉은 자연히 제외(비-repaint). 종가확정 구조 분석용.
+function _swings(highs, lows, k = 2, lookback = 60) {
+  const hh = [], ll = [];
+  if (!Array.isArray(highs) || !Array.isArray(lows)) return { hh, ll };
+  const n = Math.min(highs.length, lows.length);
+  const start = Math.max(k, n - lookback);
+  for (let i = start; i < n - k; i++) {
+    let isHigh = true, isLow = true;
+    for (let j = i - k; j <= i + k; j++) {
+      if (j === i) continue;
+      if (highs[j] >= highs[i]) isHigh = false;
+      if (lows[j] <= lows[i]) isLow = false;
+    }
+    if (isHigh && isFinite(highs[i])) hh.push({ p: highs[i], idx: i });
+    if (isLow && isFinite(lows[i])) ll.push({ p: lows[i], idx: i });
+  }
+  return { hh, ll };
+}
+// MFI (Money Flow Index) — 거래량 가중 RSI(typical price 기반). 최신값 스칼라 반환.
+export function calcMFI(highs, lows, closes, volumes, period = 14) {
+  const n = Math.min(highs?.length || 0, lows?.length || 0, closes?.length || 0, volumes?.length || 0);
+  if (n < period + 1) return null;
+  let pos = 0, neg = 0;
+  for (let i = n - period; i < n; i++) {
+    const tp = (highs[i] + lows[i] + closes[i]) / 3;
+    const tpPrev = (highs[i - 1] + lows[i - 1] + closes[i - 1]) / 3;
+    const flow = tp * (volumes[i] || 0);
+    if (tp > tpPrev) pos += flow;
+    else if (tp < tpPrev) neg += flow;
+  }
+  if (pos + neg === 0) return 50;
+  if (neg === 0) return 100;
+  return 100 - 100 / (1 + pos / neg);
+}
+
 export function refineCompositeEntry({ side, perTF = {}, sr = null, price = null }) {
   if (process.env.ZEPTA_ENTRY_REFINE === "0") return { mult: 1, reasons: [] };
   const dir = side === "LONG" ? 1 : side === "SHORT" ? -1 : 0;
   if (!dir) return { mult: 1, reasons: [] };
   const reasons = [];
   let mult = 1;
+  let mtfExhausted = false, overextended = false; // ⑥ BOS 가드 — '지속'과 '추격' 충돌 시 가점 억제
 
   // ── ① MTF RSI 소진 — 여러 타임프레임이 동시에 과매수/과매도면 추가 진입 억제 ──
   const tfs = ["1h", "4h", "1d"];
@@ -299,11 +351,11 @@ export function refineCompositeEntry({ side, perTF = {}, sr = null, price = null
     if (r <= 30) osCount++;
   }
   if (dir > 0 && obCount >= 2) {
-    mult *= obCount >= 3 ? 0.55 : 0.78;
+    mult *= obCount >= 3 ? 0.55 : 0.78; mtfExhausted = true;
     reasons.push(`과매수 ${obCount}TF 소진(${tfs.filter(t => rsiVals[t] >= 70).map(t => `${t}:${rsiVals[t]}`).join("·")})`);
   }
   if (dir < 0 && osCount >= 2) {
-    mult *= osCount >= 3 ? 0.55 : 0.78;
+    mult *= osCount >= 3 ? 0.55 : 0.78; mtfExhausted = true;
     reasons.push(`과매도 ${osCount}TF 소진(${tfs.filter(t => rsiVals[t] <= 30).map(t => `${t}:${rsiVals[t]}`).join("·")})`);
   }
 
@@ -313,16 +365,16 @@ export function refineCompositeEntry({ side, perTF = {}, sr = null, price = null
     const bb = _last(calcBB(d.closes, 20, 2));
     if (bb && bb.upper > bb.lower) {
       const pctB = (price - bb.lower) / (bb.upper - bb.lower);
-      if (dir > 0 && pctB > 1.0) { mult *= 0.82; reasons.push(`BB상단 돌파 추격(%B ${pctB.toFixed(2)})`); }
-      if (dir < 0 && pctB < 0.0) { mult *= 0.82; reasons.push(`BB하단 이탈 추격`); }
+      if (dir > 0 && pctB > 1.0) { mult *= 0.82; overextended = true; reasons.push(`BB상단 돌파 추격(%B ${pctB.toFixed(2)})`); }
+      if (dir < 0 && pctB < 0.0) { mult *= 0.82; overextended = true; reasons.push(`BB하단 이탈 추격`); }
     }
     if (d.highs?.length >= 60 && d.lows?.length >= 60) {
       const hi = Math.max(...d.highs.slice(-60));
       const lo = Math.min(...d.lows.slice(-60));
       if (hi > lo) {
         const pos = (price - lo) / (hi - lo);
-        if (dir > 0 && pos > 0.92) { mult *= 0.85; reasons.push(`60봉 고점권 ${Math.round(pos * 100)}% 추격`); }
-        if (dir < 0 && pos < 0.08) { mult *= 0.85; reasons.push(`60봉 저점권 ${Math.round(pos * 100)}% 추격`); }
+        if (dir > 0 && pos > 0.92) { mult *= 0.85; overextended = true; reasons.push(`60봉 고점권 ${Math.round(pos * 100)}% 추격`); }
+        if (dir < 0 && pos < 0.08) { mult *= 0.85; overextended = true; reasons.push(`60봉 저점권 ${Math.round(pos * 100)}% 추격`); }
       }
     }
   }
@@ -366,6 +418,176 @@ export function refineCompositeEntry({ side, perTF = {}, sr = null, price = null
         if (wasUp) { mult *= 1.12; reasons.push("상승쐐기형 하방 돌파(압축해소)"); }
         else { mult *= 1.06; reasons.push("변동성 압축 후 하방 돌파"); }
       }
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  // 차트 TA 리서치(2026-06-14, 워크플로우 w31s376lk) — robust·비중복 7종 합류.
+  //   전부 기존 mult 곱셈체인에 합류(상한1.2·하한0.45·방향불변). 거래량/구조 기반
+  //   로직은 *마지막 완결봉* ci 기준(마지막 봉은 진행 중일 수 있어 부분 거래량/돌파 배제).
+  // ══════════════════════════════════════════════════════════════════
+  const N = f ? f.closes.length : 0;
+  const ci = N - 2;             // 마지막 완결봉 (진행봉 제외)
+  let swHi = null, swLo = null; // ⑥ 추출 → ⑦ 재사용
+
+  // ── ⑤ 구조 레벨 거래량 돌파 — 가짜돌파(저거래·wick) 차단, 종가확정 돌파만 가점 ──
+  if (f && sr && ci >= 1 && Array.isArray(f.volumes) && f.volumes.length >= 22) {
+    const refClose = f.closes[ci], prevClose = f.closes[ci - 1];
+    const atr5 = _last(calcATR(f.highs.slice(0, ci + 1), f.lows.slice(0, ci + 1), f.closes.slice(0, ci + 1), 14));
+    const volSMA = _mean(f.volumes.slice(ci - 20, ci));
+    const lastVol = f.volumes[ci];
+    if (atr5 != null && atr5 > 0 && volSMA && lastVol != null && refClose > 0) {
+      const buf = 0.3 * atr5 / refClose;
+      if (dir > 0 && Array.isArray(sr.r)) {
+        const nearR = sr.r.filter(x => x.p > prevClose && (x.t || 0) >= 2).sort((a, b) => a.p - b.p)[0];
+        if (nearR && refClose > nearR.p * (1 + buf) && prevClose <= nearR.p && lastVol >= volSMA * 1.3) {
+          mult *= 1.10; reasons.push("저항 거래량 돌파(구조전환)");
+        }
+        const brokeS = (sr.s || []).filter(x => x.p < prevClose && (x.t || 0) >= 2).sort((a, b) => b.p - a.p)[0];
+        if (brokeS && refClose < brokeS.p * (1 - buf) && prevClose >= brokeS.p) { mult *= 0.82; reasons.push("지지 종가 이탈(구조붕괴)"); }
+      }
+      if (dir < 0 && Array.isArray(sr.s)) {
+        const nearS = sr.s.filter(x => x.p < prevClose && (x.t || 0) >= 2).sort((a, b) => b.p - a.p)[0];
+        if (nearS && refClose < nearS.p * (1 - buf) && prevClose >= nearS.p && lastVol >= volSMA * 1.3) {
+          mult *= 1.10; reasons.push("지지 거래량 하향돌파(구조전환)");
+        }
+        const brokeR = (sr.r || []).filter(x => x.p > prevClose && (x.t || 0) >= 2).sort((a, b) => a.p - b.p)[0];
+        if (brokeR && refClose > brokeR.p * (1 + buf) && prevClose <= brokeR.p) { mult *= 0.82; reasons.push("저항 종가 돌파(구조붕괴-숏역행)"); }
+      }
+    }
+  }
+
+  // ── ⑥ 스윙 구조 추세정합(HH/HL vs LH/LL) + 종가확정 BOS ──
+  if (f && N >= 30 && ci >= 1) {
+    const { hh, ll } = _swings(f.highs, f.lows, 2, 60);
+    const atrB = _last(calcATR(f.highs, f.lows, f.closes, 14));
+    if (hh.length >= 2 && ll.length >= 2 && atrB != null && atrB > 0) {
+      const rHH = hh.slice(-2), rLL = ll.slice(-2);
+      const up = rHH[1].p > rHH[0].p && rLL[1].p > rLL[0].p;
+      const down = rHH[1].p < rHH[0].p && rLL[1].p < rLL[0].p;
+      swHi = hh[hh.length - 1].p; swLo = ll[ll.length - 1].p;
+      if ((dir > 0 && up) || (dir < 0 && down)) { mult *= 1.06; reasons.push(dir > 0 ? "스윙 상승구조 정합(HH/HL)" : "스윙 하락구조 정합(LH/LL)"); }
+      else if ((dir > 0 && down) || (dir < 0 && up)) { mult *= 0.85; reasons.push("스윙 구조 역행"); }
+      // BOS — 마지막 완결봉이 직전 미돌파 스윙을 *처음* 종가 돌파(fresh, wick 제외)
+      const bosUp = dir > 0 && f.closes[ci] > swHi && f.closes[ci - 1] <= swHi && (f.closes[ci] - swHi) > 0.15 * atrB;
+      const bosDn = dir < 0 && f.closes[ci] < swLo && f.closes[ci - 1] >= swLo && (swLo - f.closes[ci]) > 0.15 * atrB;
+      if (bosUp || bosDn) {
+        const bonus = (overextended || mtfExhausted) ? 1.04 : 1.08; // 추격 의심이면 가점 약화
+        mult *= bonus; reasons.push(dir > 0 ? "스윙고점 종가돌파 BOS" : "스윙저점 종가돌파 BOS");
+      }
+    }
+  }
+
+  // ── ⑦ 유동성 스윕 실패돌파 — 꼬리만 넘고 종가 회귀 = 추세소진(감점) ──
+  if (f && N >= 30 && (swHi != null || swLo != null)) {
+    const atrS = _last(calcATR(f.highs, f.lows, f.closes, 14));
+    const er = _last(calcEfficiencyRatio(f.closes, 10));
+    if (atrS != null && atrS > 0) {
+      for (let b = 1; b <= 2; b++) {
+        const idx = N - 1 - b; // 완결봉만 (진행봉 N-1 제외)
+        if (idx < 1) break;
+        const hi = f.highs[idx], lo = f.lows[idx], cl = f.closes[idx];
+        if (dir > 0 && swHi != null && hi > swHi && cl < swHi) {
+          const pierce = hi - swHi;
+          if (pierce >= 0.1 * atrS && (hi - cl) >= 0.5 * pierce) {
+            mult *= (er != null && er > 0.35) ? 0.90 : 0.82; reasons.push("상단 유동성스윕 후 회귀(추세소진)"); break;
+          }
+        }
+        if (dir < 0 && swLo != null && lo < swLo && cl > swLo) {
+          const pierce = swLo - lo;
+          if (pierce >= 0.1 * atrS && (cl - lo) >= 0.5 * pierce) {
+            mult *= (er != null && er > 0.35) ? 0.90 : 0.82; reasons.push("하단 유동성스윕 후 회귀(추세소진)"); break;
+          }
+        }
+      }
+    }
+  }
+
+  // ── ⑧ 거래량 처닝 — 고거래량인데 가격 진전 없음(노력대비 정체) = 분산 의심(감점) ──
+  if (f && Array.isArray(f.volumes) && f.volumes.length >= 22 && ci >= 6) {
+    const atrArr2 = calcATR(f.highs, f.lows, f.closes, 14);
+    const atrI = atrArr2[ci] ?? _last(atrArr2);
+    const volWin = f.volumes.slice(ci - 20, ci);
+    const vMean = _mean(volWin), vStd = _std(volWin, vMean);
+    if (atrI != null && atrI > 0 && vMean != null && vStd != null && vStd > 0) {
+      const volZ = (f.volumes[ci] - vMean) / vStd;
+      const progress = Math.abs(f.closes[ci] - f.closes[ci - 1]) / atrI;
+      if (volZ >= 2.0 && progress < 0.5) {
+        const trendUp = f.closes[ci] > f.closes[ci - 5];
+        if ((dir > 0 && trendUp) || (dir < 0 && !trendUp)) { mult *= 0.83; reasons.push("거래량 처닝(노력대비 정체)"); }
+      }
+    }
+  }
+
+  // ── ⑨ 200MA 카운터트렌드 페널티 + ADX 추세정합 가점 ──
+  //   ★ 리서치의 'ADX<20 횡보장 일괄 감점'은 composite 레벨에서 전략 family(추세추종 vs
+  //     평균회귀)를 구분 못 해 평균회귀 진입을 오감점할 위험 → 제외. 200MA 거시역행
+  //     감점(가장 robust·MDD 축소)과 ADX 정합 소폭 가점만 채택.
+  if (d?.closes?.length >= 30 && price != null) {
+    const adx = _last(calcADX(d.highs, d.lows, d.closes, 14));
+    const ema21d = _last(calcEMA(d.closes, 21));
+    const diDir = ema21d != null ? (price > ema21d ? 1 : -1) : 0;
+    if (adx != null && adx >= 25 && diDir === dir) { mult *= 1.05; reasons.push(`추세장 정합(ADX ${Math.round(adx)})`); }
+    let ma200 = null, weak = false;
+    if (d.closes.length >= 200) ma200 = _last(calcEMA(d.closes, 200));
+    else { ma200 = _last(calcEMA(d.closes, 55)); weak = true; }
+    if (ma200 != null && ma200 > 0) {
+      const dist = (price - ma200) / ma200;
+      if (Math.abs(dist) > 0.015) { // 데드존 ±1.5% — 전환 직후 첫 진입 과도감점 방지
+        const counter = (dir > 0 && dist < 0) || (dir < 0 && dist > 0);
+        if (counter) {
+          let m = Math.abs(dist) > 0.08 ? 0.78 : 0.85;
+          if (weak) m = 1 - (1 - m) * 0.5; // 200봉 미만 폴백이면 감점 약화
+          mult *= m; reasons.push(`${weak ? "추세선" : "200MA"} 거시역행(${(dist * 100).toFixed(1)}%)`);
+        }
+      }
+    }
+  }
+
+  // ── ⑩ 다중 오실레이터 동시극단 소진캡 — RSI·Stoch·MFI 3계열 동시극단(감점) ──
+  if (f && N >= 20 && Array.isArray(f.volumes) && f.volumes.length >= 20) {
+    const rsi = _last(calcRSI(f.closes, 14));
+    const st = calcStochastic(f.highs, f.lows, f.closes, 14, 3);
+    const stK = _last(st?.k);
+    const mfi = calcMFI(f.highs, f.lows, f.closes, f.volumes, 14);
+    if (rsi != null && stK != null && mfi != null) {
+      const obN = (rsi >= 72 ? 1 : 0) + (stK >= 80 ? 1 : 0) + (mfi >= 80 ? 1 : 0);
+      const osN = (rsi <= 28 ? 1 : 0) + (stK <= 20 ? 1 : 0) + (mfi <= 20 ? 1 : 0);
+      if (dir > 0 && obN >= 3) { mult *= 0.85; reasons.push("RSI·Stoch·MFI 동시 과매수 소진"); }
+      if (dir < 0 && osN >= 3) { mult *= 0.85; reasons.push("RSI·Stoch·MFI 동시 과매도 소진"); }
+    }
+  }
+
+  // ── ⑪ 히든 다이버전스(추세지속 가점) + RSI2 반전 게이트 ──
+  if (f && N >= 30) {
+    const L = N - 1;
+    // 1d 추세 필터
+    let trendUp = null;
+    if (d?.closes?.length >= 55) {
+      const e21 = _last(calcEMA(d.closes, 21)), e55 = _last(calcEMA(d.closes, 55));
+      if (e21 != null && e55 != null) trendUp = e21 > e55;
+    }
+    if (trendUp !== null && L >= 13) {
+      const rsiS = calcRSI(f.closes, 14);
+      const half = 6, lb = 12;
+      let pMinNow = Infinity, pMinPrev = Infinity, sMinNow = Infinity, sMinPrev = Infinity;
+      let pMaxNow = -Infinity, pMaxPrev = -Infinity, sMaxNow = -Infinity, sMaxPrev = -Infinity;
+      for (let i = L - half + 1; i <= L; i++) { if (f.closes[i] == null || rsiS[i] == null) continue; pMinNow = Math.min(pMinNow, f.closes[i]); pMaxNow = Math.max(pMaxNow, f.closes[i]); sMinNow = Math.min(sMinNow, rsiS[i]); sMaxNow = Math.max(sMaxNow, rsiS[i]); }
+      for (let i = L - lb + 1; i <= L - half; i++) { if (f.closes[i] == null || rsiS[i] == null) continue; pMinPrev = Math.min(pMinPrev, f.closes[i]); pMaxPrev = Math.max(pMaxPrev, f.closes[i]); sMinPrev = Math.min(sMinPrev, rsiS[i]); sMaxPrev = Math.max(sMaxPrev, rsiS[i]); }
+      const bullishHidden = isFinite(pMinPrev) && isFinite(pMinNow) && pMinNow > pMinPrev && sMinNow < sMinPrev;
+      const bearishHidden = isFinite(pMaxPrev) && isFinite(pMaxNow) && pMaxNow < pMaxPrev && sMaxNow > sMaxPrev;
+      if (dir > 0 && trendUp && bullishHidden) { mult *= 1.08; reasons.push("히든 불리시 다이버전스(상승지속)"); }
+      if (dir < 0 && !trendUp && bearishHidden) { mult *= 1.08; reasons.push("히든 베어리시 다이버전스(하락지속)"); }
+    }
+    // RSI2 반전 — 평균회귀 레짐(추세장 아닐 때)에서만 회귀 가점
+    const r2 = calcRSI(f.closes, 2);
+    const hurst = calcHurst(f.closes.slice(-100));
+    const adxF = _last(calcADX(f.highs, f.lows, f.closes, 14));
+    const meanRev = (hurst != null && hurst < 0.47) || (adxF != null && adxF < 25);
+    if (meanRev && r2.length >= 2) {
+      const r2n = r2[r2.length - 1], r2p = r2[r2.length - 2];
+      if (dir > 0 && r2p != null && r2n != null && r2p <= 10 && r2n > 10) { mult *= 1.08; reasons.push("RSI2 과매도반전"); }
+      if (dir < 0 && r2p != null && r2n != null && r2p >= 90 && r2n < 90) { mult *= 1.08; reasons.push("RSI2 과매수반전"); }
     }
   }
 

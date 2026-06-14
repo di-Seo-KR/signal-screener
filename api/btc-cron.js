@@ -623,8 +623,8 @@ export default async function handler(req, res) {
       //   "합리적인 좋은 타점" 선별. 방향 불변(감점·가점만). ZEPTA_ENTRY_REFINE=0 으로 끔.
       try {
         const _mk = (arr) => (Array.isArray(arr) && arr.length)
-          ? { closes: arr.map(c => c.close), highs: arr.map(c => c.high), lows: arr.map(c => c.low) } : null;
-        const _perTF = { "1h": _mk(candles1h), "4h": _mk(candles4h), "1d": { closes, highs, lows } };
+          ? { closes: arr.map(c => c.close), highs: arr.map(c => c.high), lows: arr.map(c => c.low), volumes: arr.map(c => c.volume || 0) } : null;
+        const _perTF = { "1h": _mk(candles1h), "4h": _mk(candles4h), "1d": { closes, highs, lows, volumes } };
         const _refSide = compositeSignal?.side || latestSignal?.side;
         if (_refSide) {
           const _ref = refineCompositeEntry({ side: _refSide, perTF: _perTF, sr: srLevels, price: closes[closes.length - 1] });
