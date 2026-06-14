@@ -110,7 +110,25 @@ async function readRealTradingActivity(kv) {
       const entries = yLog.filter((e) => e.mode === "live" && e.result?.ok && !e.dryRun);
       const exits = yLog.filter((e) => e.event === "position_closed");
       const skipped = yLog.filter((e) => !e.signal && e.reason);
-      const realizedToday = exits.reduce((s, e) => s + (e.netPnL || 0), 0);
+      // ★ 2026-06-12 (확정 버그 수정): position-monitor 는 realizedPnL 필드로 기록하는데
+      //   여기선 e.netPnL 로 합산해 어제 실현 손익이 영구 $0 으로 누락됐음.
+      //   realizedPnL 우선 + netPnL 폴백. pnlSource==='unavailable'(API 조회 실패) 은 합산 제외하고 별도 카운트.
+      const realizedExits = exits.filter((e) => e.pnlSource !== "unavailable");
+      const unknownPnlExits = exits.length - realizedExits.length;
+      const realizedToday = realizedExits.reduce((s, e) => s + (Number(e.realizedPnL ?? e.netPnL ?? 0) || 0), 0);
+      // ★ churn 지표: 어제 청산 후 X분 내 동일 심볼 재진입 횟수 (재진입 쿨다운 효과 검증용)
+      const churnWindowMin = 90;
+      let churnReentries = 0;
+      const closedAtBySym = {};
+      for (const e of yLog.slice().reverse()) { // 시간 오름차순
+        const tEv = e.time ? Date.parse(e.time) : 0;
+        if (e.event === "position_closed" && e.symbol) closedAtBySym[e.symbol] = tEv;
+        // 진입 로그 — 심볼 추출 (result.plan.symbol 또는 entry.symbol)
+        const entSym = e.result?.symbol || e.result?.plan?.symbol || (e.mode === "live" && e.result?.ok ? e.symbol : null);
+        if (entSym && closedAtBySym[entSym] && (tEv - closedAtBySym[entSym]) <= churnWindowMin * 60000 && (tEv - closedAtBySym[entSym]) >= 0) {
+          churnReentries += 1;
+        }
+      }
       // 잔고 조회 (status 끼어들기)
       const realStatus = await kv.get(`di:real:user:${uid}:status-cache`).catch(() => null);
       userActivities.push({
@@ -121,6 +139,8 @@ async function readRealTradingActivity(kv) {
         exits: exits.length,
         skipped: skipped.length,
         realizedToday: Number(realizedToday.toFixed(2)),
+        unknownPnlExits,
+        churnReentries,
         openPositions: Array.isArray(posPlans) ? posPlans.length : 0,
         equity: realStatus?.totalWalletBalance ? Number(realStatus.totalWalletBalance) : null,
       });
@@ -291,9 +311,16 @@ function buildRealTradingActivityCard(activity, summary) {
   }
   const lines = [];
   lines.push(`신호 평가 ${me.evaluated}회 · 진입 ${me.entries}건 · 청산 ${me.exits}건`);
-  if (me.realizedToday !== 0) {
+  // ★ 실현 손익 — 청산이 있었으면 항상 표기($0 도). 미확인 건은 정직하게 분리.
+  if (me.exits > 0 || me.realizedToday !== 0) {
     const sign = me.realizedToday >= 0 ? "+" : "";
-    lines.push(`어제 실현 손익: ${sign}$${me.realizedToday}`);
+    let pnlLine = `어제 실현 손익: ${sign}$${me.realizedToday}`;
+    if (me.unknownPnlExits > 0) pnlLine += ` (+ 손익 미확인 ${me.unknownPnlExits}건 — binance API 지연)`;
+    lines.push(pnlLine);
+  }
+  // ★ 2026-06-12 churn 경보: 청산 직후 동일 종목 재진입 (재진입 쿨다운 효과 모니터)
+  if (me.churnReentries > 0) {
+    lines.push(`⚠️ 청산 후 90분 내 동일종목 재진입 ${me.churnReentries}회 — 쿨다운 점검 필요`);
   }
   if (me.openPositions > 0) {
     lines.push(`현재 오픈 포지션: ${me.openPositions}건`);
@@ -328,14 +355,27 @@ function buildShadowReferenceCard(summary) {
   const pf = summary.profitFactor != null ? Number(summary.profitFactor).toFixed(2) : "—";
   const pnl = Number(summary.netPnL || 0).toFixed(2);
   const sign = (summary.netPnL || 0) >= 0 ? "+" : "";
+  const lines = [
+    `누적 ${total}건 · 승률 ${wr}% · 손익비 ${pf}`,
+    `누적 손익 ${sign}$${pnl}`,
+  ];
+  // ★ 2026-06-12: 청산 사유 분포 — TIME+SOFT_TIME 비율 높으면 박스권 휩쏘(churn) 경보.
+  //   대표 제보 '청산 직후 재진입 손실'과 같은 결 — 박스권에서 자주 청산되면 재진입 churn 위험.
+  const cr = summary.byCloseReason || {};
+  const crTotal = (cr.TP || 0) + (cr.SL || 0) + (cr.TIME || 0) + (cr.SOFT_TIME || 0);
+  let warn;
+  if (crTotal >= 10) {
+    const timePct = Math.round(((cr.TIME || 0) + (cr.SOFT_TIME || 0)) / crTotal * 100);
+    const slPct = Math.round((cr.SL || 0) / crTotal * 100);
+    lines.push(`청산사유: 익절 ${cr.TP || 0} · 손절 ${cr.SL || 0} · 시간 ${(cr.TIME || 0) + (cr.SOFT_TIME || 0)} (시간청산 ${timePct}%)`);
+    if (timePct >= 50) warn = `⚠️ 시간청산 ${timePct}% — 박스권 휩쏘 다발. 변동성 필터(ZEPTA_MIN_ATR_PCT)↑ 검토`;
+    else if (slPct >= 50) warn = `⚠️ 손절 ${slPct}% — 진입 선별 강도↑ 또는 재진입 쿨다운(LOSS_MIN)↑ 검토`;
+  }
   return buildCard({
     tag: "🌙",
     title: "가상매매 누적 (참고용)",
-    lines: [
-      `누적 ${total}건 · 승률 ${wr}% · 손익비 ${pf}`,
-      `누적 손익 ${sign}$${pnl}`,
-    ],
-    footer: pf !== "—" && Number(pf) < 1.2 ? "손익비 1.2 미만 — 전략 개선 필요" : undefined,
+    lines,
+    footer: warn || (pf !== "—" && Number(pf) < 1.2 ? "손익비 1.2 미만 — 전략 개선 필요" : undefined),
   });
 }
 
