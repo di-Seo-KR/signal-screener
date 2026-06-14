@@ -32,6 +32,7 @@ import {
 import { getSymbolFilter } from "../_shared/exchange-info.js";
 import { evaluateMtfExitSignals } from "../_shared/exit-signals.js";
 import { evaluateDrawdownGuard } from "./drawdown-guard.js";
+import { recordReentryCooldown } from "../_shared/reentry-cooldown.js";
 
 export const config = { maxDuration: 60 };
 
@@ -131,6 +132,14 @@ async function checkUser(userId) {
       await kv.set(logKey, log.slice(0, 200));
       // ★ M5 fix: 객체 배열 직접 mutate (이전엔 string vs 객체 비교 버그)
       closedEntry.realizedPnL = realizedSafe;
+
+      // ★ 2026-06-12 (대표 지시): 재진입 쿨다운 기록 — 청산 직후 동일 종목·방향 즉시
+      //   재진입 churn 손실 방지. 손절은 길게(120m), 익절은 짧게(45m). plan 삭제(아래
+      //   텔레그램 블록 line ~181) 전에 side 를 확보. plan 없으면 side=null(전방향 차단).
+      try {
+        const planForSide = await kv.get(`di:real:user:${userId}:plan:${sym}`);
+        await recordReentryCooldown(kv, userId, { symbol: sym, side: planForSide?.side, pnl: realizedSafe });
+      } catch {}
 
       // ★ 청산 감지 텔레그램 알림 (수동·봇 구분, realized 누락도 fallback)
       try {
