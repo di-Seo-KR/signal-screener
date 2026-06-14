@@ -181,7 +181,11 @@ async function pullRecentSignals({ userId, lookbackMs = 4 * 60 * 60 * 1000, adva
     }
   }
   if (advanceCursor) {
-    try { await kv.set(lastSeenKey, now); } catch {}
+    // ★ 감사 P2: 커서 advance 실패를 관측 가능하게(기존 빈 catch=무음 실패). 비치명적 —
+    //   다음 사이클은 minTs=Math.min(lastSeen, now-lookback) 의 lookback 윈도우 + seenAssetType
+    //   dedup + clientOrderId 멱등성으로 중복주문이 차단되므로 로깅만 하고 진행.
+    try { await kv.set(lastSeenKey, now); }
+    catch (e) { console.warn(`[engine] lastSeen 커서 advance 실패 (${userId}): ${e?.message} — lookback 윈도우로 dedup 보호됨`); }
   }
   return { candidates, diag };
 }
@@ -862,6 +866,12 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
         currentSlPrice: plan.plan.slPrice,
         highWater: plan.plan.entryPrice,
         strategyFamily: plan.plan.strategyFamily,
+        // ★ 2026-06-14 (감사 P1-1): confidence/timeframe 영속화 — position-monitor →
+        //   live-summary(byConfidence·byTimeframe) → alpha-lab 학습통계 오염 방지.
+        //   plan.plan.confidence 는 signal.confidence 복사본(존재 확정). timeframe 은
+        //   plan 에 없어 cand.timeframe(진입 후보의 TF)으로 채움. 표시/통계 전용 — 거래 무영향.
+        confidence: plan.plan.confidence,
+        timeframe: cand.timeframe || undefined,
         regime: regimeSnapshot, // ★ 진입 시점 시장 레짐 스냅샷 (Hurst bucket 분석용)
       });
       S(`plan persisted to ${planKey}`);
