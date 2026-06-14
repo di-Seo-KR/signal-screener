@@ -909,7 +909,9 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
         //   plan.plan.confidence 는 signal.confidence 복사본(존재 확정). timeframe 은
         //   plan 에 없어 cand.timeframe(진입 후보의 TF)으로 채움. 표시/통계 전용 — 거래 무영향.
         confidence: plan.plan.confidence,
-        timeframe: cand.timeframe || undefined,
+        // ★ 2026-06-14 핫픽스: cand 는 for 루프 블록 스코프라 이 plan 저장(루프 밖)에선
+        //   ReferenceError → plan 저장 실패 → 포지션 무관리(P0). 채택된 후보는 best(=cand).
+        timeframe: best.timeframe || undefined,
         regime: regimeSnapshot, // ★ 진입 시점 시장 레짐 스냅샷 (Hurst bucket 분석용)
       });
       S(`plan persisted to ${planKey}`);
