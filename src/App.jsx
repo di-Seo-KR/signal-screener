@@ -4373,25 +4373,8 @@ function AppInner() {
   }, [user, showAuthModal]);
 
   // ── 베타 가입자 수 (MKT-LEAD 2026-05-12) ──
-  // 홈 비로그인 배너의 신뢰 시그널 4-pill 중 "베타 무료" → "베타 사용자 N+" 로 동적 노출.
-  // 비로그인 사용자만 fetch (로그인 사용자에겐 배너 미노출).
-  const [betaCount, setBetaCount] = useState(null);
-  useEffect(() => {
-    if (user) return; // 로그인 사용자는 fetch 불필요
-    let cancelled = false;
-    fetch("/api/stats/beta-count")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (cancelled) return;
-        if (d?.ok && typeof d.count === "number" && d.count > 0) {
-          setBetaCount(d.count);
-        }
-      })
-      .catch(() => {
-        /* fail-soft — static fallback ("베타 무료") 유지 */
-      });
-    return () => { cancelled = true; };
-  }, [user]);
+  // ★ 2026-06-14 (대표 지시): 가짜 베타 가입자 추산값(BASELINE 1200) 노출 제거.
+  //   실제 가입수는 마케팅 대시보드(/marketing)에서만 표기 — 홈 배너는 '베타 무료' 정직 표기.
 
   // ── 입문자 온보딩 (PLAN-SVC #5, 2026-05-11) ──
   // 가입 직후 1회 자동 표시. user_metadata.onboarding.completed 로 1회 가드.
@@ -7372,10 +7355,8 @@ function AppInner() {
                     { icon: "🧪", label: "검증 전략", value: "9개" },
                     { icon: "📡", label: "라이브 데이터", value: "Yahoo · Binance" },
                     { icon: "🔒", label: "보안", value: "TLS 1.3 · Supabase Auth" },
-                    // ★ 2026-05-12 MKT-LEAD: 베타 가입자 수 동적 노출 (fail-soft → "베타 무료")
-                    betaCount && betaCount > 0
-                      ? { icon: "👥", label: "베타 사용자", value: `${betaCount.toLocaleString("ko-KR")}+` }
-                      : { icon: "💳", label: "결제", value: "베타 무료" },
+                    // ★ 2026-06-14 (대표 지시): 가짜 베타 가입자 추산값 제거 — '베타 무료' 정직 표기.
+                    { icon: "💳", label: "결제", value: "베타 무료" },
                   ].map((it, i) => (
                     <div key={i} style={{
                       display: "inline-flex", alignItems: "center", gap: "8px",
