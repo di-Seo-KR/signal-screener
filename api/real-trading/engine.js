@@ -32,6 +32,7 @@ import { getTickerPrice, getAccountInfo, getKlines, getPositionRisk } from "../_
 import { UNIVERSE_KV_KEY } from "../_shared/futures-universe.js";
 import { executeOrderPlan } from "../binance/order.js";
 import { checkReentryCooldown } from "../_shared/reentry-cooldown.js";
+import { getStrategyStatus, STRATEGY_STATUS } from "../_shared/dynamic-config.js";
 
 export const config = { maxDuration: 60 };
 
@@ -454,6 +455,43 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     }
   } catch (e) {
     S(`family weights skipped: ${e?.message}`);
+  }
+
+  // ★ 2026-06-14 (대표 승인): 전략 상태(WATCH/DISABLED) 실거래 배선.
+  //   auto-promote 가 성과 기반으로 분류한 di:alpha:strategy-status:<family> 를 실거래
+  //   선별에 반영 — 그동안 기록만 하고 실거래에서 안 읽어 성과미달 전략이 full 가중치로
+  //   진입하던 누락(종합감사 P1-2) 보완.
+  //     • DISABLED → 실거래 차단(정의상 shadow 만 운영).
+  //     • WATCH    → 절반 가중치(0.5×)로 de-prioritize — 후순위로 밀려 덜 채택됨.
+  //   ★ shadow 미적용: 안 좋은 전략도 shadow 에선 계속 돌려 개선·회복을 관찰(대표 라이프
+  //     사이클 지시 "개선하거나 정 안되면 폐기"). 회복하면 auto-promote 가 ACTIVE 로 재승급.
+  //   ★ fail-safe: getStrategyStatus 는 KV 오류 시 ACTIVE 반환 → 오류로 인한 오차단 없음.
+  //   ZEPTA_STATUS_FILTER=0 으로 끔.
+  if (!shadow && process.env.ZEPTA_STATUS_FILTER !== "0" && ranked.length > 0) {
+    try {
+      const famOf = (r) => r.strategyFamily || r.family || "unknown";
+      const fams = [...new Set(ranked.map(famOf))];
+      const statusByFam = {};
+      await Promise.all(fams.map(async (f) => { statusByFam[f] = await getStrategyStatus(f); }));
+      const beforeN = ranked.length;
+      const kept = ranked.filter((r) => statusByFam[famOf(r)] !== STRATEGY_STATUS.DISABLED);
+      const disabledN = beforeN - kept.length;
+      // WATCH → 절반 가중치로 재정렬 (applyWeightsToRanking 와 동일 sortKey 공식 · status weight 추가)
+      const rescored = kept
+        .map((r) => {
+          const sw = statusByFam[famOf(r)] === STRATEGY_STATUS.WATCH ? 0.5 : 1;
+          const base = (r.confidence || 0) + (r.score || 0) / 100;
+          return { sig: { ...r, _statusWeight: sw }, key: base * (r._famWeight ?? 1) * sw };
+        })
+        .sort((a, b) => b.key - a.key);
+      const watchN = rescored.filter((x) => x.sig._statusWeight === 0.5).length;
+      ranked = rescored.map((x) => x.sig); // 전 후보 DISABLED 면 [] → 진입 안 함(의도된 차단, 후처리 안전)
+      if (disabledN > 0 || watchN > 0) {
+        S(`strategy-status (라이브): DISABLED ${disabledN}건 차단, WATCH ${watchN}건 0.5×${ranked.length === 0 ? " — 전 후보 차단, 진입 없음" : ""}`);
+      }
+    } catch (e) {
+      S(`strategy-status skip: ${e?.message}`);
+    }
   }
 
   // ★ 자동 종목 차단 — 2026-05-09 audit M7: live-summary 우선 + shadow 보조.
