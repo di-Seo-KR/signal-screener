@@ -31,6 +31,7 @@ import { getSymbolFilter, isSymbolAffordable } from "../_shared/exchange-info.js
 import { getTickerPrice, getAccountInfo, getKlines, getPositionRisk } from "../_shared/binance-client.js";
 import { UNIVERSE_KV_KEY } from "../_shared/futures-universe.js";
 import { executeOrderPlan } from "../binance/order.js";
+import { checkReentryCooldown } from "../_shared/reentry-cooldown.js";
 
 export const config = { maxDuration: 60 };
 
@@ -634,6 +635,22 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       S(`  ↳ ${cand.symbol}: dedup mode '${dedupMode}' — 같은 심볼 OPEN 상태로 스킵`);
       tried.push({ symbol: cand.symbol, reason: `dedup '${dedupMode}': already open` });
       continue;
+    }
+    // ★ 2026-06-12 (대표 지시): 재진입 쿨다운 — 최근 청산한 심볼(+방향)은 일정 시간
+    //   재진입 차단. 청산 직후 동일 종목·동일 방향 즉시 재진입 churn 손실 방지.
+    //   shadow 는 통계 다양성 확보 위해 미적용(라이브 결정에만 적용). ZEPTA_REENTRY_COOLDOWN=0 으로 끔.
+    if (!shadow) {
+      try {
+        const kvCd = await getKv();
+        const cd = await checkReentryCooldown(kvCd, userId, cand.symbol, cand.side);
+        if (cd.blocked) {
+          S(`  ↳ ${cand.symbol} ${cand.side}: 재진입 쿨다운 — ${cd.remainMin}분 남음 (${cd.reason})`);
+          tried.push({ symbol: cand.symbol, reason: `reentry cooldown ${cd.remainMin}m: ${cd.reason}` });
+          continue;
+        }
+      } catch (e) {
+        S(`  ↳ 재진입 쿨다운 체크 skip: ${e?.message || String(e)}`);
+      }
     }
     S(`try: ${cand.symbol} ${cand.side} conf=${cand.confidence} fam=${cand.strategyFamily}`);
     try {
