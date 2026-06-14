@@ -20,9 +20,9 @@
 // ════════════════════════════════════════════════════════════════════
 
 const KV_LIST_KEY = "zepta:beta-waitlist:payment";
-// 기존 활성 사용자 베이스라인 (퀀트팀 추산 + Sentry 식별 unique user)
-// — 실제 수치가 1 자리에서 출발하면 신뢰감을 떨어뜨리므로 합리적 baseline 부여.
-const BASELINE = 1200;
+// ★ 2026-06-14 (대표 지시): 가짜 추산 baseline(1200) 제거 — 실제 KV 카운트만 정직 반환.
+//   홈 배너는 이제 이 API 를 호출하지 않음(App.jsx 에서 제거). 실가입수는 /marketing 에서.
+const BASELINE = 0;
 
 async function getKv() {
   try {
