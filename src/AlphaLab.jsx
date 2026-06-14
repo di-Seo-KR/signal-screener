@@ -171,7 +171,10 @@ function Stat({ label, value, sub, color, tip }) {
 function RegimePanel({ data }) {
   const C = useThemeTokens();
   const regime = data?.regime || data?.leaderboard?.regime || null;
-  const weights = data?.weights?.weights || {};
+  // ★ 감사 P2: KV 가 손상된 비객체 truthy(문자열·배열)를 줘도 안전하게 — || {} 는 truthy 면
+  //   그대로 통과해 하단 Object.entries 순회가 깨질 수 있음. 평범한 객체만 허용.
+  const _w = data?.weights?.weights;
+  const weights = (_w && typeof _w === "object" && !Array.isArray(_w)) ? _w : {};
   const updatedAt = data?.weights?.updatedAt;
 
   const regimeKey = regime?.regime || "unknown";

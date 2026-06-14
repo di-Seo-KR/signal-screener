@@ -89,7 +89,8 @@ async function checkUser(userId) {
       let realized = null;
       try {
         const trades = await getUserTrades({ ...creds, symbol: sym, startTime, limit: 50 });
-        const sum = (trades || []).reduce((s, t) => s + parseFloat(t.realizedPnl || 0), 0);
+        // ★ 감사 P2: 프록시 에러 시 비배열 객체({ok:false,...}) 반환 가능 → Array.isArray 가드
+        const sum = (Array.isArray(trades) ? trades : []).reduce((s, t) => s + parseFloat(t.realizedPnl || 0), 0);
         if (Number.isFinite(sum)) realized = sum;
       } catch (e) {
         console.warn(`[monitor] userTrades ${sym} failed:`, e?.message);
@@ -509,6 +510,9 @@ async function checkUser(userId) {
     };
   }
   await kv.set(lastPosKey, nextMap);
+  // ★ 2026-06-14 (감사 P2): daily-standup 이 읽는 di:real:user:<uid>:open-positions(배열)
+  //   적재 — 미적재로 일일보고 '오픈 포지션 수'가 항상 0 이던 데이터계약 누락 보완. 표시/통계 전용.
+  await kv.set(`di:real:user:${userId}:open-positions`, Object.values(nextMap));
 
   // ── ★ 5) drawdown guard (2026-05-17 — QUANT-PLAN) ──
   //   peak (equityHigh30d) 대비 현재 equity 의 drawdown 평가.

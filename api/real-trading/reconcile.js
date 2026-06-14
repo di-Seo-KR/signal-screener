@@ -95,7 +95,8 @@ async function reconcileUser(userId) {
     for (const s of symbolsOfInterest.slice(0, 5)) {
       try {
         const tr = await getUserTrades({ ...creds, symbol: s, startTime, limit: 200 });
-        for (const t of (tr || [])) total += parseFloat(t.realizedPnl || "0");
+        // ★ 감사 P2: 프록시 에러 시 비배열 반환 가능 → Array.isArray 가드
+        for (const t of (Array.isArray(tr) ? tr : [])) total += parseFloat(t.realizedPnl || "0");
       } catch {}
     }
     diff.realizedToday = total;

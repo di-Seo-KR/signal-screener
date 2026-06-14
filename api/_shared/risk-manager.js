@@ -697,10 +697,17 @@ export function planTrade({ signal, equity, price, atr, filter, regime = null, a
   let finalLev = leverage;
   if (stopDistPct > safeSL) {
     push(`SL ${(stopDistPct * 100).toFixed(2)}% > safe ${(safeSL * 100).toFixed(2)}% — leverage 조정 필요`);
+    // needLev = SL 이 안전한 *최대* 레버리지(0.9 안전마진 포함). 레버리지가 낮을수록
+    //   청산거리가 멀어져 안전 → finalLev ≤ needLev 면 안전. 최저 허용 레버리지(minLev)로도
+    //   못 낮추면(needLev < minLev) 거부.
     const needLev = Math.ceil(1 / (stopDistPct / (cfg.liqSafetyRatio || 0.7) / 0.9));
     const adjLev = clamp(needLev, cfg.minLeverage, cfg.maxLeverage);
-    if (adjLev >= leverage) {
-      return { ok: false, reason: `SL ${(stopDistPct * 100).toFixed(2)}% 가 최대 레버리지에서도 청산거리 초과 — 거부`, log };
+    // ★ 2026-06-14 (감사 P1-3): 거부 조건을 needLev < minLeverage 로 정정.
+    //   기존 `adjLev >= leverage`는 고정 레버리지(min=max)에선 우연히 맞으나, 가변
+    //   레버리지(minLev < 현재lev)에서 needLev < minLev 인데도 거부 못 해 *불안전 레버리지*로
+    //   진입하던 latent landmine. 현 고정 5x 설정에선 동작 불변(둘 다 거부).
+    if (needLev < cfg.minLeverage) {
+      return { ok: false, reason: `SL ${(stopDistPct * 100).toFixed(2)}% 가 최저 레버리지(${cfg.minLeverage}x)에서도 청산거리 초과 — 거부`, log };
     }
     push(`auto-adjust leverage → ${adjLev}x`);
     finalLev = adjLev;
