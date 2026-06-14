@@ -681,26 +681,31 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       tried.push({ symbol: cand.symbol, reason: `dedup '${dedupMode}': already open` });
       continue;
     }
-    // ★ 2026-06-12 (대표 지시): 재진입 쿨다운 — 최근 청산한 심볼(+방향)은 일정 시간
-    //   재진입 차단. 청산 직후 동일 종목·동일 방향 즉시 재진입 churn 손실 방지.
-    //   shadow 는 통계 다양성 확보 위해 미적용(라이브 결정에만 적용). ZEPTA_REENTRY_COOLDOWN=0 으로 끔.
-    if (!shadow) {
-      try {
-        const kvCd = await getKv();
-        const cd = await checkReentryCooldown(kvCd, userId, cand.symbol, cand.side);
-        if (cd.blocked) {
-          S(`  ↳ ${cand.symbol} ${cand.side}: 재진입 쿨다운 — ${cd.remainMin}분 남음 (${cd.reason})`);
-          tried.push({ symbol: cand.symbol, reason: `reentry cooldown ${cd.remainMin}m: ${cd.reason}` });
-          continue;
-        }
-      } catch (e) {
-        S(`  ↳ 재진입 쿨다운 체크 skip: ${e?.message || String(e)}`);
-      }
-    }
+    // ★ 재진입 쿨다운 체크는 아래 ticker 가격 조회 직후로 이동(2026-06-14) — 품질 게이트가
+    //   '더 매력적 가격'을 비교하려면 현재가(pr)가 필요하기 때문.
     S(`try: ${cand.symbol} ${cand.side} conf=${cand.confidence} fam=${cand.strategyFamily}`);
     try {
       const tick = await getTickerPrice({ symbol: cand.symbol });
       const pr = parseFloat(tick.price);
+
+      // ★ 2026-06-12/14 (대표 지시): 재진입 쿨다운 + 품질 게이트. 청산 직후 동일 종목·방향
+      //   재진입 차단(churn 방지). 단 "더 매력적 가격(롱=더 싸게/숏=더 비싸게) 또는 더 강한
+      //   신호"면 쿨다운 면제 — 트레이더처럼 더 나은 타점엔 들어간다(가격 비교 위해 ticker 후 체크).
+      //   shadow 미적용(라이브만). ZEPTA_REENTRY_COOLDOWN=0 / _QUALITY_GATE=0 으로 끔.
+      if (!shadow) {
+        try {
+          const kvCd = await getKv();
+          const cd = await checkReentryCooldown(kvCd, userId, cand.symbol, cand.side, { price: pr, score: cand.score });
+          if (cd.blocked) {
+            S(`  ↳ ${cand.symbol} ${cand.side}: 재진입 쿨다운 — ${cd.remainMin}분 남음 (${cd.reason})`);
+            tried.push({ symbol: cand.symbol, reason: `reentry cooldown ${cd.remainMin}m: ${cd.reason}` });
+            continue;
+          }
+          if (cd.waived) S(`  ↳ ${cand.symbol} ${cand.side}: 쿨다운 면제 — ${cd.reason}`);
+        } catch (e) {
+          S(`  ↳ 재진입 쿨다운 체크 skip: ${e?.message || String(e)}`);
+        }
+      }
       // ★ 2026-05-09 audit N1: family-aware ATR interval.
       //   mean-revert 는 4h 시그널이라도 더 짧은 1h ATR 이 적절 (회귀는 단기 변동성 ↑).
       //   trend/breakout 은 4h 가 적절. timeframe 명시 우선.
@@ -912,6 +917,9 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
         // ★ 2026-06-14 핫픽스: cand 는 for 루프 블록 스코프라 이 plan 저장(루프 밖)에선
         //   ReferenceError → plan 저장 실패 → 포지션 무관리(P0). 채택된 후보는 best(=cand).
         timeframe: best.timeframe || undefined,
+        // ★ 2026-06-14: 진입 신호점수 — 청산 시 쿨다운 레코드로 넘겨 재진입 품질 게이트
+        //   ("더 강한 신호인가") 비교 기준. best.score = 진입 후보의 (정제) 점수.
+        score: Number.isFinite(Number(best.score)) ? Number(best.score) : null,
         regime: regimeSnapshot, // ★ 진입 시점 시장 레짐 스냅샷 (Hurst bucket 분석용)
       });
       S(`plan persisted to ${planKey}`);
