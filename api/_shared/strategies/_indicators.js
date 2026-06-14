@@ -591,6 +591,35 @@ export function refineCompositeEntry({ side, perTF = {}, sr = null, price = null
     }
   }
 
+  // ── ⑫ S/R 근접 *기회* — 지지 근접 롱 / 저항 근접 숏 = 좋은 타점(반등·거부 기대) 가점 ──
+  //   ③(저항밑 롱·지지위 숏 = 여력부족 감점)의 대칭 보완(2026-06-14 대표 지시).
+  //   "지지에 가까울수록 롱·저항에 가까울수록 숏 점수가 올라야" → 거리 램프(가까울수록 가점↑).
+  //   ★ 떨어지는 칼 방지 — t(터치횟수)별 차등배율 (적대적 검증 w2gm79qwb 반영):
+  //     • t≥2(다중터치 클러스터) = 풀배율 1.10×. 레벨 하향이탈 시 ⑤ 구조붕괴 감점(t≥2 게이트)이 곱연산 상쇄.
+  //     • t==1(단일터치 / range-band 실제 최근 극값 — #147 초변동코인 매물대) = 반배율 1.05×.
+  //       ★ ⑤ 구조붕괴 감점은 t≥2 게이트라 t:1 레벨엔 상쇄가 *없음* → 가점을 절반으로 제한해
+  //         미상쇄 익스포저를 막고, falling-knife는 ⑨ 200MA역행·① MTF소진 매크로 가드에 의존.
+  //     • t==0(합성 피봇) = 게이트(t≥1) 자동 배제 — 실제 매물대 아님.
+  //   지지/저항은 다른 레벨이라 ③ 감점과 동시 발화해도 모순 없음(좁은 박스권 → 상쇄=중립).
+  if (sr && price != null) {
+    const BAND = 0.02;                         // 2% 근접 밴드
+    const ramp = (dist, lvl) => 1 + Math.max(0, Math.min(1, (BAND - dist) / BAND)) * ((lvl.t || 0) >= 2 ? 0.10 : 0.05); // t≥2→1.10, t==1→1.05
+    if (dir > 0 && Array.isArray(sr.s)) {
+      const nearS = sr.s.filter(x => x.p < price && (x.t || 0) >= 1).sort((a, b) => b.p - a.p)[0];
+      if (nearS) {
+        const dist = (price - nearS.p) / price;
+        if (dist > 0 && dist < BAND) { const b = ramp(dist, nearS); mult *= b; reasons.push(`지지 ${(dist * 100).toFixed(1)}% 근접 롱(반등 기대 ${b.toFixed(2)}×)`); }
+      }
+    }
+    if (dir < 0 && Array.isArray(sr.r)) {
+      const nearR = sr.r.filter(x => x.p > price && (x.t || 0) >= 1).sort((a, b) => a.p - b.p)[0];
+      if (nearR) {
+        const dist = (nearR.p - price) / price;
+        if (dist > 0 && dist < BAND) { const b = ramp(dist, nearR); mult *= b; reasons.push(`저항 ${(dist * 100).toFixed(1)}% 근접 숏(거부 기대 ${b.toFixed(2)}×)`); }
+      }
+    }
+  }
+
   mult = Math.max(0.45, Math.min(1.2, mult));
   return { mult, reasons };
 }
