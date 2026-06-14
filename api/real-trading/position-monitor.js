@@ -218,6 +218,18 @@ async function checkUser(userId) {
     const entryPrice = parseFloat(p.entryPrice);
     const markPrice = parseFloat(p.markPrice);
 
+    // ★ 2026-06-14 (대표 제보 — RIF 청산 직후 롱 재진입): 봇 자체 청산(SL/TP·MTF·시간손절)이
+    //   쿨다운을 *즉시* 기록하지 않고, 다음 런의 청산 *감지*(line ~150, 최대 2분 지연)에만
+    //   의존하던 게 churn 의 근본 원인. 그 공백에 engine(5분 cron)이 재진입하면, 재진입 후엔
+    //   포지션이 다시 열려 '청산'으로 감지되지도 않아 쿨다운이 영영 안 걸렸다. → 봇이 직접
+    //   청산하는 지점에서 *즉시* 기록해 공백 제거. pnl 부호(손절/익절 구분)는 mark·entry·수량
+    //   으로 추정(SL=음수→120분, TP/이익=양수→45분). recordReentryCooldown 내부 try-catch + 여기 .catch.
+    const recordCooldownNow = () =>
+      recordReentryCooldown(kv, userId, {
+        symbol: sym, side,
+        pnl: (markPrice - entryPrice) * parseFloat(p.positionAmt),
+      }).catch(() => {});
+
     // ── highWater 갱신 (LONG=max, SHORT=min) ──
     const prevHW = plan.highWater || markPrice;
     const newHW = side === "LONG" ? Math.max(prevHW, markPrice) : Math.min(prevHW, markPrice);
@@ -286,6 +298,7 @@ async function checkUser(userId) {
         plan.botClosedAt = Date.now();
         plan.botCloseReason = reason;
         await kv.set(planKey, plan);
+        await recordCooldownNow(); // ★ 청산 즉시 쿨다운 — 재진입 공백 제거 (RIF churn 수정)
         continue; // 시간손절·트레일링 평가 스킵
       } catch (e) {
         console.warn(`[monitor] price SL/TP close failed for ${sym}:`, e?.message);
@@ -359,6 +372,7 @@ async function checkUser(userId) {
             plan.botClosedAt = Date.now();
             plan.botCloseReason = "mtf_exit";
             await kv.set(planKey, plan);
+            await recordCooldownNow(); // ★ 청산 즉시 쿨다운 — 재진입 공백 제거 (RIF churn 수정)
             if (!report.mtfClosed) report.mtfClosed = [];
             report.mtfClosed.push({ sym, confidence: mtf.confidence, reasons: mtf.reasons });
             continue; // 후속 평가 skip
@@ -415,6 +429,7 @@ async function checkUser(userId) {
           reason: ts.reason,
         });
         await kv.set(logKey, log.slice(0, 600)); // engine-log cap 600 (어제활동 보존)
+        await recordCooldownNow(); // ★ 청산 즉시 쿨다운 — 재진입 공백 제거 (RIF churn 수정)
         // 다음 단계 평가 skip
         continue;
       } catch (e) {
