@@ -392,10 +392,13 @@ export default async function handler(req, res) {
       const sigForTF = (arr, tf) => {
         if (!Array.isArray(arr) || arr.length < 61) return null;
         try {
-          return pickTopBotSignal(computeBotSignals({
-            asset, closes: arr.map(c => c.close), highs: arr.map(c => c.high),
-            lows: arr.map(c => c.low), volumes: arr.map(c => c.volume || 0), timeframe: tf, paramsByStrategy,
+          const cl = arr.map(c => c.close), hi = arr.map(c => c.high), lo = arr.map(c => c.low);
+          const s = pickTopBotSignal(computeBotSignals({
+            asset, closes: cl, highs: hi, lows: lo, volumes: arr.map(c => c.volume || 0), timeframe: tf, paramsByStrategy,
           }));
+          if (s) return s;
+          // ★ 2026-06-14: 전략 HOLD → 지표 기반 약한 추세읽기 폴백 (TF 빈칸 방지)
+          return tfFallbackSignal(cl, hi, lo, tf);
         } catch { return null; }
       };
       const tf1wSignal = sigForTF(candles1w, "1w");
@@ -1176,6 +1179,32 @@ function computeBotSignals({ asset, closes, highs, lows, volumes, timeframe, par
     }
   }
   return out;
+}
+
+// ★ 2026-06-14 (대표 제보): TF별 전략이 HOLD(무신호)면 그 타임프레임이 카드에서 빈칸(—)으로
+//   떴음(BTC/ETH/SOL 4h 등 19/49종). 전략이 비면 지표 기반 약한 추세읽기로 폴백 — 모든 TF가
+//   값을 갖게. 점수는 보수적(53~65, 등급 C)이라 전략 신호를 지배하지 않음. 진짜 중립(방향 0)이면
+//   폴백도 null(정직). analyzeLatest 폴백과 동일 철학.
+function tfFallbackSignal(closes, highs, lows, tf) {
+  if (!Array.isArray(closes) || closes.length < 30) return null;
+  const ema21 = calcEMA(closes, 21);
+  const ema55 = calcEMA(closes, 55);
+  const rsiArr = calcRSI(closes, 14);
+  const L = closes.length - 1;
+  const e21 = ema21[L], e55 = ema55[L], rsi = rsiArr[L], px = closes[L];
+  if (e21 == null || e55 == null || rsi == null || !(px > 0)) return null;
+  let dir = 0;
+  if (e21 > e55) dir += 1; else if (e21 < e55) dir -= 1;       // 추세
+  if (px > e21) dir += 1; else if (px < e21) dir -= 1;          // 위치
+  if (rsi > 55) dir += 1; else if (rsi < 45) dir -= 1;          // 모멘텀 바이어스
+  if (dir === 0) return null; // 진짜 방향 없음 → 폴백 안 함(정직)
+  const side = dir > 0 ? "LONG" : "SHORT";
+  const score = 50 + Math.abs(dir) * 5; // 55/60/65 — 전략 신호보다 보수적
+  return {
+    type: side === "LONG" ? "BUY" : "SELL", side, score,
+    confidence: "C", family: "tf-trend", timeframe: tf,
+    reason: `${tf} 추세읽기(EMA·RSI)`, fallback: true,
+  };
 }
 
 function pickTopBotSignal(botSignals) {

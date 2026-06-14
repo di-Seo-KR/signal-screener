@@ -42,6 +42,26 @@ function pivotOnly(candles, refPrice) {
   return { s, r, piv: round5(piv.P), px: round5(refPrice), m: "pivot" };
 }
 
+/** 최근 N일 실제 고점·저점 폴백 — 피봇이 ±캡 밖으로 폭주하는 초변동 코인 대응
+ *  (2026-06-14 대표 제보: SIREN·VELVET 등 지지/저항 미표시). 실제 거래 가격이라 정직. */
+function recentRangeBand(candles, refPrice, N = 20) {
+  if (!Array.isArray(candles) || !(refPrice > 0)) return null;
+  const win = candles.slice(-N);
+  if (win.length < 5) return null;
+  const highs = win.map((c) => Number(c.high)).filter((v) => Number.isFinite(v) && v > 0);
+  const lows = win.map((c) => Number(c.low)).filter((v) => Number.isFinite(v) && v > 0);
+  if (!highs.length || !lows.length) return null;
+  const hi = Math.max(...highs), lo = Math.min(...lows), mid = (hi + lo) / 2;
+  const mk = (p) => ({ p: round5(p), t: 1, d: round1((p / refPrice - 1) * 100) });
+  const s = [], r = [];
+  if (lo < refPrice * 0.998) s.push(mk(lo));        // 최근 저점 = 지지
+  if (mid < refPrice * 0.998) s.push(mk(mid));      // 중간값 보강
+  if (hi > refPrice * 1.002) r.push(mk(hi));        // 최근 고점 = 저항
+  if (mid > refPrice * 1.002) r.push(mk(mid));
+  if (!s.length && !r.length) return null;
+  return { s: s.slice(0, 2), r: r.slice(0, 2), piv: round5(mid), px: round5(refPrice), m: "range" };
+}
+
 /**
  * 지지·저항 레벨 계산.
  * @param {Array<{high:number,low:number,close:number}>} dailyCandles 일봉(과거→최신)
@@ -52,7 +72,7 @@ export function computeSRLevels(dailyCandles, refPrice, { N = 60, k = 2, tol = 0
     if (!Array.isArray(dailyCandles) || !(refPrice > 0)) return null;
     // 진행 중인 마지막 일봉 제외(고저 미확정) + 최근 N개 윈도우
     const win = dailyCandles.slice(0, -1).slice(-N);
-    if (win.length < 2 * k + 3) return pivotOnly(dailyCandles, refPrice);
+    if (win.length < 2 * k + 3) return pivotOnly(dailyCandles, refPrice) || recentRangeBand(dailyCandles, refPrice);
 
     // 1) 스윙 고저점 — 좌우 k개보다 엄격히 높/낮은 극값
     const swings = [];
@@ -66,7 +86,7 @@ export function computeSRLevels(dailyCandles, refPrice, { N = 60, k = 2, tol = 0
       if (isHigh && Number.isFinite(win[i].high)) swings.push({ p: win[i].high, idx: i });
       if (isLow && Number.isFinite(win[i].low)) swings.push({ p: win[i].low, idx: i });
     }
-    if (swings.length === 0) return pivotOnly(dailyCandles, refPrice);
+    if (swings.length === 0) return pivotOnly(dailyCandles, refPrice) || recentRangeBand(dailyCandles, refPrice);
 
     // 2) 가격순 1-pass 병합 (상대 tol — 미세가격 코인 과병합 방지)
     swings.sort((a, b) => a.p - b.p);
@@ -131,7 +151,7 @@ export function computeSRLevels(dailyCandles, refPrice, { N = 60, k = 2, tol = 0
         r.sort((a, b) => Math.abs(a.p - refPrice) - Math.abs(b.p - refPrice));
       }
     }
-    if (s.length === 0 && r.length === 0) return pivotOnly(dailyCandles, refPrice);
+    if (s.length === 0 && r.length === 0) return pivotOnly(dailyCandles, refPrice) || recentRangeBand(dailyCandles, refPrice);
 
     const hasCluster = s.some((x) => x.t > 0) || r.some((x) => x.t > 0);
     const m = hasCluster ? (usedPivotFill ? "mixed" : "cluster") : "pivot";
