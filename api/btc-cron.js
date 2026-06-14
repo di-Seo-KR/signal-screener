@@ -356,6 +356,15 @@ export default async function handler(req, res) {
       if (oi.fetched > 0) addLog(`📈 OI ${oi.fetched}심볼 조회, 변화 비교 ${Object.keys(oiChangeMap).length}건`);
     } catch { /* 무시 */ }
 
+    // ★ 2026-06-14 (감사 #3, 대표 승인): 시그널 풀 쓰기 배칭.
+    //   기존: 에셋당 kv.get→modify→kv.set (런당 ~30-50종 × 2풀 = ~60-100 KV op) — KV 쓰기
+    //   증폭 + btc-cron 동시실행 시 read-modify-write race window 가 매 에셋마다 열림.
+    //   변경: 루프 안에서는 메모리 누적만, 루프 후 풀당 1회만 쓰기 → KV op 대폭 절감 +
+    //   race window 를 런당 1회로 축소. 각 엔트리는 per-asset ts 유지(엔진이 ts 내림차순
+    //   재정렬하므로 배열 순서 무관·기존과 동일 결과). 이 두 키는 btc-cron 만 write(전수 확인).
+    const newPoolEntries = []; // di:signals:realtime-pool (거래 신호 — engine 이 읽음)
+    const newMtfEntries = [];  // di:signals:realtime-pool-mtf (코인 카드 표시용)
+
     for (const asset of ASSETS) {
       addLog(`\n📊 ${asset} 스캔 중...`);
       const futSymbol = assetToBinanceSymbol(asset, dynSymbolMap);
@@ -650,42 +659,33 @@ export default async function handler(req, res) {
       //   가상 포트폴리오 한도 / cron 중단 / skip 여부와 완전 독립적으로 작동.
       //   대표 지시: "다시는 실제매매 쪽이 이런 이슈들로 영향받지 않게"
       try {
-        const cutoffMs = Date.now() - 4 * 60 * 60 * 1000;
-
         // ── 거래 신호: 종합 스코어 플래그(ZEPTA_TRADE_COMPOSITE=1) ON 이면 종합, 아니면 1d/캐스케이드 ──
         //   기본 OFF — 봇 '매매 심장' 교체라 돈 직결. shadow 검증 후 ON 권장.
+        //   ★ 배칭: 여기선 메모리 누적만, 실제 KV 쓰기는 루프 후 1회(아래 newPoolEntries 처리).
+        //   per-asset ts 유지(엔진 ts 내림차순 재정렬 → 순서 동일).
         const tradeSignal = (process.env.ZEPTA_TRADE_COMPOSITE === "1" && compositeSignal) ? compositeSignal : latestSignal;
-        const poolKey = "di:signals:realtime-pool";
-        const existingPool = (await kv.get(poolKey)) || [];
-        const newEntry = {
+        newPoolEntries.push({
           ts: Date.now(), time: new Date().toISOString(), asset,
           type: tradeSignal.type, confidence: tradeSignal.confidence, score: tradeSignal.score,
           family: tradeSignal.family, timeframe: tradeSignal.timeframe, side: tradeSignal.side,
           reason: (tradeSignal.reason || "").slice(0, 200),
           positionSize: tradeSignal.positionSize || 0.5, source: "btc-cron",
           sr: srLevels, // ★ 지지·저항 — 표시 전용 (engine 은 이 필드를 읽지 않음, additive-safe)
-        };
-        const updatedPool = [newEntry, ...existingPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200);
-        await kv.set(poolKey, updatedPool);
+        });
 
         // ── 종합 스코어 표시 풀 (코인 카드용 — 엔진 거래와 별개로 항상 적재) ──
         if (compositeSignal) {
-          try {
-            const mKey = "di:signals:realtime-pool-mtf";
-            const mPool = (await kv.get(mKey)) || [];
-            const mEntry = {
-              ts: Date.now(), time: new Date().toISOString(), asset,
-              type: compositeSignal.type, side: compositeSignal.side, score: compositeSignal.score,
-              confidence: compositeSignal.confidence, family: "composite", timeframe: "MTF",
-              breakdown: compositeSignal.breakdown, reason: compositeSignal.reason, source: "btc-cron-mtf",
-              entryRefine: compositeSignal.entryRefine || null, // ★ MTF 소진·차트구조 정제 사유
-              sr: srLevels, // ★ 지지·저항 — 코인 카드 매물대 표시용
-            };
-            await kv.set(mKey, [mEntry, ...mPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200));
-          } catch { /* 표시용 — 실패해도 무시 */ }
+          newMtfEntries.push({
+            ts: Date.now(), time: new Date().toISOString(), asset,
+            type: compositeSignal.type, side: compositeSignal.side, score: compositeSignal.score,
+            confidence: compositeSignal.confidence, family: "composite", timeframe: "MTF",
+            breakdown: compositeSignal.breakdown, reason: compositeSignal.reason, source: "btc-cron-mtf",
+            entryRefine: compositeSignal.entryRefine || null, // ★ MTF 소진·차트구조 정제 사유
+            sr: srLevels, // ★ 지지·저항 — 코인 카드 매물대 표시용
+          });
         }
       } catch (poolErr) {
-        addLog(`⚠️ ${asset} 시그널 풀 적재 실패: ${poolErr.message}`);
+        addLog(`⚠️ ${asset} 시그널 풀 누적 실패: ${poolErr.message}`);
       }
 
       // 현재 포지션 확인
@@ -828,6 +828,27 @@ export default async function handler(req, res) {
           assetResults.push({ asset, ok: true, action: "skip", signal: latestSignal });
         }
       }
+    }
+
+    // ── ★ 시그널 풀 일괄 적재 (감사 #3) — 루프 후 풀당 1회만 쓰기 ──
+    //   에셋별 ts 는 루프에서 이미 부여됨(엔진 ts 내림차순 재정렬 → 순서 동일). 신규 엔트리를
+    //   앞에 두고 4h cutoff 통과한 기존 엔트리 뒤에 이어 200개 슬라이스. btc-cron 만 write 라
+    //   merge 충돌 없음. 실패해도 다음 런(10분)이 재구성 — 기존 풀 유지(부분쓰기 없음).
+    try {
+      const cutoffMs = Date.now() - 4 * 60 * 60 * 1000;
+      const poolKey = "di:signals:realtime-pool";
+      const existingPool = (await kv.get(poolKey)) || [];
+      const mergedPool = [...newPoolEntries, ...existingPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200);
+      await kv.set(poolKey, mergedPool);
+      if (newMtfEntries.length > 0) {
+        const mKey = "di:signals:realtime-pool-mtf";
+        const mPool = (await kv.get(mKey)) || [];
+        const mergedMtf = [...newMtfEntries, ...mPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200);
+        await kv.set(mKey, mergedMtf);
+      }
+      addLog(`💾 시그널 풀 일괄 적재: 거래 ${newPoolEntries.length}건 / 표시 ${newMtfEntries.length}건 (KV set 2회)`);
+    } catch (poolErr) {
+      addLog(`⚠️ 시그널 풀 일괄 적재 실패: ${poolErr.message}`);
     }
 
     // ── 가상 포트폴리오 KV 저장 ──
