@@ -129,7 +129,7 @@ async function checkUser(userId) {
         realizedPnL: Number(realizedSafe.toFixed(4)),
         pnlSource: realized != null ? "userTrades" : "unavailable",
       });
-      await kv.set(logKey, log.slice(0, 200));
+      await kv.set(logKey, log.slice(0, 600)); // engine-log cap 600 (어제활동 보존)
       // ★ M5 fix: 객체 배열 직접 mutate (이전엔 string vs 객체 비교 버그)
       closedEntry.realizedPnL = realizedSafe;
 
@@ -260,7 +260,7 @@ async function checkUser(userId) {
           markPrice, refPrice,
           side,
         });
-        await kv.set(logKey, log.slice(0, 200));
+        await kv.set(logKey, log.slice(0, 600)); // engine-log cap 600 (어제활동 보존)
         // 텔레그램 알림 — 봇 자체 SL/TP 청산 (binance bracket 없이도 작동)
         try {
           const { sendCards, buildCard } = await import("../_shared/telegram.js");
@@ -338,7 +338,7 @@ async function checkUser(userId) {
               confidence: mtf.confidence,
               reasons: mtf.reasons,
             });
-            await kv.set(logKey, log.slice(0, 200));
+            await kv.set(logKey, log.slice(0, 600)); // engine-log cap 600 (어제활동 보존)
             // 알림
             try {
               const { sendCards, buildCard } = await import("../_shared/telegram.js");
@@ -413,7 +413,7 @@ async function checkUser(userId) {
           symbol: sym,
           reason: ts.reason,
         });
-        await kv.set(logKey, log.slice(0, 200));
+        await kv.set(logKey, log.slice(0, 600)); // engine-log cap 600 (어제활동 보존)
         // 다음 단계 평가 skip
         continue;
       } catch (e) {
@@ -488,7 +488,7 @@ async function checkUser(userId) {
             newSL,
             reason: trail.reason,
           });
-          await kv.set(logKey, log.slice(0, 200));
+          await kv.set(logKey, log.slice(0, 600)); // engine-log cap 600 (어제활동 보존)
         } // end if newSlResult ok
       } catch (e) {
         report.trailed.push({ sym, error: e?.message });

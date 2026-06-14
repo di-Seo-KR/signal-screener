@@ -259,7 +259,10 @@ function synthProbeSignal() {
   };
 }
 
-async function appendLog(userId, key, entry, cap = 200) {
+// ★ 2026-06-12: engine-log 기본 cap 200→600. 5분 cron(~288/일)+2분 청산이 같은 키를
+//   경쟁해 어제 새벽~오전 활동이 일일보고(KST06:00) 전에 evict 되던 문제 완화.
+//   (근본책 = 일자별 키 분리는 별도 PR.) shadow-ledger 호출은 cap=500 명시라 영향 없음.
+async function appendLog(userId, key, entry, cap = 600) {
   try {
     const kv = await getKv();
     const log = (await kv.get(key)) || [];
