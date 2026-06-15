@@ -522,7 +522,10 @@ export function dynamicSLTP({ price, atr, family, regime, cfg = RISK_CONFIG }) {
             : (famEntry.tpAtrMul ?? legacyTPMul ?? 4.0);
 
   // regime 보정
-  const regimeKey = regime?.regime || regime || "default";
+  // ★ 2026-06-14 (감사): regime 이 객체({avgHurst, regime:string|null})일 때 regime.regime 이
+  //   null 이면 기존 `regime?.regime || regime` 가 *객체 자체*를 키로 써 "[object Object]" →
+  //   매트릭스 미스 → default. 타입 가드로 항상 문자열 키만 사용(정상 케이스 동작 불변).
+  const regimeKey = (typeof regime === "string" ? regime : regime?.regime) || "default";
   const regBoost = (cfg.regimeSLTPBoost || {})[regimeKey] || (cfg.regimeSLTPBoost || {}).default || { slBoost: 1, tpBoost: 1 };
   const slBoost = regBoost.slBoost ?? 1.0;
   const tpBoost = regBoost.tpBoost ?? 1.0;
