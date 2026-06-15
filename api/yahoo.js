@@ -7,7 +7,19 @@
 //   /api/yahoo-batch?symbols=AAPL,MSFT&interval=1d&range=1y → 배치 (_mode=batch)
 //   /api/yahoo-quote?symbols=AAPL,MSFT                     → 실시간 시세 (_mode=quote)
 
+import { massiveEnabled, getDailyCandles } from "./_shared/massive-stocks.js";
+
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
+// ★ 2026-06-15 (A): Massive 라우팅 가드 — 일봉 + 평범한 미국 주식 티커만(크립토 BTC-USD,
+//   FX EURUSD=X, 지수 ^GSPC 는 제외 → Yahoo 유지). 폴백 항상 보장.
+function looksLikeUsStock(sym) {
+  return typeof sym === "string" && /^[A-Za-z][A-Za-z.]{0,6}$/.test(sym);
+}
+function rangeToDays(range) {
+  const m = { "1mo": 31, "3mo": 93, "6mo": 186, "1y": 372, "2y": 744, "5y": 1830, "ytd": 366, "max": 2000 };
+  return m[range] || 372;
+}
 
 let _cookie = null;
 let _crumb = null;
@@ -199,12 +211,24 @@ export default async function handler(req, res) {
     // ═══════ MODE: ohlc ═══════
     if (_mode === "ohlc") {
       if (!symbol) return res.status(400).json({ error: "symbol required" });
+      // ★ A: 일봉 + 미국 주식 티커면 Massive 우선 (실패/미설정 시 Yahoo 폴백).
+      if (massiveEnabled() && (interval || "1d") === "1d" && looksLikeUsStock(symbol)) {
+        try {
+          const mc = await getDailyCandles(symbol, { days: rangeToDays(range || "6mo") });
+          if (mc && mc.length) {
+            res.setHeader("Cache-Control", "no-store");
+            return res.status(200).json({ symbol, interval: "1d", range: range || "6mo", candles: mc, _source: "massive" });
+          }
+        } catch (e) {
+          console.warn(`[yahoo->massive] ${symbol} 폴백: ${e?.message}`);
+        }
+      }
       const includePrePost = prepost === "true" || prepost === "1";
       const json = await fetchChart(symbol, interval || "1d", range || "6mo", includePrePost);
       const candles = parseCandles(json);
       if (!candles || !candles.length) return res.status(404).json({ error: "No data", candles: [] });
       res.setHeader("Cache-Control", "no-store");
-      return res.status(200).json({ symbol, interval: interval || "1d", range: range || "6mo", candles });
+      return res.status(200).json({ symbol, interval: interval || "1d", range: range || "6mo", candles, _source: "yahoo" });
     }
 
     // ═══════ MODE: default (단일 심볼 배열) ═══════

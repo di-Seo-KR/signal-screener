@@ -8,6 +8,7 @@ export const config = { maxDuration: 120 };
 
 import fetch from 'node-fetch';
 import { sendCards, buildCard } from "./_shared/telegram.js";
+import { massiveEnabled, getDailyArrays } from "./_shared/massive-stocks.js";
 
 const YAHOO_FINANCE_URL = 'https://query1.finance.yahoo.com/v8/finance/chart';
 
@@ -303,6 +304,15 @@ function detectBearishDivergence(closes, highs, rsi) {
 // ==================== DATA & ANALYSIS ====================
 
 async function fetchYahooFinanceData(symbol) {
+  // ★ 2026-06-15 (A): Massive 우선 — 미설정/실패 시 아래 Yahoo 경로로 폴백(항상 안전).
+  if (massiveEnabled()) {
+    try {
+      const m = await getDailyArrays(symbol, { days: 365 });
+      if (m && Array.isArray(m.close) && m.close.length > 20) return m;
+    } catch (e) {
+      console.warn(`[stock-cron] massive ${symbol} 폴백→yahoo: ${e?.message}`);
+    }
+  }
   try {
     const url = `${YAHOO_FINANCE_URL}/${symbol}?range=1y&interval=1d`;
     const res = await fetch(url);
