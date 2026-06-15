@@ -104,22 +104,37 @@ export function computeSRLevels(dailyCandles, refPrice, { N = 60, k = 2, tol = 0
     // 3) 강도 = 터치 + 최근성 보너스(마지막 터치가 10봉 이내면 +0.5)
     for (const c of clusters) c.w = c.t + (win.length - 1 - c.lastIdx <= 10 ? 0.5 : 0);
 
-    // 4) 현재가 분리(±0.2% 버퍼) + 유효거리 캡 ±25%
-    const below = clusters.filter((c) => c.p < refPrice * 0.998 && c.p > refPrice * 0.75);
-    const above = clusters.filter((c) => c.p > refPrice * 1.002 && c.p < refPrice * 1.25);
+    // 4) 현재가 분리 — ★ 2026-06-14 고도화(대표 지시): 최소거리 0.2%→0.8% (너무 붙은
+    //   노이즈 레벨 제외, "actionable 매물대"만). env ZEPTA_SR_MIN_DIST_PCT(기본 0.8). 캡 ±25%.
+    const _md = Number(process.env.ZEPTA_SR_MIN_DIST_PCT);
+    const minDist = (Number.isFinite(_md) && _md > 0 ? _md : 0.8) / 100;
+    const below = clusters.filter((c) => c.p < refPrice * (1 - minDist) && c.p > refPrice * 0.75);
+    const above = clusters.filter((c) => c.p > refPrice * (1 + minDist) && c.p < refPrice * 1.25);
 
-    // 5) 가까운 순 + 터치 2회 이상 우선 (1터치는 1.5배 거리 내 강클러스터 없을 때만)
+    // 5) ★ 고도화: 강도 가중 선별 — 기존엔 '가까운 순'(거리)으로만 골라 약한 근접 레벨이
+    //   뽑혔음. 이제 강도(w=터치+최근성)가 강한 레벨을 우선(터치 2회+ 먼저), 같은 등급 안에선
+    //   '강도/(1+거리%)' 점수순 → 강한 레벨이 살짝 멀어도 약한 근접 레벨을 이김. 표시는 가까운 순.
+    //   ZEPTA_SR_V2=0 이면 기존 동작 복귀.
+    const v2 = process.env.ZEPTA_SR_V2 !== "0";
     const pickTwo = (cands) => {
-      const sorted = [...cands].sort((a, b) => Math.abs(a.p - refPrice) - Math.abs(b.p - refPrice));
-      const strong = sorted.filter((c) => c.t >= 2);
-      const out = [];
-      for (const c of sorted) {
-        if (out.length === 2) break;
-        if (c.t >= 2) { out.push(c); continue; }
-        const blocked = strong.some((x) => !out.includes(x) && Math.abs(x.p - refPrice) <= 1.5 * Math.abs(c.p - refPrice));
-        if (!blocked) out.push(c);
+      let chosen;
+      if (v2) {
+        const score = (c) => (c.w || c.t) / (1 + Math.abs(c.p - refPrice) / refPrice * 100);
+        const strong = cands.filter((c) => c.t >= 2).sort((a, b) => score(b) - score(a));
+        const weak = cands.filter((c) => c.t < 2).sort((a, b) => score(b) - score(a));
+        chosen = [...strong, ...weak].slice(0, 2); // 강한 레벨 우선, 부족하면 약한 레벨로 채움
+      } else {
+        const sorted = [...cands].sort((a, b) => Math.abs(a.p - refPrice) - Math.abs(b.p - refPrice));
+        const strong = sorted.filter((c) => c.t >= 2);
+        chosen = [];
+        for (const c of sorted) {
+          if (chosen.length === 2) break;
+          if (c.t >= 2) { chosen.push(c); continue; }
+          const blocked = strong.some((x) => !chosen.includes(x) && Math.abs(x.p - refPrice) <= 1.5 * Math.abs(c.p - refPrice));
+          if (!blocked) chosen.push(c);
+        }
       }
-      return out
+      return chosen
         .sort((a, b) => Math.abs(a.p - refPrice) - Math.abs(b.p - refPrice))
         .map((c) => ({ p: round5(c.p), t: c.t, d: round1((c.p / refPrice - 1) * 100) }));
     };
