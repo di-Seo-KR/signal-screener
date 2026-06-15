@@ -14,7 +14,8 @@ const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML,
 // ★ 2026-06-15 (A): Massive 라우팅 가드 — 일봉 + 평범한 미국 주식 티커만(크립토 BTC-USD,
 //   FX EURUSD=X, 지수 ^GSPC 는 제외 → Yahoo 유지). 폴백 항상 보장.
 function looksLikeUsStock(sym) {
-  return typeof sym === "string" && /^[A-Za-z][A-Za-z.]{0,6}$/.test(sym);
+  // 영문 시작 + 영숫자·점(BRK.B 등) 1~10자. 크립토(BTC-USD)·FX(EURUSD=X)·지수(^GSPC)는 -,=,^ 로 제외.
+  return typeof sym === "string" && /^[A-Za-z][A-Za-z0-9.]{0,9}$/.test(sym);
 }
 function rangeToDays(range) {
   const m = { "1mo": 31, "3mo": 93, "6mo": 186, "1y": 372, "2y": 744, "5y": 1830, "ytd": 366, "max": 2000 };
