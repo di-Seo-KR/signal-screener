@@ -677,7 +677,12 @@ export default async function handler(req, res) {
             if (Number.isFinite(_v)) _rsi1h = Math.round(_v);
           }
         } catch { _rsi1h = null; }
-        const _htfConfirm = (tf4hSignal?.side === tradeSignal.side) || (sig1d?.side === tradeSignal.side);
+        // ★ 핫픽스(적대검증 F2): analyzeLatest 폴백 신호는 .side 없이 type 만 있어, 기존
+        //   (tf4hSignal?.side === tradeSignal.side) 가 undefined===undefined→true 로 htfConfirm 을
+        //   잘못 true 로 만들 수 있었음(RSI 게이트 우회). type→side 정규화 + 거래방향 존재 확인.
+        const _sideOf = (s) => s ? (s.side || (s.type === "BUY" ? "LONG" : s.type === "SELL" ? "SHORT" : null)) : null;
+        const _tradeSide = _sideOf(tradeSignal);
+        const _htfConfirm = !!_tradeSide && (_sideOf(tf4hSignal) === _tradeSide || _sideOf(sig1d) === _tradeSide);
         newPoolEntries.push({
           ts: Date.now(), time: new Date().toISOString(), asset,
           type: tradeSignal.type, confidence: tradeSignal.confidence, score: tradeSignal.score,

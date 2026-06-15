@@ -699,8 +699,8 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
           continue;
         }
       }
-      // ⑤ 거래량 게이트 — thin 코인 차단 (quoteVolume 없으면 pass-through)
-      if (process.env.ZEPTA_VOLUME_GATE !== "0" && Number.isFinite(cand.quoteVolume)) {
+      // ⑤ 거래량 게이트 — thin 코인 차단 (quoteVolume 없으면 pass-through). ★ != null 심층방어(F1).
+      if (process.env.ZEPTA_VOLUME_GATE !== "0" && cand.quoteVolume != null && Number.isFinite(cand.quoteVolume)) {
         const _mv = Number(process.env.ZEPTA_MIN_QUOTE_VOLUME_USD);
         const minVol = Number.isFinite(_mv) ? _mv : 200000;
         if (cand.quoteVolume < minVol) {
@@ -711,7 +711,7 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       }
       // ⑦ 1h RSI 극단 + 상위TF 미확인 → 차단(추격 방지). 상위TF(4h/1d)가 같은 방향 확인하면
       //   극단이어도 통과(강한 추세는 태움 — 대표 결정 "추세 미확인 시만 차단").
-      if (process.env.ZEPTA_ENTRY_RSI_GATE !== "0" && Number.isFinite(cand.rsi1h) && cand.htfConfirm !== true) {
+      if (process.env.ZEPTA_ENTRY_RSI_GATE !== "0" && cand.rsi1h != null && Number.isFinite(cand.rsi1h) && cand.htfConfirm !== true) {
         const _ob = Number(process.env.ZEPTA_ENTRY_RSI_OB); const obT = Number.isFinite(_ob) ? _ob : 80;
         const _os = Number(process.env.ZEPTA_ENTRY_RSI_OS); const osT = Number.isFinite(_os) ? _os : 20;
         if ((cand.side === "LONG" && cand.rsi1h >= obT) || (cand.side === "SHORT" && cand.rsi1h <= osT)) {
