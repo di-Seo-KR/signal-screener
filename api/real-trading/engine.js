@@ -121,6 +121,10 @@ async function pullRecentSignals({ userId, lookbackMs = 4 * 60 * 60 * 1000, adva
           family: entry.family || undefined,
           timeframe: entry.timeframe || undefined,
           positionSize: entry.positionSize || 0.5,
+          // ★ 2026-06-14: 진입 게이트 메타(btc-cron enrich) — extractSignal 통해 cand 로 전달
+          rsi1h: entry.rsi1h ?? null,
+          htfConfirm: entry.htfConfirm === true,
+          quoteVolume: entry.quoteVolume ?? null,
         },
         ts,
       });
@@ -680,6 +684,42 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       S(`  ↳ ${cand.symbol}: dedup mode '${dedupMode}' — 같은 심볼 OPEN 상태로 스킵`);
       tried.push({ symbol: cand.symbol, reason: `dedup '${dedupMode}': already open` });
       continue;
+    }
+    // ★ 2026-06-14 (대표 지시): 진입 품질 게이트 3종 — 라이브만 적용(shadow 는 통계 유지).
+    //   데이터(btc-cron enrich) 없으면 pass-through(안전·하위호환). 전부 env 킬스위치.
+    //   ticker 조회 전에 둬서 약신호/thin/추격 후보를 싸게 조기 컷.
+    if (!shadow) {
+      // ① 최소점수 게이트 — 약한 신호 진입 차단 (보수 디폴트 55, breadthCap confirms 0 수준)
+      if (process.env.ZEPTA_SCORE_GATE !== "0") {
+        const _ms = Number(process.env.ZEPTA_MIN_SCORE);
+        const minScore = Number.isFinite(_ms) ? _ms : 55;
+        if (Number.isFinite(cand.score) && cand.score < minScore) {
+          S(`  ↳ ${cand.symbol} ${cand.side}: 점수 ${cand.score} < ${minScore} (약신호) — 스킵`);
+          tried.push({ symbol: cand.symbol, reason: `score gate ${cand.score}<${minScore}` });
+          continue;
+        }
+      }
+      // ⑤ 거래량 게이트 — thin 코인 차단 (quoteVolume 없으면 pass-through). ★ != null 심층방어(F1).
+      if (process.env.ZEPTA_VOLUME_GATE !== "0" && cand.quoteVolume != null && Number.isFinite(cand.quoteVolume)) {
+        const _mv = Number(process.env.ZEPTA_MIN_QUOTE_VOLUME_USD);
+        const minVol = Number.isFinite(_mv) ? _mv : 200000;
+        if (cand.quoteVolume < minVol) {
+          S(`  ↳ ${cand.symbol}: 거래대금 $${Math.round(cand.quoteVolume / 1000)}K < $${Math.round(minVol / 1000)}K (thin) — 스킵`);
+          tried.push({ symbol: cand.symbol, reason: `volume gate ${Math.round(cand.quoteVolume)}<${minVol}` });
+          continue;
+        }
+      }
+      // ⑦ 1h RSI 극단 + 상위TF 미확인 → 차단(추격 방지). 상위TF(4h/1d)가 같은 방향 확인하면
+      //   극단이어도 통과(강한 추세는 태움 — 대표 결정 "추세 미확인 시만 차단").
+      if (process.env.ZEPTA_ENTRY_RSI_GATE !== "0" && cand.rsi1h != null && Number.isFinite(cand.rsi1h) && cand.htfConfirm !== true) {
+        const _ob = Number(process.env.ZEPTA_ENTRY_RSI_OB); const obT = Number.isFinite(_ob) ? _ob : 80;
+        const _os = Number(process.env.ZEPTA_ENTRY_RSI_OS); const osT = Number.isFinite(_os) ? _os : 20;
+        if ((cand.side === "LONG" && cand.rsi1h >= obT) || (cand.side === "SHORT" && cand.rsi1h <= osT)) {
+          S(`  ↳ ${cand.symbol} ${cand.side}: 1h RSI ${cand.rsi1h} 극단 + 상위TF 미확인 — 스킵(추격 방지)`);
+          tried.push({ symbol: cand.symbol, reason: `1h RSI extreme ${cand.rsi1h} htf-unconfirmed` });
+          continue;
+        }
+      }
     }
     // ★ 재진입 쿨다운 체크는 아래 ticker 가격 조회 직후로 이동(2026-06-14) — 품질 게이트가
     //   '더 매력적 가격'을 비교하려면 현재가(pr)가 필요하기 때문.

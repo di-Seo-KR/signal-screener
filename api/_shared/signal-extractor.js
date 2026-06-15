@@ -246,6 +246,14 @@ export function extractSignal({ asset, signal, source, stratName }, opts = {}) {
     sizeHint: Math.max(0, Math.min(1, Number(signal.positionSize ?? 0.5))),
     generatedAt,
     strategyFamily: family,
+    // ★ 2026-06-14: 진입 게이트 메타 passthrough (btc-cron enrich → engine item5/item7).
+    //   없으면(구 신호·미배선) null → 게이트 pass-through(안전).
+    //   ★ 핫픽스(적대검증 F1): Number(null)===0 이라 기존 Number.isFinite(Number(x)) 가 null 을
+    //   0 으로 만들어 quoteVolume=0 → 거래량 게이트 전 종목 오차단(정적폴백 시 라이브 정지),
+    //   rsi1h=0 → 숏 비대칭 오차단. 명시적 null 체크로 null 보존.
+    rsi1h: (signal.rsi1h == null || !Number.isFinite(Number(signal.rsi1h))) ? null : Number(signal.rsi1h),
+    htfConfirm: signal.htfConfirm === true,
+    quoteVolume: (signal.quoteVolume == null || !Number.isFinite(Number(signal.quoteVolume))) ? null : Number(signal.quoteVolume),
   };
 }
 
