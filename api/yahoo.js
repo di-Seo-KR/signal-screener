@@ -7,7 +7,7 @@
 //   /api/yahoo-batch?symbols=AAPL,MSFT&interval=1d&range=1y → 배치 (_mode=batch)
 //   /api/yahoo-quote?symbols=AAPL,MSFT                     → 실시간 시세 (_mode=quote)
 
-import { massiveEnabled, getDailyCandles } from "./_shared/massive-stocks.js";
+import { massiveEnabled, getDailyCandles, getDailyAggsRaw } from "./_shared/massive-stocks.js";
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
@@ -194,10 +194,28 @@ export default async function handler(req, res) {
     if (_mode === "batch") {
       if (!symbols) return res.status(400).json({ error: "symbols required" });
       const symList = symbols.split(",").map(s => s.trim()).filter(Boolean).slice(0, 20);
+      // ★ 2026-06-15 (B): ZEPTA_MASSIVE_BATCH=1 + 일봉 + 미국주식 → Massive 우선(실패 시 Yahoo).
+      //   스크리너 전반 데이터라 blast radius 큼 → 기본 OFF, 대표 확인 후 env 로 활성.
+      const useMassive = process.env.ZEPTA_MASSIVE_BATCH === "1" && massiveEnabled() && (interval || "1d") === "1d";
       const auth = await getAuth();
       const results = {};
       await Promise.allSettled(symList.map(async (sym) => {
         try {
+          if (useMassive && looksLikeUsStock(sym)) {
+            const raw = await getDailyAggsRaw(sym, { days: rangeToDays(range || "1y") });
+            if (raw && raw.length) {
+              const closes = [], volumes = [], highs = [], lows = [], opens = [], timestamps = [];
+              for (const rr of raw) {
+                const o = Number(rr.o), c = Number(rr.c);
+                if (![o, c].every(Number.isFinite)) continue;
+                closes.push(c); volumes.push(Number(rr.v) || 0);
+                highs.push(Number.isFinite(Number(rr.h)) ? Number(rr.h) : Math.max(o, c));
+                lows.push(Number.isFinite(Number(rr.l)) ? Number(rr.l) : Math.min(o, c));
+                opens.push(o); timestamps.push(Math.floor(Number(rr.t) / 1000));
+              }
+              if (closes.length) { results[sym] = { closes, volumes, highs, lows, opens, timestamps, _source: "massive" }; return; }
+            }
+          }
           const json = await fetchOne(sym, interval || "1d", range || "1y", auth);
           const data = json ? parseArrays(json) : null;
           results[sym] = (data && data.closes.length) ? data : { error: "No data", closes: [], volumes: [], highs: [], lows: [] };
