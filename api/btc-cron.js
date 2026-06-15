@@ -164,11 +164,13 @@ export default async function handler(req, res) {
     //   그것도 없으면 정적 30종(CRYPTO_ASSETS) 폴백. 어떤 경우에도 cron 은 멈추지 않음.
     let dynSymbolMap = null;
     let ASSETS = CRYPTO_ASSETS;
+    const quoteVolByAsset = {}; // ★ 2026-06-14: 자산별 24h 거래대금(USD) — item5 거래량 게이트용(신호풀 enrich, 추가 API 0)
     try {
       const universe = await loadUniverse(kv);
       if (universe?.entries?.length) {
         dynSymbolMap = universeSymbolMap(universe);
         ASSETS = universe.entries.map((e) => e.asset);
+        for (const e of universe.entries) quoteVolByAsset[e.asset] = Number(e.quoteVolume) || 0;
         addLog(`🌐 동적 유니버스: 유동성 상위 ${ASSETS.length}종 (${universe.generatedAt} 기준)`);
       } else {
         addLog(`🌐 동적 유니버스 미가용 — 정적 ${ASSETS.length}종 폴백`);
@@ -664,6 +666,18 @@ export default async function handler(req, res) {
         //   ★ 배칭: 여기선 메모리 누적만, 실제 KV 쓰기는 루프 후 1회(아래 newPoolEntries 처리).
         //   per-asset ts 유지(엔진 ts 내림차순 재정렬 → 순서 동일).
         const tradeSignal = (process.env.ZEPTA_TRADE_COMPOSITE === "1" && compositeSignal) ? compositeSignal : latestSignal;
+        // ★ 2026-06-14: 진입 게이트용 메타 enrich (engine 이 읽어 item5/item7 판정, 추가 API 0).
+        //   rsi1h: 1h RSI(item7 극단 진입 판정). htfConfirm: 상위TF(4h 또는 1d)가 거래방향을
+        //   확인하는가(item7 — 추세 확인되면 극단이어도 통과). quoteVolume: 24h 거래대금(item5).
+        let _rsi1h = null;
+        try {
+          if (Array.isArray(candles1h) && candles1h.length >= 15) {
+            const _r = calcRSI(candles1h.map(c => c.close), 14);
+            const _v = _r[_r.length - 1];
+            if (Number.isFinite(_v)) _rsi1h = Math.round(_v);
+          }
+        } catch { _rsi1h = null; }
+        const _htfConfirm = (tf4hSignal?.side === tradeSignal.side) || (sig1d?.side === tradeSignal.side);
         newPoolEntries.push({
           ts: Date.now(), time: new Date().toISOString(), asset,
           type: tradeSignal.type, confidence: tradeSignal.confidence, score: tradeSignal.score,
@@ -671,6 +685,9 @@ export default async function handler(req, res) {
           reason: (tradeSignal.reason || "").slice(0, 200),
           positionSize: tradeSignal.positionSize || 0.5, source: "btc-cron",
           sr: srLevels, // ★ 지지·저항 — 표시 전용 (engine 은 이 필드를 읽지 않음, additive-safe)
+          rsi1h: _rsi1h,                                  // ★ item7 (1h 극단 RSI)
+          htfConfirm: !!_htfConfirm,                      // ★ item7 (상위TF 추세 확인)
+          quoteVolume: quoteVolByAsset[asset] ?? null,    // ★ item5 (24h 거래대금 USD)
         });
 
         // ── 종합 스코어 표시 풀 (코인 카드용 — 엔진 거래와 별개로 항상 적재) ──

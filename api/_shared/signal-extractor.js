@@ -246,6 +246,11 @@ export function extractSignal({ asset, signal, source, stratName }, opts = {}) {
     sizeHint: Math.max(0, Math.min(1, Number(signal.positionSize ?? 0.5))),
     generatedAt,
     strategyFamily: family,
+    // ★ 2026-06-14: 진입 게이트 메타 passthrough (btc-cron enrich → engine item5/item7).
+    //   없으면(구 신호·미배선) null/undefined → 게이트가 pass-through(안전).
+    rsi1h: Number.isFinite(Number(signal.rsi1h)) ? Number(signal.rsi1h) : null,
+    htfConfirm: signal.htfConfirm === true,
+    quoteVolume: Number.isFinite(Number(signal.quoteVolume)) ? Number(signal.quoteVolume) : null,
   };
 }
 
