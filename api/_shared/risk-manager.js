@@ -154,7 +154,8 @@ export const RISK_CONFIG = {
   },
   // 안전 cap — 동적 산출 결과가 비현실적이지 않게 floor/ceiling
   dynamicSLFloorPct: 0.015,  // 최소 1.5% (너무 가까운 SL = costPct 못 이김)
-  dynamicSLCeilPct:  0.08,   // 최대 8% (10x lev 시 ROI -80% — maxRoiLossPct 가드와 충돌 안 함)
+  dynamicSLCeilPct:  0.075,  // 최대 7.5% (2026-06-15 item4 — 대표 "손절라인 보수적으로": 8%→7.5%
+                             //   극단 변동 꼬리만 미세 클립. 전형 SL 2.5~6%는 불변. env ZEPTA_SL_CEIL_PCT 로 조정/원복(0.08).)
   dynamicTPFloorPct: 0.02,   // 최소 2% (수수료 0.13% 대비 minNetRR 확보)
   dynamicTPCeilPct:  0.15,   // 최대 15% (장기 추세 봇 한계)
   // 전역 env over-ride (모든 family 일괄 적용)
@@ -535,7 +536,10 @@ export function dynamicSLTP({ price, atr, family, regime, cfg = RISK_CONFIG }) {
 
   // 안전 cap
   const slFloor = cfg.dynamicSLFloorPct ?? 0.015;
-  const slCeil  = cfg.dynamicSLCeilPct  ?? 0.08;
+  // ★ 2026-06-15 (item4): SL 상한 env over-ride. 백테스트상 공격적 SL 축소(3%)는 -$21로
+  //   역효과였으므로 상한만 8%→7.5%로 미세 클립(극단 꼬리). ZEPTA_SL_CEIL_PCT=0.08 로 즉시 원복.
+  const _envCeil = Number(process.env.ZEPTA_SL_CEIL_PCT);
+  const slCeil  = (Number.isFinite(_envCeil) && _envCeil > 0 ? _envCeil : (cfg.dynamicSLCeilPct ?? 0.075));
   const tpFloor = cfg.dynamicTPFloorPct ?? 0.02;
   const tpCeil  = cfg.dynamicTPCeilPct  ?? 0.15;
 
