@@ -146,7 +146,12 @@ async function readRealTradingActivity(kv) {
       });
     } catch {}
   }
-  return { phase1Count: phase1Users.length, users: userActivities };
+  // ★ 2026-06-15 (item6): Live↔Shadow 비교용 — 본인(첫 유저) 누적 실거래 요약 동봉.
+  let liveSummary = null;
+  if (phase1Users[0]) {
+    try { liveSummary = await kv.get(`di:real:user:${phase1Users[0]}:live-summary`); } catch {}
+  }
+  return { phase1Count: phase1Users.length, users: userActivities, liveSummary: liveSummary || null };
 }
 
 // 마감 거래 아카이브 (retro 백테스트 자동화 input)
@@ -341,8 +346,81 @@ function buildRealTradingActivityCard(activity, summary) {
   });
 }
 
+// ── 시간손절(TIME/SOFT_TIME) 단계 분석 (item6, 2026-06-15, 관측 전용·거래 무영향) ──
+// 대표가 반복 제보한 '시간청산 다발' 문제의 *성격* 진단: 시간청산이 (a) 이익 確定인지
+// (b) '느린 손절'인지 (c) 본전권 churn 인지 netPnL 부호로 분류. R-멀티플은 미저장이라 부호로 충분.
+function analyzeTimeStops(archive) {
+  if (!Array.isArray(archive) || archive.length === 0) return null;
+  const ts = archive.filter((c) => c && (c.closeReason === "TIME" || c.closeReason === "SOFT_TIME"));
+  if (ts.length === 0) return null;
+  const FLAT_EPS = 0.01; // |pnl| < $0.01 = 본전권
+  let profit = 0, loss = 0, flat = 0, soft = 0, hard = 0, pnlSum = 0;
+  for (const c of ts) {
+    const p = Number(c.netPnL) || 0;
+    pnlSum += p;
+    if (p > FLAT_EPS) profit += 1;
+    else if (p < -FLAT_EPS) loss += 1;
+    else flat += 1;
+    if (c.closeReason === "SOFT_TIME") soft += 1; else hard += 1;
+  }
+  const n = ts.length;
+  return {
+    n, soft, hard, profit, loss, flat,
+    profitPct: Math.round((profit / n) * 100),
+    lossPct: Math.round((loss / n) * 100),
+    avgPnL: Number((pnlSum / n).toFixed(2)),
+  };
+}
+
+// ── 실거래 vs 가상 (실행 괴리) 카드 (item6, 2026-06-15, 관측 전용) ──
+// 실거래가 전략의 가상(shadow) 엣지를 실제로 재현하는지 — 슬리피지·체결·진입타이밍 괴리 탐지.
+// live-summary(실유저 누적) vs shadow-summary(글로벌 프로브). 표본 부족 시 정직하게 '누적 중'.
+function buildLiveVsShadowCard(liveSummary, shadowSummary) {
+  const MIN_LIVE = 5;
+  const liveN = (liveSummary?.wins || 0) + (liveSummary?.losses || 0);
+  if (!liveSummary || liveN < MIN_LIVE) {
+    return buildCard({
+      tag: "🔬",
+      title: "실거래 vs 가상 (실행 괴리)",
+      lines: [`실거래 청산 표본 ${liveN}건 — ${MIN_LIVE}건 이상 누적되면 비교 시작`],
+    });
+  }
+  const lwr = (liveSummary.wins / liveN) * 100;
+  const shadowN = (shadowSummary?.wins || 0) + (shadowSummary?.losses || 0);
+  const swr = shadowN ? (shadowSummary.wins / shadowN) * 100 : null;
+  const lpf = liveSummary.profitFactor;
+  const spf = shadowSummary?.profitFactor;
+  const lnet = Number(liveSummary.netPnL || 0);
+  const lines = [
+    `실거래: ${liveN}건 · 승률 ${lwr.toFixed(0)}% · 손익비 ${lpf != null ? Number(lpf).toFixed(2) : "—"} · 누적 ${lnet >= 0 ? "+" : ""}$${lnet.toFixed(2)}`,
+  ];
+  if (swr != null) {
+    lines.push(`가상(프로브): ${shadowN}건 · 승률 ${swr.toFixed(0)}% · 손익비 ${spf != null ? Number(spf).toFixed(2) : "—"}`);
+    const gap = lwr - swr;
+    if (gap <= -15) lines.push(`⚠️ 실거래 승률이 가상 대비 ${gap.toFixed(0)}%p 낮음 — 슬리피지/체결지연/진입타이밍 괴리 점검`);
+    else if (gap >= 15) lines.push(`실거래가 가상 대비 +${gap.toFixed(0)}%p 우수 — 표본 작을 수 있어 추세 관찰`);
+    else lines.push(`승률 괴리 ${gap >= 0 ? "+" : ""}${gap.toFixed(0)}%p — 전략대로 작동 중`);
+  }
+  // 종목별 괴리 — 양쪽 모두 충분히 거래된 종목 중 괴리 큰 순 (실행 문제 종목 특정)
+  const lbs = liveSummary.bySymbol || {};
+  const sbs = shadowSummary?.bySymbol || {};
+  const both = Object.keys(lbs).filter((s) => (lbs[s]?.trades || 0) >= 3 && (sbs[s]?.trades || 0) >= 5);
+  if (both.length) {
+    const rows = both.map((s) => {
+      const lw = (lbs[s].wins / lbs[s].trades) * 100;
+      const sw = (sbs[s].wins / sbs[s].trades) * 100;
+      return { s, lw, sw, gap: lw - sw, ln: lbs[s].trades };
+    }).sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap)).slice(0, 3);
+    lines.push(`종목별 괴리(실거래 다거래순):`);
+    for (const r of rows) {
+      lines.push(`  · ${r.s.replace(/USDT$/, "")}: 실 ${r.lw.toFixed(0)}% vs 가상 ${r.sw.toFixed(0)}% (${r.gap >= 0 ? "+" : ""}${r.gap.toFixed(0)}%p, n=${r.ln})`);
+    }
+  }
+  return buildCard({ tag: "🔬", title: "실거래 vs 가상 (실행 괴리)", lines });
+}
+
 // ── 가상매매 한 줄 참고 카드 (짧게) ──
-function buildShadowReferenceCard(summary) {
+function buildShadowReferenceCard(summary, timeStops = null) {
   if (!summary) {
     return buildCard({
       tag: "🌙",
@@ -370,6 +448,14 @@ function buildShadowReferenceCard(summary) {
     lines.push(`청산사유: 익절 ${cr.TP || 0} · 손절 ${cr.SL || 0} · 시간 ${(cr.TIME || 0) + (cr.SOFT_TIME || 0)} (시간청산 ${timePct}%)`);
     if (timePct >= 50) warn = `⚠️ 시간청산 ${timePct}% — 박스권 휩쏘 다발. 변동성 필터(ZEPTA_MIN_ATR_PCT)↑ 검토`;
     else if (slPct >= 50) warn = `⚠️ 손절 ${slPct}% — 진입 선별 강도↑ 또는 재진입 쿨다운(LOSS_MIN)↑ 검토`;
+  }
+  // ★ item6: 시간청산 단계 분석 — 이익確定/느린손절/본전churn 구분 (성격 진단)
+  if (timeStops && timeStops.n >= 5) {
+    const t = timeStops;
+    lines.push(`시간청산 ${t.n}건 성격: 이익마감 ${t.profit}(${t.profitPct}%) · 손실마감 ${t.loss}(${t.lossPct}%) · 본전 ${t.flat} · 평균 ${t.avgPnL >= 0 ? "+" : ""}$${t.avgPnL}`);
+    if (t.lossPct >= 50) lines.push(`  → 시간청산이 '느린 손절'로 작동(손실마감 ${t.lossPct}%) — 진입 선별/SL 조정 검토`);
+    else if (t.profitPct >= 50) lines.push(`  → 미세이익 確定 위주(이익마감 ${t.profitPct}%) — TP 과원거리/보유시간 점검`);
+    else lines.push(`  → 본전권 다발 — 박스권 churn. 변동성 필터(ZEPTA_MIN_ATR_PCT)↑ 검토`);
   }
   return buildCard({
     tag: "🌙",
@@ -1234,11 +1320,14 @@ export default async function handler(req, res) {
       footer: ga4 && !ga4.error ? `어제 GA4 사용자 ${ga4.users}명 · 세션 ${ga4.sessions}건` : undefined,
     });
 
+    const timeStops = analyzeTimeStops(archive); // ★ item6: 시간청산(TIME/SOFT_TIME) 단계 분석
     const cards = [
       header,
       // ★ 실거래 활동 — 헤더 직후에 배치 (가장 중요한 정보)
       buildRealTradingActivityCard(realActivity, summary),
-      buildShadowReferenceCard(summary),
+      // ★ item6: 실거래 vs 가상 실행 괴리 (실거래 청산 표본 ≥5 시 비교 시작)
+      buildLiveVsShadowCard(realActivity?.liveSummary, summary),
+      buildShadowReferenceCard(summary, timeStops),
       // ★ Alpha Lab (Phase 1~6) — 24/7 자동 알파 추적 결과
       buildAlphaLabCard(alphaLeaderboard, alphaCandidates),
       buildCardsForResearch(research),
