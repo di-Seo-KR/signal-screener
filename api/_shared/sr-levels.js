@@ -63,16 +63,72 @@ function recentRangeBand(candles, refPrice, N = 20) {
 }
 
 /**
+ * 거래량 프로파일(volume-by-price) — "진짜 매물대" = 실제 거래량이 쌓인 가격대.
+ * ★ 2026-06-15 (S/R Phase2, 대표 지시 "너무 약한 매물대"): 일봉 거래량을 가격 빈에
+ *   분배(각 봉 volume 을 [low,high] 스팬에 균등) → 히스토그램 → POC(최대 거래량 가격)·
+ *   Value Area(POC 중심 70% 누적 구간의 상/하단 VAH/VAL). 추가 API 0회(보유 일봉 재사용).
+ * @returns {{poc:number, vah:number, val:number}|null}
+ */
+export function computeVolumeProfile(candles, { N = 90, bins = 40, valuePct = 0.7 } = {}) {
+  if (!Array.isArray(candles) || candles.length < 15) return null;
+  const win = candles.slice(0, -1).slice(-N); // 진행 중 봉 제외 + 최근 N (vp 는 긴 히스토리 선호)
+  if (win.length < 15) return null;
+  let pMin = Infinity, pMax = -Infinity;
+  for (const c of win) {
+    const h = Number(c.high), l = Number(c.low);
+    if (Number.isFinite(h)) pMax = Math.max(pMax, h);
+    if (Number.isFinite(l)) pMin = Math.min(pMin, l);
+  }
+  if (!Number.isFinite(pMin) || !Number.isFinite(pMax) || !(pMax > pMin)) return null;
+  const binSize = (pMax - pMin) / bins;
+  if (!(binSize > 0)) return null;
+  const vol = new Array(bins).fill(0);
+  let total = 0, volBars = 0;
+  for (const c of win) {
+    const h = Number(c.high), l = Number(c.low), v = Number(c.volume) || 0;
+    if (!Number.isFinite(h) || !Number.isFinite(l) || h < l || v <= 0) continue; // h<l(이상 OHLC) 스킵
+    const loBin = Math.max(0, Math.min(bins - 1, Math.floor((l - pMin) / binSize)));
+    const hiBin = Math.max(0, Math.min(bins - 1, Math.floor((h - pMin) / binSize)));
+    const span = hiBin - loBin + 1;
+    const per = v / span;
+    for (let b = loBin; b <= hiBin; b++) vol[b] += per;
+    total += v; volBars += 1;
+  }
+  // ★ 적대검증 반영: 거래량 보유 봉이 너무 적으면(단일 스파이크) POC 의미 없음 → null.
+  if (!(total > 0) || volBars < 10) return null;
+  let pocBin = 0;
+  for (let b = 1; b < bins; b++) if (vol[b] > vol[pocBin]) pocBin = b;
+  // Value Area — POC 중심으로 인접 고볼륨 빈을 확장해 valuePct(70%) 누적
+  let lo = pocBin, hi = pocBin, acc = vol[pocBin];
+  const target = total * valuePct;
+  let guard = 0;
+  while (acc < target && (lo > 0 || hi < bins - 1) && guard++ < bins * 2) {
+    const below = lo > 0 ? vol[lo - 1] : -1;
+    const above = hi < bins - 1 ? vol[hi + 1] : -1;
+    if (above >= below) { hi += 1; acc += vol[hi]; }
+    else { lo -= 1; acc += vol[lo]; }
+  }
+  return {
+    poc: round5(pMin + (pocBin + 0.5) * binSize),
+    vah: round5(pMin + (hi + 1) * binSize),
+    val: round5(pMin + lo * binSize),
+  };
+}
+
+/**
  * 지지·저항 레벨 계산.
  * @param {Array<{high:number,low:number,close:number}>} dailyCandles 일봉(과거→최신)
  * @param {number} refPrice 기준가(보통 마지막 일봉 종가)
  */
 export function computeSRLevels(dailyCandles, refPrice, { N = 60, k = 2, tol = 0.005 } = {}) {
   try {
-    if (!Array.isArray(dailyCandles) || !(refPrice > 0)) return null;
+    if (!Array.isArray(dailyCandles) || !(refPrice > 0) || !Number.isFinite(refPrice)) return null;
+    // ★ Phase2: 거래량 프로파일 — 함수 상단 1회 계산해 모든 return 경로(메인+폴백)에 부착.
+    const vp = process.env.ZEPTA_SR_VOLPROFILE !== "0" ? computeVolumeProfile(dailyCandles) : null;
+    const attach = (res) => (res ? { ...res, vp: res.vp ?? (vp || null) } : res);
     // 진행 중인 마지막 일봉 제외(고저 미확정) + 최근 N개 윈도우
     const win = dailyCandles.slice(0, -1).slice(-N);
-    if (win.length < 2 * k + 3) return pivotOnly(dailyCandles, refPrice) || recentRangeBand(dailyCandles, refPrice);
+    if (win.length < 2 * k + 3) return attach(pivotOnly(dailyCandles, refPrice) || recentRangeBand(dailyCandles, refPrice));
 
     // 1) 스윙 고저점 — 좌우 k개보다 엄격히 높/낮은 극값
     const swings = [];
@@ -86,7 +142,7 @@ export function computeSRLevels(dailyCandles, refPrice, { N = 60, k = 2, tol = 0
       if (isHigh && Number.isFinite(win[i].high)) swings.push({ p: win[i].high, idx: i });
       if (isLow && Number.isFinite(win[i].low)) swings.push({ p: win[i].low, idx: i });
     }
-    if (swings.length === 0) return pivotOnly(dailyCandles, refPrice) || recentRangeBand(dailyCandles, refPrice);
+    if (swings.length === 0) return attach(pivotOnly(dailyCandles, refPrice) || recentRangeBand(dailyCandles, refPrice));
 
     // 2) 가격순 1-pass 병합 (상대 tol — 미세가격 코인 과병합 방지)
     swings.sort((a, b) => a.p - b.p);
@@ -103,6 +159,21 @@ export function computeSRLevels(dailyCandles, refPrice, { N = 60, k = 2, tol = 0
     }
     // 3) 강도 = 터치 + 최근성 보너스(마지막 터치가 10봉 이내면 +0.5)
     for (const c of clusters) c.w = c.t + (win.length - 1 - c.lastIdx <= 10 ? 0.5 : 0);
+
+    // 3.5) ★ Phase2: 거래량 프로파일 — 볼륨이 뒷받침하는 레벨(진짜 매물대)에 강도 가점.
+    //   POC(최대 거래량 가격) 일치 +1.2 / VAH·VAL 일치 +0.6 → pickTwo 점수↑ → 볼륨 확인 레벨 선택.
+    //   ZEPTA_SR_VOLPROFILE=0 으로 끔. vp 는 출력에 동승(표시용 — 코인 카드 매물대 시각화).
+    // ★ 적대검증(P1) 반영: 볼륨 가점은 t>=2(다중터치 구조적 레벨)에만 적용 — 단발 거래량
+    //   스파이크(t=1)가 거리0 POC 점수로 진짜 강한 레벨을 밀어내는 inversion 방지. t 의미도 보존
+    //   (refine 이 보는 t>=2 레벨만 강화). 배율도 보수화(+0.6/+0.3 = 동급 t>=2 내 타이브레이커).
+    if (vp) {
+      for (const c of clusters) {
+        if (c.t < 2) continue; // 구조적 레벨만 볼륨 확인으로 강화 (노이즈 승격 금지)
+        if (vp.poc && Math.abs(c.p - vp.poc) / vp.poc <= tol) c.w += 0.6;
+        else if ((vp.vah && Math.abs(c.p - vp.vah) / vp.vah <= tol) ||
+                 (vp.val && Math.abs(c.p - vp.val) / vp.val <= tol)) c.w += 0.3;
+      }
+    }
 
     // 4) 현재가 분리 — ★ 2026-06-14 고도화(대표 지시): 최소거리 0.2%→0.8% (너무 붙은
     //   노이즈 레벨 제외, "actionable 매물대"만). env ZEPTA_SR_MIN_DIST_PCT(기본 0.8). 캡 ±25%.
@@ -166,11 +237,11 @@ export function computeSRLevels(dailyCandles, refPrice, { N = 60, k = 2, tol = 0
         r.sort((a, b) => Math.abs(a.p - refPrice) - Math.abs(b.p - refPrice));
       }
     }
-    if (s.length === 0 && r.length === 0) return pivotOnly(dailyCandles, refPrice) || recentRangeBand(dailyCandles, refPrice);
+    if (s.length === 0 && r.length === 0) return attach(pivotOnly(dailyCandles, refPrice) || recentRangeBand(dailyCandles, refPrice));
 
     const hasCluster = s.some((x) => x.t > 0) || r.some((x) => x.t > 0);
     const m = hasCluster ? (usedPivotFill ? "mixed" : "cluster") : "pivot";
-    return { s, r, piv: piv ? round5(piv.P) : null, px: round5(refPrice), m };
+    return attach({ s, r, piv: piv ? round5(piv.P) : null, px: round5(refPrice), m });
   } catch {
     return null; // 표시 전용 — 어떤 실패도 호출부를 막지 않음
   }
@@ -186,5 +257,10 @@ export function scaleSR(sr, factor) {
     r: sc(sr.r),
     piv: sr.piv != null ? round5(sr.piv * factor) : null,
     px: sr.px != null ? round5(sr.px * factor) : null,
+    vp: sr.vp ? {
+      poc: Number.isFinite(sr.vp.poc) ? round5(sr.vp.poc * factor) : sr.vp.poc,
+      vah: Number.isFinite(sr.vp.vah) ? round5(sr.vp.vah * factor) : sr.vp.vah,
+      val: Number.isFinite(sr.vp.val) ? round5(sr.vp.val * factor) : sr.vp.val,
+    } : null,
   };
 }
