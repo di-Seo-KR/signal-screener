@@ -30,6 +30,7 @@ import { sendCards, buildCard, fmtKST } from "../_shared/telegram.js";
 import { fetchGA4DailySummary } from "../_shared/ga4.js";
 import { fetchSentryDailySummary } from "../_shared/sentry.js";
 import { batchBacktest } from "../_shared/ohlc-backtest.js";
+import { massiveEnabled, getDailyCandles } from "../_shared/massive-stocks.js"; // ★ C: 매크로 컨텍스트
 
 // 7 명 에이전트 + OHLC 백테스트 + LLM 2회(QUANT-RES, QUANT-PLAN) — 60s 초과로 매일 타임아웃.
 // ★ 2026-06-03: maxDuration 60 → 300 (continuous-backtest 와 동일). 완주 보장.
@@ -420,6 +421,37 @@ function buildLiveVsShadowCard(liveSummary, shadowSummary) {
 }
 
 // ── 가상매매 한 줄 참고 카드 (짧게) ──
+// ── 시장 매크로 컨텍스트 (Massive C, 2026-06-15) — 미 증시 지수로 리스크온/오프 배경 ──
+//   크립토는 미 위험자산(나스닥/S&P)과 상관이 높음 → 퀀트팀이 거시 배경을 보고 판단.
+//   ETF 프록시(SPY/QQQ/IWM)는 평범한 티커 → Massive getDailyCandles 호환. 키 없으면 null(카드 생략).
+async function fetchMacroContext() {
+  if (!massiveEnabled()) return null;
+  const tickers = [["SPY", "S&P500"], ["QQQ", "나스닥100"], ["IWM", "러셀2000(소형주)"]];
+  const out = [];
+  for (const [sym, label] of tickers) {
+    try {
+      const c = await getDailyCandles(sym, { days: 10 });
+      if (c && c.length >= 2) {
+        const last = c[c.length - 1], prev = c[c.length - 2];
+        const chgPct = prev.close > 0 ? (last.close / prev.close - 1) * 100 : 0;
+        out.push({ sym, label, close: last.close, chgPct: Number(chgPct.toFixed(2)) });
+      }
+    } catch {}
+  }
+  return out.length ? out : null;
+}
+
+function buildMacroCard(macro) {
+  if (!macro || !macro.length) return null; // 미연동/실패 → 카드 생략(조건부 스프레드로 미삽입)
+  const lines = macro.map((m) => `${m.label}: $${m.close} (${m.chgPct >= 0 ? "+" : ""}${m.chgPct}%)`);
+  const avg = macro.reduce((s, m) => s + m.chgPct, 0) / macro.length;
+  const mood = avg >= 0.5 ? "리스크온 (위험자산 강세 → 크립토 통상 우호)"
+             : avg <= -0.5 ? "리스크오프 (위험자산 약세 → 크립토 주의)"
+             : "중립";
+  lines.push(`종합: ${mood}`);
+  return buildCard({ tag: "🌐", title: "시장 매크로 (미 증시, 전일)", lines, footer: "Massive 데이터 · 크립토는 미 위험자산과 상관 높음" });
+}
+
 function buildShadowReferenceCard(summary, timeStops = null) {
   if (!summary) {
     return buildCard({
@@ -1237,7 +1269,7 @@ export default async function handler(req, res) {
     }
 
     const kv = await getKv();
-    const [ledger, weights, summary, latestQuant, ga4, sentry, archive, realActivity, alphaLeaderboard, alphaCandidates] = await Promise.all([
+    const [ledger, weights, summary, latestQuant, ga4, sentry, archive, realActivity, alphaLeaderboard, alphaCandidates, macro] = await Promise.all([
       readShadowLedger(kv, 7),
       readWeights(kv),
       readShadowSummary(kv),
@@ -1248,6 +1280,7 @@ export default async function handler(req, res) {
       readRealTradingActivity(kv),                 // 어제 실거래 활동 (사용자 본인 기준)
       kv.get("di:alpha:leaderboard").catch(() => null),         // alpha-lab cron 결과
       kv.get("di:alpha:strategy-candidates").catch(() => null), // continuous-backtest 후보
+      fetchMacroContext().catch(() => null),                    // ★ C: 미 증시 매크로 (Massive)
     ]);
     // QUANT-RES 입력에 OHLC 정확 백테스트 결과 주입 (Track A+B 통합)
     // archive 누적 부족 시 ledger.closed (최대 30건 샘플) fallback
@@ -1328,6 +1361,8 @@ export default async function handler(req, res) {
       // ★ item6: 실거래 vs 가상 실행 괴리 (실거래 청산 표본 ≥5 시 비교 시작)
       buildLiveVsShadowCard(realActivity?.liveSummary, summary),
       buildShadowReferenceCard(summary, timeStops),
+      // ★ C: 미 증시 매크로 백드롭 (Massive — 키 없으면 미삽입)
+      ...(macro ? [buildMacroCard(macro)] : []),
       // ★ Alpha Lab (Phase 1~6) — 24/7 자동 알파 추적 결과
       buildAlphaLabCard(alphaLeaderboard, alphaCandidates),
       buildCardsForResearch(research),
