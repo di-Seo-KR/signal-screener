@@ -502,32 +502,43 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   //   이전: shadow-summary.bySymbol 만 사용 → shadow 와 live 분포 다르면 misaligned.
   //   현재: live-summary (>=10건) 면 그것만 본다, 부족하면 shadow (>=20건) 보조.
   //   (2026-05-03 진단: SOL 18.5%, XRP 11.5% 같은 명백한 손실 종목을 자동 정리)
+  // ★ 2026-06-15 (item2 — 대표 "저승률 코인 배제보다 보수적 접근"): 자동차단을 티어화.
+  //   파국(WR<catCut, 기본 25%) = 하드 차단 / 저조(catCut~penUpper, 기본 25~30%) = 사이즈 페널티(×0.5)
+  //   그 외 = 정상. ZEPTA_PERFORMANCE_PENALTY_ENABLED=0 이면 레거시(<30% 하드 차단)로 복귀.
   const blockedByPerf = new Set();
+  const perfPenalty = new Map(); // sym → sizeMult (저조 종목 보수 사이징)
   try {
     const kvBlock = await getKv();
     const liveSummary = (await kvBlock.get(`di:real:user:${userId}:live-summary`)) || null;
     const shadowSummary = (await kvBlock.get(`di:real:user:${userId}:shadow-summary`)) || null;
     const liveBySym = liveSummary?.bySymbol || {};
     const shadowBySym = shadowSummary?.bySymbol || {};
+    const PENALTY_ON = process.env.ZEPTA_PERFORMANCE_PENALTY_ENABLED !== "0";
+    const _cc = Number(process.env.ZEPTA_CATASTROPHIC_WR_CUTOFF);
+    const catCut = (Number.isFinite(_cc) && _cc > 0 && _cc < 1) ? _cc : 0.25;
+    const _pm = Number(process.env.ZEPTA_LOW_WR_SIZE_MULT);
+    const penMult = (Number.isFinite(_pm) && _pm > 0 && _pm < 1) ? _pm : 0.5;
+    const _pu = Number(process.env.ZEPTA_LOW_WR_PENALTY_UPPER);
+    const penUpper = (Number.isFinite(_pu) && _pu > catCut && _pu <= 1) ? _pu : 0.30;
     // 모든 등장 심볼 합집합
     const allSyms = new Set([...Object.keys(liveBySym), ...Object.keys(shadowBySym)]);
     for (const sym of allSyms) {
       const live = liveBySym[sym];
       const shadow = shadowBySym[sym];
-      // 우선순위 1: live n>=10
-      if (live && live.trades >= 10) {
-        const wr = live.wins / live.trades;
-        if (wr < 0.30) {
-          blockedByPerf.add(sym);
-          continue;
-        }
-      } else if (shadow && shadow.trades >= 20) {
-        // 우선순위 2: shadow n>=20 (live 부족 시)
-        const wr = shadow.wins / shadow.trades;
-        if (wr < 0.30) blockedByPerf.add(sym);
+      // 유효 WR: live n>=10 우선, 아니면 shadow n>=20 보조. 둘 다 부족하면 판단 보류.
+      let wr = null;
+      if (live && live.trades >= 10) wr = live.wins / live.trades;
+      else if (shadow && shadow.trades >= 20) wr = shadow.wins / shadow.trades;
+      if (wr == null) continue;
+      if (!PENALTY_ON) {
+        if (wr < 0.30) blockedByPerf.add(sym); // 레거시: <30% 하드 차단
+        continue;
       }
+      if (wr < catCut) blockedByPerf.add(sym);               // 파국 → 차단
+      else if (wr < penUpper) perfPenalty.set(sym, penMult); // 저조 → 사이즈 페널티(배제 X)
     }
-    if (blockedByPerf.size > 0) S(`auto-blocked symbols (live n>=10 또는 shadow n>=20, winRate<30%): ${Array.from(blockedByPerf).join(", ")}`);
+    if (blockedByPerf.size > 0) S(`auto-blocked (파국 WR<${(catCut*100).toFixed(0)}%, live n>=10|shadow n>=20): ${Array.from(blockedByPerf).join(", ")}`);
+    if (perfPenalty.size > 0) S(`사이즈 페널티 (저조 WR ${(catCut*100).toFixed(0)}~${(penUpper*100).toFixed(0)}%, ×${penMult}): ${Array.from(perfPenalty.keys()).join(", ")}`);
   } catch (e) {
     S(`auto-block skipped: ${e?.message}`);
   }
@@ -674,7 +685,7 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   for (const cand of ranked.slice(0, 6)) {  // 최대 6개 시도
     // 자동 차단 — 성과 부진으로 자동 디머지된 종목
     if (blockedByPerf.has(cand.symbol)) {
-      S(`  ↳ ${cand.symbol}: 부진 자동 차단 (winRate<30% AND n>=20)`);
+      S(`  ↳ ${cand.symbol}: 부진 자동 차단 (파국 저승률, n>=10/20)`);
       tried.push({ symbol: cand.symbol, reason: "auto-blocked by performance" });
       continue;
     }
@@ -776,7 +787,8 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       }
       // ★ 2026-05-17 (QUANT-RES): regime 을 planTrade 로 전달 — 동적 SL/TP 보정.
       //   trending 시 TP +30%, mean_reverting 시 양쪽 -20% 자동 적용.
-      const p = planTrade({ signal: cand, equity: effectiveEquity, price: pr, atr: a, filter: f, regime: regimeSnapshot, availableMargin: availMargin, cfg: RISK_CONFIG });
+      // ★ item2 성과 페널티는 live-only (shadow 는 full-size 유지 → 깨끗한 통계·Live↔Shadow 비교).
+      const p = planTrade({ signal: cand, equity: effectiveEquity, price: pr, atr: a, filter: f, regime: regimeSnapshot, availableMargin: availMargin, cfg: RISK_CONFIG, sizeMult: shadow ? 1 : (perfPenalty.get(cand.symbol) ?? 1) });
       if (!p.ok) {
         S(`  ↳ risk reject: ${p.reason}`);
         tried.push({ symbol: cand.symbol, reason: p.reason });

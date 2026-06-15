@@ -586,7 +586,7 @@ export function inSameCorrelationGroup(symbol, openSymbols, cfg = RISK_CONFIG) {
  * ★ 2026-05-17 (QUANT-RES): regime 파라미터 추가. signal.regime 또는 args.regime
  *   로 전달 가능. 동적 SL/TP 가 regime 보정 자동 적용.
  */
-export function planTrade({ signal, equity, price, atr, filter, regime = null, availableMargin = null, cfg = RISK_CONFIG }) {
+export function planTrade({ signal, equity, price, atr, filter, regime = null, availableMargin = null, cfg = RISK_CONFIG, sizeMult = 1 }) {
   const log = [];
   const push = (m) => log.push(m);
 
@@ -657,6 +657,12 @@ export function planTrade({ signal, equity, price, atr, filter, regime = null, a
       // 점수 없으면 confidence 등급 폴백
       convFactor = ({ A: 1.0, B: 0.72, C: 0.5 })[signal.confidence] ?? 0.6;
     }
+  }
+  // ★ 2026-06-15 (item2 — 대표 "저승률 코인 배제보다 보수적 접근"): 성과 페널티.
+  //   저승률(파국 아님) 종목을 차단하지 않고 convFactor 를 줄여 작게만 진입. sizeMult∈(0,1).
+  if (Number.isFinite(sizeMult) && sizeMult > 0 && sizeMult < 1) {
+    convFactor *= sizeMult;
+    push(`perf-penalty sizeMult ×${sizeMult} → convFactor=${convFactor.toFixed(3)}`);
   }
   const riskAmount = equity * cfg.riskPerTradePct * convFactor;
   push(`riskAmount=$${riskAmount.toFixed(3)} (${(cfg.riskPerTradePct * 100).toFixed(2)}% × 확신${convFactor.toFixed(2)} of $${equity.toFixed(2)}, score=${signal.score ?? "-"})`);
