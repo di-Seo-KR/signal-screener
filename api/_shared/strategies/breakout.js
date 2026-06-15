@@ -11,7 +11,7 @@
 //   SHORT — close < 20일 low * 1.01 + vol > 1.5x avg
 // ════════════════════════════════════════════════════════
 
-import { computeIndicatorBundle, gradeConfidence, scaleScore, calcSMA } from "./_indicators.js";
+import { computeIndicatorBundle, gradeConfidence, scaleScore, refineSignalScore, calcSMA } from "./_indicators.js";
 
 const FAMILY = "breakout";
 const MIN_BARS = 60;
@@ -93,21 +93,24 @@ export function runBreakout({ closes, highs, lows, volumes, asset, timeframe = "
     return null;
   }
 
-  const netScore = buy - sell;
-  const absNet = Math.abs(netScore);
-  if (absNet < MIN_ABS_NET) return null; // 돌파는 강한 합의만 진입
+  // ★ 2026-06-14 (감사 확정): refineSignalScore 적용 — 다른 5개 전략은 모두 적용하는데
+  //   breakout 만 누락돼 과확장·다이버전스·극단RSI·거래량페이드 댐핑과 breadthCap(상관 인플레
+  //   차단)을 우회 → 점수 인플레였음. 동일 패턴으로 정합. (raw scaleScore/gradeConfidence 대체)
+  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L });
+  if (refined.absNet < MIN_ABS_NET) return null; // 돌파는 강한 합의만 진입
+  if (refined.notes.length) reasons.push(...refined.notes);
 
-  const side = netScore > 0 ? "LONG" : "SHORT";
+  const side = refined.side;
   return {
     side,
-    score: scaleScore(absNet),
-    confidence: gradeConfidence(absNet),
+    score: refined.score,
+    confidence: refined.confidence,
     family: FAMILY,
     timeframe,
     reason: `[${timeframe}|breakout] ` + reasons.join(" + "),
-    sizeHint: Math.max(0.4, Math.min(0.9, absNet / 9)),
+    sizeHint: Math.max(0.4, Math.min(0.9, refined.absNet / 9)),
     type: side === "LONG" ? "BUY" : "SELL",
-    positionSize: Math.max(0.4, Math.min(0.9, absNet / 9)),
+    positionSize: Math.max(0.4, Math.min(0.9, refined.absNet / 9)),
   };
 }
 
