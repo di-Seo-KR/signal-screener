@@ -83,18 +83,19 @@ export function computeVolumeProfile(candles, { N = 90, bins = 40, valuePct = 0.
   const binSize = (pMax - pMin) / bins;
   if (!(binSize > 0)) return null;
   const vol = new Array(bins).fill(0);
-  let total = 0;
+  let total = 0, volBars = 0;
   for (const c of win) {
     const h = Number(c.high), l = Number(c.low), v = Number(c.volume) || 0;
-    if (!Number.isFinite(h) || !Number.isFinite(l) || v <= 0) continue;
+    if (!Number.isFinite(h) || !Number.isFinite(l) || h < l || v <= 0) continue; // h<l(이상 OHLC) 스킵
     const loBin = Math.max(0, Math.min(bins - 1, Math.floor((l - pMin) / binSize)));
     const hiBin = Math.max(0, Math.min(bins - 1, Math.floor((h - pMin) / binSize)));
     const span = hiBin - loBin + 1;
     const per = v / span;
     for (let b = loBin; b <= hiBin; b++) vol[b] += per;
-    total += v;
+    total += v; volBars += 1;
   }
-  if (!(total > 0)) return null;
+  // ★ 적대검증 반영: 거래량 보유 봉이 너무 적으면(단일 스파이크) POC 의미 없음 → null.
+  if (!(total > 0) || volBars < 10) return null;
   let pocBin = 0;
   for (let b = 1; b < bins; b++) if (vol[b] > vol[pocBin]) pocBin = b;
   // Value Area — POC 중심으로 인접 고볼륨 빈을 확장해 valuePct(70%) 누적
@@ -121,7 +122,7 @@ export function computeVolumeProfile(candles, { N = 90, bins = 40, valuePct = 0.
  */
 export function computeSRLevels(dailyCandles, refPrice, { N = 60, k = 2, tol = 0.005 } = {}) {
   try {
-    if (!Array.isArray(dailyCandles) || !(refPrice > 0)) return null;
+    if (!Array.isArray(dailyCandles) || !(refPrice > 0) || !Number.isFinite(refPrice)) return null;
     // ★ Phase2: 거래량 프로파일 — 함수 상단 1회 계산해 모든 return 경로(메인+폴백)에 부착.
     const vp = process.env.ZEPTA_SR_VOLPROFILE !== "0" ? computeVolumeProfile(dailyCandles) : null;
     const attach = (res) => (res ? { ...res, vp: res.vp ?? (vp || null) } : res);
@@ -162,11 +163,15 @@ export function computeSRLevels(dailyCandles, refPrice, { N = 60, k = 2, tol = 0
     // 3.5) ★ Phase2: 거래량 프로파일 — 볼륨이 뒷받침하는 레벨(진짜 매물대)에 강도 가점.
     //   POC(최대 거래량 가격) 일치 +1.2 / VAH·VAL 일치 +0.6 → pickTwo 점수↑ → 볼륨 확인 레벨 선택.
     //   ZEPTA_SR_VOLPROFILE=0 으로 끔. vp 는 출력에 동승(표시용 — 코인 카드 매물대 시각화).
+    // ★ 적대검증(P1) 반영: 볼륨 가점은 t>=2(다중터치 구조적 레벨)에만 적용 — 단발 거래량
+    //   스파이크(t=1)가 거리0 POC 점수로 진짜 강한 레벨을 밀어내는 inversion 방지. t 의미도 보존
+    //   (refine 이 보는 t>=2 레벨만 강화). 배율도 보수화(+0.6/+0.3 = 동급 t>=2 내 타이브레이커).
     if (vp) {
       for (const c of clusters) {
-        if (vp.poc && Math.abs(c.p - vp.poc) / vp.poc <= tol) c.w += 1.2;
+        if (c.t < 2) continue; // 구조적 레벨만 볼륨 확인으로 강화 (노이즈 승격 금지)
+        if (vp.poc && Math.abs(c.p - vp.poc) / vp.poc <= tol) c.w += 0.6;
         else if ((vp.vah && Math.abs(c.p - vp.vah) / vp.vah <= tol) ||
-                 (vp.val && Math.abs(c.p - vp.val) / vp.val <= tol)) c.w += 0.6;
+                 (vp.val && Math.abs(c.p - vp.val) / vp.val <= tol)) c.w += 0.3;
       }
     }
 
