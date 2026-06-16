@@ -400,17 +400,18 @@ export default async function handler(req, res) {
 
       // ★ 2026-06-03 (대표 지시): 멀티 타임프레임 종합 스코어용 — 각 TF 신호를 *항상* 계산.
       //   (기존 4h/1h '폴백'과 별개. 주봉·일봉·4h·1h 를 가중합산해 단일 종합 스코어 산출.)
+      // ★ 2026-06-16 (대표 제보 — 합성점수 10~20점 출렁임 진단/수정): sub-daily TF 를 *완결 캔들*로만.
+      //   기존엔 형성 중(미완결) 마지막 봉 포함 → 매 10분 지표가 봉 안에서 흔들려 borderline 신호가
+      //   깜빡(리페인팅) → 합성점수(0.20·1h+0.25·4h 부호가중) ±10~20 출렁. 진행 중 봉 제외 → 1h 는
+      //   시간당·4h 는 4시간당 1회만 변경 = 안정. 일봉 메인신호(latestSignal) 불변(반응성 보존).
+      //   ★ 적대검증 P2 반영: sigForTF 뿐 아니라 MTF충돌·refine 까지 *동일* 완결봉 사용(일관성 —
+      //   안 그러면 그 소비자들이 open-bar 잡음을 최종점수에 재유입). ZEPTA_MTF_CLOSED_BARS=0 복귀.
+      const _closedTF = (arr) => (process.env.ZEPTA_MTF_CLOSED_BARS === "0" || !Array.isArray(arr) || arr.length <= 1)
+        ? arr : arr.slice(0, -1);
       const sigForTF = (arr, tf) => {
-        if (!Array.isArray(arr) || arr.length < 61) return null;
+        if (!Array.isArray(arr) || arr.length < 62) return null; // slice 후 ≥61 보장(경계 토글 방지)
         try {
-          // ★ 2026-06-16 (대표 제보 — 합성점수 10~20점 출렁임 진단/수정): sub-daily TF 신호를
-          //   *완결 캔들*로만 계산. 기존엔 형성 중(미완결) 마지막 봉을 포함해 매 10분 재계산 →
-          //   1h/4h 지표가 봉 안에서 흔들려 borderline 신호가 깜빡(리페인팅) → 합성점수(0.20·1h +
-          //   0.25·4h 부호가중)가 ±10~20 출렁였음. 진행 중 봉 제외 → 1h 는 시간당·4h 는 4시간당
-          //   1회만 변경 = 안정. (일/주 영향 미미하나 일관성·리페인팅 제거 위해 동일 적용. 일봉
-          //   메인신호 latestSignal 은 불변.) ZEPTA_MTF_CLOSED_BARS=0 으로 기존(미완결 포함) 복귀.
-          const src = process.env.ZEPTA_MTF_CLOSED_BARS === "0" ? arr : arr.slice(0, -1);
-          if (src.length < 61) return null;
+          const src = _closedTF(arr);
           const cl = src.map(c => c.close), hi = src.map(c => c.high), lo = src.map(c => c.low);
           const s = pickTopBotSignal(computeBotSignals({
             asset, closes: cl, highs: hi, lows: lo, volumes: src.map(c => c.volume || 0), timeframe: tf, paramsByStrategy,
@@ -614,8 +615,9 @@ export default async function handler(req, res) {
       try {
         const sSide = latestSignal.side;
         // (a) MTF: 4h 추세(EMA21 vs EMA55)가 신호와 충돌하면 확신 하향
-        if (sSide && Array.isArray(candles4h) && candles4h.length >= 61) {
-          const c4 = candles4h.map(c => c.close);
+        const _c4 = _closedTF(candles4h); // ★ 완결봉 (sigForTF 와 일관 — open-bar 잡음 재유입 방지)
+        if (sSide && Array.isArray(_c4) && _c4.length >= 61) {
+          const c4 = _c4.map(c => c.close);
           const e21 = calcEMA(c4, 21), e55 = calcEMA(c4, 55);
           const L4 = c4.length - 1;
           if (e21[L4] != null && e55[L4] != null) {
@@ -643,7 +645,8 @@ export default async function handler(req, res) {
       try {
         const _mk = (arr) => (Array.isArray(arr) && arr.length)
           ? { closes: arr.map(c => c.close), highs: arr.map(c => c.high), lows: arr.map(c => c.low), volumes: arr.map(c => c.volume || 0) } : null;
-        const _perTF = { "1h": _mk(candles1h), "4h": _mk(candles4h), "1d": { closes, highs, lows, volumes } };
+        // ★ 완결봉 1h/4h (sigForTF 와 일관). 1d 는 메인신호 배열 그대로(반응성 보존).
+        const _perTF = { "1h": _mk(_closedTF(candles1h)), "4h": _mk(_closedTF(candles4h)), "1d": { closes, highs, lows, volumes } };
         const _refSide = compositeSignal?.side || latestSignal?.side;
         if (_refSide) {
           const _ref = refineCompositeEntry({ side: _refSide, perTF: _perTF, sr: srLevels, price: closes[closes.length - 1] });
