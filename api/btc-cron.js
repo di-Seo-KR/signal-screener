@@ -403,9 +403,17 @@ export default async function handler(req, res) {
       const sigForTF = (arr, tf) => {
         if (!Array.isArray(arr) || arr.length < 61) return null;
         try {
-          const cl = arr.map(c => c.close), hi = arr.map(c => c.high), lo = arr.map(c => c.low);
+          // ★ 2026-06-16 (대표 제보 — 합성점수 10~20점 출렁임 진단/수정): sub-daily TF 신호를
+          //   *완결 캔들*로만 계산. 기존엔 형성 중(미완결) 마지막 봉을 포함해 매 10분 재계산 →
+          //   1h/4h 지표가 봉 안에서 흔들려 borderline 신호가 깜빡(리페인팅) → 합성점수(0.20·1h +
+          //   0.25·4h 부호가중)가 ±10~20 출렁였음. 진행 중 봉 제외 → 1h 는 시간당·4h 는 4시간당
+          //   1회만 변경 = 안정. (일/주 영향 미미하나 일관성·리페인팅 제거 위해 동일 적용. 일봉
+          //   메인신호 latestSignal 은 불변.) ZEPTA_MTF_CLOSED_BARS=0 으로 기존(미완결 포함) 복귀.
+          const src = process.env.ZEPTA_MTF_CLOSED_BARS === "0" ? arr : arr.slice(0, -1);
+          if (src.length < 61) return null;
+          const cl = src.map(c => c.close), hi = src.map(c => c.high), lo = src.map(c => c.low);
           const s = pickTopBotSignal(computeBotSignals({
-            asset, closes: cl, highs: hi, lows: lo, volumes: arr.map(c => c.volume || 0), timeframe: tf, paramsByStrategy,
+            asset, closes: cl, highs: hi, lows: lo, volumes: src.map(c => c.volume || 0), timeframe: tf, paramsByStrategy,
           }));
           if (s) return s;
           // ★ 2026-06-14: 전략 HOLD → 지표 기반 약한 추세읽기 폴백 (TF 빈칸 방지)
