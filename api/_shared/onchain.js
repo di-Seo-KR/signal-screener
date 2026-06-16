@@ -75,22 +75,32 @@ export function cryptoquantEnabled() {
 /**
  * 거래소 순입출금(netflow) → 방향 바이어스. (양수 입금=매도압력=약세 / 음수 출금=강세)
  * @returns {{netflow:number, bias:number}|null}
- *   ※ CryptoQuant REST 계약은 키 수령 시 _source 식 실측으로 확정. 그 전까진 키 있어도 null
- *      반환하도록 보수적 — 추측 배선으로 잘못된 신호가 매매에 새지 않게(Massive 교훈).
+ *   계약(공식 문서 확정): GET /v1/{asset}/exchange-flows/netflow?exchange=all_exchange&window=day
+ *   → result.data[].netflow_total. 인증 Authorization: Bearer. 무료 티어는 막힐 수 있음(403→null).
+ *   ZEPTA_CRYPTOQUANT_LIVE=1 + 키 둘 다일 때만 호출(안전 게이트). 실패/파싱불가 시 null(매매 무해).
  */
 export async function fetchExchangeNetflow(asset) {
   if (!cryptoquantEnabled() || !asset) return null;
-  // 계약 미확정 — 키 수령 후 이 블록을 실 endpoint/인증/파싱으로 교체 + 라이브 검증.
-  // (현재는 의도적으로 null: 검증 안 된 추측 호출이 라이브 바이어스로 새는 것 방지)
-  if (process.env.ZEPTA_CRYPTOQUANT_LIVE !== "1") return null;
+  if (process.env.ZEPTA_CRYPTOQUANT_LIVE !== "1") return null; // 활성 게이트
   const sym = String(asset).toLowerCase();
-  const json = await jget(`${CQ_BASE}/${sym}/exchange-flows/netflow?window=day&limit=1`, {
+  const kv = await getKvSafe();
+  const cacheKey = `di:onchain:netflow:${sym}`;
+  if (kv) { try { const c = await kv.get(cacheKey); if (c && Number.isFinite(c.netflow)) return c; } catch {} }
+  // ★ exchange 파라미터 필수(공식 문서). all_exchange = 전 거래소 합산. window=day, 최신 1건.
+  const json = await jget(`${CQ_BASE}/${sym}/exchange-flows/netflow?exchange=all_exchange&window=day&limit=1`, {
     headers: { Authorization: `Bearer ${String(process.env.CRYPTOQUANT_API_KEY).trim()}` },
   });
+  if (!json) return null;
   const row = json?.result?.data?.[0] ?? json?.data?.[0];
   const nf = Number(row?.netflow_total ?? row?.netflow);
-  if (!Number.isFinite(nf)) return null;
-  return { netflow: nf, bias: nf > 0 ? -1 : nf < 0 ? 1 : 0 }; // 입금(+)→약세(-1), 출금(-)→강세(+1)
+  if (!Number.isFinite(nf)) {
+    // 진단: 무료 티어 막힘(status 403/구독)·필드명 변경 등 → 로그로 실체 노출(매매엔 무해, null)
+    console.warn(`[onchain] cryptoquant ${sym} netflow 미파싱 — status:${json?.status?.code ?? "?"} keys:[${Object.keys(json || {}).join(",")}]`);
+    return null;
+  }
+  const out = { netflow: Number(nf.toFixed(2)), bias: nf > 0 ? -1 : nf < 0 ? 1 : 0 }; // 입금(+)→약세(-1)/출금(-)→강세(+1)
+  if (kv) { try { await kv.set(cacheKey, out, { ex: 3 * 3600 }); } catch {} } // 3h (일 단위 데이터)
+  return out;
 }
 
 /** 통합 온체인 컨텍스트 — 일일보고/분석용. 실패 항목은 null. */
