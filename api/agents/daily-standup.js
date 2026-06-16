@@ -31,7 +31,7 @@ import { fetchGA4DailySummary } from "../_shared/ga4.js";
 import { fetchSentryDailySummary } from "../_shared/sentry.js";
 import { batchBacktest } from "../_shared/ohlc-backtest.js";
 import { massiveEnabled, getDailyCandles } from "../_shared/massive-stocks.js"; // ★ C: 매크로 컨텍스트
-import { fetchStablecoinLiquidity } from "../_shared/onchain.js"; // ★ 온체인 유동성(A)
+import { fetchStablecoinLiquidity, fetchExchangeNetflow } from "../_shared/onchain.js"; // ★ 온체인 유동성(A)+netflow(B)
 
 // 7 명 에이전트 + OHLC 백테스트 + LLM 2회(QUANT-RES, QUANT-PLAN) — 60s 초과로 매일 타임아웃.
 // ★ 2026-06-03: maxDuration 60 → 300 (continuous-backtest 와 동일). 완주 보장.
@@ -455,16 +455,21 @@ function buildMacroCard(macro) {
 
 // ── 온체인 유동성 카드 (2026-06-15) — 스테이블코인 총공급 추세 = 시장 매수여력 ──
 //   shadow 관측 전용(라이브 매매 미반영) — 신규 알파는 검증 후 라이브 적용(quant 규율).
-function buildOnchainCard(liq) {
-  if (!liq) return null;
-  const lines = [
-    `스테이블코인 총공급: $${liq.totalB}B (7일 ${liq.chg7dPct >= 0 ? "+" : ""}${liq.chg7dPct}% · 30일 ${liq.chg30dPct >= 0 ? "+" : ""}${liq.chg30dPct}%)`,
-    `유동성 국면: ${liq.regime}`,
-  ];
-  const note = liq.bias > 0 ? "자본 유입 — 크립토 매수여력 확대(상승 셋업 우호)"
-             : liq.bias < 0 ? "자본 이탈 — 매수여력 위축(주의)"
-             : "유동성 횡보";
-  return buildCard({ tag: "⛓️", title: "온체인 유동성 (스테이블코인)", lines, footer: note + " · DefiLlama · shadow 관측" });
+function buildOnchainCard(liq, netflows = {}) {
+  const hasNf = netflows.btc || netflows.eth;
+  if (!liq && !hasNf) return null;
+  const lines = [];
+  if (liq) {
+    lines.push(`스테이블코인 총공급: $${liq.totalB}B (7일 ${liq.chg7dPct >= 0 ? "+" : ""}${liq.chg7dPct}% · 30일 ${liq.chg30dPct >= 0 ? "+" : ""}${liq.chg30dPct}%)`);
+    lines.push(`유동성 국면: ${liq.regime}`);
+  }
+  // ★ CryptoQuant 거래소 순입출금 (입금+=매도압력 약세 / 출금−=강세). shadow 관측.
+  const nfLine = (label, nf) => nf ? `${label} 거래소 순흐름: ${nf.netflow > 0 ? "+" : ""}${nf.netflow} (${nf.bias > 0 ? "출금=강세" : nf.bias < 0 ? "입금=약세" : "중립"})` : null;
+  for (const l of [nfLine("BTC", netflows.btc), nfLine("ETH", netflows.eth)]) if (l) lines.push(l);
+  const note = liq
+    ? (liq.bias > 0 ? "자본 유입 — 매수여력 확대(상승 셋업 우호)" : liq.bias < 0 ? "자본 이탈 — 매수여력 위축(주의)" : "유동성 횡보")
+    : "온체인 흐름 관측";
+  return buildCard({ tag: "⛓️", title: "온체인 (유동성·거래소 흐름)", lines, footer: note + " · DefiLlama/CryptoQuant · shadow 관측" });
 }
 
 function buildShadowReferenceCard(summary, timeStops = null) {
@@ -1284,7 +1289,7 @@ export default async function handler(req, res) {
     }
 
     const kv = await getKv();
-    const [ledger, weights, summary, latestQuant, ga4, sentry, archive, realActivity, alphaLeaderboard, alphaCandidates, macro, onchainLiq] = await Promise.all([
+    const [ledger, weights, summary, latestQuant, ga4, sentry, archive, realActivity, alphaLeaderboard, alphaCandidates, macro, onchainLiq, nfBtc, nfEth] = await Promise.all([
       readShadowLedger(kv, 7),
       readWeights(kv),
       readShadowSummary(kv),
@@ -1297,6 +1302,8 @@ export default async function handler(req, res) {
       kv.get("di:alpha:strategy-candidates").catch(() => null), // continuous-backtest 후보
       fetchMacroContext().catch(() => null),                    // ★ C: 미 증시 매크로 (Massive)
       fetchStablecoinLiquidity().catch(() => null),             // ★ 온체인 유동성 (DefiLlama, 키리스)
+      fetchExchangeNetflow("btc").catch(() => null),            // ★ BTC 거래소 순흐름 (CryptoQuant, 게이트)
+      fetchExchangeNetflow("eth").catch(() => null),            // ★ ETH 거래소 순흐름
     ]);
     // QUANT-RES 입력에 OHLC 정확 백테스트 결과 주입 (Track A+B 통합)
     // archive 누적 부족 시 ledger.closed (최대 30건 샘플) fallback
@@ -1380,7 +1387,7 @@ export default async function handler(req, res) {
       // ★ C: 미 증시 매크로 백드롭 (Massive — 키 없으면 미삽입)
       ...(macro ? [buildMacroCard(macro)] : []),
       // ★ 온체인 유동성 백드롭 (DefiLlama, shadow 관측)
-      ...(onchainLiq ? [buildOnchainCard(onchainLiq)] : []),
+      ...[buildOnchainCard(onchainLiq, { btc: nfBtc, eth: nfEth })].filter(Boolean),
       // ★ Alpha Lab (Phase 1~6) — 24/7 자동 알파 추적 결과
       buildAlphaLabCard(alphaLeaderboard, alphaCandidates),
       buildCardsForResearch(research),
