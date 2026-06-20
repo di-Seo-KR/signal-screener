@@ -135,13 +135,23 @@ export function sampleRandomParams(strategyId, n = 20) {
   const space = WIDE_PARAM_SPACE[strategyId];
   if (!space) return [];
   const keys = Object.keys(space);
+  // ★ 적대감사 P2-13: 복원추출이라 같은 조합이 중복 생성 → 작은 grid(예 ensemble 15개)에선 n=50 중
+  //   다수가 중복(계산 낭비 + 미탐색 조합 발생). Set dedup + cap=min(n, gridSize)로 중복 제거·커버리지↑.
+  const gridSize = keys.reduce((p, k) => p * space[k].length, 1);
+  const cap = Math.min(n, gridSize);
+  const seen = new Set();
   const out = [];
-  for (let i = 0; i < n; i++) {
+  let guard = 0;
+  while (out.length < cap && guard < n * 50) {
+    guard++;
     const combo = {};
     for (const k of keys) {
       const arr = space[k];
       combo[k] = arr[Math.floor(Math.random() * arr.length)];
     }
+    const sig = keys.map((k) => combo[k]).join("|");
+    if (seen.has(sig)) continue;
+    seen.add(sig);
     out.push(combo);
   }
   return out;
