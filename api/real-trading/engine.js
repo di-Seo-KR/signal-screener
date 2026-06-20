@@ -188,7 +188,9 @@ async function pullRecentSignals({ userId, lookbackMs = 4 * 60 * 60 * 1000, adva
   if (advanceCursor) {
     // ★ 감사 P2: 커서 advance 실패를 관측 가능하게(기존 빈 catch=무음 실패). 비치명적 —
     //   다음 사이클은 minTs=Math.min(lastSeen, now-lookback) 의 lookback 윈도우 + seenAssetType
-    //   dedup + clientOrderId 멱등성으로 중복주문이 차단되므로 로깅만 하고 진행.
+    //   dedup + same-symbol notional cap(checkSameSymbolNotional)이 *실 가드*로 중복/과다진입을 차단.
+    //   ★ 적대감사 P1-8 정정: clientOrderId(p1-${best.id})는 generatedAt 포함이라 런마다 바뀌어 멱등
+    //   백스톱이 실제로는 미작동 — 위 가드들이 진짜 방어선. 안정 id 백스톱은 ZEPTA_STABLE_CLIENT_ORDER_ID(아래).
     try { await kv.set(lastSeenKey, now); }
     catch (e) { console.warn(`[engine] lastSeen 커서 advance 실패 (${userId}): ${e?.message} — lookback 윈도우로 dedup 보호됨`); }
   }
@@ -937,7 +939,12 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
         stopLossPrice: plan.plan.slPrice,
         takeProfitPrice: plan.plan.tpPrice,
         dryRun,
-        clientOrderId: `p1-${best.id}`,
+        // ★ 적대감사 P1-8: 안정 멱등 id 백스톱(옵션). 기본은 기존 best.id(런마다 변동) — 켜면 same
+        //   asset+side+score+10분버킷으로 안정화해 재처리(cursor 실패)/churn 을 Binance 가 reject.
+        //   ※ 같은 버킷 내 *의도된 averaging* 도 차단될 수 있어 기본 OFF(과다진입 가드는 notional cap 담당).
+        clientOrderId: process.env.ZEPTA_STABLE_CLIENT_ORDER_ID === "1"
+          ? `p1-${best.symbol}-${best.side}-${Math.round(Number(best.score) || 0)}-${Math.floor(Date.now() / 600000)}`
+          : `p1-${best.id}`,
       });
     } catch (e) {
       S(`execute failed: ${e.message}`);
