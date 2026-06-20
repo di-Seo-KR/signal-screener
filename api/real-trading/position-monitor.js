@@ -264,9 +264,8 @@ async function checkUser(userId) {
       const refPrice = slHit ? plan.slPrice : plan.tpPrice;
       try {
         const closeQty = Math.abs(parseFloat(p.positionAmt));
-        // ★ 적대감사 P2-4: 시장가 청산 전 기존 bracket(STOP/TP) 취소 — MTF/시간손절 경로와 동일.
-        //   잔여 SL 이 시장가 청산과 동시 체결되거나, 청산 후 고아 주문으로 남는 것 방지.
-        await cancelAllOpenOrders({ ...creds, symbol: sym }).catch(() => {});
+        // ★ 적대감사 P2-4+17: 시장가 청산을 *먼저* 성공시킨 뒤 잔여 bracket(STOP/TP) 정리 — 청산이 throw
+        //   해도 SL 이 그대로 포지션 보호(naked 윈도우 제거). 둘 다 reduceOnly 라 동시체결돼도 과청산 불가.
         await placeOrder({
           ...creds,
           params: {
@@ -278,6 +277,7 @@ async function checkUser(userId) {
             newOrderRespType: "RESULT",
           },
         });
+        await cancelAllOpenOrders({ ...creds, symbol: sym }).catch(() => {});
         const logKey = `di:real:user:${userId}:engine-log`;
         const log = (await kv.get(logKey)) || [];
         log.unshift({
@@ -343,7 +343,8 @@ async function checkUser(userId) {
           (mtfMode === "strict" && mtf.confidence >= 1);
         if (triggerClose) {
           try {
-            await cancelAllOpenOrders({ ...creds, symbol: sym }).catch(() => {});
+            // ★ 적대감사 P2-17: 시장가 청산 먼저 성공 → 잔여 bracket 정리(naked 윈도우 제거).
+            //   둘 다 reduceOnly 라 SL 잔존이 시장가와 동시체결돼도 과청산 불가(Binance 보장).
             const closeQty = Math.abs(parseFloat(p.positionAmt));
             await placeOrder({
               ...creds,
@@ -356,6 +357,7 @@ async function checkUser(userId) {
                 newOrderRespType: "RESULT",
               },
             });
+            await cancelAllOpenOrders({ ...creds, symbol: sym }).catch(() => {});
             const logKey = `di:real:user:${userId}:engine-log`;
             const log = (await kv.get(logKey)) || [];
             log.unshift({
@@ -418,8 +420,10 @@ async function checkUser(userId) {
     });
     if (ts.shouldClose) {
       try {
-        // bracket 취소 후 시장가 청산
-        await cancelAllOpenOrders({ ...creds, symbol: sym });
+        // ★ 적대감사 P2-17: 기존엔 cancelAllOpenOrders(SL 제거) → 시장가 청산 순서라, 청산이 throw 하면
+        //   SL 이 이미 제거돼 *무방비*(다음 2분 사이클까지 노출). 시장가 청산을 *먼저* 성공시킨 뒤 잔여
+        //   bracket 정리 → 청산 실패 시 SL 이 그대로 포지션 보호(naked 윈도우 제거). 둘 다 reduceOnly 라
+        //   SL 잔존이 시장가와 동시 체결돼도 과청산 불가(Binance reduceOnly 보장).
         const closeQty = Math.abs(parseFloat(p.positionAmt));
         await placeOrder({
           ...creds,
@@ -432,6 +436,7 @@ async function checkUser(userId) {
             newOrderRespType: "RESULT",
           },
         });
+        await cancelAllOpenOrders({ ...creds, symbol: sym }).catch(() => {}); // 청산 성공 후 잔여 SL/TP 정리
         report.timeStopped.push({ sym, reason: ts.reason, currentR: ts.currentR });
         // 엔진 로그
         const logKey = `di:real:user:${userId}:engine-log`;
