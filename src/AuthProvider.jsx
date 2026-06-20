@@ -269,6 +269,11 @@ export default function AuthProvider({ children }) {
   const signInWithOAuth = async (provider) => {
     // GA4 — OAuth 시작 (= signup 시작과 의미상 동일)
     ga.signupStarted(provider);
+    // ★ 마케팅 계측 수정: signInWithOAuth 가 즉시 full-page 리다이렉트(특히 iOS Safari)를 일으켜 위
+    //   sendBeacon 이 flush 되기 전에 페이지가 떠나 signup_started 가 유실됨 → 퍼널 '가입시작 0'이 허위
+    //   였음(signin_success 는 복귀 후 안정 페이지라 살아남아 데이터 모순 발생). 짧은 지연으로 beacon
+    //   dispatch 보장. 200ms 는 사용자 체감 없음.
+    await new Promise((r) => setTimeout(r, 200));
 
     const currentOrigin = window.location.origin;
     console.log("[Zepta Auth] Starting OAuth:", provider, "redirect:", currentOrigin);
