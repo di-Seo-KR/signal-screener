@@ -678,6 +678,18 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     S(`same-symbol notional cap = ${(capPct * 100).toFixed(0)}% of equity`);
   }
 
+  // ★ 2026-06-16 (대표 지시): 수동 관리 종목 하드 제외 — 봇이 절대 진입/평단추가 안 함.
+  //   대표가 수동으로 잡은 ETH·ZEC 포지션 보호(position-monitor 는 plan 없어 이미 스킵하지만,
+  //   engine 은 유니버스+averaging 으로 끼어들 수 있어 후보 단계에서 원천 차단). env 로 조정.
+  const _manRaw = (process.env.ZEPTA_MANUAL_SYMBOLS ?? "ETHUSDT,ZECUSDT").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+  const manualExcluded = new Set(_manRaw);
+  const manualBases = new Set(_manRaw.map((s) => s.replace(/USDT$|USD$|PERP$/, "").replace(/^1000/, "")));
+  const isManualSymbol = (sym) => {
+    const u = String(sym || "").toUpperCase();
+    return manualExcluded.has(u) || manualBases.has(u.replace(/USDT$|USD$|PERP$/, "").replace(/^1000/, ""));
+  };
+  if (manualExcluded.size) S(`수동 관리 종목 제외(봇 진입 금지): ${[..._manRaw].join(", ")}`);
+
   // 7-9) ★ ranked 시그널 순회 — 1순위가 affordability/risk reject 되어도
   // 차순위로 fallback. 첫 번째로 plan.ok 가 나오는 시그널을 채택.
   let best = null, price = null, atr = null, filter = null, plan = null;
@@ -986,7 +998,8 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       }
       if (!persisted) {
         result.planPersistFailed = true;
-        const slAttached = result.bracket?.sl?.ok === true; // Binance STOP 확정 부착만 인정(보수적)
+        // ★ 재검증 P3: stop_limit 폴백 SL 은 갭장 미체결 가능 → '보장 청산' 아님. STOP_MARKET 만 보호 인정.
+        const slAttached = result.bracket?.sl?.ok === true && result.bracket?.slMode !== "stop_limit_fallback";
         if (slAttached) {
           S(`🚨 plan 영속화 실패 — ${plan.plan.symbol}: Binance SL 부착됨(무방비 아님). 트레일링/시간손절 유실 — 수동 점검.`);
         } else if (creds?.apiKey && process.env.ZEPTA_NAKED_FORCE_CLOSE === "0") {
@@ -995,9 +1008,12 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
         } else if (creds?.apiKey) {
           S(`🚨 CRITICAL: plan 영속화 3회 실패 + Binance SL 미부착 → ${plan.plan.symbol} 무방비. reduceOnly 강제청산 시도.`);
           try {
+            // ★ 재검증 P1: plan.plan.qty 가 아니라 *실제 체결량*(result.executedQty)으로 청산 —
+            //   집행시점 재산출/라운딩 차이로 plan.qty < 실제량이면 부분청산 잔여 무방비가 됨.
+            const _closeQty = Number(result.executedQty) > 0 ? Number(result.executedQty) : plan.plan.qty;
             await placeOrder({
               apiKey: creds.apiKey, apiSecret: creds.apiSecret, testnet: creds.testnet,
-              params: { symbol: plan.plan.symbol, side: plan.plan.side === "LONG" ? "SELL" : "BUY", type: "MARKET", quantity: plan.plan.qty, reduceOnly: true },
+              params: { symbol: plan.plan.symbol, side: plan.plan.side === "LONG" ? "SELL" : "BUY", type: "MARKET", quantity: _closeQty, reduceOnly: true },
             });
             result.nakedClosed = true;
             S(`🚨 무방비 포지션 강제청산 완료: ${plan.plan.symbol} (SL 없이 노출 방지)`);
@@ -1058,8 +1074,20 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   }
 
   // 11b) ★ 실거래 진입 성공 시 텔레그램 알림 (모바일에서 즉시 인지)
+  // ★ 재검증 P2: plan 영속화 실패(무방비/강제청산)는 모바일 CRITICAL 알림 필수 (S 로그는 모바일 미도달).
+  if (!dryRun && !shadow && result?.planPersistFailed) {
+    try {
+      const { sendCards, buildCard } = await import("../_shared/telegram.js");
+      const _sym = plan.plan.symbol;
+      const _msg = result.nakedCloseFailed ? `🚨 강제청산 실패 — ${_sym} 즉시 수동청산 필요!`
+                 : result.nakedClosed ? `무방비 감지 → reduceOnly 강제청산 완료 (${_sym})`
+                 : `Binance SL 은 있으나 plan 저장 실패 (${_sym}) — 트레일링/시간손절 추적 점검`;
+      await sendCards([buildCard({ tag: "🚨", title: "실거래 CRITICAL — plan 영속화 실패", lines: [_msg, `${_sym} · ${plan.plan.side} · 진입 후 plan KV write 3회 실패`] })]);
+    } catch (e) { console.warn("[engine] naked-alert telegram error:", e?.message); }
+  }
+
   // dry/shadow 는 알림 안 보냄 (스팸 방지). live 만 발송.
-  if (!dryRun && !shadow && result?.ok && !result?.error) {
+  if (!dryRun && !shadow && result?.ok && !result?.error && !result?.planPersistFailed) { // ★ 재검증 P2: 강제청산/무방비 건은 '성공' 카드 미발송
     try {
       const { sendCards, buildCard } = await import("../_shared/telegram.js");
       const sideKr = plan.plan.side === "LONG" ? "롱(상승)" : "숏(하락)";
