@@ -90,8 +90,12 @@ async function checkUser(userId) {
       try {
         const trades = await getUserTrades({ ...creds, symbol: sym, startTime, limit: 50 });
         // ★ 감사 P2: 프록시 에러 시 비배열 객체({ok:false,...}) 반환 가능 → Array.isArray 가드
-        const sum = (Array.isArray(trades) ? trades : []).reduce((s, t) => s + parseFloat(t.realizedPnl || 0), 0);
-        if (Number.isFinite(sum)) realized = sum;
+        const _arr = Array.isArray(trades) ? trades : [];
+        const sum = _arr.reduce((s, t) => s + parseFloat(t.realizedPnl || 0), 0);
+        // ★ 적대감사 P2-3: API 성공이지만 거래 0건(룩백 밖/일시 조회실패)을 realized=0 으로 단정하면
+        //   recordTradeResult(0)이 연속손실 streak 을 거짓 리셋(서킷브레이커 무력화). 빈 결과는
+        //   null(unavailable) 유지 → recordTradeResult 미호출(streak 보존). 실제 break-even(거래有,합0)만 0.
+        if (_arr.length > 0 && Number.isFinite(sum)) realized = sum;
       } catch (e) {
         console.warn(`[monitor] userTrades ${sym} failed:`, e?.message);
       }
@@ -140,7 +144,9 @@ async function checkUser(userId) {
       try {
         const planForSide = await kv.get(`di:real:user:${userId}:plan:${sym}`);
         await recordReentryCooldown(kv, userId, {
-          symbol: sym, side: planForSide?.side, pnl: realizedSafe,
+          // ★ 적대감사 P2-18: realized==null(userTrades API 실패)을 realizedSafe=0 으로 넘기면 손절
+          //   쿨다운(120m)이 익절 윈도우(45m)로 단축 → churn. pnl 미상 시 보수적 손절(-1)로 긴 쿨다운 유지.
+          symbol: sym, side: planForSide?.side, pnl: Number.isFinite(realized) ? realized : -1,
           entryPrice: planForSide?.entryPrice, score: planForSide?.score, // ★ 품질 게이트용
         });
       } catch {}
@@ -258,6 +264,9 @@ async function checkUser(userId) {
       const refPrice = slHit ? plan.slPrice : plan.tpPrice;
       try {
         const closeQty = Math.abs(parseFloat(p.positionAmt));
+        // ★ 적대감사 P2-4: 시장가 청산 전 기존 bracket(STOP/TP) 취소 — MTF/시간손절 경로와 동일.
+        //   잔여 SL 이 시장가 청산과 동시 체결되거나, 청산 후 고아 주문으로 남는 것 방지.
+        await cancelAllOpenOrders({ ...creds, symbol: sym }).catch(() => {});
         await placeOrder({
           ...creds,
           params: {
