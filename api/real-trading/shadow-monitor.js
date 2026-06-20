@@ -321,7 +321,7 @@ async function monitorUser(userId) {
     // 신규 필드 backfill
     sum.byFamily = sum.byFamily || {};
     sum.bySymbol = sum.bySymbol || {}; // ★ 종목별 영구 누적 — 자동 차단/가중치에 사용
-    sum.byCloseReason = sum.byCloseReason || { TP: 0, SL: 0, TIME: 0 };
+    sum.byCloseReason = sum.byCloseReason || { TP: 0, SL: 0, TIME: 0, SOFT_TIME: 0 }; // ★ 적대감사 P3-4: 초기화(L318)와 동일 형태로 SOFT_TIME 백필 보강(통계 표시 일관성, 거래 무영향)
     sum.totalHoldMs = sum.totalHoldMs || 0;
     sum.bestR = sum.bestR || 0;
     sum.worstR = sum.worstR || 0;

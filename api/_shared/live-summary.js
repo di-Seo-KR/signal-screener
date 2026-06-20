@@ -106,6 +106,9 @@ export async function recordLiveTrade(userId, closeInfo) {
  * @param {string} symbol
  * @returns {Promise<{blocked: boolean, reason?: string, liveStats?, shadowStats?}>}
  */
+// ★ 적대감사 P3-3: ⚠️ 미사용·레거시 — export 만 되고 호출처 0건(engine.js 가 자체 인라인 로직 사용).
+//   임계도 구버전 flat <0.30 이라 engine 의 티어화(item2: catCut 25% 하드 + 25~30% sizeMult×0.5)와
+//   어긋남. 진실원천은 engine.js:508-544. 신규 호출 금지(호출 시 item2 정책 우회·되돌림).
 export async function shouldAutoBlock(userId, symbol) {
   const kv = await getKv();
   const live = (await kv.get(`di:real:user:${userId}:live-summary`)) || {};

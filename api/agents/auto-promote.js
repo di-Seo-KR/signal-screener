@@ -10,7 +10,10 @@
 //
 // 텔레그램: 상태 변경 시 알림 발송 (변경 없으면 무음).
 //
-// Cron: `30 6 * * *` (KST 15:30, US 시장 닫혀있어 안전)
+// Cron: `30 * * * *` (매시간 24회/일 — vercel.json:161).
+//   ★ 적대감사 P3-6 정정: 기존 헤더가 '30 6 * * * 일일·시장 닫힘 안전'이라 했으나 실제는 *매시간*
+//   실행되어 거래 활성 시간대에도 라이브 전략 상태를 변경함. 빈번한 재승급 안전은
+//   P2-9(DISABLED 백테스트 재승급 차단)·P2-10(stale leaderboard 승급 보류)으로 확보.
 // ────────────────────────────────────────────────────────────────────
 
 import {
@@ -44,10 +47,14 @@ async function getKv() {
 function decide(metrics) {
   if (!metrics) return { next: STRATEGY_STATUS.WATCH, reason: "no data" };
   const { trades = 0, sharpe = 0, profitFactor: pf = 0, winRate = 0 } = metrics;
-  if (trades >= RULES.promote.minTrades && sharpe >= RULES.promote.minSharpe && (pf || 0) >= RULES.promote.minPF) {
+  // ★ 적대감사 P3-7: 무손실(손실 0건) 전략은 computeMetrics 가 pf=null 반환 → (pf||0)=0 으로 PF
+  //   게이트 영구 탈락(최우수 전략이 WATCH 0.5×에 갇힘). trades>=minTrades 가드가 이미 있어 pf==null 은
+  //   '거래는 충분한데 손실 0'(=무한 PF)이므로 PF 조건 통과로 처리.
+  const pfPass = (pf == null) || ((pf || 0) >= RULES.promote.minPF);
+  if (trades >= RULES.promote.minTrades && sharpe >= RULES.promote.minSharpe && pfPass) {
     return {
       next: STRATEGY_STATUS.ACTIVE,
-      reason: `n=${trades}, Sharpe ${sharpe} ≥ ${RULES.promote.minSharpe}, PF ${pf} ≥ ${RULES.promote.minPF}`,
+      reason: `n=${trades}, Sharpe ${sharpe} ≥ ${RULES.promote.minSharpe}, PF ${pf == null ? "∞(무손실)" : pf} ≥ ${RULES.promote.minPF}`,
     };
   }
   if (AUTO_DEMOTE_ENABLED && trades >= RULES.demote.minTrades && (sharpe <= RULES.demote.maxSharpe || winRate < RULES.demote.minWinRate)) {
