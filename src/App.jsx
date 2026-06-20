@@ -8365,7 +8365,7 @@ function AppInner() {
                   <div style={{ width: "56px", height: "56px", borderRadius: "16px", background: C.blueBg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", fontSize: "24px" }}>🔒</div>
                   <div style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>{t("tabs.home.loginToManageWatchlist")}</div>
                   <div style={{ fontSize: "18px", color: C.text3, lineHeight: 1.6, marginBottom: "16px" }}>{t("tabs.home.realtimeQuantDescription")}</div>
-                  <button onClick={() => setShowAuth(true)} style={{
+                  <button onClick={() => setShowAuthModal(true)} style={{
                     padding: "10px 24px", borderRadius: "10px", fontSize: "18px", fontWeight: 700,
                     background: C.blue, color: "#fff", border: "none", cursor: "pointer",
                   }}>{t("tabs.home.loginOrSignup")}</button>
