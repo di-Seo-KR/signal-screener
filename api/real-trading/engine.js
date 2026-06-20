@@ -28,7 +28,7 @@ import { loadFamilyWeightsRobust, applyWeightsToRanking } from "../_shared/strat
 import { planTrade, RISK_CONFIG, checkAggregateExposure, checkPyramidGuard, checkSameSymbolNotional } from "../_shared/risk-manager.js";
 import { preTradeCheck } from "../_shared/circuit-breaker.js";
 import { getSymbolFilter, isSymbolAffordable } from "../_shared/exchange-info.js";
-import { getTickerPrice, getAccountInfo, getKlines, getPositionRisk } from "../_shared/binance-client.js";
+import { getTickerPrice, getAccountInfo, getKlines, getPositionRisk, placeOrder } from "../_shared/binance-client.js";
 import { UNIVERSE_KV_KEY } from "../_shared/futures-universe.js";
 import { executeOrderPlan } from "../binance/order.js";
 import { checkReentryCooldown } from "../_shared/reentry-cooldown.js";
@@ -678,6 +678,18 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     S(`same-symbol notional cap = ${(capPct * 100).toFixed(0)}% of equity`);
   }
 
+  // ★ 2026-06-16 (대표 지시): 수동 관리 종목 하드 제외 — 봇이 절대 진입/평단추가 안 함.
+  //   대표가 수동으로 잡은 ETH·ZEC 포지션 보호(position-monitor 는 plan 없어 이미 스킵하지만,
+  //   engine 은 유니버스+averaging 으로 끼어들 수 있어 후보 단계에서 원천 차단). env 로 조정.
+  const _manRaw = (process.env.ZEPTA_MANUAL_SYMBOLS ?? "ETHUSDT,ZECUSDT").split(",").map((s) => s.trim().toUpperCase()).filter(Boolean);
+  const manualExcluded = new Set(_manRaw);
+  const manualBases = new Set(_manRaw.map((s) => s.replace(/USDT$|USD$|PERP$/, "").replace(/^1000/, "")));
+  const isManualSymbol = (sym) => {
+    const u = String(sym || "").toUpperCase();
+    return manualExcluded.has(u) || manualBases.has(u.replace(/USDT$|USD$|PERP$/, "").replace(/^1000/, ""));
+  };
+  if (manualExcluded.size) S(`수동 관리 종목 제외(봇 진입 금지): ${[..._manRaw].join(", ")}`);
+
   // 7-9) ★ ranked 시그널 순회 — 1순위가 affordability/risk reject 되어도
   // 차순위로 fallback. 첫 번째로 plan.ok 가 나오는 시그널을 채택.
   let best = null, price = null, atr = null, filter = null, plan = null;
@@ -936,48 +948,83 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   // 11a) live 진입 성공이면 plan 을 KV 에 저장 — position-monitor 가
   // trailing stop / time stop 평가에 사용. dry/shadow 는 저장 안 함.
   if (!dryRun && !shadow && result?.ok && !result?.error) {
+    const planKey = `di:real:user:${userId}:plan:${plan.plan.symbol}`;
+    // ★ 적대감사 P1-1: plan 영속화 실패 = 무방비(naked) 포지션 — bracket 비활성 계정에서 SL/TP/
+    //   시간손절이 전적으로 plan 에 의존하는데, kv.set throw(KV 일시장애) 시 catch 가 로깅만 하고
+    //   삼켜 SL 없는 5x 포지션이 남았음. → 재시도(backoff) 후 최종 실패 + Binance SL 미부착이면
+    //   reduceOnly 강제청산으로 노출 차단. (Binance SL 부착 시엔 무방비 아님 — 경보만, 오청산 방지.)
+    const planObj = {
+      symbol: plan.plan.symbol,
+      side: plan.plan.side,
+      entryPrice: plan.plan.entryPrice,
+      slPrice: plan.plan.slPrice,
+      tpPrice: plan.plan.tpPrice,
+      slPct: plan.plan.slPct,
+      tpPct: plan.plan.tpPct,
+      leverage: plan.plan.leverage,
+      qty: plan.plan.qty,
+      openedAt: Date.now(),
+      currentSlPrice: plan.plan.slPrice,
+      highWater: plan.plan.entryPrice,
+      strategyFamily: plan.plan.strategyFamily,
+      // confidence/timeframe/score/regime — position-monitor·live-summary·쿨다운·레짐분석 input
+      confidence: plan.plan.confidence,
+      timeframe: best.timeframe || undefined, // ★ best(=채택 cand). 루프 밖이라 cand 직접참조 금지(#155 교훈)
+      score: Number.isFinite(Number(best.score)) ? Number(best.score) : null,
+      regime: regimeSnapshot,
+    };
+    let kv2 = null, skipOverwrite = false, persisted = false;
     try {
-      const kv = await getKv();
-      const planKey = `di:real:user:${userId}:plan:${plan.plan.symbol}`;
-      // ★ 같은 심볼에 기존 plan 이 있으면 덮어쓰지 않음 (포지션 추적 보호)
-      const existingPlan = await kv.get(planKey);
+      kv2 = await getKv();
+      const existingPlan = await kv2.get(planKey); // 기존 plan 있으면 덮어쓰지 않음(포지션 추적 보호)
       if (existingPlan && existingPlan.openedAt) {
+        skipOverwrite = true;
         S(`plan already exists for ${plan.plan.symbol} (opened ${new Date(existingPlan.openedAt).toISOString()}) — skip overwrite`);
-      } else {
-      // ★ 2026-05-11 대표 지시: slMissingSince 제거.
-      //   bracket SL attach 실패해도 position-monitor 가 plan.slPrice/tpPrice 로
-      //   mark-price 모니터링하면서 도달 시 시장가 청산하므로 force-close 불필요.
-      await kv.set(planKey, {
-        symbol: plan.plan.symbol,
-        side: plan.plan.side,
-        entryPrice: plan.plan.entryPrice,
-        slPrice: plan.plan.slPrice,
-        tpPrice: plan.plan.tpPrice,
-        slPct: plan.plan.slPct,
-        tpPct: plan.plan.tpPct,
-        leverage: plan.plan.leverage,
-        qty: plan.plan.qty,
-        openedAt: Date.now(),
-        currentSlPrice: plan.plan.slPrice,
-        highWater: plan.plan.entryPrice,
-        strategyFamily: plan.plan.strategyFamily,
-        // ★ 2026-06-14 (감사 P1-1): confidence/timeframe 영속화 — position-monitor →
-        //   live-summary(byConfidence·byTimeframe) → alpha-lab 학습통계 오염 방지.
-        //   plan.plan.confidence 는 signal.confidence 복사본(존재 확정). timeframe 은
-        //   plan 에 없어 cand.timeframe(진입 후보의 TF)으로 채움. 표시/통계 전용 — 거래 무영향.
-        confidence: plan.plan.confidence,
-        // ★ 2026-06-14 핫픽스: cand 는 for 루프 블록 스코프라 이 plan 저장(루프 밖)에선
-        //   ReferenceError → plan 저장 실패 → 포지션 무관리(P0). 채택된 후보는 best(=cand).
-        timeframe: best.timeframe || undefined,
-        // ★ 2026-06-14: 진입 신호점수 — 청산 시 쿨다운 레코드로 넘겨 재진입 품질 게이트
-        //   ("더 강한 신호인가") 비교 기준. best.score = 진입 후보의 (정제) 점수.
-        score: Number.isFinite(Number(best.score)) ? Number(best.score) : null,
-        regime: regimeSnapshot, // ★ 진입 시점 시장 레짐 스냅샷 (Hurst bucket 분석용)
-      });
-      S(`plan persisted to ${planKey}`);
-      } // end else (no existing plan)
+      }
     } catch (e) {
-      S(`plan persist failed: ${e.message}`);
+      S(`plan existing-check 실패(set 은 시도): ${e.message}`);
+      if (!kv2) { try { kv2 = await getKv(); } catch {} }
+    }
+    if (!skipOverwrite) {
+      for (let attempt = 0; attempt < 3 && !persisted && kv2; attempt++) {
+        try {
+          if (attempt) await new Promise((r) => setTimeout(r, 250 * attempt)); // backoff
+          await kv2.set(planKey, planObj);
+          persisted = true;
+          S(`plan persisted to ${planKey}${attempt ? ` (재시도 ${attempt})` : ""}`);
+        } catch (e) {
+          S(`⚠️ plan 영속화 실패(시도 ${attempt + 1}/3): ${e.message}`);
+        }
+      }
+      if (!persisted) {
+        result.planPersistFailed = true;
+        // ★ 재검증 P3: stop_limit 폴백 SL 은 갭장 미체결 가능 → '보장 청산' 아님. STOP_MARKET 만 보호 인정.
+        const slAttached = result.bracket?.sl?.ok === true && result.bracket?.slMode !== "stop_limit_fallback";
+        if (slAttached) {
+          S(`🚨 plan 영속화 실패 — ${plan.plan.symbol}: Binance SL 부착됨(무방비 아님). 트레일링/시간손절 유실 — 수동 점검.`);
+        } else if (creds?.apiKey && process.env.ZEPTA_NAKED_FORCE_CLOSE === "0") {
+          // 강제청산 비활성(env) — 무방비 인지하되 자동청산 안 함. 수동 개입 경보만.
+          S(`🚨 CRITICAL: plan 영속화 실패 + 무방비, 강제청산 비활성(ZEPTA_NAKED_FORCE_CLOSE=0) → ${plan.plan.symbol} 즉시 수동청산 필요!`);
+        } else if (creds?.apiKey) {
+          S(`🚨 CRITICAL: plan 영속화 3회 실패 + Binance SL 미부착 → ${plan.plan.symbol} 무방비. reduceOnly 강제청산 시도.`);
+          try {
+            // ★ 재검증 P1: plan.plan.qty 가 아니라 *실제 체결량*(result.executedQty)으로 청산 —
+            //   집행시점 재산출/라운딩 차이로 plan.qty < 실제량이면 부분청산 잔여 무방비가 됨.
+            const _closeQty = Number(result.executedQty) > 0 ? Number(result.executedQty) : plan.plan.qty;
+            await placeOrder({
+              apiKey: creds.apiKey, apiSecret: creds.apiSecret, testnet: creds.testnet,
+              params: { symbol: plan.plan.symbol, side: plan.plan.side === "LONG" ? "SELL" : "BUY", type: "MARKET", quantity: _closeQty, reduceOnly: true },
+            });
+            result.nakedClosed = true;
+            S(`🚨 무방비 포지션 강제청산 완료: ${plan.plan.symbol} (SL 없이 노출 방지)`);
+          } catch (e2) {
+            result.nakedCloseFailed = true;
+            S(`🚨🚨 강제청산도 실패: ${e2.message} — ${plan.plan.symbol} 즉시 수동청산 필요!`);
+          }
+        } else {
+          S(`🚨 plan 영속화 실패 + creds 없음 — ${plan.plan.symbol} 강제청산 불가, 수동 점검 요망.`);
+        }
+      }
     }
   }
 
@@ -1027,8 +1074,20 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   }
 
   // 11b) ★ 실거래 진입 성공 시 텔레그램 알림 (모바일에서 즉시 인지)
+  // ★ 재검증 P2: plan 영속화 실패(무방비/강제청산)는 모바일 CRITICAL 알림 필수 (S 로그는 모바일 미도달).
+  if (!dryRun && !shadow && result?.planPersistFailed) {
+    try {
+      const { sendCards, buildCard } = await import("../_shared/telegram.js");
+      const _sym = plan.plan.symbol;
+      const _msg = result.nakedCloseFailed ? `🚨 강제청산 실패 — ${_sym} 즉시 수동청산 필요!`
+                 : result.nakedClosed ? `무방비 감지 → reduceOnly 강제청산 완료 (${_sym})`
+                 : `Binance SL 은 있으나 plan 저장 실패 (${_sym}) — 트레일링/시간손절 추적 점검`;
+      await sendCards([buildCard({ tag: "🚨", title: "실거래 CRITICAL — plan 영속화 실패", lines: [_msg, `${_sym} · ${plan.plan.side} · 진입 후 plan KV write 3회 실패`] })]);
+    } catch (e) { console.warn("[engine] naked-alert telegram error:", e?.message); }
+  }
+
   // dry/shadow 는 알림 안 보냄 (스팸 방지). live 만 발송.
-  if (!dryRun && !shadow && result?.ok && !result?.error) {
+  if (!dryRun && !shadow && result?.ok && !result?.error && !result?.planPersistFailed) { // ★ 재검증 P2: 강제청산/무방비 건은 '성공' 카드 미발송
     try {
       const { sendCards, buildCard } = await import("../_shared/telegram.js");
       const sideKr = plan.plan.side === "LONG" ? "롱(상승)" : "숏(하락)";
