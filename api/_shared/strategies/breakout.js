@@ -96,7 +96,10 @@ export function runBreakout({ closes, highs, lows, volumes, asset, timeframe = "
   // ★ 2026-06-14 (감사 확정): refineSignalScore 적용 — 다른 5개 전략은 모두 적용하는데
   //   breakout 만 누락돼 과확장·다이버전스·극단RSI·거래량페이드 댐핑과 breadthCap(상관 인플레
   //   차단)을 우회 → 점수 인플레였음. 동일 패턴으로 정합. (raw scaleScore/gradeConfidence 대체)
-  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L });
+  // ★ 적대감사 P2-16: breakout 은 과확장이 *본질*(박스권 돌파). extensionPenalty 기본 true 면
+  //   자기 신호를 과확장으로 자기상쇄 감점 → _indicators 계약(L642)대로 extensionPenalty:false.
+  //   (다이버전스·극단RSI·거래량페이드·breadthCap 은 그대로 적용.)
+  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L, extensionPenalty: false });
   if (refined.absNet < MIN_ABS_NET) return null; // 돌파는 강한 합의만 진입
   if (refined.notes.length) reasons.push(...refined.notes);
 

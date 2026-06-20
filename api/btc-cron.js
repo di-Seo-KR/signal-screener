@@ -650,15 +650,20 @@ export default async function handler(req, res) {
         const _refSide = compositeSignal?.side || latestSignal?.side;
         if (_refSide) {
           const _ref = refineCompositeEntry({ side: _refSide, perTF: _perTF, sr: srLevels, price: closes[closes.length - 1] });
+          // ★ 적대감사 P2-14: refine 으로 score 가 바뀌면 confidence(A/B/C)도 재산출해야 정합
+          //   (안 그러면 score↓인데 confidence A 그대로 → 랭킹·노출게이트가 stale confidence 사용).
+          const _grade = (s) => s >= 80 ? "A" : s >= 60 ? "B" : "C";
           if (_ref.mult !== 1) {
             if (compositeSignal) {
               compositeSignal.entryRefine = { mult: _ref.mult, reasons: _ref.reasons, before: compositeSignal.score };
               compositeSignal.score = Math.max(0, Math.min(100, Math.round(compositeSignal.score * _ref.mult)));
+              compositeSignal.confidence = _grade(compositeSignal.score); // ★ P2-14
               if (_ref.reasons.length) compositeSignal.reason = (compositeSignal.reason || "") + ` | 진입정제 ${_ref.mult.toFixed(2)}×(${_ref.reasons.join(", ")})`;
             }
             if (latestSignal) {
               latestSignal.entryRefine = { mult: _ref.mult, reasons: _ref.reasons, before: latestSignal.score };
               latestSignal.score = Math.max(0, Math.min(100, Math.round((latestSignal.score || 60) * _ref.mult)));
+              latestSignal.confidence = _grade(latestSignal.score); // ★ P2-14
             }
             addLog(`  🎯 ${asset} 진입정제 ${_ref.mult.toFixed(2)}×: ${_ref.reasons.join(" · ")}`);
           }
