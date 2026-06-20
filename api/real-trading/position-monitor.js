@@ -480,10 +480,21 @@ async function checkUser(userId) {
           reduceOnly: true,
           clientOrderId: newSlClientId,
         });
+        // ★ 적대감사 P1-2: mark-price 청산 fallback(L250)이 plan.slPrice 로 청산하므로, 트레일링 SL 을
+        //   plan.slPrice 에도 one-way ratchet 으로 반영해야 이익보호가 fallback 에서도 작동한다.
+        //   (bracket-reject 계정은 STOP 이 항상 실패하는데 그 계정의 유일 보호가 fallback — 여기서
+        //   안 올리면 트레일링/브레이크이븐이 완전 무력화. STOP 성공/실패 *무관* 으로 갱신.)
+        const _ratchet = side === "LONG" ? newSL > (plan.slPrice ?? -Infinity) : newSL < (plan.slPrice ?? Infinity);
         // 새 SL 배치 성공 확인 후에만 기존 SL 취소
         if (!newSlResult || newSlResult?.code) {
-          // 새 SL 실패 → 기존 SL 유지, 이번 사이클 skip
-          report.trailed.push({ sym, error: `new SL placement failed: ${newSlResult?.msg || "unknown"}`, kept_old_sl: true });
+          // 새 SL(Binance STOP) 실패 — 그래도 fallback enforce 위해 plan.slPrice ratchet.
+          if (_ratchet) {
+            plan.slPrice = newSL; plan.currentSlPrice = newSL;
+            await kv.set(planKey, plan);
+            report.trailed.push({ sym, newSL, reason: trail.reason, currentR: trail.currentR, fallbackOnly: true, sl_order_failed: newSlResult?.msg || "unknown" });
+          } else {
+            report.trailed.push({ sym, error: `new SL placement failed: ${newSlResult?.msg || "unknown"}`, kept_old_sl: true });
+          }
         } else {
           // 새 SL 성공 → 이전 SL 주문들 취소 (새 것 제외)
           const opens = await getOpenOrders({ ...creds, symbol: sym });
@@ -496,6 +507,7 @@ async function checkUser(userId) {
             try { await cancelOrder({ ...creds, symbol: sym, orderId: o.orderId }); }
             catch (ce) { console.warn(`[trail] old SL cancel failed: ${o.orderId}`, ce?.message); }
           }
+          if (_ratchet) plan.slPrice = newSL; // ★ P1-2: mark-price fallback 도 트레일링 SL enforce
           plan.currentSlPrice = newSL;
           await kv.set(planKey, plan);
           report.trailed.push({ sym, newSL, reason: trail.reason, currentR: trail.currentR });
