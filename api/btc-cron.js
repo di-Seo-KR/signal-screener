@@ -1562,7 +1562,7 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
     const conf = absNet >= 6 ? "A" : absNet >= 3 ? "B" : "C";
     const sizeMult = absNet >= 3 ? 1.0 : absNet >= 2 ? 0.7 : 0.4;
     return {
-      type: "BUY", confidence: conf,
+      type: "BUY", side: "LONG", confidence: conf, // ★ 적대감사 P3-10: side — 폴백도 MTF충돌·선물컨텍스트·진입정제 보정 적용
       score: buyScore, factors: absNet,
       positionSize: posSize * sizeMult,
       reason: reasons.join(" + "),
@@ -1574,7 +1574,7 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
     const conf = absNet >= 6 ? "A" : absNet >= 3 ? "B" : "C";
     const sizeMult = absNet >= 3 ? 1.0 : absNet >= 2 ? 0.7 : 0.4;
     return {
-      type: "SELL", confidence: conf,
+      type: "SELL", side: "SHORT", confidence: conf, // ★ 적대감사 P3-10: side
       score: sellScore, factors: absNet,
       positionSize: posSize * sizeMult,
       reason: reasons.join(" + "),
@@ -1587,7 +1587,7 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
     // 추세장 동점: EMA 방향으로
     const dir = ema21[L] > ema55[L] ? "BUY" : "SELL";
     return {
-      type: dir, confidence: "C", score: totalScore, factors: 0,
+      type: dir, side: dir === "BUY" ? "LONG" : "SHORT", confidence: "C", score: totalScore, factors: 0, // ★ 적대감사 P3-10: side
       positionSize: posSize * 0.3,
       reason: reasons.join(" + ") + ` [동점→${dir === "BUY" ? "EMA↑" : "EMA↓"}]`,
       bar: L, price,
@@ -1596,7 +1596,7 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
     // 횡보장 동점: FNG 역방향
     const dir = fngValue <= 50 ? "BUY" : "SELL";
     return {
-      type: dir, confidence: "C", score: totalScore, factors: 0,
+      type: dir, side: dir === "BUY" ? "LONG" : "SHORT", confidence: "C", score: totalScore, factors: 0, // ★ 적대감사 P3-10: side
       positionSize: posSize * 0.3,
       reason: reasons.join(" + ") + ` [동점→FNG${dir}]`,
       bar: L, price,
