@@ -509,6 +509,7 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   //   그 외 = 정상. ZEPTA_PERFORMANCE_PENALTY_ENABLED=0 이면 레거시(<30% 하드 차단)로 복귀.
   const blockedByPerf = new Set();
   const perfPenalty = new Map(); // sym → sizeMult (저조 종목 보수 사이징)
+  const _blockCacheKey = `di:real:user:${userId}:perf-blocklist-cache`; // ★ P2-2 fail-safe 캐시
   try {
     const kvBlock = await getKv();
     const liveSummary = (await kvBlock.get(`di:real:user:${userId}:live-summary`)) || null;
@@ -541,8 +542,20 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
     }
     if (blockedByPerf.size > 0) S(`auto-blocked (파국 WR<${(catCut*100).toFixed(0)}%, live n>=10|shadow n>=20): ${Array.from(blockedByPerf).join(", ")}`);
     if (perfPenalty.size > 0) S(`사이즈 페널티 (저조 WR ${(catCut*100).toFixed(0)}~${(penUpper*100).toFixed(0)}%, ×${penMult}): ${Array.from(perfPenalty.keys()).join(", ")}`);
+    // ★ 적대감사 P2-2: 성공 시 파국 차단목록 캐시 — 다음 사이클 조회 실패 시 fail-safe 복원용.
+    try { await kvBlock.set(_blockCacheKey, { syms: Array.from(blockedByPerf), at: Date.now() }); } catch {}
   } catch (e) {
-    S(`auto-block skipped: ${e?.message}`);
+    // ★ 적대감사 P2-2: 실적 데이터 조회 실패 시 빈 Set 으로 게이트 우회(파국 저승률 종목 통과) 금지 —
+    //   마지막 캐시(24h 이내) 복원해 보호 유지 + ⚠️ 로깅(무음 우회 방지).
+    S(`⚠️ auto-block 데이터 조회 실패 (${e?.message}) — 캐시 복원 시도`);
+    try {
+      const kvR = await getKv();
+      const cached = await kvR.get(_blockCacheKey);
+      if (cached?.syms && (Date.now() - (cached.at || 0) < 24 * 3600 * 1000)) {
+        cached.syms.forEach((s) => blockedByPerf.add(s));
+        S(`auto-block 캐시 복원(${cached.syms.length}종): ${cached.syms.join(", ") || "(빈 목록)"}`);
+      }
+    } catch {}
   }
 
   // ★ Regime Filter — Hurst 지수 기반 시장 레짐 가드
