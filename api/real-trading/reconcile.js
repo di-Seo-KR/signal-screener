@@ -114,8 +114,10 @@ async function reconcileUser(userId) {
   const hasDiff = diff.missing.length || diff.extra.length || diff.mismatch.length;
   if (hasDiff) {
     const lines = [];
-    if (diff.missing.length) lines.push(`기록엔 있는데 실제 포지션 없음: ${diff.missing.join(", ")}`);
-    if (diff.extra.length)   lines.push(`실제 포지션은 있는데 기록 없음: ${diff.extra.join(", ")}`);
+    // ★ 적대감사 P2-8: missing=실제 열림·KV無 / extra=KV有·실제 닫힘(line 72-73 정의). 기존 메시지가
+    //   정확히 반대로 안내했음(부호 로직은 정상 — 표시 문자열만 정정). 동기화 동작·집계 변화 0.
+    if (diff.missing.length) lines.push(`실제 포지션은 있는데 기록 없음: ${diff.missing.join(", ")}`);
+    if (diff.extra.length)   lines.push(`기록엔 있는데 실제 포지션 없음: ${diff.extra.join(", ")}`);
     if (diff.mismatch.length) lines.push(`수량·진입가 불일치 ${diff.mismatch.length}건`);
     lines.push(`잔고 $${(diff.equity || 0).toFixed(2)}, 오늘 실현손익 $${diff.realizedToday.toFixed(2)}`);
     await sendCards([buildCard({

@@ -135,7 +135,9 @@ export async function preTradeCheck(userId, currentEquity) {
     //   있으면 자동 해제. 사용자 수동 halt 는 그대로 유지.
     const reason = state.haltedReason || "";
     const isAutoLimit = /daily loss|weekly loss|MDD/.test(reason);
-    if (isAutoLimit && state.dayStartEquity && state.weekStartEquity && state.equityHigh) {
+    // ★ 적대감사 P2-6: auto-recovery 게이트를 MDD 계산(line 142 peakForMdd)과 동일 폴백으로 정렬 —
+    //   기존 state.equityHigh(all-time)만 조건으로 둬 equityHigh30d 기반 회복 평가 진입이 어긋났음.
+    if (isAutoLimit && state.dayStartEquity && state.weekStartEquity && (state.equityHigh30d || state.equityHigh)) {
       const dPnL = (currentEquity - state.dayStartEquity) / state.dayStartEquity;
       const wPnL = (currentEquity - state.weekStartEquity) / state.weekStartEquity;
       // ★ rolling 30일 peak 사용 (auto-recovery 도 일관된 기준)
@@ -204,8 +206,12 @@ export async function preTradeCheck(userId, currentEquity) {
     state.equityHistory = state.equityHistory.filter((s) => now - s.ts <= ROLLING_WINDOW_MS);
     dirty = true;
   }
-  const equityHigh30d = state.equityHistory.length > 0
-    ? Math.max(...state.equityHistory.map((s) => s.equity), currentEquity)
+  // ★ 적대감사 P2-7: 30일 윈도우 폐기 filter 가 1시간 버킷 push 블록(line 201-205) 안에서만 실행돼,
+  //   버킷 미도래 호출에선 만료된 옛 고점이 Math.max 에 잡혀 peak 과대 → MDD 과대 → over-halt.
+  //   Math.max 직전에 윈도우를 항상 재적용(비파괴 — state.equityHistory 원본 보존, max 계산만 정확화).
+  const _freshHistory = state.equityHistory.filter((s) => now - s.ts <= ROLLING_WINDOW_MS);
+  const equityHigh30d = _freshHistory.length > 0
+    ? Math.max(..._freshHistory.map((s) => s.equity), currentEquity)
     : currentEquity;
   state.equityHigh30d = equityHigh30d;
 
