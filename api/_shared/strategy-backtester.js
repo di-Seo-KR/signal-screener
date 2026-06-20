@@ -126,10 +126,12 @@ export function backtestStrategy({
       const bar = ohlc[j];
       if (side === "LONG") {
         // 보수적: 같은 봉에서 SL/TP 둘 다 닿으면 SL 우선
-        if (bar.l <= slPrice) { exitIdx = j; exitPrice = slPrice; exitReason = "SL"; break; }
+        // ★ 적대감사 P1-6: 갭다운 모델링 — 봉 시가가 SL 아래로 열렸으면 시가(더 불리)로 체결.
+        //   기존엔 무조건 slPrice 로 박아 갭 손실(5x 레버리지에서 -6~-10%)을 SL 폭으로 과소평가했음.
+        if (bar.l <= slPrice) { exitIdx = j; exitPrice = Math.min(slPrice, bar.o); exitReason = "SL"; break; }
         if (bar.h >= tpPrice) { exitIdx = j; exitPrice = tpPrice; exitReason = "TP"; break; }
       } else {
-        if (bar.h >= slPrice) { exitIdx = j; exitPrice = slPrice; exitReason = "SL"; break; }
+        if (bar.h >= slPrice) { exitIdx = j; exitPrice = Math.max(slPrice, bar.o); exitReason = "SL"; break; }
         if (bar.l <= tpPrice) { exitIdx = j; exitPrice = tpPrice; exitReason = "TP"; break; }
       }
     }
@@ -148,6 +150,7 @@ export function backtestStrategy({
     trades.push({
       entryIdx, entryPrice, side, exitIdx, exitPrice, exitReason,
       pnlPct, holdMs: (ohlc[exitIdx].ts - entryBar.ts) || 0,
+      entryTs: entryBar.ts, exitTs: ohlc[exitIdx].ts, // ★ P1-7: 빈도 기반 연환산용
       confidence: signal.confidence, family: signal.family,
     });
 
@@ -177,7 +180,17 @@ function summarize(trades, equityCurve, maxDD) {
   const meanPnl = trades.reduce((a, b) => a + b.pnlPct, 0) / trades.length;
   const variance = trades.reduce((a, b) => a + (b.pnlPct - meanPnl) ** 2, 0) / trades.length;
   const sd = Math.sqrt(variance);
-  const sharpe = sd > 0 ? (meanPnl / sd) * ANNUALIZE : 0;
+  // ★ 적대감사 P1-7: √252 고정은 4h 데이터에서 Sharpe 과대(거래 빈도 무시 — "Sharpe 17" 원인).
+  //   실제 빈도 기반 연환산 옵션(ZEPTA_SHARPE_FREQ_ANNUALIZE=1). ※ 켜면 Sharpe *스케일이 바뀌어*
+  //   승급 게이트 임계(minSharpe 등)가 어긋나므로 데이터 기반 재보정 필수 → 기본 OFF 로 현 파이프라인
+  //   보존(별도 재보정 라운드에서 활성). 빈도 기반: annualize = sqrt(연간 거래수).
+  let annualize = ANNUALIZE;
+  if (process.env.ZEPTA_SHARPE_FREQ_ANNUALIZE === "1" && trades.length >= 2) {
+    const firstTs = trades[0].entryTs, lastTs = trades[trades.length - 1].exitTs;
+    const spanYears = (lastTs > firstTs) ? (lastTs - firstTs) / (365.25 * 24 * 3600 * 1000) : 0;
+    if (spanYears > 0) annualize = Math.sqrt(Math.max(1, trades.length / spanYears));
+  }
+  const sharpe = sd > 0 ? (meanPnl / sd) * annualize : 0;
   const avgHoldMs = trades.reduce((a, b) => a + b.holdMs, 0) / trades.length;
   const byReason = trades.reduce((acc, t) => { acc[t.exitReason] = (acc[t.exitReason] || 0) + 1; return acc; }, {});
 
