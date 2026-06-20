@@ -75,7 +75,11 @@ export default async function handler(req, res) {
       L("leaderboard not found — alpha-lab cron 이 아직 안 돌았을 수 있음");
       return res.status(200).json({ ok: false, error: "no leaderboard", log });
     }
-    L(`leaderboard age: ${leaderboard.generatedAt}`);
+    // ★ 적대감사 P2-10: leaderboard staleness 계산 — 오래된 백테스트 데이터로 라이브 승급 방지.
+    const lbAgeMs = leaderboard.generatedAt ? (Date.now() - new Date(leaderboard.generatedAt).getTime()) : Infinity;
+    const STALE_H = Number(process.env.ZEPTA_PROMOTE_STALE_HOURS || 48);
+    const lbStale = !(lbAgeMs < STALE_H * 3600 * 1000);
+    L(`leaderboard age: ${leaderboard.generatedAt} (${Number.isFinite(lbAgeMs) ? Math.round(lbAgeMs / 3600000) : "∞"}h, stale=${lbStale})`);
 
     const changes = [];
     const noChanges = [];
@@ -89,8 +93,11 @@ export default async function handler(req, res) {
       //   continuous-backtest/param-tuner 의 승급을 무효화함 — 발굴→실거래 단절 재발.)
       try {
         const tuned = await kv.get(`di:alpha:params:${strategyId}`);
+        // ★ 적대감사 P2-9: tuned(백테스트) Sharpe 만으로 라이브 강등(DISABLED)을 ACTIVE 로 되돌리면
+        //   라이브 부진 전략이 백테스트 점수로 재승급(라이브 5x). WATCH→ACTIVE(발굴→실거래 reconnect)만
+        //   허용하고, decide()가 DISABLED(라이브 n≥minTrades + Sharpe≤0/저승률)로 강등한 건 라이브 우선.
         if (tuned && Number.isFinite(tuned.sharpe) && tuned.sharpe >= RULES.promote.minSharpe
-            && decision.next !== STRATEGY_STATUS.ACTIVE) {
+            && decision.next === STRATEGY_STATUS.WATCH) {
           decision = {
             next: STRATEGY_STATUS.ACTIVE,
             reason: `tuned params 적용 (backtest Sharpe ${tuned.sharpe.toFixed(2)}) — 실거래 유지`,
@@ -98,6 +105,12 @@ export default async function handler(req, res) {
         }
       } catch {}
       const currentStatus = await getStrategyStatus(strategyId);
+      // ★ 적대감사 P2-10: stale leaderboard(>STALE_H)면 ACTIVE 신규 승급 보류(강등·유지는 허용 — 안전
+      //   방향). 새 백테스트 데이터가 들어오면 다음 사이클에 승급. (이미 ACTIVE 인 건 영향 없음.)
+      if (lbStale && decision.next === STRATEGY_STATUS.ACTIVE && currentStatus !== STRATEGY_STATUS.ACTIVE) {
+        noChanges.push({ strategyId, status: currentStatus, next: decision.next, reason: `stale leaderboard (${Number.isFinite(lbAgeMs) ? Math.round(lbAgeMs / 3600000) : "∞"}h>${STALE_H}h) — 승급 보류` });
+        continue;
+      }
       if (decision.next === currentStatus) {
         noChanges.push({ strategyId, status: currentStatus, ...decision });
         continue;
