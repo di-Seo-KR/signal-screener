@@ -37,7 +37,12 @@ const SELF_ACTIONS = new Set(["resume", "halt", "reset-mdd-baseline", "reset-sha
 
 function verifyAdminAuth(req) {
   const secret = process.env.TRADING_ADMIN_SECRET || process.env.CRON_SECRET;
-  if (!secret) return true; // 시크릿 미설정 시 개발 환경으로 간주
+  if (!secret) {
+    // ★ 적대감사 P1-5: 시크릿 미설정 fail-open 금지(enable/enable-phase1 등 권한부여 액션이 무인증
+    //   통과하던 보안 구멍). 운영(prod)에선 fail-closed(거부). 개발(NODE_ENV!=='production') 또는
+    //   명시적 ZEPTA_ALLOW_INSECURE_ADMIN=1 일 때만 우회. (prod 는 CRON_SECRET 설정돼 실제 영향 없음.)
+    return process.env.NODE_ENV !== "production" || process.env.ZEPTA_ALLOW_INSECURE_ADMIN === "1";
+  }
   const auth = req.headers?.authorization || "";
   return auth === `Bearer ${secret}`;
 }
