@@ -107,6 +107,7 @@ async function monitorUser(userId) {
 
   const now = Date.now();
   const closed = [];
+  let mutated = false; // ★ 적대감사 P1-3: MFE/MAE·트레일링 SL 변경 추적 → 청산 없어도 영속화
   const symbolPrice = {};
 
   // ★ M4: 심볼별 5분 캔들 캐시 (한 번 fetch 해서 재사용)
@@ -126,12 +127,14 @@ async function monitorUser(userId) {
     const entry = e.entryPrice;
 
     // ── MFE / MAE 트래킹 (best/worst 가격) ──
+    const _oldMfe = e.mfePrice, _oldMae = e.maePrice, _oldSl = e.plan.slPrice;
     e.mfePrice = side === "LONG"
       ? Math.max(e.mfePrice || mark, mark)
       : Math.min(e.mfePrice || mark, mark);
     e.maePrice = side === "LONG"
       ? Math.min(e.maePrice || mark, mark)
       : Math.max(e.maePrice || mark, mark);
+    if (e.mfePrice !== _oldMfe || e.maePrice !== _oldMae) mutated = true; // ★ P1-3
 
     // ── 트레일링 스탑 적용 (RISK_CONFIG.trailingStop) — hit 체크 전에 SL 업데이트 ──
     // MFE 기반으로 최고점에서 일정 R 만큼 떨어진 위치로 SL 끌어올림.
@@ -166,6 +169,8 @@ async function monitorUser(userId) {
         }
       }
     }
+
+    if (e.plan.slPrice !== _oldSl) mutated = true; // ★ P1-3: 트레일링/브레이크이븐 SL 변경 영속화
 
     // 트레일링이 SL 끌어올린 결과 반영해서 hit 체크 (즉시 효과)
     // ★ M4: candle high/low 까지 함께 검사 (TP 편향 제거)
@@ -249,9 +254,20 @@ async function monitorUser(userId) {
     }
   }
 
-  if (closed.length) {
-    await kv.set(ledgerKey, ledger.slice(0, 500));
+  // ★ 적대감사 P1-3(영속화)+P1-4(race): 청산 없어도 MFE/MAE·SL 변경이면 저장. 통짜 덮어쓰기 전
+  //   최신 ledger 재조회 후 id 기준 머지 — engine append(같은 키)와의 lost-update 완화(그 사이
+  //   추가된 OPEN 보존). monitor 변경분(closed/MFE/MAE/SL)은 해당 id 에 우선 적용.
+  if (closed.length || mutated) {
+    let _fresh;
+    try { _fresh = await kv.get(ledgerKey); } catch {}
+    if (!Array.isArray(_fresh)) _fresh = ledger;
+    const _mut = new Map();
+    for (const _e of ledger) if (_e?.id) _mut.set(_e.id, _e);
+    const _merged = _fresh.map((fe) => (fe?.id && _mut.has(fe.id)) ? _mut.get(fe.id) : fe);
+    await kv.set(ledgerKey, _merged.slice(0, 500));
+  }
 
+  if (closed.length) {
     // ── 마감 거래 아카이브 (retro 분석용) ──
     // ledger 는 500개 cap 이라 오래된 closed 가 새 OPEN 에 밀려 사라짐.
     // archive 는 최근 1000건 마감 거래만 보존 (entry/exit/MFE/MAE/closeReason 등 디테일).
