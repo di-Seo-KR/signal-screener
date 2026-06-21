@@ -143,6 +143,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ ok: true, posted: pick.id, kind: pick.kind, tweetId, remaining: remaining.length - 1, poolSize: X_CONTENT_POOL.length, cycled });
   } catch (e) {
+    console.error(`[x-autopost] 실패: ${e?.message || e}`); // ★ 런타임 로그에 X API 에러 노출(디버깅)
     try { await sendTelegram({ text: `⚠️ X 자동게시 실패: ${e?.message || e}` }); } catch {}
     return res.status(500).json({ ok: false, error: e?.message || String(e) });
   }
