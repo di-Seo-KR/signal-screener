@@ -37,6 +37,7 @@
     { "source": "/blog/telegram-trading-alerts", "destination": "/blog/telegram-trading-alerts.html" },
     { "source": "/blog/realistic-roi-expectation", "destination": "/blog/realistic-roi-expectation.html" },
     { "source": "/blog/build-vs-buy-trading-bot", "destination": "/blog/build-vs-buy-trading-bot.html" },
+    { "source": "/blog/free-crypto-trading-bot-no-code", "destination": "/blog/free-crypto-trading-bot-no-code.html" },
     { "source": "/screener", "destination": "/screener.html" },
     { "source": "/auto-trading", "destination": "/auto-trading.html" },
     { "source": "/real-trading", "destination": "/real-trading.html" },
