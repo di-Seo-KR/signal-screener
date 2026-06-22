@@ -85,6 +85,15 @@ export default function AuthProvider({ children }) {
           const provider = s?.user?.app_metadata?.provider || "email";
           ga.signinSuccess(provider);
 
+          // ★ 마케팅 계측2: OAuth 신규 가입을 퍼널 '가입완료'에 반영. 기존엔 OAuth가 signin_success 만
+          //   쏴서 신규 가입이 퍼널에서 누락됐음(이메일은 signUp()에서 별도 signupCompleted 발생).
+          //   created_at 이 60초 내면 신규 가입으로 판정. provider!=='email' 로 이메일 중복카운트 방지.
+          try {
+            const createdAt = s?.user?.created_at ? new Date(s.user.created_at).getTime() : 0;
+            const isNewSignup = createdAt > 0 && (Date.now() - createdAt < 60_000);
+            if (isNewSignup && provider !== "email") ga.signupCompleted(provider);
+          } catch { /* no-op */ }
+
           // OAuth 리다이렉트 URL 정리
           const url = new URL(window.location.href);
           if (url.searchParams.has("code") || url.hash.includes("access_token")) {
