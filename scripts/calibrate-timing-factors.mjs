@@ -28,6 +28,8 @@ const FACTORS = [
   // v3 총동원 후보 (2026-07-04) — 신규 숏은 레짐 조건부 정의
   "macdCross", "macdHistTurn", "bbReversal", "bbSqueezeBreak", "stochCross", "mfiReversal",
   "obvAccum", "ema200Reclaim", "emaCross", "doubleExtreme", "breakRetest", "thrust",
+  // 4차 사전등록 (과확장 소진형 — 마지막 숏 메커니즘 가설)
+  "exhaustReversal", "parabolicBreak", "wickExhaust",
 ];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
