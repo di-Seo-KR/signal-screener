@@ -18,7 +18,7 @@
 // 심볼)로 검증 — 통과 못 하면 배포 금지. 순수 ESM, 백엔드·프론트 공유.
 // ════════════════════════════════════════════════════════════════════
 
-import { calcEMA, calcSMA, calcRSI } from "./strategies/_indicators.js";
+import { calcEMA, calcSMA, calcRSI, calcMACD, calcBB, calcStochastic, calcMFI, calcOBV } from "./strategies/_indicators.js";
 import { analyzeCandleSeries, swingLevels, tfWeight } from "./candle-patterns.js";
 
 // 요소 가중 — 근거: ②④는 레벨·모멘텀 이중 정보라 상위, ⑥은 확인용 보조.
@@ -39,16 +39,21 @@ export const TIMING_DOMINANCE = 1.0; // 반대편 대비 우위 요구 (리서�
 //   숏은 반전형 5가설 + 지속형 2가설(구조이탈·LH) 전부 두 구간 불일치/음수로 탈락.
 //   → 검증 모드에서 숏 신호는 표시하지 않는다(동전던지기 이하를 파는 건 부정직).
 //   주봉·월봉은 1d 준용(패턴만). 재검증: scripts/calibrate-timing-factors.mjs
+// ★ v3 총동원 캘리브레이션 (2026-07-04 2차): 후보 19요소×3TF×롱숏=114조합,
+//   신규 요소는 강화 규칙(두 구간 각각 t≥1.0 추가) — 17조합 생존, 전부 롱.
+//   숏은 레짐 조건부 포함 3차례 검증에서 전멸(총 ~40 숏 조합) — 표시하지 않는다.
 export const VALIDATED_TIMING = {
-  "1h": { long: ["pattern", "pullback", "structureBreak", "structureHL"], short: [] },
-  "4h": { long: ["pattern", "rsiReversal", "sweepReclaim", "structureBreak"], short: [] },
+  "1h": { long: ["pattern", "pullback", "structureBreak", "structureHL", "stochCross", "obvAccum", "breakRetest"], short: [] },
+  "4h": { long: ["pattern", "rsiReversal", "sweepReclaim", "structureBreak", "macdCross", "macdHistTurn", "stochCross", "obvAccum", "breakRetest"], short: [] },
   "1d": { long: ["pattern"], short: [] },
 };
 
-// TF별 발화 최소 점수 (홀드아웃 실측 밀도·엣지 균형):
-//   1h 는 단일요소 밀도 과다(203/1000봉) → 2요소 합류(≥1.9)만: 38/1000봉, 홀드아웃 +37bps.
-//   4h(62/1000, +91bps t2.5)·1d(2.7/1000)는 단일요소도 희소+유효 → 0.75.
-export const TIMING_MIN_SCORE = { "1h": 1.9, "4h": 0.75, "1d": 0.75 };
+// TF별 발화 최소 점수 — 학습 8심볼 임계 스캔(홀드아웃 미사용) 실측:
+//   합류 점수와 엣지가 단조 증가 (1h: 1.9→+9bps/63봉당1개 · 2.5→+51bps · 3.0→+68bps,
+//   4h: 1.9→+24bps · 2.5→+63bps · 3.0→+89bps). 기본 마커 1.9, 강한 합류 2.5.
+export const TIMING_MIN_SCORE = { "1h": 1.9, "4h": 1.9, "1d": 0.75 };
+export const TIMING_STRONG_SCORE = 2.5; // 강한 합류 (표시 강조 + 알림 권장 티어)
+export const TIMING_SCORE_FULL = 4.0;   // 종합 점수 100점 환산 기준 (score/4×100)
 
 // ── 내부: ATR14 (candle-patterns 와 동일 — TR 의 SMA) ──
 function atrSeries(highs, lows, closes, period = 14) {
@@ -107,6 +112,21 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { 
   const volSMA = volumes ? calcSMA(volumes, 20) : null;
   const { phIdx, plIdx } = confirmedPivots(highs, lows, n, 2);
 
+  // ── v3 확장 지표 (2026-07-04 "총동원" — 후보 단계. 검증 통과분만 점수 반영) ──
+  const ema200 = n >= 210 ? calcEMA(closes, 200) : null;
+  const macd = calcMACD(closes);
+  const bb = calcBB(closes, 20, 2);
+  const stoch = calcStochastic(highs, lows, closes, 14, 3);
+  const mfi = volumes ? calcMFI(highs, lows, closes, volumes, 14) : null;
+  const obv = volumes ? calcOBV(closes, volumes) : null;
+  const obvEma = obv ? calcEMA(obv, 20) : null;
+  // BB 밴드폭 (스퀴즈 감지용)
+  const bbw = new Array(n).fill(null);
+  for (let j = 0; j < n; j++) {
+    if (bb.upper?.[j] != null && bb.lower?.[j] != null && bb.middle?.[j] > 0) bbw[j] = (bb.upper[j] - bb.lower[j]) / bb.middle[j];
+  }
+  let lastBreakUpBar = -99, lastBreakUpLvl = 0, lastBreakDnBar = -99, lastBreakDnLvl = 0; // 리테스트 추적
+
   // ① 봉패턴 이벤트 인덱스 맵 (캘리브레이션 게이트 포함)
   const patByBar = new Map();
   try {
@@ -121,6 +141,7 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { 
 
   const K = 2; // 피벗 확정 지연
   const signals = [];
+  let latest = null; // 마지막 확정봉의 종합 점수 (임계 미달도 — 패널 게이지용)
 
   for (let i = 30; i < n; i++) {
     const a = atr[i];
@@ -210,6 +231,7 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { 
           if (c > lv.p + 0.25 * a && closes[i - 1] <= lv.p + 0.05 * a) {
             factorEvents?.push({ i, dir: +1, factor: "structureBreak" });
             if (useFactor("structureBreak", +1)) { longS += (weights.structureBreak ?? 1.0); longR.push(`저항 ${lv.t}회터치 종가 돌파`); }
+            lastBreakUpBar = i; lastBreakUpLvl = lv.p; // ⑲ 리테스트 추적용
             break;
           }
         }
@@ -219,6 +241,7 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { 
           if (c < lv.p - 0.25 * a && closes[i - 1] >= lv.p - 0.05 * a) {
             factorEvents?.push({ i, dir: -1, factor: "structureBreak" });
             if (useFactor("structureBreak", -1)) { shortS += (weights.structureBreak ?? 1.0); shortR.push(`지지 ${lv.t}회터치 종가 이탈`); }
+            lastBreakDnBar = i; lastBreakDnLvl = lv.p; // ⑲ 리테스트 추적용
             break;
           }
         }
@@ -245,6 +268,110 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { 
       }
     }
 
+    // ══ v3 후보 요소 (2026-07-04 "총동원") — 신규 숏 요소는 레짐 조건부(EMA200 아래
+    //    에서만 평가 — 1·2차에서 레짐 무시 숏이 전멸한 것에 대한 사전등록 가설).
+    //    검증(calibrate-timing-factors.mjs) 통과 전에는 점수 미반영(useFactor 게이트). ══
+    {
+      const bearRegime = ema200?.[i] != null ? closes[i] < ema200[i] : ema20[i] < ema50[i];
+      const c = closes[i], o = opens[i];
+      const bodyI = Math.abs(c - o);
+      const emit = (name, dir, w, reason) => {
+        factorEvents?.push({ i, dir, factor: name });
+        if (useFactor(name, dir)) {
+          if (dir > 0) { longS += w; longR.push(reason); } else { shortS += w; shortR.push(reason); }
+        }
+      };
+
+      // ⑨ MACD 골든/데드 크로스 (신선 — 이번 봉 발생)
+      const ml = macd.macdLine, ms = macd.signal;
+      if (ml?.[i] != null && ms?.[i] != null && ml[i - 1] != null && ms[i - 1] != null) {
+        if (ml[i] > ms[i] && ml[i - 1] <= ms[i - 1]) emit("macdCross", +1, 0.9, "MACD 골든크로스");
+        if (ml[i] < ms[i] && ml[i - 1] >= ms[i - 1] && bearRegime) emit("macdCross", -1, 0.9, "MACD 데드크로스(약세장)");
+      }
+      // ⑩ MACD 히스토그램 저점/고점 반전
+      const hh = macd.histogram;
+      if (hh?.[i] != null && hh[i - 1] != null && hh[i - 2] != null) {
+        if (hh[i] > hh[i - 1] && hh[i - 1] <= hh[i - 2] && hh[i - 1] < 0) emit("macdHistTurn", +1, 0.8, "MACD 모멘텀 저점 반전");
+        if (hh[i] < hh[i - 1] && hh[i - 1] >= hh[i - 2] && hh[i - 1] > 0 && bearRegime) emit("macdHistTurn", -1, 0.8, "MACD 모멘텀 고점 반전(약세장)");
+      }
+      // ⑪ 볼린저 밴드 복귀 (이탈 후 재진입 = 되돌림 소진)
+      if (bb.lower?.[i] != null && bb.lower[i - 1] != null && bb.upper?.[i] != null && bb.upper[i - 1] != null) {
+        if (closes[i - 1] < bb.lower[i - 1] && c > bb.lower[i] && downLeg) emit("bbReversal", +1, 0.9, "볼린저 하단 복귀");
+        if (closes[i - 1] > bb.upper[i - 1] && c < bb.upper[i] && upLeg && bearRegime) emit("bbReversal", -1, 0.9, "볼린저 상단 복귀(약세장)");
+      }
+      // ⑫ 볼린저 스퀴즈 돌파 (변동성 수축 → 확장 방향 추종)
+      if (bbw[i - 1] != null && i >= 62) {
+        let minW = Infinity;
+        for (let j = i - 60; j < i; j++) if (bbw[j] != null && bbw[j] < minW) minW = bbw[j];
+        const squeezed = Number.isFinite(minW) && bbw[i - 1] <= minW * 1.25;
+        if (squeezed && c > bb.upper[i] && c > o && bodyI >= 0.5 * a) emit("bbSqueezeBreak", +1, 1.0, "스퀴즈 상방 돌파");
+        if (squeezed && c < bb.lower[i] && c < o && bodyI >= 0.5 * a) emit("bbSqueezeBreak", -1, 1.0, "스퀴즈 하방 돌파");
+      }
+      // ⑬ 스토캐스틱 극단 크로스
+      const sk = stoch.k, sd2 = stoch.d;
+      if (sk?.[i] != null && sd2?.[i] != null && sk[i - 1] != null && sd2[i - 1] != null) {
+        if (sk[i] > sd2[i] && sk[i - 1] <= sd2[i - 1] && sk[i - 1] < 25) emit("stochCross", +1, 0.8, "스토캐스틱 과매도 반등");
+        if (sk[i] < sd2[i] && sk[i - 1] >= sd2[i - 1] && sk[i - 1] > 75 && bearRegime) emit("stochCross", -1, 0.8, "스토캐스틱 과매수 이탈(약세장)");
+      }
+      // ⑭ MFI 극단 반전 (거래량 필요)
+      if (mfi?.[i] != null && mfi[i - 1] != null) {
+        if (mfi[i - 1] < 20 && mfi[i] >= 20) emit("mfiReversal", +1, 0.8, "MFI 과매도 반등");
+        if (mfi[i - 1] > 80 && mfi[i] <= 80 && bearRegime) emit("mfiReversal", -1, 0.8, "MFI 과매수 이탈(약세장)");
+      }
+      // ⑮ OBV 매집/분산 (가격 정체·하락 중 OBV 상승 = 스마트머니)
+      if (obv?.[i] != null && obvEma?.[i] != null && obv[i - 5] != null && closes[i - 5] != null) {
+        if (obv[i] > obvEma[i] && obv[i] > obv[i - 5] && c <= closes[i - 5]) emit("obvAccum", +1, 0.9, "OBV 매집 (가격 대비)");
+        if (obv[i] < obvEma[i] && obv[i] < obv[i - 5] && c >= closes[i - 5] && bearRegime) emit("obvAccum", -1, 0.9, "OBV 분산(약세장)");
+      }
+      // ⑯ EMA200 리클레임/상실 (거시 레짐 전환 봉)
+      if (ema200?.[i] != null && ema200[i - 1] != null) {
+        if (c > ema200[i] && closes[i - 1] <= ema200[i - 1] && c > o && bodyI >= 0.5 * a) emit("ema200Reclaim", +1, 1.0, "EMA200 회복");
+        if (c < ema200[i] && closes[i - 1] >= ema200[i - 1] && c < o && bodyI >= 0.5 * a) emit("ema200Reclaim", -1, 1.0, "EMA200 상실");
+      }
+      // ⑰ EMA20/50 골든·데드 크로스 (신선)
+      if (ema50[i] != null && ema20[i - 1] != null && ema50[i - 1] != null) {
+        if (ema20[i] > ema50[i] && ema20[i - 1] <= ema50[i - 1]) emit("emaCross", +1, 0.9, "EMA 골든크로스");
+        if (ema20[i] < ema50[i] && ema20[i - 1] >= ema50[i - 1]) emit("emaCross", -1, 0.9, "EMA 데드크로스");
+      }
+      // ⑱ 쌍바닥/쌍봉 (차트 패턴 — 동일 레벨 ±0.5ATR 재시험 + 모멘텀 개선/악화)
+      {
+        const pls = plIdx.filter(p => p <= i - K && p >= i - 60);
+        if (pls.length >= 2) {
+          const p2 = pls[pls.length - 1], p1 = pls[pls.length - 2];
+          if (i - K - p2 <= 5 && p2 - p1 >= 5 && Math.abs(lows[p2] - lows[p1]) <= 0.5 * a
+              && c > closes[p2] + 0.5 * a && rsi[p2] != null && rsi[p1] != null && rsi[p2] > rsi[p1]) {
+            emit("doubleExtreme", +1, 1.1, "쌍바닥 확인");
+          }
+        }
+        const phs = phIdx.filter(p => p <= i - K && p >= i - 60);
+        if (phs.length >= 2) {
+          const p2 = phs[phs.length - 1], p1 = phs[phs.length - 2];
+          if (i - K - p2 <= 5 && p2 - p1 >= 5 && Math.abs(highs[p2] - highs[p1]) <= 0.5 * a
+              && c < closes[p2] - 0.5 * a && rsi[p2] != null && rsi[p1] != null && rsi[p2] < rsi[p1]) {
+            emit("doubleExtreme", -1, 1.1, "쌍봉 확인");
+          }
+        }
+      }
+      // ⑲ 돌파 후 리테스트 확인 (차트 패턴 — 돌파 레벨 되밟고 지지 확인)
+      if (i - lastBreakUpBar >= 1 && i - lastBreakUpBar <= 6
+          && lows[i] <= lastBreakUpLvl + 0.3 * a && c > lastBreakUpLvl && c > o) {
+        emit("breakRetest", +1, 1.1, "돌파 리테스트 지지 확인");
+      }
+      if (i - lastBreakDnBar >= 1 && i - lastBreakDnBar <= 6
+          && highs[i] >= lastBreakDnLvl - 0.3 * a && c < lastBreakDnLvl && c < o && bearRegime) {
+        emit("breakRetest", -1, 1.1, "이탈 리테스트 저항 확인(약세장)");
+      }
+      // ⑳ 연속 추력 (3연속 유의 몸통 + 거래량 증가)
+      if (volumes && volumes[i] != null && volumes[i - 1] != null && volumes[i - 2] != null) {
+        const b0 = Math.abs(closes[i - 2] - opens[i - 2]), b1 = Math.abs(closes[i - 1] - opens[i - 1]);
+        const volRising = volumes[i] > volumes[i - 1] && volumes[i - 1] > volumes[i - 2];
+        if (c > o && closes[i - 1] > opens[i - 1] && closes[i - 2] > opens[i - 2]
+            && bodyI >= 0.4 * a && b1 >= 0.4 * a && b0 >= 0.4 * a && volRising) emit("thrust", +1, 0.8, "3연속 상승 추력+거래량");
+        if (c < o && closes[i - 1] < opens[i - 1] && closes[i - 2] < opens[i - 2]
+            && bodyI >= 0.4 * a && b1 >= 0.4 * a && b0 >= 0.4 * a && volRising && bearRegime) emit("thrust", -1, 0.8, "3연속 하락 추력+거래량(약세장)");
+      }
+    }
+
     // ⑥ 거래량 확인 — 다른 증거가 있을 때만 가산 (단독 발화 금지)
     if (volumes && volSMA?.[i] > 0 && volumes[i] >= 1.5 * volSMA[i]) {
       if (longS > 0 && closes[i] > opens[i]) { longS += weights.volume; longR.push("거래량 확인"); }
@@ -261,9 +388,10 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { 
     } else if (shortS >= thEff && shortS - longS >= domEff) {
       signals.push({ i, dir: -1, score: +shortS.toFixed(2), opposing: +longS.toFixed(2), reasons: shortR });
     }
+    if (i === n - 1) latest = { longScore: +longS.toFixed(2), shortScore: +shortS.toFixed(2), reasons: longR, threshold: thEff };
   }
 
-  return { signals, factorEvents: factorEvents || [] };
+  return { signals, factorEvents: factorEvents || [], latest };
 }
 
 export default { computeTimingSignals, TIMING_WEIGHTS, TIMING_TH, TIMING_DOMINANCE };

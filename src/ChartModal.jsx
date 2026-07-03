@@ -1308,6 +1308,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
   const [showDiagnosis, setShowDiagnosis] = useState(false);
   const [showSignals, setShowSignals] = useState(true);   // 캔들패턴 시그널 마커 토글 (기본 ON)
   const [recentSignals, setRecentSignals] = useState([]); // 근거 패널용 최근 시그널 (최신순 최대 3개)
+  const [latestScore, setLatestScore] = useState(null); // 마지막 확정봉 종합 점수 (게이지)
 
   // ── Customizable indicator settings ──
   const [settings, setSettings] = useState(() => {
@@ -1444,31 +1445,34 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       try {
         const closed = candles.slice(0, -1);
         const hasVolume = closed.some(c => (c.volume ?? 0) > 0); // 코인게코 OHLC 는 거래량 없음 → null 전달
-        const { signals } = computeTimingSignals({
+        const { signals, latest } = computeTimingSignals({
           opens:   closed.map(c => c.open),
           highs:   closed.map(c => c.high),
           lows:    closed.map(c => c.low),
           closes:  closed.map(c => c.close),
           volumes: hasVolume ? closed.map(c => c.volume ?? 0) : null,
-        }, { tf }); // 검증 모드 + TF별 실측 임계(1h는 2요소 합류만) 기본값
+        }, { tf }); // 검증 모드 + TF별 실측 임계 기본값 (v3: 지표·패턴 총동원 → 검증 17요소)
         // setMarkers 는 time 오름차순 필수 — candles 가 이미 정렬돼 있으므로 인덱스 기준 정렬로 보장
         const sorted = signals.slice().sort((a, b) => a.i - b.i);
         const markers = sorted.map(s => ({
           time: closed[s.i].time, // setData 에 넣은 time 값 재사용 (인트라데이/일봉 타입 불일치 방지)
           position: s.dir > 0 ? "belowBar" : "aboveBar",
           shape: s.dir > 0 ? "arrowUp" : "arrowDown",
-          color: s.dir > 0 ? (s.score >= 1.9 ? "#16A34A" : "#22C55E") : "#EF4444",
-          size: s.score >= 1.9 ? 2 : 1, // 강한 합류(2요소+)는 크게
-          text: s.score >= 1.9 ? "합류" : "",
+          color: s.dir > 0 ? (s.score >= 2.5 ? "#16A34A" : "#22C55E") : "#EF4444",
+          size: s.score >= 2.5 ? 2 : 1, // 강한 합류(≥2.5 — 실측 엣지 2배↑ 티어)는 크게
+          text: s.score >= 2.5 ? "합류" : "",
         }));
         candleSeries.setMarkers(markers);
         setRecentSignals(sorted.slice(-3).reverse()); // 근거 패널용 — 최신순 3개
+        setLatestScore(latest); // 현재 종합 점수 게이지
       } catch {
         // 마커 계산 실패가 차트 렌더링 자체를 막지 않도록 무시합니다
         setRecentSignals([]);
+        setLatestScore(null);
       }
     } else {
       setRecentSignals([]);
+      setLatestScore(null);
     }
     lastCandleRef.current = candles.length ? { ...candles[candles.length - 1] } : null;
     // Set initial live price from last candle
@@ -2126,21 +2130,37 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
             background: CC.card, borderRadius: "10px", border: `1px solid ${CC.border}`,
             fontSize: "14px",
           }}>
-            <div style={{ fontWeight: 700, color: CC.text1, marginBottom: "6px" }}>🎯 검증 타점 시그널</div>
+            <div style={{ fontWeight: 700, color: CC.text1, marginBottom: "6px" }}>🎯 종합 타점 점수 <span style={{ color: CC.text3, fontWeight: 400, fontSize: "12px" }}>— 지표·패턴 총동원, 검증 17요소 합류</span></div>
             {!SIGNAL_TFS.includes(timeframe) ? (
               <div style={{ color: CC.text3 }}>타점 시그널은 1시간봉 이상에서 제공됩니다 (저TF는 통계적으로 무효)</div>
-            ) : recentSignals.length === 0 ? (
-              <div style={{ color: CC.text3 }}>이 구간 검증된 타점 시그널 없음</div>
             ) : (
-              recentSignals.map((s, idx) => (
-                <div key={`${s.i}-${idx}`} style={{ marginBottom: "4px", color: s.dir > 0 ? CC.green : CC.red }}>
-                  <span style={{ fontWeight: 700 }}>{s.dir > 0 ? "▲ 롱" : "▼ 숏"}{s.score >= 1.9 ? " (강한 합류)" : ""}</span>
-                  <span style={{ color: CC.text2 }}> — {(s.reasons || []).join(" + ")}</span>
-                </div>
-              ))
+              <>
+                {latestScore && (
+                  <div style={{ marginBottom: "6px" }}>
+                    <span style={{ color: CC.text2, fontSize: "13px" }}>현재(마지막 확정봉) </span>
+                    <span style={{ fontWeight: 800, fontSize: "16px", color: latestScore.longScore >= 2.5 ? "#16A34A" : latestScore.longScore >= (latestScore.threshold || 1.9) ? CC.green : CC.text2 }}>
+                      롱 {Math.min(100, Math.round(latestScore.longScore / 4 * 100))}점
+                    </span>
+                    <span style={{ color: CC.text3, fontSize: "12px" }}> /100 · 발화선 {Math.round((latestScore.threshold || 1.9) / 4 * 100)} · 강한합류 63</span>
+                    {latestScore.reasons?.length > 0 && (
+                      <span style={{ color: CC.text3, fontSize: "12px" }}> — {latestScore.reasons.join(" · ")}</span>
+                    )}
+                  </div>
+                )}
+                {recentSignals.length === 0 ? (
+                  <div style={{ color: CC.text3 }}>이 구간 발화된 타점 시그널 없음</div>
+                ) : (
+                  recentSignals.map((s, idx) => (
+                    <div key={`${s.i}-${idx}`} style={{ marginBottom: "4px", color: s.dir > 0 ? CC.green : CC.red }}>
+                      <span style={{ fontWeight: 700 }}>{s.dir > 0 ? "▲ 롱" : "▼ 숏"} {Math.min(100, Math.round(s.score / 4 * 100))}점{s.score >= 2.5 ? " (강한 합류)" : ""}</span>
+                      <span style={{ color: CC.text2 }}> — {(s.reasons || []).join(" + ")}</span>
+                    </div>
+                  ))
+                )}
+              </>
             )}
             <div style={{ color: CC.text3, fontSize: "12px", marginTop: "6px" }}>
-              요소별 과거 실측 검증 통과 신호만 표시 · 숏 기계신호는 전 가설 검증 탈락으로 미표시(정직) · 수익 보장 아님
+              지표·봉패턴·차트패턴 19종 총동원 → 과거 실측(학습·OOS·홀드아웃 3중) 통과 요소만 점수화 · 숏은 전 가설 탈락으로 미표시(정직) · 수익 보장 아님
             </div>
           </div>
         )}
