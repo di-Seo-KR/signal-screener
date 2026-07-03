@@ -23,7 +23,12 @@ const TFS = [
   { tf: "1d", limit: 1500, horizon: 5 },
 ];
 const TRAIN_FRAC = 0.65, FEE = 0.0010;
-const FACTORS = ["pattern", "divergence", "rsiReversal", "sweepReclaim", "pullback", "structureBreak", "structureHL"];
+const FACTORS = [
+  "pattern", "divergence", "rsiReversal", "sweepReclaim", "pullback", "structureBreak", "structureHL",
+  // v3 총동원 후보 (2026-07-04) — 신규 숏은 레짐 조건부 정의
+  "macdCross", "macdHistTurn", "bbReversal", "bbSqueezeBreak", "stochCross", "mfiReversal",
+  "obvAccum", "ema200Reclaim", "emaCross", "doubleExtreme", "breakRetest", "thrust",
+];
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const median = (xs) => { if (!xs.length) return 0; const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
@@ -101,8 +106,12 @@ async function main() {
         const tr = stats(pool[tf][f][dir].train);
         const te = stats(pool[tf][f][dir].test);
         const pooled = stats([...pool[tf][f][dir].train, ...pool[tf][f][dir].test]);
+        // 다중가설 방어: v3 신규 12요소(후보 114조합 전수탐색)는 우연 적합 확률이 높아
+        // 기존 규칙에 더해 *두 구간 각각* t≥1.0 을 요구 (사전등록 — 결과 보고 완화 금지)
+        const isNew = !["pattern", "divergence", "rsiReversal", "sweepReclaim", "pullback", "structureBreak", "structureHL"].includes(f);
         let verdict = "✗";
-        if (tr.n >= 30 && te.n >= 10 && tr.mean > 0 && te.mean >= FEE && pooled.t >= 1.5) {
+        if (tr.n >= 30 && te.n >= 10 && tr.mean > 0 && te.mean >= FEE && pooled.t >= 1.5
+            && (!isNew || (tr.t >= 1.0 && te.t >= 1.0))) {
           verdict = "✅ 채택"; survivors.push({ tf, factor: f, dir });
         } else if (tr.n < 30 || te.n < 10) verdict = "· 표본부족";
         const fmt = (s) => `${String(s.n).padEnd(4)} ${String(Math.round(s.mean * 1e4)).padStart(5)} ${s.t.toFixed(1).padStart(5)} ${(s.winRate * 100).toFixed(0).padStart(3)}%`;
