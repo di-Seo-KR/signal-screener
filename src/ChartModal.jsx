@@ -1451,7 +1451,9 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
           lows:    closed.map(c => c.low),
           closes:  closed.map(c => c.close),
           volumes: hasVolume ? closed.map(c => c.volume ?? 0) : null,
-        }, { tf }); // 검증 모드 + TF별 실측 임계 기본값 (v3: 지표·패턴 총동원 → 검증 17요소)
+        // ★ 대표 지시(2026-07-04): "진짜 타점만" — 1h/4h 는 75점+ 롱유리만 발화(+딸린 청산).
+        //   일봉+는 검증 1요소(최대 ~35점)라 원 임계 유지 — 안 그러면 일봉 신호 전멸.
+        }, { tf, minScore: (tf === "1d" || tf === "1wk" || tf === "1mo") ? undefined : 3.0 });
         // setMarkers 는 time 오름차순 필수 — 진입/청산 병합 후 인덱스 기준 정렬로 보장
         const sorted = signals.slice().sort((a, b) => a.i - b.i);
         const entryMarkers = sorted.map(s => ({
