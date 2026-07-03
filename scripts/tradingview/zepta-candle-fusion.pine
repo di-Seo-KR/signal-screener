@@ -28,6 +28,8 @@
 indicator("Zepta Timing Fusion v3 — 총동원 종합 점수", shorttitle="Zepta 타점 v3", overlay=true)
 
 grpMode = "모드"
+onlyPrime = input.bool(true, "진짜 타점만 표시 (75점+ 롱유리·청산만)", group=grpMode,
+     tooltip="OFF 시 관찰용 47~74점 신호도 작은 ▲로 표시 (연구용 — 실전은 ON 권장)")
 confirmedOnly = input.bool(true, "확정봉만 표시 (리페인트 방지)", group=grpMode)
 showResearchShort = input.bool(false, "숏 실험 표시 (⚠ 미검증 — 실측 엣지 없음)", group=grpMode)
 grpGate = "게이트 (엔진 기본값)"
@@ -151,7 +153,9 @@ rawScore = tfKey == "1h" ? score1h : tfKey == "4h" ? score4h : tfKey == "1d" ? s
 volBonus = volConfirm and rawScore > 0 and isBull ? 0.5 : 0.0
 longScore = rawScore + volBonus
 scorePct = math.min(100, math.round(longScore / 4.0 * 100))
-thTf = tfKey == "1d" ? 0.75 : 1.9
+thBase = tfKey == "1d" ? 0.75 : 1.9
+// "진짜 타점만"(기본): 1h/4h 는 75점+ 만. 일봉+는 검증 1요소(최대 ~35점)라 원 임계 유지(이미 희소)
+thTf = onlyPrime and tfKey != "1d" ? 3.0 : thBase
 
 barOk = confirmedOnly ? barstate.isconfirmed : true
 // 쿨다운: 강추세 클러스터 억제 — 직전 신호 후 N봉 내엔 점수 에스컬레이션 시에만 재발화
