@@ -279,6 +279,7 @@ export default async function handler(req, res) {
           strategyFn,
           ohlc,
           slPct: 4, tpPct: 8, maxHoldBars: 24, minBars: 60,
+          timeframe: timeframeLabel, // ★ 캔들융합 TF 정합(적대리뷰 P2-2) — 크립토 4h/주식 1d
         });
         metrics = r;
         // backtestStrategy 는 equityCurve 를 노출 안하므로 — 다시 inline 시뮬레이션해 curve 생성
