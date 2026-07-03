@@ -161,27 +161,38 @@ var float lastSigScore = 0.0
 longSignalRaw = tfValid and longScore >= thTf and barOk
 canFire = na(lastSigBar) or bar_index - lastSigBar > cdBars or longScore > lastSigScore + 0.5
 longSignal = longSignalRaw and canFire
+var int exitUntil = na
 if longSignal
     lastSigBar := bar_index
     lastSigScore := longScore
-strongSignal = longSignal and longScore >= 2.5
+    exitUntil := bar_index + 60
+strongSignal = longSignal and longScore >= 3.0 // "롱유리" 75점+ (대표 지정 티어)
+// 청산 규칙: 롱 신호 후 EMA20 종가 하향 이탈 — 리스크 규칙(예측 아님).
+//   실측: 평균수익 소폭 희생 대신 최악 5% 손실 절반 이하(1h −652→−267bps).
+exitSignal = not na(exitUntil) and bar_index > lastSigBar and bar_index <= exitUntil and close < ema20 and close[1] >= ema20[1] and barOk
+if exitSignal
+    exitUntil := na
 shortResearch = showResearchShort and tfValid and barOk and structLH and ema20 < ema50 and close < open and close < close[1]
 
 // ── 표시 ───────────────────────────────────────────────────────────
-plotshape(strongSignal, title="강한 합류 롱(63점+)", style=shape.triangleup, location=location.belowbar, color=color.new(#16A34A, 0), size=size.small, text="합류", textcolor=color.new(#16A34A, 0))
+plotshape(strongSignal, title="롱유리(75점+)", style=shape.triangleup, location=location.belowbar, color=color.new(#16A34A, 0), size=size.small, text="롱유리", textcolor=color.new(#16A34A, 0))
 plotshape(longSignal and not strongSignal, title="검증 롱 타점(47점+)", style=shape.triangleup, location=location.belowbar, color=color.new(#22C55E, 25), size=size.tiny)
-plotshape(shortResearch, title="숏 (미검증 실험)", style=shape.triangledown, location=location.abovebar, color=color.new(#F59E0B, 20), size=size.tiny, text="실험", textcolor=color.new(#F59E0B, 20))
+plotshape(exitSignal, title="청산 (EMA20 이탈 규칙)", style=shape.square, location=location.abovebar, color=color.new(#F59E0B, 0), size=size.tiny, text="청산", textcolor=color.new(#F59E0B, 0))
+plotshape(shortResearch, title="숏 (미검증 실험)", style=shape.triangledown, location=location.abovebar, color=color.new(#F59E0B, 40), size=size.tiny, text="실험", textcolor=color.new(#F59E0B, 40))
 
 // ── 상태 패널 (종합 점수 게이지) ────────────────────────────────────
 var table panel = table.new(position.top_right, 1, 4, bgcolor=color.new(#0A0B0F, 15), border_width=1, border_color=color.new(#23262F, 0))
 if showTable and barstate.islast
-    tfTxt = tfKey == "1d" ? "일봉+ · 검증 1요소" : tfKey == "4h" ? "4시간 · 검증 9요소" : tfKey == "1h" ? "1시간 · 검증 7요소" : "⚠ 미지원 TF (1h/4h/일봉+만 — 신호 없음)"
-    scoreTxt = tfValid ? "현재 종합: 롱 " + str.tostring(scorePct) + "/100 (발화 " + str.tostring(math.round(thTf / 4.0 * 100)) + " · 강함 63)" : "—"
-    table.cell(panel, 0, 0, "Zepta Timing Fusion v3", text_color=color.new(#F4F5F7, 0), text_size=size.small)
+    tfTxt = tfKey == "1d" ? "일봉+ · 검증 1요소" : tfKey == "4h" ? "4시간 · 검증 9요소" : tfKey == "1h" ? "1시간 · 검증 7요소 · 쿨다운 6봉" : "⚠ 미지원 TF (1h/4h/일봉+만 — 신호 없음)"
+    lastPct = math.min(100, math.round(lastSigScore / 4.0 * 100))
+    recentTxt = not na(lastSigBar) and bar_index - lastSigBar <= 24 ? " · 최근 " + str.tostring(lastPct) + "점(" + str.tostring(bar_index - lastSigBar) + "봉 전)" : ""
+    scoreTxt = tfValid ? "현재 종합: 롱 " + str.tostring(scorePct) + "/100 (발화 " + str.tostring(math.round(thTf / 4.0 * 100)) + " · 롱유리 75)" + recentTxt : "—"
+    table.cell(panel, 0, 0, "Zepta Timing Fusion v3.2", text_color=color.new(#F4F5F7, 0), text_size=size.small)
     table.cell(panel, 0, 1, tfTxt, text_color=tfValid ? color.new(#A1A6B2, 0) : color.new(#FFB020, 0), text_size=size.small)
-    table.cell(panel, 0, 2, scoreTxt, text_color=scorePct >= 63 ? color.new(#16A34A, 0) : scorePct >= 47 ? color.new(#22C55E, 0) : color.new(#A1A6B2, 0), text_size=size.small)
+    table.cell(panel, 0, 2, scoreTxt, text_color=scorePct >= 75 ? color.new(#16A34A, 0) : scorePct >= 47 ? color.new(#22C55E, 0) : color.new(#A1A6B2, 0), text_size=size.small)
     table.cell(panel, 0, 3, "총동원 19종→검증 17조합만 점수화 · 숏 전 가설 탈락 · 수익 보장 아님", text_color=color.new(#6E7585, 0), text_size=size.tiny)
 
 // ── 알림 ───────────────────────────────────────────────────────────
-alertcondition(longSignal,   title="Zepta 롱 타점(47점+)",   message="Zepta v3: {{ticker}} {{interval}} 검증 롱(▲) — 종합 점수 발화")
-alertcondition(strongSignal, title="Zepta 강한 합류 롱(63점+)", message="Zepta v3: {{ticker}} {{interval}} 강한 합류 롱(▲) — 실측 엣지 상위 티어")
+alertcondition(longSignal,   title="Zepta 롱 타점(47점+)", message="Zepta v3.2: {{ticker}} {{interval}} 검증 롱(▲)")
+alertcondition(strongSignal, title="Zepta 롱유리(75점+)",  message="Zepta v3.2: {{ticker}} {{interval}} 롱유리(▲) — 실측 상위 티어")
+alertcondition(exitSignal,   title="Zepta 청산 신호",      message="Zepta v3.2: {{ticker}} {{interval}} 청산(■) — EMA20 이탈 리스크 규칙")
