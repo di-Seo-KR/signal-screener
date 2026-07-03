@@ -58,6 +58,7 @@ function windowSlice(ohlc, endIdx, minBars = 60) {
     highs: slice.map((b) => b.h),
     lows: slice.map((b) => b.l),
     volumes: slice.map((b) => b.v),
+    opens: slice.map((b) => b.o), // ★ 2026-07 캔들패턴 융합 — 윈도우 끝봉=완결봉(진입은 i+1 시가라 룩어헤드 없음)
   };
 }
 
@@ -81,6 +82,7 @@ export function backtestStrategy({
   tpPct = 8,
   maxHoldBars = 24,
   minBars = 60,
+  timeframe = "1h", // ★ 2026-07: 실제 봉 TF 전달(캔들패턴 캘리브레이션 TF 매칭용). 기존 하드코딩 "1h" 하위호환.
 }) {
   if (typeof strategyFn !== "function" || !Array.isArray(ohlc) || ohlc.length < minBars + 5) {
     return emptyResult();
@@ -98,7 +100,7 @@ export function backtestStrategy({
     if (!win) { i += 1; continue; }
     let signal;
     try {
-      signal = strategyFn({ ...win, params, asset: "BTC/USD", timeframe: "1h" });
+      signal = strategyFn({ ...win, params, asset: "BTC/USD", timeframe });
     } catch (e) {
       signal = null;
     }

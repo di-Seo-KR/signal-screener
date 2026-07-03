@@ -17,7 +17,7 @@ import { computeIndicatorBundle, gradeConfidence, scaleScore, refineSignalScore 
 const FAMILY = "trend-follow"; // ★ 2026-06-02 "trend"→canonical (hurst-trend 와 family 충돌 해소)
 const MIN_BARS = 60;
 
-export function runTrendFollow({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null }) {
+export function runTrendFollow({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null, opens = null, lastBarClosed = true }) {
   if (!closes || closes.length < MIN_BARS) {
     return null;
   }
@@ -93,7 +93,7 @@ export function runTrendFollow({ closes, highs, lows, volumes, asset, timeframe 
 
   // ★ 2026-06-02 — 알파 정제 레이어: 과확장·다이버전스·극단RSI소진·거래량페이드
   //   dampening + 독립확인 폭(breadth) 점수 캡. 정상 추세면 표 변화 0(기존과 동일).
-  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L });
+  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L, opens, highs, lows, tf: timeframe, lastBarClosed });
   if (refined.absNet < MIN_ABS_NET) return null; // 추세장 약한 합의는 매매 안 함
   if (refined.notes.length) reasons.push(...refined.notes);
 

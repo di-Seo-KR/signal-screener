@@ -17,7 +17,7 @@ import { computeIndicatorBundle, gradeConfidence, scaleScore, refineSignalScore 
 const FAMILY = "hurst-trend"; // ★ 2026-06-02 "trend"→canonical (trend-follow 로 흡수되던 것 분리)
 const MIN_BARS = 80;
 
-export function runHurstTrend({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null }) {
+export function runHurstTrend({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null, opens = null, lastBarClosed = true }) {
   if (!closes || closes.length < MIN_BARS) return null;
   // ★ 2026-05-29 — 튜닝 파라미터 주입 (없으면 기존 하드코딩 값 그대로).
   const P = params || {};
@@ -82,7 +82,7 @@ export function runHurstTrend({ closes, highs, lows, volumes, asset, timeframe =
   }
 
   // ★ 2026-06-02 — 알파 정제 레이어 (과확장·다이버전스·극단RSI·거래량·breadth 캡)
-  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L });
+  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L, opens, highs, lows, tf: timeframe, lastBarClosed });
   if (refined.absNet < MIN_ABS_NET) return null;
   if (refined.notes.length) reasons.push(...refined.notes);
 

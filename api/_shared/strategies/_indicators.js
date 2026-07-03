@@ -5,6 +5,10 @@
 // strategy 모듈이 순수 함수가 되도록 (KV/네트워크 의존 0) 공유 dependency.
 // ════════════════════════════════════════════════════════
 
+// 캔들 패턴 융합(2026-07) — 순환 import 이나 양쪽 모두 함수 선언(호이스팅)만
+// 런타임에 호출하므로 ESM 에서 안전. (candle-patterns → calcEMA/calcSMA)
+import { scoreCandleBlock } from "../candle-patterns.js";
+
 export function calcSMA(data, period) {
   const result = new Array(data.length).fill(null);
   for (let i = period - 1; i < data.length; i++) {
@@ -627,7 +631,7 @@ export function refineCompositeEntry({ side, perTF = {}, sr = null, price = null
 // 원시 buy/sell 표 → 정제된 net/score/confidence.
 //   strategy 들이 net 계산 직전에 호출. dampening 우세이며, 정상 추세(과확장·
 //   다이버전스·극단·거래량부진 없음)에선 표 변화 0 → 기존과 동일 신호.
-export function refineSignalScore({ buy, sell, ind, closes, volumes, L, extensionPenalty = true }) {
+export function refineSignalScore({ buy, sell, ind, closes, volumes, L, extensionPenalty = true, opens = null, highs = null, lows = null, tf = "1d", lastBarClosed = true }) {
   let adjBuy = buy, adjSell = sell;
   const notes = [];
   const price = closes?.[L];
@@ -663,6 +667,29 @@ export function refineSignalScore({ buy, sell, ind, closes, volumes, L, extensio
   if (volMult < 0.7) {
     if (side === "LONG") adjBuy = Math.max(0, adjBuy - 1); else adjSell = Math.max(0, adjSell - 1);
     notes.push(`거래량부진${volMult.toFixed(1)}x`);
+  }
+
+  // ⑥ 캔들 패턴 융합 (2026-07, 대표 지시 — "봉패턴을 전략·스코어링에 녹여라")
+  //   candle-patterns.js: 웹 리서치 채택 6패밀리 × 컨텍스트 게이트(추세레그+S/R근접
+  //   [+거래량]) × 24심볼 과거 캘리브레이션(두 구간 부호일관+유의 조합만 mult>0).
+  //   같은 방향 = 가점, 역방향 = dampening(기존 레이어 철학과 동일 — 부호 반전 없음).
+  //   ±2점 상한: 캔들 블록이 종합 신호를 지배하지 못하게(리서치: 블록 ≤10~15%).
+  //   opens 미제공 호출자(구 경로·백테스트 fixture)는 변화 0 — 하위호환.
+  //   킬스위치: ZEPTA_CANDLE_FUSION=0 (브라우저 번들 안전 가드 포함).
+  if (opens && highs && lows
+      && !(typeof process !== "undefined" && process.env?.ZEPTA_CANDLE_FUSION === "0")) {
+    try {
+      const cp = scoreCandleBlock({ opens, highs, lows, closes, volumes, tf, lastBarClosed });
+      const pts = (x) => Math.min(2, x * 1.5);
+      if (cp.bull > 0) {
+        if (side === "LONG") { adjBuy += pts(cp.bull); notes.push(`패턴:${cp.bullNote}`); }
+        else { adjSell = Math.max(0, adjSell - pts(cp.bull)); notes.push(`역패턴:${cp.bullNote}`); }
+      }
+      if (cp.bear > 0) {
+        if (side === "SHORT") { adjSell += pts(cp.bear); notes.push(`패턴:${cp.bearNote}`); }
+        else { adjBuy = Math.max(0, adjBuy - pts(cp.bear)); notes.push(`역패턴:${cp.bearNote}`); }
+      }
+    } catch { /* 패턴 실패는 신호를 막지 않음 */ }
   }
 
   // dampening 이 부호를 뒤집지 않도록 중립까지만 (whipsaw 방지)

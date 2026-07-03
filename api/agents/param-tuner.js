@@ -46,7 +46,8 @@ const TUNER_IMPROVE_MARGIN = 0.3;
 const TUNER_INJECT_ENABLED = process.env.ZEPTA_PARAM_TUNER_INJECT === "1";
 
 // 백테스트 룰 (고정) — 파라미터만 튜닝, exit 룰은 별도 (auto-promote 에서 조정)
-const BACKTEST_RULES = { slPct: 4, tpPct: 8, maxHoldBars: 24 };
+// ★ timeframe: 캔들융합 TF 정합(적대리뷰 P2-2) — gridSearch→backtestStrategy 로 전달
+const BACKTEST_RULES = { slPct: 4, tpPct: 8, maxHoldBars: 24, timeframe: KLINE_INTERVAL };
 
 // strategy 가 cfg.params 를 받지 않는 경우 (다 그렇지만)
 // 직접 paramSpace 를 받아 wrapper 로 임시 주입하는 방법:

@@ -16,7 +16,7 @@ import { computeIndicatorBundle, gradeConfidence, scaleScore, refineSignalScore 
 const FAMILY = "momentum-rotation"; // ★ 2026-06-02 "momentum"→canonical (defi 와 family 충돌 해소)
 const MIN_BARS = 60;
 
-export function runMomentumRotation({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null }) {
+export function runMomentumRotation({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null, opens = null, lastBarClosed = true }) {
   if (!closes || closes.length < MIN_BARS) return null;
   // ★ 2026-05-29 — 튜닝 파라미터 주입 (없으면 기존 하드코딩 값 그대로).
   const P = params || {};
@@ -75,7 +75,7 @@ export function runMomentumRotation({ closes, highs, lows, volumes, asset, timef
   }
 
   // ★ 2026-06-02 — 알파 정제 레이어 (과확장·다이버전스·극단RSI·거래량·breadth 캡)
-  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L });
+  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L, opens, highs, lows, tf: timeframe, lastBarClosed });
   if (refined.absNet < MIN_ABS_NET) return null; // 회전 전략은 명확한 모멘텀 필요
   if (refined.notes.length) reasons.push(...refined.notes);
 

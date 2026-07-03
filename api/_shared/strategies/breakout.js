@@ -16,7 +16,7 @@ import { computeIndicatorBundle, gradeConfidence, scaleScore, refineSignalScore,
 const FAMILY = "breakout";
 const MIN_BARS = 60;
 
-export function runBreakout({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null }) {
+export function runBreakout({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null, opens = null, lastBarClosed = true }) {
   if (!closes || closes.length < MIN_BARS) return null;
   // ★ 2026-05-29 — 튜닝 파라미터 주입 (없으면 기존 하드코딩 값 그대로).
   const P = params || {};
@@ -99,7 +99,7 @@ export function runBreakout({ closes, highs, lows, volumes, asset, timeframe = "
   // ★ 적대감사 P2-16: breakout 은 과확장이 *본질*(박스권 돌파). extensionPenalty 기본 true 면
   //   자기 신호를 과확장으로 자기상쇄 감점 → _indicators 계약(L642)대로 extensionPenalty:false.
   //   (다이버전스·극단RSI·거래량페이드·breadthCap 은 그대로 적용.)
-  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L, extensionPenalty: false });
+  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L, extensionPenalty: false, opens, highs, lows, tf: timeframe, lastBarClosed });
   if (refined.absNet < MIN_ABS_NET) return null; // 돌파는 강한 합의만 진입
   if (refined.notes.length) reasons.push(...refined.notes);
 

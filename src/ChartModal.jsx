@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createChart, CrosshairMode, LineStyle } from "lightweight-charts";
 import { useIsMobile } from "./ui/useBreakpoint.jsx";
+// 백엔드와 *같은* 캔들패턴 모듈 공유 — 차트에 보이는 신호 = 스코어에 반영되는 신호 (이중 구현 금지)
+import { analyzeCandleSeries } from "../api/_shared/candle-patterns.js";
 
 // ── 보조지표 계산 ────────────────────────────────────────────────
 function calcSMA(data, period) {
@@ -119,6 +121,9 @@ const TF_CONFIG = {
   "1wk": { label: "주봉",  interval: "1wk", range: "5y" },   // 최근 5년
   "1mo": { label: "월봉",  interval: "1mo", range: "max" },  // 상장일부터 전체
 };
+
+// ── 캔들패턴 시그널 지원 TF — 1h 미만 저TF 는 통계적으로 무효(모듈이 빈 events 반환) ──
+const SIGNAL_TFS = ["1h", "4h", "1d", "1wk", "1mo"];
 
 const CRYPTO_TF = {
   "1m":  { label: "1분",   days: "1" },
@@ -1301,6 +1306,8 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
   const [logScale, setLogScale] = useState(false);
   const [currentRSI, setCurrentRSI] = useState(null);
   const [showDiagnosis, setShowDiagnosis] = useState(false);
+  const [showSignals, setShowSignals] = useState(true);   // 캔들패턴 시그널 마커 토글 (기본 ON)
+  const [recentSignals, setRecentSignals] = useState([]); // 근거 패널용 최근 시그널 (최신순 최대 3개)
 
   // ── Customizable indicator settings ──
   const [settings, setSettings] = useState(() => {
@@ -1429,6 +1436,38 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
     });
     candleSeries.setData(candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
     candleSeriesRef.current = candleSeries;
+
+    // ── 캔들패턴 시그널 마커 (검증된 패턴 → ▲롱/▼숏 타이밍 표시) ──
+    // 마지막 봉은 진행 중(미확정)이라 리페인팅 위험이 있어 제외합니다(확정봉 원칙).
+    if (showSignals) {
+      try {
+        const closed = candles.slice(0, -1);
+        const hasVolume = closed.some(c => (c.volume ?? 0) > 0); // 코인게코 OHLC 는 거래량 없음 → null 전달
+        const { events } = analyzeCandleSeries({
+          opens:   closed.map(c => c.open),
+          highs:   closed.map(c => c.high),
+          lows:    closed.map(c => c.low),
+          closes:  closed.map(c => c.close),
+          volumes: hasVolume ? closed.map(c => c.volume ?? 0) : null,
+        }, { tf });
+        // setMarkers 는 time 오름차순 필수 — candles 가 이미 정렬돼 있으므로 인덱스 기준 정렬로 보장
+        const sorted = events.slice().sort((a, b) => a.i - b.i);
+        const markers = sorted.map(ev => ({
+          time: closed[ev.i].time, // setData 에 넣은 time 값 재사용 (인트라데이/일봉 타입 불일치 방지)
+          position: ev.dir > 0 ? "belowBar" : "aboveBar",
+          shape: ev.dir > 0 ? "arrowUp" : "arrowDown",
+          color: ev.dir > 0 ? "#22C55E" : "#EF4444",
+          text: ev.ko,
+        }));
+        candleSeries.setMarkers(markers);
+        setRecentSignals(sorted.slice(-3).reverse()); // 근거 패널용 — 최신순 3개
+      } catch {
+        // 마커 계산 실패가 차트 렌더링 자체를 막지 않도록 무시합니다
+        setRecentSignals([]);
+      }
+    } else {
+      setRecentSignals([]);
+    }
     lastCandleRef.current = candles.length ? { ...candles[candles.length - 1] } : null;
     // Set initial live price from last candle
     if (candles.length) {
@@ -1570,7 +1609,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         applyTvRange();
       }
     });
-  }, [fetchData, settings, logScale]);
+  }, [fetchData, settings, logScale, showSignals]);
 
   useEffect(() => {
     if (!asset) return;
@@ -1579,7 +1618,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       clearTimeout(timer);
       Object.values(chartObjs.current).forEach(c => { try { c.remove(); } catch {} });
     };
-  }, [asset, timeframe, settings, showKRW, theme, logScale]);
+  }, [asset, timeframe, settings, showKRW, theme, logScale, showSignals]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -1845,6 +1884,14 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
             border: `1px solid ${logScale ? CC.yellow : CC.border}`,
             minHeight: isMobile ? "40px" : "auto",
           }}>📐 로그</button>
+          {/* 캔들패턴 시그널 토글 — 검증된 패턴의 ▲롱/▼숏 마커 표시 */}
+          <button onClick={() => setShowSignals(p => !p)} style={{
+            padding: isMobile ? "8px 10px" : "5px 10px", borderRadius: "8px", fontSize: isMobile ? "14px" : "14px", cursor: "pointer", fontWeight: 600,
+            background: showSignals ? `${CC.green}22` : CC.card,
+            color: showSignals ? CC.green : CC.text3,
+            border: `1px solid ${showSignals ? CC.green : CC.border}`,
+            minHeight: isMobile ? "40px" : "auto",
+          }}>🎯 시그널</button>
         </div>
 
         {/* Indicator quick toggles + settings gear */}
@@ -2069,6 +2116,32 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
           ))}
           {showKRW && canShowKRW && <span style={{ color: CC.blue, fontWeight: 600, marginLeft: "auto" }}>KRW 환산</span>}
         </div>
+
+        {/* ── 캔들패턴 시그널 근거 패널 — "그래서 롱이야 숏이야?" 원칙 ── */}
+        {!loading && !error && showSignals && (
+          <div style={{
+            marginTop: "12px", padding: "10px 12px",
+            background: CC.card, borderRadius: "10px", border: `1px solid ${CC.border}`,
+            fontSize: "14px",
+          }}>
+            <div style={{ fontWeight: 700, color: CC.text1, marginBottom: "6px" }}>🎯 캔들패턴 시그널</div>
+            {!SIGNAL_TFS.includes(timeframe) ? (
+              <div style={{ color: CC.text3 }}>패턴 시그널은 1시간봉 이상에서 제공됩니다 (저TF는 통계적으로 무효)</div>
+            ) : recentSignals.length === 0 ? (
+              <div style={{ color: CC.text3 }}>이 구간 검증된 패턴 시그널 없음</div>
+            ) : (
+              recentSignals.map((ev, idx) => (
+                <div key={`${ev.i}-${ev.name}-${idx}`} style={{ marginBottom: "4px", color: ev.dir > 0 ? CC.green : CC.red }}>
+                  <span style={{ fontWeight: 700 }}>{ev.dir > 0 ? "▲" : "▼"} {ev.ko}</span>
+                  <span style={{ color: CC.text2 }}> — {ev.reasons?.[0] || ""}</span>
+                </div>
+              ))
+            )}
+            <div style={{ color: CC.text3, fontSize: "12px", marginTop: "6px" }}>
+              과거 데이터 캘리브레이션 기반 참고 신호 · 수익 보장 아님
+            </div>
+          </div>
+        )}
 
         {/* ── 투자진단 패널 ─────────────────────────────────────── */}
         {!loading && !error && diagData && (

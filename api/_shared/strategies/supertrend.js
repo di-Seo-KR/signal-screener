@@ -42,7 +42,7 @@ function computeSupertrend(highs, lows, closes, atr, mult) {
   return { dir, stLine };
 }
 
-export function runSupertrend({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null }) {
+export function runSupertrend({ closes, highs, lows, volumes, asset, timeframe = "1d", params = null, opens = null, lastBarClosed = true }) {
   if (!closes || closes.length < MIN_BARS) return null;
   const P = params || {};
   const ATR_PERIOD  = P.ATR_PERIOD  ?? 10;
@@ -95,7 +95,7 @@ export function runSupertrend({ closes, highs, lows, volumes, asset, timeframe =
   }
 
   // 추세 계열 정제 (상관완화 + 반전/소진 감지)
-  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L });
+  const refined = refineSignalScore({ buy, sell, ind, closes, volumes, L, opens, highs, lows, tf: timeframe, lastBarClosed });
   if (refined.absNet < MIN_ABS_NET) return null;
   if (refined.notes.length) reasons.push(...refined.notes);
 

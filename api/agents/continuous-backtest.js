@@ -102,12 +102,12 @@ function validateParamSet(strategyFn, params, ohlcCache) {
   const per = [];
   for (const [sym, ohlc] of Object.entries(ohlcCache)) {
     if (!ohlc || ohlc.length < 120) continue;
-    const full = backtestStrategy({ strategyFn, ohlc, params, slPct: 4, tpPct: 8, maxHoldBars: 24 });
+    const full = backtestStrategy({ strategyFn, ohlc, params, slPct: 4, tpPct: 8, maxHoldBars: 24, timeframe: KLINE_INTERVAL }); // ★ 캔들융합 TF 정합(적대리뷰 P2-2)
     // out-of-sample = 최근 35% (후보 선택에 안 쓰인 구간)
     const cut = Math.floor(ohlc.length * 0.65);
     const oosOhlc = ohlc.slice(cut);
     const oos = oosOhlc.length >= 80
-      ? backtestStrategy({ strategyFn, ohlc: oosOhlc, params, slPct: 4, tpPct: 8, maxHoldBars: 24 })
+      ? backtestStrategy({ strategyFn, ohlc: oosOhlc, params, slPct: 4, tpPct: 8, maxHoldBars: 24, timeframe: KLINE_INTERVAL })
       : null;
     per.push({ sym, full, oos });
   }
@@ -413,7 +413,7 @@ export async function runDiscoveryCycle({ budgetMs = 280_000, symbolsPerRun = SY
         if (Date.now() - t0Scan > TIMEOUT_BUDGET_MS) break;
         const per = [];
         for (const sym of cachedSymbols) {
-          try { per.push(backtestStrategy({ strategyFn, ohlc: ohlcCache[sym], params, slPct: 4, tpPct: 8, maxHoldBars: 24 })); } catch {}
+          try { per.push(backtestStrategy({ strategyFn, ohlc: ohlcCache[sym], params, slPct: 4, tpPct: 8, maxHoldBars: 24, timeframe: KLINE_INTERVAL })); } catch {}
         }
         if (per.length < MIN_SYMS) continue;
         const medSharpe = median(per.map((r) => r.sharpe));

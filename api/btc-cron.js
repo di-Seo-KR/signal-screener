@@ -16,6 +16,7 @@ import { getOIChangeMap } from "./_shared/oi-tracker.js";
 import { loadUniverse, universeSymbolMap } from "./_shared/futures-universe.js";
 import { computeSRLevels, scaleSR } from "./_shared/sr-levels.js"; // ★ 지지·저항(매물대) — 표시 전용
 import { refineCompositeEntry } from "./_shared/strategies/_indicators.js"; // ★ MTF 소진·차트구조 진입 정제
+import { scoreCandleBlock } from "./_shared/candle-patterns.js"; // ★ 2026-07 캔들패턴 융합(캘리브레이션 게이트)
 
 // asset → 바이낸스 *선물(USDⓈ-M, fapi)* 심볼. 펀딩/OI/베이시스 맵 조회 키.
 //   ★ 2026-06-02 버그수정: 선물은 저가 밈코인을 1000배 묶음(1000SHIB/1000PEPE)으로,
@@ -415,6 +416,9 @@ export default async function handler(req, res) {
           const cl = src.map(c => c.close), hi = src.map(c => c.high), lo = src.map(c => c.low);
           const s = pickTopBotSignal(computeBotSignals({
             asset, closes: cl, highs: hi, lows: lo, volumes: src.map(c => c.volume || 0), timeframe: tf, paramsByStrategy,
+            // ★ 캔들패턴 융합 — ZEPTA_MTF_CLOSED_BARS=0 롤백 시 src===arr(진행봉 포함)이므로
+            //   하드코딩 금지, 실제 슬라이스 여부로 판정 (적대리뷰 P1-1: 조건부 리페인팅 차단)
+            opens: src.map(c => c.open), lastBarClosed: src !== arr,
           }));
           if (s) return s;
           // ★ 2026-06-14: 전략 HOLD → 지표 기반 약한 추세읽기 폴백 (TF 빈칸 방지)
@@ -435,6 +439,7 @@ export default async function handler(req, res) {
       const highs = candles.map(c => c.high);
       const lows = candles.map(c => c.low);
       const volumes = candles.map(c => c.volume || 0);
+      const opens = candles.map(c => c.open); // ★ 2026-07 캔들패턴 융합용 (원천에 이미 존재)
 
       // ★ 2026-06-12 (대표 지시): 지지·저항(매물대) 레벨 — 일봉 재활용, 추가 API 0회.
       //   refPrice 는 priceMap 이 아닌 *일봉 마지막 종가* (캔들·기준가 스케일 일치 필수).
@@ -478,7 +483,7 @@ export default async function handler(req, res) {
       //   이 자산을 다루는 활성 봇 각각의 전용 strategy 실행.
       //   결과: { botId, signal } 배열. 최고 점수를 latestSignal 로 채택.
       //   봇별 perf 저장 시에도 이 botSignals 를 사용해 봇마다 다른 메타데이터 기록.
-      const botSignals = computeBotSignals({ asset, closes, highs, lows, volumes, timeframe: "1d", paramsByStrategy });
+      const botSignals = computeBotSignals({ asset, closes, highs, lows, volumes, timeframe: "1d", paramsByStrategy, opens, lastBarClosed: false }); // 1d 는 진행봉 포함 경로 — 패턴은 직전 확정봉 기준
 
       // 일봉 단계 — 봇별 strategy 결과 중 가장 점수 높은 1개를 우선 시그널로
       let latestSignal = pickTopBotSignal(botSignals);
@@ -525,9 +530,10 @@ export default async function handler(req, res) {
         const highs4h = c4h.map(c => c.high);
         const lows4h = c4h.map(c => c.low);
         const volumes4h = c4h.map(c => c.volume || 0);
+        const opens4h = c4h.map(c => c.open);
 
         // ★ 봇별 strategy 4h 단계 — 일봉 빈 자산도 더 짧은 TF 로 한 번 더 기회
-        const botSignals4h = computeBotSignals({ asset, closes: closes4h, highs: highs4h, lows: lows4h, volumes: volumes4h, timeframe: "4h", paramsByStrategy });
+        const botSignals4h = computeBotSignals({ asset, closes: closes4h, highs: highs4h, lows: lows4h, volumes: volumes4h, timeframe: "4h", paramsByStrategy, opens: opens4h, lastBarClosed: false });
         latestSignal = pickTopBotSignal(botSignals4h);
 
         if (!latestSignal) {
@@ -548,7 +554,7 @@ export default async function handler(req, res) {
             rsi: rsi4h, bb: bb4h, ema21: ema21_4h, ema55: ema55_4h, ema200: ema200_4h,
             macdLine: macd4h.macdLine, macdSig: macd4h.signal, histogram: macd4h.histogram,
             adx: adx4h, atr: atr4h, stoch: stoch4h, obv: obv4h, obvEma: obvEma4h, volSMA: volSMA4h, weeklyTrendUp,
-          }, fngValue, marketRegime, assetAlerts);
+          }, fngValue, marketRegime, assetAlerts, "4h");
           if (latestSignal) {
             latestSignal.reason = `[4h] ${latestSignal.reason}`;
             latestSignal.positionSize = (latestSignal.positionSize || 0.5) * 0.5;
@@ -571,9 +577,10 @@ export default async function handler(req, res) {
         const highs1h = c1h.map(c => c.high);
         const lows1h = c1h.map(c => c.low);
         const volumes1h = c1h.map(c => c.volume || 0);
+        const opens1h = c1h.map(c => c.open);
 
         // ★ 봇별 strategy 1h 단계
-        const botSignals1h = computeBotSignals({ asset, closes: closes1h, highs: highs1h, lows: lows1h, volumes: volumes1h, timeframe: "1h", paramsByStrategy });
+        const botSignals1h = computeBotSignals({ asset, closes: closes1h, highs: highs1h, lows: lows1h, volumes: volumes1h, timeframe: "1h", paramsByStrategy, opens: opens1h, lastBarClosed: false });
         latestSignal = pickTopBotSignal(botSignals1h);
 
         if (!latestSignal) {
@@ -593,7 +600,7 @@ export default async function handler(req, res) {
             rsi: rsi1h, bb: bb1h, ema21: ema21_1h, ema55: ema55_1h, ema200: ema200_1h,
             macdLine: macd1h.macdLine, macdSig: macd1h.signal, histogram: macd1h.histogram,
             adx: adx1h, atr: atr1h, stoch: stoch1h, obv: obv1h, obvEma: obvEma1h, volSMA: volSMA1h, weeklyTrendUp,
-          }, fngValue, marketRegime, assetAlerts);
+          }, fngValue, marketRegime, assetAlerts, "1h");
           if (latestSignal) {
             latestSignal.reason = `[1h] ${latestSignal.reason}`;
             latestSignal.positionSize = (latestSignal.positionSize || 0.5) * 0.3;
@@ -1222,7 +1229,7 @@ function calcEfficiencyRatio(closes, period = 10) {
 // pickTopBotSignal:  여러 봇 시그널 중 최고 점수 1개를 단일 시그널로 채택.
 //                    (분배는 호출 측에서 다시 봇별로 처리)
 // ════════════════════════════════════════════════════════
-function computeBotSignals({ asset, closes, highs, lows, volumes, timeframe, paramsByStrategy = {} }) {
+function computeBotSignals({ asset, closes, highs, lows, volumes, timeframe, paramsByStrategy = {}, opens = null, lastBarClosed = true }) {
   const out = [];
   const botIds = getBotsForAsset(asset); // 이 자산을 다루는 봇 ID 목록
   for (const botId of botIds) {
@@ -1230,7 +1237,7 @@ function computeBotSignals({ asset, closes, highs, lows, volumes, timeframe, par
       // ★ 2026-05-29 — 이 봇 strategy 에 발굴·튜닝된 파라미터가 있으면 주입.
       const stratName = getStrategyNameForBot(botId);
       const params = paramsByStrategy[stratName] || null;
-      const sig = runStrategyForBot(botId, { closes, highs, lows, volumes, asset, timeframe, params });
+      const sig = runStrategyForBot(botId, { closes, highs, lows, volumes, asset, timeframe, params, opens, lastBarClosed });
       if (sig) out.push({ botId, signal: sig });
     } catch (e) {
       // 한 봇 strategy 실패가 다른 봇에 영향 안 주도록 격리
@@ -1332,7 +1339,7 @@ function applyFuturesContext(sig, { fr, oiCh, bs }) {
 // 시그널 빈도 목표: 6개 자산 × 매시간 = 대부분 시그널 발생
 // 알파 보존: 레짐별 전략 분리로 무분별 매매 방지
 // ════════════════════════════════════════════════════════
-function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50, marketRegime = null, assetAlerts = []) {
+function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50, marketRegime = null, assetAlerts = [], tf = "1d") {
   const { rsi, bb, ema21, ema55, ema200, macdLine, macdSig, histogram,
     adx, atr, stoch, obv, obvEma, volSMA, weeklyTrendUp } = ind;
 
@@ -1522,10 +1529,18 @@ function analyzeLatest(candles, closes, highs, lows, volumes, ind, fngValue = 50
   if (weeklyTrendUp === true) { buyScore += 1; reasons.push("주봉↑"); }
   if (weeklyTrendUp === false) { sellScore += 1; reasons.push("주봉↓"); }
 
-  // ── 캔들 패턴 ──
-  const pattern = detectCandlePattern(candles, L);
-  if (pattern === "hammer" || pattern === "bullish_engulfing") { buyScore += 1; reasons.push(pattern === "hammer" ? "해머" : "강세장악"); }
-  if (pattern === "bearish_engulfing") { sellScore += 1; reasons.push("약세장악"); }
+  // ── 캔들 패턴 (2026-07: 캘리브레이션 융합 모듈로 교체 — 구 감지기는 해머 오정의
+  //    B1·doji 죽은분기 B2·롱편향 B3·ATR 미상대화 B4 + 진행봉 리페인트까지 있었음.
+  //    신 모듈: 확정봉 기준 + 컨텍스트 게이트 + 실측 mult. 기존과 동일하게 ±1점 역할.) ──
+  //    (적대리뷰 P2-1: 폴백 경로도 동일 킬스위치 — 긴급 롤백 시 부분 작동 방지)
+  const _cp = process.env.ZEPTA_CANDLE_FUSION === "0"
+    ? { bull: 0, bear: 0, bullNote: "", bearNote: "" }
+    : scoreCandleBlock({
+        opens: candles.map(c => c.open), highs, lows, closes, volumes,
+        tf, lastBarClosed: false, // cron 폴백 경로의 candles 는 진행봉 포함
+      });
+  if (_cp.bull > 0) { buyScore += 1; reasons.push(`패턴:${_cp.bullNote}`); }
+  if (_cp.bear > 0) { sellScore += 1; reasons.push(`패턴:${_cp.bearNote}`); }
 
   // ── market-monitor 실시간 알림 부스트 ──
   for (const alert of assetAlerts) {
@@ -1780,24 +1795,9 @@ function resampleWeekly(candles) {
   return weeks;
 }
 
-function detectCandlePattern(candles, i) {
-  if (i < 2) return null;
-  const c = candles[i], p = candles[i - 1], pp = candles[i - 2];
-  const bodyC = Math.abs(c.close - c.open);
-  const rangeC = c.high - c.low;
-  const bodyP = Math.abs(p.close - p.open);
-  const lowerWick = Math.min(c.open, c.close) - c.low;
-  const upperWick = c.high - Math.max(c.open, c.close);
-  if (lowerWick > bodyC * 2 && upperWick < bodyC * 0.5 && rangeC > 0) {
-    if (p.close < p.open && pp.close < pp.open) return "hammer";
-  }
-  if (p.close < p.open && c.close > c.open && c.close > p.open && c.open < p.close && bodyC > bodyP * 1.2)
-    return "bullish_engulfing";
-  if (p.close > p.open && c.close < c.open && c.close < p.open && c.open > p.close && bodyC > bodyP * 1.2)
-    return "bearish_engulfing";
-  if (rangeC > 0 && bodyC / rangeC < 0.1) return "doji";
-  return null;
-}
+// (2026-07) 구 detectCandlePattern 제거 — candle-patterns.js 의 scoreCandleBlock 으로 대체.
+//   구 함수는 해머 정의 오류(음봉2연속 요구)·doji 죽은 분기·롱편향(강세2:약세1)·
+//   ATR 미상대화 버그가 있었고 진행봉 기준이라 리페인팅됐음.
 
 function detectBullishDivergence(closes, rsi, i, lookback = 10) {
   // 강세 다이버전스: 가격은 더 낮은 저점, RSI는 더 높은 저점
