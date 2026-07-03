@@ -1445,26 +1445,42 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       try {
         const closed = candles.slice(0, -1);
         const hasVolume = closed.some(c => (c.volume ?? 0) > 0); // 코인게코 OHLC 는 거래량 없음 → null 전달
-        const { signals, latest } = computeTimingSignals({
+        const { signals, latest, exits } = computeTimingSignals({
           opens:   closed.map(c => c.open),
           highs:   closed.map(c => c.high),
           lows:    closed.map(c => c.low),
           closes:  closed.map(c => c.close),
           volumes: hasVolume ? closed.map(c => c.volume ?? 0) : null,
         }, { tf }); // 검증 모드 + TF별 실측 임계 기본값 (v3: 지표·패턴 총동원 → 검증 17요소)
-        // setMarkers 는 time 오름차순 필수 — candles 가 이미 정렬돼 있으므로 인덱스 기준 정렬로 보장
+        // setMarkers 는 time 오름차순 필수 — 진입/청산 병합 후 인덱스 기준 정렬로 보장
         const sorted = signals.slice().sort((a, b) => a.i - b.i);
-        const markers = sorted.map(s => ({
+        const entryMarkers = sorted.map(s => ({
+          _i: s.i,
           time: closed[s.i].time, // setData 에 넣은 time 값 재사용 (인트라데이/일봉 타입 불일치 방지)
           position: s.dir > 0 ? "belowBar" : "aboveBar",
           shape: s.dir > 0 ? "arrowUp" : "arrowDown",
-          color: s.dir > 0 ? (s.score >= 2.5 ? "#16A34A" : "#22C55E") : "#EF4444",
-          size: s.score >= 2.5 ? 2 : 1, // 강한 합류(≥2.5 — 실측 엣지 2배↑ 티어)는 크게
-          text: s.score >= 2.5 ? "합류" : "",
+          color: s.dir > 0 ? (s.score >= 3.0 ? "#16A34A" : "#22C55E") : "#EF4444",
+          size: s.score >= 3.0 ? 2 : 1, // 롱유리(75점+ — 대표 지정 티어, 실측 1h +68/4h +89bps)는 크게
+          text: s.score >= 3.0 ? "롱유리" : "",
         }));
-        candleSeries.setMarkers(markers);
-        setRecentSignals(sorted.slice(-3).reverse()); // 근거 패널용 — 최신순 3개
-        setLatestScore(latest); // 현재 종합 점수 게이지
+        // 청산 규칙 마커 (EMA20 종가 이탈 — 리스크 규칙, 예측 아님. 꼬리손실 절반↓ 실측)
+        const exitMarkers = (exits || []).map(x => ({
+          _i: x.i,
+          time: closed[x.i].time,
+          position: "aboveBar",
+          shape: "square",
+          color: "#F59E0B",
+          size: 1,
+          text: "청산",
+        }));
+        candleSeries.setMarkers([...entryMarkers, ...exitMarkers].sort((a, b) => a._i - b._i).map(({ _i, ...m }) => m));
+        // 근거 패널: 진입+청산 병합 최신순 3개
+        const merged = [
+          ...sorted.map(s => ({ kind: "sig", ...s })),
+          ...(exits || []).map(x => ({ kind: "exit", ...x })),
+        ].sort((a, b) => a.i - b.i);
+        setRecentSignals(merged.slice(-3).reverse());
+        setLatestScore(latest); // 현재 종합 점수 게이지 (+최근 발화 폴백)
       } catch {
         // 마커 계산 실패가 차트 렌더링 자체를 막지 않도록 무시합니다
         setRecentSignals([]);
@@ -2138,10 +2154,13 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                 {latestScore && (
                   <div style={{ marginBottom: "6px" }}>
                     <span style={{ color: CC.text2, fontSize: "13px" }}>현재(마지막 확정봉) </span>
-                    <span style={{ fontWeight: 800, fontSize: "16px", color: latestScore.longScore >= 2.5 ? "#16A34A" : latestScore.longScore >= (latestScore.threshold || 1.9) ? CC.green : CC.text2 }}>
+                    <span style={{ fontWeight: 800, fontSize: "16px", color: latestScore.longScore >= 3.0 ? "#16A34A" : latestScore.longScore >= (latestScore.threshold || 1.9) ? CC.green : CC.text2 }}>
                       롱 {Math.min(100, Math.round(latestScore.longScore / 4 * 100))}점
                     </span>
-                    <span style={{ color: CC.text3, fontSize: "12px" }}> /100 · 발화선 {Math.round((latestScore.threshold || 1.9) / 4 * 100)} · 강한합류 63</span>
+                    <span style={{ color: CC.text3, fontSize: "12px" }}> /100 · 발화선 {Math.round((latestScore.threshold || 1.9) / 4 * 100)} · 롱유리 75</span>
+                    {latestScore.longScore === 0 && latestScore.recent && (
+                      <span style={{ color: CC.green, fontSize: "12px", fontWeight: 600 }}> · 최근 발화 {Math.min(100, Math.round(latestScore.recent.score / 4 * 100))}점 ({latestScore.recent.barsAgo}봉 전)</span>
+                    )}
                     {latestScore.reasons?.length > 0 && (
                       <span style={{ color: CC.text3, fontSize: "12px" }}> — {latestScore.reasons.join(" · ")}</span>
                     )}
@@ -2151,16 +2170,23 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                   <div style={{ color: CC.text3 }}>이 구간 발화된 타점 시그널 없음</div>
                 ) : (
                   recentSignals.map((s, idx) => (
-                    <div key={`${s.i}-${idx}`} style={{ marginBottom: "4px", color: s.dir > 0 ? CC.green : CC.red }}>
-                      <span style={{ fontWeight: 700 }}>{s.dir > 0 ? "▲ 롱" : "▼ 숏"} {Math.min(100, Math.round(s.score / 4 * 100))}점{s.score >= 2.5 ? " (강한 합류)" : ""}</span>
-                      <span style={{ color: CC.text2 }}> — {(s.reasons || []).join(" + ")}</span>
-                    </div>
+                    s.kind === "exit" ? (
+                      <div key={`x-${s.i}-${idx}`} style={{ marginBottom: "4px", color: "#F59E0B" }}>
+                        <span style={{ fontWeight: 700 }}>■ 청산</span>
+                        <span style={{ color: CC.text2 }}> — {(s.reasons || []).join(" + ")}</span>
+                      </div>
+                    ) : (
+                      <div key={`${s.i}-${idx}`} style={{ marginBottom: "4px", color: s.dir > 0 ? CC.green : CC.red }}>
+                        <span style={{ fontWeight: 700 }}>{s.dir > 0 ? "▲ 롱" : "▼ 숏"} {Math.min(100, Math.round(s.score / 4 * 100))}점{s.score >= 3.0 ? " (롱유리)" : ""}</span>
+                        <span style={{ color: CC.text2 }}> — {(s.reasons || []).join(" + ")}</span>
+                      </div>
+                    )
                   ))
                 )}
               </>
             )}
             <div style={{ color: CC.text3, fontSize: "12px", marginTop: "6px" }}>
-              지표·봉패턴·차트패턴 19종 총동원 → 과거 실측(학습·OOS·홀드아웃 3중) 통과 요소만 점수화 · 숏은 전 가설 탈락으로 미표시(정직) · 수익 보장 아님
+              지표·봉패턴·차트패턴 총동원 → 과거 실측(학습·OOS·홀드아웃 3중) 통과 요소만 점수화 · ■청산 = EMA20 이탈 리스크 규칙(최악손실 절반↓ 실측, 예측 아님) · 숏은 전 가설 탈락으로 미표시(정직) · 수익 보장 아님
             </div>
           </div>
         )}

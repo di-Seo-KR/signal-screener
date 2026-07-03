@@ -52,7 +52,7 @@ export const VALIDATED_TIMING = {
 //   합류 점수와 엣지가 단조 증가 (1h: 1.9→+9bps/63봉당1개 · 2.5→+51bps · 3.0→+68bps,
 //   4h: 1.9→+24bps · 2.5→+63bps · 3.0→+89bps). 기본 마커 1.9, 강한 합류 2.5.
 export const TIMING_MIN_SCORE = { "1h": 1.9, "4h": 1.9, "1d": 0.75 };
-export const TIMING_STRONG_SCORE = 2.5; // 강한 합류 (표시 강조 + 알림 권장 티어)
+export const TIMING_STRONG_SCORE = 3.0; // "롱유리" 티어 (75/100 — 대표 지정. 실측: 1h +68bps·4h +89bps)
 export const TIMING_SCORE_FULL = 4.0;   // 종합 점수 100점 환산 기준 (score/4×100)
 
 // 쿨다운 (2026-07-04 대표 피드백 "1h 신호 과다"): 강추세 구간에서 눌림목·HL구조가
@@ -149,6 +149,11 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { 
   let latest = null; // 마지막 확정봉의 종합 점수 (임계 미달도 — 패널 게이지용)
   const cooldown = TIMING_COOLDOWN[tfValKey] ?? 4;
   let lastLongBar = -1e9, lastLongScore = 0, lastShortBar = -1e9, lastShortScore = 0;
+  // 청산 규칙 (2026-07-04 검증): 롱 신호 후 EMA20 *종가* 이탈 시 청산 마커.
+  //   예측 아닌 리스크 규칙 — 평균수익 소폭 희생(1h +18→+10bps) 대신 최악 5% 손실
+  //   절반 이하(−652→−267bps). 신호 없이는 발화 안 함(포지션 컨텍스트 한정).
+  const exits = [];
+  let activeUntil = -1e9;
 
   for (let i = 30; i < n; i++) {
     const a = atr[i];
@@ -415,6 +420,7 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { 
       if (i - lastLongBar > cooldown || longS > lastLongScore + 0.5) {
         signals.push({ i, dir: +1, score: +longS.toFixed(2), opposing: +shortS.toFixed(2), reasons: longR });
         lastLongBar = i; lastLongScore = longS;
+        activeUntil = i + 60; // 청산 규칙 추적 시작
       }
     } else if (shortS >= thEff && shortS - longS >= domEff) {
       if (i - lastShortBar > cooldown || shortS > lastShortScore + 0.5) {
@@ -422,10 +428,23 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { 
         lastShortBar = i; lastShortScore = shortS;
       }
     }
+    // 청산 규칙: 활성 창(마지막 롱 신호 후 60봉) 내 EMA20 종가 하향 이탈
+    if (i > lastLongBar && i <= activeUntil && ema20[i] != null && ema20[i - 1] != null
+        && closes[i] < ema20[i] && closes[i - 1] >= ema20[i - 1]) {
+      exits.push({ i, reasons: ["EMA20 종가 이탈 — 추세 규칙 청산 (리스크 관리, 예측 아님)"] });
+      activeUntil = -1e9;
+    }
+
     if (i === n - 1) latest = { longScore: +longS.toFixed(2), shortScore: +shortS.toFixed(2), reasons: longR, threshold: thEff };
   }
 
-  return { signals, factorEvents: factorEvents || [], latest };
+  // 패널 게이지: 마지막 봉 점수가 0이어도 최근 발화(8봉 내)를 함께 노출 — "0/100 만 보임" UX 해결
+  if (latest) {
+    const lastSig = signals.length ? signals[signals.length - 1] : null;
+    latest.recent = lastSig && (n - 1 - lastSig.i) <= 8
+      ? { score: lastSig.score, barsAgo: n - 1 - lastSig.i, reasons: lastSig.reasons } : null;
+  }
+  return { signals, factorEvents: factorEvents || [], latest, exits };
 }
 
 export default { computeTimingSignals, TIMING_WEIGHTS, TIMING_TH, TIMING_DOMINANCE };
