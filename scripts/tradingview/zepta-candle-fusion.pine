@@ -1,6 +1,6 @@
 //@version=6
 // ════════════════════════════════════════════════════════════════════
-// Zepta Timing Fusion v3 — 총동원 종합 점수 타점 (나만의 인디케이터)
+// Zepta Timing Fusion v3.3 — 진짜 타점만 (총동원 종합 점수)
 // ────────────────────────────────────────────────────────────────────
 // Zepta 퀀트 엔진(api/_shared/timing-signals.js v3)과 동일 로직 Pine 포팅.
 //
@@ -25,7 +25,7 @@
 //   바이낸스 무기한 × 1h/4h/일봉. 알림: ⏰ → "Zepta 강한 합류 롱" → 봉 마감 시 1회.
 // 정직 고지: 과거 실측 기반 참고 신호이며 수익을 보장하지 않습니다.
 // ════════════════════════════════════════════════════════════════════
-indicator("Zepta Timing Fusion v3 — 총동원 종합 점수", shorttitle="Zepta 타점 v3", overlay=true)
+indicator("Zepta Timing Fusion v3.3 — 진짜 타점만", shorttitle="Zepta 타점", overlay=true)
 
 grpMode = "모드"
 onlyPrime = input.bool(true, "진짜 타점만 표시 (75점+ 롱유리·청산만)", group=grpMode,
@@ -191,7 +191,7 @@ if showTable and barstate.islast
     lastPct = math.min(100, math.round(lastSigScore / 4.0 * 100))
     recentTxt = not na(lastSigBar) and bar_index - lastSigBar <= 24 ? " · 최근 " + str.tostring(lastPct) + "점(" + str.tostring(bar_index - lastSigBar) + "봉 전)" : ""
     scoreTxt = tfValid ? "현재 종합: 롱 " + str.tostring(scorePct) + "/100 (발화 " + str.tostring(math.round(thTf / 4.0 * 100)) + " · 롱유리 75)" + recentTxt : "—"
-    table.cell(panel, 0, 0, "Zepta Timing Fusion v3.2", text_color=color.new(#F4F5F7, 0), text_size=size.small)
+    table.cell(panel, 0, 0, "Zepta Timing Fusion v3.3", text_color=color.new(#F4F5F7, 0), text_size=size.small)
     table.cell(panel, 0, 1, tfTxt, text_color=tfValid ? color.new(#A1A6B2, 0) : color.new(#FFB020, 0), text_size=size.small)
     table.cell(panel, 0, 2, scoreTxt, text_color=scorePct >= 75 ? color.new(#16A34A, 0) : scorePct >= 47 ? color.new(#22C55E, 0) : color.new(#A1A6B2, 0), text_size=size.small)
     table.cell(panel, 0, 3, "총동원 19종→검증 17조합만 점수화 · 숏 전 가설 탈락 · 수익 보장 아님", text_color=color.new(#6E7585, 0), text_size=size.tiny)
