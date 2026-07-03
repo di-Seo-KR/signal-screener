@@ -55,6 +55,11 @@ export const TIMING_MIN_SCORE = { "1h": 1.9, "4h": 1.9, "1d": 0.75 };
 export const TIMING_STRONG_SCORE = 2.5; // 강한 합류 (표시 강조 + 알림 권장 티어)
 export const TIMING_SCORE_FULL = 4.0;   // 종합 점수 100점 환산 기준 (score/4×100)
 
+// 쿨다운 (2026-07-04 대표 피드백 "1h 신호 과다"): 강추세 구간에서 눌림목·HL구조가
+// 연속 봉 재발화 → 클러스터. 같은 방향 신호 후 N봉 억제, 점수가 직전+0.5 초과로
+// 세지면 예외(에스컬레이션 허용). 표시 필터이며 요소 검증과 무관.
+export const TIMING_COOLDOWN = { "1h": 6, "4h": 4, "1d": 2 };
+
 // ── 내부: ATR14 (candle-patterns 와 동일 — TR 의 SMA) ──
 function atrSeries(highs, lows, closes, period = 14) {
   const n = closes.length;
@@ -142,6 +147,8 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { 
   const K = 2; // 피벗 확정 지연
   const signals = [];
   let latest = null; // 마지막 확정봉의 종합 점수 (임계 미달도 — 패널 게이지용)
+  const cooldown = TIMING_COOLDOWN[tfValKey] ?? 4;
+  let lastLongBar = -1e9, lastLongScore = 0, lastShortBar = -1e9, lastShortScore = 0;
 
   for (let i = 30; i < n; i++) {
     const a = atr[i];
@@ -361,6 +368,26 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { 
           && highs[i] >= lastBreakDnLvl - 0.3 * a && c < lastBreakDnLvl && c < o && bearRegime) {
         emit("breakRetest", -1, 1.1, "이탈 리테스트 저항 확인(약세장)");
       }
+      // ㉑~㉓ 과확장 소진형 (2026-07-04 4차 사전등록 — 지금까지 미검증이던 *유일한*
+      //   숏 메커니즘: 반전/지속이 아닌 "과열의 되돌림". 급등 파라볼릭 꺾임을 노린다.
+      //   레짐 게이트 없음 — 소진 숏은 상승장 한복판에서 발생하는 게 본질)
+      {
+        // ㉑ 과확장 반전: 직전 봉이 EMA20 대비 2.5ATR+ 과확장 → 첫 유의 반대 봉
+        const ext1 = ema20[i - 1] != null ? (closes[i - 1] - ema20[i - 1]) / a : 0;
+        if (ext1 > 2.5 && c < o && bodyI >= 0.7 * a && c < closes[i - 1]) emit("exhaustReversal", -1, 1.0, "과확장 소진 반전(↓)");
+        if (ext1 < -2.5 && c > o && bodyI >= 0.7 * a && c > closes[i - 1]) emit("exhaustReversal", +1, 1.0, "과낙폭 소진 반전(↑)");
+        // ㉒ 파라볼릭 꺾임: 최근 6봉 중 5봉+ 같은 방향 & 누적 4ATR+ → 첫 유의 반대 봉
+        let ups = 0, dns = 0;
+        for (let j = i - 6; j < i; j++) { if (closes[j] > opens[j]) ups++; else if (closes[j] < opens[j]) dns++; }
+        const cum6 = closes[i - 1] - closes[i - 7];
+        if (ups >= 5 && cum6 > 4 * a && c < o && bodyI >= 0.7 * a) emit("parabolicBreak", -1, 1.1, "파라볼릭 급등 꺾임");
+        if (dns >= 5 && -cum6 > 4 * a && c > o && bodyI >= 0.7 * a) emit("parabolicBreak", +1, 1.1, "파라볼릭 급락 꺾임");
+        // ㉓ 극단 꼬리 소진: 볼린저 밖 극단 + 긴 거부 꼬리 + 반대 종가
+        const upW2 = highs[i] - Math.max(o, c), loW2 = Math.min(o, c) - lows[i];
+        if (bb.upper?.[i] != null && highs[i] >= bb.upper[i] && upW2 >= 1.2 * a && upW2 >= 2 * bodyI && c < o) emit("wickExhaust", -1, 1.0, "상단 극단 꼬리 거부");
+        if (bb.lower?.[i] != null && lows[i] <= bb.lower[i] && loW2 >= 1.2 * a && loW2 >= 2 * bodyI && c > o) emit("wickExhaust", +1, 1.0, "하단 극단 꼬리 거부");
+      }
+
       // ⑳ 연속 추력 (3연속 유의 몸통 + 거래량 증가)
       if (volumes && volumes[i] != null && volumes[i - 1] != null && volumes[i - 2] != null) {
         const b0 = Math.abs(closes[i - 2] - opens[i - 2]), b1 = Math.abs(closes[i - 1] - opens[i - 1]);
@@ -384,9 +411,16 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { 
     const thEff = validated ? minScoreEff : th;
     const domEff = validated ? 0 : dominance;
     if (longS >= thEff && longS - shortS >= domEff) {
-      signals.push({ i, dir: +1, score: +longS.toFixed(2), opposing: +shortS.toFixed(2), reasons: longR });
+      // 쿨다운: 클러스터 억제 — 직전 롱 신호 후 N봉 내엔 점수 에스컬레이션 시에만
+      if (i - lastLongBar > cooldown || longS > lastLongScore + 0.5) {
+        signals.push({ i, dir: +1, score: +longS.toFixed(2), opposing: +shortS.toFixed(2), reasons: longR });
+        lastLongBar = i; lastLongScore = longS;
+      }
     } else if (shortS >= thEff && shortS - longS >= domEff) {
-      signals.push({ i, dir: -1, score: +shortS.toFixed(2), opposing: +longS.toFixed(2), reasons: shortR });
+      if (i - lastShortBar > cooldown || shortS > lastShortScore + 0.5) {
+        signals.push({ i, dir: -1, score: +shortS.toFixed(2), opposing: +longS.toFixed(2), reasons: shortR });
+        lastShortBar = i; lastShortScore = shortS;
+      }
     }
     if (i === n - 1) latest = { longScore: +longS.toFixed(2), shortScore: +shortS.toFixed(2), reasons: longR, threshold: thEff };
   }

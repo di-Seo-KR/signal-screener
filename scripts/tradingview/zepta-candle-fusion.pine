@@ -154,7 +154,16 @@ scorePct = math.min(100, math.round(longScore / 4.0 * 100))
 thTf = tfKey == "1d" ? 0.75 : 1.9
 
 barOk = confirmedOnly ? barstate.isconfirmed : true
-longSignal   = tfValid and longScore >= thTf and barOk
+// 쿨다운: 강추세 클러스터 억제 — 직전 신호 후 N봉 내엔 점수 에스컬레이션 시에만 재발화
+cdBars = tfKey == "1h" ? 6 : tfKey == "4h" ? 4 : 2
+var int   lastSigBar = na
+var float lastSigScore = 0.0
+longSignalRaw = tfValid and longScore >= thTf and barOk
+canFire = na(lastSigBar) or bar_index - lastSigBar > cdBars or longScore > lastSigScore + 0.5
+longSignal = longSignalRaw and canFire
+if longSignal
+    lastSigBar := bar_index
+    lastSigScore := longScore
 strongSignal = longSignal and longScore >= 2.5
 shortResearch = showResearchShort and tfValid and barOk and structLH and ema20 < ema50 and close < open and close < close[1]
 
