@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { createChart, CrosshairMode, LineStyle } from "lightweight-charts";
 import { useIsMobile } from "./ui/useBreakpoint.jsx";
 // 백엔드와 *같은* 캔들패턴 모듈 공유 — 차트에 보이는 신호 = 스코어에 반영되는 신호 (이중 구현 금지)
-import { analyzeCandleSeries } from "../api/_shared/candle-patterns.js";
+import { computeTimingSignals } from "../api/_shared/timing-signals.js"; // 합류 타점 엔진 v2 (검증 요소만)
 
 // ── 보조지표 계산 ────────────────────────────────────────────────
 function calcSMA(data, period) {
@@ -1437,27 +1437,29 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
     candleSeries.setData(candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
     candleSeriesRef.current = candleSeries;
 
-    // ── 캔들패턴 시그널 마커 (검증된 패턴 → ▲롱/▼숏 타이밍 표시) ──
+    // ── 합류 타점 마커 v2 (요소별 실측 검증 통과 조합만 — 패턴·눌림목·RSI반등·
+    //    스윕리클레임·구조돌파. 숏 기계신호는 12가설 전부 검증 탈락이라 미표시(정직)) ──
     // 마지막 봉은 진행 중(미확정)이라 리페인팅 위험이 있어 제외합니다(확정봉 원칙).
     if (showSignals) {
       try {
         const closed = candles.slice(0, -1);
         const hasVolume = closed.some(c => (c.volume ?? 0) > 0); // 코인게코 OHLC 는 거래량 없음 → null 전달
-        const { events } = analyzeCandleSeries({
+        const { signals } = computeTimingSignals({
           opens:   closed.map(c => c.open),
           highs:   closed.map(c => c.high),
           lows:    closed.map(c => c.low),
           closes:  closed.map(c => c.close),
           volumes: hasVolume ? closed.map(c => c.volume ?? 0) : null,
-        }, { tf });
+        }, { tf }); // 검증 모드 + TF별 실측 임계(1h는 2요소 합류만) 기본값
         // setMarkers 는 time 오름차순 필수 — candles 가 이미 정렬돼 있으므로 인덱스 기준 정렬로 보장
-        const sorted = events.slice().sort((a, b) => a.i - b.i);
-        const markers = sorted.map(ev => ({
-          time: closed[ev.i].time, // setData 에 넣은 time 값 재사용 (인트라데이/일봉 타입 불일치 방지)
-          position: ev.dir > 0 ? "belowBar" : "aboveBar",
-          shape: ev.dir > 0 ? "arrowUp" : "arrowDown",
-          color: ev.dir > 0 ? "#22C55E" : "#EF4444",
-          text: ev.ko,
+        const sorted = signals.slice().sort((a, b) => a.i - b.i);
+        const markers = sorted.map(s => ({
+          time: closed[s.i].time, // setData 에 넣은 time 값 재사용 (인트라데이/일봉 타입 불일치 방지)
+          position: s.dir > 0 ? "belowBar" : "aboveBar",
+          shape: s.dir > 0 ? "arrowUp" : "arrowDown",
+          color: s.dir > 0 ? (s.score >= 1.9 ? "#16A34A" : "#22C55E") : "#EF4444",
+          size: s.score >= 1.9 ? 2 : 1, // 강한 합류(2요소+)는 크게
+          text: s.score >= 1.9 ? "합류" : "",
         }));
         candleSeries.setMarkers(markers);
         setRecentSignals(sorted.slice(-3).reverse()); // 근거 패널용 — 최신순 3개
@@ -2124,21 +2126,21 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
             background: CC.card, borderRadius: "10px", border: `1px solid ${CC.border}`,
             fontSize: "14px",
           }}>
-            <div style={{ fontWeight: 700, color: CC.text1, marginBottom: "6px" }}>🎯 캔들패턴 시그널</div>
+            <div style={{ fontWeight: 700, color: CC.text1, marginBottom: "6px" }}>🎯 검증 타점 시그널</div>
             {!SIGNAL_TFS.includes(timeframe) ? (
-              <div style={{ color: CC.text3 }}>패턴 시그널은 1시간봉 이상에서 제공됩니다 (저TF는 통계적으로 무효)</div>
+              <div style={{ color: CC.text3 }}>타점 시그널은 1시간봉 이상에서 제공됩니다 (저TF는 통계적으로 무효)</div>
             ) : recentSignals.length === 0 ? (
-              <div style={{ color: CC.text3 }}>이 구간 검증된 패턴 시그널 없음</div>
+              <div style={{ color: CC.text3 }}>이 구간 검증된 타점 시그널 없음</div>
             ) : (
-              recentSignals.map((ev, idx) => (
-                <div key={`${ev.i}-${ev.name}-${idx}`} style={{ marginBottom: "4px", color: ev.dir > 0 ? CC.green : CC.red }}>
-                  <span style={{ fontWeight: 700 }}>{ev.dir > 0 ? "▲" : "▼"} {ev.ko}</span>
-                  <span style={{ color: CC.text2 }}> — {ev.reasons?.[0] || ""}</span>
+              recentSignals.map((s, idx) => (
+                <div key={`${s.i}-${idx}`} style={{ marginBottom: "4px", color: s.dir > 0 ? CC.green : CC.red }}>
+                  <span style={{ fontWeight: 700 }}>{s.dir > 0 ? "▲ 롱" : "▼ 숏"}{s.score >= 1.9 ? " (강한 합류)" : ""}</span>
+                  <span style={{ color: CC.text2 }}> — {(s.reasons || []).join(" + ")}</span>
                 </div>
               ))
             )}
             <div style={{ color: CC.text3, fontSize: "12px", marginTop: "6px" }}>
-              과거 데이터 캘리브레이션 기반 참고 신호 · 수익 보장 아님
+              요소별 과거 실측 검증 통과 신호만 표시 · 숏 기계신호는 전 가설 검증 탈락으로 미표시(정직) · 수익 보장 아님
             </div>
           </div>
         )}
