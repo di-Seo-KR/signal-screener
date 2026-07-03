@@ -1,0 +1,174 @@
+//@version=6
+// ════════════════════════════════════════════════════════════════════
+// Zepta Timing Fusion v2 — 실측 검증 합류 타점 (나만의 인디케이터)
+// ────────────────────────────────────────────────────────────────────
+// Zepta 퀀트 엔진(api/_shared/timing-signals.js)과 동일 로직의 Pine 포팅.
+//
+// 만든 방법 (2026-07-04, 바이낸스 USDM 24심볼 × 1h/4h/1d × 1500봉 실측):
+//   후보 요소 7종 × 3TF × 롱숏 = 42조합을 "두 구간(65/35) 부호 일관 + OOS ≥
+//   수수료 + 클러스터-강건 t≥1.5"로 선별 → 9조합 생존(전부 롱) → 학습에 안 쓴
+//   홀드아웃 6심볼에서 최종 확인: 1h 롱 +114bps(t 6.3) · 4h 롱 +91bps(t 2.5).
+//
+// TF별 검증 요소(이 조합만 신호를 만듭니다):
+//   1h  : 상승장악 패턴 · 눌림목 반등 · 저항 종가돌파 · 저점 높아짐(HL)
+//         — 밀도 조절 위해 *2요소 이상 합류(점수≥1.9)* 시에만 발화
+//   4h  : 관통형 패턴 · RSI 30 반등 · 지지 스윕-리클레임 · 저항 종가돌파
+//   일봉+: 적삼병 패턴
+//
+// ★ 숏에 대한 정직한 고지: 반전형 5가설 + 지속형 2가설, 총 12개 숏 조합이
+//   전부 검증 탈락했습니다(두 구간 부호 불일치/음수 — 크립토 특성). 그래서
+//   검증 모드에는 숏 신호가 없습니다. "숏 실험 표시" 토글을 켜면 미검증
+//   숏 셋업(구조 LH+되돌림 거부)을 주황색으로 표시하지만, 과거 데이터상
+//   엣지가 확인되지 않은 참고용임을 기억하십시오.
+//
+// 사용법: TradingView 하단 Pine 편집기 → 전체 붙여넣기 → "차트에 추가".
+//   권장 심볼: 캘리브레이션과 동일한 바이낸스 무기한 (예: BINANCE:BTCUSDT.P)
+//   알림: 우측 ⏰ → 조건 "Zepta 롱 타점" → "봉 마감 시 1회" 권장.
+// 정직 고지: 과거 실측 기반 참고 신호이며 수익을 보장하지 않습니다.
+// ════════════════════════════════════════════════════════════════════
+indicator("Zepta Timing Fusion v2 — 검증 합류 타점", shorttitle="Zepta 타점", overlay=true)
+
+// ── 입력 ──────────────────────────────────────────────────────────
+grpMode = "모드"
+confirmedOnly = input.bool(true, "확정봉만 표시 (리페인트 방지)", group=grpMode)
+showResearchShort = input.bool(false, "숏 실험 표시 (⚠ 미검증 — 과거 실측 엣지 없음)", group=grpMode,
+     tooltip="숏 기계신호 12가설이 전부 검증 탈락했습니다. 켜면 미검증 숏 셋업을 주황색으로 표시만 합니다.")
+grpGate = "게이트 파라미터 (엔진 기본값)"
+srAtrMult = input.float(1.5, "S/R 근접 허용 (×ATR)", minval=0.5, maxval=3.0, step=0.1, group=grpGate)
+pivotLen  = input.int(2, "피벗 강도 (좌우 봉)", minval=2, maxval=5, group=grpGate)
+showTable = input.bool(true, "상태 패널", group=grpGate)
+
+// ── TF 판정 ────────────────────────────────────────────────────────
+tfMinutes = timeframe.in_seconds() / 60.0
+isTfDaily = timeframe.isdaily or timeframe.isweekly or timeframe.ismonthly
+tfKey = isTfDaily ? "1d" : tfMinutes == 240.0 ? "4h" : tfMinutes == 60.0 ? "1h" : "off"
+tfValid = tfKey != "off"
+
+// ── 공통 지표 (엔진과 동일: ATR14 = TR 의 SMA) ─────────────────────
+atr    = ta.sma(ta.tr(true), 14)
+ema20  = ta.ema(close, 20)
+ema50  = ta.ema(close, 50)
+rsi    = ta.rsi(close, 14)
+volSma = ta.sma(volume, 20)
+hasVol = not na(volume) and volume > 0
+
+body  = math.abs(close - open)
+rng   = high - low
+body1 = math.abs(close[1] - open[1])
+body2 = math.abs(close[2] - open[2])
+upW   = high - math.max(open, close)
+loW   = math.min(open, close) - low
+isBull = close > open
+isBear = close < open
+closePos  = rng > 0 ? (close - low) / rng : 0.0
+rng1 = high[1] - low[1]
+rng2 = high[2] - low[2]
+closePos1 = rng1 > 0 ? (close[1] - low[1]) / rng1 : 0.0
+closePos2 = rng2 > 0 ? (close[2] - low[2]) / rng2 : 0.0
+
+// ── S/R 피벗 클러스터 (엔진 swingLevels 포팅: 0.5ATR 클러스터, 터치≥2, 120봉) ──
+var array<float> pivots   = array.new<float>()
+var array<int>   pivotBar = array.new<int>()
+ph = ta.pivothigh(high, pivotLen, pivotLen)
+pl = ta.pivotlow(low, pivotLen, pivotLen)
+if not na(ph)
+    array.push(pivots, ph)
+    array.push(pivotBar, bar_index - pivotLen)
+if not na(pl)
+    array.push(pivots, pl)
+    array.push(pivotBar, bar_index - pivotLen)
+while array.size(pivotBar) > 0 and bar_index - array.get(pivotBar, 0) > 120
+    array.shift(pivots)
+    array.shift(pivotBar)
+
+// 레벨 헬퍼: 조건 함수형 — 지지 스윕리클레임 / 저항 종가돌파 / 근접
+f_srFlags() =>
+    sweepUp = false      // 지지 꼬리 관통 후 종가 회복 (4h 롱 요소)
+    breakUp = false      // 저항 종가 확정 돌파 (1h·4h 롱 요소)
+    nearSup = false
+    nearRes = false
+    n = array.size(pivots)
+    if n > 0 and atr > 0
+        for i = 0 to n - 1
+            p = array.get(pivots, i)
+            touches = 0
+            for j = 0 to n - 1
+                if math.abs(array.get(pivots, j) - p) <= 0.5 * atr
+                    touches += 1
+            if touches >= 2
+                if math.abs(close - p) <= srAtrMult * atr
+                    if p <= close + 0.25 * atr
+                        nearSup := true
+                    if p >= close - 0.25 * atr
+                        nearRes := true
+                if low < p - 0.05 * atr and close > p + 0.05 * atr and loW >= 0.7 * atr and isBull
+                    sweepUp := true
+                if close > p + 0.25 * atr and close[1] <= p + 0.05 * atr
+                    breakUp := true
+    [sweepUp, breakUp, nearSup, nearRes]
+[sweepUp, breakUp, nearSup, nearRes] = f_srFlags()
+
+// ── 스윙 구조 (확정 피벗 저점 2개 → HL, 신선도 3봉) ─────────────────
+var float lastPL = na
+var float prevPL = na
+if not na(pl)
+    prevPL := lastPL
+    lastPL := pl
+barsSincePL = ta.barssince(not na(pl))
+structHL = not na(prevPL) and not na(lastPL) and lastPL > prevPL + 0.1 * atr and barsSincePL <= 3 and close > ema20
+var float lastPH = na
+var float prevPH = na
+if not na(ph)
+    prevPH := lastPH
+    lastPH := ph
+barsSincePH = ta.barssince(not na(ph))
+structLH = not na(prevPH) and not na(lastPH) and lastPH < prevPH - 0.1 * atr and barsSincePH <= 3 and close < ema20
+
+// ── 검증 요소 (TF별 — 엔진 VALIDATED_TIMING 과 동일) ────────────────
+downLeg = close < ema20 or close < close[10]
+upLeg   = close > ema20 or close > close[10]
+volConfirm = hasVol and volSma > 0 and volume >= 1.5 * volSma
+
+// 패턴: 1h=상승장악, 4h=관통형, 1d=적삼병 (캘리브레이션 생존 조합)
+patBullEngulf = close[1] < open[1] and isBull and body >= 1.2 * body1 and body >= 0.5 * atr and body1 >= 0.05 * atr and close >= math.max(open[1], close[1]) and open <= math.min(open[1], close[1]) + 0.1 * atr and downLeg and nearSup
+patPiercing   = close[1] < open[1] and body1 >= 0.5 * atr and isBull and open <= close[1] + 0.1 * atr and close > (open[1] + close[1]) / 2 and close < open[1] and downLeg and nearSup
+patSoldiers   = close[2] > open[2] and close[1] > open[1] and isBull and body2 >= 0.5 * atr and body1 >= 0.5 * atr and body >= 0.5 * atr and close[1] > close[2] and close > close[1] and closePos >= 0.6 and closePos1 >= 0.6 and closePos2 >= 0.6 and (close - open[2]) <= 3.2 * atr and upLeg
+// 눌림목 반등 (1h)
+pullbackL = ema20 > ema50 and low <= ema20 + 0.3 * atr and close > ema20 and isBull and close > close[1]
+// RSI 30 반등 (4h)
+rsiRevL = rsi[1] < 30 and rsi >= 30 and rsi < 45
+// 구조 돌파 롱 (1h·4h): 상승 정렬 + 유의 양봉 + 저항 종가돌파
+structBreakL = ema20 > ema50 and isBull and body >= 0.5 * atr and breakUp
+
+// ── 점수 조립 (엔진 가중과 동일: 패턴 1.5×w, 구조/눌림목 1.0, RSI 0.8, 스윕 1.2, 량 +0.5) ──
+score1h = (patBullEngulf ? 0.525 : 0) + (pullbackL ? 1.0 : 0) + (structBreakL ? 1.0 : 0) + (structHL ? 1.0 : 0)
+score4h = (patPiercing ? 1.0125 : 0) + (rsiRevL ? 0.8 : 0) + (sweepUp ? 1.2 : 0) + (structBreakL ? 1.0 : 0)
+score1d = patSoldiers ? 0.9 : 0
+rawScore = tfKey == "1h" ? score1h : tfKey == "4h" ? score4h : tfKey == "1d" ? score1d : 0.0
+volBonus = volConfirm and rawScore > 0 and isBull ? 0.5 : 0.0
+longScore = rawScore + volBonus
+thTf = tfKey == "1h" ? 1.9 : 0.75 // 1h 는 2요소 합류만 (밀도·엣지 균형 실측값)
+
+barOk = confirmedOnly ? barstate.isconfirmed : true
+longSignal   = tfValid and longScore >= thTf and barOk
+strongSignal = longSignal and longScore >= 1.9
+
+// 미검증 숏 실험 (옵션): LH 구조 + 하락추세 되돌림 거부 — 참고용
+shortResearch = showResearchShort and tfValid and barOk and structLH and ema20 < ema50 and isBear and close < close[1]
+
+// ── 표시 ───────────────────────────────────────────────────────────
+plotshape(strongSignal, title="강한 합류 롱", style=shape.triangleup, location=location.belowbar, color=color.new(#16A34A, 0), size=size.small, text="합류", textcolor=color.new(#16A34A, 0))
+plotshape(longSignal and not strongSignal, title="검증 롱 타점", style=shape.triangleup, location=location.belowbar, color=color.new(#22C55E, 25), size=size.tiny)
+plotshape(shortResearch, title="숏 (미검증 실험)", style=shape.triangledown, location=location.abovebar, color=color.new(#F59E0B, 20), size=size.tiny, text="실험", textcolor=color.new(#F59E0B, 20))
+
+// ── 상태 패널 ──────────────────────────────────────────────────────
+var table panel = table.new(position.top_right, 1, 3, bgcolor=color.new(#0A0B0F, 15), border_width=1, border_color=color.new(#23262F, 0))
+if showTable and barstate.islast
+    tfTxt = tfKey == "1d" ? "일봉+ · 검증요소: 적삼병" : tfKey == "4h" ? "4시간 · 검증요소: 관통형·RSI반등·스윕·돌파" : tfKey == "1h" ? "1시간 · 검증요소 4종, 2요소 합류만 발화" : "⚠ 미지원 TF (1h/4h/일봉+만 검증됨 — 신호 없음)"
+    table.cell(panel, 0, 0, "Zepta Timing Fusion v2", text_color=color.new(#F4F5F7, 0), text_size=size.small)
+    table.cell(panel, 0, 1, tfTxt, text_color=tfValid ? color.new(#A1A6B2, 0) : color.new(#FFB020, 0), text_size=size.small)
+    table.cell(panel, 0, 2, "실측 검증 롱 전용 · 숏은 전 가설 탈락(미검증 실험만) · 수익 보장 아님", text_color=color.new(#6E7585, 0), text_size=size.tiny)
+
+// ── 알림 ───────────────────────────────────────────────────────────
+alertcondition(longSignal,   title="Zepta 롱 타점",        message="Zepta 타점: {{ticker}} {{interval}} 검증 롱(▲) 신호")
+alertcondition(strongSignal, title="Zepta 강한 합류 롱",   message="Zepta 타점: {{ticker}} {{interval}} 강한 합류(2요소+) 롱(▲) 신호")

@@ -79,7 +79,7 @@ function atrSeries(highs, lows, closes, period = 14) {
 
 // ── 내부: 스윙 피벗 기반 S/R 레벨 (fractal k=2, 0.5ATR 클러스터, 터치≥2) ──
 //   백엔드 sr 스키마(매물대)가 있으면 caller 가 srLevels 로 주입해 대체 가능.
-function swingLevels(highs, lows, endIdx, atr, lookback = 120) {
+export function swingLevels(highs, lows, endIdx, atr, lookback = 120) { // timing-signals.js 에서 재사용
   const start = Math.max(2, endIdx - lookback);
   const pivots = [];
   for (let i = start; i <= endIdx - 2; i++) {
