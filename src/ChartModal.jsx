@@ -1451,9 +1451,9 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
           lows:    closed.map(c => c.low),
           closes:  closed.map(c => c.close),
           volumes: hasVolume ? closed.map(c => c.volume ?? 0) : null,
-        // ★ 대표 지시(2026-07-04): "진짜 타점만" — 1h/4h 는 75점+ 롱유리만 발화(+딸린 청산).
-        //   일봉+는 검증 1요소(최대 ~35점)라 원 임계 유지 — 안 그러면 일봉 신호 전멸.
-        }, { tf, minScore: (tf === "1d" || tf === "1wk" || tf === "1mo") ? undefined : 3.0 });
+        // v4 딥 캘리브레이션(상장 이후 전체·약세장 포함·레짐 게이트·홀드아웃 필터):
+        //   생존 요소가 개당 +100~800bps 로 강해 *검증 단일요소 발화 = 진짜 타점*. 엔진 기본 임계.
+        }, { tf });
         // setMarkers 는 time 오름차순 필수 — 진입/청산 병합 후 인덱스 기준 정렬로 보장
         const sorted = signals.slice().sort((a, b) => a.i - b.i);
         const entryMarkers = sorted.map(s => ({
@@ -1461,9 +1461,9 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
           time: closed[s.i].time, // setData 에 넣은 time 값 재사용 (인트라데이/일봉 타입 불일치 방지)
           position: s.dir > 0 ? "belowBar" : "aboveBar",
           shape: s.dir > 0 ? "arrowUp" : "arrowDown",
-          color: s.dir > 0 ? (s.score >= 3.0 ? "#16A34A" : "#22C55E") : "#EF4444",
-          size: s.score >= 3.0 ? 2 : 1, // 롱유리(75점+ — 대표 지정 티어, 실측 1h +68/4h +89bps)는 크게
-          text: s.score >= 3.0 ? "롱유리" : "",
+          color: s.dir > 0 ? (s.score >= 1.7 ? "#16A34A" : "#22C55E") : "#EF4444",
+          size: s.score >= 1.7 ? 2 : 1, // 롱유리 = 2요소 합류(68점+, v4 재보정)
+          text: s.dir < 0 ? "분산" : (s.score >= 1.7 ? "롱유리" : ""),
         }));
         // 청산 규칙 마커 (EMA20 종가 이탈 — 리스크 규칙, 예측 아님. 꼬리손실 절반↓ 실측)
         const exitMarkers = (exits || []).map(x => ({
@@ -2156,12 +2156,12 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                 {latestScore && (
                   <div style={{ marginBottom: "6px" }}>
                     <span style={{ color: CC.text2, fontSize: "13px" }}>현재(마지막 확정봉) </span>
-                    <span style={{ fontWeight: 800, fontSize: "16px", color: latestScore.longScore >= 3.0 ? "#16A34A" : latestScore.longScore >= (latestScore.threshold || 1.9) ? CC.green : CC.text2 }}>
-                      롱 {Math.min(100, Math.round(latestScore.longScore / 4 * 100))}점
+                    <span style={{ fontWeight: 800, fontSize: "16px", color: latestScore.longScore >= 1.7 ? "#16A34A" : latestScore.longScore >= (latestScore.threshold || 0.75) ? CC.green : CC.text2 }}>
+                      롱 {Math.min(100, Math.round(latestScore.longScore / 2.5 * 100))}점
                     </span>
-                    <span style={{ color: CC.text3, fontSize: "12px" }}> /100 · 발화선 {Math.round((latestScore.threshold || 1.9) / 4 * 100)} · 롱유리 75</span>
+                    <span style={{ color: CC.text3, fontSize: "12px" }}> /100 · 발화선 {Math.round((latestScore.threshold || 0.75) / 2.5 * 100)} · 롱유리 68</span>
                     {latestScore.longScore === 0 && latestScore.recent && (
-                      <span style={{ color: CC.green, fontSize: "12px", fontWeight: 600 }}> · 최근 발화 {Math.min(100, Math.round(latestScore.recent.score / 4 * 100))}점 ({latestScore.recent.barsAgo}봉 전)</span>
+                      <span style={{ color: CC.green, fontSize: "12px", fontWeight: 600 }}> · 최근 발화 {Math.min(100, Math.round(latestScore.recent.score / 2.5 * 100))}점 ({latestScore.recent.barsAgo}봉 전)</span>
                     )}
                     {latestScore.reasons?.length > 0 && (
                       <span style={{ color: CC.text3, fontSize: "12px" }}> — {latestScore.reasons.join(" · ")}</span>
@@ -2179,7 +2179,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                       </div>
                     ) : (
                       <div key={`${s.i}-${idx}`} style={{ marginBottom: "4px", color: s.dir > 0 ? CC.green : CC.red }}>
-                        <span style={{ fontWeight: 700 }}>{s.dir > 0 ? "▲ 롱" : "▼ 숏"} {Math.min(100, Math.round(s.score / 4 * 100))}점{s.score >= 3.0 ? " (롱유리)" : ""}</span>
+                        <span style={{ fontWeight: 700 }}>{s.dir > 0 ? "▲ 롱" : "▼ 숏(OBV분산·단기)"} {Math.min(100, Math.round(s.score / 2.5 * 100))}점{s.dir > 0 && s.score >= 1.7 ? " (롱유리)" : ""}</span>
                         <span style={{ color: CC.text2 }}> — {(s.reasons || []).join(" + ")}</span>
                       </div>
                     )
@@ -2188,7 +2188,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
               </>
             )}
             <div style={{ color: CC.text3, fontSize: "12px", marginTop: "6px" }}>
-              지표·봉패턴·차트패턴 총동원 → 과거 실측(학습·OOS·홀드아웃 3중) 통과 요소만 점수화 · ■청산 = EMA20 이탈 리스크 규칙(최악손실 절반↓ 실측, 예측 아님) · 숏은 전 가설 탈락으로 미표시(정직) · 수익 보장 아님
+              상장 이후 전체(약세장 포함) 딥 실측+홀드아웃 통과 요소만 점수화 · 롱은 EMA200 위에서만(레짐 게이트) · ▼숏=OBV 분산(약세장 한정·단기 성격, 유일 검증 숏) · ■청산=EMA20 이탈 리스크 규칙 · 1h는 펀딩 기반 요소(서버 연동 예정)라 4h/일봉 권장 · 수익 보장 아님
             </div>
           </div>
         )}
