@@ -1,167 +1,180 @@
 //@version=6
 // ════════════════════════════════════════════════════════════════════
-// Zepta Timing Fusion v4 — 딥 검증 타점 (상장 이후 전체 · 약세장 포함)
+// Zepta Timing Fusion v4.2 — 딥 검증 타점 (핵심만 · 1h 투영 · 모바일 패널)
 // ────────────────────────────────────────────────────────────────────
-// 검증 (2026-07-04, 바이낸스 USDM 24심볼 상장 이후 전체 = 1h 86만·4h 27만·
-// 1d 4.6만 봉, 2021 고점 붕괴·2022 약세장 포함 + 홀드아웃 6심볼 최종 필터):
-//   - 사전등록 레짐 게이트 "롱은 EMA200 위에서만" — 약세장에서 롱 신호 자동 침묵
-//   - 4h 롱 5요소: 스윕리클레임(+29/+208bps 홀드아웃)·구조돌파(+65/+46)·
-//     MACD골든크로스(+46/+103)·쌍바닥·추력(+183/+235)
-//   - 4h 숏 1요소(최초 검증 숏): OBV 분산 — 가격은 버티는데 OBV 가 빠지는
-//     스마트머니 이탈. 약세장(EMA200 아래) 한정 · 단기(~24h) 성격
-//   - 1d 롱 3요소: 적삼병·EMA 골든크로스(+584/+235bps)·추력
-//   - 1h: 유일한 검증 요소가 펀딩비 기반(TradingView 에서 데이터 불가) →
-//     1h 는 신호 없음이 정직한 상태. 4h/일봉 사용 권장.
-// 티어: 발화 = 검증 단일요소(30/100+) · 롱유리 = 2요소 합류(68/100+)
-// ■청산 = 롱 신호 후 EMA20 종가 이탈 (리스크 규칙 — 최악 5% 손실 절반↓ 실측)
+// 검증: 바이낸스 USDM 24심볼 상장 이후 전체(1h 86만·4h 27만·1d 4.6만 봉,
+// 2022 약세장 포함) + 홀드아웃 6심볼 필터. 레짐 게이트 "롱은 EMA200 위" 내장.
+//   4h 롱 5요소(스윕·구조돌파·MACD크로스·쌍바닥·추력) + 숏 1요소(OBV 분산)
+//   1d 롱 3요소(적삼병·골든크로스·추력)
+// v4.2 변경 (대표 피드백):
+//   ① 1시간봉: 4h 검증 신호를 1h 차트에 투영(request.security) — 1h 에서도 신호 표시
+//   ② 핵심만 기본: 4h 롱은 2요소 합류(롱유리 68점+)만 발화 — 단일요소 소음 제거
+//   ③ 숏(OBV 분산)은 상태성 조건이라 지속 반복 발화 → 쿨다운 12봉(전환 초기만)
+//   ④ 상태 패널 위치 선택(모바일: 좌측 하단 권장)
+// ■청산 = 롱 신호 후 EMA20 종가 이탈(리스크 규칙 — 최악 5% 손실 절반↓ 실측)
 // 정직 고지: 과거 실측 기반 참고 신호이며 수익을 보장하지 않습니다.
 // ════════════════════════════════════════════════════════════════════
-indicator("Zepta Timing Fusion v4 — 딥 검증 타점", shorttitle="Zepta 타점 v4", overlay=true)
+indicator("Zepta Timing Fusion v4.2 — 딥 검증 타점", shorttitle="Zepta 타점", overlay=true)
 
 grpMode = "모드"
-confirmedOnly = input.bool(true, "확정봉만 표시 (리페인트 방지)", group=grpMode)
-showShort = input.bool(true, "숏(OBV 분산) 표시", group=grpMode)
-grpGate = "게이트 (엔진 기본값)"
+confirmedOnly = input.bool(true, "확정봉만 (리페인트 방지)", group=grpMode)
+showShort   = input.bool(true, "숏(OBV 분산) 표시", group=grpMode)
+showSingles = input.bool(false, "4h 단일요소 신호도 표시 (연구용)", group=grpMode)
+grpGate = "게이트"
 srAtrMult = input.float(1.5, "S/R 근접 허용 (×ATR)", minval=0.5, maxval=3.0, step=0.1, group=grpGate)
 pivotLen  = input.int(2, "피벗 강도", minval=2, maxval=5, group=grpGate)
-showTable = input.bool(true, "상태 패널", group=grpGate)
+grpPanel = "패널"
+showTable = input.bool(true, "상태 패널", group=grpPanel)
+panelPos  = input.string("우측 상단", "패널 위치 (모바일: 좌측 하단 권장)", options=["우측 상단", "우측 하단", "좌측 하단", "좌측 상단"], group=grpPanel)
 
-// ── TF ─────────────────────────────────────────────────────────────
+// ── 타점 엔진 (컨텍스트별 독립 실행 — 차트 TF 또는 security("240")) ──
+f_engine() =>
+    _tfMin = timeframe.in_seconds() / 60.0
+    _isD = timeframe.isdaily or timeframe.isweekly or timeframe.ismonthly
+    _tfKey = _isD ? "1d" : _tfMin == 240.0 ? "4h" : "off"
+    _valid = _tfKey == "4h" or _tfKey == "1d"
+
+    _atr    = ta.sma(ta.tr(true), 14)
+    _ema20  = ta.ema(close, 20)
+    _ema50  = ta.ema(close, 50)
+    _ema200 = ta.ema(close, 200)
+    _rsi    = ta.rsi(close, 14)
+    _volSma = ta.sma(volume, 20)
+    _hasVol = not na(volume) and volume > 0
+    [_macdL, _macdS, _macdH] = ta.macd(close, 12, 26, 9)
+    _obv  = ta.obv
+    _obvE = ta.ema(_obv, 20)
+
+    _body  = math.abs(close - open)
+    _rng   = high - low
+    _body1 = math.abs(close[1] - open[1])
+    _body2 = math.abs(close[2] - open[2])
+    _loW   = math.min(open, close) - low
+    _bull  = close > open
+    _cp0 = _rng > 0 ? (close - low) / _rng : 0.0
+    _r1 = high[1] - low[1]
+    _r2 = high[2] - low[2]
+    _cp1 = _r1 > 0 ? (close[1] - low[1]) / _r1 : 0.0
+    _cp2 = _r2 > 0 ? (close[2] - low[2]) / _r2 : 0.0
+
+    _regUp = not na(_ema200) ? close > _ema200 : close > _ema50
+    _regDn = not na(_ema200) ? close < _ema200 : close < _ema50
+
+    // S/R 피벗 클러스터 (0.5ATR·터치≥2·120봉)
+    var array<float> _pv = array.new<float>()
+    var array<int>   _pb = array.new<int>()
+    _ph = ta.pivothigh(high, pivotLen, pivotLen)
+    _pl = ta.pivotlow(low, pivotLen, pivotLen)
+    if not na(_ph)
+        array.push(_pv, _ph)
+        array.push(_pb, bar_index - pivotLen)
+    if not na(_pl)
+        array.push(_pv, _pl)
+        array.push(_pb, bar_index - pivotLen)
+    while array.size(_pb) > 0 and bar_index - array.get(_pb, 0) > 120
+        array.shift(_pv)
+        array.shift(_pb)
+    _sweepUp = false
+    _breakUp = false
+    _n = array.size(_pv)
+    if _n > 0 and _atr > 0
+        for _i = 0 to _n - 1
+            _p = array.get(_pv, _i)
+            _t = 0
+            for _j = 0 to _n - 1
+                if math.abs(array.get(_pv, _j) - _p) <= 0.5 * _atr
+                    _t += 1
+            if _t >= 2
+                if low < _p - 0.05 * _atr and close > _p + 0.05 * _atr and _loW >= 0.7 * _atr and _bull
+                    _sweepUp := true
+                if close > _p + 0.25 * _atr and close[1] <= _p + 0.05 * _atr
+                    _breakUp := true
+
+    // 쌍바닥 (동일레벨 재시험 + RSI 개선 + 상방 확인)
+    var float _lastPL = na
+    var float _prevPL = na
+    var float _rsiL = na
+    var float _rsiP = na
+    var float _clsL = na
+    if not na(_pl)
+        _prevPL := _lastPL
+        _rsiP := _rsiL
+        _lastPL := _pl
+        _rsiL := _rsi[pivotLen]
+        _clsL := close[pivotLen]
+    _dblBot = not na(_prevPL) and not na(_lastPL) and math.abs(_lastPL - _prevPL) <= 0.5 * _atr and ta.barssince(not na(_pl)) <= 5 and not na(_clsL) and close > _clsL + 0.5 * _atr and not na(_rsiP) and _rsiL > _rsiP
+
+    // 검증 요소
+    _upLeg = close > _ema20 or close > close[10]
+    _volC  = _hasVol and _volSma > 0 and volume >= 1.5 * _volSma
+    _sBrk  = _ema20 > _ema50 and _bull and _body >= 0.5 * _atr and _breakUp
+    _mCrs  = _macdL > _macdS and _macdL[1] <= _macdS[1]
+    _thr   = _bull and close[1] > open[1] and close[2] > open[2] and _body >= 0.4 * _atr and _body1 >= 0.4 * _atr and _body2 >= 0.4 * _atr and _hasVol and volume > volume[1] and volume[1] > volume[2]
+    _sold  = close[2] > open[2] and close[1] > open[1] and _bull and _body2 >= 0.5 * _atr and _body1 >= 0.5 * _atr and _body >= 0.5 * _atr and close[1] > close[2] and close > close[1] and _cp0 >= 0.6 and _cp1 >= 0.6 and _cp2 >= 0.6 and (close - open[2]) <= 3.2 * _atr and _upLeg
+    _eCrs  = _ema20 > _ema50 and _ema20[1] <= _ema50[1]
+    _obvD  = _hasVol and _obv < _obvE and _obv < _obv[5] and close >= close[5] and _regDn
+
+    // 종합 점수 (엔진 가중 동일)
+    _l4 = (_sweepUp ? 1.2 : 0) + (_sBrk ? 1.0 : 0) + (_mCrs ? 0.9 : 0) + (_dblBot ? 1.1 : 0) + (_thr ? 0.8 : 0)
+    _l1 = (_sold ? 0.9 : 0) + (_eCrs ? 0.9 : 0) + (_thr ? 0.8 : 0)
+    _raw = _tfKey == "4h" ? _l4 : _tfKey == "1d" ? _l1 : 0.0
+    _vB = _volC and _raw > 0 and _bull ? 0.5 : 0.0
+    _lScore = _regUp ? _raw + _vB : 0.0
+    _sScore = _tfKey == "4h" and _obvD ? 0.9 : 0.0
+    _pct = math.min(100, math.round(_lScore / 2.5 * 100))
+
+    // 발화 (핵심만: 4h 는 롱유리 1.7+ 만, 1d 는 단일 0.75 — showSingles 로 완화 가능)
+    _barOk = confirmedOnly ? barstate.isconfirmed : true
+    _fireTh = _tfKey == "4h" ? (showSingles ? 0.75 : 1.7) : 0.75
+    _cd = _tfKey == "4h" ? 4 : 2
+    var int   _lb = na
+    var float _ls = 0.0
+    _lRaw = _valid and _lScore >= _fireTh and _barOk
+    _can = na(_lb) or bar_index - _lb > _cd or _lScore > _ls + 0.5
+    _long = _lRaw and _can
+    var int _exU = na
+    if _long
+        _lb := bar_index
+        _ls := _lScore
+        _exU := bar_index + 60
+    _strong = _long and _lScore >= 1.7
+    _exit = not na(_exU) and bar_index > _lb and bar_index <= _exU and close < _ema20 and close[1] >= _ema20[1] and _barOk
+    if _exit
+        _exU := na
+    var int _sb = na
+    _sRaw = _valid and _sScore >= 0.75 and _barOk
+    _sCan = na(_sb) or bar_index - _sb > 12 // 상태성 조건 — 전환 초기만
+    _short = _sRaw and _sCan
+    if _short
+        _sb := bar_index
+    _lastAgo = na(_lb) ? 999 : bar_index - _lb
+    _lastPct = math.min(100, math.round(_ls / 2.5 * 100))
+    [_long, _strong, _short, _exit, _pct, _regUp, _lastPct, _lastAgo]
+
+// ── 실행: 차트 TF 직접 or 1h 는 4h 투영 ─────────────────────────────
 tfMinutes = timeframe.in_seconds() / 60.0
 isTfDaily = timeframe.isdaily or timeframe.isweekly or timeframe.ismonthly
-tfKey = isTfDaily ? "1d" : tfMinutes == 240.0 ? "4h" : tfMinutes == 60.0 ? "1h" : "off"
-tfValid = tfKey == "4h" or tfKey == "1d" // 1h 는 클라 검증 요소 없음(펀딩 전용)
+isProj = not isTfDaily and tfMinutes == 60.0 // 1h → 4h 신호 투영
+tfNative = isTfDaily or tfMinutes == 240.0
 
-// ── 지표 ───────────────────────────────────────────────────────────
-atr    = ta.sma(ta.tr(true), 14)
-ema20  = ta.ema(close, 20)
-ema50  = ta.ema(close, 50)
-ema200 = ta.ema(close, 200)
-rsi    = ta.rsi(close, 14)
-volSma = ta.sma(volume, 20)
-hasVol = not na(volume) and volume > 0
-[macdLine, macdSig, macdHist] = ta.macd(close, 12, 26, 9)
-obvV   = ta.obv
-obvE   = ta.ema(obvV, 20)
+[nL, nS, nSh, nEx, nPct, nRu, nLp, nLa] = f_engine()
+[pL, pS, pSh, pEx, pPct, pRu, pLp, pLa] = request.security(syminfo.tickerid, "240", f_engine(), lookahead = barmerge.lookahead_off)
 
-body  = math.abs(close - open)
-rng   = high - low
-body1 = math.abs(close[1] - open[1])
-body2 = math.abs(close[2] - open[2])
-loW   = math.min(open, close) - low
-isBull = close > open
-isBear = close < open
-closePos  = rng > 0 ? (close - low) / rng : 0.0
-rng1 = high[1] - low[1]
-rng2 = high[2] - low[2]
-closePos1 = rng1 > 0 ? (close[1] - low[1]) / rng1 : 0.0
-closePos2 = rng2 > 0 ? (close[2] - low[2]) / rng2 : 0.0
+// 투영 시 LTF 중복 제거 (4h 값이 1h 4봉에 반복 → 전환 에지만 발화)
+projL  = isProj and pL  and not pL[1]
+projS  = isProj and pS  and not pS[1]
+projSh = isProj and pSh and not pSh[1]
+projEx = isProj and pEx and not pEx[1]
 
-// 레짐 (딥 검증 사전등록): 롱은 EMA200 위에서만, EMA200 미형성 시 EMA50 폴백
-regimeUp   = not na(ema200) ? close > ema200 : close > ema50
-regimeDown = not na(ema200) ? close < ema200 : close < ema50
-
-// ── S/R 피벗 클러스터 ───────────────────────────────────────────────
-var array<float> pivots   = array.new<float>()
-var array<int>   pivotBar = array.new<int>()
-ph = ta.pivothigh(high, pivotLen, pivotLen)
-pl = ta.pivotlow(low, pivotLen, pivotLen)
-if not na(ph)
-    array.push(pivots, ph)
-    array.push(pivotBar, bar_index - pivotLen)
-if not na(pl)
-    array.push(pivots, pl)
-    array.push(pivotBar, bar_index - pivotLen)
-while array.size(pivotBar) > 0 and bar_index - array.get(pivotBar, 0) > 120
-    array.shift(pivots)
-    array.shift(pivotBar)
-
-f_srFlags() =>
-    sweepUp = false
-    breakUp = false
-    nearSup = false
-    n = array.size(pivots)
-    if n > 0 and atr > 0
-        for i = 0 to n - 1
-            p = array.get(pivots, i)
-            touches = 0
-            for j = 0 to n - 1
-                if math.abs(array.get(pivots, j) - p) <= 0.5 * atr
-                    touches += 1
-            if touches >= 2
-                if math.abs(close - p) <= srAtrMult * atr and p <= close + 0.25 * atr
-                    nearSup := true
-                if low < p - 0.05 * atr and close > p + 0.05 * atr and loW >= 0.7 * atr and isBull
-                    sweepUp := true
-                if close > p + 0.25 * atr and close[1] <= p + 0.05 * atr
-                    breakUp := true
-    [sweepUp, breakUp, nearSup]
-[sweepUp, breakUp, nearSup] = f_srFlags()
-
-// ── 쌍바닥 (확정 피벗 저점 2개 동일레벨 재시험 + RSI 개선 + 상방 확인) ──
-var float lastPL = na
-var float prevPL = na
-var float rsiAtLastPL = na
-var float rsiAtPrevPL = na
-var float closeAtLastPL = na
-if not na(pl)
-    prevPL := lastPL
-    rsiAtPrevPL := rsiAtLastPL
-    lastPL := pl
-    rsiAtLastPL := rsi[pivotLen]
-    closeAtLastPL := close[pivotLen]
-barsSincePL = ta.barssince(not na(pl))
-doubleBottom = not na(prevPL) and not na(lastPL) and math.abs(lastPL - prevPL) <= 0.5 * atr and barsSincePL <= 5 and not na(closeAtLastPL) and close > closeAtLastPL + 0.5 * atr and not na(rsiAtPrevPL) and rsiAtLastPL > rsiAtPrevPL
-
-// ── 검증 요소 (홀드아웃 필터 후 최종 셋) ────────────────────────────
-upLeg = close > ema20 or close > close[10]
-volConfirm = hasVol and volSma > 0 and volume >= 1.5 * volSma
-
-// 4h 롱 5요소
-structBreakL = ema20 > ema50 and isBull and body >= 0.5 * atr and breakUp
-macdCrossL   = macdLine > macdSig and macdLine[1] <= macdSig[1]
-thrustL      = isBull and close[1] > open[1] and close[2] > open[2] and body >= 0.4 * atr and body1 >= 0.4 * atr and body2 >= 0.4 * atr and hasVol and volume > volume[1] and volume[1] > volume[2]
-// (sweepUp, doubleBottom 은 위에서 산출)
-
-// 1d 롱 3요소 (적삼병·골든크로스·추력)
-patSoldiers = close[2] > open[2] and close[1] > open[1] and isBull and body2 >= 0.5 * atr and body1 >= 0.5 * atr and body >= 0.5 * atr and close[1] > close[2] and close > close[1] and closePos >= 0.6 and closePos1 >= 0.6 and closePos2 >= 0.6 and (close - open[2]) <= 3.2 * atr and upLeg
-emaCrossL   = ema20 > ema50 and ema20[1] <= ema50[1]
-
-// 4h 숏 1요소: OBV 분산 (약세 레짐 한정 — 정의에 내장)
-obvDistS = hasVol and obvV < obvE and obvV < obvV[5] and close >= close[5] and regimeDown
-
-// ── 종합 점수 (엔진 가중 동일) ──────────────────────────────────────
-long4h = (sweepUp ? 1.2 : 0) + (structBreakL ? 1.0 : 0) + (macdCrossL ? 0.9 : 0) + (doubleBottom ? 1.1 : 0) + (thrustL ? 0.8 : 0)
-long1d = (patSoldiers ? 0.9 : 0) + (emaCrossL ? 0.9 : 0) + (thrustL ? 0.8 : 0)
-rawLong = tfKey == "4h" ? long4h : tfKey == "1d" ? long1d : 0.0
-volBonus = volConfirm and rawLong > 0 and isBull ? 0.5 : 0.0
-longScore = regimeUp ? rawLong + volBonus : 0.0 // 레짐 게이트: EMA200 아래에선 롱 0
-shortScore = tfKey == "4h" and obvDistS ? 0.9 : 0.0
-scorePct = math.min(100, math.round(longScore / 2.5 * 100))
-
-// ── 발화 (쿨다운 + 확정봉) ──────────────────────────────────────────
-barOk = confirmedOnly ? barstate.isconfirmed : true
-cdBars = tfKey == "4h" ? 4 : 2
-var int   lastSigBar = na
-var float lastSigScore = 0.0
-longRaw = tfValid and longScore >= 0.75 and barOk
-canFire = na(lastSigBar) or bar_index - lastSigBar > cdBars or longScore > lastSigScore + 0.5
-longSignal = longRaw and canFire
-var int exitUntil = na
-if longSignal
-    lastSigBar := bar_index
-    lastSigScore := longScore
-    exitUntil := bar_index + 60
-strongSignal = longSignal and longScore >= 1.7 // 롱유리 = 2요소 합류 (68/100+)
-exitSignal = not na(exitUntil) and bar_index > lastSigBar and bar_index <= exitUntil and close < ema20 and close[1] >= ema20[1] and barOk
-if exitSignal
-    exitUntil := na
-var int lastShortBar = na
-shortRaw = tfValid and showShort and shortScore >= 0.75 and barOk
-shortCan = na(lastShortBar) or bar_index - lastShortBar > cdBars
-shortSignal = shortRaw and shortCan
-if shortSignal
-    lastShortBar := bar_index
+longSignal   = tfNative ? nL : projL
+strongSignal = tfNative ? nS : projS
+shortSignal  = (tfNative ? nSh : projSh) and showShort
+exitSignal   = tfNative ? nEx : projEx
+scorePct     = tfNative ? nPct : pPct
+regimeUp     = tfNative ? nRu : pRu
+lastPct      = tfNative ? nLp : pLp
+lastAgo      = tfNative ? nLa : pLa
+tfSupported  = tfNative or isProj
 
 // ── 표시 ───────────────────────────────────────────────────────────
 plotshape(strongSignal, title="롱유리(68점+, 2요소 합류)", style=shape.triangleup, location=location.belowbar, color=color.new(#16A34A, 0), size=size.small, text="롱유리", textcolor=color.new(#16A34A, 0))
@@ -169,21 +182,21 @@ plotshape(longSignal and not strongSignal, title="검증 롱 타점(단일요소
 plotshape(shortSignal, title="숏 — OBV 분산 (약세장·단기)", style=shape.triangledown, location=location.abovebar, color=color.new(#EF4444, 0), size=size.tiny, text="분산", textcolor=color.new(#EF4444, 0))
 plotshape(exitSignal, title="청산 (EMA20 이탈 규칙)", style=shape.square, location=location.abovebar, color=color.new(#F59E0B, 0), size=size.tiny, text="청산", textcolor=color.new(#F59E0B, 0))
 
-// ── 상태 패널 ──────────────────────────────────────────────────────
-var table panel = table.new(position.top_right, 1, 4, bgcolor=color.new(#0A0B0F, 15), border_width=1, border_color=color.new(#23262F, 0))
+// ── 상태 패널 (위치 선택 — 모바일: 좌측 하단 권장) ───────────────────
+posSel = panelPos == "우측 하단" ? position.bottom_right : panelPos == "좌측 하단" ? position.bottom_left : panelPos == "좌측 상단" ? position.top_left : position.top_right
+var table panel = table.new(posSel, 1, 4, bgcolor=color.new(#0A0B0F, 15), border_width=1, border_color=color.new(#23262F, 0))
 if showTable and barstate.islast
-    tfTxt = tfKey == "1d" ? "일봉+ · 롱 3요소" : tfKey == "4h" ? "4시간 · 롱 5요소 + 숏(OBV분산)" : tfKey == "1h" ? "⚠ 1h 검증요소는 펀딩 기반(TV 불가) — 4h/일봉 권장" : "⚠ 미지원 TF (4h/일봉 권장)"
-    lastPct = math.min(100, math.round(lastSigScore / 2.5 * 100))
-    recentTxt = not na(lastSigBar) and bar_index - lastSigBar <= 24 ? " · 최근 " + str.tostring(lastPct) + "점(" + str.tostring(bar_index - lastSigBar) + "봉 전)" : ""
-    regimeTxt = tfValid ? (regimeUp ? "" : " · ⚠ EMA200 아래(롱 침묵)") : ""
-    scoreTxt = tfValid ? "현재 종합: 롱 " + str.tostring(scorePct) + "/100 (발화 30 · 롱유리 68)" + recentTxt + regimeTxt : "—"
-    table.cell(panel, 0, 0, "Zepta Timing Fusion v4", text_color=color.new(#F4F5F7, 0), text_size=size.small)
-    table.cell(panel, 0, 1, tfTxt, text_color=tfValid ? color.new(#A1A6B2, 0) : color.new(#FFB020, 0), text_size=size.small)
+    tfTxt = isTfDaily ? "일봉+ · 롱 3요소" : tfMinutes == 240.0 ? "4시간 · 롱유리(2요소+) + 숏(OBV분산)" : isProj ? "1시간 · 4h 검증 신호 투영" : "⚠ 미지원 TF (1h/4h/일봉 사용)"
+    recentTxt = lastAgo <= 24 ? " · 최근 " + str.tostring(lastPct) + "점(" + str.tostring(lastAgo) + "봉 전)" : ""
+    regimeTxt = tfSupported ? (regimeUp ? "" : " · ⚠ EMA200 아래(롱 침묵)") : ""
+    scoreTxt = tfSupported ? "종합: 롱 " + str.tostring(scorePct) + "/100 (롱유리 68)" + recentTxt + regimeTxt : "—"
+    table.cell(panel, 0, 0, "Zepta Timing Fusion v4.2", text_color=color.new(#F4F5F7, 0), text_size=size.small)
+    table.cell(panel, 0, 1, tfTxt, text_color=tfSupported ? color.new(#A1A6B2, 0) : color.new(#FFB020, 0), text_size=size.small)
     table.cell(panel, 0, 2, scoreTxt, text_color=scorePct >= 68 ? color.new(#16A34A, 0) : scorePct >= 30 ? color.new(#22C55E, 0) : color.new(#A1A6B2, 0), text_size=size.small)
-    table.cell(panel, 0, 3, "상장이후 전체+약세장 딥 검증·홀드아웃 통과 요소만 · 롱은 EMA200 위 한정 · 수익 보장 아님", text_color=color.new(#6E7585, 0), text_size=size.tiny)
+    table.cell(panel, 0, 3, "딥 검증(약세장 포함)+홀드아웃 통과 요소만 · 롱은 EMA200 위 한정 · 수익 보장 아님", text_color=color.new(#6E7585, 0), text_size=size.tiny)
 
 // ── 알림 ───────────────────────────────────────────────────────────
-alertcondition(longSignal,   title="Zepta 롱 타점",           message="Zepta v4: {{ticker}} {{interval}} 검증 롱(▲)")
-alertcondition(strongSignal, title="Zepta 롱유리(2요소 합류)", message="Zepta v4: {{ticker}} {{interval}} 롱유리(▲) — 합류 타점")
-alertcondition(shortSignal,  title="Zepta 숏(OBV 분산)",      message="Zepta v4: {{ticker}} {{interval}} 숏(▼) — OBV 분산·단기 성격")
-alertcondition(exitSignal,   title="Zepta 청산 신호",         message="Zepta v4: {{ticker}} {{interval}} 청산(■) — EMA20 이탈 규칙")
+alertcondition(longSignal,   title="Zepta 롱 타점",           message="Zepta v4.2: {{ticker}} {{interval}} 검증 롱(▲)")
+alertcondition(strongSignal, title="Zepta 롱유리(2요소 합류)", message="Zepta v4.2: {{ticker}} {{interval}} 롱유리(▲)")
+alertcondition(shortSignal,  title="Zepta 숏(OBV 분산)",      message="Zepta v4.2: {{ticker}} {{interval}} 숏(▼) — 단기 성격")
+alertcondition(exitSignal,   title="Zepta 청산 신호",         message="Zepta v4.2: {{ticker}} {{interval}} 청산(■) — EMA20 이탈")
