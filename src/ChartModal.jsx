@@ -1307,6 +1307,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
   const [currentRSI, setCurrentRSI] = useState(null);
   const [showDiagnosis, setShowDiagnosis] = useState(false);
   const [showSignals, setShowSignals] = useState(true);   // 캔들패턴 시그널 마커 토글 (기본 ON)
+  const [fundingRates, setFundingRates] = useState(null);  // 펀딩 스퀴즈 요소용 (v4.1 — 코인 1h/4h 한정)
   const [recentSignals, setRecentSignals] = useState([]); // 근거 패널용 최근 시그널 (최신순 최대 3개)
   const [latestScore, setLatestScore] = useState(null); // 마지막 확정봉 종합 점수 (게이지)
 
@@ -1341,6 +1342,16 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         if (!r.ok) throw new Error(`CoinGecko ${r.status}`);
         const j = await r.json();
         candles = (j.candles || []).map(c => ({ ...c, time: tsToTime(c.time, tf) }));
+        // 펀딩 스퀴즈 요소용 (v4.1) — 코인 1h/4h 한정, 실패해도 차트·다른 요소 무관 (fire-and-forget)
+        if (tf === "1h" || tf === "4h") {
+          const base = String(asset.symbol || "").toUpperCase().replace(/[/-].*/, "");
+          fetch(`/api/funding-history?symbol=${encodeURIComponent(base)}USDT`)
+            .then(fr => fr.json())
+            .then(fj => setFundingRates(fj?.ok && Array.isArray(fj.rates) && fj.rates.length ? fj.rates : null))
+            .catch(() => setFundingRates(null));
+        } else {
+          setFundingRates(null);
+        }
       } else {
         const cfg = TF_CONFIG[tf] || TF_CONFIG["1d"];
         const sym = asset.symbolRaw || asset.symbol;
@@ -1445,12 +1456,25 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       try {
         const closed = candles.slice(0, -1);
         const hasVolume = closed.some(c => (c.volume ?? 0) > 0); // 코인게코 OHLC 는 거래량 없음 → null 전달
+        // 펀딩 정렬 (v4.1 — 인트라데이 한정: time 은 tz 보정 unix 초 → ms 복원 후 직전 확정 펀딩 매핑)
+        let fundingAt = null;
+        if (fundingRates && (tf === "1h" || tf === "4h")) {
+          fundingAt = new Array(closed.length).fill(null);
+          let fi = 0;
+          for (let ci = 0; ci < closed.length; ci++) {
+            const ms = (Number(closed[ci].time) + LOCAL_TZ_OFFSET) * 1000;
+            if (!Number.isFinite(ms)) continue;
+            while (fi + 1 < fundingRates.length && fundingRates[fi + 1].t <= ms) fi++;
+            if (fundingRates[fi] && fundingRates[fi].t <= ms) fundingAt[ci] = fundingRates[fi].rate;
+          }
+        }
         const { signals, latest, exits } = computeTimingSignals({
           opens:   closed.map(c => c.open),
           highs:   closed.map(c => c.high),
           lows:    closed.map(c => c.low),
           closes:  closed.map(c => c.close),
           volumes: hasVolume ? closed.map(c => c.volume ?? 0) : null,
+          fundingAt, // v4.1: 펀딩 스퀴즈(숏 과밀) 롱 — 홀드아웃 최강 요소 (코인 1h/4h)
         // v4 딥 캘리브레이션(상장 이후 전체·약세장 포함·레짐 게이트·홀드아웃 필터):
         //   생존 요소가 개당 +100~800bps 로 강해 *검증 단일요소 발화 = 진짜 타점*. 엔진 기본 임계.
         }, { tf });
@@ -1633,7 +1657,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         applyTvRange();
       }
     });
-  }, [fetchData, settings, logScale, showSignals]);
+  }, [fetchData, settings, logScale, showSignals, fundingRates]);
 
   useEffect(() => {
     if (!asset) return;
@@ -1642,7 +1666,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       clearTimeout(timer);
       Object.values(chartObjs.current).forEach(c => { try { c.remove(); } catch {} });
     };
-  }, [asset, timeframe, settings, showKRW, theme, logScale, showSignals]);
+  }, [asset, timeframe, settings, showKRW, theme, logScale, showSignals, fundingRates]);
 
   useEffect(() => {
     const el = containerRef.current;

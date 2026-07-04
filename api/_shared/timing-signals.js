@@ -49,9 +49,11 @@ export const TIMING_DOMINANCE = 1.0; // 반대편 대비 우위 요구 (리서�
 //   홀드아웃(미지 6심볼, 22만 봉) 최종 필터: 4h ema200Reclaim(부호반전)·1h exhaustReversal
 //   (표본부족+음수) 탈락. 1h 의 유일한 검증 요소는 fundingCrowdedShort 롱(홀드아웃 +72/+39,
 //   t 4.0/2.1 최강)이나 펀딩 데이터가 필요해 클라이언트 제외 — 백엔드 연동 예정.
+//   v4.1: fundingCrowdedShort 롱(숏 과밀 스퀴즈 — 홀드아웃 1h +72/+39bps t4.0/2.1,
+//   4h +56/+132bps t1.3/2.7, 전 요소 중 최강) 탑재 — caller 가 fundingAt 배열 제공 시 활성.
 export const VALIDATED_TIMING = {
-  "1h": { long: [], short: [] }, // 클라 요소 없음 — 펀딩 기반(백엔드 전용), 4h/1d 권장
-  "4h": { long: ["sweepReclaim", "structureBreak", "macdCross", "doubleExtreme", "thrust"], short: ["obvAccum"] },
+  "1h": { long: ["fundingCrowdedShort"], short: [] }, // 펀딩 데이터 있을 때만 발화
+  "4h": { long: ["sweepReclaim", "structureBreak", "macdCross", "doubleExtreme", "thrust", "fundingCrowdedShort"], short: ["obvAccum"] },
   "1d": { long: ["pattern", "emaCross", "thrust"], short: [] },
 };
 
@@ -108,7 +110,7 @@ function confirmedPivots(highs, lows, n, k = 2) {
  *   volumes 없으면 ⑥ 비활성 + 거래량 필수 패턴 자동 비활성(모듈 위임).
  * 반환: { signals: [{i, dir(+1/-1), score, opposing, reasons[]}] }
  */
-export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { tf = "1d", calib, th = TIMING_TH, dominance = TIMING_DOMINANCE, weights = TIMING_WEIGHTS, emitFactors = false, mode = "validated", minScore = null } = {}) {
+export function computeTimingSignals({ opens, highs, lows, closes, volumes, fundingAt = null }, { tf = "1d", calib, th = TIMING_TH, dominance = TIMING_DOMINANCE, weights = TIMING_WEIGHTS, emitFactors = false, mode = "validated", minScore = null } = {}) {
   const n = closes?.length || 0;
   if (!opens || !highs || !lows || n < 40 || tfWeight(tf) === 0) return { signals: [], factorEvents: [] };
   const factorEvents = emitFactors ? [] : null; // 요소별 캘리브레이션용 (검증 하니스 전용)
@@ -411,6 +413,24 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { 
             && bodyI >= 0.4 * a && b1 >= 0.4 * a && b0 >= 0.4 * a && volRising) emit("thrust", +1, 0.8, "3연속 상승 추력+거래량");
         if (c < o && closes[i - 1] < opens[i - 1] && closes[i - 2] < opens[i - 2]
             && bodyI >= 0.4 * a && b1 >= 0.4 * a && b0 >= 0.4 * a && volRising && bearRegime) emit("thrust", -1, 0.8, "3연속 하락 추력+거래량(약세장)");
+      }
+    }
+
+    // ㉔ 펀딩 스퀴즈 (v4.1 — 딥+홀드아웃 검증 전 요소 중 최강): 직전 90일 롤링 P10 이하
+    //    음수 펀딩(숏 과밀) + 양봉 = 스퀴즈 롱. 정의는 캘리브레이션과 동일(룩어헤드 금지 —
+    //    분위는 봉 i 이전 값만). fundingAt 미제공 시 비활성(하위호환).
+    if (fundingAt && fundingAt[i] != null) {
+      const winBars = tfValKey === "1h" ? 2160 : tfValKey === "4h" ? 540 : 90; // ≈90일
+      const s0 = Math.max(0, i - winBars);
+      const window = [];
+      for (let j = s0; j < i; j++) if (fundingAt[j] != null) window.push(fundingAt[j]);
+      if (window.length >= 60) {
+        const sorted = [...window].sort((a, b) => a - b);
+        const p10 = sorted[Math.floor(sorted.length * 0.1)];
+        if (fundingAt[i] <= p10 && fundingAt[i] < 0 && closes[i] > opens[i]) {
+          factorEvents?.push({ i, dir: +1, factor: "fundingCrowdedShort" });
+          if (useFactor("fundingCrowdedShort", +1)) { longS += 1.0; longR.push("펀딩 스퀴즈(숏 과밀) 롱"); }
+        }
       }
     }
 

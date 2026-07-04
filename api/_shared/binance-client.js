@@ -250,6 +250,31 @@ export async function getKlines({ symbol, interval = "4h", limit = 100, startTim
   return await resp.json();
 }
 
+/**
+ * 펀딩비 히스토리 — GET /fapi/v1/fundingRate (무서명, 프록시 인식)
+ *   8시간마다 1건. limit 1000 ≈ 333일. 타점 엔진 v4.1 펀딩 스퀴즈 요소용.
+ * @returns [{ symbol, fundingTime, fundingRate, ... }] 오름차순
+ */
+export async function getFundingHistory({ symbol, limit = 300, startTime, testnet = false }) {
+  const params = { symbol, limit };
+  if (startTime != null) params.startTime = startTime;
+  if (isProxyMode()) {
+    return await viaProxy({ method: "GET", path: "/fapi/v1/fundingRate", params, testnet, signed: false });
+  }
+  const base = testnet ? BINANCE_FAPI_TESTNET : BINANCE_FAPI;
+  let url = `${base}/fapi/v1/fundingRate?symbol=${symbol}&limit=${limit}`;
+  if (startTime != null) url += `&startTime=${startTime}`;
+  const resp = await fetch(url, {
+    signal: AbortSignal.timeout(15000),
+    headers: { "User-Agent": "Zepta/1.0", "Accept": "application/json" },
+  });
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => "");
+    throw new Error(`fundingRate ${resp.status}: ${body.slice(0, 200)}`);
+  }
+  return await resp.json();
+}
+
 /** 선물 시장 컨텍스트 — premiumIndex 1회로 {funding, basis} 동시 반환.
  *  basis = (markPrice - indexPrice)/indexPrice (퍼프 프리미엄; 펀딩과 관련). 실패 시 빈 맵. */
 export async function getMarketContext({ testnet = false } = {}) {
