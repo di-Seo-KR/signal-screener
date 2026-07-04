@@ -39,21 +39,30 @@ export const TIMING_DOMINANCE = 1.0; // 반대편 대비 우위 요구 (리서�
 //   숏은 반전형 5가설 + 지속형 2가설(구조이탈·LH) 전부 두 구간 불일치/음수로 탈락.
 //   → 검증 모드에서 숏 신호는 표시하지 않는다(동전던지기 이하를 파는 건 부정직).
 //   주봉·월봉은 1d 준용(패턴만). 재검증: scripts/calibrate-timing-factors.mjs
-// ★ v3 총동원 캘리브레이션 (2026-07-04 2차): 후보 19요소×3TF×롱숏=114조합,
-//   신규 요소는 강화 규칙(두 구간 각각 t≥1.0 추가) — 17조합 생존, 전부 롱.
-//   숏은 레짐 조건부 포함 3차례 검증에서 전멸(총 ~40 숏 조합) — 표시하지 않는다.
+// ★ v4 딥 히스토리 캘리브레이션 (2026-07-04 3차 — 상장 이후 전체: 1h 86만·4h 27만·
+//   1d 4.6만 봉, 2021 고점 붕괴·2022 약세장 포함. 사전등록 레짐 게이트 "롱은 EMA200
+//   위에서만" 적용 후 12조합 생존):
+//   - 최초의 검증 숏: 4h OBV 분산(스마트머니 이탈, 절반지평 +16/+18bps 양구간 t≥1.7)
+//   - 봉패턴은 일봉에서만 생존 — 4h 는 구조·모멘텀 요소가 지배
+//   - fundingCrowdedShort 롱(숏과밀 스퀴즈, n=9,654)도 생존 — 단 펀딩 데이터가 필요해
+//     클라이언트 차트/Pine 제외, 백엔드(btc-cron) 통합 후보로 분리
+//   홀드아웃(미지 6심볼, 22만 봉) 최종 필터: 4h ema200Reclaim(부호반전)·1h exhaustReversal
+//   (표본부족+음수) 탈락. 1h 의 유일한 검증 요소는 fundingCrowdedShort 롱(홀드아웃 +72/+39,
+//   t 4.0/2.1 최강)이나 펀딩 데이터가 필요해 클라이언트 제외 — 백엔드 연동 예정.
 export const VALIDATED_TIMING = {
-  "1h": { long: ["pattern", "pullback", "structureBreak", "structureHL", "stochCross", "obvAccum", "breakRetest"], short: [] },
-  "4h": { long: ["pattern", "rsiReversal", "sweepReclaim", "structureBreak", "macdCross", "macdHistTurn", "stochCross", "obvAccum", "breakRetest"], short: [] },
-  "1d": { long: ["pattern"], short: [] },
+  "1h": { long: [], short: [] }, // 클라 요소 없음 — 펀딩 기반(백엔드 전용), 4h/1d 권장
+  "4h": { long: ["sweepReclaim", "structureBreak", "macdCross", "doubleExtreme", "thrust"], short: ["obvAccum"] },
+  "1d": { long: ["pattern", "emaCross", "thrust"], short: [] },
 };
 
-// TF별 발화 최소 점수 — 학습 8심볼 임계 스캔(홀드아웃 미사용) 실측:
-//   합류 점수와 엣지가 단조 증가 (1h: 1.9→+9bps/63봉당1개 · 2.5→+51bps · 3.0→+68bps,
-//   4h: 1.9→+24bps · 2.5→+63bps · 3.0→+89bps). 기본 마커 1.9, 강한 합류 2.5.
-export const TIMING_MIN_SCORE = { "1h": 1.9, "4h": 1.9, "1d": 0.75 };
-export const TIMING_STRONG_SCORE = 3.0; // "롱유리" 티어 (75/100 — 대표 지정. 실측: 1h +68bps·4h +89bps)
-export const TIMING_SCORE_FULL = 4.0;   // 종합 점수 100점 환산 기준 (score/4×100)
+// 티어 재보정 (딥 기준): 생존 요소들이 개당 +100~800bps 로 훨씬 강해져
+//   *검증 단일요소 발화 = 진짜 타점*. 발화 0.75(단일), 롱유리 1.7(2요소 합류).
+//   실측 밀도: 4h 롱 ~5일당 1개 · 숏 ~8일당 1개 · 1d ~월 1개 · 1h 희소(펀딩 요소는 백엔드 전용).
+export const TIMING_MIN_SCORE = { "1h": 0.75, "4h": 0.75, "1d": 0.75 };
+export const TIMING_PRIME_SCORE = { "1h": 0.75, "4h": 0.75, "1d": 0.75 }; // v4: 발화 자체가 검증 타점
+export const TIMING_SHORT_MIN_SCORE = 0.75;
+export const TIMING_STRONG_SCORE = 1.7; // "롱유리" = 2요소 합류 (68/100)
+export const TIMING_SCORE_FULL = 2.5;   // 종합 점수 100점 환산 (score/2.5×100 — v4 재보정)
 
 // 쿨다운 (2026-07-04 대표 피드백 "1h 신호 과다"): 강추세 구간에서 눌림목·HL구조가
 // 연속 봉 재발화 → 클러스터. 같은 방향 신호 후 N봉 억제, 점수가 직전+0.5 초과로
@@ -109,6 +118,7 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { 
   const validated = mode === "validated" ? (VALIDATED_TIMING[tfValKey] || { long: [], short: [] }) : null;
   const useFactor = (factor, dir) => !validated || (dir > 0 ? validated.long : validated.short).includes(factor);
   const minScoreEff = minScore ?? (TIMING_MIN_SCORE[tfValKey] ?? 0.75);
+  const shortMinScoreEff = TIMING_SHORT_MIN_SCORE; // 숏은 프라임 상향 미적용(단일 검증요소)
 
   const atr = atrSeries(highs, lows, closes, 14);
   const ema20 = calcEMA(closes, 20);
@@ -413,6 +423,13 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { 
     // ── 발화 판정 ──
     //   검증 모드: 생존 요소 하나라도 발화 = 신호 (각 요소가 독립 실측 검증됨 —
     //   합류 시 score 로 강도만 표시). 리서치 모드: 임계 + 반대편 우위 규칙.
+    // ★ 레짐 게이트 (딥 검증 사전등록): 롱은 EMA200 위(상승 레짐)에서만 —
+    //   2022 약세장에서 롱 타점이 무효화되는 것을 실측으로 확인해 내장한 안전장치.
+    //   EMA200 산출 불가(짧은 시리즈)면 EMA50 로 폴백.
+    const regimeUp = ema200?.[i] != null ? closes[i] > ema200[i]
+      : (ema50[i] != null ? closes[i] > ema50[i] : true);
+    if (validated && !regimeUp) longS = 0;
+
     const thEff = validated ? minScoreEff : th;
     const domEff = validated ? 0 : dominance;
     if (longS >= thEff && longS - shortS >= domEff) {
@@ -422,7 +439,7 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes }, { 
         lastLongBar = i; lastLongScore = longS;
         activeUntil = i + 60; // 청산 규칙 추적 시작
       }
-    } else if (shortS >= thEff && shortS - longS >= domEff) {
+    } else if (shortS >= (validated ? shortMinScoreEff : thEff) && shortS - longS >= domEff) {
       if (i - lastShortBar > cooldown || shortS > lastShortScore + 0.5) {
         signals.push({ i, dir: -1, score: +shortS.toFixed(2), opposing: +longS.toFixed(2), reasons: shortR });
         lastShortBar = i; lastShortScore = shortS;
