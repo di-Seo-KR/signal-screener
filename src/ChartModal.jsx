@@ -1475,9 +1475,9 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
           closes:  closed.map(c => c.close),
           volumes: hasVolume ? closed.map(c => c.volume ?? 0) : null,
           fundingAt, // v4.1: 펀딩 스퀴즈(숏 과밀) 롱 — 홀드아웃 최강 요소 (코인 1h/4h)
-        // v4 딥 캘리브레이션(상장 이후 전체·약세장 포함·레짐 게이트·홀드아웃 필터):
-        //   생존 요소가 개당 +100~800bps 로 강해 *검증 단일요소 발화 = 진짜 타점*. 엔진 기본 임계.
-        }, { tf });
+        // v4.2 (대표 피드백 "혼란 줄이기"): 4h 롱은 2요소 합류(롱유리)만 발화 — 단일요소
+        //   소음 제거. 1h(펀딩 단일)·1d(요소 희소)는 단일 발화 유지. 숏은 엔진 쿨다운 3배.
+        }, { tf, minScore: tf === "4h" ? 1.7 : undefined });
         // setMarkers 는 time 오름차순 필수 — 진입/청산 병합 후 인덱스 기준 정렬로 보장
         const sorted = signals.slice().sort((a, b) => a.i - b.i);
         const entryMarkers = sorted.map(s => ({

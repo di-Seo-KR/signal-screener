@@ -460,7 +460,8 @@ export function computeTimingSignals({ opens, highs, lows, closes, volumes, fund
         activeUntil = i + 60; // 청산 규칙 추적 시작
       }
     } else if (shortS >= (validated ? shortMinScoreEff : thEff) && shortS - longS >= domEff) {
-      if (i - lastShortBar > cooldown || shortS > lastShortScore + 0.5) {
+      // 숏(OBV 분산)은 상태성 조건이라 지속 구간에서 반복 발화 → 쿨다운 3배(전환 초기만 표시)
+      if (i - lastShortBar > cooldown * 3 || shortS > lastShortScore + 0.5) {
         signals.push({ i, dir: -1, score: +shortS.toFixed(2), opposing: +longS.toFixed(2), reasons: shortR });
         lastShortBar = i; lastShortScore = shortS;
       }
