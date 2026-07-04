@@ -177,26 +177,23 @@ lastAgo      = tfNative ? nLa : pLa
 tfSupported  = tfNative or isProj
 
 // ── 표시 ───────────────────────────────────────────────────────────
-plotshape(strongSignal, title="롱유리(68점+, 2요소 합류)", style=shape.triangleup, location=location.belowbar, color=color.new(#16A34A, 0), size=size.small, text="롱유리", textcolor=color.new(#16A34A, 0))
+plotshape(strongSignal, title="롱 진입 (2요소 검증, 68점+)", style=shape.triangleup, location=location.belowbar, color=color.new(#16A34A, 0), size=size.small, text="롱 진입", textcolor=color.new(#16A34A, 0))
 plotshape(longSignal and not strongSignal, title="검증 롱 타점(단일요소)", style=shape.triangleup, location=location.belowbar, color=color.new(#22C55E, 25), size=size.tiny)
-plotshape(shortSignal, title="숏 — OBV 분산 (약세장·단기)", style=shape.triangledown, location=location.abovebar, color=color.new(#EF4444, 0), size=size.tiny, text="분산", textcolor=color.new(#EF4444, 0))
+plotshape(shortSignal, title="숏 신호 (OBV 분산 · 약세장·단기)", style=shape.triangledown, location=location.abovebar, color=color.new(#EF4444, 0), size=size.tiny, text="숏", textcolor=color.new(#EF4444, 0))
 plotshape(exitSignal, title="청산 (EMA20 이탈 규칙)", style=shape.square, location=location.abovebar, color=color.new(#F59E0B, 0), size=size.tiny, text="청산", textcolor=color.new(#F59E0B, 0))
 
 // ── 상태 패널 (위치 선택 — 모바일: 좌측 하단 권장) ───────────────────
 posSel = panelPos == "우측 하단" ? position.bottom_right : panelPos == "좌측 하단" ? position.bottom_left : panelPos == "좌측 상단" ? position.top_left : position.top_right
-var table panel = table.new(posSel, 1, 4, bgcolor=color.new(#0A0B0F, 15), border_width=1, border_color=color.new(#23262F, 0))
+var table panel = table.new(posSel, 1, 2, bgcolor=color.new(#0A0B0F, 20), border_width=1, border_color=color.new(#23262F, 0))
 if showTable and barstate.islast
-    tfTxt = isTfDaily ? "일봉+ · 롱 3요소" : tfMinutes == 240.0 ? "4시간 · 롱유리(2요소+) + 숏(OBV분산)" : isProj ? "1시간 · 4h 검증 신호 투영" : "⚠ 미지원 TF (1h/4h/일봉 사용)"
-    recentTxt = lastAgo <= 24 ? " · 최근 " + str.tostring(lastPct) + "점(" + str.tostring(lastAgo) + "봉 전)" : ""
-    regimeTxt = tfSupported ? (regimeUp ? "" : " · ⚠ EMA200 아래(롱 침묵)") : ""
-    scoreTxt = tfSupported ? "종합: 롱 " + str.tostring(scorePct) + "/100 (롱유리 68)" + recentTxt + regimeTxt : "—"
-    table.cell(panel, 0, 0, "Zepta Timing Fusion v4.2", text_color=color.new(#F4F5F7, 0), text_size=size.small)
-    table.cell(panel, 0, 1, tfTxt, text_color=tfSupported ? color.new(#A1A6B2, 0) : color.new(#FFB020, 0), text_size=size.small)
-    table.cell(panel, 0, 2, scoreTxt, text_color=scorePct >= 68 ? color.new(#16A34A, 0) : scorePct >= 30 ? color.new(#22C55E, 0) : color.new(#A1A6B2, 0), text_size=size.small)
-    table.cell(panel, 0, 3, "딥 검증(약세장 포함)+홀드아웃 통과 요소만 · 롱은 EMA200 위 한정 · 수익 보장 아님", text_color=color.new(#6E7585, 0), text_size=size.tiny)
+    tfShort = isTfDaily ? "일봉" : tfMinutes == 240.0 ? "4h" : isProj ? "1h(4h투영)" : "미지원"
+    warnTxt = tfSupported and not regimeUp ? " ⚠약세장" : ""
+    recentTxt = lastAgo <= 24 ? " · " + str.tostring(lastAgo) + "봉 전 " + str.tostring(lastPct) + "점" : ""
+    table.cell(panel, 0, 0, "Zepta " + tfShort + warnTxt, text_color=color.new(#F4F5F7, 0), text_size=size.small)
+    table.cell(panel, 0, 1, "롱 " + str.tostring(scorePct) + "/100" + recentTxt, text_color=scorePct >= 68 ? color.new(#16A34A, 0) : scorePct >= 30 ? color.new(#22C55E, 0) : color.new(#A1A6B2, 0), text_size=size.small)
 
 // ── 알림 ───────────────────────────────────────────────────────────
 alertcondition(longSignal,   title="Zepta 롱 타점",           message="Zepta v4.2: {{ticker}} {{interval}} 검증 롱(▲)")
-alertcondition(strongSignal, title="Zepta 롱유리(2요소 합류)", message="Zepta v4.2: {{ticker}} {{interval}} 롱유리(▲)")
-alertcondition(shortSignal,  title="Zepta 숏(OBV 분산)",      message="Zepta v4.2: {{ticker}} {{interval}} 숏(▼) — 단기 성격")
+alertcondition(strongSignal, title="Zepta 롱 진입",             message="Zepta v4.2: {{ticker}} {{interval}} 롱 진입(▲)")
+alertcondition(shortSignal,  title="Zepta 숏 신호",            message="Zepta v4.2: {{ticker}} {{interval}} 숏(▼) — 단기 성격")
 alertcondition(exitSignal,   title="Zepta 청산 신호",         message="Zepta v4.2: {{ticker}} {{interval}} 청산(■) — EMA20 이탈")

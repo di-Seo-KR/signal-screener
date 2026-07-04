@@ -1487,7 +1487,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
           shape: s.dir > 0 ? "arrowUp" : "arrowDown",
           color: s.dir > 0 ? (s.score >= 1.7 ? "#16A34A" : "#22C55E") : "#EF4444",
           size: s.score >= 1.7 ? 2 : 1, // 롱유리 = 2요소 합류(68점+, v4 재보정)
-          text: s.dir < 0 ? "분산" : (s.score >= 1.7 ? "롱유리" : ""),
+          text: s.dir < 0 ? "숏" : (s.score >= 1.7 ? "롱 진입" : ""),
         }));
         // 청산 규칙 마커 (EMA20 종가 이탈 — 리스크 규칙, 예측 아님. 꼬리손실 절반↓ 실측)
         const exitMarkers = (exits || []).map(x => ({
@@ -2183,7 +2183,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                     <span style={{ fontWeight: 800, fontSize: "16px", color: latestScore.longScore >= 1.7 ? "#16A34A" : latestScore.longScore >= (latestScore.threshold || 0.75) ? CC.green : CC.text2 }}>
                       롱 {Math.min(100, Math.round(latestScore.longScore / 2.5 * 100))}점
                     </span>
-                    <span style={{ color: CC.text3, fontSize: "12px" }}> /100 · 발화선 {Math.round((latestScore.threshold || 0.75) / 2.5 * 100)} · 롱유리 68</span>
+                    <span style={{ color: CC.text3, fontSize: "12px" }}> /100 · 진입선 68</span>
                     {latestScore.longScore === 0 && latestScore.recent && (
                       <span style={{ color: CC.green, fontSize: "12px", fontWeight: 600 }}> · 최근 발화 {Math.min(100, Math.round(latestScore.recent.score / 2.5 * 100))}점 ({latestScore.recent.barsAgo}봉 전)</span>
                     )}
@@ -2203,7 +2203,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                       </div>
                     ) : (
                       <div key={`${s.i}-${idx}`} style={{ marginBottom: "4px", color: s.dir > 0 ? CC.green : CC.red }}>
-                        <span style={{ fontWeight: 700 }}>{s.dir > 0 ? "▲ 롱" : "▼ 숏(OBV분산·단기)"} {Math.min(100, Math.round(s.score / 2.5 * 100))}점{s.dir > 0 && s.score >= 1.7 ? " (롱유리)" : ""}</span>
+                        <span style={{ fontWeight: 700 }}>{s.dir > 0 ? "▲ 롱 진입" : "▼ 숏(단기)"} {Math.min(100, Math.round(s.score / 2.5 * 100))}점</span>
                         <span style={{ color: CC.text2 }}> — {(s.reasons || []).join(" + ")}</span>
                       </div>
                     )
