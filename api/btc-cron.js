@@ -639,11 +639,15 @@ export default async function handler(req, res) {
         }
         // (b)(c)(d) 펀딩·OI·베이시스 — 그래디언트 보정(임계↓·점진·bounded). 1d 신호 + 종합에 동일 적용.
         //   ★ 2026-06-03(대표 지시): 극단-only → 더 자주·점진적으로 알파 기여. 방향은 검증된 것만.
+        // ★ 2026-07-04 (e) 펀딩 스퀴즈 롱 — 딥+홀드아웃 검증 최강 요소(1h +72/+39bps t4.0):
+        //   현재 펀딩이 90일 롤링 P10 이하 음수(숏 과밀)면 LONG mult ×1.08.
+        //   P10 은 KV 12h 캐시(getFundingP10) — 실패 시 null(보정 스킵, 안전).
         const sym = futSymbol;
         const fr = fundingMap[sym], oiCh = oiChangeMap[sym], bs = basisMap[sym];
-        const n1 = applyFuturesContext(latestSignal, { fr, oiCh, bs });
+        const fundingP10 = await getFundingP10(sym).catch(() => null);
+        const n1 = applyFuturesContext(latestSignal, { fr, oiCh, bs, p10: fundingP10 });
         if (n1 && n1.length) addLog(`  ⚙ ${asset} 선물보정(${latestSignal.side}): ${n1.join("·")} → ${latestSignal.score}pt`);
-        applyFuturesContext(compositeSignal, { fr, oiCh, bs }); // 종합 스코어에도 동일
+        applyFuturesContext(compositeSignal, { fr, oiCh, bs, p10: fundingP10 }); // 종합 스코어에도 동일
       } catch (e) { addLog(`⚠️ ${asset} 선물컨텍스트 보정 실패: ${e?.message}`); }
 
       // ★ 2026-06-14 (대표 지시): MTF 소진·차트구조 진입 정제 — 1h·4h·1d 다중 과매수면
@@ -1296,7 +1300,7 @@ function pickTopBotSignal(botSignals) {
 //   투기적 새 방향 베팅 없음. 전체 보정폭 ±는 0.65~1.15 로 bounded(신호 방향 절대 불변).
 //   sig 를 in-place 보정. 적용된 요인명 배열 반환(로깅용).
 // ════════════════════════════════════════════════════════
-function applyFuturesContext(sig, { fr, oiCh, bs }) {
+function applyFuturesContext(sig, { fr, oiCh, bs, p10 = null }) {
   if (!sig || !sig.side) return null;
   const side = sig.side;
   let mult = 1.0;
@@ -1305,6 +1309,12 @@ function applyFuturesContext(sig, { fr, oiCh, bs }) {
   if (Number.isFinite(fr)) {
     const crowd = side === "SHORT" ? -fr : fr; // >0 = 신호방향 과밀
     if (crowd > 0.0001) { mult *= 1 - Math.min(0.15, crowd * 250); notes.push("펀딩과밀"); }
+  }
+  // (e) 펀딩 스퀴즈 롱 (2026-07-04 딥+홀드아웃 검증 최강 요소) — 90일 P10 이하 음수 펀딩
+  //   = 숏 과밀 → LONG 가점 ×1.08. 킬스위치 ZEPTA_FUNDING_SQUEEZE=0.
+  if (process.env.ZEPTA_FUNDING_SQUEEZE !== "0"
+      && side === "LONG" && Number.isFinite(fr) && Number.isFinite(p10) && fr <= p10 && fr < 0) {
+    mult *= 1.08; notes.push("펀딩스퀴즈롱");
   }
   // (c) OI 증가 = 추세 확인(가점), 감소 = 소진(감점) — 임계 1%, 그래디언트
   if (Number.isFinite(oiCh)) {
@@ -1793,6 +1803,34 @@ function resampleWeekly(candles) {
   }
   if (week) weeks.push(week);
   return weeks;
+}
+
+// ★ 2026-07-04 펀딩 P10 (90일 롤링 하위 10% 분위) — KV 12h 캐시. 스퀴즈 롱 보정용.
+//   실패는 null 반환(보정 스킵) — 신호 생성 자체엔 영향 없음.
+const _fundingP10Mem = {}; // 프로세스 내 메모(웜 람다 재사용)
+async function getFundingP10(futSymbol) {
+  const mem = _fundingP10Mem[futSymbol];
+  if (mem && Date.now() - mem.at < 12 * 3600 * 1000) return mem.p10;
+  try {
+    const kvModule = await import("@vercel/kv");
+    const kv = kvModule.kv;
+    const key = `di:funding:p10:${futSymbol}`;
+    const cached = await kv.get(key);
+    if (cached && Number.isFinite(cached.p10) && Date.now() - (cached.at || 0) < 12 * 3600 * 1000) {
+      _fundingP10Mem[futSymbol] = cached;
+      return cached.p10;
+    }
+    const { getFundingHistory } = await import("./_shared/binance-client.js");
+    const rows = await getFundingHistory({ symbol: futSymbol, limit: 270 }); // 8h×270 = 90일
+    const rates = (rows || []).map((r) => parseFloat(r.fundingRate)).filter(Number.isFinite);
+    if (rates.length < 60) return null; // 표본 부족(신규상장) — 판단 유보
+    rates.sort((a, b) => a - b);
+    const p10 = rates[Math.floor(rates.length * 0.1)];
+    const entry = { p10, at: Date.now() };
+    _fundingP10Mem[futSymbol] = entry;
+    try { await kv.set(key, entry); } catch {}
+    return p10;
+  } catch { return null; }
 }
 
 // (2026-07) 구 detectCandlePattern 제거 — candle-patterns.js 의 scoreCandleBlock 으로 대체.
