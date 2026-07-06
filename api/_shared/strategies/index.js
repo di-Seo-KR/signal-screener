@@ -5,7 +5,7 @@
 // btc-cron.js 의 단일 analyzeLatest 를 대체 — 봇별 차별성 확보.
 //
 // 봇 매핑:
-//   btc-alpha          → hurst-trend (BTC 단일, Hurst 기반)
+//   btc-alpha          → ensemble (2026-07 hurst-trend 전 구간 PF<1 로 교체)
 //   highcap-momentum   → trend-follow (EMA+MACD+ADX 추세)
 //   defi-infra         → defi-momentum (OBV+모멘텀+EMA)
 //   l2-emerging        → supertrend (ATR밴드 추세; breakout 손실로 2026-06 교체)
@@ -28,8 +28,12 @@ import { runSupertrend } from "./supertrend.js";
 // 봇 ID → strategy 함수 매핑
 //   ★ 2026-06-02 l2-emerging: breakout(백테스트 PF<1 손실) → supertrend(검증 OOS 3.69) 교체.
 //     검증된 승자로 손실 전략 대체 + 실거래 전략 다양화. breakout 은 발굴 풀엔 유지(params 개선 시 복귀 가능).
+// ★ 2026-07-04 btc-alpha: hurst-trend → ensemble 교체 (대표 지시 "승률·PF 개선").
+//   딥 그리드 실측: hurst-trend 는 기존 청산에서도(PF 0.90/OOS 0.88), 개선 필터에서도
+//   (0.97/0.91) 유일하게 전 구간 PF<1 — 일관 손실 전략. ensemble 은 동일 조건에서
+//   PF 1.10/OOS 1.14 최상위군. hurst 는 발굴 풀(ALL_STRATEGIES)엔 유지(개선 시 복귀 가능).
 export const BOT_STRATEGY_MAP = {
-  "btc-alpha":        runHurstTrend,
+  "btc-alpha":        runEnsemble,
   "highcap-momentum": runTrendFollow,
   "defi-infra":       runDefiMomentum,
   "l2-emerging":      runSupertrend,
@@ -81,7 +85,7 @@ export function runStrategyForBot(botId, input) {
  */
 export function getStrategyNameForBot(botId) {
   const lookup = {
-    "btc-alpha":        "hurst-trend",
+    "btc-alpha":        "ensemble", // 2026-07-04 hurst-trend 교체 (전 구간 PF<1)
     "highcap-momentum": "trend-follow",
     "defi-infra":       "defi-momentum",
     "l2-emerging":      "supertrend",

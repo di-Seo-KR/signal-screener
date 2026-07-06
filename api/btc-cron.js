@@ -710,6 +710,38 @@ export default async function handler(req, res) {
         const _sideOf = (s) => s ? (s.side || (s.type === "BUY" ? "LONG" : s.type === "SELL" ? "SHORT" : null)) : null;
         const _tradeSide = _sideOf(tradeSignal);
         const _htfConfirm = !!_tradeSide && (_sideOf(tf4hSignal) === _tradeSide || _sideOf(sig1d) === _tradeSide);
+
+        // ★ 2026-07-04 승률·PF 개선 (대표 지시 "잃고벌고 반복") — 딥 그리드 F3 검증 필터.
+        //   4h 완결봉 기준(검증 조건 동일): ① 레짐 정렬 — LONG 은 4h EMA200 위·SHORT 는 아래만,
+        //   ② 횡보 회피 — ER14 ≥ 0.2. 실측(7전략×24심볼 상장이후 전체, OOS 일관):
+        //   PF 0.99→1.09(OOS 0.98→1.08)·승률 36→43%·거래수 절반(잃고벌고 churn 자체 감소).
+        //   거래 풀만 차단 — 표시(MTF 풀)·코인카드 불변. 킬스위치 ZEPTA_TRADE_FILTERS=0.
+        let _filterBlock = null;
+        if (process.env.ZEPTA_TRADE_FILTERS !== "0" && _tradeSide) {
+          try {
+            const _c4 = _closedTF(candles4h);
+            if (Array.isArray(_c4) && _c4.length >= 220) {
+              const _cl4 = _c4.map(c => c.close);
+              const _e200arr = calcEMA(_cl4, 200);
+              const _px = _cl4[_cl4.length - 1], _e200v = _e200arr[_e200arr.length - 1];
+              if (Number.isFinite(_e200v)) {
+                if (_tradeSide === "LONG" && _px <= _e200v) _filterBlock = "레짐(4h EMA200 아래 롱)";
+                if (_tradeSide === "SHORT" && _px >= _e200v) _filterBlock = "레짐(4h EMA200 위 숏)";
+              }
+              if (!_filterBlock) {
+                const _p = 14, _L4 = _cl4.length - 1;
+                const _net = Math.abs(_cl4[_L4] - _cl4[_L4 - _p]);
+                let _vol = 0;
+                for (let _k = _L4 - _p + 1; _k <= _L4; _k++) _vol += Math.abs(_cl4[_k] - _cl4[_k - 1]);
+                const _er = _vol > 0 ? _net / _vol : 0;
+                if (_er < 0.2) _filterBlock = `횡보(ER${_er.toFixed(2)})`;
+              }
+            }
+          } catch { _filterBlock = null; } // 필터 계산 실패는 차단하지 않음(안전)
+        }
+        if (_filterBlock) {
+          addLog(`  ⛔ ${asset} 거래신호 필터: ${_filterBlock} — ${_tradeSide} 미적재 (표시는 유지)`);
+        } else {
         newPoolEntries.push({
           ts: Date.now(), time: new Date().toISOString(), asset,
           type: tradeSignal.type, confidence: tradeSignal.confidence, score: tradeSignal.score,
@@ -721,6 +753,7 @@ export default async function handler(req, res) {
           htfConfirm: !!_htfConfirm,                      // ★ item7 (상위TF 추세 확인)
           quoteVolume: quoteVolByAsset[asset] ?? null,    // ★ item5 (24h 거래대금 USD)
         });
+        }
 
         // ── 종합 스코어 표시 풀 (코인 카드용 — 엔진 거래와 별개로 항상 적재) ──
         if (compositeSignal) {
