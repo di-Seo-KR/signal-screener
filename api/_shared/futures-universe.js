@@ -36,12 +36,23 @@ export async function refreshUniverse(kv, { size = UNIVERSE_SIZE } = {}) {
     if (t?.symbol && Number.isFinite(v)) volBySym[t.symbol] = v;
   }
 
+  // ★ 2026-07-08 스윙 전환 — 상장연령 가드 (진단: 30일 손실 100%가 마이크로캡 롱,
+  //   TRIA/BIRB/ALLO/4 는 전부 상장 9개월 미만 신규). 신규 상장은 24h 거래대금 스파이크로
+  //   top50 에 자동 편입되지만 가격 이력이 짧아 전략·백테스트 분포 밖 → 유니버스에서 제외.
+  //   exchangeInfo 의 onboardDate(ms) 실측 확인(2026-07-08). 필드 누락 시 통과(포맷 변경 내성).
+  //   ZEPTA_UNIVERSE_MIN_AGE_DAYS 로 조정, 0 이면 비활성.
+  const _minAgeDaysRaw = Number(process.env.ZEPTA_UNIVERSE_MIN_AGE_DAYS);
+  const minAgeDays = Number.isFinite(_minAgeDaysRaw) ? _minAgeDaysRaw : 180;
+  const minAgeMs = minAgeDays * 24 * 60 * 60 * 1000;
+  const nowMs = Date.now();
+
   const entries = symbols
     .filter((s) =>
       s?.status === "TRADING" &&
       s?.contractType === "PERPETUAL" &&
       s?.quoteAsset === "USDT" &&
-      s?.baseAsset && !STABLE_BASES.has(s.baseAsset)
+      s?.baseAsset && !STABLE_BASES.has(s.baseAsset) &&
+      (minAgeDays <= 0 || !Number.isFinite(s?.onboardDate) || nowMs - s.onboardDate >= minAgeMs)
     )
     .map((s) => ({
       asset: `${s.baseAsset}/USD`,
