@@ -13,6 +13,7 @@
 import { getTickerPrice, getKlines } from "../_shared/binance-client.js";
 import { respondError } from "../_shared/binance-auth.js";
 import { RISK_CONFIG } from "../_shared/risk-manager.js";
+import { recordReentryCooldown } from "../_shared/reentry-cooldown.js";
 
 export const config = { maxDuration: 60 };
 
@@ -45,29 +46,33 @@ async function getKv() {
 //   현재: 마지막 5분 캔들 high/low 가 SL/TP 통과했는지 확인. 둘 다 통과 시 SL 우선 (보수적).
 //   그게 없으면 mark price 로 fallback (이전 동작).
 function hitLong(entry, markPrice, sl, tp, candle) {
+  // ★ 2026-07-08 스윙: TP 미설치(plan.tpPrice=null) 지원 — null 이면 TP 판정 자체를 안 함.
+  //   (가드 없으면 `high >= null` 이 `high >= 0` 으로 강제변환돼 롱이 즉시 TP 처리되는 함정)
+  const hasTp = Number.isFinite(tp);
   // 5m candle 기준으로 wick 통과 확인 (있으면)
   if (candle && Number.isFinite(candle.low) && Number.isFinite(candle.high)) {
     const slHit = candle.low <= sl;
-    const tpHit = candle.high >= tp;
+    const tpHit = hasTp && candle.high >= tp;
     if (slHit && tpHit) return "SL";   // ← SL 우선 (보수적 — 둘 다 wick 통과 시 손실 가정)
     if (slHit) return "SL";
     if (tpHit) return "TP";
   }
   // fallback: mark price 비교
   if (markPrice <= sl) return "SL";
-  if (markPrice >= tp) return "TP";
+  if (hasTp && markPrice >= tp) return "TP";
   return null;
 }
 function hitShort(entry, markPrice, sl, tp, candle) {
+  const hasTp = Number.isFinite(tp);
   if (candle && Number.isFinite(candle.low) && Number.isFinite(candle.high)) {
     const slHit = candle.high >= sl;
-    const tpHit = candle.low <= tp;
+    const tpHit = hasTp && candle.low <= tp;
     if (slHit && tpHit) return "SL";
     if (slHit) return "SL";
     if (tpHit) return "TP";
   }
   if (markPrice >= sl) return "SL";
-  if (markPrice <= tp) return "TP";
+  if (hasTp && markPrice <= tp) return "TP";
   return null;
 }
 
@@ -150,8 +155,12 @@ async function monitorUser(userId) {
           ? (e.mfePrice - entry) / entry
           : (entry - e.mfePrice) / entry;
         const peakR = (mfePct * notional) / riskAmt;
-        // 1) 브레이크이븐 — peakR ≥ breakEvenAtR 이면 SL 을 최소 entry 로 이동
-        if (peakR >= (trail.breakEvenAtR ?? 0.7)) {
+        // 1) 브레이크이븐 — BE 창(≥breakEvenAtR && <activationR)에서만 SL 을 entry 로 이동.
+        // ★ 2026-07-08 리뷰 C 반영: 상한 없는 단순 임계(peakR ≥ BE)는 스윙 설정
+        //   (breakEvenAtR=activationR=1.0 → BE 무효화 의도)에서도 +1R 즉시 BE 를 발동시켰음.
+        //   risk-manager.evaluateTrailingStop 의 창 판정과 동일하게 정렬 — 라이브·shadow 규칙 일치.
+        //   (legacy 설정 0.7/1.0 에선 peakR≥1.0 구간은 트레일(lockR≥0.5R>BE)이 대체해 동작 불변)
+        if (peakR >= (trail.breakEvenAtR ?? 0.7) && peakR < (trail.activationR ?? 1.0)) {
           if (side === "LONG" && e.plan.slPrice < entry) e.plan.slPrice = entry;
           if (side === "SHORT" && e.plan.slPrice > entry) e.plan.slPrice = entry;
         }
@@ -268,6 +277,21 @@ async function monitorUser(userId) {
   }
 
   if (closed.length) {
+    // ★ 2026-07-08 스윙 전환: 재진입 쿨다운을 shadow 에도 미러링 (진단 실측: 쿨다운 기록이
+    //   live 청산 경로에만 있어 shadow 는 TLM 동일 진입 9스택/3h 허용 → 통계가 라이브 규칙과
+    //   다른 조건의 성과가 됨). engine 쪽 shadow 쿨다운 체크와 세트. ZEPTA_SHADOW_MIRROR_GATES=0 으로 끔.
+    if (process.env.ZEPTA_SHADOW_MIRROR_GATES !== "0") {
+      for (const c of closed) {
+        try {
+          // ★ 리뷰 E 반영: #shadow 네임스페이스로 기록 — live 쿨다운 키와 분리
+          //   (같은 키면 가상 청산이 실돈 진입을 차단). engine 의 shadow 체크와 동일 스코프.
+          await recordReentryCooldown(kv, `${userId}#shadow`, {
+            symbol: c.plan?.symbol, side: c.plan?.side, pnl: c.netPnL,
+            entryPrice: c.entryPrice, score: c.signal?.score,
+          });
+        } catch { /* 쿨다운 기록 실패는 비치명 */ }
+      }
+    }
     // ── 마감 거래 아카이브 (retro 분석용) ──
     // ledger 는 500개 cap 이라 오래된 closed 가 새 OPEN 에 밀려 사라짐.
     // archive 는 최근 1000건 마감 거래만 보존 (entry/exit/MFE/MAE/closeReason 등 디테일).

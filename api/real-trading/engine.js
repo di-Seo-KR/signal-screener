@@ -25,7 +25,7 @@ import { loadUserCredentials, respondError } from "../_shared/binance-auth.js";
 // ★ 2026-05-09 audit N2: pickBestSignal 미사용 (rankSignals 만 사용) — dead import 제거
 import { extractSignal, rankSignals } from "../_shared/signal-extractor.js";
 import { loadFamilyWeightsRobust, applyWeightsToRanking } from "../_shared/strategy-weights.js";
-import { planTrade, RISK_CONFIG, checkAggregateExposure, checkPyramidGuard, checkSameSymbolNotional } from "../_shared/risk-manager.js";
+import { planTrade, RISK_CONFIG, SWING_EXITS, checkAggregateExposure, checkPyramidGuard, checkSameSymbolNotional } from "../_shared/risk-manager.js";
 import { preTradeCheck } from "../_shared/circuit-breaker.js";
 import { getSymbolFilter, isSymbolAffordable } from "../_shared/exchange-info.js";
 import { getTickerPrice, getAccountInfo, getKlines, getPositionRisk, placeOrder } from "../_shared/binance-client.js";
@@ -133,8 +133,23 @@ async function pullRecentSignals({ userId, lookbackMs = 4 * 60 * 60 * 1000, adva
     diag.poolError = poolErr?.message;
   }
 
-  // Fallback: di:bot:*:perf 의 trades — 풀 미적재 케이스 또는 옛 데이터 보강
-  for (const b of cryptoBots) {
+  // Fallback: di:bot:*:perf 의 trades — 풀 미적재 케이스 대비 (fail-safe 원래 목적).
+  // ★ 2026-07-08 (진단 F3 우회 구멍 봉합): 풀이 살아있으면 perf 폴백을 아예 안 탄다.
+  //   btc-cron 은 F3(레짐+ER+ATR) 필터로 차단된 신호도 가상매매 perf.trades 에는 기록하므로,
+  //   폴백이 항상 돌면 필터 우회 경로가 됨(실측: 필터 배포 후에도 마이크로캡 유입).
+  // ★ 리뷰 A(critical) 반영: poolHits=0 은 "장애"와 "전 신호 필터 차단"을 구분 못 함 —
+  //   횡보장에 필터가 전량 차단하면 풀이 비는 게 정상이고 그때 폴백이 차단 신호를 재유입시킴.
+  //   btc-cron 하트비트(di:signals:pool-heartbeat, 매 런 기록)가 30분 넘게 정체일 때만
+  //   진짜 장애로 판정해 폴백 가동. 하트비트 키 부재(구버전)는 장애 취급(하위호환 fail-safe).
+  let cronStale = true;
+  try {
+    const hb = await kv.get("di:signals:pool-heartbeat");
+    cronStale = !Number.isFinite(hb) || (now - hb) > 30 * 60 * 1000;
+  } catch { cronStale = true; }
+  const usePerfFallback = diag.poolHits === 0 && cronStale;
+  if (!usePerfFallback && cryptoBots.length) diag.perfFallbackSkipped = true;
+  diag.cronStale = cronStale;
+  for (const b of usePerfFallback ? cryptoBots : []) {
     const botId = b.id || b.botId;
     const perf = await kv.get(`di:bot:${botId}:perf`);
     if (!perf || !Array.isArray(perf.trades)) continue;
@@ -626,15 +641,17 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
   }
 
   // ★ 2026-05-11 대표 지시: dedup OFF 모드 전면 도입.
-  //   ZEPTA_DEDUP_MODE = "off" (default) | "live-only" | "always"
+  //   ZEPTA_DEDUP_MODE = "off" | "live-only" | "always" (default)
   //     - "off": shadow + live 모두 dedup 안 함. 같은 종목 averaging 허용 + shadow
   //             가 같은 종목으로 시그널 풀 다양화 차단하지 않게.
   //     - "live-only": 옛 동작. shadow 만 dedup, live 는 averaging 허용.
   //     - "always": 둘 다 dedup. 옛옛 동작.
   //
-  //   shadow 통계 왜곡 우려가 있지만 시그널 다양성 부족 (같은 6개 종목 만 반복)
-  //   이 더 큰 문제라 대표 지시로 OFF 기본.
-  const dedupMode = (process.env.ZEPTA_DEDUP_MODE || "off").toLowerCase();
+  // ★ 2026-07-08 스윙 전환으로 기본값 off → always 변경 (대표 지시 "스윙에 초점"이
+  //   2026-05-11 "다양성 우선 off" 지시를 대체). 진단 실측: off 상태에서 TLM 동일 방향
+  //   9포지션 동시 스택(3.25h 내, 간격 중위 17.5분) — 스윙은 심볼당 1포지션이 정합.
+  //   averaging 재개는 ZEPTA_DEDUP_MODE=off 로 즉시 원복.
+  const dedupMode = (process.env.ZEPTA_DEDUP_MODE || "always").toLowerCase();
   const openSymbols = new Set();
   if (shadow && dedupMode === "always") {
     // shadow always dedup mode
@@ -723,10 +740,13 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       tried.push({ symbol: cand.symbol, reason: `dedup '${dedupMode}': already open` });
       continue;
     }
-    // ★ 2026-06-14 (대표 지시): 진입 품질 게이트 3종 — 라이브만 적용(shadow 는 통계 유지).
-    //   데이터(btc-cron enrich) 없으면 pass-through(안전·하위호환). 전부 env 킬스위치.
-    //   ticker 조회 전에 둬서 약신호/thin/추격 후보를 싸게 조기 컷.
-    if (!shadow) {
+    // ★ 2026-06-14 (대표 지시): 진입 품질 게이트 3종 — 데이터(btc-cron enrich) 없으면
+    //   pass-through(안전·하위호환). 전부 env 킬스위치. ticker 조회 전에 둬서 조기 컷.
+    // ★ 2026-07-08 스윙 전환: shadow 에도 동일 적용(미러링). 진단 실측 — shadow 만 게이트가
+    //   없어 마이크로캡 스팸이 통계를 오염(라이브 규칙과 다른 조건의 성과). shadow 통계가
+    //   라이브 규칙의 성과를 말하려면 게이트가 같아야 함. ZEPTA_SHADOW_MIRROR_GATES=0 으로 원복.
+    const _mirrorGates = process.env.ZEPTA_SHADOW_MIRROR_GATES !== "0";
+    if (!shadow || _mirrorGates) {
       // ① 최소점수 게이트 — 약한 신호 진입 차단 (보수 디폴트 55, breadthCap confirms 0 수준)
       if (process.env.ZEPTA_SCORE_GATE !== "0") {
         const _ms = Number(process.env.ZEPTA_MIN_SCORE);
@@ -769,11 +789,16 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       // ★ 2026-06-12/14 (대표 지시): 재진입 쿨다운 + 품질 게이트. 청산 직후 동일 종목·방향
       //   재진입 차단(churn 방지). 단 "더 매력적 가격(롱=더 싸게/숏=더 비싸게) 또는 더 강한
       //   신호"면 쿨다운 면제 — 트레이더처럼 더 나은 타점엔 들어간다(가격 비교 위해 ticker 후 체크).
-      //   shadow 미적용(라이브만). ZEPTA_REENTRY_COOLDOWN=0 / _QUALITY_GATE=0 으로 끔.
-      if (!shadow) {
+      //   ZEPTA_REENTRY_COOLDOWN=0 / _QUALITY_GATE=0 으로 끔.
+      // ★ 2026-07-08 스윙 전환: shadow 에도 미러링(shadow-monitor 가 청산 시 쿨다운 기록하는
+      //   것과 세트 — 진단 실측 TLM 9스택 방지). ZEPTA_SHADOW_MIRROR_GATES=0 으로 원복.
+      if (!shadow || _mirrorGates) {
         try {
           const kvCd = await getKv();
-          const cd = await checkReentryCooldown(kvCd, userId, cand.symbol, cand.side, { price: pr, score: cand.score });
+          // ★ 리뷰 E 반영: shadow 쿨다운은 별도 네임스페이스(#shadow) — 같은 KV 키를 쓰면
+          //   가상 청산이 실돈 진입을 최대 120분 차단하는 교차 오염 발생. live 는 기존 키 그대로.
+          const cdUser = shadow ? `${userId}#shadow` : userId;
+          const cd = await checkReentryCooldown(kvCd, cdUser, cand.symbol, cand.side, { price: pr, score: cand.score });
           if (cd.blocked) {
             S(`  ↳ ${cand.symbol} ${cand.side}: 재진입 쿨다운 — ${cd.remainMin}분 남음 (${cd.reason})`);
             tried.push({ symbol: cand.symbol, reason: `reentry cooldown ${cd.remainMin}m: ${cd.reason}` });
@@ -787,7 +812,12 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       // ★ 2026-05-09 audit N1: family-aware ATR interval.
       //   mean-revert 는 4h 시그널이라도 더 짧은 1h ATR 이 적절 (회귀는 단기 변동성 ↑).
       //   trend/breakout 은 4h 가 적절. timeframe 명시 우선.
-      const klInterval = cand.timeframe === "1h" ? "1h"
+      // ★ 2026-07-08 리뷰 D 반영: 스윙 모드는 4h ATR 고정 — S3 그리드 검증(SL 2×ATR·트레일
+      //   +1R/2R)이 전부 4h ATR 기준이라, 1d 신호에 1d ATR 을 쓰면 SL 기하·R 단위가 검증
+      //   조건과 달라짐(1d ATR 2×는 7.5% 캡에 잘려 'SL 설계 불가' 상태 재발). btc-cron 의
+      //   ATR 적합성 가드(4h 기준)와도 이걸로 정합. ZEPTA_SWING_EXITS=0 이면 기존 분기.
+      const klInterval = SWING_EXITS ? "4h"
+                       : cand.timeframe === "1h" ? "1h"
                        : cand.timeframe === "1d" ? "1d"
                        : cand.strategyFamily === "mean-revert" ? "1h"
                        : "4h";
@@ -1112,7 +1142,9 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
       const { sendCards, buildCard } = await import("../_shared/telegram.js");
       const sideKr = plan.plan.side === "LONG" ? "롱(상승)" : "숏(하락)";
       const slPct = (plan.plan.slPct * 100).toFixed(2);
-      const tpPct = (plan.plan.tpPct * 100).toFixed(2);
+      // ★ 스윙 전환: TP 미설치(null) 지원 — 트레일 청산 안내로 대체
+      const _hasTp = plan.plan.tpPct != null && plan.plan.tpPrice != null;
+      const tpPct = _hasTp ? (plan.plan.tpPct * 100).toFixed(2) : null;
       // ★ bracket SL/TP 상태 점검 — rescue 발동 또는 SL attach 실패 시 경고
       const bracketInfo = result.bracket || {};
       const bracketRescue = result.bracketRescue;
@@ -1122,13 +1154,15 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
 
       // ROI% (마진 대비 손익률, Binance UI 기준) 계산
       const slRoiPct = (plan.plan.slPct * plan.plan.leverage * 100).toFixed(0);
-      const tpRoiPct = (plan.plan.tpPct * plan.plan.leverage * 100).toFixed(0);
+      const tpRoiPct = _hasTp ? (plan.plan.tpPct * plan.plan.leverage * 100).toFixed(0) : null;
       const lines = [
         `진입가 $${plan.plan.entryPrice} · 수량 ${plan.plan.qty}`,
         `노출 $${plan.plan.notional?.toFixed(2)} · 마진 $${plan.plan.marginRequired.toFixed(2)} (레버리지 ${plan.plan.leverage}x)`,
         `손절라인 $${plan.plan.slPrice} (가격 -${slPct}% / ROI -${slRoiPct}%)`,
-        `익절라인 $${plan.plan.tpPrice} (가격 +${tpPct}% / ROI +${tpRoiPct}%)`,
-        `손익비 ${plan.plan.effectiveRR?.toFixed(2) || "?"}배 · 감내 손실 $${plan.plan.riskAmount?.toFixed(2) || "?"}`,
+        _hasTp
+          ? `익절라인 $${plan.plan.tpPrice} (가격 +${tpPct}% / ROI +${tpRoiPct}%)`
+          : `익절: 고정 TP 없음 — +1R 후 트레일링(최고점 추적)으로 청산 (스윙 모드)`,
+        `${_hasTp ? `손익비 ${plan.plan.effectiveRR?.toFixed(2) || "?"}배` : "손익비 트레일 기반(상방 무제한)"} · 감내 손실 $${plan.plan.riskAmount?.toFixed(2) || "?"}`,
         `시그널: ${best.source || "봇"} (conf ${best.confidence})`,
       ];
       // SL/TP attach 상태 명시

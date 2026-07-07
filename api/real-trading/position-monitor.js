@@ -28,6 +28,7 @@ import {
   evaluateTimeStop,
   evaluateTrailingStop,
   RISK_CONFIG,
+  SWING_EXITS,
 } from "../_shared/risk-manager.js";
 import { getSymbolFilter } from "../_shared/exchange-info.js";
 import { evaluateMtfExitSignals } from "../_shared/exit-signals.js";
@@ -327,7 +328,12 @@ async function checkUser(userId) {
     //     - off: 평가 안 함
     //     - soft: confidence >= 2 일 때만 청산
     //     - strict: confidence >= 1 일 때 청산 (가장 공격적)
-    const mtfMode = (process.env.ZEPTA_MTF_EXIT_MODE || "soft").toLowerCase();
+    // ★ 2026-07-08 스윙 전환 (리뷰 B 반영): 스윙 모드 기본 off — 검증된 청산 구조는
+    //   "SL / +1R 후 2R 트레일 / maxHold 15일" 뿐인데, MTF soft 청산(RSI 과열·MACD·레짐플립·
+    //   profitLockTrail 피크 +5% 후 30% 반납)은 검증된 트레일보다 훨씬 타이트하게 승자를
+    //   조기 절단(그리드 실측: TP 15% 백스톱조차 기대값 53→11bps 훼손 — 같은 패턴).
+    //   shadow 에는 MTF 가 없어 Live↔Shadow 비교도 왜곡. env 명시 설정은 그대로 우선.
+    const mtfMode = (process.env.ZEPTA_MTF_EXIT_MODE || (SWING_EXITS ? "off" : "soft")).toLowerCase();
     if (mtfMode !== "off") {
       try {
         const mtf = await evaluateMtfExitSignals({

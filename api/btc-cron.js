@@ -736,6 +736,22 @@ export default async function handler(req, res) {
                 const _er = _vol > 0 ? _net / _vol : 0;
                 if (_er < 0.2) _filterBlock = `횡보(ER${_er.toFixed(2)})`;
               }
+              // ★ 2026-07-08 스윙 전환 — ATR 적합성 가드 (진단: 30일 손실 100%가 마이크로캡).
+              //   SL 설계 = 2×ATR 인데 상한 7.5% 를 초과하는 고변동 심볼(TLM ATR 16% 등)은
+              //   스탑이 한 캔들 노이즈 안에 들어가 동전던지기 이하 생존율 + 백테스트 분포 밖.
+              //   4h ATR14% × 2 > SL 상한 → 진입 금지. (검증 유니버스 24종은 전부 통과 범위)
+              if (!_filterBlock) {
+                const _hi4 = _c4.map(c => c.high), _lo4 = _c4.map(c => c.low);
+                let _atrSum = 0, _atrCnt = 0;
+                for (let _k = Math.max(1, _cl4.length - 14); _k < _cl4.length; _k++) {
+                  _atrSum += Math.max(_hi4[_k] - _lo4[_k], Math.abs(_hi4[_k] - _cl4[_k - 1]), Math.abs(_lo4[_k] - _cl4[_k - 1]));
+                  _atrCnt++;
+                }
+                const _atrPct = _atrCnt > 0 && _px > 0 ? (_atrSum / _atrCnt) / _px : 0;
+                const _envCeil2 = Number(process.env.ZEPTA_SL_CEIL_PCT);
+                const _slCeil = Number.isFinite(_envCeil2) && _envCeil2 > 0 ? _envCeil2 : 0.075;
+                if (_atrPct * 2.0 > _slCeil) _filterBlock = `ATR 과대(4h ${(_atrPct * 100).toFixed(1)}% — 2×ATR SL 이 상한 ${(_slCeil * 100).toFixed(1)}% 초과, SL 설계 불가)`;
+              }
             }
           } catch { _filterBlock = null; } // 필터 계산 실패는 차단하지 않음(안전)
         }
@@ -922,6 +938,10 @@ export default async function handler(req, res) {
       const existingPool = (await kv.get(poolKey)) || [];
       const mergedPool = [...newPoolEntries, ...existingPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200);
       await kv.set(poolKey, mergedPool);
+      // ★ 2026-07-08 하트비트 (리뷰 A): "btc-cron 장애로 풀이 빔"과 "신호 전부 필터 차단으로
+      //   풀이 빔"을 엔진이 구분할 수 있게 — 적재 0건이어도 런마다 기록. 엔진 perf 폴백은
+      //   하트비트가 정체(>30분)일 때만 가동(정상 가동 중 빈 풀 = 필터가 막은 것 = 거래 안 함이 정답).
+      try { await kv.set("di:signals:pool-heartbeat", Date.now()); } catch {}
       if (newMtfEntries.length > 0) {
         const mKey = "di:signals:realtime-pool-mtf";
         const mPool = (await kv.get(mKey)) || [];

@@ -267,6 +267,36 @@ export const RISK_CONFIG = {
   },
 };
 
+// ════════════════════════════════════════════════════════════════════
+// ★ 2026-07-08 스윙 전환 (대표 지시 "스윙에 초점 — 손실만 커진다")
+// ────────────────────────────────────────────────────────────────────
+// 딥 그리드 S3 검증 청산 구조 (7전략×24심볼 상장이후 전체 + 홀드아웃 6심볼 1회):
+//   현행 F3 대비 기대값 29→86bps(OOS 21→46), 홀드아웃 PF 1.00→1.16 (7전략 전원 PF>1),
+//   평균 보유 13.3봉(2.2일)→30봉(5일). 구성:
+//   - SL 2×ATR 균일 (family별 1.2~3.0 가변 → 검증 조건과 동일하게 통일)
+//   - 고정 TP 미설치 — TP 15% 백스톱조차 기대값 53→11bps 로 훼손 실측(승자 절단).
+//     청산은 SL / 트레일 / maxHold 만. (라이브 SL·TP 집행은 mark-price 모니터라 TP 생략 안전)
+//   - 트레일: +1R(=2×ATR) 도달 후 최고점에서 2R(=4×ATR) 양보 추적. 브레이크이븐 단계 없음
+//     (그리드 A3/F4 에서 BE 가 승률·PF 저하 실측 — breakEvenAtR=activationR 로 BE 창 무효화)
+//   - 레짐 SL/TP 부스트 미적용 (검증 조건 동일 — 균일 2×ATR)
+//   - 최대 보유 15일 (검증 90봉×4h)
+// 킬스위치: ZEPTA_SWING_EXITS=0 → 이 블록 전체 미적용(기존 설정 원복).
+// ════════════════════════════════════════════════════════════════════
+export const SWING_EXITS = process.env.ZEPTA_SWING_EXITS !== "0";
+if (SWING_EXITS) {
+  for (const k of Object.keys(RISK_CONFIG.familySLTPMatrix)) {
+    RISK_CONFIG.familySLTPMatrix[k] = { slAtrMul: 2.0, tpAtrMul: 4.0 }; // tpAtrMul 은 표시용 잔존값 — planTrade 가 TP 미설치로 무시
+  }
+  RISK_CONFIG.regimeSLTPBoost = { default: { slBoost: 1.0, tpBoost: 1.0 } };
+  RISK_CONFIG.trailingStop = {
+    enabled: true,
+    activationR: 1.0,    // +1R(=2×ATR) 도달 시 트레일 활성화
+    trailDistanceR: 2.0, // 최고점에서 2R(=4×ATR) 양보 — S3 검증값
+    breakEvenAtR: 1.0,   // activationR 와 동일 → BE 단계 창(≥BE && <activation)이 공집합 = BE 없음
+  };
+  RISK_CONFIG.maxHoldMs = 15 * 24 * 60 * 60 * 1000; // 15일 (검증 90봉×4h)
+}
+
 function roundDownStep(x, step) { if (!step || step <= 0) return x; return Math.floor(x / step) * step; }
 function round(x, decimals)     { const f = Math.pow(10, decimals || 0); return Math.round(x * f) / f; }
 function clamp(x, lo, hi)       { return Math.max(lo, Math.min(hi, x)); }
@@ -608,6 +638,16 @@ export function planTrade({ signal, equity, price, atr, filter, regime = null, a
   let stopDistPct = dyn.slPct;
   let dynamicTpPct = dyn.tpPct;
   push(`dynamicSLTP source=${dyn.source} regime=${dyn.regimeKey} atr%=${(dyn.atrPct*100).toFixed(2)} slMul=${dyn.slMul}×${dyn.slBoost} tpMul=${dyn.tpMul}×${dyn.tpBoost}`);
+  // ★ 2026-07-08 스윙 전환 (리뷰 A 엔진측 방어선): 설계 SL(slMul×ATR)이 상한에 잘리는
+  //   고변동 심볼은 "2×ATR 미만 SL" 상태(노이즈 스탑, 백테스트 분포 밖)라 진입 자체를 거부.
+  //   btc-cron 풀 필터와 동일 기준 — 폴백 등 어떤 경로로 와도 여기서 최종 차단.
+  if (SWING_EXITS) {
+    const _envCeil0 = Number(process.env.ZEPTA_SL_CEIL_PCT);
+    const _slCeil0 = Number.isFinite(_envCeil0) && _envCeil0 > 0 ? _envCeil0 : (cfg.dynamicSLCeilPct ?? 0.075);
+    if (dyn.atrPct * dyn.slMul > _slCeil0) {
+      return { ok: false, reason: `ATR 과대 — 설계 SL ${(dyn.atrPct * dyn.slMul * 100).toFixed(1)}% > 상한 ${(_slCeil0 * 100).toFixed(1)}% (SL 설계 불가 심볼, 스윙 가드)`, log };
+    }
+  }
   push(`rawStopDistPct=${(stopDistPct * 100).toFixed(3)}% (dynamic TP=${(dynamicTpPct * 100).toFixed(3)}%)`);
 
   // ★ 1-1) 손절 거리 결정.
@@ -831,22 +871,32 @@ export function planTrade({ signal, equity, price, atr, filter, regime = null, a
   // ★ 2026-05-17 (QUANT-RES): 동적 TP 우선. dynamicSLTP 가 family + regime 기반으로
   //   tpPct 를 이미 산출했으므로 그것을 base 로 사용하되, "비용 차감 후 순 RR" 하한은
   //   여전히 강제 (minNetRR 안전망).
+  // ★ 2026-07-08 스윙 전환: SWING_EXITS 면 고정 TP 미설치(딥 그리드 S3 검증 —
+  //   TP 15% 백스톱조차 기대값 53→11bps 훼손). 청산 = SL / +1R 후 2R 트레일 / maxHold 15일.
+  //   netRR 게이트는 TP 가 없어 계산 불능 — 그리드가 비용(0.1%) 포함 기대값 양수를 이미 검증.
   const slPct = stopDistPct;
-  // dynamic TP 기본 — 위 dyn.tpPct (slPct 가 cap 으로 줄었어도 dynamicTpPct 는 보존).
-  const dynamicBaseTp = Number.isFinite(dynamicTpPct) && dynamicTpPct > 0 ? dynamicTpPct : slPct * 2.0;
-  // legacy rewardToRisk 폴백 (env / family 매핑 없을 때만 영향)
-  const legacyRR = cfg.rewardToRisk?.[signal.strategyFamily] || cfg.rewardToRisk?.unknown || 2.0;
-  // 순 RR 하한: (tpPct - costPct) / (slPct + costPct) ≥ minNetRR
-  const minNetTp = (cfg.minNetRR || 1.8) * (slPct + costPct) + costPct;
-  const tpPct = Math.max(dynamicBaseTp, slPct * legacyRR, minNetTp);
-  const netRR = (tpPct - costPct) / (slPct + costPct);
-  push(`tp source: dynamic=${(dynamicBaseTp*100).toFixed(2)}% legacyRR=${legacyRR} minNetFloor=${(minNetTp*100).toFixed(2)}% → tpPct=${(tpPct * 100).toFixed(3)}% netRR=${netRR.toFixed(2)}`);
-  if (netRR < (cfg.minNetRR || 1.8)) {
-    return { ok: false, reason: `net RR ${netRR.toFixed(2)} < min ${cfg.minNetRR}`, log };
+  let tpPct = null, tpPrice = null, netRR = null;
+  if (SWING_EXITS) {
+    push(`swing exits: TP 미설치 — SL(2×ATR)/트레일(+1R 후 2R)/maxHold 15d (그리드 S3 검증, 킬스위치 ZEPTA_SWING_EXITS=0)`);
+  } else {
+    // dynamic TP 기본 — 위 dyn.tpPct (slPct 가 cap 으로 줄었어도 dynamicTpPct 는 보존).
+    const dynamicBaseTp = Number.isFinite(dynamicTpPct) && dynamicTpPct > 0 ? dynamicTpPct : slPct * 2.0;
+    // legacy rewardToRisk 폴백 (env / family 매핑 없을 때만 영향)
+    const legacyRR = cfg.rewardToRisk?.[signal.strategyFamily] || cfg.rewardToRisk?.unknown || 2.0;
+    // 순 RR 하한: (tpPct - costPct) / (slPct + costPct) ≥ minNetRR
+    const minNetTp = (cfg.minNetRR || 1.8) * (slPct + costPct) + costPct;
+    tpPct = Math.max(dynamicBaseTp, slPct * legacyRR, minNetTp);
+    netRR = (tpPct - costPct) / (slPct + costPct);
+    push(`tp source: dynamic=${(dynamicBaseTp*100).toFixed(2)}% legacyRR=${legacyRR} minNetFloor=${(minNetTp*100).toFixed(2)}% → tpPct=${(tpPct * 100).toFixed(3)}% netRR=${netRR.toFixed(2)}`);
+    if (netRR < (cfg.minNetRR || 1.8)) {
+      return { ok: false, reason: `net RR ${netRR.toFixed(2)} < min ${cfg.minNetRR}`, log };
+    }
   }
 
   const slPrice = signal.side === "LONG" ? price * (1 - slPct) : price * (1 + slPct);
-  const tpPrice = signal.side === "LONG" ? price * (1 + tpPct) : price * (1 - tpPct);
+  if (tpPct != null) {
+    tpPrice = signal.side === "LONG" ? price * (1 + tpPct) : price * (1 - tpPct);
+  }
 
   const tickSize = filter.tickSize || 0;
   const pricePrecision = filter.pricePrecision || 2;
@@ -864,13 +914,18 @@ export function planTrade({ signal, equity, price, atr, filter, regime = null, a
     marginRequired: finalNotional / finalLev,
     leverage: finalLev,
     slPrice: roundPrice(slPrice),
-    tpPrice: roundPrice(tpPrice),
+    tpPrice: tpPrice != null ? roundPrice(tpPrice) : null, // ★ 스윙: TP 미설치 (모니터가 null 안전 처리)
     slPct,
     tpPct,
     costPct,
     effectiveRR: netRR,
-    riskAmount,
-    expectedNetWin: finalNotional * (tpPct - costPct),
+    // ★ 2026-07-08 정정: 기존엔 sizeHint 축소 *이전* 원본 riskAmount 를 기록해
+    //   rMultiple(netPnL/riskAmount)·트레일 R 이 sizeHint 배만큼 과소 표기됐음(진단 실측:
+    //   SL 풀히트가 R -0.62 로 보임). 실효 위험액(= 최종 노셔널 × 손실률)으로 기록 —
+    //   shadow-monitor R 계산·엔진 '감내 손실' 표기가 전부 실제와 일치하게 됨.
+    riskAmount: finalNotional * (slPct + costPct),
+    riskAmountGen: 2, // ★ 세대 표식 (리뷰 F): R 지표 분석 시 구 스케일(sizeHint 과소 R)과 구분용
+    expectedNetWin: tpPct != null ? finalNotional * (tpPct - costPct) : null,
     expectedNetLoss: finalNotional * (slPct + costPct),
     strategyFamily: signal.strategyFamily,
     confidence: signal.confidence,
