@@ -295,6 +295,7 @@ export default async function handler(req, res) {
         unrealized_pl: unrealizedPL,
         unrealized_plpc: unrealizedPLPct / 100,
         updated_at: pos.entryTime,
+        botId: pos.botId || null, // ★ 귀속 v2 — 스냅샷이 발원 봇 기준으로 집계
       };
     }
     const equity = portfolio.cash + totalMarketValue;
@@ -877,14 +878,15 @@ export default async function handler(req, res) {
             const totalQty = existing.qty + buyQty;
             const totalCost = (existing.qty * existing.avgPrice) + tradeAmount;
             const newAvgPrice = totalQty > 0 ? totalCost / totalQty : currentPrice;
-            portfolio.positions[asset] = { qty: totalQty, avgPrice: isFinite(newAvgPrice) ? newAvgPrice : currentPrice, entryTime: existing.entryTime };
+            // ★ 귀속 v2: 평단추가여도 귀속은 최초 개설 봇 유지 (없으면 이번 신호 봇으로 소급)
+            portfolio.positions[asset] = { qty: totalQty, avgPrice: isFinite(newAvgPrice) ? newAvgPrice : currentPrice, entryTime: existing.entryTime, botId: existing.botId || latestSignal?.botId || null };
           } else {
-            portfolio.positions[asset] = { qty: buyQty, avgPrice: currentPrice, entryTime: new Date().toISOString() };
+            portfolio.positions[asset] = { qty: buyQty, avgPrice: currentPrice, entryTime: new Date().toISOString(), botId: latestSignal?.botId || null };
           }
           portfolio.cash -= tradeAmount;
           portfolio.totalTrades = (portfolio.totalTrades || 0) + 1;
           addLog(`🟢 ${asset} 매수: $${tradeAmount.toFixed(0)} (${buyQty.toFixed(6)}개 @ $${currentPrice.toFixed(2)})`);
-          assetResults.push({ asset, ok: true, type: "BUY", signal: latestSignal, amount: tradeAmount, price: currentPrice, qty: buyQty });
+          assetResults.push({ asset, ok: true, type: "BUY", signal: latestSignal, amount: tradeAmount, price: currentPrice, qty: buyQty, botId: portfolio.positions[asset].botId });
         }
       }
 
@@ -902,11 +904,12 @@ export default async function handler(req, res) {
         if (sellValue > 10) {
           const costBasis = sellQty * (portfolio.positions[asset]?.avgPrice || currentPrice);
           const realizedPL = sellValue - costBasis;
+          const posBotId = portfolio.positions[asset]?.botId || null; // ★ 귀속 v2 — delete 전에 캡처
           portfolio.cash += sellValue;
           delete portfolio.positions[asset];
           portfolio.totalTrades = (portfolio.totalTrades || 0) + 1;
           addLog(`🔴 ${asset} 매도: $${sellValue.toFixed(0)} (P&L: ${realizedPL >= 0 ? "+" : ""}$${realizedPL.toFixed(2)})`);
-          assetResults.push({ asset, ok: true, type: "SELL", signal: latestSignal, amount: sellValue, price: currentPrice, pnl: realizedPL });
+          assetResults.push({ asset, ok: true, type: "SELL", signal: latestSignal, amount: sellValue, price: currentPrice, pnl: realizedPL, botId: posBotId });
         }
       }
 
@@ -968,13 +971,45 @@ export default async function handler(req, res) {
 
     // ── 봇별 성과 KV 저장 ──
     try {
+      // ★ 2026-07-08 귀속 v2 — 1회 마이그레이션: ALL 봇 2종의 누적 통계는 중복 계상으로
+      //   오염(전 자산 거래가 각자 realizedPL 에 합산 — 실제 전략 성과가 아님) → 카운터 리셋.
+      //   trades 목록은 참고용 보존, 리셋 사유·시각 명기. 고정 봇은 왜곡 폭이 작아 보존
+      //   (go-forward 단일 귀속으로 자연 정상화).
+      try {
+        if (!(await kv.get("di:bot:attribution-v2"))) {
+          for (const _rb of ["crypto-diversity", "crypto-swing"]) {
+            const _rk = `di:bot:${_rb}:perf`;
+            const _rp = await kv.get(_rk);
+            if (_rp) {
+              Object.assign(_rp, {
+                realizedPL: 0, totalBuyCost: 0, totalSellRevenue: 0, tradeCount: 0,
+                winCount: 0, closedCount: 0, lossCount: 0, grossWin: 0, grossLoss: 0,
+                statsResetAt: new Date().toISOString(),
+                statsResetReason: "귀속 중복 계상 버그 정정(전 자산 거래가 ALL 봇 2종에 각자 합산) — v2 단일 귀속 전환",
+              });
+              await kv.set(_rk, _rp);
+            }
+            const _sk = `di:bot:${_rb}:snapshot`;
+            const _sp = await kv.get(_sk);
+            if (_sp) { _sp.peakEquity = 0; _sp.mdd = 0; _sp.dd = 0; _sp.history = []; await kv.set(_sk, _sp); }
+          }
+          await kv.set("di:bot:attribution-v2", new Date().toISOString());
+          addLog(`🧮 봇 귀속 v2 마이그레이션: crypto-diversity/crypto-swing 통계 리셋(중복 계상 정정)`);
+        }
+      } catch (mErr) {
+        addLog(`⚠️ 귀속 v2 마이그레이션 실패(다음 런 재시도): ${mErr.message}`);
+      }
       // ★ signalOnly 마커 trade 도 포함 — perf.trades 에 누적 후 통계는 별도 처리 (라인 ~699)
       const executedTrades = assetResults.filter(r => r.type === "BUY" || r.type === "SELL");
 
       if (executedTrades.length > 0) {
-        // 각 거래를 봇별로 분류하여 기록
+        // ★ 2026-07-08 귀속 v2 (진단: 표시 손익 신뢰성): 기존 getBotsForAsset 전체 기록은
+        //   같은 거래를 커버 봇 전부에 중복 계상 — ALL 봇 2종은 전 자산 거래를 각자 계상해
+        //   marketValue 가 할당액의 15~45배, 수익률 -85%/-92% 같은 회계 아티팩트를 만들었음.
+        //   이제 발원 봇(신호를 만든 봇, SELL 은 포지션 개설 봇) 1곳에만 기록.
         for (const trade of executedTrades) {
-          const bots = getBotsForAsset(trade.asset);
+          const primaryBot = attributedBot(trade.botId || trade.signal?.botId, trade.asset);
+          const bots = primaryBot ? [primaryBot] : [];
           for (const botId of bots) {
             const key = `di:bot:${botId}:perf`;
             const existing = (await kv.get(key)) || {
@@ -1055,10 +1090,14 @@ export default async function handler(req, res) {
         const botId = ab.botId;
         const mapped = BOT_ASSET_MAP[botId];
         if (!mapped) continue; // 알 수 없는 봇 ID 스킵
-        const assets = mapped === "ALL" ? ASSETS : mapped; // ★ 2026-06-11: 동적 유니버스 봇
+        // ★ 2026-07-08 귀속 v2: 기존 `assets 포함 여부` 집계는 같은 포지션을 커버 봇 전부에
+        //   중복 계상(ALL 봇 2종은 전 포트폴리오를 각자 계상 → marketValue 가 할당의 15~45배).
+        //   이제 포지션의 발원 봇(botId, 레거시는 attributedBot 폴백) 기준으로만 집계.
+        const botOwnedPositions = Object.values(positionMap)
+          .filter(p => attributedBot(p.botId, p.symbol) === botId);
 
         // ── 기존 포지션 백필: 포지션 있는데 거래 기록이 0이면 초기 진입으로 기록 ──
-        const botPositionsForBackfill = assets.map(a => positionMap[a]).filter(Boolean);
+        const botPositionsForBackfill = botOwnedPositions;
         if (botPositionsForBackfill.length > 0) {
           const perfKeyBf = `di:bot:${botId}:perf`;
           const perfBf = (await kv.get(perfKeyBf)) || { botId, trades: [], tradeCount: 0, realizedPL: 0, totalBuyCost: 0, totalSellRevenue: 0, winCount: 0 };
@@ -1083,9 +1122,7 @@ export default async function handler(req, res) {
           }
         }
 
-        const botPositions = assets
-          .map(a => positionMap[a])
-          .filter(Boolean);
+        const botPositions = botOwnedPositions;
         const botUnrealizedPL = botPositions.reduce((s, p) => s + parseFloat(p.unrealized_pl || 0), 0);
         const botMarketValue = botPositions.reduce((s, p) => s + parseFloat(p.market_value || 0), 0);
 
@@ -1343,7 +1380,18 @@ function pickTopBotSignal(botSignals) {
   // type 필드를 btc-cron 호환으로 보장 (BUY/SELL)
   const top = sorted[0].signal;
   if (!top.type) top.type = top.side === "LONG" ? "BUY" : (top.side === "SHORT" ? "SELL" : "BUY");
+  // ★ 2026-07-08 귀속 v2: 발원 봇 ID 부착 — perf·포지션이 "이 신호를 만든 봇 1곳"에만
+  //   귀속되게 함(기존: getBotsForAsset 전체에 중복 기록 → ALL 봇 2종이 전 거래를 각자 계상).
+  top.botId = sorted[0].botId;
   return top;
+}
+
+// ★ 2026-07-08 귀속 v2: 거래/포지션의 귀속 봇 결정.
+//   1순위 명시 botId(신호 발원) → 2순위 getBotsForAsset 첫 봇(고정 유니버스 봇이 매핑 순서상
+//   먼저라 결정적; 어느 고정 봇에도 없으면 crypto-diversity) — 레거시(botId 없는 기존 포지션) 폴백.
+function attributedBot(explicitBotId, asset) {
+  if (explicitBotId) return explicitBotId;
+  return getBotsForAsset(asset)[0] || null;
 }
 
 // ════════════════════════════════════════════════════════
