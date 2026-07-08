@@ -15,6 +15,7 @@
 // Timeout: 60초 (8 strategy × 8 strategy × 평균 16조합 × 100ms ≈ 13초)
 // ════════════════════════════════════════════════════════════════════
 
+import { requireCronAuth } from "../_shared/require-cron.js";
 import { getKlines } from "../_shared/binance-client.js";
 import { gridSearch, klinesToOhlc } from "../_shared/strategy-backtester.js";
 import { PARAM_SPACE } from "../_shared/strategy-param-space.js";
@@ -67,6 +68,7 @@ async function fetchOhlc(symbol = SYMBOL) {
 }
 
 export default async function handler(req, res) {
+  if (!requireCronAuth(req, res)) return; // ★ 크론/내부 전용 (2026-07-08 무인증 노출 차단)
   res.setHeader("Access-Control-Allow-Origin", "*");
   const t0 = Date.now();
   const log = [];

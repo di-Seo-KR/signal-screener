@@ -18,6 +18,7 @@
 //   GET /api/agents/shadow-debug?retroSL=3,4,5&retroTP=5,6,8  // 다중 변형 비교
 // ════════════════════════════════════════════════════════════════════
 
+import { requireCronAuth } from "../_shared/require-cron.js";
 import { sendCards, buildCard, fmtKSTShort } from "../_shared/telegram.js";
 import { batchBacktest } from "../_shared/ohlc-backtest.js";
 
@@ -145,6 +146,7 @@ function parseList(s) {
 }
 
 export default async function handler(req, res) {
+  if (!requireCronAuth(req, res)) return; // ★ 크론/내부 전용 (2026-07-08 무인증 노출 차단)
   res.setHeader("Access-Control-Allow-Origin", "*");
   try {
     const days = Number(req.query?.days) || 30;

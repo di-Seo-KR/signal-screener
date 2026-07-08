@@ -17,6 +17,7 @@
 // Timeout: 60초 — 8 strategy × 20 sample × 백테스트 ≈ 16~25초
 // ════════════════════════════════════════════════════════════════════
 
+import { requireCronAuth } from "../_shared/require-cron.js";
 import { getKlines } from "../_shared/binance-client.js";
 import { backtestStrategy, klinesToOhlc } from "../_shared/strategy-backtester.js";
 import { sampleRandomParams } from "../_shared/strategy-param-space.js";
@@ -543,6 +544,7 @@ export async function runDiscoveryCycle({ budgetMs = 280_000, symbolsPerRun = SY
 
 // Vercel cron 핸들러 — 추출된 runDiscoveryCycle 을 280초 예산으로 호출 (얇은 래퍼).
 export default async function handler(req, res) {
+  if (!requireCronAuth(req, res)) return; // ★ 크론/내부 전용 (2026-07-08 무인증 노출 차단)
   res.setHeader("Access-Control-Allow-Origin", "*");
   const dryRun = req.query?.dryRun === "1" || req.query?.dryRun === "true";
   const result = await runDiscoveryCycle({ budgetMs: 280_000, symbolsPerRun: SYMBOLS_PER_RUN, dryRun });

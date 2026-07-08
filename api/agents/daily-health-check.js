@@ -13,6 +13,7 @@
 // Cron: 매일 1회. Timeout 60초. 이상 있을 때만 텔레그램 발송(스팸 방지).
 // ════════════════════════════════════════════════════════════════════
 
+import { requireCronAuth } from "../_shared/require-cron.js";
 import { sendTelegram } from "../_shared/telegram.js";
 import { ALL_STRATEGIES } from "../_shared/strategies/index.js";
 
@@ -29,6 +30,7 @@ function minsAgo(t) {
 }
 
 export default async function handler(req, res) {
+  if (!requireCronAuth(req, res)) return; // ★ 크론/내부 전용 (2026-07-08 무인증 노출 차단)
   res.setHeader("Access-Control-Allow-Origin", "*");
   const findings = [];
   const add = (level, area, msg) => findings.push({ level, area, msg });

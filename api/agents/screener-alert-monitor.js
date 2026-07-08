@@ -18,6 +18,7 @@
 //   - 종목 풀은 watchlist + sample universe (BTC, ETH, SPY, AAPL, NVDA, TSLA)
 // ════════════════════════════════════════════════════════════════════
 
+import { requireCronAuth } from "../_shared/require-cron.js";
 import { sendTelegram } from "../_shared/telegram.js";
 import { pushNotification } from "../notifications/list.js";
 import { getPrefs } from "../notifications/preferences.js";
@@ -284,6 +285,7 @@ async function processUser(kv, uid) {
 }
 
 export default async function handler(req, res) {
+  if (!requireCronAuth(req, res)) return; // ★ 크론/내부 전용 (2026-07-08 무인증 노출 차단)
   res.setHeader("Cache-Control", "no-store");
   const kv = await getKv();
   if (!kv) {

@@ -16,6 +16,7 @@
 //   P2-9(DISABLED 백테스트 재승급 차단)·P2-10(stale leaderboard 승급 보류)으로 확보.
 // ────────────────────────────────────────────────────────────────────
 
+import { requireCronAuth } from "../_shared/require-cron.js";
 import {
   setStrategyStatus,
   getStrategyStatus,
@@ -69,6 +70,7 @@ function decide(metrics) {
 }
 
 export default async function handler(req, res) {
+  if (!requireCronAuth(req, res)) return; // ★ 크론/내부 전용 (2026-07-08 무인증 노출 차단)
   res.setHeader("Access-Control-Allow-Origin", "*");
   const dryRun = req.query?.dryRun === "1" || req.query?.dryRun === "true";
   const log = [];

@@ -20,6 +20,7 @@
 // Cron: `15 * * * *` (매시 15분)
 // ════════════════════════════════════════════════════════════════════
 
+import { requireCronAuth } from "../_shared/require-cron.js";
 import { createHash } from "crypto";
 
 export const config = { maxDuration: 60 };
@@ -158,6 +159,7 @@ function metricsFromPerf(perf) {
 
 // ── 메인 핸들러 ───────────────────────────────────────────────────
 export default async function handler(req, res) {
+  if (!requireCronAuth(req, res)) return; // ★ 크론/내부 전용 (2026-07-08 무인증 노출 차단)
   try {
     const kv = await getKv();
     const users = await listAllUsers(kv);

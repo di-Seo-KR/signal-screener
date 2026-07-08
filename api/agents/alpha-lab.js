@@ -18,6 +18,7 @@
 // Timeout: 60초 (모든 사용자 처리. shadow-summary 가 누적 데이터라 빠름)
 // ════════════════════════════════════════════════════════════════════
 
+import { requireCronAuth } from "../_shared/require-cron.js";
 import { getKlines } from "../_shared/binance-client.js";
 import { updateMarketRegimeAndWeights } from "../_shared/strategy-router.js";
 
@@ -332,6 +333,7 @@ async function fetchMarketRegime() {
 // 메인 핸들러
 // ────────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
+  if (!requireCronAuth(req, res)) return; // ★ 크론/내부 전용 (2026-07-08 무인증 노출 차단)
   res.setHeader("Access-Control-Allow-Origin", "*");
   const t0 = Date.now();
   const log = [];
