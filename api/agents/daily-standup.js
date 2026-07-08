@@ -25,6 +25,7 @@
 // 수동 호출: GET /api/agents/daily-standup?dryRun=1
 // ════════════════════════════════════════════════════════════════════
 
+import { requireCronAuth } from "../_shared/require-cron.js";
 import Anthropic from "@anthropic-ai/sdk";
 import { sendCards, buildCard, fmtKST } from "../_shared/telegram.js";
 import { fetchGA4DailySummary } from "../_shared/ga4.js";
@@ -1278,6 +1279,7 @@ function buildCardsForMarketing(m) {
 
 // ── 메인 핸들러 ──
 export default async function handler(req, res) {
+  if (!requireCronAuth(req, res)) return; // ★ 크론/내부 전용 (2026-07-08 무인증 노출 차단)
   res.setHeader("Access-Control-Allow-Origin", "*");
   const dryRun = req.query?.dryRun === "1" || req.query?.dryRun === "true";
   const log = [];

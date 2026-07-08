@@ -12,9 +12,11 @@
 //
 // ════════════════════════════════════════════════════════════════════
 
+import { requireCronAuth } from "../_shared/require-cron.js";
 import { fetchGA4DailySummary } from "../_shared/ga4.js";
 
 export default async function handler(req, res) {
+  if (!requireCronAuth(req, res)) return; // ★ 크론/내부 전용 (2026-07-08 무인증 노출 차단)
   res.setHeader("Access-Control-Allow-Origin", "*");
 
   // 환경변수 존재 여부 (값은 노출 안 함)

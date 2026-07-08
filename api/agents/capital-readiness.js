@@ -27,6 +27,7 @@
 //   상태 — di:alpha:capital-readiness-state    (startedAt, lastVerdict, lastMilestone)
 // ════════════════════════════════════════════════════════════════════
 
+import { requireCronAuth } from "../_shared/require-cron.js";
 import { sendTelegram } from "../_shared/telegram.js";
 
 async function getKv() {
@@ -51,6 +52,7 @@ function fmtUsd(n) {
 }
 
 export default async function handler(req, res) {
+  if (!requireCronAuth(req, res)) return; // ★ 크론/내부 전용 (2026-07-08 무인증 노출 차단)
   res.setHeader("Access-Control-Allow-Origin", "*");
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();
