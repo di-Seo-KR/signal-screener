@@ -24,6 +24,7 @@ import {
   // ★ 2026-05-11: 신규 페이지 아이콘
   Sparkles, Trophy, Share2, GitCompare, PieChart, Save, Crown,
   Coins, // ★ 2026-06-08: 코인별 분석 페이지(/coin)
+  Gauge, // ★ 2026-07 정보 피벗 Phase 2: 지표 허브(/indicators)
 } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -107,8 +108,9 @@ const getNavCategories = (t) => [
   },
   {
     id: "indicators", label: t("nav.indicators"), catId: "indicators", icon: Activity,
-    // ★ 온체인 허브는 Phase 2 예정 — 현재는 경제 캘린더 · 시장 심리 2종만
+    // ★ 2026-07 정보 피벗 Phase 2: 지표 허브를 첫 항목으로 추가 (기존 2종 유지)
     items: [
+      { id: "indicators", label: "지표 허브", icon: Gauge },
       { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
       { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
     ],
@@ -158,6 +160,7 @@ const getMobileMenuSections = (isOwner, t) => [
   },
   {
     section: t("nav.indicators"), items: [
+      { id: "indicators", label: "지표 허브", icon: Gauge }, // ★ Phase 2
       { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
       { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
     ],
@@ -201,6 +204,7 @@ const gnbCategoryMap = {
   screener: "market", anomaly: "market", "saved-screeners": "market",
   "risk-map": "market", "quant-report": "market",
   // 지표 (거시·심리)
+  indicators: "indicators", // ★ Phase 2 — 지표 허브
   "econ-calendar": "indicators", sentiment: "indicators",
   // 트레이딩 (내부 운영 전용) — 전략 검증 도구 포함
   "auto-trading": "ai-quant", "real-trading": "ai-quant",

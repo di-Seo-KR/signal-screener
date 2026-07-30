@@ -69,7 +69,11 @@
     { "source": "/briefing", "destination": "/api/briefing" },
     { "source": "/briefing/:date", "destination": "/api/briefing?date=:date" },
     { "source": "/kimchi-premium", "destination": "/api/kimchi-premium" },
+    { "source": "/econ", "destination": "/api/econ-page" },
+    { "source": "/econ/:key", "destination": "/api/econ-page?key=:key" },
+    { "source": "/index/:slug", "destination": "/api/index-page?slug=:slug" },
     { "source": "/sitemap-briefings.xml", "destination": "/api/sitemap-briefings" },
+    { "source": "/sitemap-econ.xml", "destination": "/api/sitemap-econ" },
     { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon)(?!about)(?!guide)(?!privacy)(?!terms)(?!contact)(?!blog)(?!coin)(?!screener)(?!auto-trading)(?!real-trading)(?!alpha-lab)(?!portfolio-analysis)(?!portfolio)(?!backtest-compare)(?!backtest)(?!strategy)(?!risk-map)(?!sentiment)(?!econ-calendar)(?!news)(?!anomaly)(?!alerts)(?!quant-portfolio)(?!quant-port)(?!quant-report)(?!notifications)(?!saved-screeners)(?!leaderboard)(?!reports)(?!copy-trading)(?!pricing)(?!profile).*)", "destination": "/index.html" }
   ],
   "headers": [
@@ -200,6 +204,10 @@
     {
       "path": "/api/agents/daily-briefing",
       "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/agents/econ-results",
+      "schedule": "20 * * * *"
     }
   ]
 }
