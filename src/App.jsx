@@ -293,7 +293,9 @@ const Onboarding = lazy(() => import("./Onboarding.jsx"));
 const PortfolioAnalysis = lazy(() => import("./PortfolioAnalysis.jsx"));
 // PLAN-BIZ Q3 #1 (2026-05-11) — 구독 모델 (Free / Pro / Premium)
 const Pricing = lazy(() => import("./Pricing.jsx"));
+const IndicatorHub = lazy(() => import("./pages/IndicatorHub.jsx")); // ★ 2026-07 정보 피벗 Phase 2 — 지표 허브
 import { ALL_STRATEGIES } from "./strategies.js";
+import { IndicatorCard } from "./components/uiKit.jsx"; // ★ 디자인 시스템 v1 — 홈 ④ 첫 적용
 
 // 공용 lazy fallback — 탭 전환 시 0.1~0.3초 노출
 function LazyTabFallback() {
@@ -4422,7 +4424,8 @@ function AppInner() {
 
   // ★ 2026-07 정보 피벗 Phase 1: mypage 추가 — 이전엔 setTab("mypage") 로 진입 후
   //   새로고침하면 홈으로 튕기던 문제(경로 미등록) 해소. 기존 탭 id 는 전부 유지.
-  const validTabs = ["home","auto-trading","real-trading","alpha-lab","portfolio","portfolio-analysis","screener","alerts","notifications","saved-screeners","news","quant-portfolio","quant-port","risk-map","backtest","backtest-compare","copy-trading","sentiment","strategy","anomaly","quant-report","econ-calendar","leaderboard","reports","bot-report","profile","mypage","dev","pricing","about","privacy","terms","contact","marketing"];
+  // ★ 2026-07 정보 피벗 Phase 2: indicators(지표 허브) 추가.
+  const validTabs = ["home","auto-trading","real-trading","alpha-lab","portfolio","portfolio-analysis","screener","alerts","notifications","saved-screeners","news","quant-portfolio","quant-port","risk-map","backtest","backtest-compare","copy-trading","sentiment","strategy","anomaly","quant-report","econ-calendar","indicators","leaderboard","reports","bot-report","profile","mypage","dev","pricing","about","privacy","terms","contact","marketing"];
 
   // ── 경로 → tab 변환 ──
   //   /reports             → "reports"
@@ -4509,6 +4512,7 @@ function AppInner() {
     portfolio: { title: "포트폴리오 | Zepta", desc: "실시간 포트폴리오 추적 및 벤치마크 비교" },
     news: { title: "마켓 뉴스 | Zepta", desc: "AI 센티먼트 분석이 포함된 실시간 글로벌 투자 뉴스" },
     "econ-calendar": { title: "경제 캘린더 | Zepta", desc: "주요 경제 지표 발표 일정 및 영향 분석" },
+    indicators: { title: "지표 허브 | Zepta", desc: "공포·탐욕, 마켓 온도 등 핵심 시장 지표 요약과 해석" },
     sentiment: { title: "소셜 센티먼트 | Zepta", desc: "StockTwits · Reddit 기반 실시간 투자 심리 분석" },
     alerts: { title: "매매 알림 | Zepta", desc: "실시간 AI 매매 신호 알림 및 텔레그램 연동" },
     anomaly: { title: "이상 탐지 | Zepta", desc: "AI 기반 시장 이상 징후 실시간 탐지" },
@@ -4535,6 +4539,7 @@ function AppInner() {
     "risk-map": "market",
     "quant-report": "market",
     // 지표 (거시·심리)
+    "indicators": "indicators", // ★ Phase 2 — 지표 허브
     "econ-calendar": "indicators",
     "sentiment": "indicators",
     // 트레이딩 (내부 운영 전용) — 전략 검증 도구 포함
@@ -7551,6 +7556,21 @@ function AppInner() {
           const fgCryptoVal = fearGreed.crypto?.value;
           const fgColorOf = (v) => v == null ? C.text3 : (v <= 25 ? C.red : v <= 40 ? "#FF8C42" : v <= 60 ? C.yellow : C.green);
           const fgLabelOf = (v) => v == null ? "—" : (v <= 25 ? "극도의 공포" : v <= 40 ? "공포" : v <= 60 ? "중립" : v <= 75 ? "탐욕" : "극도의 탐욕");
+          // ★ Phase 2 — ④ 블록 uiKit IndicatorCard 용 tone·한줄 해석 매핑
+          //   (tone 규격: up=green / down=red / neutral / hot=orange / cold=blue)
+          const fgToneOf = (v) => v == null ? "neutral" : v <= 40 ? "down" : v <= 60 ? "neutral" : v <= 75 ? "up" : "hot";
+          const fgDescOf = (v) => v == null ? "심리 데이터를 불러오는 중입니다"
+            : v <= 25 ? "시장 참여자 심리가 극도로 위축된 구간입니다"
+            : v <= 40 ? "불안 심리가 우세한 구간입니다"
+            : v <= 60 ? "쏠림 없이 균형 잡힌 중립 구간입니다"
+            : v <= 75 ? "낙관 심리가 우세한 구간입니다"
+            : "낙관이 과열에 가까워진 구간입니다";
+          const tempToneOf = (v) => v == null ? "neutral" : v <= 25 ? "cold" : v <= 50 ? "up" : v <= 75 ? "hot" : "down";
+          const tempDescOf = (v) => v == null ? ""
+            : v <= 25 ? "시장 에너지가 낮은 차분한 흐름입니다"
+            : v <= 50 ? "완만한 온기가 도는 안정적 흐름입니다"
+            : v <= 75 ? "거래 열기가 달아오른 흐름입니다"
+            : "과열 신호가 나타나는 뜨거운 흐름입니다";
           // ② 톱 뉴스 3행 — 뉴스 탭과 동일 데이터(newsItems) 재사용
           const topNews = [...newsItems].sort((a, b) =>
             new Date(b.date || b.publishedAt || b.pubDate || 0) - new Date(a.date || a.publishedAt || a.pubDate || 0)
@@ -7563,7 +7583,6 @@ function AppInner() {
             .slice(0, 3);
           // ④ Zepta 마켓 온도 — API 실패 시 온도 부분만 조용히 숨김
           const tempVal = marketTemp ? Math.max(0, Math.min(100, Number(marketTemp.temp))) : null;
-          const tempColor = tempVal == null ? C.text3 : (tempVal <= 25 ? C.blue : tempVal <= 50 ? C.green : tempVal <= 75 ? C.yellow : C.red);
           const tempUpdated = (() => {
             if (!marketTemp?.updatedAt) return null;
             const d = new Date(marketTemp.updatedAt);
@@ -7756,27 +7775,36 @@ function AppInner() {
                 )}
               </div>
 
-              {/* ── ④ 시장 지표 스냅샷 — 공포·탐욕 + Zepta 마켓 온도 (숫자·상태 라벨만) ── */}
+              {/* ── ④ 시장 지표 스냅샷 — uiKit IndicatorCard 첫 적용 (정보 피벗 Phase 2) ── */}
               <div style={cardBase}>
-                <div style={{ fontWeight: 800, fontSize: "16px", color: C.text1, marginBottom: "12px" }}>🌡️ 시장 지표 스냅샷</div>
-                <div style={{ display: "grid", gridTemplateColumns: tempVal != null ? "1fr 1fr" : "1fr", gap: "10px" }}>
-                  <div style={{ padding: "14px", borderRadius: "12px", background: `${fgColorOf(fgVal)}10`, border: `1px solid ${fgColorOf(fgVal)}25`, textAlign: "center" }}>
-                    <div style={{ fontSize: "12px", fontWeight: 700, color: C.text3, marginBottom: "6px" }}>공포·탐욕 지수 (주식)</div>
-                    <div style={{ fontSize: "30px", fontWeight: 900, color: fgColorOf(fgVal), lineHeight: 1 }}>{fgVal != null ? fgVal : "—"}</div>
-                    <div style={{ fontSize: "13px", fontWeight: 700, color: fgColorOf(fgVal), marginTop: "4px" }}>{fgLabelOf(fgVal)}</div>
-                    {fgCryptoVal != null && (
-                      <div style={{ fontSize: "12px", color: C.text3, marginTop: "6px" }}>
-                        크립토 {fgCryptoVal} · {fgLabelOf(fgCryptoVal)}
-                      </div>
-                    )}
-                  </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "12px" }}>
+                  <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>🌡️ 시장 지표 스냅샷</span>
+                  <button onClick={() => setTab("indicators")} style={{
+                    fontSize: "13px", fontWeight: 700, color: C.blue, background: `${C.blue}10`,
+                    border: `1px solid ${C.blue}25`, borderRadius: "8px", padding: "4px 12px", cursor: "pointer", whiteSpace: "nowrap",
+                  }}>지표 허브 전체 보기 →</button>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: !isMobile && tempVal != null ? "1fr 1fr" : "1fr", gap: "10px" }}>
+                  <IndicatorCard
+                    title="공포·탐욕 지수 (주식)"
+                    value={fgVal != null ? fgVal : null}
+                    label={fgLabelOf(fgVal)}
+                    tone={fgToneOf(fgVal)}
+                    desc={fgDescOf(fgVal)}
+                    detail={fgCryptoVal != null
+                      ? `크립토 공포·탐욕 ${fgCryptoVal} · ${fgLabelOf(fgCryptoVal)}\n주식과 크립토의 심리가 다르면 자금 흐름의 온도차를 읽는 힌트가 됩니다.`
+                      : null}
+                  />
                   {tempVal != null && (
-                    <div style={{ padding: "14px", borderRadius: "12px", background: `${tempColor}10`, border: `1px solid ${tempColor}25`, textAlign: "center" }}>
-                      <div style={{ fontSize: "12px", fontWeight: 700, color: C.text3, marginBottom: "6px" }}>Zepta 마켓 온도</div>
-                      <div style={{ fontSize: "30px", fontWeight: 900, color: tempColor, lineHeight: 1 }}>{Math.round(tempVal)}°</div>
-                      <div style={{ fontSize: "13px", fontWeight: 700, color: tempColor, marginTop: "4px" }}>{marketTemp.label || "—"}</div>
-                      {tempUpdated && <div style={{ fontSize: "12px", color: C.text3, marginTop: "6px" }}>{tempUpdated}</div>}
-                    </div>
+                    <IndicatorCard
+                      title="Zepta 마켓 온도"
+                      value={Math.round(tempVal)}
+                      unit="°"
+                      label={marketTemp.label || "—"}
+                      tone={tempToneOf(tempVal)}
+                      desc={tempDescOf(tempVal)}
+                      updatedAt={tempUpdated}
+                    />
                   )}
                 </div>
               </div>
@@ -11141,6 +11169,13 @@ function AppInner() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════
+            TAB: 지표 허브 (/indicators) — 2026-07 정보 피벗 Phase 2
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "indicators" && (
+          <Suspense fallback={<LazyTabFallback />}><IndicatorHub onNavigate={setTab} /></Suspense>
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════
             TAB: 경제 캘린더 (토스증권 스타일)
         ═══════════════════════════════════════════════════════════ */}
         {tab === "econ-calendar" && (() => {
@@ -13244,7 +13279,8 @@ function AppInner() {
             { id: "home", cat: "home", label: "홈", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><path d={active ? "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10.5z" : "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-4.5v-6h-3v6H4a1 1 0 0 1-1-1V10.5z"} />{active && <rect x="9" y="14" width="6" height="7" rx="0.5" fill={C.isDark ? C.bg : "#fff"} />}</svg> },
             { id: "news", cat: "news", label: "뉴스", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="18" rx="2" fill={active ? "currentColor" : "none"} /><path d="M8 7h8M8 11h5M8 15h7" stroke={active ? (C.isDark ? C.bg : "#fff") : "currentColor"} strokeWidth="1.8" fill="none" /></svg> },
             { id: "screener", cat: "market", label: "시장", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1}/><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg> },
-            { id: "econ-calendar", cat: "indicators", label: "지표", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="2" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1} /><rect x="3" y="4" width="18" height="17" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" /></svg> },
+            // ★ Phase 2: '지표' 직행 대상 econ-calendar → indicators(지표 허브)
+            { id: "indicators", cat: "indicators", label: "지표", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="2" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1} /><rect x="3" y="4" width="18" height="17" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" /></svg> },
             { id: "profile", cat: "my", label: "MY", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1} /><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg> },
           ].map(item => {
             const isActive = item.cat === gnbCategory;

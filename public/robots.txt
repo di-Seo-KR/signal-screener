@@ -4,6 +4,7 @@ Disallow: /dev
 Disallow: /api/
 Sitemap: https://zepta.app/sitemap.xml
 Sitemap: https://zepta.app/sitemap-briefings.xml
+Sitemap: https://zepta.app/sitemap-econ.xml
 
 User-agent: Googlebot
 Allow: /

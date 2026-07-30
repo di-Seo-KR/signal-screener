@@ -109,7 +109,9 @@ export function computeFundingScore(fundingMap) {
 }
 
 // ── 구성요소 ③ fearGreed — Alternative.me (api/fear-greed.js 크립토 소스와 동일) ──
-async function fetchCryptoFearGreed() {
+//   2026-07-30 (정보 피벗 2차): 지표 허브(api/indicators/summary.js)에서도 재사용할 수
+//   있도록 export 로 공개했습니다. 동작 변경 없음.
+export async function fetchCryptoFearGreed() {
   try {
     const resp = await fetch("https://api.alternative.me/fng/?limit=1", {
       headers: { "User-Agent": "Zepta/1.0" },

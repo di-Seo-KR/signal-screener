@@ -4,12 +4,13 @@
 //   인터스티셜(클릭 시 전면 팝업)도 쿠팡·구글 모두 제거 — 클릭마다 확률성 팝업은
 //   UX 훼손 + 애드센스 Better Ads 정책 위험. 인라인 GoogleAd 유닛만 유지.
 // ════════════════════════════════════════════════════════════════════
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // ── Google AdSense 배너 ──
 // 광고 형식: banner (728x90), rectangle (300x250), in-feed (responsive article), responsive (auto-size)
 export function GoogleAd({ format = "responsive", slot = "auto", style = {} }) {
   const adRef = useRef(null);
+  const [filled, setFilled] = useState(false);
 
   useEffect(() => {
     try {
@@ -19,6 +20,16 @@ export function GoogleAd({ format = "responsive", slot = "auto", style = {} }) {
     } catch (e) {
       // AdSense script not loaded yet
     }
+    // ★ 2026-07-30 (대표 지시 "빈칸으로 두지 말자"): 광고가 실제로 채워졌을 때만 영역을 연다.
+    //   AdSense 는 채움 여부를 <ins data-ad-status="filled|unfilled"> 로 표시 — 승인 전/미채움엔
+    //   컨테이너를 0 높이로 접어 빈 박스가 화면에 남지 않게 함. MutationObserver 로 상태 감지.
+    const ins = adRef.current;
+    if (!ins) return;
+    const check = () => setFilled(ins.getAttribute("data-ad-status") === "filled");
+    check();
+    const mo = new MutationObserver(check);
+    mo.observe(ins, { attributes: true, attributeFilter: ["data-ad-status"] });
+    return () => mo.disconnect();
   }, []);
 
   // 광고 형식에 따른 기본 스타일 지정
@@ -37,7 +48,12 @@ export function GoogleAd({ format = "responsive", slot = "auto", style = {} }) {
   };
 
   return (
-    <div style={{ textAlign: "center", overflow: "hidden", ...getAdStyle(), ...style }}>
+    <div style={{
+      textAlign: "center", overflow: "hidden",
+      // ★ 채워진 광고만 영역 차지 — 미채움(승인 전 포함)은 0 높이로 접힘(빈 박스 금지)
+      ...(filled ? getAdStyle() : { minHeight: 0, height: 0, margin: 0, padding: 0 }),
+      ...(filled ? style : {}),
+    }}>
       <ins
         ref={adRef}
         className="adsbygoogle"

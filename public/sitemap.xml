@@ -236,4 +236,26 @@
     <priority>0.85</priority>
   </url>
 
+  <!-- Zepta 자체 지수 공개 페이지 (정보 피벗 2차) -->
+  <url>
+    <loc>https://zepta.app/index/market-temp</loc>
+    <lastmod>2026-07-30</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://zepta.app/index/funding-squeeze</loc>
+    <lastmod>2026-07-30</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+
+  <url>
+    <loc>https://zepta.app/index/alt-heat</loc>
+    <lastmod>2026-07-30</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+
 </urlset>
