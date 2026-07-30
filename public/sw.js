@@ -4,7 +4,10 @@
 // v4 — 시세 API stale 위험 차단 + /api/ stale-while-revalidate (5분)
 // 이전 v3 는 yahoo/finnhub/coingecko 응답까지 무조건 cache.put → 모바일 스토리지
 // 비대 + 오래된 시세 노출 위험. v4 부터 외부 시세 직접 요청은 캐시 안 함.
-const CACHE_NAME = 'zepta-v6';
+// ★ 2026-07-30 v7: 피벗 배포(#206·#207) 연속 2회 동안 버전 미증가로 구캐시가 옛 청크를
+//   물고 있어 일부 클라이언트가 스플래시에서 정지(대표 실보고). 캐시 전면 갱신.
+//   교훈 재확인: 청크 해시가 바뀌는 배포가 나가면 SW 캐시 버전도 함께 올릴 것.
+const CACHE_NAME = 'zepta-v7';
 const API_MAX_AGE_MS = 5 * 60 * 1000; // 5분
 const STATIC_ASSETS = [
   '/',
@@ -113,11 +116,11 @@ self.addEventListener('fetch', (event) => {
               caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
             }
             return response;
-          }).catch(() => {
-            // 정적 자산 폴백 (기본값)
-            if (url.endsWith('.js')) return new Response('', { status: 404 });
-            if (url.endsWith('.css')) return new Response('', { status: 404 });
-            return new Response('', { status: 404 });
+          }).catch((err) => {
+            // ★ 2026-07-30 수정: 빈 404 응답 조작 금지 — 빈 스크립트를 물려주면 앱이
+            //   조용히 스플래시에서 영구 정지함(실사례). 실패를 그대로 던져 브라우저
+            //   에러로 표면화하고, index.html 의 청크 로드 실패 복구/유저 새로고침이 동작하게 함.
+            throw err;
           });
         })
     );
