@@ -2141,7 +2141,7 @@ function calcBuyLevels(asset) {
   if (!currentPrice || currentPrice <= 0) {
     return {
       levels: [],
-      summary: "현재가 정보 부재로 매수 타점 계산 불가"
+      summary: "현재가 정보 부재로 주요 지지 구간 계산 불가"
     };
   }
 
@@ -2297,14 +2297,14 @@ function calcBuyLevels(asset) {
       levels[1].discount,
       levels[2].discount
     );
-    summary = `현재가 대비 -${minDiscount.toFixed(1)}%~-${maxDiscount.toFixed(1)}% 구간에 매수 타점 형성`;
+    summary = `현재가 대비 -${minDiscount.toFixed(1)}%~-${maxDiscount.toFixed(1)}% 영역에 주요 지지 구간 형성`;
   } else if (levels.length > 0) {
     const discounts = levels.map(l => l.discount);
     const minDiscount = Math.min(...discounts);
     const maxDiscount = Math.max(...discounts);
     summary = `현재가 대비 -${minDiscount.toFixed(1)}%~-${maxDiscount.toFixed(1)}% 구간 진입 추천`;
   } else {
-    summary = "충분한 데이터 부재로 매수 타점 계산 불가";
+    summary = "충분한 데이터 부재로 주요 지지 구간 계산 불가";
   }
 
   return {
@@ -4042,12 +4042,12 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                   borderLeft: `3px solid ${diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow}`,
                 }}>
                   {isBullish && targetPrice
-                    ? `기술적 상승 신호 우세. 목표가 ${fmtP(targetPrice)}(+${upside}%)까지 상승 여력, 손절 ${fmtP(stopLoss)} 이탈 시 청산 권장.${riskReward ? ` R:R 1:${riskReward}.` : ""}`
+                    ? `기술적 상승 신호 우세. 상단 참고 레벨 ${fmtP(targetPrice)}(+${upside}%), 하단 리스크 레벨 ${fmtP(stopLoss)}.${riskReward ? ` R:R 1:${riskReward}.` : ""}`
                     : isBullish
-                    ? `상승 추세 감지. 분할 매수 접근 유효. ${fmtP(stopLoss)} 하회 시 리스크 관리 필요.`
+                    ? `상승 추세 감지. ${fmtP(stopLoss)} 하회 시 신호 약화 가능성이 있는 구간입니다.`
                     : isBearish
-                    ? `하락 신호 우세. 관망 또는 ${fmtP(sup1?.price || stopLoss)} 지지 확인 후 진입 권장.`
-                    : `혼조 구간. 지지 ${fmtP(sup1?.price || stopLoss)}·저항 ${fmtP(res1?.price)} 돌파 확인 후 대응.`}
+                    ? `하락 신호 우세. ${fmtP(sup1?.price || stopLoss)} 이 주요 지지 레벨로 관측됩니다.`
+                    : `혼조 구간. 지지 ${fmtP(sup1?.price || stopLoss)}·저항 ${fmtP(res1?.price)} 사이에서 신호가 혼재된 상태입니다.`}
                 </div>
 
                 {/* 목표가 + 손절가 (근거 표시) */}
@@ -4333,6 +4333,15 @@ const SCREENER_PRESETS = [
 // 소유자 전용 기능 게이트 (실전매매 탭) — 이 이메일로 로그인한 사용자에게만 노출
 const OWNER_EMAIL = "donginseo0421@gmail.com";
 
+// ★ 2026-07 정보 서비스 피벗: 매매 관련 탭 전체를 내부 운영(owner) 전용으로 게이트
+//   비owner 접근 시 렌더 차단 + 안내 화면 (real-trading 기존 게이트 패턴 확장)
+//   quant-portfolio 는 quant-port 의 별칭 라우트라 함께 포함.
+const OWNER_ONLY_TABS = new Set([
+  "auto-trading", "real-trading", "alpha-lab", "copy-trading", "leaderboard",
+  "reports", "bot-report", "backtest", "backtest-compare", "strategy",
+  "quant-port", "quant-portfolio", "alerts", "pricing",
+]);
+
 function AppInner() {
   const { t } = useLanguage();
   const { user, loading: authLoading, signOut, refreshUser } = useAuth();
@@ -4492,7 +4501,7 @@ function AppInner() {
 
   // ── 탭별 SEO 메타 정보 (제목, 설명, OG 태그용) ──
   const TAB_META = {
-    home: { title: "Zepta — AI 퀀트 투자 플랫폼", desc: "실시간 주식/코인 스크리너, 9개 알파 전략 자동매매, 백테스트, 리스크 관리" },
+    home: { title: "Zepta — 투자 정보 플랫폼", desc: "실시간 주식/코인 스크리너, 시장 신호·데이터 분석, 뉴스·경제 캘린더, 리스크 관리" },
     screener: { title: "주식 스크리너 | Zepta", desc: "AI 기반 주식 스크리닝 — 모멘텀, 변동성, 수급 조건으로 종목 필터링" },
     "auto-trading": { title: "AI 자동매매 | Zepta", desc: "9개 퀀트 전략 기반 암호화폐 자동매매 봇" },
     portfolio: { title: "포트폴리오 | Zepta", desc: "실시간 포트폴리오 추적 및 벤치마크 비교" },
@@ -4507,7 +4516,7 @@ function AppInner() {
     "risk-map": { title: "리스크 맵 | Zepta", desc: "시장 리스크 종합 분석 히트맵" },
     "quant-report": { title: "퀀트 리포트 | Zepta", desc: "AI 기반 실시간 시장 분석 리포트" },
     profile: { title: "프로필 | Zepta", desc: "투자 성적표 및 계정 설정" },
-    about: { title: "서비스 소개 | Zepta", desc: "Zepta AI 퀀트 투자 플랫폼 소개" }
+    about: { title: "서비스 소개 | Zepta", desc: "Zepta 투자 정보 플랫폼 소개" }
   };
 
   // ── GNB 카테고리 상태 ──
@@ -6724,14 +6733,15 @@ function AppInner() {
       if (!isInputFocused) {
         if (e.key === "1") setTab("home");
         else if (e.key === "2") setTab("screener");
-        else if (e.key === "3") setTab("auto-trading");
+        // ★ 2026-07 정보 서비스 피벗: 비owner 는 '3' 단축키로 뉴스 이동
+        else if (e.key === "3") setTab(isOwner ? "auto-trading" : "news");
         else if (e.key === "4") setTab("portfolio");
         else if (e.key === "5") setTab("news");
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [isOwner]);
 
   // ── 스크롤 감지 (맨 위로 버튼) ──
   useEffect(() => {
@@ -7320,7 +7330,7 @@ function AppInner() {
               }}>
                 <div style={{ position: "absolute", top: "-30px", right: "-20px", fontSize: "100px", opacity: 0.06 }}>🚀</div>
                 <h2 style={{ fontSize: isMobile ? "20px" : "24px", fontWeight: 900, color: C.text1, marginBottom: "8px", letterSpacing: "-0.02em" }}>
-                  퀀트 9개 전략으로 매수 타점을 검증합니다
+                  퀀트 전략이 주요 지지 구간을 자동 분석합니다
                 </h2>
                 <p style={{ fontSize: "15px", color: C.text2, marginBottom: "16px", lineHeight: 1.55, wordBreak: "keep-all" }}>
                   주식 · 코인 · 외환까지. 무료로 시작하고 검증된 전략을 골라 쓰세요.
@@ -7387,21 +7397,22 @@ function AppInner() {
                 {[
                   // ★ 2026-05-12 v2: 한국 핀테크 컨벤션 재정비 — 토스/카카오/미래에셋 reference
                   //   원칙: 짧은 명사형, AI 마케팅 단어 제거, 업계 표준 외래어 유지 (백테스트/카피트레이딩)
+                  // ★ 2026-07 정보 서비스 피벗: 매매 관련 버튼은 내부 운영(owner) 전용
                   { icon: "🔍", label: "스크리너", tab: "screener" },
-                  { icon: "🤖", label: "자동매매", tab: "auto-trading" },
-                  { icon: "🧬", label: "알파 랩", tab: "alpha-lab" },
-                  { icon: "🏆", label: "봇 랭킹", tab: "leaderboard" },
-                  { icon: "🔗", label: "카피트레이딩", tab: "copy-trading" },
-                  { icon: "📊", label: "전략 분석", tab: "strategy" },
-                  { icon: "🎯", label: "백테스트", tab: "backtest" },
-                  { icon: "⚖️", label: "전략 비교", tab: "backtest-compare" },
+                  { icon: "🤖", label: "자동매매", tab: "auto-trading", ownerOnly: true },
+                  { icon: "🧬", label: "알파 랩", tab: "alpha-lab", ownerOnly: true },
+                  { icon: "🏆", label: "봇 랭킹", tab: "leaderboard", ownerOnly: true },
+                  { icon: "🔗", label: "카피트레이딩", tab: "copy-trading", ownerOnly: true },
+                  { icon: "📊", label: "전략 분석", tab: "strategy", ownerOnly: true },
+                  { icon: "🎯", label: "백테스트", tab: "backtest", ownerOnly: true },
+                  { icon: "⚖️", label: "전략 비교", tab: "backtest-compare", ownerOnly: true },
                   { icon: "💼", label: "자산 분석", tab: "portfolio-analysis" },
                   { icon: "💾", label: "저장한 조건", tab: "saved-screeners" },
                   { icon: "🔔", label: "알림", tab: "notifications" },
-                  { icon: "👑", label: "멤버십", tab: "pricing" },
+                  { icon: "👑", label: "멤버십", tab: "pricing", ownerOnly: true },
                   { icon: "📰", label: "뉴스", tab: "news" },
                   { icon: "📅", label: "경제 일정", tab: "econ-calendar" },
-                ].map((item) => (
+                ].filter((item) => !item.ownerOnly || isOwner).map((item) => (
                   <button key={item.tab} onClick={() => setTab(item.tab)} style={{
                     display: "flex", flexDirection: "column", alignItems: "center", gap: "6px",
                     padding: "12px 16px", borderRadius: "16px", border: "none",
@@ -7660,7 +7671,8 @@ function AppInner() {
             {/* ★ 리뉴얼 V2 — 라이브 시그널 보드 (2026-06-12 대표 지시: 마켓 브리핑 아래로) */}
             <HomeSignalBoard isMobile={isMobile} onNavigate={isOwner ? setTab : null} />
 
-            {/* ── AI 퀀트 전략 하이라이트 (핵심 기능 → 최상단) ─── */}
+            {/* ── AI 퀀트 전략 하이라이트 (★ 2026-07 정보 서비스 피벗: 내부 운영 전용) ─── */}
+            {isOwner && (
             <div onClick={() => { setTab("auto-trading"); }} className="ui-card-premium" style={{
               cursor: "pointer", transition: "all .2s",
               position: "relative", overflow: "hidden",
@@ -7686,9 +7698,11 @@ function AppInner() {
                 }}>바로가기 →</div>
               </div>
             </div>
+            )}
 
-            {/* ── 전략 운용 + 리스크 바로가기 위젯 ─── */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+            {/* ── 전략 운용(내부 운영 전용) + 리스크 바로가기 위젯 ─── */}
+            <div style={{ display: "grid", gridTemplateColumns: isOwner ? "1fr 1fr" : "1fr", gap: "12px" }}>
+              {isOwner && (
               <div onClick={() => { setTab("quant-port"); }} style={{
                 background: `linear-gradient(135deg, ${C.card} 0%, ${C.greenBg} 100%)`,
                 borderRadius: "16px", padding: "20px", cursor: "pointer", transition: "all .2s",
@@ -7703,6 +7717,7 @@ function AppInner() {
                   실시간 수익률 추적 →
                 </div>
               </div>
+              )}
               <div onClick={() => { setTab("risk-map"); }} style={{
                 background: `linear-gradient(135deg, ${C.card} 0%, ${C.redBg} 100%)`,
                 borderRadius: "16px", padding: "20px", cursor: "pointer", transition: "all .2s",
@@ -7912,7 +7927,7 @@ function AppInner() {
             )}
 
 
-            {/* ── 오늘의 추천 ─── */}
+            {/* ── 오늘의 신호 강도 상위 ─── */}
             {dailyPicks.length > 0 && (
               <div className="ui-card" style={{
                 borderRadius: "20px", overflow: "hidden", position: "relative",
@@ -7920,7 +7935,7 @@ function AppInner() {
                 <div style={{ position: "relative", padding: "20px" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <span style={{ fontWeight: 800, fontSize: "18px", color: C.text1 }}>{t("tabs.home.todayPicks") || "오늘의 추천"}</span>
+                      <span style={{ fontWeight: 800, fontSize: "18px", color: C.text1 }}>{t("tabs.home.todayPicks") || "오늘의 신호 강도 상위"}</span>
                     </div>
                     <button onClick={() => setPicksExpanded(!picksExpanded)} style={{
                       fontSize: "14px", color: C.blue, background: `${C.blue}10`, border: `1px solid ${C.blue}25`,
@@ -7994,8 +8009,8 @@ function AppInner() {
                   {/* 공유 버튼 */}
                   <button onClick={() => {
                     const top5 = dailyPicks.slice(0, 5).map((p, i) => `${i + 1}. ${p.name} (${p.symbol}) ${p.change >= 0 ? "+" : ""}${p.change}%`).join("\n");
-                    const txt = `[Zepta AI ${t("tabs.home.todayPicks") || "오늘의 추천"}]\n\n${top5}\n\n${t("tabs.home.shareDesc") || "AI 퀀트 9개 전략이 실시간으로 찾아낸 종목입니다"}\n👉 https://zepta.app`;
-                    if (navigator.share) navigator.share({ title: `Zepta AI ${t("tabs.home.todayPicks") || "오늘의 추천"}`, text: txt, url: "https://zepta.app" }).catch(() => {});
+                    const txt = `[Zepta AI ${t("tabs.home.todayPicks") || "오늘의 신호 강도 상위"}]\n\n${top5}\n\n${t("tabs.home.shareDesc") || "AI 퀀트가 다양한 시장 신호를 분석해 실시간으로 찾아낸 종목입니다"}\n👉 https://zepta.app`;
+                    if (navigator.share) navigator.share({ title: `Zepta AI ${t("tabs.home.todayPicks") || "오늘의 신호 강도 상위"}`, text: txt, url: "https://zepta.app" }).catch(() => {});
                     else navigator.clipboard.writeText(txt).then(() => showToast(t("tabs.home.copied") || "추천 종목이 복사되었습니다!", "success")).catch(() => {});
                   }} style={{
                     width: "100%", padding: "10px 0", marginTop: "12px", borderRadius: "12px",
@@ -8006,7 +8021,7 @@ function AppInner() {
                   }}
                   onMouseEnter={e => { e.currentTarget.style.color = C.blue; e.currentTarget.style.background = `${C.blue}10`; e.currentTarget.style.borderColor = `${C.blue}30`; }}
                   onMouseLeave={e => { e.currentTarget.style.color = C.text3; e.currentTarget.style.background = `${C.card2}40`; e.currentTarget.style.borderColor = `${C.border}20`; }}
-                  >📤 {t("tabs.home.shareRecommendation") || "오늘의 추천 공유"}</button>
+                  >📤 {t("tabs.home.shareRecommendation") || "오늘의 신호 강도 상위 공유"}</button>
                 </div>
               </div>
             )}
@@ -8511,7 +8526,7 @@ function AppInner() {
               )}
             </div>
 
-            {/* ── 관심종목 투자 진단 + 매수 타점 (v9 고도화) ─── */}
+            {/* ── 관심종목 투자 진단 + 주요 지지 구간 (v9 고도화) ─── */}
             {watchlist.length > 0 && hotAssets.length > 0 && (() => {
               const watchDiags = watchlist.map(w => {
                 const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
@@ -8524,7 +8539,7 @@ function AppInner() {
               return (
                 <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                    <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>📊 투자 진단 & 매수 타점</span>
+                    <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>📊 투자 진단 & 주요 지지 구간</span>
                     <span style={{ fontSize: mf(11), color: C.text3 }}>실시간 분석</span>
                   </div>
                   {watchDiags.map((w, i) => {
@@ -8566,7 +8581,7 @@ function AppInner() {
                           </div>
                         </div>
 
-                        {/* 4축 미니 바 + 매수 타점 */}
+                        {/* 4축 미니 바 + 주요 지지 구간 */}
                         <div style={{ padding: "6px 12px 10px", display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-start" }}>
                           {/* 4축 진단 미니바 */}
                           <div style={{ display: "flex", gap: "6px", flex: "1 1 160px", minWidth: 0 }}>
@@ -8584,7 +8599,7 @@ function AppInner() {
                             })}
                           </div>
 
-                          {/* 매수 타점 3단계 */}
+                          {/* 주요 지지 구간 3단계 */}
                           {bl.levels.length > 0 && (
                             <div style={{ display: "flex", gap: "4px", flex: "1 1 auto", flexWrap: "wrap", justifyContent: "flex-end" }}>
                               {bl.levels.map((lv, li) => {
@@ -8694,10 +8709,10 @@ function AppInner() {
                   {/* 요약 */}
                   <div style={{ fontSize: "16px", color: C.text3, lineHeight: 1.6, padding: "10px 0 0", borderTop: `1px solid ${C.border}20` }}>
                     {mktScore >= 60
-                      ? `매수 우위 장세 — 상승 종목 ${upCount}개, 추천 ${buyPicks}개 감지`
+                      ? `상승 신호 우세 — 상승 종목 ${upCount}개, 신호 ${buyPicks}개 감지`
                       : mktScore >= 45
-                      ? `혼조 장세 — 방향성 확인 후 진입 권장`
-                      : `약세 장세 — 리스크 관리 필수, 하락 종목 ${dnCount}개`
+                      ? `혼조 장세 — 상승·하락 신호 혼재`
+                      : `약세 장세 — 하락 신호 우세, 하락 종목 ${dnCount}개`
                     }
                   </div>
                 </div>
@@ -9751,7 +9766,8 @@ function AppInner() {
             items={[
               { tab: "portfolio", label: "내 자산" },
               { tab: "portfolio-analysis", label: "자산 분석" },
-              { tab: "quant-port", label: "퀀트 포트폴리오" },
+              // ★ 2026-07 정보 서비스 피벗: 퀀트 포트폴리오는 내부 운영 전용
+              ...(isOwner ? [{ tab: "quant-port", label: "퀀트 포트폴리오" }] : []),
             ]}
             active={tab} onNavigate={setTab} theme={themeMode}
           />
@@ -10051,7 +10067,7 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 전략
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "strategy" && (
+        {tab === "strategy" && isOwner && (
           <div style={{
             background: `linear-gradient(135deg, ${C.purpleBg} 0%, ${C.card} 100%)`,
             borderRadius: "24px", padding: "24px",
@@ -10066,7 +10082,7 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 전략 운용 (퀀트 포트폴리오)
         ═══════════════════════════════════════════════════════════ */}
-        {(tab === "quant-port" || tab === "quant-portfolio") && (
+        {(tab === "quant-port" || tab === "quant-portfolio") && isOwner && (
           <div style={{
             background: `linear-gradient(135deg, ${C.purpleBg} 0%, ${C.blueBg} 100%)`,
             borderRadius: "24px", padding: "24px",
@@ -10183,10 +10199,10 @@ function AppInner() {
                     <div className="text-xl font-black mb-1.5" style={{ color: mktColor }}>{mktVerdict}</div>
                     <div className="text-base" style={{ color: C.text2, lineHeight: 1.6 }}>
                       {mktScore >= 60
-                        ? `매수 우위 장세입니다. 상승 종목 ${upCount}개, 추천 매수 ${buyPicks}개가 감지되었습니다.`
+                        ? `상승 신호가 우세한 상태입니다. 상승 종목 ${upCount}개, 상승 신호 ${buyPicks}개가 감지되었습니다.`
                         : mktScore >= 45
-                        ? `혼조 장세입니다. 방향성 확인 후 신중한 진입을 권장합니다.`
-                        : `약세 장세입니다. 리스크 관리를 최우선으로 하세요. 하락 종목 ${dnCount}개.`}
+                        ? `상승·하락 신호가 혼재된 혼조 상태입니다.`
+                        : `하락 신호가 우세한 상태입니다. 하락 종목 ${dnCount}개.`}
                     </div>
                   </div>
                 </div>
@@ -10263,7 +10279,7 @@ function AppInner() {
                     </div>
                   )}
                   <div className="rounded-[10px] p-3" style={{ background: C.bg }}>
-                    <div className="text-sm mb-1" style={{ color: C.text3 }}>추천 매수 신호</div>
+                    <div className="text-sm mb-1" style={{ color: C.text3 }}>상승 신호 감지</div>
                     <div className="flex items-baseline gap-1.5">
                       <span className="text-2xl font-black" style={{ color: C.blue }}>{buyPicks}</span>
                       <span className="text-base" style={{ color: C.text3 }}>/ {dailyPicks.length} 종목</span>
@@ -10386,10 +10402,10 @@ function AppInner() {
                 </div>
               </div>
 
-              {/* 추천 매수 종목 */}
+              {/* 상승 신호 감지 종목 */}
               {topPicks.length > 0 && (
                 <div className="rounded-[16px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
-                  <div className="font-bold text-lg mb-3.5" style={{ color: C.text1 }}>추천 매수 종목</div>
+                  <div className="font-bold text-lg mb-3.5" style={{ color: C.text1 }}>상승 신호 감지 종목</div>
                   {topPicks.map((pick, i) => {
                     const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
                     return (
@@ -10551,7 +10567,7 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 백테스트
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "backtest" && (
+        {tab === "backtest" && isOwner && (
           <div style={{
             background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.card} 100%)`,
             borderRadius: "24px", padding: "24px",
@@ -11156,7 +11172,7 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 알림
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "alerts" && (
+        {tab === "alerts" && isOwner && (
           <div className="tab-content">
             {/* 알림 히어로 헤더 — 극적인 그라데이션과 섀도우 */}
             <div style={{
@@ -11766,7 +11782,7 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: AI 퀀트 전략 (주식 + 크립토 통합)
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "auto-trading" && (
+        {tab === "auto-trading" && isOwner && (
           <div className="card-stagger">
             <Suspense fallback={<LazyTabFallback />}><AutoTrading theme={themeMode} user={user} isOwner={isOwner} onNavigate={setTab} /></Suspense>
           </div>
@@ -11778,10 +11794,11 @@ function AppInner() {
         {tab === "real-trading" && isOwner && (
           <Suspense fallback={<LazyTabFallback />}><RealTrading theme={themeMode} onNavigate={setTab} /></Suspense>
         )}
-        {tab === "real-trading" && !isOwner && (
+        {/* ★ 2026-07 정보 서비스 피벗: 매매 탭 공통 게이트 — 비owner 는 OWNER_ONLY_TABS 전체 렌더 차단 */}
+        {!isOwner && OWNER_ONLY_TABS.has(tab) && (
           <div style={{ maxWidth: 720, margin: "80px auto", padding: "40px 24px", textAlign: "center", color: C.text2 }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: C.text1, marginBottom: 8 }}>접근 권한이 없는 페이지입니다</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: C.text1, marginBottom: 8 }}>이 기능은 내부 운영 전용입니다</div>
             <div style={{ fontSize: 15, color: C.text3, marginBottom: 24 }}>요청하신 페이지는 존재하지 않거나 접근할 수 없습니다.</div>
             <button onClick={() => setTab("home")} style={{ padding: "10px 20px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.card, color: C.text1, fontWeight: 700, cursor: "pointer" }}>홈으로</button>
           </div>
@@ -11790,7 +11807,7 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: Alpha Lab — 24/7 알파 추적 + 자동 개선 시스템
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "alpha-lab" && (
+        {tab === "alpha-lab" && isOwner && (
           <Suspense fallback={<LazyTabFallback />}><AlphaLab onRequestLogin={() => setShowAuthModal(true)} /></Suspense>
         )}
 
@@ -11832,7 +11849,7 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 봇 리더보드 (/leaderboard)
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "leaderboard" && (
+        {tab === "leaderboard" && isOwner && (
           <Suspense fallback={<LazyTabFallback />}>
             <BotLeaderboard onNavigate={setTab} />
           </Suspense>
@@ -11841,7 +11858,7 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 봇 리포트 목록 (/reports)
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "reports" && (
+        {tab === "reports" && isOwner && (
           <Suspense fallback={<LazyTabFallback />}>
             <BotReport onNavigate={setTab} />
           </Suspense>
@@ -11850,7 +11867,7 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 봇 리포트 상세 (/reports/<botId>)
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "bot-report" && (
+        {tab === "bot-report" && isOwner && (
           <Suspense fallback={<LazyTabFallback />}>
             <BotReport botId={reportBotId} onNavigate={setTab} />
           </Suspense>
@@ -11859,7 +11876,7 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 백테스트 비교 (/backtest-compare)
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "backtest-compare" && (
+        {tab === "backtest-compare" && isOwner && (
           <Suspense fallback={<LazyTabFallback />}>
             <BacktestCompare onNavigate={setTab} />
           </Suspense>
@@ -11868,7 +11885,7 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 카피트레이딩 (/copy-trading) — 법적 안전 모드 (알림 + 설정 복사)
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "copy-trading" && (
+        {tab === "copy-trading" && isOwner && (
           <Suspense fallback={<LazyTabFallback />}>
             <CopyTrading onNavigate={setTab} />
           </Suspense>
@@ -11878,7 +11895,7 @@ function AppInner() {
             TAB: 구독 가격 (/pricing) — PLAN-BIZ Q3 #1
             Free / Pro / Premium 3 tier 비교 · FAQ · 14일 trial CTA
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "pricing" && (
+        {tab === "pricing" && isOwner && (
           <Suspense fallback={<LazyTabFallback />}>
             <Pricing onRequestLogin={() => setShowAuthModal(true)} />
           </Suspense>
@@ -11953,7 +11970,7 @@ function AppInner() {
               }}>
                 <div>
                   <div style={{ fontSize: "16px", fontWeight: 800, color: C.text1, marginBottom: "4px" }}>로그인하고 시작하세요</div>
-                  <div style={{ fontSize: "12px", color: C.text3 }}>관심종목·포트폴리오 동기화, 봇 운용 현황까지</div>
+                  <div style={{ fontSize: "12px", color: C.text3 }}>관심종목·포트폴리오 동기화, 맞춤 시장 신호까지</div>
                 </div>
                 <button onClick={() => setShowAuthModal(true)} style={{
                   padding: "10px 20px", borderRadius: "12px", fontSize: "14px", fontWeight: 700,
@@ -11983,7 +12000,8 @@ function AppInner() {
               }[id] || id);
               return (
                 <>
-                  {/* 모의투자 봇 운용 현황 */}
+                  {/* 모의투자 봇 운용 현황 (★ 2026-07 정보 서비스 피벗: 내부 운영 전용) */}
+                  {isOwner && user && (
                   <div onClick={() => setTab("auto-trading")} style={{
                     background: C.card, borderRadius: "16px", padding: "16px 20px",
                     border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`, marginBottom: "12px", cursor: "pointer",
@@ -12019,6 +12037,7 @@ function AppInner() {
                       </>
                     )}
                   </div>
+                  )}
 
                   {/* 실전매매 실적 (오너 전용) */}
                   {isOwner && user && (
@@ -12230,7 +12249,7 @@ function AppInner() {
               <div style={{ fontSize: "14px", color: C.text3, marginBottom: "12px" }}>AI 퀀트 전략을 무료로 이용할 수 있어요</div>
               <div style={{ display: "flex", gap: "8px" }}>
                 <button onClick={() => {
-                  const txt = "AI가 매수 타점 잡아주는 투자앱이야. 무료인데 한번 써봐 👉 https://zepta.app";
+                  const txt = "시장 신호와 데이터를 한눈에 보는 투자 정보 앱이야. 무료인데 한번 써봐 👉 https://zepta.app";
                   if (navigator.share) navigator.share({ text: txt }).catch(() => {});
                   else navigator.clipboard.writeText(txt).then(() => showToast("복사됨!", "success")).catch(() => {});
                 }} style={{ flex: 1, padding: "10px", borderRadius: "10px", fontSize: "14px", fontWeight: 700, background: C.blue, color: "#fff", border: "none", cursor: "pointer" }}>공유하기</button>
@@ -12264,7 +12283,7 @@ function AppInner() {
                 fontSize: isMobile ? "15px" : "18px", color: C.text2,
                 marginBottom: "0", lineHeight: 1.6, maxWidth: "600px", margin: "0 auto"
               }}>
-                9개 퀀트 전략으로 24/7 자동 분석하고, 최적의 매수 타점을 찾아줍니다.
+                퀀트 지표를 24/7 자동 분석하고, 주요 지지 구간과 시장 신호를 짚어줍니다.
               </p>
             </div>
 
@@ -12279,8 +12298,8 @@ function AppInner() {
                 gap: "16px", marginBottom: "24px"
               }}>
                 {[
-                  { icon: "🤖", title: "AI 퀀트 자동매매", desc: "9개 알파 전략으로 24/7 자동 매매" },
-                  { icon: "📊", title: "실시간 스크리너", desc: "수백 개 지표로 매수 타점 자동 탐색" },
+                  { icon: "🤖", title: "AI 시장 신호 분석", desc: "다양한 알파 신호를 24/7 자동 분석" },
+                  { icon: "📊", title: "실시간 스크리너", desc: "수백 개 지표로 주요 지지 구간 자동 탐색" },
                   { icon: "🎯", title: "백테스트 엔진", desc: "과거 데이터로 전략 성과 검증" },
                   { icon: "⚡", title: "이상 감지", desc: "통계적 이상치 실시간 모니터링" },
                   { icon: "🌍", title: "글로벌 커버리지", desc: "미국·한국 주식 + 주요 암호화폐" },
@@ -12323,7 +12342,7 @@ function AppInner() {
               <section style={{ marginBottom: "32px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "24px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.blue}` }}>
                 <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>서비스 개요</h2>
                 <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "14px", lineHeight: 1.7 }}>
-                  Zepta는 개인 투자자를 위한 종합 투자 정보 플랫폼입니다. 미국 주식과 글로벌 암호화폐 시장을 아우르는 실시간 데이터 분석, AI 기반 퀀트 전략, 자동매매 시스템을 제공하여 데이터 기반의 합리적인 투자 의사결정을 지원합니다.
+                  Zepta는 개인 투자자를 위한 종합 투자 정보 플랫폼입니다. 미국 주식과 글로벌 암호화폐 시장을 아우르는 실시간 데이터 분석, AI 기반 퀀트 시장 신호, 리스크 지표를 제공하여 데이터 기반의 합리적인 투자 의사결정을 지원합니다.
                 </p>
                 <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>
                   기존 금융 서비스의 복잡하고 전문가 중심적인 인터페이스에서 벗어나, 투자 초보자부터 전문 트레이더까지 누구나 쉽게 사용할 수 있는 직관적인 경험을 제공하는 것이 Zepta의 핵심 가치입니다.
@@ -12337,7 +12356,7 @@ function AppInner() {
                     <strong style={{ color: C.text1 }}>실시간 시장 모니터링</strong> — S&P 500, 나스닥, 다우존스 등 주요 지수와 개별 종목의 실시간 시세를 한눈에 확인할 수 있습니다.
                   </p>
                   <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>
-                    <strong style={{ color: C.text1 }}>AI 퀀트 자동매매</strong> — 멀티팩터 시그널 분석을 기반으로 매수/매도 시점을 자동으로 판단합니다.
+                    <strong style={{ color: C.text1 }}>AI 시장 신호 분석</strong> — 멀티팩터 시그널 분석으로 상승·하락 신호 상태를 자동 산출합니다.
                   </p>
                   <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>
                     <strong style={{ color: C.text1 }}>종목 스크리너</strong> — 기술적 분석 지표와 펀더멘털 데이터를 조합하여 투자 기회를 탐색합니다.
@@ -12393,7 +12412,7 @@ function AppInner() {
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>2. 개인정보의 수집 및 이용 목적</h2>
               <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                 <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>회원 관리: 회원 식별, 인증, 계정 관리</p>
-                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>서비스 제공: 관심 종목 저장, 자동매매 봇 설정 저장</p>
+                <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>서비스 제공: 관심 종목 저장, 사용자 설정 저장</p>
                 <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>서비스 개선: 이용 통계 분석, 서비스 품질 향상</p>
                 <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>광고 게재: Google AdSense를 통한 맞춤형 광고 제공</p>
               </div>
@@ -12462,7 +12481,7 @@ function AppInner() {
             <section style={{ marginBottom: "28px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.purple}` }}>
               <h2 style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, marginBottom: "10px" }}>제2조 (서비스의 내용)</h2>
               <p style={{ fontSize: isMobile ? "15px" : "16px", lineHeight: 1.7, marginBottom: "0" }}>
-                서비스는 실시간 시장 데이터 조회 및 분석, AI 기반 자동매매, 종목 스크리닝, 포트폴리오 관리, 경제 캘린더 및 뉴스를 제공합니다. 서비스는 투자 참고 자료를 제공하는 것이며, 투자 자문 서비스가 아닙니다.
+                서비스는 실시간 시장 데이터 조회 및 분석, AI 기반 시장 신호 분석, 종목 스크리닝, 포트폴리오 관리, 경제 캘린더 및 뉴스를 제공합니다. 서비스는 투자 참고 자료를 제공하는 것이며, 투자 자문 서비스가 아닙니다.
               </p>
             </section>
 
@@ -12613,8 +12632,8 @@ function AppInner() {
               ⚠️ 투자 면책 고지
             </p>
             <p style={{ margin: "0 0 6px" }}>
-              Zepta는 투자 도구 제공 서비스이며, 투자자문업·투자일임업자가 아닙니다.
-              제공되는 모든 정보·시그널·자동매매 결과는 투자 판단의 단순 참고용으로,
+              Zepta는 투자 정보·데이터 제공 서비스이며, 투자자문업·투자일임업자가 아닙니다.
+              제공되는 모든 정보·시그널·데이터는 투자 판단의 단순 참고용으로,
               종목 추천이나 투자 권유가 아닙니다.
             </p>
             <p style={{ margin: "0 0 6px" }}>
@@ -12784,13 +12803,17 @@ function AppInner() {
           {[
             { id: "home", cat: "home", label: "홈", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><path d={active ? "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10.5z" : "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-4.5v-6h-3v6H4a1 1 0 0 1-1-1V10.5z"} />{active && <rect x="9" y="14" width="6" height="7" rx="0.5" fill={C.isDark ? C.bg : "#fff"} />}</svg> },
             { id: "screener", cat: "analysis", label: "마켓", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1}/><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg> },
-            { id: "auto-trading", cat: "ai-quant", label: "트레이딩", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="3" fill={active ? "currentColor" : "none"} /><path d="M8 12l3 3 5-6" stroke={active ? (C.isDark ? C.bg : "#fff") : "currentColor"} strokeWidth="2" fill="none" />{active && <circle cx="18" cy="6" r="3.5" fill={C.green} stroke="none" />}</svg> },
+            // ★ 2026-07 정보 서비스 피벗: 하단 탭 '트레이딩' → '뉴스' (owner 포함 공통)
+            { id: "news", cat: "news", label: "뉴스", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="18" rx="2" fill={active ? "currentColor" : "none"} /><path d="M8 7h8M8 11h5M8 15h7" stroke={active ? (C.isDark ? C.bg : "#fff") : "currentColor"} strokeWidth="1.8" fill="none" /></svg> },
             { id: "portfolio", cat: "management", label: "포트폴리오", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" fill="none" stroke={active ? (C.isDark ? C.bg : "#fff") : "currentColor"} strokeWidth="1.8" /></svg> },
             { id: "more", cat: "info", label: "메뉴", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg> },
           ].map(item => {
             const isActive = item.id === "more"
-              ? gnbCategory === "info"
-              : item.cat === gnbCategory;
+              ? gnbCategory === "info" && tab !== "news"
+              : item.id === "news"
+              ? tab === "news"
+              // 뉴스 탭에서는 '뉴스'만 점등 (뉴스는 마켓 카테고리 소속이라 이중 점등 방지)
+              : item.cat === gnbCategory && tab !== "news";
             return (
               <button key={item.id} onClick={() => {
                 if (item.id === "more") {
@@ -12849,7 +12872,8 @@ function AppInner() {
         ];
         const categories = [
           { label: "스크리너", tab: "screener", icon: "🔍" },
-          { label: "시그널 보드", tab: "real-trading", icon: "📡" },
+          // ★ 2026-07 정보 서비스 피벗: 비owner 는 홈 시그널 보드로
+          { label: "시그널 보드", tab: isOwner ? "real-trading" : "home", icon: "📡" },
           { label: "코인 분석", href: "/coin", icon: "🪙" },
           { label: "경제 일정", tab: "econ-calendar", icon: "📅" },
         ];
@@ -12987,6 +13011,7 @@ function AppInner() {
           <Onboarding
             onClose={() => setShowOnboarding(false)}
             onNavigate={(targetTab) => { try { setTab(targetTab); } catch {} }}
+            isOwner={isOwner}
           />
         </Suspense>
       )}

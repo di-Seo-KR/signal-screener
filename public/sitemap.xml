@@ -18,13 +18,6 @@
   </url>
 
   <url>
-    <loc>https://zepta.app/auto-trading</loc>
-    <lastmod>2026-05-01</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.95</priority>
-  </url>
-
-  <url>
     <loc>https://zepta.app/portfolio</loc>
     <lastmod>2026-05-01</lastmod>
     <changefreq>daily</changefreq>
@@ -39,19 +32,6 @@
   </url>
 
   <!-- 분석 및 모니터링 페이지들 -->
-  <url>
-    <loc>https://zepta.app/backtest</loc>
-    <lastmod>2026-05-01</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-  </url>
-
-  <url>
-    <loc>https://zepta.app/strategy</loc>
-    <lastmod>2026-05-01</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.85</priority>
-  </url>
 
   <url>
     <loc>https://zepta.app/risk-map</loc>
@@ -77,26 +57,6 @@
   <!-- quant-port 제거(2026-06-12): quant-portfolio 의 별칭 — canonical 통일로 중복 제거 -->
 
   <!-- 2026-05-11 추가: 실거래 + Alpha Lab + 누락된 SPA 경로 -->
-  <url>
-    <loc>https://zepta.app/real-trading</loc>
-    <lastmod>2026-05-11</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.9</priority>
-  </url>
-
-  <url>
-    <loc>https://zepta.app/alpha-lab</loc>
-    <lastmod>2026-05-11</lastmod>
-    <changefreq>hourly</changefreq>
-    <priority>0.85</priority>
-  </url>
-
-  <url>
-    <loc>https://zepta.app/quant-portfolio</loc>
-    <lastmod>2026-05-11</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.75</priority>
-  </url>
 
   <url>
     <loc>https://zepta.app/anomaly</loc>
@@ -110,13 +70,6 @@
     <lastmod>2026-05-01</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.75</priority>
-  </url>
-
-  <url>
-    <loc>https://zepta.app/alerts</loc>
-    <lastmod>2026-05-01</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.7</priority>
   </url>
 
   <!-- profile 제거(2026-06-12): 계정·API키 관리 화면 — noindex 처리, 공개 색인 가치 없음 -->
@@ -134,20 +87,6 @@
     <lastmod>2026-06-12</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.75</priority>
-  </url>
-
-  <url>
-    <loc>https://zepta.app/backtest-compare</loc>
-    <lastmod>2026-06-12</lastmod>
-    <changefreq>weekly</changefreq>
-    <priority>0.7</priority>
-  </url>
-
-  <url>
-    <loc>https://zepta.app/leaderboard</loc>
-    <lastmod>2026-06-12</lastmod>
-    <changefreq>daily</changefreq>
-    <priority>0.7</priority>
   </url>
 
   <!-- 정보 및 참고 페이지들 -->
@@ -225,13 +164,6 @@
   </url>
 
   <url>
-    <loc>https://zepta.app/blog/binance-api-guide</loc>
-    <lastmod>2026-05-09</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-
-  <url>
     <loc>https://zepta.app/blog/portfolio-rebalancing</loc>
     <lastmod>2026-05-09</lastmod>
     <changefreq>monthly</changefreq>
@@ -260,19 +192,6 @@
   </url>
 
   <!-- 2026-05-11 추가: 신규 블로그 글 8편 (MKT-LEAD Phase A) -->
-  <url>
-    <loc>https://zepta.app/blog/bitcoin-auto-trading-5-steps</loc>
-    <lastmod>2026-05-11</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.85</priority>
-  </url>
-
-  <url>
-    <loc>https://zepta.app/blog/leverage-risk-guide</loc>
-    <lastmod>2026-05-11</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
 
   <url>
     <loc>https://zepta.app/blog/macd-golden-cross</loc>
@@ -303,29 +222,10 @@
   </url>
 
   <url>
-    <loc>https://zepta.app/blog/telegram-trading-alerts</loc>
-    <lastmod>2026-05-11</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.75</priority>
-  </url>
-
-  <url>
     <loc>https://zepta.app/blog/realistic-roi-expectation</loc>
     <lastmod>2026-05-11</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.85</priority>
   </url>
 
-  <url>
-    <loc>https://zepta.app/blog/build-vs-buy-trading-bot</loc>
-    <lastmod>2026-05-11</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.75</priority>
-  </url>
-  <url>
-    <loc>https://zepta.app/blog/free-crypto-trading-bot-no-code</loc>
-    <lastmod>2026-06-21</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
 </urlset>
