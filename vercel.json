@@ -66,6 +66,10 @@
     { "source": "/pricing", "destination": "/pricing.html" },
     { "source": "/coin", "destination": "/coin/index.html" },
     { "source": "/coin/:symbol", "destination": "/coin/:symbol.html" },
+    { "source": "/briefing", "destination": "/api/briefing" },
+    { "source": "/briefing/:date", "destination": "/api/briefing?date=:date" },
+    { "source": "/kimchi-premium", "destination": "/api/kimchi-premium" },
+    { "source": "/sitemap-briefings.xml", "destination": "/api/sitemap-briefings" },
     { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon)(?!about)(?!guide)(?!privacy)(?!terms)(?!contact)(?!blog)(?!coin)(?!screener)(?!auto-trading)(?!real-trading)(?!alpha-lab)(?!portfolio-analysis)(?!portfolio)(?!backtest-compare)(?!backtest)(?!strategy)(?!risk-map)(?!sentiment)(?!econ-calendar)(?!news)(?!anomaly)(?!alerts)(?!quant-portfolio)(?!quant-port)(?!quant-report)(?!notifications)(?!saved-screeners)(?!leaderboard)(?!reports)(?!copy-trading)(?!pricing)(?!profile).*)", "destination": "/index.html" }
   ],
   "headers": [
@@ -192,6 +196,10 @@
     {
       "path": "/api/agents/timing-tracker",
       "schedule": "30 20 * * *"
+    },
+    {
+      "path": "/api/agents/daily-briefing",
+      "schedule": "0 22 * * *"
     }
   ]
 }

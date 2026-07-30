@@ -34,7 +34,10 @@
     "sentiment": "Sentiment",
     "econ": "Economic Calendar",
     "alerts": "Alert Settings",
-    "tradingCat": "Trading"
+    "tradingCat": "Trading",
+    "market": "Market",
+    "indicators": "Indicators",
+    "my": "MY"
   },
   "header": {
     "login": "Login",

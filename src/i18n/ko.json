@@ -34,7 +34,10 @@
     "sentiment": "시장 심리",
     "econ": "경제 일정",
     "alerts": "알림",
-    "tradingCat": "트레이딩"
+    "tradingCat": "트레이딩",
+    "market": "시장",
+    "indicators": "지표",
+    "my": "MY"
   },
   "header": {
     "login": "로그인",

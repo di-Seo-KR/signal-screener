@@ -54,6 +54,14 @@
     <priority>0.8</priority>
   </url>
 
+  <!-- 2026-07-30 추가: 김치프리미엄 실시간 페이지 (정보 피벗 1차) -->
+  <url>
+    <loc>https://zepta.app/kimchi-premium</loc>
+    <lastmod>2026-07-30</lastmod>
+    <changefreq>hourly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
   <!-- quant-port 제거(2026-06-12): quant-portfolio 의 별칭 — canonical 통일로 중복 제거 -->
 
   <!-- 2026-05-11 추가: 실거래 + Alpha Lab + 누락된 SPA 경로 -->

@@ -4420,7 +4420,9 @@ function AppInner() {
     });
   }, []);
 
-  const validTabs = ["home","auto-trading","real-trading","alpha-lab","portfolio","portfolio-analysis","screener","alerts","notifications","saved-screeners","news","quant-portfolio","quant-port","risk-map","backtest","backtest-compare","copy-trading","sentiment","strategy","anomaly","quant-report","econ-calendar","leaderboard","reports","bot-report","profile","dev","pricing","about","privacy","terms","contact","marketing"];
+  // ★ 2026-07 정보 피벗 Phase 1: mypage 추가 — 이전엔 setTab("mypage") 로 진입 후
+  //   새로고침하면 홈으로 튕기던 문제(경로 미등록) 해소. 기존 탭 id 는 전부 유지.
+  const validTabs = ["home","auto-trading","real-trading","alpha-lab","portfolio","portfolio-analysis","screener","alerts","notifications","saved-screeners","news","quant-portfolio","quant-port","risk-map","backtest","backtest-compare","copy-trading","sentiment","strategy","anomaly","quant-report","econ-calendar","leaderboard","reports","bot-report","profile","mypage","dev","pricing","about","privacy","terms","contact","marketing"];
 
   // ── 경로 → tab 변환 ──
   //   /reports             → "reports"
@@ -4520,38 +4522,42 @@ function AppInner() {
   };
 
   // ── GNB 카테고리 상태 ──
-  // ★ 2026-05-11: 신규 페이지 9개 추가 (Pricing 은 별도 — 푸터/사이드만)
+  // ★ 2026-07 정보 피벗 Phase 1: 홈 / 뉴스(직행) / 시장 / 지표 / MY (+owner 트레이딩)
+  //   Header.jsx 의 gnbCategoryMap 과 반드시 동기 유지해야 합니다.
   const gnbCategoryMap = {
     "home": "home",
-    // 분석
-    "screener": "analysis",
-    "anomaly": "analysis",
-    "strategy": "analysis",
-    "quant-report": "analysis",
-    // ★ 2026-06-08 IA 재설계: 마켓 / 트레이딩 / 포트폴리오 / 더보기
-    "backtest": "ai-quant",
-    "backtest-compare": "ai-quant",
-    "alpha-lab": "ai-quant",
-    "saved-screeners": "info",
-    // 포트폴리오 (자산을 관리한다)
-    "quant-port": "management",
-    "quant-portfolio": "management",
-    "risk-map": "management",
-    "portfolio": "management",
-    "portfolio-analysis": "management",
-    // 트레이딩 (매매한다) — 모의·실전 일원화
+    // 뉴스 — 단일 직행 탭
+    "news": "news",
+    // 시장 (시장을 본다)
+    "screener": "market",
+    "anomaly": "market",
+    "saved-screeners": "market",
+    "risk-map": "market",
+    "quant-report": "market",
+    // 지표 (거시·심리)
+    "econ-calendar": "indicators",
+    "sentiment": "indicators",
+    // 트레이딩 (내부 운영 전용) — 전략 검증 도구 포함
     "auto-trading": "ai-quant",
     "real-trading": "ai-quant",
+    "alpha-lab": "ai-quant",
+    "backtest": "ai-quant",
+    "backtest-compare": "ai-quant",
     "copy-trading": "ai-quant",
     "leaderboard": "ai-quant",
     "reports": "ai-quant",
     "bot-report": "ai-quant",
-    // 마켓 (시장을 본다)
-    "news": "analysis",
-    "sentiment": "analysis",
-    "alerts": "info",
-    "notifications": "info",
-    "econ-calendar": "analysis",
+    "strategy": "ai-quant",
+    // MY (개인화)
+    "portfolio": "my",
+    "portfolio-analysis": "my",
+    "quant-port": "my",
+    "quant-portfolio": "my",
+    "notifications": "my",
+    "alerts": "my",
+    "pricing": "my",
+    "profile": "my",
+    "mypage": "my",
   };
   const [gnbCategory, setGnbCategory] = useState(() => gnbCategoryMap[tab] || "home");
 
@@ -6687,7 +6693,34 @@ function AppInner() {
     setNewsLoading(false);
   }, []);
 
-  useEffect(() => { if (tab === "news") fetchNews(); }, [tab]);
+  // ★ 2026-07 정보 피벗 Phase 1: 비owner 새 홈의 '톱 뉴스 3행' 블록도 같은 데이터를
+  //   재사용 — 홈 진입 시 뉴스가 비어 있으면 1회 로드 (뉴스 탭은 기존대로 매 진입 갱신)
+  useEffect(() => {
+    if (tab === "news") fetchNews();
+    else if (tab === "home" && !isOwner && newsItems.length === 0) fetchNews();
+  }, [tab, isOwner]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Zepta 마켓 온도 (비owner 새 홈 ④ 시장 지표 스냅샷) ──
+  // 계약: GET /api/market-temp → { ok, temp: 0~100, label, updatedAt }
+  // 백엔드 병렬 구현 중 — 실패/404 시 온도 부분만 조용히 숨깁니다 (null 유지).
+  const [marketTemp, setMarketTemp] = useState(null);
+  useEffect(() => {
+    if (tab !== "home" || isOwner) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/market-temp");
+        if (!r.ok) { if (!cancelled) setMarketTemp(null); return; }
+        const j = await r.json();
+        if (!cancelled) {
+          setMarketTemp(j && j.ok && Number.isFinite(Number(j.temp)) ? j : null);
+        }
+      } catch {
+        if (!cancelled) setMarketTemp(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [tab, isOwner]);
 
   // ── 소셜 센티먼트 ──
   const fetchSentiment = useCallback(async (sym) => {
@@ -6847,6 +6880,242 @@ function AppInner() {
   });
 
   // ────────────────────────────────────────────────────────────────
+
+  // ── 리텐션 콘텐츠 카드 렌더러 (★ 2026-07 정보 피벗 Phase 1) ──
+  // 새 홈(비owner 6블록 상한)에서 빠진 '오늘의 마켓 예측·퀴즈'를 기능 삭제 없이
+  // 마이페이지(내 정보)로 이관하기 위해 홈 인라인 IIFE 를 공용 렌더러로 추출했습니다.
+  // owner 홈과 mypage 두 곳에서 동일하게 호출합니다 (로직 변경 없음).
+  const renderMarketPredictionCard = () => {
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const predKey = `zepta:pred:${todayKey}`;
+    const pred = predictionState;
+    // 어제 예측 결과
+    const yesterdayKey = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+    let yesterdayPred = null;
+    try { yesterdayPred = JSON.parse(localStorage.getItem(`zepta:pred:${yesterdayKey}`)); } catch {}
+    const sp = marketIndices.find(i => i.symbol === "^GSPC");
+    const spChange = sp?.change || 0;
+    // 어제 예측이 있고 오늘 결과가 나왔으면 판정
+    let yesterdayResult = null;
+    if (yesterdayPred && sp) {
+      const correct = (yesterdayPred.dir === "up" && spChange >= 0) || (yesterdayPred.dir === "down" && spChange < 0);
+      yesterdayResult = correct;
+    }
+    // 적중률 계산
+    let totalPreds = 0, correctPreds = 0;
+    try {
+      const stats = JSON.parse(localStorage.getItem("zepta:pred:stats") || '{"total":0,"correct":0}');
+      totalPreds = stats.total; correctPreds = stats.correct;
+    } catch {}
+    const accuracy = totalPreds > 0 ? Math.round((correctPreds / totalPreds) * 100) : 0;
+
+    const handlePredict = (dir) => {
+      const data = { dir, timestamp: Date.now() };
+      localStorage.setItem(predKey, JSON.stringify(data));
+      setPredictionState(data);
+      // 어제 결과 업데이트
+      if (yesterdayPred && yesterdayResult !== null && !yesterdayPred.scored) {
+        try {
+          const stats = JSON.parse(localStorage.getItem("zepta:pred:stats") || '{"total":0,"correct":0}');
+          stats.total += 1;
+          if (yesterdayResult) stats.correct += 1;
+          localStorage.setItem("zepta:pred:stats", JSON.stringify(stats));
+          yesterdayPred.scored = true;
+          localStorage.setItem(`zepta:pred:${yesterdayKey}`, JSON.stringify(yesterdayPred));
+        } catch {}
+      }
+      syncUserDataToSupabase();
+    };
+
+    return (
+      <div style={{
+        background: `linear-gradient(135deg, ${C.card} 0%, ${C.purple}08 100%)`,
+        borderRadius: "16px", padding: "18px", border: `1px solid ${C.purple}15`,
+        position: "relative", overflow: "hidden", flexShrink: 0,
+      }}>
+        <div style={{ position: "absolute", top: "-30px", right: "-20px", width: "100px", height: "100px",
+          borderRadius: "50%", background: `${C.purple}06`, filter: "blur(30px)", pointerEvents: "none" }} />
+        <div style={{ position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "16px" }}>🎯</span>
+              <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>{t("tabs.home.marketPrediction") || "오늘의 예측"}</span>
+            </div>
+            {totalPreds > 0 && (
+              <span style={{ fontSize: "12px", color: C.text3, fontWeight: 500 }}>
+                {t("tabs.home.accuracy") || "적중률"} <span style={{ color: accuracy >= 60 ? C.green : accuracy >= 40 ? C.yellow : C.red, fontWeight: 700 }}>{accuracy}%</span>
+                <span style={{ color: C.text3 }}> ({correctPreds}/{totalPreds})</span>
+              </span>
+            )}
+          </div>
+
+          {/* 어제 결과 */}
+          {yesterdayResult !== null && (
+            <div style={{
+              padding: "8px 12px", borderRadius: "10px", marginBottom: "10px",
+              background: yesterdayResult ? `${C.green}10` : `${C.red}10`,
+              border: `1px solid ${yesterdayResult ? C.green : C.red}20`,
+              display: "flex", alignItems: "center", gap: "6px",
+              fontSize: "14px", color: yesterdayResult ? C.green : C.red, fontWeight: 600,
+            }}>
+              {yesterdayResult ? "✅" : "❌"} {t("tabs.home.yesterdayPrediction") || "어제 예측"}: {yesterdayResult ? (t("tabs.home.correct") || "적중!") : (t("tabs.home.wrong") || "빗나감")}
+              <span style={{ color: C.text3, fontWeight: 400 }}>
+                (S&P {spChange >= 0 ? "+" : ""}{spChange}%)
+              </span>
+            </div>
+          )}
+
+          <div style={{ fontSize: "16px", color: C.text3, marginBottom: "10px", fontWeight: 500 }}>
+            {t("tabs.home.tomorrowSP") || "내일 S&P 500은?"}
+          </div>
+
+          {pred ? (
+            <div style={{
+              padding: "12px", borderRadius: "12px", textAlign: "center",
+              background: pred.dir === "up" ? `${C.green}10` : `${C.red}10`,
+              border: `1px solid ${pred.dir === "up" ? C.green : C.red}25`,
+            }}>
+              <span style={{ fontSize: "20px" }}>{pred.dir === "up" ? "📈" : "📉"}</span>
+              <div style={{ fontSize: "15px", fontWeight: 700, color: pred.dir === "up" ? C.green : C.red, marginTop: "4px" }}>
+                {pred.dir === "up" ? (t("tabs.home.predictedUp") || "상승 예측 완료!") : (t("tabs.home.predictedDown") || "하락 예측 완료!")}
+              </div>
+              <div style={{ fontSize: "12px", color: C.text3, marginTop: "2px" }}>{t("tabs.home.checkTomorrow") || "내일 결과를 확인하세요"}</div>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+              <button onClick={() => handlePredict("up")} style={{
+                padding: "18px", borderRadius: "12px", cursor: "pointer", transition: "all .15s",
+                background: `linear-gradient(135deg, ${C.green}12, ${C.green}04)`, border: `1px solid ${C.green}20`,
+                display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 20px ${C.green}20`; e.currentTarget.style.transform = "scale(1.02)"; }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)"; e.currentTarget.style.transform = "none"; }}>
+                <span style={{ fontSize: "32px" }}>📈</span>
+                <span style={{ fontSize: "15px", fontWeight: 700, color: C.green }}>{t("tabs.home.bullish") || "상승"}</span>
+              </button>
+              <button onClick={() => handlePredict("down")} style={{
+                padding: "18px", borderRadius: "12px", cursor: "pointer", transition: "all .15s",
+                background: `linear-gradient(135deg, ${C.red}12, ${C.red}04)`, border: `1px solid ${C.red}20`,
+                display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 20px ${C.red}20`; e.currentTarget.style.transform = "scale(1.02)"; }}
+              onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)"; e.currentTarget.style.transform = "none"; }}>
+                <span style={{ fontSize: "32px" }}>📉</span>
+                <span style={{ fontSize: "15px", fontWeight: 700, color: C.red }}>{t("tabs.home.bearishPred") || "하락"}</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderMarketQuizCard = () => {
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const quizKey = `zepta:quiz:${todayKey}`;
+
+    const quizPool = [
+      { q: "VIX 지수가 30 이상이면 시장은?", options: ["공포 상태", "탐욕 상태", "중립"], answer: 0 },
+      { q: "골든크로스란?", options: ["단기MA > 장기MA", "단기MA < 장기MA", "거래량 급증"], answer: 0 },
+      { q: "PER이 높으면 주식은?", options: ["고평가", "저평가", "정상"], answer: 0 },
+      { q: "RSI가 30 이하면?", options: ["과매도", "과매수", "중립"], answer: 0 },
+      { q: "미국 기준금리를 결정하는 기관은?", options: ["SEC", "Fed (FOMC)", "IMF"], answer: 1 },
+      { q: "코스피 시장이 열리는 시간은?", options: ["오전 8시", "오전 9시", "오전 10시"], answer: 1 },
+      { q: "달러 강세 시 원화는?", options: ["약세", "강세", "무관"], answer: 0 },
+      { q: "볼린저 밴드 상단 돌파 시?", options: ["과매수 신호", "과매도 신호", "추세 전환"], answer: 0 },
+      { q: "S&P 500에 포함된 기업 수는?", options: ["100개", "500개", "1000개"], answer: 1 },
+      { q: "채권 가격과 금리의 관계는?", options: ["반비례", "비례", "무관"], answer: 0 },
+      { q: "MACD 골든크로스 발생 시?", options: ["매수 신호", "매도 신호", "관망"], answer: 0 },
+      { q: "원유 가격 상승 시 수혜 섹터?", options: ["에너지", "기술", "유틸리티"], answer: 0 },
+      { q: "시가총액 1위 기업은? (2025)", options: ["Apple", "Microsoft", "NVIDIA"], answer: 0 },
+      { q: "나스닥 지수의 특징은?", options: ["기술주 중심", "산업주 중심", "금융주 중심"], answer: 0 },
+    ];
+
+    const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+    const todayQuiz = quizPool[dayOfYear % quizPool.length];
+
+    let quizStats = { total: 0, correct: 0 };
+    try { quizStats = JSON.parse(localStorage.getItem("zepta:quiz:stats") || '{"total":0,"correct":0}'); } catch {}
+
+    const handleQuizAnswer = (idx) => {
+      const isCorrect = idx === todayQuiz.answer;
+      const result = { answered: idx, correct: isCorrect, timestamp: Date.now() };
+      localStorage.setItem(quizKey, JSON.stringify(result));
+      try {
+        const stats = JSON.parse(localStorage.getItem("zepta:quiz:stats") || '{"total":0,"correct":0}');
+        stats.total += 1;
+        if (isCorrect) stats.correct += 1;
+        localStorage.setItem("zepta:quiz:stats", JSON.stringify(stats));
+      } catch {}
+      setQuizAnswered(result);
+      syncUserDataToSupabase();
+    };
+
+    return (
+      <div style={{
+        background: `linear-gradient(135deg, ${C.card} 0%, ${C.blue}08 100%)`,
+        borderRadius: "16px", padding: "18px", border: `1px solid ${C.blue}15`,
+        position: "relative", overflow: "hidden", flexShrink: 0,
+      }}>
+        <div style={{ position: "absolute", top: "-20px", left: "-15px", width: "80px", height: "80px",
+          borderRadius: "50%", background: `${C.blue}06`, filter: "blur(25px)", pointerEvents: "none" }} />
+        <div style={{ position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <span style={{ fontSize: "16px" }}>🧠</span>
+              <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>{t("tabs.home.dailyQuiz") || "오늘의 퀴즈"}</span>
+            </div>
+            {quizStats.total > 0 && (
+              <span style={{ fontSize: "12px", color: C.text3, fontWeight: 500 }}>
+                {Math.round((quizStats.correct / quizStats.total) * 100)}% ({quizStats.correct}/{quizStats.total})
+              </span>
+            )}
+          </div>
+
+          <div style={{ fontSize: "15px", fontWeight: 600, color: C.text1, marginBottom: "12px", lineHeight: 1.4 }}>
+            {todayQuiz.q}
+          </div>
+
+          {quizAnswered ? (
+            <div style={{
+              padding: "14px", borderRadius: "12px", textAlign: "center",
+              background: quizAnswered.correct ? `${C.green}10` : `${C.red}10`,
+              border: `1px solid ${quizAnswered.correct ? C.green : C.red}25`,
+            }}>
+              <span style={{ fontSize: "20px" }}>{quizAnswered.correct ? "🎉" : "📚"}</span>
+              <div style={{ fontSize: "15px", fontWeight: 700, color: quizAnswered.correct ? C.green : C.red, marginTop: "4px" }}>
+                {quizAnswered.correct ? (t("tabs.home.quizCorrect") || "정답입니다!") : (t("tabs.home.quizWrong") || "아쉽네요!")}
+              </div>
+              <div style={{ fontSize: "14px", color: C.text3, marginTop: "4px" }}>
+                {t("tabs.home.correctAnswer") || "정답"}: {todayQuiz.options[todayQuiz.answer]}
+              </div>
+              <div style={{ fontSize: "12px", color: C.text3, marginTop: "6px" }}>
+                {t("tabs.home.quizTomorrow") || "내일 새로운 퀴즈가 준비됩니다"}
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {todayQuiz.options.map((opt, idx) => (
+                <button key={idx} onClick={() => handleQuizAnswer(idx)} style={{
+                  padding: "14px 16px", borderRadius: "10px", cursor: "pointer",
+                  background: `${C.card2}40`, border: `1px solid ${C.border}20`,
+                  textAlign: "left", fontSize: "15px", fontWeight: 600, color: C.text2,
+                  transition: "all .15s", display: "flex", alignItems: "center", gap: "10px",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}12`; e.currentTarget.style.borderColor = `${C.blue}30`; e.currentTarget.style.color = C.text1; e.currentTarget.style.borderLeft = `3px solid ${C.blue}`; }}
+                onMouseLeave={e => { e.currentTarget.style.background = `${C.card2}40`; e.currentTarget.style.borderColor = `${C.border}20`; e.currentTarget.style.color = C.text2; e.currentTarget.style.borderLeft = "none"; }}>
+                  <span style={{ width: "28px", height: "28px", borderRadius: "50%", background: `${C.blue}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: 700, color: C.blue, flexShrink: 0 }}>
+                    {String.fromCharCode(65 + idx)}
+                  </span>
+                  {opt}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   // ── 인증 로딩 중이면 스플래시 (hooks 뒤에 배치해야 hook 수 일관) ──
   if (authLoading) {
@@ -7255,7 +7524,332 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 홈 (토스 스타일 — 깔끔하고 정보 밀도 최적화)
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "home" && (
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 홈 (비owner) — 2026-07 정보 피벗 Phase 1 새 홈, 6블록 상한
+            ① 마켓 브리핑 ② 톱 뉴스 3행 ③ 경제 캘린더 오늘·내일 상위 3
+            ④ 시장 지표 스냅샷 ⑤ 관심종목 요약/인기 종목 ⑥ 시장 리포트 진입
+            (owner 는 아래 기존 홈 그대로 유지 — 데이터 fetch 는 전부 기존 재사용)
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "home" && !isOwner && (() => {
+          const idxOf = (sym) => marketIndices.find(i => i.symbol === sym);
+          const indexCards = [
+            { idx: idxOf("^GSPC"), symbol: "^GSPC", name: "S&P 500", flag: "🇺🇸", market: "us" },
+            { idx: idxOf("^IXIC"), symbol: "^IXIC", name: "NASDAQ", flag: "🇺🇸", market: "us" },
+            { idx: idxOf("^DJI"), symbol: "^DJI", name: t("tabs.home.dowLabel") || "다우존스", flag: "🇺🇸", market: "us" },
+            { idx: idxOf("^KS11"), symbol: "^KS11", name: t("tabs.home.kospiLabel") || "코스피", flag: "🇰🇷", market: "kr" },
+            { idx: idxOf("^KQ11"), symbol: "^KQ11", name: t("tabs.home.kosdaqLabel") || "코스닥", flag: "🇰🇷", market: "kr" },
+            { idx: idxOf("USDKRW=X"), symbol: "USDKRW=X", name: "KRW/USD", flag: "💱", market: "fx" },
+          ];
+          const sp = idxOf("^GSPC");
+          const nq = idxOf("^IXIC");
+          const spChg = sp?.change || 0;
+          const nqChg = nq?.change || 0;
+          const avgChg = (spChg + nqChg) / 2;
+          const moodText = avgChg > 0.5 ? "강세" : avgChg > 0 ? "소폭 상승" : avgChg > -0.5 ? "소폭 하락" : "약세";
+          const moodEmoji = avgChg > 0.5 ? "🚀" : avgChg > 0 ? "📈" : avgChg > -0.5 ? "📉" : "⚠️";
+          const fgVal = fearGreed.stock?.value;
+          const fgCryptoVal = fearGreed.crypto?.value;
+          const fgColorOf = (v) => v == null ? C.text3 : (v <= 25 ? C.red : v <= 40 ? "#FF8C42" : v <= 60 ? C.yellow : C.green);
+          const fgLabelOf = (v) => v == null ? "—" : (v <= 25 ? "극도의 공포" : v <= 40 ? "공포" : v <= 60 ? "중립" : v <= 75 ? "탐욕" : "극도의 탐욕");
+          // ② 톱 뉴스 3행 — 뉴스 탭과 동일 데이터(newsItems) 재사용
+          const topNews = [...newsItems].sort((a, b) =>
+            new Date(b.date || b.publishedAt || b.pubDate || 0) - new Date(a.date || a.publishedAt || a.pubDate || 0)
+          ).slice(0, 3);
+          // ③ 경제 캘린더 — 오늘·내일 이벤트 우선, 없으면 가장 가까운 예정 3건
+          const nearEvents = econEvents.filter(e => e.daysUntil === 0 || e.daysUntil === 1);
+          const calRows = (nearEvents.length > 0 ? nearEvents : econEvents.filter(e => e.daysUntil >= 0))
+            .slice()
+            .sort((a, b) => (a.daysUntil - b.daysUntil) || ((b.importance === "high" ? 1 : 0) - (a.importance === "high" ? 1 : 0)))
+            .slice(0, 3);
+          // ④ Zepta 마켓 온도 — API 실패 시 온도 부분만 조용히 숨김
+          const tempVal = marketTemp ? Math.max(0, Math.min(100, Number(marketTemp.temp))) : null;
+          const tempColor = tempVal == null ? C.text3 : (tempVal <= 25 ? C.blue : tempVal <= 50 ? C.green : tempVal <= 75 ? C.yellow : C.red);
+          const tempUpdated = (() => {
+            if (!marketTemp?.updatedAt) return null;
+            const d = new Date(marketTemp.updatedAt);
+            return isNaN(d.getTime()) ? null : `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")} 기준`;
+          })();
+          // ⑤ 관심종목 요약(로그인+보유 시) / 인기 종목(기존 주요종목 데이터 재사용)
+          const watchRows = user && watchlist.length > 0
+            ? watchlist.slice(0, 5).map(w => ({ ...w, hot: hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw) }))
+            : null;
+          const popularRows = [...hotAssets].sort((a, b) => Math.abs(b.change || 0) - Math.abs(a.change || 0)).slice(0, 5);
+          const cardBase = { background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` };
+          const newsTime = (n) => {
+            const d = new Date(n.date || n.publishedAt || n.pubDate || 0);
+            return isNaN(d.getTime()) ? "--:--" : `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+          };
+          return (
+            <div className="tab-content" style={{ maxWidth: "860px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "16px" }}>
+
+              {/* ── ① 마켓 브리핑 카드 (기존 마켓브리핑 블록 압축 재사용) ── */}
+              <div style={{ ...cardBase, position: "relative", overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "1px", background: `linear-gradient(90deg, transparent 0%, ${C.blue}40 50%, transparent 100%)` }} />
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <span style={{ fontSize: "16px", color: C.text1, fontWeight: 800, letterSpacing: "-0.5px" }}>{t("tabs.home.marketBriefing") || "마켓 브리핑"}</span>
+                    {marketIndices.length > 0 && (
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", padding: "2px 7px", borderRadius: "6px", background: `${C.green}12`, fontSize: "12px", fontWeight: 700, color: C.green }}>
+                        <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: C.green, animation: "livePulse 1.5s ease-in-out infinite" }} /> LIVE
+                      </span>
+                    )}
+                  </div>
+                  <button onClick={fetchMarketOverview} disabled={marketLoading} style={{
+                    background: "none", border: "none", fontSize: "14px", color: C.text3, cursor: "pointer", fontWeight: 500, padding: "2px 6px",
+                  }}>{marketLoading ? "..." : "↻"}</button>
+                </div>
+                {/* 지수 요약 — 3열 그리드(데스크톱) / 가로 스크롤(모바일) */}
+                <div className="hscroll" style={{
+                  display: isMobile ? "flex" : "grid",
+                  gridTemplateColumns: !isMobile ? "repeat(3, 1fr)" : undefined,
+                  gap: "10px",
+                  overflowX: isMobile ? "auto" : "visible",
+                  WebkitOverflowScrolling: "touch",
+                  scrollbarWidth: "none",
+                  paddingBottom: isMobile ? "6px" : 0,
+                  marginBottom: "12px",
+                }}>
+                  {marketLoading && marketIndices.length === 0 ? (
+                    Array.from({ length: 6 }).map((_, i) => (
+                      <div key={`nh-skel-${i}`} style={{ padding: "12px 14px", borderRadius: "12px", background: C.card2, minWidth: isMobile ? "128px" : undefined, flexShrink: isMobile ? 0 : undefined }}>
+                        <Skeleton width="70px" height="12px" />
+                        <div style={{ marginTop: "8px" }}><Skeleton width="100%" height="20px" /></div>
+                      </div>
+                    ))
+                  ) : (
+                    indexCards.map((item) => {
+                      const isUp = item.idx?.change >= 0;
+                      return (
+                        <div key={item.symbol}
+                          onClick={() => item.idx && setChartAsset({ symbol: item.idx.symbol, name: item.name, market: item.market, symbolRaw: item.idx.symbol })}
+                          style={{
+                            cursor: item.idx ? "pointer" : "default",
+                            padding: "12px 14px", borderRadius: "12px",
+                            background: `${isUp ? C.green : C.red}08`,
+                            border: `1px solid ${isUp ? C.green : C.red}18`,
+                            borderLeft: `3px solid ${isUp ? C.green : C.red}`,
+                            minWidth: isMobile ? "128px" : undefined,
+                            flexShrink: isMobile ? 0 : undefined,
+                          }}>
+                          <div style={{ fontSize: "12px", color: C.text3, fontWeight: 600, marginBottom: "5px" }}>{item.flag} {item.name}</div>
+                          <div style={{ fontSize: "20px", fontWeight: 800, color: C.text1, letterSpacing: "-0.5px", lineHeight: 1.1 }}>
+                            {item.idx
+                              ? (item.symbol === "USDKRW=X"
+                                ? `₩${Math.round(item.idx.price).toLocaleString()}`
+                                : item.idx.price?.toLocaleString(undefined, { maximumFractionDigits: 0 }))
+                              : "—"}
+                          </div>
+                          <div style={{ fontSize: "13px", fontWeight: 800, color: isUp ? C.green : C.red, marginTop: "2px" }}>
+                            {item.idx ? `${isUp ? "+" : ""}${item.idx.change}%` : "—"}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+                {/* 한줄 요약 + 심리 게이지 */}
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  {marketIndices.length > 0 && (
+                    <div style={{
+                      flex: "1 1 240px", padding: "10px 14px", borderRadius: "10px", fontSize: "14px",
+                      background: `linear-gradient(90deg, ${avgChg >= 0 ? C.greenBg : C.redBg} 0%, transparent 100%)`,
+                      color: C.text2, fontWeight: 600,
+                      borderLeft: `3px solid ${avgChg >= 0 ? C.green : C.red}`,
+                    }}>
+                      {moodEmoji} 오늘 미국 증시는 <span style={{ color: avgChg >= 0 ? C.green : C.red, fontWeight: 800 }}>{moodText}</span> 흐름
+                      {sp && <span> · S&P 500 {spChg >= 0 ? "+" : ""}{spChg.toFixed(2)}%</span>}
+                    </div>
+                  )}
+                  {fgVal != null && (
+                    <div style={{
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: "1px",
+                      padding: "7px 14px", borderRadius: "10px",
+                      background: `${fgColorOf(fgVal)}15`, border: `1px solid ${fgColorOf(fgVal)}30`, minWidth: "76px",
+                    }}>
+                      <span style={{ fontSize: "20px", fontWeight: 900, color: fgColorOf(fgVal), lineHeight: 1 }}>{fgVal}</span>
+                      <span style={{ fontSize: "12px", fontWeight: 700, color: fgColorOf(fgVal) }}>{fgLabelOf(fgVal)}</span>
+                    </div>
+                  )}
+                </div>
+                {/* 브리핑 전문 링크 */}
+                <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: `1px solid ${C.border}15`, textAlign: "right" }}>
+                  <a href="/briefing" style={{ fontSize: "14px", fontWeight: 700, color: C.blue, textDecoration: "none" }}>
+                    오늘의 브리핑 전문 보기 →
+                  </a>
+                </div>
+              </div>
+
+              {/* ── ② 톱 뉴스 3행 (뉴스 탭 데이터 재사용 — 타임라인 행 스타일) ── */}
+              <div style={cardBase}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                  <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>📰 톱 뉴스</span>
+                  <button onClick={() => setTab("news")} style={{
+                    fontSize: "13px", fontWeight: 700, color: C.blue, background: `${C.blue}10`,
+                    border: `1px solid ${C.blue}25`, borderRadius: "8px", padding: "4px 12px", cursor: "pointer",
+                  }}>더보기 →</button>
+                </div>
+                {newsLoading && topNews.length === 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {[1, 2, 3].map(i => <Skeleton key={i} width="100%" height="40px" />)}
+                  </div>
+                ) : topNews.length === 0 ? (
+                  <div style={{ fontSize: "14px", color: C.text3, padding: "10px 0" }}>표시할 뉴스가 아직 없습니다.</div>
+                ) : (
+                  topNews.map((n, i) => {
+                    const senti = analyzeSentiment(n.title);
+                    const sColor = senti === "positive" ? C.green : senti === "negative" ? C.red : C.text3;
+                    return (
+                      <a key={i} href={n.url || n.link || "#"} target="_blank" rel="noopener" style={{
+                        display: "flex", alignItems: "baseline", gap: "10px",
+                        padding: "10px 4px", textDecoration: "none",
+                        borderBottom: i < topNews.length - 1 ? `1px solid ${C.border}12` : "none",
+                      }}>
+                        <span className="z-num" style={{ fontSize: "13px", fontWeight: 700, color: C.text3, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{newsTime(n)}</span>
+                        <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: sColor, flexShrink: 0, alignSelf: "center" }} />
+                        <span style={{ flex: 1, minWidth: 0, fontSize: "15px", fontWeight: 600, color: C.text1, lineHeight: 1.45, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{n.title}</span>
+                        <span style={{ fontSize: "12px", color: C.text3, flexShrink: 0 }}>{n.source || ""}</span>
+                      </a>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* ── Google AdSense (②아래 — 기존 홈 슬롯 재배치) ── */}
+              <div style={{ minHeight: 0, overflow: "hidden" }}>
+                <GoogleAd format="responsive" slot="home-main" style={{ margin: "4px 0" }} />
+              </div>
+
+              {/* ── ③ 경제 캘린더 — 오늘·내일 상위 3 (기존 캘린더 위젯 압축 재사용) ── */}
+              <div style={cardBase}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                  <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>📅 경제 캘린더 <span style={{ fontSize: "12px", fontWeight: 500, color: C.text3 }}>(KST)</span></span>
+                  <button onClick={() => setTab("econ-calendar")} style={{
+                    fontSize: "13px", fontWeight: 700, color: C.blue, background: `${C.blue}10`,
+                    border: `1px solid ${C.blue}25`, borderRadius: "8px", padding: "4px 12px", cursor: "pointer",
+                  }}>전체 일정 →</button>
+                </div>
+                {calRows.length === 0 ? (
+                  <div style={{ fontSize: "14px", color: C.text3, padding: "10px 0" }}>예정된 주요 지표 일정이 없습니다.</div>
+                ) : (
+                  calRows.map((evt, i) => {
+                    const k = kstParts(evt.date);
+                    const dayLabel = evt.daysUntil === 0 ? "오늘" : evt.daysUntil === 1 ? "내일" : (k.valid ? `${String(k.month + 1).padStart(2, "0")}.${String(k.date).padStart(2, "0")}` : "—");
+                    const hhmm = k.valid ? `${String(k.hour).padStart(2, "0")}:${String(k.min).padStart(2, "0")}` : "--:--";
+                    return (
+                      <div key={`${evt.name}-${i}`} style={{
+                        display: "flex", alignItems: "center", gap: "10px", padding: "10px 4px",
+                        borderBottom: i < calRows.length - 1 ? `1px solid ${C.border}12` : "none",
+                      }}>
+                        <span style={{
+                          fontSize: "12px", fontWeight: 800, padding: "3px 8px", borderRadius: "6px", flexShrink: 0,
+                          background: evt.daysUntil === 0 ? C.redBg : C.blueBg,
+                          color: evt.daysUntil === 0 ? C.red : C.blue,
+                        }}>{dayLabel}</span>
+                        <span className="z-num" style={{ fontSize: "13px", color: C.text3, fontVariantNumeric: "tabular-nums", flexShrink: 0 }}>{hhmm}</span>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: "15px", fontWeight: 600, color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{evt.icon} {evt.name}</span>
+                        <span style={{ fontSize: "13px", color: C.text3, flexShrink: 0 }}>
+                          {evt.estimate != null ? `예상 ${evt.estimate}${evt.unit}` : evt.importance === "high" ? "중요" : ""}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* ── ④ 시장 지표 스냅샷 — 공포·탐욕 + Zepta 마켓 온도 (숫자·상태 라벨만) ── */}
+              <div style={cardBase}>
+                <div style={{ fontWeight: 800, fontSize: "16px", color: C.text1, marginBottom: "12px" }}>🌡️ 시장 지표 스냅샷</div>
+                <div style={{ display: "grid", gridTemplateColumns: tempVal != null ? "1fr 1fr" : "1fr", gap: "10px" }}>
+                  <div style={{ padding: "14px", borderRadius: "12px", background: `${fgColorOf(fgVal)}10`, border: `1px solid ${fgColorOf(fgVal)}25`, textAlign: "center" }}>
+                    <div style={{ fontSize: "12px", fontWeight: 700, color: C.text3, marginBottom: "6px" }}>공포·탐욕 지수 (주식)</div>
+                    <div style={{ fontSize: "30px", fontWeight: 900, color: fgColorOf(fgVal), lineHeight: 1 }}>{fgVal != null ? fgVal : "—"}</div>
+                    <div style={{ fontSize: "13px", fontWeight: 700, color: fgColorOf(fgVal), marginTop: "4px" }}>{fgLabelOf(fgVal)}</div>
+                    {fgCryptoVal != null && (
+                      <div style={{ fontSize: "12px", color: C.text3, marginTop: "6px" }}>
+                        크립토 {fgCryptoVal} · {fgLabelOf(fgCryptoVal)}
+                      </div>
+                    )}
+                  </div>
+                  {tempVal != null && (
+                    <div style={{ padding: "14px", borderRadius: "12px", background: `${tempColor}10`, border: `1px solid ${tempColor}25`, textAlign: "center" }}>
+                      <div style={{ fontSize: "12px", fontWeight: 700, color: C.text3, marginBottom: "6px" }}>Zepta 마켓 온도</div>
+                      <div style={{ fontSize: "30px", fontWeight: 900, color: tempColor, lineHeight: 1 }}>{Math.round(tempVal)}°</div>
+                      <div style={{ fontSize: "13px", fontWeight: 700, color: tempColor, marginTop: "4px" }}>{marketTemp.label || "—"}</div>
+                      {tempUpdated && <div style={{ fontSize: "12px", color: C.text3, marginTop: "6px" }}>{tempUpdated}</div>}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── ⑤ 관심종목 요약 (로그인+보유 시) / 인기 종목 (기존 주요종목 데이터 재사용) ── */}
+              <div style={cardBase}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
+                  <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>
+                    {watchRows ? `⭐ 관심종목 요약` : "🔥 오늘 변동 큰 종목"}
+                  </span>
+                  <button onClick={() => setTab("screener")} style={{
+                    fontSize: "13px", fontWeight: 700, color: C.blue, background: `${C.blue}10`,
+                    border: `1px solid ${C.blue}25`, borderRadius: "8px", padding: "4px 12px", cursor: "pointer",
+                  }}>스크리너 →</button>
+                </div>
+                {(watchRows || popularRows).length === 0 ? (
+                  <div style={{ fontSize: "14px", color: C.text3, padding: "10px 0" }}>시세 데이터를 불러오는 중입니다…</div>
+                ) : (
+                  (watchRows || popularRows).map((row, i, arr) => {
+                    const hot = watchRows ? row.hot : row;
+                    const name = row.name || row.symbol;
+                    const flag = (row.market || hot?.market) === "kr" ? "🇰🇷" : (row.market || hot?.market) === "crypto" ? "₿" : "🇺🇸";
+                    return (
+                      <div key={row.symbol || i} onClick={() => setSelectedAsset(watchRows ? row : hot)} style={{
+                        display: "flex", alignItems: "center", gap: "10px", padding: "10px 4px", cursor: "pointer",
+                        borderBottom: i < arr.length - 1 ? `1px solid ${C.border}12` : "none",
+                      }}>
+                        <span style={{ fontSize: "14px", flexShrink: 0 }}>{flag}</span>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: "15px", fontWeight: 600, color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
+                        {hot ? (
+                          <>
+                            <span className="z-num" style={{ fontSize: "14px", fontWeight: 700, color: C.text1, fontVariantNumeric: "tabular-nums" }}>{fmtPrice(hot.price, hot.market || row.market)}</span>
+                            <span className="z-num" style={{ fontSize: "14px", fontWeight: 800, color: hot.change >= 0 ? C.green : C.red, minWidth: "60px", textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                              {hot.change >= 0 ? "+" : ""}{hot.change}%
+                            </span>
+                          </>
+                        ) : (
+                          <span style={{ fontSize: "13px", color: C.text3 }}>시세 준비 중</span>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* ── Google AdSense (⑤아래 — 기존 홈 슬롯 재배치) ── */}
+              <div style={{ minHeight: 0, overflow: "hidden" }}>
+                <GoogleAd format="responsive" slot="home-main" style={{ margin: "4px 0" }} />
+              </div>
+
+              {/* ── ⑥ 시장 리포트 진입 카드 ── */}
+              <div onClick={() => setTab("quant-report")} style={{
+                ...cardBase, cursor: "pointer", display: "flex", alignItems: "center", gap: "14px",
+                background: `linear-gradient(135deg, ${C.card} 0%, ${C.blueBg} 100%)`,
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
+              onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
+                <div style={{
+                  width: "44px", height: "44px", borderRadius: "12px", flexShrink: 0,
+                  background: `linear-gradient(135deg, ${C.blue}25, ${C.purple}20)`,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px",
+                }}>📊</div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 800, fontSize: "16px", color: C.text1, marginBottom: "2px" }}>시장 리포트</div>
+                  <div style={{ fontSize: "13px", color: C.text3, lineHeight: 1.4 }}>지수·심리·수급 지표를 모아 만든 오늘의 시장 요약 리포트입니다.</div>
+                </div>
+                <span style={{ fontSize: "14px", fontWeight: 700, color: C.blue, flexShrink: 0 }}>보러가기 →</span>
+              </div>
+            </div>
+          );
+        })()}
+
+        {tab === "home" && isOwner && (
           <div className="tab-content">
             {/* 2컬럼 그리드 (데스크톱) / 1컬럼 (모바일) */}
             <div className="home-grid">
@@ -8128,239 +8722,11 @@ function AppInner() {
             </div>{/* end home-left */}
             <div className="home-right" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
 
-            {/* ── 오늘의 마켓 예측 (유저 리텐션 훅) ─── */}
-            {(() => {
-              const todayKey = new Date().toISOString().slice(0, 10);
-              const predKey = `zepta:pred:${todayKey}`;
-              const pred = predictionState;
-              // 어제 예측 결과
-              const yesterdayKey = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-              let yesterdayPred = null;
-              try { yesterdayPred = JSON.parse(localStorage.getItem(`zepta:pred:${yesterdayKey}`)); } catch {}
-              const sp = marketIndices.find(i => i.symbol === "^GSPC");
-              const spChange = sp?.change || 0;
-              // 어제 예측이 있고 오늘 결과가 나왔으면 판정
-              let yesterdayResult = null;
-              if (yesterdayPred && sp) {
-                const correct = (yesterdayPred.dir === "up" && spChange >= 0) || (yesterdayPred.dir === "down" && spChange < 0);
-                yesterdayResult = correct;
-              }
-              // 적중률 계산
-              let totalPreds = 0, correctPreds = 0;
-              try {
-                const stats = JSON.parse(localStorage.getItem("zepta:pred:stats") || '{"total":0,"correct":0}');
-                totalPreds = stats.total; correctPreds = stats.correct;
-              } catch {}
-              const accuracy = totalPreds > 0 ? Math.round((correctPreds / totalPreds) * 100) : 0;
+            {/* ── 오늘의 마켓 예측 (유저 리텐션 훅 — ★ 2026-07 정보 피벗: 공용 렌더러로 추출, mypage 와 공유) ─── */}
+            {renderMarketPredictionCard()}
 
-              const handlePredict = (dir) => {
-                const data = { dir, timestamp: Date.now() };
-                localStorage.setItem(predKey, JSON.stringify(data));
-                setPredictionState(data);
-                // 어제 결과 업데이트
-                if (yesterdayPred && yesterdayResult !== null && !yesterdayPred.scored) {
-                  try {
-                    const stats = JSON.parse(localStorage.getItem("zepta:pred:stats") || '{"total":0,"correct":0}');
-                    stats.total += 1;
-                    if (yesterdayResult) stats.correct += 1;
-                    localStorage.setItem("zepta:pred:stats", JSON.stringify(stats));
-                    yesterdayPred.scored = true;
-                    localStorage.setItem(`zepta:pred:${yesterdayKey}`, JSON.stringify(yesterdayPred));
-                  } catch {}
-                }
-                syncUserDataToSupabase();
-              };
-
-              return (
-                <div style={{
-                  background: `linear-gradient(135deg, ${C.card} 0%, ${C.purple}08 100%)`,
-                  borderRadius: "16px", padding: "18px", border: `1px solid ${C.purple}15`,
-                  position: "relative", overflow: "hidden", flexShrink: 0,
-                }}>
-                  <div style={{ position: "absolute", top: "-30px", right: "-20px", width: "100px", height: "100px",
-                    borderRadius: "50%", background: `${C.purple}06`, filter: "blur(30px)", pointerEvents: "none" }} />
-                  <div style={{ position: "relative" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "16px" }}>🎯</span>
-                        <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>{t("tabs.home.marketPrediction") || "오늘의 예측"}</span>
-                      </div>
-                      {totalPreds > 0 && (
-                        <span style={{ fontSize: "12px", color: C.text3, fontWeight: 500 }}>
-                          {t("tabs.home.accuracy") || "적중률"} <span style={{ color: accuracy >= 60 ? C.green : accuracy >= 40 ? C.yellow : C.red, fontWeight: 700 }}>{accuracy}%</span>
-                          <span style={{ color: C.text3 }}> ({correctPreds}/{totalPreds})</span>
-                        </span>
-                      )}
-                    </div>
-
-                    {/* 어제 결과 */}
-                    {yesterdayResult !== null && (
-                      <div style={{
-                        padding: "8px 12px", borderRadius: "10px", marginBottom: "10px",
-                        background: yesterdayResult ? `${C.green}10` : `${C.red}10`,
-                        border: `1px solid ${yesterdayResult ? C.green : C.red}20`,
-                        display: "flex", alignItems: "center", gap: "6px",
-                        fontSize: "14px", color: yesterdayResult ? C.green : C.red, fontWeight: 600,
-                      }}>
-                        {yesterdayResult ? "✅" : "❌"} {t("tabs.home.yesterdayPrediction") || "어제 예측"}: {yesterdayResult ? (t("tabs.home.correct") || "적중!") : (t("tabs.home.wrong") || "빗나감")}
-                        <span style={{ color: C.text3, fontWeight: 400 }}>
-                          (S&P {spChange >= 0 ? "+" : ""}{spChange}%)
-                        </span>
-                      </div>
-                    )}
-
-                    <div style={{ fontSize: "16px", color: C.text3, marginBottom: "10px", fontWeight: 500 }}>
-                      {t("tabs.home.tomorrowSP") || "내일 S&P 500은?"}
-                    </div>
-
-                    {pred ? (
-                      <div style={{
-                        padding: "12px", borderRadius: "12px", textAlign: "center",
-                        background: pred.dir === "up" ? `${C.green}10` : `${C.red}10`,
-                        border: `1px solid ${pred.dir === "up" ? C.green : C.red}25`,
-                      }}>
-                        <span style={{ fontSize: "20px" }}>{pred.dir === "up" ? "📈" : "📉"}</span>
-                        <div style={{ fontSize: "15px", fontWeight: 700, color: pred.dir === "up" ? C.green : C.red, marginTop: "4px" }}>
-                          {pred.dir === "up" ? (t("tabs.home.predictedUp") || "상승 예측 완료!") : (t("tabs.home.predictedDown") || "하락 예측 완료!")}
-                        </div>
-                        <div style={{ fontSize: "12px", color: C.text3, marginTop: "2px" }}>{t("tabs.home.checkTomorrow") || "내일 결과를 확인하세요"}</div>
-                      </div>
-                    ) : (
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                        <button onClick={() => handlePredict("up")} style={{
-                          padding: "18px", borderRadius: "12px", cursor: "pointer", transition: "all .15s",
-                          background: `linear-gradient(135deg, ${C.green}12, ${C.green}04)`, border: `1px solid ${C.green}20`,
-                          display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 20px ${C.green}20`; e.currentTarget.style.transform = "scale(1.02)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)"; e.currentTarget.style.transform = "none"; }}>
-                          <span style={{ fontSize: "32px" }}>📈</span>
-                          <span style={{ fontSize: "15px", fontWeight: 700, color: C.green }}>{t("tabs.home.bullish") || "상승"}</span>
-                        </button>
-                        <button onClick={() => handlePredict("down")} style={{
-                          padding: "18px", borderRadius: "12px", cursor: "pointer", transition: "all .15s",
-                          background: `linear-gradient(135deg, ${C.red}12, ${C.red}04)`, border: `1px solid ${C.red}20`,
-                          display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 4px 20px ${C.red}20`; e.currentTarget.style.transform = "scale(1.02)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.1)"; e.currentTarget.style.transform = "none"; }}>
-                          <span style={{ fontSize: "32px" }}>📉</span>
-                          <span style={{ fontSize: "15px", fontWeight: 700, color: C.red }}>{t("tabs.home.bearishPred") || "하락"}</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* ── 오늘의 마켓 퀴즈 (리텐션 훅) ─── */}
-            {(() => {
-              const todayKey = new Date().toISOString().slice(0, 10);
-              const quizKey = `zepta:quiz:${todayKey}`;
-
-              const quizPool = [
-                { q: "VIX 지수가 30 이상이면 시장은?", options: ["공포 상태", "탐욕 상태", "중립"], answer: 0 },
-                { q: "골든크로스란?", options: ["단기MA > 장기MA", "단기MA < 장기MA", "거래량 급증"], answer: 0 },
-                { q: "PER이 높으면 주식은?", options: ["고평가", "저평가", "정상"], answer: 0 },
-                { q: "RSI가 30 이하면?", options: ["과매도", "과매수", "중립"], answer: 0 },
-                { q: "미국 기준금리를 결정하는 기관은?", options: ["SEC", "Fed (FOMC)", "IMF"], answer: 1 },
-                { q: "코스피 시장이 열리는 시간은?", options: ["오전 8시", "오전 9시", "오전 10시"], answer: 1 },
-                { q: "달러 강세 시 원화는?", options: ["약세", "강세", "무관"], answer: 0 },
-                { q: "볼린저 밴드 상단 돌파 시?", options: ["과매수 신호", "과매도 신호", "추세 전환"], answer: 0 },
-                { q: "S&P 500에 포함된 기업 수는?", options: ["100개", "500개", "1000개"], answer: 1 },
-                { q: "채권 가격과 금리의 관계는?", options: ["반비례", "비례", "무관"], answer: 0 },
-                { q: "MACD 골든크로스 발생 시?", options: ["매수 신호", "매도 신호", "관망"], answer: 0 },
-                { q: "원유 가격 상승 시 수혜 섹터?", options: ["에너지", "기술", "유틸리티"], answer: 0 },
-                { q: "시가총액 1위 기업은? (2025)", options: ["Apple", "Microsoft", "NVIDIA"], answer: 0 },
-                { q: "나스닥 지수의 특징은?", options: ["기술주 중심", "산업주 중심", "금융주 중심"], answer: 0 },
-              ];
-
-              const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
-              const todayQuiz = quizPool[dayOfYear % quizPool.length];
-
-              let quizStats = { total: 0, correct: 0 };
-              try { quizStats = JSON.parse(localStorage.getItem("zepta:quiz:stats") || '{"total":0,"correct":0}'); } catch {}
-
-              const handleQuizAnswer = (idx) => {
-                const isCorrect = idx === todayQuiz.answer;
-                const result = { answered: idx, correct: isCorrect, timestamp: Date.now() };
-                localStorage.setItem(quizKey, JSON.stringify(result));
-                try {
-                  const stats = JSON.parse(localStorage.getItem("zepta:quiz:stats") || '{"total":0,"correct":0}');
-                  stats.total += 1;
-                  if (isCorrect) stats.correct += 1;
-                  localStorage.setItem("zepta:quiz:stats", JSON.stringify(stats));
-                } catch {}
-                setQuizAnswered(result);
-                syncUserDataToSupabase();
-              };
-
-              return (
-                <div style={{
-                  background: `linear-gradient(135deg, ${C.card} 0%, ${C.blue}08 100%)`,
-                  borderRadius: "16px", padding: "18px", border: `1px solid ${C.blue}15`,
-                  position: "relative", overflow: "hidden", flexShrink: 0,
-                }}>
-                  <div style={{ position: "absolute", top: "-20px", left: "-15px", width: "80px", height: "80px",
-                    borderRadius: "50%", background: `${C.blue}06`, filter: "blur(25px)", pointerEvents: "none" }} />
-                  <div style={{ position: "relative" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "16px" }}>🧠</span>
-                        <span style={{ fontWeight: 700, fontSize: "16px", color: C.text1 }}>{t("tabs.home.dailyQuiz") || "오늘의 퀴즈"}</span>
-                      </div>
-                      {quizStats.total > 0 && (
-                        <span style={{ fontSize: "12px", color: C.text3, fontWeight: 500 }}>
-                          {Math.round((quizStats.correct / quizStats.total) * 100)}% ({quizStats.correct}/{quizStats.total})
-                        </span>
-                      )}
-                    </div>
-
-                    <div style={{ fontSize: "15px", fontWeight: 600, color: C.text1, marginBottom: "12px", lineHeight: 1.4 }}>
-                      {todayQuiz.q}
-                    </div>
-
-                    {quizAnswered ? (
-                      <div style={{
-                        padding: "14px", borderRadius: "12px", textAlign: "center",
-                        background: quizAnswered.correct ? `${C.green}10` : `${C.red}10`,
-                        border: `1px solid ${quizAnswered.correct ? C.green : C.red}25`,
-                      }}>
-                        <span style={{ fontSize: "20px" }}>{quizAnswered.correct ? "🎉" : "📚"}</span>
-                        <div style={{ fontSize: "15px", fontWeight: 700, color: quizAnswered.correct ? C.green : C.red, marginTop: "4px" }}>
-                          {quizAnswered.correct ? (t("tabs.home.quizCorrect") || "정답입니다!") : (t("tabs.home.quizWrong") || "아쉽네요!")}
-                        </div>
-                        <div style={{ fontSize: "14px", color: C.text3, marginTop: "4px" }}>
-                          {t("tabs.home.correctAnswer") || "정답"}: {todayQuiz.options[todayQuiz.answer]}
-                        </div>
-                        <div style={{ fontSize: "12px", color: C.text3, marginTop: "6px" }}>
-                          {t("tabs.home.quizTomorrow") || "내일 새로운 퀴즈가 준비됩니다"}
-                        </div>
-                      </div>
-                    ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                        {todayQuiz.options.map((opt, idx) => (
-                          <button key={idx} onClick={() => handleQuizAnswer(idx)} style={{
-                            padding: "14px 16px", borderRadius: "10px", cursor: "pointer",
-                            background: `${C.card2}40`, border: `1px solid ${C.border}20`,
-                            textAlign: "left", fontSize: "15px", fontWeight: 600, color: C.text2,
-                            transition: "all .15s", display: "flex", alignItems: "center", gap: "10px",
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}12`; e.currentTarget.style.borderColor = `${C.blue}30`; e.currentTarget.style.color = C.text1; e.currentTarget.style.borderLeft = `3px solid ${C.blue}`; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = `${C.card2}40`; e.currentTarget.style.borderColor = `${C.border}20`; e.currentTarget.style.color = C.text2; e.currentTarget.style.borderLeft = "none"; }}>
-                            <span style={{ width: "28px", height: "28px", borderRadius: "50%", background: `${C.blue}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: 700, color: C.blue, flexShrink: 0 }}>
-                              {String.fromCharCode(65 + idx)}
-                            </span>
-                            {opt}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
+            {/* ── 오늘의 마켓 퀴즈 (리텐션 훅 — ★ 2026-07 정보 피벗: 공용 렌더러로 추출, mypage 와 공유) ─── */}
+            {renderMarketQuizCard()}
 
             {/* ── 관심종목 (v10.3 유저별 격리) ─── */}
             <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
@@ -10669,62 +11035,107 @@ function AppInner() {
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col gap-2">
+              /* ★ 2026-07 정보 피벗 Phase 1: 카드 그리드 → 코인니스식 타임라인 리스트
+                 (시간 HH:MM · 제목 · 소스 · 센티먼트 배지 — fetch 로직·데이터는 기존 그대로) */
+              <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "16px", overflow: "hidden" }}>
                 {sortedNews.map((news, i) => {
                   const sentiment = analyzeSentiment(news.title);
                   const sentColor = sentiment === "positive" ? C.green : sentiment === "negative" ? C.red : C.text3;
                   const sentLabel = sentiment === "positive" ? "긍정" : sentiment === "negative" ? "부정" : "중립";
-                  const sentIcon = sentiment === "positive" ? "▲" : sentiment === "negative" ? "▼" : "●";
-                  const pubDate = new Date(news.date || news.publishedAt || news.pubDate || Date.now());
-                  const timeAgo = (() => {
-                    const diff = Date.now() - pubDate.getTime();
-                    const mins = Math.floor(diff / 60000);
-                    if (mins < 60) return `${mins}분 전`;
-                    const hrs = Math.floor(mins / 60);
-                    if (hrs < 24) return `${hrs}시간 전`;
-                    return `${Math.floor(hrs / 24)}일 전`;
+                  const pubDate = new Date(news.date || news.publishedAt || news.pubDate || 0);
+                  const validDate = !isNaN(pubDate.getTime()) && pubDate.getTime() > 0;
+                  const hhmm = validDate ? `${String(pubDate.getHours()).padStart(2, "0")}:${String(pubDate.getMinutes()).padStart(2, "0")}` : "--:--";
+                  // 날짜 구분선 — 최신순 정렬일 때만 (다른 정렬은 날짜가 뒤섞여 무의미)
+                  const dateLabelOf = (d) => {
+                    const today = new Date(); const yst = new Date(Date.now() - 86400000);
+                    const same = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+                    if (same(d, today)) return "오늘";
+                    if (same(d, yst)) return "어제";
+                    return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+                  };
+                  const showDateDivider = newsSort === "time" && validDate && (() => {
+                    if (i === 0) return true;
+                    const prev = new Date(sortedNews[i - 1].date || sortedNews[i - 1].publishedAt || sortedNews[i - 1].pubDate || 0);
+                    return isNaN(prev.getTime()) || prev.toDateString() !== pubDate.toDateString();
                   })();
-                  return (<>
-                    <a key={i} href={news.url || news.link || "#"} target="_blank" rel="noopener" onClick={() => { }} style={{
-                      background: C.card, border: `1px solid ${C.border}20`, borderRadius: "16px", padding: isMobile ? "14px" : "16px 18px",
-                      textDecoration: "none", color: "inherit", display: "block", transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
-                      borderLeft: `4px solid ${sentColor}`,
-                      boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
-                      cursor: "pointer",
+                  return (<div key={i}>
+                    {showDateDivider && (
+                      <div style={{
+                        padding: "10px 16px 6px", fontSize: "13px", fontWeight: 800, color: C.text3,
+                        background: `${C.card2}50`, borderBottom: `1px solid ${C.border}12`,
+                        letterSpacing: "0.3px",
+                      }}>{dateLabelOf(pubDate)}</div>
+                    )}
+                    <a href={news.url || news.link || "#"} target="_blank" rel="noopener" style={{
+                      display: "flex", gap: "12px", alignItems: "flex-start",
+                      padding: isMobile ? "12px 14px" : "13px 18px",
+                      textDecoration: "none", color: "inherit",
+                      borderBottom: i < sortedNews.length - 1 ? `1px solid ${C.border}12` : "none",
+                      transition: "background .15s",
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.boxShadow = `0 8px 24px ${sentColor}30`; e.currentTarget.style.transform = "translateY(-3px) scale(1.01)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 1px 2px rgba(0,0,0,0.05)"; e.currentTarget.style.transform = "translateY(0) scale(1)"; }}>
-                      <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontWeight: 600, fontSize: mf(16), marginBottom: "8px", color: C.text1, lineHeight: 1.5 }}>{news.title}</div>
-                          {(news.desc || news.description) && (
-                            <div style={{ fontSize: mf(16), color: C.text2, lineHeight: 1.6, marginBottom: "8px" }}>{(news.desc || news.description).slice(0, 150)}</div>
-                          )}
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                            <span style={{ fontSize: "16px", fontWeight: 600, color: sentColor, display: "flex", alignItems: "center", gap: "3px" }}>
-                              <span style={{ fontSize: "14px" }}>{sentIcon}</span> {sentLabel}
-                            </span>
-                            <span style={{ width: "1px", height: "10px", background: C.border }} />
-                            <span style={{ fontSize: "16px", color: C.text3 }}>{news.source || "Unknown"}</span>
-                            <span style={{ width: "1px", height: "10px", background: C.border }} />
-                            <span style={{ fontSize: "16px", color: C.text3 }}>{timeAgo}</span>
+                    onMouseEnter={e => e.currentTarget.style.background = `${C.card2}60`}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      {/* 시간 + 타임라인 도트 */}
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", flexShrink: 0, paddingTop: "2px" }}>
+                        <span className="z-num" style={{ fontSize: mf(12), fontWeight: 700, color: C.text3, fontVariantNumeric: "tabular-nums" }}>{hhmm}</span>
+                        <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: sentColor, boxShadow: `0 0 6px ${sentColor}50` }} />
+                      </div>
+                      {/* 제목 + 요약 + 메타 */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: mf(15), color: C.text1, lineHeight: 1.45 }}>{news.title}</div>
+                        {!isMobile && (news.desc || news.description) && (
+                          <div style={{ fontSize: mf(13), color: C.text3, lineHeight: 1.5, marginTop: "3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {(news.desc || news.description).slice(0, 120)}
                           </div>
-                          {news.tags?.length > 0 && (
-                            <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "8px" }}>
-                              {news.tags.slice(0, 4).map((tag, ti) => (
-                                <span key={ti} style={{ padding: "2px 8px", borderRadius: "6px", fontSize: "15px", background: C.card2, color: C.text3, fontWeight: 500 }}>{tag}</span>
-                              ))}
-                            </div>
-                          )}
+                        )}
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "5px", flexWrap: "wrap" }}>
+                          <span style={{
+                            fontSize: mf(11), fontWeight: 700, padding: "1px 7px", borderRadius: "5px",
+                            background: `${sentColor}14`, color: sentColor,
+                          }}>{sentLabel}</span>
+                          <span style={{ fontSize: mf(12), color: C.text3 }}>{news.source || "Unknown"}</span>
+                          {news.tags?.length > 0 && news.tags.slice(0, 2).map((tag, ti) => (
+                            <span key={ti} style={{ padding: "1px 7px", borderRadius: "5px", fontSize: mf(11), background: C.card2, color: C.text3, fontWeight: 500 }}>{tag}</span>
+                          ))}
                         </div>
                       </div>
                     </a>
                     {/* ── Google AdSense (News - In-Feed after 3rd item) ─── */}
                     {i === 2 && <GoogleAd format="in-feed" slot="news-feed" style={{ margin: "12px 0" }} />}
-                  </>);
+                  </div>);
                 })}
               </div>
             )}
+
+            {/* ── 읽을거리 — 블로그 아티클 진입 (★ 2026-07 정보 피벗 Phase 1) ── */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "16px", padding: "20px", marginTop: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>📚 읽을거리</span>
+                <a href="/blog" style={{ fontSize: "13px", fontWeight: 700, color: C.blue, textDecoration: "none" }}>블로그 전체 →</a>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: "8px" }}>
+                {[
+                  { href: "/blog/rsi-divergence.html", title: "RSI 다이버전스 — 추세 전환을 미리 알아채는 법" },
+                  { href: "/blog/macd-golden-cross.html", title: "MACD 골든크로스 — 실전 백테스트 검증" },
+                  { href: "/blog/portfolio-rebalancing.html", title: "포트폴리오 리밸런싱이란? 자동화 방법까지" },
+                  { href: "/blog/korea-vs-us-stocks.html", title: "한국 주식 vs 미국 주식 — 진짜 차이점 7가지" },
+                  { href: "/blog/sharpe-ratio-profit-factor.html", title: "Sharpe Ratio · Profit Factor — 전략 평가 핵심 지표" },
+                  { href: "/blog/hurst-explained.html", title: "Hurst 지수란? 추세장과 박스권 구분하는 법" },
+                ].map((post, i) => (
+                  <a key={i} href={post.href} style={{
+                    display: "flex", alignItems: "center", gap: "10px",
+                    padding: "12px 14px", borderRadius: "12px",
+                    background: `${C.card2}50`, border: `1px solid ${C.border}15`,
+                    textDecoration: "none", transition: "all .15s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}10`; e.currentTarget.style.borderColor = `${C.blue}30`; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = `${C.card2}50`; e.currentTarget.style.borderColor = `${C.border}15`; }}>
+                    <span style={{ fontSize: "16px", flexShrink: 0 }}>📄</span>
+                    <span style={{ fontSize: mf(13), fontWeight: 600, color: C.text2, lineHeight: 1.4, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{post.title}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
 
           </div>
         )}
@@ -12243,6 +12654,35 @@ function AppInner() {
               }}>📤 공유하기</button>
             </div>
 
+            {/* ── 오늘의 참여 콘텐츠 (★ 2026-07 정보 피벗 Phase 1: 새 홈 6블록 상한으로
+                 홈에서 빠진 '마켓 예측·퀴즈'를 기능 삭제 없이 이곳으로 이관) ── */}
+            <div style={{ fontSize: "14px", fontWeight: 800, color: C.text3, letterSpacing: "0.4px", margin: "8px 4px 0" }}>오늘의 참여 콘텐츠</div>
+            {renderMarketPredictionCard()}
+            {renderMarketQuizCard()}
+
+            {/* ── 콘텐츠 바로가기 — 새 홈에서 빠진 정보 블록의 상위 화면 진입 링크 목록 ── */}
+            <div style={{ background: C.card, borderRadius: "16px", overflow: "hidden", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
+              <div style={{ padding: "14px 20px", fontSize: "14px", fontWeight: 800, color: C.text1 }}>콘텐츠 바로가기</div>
+              {[
+                { icon: "⚡", label: "이상 탐지", tab: "anomaly" },
+                { icon: "🗺️", label: "리스크맵", tab: "risk-map" },
+                { icon: "🔍", label: "스크리너 (섹터·전체 종목 탐색)", tab: "screener" },
+                { icon: "📊", label: "시장 리포트", tab: "quant-report" },
+              ].map((item, i) => (
+                <div key={i} onClick={() => setTab(item.tab)} style={{
+                  display: "flex", alignItems: "center", gap: "14px",
+                  padding: "13px 20px", borderTop: `1px solid ${C.border}15`, cursor: "pointer",
+                  transition: "background .1s",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = `${C.border}10`}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <span style={{ fontSize: "16px", width: "24px", textAlign: "center" }}>{item.icon}</span>
+                  <span style={{ fontSize: "15px", fontWeight: 600, color: C.text2, flex: 1 }}>{item.label}</span>
+                  <span style={{ fontSize: "14px", color: C.text3 }}>›</span>
+                </div>
+              ))}
+            </div>
+
             {/* 친구 초대 */}
             <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
               <div style={{ fontSize: "14px", fontWeight: 800, color: C.text1, marginBottom: "10px" }}>친구 초대</div>
@@ -12797,30 +13237,20 @@ function AppInner() {
           paddingTop: "6px",
           zIndex: 10000,
         }}>
-          {/* ★ 2026-06-08 IA 재설계: 홈/마켓/트레이딩/포트폴리오/메뉴 — GNB 4축과 동기화.
-              활성 판정은 탭 정확일치 → 카테고리 일치로 변경 (마켓 하위 화면에서도 '마켓' 점등).
-              '메뉴'는 profile 이동(버그) → 실제 메뉴 시트 열기로 수정. */}
+          {/* ★ 2026-07 정보 피벗 Phase 1: 홈/뉴스/시장/지표/MY — 새 GNB 5축과 동기화.
+              활성 판정은 카테고리 일치(gnbCategoryMap 재편으로 뉴스는 독립 카테고리라
+              이중 점등 특례가 불필요해졌습니다). 전체 메뉴 시트는 상단 햄버거로 진입. */}
           {[
             { id: "home", cat: "home", label: "홈", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><path d={active ? "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10.5z" : "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-4.5v-6h-3v6H4a1 1 0 0 1-1-1V10.5z"} />{active && <rect x="9" y="14" width="6" height="7" rx="0.5" fill={C.isDark ? C.bg : "#fff"} />}</svg> },
-            { id: "screener", cat: "analysis", label: "마켓", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1}/><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg> },
-            // ★ 2026-07 정보 서비스 피벗: 하단 탭 '트레이딩' → '뉴스' (owner 포함 공통)
             { id: "news", cat: "news", label: "뉴스", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="18" rx="2" fill={active ? "currentColor" : "none"} /><path d="M8 7h8M8 11h5M8 15h7" stroke={active ? (C.isDark ? C.bg : "#fff") : "currentColor"} strokeWidth="1.8" fill="none" /></svg> },
-            { id: "portfolio", cat: "management", label: "포트폴리오", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" fill="none" stroke={active ? (C.isDark ? C.bg : "#fff") : "currentColor"} strokeWidth="1.8" /></svg> },
-            { id: "more", cat: "info", label: "메뉴", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><line x1="4" y1="6" x2="20" y2="6" /><line x1="4" y1="12" x2="20" y2="12" /><line x1="4" y1="18" x2="20" y2="18" /></svg> },
+            { id: "screener", cat: "market", label: "시장", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1}/><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg> },
+            { id: "econ-calendar", cat: "indicators", label: "지표", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="2" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1} /><rect x="3" y="4" width="18" height="17" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" /></svg> },
+            { id: "profile", cat: "my", label: "MY", icon: (active) => <svg width="24" height="24" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1} /><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg> },
           ].map(item => {
-            const isActive = item.id === "more"
-              ? gnbCategory === "info" && tab !== "news"
-              : item.id === "news"
-              ? tab === "news"
-              // 뉴스 탭에서는 '뉴스'만 점등 (뉴스는 마켓 카테고리 소속이라 이중 점등 방지)
-              : item.cat === gnbCategory && tab !== "news";
+            const isActive = item.cat === gnbCategory;
             return (
               <button key={item.id} onClick={() => {
-                if (item.id === "more") {
-                  try { window.dispatchEvent(new CustomEvent("zepta:open-mobile-menu")); } catch {}
-                } else {
-                  setTab(item.id);
-                }
+                setTab(item.id);
               }} style={{
                 flex: 1,
                 display: "flex",
