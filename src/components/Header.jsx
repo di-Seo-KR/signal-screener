@@ -86,22 +86,31 @@ function CssDropdownItem({ children, onClick, className, variant }) {
 }
 
 /* ── 네비게이션 데이터 정의 (다국어 대응 — t 함수 주입) ── */
-/* ★ 2026-06-08 IA 재설계 (대표 지시 — 전면 개편 스프린트):
-   사용자 멘탈모델 기준 4축 — 마켓(시장을 본다) / 트레이딩(매매한다) /
-   포트폴리오(자산을 관리한다) / 더보기(부가 기능).
-   '모의(자동매매)·실전매매'는 트레이딩 카테고리 + 화면 내 모드 스위치로 일원화. */
+/* ★ 2026-07 정보 피벗 Phase 1 (대표 지시): GNB 5메뉴 재편.
+   홈 / 뉴스(단일 직행 탭) / 시장 / 지표 / MY — 정보 소비 동선 중심.
+   트레이딩 카테고리는 내부 운영(owner) 전용으로 기존 그대로 유지(비owner 비노출).
+   어떤 탭 id 도 삭제하지 않고 메뉴 배치만 재편했습니다 (라우팅·북마크 호환). */
 const getNavCategories = (t) => [
   { id: "home", label: t("nav.home"), catId: "home", icon: LayoutDashboard, directTab: "home" },
+  // ★ 뉴스: 카테고리가 아닌 단일 직행 탭
+  { id: "news-direct", label: t("nav.news"), catId: "news", icon: Newspaper, directTab: "news" },
   {
-    id: "analysis", label: t("nav.analysis"), catId: "analysis", icon: BarChart3,
+    id: "market", label: t("nav.market"), catId: "market", icon: BarChart3,
     items: [
       { id: "screener", label: t("nav.screener"), icon: Search },
       { id: "/coin", label: "코인 분석", icon: Coins },
+      { id: "saved-screeners", label: "저장한 조건", icon: Save },
       { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
-      { id: "news", label: t("nav.news"), icon: Newspaper },
-      { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
+      { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
+      { id: "quant-report", label: "시장 리포트", icon: FileText },
+    ],
+  },
+  {
+    id: "indicators", label: t("nav.indicators"), catId: "indicators", icon: Activity,
+    // ★ 온체인 허브는 Phase 2 예정 — 현재는 경제 캘린더 · 시장 심리 2종만
+    items: [
       { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
-      { id: "quant-report", label: t("nav.report"), icon: FileText },
+      { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
     ],
   },
   {
@@ -119,20 +128,13 @@ const getNavCategories = (t) => [
     ],
   },
   {
-    id: "management", label: t("nav.management"), catId: "management", icon: Briefcase,
-    // ★ 2026-06-08 포트폴리오 허브 통합 — 자산분석·퀀트포트는 포트폴리오 화면 안
-    //   세그먼트로 진입 (3중복 메뉴 정리). 리스크맵만 별도 화면 유지.
+    // ★ MY: 개인화 영역 — 로그인 여부와 무관하게 카테고리 자체는 항상 표시
+    id: "my", label: t("nav.my"), catId: "my", icon: User,
     items: [
       { id: "portfolio", label: t("nav.portfolio"), icon: Briefcase },
-      { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
-    ],
-  },
-  {
-    id: "info", label: t("nav.info"), catId: "info", icon: Newspaper,
-    items: [
-      { id: "saved-screeners", label: "저장한 조건", icon: Save },
+      { id: "portfolio-analysis", label: "자산 분석", icon: PieChart },
       { id: "notifications", label: "🔔 알림", icon: Bell },
-      { id: "/blog", label: "블로그", icon: BookOpen },
+      { id: "profile", label: "내 정보", icon: User },
       { id: "pricing", label: "👑 멤버십", icon: Crown, ownerOnly: true }, // ★ 내부 운영 전용
     ],
   },
@@ -142,14 +144,22 @@ const getNavCategories = (t) => [
    ★ real-trading 은 owner 전용 큰 배너로 분리 (Sheet 상단) — 여기 셀에서는 제외 */
 const getMobileMenuSections = (isOwner, t) => [
   {
-    section: t("nav.analysis"), items: [
+    // ★ 2026-07 정보 피벗 Phase 1: 시장(시장을 본다) — 뉴스는 직행 탭이지만
+    //   시트 안에서도 찾을 수 있도록 첫 항목으로 포함 (하단 탭바에도 별도 존재)
+    section: t("nav.market"), items: [
+      { id: "news", label: t("nav.news"), icon: Newspaper },
       { id: "screener", label: t("nav.screener"), icon: Search },
       { id: "/coin", label: "코인 분석", icon: Coins },
+      { id: "saved-screeners", label: "저장한 조건", icon: Save },
       { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
-      { id: "news", label: t("nav.news"), icon: Newspaper },
-      { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
+      { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
+      { id: "quant-report", label: "시장 리포트", icon: FileText },
+    ],
+  },
+  {
+    section: t("nav.indicators"), items: [
       { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
-      { id: "quant-report", label: t("nav.report"), icon: FileText },
+      { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
     ],
   },
   {
@@ -166,15 +176,11 @@ const getMobileMenuSections = (isOwner, t) => [
     ],
   },
   {
-    section: t("nav.management"), items: [
+    section: t("nav.my"), items: [
       { id: "portfolio", label: t("nav.portfolio"), icon: Briefcase },
-      { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
-    ],
-  },
-  {
-    section: t("nav.info"), items: [
-      { id: "saved-screeners", label: "저장한 조건", icon: Save },
+      { id: "portfolio-analysis", label: "자산 분석", icon: PieChart },
       { id: "notifications", label: "🔔 알림", icon: Bell },
+      { id: "profile", label: "내 정보", icon: User },
       { id: "/blog", label: "블로그", icon: BookOpen },
       { id: "pricing", label: "👑 멤버십", icon: Crown, ownerOnly: true }, // ★ 내부 운영 전용
     ],
@@ -185,22 +191,27 @@ const getMobileMenuSections = (isOwner, t) => [
   .filter((sec) => sec.items.length > 0);
 
 /* ── GNB 카테고리 매핑 ── */
+/* ★ 2026-07 정보 피벗 Phase 1: 홈/뉴스/시장/지표/MY (+owner 트레이딩) 재편.
+   App.jsx 의 gnbCategoryMap 과 반드시 동기 유지해야 합니다. */
 const gnbCategoryMap = {
   home: "home",
-  // 마켓 (시장을 본다)
-  screener: "analysis", anomaly: "analysis", strategy: "analysis",
-  "quant-report": "analysis", news: "analysis", sentiment: "analysis",
-  "econ-calendar": "analysis",
-  // 트레이딩 (매매한다) — 모의·실전 일원화 + 전략 검증 도구
+  // 뉴스 — 단일 직행 탭
+  news: "news",
+  // 시장 (시장을 본다)
+  screener: "market", anomaly: "market", "saved-screeners": "market",
+  "risk-map": "market", "quant-report": "market",
+  // 지표 (거시·심리)
+  "econ-calendar": "indicators", sentiment: "indicators",
+  // 트레이딩 (내부 운영 전용) — 전략 검증 도구 포함
   "auto-trading": "ai-quant", "real-trading": "ai-quant",
   "alpha-lab": "ai-quant", backtest: "ai-quant", "backtest-compare": "ai-quant",
   "copy-trading": "ai-quant", "leaderboard": "ai-quant", "reports": "ai-quant",
-  // 포트폴리오 (자산을 관리한다)
-  "quant-port": "management", "risk-map": "management", portfolio: "management",
-  "portfolio-analysis": "management",
-  // 더보기
-  "saved-screeners": "info", alerts: "info",
-  "notifications": "info", "pricing": "info",
+  "bot-report": "ai-quant", strategy: "ai-quant",
+  // MY (개인화)
+  portfolio: "my", "portfolio-analysis": "my",
+  "quant-port": "my", "quant-portfolio": "my",
+  notifications: "my", alerts: "my", pricing: "my",
+  profile: "my", mypage: "my",
 };
 
 export default memo(function Header({
