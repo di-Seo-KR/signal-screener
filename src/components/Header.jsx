@@ -105,7 +105,8 @@ const getNavCategories = (t) => [
     ],
   },
   {
-    id: "ai-quant", label: t("nav.tradingCat"), catId: "ai-quant", icon: Bot,
+    // ★ 2026-07 정보 서비스 피벗: 트레이딩 카테고리 전체 내부 운영(owner) 전용 — 비owner 완전 비노출
+    id: "ai-quant", label: t("nav.tradingCat"), catId: "ai-quant", icon: Bot, ownerOnly: true,
     items: [
       { id: "auto-trading", label: "모의투자 (AI 자동매매)", icon: Bot },
       { id: "real-trading", label: "실전투자", icon: Activity, ownerOnly: true },
@@ -132,7 +133,7 @@ const getNavCategories = (t) => [
       { id: "saved-screeners", label: "저장한 조건", icon: Save },
       { id: "notifications", label: "🔔 알림", icon: Bell },
       { id: "/blog", label: "블로그", icon: BookOpen },
-      { id: "pricing", label: "👑 멤버십", icon: Crown },
+      { id: "pricing", label: "👑 멤버십", icon: Crown, ownerOnly: true }, // ★ 내부 운영 전용
     ],
   },
 ];
@@ -152,15 +153,16 @@ const getMobileMenuSections = (isOwner, t) => [
     ],
   },
   {
+    // ★ 2026-07 정보 서비스 피벗: 트레이딩 섹션 전체 내부 운영 전용 (항목 전부 숨김 → 섹션 자동 제거)
     section: t("nav.tradingCat"), items: [
-      { id: "auto-trading", label: "모의투자", icon: Bot },
-      ...(isOwner ? [{ id: "real-trading", label: "실전투자", icon: Activity }] : []),
-      { id: "alpha-lab", label: "🧬 알파 랩", icon: Sparkles },
-      { id: "backtest", label: t("nav.backtest"), icon: LineChart },
-      { id: "backtest-compare", label: "전략 비교", icon: GitCompare },
-      { id: "leaderboard", label: "🏆 봇 랭킹", icon: Trophy },
-      { id: "copy-trading", label: "카피트레이딩", icon: Share2 },
-      { id: "reports", label: "봇 리포트", icon: FileText },
+      { id: "auto-trading", label: "모의투자", icon: Bot, ownerOnly: true },
+      { id: "real-trading", label: "실전투자", icon: Activity, ownerOnly: true },
+      { id: "alpha-lab", label: "🧬 알파 랩", icon: Sparkles, ownerOnly: true },
+      { id: "backtest", label: t("nav.backtest"), icon: LineChart, ownerOnly: true },
+      { id: "backtest-compare", label: "전략 비교", icon: GitCompare, ownerOnly: true },
+      { id: "leaderboard", label: "🏆 봇 랭킹", icon: Trophy, ownerOnly: true },
+      { id: "copy-trading", label: "카피트레이딩", icon: Share2, ownerOnly: true },
+      { id: "reports", label: "봇 리포트", icon: FileText, ownerOnly: true },
     ],
   },
   {
@@ -174,10 +176,13 @@ const getMobileMenuSections = (isOwner, t) => [
       { id: "saved-screeners", label: "저장한 조건", icon: Save },
       { id: "notifications", label: "🔔 알림", icon: Bell },
       { id: "/blog", label: "블로그", icon: BookOpen },
-      { id: "pricing", label: "👑 멤버십", icon: Crown },
+      { id: "pricing", label: "👑 멤버십", icon: Crown, ownerOnly: true }, // ★ 내부 운영 전용
     ],
   },
-];
+]
+  // ★ 2026-07 정보 서비스 피벗: ownerOnly 항목 필터 → 항목이 전부 사라진 섹션은 섹션째 숨김
+  .map((sec) => ({ ...sec, items: sec.items.filter((it) => !it.ownerOnly || isOwner) }))
+  .filter((sec) => sec.items.length > 0);
 
 /* ── GNB 카테고리 매핑 ── */
 const gnbCategoryMap = {
@@ -206,7 +211,12 @@ export default memo(function Header({
   const [mobileOpen, setMobileOpen] = useState(false);
   const { lang, setLang, t } = useLanguage();
   const activeCategory = gnbCategoryMap[tab] || "home";
-  const NAV_CATEGORIES = getNavCategories(t);
+  // ★ 2026-07 정보 서비스 피벗: ownerOnly 카테고리/항목은 비owner 에게 비노출
+  //   (항목이 전부 숨겨진 카테고리는 카테고리째 숨김)
+  const NAV_CATEGORIES = getNavCategories(t)
+    .filter((cat) => !cat.ownerOnly || isOwner)
+    .map((cat) => (cat.items ? { ...cat, items: cat.items.filter((it) => !it.ownerOnly || isOwner) } : cat))
+    .filter((cat) => cat.directTab || (cat.items && cat.items.length > 0));
   const mobileMenuSections = getMobileMenuSections(isOwner, t);
 
   // ★ 2026-06-08: 모바일 하단 탭바의 '메뉴' 버튼이 이 시트를 열도록 — 커스텀 이벤트 수신
@@ -517,9 +527,11 @@ export default memo(function Header({
                     <CssDropdownItem onClick={() => { navigate("profile"); close(); }}>
                       <User className="size-4" /><span>{t("header.profile")}</span>
                     </CssDropdownItem>
-                    <CssDropdownItem onClick={() => { navigate("auto-trading"); close(); }}>
-                      <Bot className="size-4" /><span>{t("header.botStatus")}</span>
-                    </CssDropdownItem>
+                    {isOwner && (
+                      <CssDropdownItem onClick={() => { navigate("auto-trading"); close(); }}>
+                        <Bot className="size-4" /><span>{t("header.botStatus")}</span>
+                      </CssDropdownItem>
+                    )}
                     {isOwner && (
                       <CssDropdownItem onClick={() => { navigate("real-trading"); close(); }}>
                         <Activity className="size-4" /><span>{t("header.liveTrading")}</span>
