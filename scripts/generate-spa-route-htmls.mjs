@@ -32,12 +32,12 @@ const DIST = "dist";
 const ROUTES = [
   {
     path: "screener",
-    title: "Zepta 스크리너 — AI가 찾는 매수 종목 실시간 스코어",
-    desc: "주식·코인 실시간 스크리닝. 알파 33개 통합 점수, 멀티팩터, 골든크로스/RSI/MACD 자동 분석.",
-    h1: "Zepta 스크리너 — AI가 매수 종목을 찾아드립니다",
-    intro: "미국 주식과 글로벌 암호화폐를 실시간으로 스크리닝합니다. 33개 알파 시그널을 통합한 종목별 스코어로 매수 후보를 빠르게 식별하세요.",
+    title: "Zepta 스크리너 — AI가 찾는 상승 신호 종목 실시간 스코어",
+    desc: "주식·코인 실시간 스크리닝. 통합 알파 점수, 멀티팩터, 골든크로스/RSI/MACD 자동 분석.",
+    h1: "Zepta 스크리너 — AI가 상승 신호 종목을 짚어드립니다",
+    intro: "미국 주식과 글로벌 암호화폐를 실시간으로 스크리닝합니다. 다양한 알파 시그널을 통합한 종목별 스코어로 신호 강도 상위 종목을 빠르게 확인할 수 있습니다.",
     features: [
-      "통합 알파 스코어 — 33개 시그널을 가중 평균한 종목별 매수 강도",
+      "통합 알파 스코어 — 다중 시그널을 가중 평균한 종목별 신호 강도",
       "멀티팩터 필터 — 가격, 거래량, 변동성, 모멘텀을 한 화면에서 조합",
       "골든크로스·RSI·MACD — 검증된 기술적 시그널 자동 탐지",
       "실시간 데이터 — Yahoo Finance + Binance 시세를 분당 갱신",
@@ -51,7 +51,8 @@ const ROUTES = [
   },
   {
     path: "auto-trading",
-    title: "Zepta 자동매매 — AI 33개 퀀트 봇 전략",
+    noindex: true, // ★ 2026-07 정보 서비스 피벗: 내부 운영 전용 경로 — 검색 색인 제외
+    title: "Zepta 자동매매 — AI 퀀트 봇 전략",
     desc: "백테스트 검증된 알파 기반 자동 진입·청산. 7개 코인 봇 + 6개 주식 봇 + 8개 strategy 다양화.",
     h1: "Zepta 자동매매 — AI 퀀트 봇이 24시간 매매합니다",
     intro: "백테스트로 검증된 알파 전략을 기반으로 자동 진입·청산합니다. 7개 코인 봇과 6개 주식 봇, 8개 strategy 조합으로 리스크를 분산하세요.",
@@ -70,6 +71,7 @@ const ROUTES = [
   },
   {
     path: "real-trading",
+    noindex: true, // ★ 2026-07 정보 서비스 피벗: 내부 운영 전용 경로 — 검색 색인 제외
     title: "Zepta 실전매매 — Binance Futures USDM 실거래",
     desc: "Binance Futures 실전매매 관제센터. 일/주 손익 한도, MDD 30일 rolling, 자동 force-close 안전망.",
     h1: "Zepta 실전매매 — Binance Futures 실거래 관제센터",
@@ -89,6 +91,7 @@ const ROUTES = [
   },
   {
     path: "alpha-lab",
+    noindex: true, // ★ 2026-07 정보 서비스 피벗: 내부 운영 전용 경로 — 검색 색인 제외
     title: "Zepta Alpha Lab — 24/7 알파 추적·자동 개선",
     desc: "8개 strategy 의 Sharpe·PF·승률 매시간 leaderboard. 파라미터 자동 튜닝 + 시장 레짐 자동 적응.",
     h1: "Zepta Alpha Lab — 알파 전략을 24/7 추적·개선합니다",
@@ -146,6 +149,7 @@ const ROUTES = [
   },
   {
     path: "backtest",
+    noindex: true, // ★ 2026-07 정보 서비스 피벗: 내부 운영 전용 경로 — 검색 색인 제외
     title: "Zepta 백테스트 — OHLC 시계열 walk-forward",
     desc: "30/60/90일 walk-forward 백테스트. Sharpe·PF·MDD·Calmar 자동 산출. 파라미터 grid search.",
     h1: "Zepta 백테스트 — Walk-forward 로 과거 성과를 검증",
@@ -165,10 +169,11 @@ const ROUTES = [
   },
   {
     path: "strategy",
-    title: "Zepta 알파 전략 — 33개 검증된 퀀트 시그널",
-    desc: "RSI/MACD/볼린저밴드/Hurst/ER/OBV 등 검증된 33개 알파. Family 별 가중치 자동 학습.",
-    h1: "Zepta 알파 전략 — 33개 검증된 퀀트 시그널 모음",
-    intro: "RSI, MACD, 볼린저밴드, Hurst 지수, Efficiency Ratio, OBV 등 검증된 33개 알파 시그널을 family 별로 정리했습니다. 각 시그널의 작동 원리와 백테스트 성과를 확인하세요.",
+    noindex: true, // ★ 2026-07 정보 서비스 피벗: 내부 운영 전용 경로 — 검색 색인 제외
+    title: "Zepta 알파 전략 — 검증된 퀀트 시그널",
+    desc: "RSI/MACD/볼린저밴드/Hurst/ER/OBV 등 검증된 알파 모음. Family 별 가중치 자동 학습.",
+    h1: "Zepta 알파 전략 — 검증된 퀀트 시그널 모음",
+    intro: "RSI, MACD, 볼린저밴드, Hurst 지수, Efficiency Ratio, OBV 등 검증된 알파 시그널을 family 별로 정리했습니다. 각 시그널의 작동 원리와 백테스트 성과를 확인하세요.",
     features: [
       "Momentum family — RSI·MACD·Stochastic 등 추세 시그널",
       "Mean Reversion family — 볼린저밴드·Z-score·평균회귀",
@@ -177,7 +182,7 @@ const ROUTES = [
       "Volume family — OBV·MFI·CMF 등 거래량 기반 시그널",
     ],
     faq: [
-      { q: "33개 시그널 중 어떤 것이 가장 좋나요?", a: "시장 상황(추세/횡보)에 따라 최적 시그널이 달라집니다. Alpha Lab leaderboard 에서 현재 시장 레짐에 맞는 상위 시그널을 확인하세요." },
+      { q: "여러 시그널 중 어떤 것이 가장 좋나요?", a: "시장 상황(추세/횡보)에 따라 최적 시그널이 달라집니다. Alpha Lab leaderboard 에서 현재 시장 레짐에 맞는 상위 시그널을 확인하세요." },
       { q: "시그널을 직접 조합할 수 있나요?", a: "스크리너에서 여러 시그널을 AND/OR 로 조합한 사용자 정의 필터를 만들 수 있습니다." },
       { q: "Hurst 지수가 뭔가요?", a: "시계열의 장기 기억(추세 지속성)을 측정하는 지표입니다. 0.5 초과면 추세, 미만이면 평균회귀 성향을 나타냅니다." },
     ],
@@ -263,7 +268,7 @@ const ROUTES = [
     title: "Zepta 이상 감지 — 변동성·거래량 스파이크",
     desc: "비정상 변동률 2σ 초과, 거래량 3배 폭증, 급격한 갭 자동 감지. 실시간 알림.",
     h1: "Zepta 이상 감지 — 비정상 변동과 거래량 스파이크 포착",
-    intro: "2σ 초과 변동률, 거래량 3배 폭증, 급격한 갭을 자동 감지합니다. 이벤트 드라이븐 매매 기회를 실시간으로 잡으세요.",
+    intro: "2σ 초과 변동률, 거래량 3배 폭증, 급격한 갭을 자동 감지합니다. 이벤트 드라이븐 시장 변화를 실시간으로 포착합니다.",
     features: [
       "변동성 스파이크 — 2σ 초과 비정상 변동 자동 알림",
       "거래량 폭증 — 평균 대비 3배 이상 거래량 감지",
@@ -279,13 +284,14 @@ const ROUTES = [
   },
   {
     path: "alerts",
+    noindex: true, // ★ 2026-07 정보 서비스 피벗: 내부 운영 전용 경로 — 검색 색인 제외
     title: "Zepta 알림 — 가격·신호 사용자 정의",
     desc: "사용자 정의 가격 알림, 시그널 발생 알림, 포트폴리오 임계값 알림. 텔레그램 연동.",
     h1: "Zepta 알림 — 가격·시그널·포트폴리오 사용자 정의 알림",
     intro: "원하는 종목의 가격 조건, 시그널 발생, 포트폴리오 임계값 도달 시 실시간 알림을 받아보세요. 텔레그램 연동으로 모바일에서도 즉시 확인합니다.",
     features: [
       "가격 알림 — 종목별 상한/하한 가격 도달 시 알림",
-      "시그널 알림 — 33개 알파 시그널 중 선택해 발생 시 알림",
+      "시그널 알림 — 다양한 알파 시그널 중 선택해 발생 시 알림",
       "포트폴리오 알림 — 보유 자산 손익률·집중도 임계값 도달 시 알림",
       "텔레그램 연동 — 모바일 푸시보다 빠른 즉시 알림",
       "조건 조합 — AND/OR 로 복합 조건 알림 생성",
@@ -317,6 +323,7 @@ const ROUTES = [
   },
   {
     path: "quant-portfolio",
+    noindex: true, // ★ 2026-07 정보 서비스 피벗: 내부 운영 전용 경로 — 검색 색인 제외
     title: "Zepta 퀀트 포트폴리오 — 다중 알고리즘 최적화",
     desc: "켈리·평균분산·블랙리터만 다중 알고리즘. 자동 리밸런싱, 리스크 패리티.",
     h1: "Zepta 퀀트 포트폴리오 — 다중 알고리즘으로 최적 배분",
@@ -393,6 +400,7 @@ const ROUTES = [
   },
   {
     path: "leaderboard",
+    noindex: true, // ★ 2026-07 정보 서비스 피벗: 내부 운영 전용 경로 — 검색 색인 제외
     title: "Zepta 봇 리더보드 — 익명 사용자 봇 성과 랭킹",
     desc: "모든 사용자의 자동매매 봇 성과를 익명으로 비교. 30일 수익률, 안정성(Sharpe), MDD, 거래수 매시간 갱신.",
     h1: "Zepta 봇 리더보드 — 익명 사용자 봇 성과 랭킹",
@@ -412,6 +420,7 @@ const ROUTES = [
   },
   {
     path: "reports",
+    noindex: true, // ★ 2026-07 정보 서비스 피벗: 내부 운영 전용 경로 — 검색 색인 제외
     title: "Zepta 봇 리포트 — 봇별 누적 성과·에쿼티 커브",
     desc: "13개 자동매매 봇의 누적 수익, 승률, PF, MDD, 최근 30일 에쿼티 커브와 거래 내역을 한 곳에서 확인.",
     h1: "Zepta 봇 리포트 — 봇별 누적 성과와 거래 내역",
@@ -431,6 +440,7 @@ const ROUTES = [
   },
   {
     path: "backtest-compare",
+    noindex: true, // ★ 2026-07 정보 서비스 피벗: 내부 운영 전용 경로 — 검색 색인 제외
     title: "Zepta 백테스트 비교 — 멀티 전략 동시 백테스트",
     desc: "같은 자산·기간에 추세·돌파·평균회귀·앙상블 등 여러 strategy 를 한 차트에 overlay 비교. Sharpe·PF·MDD·승률 메트릭 테이블.",
     h1: "Zepta 백테스트 비교 — 여러 전략을 한 차트에서",
@@ -450,6 +460,7 @@ const ROUTES = [
   },
   {
     path: "copy-trading",
+    noindex: true, // ★ 2026-07 정보 서비스 피벗: 내부 운영 전용 경로 — 검색 색인 제외
     title: "Zepta 카피트레이딩 — 신호 알림 + 설정 복사 (법적 안전 모드)",
     desc: "다른 봇의 진입·청산 신호를 알림으로 받거나 strategy / parameter 만 복사. 자동 미러 매매 X — 한국 자본시장법 준수.",
     h1: "Zepta 카피트레이딩 — 신호 알림과 설정 복사 (법적 안전 모드)",
@@ -469,6 +480,7 @@ const ROUTES = [
   },
   {
     path: "pricing",
+    noindex: true, // ★ 2026-07 정보 서비스 피벗: 내부 운영 전용 경로 — 검색 색인 제외
     title: "Zepta 가격 — Free · Pro · Premium 구독 플랜",
     desc: "투자 도구 SaaS 3 tier 비교. Pro 14일 무료 체험. 봇·백테스트·알림·AlphaLab·카피트레이딩 풀 액세스. 환불 정책 명시.",
     h1: "Zepta 가격 — Free·Pro·Premium 3개 플랜",
@@ -488,6 +500,7 @@ const ROUTES = [
   },
   {
     path: "quant-port",
+    noindex: true, // ★ 2026-07 정보 서비스 피벗: 내부 운영 전용 경로 — 검색 색인 제외
     // 'quant-portfolio' 의 짧은 별칭 (sitemap.xml 에 등록됨). 동일 콘텐츠 prerender.
     title: "Zepta 퀀트 포트폴리오 — 다중 알고리즘 최적화",
     desc: "켈리·평균분산·블랙리터만 다중 알고리즘. 자동 리밸런싱, 리스크 패리티.",
@@ -590,9 +603,9 @@ function buildPrerenderBody(route) {
       <nav style="margin-top:32px;padding-top:16px;border-top:1px solid #1E2A42;font-size:14px;color:#9AA7BD;">
         <a href="/" style="color:#60A5FA;margin-right:12px;">홈</a>
         <a href="/screener" style="color:#60A5FA;margin-right:12px;">스크리너</a>
-        <a href="/auto-trading" style="color:#60A5FA;margin-right:12px;">자동매매</a>
+        <a href="/coin" style="color:#60A5FA;margin-right:12px;">코인 분석</a>
         <a href="/portfolio" style="color:#60A5FA;margin-right:12px;">포트폴리오</a>
-        <a href="/pricing" style="color:#60A5FA;">요금제</a>
+        <a href="/blog" style="color:#60A5FA;">블로그</a>
       </nav>
     </section>
   `;
@@ -604,39 +617,38 @@ function buildPrerenderBody(route) {
 //   홈에 실질 콘텐츠(소개 3문단 · 기능 모듈 · 가이드 링크 · FAQ · 면책)를 채운다.
 // ────────────────────────────────────────────────────────────────────
 const HOME = {
-  title: "Zepta — AI 퀀트 투자 플랫폼 | 주식·코인 자동매매·스크리너·백테스트",
-  desc: "Zepta는 주식과 암호화폐를 위한 올인원 AI 퀀트 투자 플랫폼입니다. 실시간 스크리너, 검증된 알파 기반 자동매매, walk-forward 백테스트, 포트폴리오 최적화, 시장 심리·경제 캘린더까지 한 곳에서 제공합니다.",
-  h1: "Zepta — 주식·코인을 위한 올인원 AI 퀀트 투자 플랫폼",
+  title: "Zepta — 투자 정보 플랫폼 | 주식·코인 스크리너·시장 신호·데이터 분석",
+  desc: "Zepta는 주식과 암호화폐를 위한 올인원 투자 정보 플랫폼입니다. 실시간 스크리너, 멀티 타임프레임 시장 신호, 코인별 모멘텀 스코어, 시장 심리·경제 캘린더까지 한 곳에서 제공합니다.",
+  h1: "Zepta — 주식·코인을 위한 올인원 투자 정보 플랫폼",
   intros: [
-    "Zepta는 개인 투자자가 기관 수준의 퀀트 도구를 쉽게 쓸 수 있도록 만든 올인원 투자 플랫폼입니다. 33개 알파 시그널을 통합한 실시간 스크리너로 매수 후보를 찾고, 백테스트로 검증된 전략을 자동매매 봇으로 24시간 운영하며, 포트폴리오 최적화와 리스크 분석까지 한 화면에서 처리합니다.",
-    "모든 전략은 walk-forward 백테스트와 교차심볼·out-of-sample 검증을 거쳐 과적합을 걸러낸 뒤에만 실거래에 반영됩니다. Alpha Lab은 8개 전략군의 Sharpe·손익비·승률을 매시간 추적하고 시장 레짐(추세/횡보)에 맞춰 가중치를 자동 조정합니다.",
-    "Zepta는 투자 결정을 돕는 분석·자동화 도구입니다. 자금은 본인 거래소 계좌에 그대로 있고, Zepta는 매매 권한만 받은 API로 주문을 전송하며 출금 권한은 절대 요청하지 않습니다.",
+    "Zepta는 개인 투자자가 기관 수준의 퀀트 데이터를 쉽게 볼 수 있도록 만든 올인원 투자 정보 플랫폼입니다. 다양한 알파 시그널을 통합한 실시간 스크리너로 신호 강도 상위 종목을 확인하고, 코인별 멀티 타임프레임 모멘텀 스코어와 리스크 분석까지 한 화면에서 살펴볼 수 있습니다.",
+    "모든 신호는 walk-forward 검증과 교차심볼·out-of-sample 검증을 거쳐 과적합을 걸러낸 지표를 기반으로 산출됩니다. 시장 레짐(추세/횡보)에 맞춰 가중치가 자동 조정되며, 모든 수치는 참고용 정보로 제공됩니다.",
+    "Zepta는 투자 정보·데이터 서비스입니다. 이용자의 자금이나 계좌에 접근하지 않으며, 매매를 대행하거나 특정 종목의 매매를 권유하지 않습니다. 최종 투자 판단과 책임은 본인에게 있습니다.",
   ],
   modules: [
-    "실시간 스크리너 — 미국 주식·한국 주식·암호화폐를 33개 알파 통합 스코어로 스크리닝",
-    "자동매매 — 백테스트 검증 전략으로 자동 진입·청산, 손절·익절 자동 관리",
-    "Alpha Lab — 8개 전략군 성과를 매시간 추적하고 파라미터를 자동 튜닝",
-    "백테스트 엔진 — Walk-forward 방식으로 Sharpe·MDD·Profit Factor 산출",
-    "포트폴리오 최적화 — 켈리·평균분산·블랙리터만·리스크패리티 다중 알고리즘",
+    "실시간 스크리너 — 미국 주식·한국 주식·암호화폐를 통합 알파 스코어로 스크리닝",
+    "코인별 모멘텀 스코어 — 메이저 30종을 주봉·일봉·4시간·1시간 종합 분석",
+    "이상 감지 — 변동성·거래량 스파이크와 급격한 갭 실시간 포착",
+    "퀀트 리포트 — 시장 지표를 종합한 실시간 분석 리포트",
+    "포트폴리오 트래킹 — 실시간 수익률 추적과 벤치마크 비교",
     "리스크 맵 — 상관관계 히트맵·변동성 레짐·집중도 시각화",
     "시장 심리 — Fear & Greed, 비트코인 도미넌스, 펀딩비 종합 센티먼트",
     "경제 캘린더·뉴스 — FOMC·CPI 일정과 AI 요약 시장 뉴스",
   ],
   guides: [
-    { href: "/coin", title: "코인별 실시간 롱숏 스코어 — 메이저 30종" },
-    { href: "/blog/ai-trading-guide", title: "AI 자동매매 입문자 가이드" },
-    { href: "/blog/bitcoin-auto-trading-5-steps", title: "비트코인 자동매매 5단계로 시작하기" },
+    { href: "/coin", title: "코인별 멀티 타임프레임 모멘텀 스코어 — 메이저 30종" },
+    { href: "/blog/screener-guide", title: "스크리너 활용 가이드" },
     { href: "/blog/quant-strategies", title: "퀀트 전략 33가지 정리" },
     { href: "/blog/backtest-tips", title: "백테스트 제대로 하는 법" },
     { href: "/blog/sharpe-ratio-profit-factor", title: "Sharpe Ratio와 Profit Factor 이해하기" },
-    { href: "/blog/realistic-roi-expectation", title: "자동매매 현실적인 수익률 기대치" },
+    { href: "/blog/rsi-divergence", title: "RSI 다이버전스 읽는 법" },
   ],
   faq: [
-    { q: "Zepta는 무엇인가요?", a: "주식과 암호화폐를 위한 올인원 AI 퀀트 투자 플랫폼입니다. 스크리너, 자동매매, 백테스트, 포트폴리오 최적화, 시장 분석을 한 곳에서 제공합니다." },
-    { q: "Zepta가 수익을 보장하나요?", a: "아니요. Zepta는 분석·자동화 도구이며 투자에는 항상 원금 손실 위험이 있습니다. 모든 백테스트 수치는 과거 성과일 뿐 미래 수익을 보장하지 않습니다." },
-    { q: "Zepta가 제 자금을 보관하나요?", a: "아니요. 자금은 본인 거래소 계좌에 그대로 있습니다. Zepta는 매매 권한만 받은 API 키로 주문을 전송하며 출금 권한은 요청하지 않습니다." },
-    { q: "무료로 사용할 수 있나요?", a: "기본 스크리너·시장 뉴스·페이퍼 트레이딩은 무료입니다. 자동매매 실거래·Alpha Lab·고급 알림은 Pro 플랜에서 제공됩니다." },
-    { q: "초보자도 사용할 수 있나요?", a: "네. 입문자 가이드와 페이퍼 트레이딩으로 위험 없이 시작할 수 있고, 어려운 지표는 쉬운 설명과 툴팁으로 안내합니다." },
+    { q: "Zepta는 무엇인가요?", a: "주식과 암호화폐를 위한 올인원 투자 정보 플랫폼입니다. 스크리너, 시장 신호 분석, 코인별 모멘텀 스코어, 뉴스·경제 캘린더를 한 곳에서 제공합니다." },
+    { q: "Zepta가 수익을 보장하나요?", a: "아니요. Zepta는 투자 정보·데이터 서비스이며 투자에는 항상 원금 손실 위험이 있습니다. 모든 수치는 과거 데이터 기반 참고 정보일 뿐 미래 수익을 보장하지 않습니다." },
+    { q: "Zepta가 제 자금을 보관하나요?", a: "아니요. Zepta는 투자 정보·데이터 서비스로, 이용자의 자금이나 거래소 계좌에 접근하지 않습니다." },
+    { q: "무료로 사용할 수 있나요?", a: "스크리너·코인 분석·시장 뉴스·경제 캘린더 등 핵심 정보 기능은 무료로 사용할 수 있습니다." },
+    { q: "초보자도 사용할 수 있나요?", a: "네. 입문자 가이드와 쉬운 설명·툴팁으로 어려운 지표도 차근차근 이해할 수 있습니다." },
   ],
 };
 
@@ -658,11 +670,9 @@ function buildHomePrerender(h) {
       <p style="font-size:13px;color:#64728C;margin-top:24px;border-top:1px solid #1E2A42;padding-top:16px;">⚠ Zepta는 투자 분석·자동화 도구이며 투자 자문이 아닙니다. 모든 수치는 과거 시뮬레이션 결과로 미래 수익을 보장하지 않으며, 투자에는 원금 손실 위험이 따릅니다. 최종 투자 결정과 책임은 본인에게 있습니다.</p>
       <nav style="margin-top:24px;font-size:14px;">
         <a href="/screener" style="color:#60A5FA;margin-right:12px;">스크리너</a>
-        <a href="/auto-trading" style="color:#60A5FA;margin-right:12px;">자동매매</a>
-        <a href="/alpha-lab" style="color:#60A5FA;margin-right:12px;">Alpha Lab</a>
-        <a href="/backtest" style="color:#60A5FA;margin-right:12px;">백테스트</a>
-        <a href="/blog" style="color:#60A5FA;margin-right:12px;">블로그</a>
-        <a href="/pricing" style="color:#60A5FA;">요금제</a>
+        <a href="/coin" style="color:#60A5FA;margin-right:12px;">코인 분석</a>
+        <a href="/news" style="color:#60A5FA;margin-right:12px;">뉴스</a>
+        <a href="/blog" style="color:#60A5FA;">블로그</a>
       </nav>
     </section>`;
 }
@@ -690,6 +700,10 @@ function transformHtml(baseHtml, route) {
 
   // 1) head 메타 교체
   html = html.replace(/<title>[^<]*<\/title>/i, `<title>${escapeText(route.title)}</title>`);
+  // ★ 2026-07 정보 서비스 피벗: 내부 운영 전용 경로는 검색 색인 제외
+  if (route.noindex) {
+    html = replaceMetaTag(html, "name", "robots", "content", "noindex");
+  }
   html = html.replace(/(<link\s+rel="canonical"[^>]*href=")[^"]+(")/i, `$1${url}$2`);
   html = replaceMetaTag(html, "name", "description", "content", route.desc);
   html = replaceMetaTag(html, "property", "og:title", "content", route.title);

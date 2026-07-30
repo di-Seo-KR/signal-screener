@@ -814,7 +814,7 @@ function LoadingSkeleton({ progress }) {
           <style>{`@keyframes qpSpin { to { transform: rotate(360deg); } }`}</style>
           <div style={{ fontWeight: 800, fontSize: "18px", marginBottom: "8px" }}>실시간 데이터 로딩 중</div>
           <div style={{ color: C.text3, fontSize: "15px", marginBottom: "16px" }}>
-            {collectAllSymbols().length}개 종목 시세 수신 + 33개 전략 백테스트 실행
+            {collectAllSymbols().length}개 종목 시세 수신 + 전체 전략 백테스트 실행
           </div>
         </div>
         <div style={{ maxWidth: "300px", margin: "0 auto" }}>

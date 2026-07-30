@@ -150,7 +150,7 @@ function DisclaimerBanner({ C }) {
   );
 }
 
-export default function Onboarding({ onClose, onNavigate }) {
+export default function Onboarding({ onClose, onNavigate, isOwner = false }) {
   const C = useThemeTokens();
   const { isMobile } = useBreakpoint();
   let auth = null;
@@ -158,6 +158,13 @@ export default function Onboarding({ onClose, onNavigate }) {
   const user = auth?.user;
 
   const [step, setStep] = useState(1);
+
+  // ★ 2026-07 정보 서비스 피벗: 비owner(일반 유저)는 step 3(위험 성향·추천 봇·예상 연 수익)과
+  //   step 4(Binance 연결)를 건너뜀 — 성과 예측 전시·자동매매 소구를 공개 온보딩에서 제거.
+  //   owner 는 기존 5단계 전부 유지.
+  const stepFlow = isOwner ? [1, 2, 3, 4, 5] : [1, 2, 5];
+  const totalSteps = stepFlow.length;
+  const stepIndex = Math.max(0, stepFlow.indexOf(step));
   const [assetType, setAssetType] = useState("stock"); // 'stock' | 'coin'
   const [interests, setInterests] = useState([]); // ['us-megacap', ...]
   const [risk, setRisk] = useState(null);
@@ -200,8 +207,10 @@ export default function Onboarding({ onClose, onNavigate }) {
   }, [saveOnboarding, step, onClose]);
 
   const handleNext = useCallback(async () => {
-    if (step < TOTAL_STEPS) {
-      const next = step + 1;
+    // ★ 스텝 흐름 배열 기반 이동 (비owner 는 3·4 건너뜀)
+    const idx = stepFlow.indexOf(step);
+    if (idx >= 0 && idx < stepFlow.length - 1) {
+      const next = stepFlow[idx + 1];
       await saveOnboarding({ step: next });
       ga.ctaClick("onboarding", `next-step-${step}`);
       setStep(next);
@@ -213,11 +222,12 @@ export default function Onboarding({ onClose, onNavigate }) {
       setSaving(false);
       if (typeof onClose === "function") onClose();
     }
-  }, [step, saveOnboarding, onClose]);
+  }, [step, stepFlow, saveOnboarding, onClose]);
 
   const handlePrev = useCallback(() => {
-    if (step > 1) setStep(step - 1);
-  }, [step]);
+    const idx = stepFlow.indexOf(step);
+    if (idx > 0) setStep(stepFlow[idx - 1]);
+  }, [step, stepFlow]);
 
   const toggleInterest = useCallback((id) => {
     setInterests(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -250,7 +260,7 @@ export default function Onboarding({ onClose, onNavigate }) {
             </ul>
           </div>
           <div style={{ fontSize: FONT.xs, color: C.text3, textAlign: "center", lineHeight: 1.5 }}>
-            5단계로 빠르게 설정해드릴게요 · 약 1분 소요
+            {totalSteps}단계로 빠르게 설정해드릴게요 · 약 1분 소요
           </div>
         </div>
       );
@@ -366,9 +376,9 @@ export default function Onboarding({ onClose, onNavigate }) {
               setBinanceConnected(true);
               ga.binanceConnectClicked();
               ga.ctaClick("onboarding", "binance-now");
-              // 자동매매 탭으로 이동 + 온보딩은 완료로 마킹
+              // ★ 2026-07 정보 서비스 피벗: 자동매매 대신 코인 분석(스크리너)으로 이동 + 온보딩은 완료로 마킹
               saveOnboarding({ completed: true, completedAt: new Date().toISOString(), step: 4, binanceConnected: true }).then(() => {
-                if (typeof onNavigate === "function") onNavigate("auto-trading");
+                if (typeof onNavigate === "function") onNavigate("screener");
                 if (typeof onClose === "function") onClose();
               });
             }} style={{
@@ -395,22 +405,39 @@ export default function Onboarding({ onClose, onNavigate }) {
           <div style={{ fontSize: isMobile ? FONT.xl : FONT["2xl"], fontWeight: 800, color: C.text1, textAlign: "center" }}>
             설정 완료! 첫 시그널을 보여드릴게요
           </div>
-          <div style={{
-            padding: 16, background: C.blueBg, borderRadius: RADIUS.lg,
-            border: `1.5px solid ${C.blue}40`,
-          }}>
-            <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 4 }}>회원님께 추천하는 전략</div>
-            <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>
-              {profile.emoji} {profile.botLabel}
+          {/* ★ 2026-07 정보 서비스 피벗: 추천 전략·예상 연 수익 카드는 내부 운영(owner) 전용 —
+              비owner 에게는 성과 예측 전시 없이 관심 자산 기반 중립 안내만 표시 */}
+          {isOwner ? (
+            <div style={{
+              padding: 16, background: C.blueBg, borderRadius: RADIUS.lg,
+              border: `1.5px solid ${C.blue}40`,
+            }}>
+              <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 4 }}>회원님께 추천하는 전략</div>
+              <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>
+                {profile.emoji} {profile.botLabel}
+              </div>
+              <div style={{ fontSize: FONT.sm, color: C.text2, marginTop: 8, lineHeight: 1.6 }}>
+                {profile.desc}
+              </div>
+              <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
+                <span style={{ fontSize: FONT.xs, color: C.text3 }}>예상 연 수익: <b style={{ color: C.green }}>{profile.expectedAnnual}</b></span>
+                <span style={{ fontSize: FONT.xs, color: C.text3 }}>{profile.drawdownGuide}</span>
+              </div>
             </div>
-            <div style={{ fontSize: FONT.sm, color: C.text2, marginTop: 8, lineHeight: 1.6 }}>
-              {profile.desc}
+          ) : (
+            <div style={{
+              padding: 16, background: C.blueBg, borderRadius: RADIUS.lg,
+              border: `1.5px solid ${C.blue}40`,
+            }}>
+              <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 4 }}>맞춤 설정 완료</div>
+              <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>
+                🪙 관심 자산 {interests.length > 0 ? `${interests.length}개 카테고리` : "설정됨"}
+              </div>
+              <div style={{ fontSize: FONT.sm, color: C.text2, marginTop: 8, lineHeight: 1.6 }}>
+                스크리너와 코인 분석에서 선택하신 자산의 실시간 시장 신호와 데이터를 바로 확인할 수 있어요.
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
-              <span style={{ fontSize: FONT.xs, color: C.text3 }}>예상 연 수익: <b style={{ color: C.green }}>{profile.expectedAnnual}</b></span>
-              <span style={{ fontSize: FONT.xs, color: C.text3 }}>{profile.drawdownGuide}</span>
-            </div>
-          </div>
+          )}
           <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 10 }}>
             <button onClick={() => {
               ga.ctaClick("onboarding", "go-screener");
@@ -429,9 +456,10 @@ export default function Onboarding({ onClose, onNavigate }) {
               📊 스크리너 둘러보기
             </button>
             <button onClick={() => {
-              ga.ctaClick("onboarding", "go-auto-trading");
+              // ★ 2026-07 정보 서비스 피벗: 자동매매 CTA → 코인 분석 보기
+              ga.ctaClick("onboarding", "go-coin-analysis");
               saveOnboarding({ completed: true, completedAt: new Date().toISOString(), step: 5 }).then(() => {
-                if (typeof onNavigate === "function") onNavigate("auto-trading");
+                if (typeof onNavigate === "function") onNavigate("screener");
                 if (typeof onClose === "function") onClose();
               });
             }} style={{
@@ -442,7 +470,7 @@ export default function Onboarding({ onClose, onNavigate }) {
               borderRadius: RADIUS.md,
               fontSize: pickFont("button", isMobile) ?? FONT.sm, fontWeight: 700, cursor: "pointer",
             }}>
-              🤖 자동매매 살펴보기
+              🪙 코인 분석 보기
             </button>
           </div>
           <DisclaimerBanner C={C} />
@@ -495,7 +523,7 @@ export default function Onboarding({ onClose, onNavigate }) {
         }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <span style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 600 }}>
-              {step} / {TOTAL_STEPS} 단계
+              {stepIndex + 1} / {totalSteps} 단계
             </span>
             <button onClick={handleSkip} style={{
               background: "none", border: "none",
@@ -507,8 +535,8 @@ export default function Onboarding({ onClose, onNavigate }) {
           </div>
           {/* 모바일은 Stepper 점, 데스크탑은 progress bar */}
           {isMobile
-            ? <Stepper current={step} total={TOTAL_STEPS} showLabel={false} />
-            : <ProgressBar step={step} total={TOTAL_STEPS} C={C} />}
+            ? <Stepper current={stepIndex + 1} total={totalSteps} showLabel={false} />
+            : <ProgressBar step={stepIndex + 1} total={totalSteps} C={C} />}
         </div>
 
         {/* 바디 */}
@@ -526,15 +554,15 @@ export default function Onboarding({ onClose, onNavigate }) {
             display: "flex", gap: 10, justifyContent: "space-between",
             background: C.card,
           }}>
-            <button onClick={handlePrev} disabled={step === 1} style={{
+            <button onClick={handlePrev} disabled={stepIndex === 0} style={{
               padding: isMobile ? "14px 18px" : "10px 18px",
               minHeight: 48,
-              background: "transparent", color: step === 1 ? C.text4 : C.text2,
+              background: "transparent", color: stepIndex === 0 ? C.text4 : C.text2,
               border: `1px solid ${C.border}`,
               borderRadius: RADIUS.md,
               fontSize: pickFont("button", isMobile) ?? FONT.sm, fontWeight: 600,
-              cursor: step === 1 ? "not-allowed" : "pointer",
-              opacity: step === 1 ? 0.4 : 1,
+              cursor: stepIndex === 0 ? "not-allowed" : "pointer",
+              opacity: stepIndex === 0 ? 0.4 : 1,
             }}>
               ← 이전
             </button>
@@ -549,7 +577,7 @@ export default function Onboarding({ onClose, onNavigate }) {
               fontSize: pickFont("button", isMobile) ?? FONT.sm, fontWeight: 700,
               cursor: canProceed ? "pointer" : "not-allowed",
             }}>
-              {saving ? "저장 중…" : (step === TOTAL_STEPS ? "완료" : "다음 →")}
+              {saving ? "저장 중…" : (stepIndex === totalSteps - 1 ? "완료" : "다음 →")}
             </button>
           </div>
         )}

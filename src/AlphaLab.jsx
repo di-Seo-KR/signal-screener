@@ -1062,7 +1062,7 @@ export default function AlphaLab({ onRequestLogin }) {
       <div className="z-bento-scope" style={{ padding: "14px 14px", maxWidth: 1200, margin: "0 auto" }}>
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, letterSpacing: "-0.02em" }}>알파 랩</div>
-          <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4 }}>검증된 33개 전략을 한 자리에서 비교하세요</div>
+          <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4 }}>검증된 전략들을 한 자리에서 비교하세요</div>
         </div>
         <LoadingBlock rows={4} height={84} label="알파 데이터 불러오는 중…" />
       </div>
@@ -1076,7 +1076,7 @@ export default function AlphaLab({ onRequestLogin }) {
         <div>
           <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, letterSpacing: "-0.02em" }}>알파 랩</div>
           <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4, lineHeight: 1.55 }}>
-            33개 매매 전략을 24시간 검증합니다. 가장 잘 작동하는 알파를 자동으로 골라냅니다.
+            다수의 매매 전략을 24시간 검증합니다. 가장 잘 작동하는 알파를 자동으로 골라냅니다.
           </div>
         </div>
 

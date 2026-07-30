@@ -855,14 +855,15 @@ function runDiagnosis(candles) {
   );
 
   // 판정 (7단계로 세분화)
+  // ★ 2026-07 정보 서비스 피벗: 매수/매도 행동 지시 표현 → 신호 상태 서술로 전환 (유사투자자문 위험 표현 정비)
   let verdict, summary;
-  if (totalScore >= 80) { verdict = "적극 매수"; summary = "기술적 지표 대부분이 강력한 매수 신호를 보이고 있습니다. 추세·모멘텀·수급 3박자가 일치합니다."; }
-  else if (totalScore >= 68) { verdict = "매수"; summary = "긍정적 신호가 우세합니다. 기술적 분석상 매수 관점이 유리한 구간입니다."; }
-  else if (totalScore >= 58) { verdict = "매수 우위"; summary = "약한 매수 신호입니다. 추가 확인 지표와 함께 분할 매수를 고려해 볼 수 있습니다."; }
-  else if (totalScore >= 42) { verdict = "중립 (관망)"; summary = "매수와 매도 신호가 혼재합니다. 추세가 명확해질 때까지 관망이 유리합니다."; }
-  else if (totalScore >= 32) { verdict = "매도 우위"; summary = "부정적 신호가 감지됩니다. 포지션 축소 또는 방어적 전략을 권장합니다."; }
-  else if (totalScore >= 20) { verdict = "매도"; summary = "다수의 하락 신호가 감지됩니다. 포지션 정리 또는 손절을 고려하세요."; }
-  else { verdict = "적극 매도"; summary = "강한 하락 신호가 다수 감지됩니다. 즉각적인 리스크 관리가 필요합니다."; }
+  if (totalScore >= 80) { verdict = "강한 상승 신호 우세"; summary = "기술적 지표 대부분이 강한 상승 신호를 보이는 상태입니다. 추세·모멘텀·수급 3박자가 일치합니다."; }
+  else if (totalScore >= 68) { verdict = "상승 신호 우세"; summary = "긍정적 신호가 우세한 상태입니다. 기술적 지표 다수가 상승 방향을 가리키고 있습니다."; }
+  else if (totalScore >= 58) { verdict = "상승 신호 약우세"; summary = "약한 상승 신호가 감지된 상태입니다. 추가 확인 지표에 따라 신호 강도가 달라질 수 있습니다."; }
+  else if (totalScore >= 42) { verdict = "신호 혼조"; summary = "상승 신호와 하락 신호가 혼재된 상태입니다. 추세 방향이 아직 명확하지 않습니다."; }
+  else if (totalScore >= 32) { verdict = "하락 신호 약우세"; summary = "부정적 신호가 감지된 상태입니다. 하락 방향 지표가 다소 우세합니다."; }
+  else if (totalScore >= 20) { verdict = "하락 신호 우세"; summary = "다수의 하락 신호가 감지된 상태입니다. 기술적 지표 다수가 하락 방향을 가리키고 있습니다."; }
+  else { verdict = "강한 하락 신호 우세"; summary = "강한 하락 신호가 다수 감지된 상태입니다. 변동성이 확대될 수 있는 구간입니다."; }
 
   // ── 적정가치 추정 (다중 모델 앙상블) ──
   let fairValue = null;

@@ -75,7 +75,6 @@ footer a{color:#60A5FA;text-decoration:none;margin:0 6px}
 const NAV = `
   <nav>
     <a href="/">홈</a>
-    <a href="/auto-trading">AI 매매</a>
     <a href="/screener">스크리너</a>
     <a href="/coin">코인 분석</a>
     <a href="/blog">블로그</a>
@@ -103,8 +102,8 @@ function liveScript(sym) {
       var list=(d&&d.coins)||[],c=null,i;
       for(i=0;i<list.length;i++){if(list[i].asset===${jstr(sym)}){c=list[i];break}}
       if(!c){box.innerHTML='<div class="signal-na">현재 ${escH(sym)} 종합 시그널을 집계 중입니다. 10분 주기로 갱신되니 잠시 후 다시 확인해 주세요.</div>';return}
-      var isLong=c.side==='LONG',side=isLong?'롱 (매수 우위)':'숏 (매도 우위)',cls=isLong?'green':'red',bd=c.breakdown||{};
-      function tf(k,label){var x=bd[k];if(!x)return '<div class="tf"><span>'+label+'</span><b>—</b></div>';var s=x.side==='LONG'?'롱':'숏',cl=x.side==='LONG'?'green':'red';return '<div class="tf"><span>'+label+'</span><b class="'+cl+'">'+s+' '+Math.round(x.score)+'</b></div>'}
+      var isLong=c.side==='LONG',side=isLong?'상승 모멘텀 우세':'하락 모멘텀 우세',cls=isLong?'green':'red',bd=c.breakdown||{};
+      function tf(k,label){var x=bd[k];if(!x)return '<div class="tf"><span>'+label+'</span><b>—</b></div>';var s=x.side==='LONG'?'상승':'하락',cl=x.side==='LONG'?'green':'red';return '<div class="tf"><span>'+label+'</span><b class="'+cl+'">'+s+' '+Math.round(x.score)+'</b></div>'}
       box.innerHTML='<div class="signal-head"><span class="signal-label">현재 Zepta 종합 시그널</span><span class="signal-score '+cls+'">'+side+' · '+Math.round(c.score)+'점</span></div>'+
         '<div class="tf-row">'+tf('1w','주봉')+tf('1d','일봉')+tf('4h','4시간')+tf('1h','1시간')+'</div>'+
         '<div class="signal-note">'+(c.reason?esc(c.reason):'')+' · 10분마다 자동 갱신</div>';
@@ -116,13 +115,13 @@ function liveScript(sym) {
 function buildCoinPage(coin, idx) {
   const { sym, fut, ko, en, cat, consensus, year, desc, watch } = coin;
   const url = `${SITE}/coin/${sym.toLowerCase()}`;
-  const title = `${ko}(${sym}) 전망·롱숏 스코어·자동매매 | Zepta`;
-  const metaDesc = `${ko}(${en}, ${sym}) 실시간 종합 롱숏 스코어와 주봉·일봉·4시간·1시간 분석. ${cat}. Zepta AI 퀀트가 ${fut} 선물을 10분마다 자동 분석합니다.`;
-  const kw = `${ko}, ${sym}, ${en}, ${ko} 전망, ${ko} 롱숏, ${sym} 자동매매, ${ko} 선물, ${fut}`;
+  const title = `${ko}(${sym}) 전망·멀티 타임프레임 모멘텀 스코어 | Zepta`;
+  const metaDesc = `${ko}(${en}, ${sym}) 실시간 종합 모멘텀 스코어와 주봉·일봉·4시간·1시간 분석. ${cat}. Zepta 가 ${fut} 시장 데이터를 10분마다 자동 분석합니다.`;
+  const kw = `${ko}, ${sym}, ${en}, ${ko} 전망, ${ko} 모멘텀, ${sym} 분석, ${ko} 시세, ${fut}`;
 
   const faq = [
-    { q: `${ko}(${sym}) 선물을 Zepta에서 자동매매할 수 있나요?`,
-      a: `네. ${ko}는 Zepta가 다루는 30개 메이저 코인 중 하나로, 바이낸스 USDM 선물 ${fut} 심볼로 거래됩니다. 봇이 주봉·일봉·4시간·1시간을 종합한 스코어로 롱·숏을 자동 판단하고, 레버리지 5배·격리마진으로 진입합니다.` },
+    { q: `Zepta의 ${ko}(${sym}) 스코어는 어떤 서비스인가요?`,
+      a: `Zepta 는 투자 정보·데이터 서비스입니다. ${ko}는 Zepta가 다루는 30개 메이저 코인 중 하나로, 주봉·일봉·4시간·1시간을 종합한 모멘텀 스코어를 10분마다 산출해 참고 정보로 제공합니다. 매매를 대행하거나 특정 매매를 권유하지 않습니다.` },
     { q: `${ko}는 어떤 코인이고 무엇에 영향을 받나요?`, a: watch },
     { q: `${ko} 롱·숏 스코어는 얼마나 자주 갱신되나요?`,
       a: `10분마다 재산출됩니다. 주봉 30%·일봉 25%·4시간 25%·1시간 20% 가중치로 네 시간대를 합산하며, 여러 시간대가 한 방향으로 모일수록 점수(확신도)가 높아집니다. 펀딩비·미결제약정(OI)·베이시스 같은 선물 지표도 보정에 반영됩니다.` },
@@ -134,7 +133,7 @@ function buildCoinPage(coin, idx) {
   };
   const articleLd = {
     "@context": "https://schema.org", "@type": "Article",
-    headline: `${ko}(${sym}) 전망과 실시간 롱숏 스코어`,
+    headline: `${ko}(${sym}) 전망과 멀티 타임프레임 모멘텀 스코어`,
     description: metaDesc,
     author: { "@type": "Organization", name: "Zepta" },
     publisher: { "@type": "Organization", name: "Zepta", url: SITE + "/" },
@@ -153,9 +152,9 @@ function buildCoinPage(coin, idx) {
   // 형제 코인 5개(순환) + 블로그 2개 내부링크
   const sibs = [];
   for (let k = 1; k <= 5; k++) { const c = COINS[(idx + k) % COINS.length]; sibs.push(c); }
-  const related = sibs.map((c) => `<a href="/coin/${c.sym.toLowerCase()}">${escH(c.ko)}(${c.sym}) 전망·롱숏 스코어</a>`).join("\n      ")
-    + `\n      <a href="/blog/ai-trading-guide">AI 자동매매란? 시작 전에 꼭 알아야 할 것들</a>`
-    + `\n      <a href="/blog/leverage-risk-guide">암호화폐 레버리지 매매 위험과 안전한 사용법</a>`;
+  const related = sibs.map((c) => `<a href="/coin/${c.sym.toLowerCase()}">${escH(c.ko)}(${c.sym}) 전망·모멘텀 스코어</a>`).join("\n      ")
+    + `\n      <a href="/blog/quant-strategies">퀀트 전략이란? 종류와 원리 정리</a>`
+    + `\n      <a href="/blog/rsi-divergence">RSI 다이버전스로 추세 전환 신호 읽는 법</a>`;
 
   const faqHtml = faq.map((f) => `    <h3 style="font-size:16px;color:#F1F5FB;margin:20px 0 6px">${escH(f.q)}</h3>\n    <p>${escH(f.a)}</p>`).join("\n");
 
@@ -184,7 +183,7 @@ function buildCoinPage(coin, idx) {
 <body>${NAV}
   <main class="wrap">
     <div class="breadcrumb"><a href="/">홈</a> › <a href="/coin">코인 분석</a> › ${escH(ko)}(${sym})</div>
-    <h1>${escH(ko)}(${sym}) 전망과 실시간 롱숏 스코어</h1>
+    <h1>${escH(ko)}(${sym}) 전망과 멀티 타임프레임 모멘텀 스코어</h1>
     <div class="meta-row">${escH(cat)} · ${escH(consensus)} · ${year}년 출시 · 최종 갱신 ${BUILD_DATE}</div>
 
     <div class="signal" id="live-signal" data-sym="${escA(sym)}">
@@ -208,12 +207,11 @@ function buildCoinPage(coin, idx) {
       <li><strong>멀티 타임프레임 가중합</strong> — 주봉 30% · 일봉 25% · 4시간 25% · 1시간 20%. 여러 시간대가 같은 방향이면 점수가 높아지고, 서로 엇갈리면 상쇄돼 신중하게 판단합니다.</li>
       <li><strong>선물 시장 지표 반영</strong> — 펀딩비, 미결제약정(OI) 변화, 베이시스(현·선물 괴리)를 보정에 넣어 과열·쏠림 구간을 걸러냅니다.</li>
       <li><strong>10분마다 재산출</strong> — 위 실시간 시그널 박스가 가장 최근 계산값이며 자동으로 갱신됩니다.</li>
-      <li><strong>자동 진입·청산</strong> — 봇 매매를 켜면 ${escH(ko)} 스코어가 충분히 강할 때 레버리지 5배·격리마진으로 진입하고, 손절·익절을 자동 관리합니다.</li>
     </ul>
 
-    <h2>${escH(ko)} 매매 시 주의할 점</h2>
+    <h2>${escH(ko)} 시장을 볼 때 주의할 점</h2>
     <p>${escH(watch)}</p>
-    <p>선물 거래는 레버리지가 손익을 함께 키웁니다. 청산가까지 거리를 항상 확인하고, 한 종목에 자본을 몰아넣지 않는 것이 안전합니다. Zepta는 종목별 포지션을 가용 잔고 안에서 자동으로 조절하지만, 시장 급변 시 손실이 발생할 수 있습니다.</p>
+    <p>선물 시장은 레버리지가 손익을 함께 키우는 구조라 변동성이 큽니다. 스코어는 시장 상태를 요약한 참고 지표일 뿐이며, 시장 급변 시 신호와 다르게 움직일 수 있습니다.</p>
 
     <div class="disc">⚠️ 위 종합 스코어와 설명은 알고리즘이 산출한 <strong>참고 정보</strong>이며 투자 조언이나 매수·매도 권유가 아닙니다. 암호화폐 선물은 원금 손실 위험이 크며, 모든 투자 판단과 책임은 본인에게 있습니다.</div>
 
@@ -221,8 +219,8 @@ function buildCoinPage(coin, idx) {
 ${faqHtml}
 
     <div class="cta">
-      <p>${escH(ko)}를 포함한 30개 메이저 코인을 AI가 자동으로 분석·매매합니다.</p>
-      <a href="/auto-trading">AI 자동매매 살펴보기 →</a>
+      <p>${escH(ko)}를 포함한 30개 메이저 코인의 실시간 스코어를 한눈에 볼 수 있습니다.</p>
+      <a href="/coin">코인 분석 허브 보기 →</a>
     </div>
 
     <div class="related">
@@ -237,8 +235,8 @@ ${faqHtml}
 
 function buildHub() {
   const url = `${SITE}/coin`;
-  const title = "코인별 실시간 롱숏 스코어 — 메이저 30종 AI 분석 | Zepta";
-  const metaDesc = "비트코인·이더리움·솔라나 등 메이저 30개 코인의 실시간 종합 롱숏 스코어. 주봉·일봉·4시간·1시간을 종합해 10분마다 자동 분석합니다.";
+  const title = "코인별 멀티 타임프레임 모멘텀 스코어 — 메이저 30종 AI 분석 | Zepta";
+  const metaDesc = "비트코인·이더리움·솔라나 등 메이저 30개 코인의 실시간 종합 모멘텀 스코어. 주봉·일봉·4시간·1시간을 종합해 10분마다 자동 분석합니다.";
   const cards = COINS.map((c) => `      <div class="coin-card"><a href="/coin/${c.sym.toLowerCase()}"><div class="c-sym">${c.sym}</div><div class="c-ko">${escH(c.ko)}</div><div class="c-score" data-sym="${escA(c.sym)}">로딩…</div></a></div>`).join("\n");
   const listText = COINS.map((c) => `${escH(c.ko)}(${c.sym})`).join(", ");
   const crumbLd = {
@@ -260,7 +258,7 @@ function buildHub() {
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>${escA(title)}</title>
   <meta name="description" content="${escA(metaDesc)}"/>
-  <meta name="keywords" content="코인 롱숏 스코어, 코인 전망, 비트코인 전망, 이더리움 전망, 알트코인 분석, 암호화폐 자동매매, 코인 종합 스코어"/>
+  <meta name="keywords" content="코인 모멘텀 스코어, 코인 전망, 비트코인 전망, 이더리움 전망, 알트코인 분석, 암호화폐 데이터 분석, 코인 종합 스코어"/>
   <link rel="canonical" href="${url}"/>
   <meta name="robots" content="index, follow"/>
   <meta property="og:title" content="${escA(title)}"/>
@@ -277,10 +275,10 @@ function buildHub() {
 <body>${NAV}
   <main class="wrap">
     <div class="breadcrumb"><a href="/">홈</a> › 코인 분석</div>
-    <h1>코인별 실시간 롱숏 스코어</h1>
+    <h1>코인별 멀티 타임프레임 모멘텀 스코어</h1>
     <div class="meta-row">메이저 30종 · 주봉·일봉·4시간·1시간 종합 · 10분마다 자동 갱신 · 최종 갱신 ${BUILD_DATE}</div>
 
-    <p>Zepta는 비트코인을 비롯한 메이저 암호화폐 <strong>30종</strong>을 각각 네 개의 시간대(주봉·일봉·4시간·1시간)로 동시에 분석해, 지금 롱(매수)과 숏(매도) 중 어느 쪽 우위인지 하나의 <strong>종합 스코어</strong>로 보여줍니다. 아래에서 종목을 선택하면 코인별 상세 분석과 실시간 시그널을 확인할 수 있습니다.</p>
+    <p>Zepta는 비트코인을 비롯한 메이저 암호화폐 <strong>30종</strong>을 각각 네 개의 시간대(주봉·일봉·4시간·1시간)로 동시에 분석해, 지금 상승 모멘텀과 하락 모멘텀 중 어느 쪽 우세인지 하나의 <strong>종합 스코어</strong>로 보여줍니다. 아래에서 종목을 선택하면 코인별 상세 분석과 실시간 시그널을 확인할 수 있습니다.</p>
 
     <div class="coin-grid">
 ${cards}
@@ -295,8 +293,8 @@ ${cards}
     <div class="disc">⚠️ 본 페이지의 스코어는 알고리즘 산출 참고 정보이며 투자 조언이 아닙니다. 암호화폐 선물은 원금 손실 위험이 크며, 투자 판단과 책임은 본인에게 있습니다.</div>
 
     <div class="cta">
-      <p>30종 전체를 AI가 자동으로 분석하고, 원하면 자동매매까지 맡길 수 있습니다.</p>
-      <a href="/auto-trading">AI 자동매매 살펴보기 →</a>
+      <p>30종 전체를 조건 검색으로 더 깊게 살펴볼 수 있습니다.</p>
+      <a href="/screener">실시간 스크리너 살펴보기 →</a>
     </div>
   </main>${FOOTER}
   <script>
@@ -305,7 +303,7 @@ ${cards}
       var list=(d&&d.coins)||[],map={},i;
       for(i=0;i<list.length;i++){map[list[i].asset]=list[i]}
       var cells=document.querySelectorAll('.c-score[data-sym]');
-      for(i=0;i<cells.length;i++){(function(el){var c=map[el.getAttribute('data-sym')];if(!c){el.textContent='집계 중';return}var isLong=c.side==='LONG';el.textContent=(isLong?'롱 ':'숏 ')+Math.round(c.score);el.style.color=isLong?'#10D884':'#FF7B91'})(cells[i])}
+      for(i=0;i<cells.length;i++){(function(el){var c=map[el.getAttribute('data-sym')];if(!c){el.textContent='집계 중';return}var isLong=c.side==='LONG';el.textContent=(isLong?'상승 ':'하락 ')+Math.round(c.score);el.style.color=isLong?'#10D884':'#FF7B91'})(cells[i])}
     }).catch(function(){});
   })();
   </script>

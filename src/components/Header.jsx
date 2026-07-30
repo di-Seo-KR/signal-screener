@@ -96,31 +96,31 @@ const getNavCategories = (t) => [
       { id: "/coin", label: "코인 분석", icon: Coins },                 // ★ 2026-06-08: 종목별 공개 분석 페이지
       { id: "saved-screeners", label: "저장한 조건", icon: Save },     // ★ 신규
       { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
-      { id: "strategy", label: t("nav.strategy"), icon: Target },
-      { id: "alpha-lab", label: "🧬 알파 랩", icon: Sparkles },           // ★ 신규
+      { id: "strategy", label: t("nav.strategy"), icon: Target, ownerOnly: true },       // ★ 2026-07 정보 서비스 피벗: 내부 운영 전용
+      { id: "alpha-lab", label: "🧬 알파 랩", icon: Sparkles, ownerOnly: true },          // ★ 내부 운영 전용
       { id: "quant-report", label: t("nav.report"), icon: FileText },
-      { id: "backtest", label: t("nav.backtest"), icon: LineChart },
-      { id: "backtest-compare", label: "전략 비교", icon: GitCompare },     // ★ 신규
+      { id: "backtest", label: t("nav.backtest"), icon: LineChart, ownerOnly: true },    // ★ 내부 운영 전용
+      { id: "backtest-compare", label: "전략 비교", icon: GitCompare, ownerOnly: true }, // ★ 내부 운영 전용
     ],
   },
   {
     id: "management", label: t("nav.management"), catId: "management", icon: Briefcase,
     items: [
-      { id: "quant-port", label: t("nav.trading"), icon: TrendingUp },
+      { id: "quant-port", label: t("nav.trading"), icon: TrendingUp, ownerOnly: true }, // ★ 내부 운영 전용
       { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
       { id: "portfolio", label: t("nav.portfolio"), icon: Briefcase },
       { id: "portfolio-analysis", label: "자산 분석", icon: PieChart }, // ★ 신규
     ],
   },
   {
-    id: "ai-quant", label: t("nav.aiQuant"), catId: "ai-quant", icon: Bot,
-    // ★ 2026-05-11: 자동매매 카테고리로 변경 (이전 directTab) — 하위 메뉴 추가
+    // ★ 2026-07 정보 서비스 피벗: 자동매매 카테고리 전체 내부 운영 전용 (비owner 완전 비노출)
+    id: "ai-quant", label: t("nav.aiQuant"), catId: "ai-quant", icon: Bot, ownerOnly: true,
     items: [
-      { id: "auto-trading", label: t("nav.aiQuant"), icon: Bot },
+      { id: "auto-trading", label: t("nav.aiQuant"), icon: Bot, ownerOnly: true },
       { id: "real-trading", label: "실전매매", icon: Activity, ownerOnly: true },
-      { id: "copy-trading", label: "카피트레이딩", icon: Share2 },
-      { id: "leaderboard", label: "🏆 봇 랭킹", icon: Trophy },
-      { id: "reports", label: "봇 리포트", icon: FileText },
+      { id: "copy-trading", label: "카피트레이딩", icon: Share2, ownerOnly: true },
+      { id: "leaderboard", label: "🏆 봇 랭킹", icon: Trophy, ownerOnly: true },
+      { id: "reports", label: "봇 리포트", icon: FileText, ownerOnly: true },
     ],
   },
   {
@@ -130,9 +130,9 @@ const getNavCategories = (t) => [
       { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
       { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
       { id: "/blog", label: "블로그", icon: BookOpen },
-      { id: "alerts", label: t("nav.alerts"), icon: Bell, locked: true },
+      { id: "alerts", label: t("nav.alerts"), icon: Bell, locked: true, ownerOnly: true }, // ★ 내부 운영 전용
       { id: "notifications", label: "🔔 알림", icon: Bell },
-      { id: "pricing", label: "👑 멤버십", icon: Crown },
+      { id: "pricing", label: "👑 멤버십", icon: Crown, ownerOnly: true },                 // ★ 내부 운영 전용
     ],
   },
 ];
@@ -143,7 +143,8 @@ const getMobileMenuSections = (isOwner, t) => [
   {
     section: t("nav.home"), items: [
       { id: "home", label: t("nav.home"), icon: LayoutDashboard },
-      { id: "auto-trading", label: t("nav.aiQuant"), icon: Bot },
+      // ★ 2026-07 정보 서비스 피벗: 자동매매 진입점 내부 운영 전용
+      { id: "auto-trading", label: t("nav.aiQuant"), icon: Bot, ownerOnly: true },
     ],
   },
   {
@@ -152,28 +153,29 @@ const getMobileMenuSections = (isOwner, t) => [
       { id: "/coin", label: "코인 분석", icon: Coins },
       { id: "saved-screeners", label: "저장한 조건", icon: Save },
       { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
-      { id: "strategy", label: t("nav.strategy"), icon: Target },
-      { id: "alpha-lab", label: "🧬 알파 랩", icon: Sparkles },
+      { id: "strategy", label: t("nav.strategy"), icon: Target, ownerOnly: true },
+      { id: "alpha-lab", label: "🧬 알파 랩", icon: Sparkles, ownerOnly: true },
       { id: "quant-report", label: t("nav.report"), icon: FileText },
-      { id: "backtest", label: t("nav.backtest"), icon: LineChart },
-      { id: "backtest-compare", label: "전략 비교", icon: GitCompare },
+      { id: "backtest", label: t("nav.backtest"), icon: LineChart, ownerOnly: true },
+      { id: "backtest-compare", label: "전략 비교", icon: GitCompare, ownerOnly: true },
     ],
   },
   {
     section: t("nav.management"), items: [
-      { id: "quant-port", label: t("nav.trading"), icon: TrendingUp },
+      { id: "quant-port", label: t("nav.trading"), icon: TrendingUp, ownerOnly: true },
       { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
       { id: "portfolio", label: t("nav.portfolio"), icon: Briefcase },
       { id: "portfolio-analysis", label: "자산 분석", icon: PieChart },
     ],
   },
   {
+    // ★ 2026-07 정보 서비스 피벗: '자동매매' 섹션 전체 내부 운영 전용 (항목 전부 숨김 → 섹션 자동 제거)
     section: "자동매매", items: [
-      { id: "auto-trading", label: t("nav.aiQuant"), icon: Bot },
-      ...(isOwner ? [{ id: "real-trading", label: "실전매매", icon: Activity }] : []),
-      { id: "copy-trading", label: "카피트레이딩", icon: Share2 },
-      { id: "leaderboard", label: "🏆 봇 랭킹", icon: Trophy },
-      { id: "reports", label: "봇 리포트", icon: FileText },
+      { id: "auto-trading", label: t("nav.aiQuant"), icon: Bot, ownerOnly: true },
+      { id: "real-trading", label: "실전매매", icon: Activity, ownerOnly: true },
+      { id: "copy-trading", label: "카피트레이딩", icon: Share2, ownerOnly: true },
+      { id: "leaderboard", label: "🏆 봇 랭킹", icon: Trophy, ownerOnly: true },
+      { id: "reports", label: "봇 리포트", icon: FileText, ownerOnly: true },
     ],
   },
   {
@@ -183,11 +185,14 @@ const getMobileMenuSections = (isOwner, t) => [
       { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
       { id: "/blog", label: "블로그", icon: BookOpen },
       { id: "notifications", label: "🔔 알림", icon: Bell },
-      { id: "alerts", label: t("nav.alerts"), icon: Bell, locked: true },
-      { id: "pricing", label: "👑 멤버십", icon: Crown },
+      { id: "alerts", label: t("nav.alerts"), icon: Bell, locked: true, ownerOnly: true },
+      { id: "pricing", label: "👑 멤버십", icon: Crown, ownerOnly: true },
     ],
   },
-];
+]
+  // ownerOnly 항목 필터 → 항목이 전부 사라진 섹션은 섹션째 숨김
+  .map((sec) => ({ ...sec, items: sec.items.filter((it) => !it.ownerOnly || isOwner) }))
+  .filter((sec) => sec.items.length > 0);
 
 /* ── GNB 카테고리 매핑 ── */
 const gnbCategoryMap = {
@@ -215,7 +220,12 @@ export default memo(function Header({
   const [mobileOpen, setMobileOpen] = useState(false);
   const { lang, setLang, t } = useLanguage();
   const activeCategory = gnbCategoryMap[tab] || "home";
-  const NAV_CATEGORIES = getNavCategories(t);
+  // ★ 2026-07 정보 서비스 피벗: ownerOnly 카테고리/항목은 비owner 에게 비노출
+  //   (항목이 전부 숨겨진 카테고리는 카테고리째 숨김)
+  const NAV_CATEGORIES = getNavCategories(t)
+    .filter((cat) => !cat.ownerOnly || isOwner)
+    .map((cat) => (cat.items ? { ...cat, items: cat.items.filter((it) => !it.ownerOnly || isOwner) } : cat))
+    .filter((cat) => cat.directTab || (cat.items && cat.items.length > 0));
   const mobileMenuSections = getMobileMenuSections(isOwner, t);
 
   const navigate = useCallback((tabId) => {
@@ -511,9 +521,11 @@ export default memo(function Header({
                     <CssDropdownItem onClick={() => { navigate("profile"); close(); }}>
                       <User className="size-4" /><span>{t("header.profile")}</span>
                     </CssDropdownItem>
-                    <CssDropdownItem onClick={() => { navigate("auto-trading"); close(); }}>
-                      <Bot className="size-4" /><span>{t("header.botStatus")}</span>
-                    </CssDropdownItem>
+                    {isOwner && (
+                      <CssDropdownItem onClick={() => { navigate("auto-trading"); close(); }}>
+                        <Bot className="size-4" /><span>{t("header.botStatus")}</span>
+                      </CssDropdownItem>
+                    )}
                     {isOwner && (
                       <CssDropdownItem onClick={() => { navigate("real-trading"); close(); }}>
                         <Activity className="size-4" /><span>{t("header.liveTrading")}</span>
