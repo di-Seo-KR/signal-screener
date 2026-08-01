@@ -96,14 +96,20 @@ const getNavCategories = (t) => [
   // ★ 뉴스: 카테고리가 아닌 단일 직행 탭
   { id: "news-direct", label: t("nav.news"), catId: "news", icon: Newspaper, directTab: "news" },
   {
+    // ★ 2026-08-02 (주식+코인 양축 확장, 대표 지시): '시장' 항목을 주식 축 포함으로 재정비.
+    //   스크리너(주식+코인 전체) → 주식 분석 → 코인 분석 순으로 두 축을 나란히 노출합니다.
+    //   '주식 분석'은 전용 화면이 없어 스크리너에 주식(미국+한국) 필터를 걸어 진입합니다
+    //   (screenerMarket → zepta:screener-market 이벤트 → App.jsx 의 filterMarket).
+    //   기존 항목은 하나도 제거하지 않고 순서만 조정했습니다.
     id: "market", label: t("nav.market"), catId: "market", icon: BarChart3,
     items: [
       { id: "screener", label: t("nav.screener"), icon: Search },
+      { id: "screener", key: "screener-stock", label: "주식 분석", icon: TrendingUp, screenerMarket: "stock" },
       { id: "/coin", label: "코인 분석", icon: Coins },
-      { id: "saved-screeners", label: "저장한 조건", icon: Save },
       { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
       { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
       { id: "quant-report", label: "시장 리포트", icon: FileText },
+      { id: "saved-screeners", label: "저장한 조건", icon: Save },
     ],
   },
   {
@@ -151,11 +157,13 @@ const getMobileMenuSections = (isOwner, t) => [
     section: t("nav.market"), items: [
       { id: "news", label: t("nav.news"), icon: Newspaper },
       { id: "screener", label: t("nav.screener"), icon: Search },
+      // ★ 2026-08-02 주식+코인 양축 — 데스크톱 GNB 와 동일 구성
+      { id: "screener", key: "screener-stock", label: "주식 분석", icon: TrendingUp, screenerMarket: "stock" },
       { id: "/coin", label: "코인 분석", icon: Coins },
-      { id: "saved-screeners", label: "저장한 조건", icon: Save },
       { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
       { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
       { id: "quant-report", label: "시장 리포트", icon: FileText },
+      { id: "saved-screeners", label: "저장한 조건", icon: Save },
     ],
   },
   {
@@ -241,11 +249,16 @@ export default memo(function Header({
     return () => window.removeEventListener("zepta:open-mobile-menu", open);
   }, []);
 
-  const navigate = useCallback((tabId) => {
+  const navigate = useCallback((tabId, screenerMarket) => {
     // 외부 path (블로그처럼 정적 HTML) — 새 페이지로 이동
     if (typeof tabId === "string" && tabId.startsWith("/")) {
       window.location.href = tabId;
       return;
+    }
+    // ★ 2026-08-02: '주식 분석'처럼 시장 필터를 미리 걸고 진입하는 항목 지원.
+    //   App.jsx 가 이 이벤트를 받아 스크리너의 filterMarket 을 설정합니다.
+    if (screenerMarket) {
+      try { window.dispatchEvent(new CustomEvent("zepta:screener-market", { detail: screenerMarket })); } catch { /* 무시 */ }
     }
     setTab(tabId);
     setMobileOpen(false);
@@ -352,13 +365,14 @@ export default memo(function Header({
                       <div className="grid grid-cols-3 gap-1.5">
                         {group.items.map((item) => {
                           const Icon = item.icon;
-                          const isActive = tab === item.id;
+                          // 같은 탭을 다른 필터로 여는 항목(주식 분석)은 활성 표시에서 제외 — 중복 하이라이트 방지
+                          const isActive = tab === item.id && !item.screenerMarket;
                           return (
                             <button
-                              key={item.id}
+                              key={item.key || item.id}
                               onClick={() => {
                                 if (item.locked && requireLogin?.(item.id)) { setMobileOpen(false); return; }
-                                navigate(item.id);
+                                navigate(item.id, item.screenerMarket);
                               }}
                               className={cn(
                                 "flex flex-col items-center gap-1 rounded-xl p-2.5 text-xs font-semibold transition-colors",
@@ -470,13 +484,13 @@ export default memo(function Header({
                     const Icon = item.icon;
                     return (
                       <CssDropdownItem
-                        key={item.id}
+                        key={item.key || item.id}
                         onClick={() => {
                           if (item.locked && requireLogin?.(item.id)) return;
-                          navigate(item.id);
+                          navigate(item.id, item.screenerMarket);
                           close();
                         }}
-                        className={cn(tab === item.id && "bg-primary/10 text-primary")}
+                        className={cn(tab === item.id && !item.screenerMarket && "bg-primary/10 text-primary")}
                       >
                         <Icon className="size-4" />
                         {item.label}

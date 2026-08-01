@@ -886,6 +886,18 @@ const ALL_ASSETS = [
   }),
 ];
 
+// ★ 2026-08-02 (주식+코인 양축 확장, 대표 지시): 시장 필터 매칭 (SSOT)
+//   기존 값(all/us/kr/crypto)에 "stock"(미국+한국 주식 묶음)을 추가했습니다.
+//   GNB '주식 분석'·지표 허브의 주식 진입점이 이 값으로 스크리너에 딥링크합니다.
+const MARKET_FILTERS = ["all", "stock", "us", "kr", "crypto"];
+const matchMarketFilter = (asset, filter) => {
+  if (filter === "all" || !filter) return true;
+  if (filter === "stock") return asset?.market === "us" || asset?.market === "kr";
+  return asset?.market === filter;
+};
+// 시장 → 표시용 배지 라벨 (홈 인기 종목 등 공용)
+const MARKET_BADGE = { us: "🇺🇸 미국", kr: "🇰🇷 한국", crypto: "₿ 코인" };
+
 // 고위험 종목 (레버리지/인버스 ETF, 페니스톡 등)
 const RISKY_SYMBOLS = new Set([
   // 레버리지/인버스 ETF
@@ -4507,12 +4519,13 @@ function AppInner() {
   // ── 탭별 SEO 메타 정보 (제목, 설명, OG 태그용) ──
   const TAB_META = {
     home: { title: "Zepta — 투자 정보 플랫폼", desc: "실시간 주식/코인 스크리너, 시장 신호·데이터 분석, 뉴스·경제 캘린더, 리스크 관리" },
-    screener: { title: "주식 스크리너 | Zepta", desc: "AI 기반 주식 스크리닝 — 모멘텀, 변동성, 수급 조건으로 종목 필터링" },
+    // ★ 2026-08-02 (주식+코인 양축): 실제 스캔 범위(미국·한국 주식 + 코인)에 맞춰 카피 정합
+    screener: { title: "주식·코인 스크리너 | Zepta", desc: "AI 기반 주식·코인 스크리닝 — 모멘텀, 변동성, 수급 조건으로 종목 필터링" },
     "auto-trading": { title: "AI 자동매매 | Zepta", desc: "9개 퀀트 전략 기반 암호화폐 자동매매 봇" },
     portfolio: { title: "포트폴리오 | Zepta", desc: "실시간 포트폴리오 추적 및 벤치마크 비교" },
     news: { title: "마켓 뉴스 | Zepta", desc: "AI 센티먼트 분석이 포함된 실시간 글로벌 투자 뉴스" },
     "econ-calendar": { title: "경제 캘린더 | Zepta", desc: "주요 경제 지표 발표 일정 및 영향 분석" },
-    indicators: { title: "지표 허브 | Zepta", desc: "공포·탐욕, 마켓 온도 등 핵심 시장 지표 요약과 해석" },
+    indicators: { title: "지표 허브 | Zepta", desc: "주식·코인 핵심 시장 지표를 한 화면에 — 국내증시 온도, 환율 압력, 공포·탐욕, 마켓 온도 요약과 해석" },
     sentiment: { title: "소셜 센티먼트 | Zepta", desc: "StockTwits · Reddit 기반 실시간 투자 심리 분석" },
     alerts: { title: "매매 알림 | Zepta", desc: "실시간 AI 매매 신호 알림 및 텔레그램 연동" },
     anomaly: { title: "이상 탐지 | Zepta", desc: "AI 기반 시장 이상 징후 실시간 탐지" },
@@ -6727,6 +6740,41 @@ function AppInner() {
     return () => { cancelled = true; };
   }, [tab, isOwner]);
 
+  // ── 주식 축 지표 1종 (비owner 새 홈 ④ 시장 지표 스냅샷) ──
+  // ★ 2026-08-02 (대표 지시 "주식+코인 양축"): ④ 스냅샷이 코인 지표에만 쏠리지 않도록
+  //   지표 허브 집계에서 market:"stock" 지표(국내증시 온도)를 하나 골라 함께 노출합니다.
+  //   계약: GET /api/indicators/summary → { ok, indicators: [{ id, market, value, ... }] }
+  //   실패/결측 시 null 유지 — 해당 카드만 조용히 숨깁니다 (값 조작 금지).
+  const [stockIndicator, setStockIndicator] = useState(null);
+  useEffect(() => {
+    if (tab !== "home" || isOwner) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/indicators/summary");
+        if (!r.ok) { if (!cancelled) setStockIndicator(null); return; }
+        const j = await r.json();
+        const list = Array.isArray(j?.indicators) ? j.indicators : [];
+        const pick = list.find(i => i?.market === "stock" && i.value != null) || null;
+        if (!cancelled) setStockIndicator(pick);
+      } catch {
+        if (!cancelled) setStockIndicator(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [tab, isOwner]);
+
+  // ── 스크리너 시장 필터 딥링크 (GNB '주식 분석' · 지표 허브 진입 버튼) ──
+  // ★ 2026-08-02: Header/IndicatorHub 가 zepta:screener-market 이벤트로 필터를 전달합니다.
+  useEffect(() => {
+    const onScreenerMarket = (e) => {
+      const m = e?.detail;
+      if (MARKET_FILTERS.includes(m)) setFilterMarket(m);
+    };
+    window.addEventListener("zepta:screener-market", onScreenerMarket);
+    return () => window.removeEventListener("zepta:screener-market", onScreenerMarket);
+  }, []);
+
   // ── 소셜 센티먼트 ──
   const fetchSentiment = useCallback(async (sym) => {
     setSentimentLoading(true);
@@ -6833,7 +6881,7 @@ function AppInner() {
 
   // ★ 2026-06-12 (전수 감사): 정렬 버튼이 한 번도 동작한 적 없던 버그 — sortedResults 가
   //   계산만 되고 raw results 를 렌더하고 있었음 → 정렬 결과 기반으로 필터.
-  const filtered = sortedResults.filter(a => filterMarket === "all" || a.market === filterMarket);
+  const filtered = sortedResults.filter(a => matchMarketFilter(a, filterMarket));
 
   // ★ 2026-06-12 (전수 감사 — 치명 버그): KR 종목(₩ 단위)과 US/크립토($ 단위)를 환산 없이
   //   합산해 혼합 보유 시 총액이 수백 배 틀리던 문제 → KR 은 USD 로 정규화 후 합산.
@@ -7592,7 +7640,25 @@ function AppInner() {
           const watchRows = user && watchlist.length > 0
             ? watchlist.slice(0, 5).map(w => ({ ...w, hot: hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw) }))
             : null;
-          const popularRows = [...hotAssets].sort((a, b) => Math.abs(b.change || 0) - Math.abs(a.change || 0)).slice(0, 5);
+          // ★ 2026-08-02 (대표 지시 "주식+코인 양축"): 이전엔 변동률 절대값 상위만 뽑아
+          //   변동성이 큰 코인이 목록을 독점하는 일이 잦았습니다. 미국 주식·한국 주식·코인
+          //   버킷에서 각각 변동률 상위를 뽑아 라운드로빈으로 섞습니다(버킷 소진 시 자동 축소).
+          const popularRows = (() => {
+            const byAbsChg = (m) => hotAssets
+              .filter(a => a.market === m)
+              .sort((a, b) => Math.abs(b.change || 0) - Math.abs(a.change || 0));
+            const buckets = [byAbsChg("us"), byAbsChg("kr"), byAbsChg("crypto")];
+            const LIMIT = 6;
+            const out = [];
+            for (let i = 0; out.length < LIMIT; i++) {
+              let added = false;
+              for (const b of buckets) {
+                if (b[i] && out.length < LIMIT) { out.push(b[i]); added = true; }
+              }
+              if (!added) break; // 모든 버킷 소진
+            }
+            return out;
+          })();
           const cardBase = { background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` };
           const newsTime = (n) => {
             const d = new Date(n.date || n.publishedAt || n.pubDate || 0);
@@ -7784,7 +7850,9 @@ function AppInner() {
                     border: `1px solid ${C.blue}25`, borderRadius: "8px", padding: "4px 12px", cursor: "pointer", whiteSpace: "nowrap",
                   }}>지표 허브 전체 보기 →</button>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: !isMobile && tempVal != null ? "1fr 1fr" : "1fr", gap: "10px" }}>
+                {/* ★ 2026-08-02 주식+코인 양축: 주식 지표(공포탐욕·국내증시 온도)와
+                    코인 지표(마켓 온도)를 함께 노출. 결측 카드는 조용히 빠집니다. */}
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(230px, 1fr))", gap: "10px" }}>
                   <IndicatorCard
                     title="공포·탐욕 지수 (주식)"
                     value={fgVal != null ? fgVal : null}
@@ -7795,9 +7863,20 @@ function AppInner() {
                       ? `크립토 공포·탐욕 ${fgCryptoVal} · ${fgLabelOf(fgCryptoVal)}\n주식과 크립토의 심리가 다르면 자금 흐름의 온도차를 읽는 힌트가 됩니다.`
                       : null}
                   />
+                  {stockIndicator && (
+                    <IndicatorCard
+                      title={stockIndicator.title}
+                      value={stockIndicator.value}
+                      unit={stockIndicator.unit}
+                      label={stockIndicator.label}
+                      tone={stockIndicator.tone}
+                      desc={stockIndicator.desc}
+                      detail={stockIndicator.detail}
+                    />
+                  )}
                   {tempVal != null && (
                     <IndicatorCard
-                      title="Zepta 마켓 온도"
+                      title="Zepta 마켓 온도 (코인)"
                       value={Math.round(tempVal)}
                       unit="°"
                       label={marketTemp.label || "—"}
@@ -7813,7 +7892,7 @@ function AppInner() {
               <div style={cardBase}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
                   <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>
-                    {watchRows ? `⭐ 관심종목 요약` : "🔥 오늘 변동 큰 종목"}
+                    {watchRows ? `⭐ 관심종목 요약` : "🔥 오늘 변동 큰 종목 (주식·코인)"}
                   </span>
                   <button onClick={() => setTab("screener")} style={{
                     fontSize: "13px", fontWeight: 700, color: C.blue, background: `${C.blue}10`,
@@ -7826,13 +7905,18 @@ function AppInner() {
                   (watchRows || popularRows).map((row, i, arr) => {
                     const hot = watchRows ? row.hot : row;
                     const name = row.name || row.symbol;
-                    const flag = (row.market || hot?.market) === "kr" ? "🇰🇷" : (row.market || hot?.market) === "crypto" ? "₿" : "🇺🇸";
+                    // ★ 2026-08-02 양축 확장: 이모지 하나 대신 시장 구분 배지 (기존 검색 결과 배지 스타일 재사용)
+                    const mkt = row.market || hot?.market || "us";
+                    const mktLabel = MARKET_BADGE[mkt] || MARKET_BADGE.us;
                     return (
                       <div key={row.symbol || i} onClick={() => setSelectedAsset(watchRows ? row : hot)} style={{
                         display: "flex", alignItems: "center", gap: "10px", padding: "10px 4px", cursor: "pointer",
                         borderBottom: i < arr.length - 1 ? `1px solid ${C.border}12` : "none",
                       }}>
-                        <span style={{ fontSize: "14px", flexShrink: 0 }}>{flag}</span>
+                        <span style={{
+                          fontSize: "11px", fontWeight: 700, padding: "3px 7px", borderRadius: "6px",
+                          background: C.card2, color: C.text3, flexShrink: 0, whiteSpace: "nowrap",
+                        }}>{mktLabel}</span>
                         <span style={{ flex: 1, minWidth: 0, fontSize: "15px", fontWeight: 600, color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</span>
                         {hot ? (
                           <>
@@ -9416,7 +9500,7 @@ function AppInner() {
               {homeSection.allAssets && (
                 <>
                   <div style={{ display: "flex", gap: "6px", margin: "10px 0", flexWrap: "wrap" }}>
-                    {[["all","전체"], ["us","🇺🇸 미국"], ["kr","🇰🇷 한국"], ["crypto","₿ 크립토"]].map(([v, l]) => (
+                    {[["all","전체"], ["stock","📈 주식"], ["us","🇺🇸 미국"], ["kr","🇰🇷 한국"], ["crypto","₿ 크립토"]].map(([v, l]) => (
                       <button key={v} onClick={() => setFilterMarket(v)} style={{
                         padding: "5px 12px", borderRadius: "8px", fontSize: mf(11), fontWeight: 600,
                         background: filterMarket === v ? C.blueBg : "transparent",
@@ -9425,7 +9509,7 @@ function AppInner() {
                     ))}
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(150px, 1fr))", gap: "4px", maxHeight: "280px", overflow: "auto" }}>
-                    {ALL_ASSETS.filter(a => filterMarket === "all" || a.market === filterMarket).map((asset, i) => {
+                    {ALL_ASSETS.filter(a => matchMarketFilter(a, filterMarket)).map((asset, i) => {
                       const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
                       return (
                         <div key={`${asset.symbol}-${i}`}
@@ -9807,13 +9891,14 @@ function AppInner() {
                     paddingBottom: isMobile ? "4px" : 0,
                   }} className={isMobile ? "hscroll" : undefined}>
                     <span style={{ fontSize: mf(17), color: C.text2, fontWeight: 600, flexShrink: 0 }}>🎯 {filtered.length}개</span>
-                    {["all","us","kr","crypto"].map(m => (
+                    {/* ★ 2026-08-02 주식+코인 양축: '주식'(미국+한국) 묶음 필터 추가 */}
+                    {MARKET_FILTERS.map(m => (
                       <button key={m} onClick={() => setFilterMarket(m)} style={{
                         padding: isMobile ? "8px 12px" : "4px 10px", borderRadius: "8px", fontSize: mf(16), fontWeight: 600,
                         background: filterMarket === m ? C.blueBg : "transparent",
                         color: filterMarket === m ? C.blue : C.text3, border: `1px solid ${filterMarket === m ? C.blue : C.border2}`,
                         flexShrink: 0, minHeight: isMobile ? 36 : undefined, whiteSpace: "nowrap",
-                      }}>{m === "all" ? "전체" : m === "us" ? "🇺🇸 미국" : m === "kr" ? "🇰🇷 한국" : "₿ 크립토"}</button>
+                      }}>{m === "all" ? "전체" : m === "stock" ? "📈 주식" : m === "us" ? "🇺🇸 미국" : m === "kr" ? "🇰🇷 한국" : "₿ 크립토"}</button>
                     ))}
                     {isMobile ? (
                       // 모바일: 정렬을 ActionSheet 트리거 단일 버튼으로 압축 (가로 폭 절약)
@@ -12817,7 +12902,7 @@ function AppInner() {
               <section style={{ marginBottom: "32px", background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`, borderRadius: "16px", padding: "24px", border: `1px solid ${C.border}20`, borderLeft: `4px solid ${C.blue}` }}>
                 <h2 style={{ fontSize: isMobile ? "18px" : "20px", fontWeight: 700, color: C.text1, marginBottom: "12px" }}>서비스 개요</h2>
                 <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "14px", lineHeight: 1.7 }}>
-                  Zepta는 개인 투자자를 위한 종합 투자 정보 플랫폼입니다. 미국 주식과 글로벌 암호화폐 시장을 아우르는 실시간 데이터 분석, AI 기반 퀀트 시장 신호, 리스크 지표를 제공하여 데이터 기반의 합리적인 투자 의사결정을 지원합니다.
+                  Zepta는 개인 투자자를 위한 종합 투자 정보 플랫폼입니다. 미국·한국 주식과 글로벌 암호화폐 시장을 아우르는 실시간 데이터 분석, AI 기반 퀀트 시장 신호, 리스크 지표를 제공하여 데이터 기반의 합리적인 투자 의사결정을 지원합니다.
                 </p>
                 <p style={{ fontSize: isMobile ? "15px" : "16px", marginBottom: "0", lineHeight: 1.7 }}>
                   기존 금융 서비스의 복잡하고 전문가 중심적인 인터페이스에서 벗어나, 투자 초보자부터 전문 트레이더까지 누구나 쉽게 사용할 수 있는 직관적인 경험을 제공하는 것이 Zepta의 핵심 가치입니다.
