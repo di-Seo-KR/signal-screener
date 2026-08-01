@@ -1,8 +1,11 @@
 // ════════════════════════════════════════════════════════════════════
-// Zepta 자체 지수 3호·4호 — 펀딩 스퀴즈 지수 / 알트 과열 지수 (계산 공유 모듈)
+// Zepta 자체 지수 3호~6호 — 펀딩 스퀴즈 / 알트 과열 / 국내증시 온도 / 환율 압력
+// (계산 공유 모듈)
 // ────────────────────────────────────────────────────────────────────
 // 2026-07-30 (정보 피벗 2차): 마켓 온도(1호, market-temp.js)와 동일한 패턴으로
 // 순수 계산 함수 + KV 10분 캐시 게터를 제공합니다.
+// 2026-08-02 (주식+코인 양축 확장, 대표 지시): 코인 편중을 해소하기 위해
+//   주식 축 지수 2종(5호 국내증시 온도 · 6호 환율 압력 지수)을 같은 패턴으로 신설.
 // 사용처: api/indicators/summary.js (지표 허브 집계 API), api/index-page.js (공개 페이지).
 //
 // ── 지수 3호: 펀딩 스퀴즈 지수 (0~100) ─────────────────────────────
@@ -47,6 +50,48 @@
 //         (상위 50 선물 유니버스에서 알트 비중 0.65 부근이 통상 — 그 이상이면 과열 방향)
 //   value = Σ(가중 × 점수) ÷ Σ(가중)   — 알트 표본 5개 미만이면 null (조작 금지)
 //
+// ── 지수 5호: 국내증시 온도 (0~100) ───────────────────────────────
+// 국내 증시(코스피·코스닥)의 하루 체감 온도를 0~100 한 숫자로 요약합니다.
+// 라벨은 마켓 온도(1호)와 동일 체계: ≤20 냉각 / ≤40 위축 / ≤60 중립 / ≤80 가열 / >80 과열.
+//
+// 산식 (가용 구성요소만 가중 재정규화 — market-temp 와 동일 방식):
+//   ① index   (가중 0.40) — 코스피·코스닥 등락률 평균
+//        chgPct = 최근 일봉 종가 대비 직전 일봉 종가의 변화율(%). 두 지수 중
+//        가용한 것만 평균(하나만 있어도 계산). 둘 다 없으면 이 항목 제외.
+//        idxScore = clamp(50 + avgChgPct × 12.5, 0, 100)
+//        → ±4% 에서 0/100 포화 (국내 지수 일간 변동의 사실상 상단).
+//   ② breadth (가중 0.40) — 국내 대표 30종목(KR_BREADTH_UNIVERSE) 상승 비율
+//        upRatio = 직전 종가 대비 상승한 종목 수 ÷ 유효 종목 수
+//        breadthScore = upRatio × 100
+//        유효 종목 10개 미만이면 이 항목 제외 (부분 데이터로 조작 금지).
+//   ③ fng     (가중 0.20) — 주식 공포·탐욕 (CNN, 실패 시 VIX 근사)
+//        fngScore = 값 그대로 (0~100).
+//        ※ CNN/VIX 는 미국 지수 기반이라 '국내' 지표가 아닙니다. 국내 증시는
+//          외국인 수급을 통해 글로벌 위험선호에 강하게 연동돼 온 점을 반영해
+//          보조 항목(가중 0.20)으로만 사용하고, detail 에 출처를 명시합니다.
+//   value = Σ(가중 × 점수) ÷ Σ(가중)  — 전 구성요소 결측이면 null (값 조작 금지)
+//
+// 데이터 소스: Yahoo Finance (인증 불필요 공개 엔드포인트 — 2026-08-02 curl 실측)
+//   지수:   GET /v8/finance/chart/%5EKS11 · %5EKQ11 ?interval=1d&range=5d
+//   브레드스: GET /v7/finance/spark?symbols=...&range=5d&interval=1d
+//            (심볼 20개 상한 실측 — 21개 이상 400 Bad Request → 20개씩 분할)
+//
+// ── 지수 6호: 환율 압력 지수 (0~100) ──────────────────────────────
+// 원/달러 환율의 '수준'과 '속도'를 합쳐 원화 약세 압력을 0~100 으로 요약합니다.
+// 고환율·급등일수록 값이 높고, 국내 증시에서는 외국인 수급 부담 요인으로
+// 관찰돼 온 맥락입니다. 라벨: ≥70 원화 약세 압력 / ≤30 원화 강세 / 그 외 중립.
+//
+// 산식 (가용 구성요소만 가중 재정규화):
+//   ① level (가중 0.50) — 최근 1년 일봉 종가 분포 내 현재 환율의 백분위 × 100
+//        (52주 신고가 부근이면 100, 신저가 부근이면 0)
+//   ② chg20 (가중 0.30) — 20거래일 변화율 → clamp(50 + chg20Pct × 10, 0, 100)
+//        → ±5% 에서 포화
+//   ③ chg5  (가중 0.20) — 5거래일 변화율  → clamp(50 + chg5Pct × 25, 0, 100)
+//        → ±2% 에서 포화
+//   종가 표본 60개 미만이면 null (백분위가 의미를 갖지 못함 — 조작 금지)
+//
+// 데이터 소스: GET /v8/finance/chart/USDKRW=X?interval=1d&range=1y (Yahoo, 실측 확인)
+//
 // KV 캐시: 각 10분 (btc-cron 갱신 주기 스케일과 동일). 결측 시 ok:false — 값 조작 금지.
 // ════════════════════════════════════════════════════════════════════
 
@@ -57,12 +102,39 @@ const MTF_POOL_KEY = "di:signals:realtime-pool-mtf";
 const UNIVERSE_KEY = "di:signals:futures-universe";
 const FS_CACHE_KEY = "di:index:funding-squeeze-cache";
 const AH_CACHE_KEY = "di:index:alt-heat-cache";
+const KRT_CACHE_KEY = "di:index:kr-market-temp-cache"; // 5호
+const FXP_CACHE_KEY = "di:index:fx-pressure-cache";    // 6호
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10분
 const FUNDING_EXT = 0.0005; // ±0.05%/8h — 극단 펀딩 기준 (market-temp 와 동일)
 const BASE_NEG_RATIO = 0.25; // 통상 시장의 음수 펀딩 비율 기준선 (상단 산식 주석 참조)
 
+// ── Yahoo Finance 공개 엔드포인트 (인증 불필요 — fetchStockFearGreed 의 VIX 폴백과 동일 경로) ──
+const YF_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36";
+const YF_SPARK_MAX = 20; // 심볼 상한 실측치 (21개 이상 → 400 "less than or equal to 20")
+const KOSPI_SYMBOL = "^KS11";
+const KOSDAQ_SYMBOL = "^KQ11";
+const USDKRW_SYMBOL = "USDKRW=X";
+
+/**
+ * 국내증시 브레드스 유니버스 — 코스피 22 + 코스닥 8 (시총·거래대금 상위 대표주).
+ * src/App.jsx 의 KR_ASSETS 상위 종목에서 발췌해 20개씩 2회 spark 호출로 커버합니다.
+ * (전 종목 상승/하락 집계 API 가 없어 대표 표본으로 근사 — detail 에 표본 수 명시)
+ */
+export const KR_BREADTH_UNIVERSE = [
+  // 코스피 대형주
+  "005930.KS", "000660.KS", "373220.KS", "207940.KS", "005380.KS",
+  "000270.KS", "068270.KS", "035420.KS", "035720.KS", "051910.KS",
+  "006400.KS", "066570.KS", "105560.KS", "055550.KS", "086790.KS",
+  "316140.KS", "012330.KS", "096770.KS", "017670.KS", "028260.KS",
+  "259960.KS", "018260.KS",
+  // 코스닥 대표주
+  "086520.KQ", "403870.KQ", "240810.KQ", "357780.KQ",
+  "196170.KQ", "140860.KQ", "039030.KQ", "005290.KQ",
+];
+
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const r1 = (v) => Math.round(v * 10) / 10;
+const r2 = (v) => Math.round(v * 100) / 100;
 const r3 = (v) => Math.round(v * 1000) / 1000;
 
 /** 펀딩 스퀴즈 지수 → 상태 라벨 (행동 지시 아님 — 상태 서술만) */
@@ -76,6 +148,22 @@ export function fundingSqueezeLabel(value) {
 export function altHeatLabel(value) {
   if (value >= 70) return "과열";
   if (value <= 30) return "냉각";
+  return "중립";
+}
+
+/** 국내증시 온도 → 상태 라벨 (마켓 온도 1호와 동일 5단계 체계) */
+export function krMarketTempLabel(value) {
+  if (value <= 20) return "냉각";
+  if (value <= 40) return "위축";
+  if (value <= 60) return "중립";
+  if (value <= 80) return "가열";
+  return "과열";
+}
+
+/** 환율 압력 지수 → 상태 라벨 (행동 지시 아님 — 상태 서술만) */
+export function fxPressureLabel(value) {
+  if (value >= 70) return "원화 약세 압력";
+  if (value <= 30) return "원화 강세";
   return "중립";
 }
 
@@ -183,6 +271,170 @@ export function computeAltHeat(poolMtf, universe = null, now = Date.now()) {
   };
 }
 
+// ════════════════════════════════════════════════════════════════════
+// 지수 5호·6호 (주식 축) — 순수 계산 함수 + Yahoo 소스 어댑터
+// ════════════════════════════════════════════════════════════════════
+
+/**
+ * 지수 5호 실계산 (순수 함수 — 단위 테스트 주입 지점).
+ * 가용 구성요소만 가중 재정규화합니다. 전 항목 결측이면 null.
+ * @param {object} input
+ * @param {number|null} input.kospiChgPct   코스피 등락률(%) — 없으면 null
+ * @param {number|null} input.kosdaqChgPct  코스닥 등락률(%) — 없으면 null
+ * @param {{up:number, down:number, total:number}|null} input.breadth 유니버스 상승/하락 집계
+ * @param {number|null} input.fngStockValue 주식 공포·탐욕 (0~100) — 없으면 null
+ * @returns {{value:number, label:string, components:object}|null}
+ */
+export function computeKrMarketTemp({ kospiChgPct = null, kosdaqChgPct = null, breadth = null, fngStockValue = null } = {}) {
+  const chgs = [kospiChgPct, kosdaqChgPct].filter((v) => Number.isFinite(v));
+  const avgChgPct = chgs.length > 0 ? chgs.reduce((s, v) => s + v, 0) / chgs.length : null;
+
+  // 브레드스는 유효 표본 10개 이상일 때만 채택 (부분 데이터로 조작 금지)
+  const bTotal = Number(breadth?.total);
+  const bUp = Number(breadth?.up);
+  const upRatio = Number.isFinite(bTotal) && bTotal >= 10 && Number.isFinite(bUp) ? bUp / bTotal : null;
+
+  const fng = Number.isFinite(fngStockValue) ? clamp(fngStockValue, 0, 100) : null;
+
+  const parts = [];
+  if (avgChgPct != null) parts.push({ key: "index", weight: 0.40, score: clamp(50 + avgChgPct * 12.5, 0, 100) });
+  if (upRatio != null) parts.push({ key: "breadth", weight: 0.40, score: upRatio * 100 });
+  if (fng != null) parts.push({ key: "fng", weight: 0.20, score: fng });
+  if (parts.length === 0) return null; // 전 구성요소 결측 — 값 조작 금지
+
+  const wSum = parts.reduce((s, p) => s + p.weight, 0);
+  const value = Math.round(clamp(parts.reduce((s, p) => s + p.weight * p.score, 0) / wSum, 0, 100));
+
+  return {
+    value,
+    label: krMarketTempLabel(value),
+    components: {
+      kospiChgPct: Number.isFinite(kospiChgPct) ? r2(kospiChgPct) : null,
+      kosdaqChgPct: Number.isFinite(kosdaqChgPct) ? r2(kosdaqChgPct) : null,
+      avgChgPct: avgChgPct != null ? r2(avgChgPct) : null,
+      breadthUp: upRatio != null ? bUp : null,
+      breadthTotal: upRatio != null ? bTotal : null,
+      upRatio: upRatio != null ? r3(upRatio) : null,
+      fngStock: fng,
+      usedParts: parts.map((p) => p.key),
+    },
+  };
+}
+
+/**
+ * 지수 6호 실계산 (순수 함수).
+ * @param {number[]} closes 원/달러 일봉 종가 (오름차순, 최근이 마지막). 60개 미만이면 null
+ * @returns {{value:number, label:string, components:object}|null}
+ */
+export function computeFxPressure(closes) {
+  const xs = (Array.isArray(closes) ? closes : []).filter((v) => Number.isFinite(v) && v > 0);
+  if (xs.length < 60) return null; // 백분위가 의미를 갖지 못하는 표본 — 결측 처리
+
+  const last = xs[xs.length - 1];
+  // ① 수준: 최근 1년(가용 표본) 종가 분포 내 백분위 (중간 순위 방식)
+  //   동일값(ties)에 0.5 가중을 주는 표준 percentile rank —
+  //   전 구간 같은 값(변동 없음)일 때 0 이 아니라 50(중립)이 되도록 하기 위함입니다.
+  //   (단순 '미만 개수' 방식은 평탄 구간을 '원화 강세'로 오분류함 — 2026-08-02 단위검증에서 발견)
+  const below = xs.filter((v) => v < last).length;
+  const ties = xs.filter((v) => v === last).length - 1; // 자기 자신 제외
+  const levelScore = clamp(((below + 0.5 * ties) / xs.length) * 100, 0, 100);
+
+  // ②③ 속도: 20 / 5 거래일 변화율
+  const pctBack = (n) => {
+    if (xs.length <= n) return null;
+    const prev = xs[xs.length - 1 - n];
+    return prev > 0 ? ((last - prev) / prev) * 100 : null;
+  };
+  const chg20Pct = pctBack(20);
+  const chg5Pct = pctBack(5);
+
+  const parts = [{ key: "level", weight: 0.50, score: levelScore }];
+  if (chg20Pct != null) parts.push({ key: "chg20", weight: 0.30, score: clamp(50 + chg20Pct * 10, 0, 100) });
+  if (chg5Pct != null) parts.push({ key: "chg5", weight: 0.20, score: clamp(50 + chg5Pct * 25, 0, 100) });
+
+  const wSum = parts.reduce((s, p) => s + p.weight, 0);
+  const value = Math.round(clamp(parts.reduce((s, p) => s + p.weight * p.score, 0) / wSum, 0, 100));
+
+  return {
+    value,
+    label: fxPressureLabel(value),
+    components: {
+      rate: r2(last),
+      levelPct: Math.round(levelScore),
+      chg20Pct: chg20Pct != null ? r2(chg20Pct) : null,
+      chg5Pct: chg5Pct != null ? r2(chg5Pct) : null,
+      low52w: r2(Math.min(...xs)),
+      high52w: r2(Math.max(...xs)),
+      sampled: xs.length,
+      usedParts: parts.map((p) => p.key),
+    },
+  };
+}
+
+// ── Yahoo 소스 어댑터 (실패 시 항상 null — throw 안 함) ──
+
+/** 단일 심볼 일봉 종가 배열. 실패 시 null. */
+export async function fetchYahooCloses(symbol, { range = "5d", interval = "1d", timeoutMs = 8000 } = {}) {
+  try {
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}`;
+    const resp = await fetch(url, { headers: { "User-Agent": YF_UA, Accept: "application/json" }, signal: AbortSignal.timeout(timeoutMs) });
+    if (!resp.ok) return null;
+    const json = await resp.json();
+    const res = json?.chart?.result?.[0];
+    const closes = (res?.indicators?.quote?.[0]?.close || []).filter((v) => Number.isFinite(v));
+    return closes.length > 0 ? closes : null;
+  } catch { return null; }
+}
+
+/** 종가 배열 → 직전 대비 등락률(%). 표본 2개 미만이면 null. */
+function lastChgPct(closes) {
+  if (!Array.isArray(closes) || closes.length < 2) return null;
+  const last = closes[closes.length - 1];
+  const prev = closes[closes.length - 2];
+  return prev > 0 ? ((last - prev) / prev) * 100 : null;
+}
+
+/**
+ * 다중 심볼 일봉 종가 — Yahoo spark (20개씩 분할). 실패한 청크는 건너뜁니다.
+ * @returns {Promise<Object<string, number[]>>} 심볼 → 종가 배열
+ */
+export async function fetchYahooSparkCloses(symbols, { range = "5d", interval = "1d", timeoutMs = 8000 } = {}) {
+  const list = (Array.isArray(symbols) ? symbols : []).filter(Boolean);
+  const chunks = [];
+  for (let i = 0; i < list.length; i += YF_SPARK_MAX) chunks.push(list.slice(i, i + YF_SPARK_MAX));
+
+  const results = await Promise.allSettled(chunks.map(async (chunk) => {
+    const url = `https://query1.finance.yahoo.com/v7/finance/spark?symbols=${encodeURIComponent(chunk.join(","))}&range=${range}&interval=${interval}`;
+    const resp = await fetch(url, { headers: { "User-Agent": YF_UA, Accept: "application/json" }, signal: AbortSignal.timeout(timeoutMs) });
+    if (!resp.ok) return [];
+    const json = await resp.json();
+    return Array.isArray(json?.spark?.result) ? json.spark.result : [];
+  }));
+
+  const out = {};
+  for (const r of results) {
+    if (r.status !== "fulfilled") continue;
+    for (const row of r.value) {
+      const sym = row?.symbol;
+      const closes = (row?.response?.[0]?.indicators?.quote?.[0]?.close || []).filter((v) => Number.isFinite(v));
+      if (sym && closes.length >= 2) out[sym] = closes;
+    }
+  }
+  return out;
+}
+
+/** spark 결과 → 상승/하락 집계 (직전 종가 대비) */
+export function computeKrBreadth(closesBySymbol) {
+  let up = 0, down = 0, flat = 0;
+  for (const closes of Object.values(closesBySymbol || {})) {
+    const chg = lastChgPct(closes);
+    if (chg == null) continue;
+    if (chg > 0) up++; else if (chg < 0) down++; else flat++;
+  }
+  const total = up + down + flat;
+  return total > 0 ? { up, down, flat, total } : null;
+}
+
 // ── KV 캐시 게터 (market-temp.getMarketTempCached 와 동일 패턴) ──
 
 async function readCache(kv, key) {
@@ -235,6 +487,59 @@ export async function getAltHeatCached(kv, deps = {}) {
   return data;
 }
 
+/**
+ * 국내증시 온도 (5호) — KV 10분 캐시. 결측 시 { ok:false, error } (값 조작 금지).
+ * deps.getIndexCloses / deps.getBreadthCloses / deps.getFngStock 로 테스트 목 주입 가능.
+ */
+export async function getKrMarketTempCached(kv, deps = {}) {
+  const cached = deps.force ? null : await readCache(kv, KRT_CACHE_KEY);
+  if (cached) return cached;
+
+  const getIndexCloses = deps.getIndexCloses || ((sym) => fetchYahooCloses(sym, { range: "5d", interval: "1d" }));
+  const getBreadthCloses = deps.getBreadthCloses || (() => fetchYahooSparkCloses(KR_BREADTH_UNIVERSE));
+  const getFngStock = deps.getFngStock || (() => fetchStockFearGreed());
+
+  const [ksR, kqR, brR, fngR] = await Promise.allSettled([
+    getIndexCloses(KOSPI_SYMBOL),
+    getIndexCloses(KOSDAQ_SYMBOL),
+    getBreadthCloses(),
+    getFngStock(),
+  ]);
+  const val = (r) => (r.status === "fulfilled" ? r.value : null);
+
+  const calc = computeKrMarketTemp({
+    kospiChgPct: lastChgPct(val(ksR)),
+    kosdaqChgPct: lastChgPct(val(kqR)),
+    breadth: computeKrBreadth(val(brR)),
+    fngStockValue: val(fngR)?.value ?? null,
+  });
+  if (!calc) return { ok: false, error: "kr market data unavailable" };
+
+  const data = { ok: true, ...calc, updatedAt: new Date().toISOString() };
+  await writeCache(kv, KRT_CACHE_KEY, data);
+  return data;
+}
+
+/**
+ * 환율 압력 지수 (6호) — KV 10분 캐시. 결측 시 { ok:false, error }.
+ * deps.getCloses 로 테스트 목 주입 가능.
+ */
+export async function getFxPressureCached(kv, deps = {}) {
+  const cached = deps.force ? null : await readCache(kv, FXP_CACHE_KEY);
+  if (cached) return cached;
+
+  const getCloses = deps.getCloses || (() => fetchYahooCloses(USDKRW_SYMBOL, { range: "1y", interval: "1d" }));
+  let closes = null;
+  try { closes = await getCloses(); } catch { closes = null; }
+
+  const calc = computeFxPressure(closes);
+  if (!calc) return { ok: false, error: "usdkrw history unavailable" };
+
+  const data = { ok: true, ...calc, updatedAt: new Date().toISOString() };
+  await writeCache(kv, FXP_CACHE_KEY, data);
+  return data;
+}
+
 // ── 주식 공포·탐욕 (CNN, 실패 시 VIX 근사) — api/fear-greed.js 로직의 축약 복제 ──
 //   (fear-greed.js 는 핸들러 전용이라 import 불가 — 소유권 밖 파일 수정 대신 복제.
 //    크립토 쪽은 market-temp.fetchCryptoFearGreed 재사용)
@@ -278,4 +583,9 @@ export default {
   computeFundingSqueeze, computeAltHeat,
   getFundingSqueezeCached, getAltHeatCached,
   fundingSqueezeLabel, altHeatLabel, fetchStockFearGreed,
+  // ── 주식 축 (2026-08-02 양축 확장) ──
+  computeKrMarketTemp, computeFxPressure, computeKrBreadth,
+  getKrMarketTempCached, getFxPressureCached,
+  krMarketTempLabel, fxPressureLabel,
+  fetchYahooCloses, fetchYahooSparkCloses, KR_BREADTH_UNIVERSE,
 };
