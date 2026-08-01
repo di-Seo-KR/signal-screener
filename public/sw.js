@@ -8,7 +8,7 @@
 //   물고 있어 일부 클라이언트가 스플래시에서 정지(대표 실보고). 캐시 전면 갱신.
 //   교훈 재확인: 청크 해시가 바뀌는 배포가 나가면 SW 캐시 버전도 함께 올릴 것.
 // ★ v8 (2026-07-30): Phase 2(#209) 청크 변경 배포 후행 bump — 규칙 준수(청크 변경 시 SW 동반 bump)
-const CACHE_NAME = 'zepta-v8';
+const CACHE_NAME = "zepta-v9";
 const API_MAX_AGE_MS = 5 * 60 * 1000; // 5분
 const STATIC_ASSETS = [
   '/',
