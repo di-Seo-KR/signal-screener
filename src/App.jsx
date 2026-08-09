@@ -825,7 +825,7 @@ const KR_ASSETS = [
 ];
 
 const CRYPTO_ASSETS = [
-  // ── 시총 상위 10개만 ──
+  // ── 시총 상위 10개 ──
   { id: "bitcoin", symbol: "BTC", name: "Bitcoin" },
   { id: "ethereum", symbol: "ETH", name: "Ethereum" },
   { id: "binancecoin", symbol: "BNB", name: "BNB" },
@@ -836,6 +836,23 @@ const CRYPTO_ASSETS = [
   { id: "tron", symbol: "TRX", name: "TRON" },
   { id: "avalanche-2", symbol: "AVAX", name: "Avalanche" },
   { id: "toncoin", symbol: "TON", name: "Toncoin" },
+  // ── 시그널 유니버스(바이낸스 선물 유동성 상위) 커버 확장 (2026-08) ──
+  // 종목 상세 시트의 한글 종목명·관심 별·추이 차트가 이 마스터의 coingecko id 에
+  // 의존합니다. id 가 확실히 검증된 코인만 등록 — 불확실한 신생 코인은 넣지 않습니다
+  // (잘못된 id 는 다른 자산의 차트를 그리는 사고로 이어집니다).
+  { id: "zcash", symbol: "ZEC", name: "Zcash" },
+  { id: "monero", symbol: "XMR", name: "Monero" },
+  { id: "near", symbol: "NEAR", name: "NEAR Protocol" },
+  { id: "chainlink", symbol: "LINK", name: "Chainlink" },
+  { id: "uniswap", symbol: "UNI", name: "Uniswap" },
+  { id: "sui", symbol: "SUI", name: "Sui" },
+  { id: "bittensor", symbol: "TAO", name: "Bittensor" },
+  { id: "aave", symbol: "AAVE", name: "Aave" },
+  { id: "ethena", symbol: "ENA", name: "Ethena" },
+  { id: "worldcoin-wld", symbol: "WLD", name: "Worldcoin" },
+  { id: "hyperliquid", symbol: "HYPE", name: "Hyperliquid" },
+  { id: "iotex", symbol: "IOTX", name: "IoTeX" },
+  { id: "biconomy", symbol: "BICO", name: "Biconomy" },
 ];
 
 // 미국 주식 한글명 매핑 (한글 검색 지원)
@@ -866,12 +883,17 @@ const US_KO_NAMES = {
   ARKK: "아크혁신", SOXX: "반도체ETF", SMH: "반도체밴에크",
   TQQQ: "나스닥3배", SQQQ: "나스닥인버스3배", SOXL: "반도체3배", SOXS: "반도체인버스3배",
 };
-// 크립토 한글명
+// 크립토 한글명 (키 = coingecko id — CRYPTO_ASSETS 와 반드시 동기 유지)
 const CRYPTO_KO_NAMES = {
   "bitcoin": "비트코인", "ethereum": "이더리움", "solana": "솔라나",
   "binancecoin": "바이낸스코인", "ripple": "리플", "cardano": "카르다노",
   "dogecoin": "도지코인", "tron": "트론", "avalanche-2": "아발란체",
   "toncoin": "톤코인",
+  "zcash": "지캐시", "monero": "모네로", "near": "니어프로토콜",
+  "chainlink": "체인링크", "uniswap": "유니스왑", "sui": "수이",
+  "bittensor": "비트텐서", "aave": "에이브", "ethena": "에테나",
+  "worldcoin-wld": "월드코인", "hyperliquid": "하이퍼리퀴드",
+  "iotex": "아이오텍스", "biconomy": "비코노미",
 };
 
 // ════════════════════════════════════════════════════════════════════
@@ -894,6 +916,28 @@ function fmtLevelPrice(v) {
 
 const DETAIL_TF = [["1w", "1주"], ["1d", "1일"], ["4h", "4시간"], ["1h", "1시간"]];
 
+/** coin-scores 산출 시각(ts, epoch ms) → "N분 전 집계" 실측 문구.
+ *  ts 가 없거나 비정상이면 null — 신선도를 지어내지 않고 표기를 생략합니다.
+ *  30분(생성 주기 10분의 3배) 이상 밀리면 "갱신 지연"을 덧붙여 정직하게 알립니다.
+ *  두 번째 인자로 i18n t() 를 넘기면 로케일 문구(tabs.home.aggregated*)로 표기합니다 —
+ *  영어 화면에서 한국어 고정 문구가 섞이던 문제 방지. t 를 생략하면 기존 한국어
+ *  문구 그대로라 아직 i18n 미적용 화면(상세 시트 asOfLabel)은 동작이 변하지 않습니다. */
+function coinScoreFreshness(ts, t) {
+  const n = Number(ts);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  const min = Math.max(0, Math.round((Date.now() - n) / 60000));
+  const base = t
+    ? (min < 1 ? t("tabs.home.aggregatedJustNow")
+      : min < 60 ? t("tabs.home.aggregatedMinAgo", { n: min })
+      : t("tabs.home.aggregatedHourAgo", { n: Math.floor(min / 60) }))
+    : (min < 1 ? "방금 집계" : min < 60 ? `${min}분 전 집계` : `${Math.floor(min / 60)}시간 전 집계`);
+  const stale = t ? t("tabs.home.staleSuffix") : "갱신 지연";
+  return min >= 30 ? `${base} · ${stale}` : base;
+}
+
+/** 상세 시트 기간 탭 → CoinGecko OHLC days 매핑 (탭마다 실제 다른 데이터를 불러옵니다). */
+const DETAIL_RANGE_DAYS = { "1D": "1", "1W": "7", "1M": "30", "1Y": "365" };
+
 function buildAssetDetailProps(sig) {
   if (!sig) return null;
   const ticker = String(sig.asset || sig.symbol || "").replace(/USDT$/i, "").toUpperCase();
@@ -911,6 +955,21 @@ function buildAssetDetailProps(sig) {
     ...rArr.slice().reverse().map((x, i) => mkLevel(x, `R${rArr.length - i}`)),
     ...sArr.map((x, i) => mkLevel(x, `S${i + 1}`)),
   ].filter((x) => x.price);
+
+  // ── 매물대 POC — 서버가 이미 계산해 내려주는 거래량 프로파일(sr.vp)을 함께 표기합니다.
+  //    (VAH/VAL 은 시트의 지지/저항 색 규칙과 의미가 어긋나 POC 만 — 최다 거래 가격대)
+  const pocPrice = fmtLevelPrice(sr?.vp?.poc);
+  if (pocPrice) {
+    const pocN = Number(sr.vp.poc);
+    const pxN = Number(sr?.px);
+    levelItems.push({
+      tag: "POC", price: pocPrice,
+      distancePct: (Number.isFinite(pocN) && Number.isFinite(pxN) && pxN > 0)
+        ? ((pocN - pxN) / pxN) * 100
+        : NaN,
+      touches: NaN, // 터치 횟수 개념이 없는 지표 — 시트가 칸을 숨깁니다
+    });
+  }
 
   // 현재가가 가장 먼 지지(0%)~가장 먼 저항(100%) 사이 어디인지 — 양쪽이 다 있어야 계산합니다.
   const px = Number(sr?.px);
@@ -965,7 +1024,11 @@ function buildAssetDetailProps(sig) {
       meta: "바이낸스 선물 · 무기한",
       price: priceStr ? `$${priceStr}` : undefined,
       // ⚠️ coin-scores 에 등락률 필드가 없어 등락 알약은 넣지 않습니다(0% 를 지어내지 않음).
-      asOfLabel: priceStr ? "최근 일봉 종가 기준 · 10분 주기 갱신" : undefined,
+      // 갱신 표기는 엔진 산출 시각(ts) 실측 — "10분 주기 갱신" 고정 문구는 크론이 멈춰도
+      // 신선한 척 보여 제거했습니다. ts 가 없으면 경과 표기 자체를 생략합니다.
+      asOfLabel: priceStr
+        ? ["최근 일봉 종가 기준", coinScoreFreshness(sig.ts)].filter(Boolean).join(" · ")
+        : undefined,
       signal: Number.isFinite(score) ? {
         dir, sideLabel: dir === "up" ? "롱 우위" : dir === "down" ? "숏 우위" : "중립",
         score: Math.round(Math.max(0, Math.min(100, score))),
@@ -1814,12 +1877,16 @@ function SearchBar({ onSelect, placeholder = "종목 검색 (예: AAPL, 삼성�
                 }}>
                 <div style={{
                   width: "36px", height: "36px", borderRadius: "10px", flexShrink: 0,
-                  background: asset.market === "us" ? "#1A2C4F" : asset.market === "kr" ? "#1A2A1E" : "#1E1A2A",
+                  // 다크 전용 hex 하드코딩 → 테마 알파 틴트 (라이트 모드에서 흰 카드 위 검은 사각형이 되던 문제 수정)
+                  background: asset.market === "us" ? `${C.blue}1A` : asset.market === "kr" ? `${C.green}1A` : `${C.purple}1A`,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontWeight: 800, fontSize: "14px",
+                  // 5글자 티커(GOOGL 등)가 36px 타일 밖으로 삐져나오지 않도록 폰트 축소 + overflow 보험
+                  fontWeight: 800, fontSize: asset.market !== "kr" && asset.symbol.length > 4 ? "11px" : "14px",
+                  overflow: "hidden",
                   color: asset.market === "us" ? C.blue : asset.market === "kr" ? C.green : C.purple,
                 }}>
-                  {asset.symbol.length <= 5 ? asset.symbol : asset.symbol.slice(0, 5)}
+                  {/* 한국 종목은 숫자코드를 자르면 식별 불가("00081") — 종목명 앞 2글자로 표기 (전체 심볼은 옆 줄에 표기됨) */}
+                  {asset.market === "kr" ? (asset.name || "").slice(0, 2) : asset.symbol.slice(0, 5)}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 600, fontSize: "18px", color: C.text1 }}>{asset.name}</div>
@@ -2209,7 +2276,9 @@ function verdictLabel(verdict) {
     case "적극 매수": return "상승 신호 강함";
     case "매수": return "상승 신호 우세";
     case "매수 우위": return "상승 신호 다소 우세";
+    case "매수 관망": return "상승 신호 다소 우세"; // opinion 밴드(58~68)도 동일 어휘로 서술
     case "중립": return "중립";
+    case "매도 관망": return "하락 신호 다소 우세";
     case "매도 우위": return "하락 신호 다소 우세";
     case "매도": return "하락 신호 우세";
     case "적극 매도": return "하락 신호 강함";
@@ -2317,7 +2386,7 @@ function calcBuyLevels(asset) {
 
     levels.push({
       price: Math.round(priceL1 * 100) / 100,
-      label: "1차 매수",
+      label: "1차 지지",
       type: "aggressive",
       confidence: confidenceL1,
       rationale: rationaleL1,
@@ -2360,7 +2429,7 @@ function calcBuyLevels(asset) {
 
     levels.push({
       price: Math.round(priceL2 * 100) / 100,
-      label: "2차 매수",
+      label: "2차 지지",
       type: "scale-in",
       confidence: confidenceL2,
       rationale: rationaleL2,
@@ -2404,7 +2473,7 @@ function calcBuyLevels(asset) {
 
     levels.push({
       price: Math.round(priceL3 * 100) / 100,
-      label: "3차 매수",
+      label: "3차 지지",
       type: "bottom",
       confidence: confidenceL3,
       rationale: rationaleL3,
@@ -2423,7 +2492,7 @@ function calcBuyLevels(asset) {
       levels.splice(i - 1, 2, keep);
     }
   }
-  levels.forEach((lv, i) => { lv.label = `${i + 1}차 매수`; });
+  levels.forEach((lv, i) => { lv.label = `${i + 1}차 지지`; });
 
   // ── 요약 문구 생성 ──
   let summary = "";
@@ -2443,7 +2512,7 @@ function calcBuyLevels(asset) {
     const discounts = levels.map(l => l.discount);
     const minDiscount = Math.min(...discounts);
     const maxDiscount = Math.max(...discounts);
-    summary = `현재가 대비 -${minDiscount.toFixed(1)}%~-${maxDiscount.toFixed(1)}% 구간 진입 추천`;
+    summary = `현재가 대비 -${minDiscount.toFixed(1)}%~-${maxDiscount.toFixed(1)}% 구간에 주요 지지 형성`;
   } else {
     summary = "충분한 데이터 부재로 주요 지지 구간 계산 불가";
   }
@@ -2810,7 +2879,8 @@ function calcAdvancedLevels(closes, highs, lows, volumes, techData, fairValue, a
 function AssetCard({ asset, onChart, isMobile = false }) {
   const [expanded, setExpanded] = useState(false);
   const isPos = asset.weekChange >= 0;
-  const mcBg = asset.market === "us" ? "#1A2C4F" : asset.market === "kr" ? "#1A2A1E" : "#1E1A2A";
+  // 다크 전용 hex 하드코딩 → 테마 알파 틴트 (라이트 모드 대비 유지)
+  const mcBg = asset.market === "us" ? `${C.blue}1A` : asset.market === "kr" ? `${C.green}1A` : `${C.purple}1A`;
   const mcColor = asset.market === "us" ? C.blue : asset.market === "kr" ? C.green : C.purple;
   const borderColor = asset.triggers && asset.triggers.length > 0
     ? (asset.triggers.some(t => t.includes("buy") || t.includes("bullish")) ? C.green : C.red)
@@ -2851,7 +2921,7 @@ function AssetCard({ asset, onChart, isMobile = false }) {
                 fontSize: isMobile ? "11px" : "12px", fontWeight: 800, padding: "3px 8px", borderRadius: "var(--z-r-full)", marginLeft: "auto", whiteSpace: "nowrap", flexShrink: 0,
                 background: diag.score >= 68 ? `${C.green}20` : diag.score >= 42 ? `${C.yellow}20` : `${C.red}20`,
                 color: diag.score >= 68 ? C.green : diag.score >= 42 ? C.yellow : C.red,
-              }}>{diag.score}점 {diag.opinion}</span>
+              }}>{diag.score}점 {verdictLabel(diag.opinion)}</span>
             )}
           </div>
           <div style={{ display: "flex", gap: "5px", flexWrap: "wrap", alignItems: "center" }}>
@@ -2916,16 +2986,16 @@ function AssetCard({ asset, onChart, isMobile = false }) {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
-                    <span style={{ fontSize: "16px", fontWeight: 700, color: C.text3 }}>🩺 투자진단</span>
+                    <span style={{ fontSize: "16px", fontWeight: 700, color: C.text3 }}>🩺 신호 요약</span>
                     <span style={{
                       fontSize: "16px", fontWeight: 700,
                       color: diag.score >= 70 ? C.green : diag.score >= 40 ? C.yellow : C.red,
-                    }}>{diag.verdict}</span>
+                    }}>{verdictLabel(diag.verdict)}</span>
                     <span style={{
                       fontSize: "15px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px",
                       background: diag.opinionColor === "green" ? `${C.green}18` : diag.opinionColor === "red" ? `${C.red}18` : `${C.yellow}18`,
                       color: diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow,
-                    }}>{diag.opinion}</span>
+                    }}>{verdictLabel(diag.opinion)}</span>
                   </div>
                   {/* 카테고리 미니 바 — ★ 2026-06-12 (대표 피드백): 라벨 폭 36→50px + 줄바꿈 방지
                       (모멘텀·펀더멘털이 '모멘↵텀'으로 깨지던 문제) */}
@@ -3127,7 +3197,8 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
     return () => { document.body.style.overflow = prev; };
   }, []);
   const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
-  const mcBg = asset.market === "us" ? "#1A2C4F" : asset.market === "kr" ? "#1A2A1E" : "#1E1A2A";
+  // 다크 전용 hex 하드코딩 → 테마 알파 틴트 (라이트 모드 대비 유지)
+  const mcBg = asset.market === "us" ? `${C.blue}1A` : asset.market === "kr" ? `${C.green}1A` : `${C.purple}1A`;
   const mcColor = asset.market === "us" ? C.blue : asset.market === "kr" ? C.green : C.purple;
 
   // 가격 정보 (hotAssets에서 찾기)
@@ -3620,13 +3691,13 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                    <span style={{ fontSize: "18px", fontWeight: 700, color: C.text3 }}>🩺 투자진단</span>
+                    <span style={{ fontSize: "18px", fontWeight: 700, color: C.text3 }}>🩺 신호 요약</span>
                     <span style={{
                       fontSize: "18px", fontWeight: 800,
                       color: diag.score >= 70 ? C.green : diag.score >= 40 ? C.yellow : C.red,
-                    }}>{diag.verdict}</span>
+                    }}>{verdictLabel(diag.verdict)}</span>
                   </div>
-                  {/* 매수/매도/중립 의견 */}
+                  {/* 신호 상태 서술 (표현 3원칙 — 이모지는 opinionColor 기준으로만 판정) */}
                   <div style={{
                     display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px",
                     padding: "6px 10px", borderRadius: "8px",
@@ -3636,7 +3707,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                       fontSize: "18px", fontWeight: 800,
                       color: diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow,
                     }}>
-                      {diag.opinion === "매수" ? "🟢" : diag.opinion === "매도" ? "🔴" : diag.opinion === "중립" ? "🟡" : diag.opinionColor === "green" ? "🟢" : "🔴"} {diag.opinion}
+                      {diag.opinionColor === "green" ? "🟢" : diag.opinionColor === "red" ? "🔴" : "🟡"} {verdictLabel(diag.opinion)}
                     </span>
                     <span style={{ fontSize: "15px", color: C.text3 }}>{diag.rationale}</span>
                   </div>
@@ -3670,11 +3741,11 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 </div>
               )}
 
-              {/* 매수 추천가 3단계 — 모바일: 가로 3열이 세로로 깨지던 문제 → 행(row) 카드 스택 (대표 피드백 2026-06-12) */}
+              {/* 주요 지지 구간 3단계 — 모바일: 가로 3열이 세로로 깨지던 문제 → 행(row) 카드 스택 (대표 피드백 2026-06-12) */}
               {buyLevels.levels.length > 0 && (
                 <div style={{ marginTop: "12px", padding: isMobile ? "12px" : "14px", borderRadius: "12px", background: `${C.blueBg}60`, border: `1px solid ${C.blue}20` }}>
                   <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", gap: isMobile ? 2 : 8, marginBottom: "10px" }}>
-                    <span style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, whiteSpace: "nowrap" }}>🎯 매수 추천가</span>
+                    <span style={{ fontSize: isMobile ? "16px" : "18px", fontWeight: 700, color: C.text1, whiteSpace: "nowrap" }}>📉 주요 지지 구간</span>
                     <span style={{ fontSize: isMobile ? "13px" : "15px", color: C.text3, wordBreak: "keep-all", lineHeight: 1.4 }}>{buyLevels.summary}</span>
                   </div>
                   <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: "8px" }}>
@@ -3700,7 +3771,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                                 <div style={{ flex: 1, height: "3px", borderRadius: "4px", background: `${C.border}40`, overflow: "hidden" }}>
                                   <div style={{ height: "100%", width: `${lv.confidence}%`, background: lvColors[li], borderRadius: "4px" }} />
                                 </div>
-                                <span style={{ fontSize: "12px", color: C.text3, whiteSpace: "nowrap" }}>신뢰도 {lv.confidence}%</span>
+                                <span style={{ fontSize: "12px", color: C.text3, whiteSpace: "nowrap" }}>근거 강도 {lv.confidence}</span>
                               </div>
                             </div>
                           </div>
@@ -3720,7 +3791,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                             <div style={{ height: "3px", borderRadius: "4px", background: `${C.border}40`, overflow: "hidden" }}>
                               <div style={{ height: "100%", width: `${lv.confidence}%`, background: lvColors[li], borderRadius: "4px" }} />
                             </div>
-                            <div style={{ fontSize: "14px", color: C.text3, marginTop: "2px" }}>신뢰도 {lv.confidence}%</div>
+                            <div style={{ fontSize: "14px", color: C.text3, marginTop: "2px" }}>근거 강도 {lv.confidence}</div>
                           </div>
                         </div>
                       );
@@ -4185,7 +4256,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                       fontSize: "15px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px",
                       background: diag.opinionColor === "green" ? `${C.green}18` : diag.opinionColor === "red" ? `${C.red}18` : `${C.yellow}18`,
                       color: diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow,
-                    }}>{diag.opinion}</span>
+                    }}>{verdictLabel(diag.opinion)}</span>
                   </div>
                   {freshMin != null && <span style={{ fontSize: "14px", color: C.text3 }}>{freshMin < 1 ? "방금" : `${freshMin}분 전`} 분석</span>}
                 </div>
@@ -4254,12 +4325,12 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                     </div>
                   )}
                   <div style={{ flex: 1, padding: "8px 10px", borderRadius: "8px", background: C.card, textAlign: "center" }}>
-                    <div style={{ fontSize: "14px", color: C.text3 }}>진입</div>
-                    <div style={{ fontSize: "16px", fontWeight: 700, color: C.text1, marginTop: "2px" }}>{isBullish ? "분할매수" : isBearish ? "관망" : "확인 후"}</div>
+                    <div style={{ fontSize: "14px", color: C.text3 }}>추세</div>
+                    <div style={{ fontSize: "16px", fontWeight: 700, color: C.text1, marginTop: "2px" }}>{isBullish ? "상승 정렬" : isBearish ? "하락 정렬" : "혼조"}</div>
                   </div>
                   <div style={{ flex: 1, padding: "8px 10px", borderRadius: "8px", background: C.card, textAlign: "center" }}>
-                    <div style={{ fontSize: "14px", color: C.text3 }}>포지션</div>
-                    <div style={{ fontSize: "16px", fontWeight: 700, color: C.text1, marginTop: "2px" }}>{diag.score >= 70 ? "비중확대" : diag.score >= 55 ? "소량매수" : diag.score >= 40 ? "비중유지" : "비중축소"}</div>
+                    <div style={{ fontSize: "14px", color: C.text3 }}>종합점수</div>
+                    <div style={{ fontSize: "16px", fontWeight: 700, color: C.text1, marginTop: "2px" }}>{diag.score >= 70 ? "강함" : diag.score >= 55 ? "다소 강함" : diag.score >= 40 ? "중립" : "약함"}</div>
                   </div>
                 </div>
               </div>
@@ -4272,6 +4343,10 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
                     <span style={{ fontSize: "16px", fontWeight: 700, color: C.text3 }}>📊 퀀트 전략 백테스트 (1년)</span>
                     <span style={{ fontSize: "14px", color: C.text3 }}>상위 {bt.length}개</span>
+                  </div>
+                  {/* 백테스트 고지 — 성과 전시에는 시뮬레이션 한계 고지를 반드시 동반 (2026-08 전수 감사) */}
+                  <div style={{ fontSize: "13px", color: C.text3, lineHeight: 1.5, marginBottom: "10px" }}>
+                    과거 데이터 기준 시뮬레이션 결과이며 미래 수익을 보장하지 않습니다. 수수료·슬리피지는 반영되지 않았습니다.
                   </div>
                   {bt.map((s, i) => {
                     const isTop = i === 0;
@@ -4449,6 +4524,12 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           onMouseEnter={e => { e.currentTarget.style.background = C.card2; e.currentTarget.style.color = C.text2; }}
           onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = C.text3; }}
           >📤 진단 결과 공유</button>
+        </div>
+        {/* 면책 — 이 팝업은 전역 푸터 면책을 가리는 오버레이라 화면 내 고지가 필요합니다 (2026-08 전수 감사) */}
+        <div style={{ padding: "0 20px 18px" }}>
+          <Disclaimer style={{ fontSize: "13px", textAlign: "left", padding: 0 }}>
+            표시되는 목표가·손절가·지지/저항 레벨과 점수는 과거 시세를 계산한 참고 정보이며 투자 조언이 아닙니다. 투자 판단과 책임은 본인에게 있습니다.
+          </Disclaimer>
         </div>
       </div>
     </div>
@@ -4670,20 +4751,20 @@ function AppInner() {
   const TAB_META = {
     home: { title: "Zepta — 투자 정보 플랫폼", desc: "실시간 주식/코인 스크리너, 시장 신호·데이터 분석, 뉴스·경제 캘린더, 리스크 관리" },
     // ★ 2026-08-02 (주식+코인 양축): 실제 스캔 범위(미국·한국 주식 + 코인)에 맞춰 카피 정합
-    screener: { title: "주식·코인 스크리너 | Zepta", desc: "AI 기반 주식·코인 스크리닝 — 모멘텀, 변동성, 수급 조건으로 종목 필터링" },
+    screener: { title: "주식·코인 스크리너 | Zepta", desc: "조건 기반 주식·코인 스크리닝 — 모멘텀, 변동성, 수급 조건으로 종목 필터링" },
     "auto-trading": { title: "AI 자동매매 | Zepta", desc: "9개 퀀트 전략 기반 암호화폐 자동매매 봇" },
     portfolio: { title: "포트폴리오 | Zepta", desc: "실시간 포트폴리오 추적 및 벤치마크 비교" },
-    news: { title: "마켓 뉴스 | Zepta", desc: "AI 센티먼트 분석이 포함된 실시간 글로벌 투자 뉴스" },
+    news: { title: "마켓 뉴스 | Zepta", desc: "키워드 기반 감성 분류가 포함된 실시간 글로벌 투자 뉴스" },
     "econ-calendar": { title: "경제 캘린더 | Zepta", desc: "주요 경제 지표 발표 일정 및 영향 분석" },
     indicators: { title: "지표 허브 | Zepta", desc: "주식·코인 핵심 시장 지표를 한 화면에 — 국내증시 온도, 환율 압력, 공포·탐욕, 마켓 온도 요약과 해석" },
     sentiment: { title: "소셜 센티먼트 | Zepta", desc: "StockTwits · Reddit 기반 실시간 투자 심리 분석" },
     alerts: { title: "매매 알림 | Zepta", desc: "실시간 AI 매매 신호 알림 및 텔레그램 연동" },
-    anomaly: { title: "이상 탐지 | Zepta", desc: "AI 기반 시장 이상 징후 실시간 탐지" },
+    anomaly: { title: "이상 탐지 | Zepta", desc: "통계 기반 시장 이상 징후 실시간 탐지" },
     strategy: { title: "전략 분석 | Zepta", desc: "41개 퀀트 전략 상세 분석 및 성과 비교" },
     backtest: { title: "백테스트 | Zepta", desc: "전략별 과거 수익률 시뮬레이션" },
     "quant-port": { title: "퀀트 포트폴리오 | Zepta", desc: "전략 기반 포트폴리오 자동 구성" },
     "risk-map": { title: "리스크 맵 | Zepta", desc: "시장 리스크 종합 분석 히트맵" },
-    "quant-report": { title: "퀀트 리포트 | Zepta", desc: "AI 기반 실시간 시장 분석 리포트" },
+    "quant-report": { title: "퀀트 리포트 | Zepta", desc: "지수·투자심리·상승종목 비율을 합산한 시장 요약 리포트" },
     profile: { title: "프로필 | Zepta", desc: "투자 성적표 및 계정 설정" },
     about: { title: "서비스 소개 | Zepta", desc: "Zepta 투자 정보 플랫폼 소개" }
   };
@@ -4735,12 +4816,8 @@ function AppInner() {
     setGnbCategory(newCategory);
   }, [tab]);
 
-  const [gnbHover, setGnbHover] = useState(null); // GNB 호버 드롭다운 상태
-  const gnbHoverTimeout = useRef(null);
-  const [userDropOpen, setUserDropOpen] = useState(false); // 유저 드롭다운 상태
-  const userDropTimeout = useRef(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [sbCollapsed, setSbCollapsed] = useState({ main: false, ops: false, info: false });
+  // (구 인앱 GNB 의 호버·드롭다운·사이드바 state 는 Header.jsx 자체 state 로 이관 완료되어
+  //  2026-08 정리에서 제거했습니다 — GNB 를 손볼 때는 src/components/Header.jsx 를 보세요.)
 
   // ── 모바일 감지 (폰트 크기 보정용) ──
   // ★ SSOT — useIsMobile (src/ui/useBreakpoint.jsx). 이전 자체 useState +
@@ -4828,6 +4905,9 @@ function AppInner() {
   // ═══════════════════════════════════════════════════════════════
   const userDataLoaded = useRef(false);
   const userDataSaveTimer = useRef(null);
+  // 서버 → localStorage 복원 완료 신호 — 복원 전에 streak 등을 증가시키면
+  // 뒤늦게 도착한 서버 값이 증가분을 덮어쓰는 race 가 생겨, 완료 후에만 기록합니다.
+  const [userDataRestored, setUserDataRestored] = useState(false);
 
   // 개인화 데이터 localStorage 읽기 헬퍼
   const readUserLocal = useCallback((key, fallback = null) => {
@@ -4888,11 +4968,33 @@ function AppInner() {
         }
       } catch (e) { console.warn("[Sync] 초기 동기화 실패:", e); }
       userDataLoaded.current = true;
+      setUserDataRestored(true);
     })();
   }, [user, writeUserLocal, syncUserDataToSupabase]);
 
   // 유저 변경 시 플래그 리셋
-  useEffect(() => { userDataLoaded.current = false; }, [user?.id]);
+  useEffect(() => { userDataLoaded.current = false; setUserDataRestored(false); }, [user?.id]);
+
+  // ── 연속 접속(streak) 기록 — 로그인 사용자 공용 경로 ──────────────
+  // ★ 2026-08 정비: 기록 코드가 owner 홈 렌더 IIFE 안에만 있어 일반 사용자는
+  //   매일 접속해도 streak 이 영원히 쌓이지 않았습니다(MY 스탯 칸 영구 미표시).
+  //   탭과 무관하게 서버 복원 완료 후 1회 기록하는 공용 effect 로 옮깁니다.
+  //   하루 1회 멱등(lastDate === 오늘이면 증가 없이 읽기만)이라 owner 홈의
+  //   기존 렌더 내 계산과 겹쳐 실행돼도 이중 증가는 없습니다.
+  const [streakInfo, setStreakInfo] = useState(null);
+  useEffect(() => {
+    if (!user?.id || !userDataRestored) return;
+    const todayKey = new Date().toISOString().slice(0, 10);
+    try {
+      const stored = JSON.parse(localStorage.getItem("zepta:streak") || "{}");
+      if (stored.lastDate === todayKey) { setStreakInfo(stored); return; }
+      const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+      const updated = { lastDate: todayKey, count: stored.lastDate === yesterday ? (stored.count || 0) + 1 : 1 };
+      localStorage.setItem("zepta:streak", JSON.stringify(updated));
+      setStreakInfo(updated);
+      syncUserDataToSupabase();
+    } catch {}
+  }, [user?.id, userDataRestored, syncUserDataToSupabase]);
 
   // ── 스크롤 및 UX 상태 ──
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -7005,17 +7107,85 @@ function AppInner() {
   // 홈 "오늘의 시그널" 카드를 누르면 그 종목 하나를 끝까지 읽는 화면을 띄웁니다.
   // 값은 이미 받아둔 coin-scores 엔트리에서 전부 파생 — 추가 fetch 가 없습니다.
   const [detailSignal, setDetailSignal] = useState(null);
+  // 시트 오버레이 컨테이너 ref — 열릴 때 포커스를 옮기고 Tab 순환의 기준점이 됩니다.
+  const sheetRef = useRef(null);
   // 탭이 바뀌면(검색 이동 등) 시트를 닫아 이전 화면의 잔상이 남지 않게 합니다.
   useEffect(() => { setDetailSignal(null); }, [tab]);
   useEffect(() => {
     if (!detailSignal) return;
-    const onKey = (e) => { if (e.key === "Escape") setDetailSignal(null); };
+    // aria-modal 다이얼로그 접근성: 열릴 때 포커스를 시트 안으로 옮기고(스크린리더가
+    // aria-label 을 읽음), Tab 이 시트 뒤 배경 요소로 새지 않게 순환시키고, 닫힐 때 복원합니다.
+    const prevFocus = document.activeElement;
+    // 시트 본문은 lazy(Suspense)라 첫 오픈 시 아직 없습니다 —
+    // 컨테이너(tabIndex=-1)에 포커스를 주면 aria-label 이 읽히고 Tab 기준점이 생깁니다.
+    sheetRef.current?.focus();
+
+    const onKey = (e) => {
+      if (e.key === "Escape") { setDetailSignal(null); return; }
+      if (e.key !== "Tab") return;
+      const root = sheetRef.current;
+      if (!root) return;
+      const f = Array.from(root.querySelectorAll(
+        'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+      )).filter((el) => el.offsetParent !== null || el === document.activeElement);
+      if (!f.length) { e.preventDefault(); root.focus(); return; }
+      const first = f[0], last = f[f.length - 1];
+      const cur = document.activeElement;
+      if (e.shiftKey && (cur === first || cur === root)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (cur === last || cur === root)) { e.preventDefault(); first.focus(); }
+      // 배경에 포커스가 남아 있으면 시트 안 첫 요소로 끌어옵니다 (배경 tab order 유출 방지)
+      else if (!root.contains(cur)) { e.preventDefault(); first.focus(); }
+    };
     window.addEventListener("keydown", onKey);
     // 시트가 전체 화면을 덮는 동안 뒤 페이지가 같이 스크롤되지 않게 잠급니다.
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+      // 탭 전환으로 시트가 닫히면 원래 카드가 이미 언마운트돼 있을 수 있어 문서 잔존 시에만 복원합니다.
+      if (prevFocus && document.contains(prevFocus)) prevFocus.focus?.();
+    };
   }, [detailSignal]);
+
+  // ── 상세 시트 추이 차트 (2026-08 배선) ─────────────────────────────
+  // 자산 마스터(CRYPTO_ASSETS)에 coingecko id 가 있는 코인만 /api/coingecko OHLC 로
+  // 실데이터를 불러옵니다. id 매핑이 없는 코인은 spark 를 넘기지 않아 차트 섹션이
+  // 기존처럼 통째로 숨겨집니다(가짜 차트 금지). 기간 탭은 탭마다 days 를 바꿔
+  // 실제 다른 데이터를 다시 불러옵니다 — 표시만 되는 죽은 탭이 아닙니다.
+  const [detailRange, setDetailRange] = useState("1M");
+  const [detailSpark, setDetailSpark] = useState(null); // { symbol, range, points }
+  useEffect(() => {
+    if (!detailSignal) { setDetailSpark(null); return; }
+    const ticker = String(detailSignal.asset || detailSignal.symbol || "").replace(/USDT$/i, "").toUpperCase();
+    const knownAsset = CRYPTO_ASSETS.find((a) => a.symbol === ticker);
+    if (!knownAsset) { setDetailSpark(null); return; }
+    // 종목이 바뀌면 이전 종목 차트를 즉시 비우고 재실행에 맡깁니다
+    // (다른 자산의 차트가 잠깐 보이는 것 방지 + fetch 중복 방지).
+    if (detailSpark && detailSpark.symbol !== ticker) { setDetailSpark(null); return; }
+    if (detailSpark && detailSpark.symbol === ticker && detailSpark.range === detailRange) return;
+    const days = DETAIL_RANGE_DAYS[detailRange] || "30";
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(`/api/coingecko?id=${encodeURIComponent(knownAsset.id)}&days=${days}&type=ohlc`);
+        if (r.ok) {
+          const j = await r.json();
+          if (cancelled) return;
+          const pts = Array.isArray(j?.candles)
+            ? j.candles.map((c) => Number(c?.close)).filter(Number.isFinite)
+            : [];
+          if (pts.length >= 2) { setDetailSpark({ symbol: ticker, range: detailRange, points: pts }); return; }
+        }
+      } catch {}
+      // 실패 시: 이미 그려 둔 기간이 있으면 탭 선택을 그 기간으로 되돌려
+      // "탭은 1년인데 차트는 1개월" 같은 어긋난 표시가 남지 않게 합니다.
+      if (!cancelled) {
+        setDetailRange((cur) => (detailSpark && detailSpark.symbol === ticker ? detailSpark.range : cur));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [detailSignal, detailRange, detailSpark]);
 
   // ── MY 화면 스탯: 저장한 조건 수 (2026-08 모바일 시안 — 프로필 상단 3열) ──
   // 저장한 스크리너는 App state 가 아니라 KV 에 있습니다(GET /api/screeners/list?uid=).
@@ -7075,6 +7245,9 @@ function AppInner() {
   // ── 글로벌 검색 단축키 (/ 키) + 탭 단축키 (1-5) ──
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // 종목 상세 시트(z 10001)가 열려 있으면 전역 단축키를 중단합니다 —
+      // 검색 오버레이(z 9999)가 시트 뒤에 보이지 않게 뜨는 문제 방지. 시트 전용 키는 별도 이펙트가 처리합니다.
+      if (detailSignal) return;
       const isInputFocused = ["INPUT", "TEXTAREA", "SELECT"].includes(e.target.tagName);
 
       // 글로벌 검색 (/)
@@ -7098,7 +7271,7 @@ function AppInner() {
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOwner]);
+  }, [isOwner, detailSignal]);
 
   // ── 스크롤 감지 (맨 위로 버튼) ──
   useEffect(() => {
@@ -7567,10 +7740,9 @@ function AppInner() {
         .di-app-body { display: flex; flex-direction: column; }
         .di-main-wrap { flex: 1; }
         .gnb-inner { margin-left: auto !important; margin-right: auto !important; }
-        /* 모바일 하단탭 존재 시 상단 햄버거 숨김 */
-        @media (max-width: 640px) {
-          .mobile-hamburger { display: none !important; }
-        }
+        /* ★ 하단탭 도입 시 넣었던 640px 이하 햄버거 숨김 규칙은 삭제했습니다 —
+           하단 5탭 밖의 화면(자산 분석·저장한 조건·포트폴리오)과 비로그인 테마 전환이
+           폰에서 도달 불가(고아)가 되던 회귀. 전체 메뉴 시트는 상단 햄버거로 진입합니다. */
         /* v7.5: 공통 카드 스타일 — 개선된 간격 ── */
         .ui-card {
           background: ${C.isDark
@@ -7870,16 +8042,20 @@ function AppInner() {
           ];
           const fgVal = fearGreed.stock?.value;
           const fgCryptoVal = fearGreed.crypto?.value;
-          const fgColorOf = (v) => v == null ? C.text3 : (v <= 25 ? C.redL : v <= 40 ? C.orange : v <= 60 ? C.yellowL : C.greenL);
-          const fgLabelOf = (v) => v == null ? "—" : (v <= 25 ? "극도의 공포" : v <= 40 ? "공포" : v <= 60 ? "중립" : v <= 75 ? "탐욕" : "극도의 탐욕");
+          // ★ 지표 허브(IndicatorHub)와 색 문법 통일 — 같은 지표가 홈에서는 빨강→초록,
+          //   허브에서는 파랑→주황으로 달리 보이던 문제. 허브의 temp 램프(냉각 파랑 ~ 과열 주황)와
+          //   tone 임계값(≤25 cold / ≥75 hot / 그 외 중립)을 그대로 따릅니다.
+          const fgColorOf = (v) => v == null ? C.text3 : (v <= 25 ? C.blue : v >= 75 ? C.orange : C.text3);
+          const fgRamp = `linear-gradient(90deg, ${C.blue}, ${C.yellow} 50%, ${C.orange})`;
+          const fgLabelOf = (v) => v == null ? "—" : (v <= 25 ? t("tabs.home.extremeFear") : v <= 40 ? t("tabs.home.fear") : v <= 60 ? t("tabs.home.neutral") : v <= 75 ? t("tabs.home.greed") : t("tabs.home.extremeGreed"));
           // ★ Phase 2 — ④ 블록 uiKit IndicatorCard 용 tone·한줄 해석 매핑
           //   (tone 규격: up=green / down=red / neutral / hot=orange / cold=blue)
           const tempToneOf = (v) => v == null ? "neutral" : v <= 25 ? "cold" : v <= 50 ? "up" : v <= 75 ? "hot" : "down";
           const tempDescOf = (v) => v == null ? ""
-            : v <= 25 ? "시장 에너지가 낮은 차분한 흐름입니다"
-            : v <= 50 ? "완만한 온기가 도는 안정적 흐름입니다"
-            : v <= 75 ? "거래 열기가 달아오른 흐름입니다"
-            : "과열 신호가 나타나는 뜨거운 흐름입니다";
+            : v <= 25 ? t("tabs.home.tempDescCalm")
+            : v <= 50 ? t("tabs.home.tempDescMild")
+            : v <= 75 ? t("tabs.home.tempDescHot")
+            : t("tabs.home.tempDescOverheat");
           // ② 톱 뉴스 3행 — 뉴스 탭과 동일 데이터(newsItems) 재사용
           const topNews = [...newsItems].sort((a, b) =>
             new Date(b.date || b.publishedAt || b.pubDate || 0) - new Date(a.date || a.publishedAt || a.pubDate || 0)
@@ -7930,7 +8106,7 @@ function AppInner() {
           // ── 인사 + 헤드라인 ──────────────────────────────────────
           // 헤드라인은 "상태 서술"만 합니다(행동 지시 금지 — 서비스 표현 3원칙).
           const hour = new Date().getHours();
-          const greetText = hour < 6 ? "이른 새벽입니다"
+          const greetText = hour < 6 ? t("tabs.home.greetDawn")
             : hour < 12 ? (t("tabs.home.goodMorning") || "좋은 아침이에요")
             : hour < 18 ? (t("tabs.home.goodAfternoon") || "좋은 오후예요")
             : (t("tabs.home.goodEvening") || "오늘도 고생 많으셨어요");
@@ -7941,7 +8117,7 @@ function AppInner() {
             .map(c => Number(c.idx.change));
           const upRatio = biasSamples.length ? biasSamples.filter(v => v > 0).length / biasSamples.length : null;
           const bias = upRatio == null ? null : upRatio >= 0.6 ? "up" : upRatio <= 0.4 ? "down" : "flat";
-          const biasWord = bias === "up" ? "상승 우위" : bias === "down" ? "하락 우위" : "혼조";
+          const biasWord = bias === "up" ? t("tabs.home.upDominant") : bias === "down" ? t("tabs.home.downDominant") : t("tabs.home.mixed");
           const biasColor = bias === "up" ? C.greenL : bias === "down" ? C.redL : C.yellowL;
 
           // ── ① 지수 스트립 데이터 ────────────────────────────────
@@ -7978,12 +8154,12 @@ function AppInner() {
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px" }}>
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <div style={{ fontSize: "13px", color: C.text3, fontWeight: 600 }}>
-                    {displayName ? `${displayName}님, ${greetText}` : greetText}
+                    {displayName ? `${displayName}${t("tabs.home.nameSuffix")}${greetText}` : greetText}
                   </div>
                   <div style={{ fontSize: "21px", fontWeight: 800, color: C.text1, letterSpacing: "-0.03em", marginTop: "4px", lineHeight: 1.3 }}>
                     {bias
-                      ? <>오늘 시장은 <span style={{ color: biasColor }}>{biasWord}</span>입니다</>
-                      : "오늘의 시장을 불러오는 중입니다"}
+                      ? <>{t("tabs.home.todayMarketPrefix")}<span style={{ color: biasColor }}>{biasWord}</span>{t("tabs.home.todayMarketSuffix")}</>
+                      : t("tabs.home.headlineLoading")}
                   </div>
                 </div>
                 <IconButton ariaLabel="알림" badge={alertBadge > 0} onClick={() => setTab("notifications")} style={{ flexShrink: 0, marginTop: "2px" }}>
@@ -8000,7 +8176,7 @@ function AppInner() {
                 <MobileSectionHeader
                   title={t("tabs.home.marketBriefing") || "마켓 브리핑"}
                   live={marketIndices.length > 0}
-                  actionLabel={marketLoading ? "갱신 중…" : "새로고침"}
+                  actionLabel={marketLoading ? t("tabs.home.updating") : t("tabs.home.refresh")}
                   onAction={marketLoading ? undefined : fetchMarketOverview}
                 />
                 {marketIndices.length === 0 ? (
@@ -8012,11 +8188,17 @@ function AppInner() {
                     ))}
                   </div>
                 ) : (
-                  <IndexStrip items={indexItems} />
+                  // 데스크탑은 가로 스크롤 스트립 대신 3열 그리드로 전폭을 채웁니다
+                  // (좌측 몰림 + 우측 빈 공간 회귀 수정 — 모바일은 시안 그대로 스크롤).
+                  // IndexStrip 의 style prop 이 컨테이너 기본값을 덮으므로 grid 전환이 안전합니다.
+                  <IndexStrip
+                    items={indexItems}
+                    style={!isMobile ? { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", overflowX: "visible" } : undefined}
+                  />
                 )}
                 <div style={{ marginTop: "10px", textAlign: "right" }}>
                   <a href="/briefing" style={{ fontSize: "13px", fontWeight: 700, color: C.blueL, textDecoration: "none" }}>
-                    오늘의 브리핑 전문 보기 →
+                    {t("tabs.home.briefingLink")}
                   </a>
                 </div>
               </section>
@@ -8025,9 +8207,9 @@ function AppInner() {
               {signalRows.length > 0 && (
                 <section>
                   <MobileSectionHeader
-                    title="오늘의 시그널"
+                    title={t("tabs.home.todaySignals")}
                     live
-                    actionLabel="전체 보기 →"
+                    actionLabel={t("tabs.home.viewAll")}
                     onAction={() => { window.location.href = "/coin"; }}
                   />
                   <div style={{ display: "flex", flexDirection: "column", gap: "9px" }}>
@@ -8046,7 +8228,7 @@ function AppInner() {
                         <SignalCard
                           key={`${sig.symbol || sig.asset || "sig"}-${i}`}
                           symbol={String(sig.symbol || sig.asset || "—").replace("USDT", "")}
-                          sideLabel={sig.side === "LONG" ? "롱 우위" : "숏 우위"}
+                          sideLabel={sig.side === "LONG" ? t("tabs.home.longDominant") : t("tabs.home.shortDominant")}
                           dir={dir}
                           score={Math.round(Math.max(0, Math.min(100, Number(sig.score))))}
                           timeframes={tfs.some(x => x.dir) ? tfs : []}
@@ -8059,7 +8241,14 @@ function AppInner() {
                     })}
                   </div>
                   <div style={{ fontSize: "11px", color: C.text4, marginTop: "8px" }}>
-                    바이낸스 선물 상위 코인 · 10분 주기 갱신
+                    {/* 엔진 산출 시각(ts) 실측 병기 — 크론이 멈춰 스코어가 밀리면
+                        "N시간 전 집계 · 갱신 지연"이 그대로 드러납니다. ts 없으면 병기 생략. */}
+                    {(() => {
+                      const newestTs = signalRows.reduce((m, s) => Math.max(m, Number(s?.ts) || 0), 0);
+                      // t 를 넘겨 신선도 문구도 로케일을 따릅니다 (영어 화면 혼합 언어 방지).
+                      const fresh = coinScoreFreshness(newestTs, t);
+                      return fresh ? `${t("tabs.home.signalSourceNote")} · ${fresh}` : t("tabs.home.signalSourceNote");
+                    })()}
                   </div>
                 </section>
               )}
@@ -8067,8 +8256,8 @@ function AppInner() {
               {/* ── ② 톱 뉴스 3행 (뉴스 탭 데이터 재사용 — 타임라인 행 스타일) ── */}
               <div style={cardBase}>
                 <MobileSectionHeader
-                  title="📰 톱 뉴스"
-                  actionLabel="더보기 →"
+                  title={`📰 ${t("tabs.home.topNews")}`}
+                  actionLabel={t("tabs.home.more")}
                   onAction={() => setTab("news")}
                 />
                 {newsLoading && topNews.length === 0 ? (
@@ -8076,21 +8265,35 @@ function AppInner() {
                     {[1, 2, 3].map(i => <Skeleton key={i} width="100%" height="40px" />)}
                   </div>
                 ) : topNews.length === 0 ? (
-                  <div style={{ fontSize: "14px", color: C.text3, padding: "10px 0" }}>표시할 뉴스가 아직 없습니다.</div>
+                  <div style={{ fontSize: "14px", color: C.text3, padding: "10px 0" }}>{t("tabs.home.noNews")}</div>
                 ) : (
                   topNews.map((n, i) => {
                     const senti = analyzeSentiment(n.title);
                     const sColor = senti === "positive" ? C.green : senti === "negative" ? C.red : C.text3;
+                    const sLabel = senti === "positive" ? t("tabs.home.sentiPositive") : senti === "negative" ? t("tabs.home.sentiNegative") : t("tabs.home.neutral");
                     return (
+                      // 뉴스 탭 타임라인 행과 동일한 '제목 먼저, 메타 아래' 구조 —
+                      // 긴 언론사명이 제목을 압착하던 문제와 색 점만으로 감성을 전달하던 문제를 함께 해소합니다.
                       <a key={i} href={n.url || n.link || "#"} target="_blank" rel="noopener" style={{
-                        display: "flex", alignItems: "baseline", gap: "10px",
+                        display: "flex", alignItems: "flex-start", gap: "10px",
                         padding: "10px 4px", textDecoration: "none",
                         borderBottom: i < topNews.length - 1 ? `1px solid ${C.card2}` : "none",
                       }}>
-                        <Num size="12px" weight={700} color={C.text3} style={{ flexShrink: 0 }}>{newsTime(n)}</Num>
-                        <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: sColor, flexShrink: 0, alignSelf: "center" }} />
-                        <span style={{ flex: 1, minWidth: 0, fontSize: "15px", fontWeight: 600, color: C.text1, lineHeight: 1.45, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{n.title}</span>
-                        <span style={{ fontSize: "12px", color: C.text3, flexShrink: 0 }}>{n.source || ""}</span>
+                        {/* 시간 + 감성 도트 (도트는 장식 — 감성은 아래 텍스트 배지가 전달) */}
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", flexShrink: 0, paddingTop: "2px" }}>
+                          <Num size="12px" weight={700} color={C.text3}>{newsTime(n)}</Num>
+                          <span aria-hidden="true" style={{ width: "6px", height: "6px", borderRadius: "50%", background: sColor }} />
+                        </div>
+                        {/* 제목 전폭 → 아래 메타(감성 텍스트 배지 · 언론사) */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: "15px", fontWeight: 600, color: C.text1, lineHeight: 1.45, overflow: "hidden", textOverflow: "ellipsis", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{n.title}</div>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "3px", minWidth: 0 }}>
+                            <span style={{ fontSize: "11px", fontWeight: 700, padding: "1px 7px", borderRadius: "5px", background: `${sColor}14`, color: sColor, flexShrink: 0 }}>{sLabel}</span>
+                            {n.source ? (
+                              <span style={{ fontSize: "12px", color: C.text3, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.source}</span>
+                            ) : null}
+                          </div>
+                        </div>
                       </a>
                     );
                   })
@@ -8105,20 +8308,20 @@ function AppInner() {
               {/* ── ③ 경제 캘린더 — 오늘·내일 상위 3 (첫 건은 시안 EventCard) ── */}
               <section>
                 <MobileSectionHeader
-                  title="📅 경제 캘린더 (KST)"
-                  actionLabel="전체 일정 →"
+                  title={`📅 ${t("tabs.home.economicCalendar")} (KST)`}
+                  actionLabel={t("tabs.home.fullSchedule")}
                   onAction={() => setTab("econ-calendar")}
                 />
                 {calRows.length === 0 ? (
-                  <div style={{ ...cardBase, fontSize: "14px", color: C.text3 }}>예정된 주요 지표 일정이 없습니다.</div>
+                  <div style={{ ...cardBase, fontSize: "14px", color: C.text3 }}>{t("tabs.home.noEvents")}</div>
                 ) : (() => {
                   const fmtRow = (evt) => {
                     const k = kstParts(evt.date);
                     return {
-                      dayLabel: evt.daysUntil === 0 ? "오늘" : evt.daysUntil === 1 ? "내일"
+                      dayLabel: evt.daysUntil === 0 ? t("tabs.home.today") : evt.daysUntil === 1 ? t("tabs.home.tomorrow")
                         : (k.valid ? `${String(k.month + 1).padStart(2, "0")}.${String(k.date).padStart(2, "0")}` : "—"),
                       hhmm: k.valid ? `${String(k.hour).padStart(2, "0")}:${String(k.min).padStart(2, "0")}` : "--:--",
-                      tail: evt.estimate != null ? `예상 ${evt.estimate}${evt.unit}` : evt.importance === "high" ? "중요" : "",
+                      tail: evt.estimate != null ? `${t("tabs.home.forecastCol")} ${evt.estimate}${evt.unit}` : evt.importance === "high" ? t("tabs.home.important") : "",
                     };
                   };
                   const head = calRows[0];
@@ -8130,7 +8333,7 @@ function AppInner() {
                         icon={head.icon || "📅"}
                         title={head.name}
                         meta={`${headMeta.dayLabel} ${headMeta.hhmm}${headMeta.tail ? ` · ${headMeta.tail}` : ""}`}
-                        badge={head.importance === "high" ? "중요" : (head.daysUntil === 0 ? "오늘" : null)}
+                        badge={head.importance === "high" ? t("tabs.home.important") : (head.daysUntil === 0 ? t("tabs.home.today") : null)}
                         badgeTone={head.importance === "high" ? "down" : "neutral"}
                         onClick={() => setTab("econ-calendar")}
                       />
@@ -8165,8 +8368,8 @@ function AppInner() {
               {hasSnapshot && (
                 <section>
                   <MobileSectionHeader
-                    title="🌡️ 시장 지표 스냅샷"
-                    actionLabel="지표 허브 전체 보기 →"
+                    title={`🌡️ ${t("tabs.home.marketSnapshot")}`}
+                    actionLabel={t("tabs.home.indicatorHubLink")}
                     onAction={() => setTab("indicators")}
                   />
                   <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -8175,19 +8378,25 @@ function AppInner() {
                       <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fit, minmax(260px, 1fr))", gap: "10px" }}>
                         {fgVal != null && (
                           <GaugeCard
-                            title="공포·탐욕 지수 (주식)"
+                            title={t("tabs.home.fgStock")}
                             value={fgVal}
                             label={fgLabelOf(fgVal)}
                             valueColor={fgColorOf(fgVal)}
+                            gradient={fgRamp}
+                            scaleLeft={`0 ${t("tabs.home.fear")}`}
+                            scaleRight={`${t("tabs.home.greed")} 100`}
                             onClick={() => setTab("indicators")}
                           />
                         )}
                         {fgCryptoVal != null && (
                           <GaugeCard
-                            title="공포·탐욕 지수 (크립토)"
+                            title={t("tabs.home.fgCrypto")}
                             value={fgCryptoVal}
                             label={fgLabelOf(fgCryptoVal)}
                             valueColor={fgColorOf(fgCryptoVal)}
+                            gradient={fgRamp}
+                            scaleLeft={`0 ${t("tabs.home.fear")}`}
+                            scaleRight={`${t("tabs.home.greed")} 100`}
                             onClick={() => setTab("indicators")}
                           />
                         )}
@@ -8209,7 +8418,7 @@ function AppInner() {
                         )}
                         {tempVal != null && (
                           <IndicatorCard
-                            title="Zepta 마켓 온도 (코인)"
+                            title={t("tabs.home.marketTempCoin")}
                             value={Math.round(tempVal)}
                             unit="°"
                             label={marketTemp.label || "—"}
@@ -8227,12 +8436,12 @@ function AppInner() {
               {/* ── ⑤ 관심종목 요약 (로그인+보유 시) / 인기 종목 (기존 주요종목 데이터 재사용) ── */}
               <section>
                 <MobileSectionHeader
-                  title={watchRows ? "⭐ 관심종목 요약" : "🔥 오늘 변동 큰 종목 (주식·코인)"}
-                  actionLabel="스크리너 →"
+                  title={watchRows ? `⭐ ${t("tabs.home.watchlistSummary")}` : `🔥 ${t("tabs.home.bigMovers")}`}
+                  actionLabel={t("tabs.home.screenerLink")}
                   onAction={() => setTab("screener")}
                 />
                 {(watchRows || popularRows).length === 0 ? (
-                  <div style={{ ...cardBase, fontSize: "14px", color: C.text3 }}>시세 데이터를 불러오는 중입니다…</div>
+                  <div style={{ ...cardBase, fontSize: "14px", color: C.text3 }}>{t("tabs.home.loadingQuotes")}</div>
                 ) : (
                   <ListCard>
                     {(watchRows || popularRows).map((row, i, arr) => {
@@ -8242,12 +8451,20 @@ function AppInner() {
                       const mkt = row.market || hot?.market || "us";
                       const mktLabel = MARKET_BADGE[mkt] || MARKET_BADGE.us;
                       const chg = hot && Number.isFinite(Number(hot.change)) ? Number(hot.change) : null;
+                      // 시안의 38px 심볼 타일 — 글로벌 검색 결과와 같은 규칙
+                      // (한국 주식은 숫자 코드라 종목명 앞 2글자, 그 외는 티커 앞 4글자).
+                      const iconText = mkt === "kr"
+                        ? String(name || "").slice(0, 2)
+                        : String(row.symbol || "").slice(0, 4).toUpperCase();
+                      const iconColor = mkt === "kr" ? C.green : mkt === "crypto" ? C.purple : C.blue;
                       return (
                         <AssetRow
                           key={row.symbol || i}
                           rank={watchRows ? null : i + 1}
+                          icon={iconText || undefined}
+                          iconColor={iconColor}
                           name={name}
-                          meta={hot ? null : "시세 준비 중"}
+                          meta={hot ? null : t("tabs.home.quotePreparing")}
                           badge={
                             <span style={{
                               fontSize: "11px", fontWeight: 700, padding: "3px 7px", borderRadius: "6px",
@@ -8283,14 +8500,14 @@ function AppInner() {
                   display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px",
                 }}>📊</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 800, fontSize: "16px", color: C.text1, marginBottom: "2px" }}>시장 리포트</div>
-                  <div style={{ fontSize: "13px", color: C.text3, lineHeight: 1.4 }}>지수·심리·수급 지표를 모아 만든 오늘의 시장 요약 리포트입니다.</div>
+                  <div style={{ fontWeight: 800, fontSize: "16px", color: C.text1, marginBottom: "2px" }}>{t("tabs.home.marketReport")}</div>
+                  <div style={{ fontSize: "13px", color: C.text3, lineHeight: 1.4 }}>{t("tabs.home.marketReportDesc")}</div>
                 </div>
-                <span style={{ fontSize: "14px", fontWeight: 700, color: C.blueL, flexShrink: 0 }}>보러가기 →</span>
+                <span style={{ fontSize: "14px", fontWeight: 700, color: C.blueL, flexShrink: 0 }}>{t("tabs.home.goView")}</span>
               </div>
 
               {/* ── 면책 (시안: 모든 정보 화면 끝의 한 줄) ── */}
-              <Disclaimer style={{ marginTop: "2px" }} />
+              <Disclaimer style={{ marginTop: "2px" }}>{t("tabs.home.disclaimer")}</Disclaimer>
             </div>
           );
         })()}
@@ -10994,9 +11211,9 @@ function AppInner() {
                   <span className="font-black text-xl" style={{ color: C.text1 }}>퀀트 리포트</span>
                   <div className="flex items-center gap-2">
                     <button onClick={() => {
-                      const shareText = `[Zepta AI 시장 리포트] ${reportTime}\n\n시장 점수: ${mktScore}/100 (${mktVerdict})\n상승 ${upCount}개 · 하락 ${dnCount}개\n\nAI 퀀트 9개 전략 실시간 분석\n👉 https://zepta.app`;
+                      const shareText = `[Zepta 시장 리포트] ${reportTime}\n\n시장 점수: ${mktScore}/100 (${mktVerdict})\n상승 ${upCount}개 · 하락 ${dnCount}개\n\n지수·공포탐욕·상승비율 합산 스코어\n👉 https://zepta.app`;
                       if (navigator.share) {
-                        navigator.share({ title: "Zepta AI 시장 리포트", text: shareText, url: "https://zepta.app" }).catch(() => {});
+                        navigator.share({ title: "Zepta 시장 리포트", text: shareText, url: "https://zepta.app" }).catch(() => {});
                       } else {
                         navigator.clipboard.writeText(shareText).then(() => showToast("리포트가 복사되었습니다!", "success")).catch(() => {});
                       }
@@ -11009,7 +11226,7 @@ function AppInner() {
                     <span className="text-xs" style={{ color: C.text3 }}>{reportTime} 기준</span>
                   </div>
                 </div>
-                <div className="text-base mb-4" style={{ color: C.text3 }}>AI 기반 실시간 시장 분석 리포트</div>
+                <div className="text-base mb-4" style={{ color: C.text3 }}>지수·투자심리·상승종목 비율을 합산한 시장 요약</div>
 
                 {/* 시장 점수 대형 게이지 */}
                 <div className="flex items-center gap-5 mb-4">
@@ -11299,7 +11516,7 @@ function AppInner() {
                               <span className="text-sm font-bold px-1.5 py-0.5 rounded" style={{
                                 background: d.opinionColor === "green" ? `${C.green}18` : d.opinionColor === "red" ? `${C.red}18` : `${C.yellow}18`,
                                 color: d.opinionColor === "green" ? C.green : d.opinionColor === "red" ? C.red : C.yellow,
-                              }}>{d.opinion}</span>
+                              }}>{verdictLabel(d.opinion)}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-2">
@@ -11319,24 +11536,24 @@ function AppInner() {
                 </div>
               )}
 
-              {/* 오늘의 액션 플랜 */}
+              {/* 오늘의 시장 상태 요약 (표현 3원칙 — 행동 지시 대신 상태 서술만) */}
               <div className="rounded-[16px] p-5" style={{ background: C.card, border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
-                <div className="font-bold text-lg mb-3.5" style={{ color: C.text1 }}>📋 오늘의 액션 플랜</div>
+                <div className="font-bold text-lg mb-3.5" style={{ color: C.text1 }}>📋 오늘의 시장 상태 요약</div>
                 <div className="flex flex-col gap-2">
                   {(() => {
                     const actions = [];
-                    if (mktScore >= 60) actions.push({ icon: "🟢", text: "매수 우위 — 관심종목 1차 진입 검토", color: C.green });
-                    else if (mktScore >= 45) actions.push({ icon: "🟡", text: "혼조세 — 신규 진입보다 관망 우선", color: C.yellow });
-                    else actions.push({ icon: "🔴", text: "약세장 — 비중 축소 및 현금 확보", color: C.red });
-                    if (anomalies.length > 0) actions.push({ icon: "⚡", text: `이상 탐지 ${anomalies.length}건 — 급등락 종목 주의`, color: C.yellow });
-                    if (buyPicks > 3) actions.push({ icon: "🎯", text: `매수 신호 ${buyPicks}건 — 상위 종목 분할 매수 고려`, color: C.green });
-                    if (sellPicks > 3) actions.push({ icon: "🛡️", text: `매도 신호 ${sellPicks}건 — 보유 종목 점검 필요`, color: C.red });
-                    if (fg && fg <= 25) actions.push({ icon: "💎", text: "극도의 공포 — 역발상 매수 기회 탐색", color: C.purple });
-                    if (fg && fg >= 75) actions.push({ icon: "⚠️", text: "극도의 탐욕 — 차익실현 고려", color: C.red });
+                    if (mktScore >= 60) actions.push({ icon: "🟢", text: "상승 신호가 우세한 구간입니다", color: C.green });
+                    else if (mktScore >= 45) actions.push({ icon: "🟡", text: "혼조 구간 — 뚜렷한 방향성이 없습니다", color: C.yellow });
+                    else actions.push({ icon: "🔴", text: "하락 신호가 우세한 구간입니다", color: C.red });
+                    if (anomalies.length > 0) actions.push({ icon: "⚡", text: `이상 탐지 ${anomalies.length}건 — 급등락 종목이 포착됐습니다`, color: C.yellow });
+                    if (buyPicks > 3) actions.push({ icon: "🎯", text: `상승 신호 ${buyPicks}건이 감지됐습니다`, color: C.green });
+                    if (sellPicks > 3) actions.push({ icon: "🛡️", text: `하락 신호 ${sellPicks}건이 감지됐습니다`, color: C.red });
+                    if (fg && fg <= 25) actions.push({ icon: "💎", text: "공포탐욕 지수가 극단적 공포 구간입니다", color: C.purple });
+                    if (fg && fg >= 75) actions.push({ icon: "⚠️", text: "공포탐욕 지수가 극단적 탐욕 구간입니다", color: C.red });
                     const vix = marketIndices.find(i => i.symbol === "^VIX");
-                    if (vix?.price > 30) actions.push({ icon: "🌊", text: `VIX ${vix.price.toFixed(1)} — 고변동성, 포지션 축소`, color: C.red });
+                    if (vix?.price > 30) actions.push({ icon: "🌊", text: `VIX ${vix.price.toFixed(1)} — 고변동성 구간입니다`, color: C.red });
                     if (portfolio.length > 0 && benchmarkData) {
-                      if (benchmarkData.myReturn < -5) actions.push({ icon: "📊", text: "포트폴리오 손실 중 — 리밸런싱 검토", color: C.yellow });
+                      if (benchmarkData.myReturn < -5) actions.push({ icon: "📊", text: "포트폴리오가 손실 구간입니다", color: C.yellow });
                       else if (benchmarkData.alpha > 3) actions.push({ icon: "🏆", text: `시장 대비 +${benchmarkData.alpha.toFixed(1)}% 초과 수익`, color: C.green });
                     }
                     return actions.map((a, i) => (
@@ -11351,21 +11568,21 @@ function AppInner() {
                 </div>
               </div>
 
-              {/* 종합 의견 */}
+              {/* 시장 상태 종합 (표현 3원칙 — 행동 지시 대신 상태 서술만) */}
               <div className="rounded-[16px] p-5" style={{
                 background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`,
               }}>
-                <div className="font-bold text-lg mb-3.5" style={{ color: C.text1 }}>종합 의견</div>
+                <div className="font-bold text-lg mb-3.5" style={{ color: C.text1 }}>시장 상태 종합</div>
                 <div className="text-lg" style={{ color: C.text2, lineHeight: 1.8 }}>
                   {mktScore >= 70
-                    ? `현재 시장은 강세 국면입니다. S&P500 ${sp ? `${sp.change >= 0 ? "+" : ""}${sp.change}%` : ""}, 상승종목 비율 ${advDecl.toFixed(0)}%로 매수 우위 환경입니다. ${buyPicks}개 종목에서 매수 신호가 감지되었으며, 적극적인 포지션 확대를 고려할 수 있습니다.${fg && fg > 75 ? " 다만 공포탐욕 지수가 극단적 탐욕 구간으로, 과열 리스크에 유의하세요." : ""}`
+                    ? `현재 시장은 강세 국면입니다. S&P500 ${sp ? `${sp.change >= 0 ? "+" : ""}${sp.change}%` : ""}, 상승종목 비율 ${advDecl.toFixed(0)}%로 상승 신호가 우세한 환경입니다. ${buyPicks}개 종목에서 상승 신호가 감지된 상태입니다.${fg && fg > 75 ? " 공포탐욕 지수는 극단적 탐욕, 즉 과열 구간에 해당합니다." : ""}`
                     : mktScore >= 55
-                    ? `시장은 약한 강세를 보이고 있습니다. 상승 종목이 ${upCount}개로 하락 종목(${dnCount}개)보다 많으나, 확실한 방향성은 아직 형성되지 않았습니다. 분할 매수 접근이 적절하며, ${fg ? `공포탐욕 ${fg}(${fg <= 40 ? "공포" : fg <= 60 ? "중립" : "탐욕"})` : "시장 심리"}를 참고하여 비중을 조절하세요.`
+                    ? `시장은 약한 강세를 보이고 있습니다. 상승 종목이 ${upCount}개로 하락 종목(${dnCount}개)보다 많으나, 확실한 방향성은 아직 형성되지 않았습니다. ${fg ? `공포탐욕 ${fg}(${fg <= 40 ? "공포" : fg <= 60 ? "중립" : "탐욕"}) 지표가` : "시장 심리 지표가"} 함께 관측되고 있습니다.`
                     : mktScore >= 45
-                    ? `혼조 장세입니다. 상승(${upCount})과 하락(${dnCount}) 종목이 팽팽하게 대치하고 있으며, 뚜렷한 방향성이 없습니다. 신규 진입보다는 관망하거나 기존 포지션 리밸런싱에 집중하세요. 주요 지지/저항선 돌파 여부를 확인한 후 대응하는 것이 유리합니다.`
+                    ? `혼조 장세입니다. 상승(${upCount})과 하락(${dnCount}) 종목이 팽팽하게 대치하고 있으며, 뚜렷한 방향성이 없습니다. 주요 지지·저항 구간 돌파 여부가 아직 확인되지 않은 상태입니다.`
                     : mktScore >= 30
-                    ? `약세 장세입니다. 하락 종목(${dnCount}개)이 우세하며 시장 심리가 위축되고 있습니다. 비중 축소와 현금 비율 확대를 권장합니다.${fg && fg <= 30 ? " 공포 지수가 낮은 구간이므로 역발상 투자를 위한 관심 종목 리스트를 준비해두세요." : ""}`
-                    : `강한 약세 장세입니다. 대부분의 종목이 하락세이며, 시장 전반적으로 매도 압력이 강합니다. 방어적 포지션을 취하고, 현금 비율을 높이세요. 패닉 매도보다는 손절 기준을 엄격히 적용하여 체계적으로 대응하세요.`}
+                    ? `약세 장세입니다. 하락 종목(${dnCount}개)이 우세하며 시장 심리가 위축되고 있습니다. 하락 신호가 우세한 상태입니다.${fg && fg <= 30 ? " 공포 지수가 낮은 구간입니다." : ""}`
+                    : `강한 약세 장세입니다. 대부분의 종목이 하락세이며, 매도 압력이 강한 구간입니다. 변동성이 확대된 상태입니다.`}
                 </div>
                 <div className="flex gap-2 mt-3.5 flex-wrap">
                   <span className="text-base px-2.5 py-1 rounded font-bold" style={{
@@ -11392,6 +11609,11 @@ function AppInner() {
                   )}
                 </div>
               </div>
+
+              {/* 면책 — quant-report 는 공개 탭이므로 탭 내부 고지 필수 (2026-08 전수 감사) */}
+              <Disclaimer style={{ fontSize: "13px", padding: "0 4px" }}>
+                본 화면은 시장 데이터 요약이며 종목 추천이나 투자 권유가 아닙니다. 투자 판단과 책임은 본인에게 있습니다.
+              </Disclaimer>
             </div>
           );
         })()}
@@ -11476,6 +11698,9 @@ function AppInner() {
                     background: newsSort === v ? (v === "positive" ? C.greenBg : v === "negative" ? C.redBg : C.blueBg) : "transparent",
                     color: newsSort === v ? (v === "positive" ? C.green : v === "negative" ? C.red : C.blue) : C.text3,
                     border: "none", cursor: "pointer", transition: "all .15s",
+                    // 카테고리 칩과 동일 처리 — 모바일 전역 min-width:44px 클램프로 '최신순'이
+                    // 세로 3줄로 쪼개지고 줄 전체가 73px 로 늘어나던 문제 방지 (가로 스크롤로 흘림)
+                    flexShrink: 0, whiteSpace: "nowrap",
                   }}>{l}</button>
                 ))}
               </div>
@@ -11835,9 +12060,8 @@ function AppInner() {
                           );
                         })}
                       </div>
-                      <div style={{ marginTop: "10px", fontSize: "16px", color: C.blue, cursor: "pointer", fontWeight: 600 }}>
-                        자세히 보기 ›
-                      </div>
+                      {/* "자세히 보기 ›" 가짜 링크 제거(2026-08) — onClick 없는 순수 텍스트가
+                          링크처럼 보였고, 우측 컬럼이 이미 전체 이벤트 목록을 보여줘 기능 중복입니다. */}
                     </div>
                   )}
 
@@ -11980,7 +12204,9 @@ function AppInner() {
                                   </span>
                                 ) : (
                                   <span className="text-sm text-muted-foreground" style={{fontVariantNumeric: "tabular-nums"}}>
-                                    {isPast ? "발표 대기" : `${kstHour}시 예정`}
+                                    {/* 3일 넘게 지난 지표에 "발표 대기"(아직 발표 전)는 사실과 다른 서술 —
+                                        수치를 못 채운 상태를 "집계 없음"으로 정직하게 표기합니다. */}
+                                    {isPast ? (evt.daysUntil < -3 ? "집계 없음" : "발표 대기") : `${kstHour}시 예정`}
                                   </span>
                                 )}
                                 {isMobile && evt.estimate != null && (
@@ -12814,13 +13040,10 @@ function AppInner() {
           //   스탯은 "실제로 값이 있는 칸"만 렌더합니다 — 없는 지표를 0 으로 지어내지 않습니다.
           //   · 관심종목: App state(watchlist) — 로그인 사용자면 항상 실측값
           //   · 저장한 조건: /api/screeners/list (조회 실패 시 null → 칸 자체를 숨김)
-          //   · 연속 접속: localStorage "zepta:streak" (기록 없으면 칸을 숨김)
+          //   · 연속 접속: 공용 streak effect 의 streakInfo (기록 없으면 칸을 숨김 — 0 을 지어내지 않음)
           const streakCount = (() => {
-            try {
-              const s = JSON.parse(localStorage.getItem("zepta:streak") || "{}");
-              const n = Number(s?.count);
-              return Number.isFinite(n) && n > 0 ? n : null;
-            } catch { return null; }
+            const n = Number(streakInfo?.count);
+            return Number.isFinite(n) && n > 0 ? n : null;
           })();
           const statCells = [
             { label: "관심종목", value: `${watchlist.length}` },
@@ -13026,7 +13249,7 @@ function AppInner() {
                 ].map((item, i, arr) => (
                   <div key={i} onClick={() => { if (item.href) window.location.href = item.href; else setTab(item.tab); }}
                     role="button" tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === "Enter") { if (item.href) window.location.href = item.href; else setTab(item.tab); } }}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (item.href) window.location.href = item.href; else setTab(item.tab); } }}
                     style={{
                       display: "flex", alignItems: "center", gap: "14px",
                       padding: "14px 16px", borderTop: `1px solid ${C.card2}`, cursor: "pointer",
@@ -13182,11 +13405,15 @@ function AppInner() {
                 { icon: "🔍", label: "스크리너 (섹터·전체 종목 탐색)", tab: "screener" },
                 { icon: "📊", label: "시장 리포트", tab: "quant-report" },
               ].map((item, i) => (
-                <div key={i} onClick={() => setTab(item.tab)} style={{
-                  display: "flex", alignItems: "center", gap: "14px",
-                  padding: "13px 20px", borderTop: `1px solid ${C.border}15`, cursor: "pointer",
-                  transition: "background .1s",
-                }}
+                // 고객지원 리스트와 동일한 키보드 접근성 처리 (role/tabIndex/onKeyDown)
+                <div key={i} onClick={() => setTab(item.tab)}
+                  role="button" tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setTab(item.tab); } }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "14px",
+                    padding: "13px 20px", borderTop: `1px solid ${C.border}15`, cursor: "pointer",
+                    transition: "background .1s",
+                  }}
                 onMouseEnter={e => e.currentTarget.style.background = `${C.border}10`}
                 onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <span style={{ fontSize: "16px", width: "24px", textAlign: "center" }}>{item.icon}</span>
@@ -13199,7 +13426,8 @@ function AppInner() {
             {/* 친구 초대 */}
             <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
               <div style={{ fontSize: "14px", fontWeight: 800, color: C.text1, marginBottom: "10px" }}>친구 초대</div>
-              <div style={{ fontSize: "14px", color: C.text3, marginBottom: "12px" }}>AI 퀀트 전략을 무료로 이용할 수 있어요</div>
+              {/* "AI 퀀트 전략" 표현은 룰베이스 산출을 AI 로 표기하는 역량 과장이라 사실 서술로 정정했습니다. */}
+              <div style={{ fontSize: "14px", color: C.text3, marginBottom: "12px" }}>시장 신호와 데이터 분석을 무료로 이용할 수 있어요</div>
               <div style={{ display: "flex", gap: "8px" }}>
                 <button onClick={() => {
                   const txt = "시장 신호와 데이터를 한눈에 보는 투자 정보 앱이야. 무료인데 한번 써봐 👉 https://zepta.app";
@@ -13520,6 +13748,8 @@ function AppInner() {
           const isFav = wl ? watchlist.some((w) => w.symbol === wl.symbol) : false;
           return (
             <div
+              ref={sheetRef}
+              tabIndex={-1}
               role="dialog"
               aria-modal="true"
               aria-label={`${built.ticker} 종목 상세`}
@@ -13528,20 +13758,41 @@ function AppInner() {
                 position: "fixed", inset: 0, zIndex: 10001, background: C.bg,
                 overflowY: "auto", WebkitOverflowScrolling: "touch",
                 paddingBottom: "env(safe-area-inset-bottom, 0px)",
+                outline: "none",
               }}
             >
-              <Suspense fallback={<LazyTabFallback />}>
-                <AssetDetailSheet
-                  {...built.props}
-                  onBack={() => setDetailSignal(null)}
-                  isFavorite={isFav}
-                  onToggleFavorite={wl ? () => setWatchlist((prev) =>
-                    prev.some((w) => w.symbol === wl.symbol)
-                      ? prev.filter((w) => w.symbol !== wl.symbol)
-                      : [...prev, wl]
-                  ) : undefined}
-                />
-              </Suspense>
+              {/* 375px 시안 전제 시트가 데스크탑에서 1440px 전폭으로 늘어지지 않도록
+                  폭만 제한합니다 (모바일은 none — 현행 동일). 스크롤 컨테이너가 아니라
+                  내부 sticky 헤더는 계속 오버레이 기준으로 동작합니다. */}
+              <div style={{ maxWidth: isMobile ? "none" : "560px", margin: "0 auto", minHeight: "100%" }}>
+                <Suspense fallback={<LazyTabFallback />}>
+                  {/* spark: coingecko id 가 있는 코인만 실데이터 차트 —
+                      symbol 일치 가드로 이전 종목의 응답이 새 종목 화면에 남지 않게 합니다. */}
+                  <AssetDetailSheet
+                    {...built.props}
+                    spark={(() => {
+                      if (!(detailSpark && detailSpark.symbol === built.ticker && detailSpark.points.length >= 2)) return undefined;
+                      const pts = detailSpark.points;
+                      // 라인 색은 시그널 방향이 아니라 "선택 기간의 실제 등락"을 따릅니다
+                      // (숏 시그널이어도 기간 내 상승했으면 상승색 — 사실 서술 원칙).
+                      return { points: pts, dir: pts[pts.length - 1] >= pts[0] ? "up" : "down" };
+                    })()}
+                    range={detailRange}
+                    onRangeChange={setDetailRange}
+                    // 기간 탭을 바꿔 새 데이터를 불러오는 동안(보유 spark 의 range ≠ 선택 range)
+                    // 이전 기간 차트를 흐리게 표시합니다. 실패 시 detailRange 가 보유 기간으로
+                    // 되돌아가므로 흐림도 함께 풀립니다.
+                    sparkPending={!!(detailSpark && detailSpark.symbol === built.ticker && detailSpark.range !== detailRange)}
+                    onBack={() => setDetailSignal(null)}
+                    isFavorite={isFav}
+                    onToggleFavorite={wl ? () => setWatchlist((prev) =>
+                      prev.some((w) => w.symbol === wl.symbol)
+                        ? prev.filter((w) => w.symbol !== wl.symbol)
+                        : [...prev, wl]
+                    ) : undefined}
+                  />
+                </Suspense>
+              </div>
             </div>
           );
         })()}
@@ -13591,15 +13842,18 @@ function AppInner() {
                     }}
                   >{item.label}</a>
                 ) : (
-                  <span
-                    onClick={() => setTab(item.tab)}
+                  // span onClick → 앵커: 키보드·스크린리더 도달성과 새 탭 열기를 살립니다.
+                  // setTab 이 같은 경로로 pushState 하므로 좌클릭 동작·URL 은 현행과 동일합니다.
+                  <a
+                    href={`/${item.tab}`}
+                    onClick={(e) => { e.preventDefault(); setTab(item.tab); }}
                     style={{
                       fontSize: isMobile ? "14px" : "16px", color: C.text2, cursor: "pointer",
-                      fontWeight: item.bold ? 700 : 400,
+                      fontWeight: item.bold ? 700 : 400, textDecoration: "none",
                       minHeight: isMobile ? "32px" : "auto",
                       display: "flex", alignItems: "center",
                     }}
-                  >{item.label}</span>
+                  >{item.label}</a>
                 )}
               </span>
             ))}
@@ -13743,7 +13997,7 @@ function AppInner() {
                       }}>{diag ? diag.score : (w.market === "us" ? "🇺🇸" : w.market === "kr" ? "🇰🇷" : "₿")}</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 700, fontSize: 13, color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.name || w.symbol}</div>
-                        {diag && <div style={{ fontSize: 11, color: diagColor, fontWeight: 600 }}>{diag.opinion}</div>}
+                        {diag && <div style={{ fontSize: 11, color: diagColor, fontWeight: 600 }}>{verdictLabel(diag.opinion)}</div>}
                       </div>
                       {hot && (
                         <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -13806,7 +14060,10 @@ function AppInner() {
             return (
               <button key={item.id} onClick={() => {
                 setTab(item.id);
-              }} style={{
+              }}
+              // 스크린리더가 현재 탭 위치를 알 수 있도록 노출 (색·아이콘 fill 만으로는 전달 안 됨)
+              aria-current={isActive ? "page" : undefined}
+              style={{
                 flex: 1,
                 minHeight: "50px",
                 display: "flex",
@@ -13831,6 +14088,9 @@ function AppInner() {
                   fontWeight: 700,
                   lineHeight: 1,
                   letterSpacing: "-0.2px",
+                  // 비활성 라벨은 text3(4.26:1)로 AA 4.5:1 미달 — 텍스트만 text2 로 올립니다.
+                  // 아이콘은 그래픽(3:1 기준 충족)이라 버튼 상속색(text3) 유지.
+                  color: isActive ? C.blueL : C.text2,
                 }}>{item.label}</span>
               </button>
             );
@@ -13918,8 +14178,11 @@ function AppInner() {
                       >
                         <div style={{
                           width: "32px", height: "32px", borderRadius: "8px", flexShrink: 0,
-                          background: "#1A2C4F", display: "flex", alignItems: "center", justifyContent: "center",
-                          fontWeight: 800, fontSize: s.symbol.length > 4 ? "10px" : "12px", color: C.blue,
+                          // 다크 전용 hex 고정(한국 종목에도 파란 타일) → 테마 알파 틴트 + 시장별 분기
+                          background: s.flag === "🇰🇷" ? `${C.green}1A` : `${C.blue}1A`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontWeight: 800, fontSize: s.symbol.length > 4 ? "10px" : "12px",
+                          color: s.flag === "🇰🇷" ? C.green : C.blue,
                         }}>{s.flag === "🇰🇷" ? s.name.slice(0, 2) : s.symbol.slice(0, 4)}</div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 700, fontSize: "15px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>

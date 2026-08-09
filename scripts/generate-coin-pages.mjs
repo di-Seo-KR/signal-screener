@@ -87,6 +87,8 @@ ul{margin:0 0 16px 22px}li{margin-bottom:8px;font-size:16px}
 .coin-card .c-ko{font-size:13px;color:#A1A6B2}
 .coin-card .c-score{font-size:14px;font-weight:700;margin-top:8px;color:#6E7585}
 .dash-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:20px 0}
+.live-note{background:#14151B;border:1px solid #23262F;border-radius:12px;padding:12px 16px;margin:0 0 16px;font-size:14px;color:#A1A6B2;text-align:center}
+.live-note a{color:#6E92FF;font-weight:600}
 .dash-stat{background:#14151B;border:1px solid #23262F;border-radius:12px;padding:14px 10px;text-align:center}
 .dash-stat .v{font-size:22px;font-weight:800;color:#F4F5F7;line-height:1.2}
 .dash-stat .l{font-size:12px;color:#6E7585;margin-top:2px}
@@ -137,7 +139,11 @@ const GA_SNIPPET = `
   </script>`;
 
 // 라이브 시그널 위젯 스크립트 (코인별 asset 매칭)
-function liveScript(sym) {
+//   ★ 2026-08 매칭 보정: 풀의 asset 은 1000PEPE 처럼 바이낸스 1000X 승수 접두가 붙을 수
+//     있어 허브(render)와 동일하게 ^1000 정규화 후 대조하고, MATIC→POL 처럼 자산 표기가
+//     바뀐 코인은 선물 심볼(fut) 대조로 구제합니다. 풀에 없으면 "집계 중"(일시 상태로
+//     오인되는 거짓 문구) 대신 유니버스 미편입 사실을 그대로 안내합니다.
+function liveScript(sym, fut) {
   return `
   <script>
   (function(){
@@ -145,8 +151,8 @@ function liveScript(sym) {
     function esc(s){return String(s).replace(/[&<>]/g,function(m){return{'&':'&amp;','<':'&lt;','>':'&gt;'}[m]})}
     fetch('/api/real-trading/coin-scores').then(function(r){return r.json()}).then(function(d){
       var list=(d&&d.coins)||[],c=null,i;
-      for(i=0;i<list.length;i++){if(list[i].asset===${jstr(sym)}){c=list[i];break}}
-      if(!c){box.innerHTML='<div class="signal-na">현재 ${escH(sym)} 종합 시그널을 집계 중입니다. 10분 주기로 갱신되니 잠시 후 다시 확인해 주세요.</div>';return}
+      for(i=0;i<list.length;i++){var a=String(list[i].asset||'').replace(/^1000/,'');if(a===${jstr(sym)}||String(list[i].symbol||'')===${jstr(fut)}){c=list[i];break}}
+      if(!c){box.innerHTML='<div class="signal-na">${escH(sym)}는 현재 Zepta 실시간 분석 유니버스(바이낸스 USDⓈ-M 선물 거래대금 상위 코인, 6시간 주기 자동 재선별)에 포함돼 있지 않아 종합 스코어가 산출되지 않습니다. <a href="/coin">현재 분석 중인 코인 보기 →</a></div>';return}
       var isLong=c.side==='LONG',side=isLong?'상승 모멘텀 우세':'하락 모멘텀 우세',cls=isLong?'green':'red',bd=c.breakdown||{};
       function tf(k,label){var x=bd[k];if(!x)return '<div class="tf"><span>'+label+'</span><b>—</b></div>';var s=x.side==='LONG'?'상승':'하락',cl=x.side==='LONG'?'green':'red';return '<div class="tf"><span>'+label+'</span><b class="'+cl+'">'+s+' '+Math.round(x.score)+'</b></div>'}
       box.innerHTML='<div class="signal-head"><span class="signal-label">현재 Zepta 종합 시그널</span><span class="signal-score '+cls+'">'+side+' · '+Math.round(c.score)+'점</span></div>'+
@@ -161,15 +167,17 @@ function buildCoinPage(coin, idx) {
   const { sym, fut, ko, en, cat, consensus, year, desc, watch } = coin;
   const url = `${SITE}/coin/${sym.toLowerCase()}`;
   const title = `${ko}(${sym}) 전망·멀티 타임프레임 모멘텀 스코어 | Zepta`;
-  const metaDesc = `${ko}(${en}, ${sym}) 실시간 종합 모멘텀 스코어와 주봉·일봉·4시간·1시간 분석. ${cat}. Zepta 가 ${fut} 시장 데이터를 10분마다 자동 분석합니다.`;
+  // ★ 2026-08: 유니버스(유동성 상위 자동 선별) 밖 코인 페이지에서 "10분마다 자동 분석"
+  //   단정이 거짓이 되지 않도록, 스코어 산출 주장은 모두 '유니버스 편입 시' 조건부로 서술합니다.
+  const metaDesc = `${ko}(${en}, ${sym}) 종합 모멘텀 스코어와 주봉·일봉·4시간·1시간 분석. ${cat}. 유동성 상위 유니버스 편입 시 Zepta 가 ${fut} 시장 데이터를 10분마다 자동 분석합니다.`;
   const kw = `${ko}, ${sym}, ${en}, ${ko} 전망, ${ko} 모멘텀, ${sym} 분석, ${ko} 시세, ${fut}`;
 
   const faq = [
     { q: `Zepta의 ${ko}(${sym}) 스코어는 어떤 서비스인가요?`,
-      a: `Zepta 는 투자 정보·데이터 서비스입니다. ${ko}는 Zepta가 상세 분석을 제공하는 ${COINS.length}개 메이저 코인 중 하나로, 주봉·일봉·4시간·1시간을 종합한 모멘텀 스코어를 10분마다 산출해 참고 정보로 제공합니다. 매매를 대행하거나 특정 매매를 권유하지 않습니다.` },
+      a: `Zepta 는 투자 정보·데이터 서비스입니다. ${ko}는 Zepta가 상세 분석을 제공하는 ${COINS.length}개 메이저 코인 중 하나로, 실시간 분석 유니버스(바이낸스 선물 거래대금 상위 코인, 자동 선별)에 편입돼 있는 동안 주봉·일봉·4시간·1시간을 종합한 모멘텀 스코어를 10분마다 산출해 참고 정보로 제공합니다. 매매를 대행하거나 특정 매매를 권유하지 않습니다.` },
     { q: `${ko}는 어떤 코인이고 무엇에 영향을 받나요?`, a: watch },
     { q: `${ko} 모멘텀 스코어는 얼마나 자주 갱신되나요?`,
-      a: `10분마다 재산출됩니다. 주봉 30%·일봉 25%·4시간 25%·1시간 20% 가중치로 네 시간대를 합산하며, 여러 시간대가 한 방향으로 모일수록 점수(확신도)가 높아집니다. 펀딩비·미결제약정(OI)·베이시스 같은 선물 지표도 보정에 반영됩니다.` },
+      a: `실시간 분석 유니버스에 편입돼 있는 동안 10분마다 재산출됩니다. 유니버스는 바이낸스 선물 거래대금 상위 코인으로 6시간 주기 자동 재선별되며, 편입되지 않은 기간에는 스코어가 제공되지 않습니다. 주봉 30%·일봉 25%·4시간 25%·1시간 20% 가중치로 네 시간대를 합산하며, 여러 시간대가 한 방향으로 모일수록 점수(확신도)가 높아집니다. 펀딩비·미결제약정(OI)·베이시스 같은 선물 지표도 보정에 반영됩니다.` },
   ];
 
   const faqLd = {
@@ -247,11 +255,11 @@ function buildCoinPage(coin, idx) {
     </div>
 
     <h2>Zepta는 ${escH(ko)}를 어떻게 분석하나요?</h2>
-    <p>Zepta는 ${escH(ko)}(${fut})를 <strong>네 개의 시간대로 동시에</strong> 분석해 하나의 종합 스코어로 묶습니다. 주봉으로 큰 추세를, 일봉으로 중기 흐름을, 4시간·1시간으로 단기 진입 타이밍을 봅니다.</p>
+    <p>Zepta는 실시간 분석 유니버스(바이낸스 선물 거래대금 상위 코인, 6시간 주기 자동 재선별)에 편입된 코인을 <strong>네 개의 시간대로 동시에</strong> 분석해 하나의 종합 스코어로 묶습니다. ${escH(ko)}(${fut})가 유니버스에 편입돼 있으면 위 시그널 박스에 가장 최근 계산값이 표시됩니다. 주봉으로 큰 추세를, 일봉으로 중기 흐름을, 4시간·1시간으로 단기 흐름을 봅니다.</p>
     <ul>
       <li><strong>멀티 타임프레임 가중합</strong> — 주봉 30% · 일봉 25% · 4시간 25% · 1시간 20%. 여러 시간대가 같은 방향이면 점수가 높아지고, 서로 엇갈리면 상쇄돼 신중하게 판단합니다.</li>
       <li><strong>선물 시장 지표 반영</strong> — 펀딩비, 미결제약정(OI) 변화, 베이시스(현·선물 괴리)를 보정에 넣어 과열·쏠림 구간을 걸러냅니다.</li>
-      <li><strong>10분마다 재산출</strong> — 위 실시간 시그널 박스가 가장 최근 계산값이며 자동으로 갱신됩니다.</li>
+      <li><strong>10분마다 재산출</strong> — 유니버스 편입 기간에는 위 시그널 박스가 가장 최근 계산값으로 자동 갱신됩니다.</li>
     </ul>
 
     <h2>${escH(ko)} 시장을 볼 때 주의할 점</h2>
@@ -272,7 +280,7 @@ ${faqHtml}
       <h3>다른 코인·가이드 보기</h3>
       ${related}
     </div>
-  </main>${FOOTER}${DRAWER}${liveScript(sym)}
+  </main>${FOOTER}${DRAWER}${liveScript(sym, fut)}
 </body>
 </html>
 `;
@@ -333,6 +341,9 @@ function buildHub() {
       <div class="dash-stat"><div class="v" id="st-avg">—</div><div class="l">평균 스코어</div></div>
     </div>
 
+    <!-- 라이브 집계 상태 안내 (빈 응답·조회 실패 시에만 노출) -->
+    <div class="live-note" id="live-note" style="display:none"></div>
+
     <!-- 지금 가장 강한 시그널 -->
     <div class="top-sigs" id="top-sigs" style="display:none"></div>
 
@@ -358,6 +369,12 @@ ${cards}
     // 상세 페이지 보유 코인 — sym/선물심볼 모두 매핑
     var PAGES={${COINS.map((c) => `"${c.sym}":"/coin/${c.sym.toLowerCase()}","${c.fut}":"/coin/${c.sym.toLowerCase()}"`).join(",")}};
     function esc(s){return String(s).replace(/[&<>"]/g,function(ch){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[ch]})}
+    // ★ 2026-08: 빈 응답·조회 실패를 조용히 삼키지 않습니다 — 카드 48장이 '로딩…' 으로
+    //   영구 고정되는 것을 막고, 상태 배너 + 다시 시도 링크로 사실을 그대로 안내합니다.
+    var loaded=false,note=document.getElementById('live-note');
+    function setNote(html){if(!note)return;if(html){note.innerHTML=html;note.style.display='block'}else{note.innerHTML='';note.style.display='none'}}
+    if(note){note.addEventListener('click',function(e){var t=e.target;if(t&&t.id==='live-retry'){e.preventDefault();load()}})}
+    function markPending(){var els=document.querySelectorAll('#coin-grid .c-score'),i;for(i=0;i<els.length;i++)els[i].textContent='집계 대기'}
     function render(list){
       var i,longN=0,shortN=0,sum=0;
       for(i=0;i<list.length;i++){if(list[i].side==='LONG')longN++;else shortN++;sum+=list[i].score||0}
@@ -384,8 +401,16 @@ ${cards}
     }
     function load(){
       fetch('/api/real-trading/coin-scores?limit=60').then(function(r){return r.json()}).then(function(d){
-        var list=(d&&d.coins)||[];if(list.length)render(list);
-      }).catch(function(){});
+        var list=(d&&d.coins)||[];
+        if(list.length){loaded=true;setNote('');render(list);return}
+        if(loaded){setNote('새 스코어를 불러오지 못해 마지막 집계값을 표시 중입니다. <a href="#" id="live-retry">다시 시도</a>');return}
+        markPending();
+        setNote('실시간 스코어가 아직 집계되지 않았습니다. 집계가 재개되면 자동으로 표시됩니다. <a href="#" id="live-retry">다시 시도</a>');
+      }).catch(function(){
+        if(loaded){setNote('새 스코어를 불러오지 못해 마지막 집계값을 표시 중입니다. <a href="#" id="live-retry">다시 시도</a>');return}
+        markPending();
+        setNote('실시간 스코어를 불러오지 못했습니다. 네트워크 상태를 확인한 뒤 다시 시도해 주세요. <a href="#" id="live-retry">다시 시도</a>');
+      });
     }
     load();
     setInterval(load,5*60*1000); // 5분마다 자동 갱신

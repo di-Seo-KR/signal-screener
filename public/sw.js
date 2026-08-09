@@ -8,8 +8,15 @@
 //   물고 있어 일부 클라이언트가 스플래시에서 정지(대표 실보고). 캐시 전면 갱신.
 //   교훈 재확인: 청크 해시가 바뀌는 배포가 나가면 SW 캐시 버전도 함께 올릴 것.
 // ★ v8 (2026-07-30): Phase 2(#209) 청크 변경 배포 후행 bump — 규칙 준수(청크 변경 시 SW 동반 bump)
+// ★ 2026-08-10: /api/ 캐시 정책 보강 — (1) 비GET 은 네트워크 통과 + 관련 GET 캐시 엔트리 무효화
+//   (Cache.put 은 GET 전용이라 기존엔 POST 마다 unhandled TypeError 발생),
+//   (2) 상태성 엔드포인트(알림·스크리너 등)는 SWR 금지 — 읽음/저장/삭제 직후 재조회가
+//   옛 목록으로 되돌아가는 문제 방지, (3) _t= 캐시버스터 요청은 저장 제외(엔트리 무한 증가 방지).
 const CACHE_NAME = "zepta-v11";
 const API_MAX_AGE_MS = 5 * 60 * 1000; // 5분
+// 뮤테이션 유발/사용자 상태 엔드포인트 — SWR 금지, 항상 네트워크 우선.
+// 캐시본을 먼저 돌려주면 사용자의 읽음/저장/삭제 동작이 화면에서 되돌아간 것처럼 보임.
+const NO_SWR_API = /\/api\/(notifications|screeners|real-trading\/status|econ-calendar|sync|follow)/;
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -77,7 +84,32 @@ self.addEventListener('fetch', (event) => {
   // 1b. 자체 API (/api/) — stale-while-revalidate (5분 max-age)
   // 캐시가 있으면 즉시 반환 (UI 빠르게) + 백그라운드로 갱신.
   // 캐시가 5분 넘었거나 없으면 네트워크 우선.
+  // ★ 예외 1: 비GET(POST/DELETE 등)은 네트워크 통과 + 관련 GET 캐시 엔트리 무효화.
+  // ★ 예외 2: NO_SWR_API 는 항상 네트워크 우선(실패 시에만 캐시 폴백).
   if (url.includes('/api/')) {
+    if (event.request.method !== 'GET') {
+      // Cache.put 은 GET 전용 — 비GET 저장 시도는 TypeError 로 unhandled rejection 발생.
+      // 뮤테이션 성공 시 같은 엔드포인트 계열의 GET 캐시를 지워 stale 재조회를 차단.
+      // 주의: caches.delete(이름) 은 캐시 "전체" 삭제라 절대 금지 — 반드시 엔트리 단위 cache.delete 사용.
+      event.respondWith(
+        fetch(event.request).then(async (res) => {
+          if (res.ok) {
+            try {
+              const cache = await caches.open(CACHE_NAME);
+              const keys = await cache.keys();
+              const base = new URL(url).pathname.split('/').slice(0, 3).join('/'); // 예: /api/screeners
+              await Promise.all(
+                keys.filter((k) => k.url.includes(base)).map((k) => cache.delete(k))
+              );
+            } catch (_) {
+              // 캐시 무효화 실패는 응답 반환을 막지 않음
+            }
+          }
+          return res;
+        })
+      );
+      return;
+    }
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
         const cached = await cache.match(event.request);
@@ -85,18 +117,24 @@ self.addEventListener('fetch', (event) => {
         const cachedFresh = cached && cachedAt && (Date.now() - Number(cachedAt) < API_MAX_AGE_MS);
         const fetchPromise = fetch(event.request)
           .then((response) => {
-            if (response.ok) {
+            // _t= 캐시버스터가 붙은 요청은 매 호출이 새 캐시 키가 되어 절대 재사용되지 않으므로 저장 제외.
+            const hasBuster = new URL(event.request.url).searchParams.has('_t');
+            if (response.ok && !hasBuster) {
               // x-cached-at 헤더로 만료 추적 (Response 헤더 mutation 위해 새 Response)
               const headers = new Headers(response.headers);
               headers.set('x-cached-at', String(Date.now()));
               response.clone().blob().then((body) => {
                 const tagged = new Response(body, { status: response.status, statusText: response.statusText, headers });
-                cache.put(event.request, tagged);
+                return cache.put(event.request, tagged);
+              }).catch(() => {
+                // 스토리지 할당량 초과 등 저장 실패는 응답 반환과 무관 — 조용히 무시
               });
             }
             return response;
           })
-          .catch(() => cached || new Response('', { status: 503 }));
+          .catch(() => cached || new Response('', { status: 503 })); // 오프라인 폴백 유지
+        // 상태성 엔드포인트는 SWR 금지 — 네트워크 우선, 실패 시에만 캐시 폴백
+        if (NO_SWR_API.test(url)) return fetchPromise;
         // fresh cache 가 있으면 즉시 반환, 없으면 네트워크 대기
         return cachedFresh ? cached : fetchPromise;
       })
