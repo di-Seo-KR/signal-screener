@@ -355,14 +355,19 @@ export default memo(function Header({
                   </div>
                 )}
 
-                {/* 메뉴 섹션 */}
+                {/* 메뉴 섹션
+                    ★ 2026-08-09 모바일 디자인 시안 정합 (스타일만 — 메뉴 구성·항목·순서·동작 무변경):
+                      3열 아이콘 그리드 → 시안의 리스트 문법으로 교체했습니다.
+                      행 세로 패딩 14px(py-3.5) · 구분선 border-muted(= --z-card-2, C.card2 와 동일 토큰)
+                      · 우측 chevron. 라벨이 두 줄로 접히거나 말줄임되던 문제도 함께 해소됩니다.
+                      색은 전부 Tailwind 시맨틱 토큰이라 라이트 모드에서 그대로 동작합니다. */}
                 <div className="flex flex-col gap-1 p-3">
                   {mobileMenuSections.map((group) => (
                     <div key={group.section}>
                       <p className="px-2 pt-3 pb-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted-foreground">
                         {group.section}
                       </p>
-                      <div className="grid grid-cols-3 gap-1.5">
+                      <div className="overflow-hidden rounded-xl border border-border/40 bg-card">
                         {group.items.map((item) => {
                           const Icon = item.icon;
                           // 같은 탭을 다른 필터로 여는 항목(주식 분석)은 활성 표시에서 제외 — 중복 하이라이트 방지
@@ -375,14 +380,15 @@ export default memo(function Header({
                                 navigate(item.id, item.screenerMarket);
                               }}
                               className={cn(
-                                "flex flex-col items-center gap-1 rounded-xl p-2.5 text-xs font-semibold transition-colors",
+                                "flex w-full items-center gap-3 border-b border-muted px-3.5 py-3.5 text-left text-[14px] font-semibold transition-colors last:border-b-0",
                                 isActive
-                                  ? "bg-primary/10 text-primary border border-primary/20"
-                                  : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-transparent"
+                                  ? "bg-primary/10 text-primary"
+                                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                               )}
                             >
-                              <Icon className="size-4" />
-                              <span className="leading-tight">{item.label}</span>
+                              <Icon className="size-4 shrink-0" />
+                              <span className="min-w-0 flex-1 truncate leading-tight">{item.label}</span>
+                              <ChevronRight className={cn("size-4 shrink-0", isActive ? "opacity-60" : "opacity-30")} />
                             </button>
                           );
                         })}

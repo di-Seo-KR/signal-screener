@@ -44,6 +44,9 @@
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="apple-touch-icon" sizes="192x192" href="/zepta-icon-192.png" />
+    <!-- ★ 2026-08 폰트 로드 가속: 서체 자체는 ui/tokens.css 가 @import 합니다(중복 로드 금지).
+         여기서는 preconnect 만 걸어 CSS 파싱 후 폰트 요청까지의 지연을 줄입니다. -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
     <!-- JSON-LD Structured Data for SEO -->
     <script type="application/ld+json">
     {
