@@ -76,10 +76,13 @@ export async function runEconResults(kv, { now = Date.now() } = {}) {
     const key = `${date}-${slug}`;
     if (existing.has(key)) continue; // 이미 발행됨
     const est = estimates[k] || {};
+    // ★ 2026-08-10 (전수 감사): Number(null)===0·Number("")===0 이라 미집계 컨센서스가
+    //   "예측 0" 으로 페이지에 굳던 함정 — null/빈 문자열은 명시적으로 걸러냅니다.
+    const toNum = (v) => (v == null || v === "" ? NaN : Number(v));
     candidates.push({
       key, date, event, actual: val,
-      estimate: Number.isFinite(Number(est.e)) ? Number(est.e) : null,
-      previous: Number.isFinite(Number(est.p)) ? Number(est.p) : null,
+      estimate: Number.isFinite(toNum(est.e)) ? Number(est.e) : null,
+      previous: Number.isFinite(toNum(est.p)) ? Number(est.p) : null,
     });
   }
   candidates.sort((a, b) => b.date.localeCompare(a.date) || a.event.localeCompare(b.event));

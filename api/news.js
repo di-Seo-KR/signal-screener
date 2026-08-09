@@ -59,6 +59,27 @@ const MARKET_KEYWORDS_EN = [
   "employment", "jobs", "housing", "recession",
 ];
 
+// ── HTML 엔티티 디코딩 (RSS 폴백 경로 전용) ──────────────────────
+// RSS 원문의 "S&amp;P500" 류가 화면에 그대로 노출되는 문제를 막습니다.
+// 반드시 파싱 직후·관련도 판정 이전에 적용해야 합니다 — 키워드에 "S&P" 가
+// 들어 있어 미디코딩 상태로는 isRelevant()/extractKeywords() 매칭도 함께
+// 실패하기 때문입니다. 외부 의존성 없이 주요 명명 엔티티와 숫자 엔티티
+// (10진·16진)만 처리하며, 이중 이스케이프(&amp;amp;)는 한 단계씩 풀립니다.
+const NAMED_ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+function decodeEntities(s) {
+  if (!s) return s;
+  return String(s)
+    .replace(/&#x([0-9a-f]+);/gi, (m, hex) => {
+      const cp = parseInt(hex, 16);
+      return cp > 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
+    })
+    .replace(/&#(\d+);/g, (m, dec) => {
+      const cp = parseInt(dec, 10);
+      return cp > 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
+    })
+    .replace(/&(amp|lt|gt|quot|apos|nbsp);/gi, (m, name) => NAMED_ENTITIES[name.toLowerCase()]);
+}
+
 function isRelevant(title, desc, lang) {
   const text = `${title} ${desc}`.toLowerCase();
   const keywords = lang === "ko" ? MARKET_KEYWORDS_KO : MARKET_KEYWORDS_EN;
@@ -86,12 +107,17 @@ async function fetchYahoo() {
   const xml = await yahooRes.text();
   const items = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
   items.slice(0, 15).forEach(item => {
-    const title = (item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || item.match(/<title>(.*?)<\/title>/) || [])[1];
+    // ★ 제목·요약은 파싱 직후 엔티티 디코딩 — 아래 isRelevant() 의 "S&P" 매칭이 원문
+    //   "S&amp;P" 상태로는 실패하고, 화면에도 이스케이프 잔재가 그대로 노출되기 때문입니다.
+    const title = decodeEntities((item.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || item.match(/<title>(.*?)<\/title>/) || [])[1]);
     const link = (item.match(/<link>(.*?)<\/link>/) || [])[1];
     const pubDate = (item.match(/<pubDate>(.*?)<\/pubDate>/) || [])[1];
+    // rssindex 피드는 현재 <description> 을 내려주지 않습니다(2026-08 실측 — item 에
+    // title/link/pubDate/source/guid/media 만 존재). 태그가 오는 경우에만 파싱되며,
+    // 없으면 desc 는 빈 값으로 정직하게 남습니다(요약을 지어내지 않습니다).
     const desc = (item.match(/<description><!\[CDATA\[(.*?)\]\]><\/description>/) || item.match(/<description>(.*?)<\/description>/) || [])[1];
     if (title && link) {
-      const cleanDesc = (desc || "").replace(/<[^>]*>/g, "").slice(0, 120);
+      const cleanDesc = decodeEntities((desc || "").replace(/<[^>]*>/g, "")).slice(0, 120);
       if (isRelevant(title, cleanDesc, "en")) {
         const tags = extractKeywords(title, "en");
         out.push({ title: title.trim(), url: link.trim(), date: pubDate || "", desc: cleanDesc, source: "Yahoo Finance", tags, category: "" });
@@ -113,12 +139,17 @@ async function fetchGoogleQuery(q, lang) {
   const xml = await googleRes.text();
   const items = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
   items.slice(0, 8).forEach(item => {
-    const title = (item.match(/<title>(.*?)<\/title>/) || [])[1];
+    // ★ 제목·매체명은 파싱 직후 엔티티 디코딩 — "S&amp;P500" 노출 방지 + isRelevant() 의
+    //   "S&P" 키워드 매칭 정상화 (디코딩 전에 판정하면 해당 기사가 통째로 누락됩니다).
+    const title = decodeEntities((item.match(/<title>(.*?)<\/title>/) || [])[1]);
     const link = (item.match(/<link\/>(.*?)<pubDate>/) || item.match(/<link>(.*?)<\/link>/) || [])[1];
     const pubDate = (item.match(/<pubDate>(.*?)<\/pubDate>/) || [])[1];
-    const source = (item.match(/<source[^>]*>(.*?)<\/source>/) || [])[1];
+    const source = decodeEntities((item.match(/<source[^>]*>(.*?)<\/source>/) || [])[1]);
     if (title && isRelevant(title, "", lang)) {
       const tags = extractKeywords(title, lang);
+      // desc 는 빈 값 유지 — Google News RSS 의 <description> 은 제목을 <a> 로 감싼
+      // 중복 문자열 + 매체명뿐이라 실제 요약이 없습니다(2026-08 실측). 제목을 요약처럼
+      // 복제해 넣는 것은 가짜 데이터라 하지 않으며, 요약은 네이버 풀 경로가 제공합니다.
       out.push({ title: title.trim(), url: (link || "").trim(), date: pubDate || "", desc: "", source: source || "Google News", tags, category: "" });
     }
   });

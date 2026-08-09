@@ -22,6 +22,15 @@ async function getKv() {
 
 export const config = { maxDuration: 30 };
 
+/**
+ * null/undefined/"" 를 NaN 으로 변환합니다 — Number(null)===0 이라
+ * 집계되지 않은 컨센서스가 '예측 0K·0%' 로 지어내지는 함정을 차단합니다.
+ * (과거 세대 인덱스에 문자열 수치("4.2")가 저장된 경우도 정상 처리)
+ */
+function toNum(v) {
+  return v === null || v === undefined || v === "" ? NaN : Number(v);
+}
+
 function send(res, status, html, cacheSeconds = 600) {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader(
@@ -60,7 +69,10 @@ function renderHub(index) {
     ? `<div class="news-list">
 ${entries.map((e) => {
       const label = `${e.date} — ${e.ko || e.event}`;
-      const nums = `발표 ${fmtVal(Number(e.actual), e.unit)}${Number.isFinite(Number(e.estimate)) ? ` · 예측 ${fmtVal(Number(e.estimate), e.unit)}` : ""}`;
+      // 컨센서스 미집계(null)면 예측 표기를 아예 생략합니다 (fmtVal 은 NaN 에 "—" 폴백)
+      const act = toNum(e.actual);
+      const est = toNum(e.estimate);
+      const nums = `발표 ${fmtVal(act, e.unit)}${Number.isFinite(est) ? ` · 예측 ${fmtVal(est, e.unit)}` : ""}`;
       return `      <a href="/econ/${escH(e.key)}">${escH(label)}<span class="src">${escH(nums)}</span></a>`;
     }).join("\n")}
     </div>`

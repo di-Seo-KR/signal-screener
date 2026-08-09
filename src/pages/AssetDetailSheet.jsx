@@ -10,11 +10,10 @@
 //
 // ★ 이 파일은 "순수 프레젠테이션 컴포넌트"입니다 — fetch·상태 저장·라우팅이 전혀 없고
 //   모든 값을 props 로 받습니다.
-//   ⚠️ 데이터 배선은 다음 단계 과제입니다(이 브랜치 범위 밖).
-//      배선 담당자는 아래 "props 계약" 주석을 그대로 채워 주시면 됩니다.
-//      · 시세/등락 → 기존 스크리너 시세 소스
-//      · signal/levels/indicators → 시그널 산출부(sr 스키마의 지지·저항 포함)
-//      · news → 뉴스 탭이 쓰는 소스
+//   ★ 배선 현황(2026-08): 시세·signal/levels/indicators 는 App.jsx 의
+//      buildAssetDetailProps(coin-scores + sr 스키마)가, spark/range/onRangeChange 는
+//      App.jsx 의 /api/coingecko OHLC 배선이 채우고 있습니다.
+//      · news → 뉴스 탭이 쓰는 소스 — 유일한 미배선 잔여 과제입니다(섹션 자동 숨김).
 //
 // ── props 계약 ──────────────────────────────────────────────────────
 //  symbol        : string            심볼 표기 (예: "BTCUSDT", "005930")
@@ -29,7 +28,9 @@
 //  spark         : { points: number[], dir: "up"|"down" }   추이 라인 (points 비면 차트 섹션 숨김)
 //  ranges        : [{ value, label }]  기간 탭 목록 (기본 1D/1W/1M/1Y)
 //  range         : string            현재 선택 기간 value
-//  onRangeChange : (value) => void   기간 변경 (미배선이면 탭은 표시만 되고 동작 없음)
+//  onRangeChange : (value) => void   기간 변경 (App.jsx 배선 완료 — 미전달 시 탭은 표시만 되고 동작 없음)
+//  sparkPending  : boolean           기간 전환 등으로 새 차트 데이터를 불러오는 중 표시 —
+//                                    이전 기간 차트를 흐리게 유지해 탭-차트 불일치 오해를 줄입니다
 //  signal        : {
 //                    dir: "up"|"down"|"neutral", sideLabel: string,  // 예: "상승 우세"
 //                    score: number,                                  // 종합 점수
@@ -123,7 +124,7 @@ function LevelRow({ item, last }) {
 export default function AssetDetailSheet({
   symbol, name, meta, price, changePct, asOfLabel,
   isFavorite = false, onToggleFavorite, onBack,
-  spark, ranges, range, onRangeChange,
+  spark, ranges, range, onRangeChange, sparkPending = false,
   signal, levels, indicators = [], news = [],
 }) {
   const C = useThemeTokens();
@@ -194,7 +195,11 @@ export default function AssetDetailSheet({
         {/* ── 추이 차트 + 기간 탭 (데이터 없으면 섹션째 숨김) ── */}
         {sparkPoints.length > 0 && (
           <Panel style={{ padding: "14px 16px 12px" }}>
-            <Sparkline points={sparkPoints} dir={spark?.dir || "up"} height={110} />
+            {/* 새 기간 데이터를 불러오는 동안 이전 기간 차트를 흐리게 유지합니다 —
+                "탭은 1년인데 차트는 1개월" 짧은 불일치 구간을 로딩 중으로 읽히게 처리. */}
+            <div style={{ opacity: sparkPending ? 0.4 : 1, transition: "opacity .15s ease" }}>
+              <Sparkline points={sparkPoints} dir={spark?.dir || "up"} height={110} />
+            </div>
             <div style={{ display: "flex", marginTop: "12px" }}>
               <Segment
                 value={range || rangeOptions[0].value}

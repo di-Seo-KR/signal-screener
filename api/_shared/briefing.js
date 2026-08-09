@@ -62,11 +62,18 @@ async function fetchGoogleNewsKo(q) {
     if (!resp.ok) return out;
     const xml = await resp.text();
     const items = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
+    // ★ 2026-08-10 (전수 감사): RSS 제목의 HTML 엔티티(&amp; 등)가 브리핑 페이지에
+    //   그대로 노출되던 문제 — api/news.js 의 decodeEntities 와 같은 규칙으로 해제합니다.
+    const NAMED = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
+    const decodeEnt = (s) => String(s || "")
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+      .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+      .replace(/&(amp|lt|gt|quot|apos|nbsp);/g, (_, n) => NAMED[n]);
     for (const item of items.slice(0, 8)) {
-      const title = (item.match(/<title>(.*?)<\/title>/) || [])[1];
+      const title = decodeEnt((item.match(/<title>(.*?)<\/title>/) || [])[1]);
       const link = (item.match(/<link\/>(.*?)<pubDate>/) || item.match(/<link>(.*?)<\/link>/) || [])[1];
       const pubDate = (item.match(/<pubDate>(.*?)<\/pubDate>/) || [])[1];
-      const source = (item.match(/<source[^>]*>(.*?)<\/source>/) || [])[1];
+      const source = decodeEnt((item.match(/<source[^>]*>(.*?)<\/source>/) || [])[1]);
       if (title) out.push({ title: title.trim(), url: (link || "").trim(), date: pubDate || "", source: source || "Google News" });
     }
   } catch { /* 실패 → 빈 배열 (섹션 생략) */ }
