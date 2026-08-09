@@ -28,6 +28,9 @@ export const THEME_TOKENS = {
     purple: "#9B6FFF", purpleBg: "#1B172C",
     orange: "#FF6B2C", orangeBg: "#271713",
     text1: "#F4F5F7", text2: "#A1A6B2", text3: "#6E7585", text4: "#474C5A",
+    // ★ 2026-08 모바일 디자인 시안 반영 — 강조 틴트(accent-hi).
+    //   숫자·배지처럼 작은 면적에서 base 색은 어두워 눌려 보여, 한 단계 밝은 짝을 씁니다.
+    greenL: "#34E89A", redL: "#FF6B7E", yellowL: "#FFC55A", purpleL: "#B793FF",
     isDark: true,
     cardShadow: "0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.28)",
   },
@@ -43,6 +46,8 @@ export const THEME_TOKENS = {
     text1: "#0A1224", text2: "#4C5870",
     text3: "#5A6478", // WCAG AA (#F6F8FC 대비 5.4:1) — 이전 #7D889D 는 3.6:1 미달
     text4: "#94A0B6",
+    // ★ 강조 틴트 라이트 짝 — 밝은 배경에선 반대로 한 단계 진하게 잡아야 대비가 섭니다.
+    greenL: "#047A50", redL: "#BE123C", yellowL: "#A96A00", purpleL: "#6D28D9",
     isDark: false,
     cardShadow: "0 2px 10px rgba(15,23,42,0.08), 0 1px 2px rgba(15,23,42,0.04)",
   },
