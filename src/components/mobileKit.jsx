@@ -182,9 +182,12 @@ export function IndexStrip({ items = [], style }) {
   const C = useThemeTokens();
   if (!items.length) return null;
   return (
+    // ⚠️ 화면 끝까지 흘리는 bleed(음수 마진 + 같은 크기 패딩)를 쓰지 않습니다.
+    //    홈 컨테이너의 좌우 여백이 16px 이 아니라, 프리뷰에서 첫 카드가 화면 왼쪽으로
+    //    6px 잘려 나갔습니다(2026-08 실측). 부모 여백을 그대로 따르는 편이 안전합니다.
     <div style={{
-      display: "flex", gap: "8px", overflowX: "auto", margin: "0 -16px",
-      padding: "0 16px 2px", scrollSnapType: "x proximity",
+      display: "flex", gap: "8px", overflowX: "auto",
+      paddingBottom: "2px", scrollSnapType: "x proximity",
       scrollbarWidth: "none", ...style,
     }}>
       {items.map((ix, i) => (
