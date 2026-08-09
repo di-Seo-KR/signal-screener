@@ -3119,7 +3119,11 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
   const price = asset.price || hot?.price;
   const change = asset.change ?? hot?.change;
   const isPos = (change ?? 0) >= 0;
-  const ext = extendedHours[asset.symbol];
+  // ★ 2026-08-09: 전 종목 장외가 스캔이 owner 전용(Stage B)이 되면서, 비owner 는
+  //   extendedHours 맵이 비어 있습니다. 팝업이 어차피 받는 yahoo-quote 응답에서
+  //   직접 파생한 값(extSelf)을 폴백으로 씁니다 — 추가 요청 0회.
+  const [extSelf, setExtSelf] = useState(null);
+  const ext = extendedHours[asset.symbol] || extSelf;
 
   // 팝업 열릴 때 기술적 데이터 + 애널리스트 데이터 병렬 fetch
   useEffect(() => {
@@ -3137,6 +3141,16 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           ? fetch(`/api/yahoo-quote?symbols=${encodeURIComponent(sym)}`).then(r => r.ok ? r.json() : null).catch(() => null)
           : Promise.resolve(null);
         const [candleData, analystData] = await Promise.all([candlePromise, analystPromise]);
+
+        // 장외가 자가 파생 — 위 extSelf 주석 참조
+        const selfQ = analystData?.quotes?.[sym];
+        if (selfQ && !cancelled) {
+          if (selfQ.marketState === "PRE" && selfQ.preMarketPrice) {
+            setExtSelf({ price: selfQ.preMarketPrice, change: selfQ.preMarketChangePct, isPreMarket: true, isPostMarket: false });
+          } else if ((selfQ.marketState === "POST" || selfQ.marketState === "POSTPOST" || selfQ.marketState === "CLOSED") && selfQ.postMarketPrice) {
+            setExtSelf({ price: selfQ.postMarketPrice, change: selfQ.postMarketChangePct, isPreMarket: false, isPostMarket: true });
+          }
+        }
 
         let closes = [], volumes = [], highs = [], lows = [];
         if (isCrypto && candleData) {
@@ -4741,6 +4755,12 @@ function AppInner() {
   // ── AbortController & 요청 중복 방지 refs ──
   const abortRef = useRef(null);
   const fetchingRef = useRef(false);
+  // ★ 2026-08-09 (대표 실보고 "로딩이 너무 오래 걸려") — fetchMarketOverview 2단 분리용.
+  //   ownerRef: useCallback([]) 안에서 최신 isOwner 를 읽기 위한 미러(스테일 클로저 방지).
+  //   marketExtrasAtRef: owner 대시보드 확장 데이터(장외가·섹터·추천)의 마지막 갱신 시각 — 5분 스로틀.
+  const ownerRef = useRef(false);
+  const marketExtrasAtRef = useRef(0);
+  useEffect(() => { ownerRef.current = isOwner; }, [isOwner]);
 
   // ── 홈 대시보드 상태 ───────────────────────────────────────────
   const [marketIndices, setMarketIndices] = useState([]);
@@ -5197,6 +5217,32 @@ function AppInner() {
     abortRef.current = controller;
     const signal = controller.signal;
     setMarketLoading(true);
+    // ★ 2026-08-09 홈 로딩 다이어트 (대표 실보고 "로딩이 너무 오래 걸려") —
+    //   공포/탐욕은 지수·핫 종목과 독립이라 지금 발사해 두고, 홈 필수 데이터가
+    //   끝나는 지점에서 결과만 받습니다(직렬 대기 제거).
+    const fgPromise = (async () => {
+      const fgData = { stock: null, crypto: null };
+      try {
+        const fgRes = await fetch("/api/fear-greed?_t=" + Date.now());
+        if (fgRes.ok) {
+          const fgJson = await fgRes.json();
+          if (fgJson.stock) fgData.stock = fgJson.stock;
+          if (fgJson.crypto) fgData.crypto = fgJson.crypto;
+        }
+      } catch {}
+      // Fallback: Alternative.me Crypto Fear & Greed
+      if (!fgData.crypto) {
+        try {
+          const altRes = await fetch("https://api.alternative.me/fng/?limit=1");
+          if (altRes.ok) {
+            const altJson = await altRes.json();
+            const d = altJson?.data?.[0];
+            if (d) fgData.crypto = { value: parseInt(d.value), label: d.value_classification, ts: d.timestamp };
+          }
+        } catch {}
+      }
+      return fgData;
+    })();
     const indices = [
       { symbol: "^GSPC", name: "S&P 500", flag: "🇺🇸" },
       { symbol: "^IXIC", name: "NASDAQ", flag: "🇺🇸" },
@@ -5284,11 +5330,13 @@ function AppInner() {
       { symbol: "259960.KS", name: "크래프톤", market: "kr" },
       { symbol: "352820.KS", name: "하이브", market: "kr" },
     ];
-    // Hot assets 병렬 fetch (배치 분할)
-    const hotResults = [];
+    // Hot assets 병렬 fetch — ★ 청크를 동시에 발사하고 결과는 청크 순서대로 병합
+    //   (순차 await 는 청크 수만큼 왕복 지연이 쌓입니다)
     const hotChunkSize = 30;
-    for (let ci = 0; ci < hots.length; ci += hotChunkSize) {
-      const hotChunk = hots.slice(ci, ci + hotChunkSize);
+    const hotChunkList = [];
+    for (let ci = 0; ci < hots.length; ci += hotChunkSize) hotChunkList.push(hots.slice(ci, ci + hotChunkSize));
+    const hotChunkResults = await Promise.all(hotChunkList.map(async (hotChunk) => {
+      const acc = [];
       const hotSyms = hotChunk.map(h => h.symbol).join(",");
       try {
         const hr = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(hotSyms)}&interval=1d&range=5d`, { signal });
@@ -5299,12 +5347,14 @@ function AppInner() {
             if (d && d.closes?.length >= 2) {
               const cur = d.closes[d.closes.length - 1];
               const prev = d.closes[d.closes.length - 2];
-              hotResults.push({ ...h, price: cur, change: +( ((cur - prev) / prev) * 100 ).toFixed(2), symbolRaw: h.symbol });
+              acc.push({ ...h, price: cur, change: +( ((cur - prev) / prev) * 100 ).toFixed(2), symbolRaw: h.symbol });
             }
           }
         }
       } catch {}
-    }
+      return acc;
+    }));
+    const hotResults = hotChunkResults.flat();
     // Crypto hots — 병렬
     const cryptoHots = [
       { id: "bitcoin", sym: "BTC", name: "Bitcoin" },
@@ -5325,6 +5375,21 @@ function AppInner() {
       }
     });
     setHotAssets(hotResults);
+
+    // ── 공포/탐욕 — Stage A 시작 시 발사해 둔 병렬 요청의 결과 수령 ──
+    setFearGreed(await fgPromise);
+
+    // ★ 홈 필수 데이터 끝 — 여기서 로딩을 해제합니다. 아래는 owner 홈 전용 확장입니다.
+    setMarketLoading(false);
+    // 지표 보강·장외가 전 종목 스캔·섹터·오늘의 추천은 owner 홈에서만 렌더됩니다
+    // (비owner 홈·검색 팝업은 자체 per-symbol 조회로 동작 — extendedHours 미의존 확인).
+    // 일반 사용자 세션에서 30초마다 ~15회의 yahoo 호출이 낭비되고 있었습니다.
+    // → owner 게이트 + 5분 스로틀.
+    if (!ownerRef.current || Date.now() - marketExtrasAtRef.current < 5 * 60 * 1000) {
+      fetchingRef.current = false;
+      return;
+    }
+    marketExtrasAtRef.current = Date.now();
 
     // ── 관심종목 + 핫 종목 기술적 지표 보강 (1년 데이터 기반) ──
     const enrichSymbols = [...new Set([
@@ -5500,31 +5565,7 @@ function AppInner() {
       }
     }
 
-    // ── 공포/탐욕 지수 ──
-    const fgData = { stock: null, crypto: null };
-    // CNN Fear & Greed (via proxy API)
-    try {
-      const fgRes = await fetch("/api/fear-greed?_t=" + Date.now());
-      if (fgRes.ok) {
-        const fgJson = await fgRes.json();
-        if (fgJson.stock) fgData.stock = fgJson.stock;
-        if (fgJson.crypto) fgData.crypto = fgJson.crypto;
-      }
-    } catch {}
-    // Fallback: Alternative.me Crypto Fear & Greed
-    if (!fgData.crypto) {
-      try {
-        const altRes = await fetch("https://api.alternative.me/fng/?limit=1");
-        if (altRes.ok) {
-          const altJson = await altRes.json();
-          const d = altJson?.data?.[0];
-          if (d) fgData.crypto = { value: parseInt(d.value), label: d.value_classification, ts: d.timestamp };
-        }
-      } catch {}
-    }
-    setFearGreed(fgData);
-
-    // ── 장외(프리/포스트마켓) 가격 — 전체 US 종목 + 관심종목 ──
+    // ── 장외(프리/포스트마켓) 가격 — 전체 US 종목 + 관심종목 (owner 전용 Stage B) ──
     const extSymSet = new Set();
     // 기본 주요 종목 + hotAssets에서 가져온 종목 (hotResults 참조 — 최신 데이터)
     ["NVDA","AAPL","TSLA","MSFT","GOOGL","AMZN","META","AMD","AVGO","COIN","MSTR",
@@ -5549,10 +5590,12 @@ function AppInner() {
     }
     const extResults = {};
     // yahoo-quote API는 한번에 최대 50개 정도 처리 가능, 필요시 분할
+    // ★ 청크 순차 await → 동시 발사 (8청크 × ~350ms 직렬 3초가 최장 1청크 시간으로 단축)
     const extSymArr = [...extSymSet];
     const chunkSize = 40;
-    for (let ci = 0; ci < extSymArr.length; ci += chunkSize) {
-      const chunk = extSymArr.slice(ci, ci + chunkSize).join(",");
+    const extChunks = [];
+    for (let ci = 0; ci < extSymArr.length; ci += chunkSize) extChunks.push(extSymArr.slice(ci, ci + chunkSize).join(","));
+    await Promise.all(extChunks.map(async (chunk) => {
       try {
         const er = await fetch(`/api/yahoo-quote?symbols=${encodeURIComponent(chunk)}`);
         if (er.ok) {
@@ -5566,7 +5609,7 @@ function AppInner() {
           }
         }
       } catch {}
-    }
+    }));
     setExtendedHours(extResults);
 
     // ── 섹터/테마 ETF 성과 ──
@@ -5665,7 +5708,7 @@ function AppInner() {
     picks.sort((a, b) => b.score - a.score);
     setDailyPicks(picks);
 
-    setMarketLoading(false);
+    // marketLoading 은 Stage A 끝에서 이미 해제됨 — 여기선 재진입 가드만 풉니다.
     fetchingRef.current = false;
   }, []);
 
