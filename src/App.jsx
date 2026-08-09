@@ -2201,6 +2201,22 @@ function quickDiagnosis(asset) {
   return { score: totalScore, verdict, opinion, opinionColor, rationale, signals, keySignals, categories, hasFundData };
 }
 
+// ── 표시용 상태 라벨 (표현 3원칙: 행동 지시 → 상태 서술) ─────────────
+// quickDiagnosis 의 verdict 밴드를 사용자 화면·공유 텍스트가 공유하는 단일 매핑.
+// "매수/매도" 같은 행동 지시 대신 신호 상태만 서술합니다 (유사투자자문 리스크 + 대표 지시).
+function verdictLabel(verdict) {
+  switch (verdict) {
+    case "적극 매수": return "상승 신호 강함";
+    case "매수": return "상승 신호 우세";
+    case "매수 우위": return "상승 신호 다소 우세";
+    case "중립": return "중립";
+    case "매도 우위": return "하락 신호 다소 우세";
+    case "매도": return "하락 신호 우세";
+    case "적극 매도": return "하락 신호 강함";
+    default: return verdict || "중립";
+  }
+}
+
 // ════════════════════════════════════════════════════════════════════
 // 매수 진입 가격 레벨 계산 (3단계 진입 전략)
 // ════════════════════════════════════════════════════════════════════
@@ -4415,11 +4431,12 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
         {/* 공유 버튼 — 바이럴 */}
         <div style={{ padding: "0 20px 20px" }}>
           <button onClick={() => {
-            const score = techData?.overallScore || 0;
-            const verdict = score >= 80 ? "강력매수" : score >= 65 ? "매수" : score >= 50 ? "중립" : score >= 35 ? "주의" : "매도";
-            const shareText = `[Zepta AI 진단] ${asset.name}(${asset.symbol}) — 투자점수 ${score}점 (${verdict})\n\nAI 퀀트 9개 전략 분석 결과입니다.\n무료로 확인해보세요 👉 https://zepta.app`;
+            // ★ 2026-08-10 (전수 감사): techData.overallScore 는 존재하지 않는 필드라 항상
+            //   "0점 (매도)" 로 공유되던 실버그. 화면 게이지와 같은 diag 를 단일 진실원천으로 쓰고,
+            //   출처 문구도 실제 산출 방식(기술적 지표 종합)으로 정정. 라벨은 상태 서술(3원칙).
+            const shareText = `[Zepta 진단] ${asset.name}(${asset.symbol}) — 종합 ${diag.score}점 · ${verdictLabel(diag.verdict)}\n\n기술적 지표 종합 스코어입니다. 투자 판단과 책임은 본인에게 있습니다.\n👉 https://zepta.app`;
             if (navigator.share) {
-              navigator.share({ title: `${asset.name} AI 투자 진단`, text: shareText, url: "https://zepta.app" }).catch(() => {});
+              navigator.share({ title: `${asset.name} 기술적 진단`, text: shareText, url: "https://zepta.app" }).catch(() => {});
             } else {
               navigator.clipboard.writeText(shareText).then(() => showToast("진단 결과가 복사되었습니다!", "success")).catch(() => {});
             }
@@ -4761,6 +4778,12 @@ function AppInner() {
   const ownerRef = useRef(false);
   const marketExtrasAtRef = useRef(0);
   useEffect(() => { ownerRef.current = isOwner; }, [isOwner]);
+  // ★ 2026-08-10 (#215 회귀 수정): /quant-report 는 공개 탭인데 dailyPicks 가 owner 게이트
+  //   뒤에 있어 비owner 에게 "상승 신호 감지 0 / 0 종목"이 표시됐습니다. 추천 스캔(yahoo 2회)만
+  //   게이트 밖으로 분리 — tab 미러와 전용 스로틀(공유하면 owner 경로와 서로 굶깁니다)을 씁니다.
+  const tabForFetchRef = useRef("home");
+  const picksAtRef = useRef(0);
+  useEffect(() => { tabForFetchRef.current = tab; }, [tab]);
 
   // ── 홈 대시보드 상태 ───────────────────────────────────────────
   const [marketIndices, setMarketIndices] = useState([]);
@@ -5207,6 +5230,69 @@ function AppInner() {
     });
   }, [results, sortBy]);
 
+  // ── 오늘의 종목 추천 (핵심 50종목 스캔) ───────────────────────
+  // ★ 2026-08-10: fetchMarketOverview 의 owner 게이트 뒤에 있던 블록을 분리.
+  //   /quant-report(공개 탭)가 dailyPicks 를 소비하므로 비owner 도 채울 수 있어야 합니다.
+  //   비용은 yahoo-batch 2회뿐이라 #215 가 잡은 유니버스 스캔 낭비와는 무관합니다.
+  const fetchDailyPicks = useCallback(async () => {
+    const pickList = [
+      "NVDA","AAPL","TSLA","MSFT","GOOGL","AMZN","META","AMD","AVGO","COIN",
+      "NFLX","CRM","PLTR","MSTR","SOFI","HOOD","ARM","SMCI","TSM","APP",
+      "RDDT","BABA","JPM","LLY","BA","DIS","IONQ","CPNG","SHOP","CRWD","BITX",
+      "005930.KS","000660.KS","035420.KS","068270.KS","373220.KS","005380.KS",
+      "000270.KS","035720.KS","051910.KS","006400.KS","207940.KS","259960.KS",
+      "352820.KS","105560.KS","055550.KS","042660.KS","329180.KS","009540.KS",
+      "196170.KQ","042700.KS",
+    ];
+    const picks = [];
+    const pickChunkSize = 25;
+    for (let ci = 0; ci < pickList.length; ci += pickChunkSize) {
+      const pickChunk = pickList.slice(ci, ci + pickChunkSize).join(",");
+      try {
+        const pr = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(pickChunk)}&interval=1d&range=1mo`);
+        if (pr.ok) {
+          const pBatch = (await pr.json()).results || {};
+          for (const [sym, data] of Object.entries(pBatch)) {
+            if (!data?.closes?.length || data.closes.length < 10) continue;
+            const closes = data.closes;
+            const n = closes.length;
+            const last = closes[n - 1];
+            const prev = closes[n - 2];
+            const change1d = ((last - prev) / prev) * 100;
+            const change5d = n >= 5 ? ((last - closes[n - 5]) / closes[n - 5]) * 100 : 0;
+            const sma10 = closes.slice(-10).reduce((a, b) => a + b, 0) / 10;
+            const sma20 = closes.slice(-20).reduce((a, b) => a + b, 0) / Math.min(20, n);
+            // 14일 RSI 간이 계산
+            let ag = 0, al = 0;
+            for (let ri = n - 14; ri < n; ri++) { const d = closes[ri] - closes[ri - 1]; if (d > 0) ag += d; else al -= d; }
+            const rsiV = al === 0 ? 100 : 100 - 100 / (1 + (ag / 14) / (al / 14));
+            let score = 0;
+            if (last > sma10) score += 2;
+            if (last > sma20) score += 2;
+            if (change5d > 0 && change5d < 10) score += 3;
+            if (change1d > -2 && change1d < 5) score += 1;
+            if (sma10 > sma20) score += 2;
+            if (rsiV >= 30 && rsiV <= 65) score += 1; // 과매수 아닌 건강 구간
+            if (rsiV < 30) score += 2; // 과매도 반등 기회
+            const isKR = sym.includes(".KS") || sym.includes(".KQ");
+            const assetInfo = [...US_ASSETS, ...KR_ASSETS].find(a => a.symbol === sym);
+            if (!assetInfo) continue;
+            picks.push({
+              symbol: sym, name: assetInfo.name,
+              market: isKR ? "kr" : "us",
+              symbolRaw: sym,
+              price: last, change: +change1d.toFixed(2),
+              score, change5d: +change5d.toFixed(2),
+              reason: score >= 8 ? "강한 상승 추세" : score >= 6 ? "긍정적 모멘텀" : score >= 4 ? "관심 구간" : "모니터링",
+            });
+          }
+        }
+      } catch {}
+    }
+    picks.sort((a, b) => b.score - a.score);
+    setDailyPicks(picks);
+  }, []);
+
   // ── 홈 대시보드 데이터 ─────────────────────────────────────────
   const fetchMarketOverview = useCallback(async () => {
     if (fetchingRef.current) return;
@@ -5381,7 +5467,16 @@ function AppInner() {
 
     // ★ 홈 필수 데이터 끝 — 여기서 로딩을 해제합니다. 아래는 owner 홈 전용 확장입니다.
     setMarketLoading(false);
-    // 지표 보강·장외가 전 종목 스캔·섹터·오늘의 추천은 owner 홈에서만 렌더됩니다
+    // ── 오늘의 추천: owner 이거나 공개 /quant-report 를 보고 있으면 채웁니다 ──
+    //   (홈 30초 인터벌은 tab==="home" 안에서만 돌아 비owner 홈 추가 호출 0건.
+    //    quant-report 딥링크는 marketIndices 빈 경우 fetchMarketOverview 를 1회 부르므로 이 경로로 채워짐)
+    if ((ownerRef.current || tabForFetchRef.current === "quant-report") &&
+        Date.now() - picksAtRef.current > 5 * 60 * 1000) {
+      picksAtRef.current = Date.now();
+      await fetchDailyPicks();
+    }
+
+    // 지표 보강·장외가 전 종목 스캔·섹터는 owner 홈에서만 렌더됩니다
     // (비owner 홈·검색 팝업은 자체 per-symbol 조회로 동작 — extendedHours 미의존 확인).
     // 일반 사용자 세션에서 30초마다 ~15회의 yahoo 호출이 낭비되고 있었습니다.
     // → owner 게이트 + 5분 스로틀.
@@ -5650,67 +5745,9 @@ function AppInner() {
     sectorResults.sort((a, b) => b.change1d - a.change1d);
     setSectorPerf(sectorResults);
 
-    // ── 오늘의 종목 추천 (핵심 50종목 스캔) ──
-    const pickList = [
-      "NVDA","AAPL","TSLA","MSFT","GOOGL","AMZN","META","AMD","AVGO","COIN",
-      "NFLX","CRM","PLTR","MSTR","SOFI","HOOD","ARM","SMCI","TSM","APP",
-      "RDDT","BABA","JPM","LLY","BA","DIS","IONQ","CPNG","SHOP","CRWD","BITX",
-      "005930.KS","000660.KS","035420.KS","068270.KS","373220.KS","005380.KS",
-      "000270.KS","035720.KS","051910.KS","006400.KS","207940.KS","259960.KS",
-      "352820.KS","105560.KS","055550.KS","042660.KS","329180.KS","009540.KS",
-      "196170.KQ","042700.KS",
-    ];
-    const picks = [];
-    const pickChunkSize = 25;
-    for (let ci = 0; ci < pickList.length; ci += pickChunkSize) {
-      const pickChunk = pickList.slice(ci, ci + pickChunkSize).join(",");
-      try {
-        const pr = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(pickChunk)}&interval=1d&range=1mo`);
-        if (pr.ok) {
-          const pBatch = (await pr.json()).results || {};
-          for (const [sym, data] of Object.entries(pBatch)) {
-            if (!data?.closes?.length || data.closes.length < 10) continue;
-            const closes = data.closes;
-            const n = closes.length;
-            const last = closes[n - 1];
-            const prev = closes[n - 2];
-            const change1d = ((last - prev) / prev) * 100;
-            const change5d = n >= 5 ? ((last - closes[n - 5]) / closes[n - 5]) * 100 : 0;
-            const sma10 = closes.slice(-10).reduce((a, b) => a + b, 0) / 10;
-            const sma20 = closes.slice(-20).reduce((a, b) => a + b, 0) / Math.min(20, n);
-            // 14일 RSI 간이 계산
-            let ag = 0, al = 0;
-            for (let ri = n - 14; ri < n; ri++) { const d = closes[ri] - closes[ri - 1]; if (d > 0) ag += d; else al -= d; }
-            const rsiV = al === 0 ? 100 : 100 - 100 / (1 + (ag / 14) / (al / 14));
-            let score = 0;
-            if (last > sma10) score += 2;
-            if (last > sma20) score += 2;
-            if (change5d > 0 && change5d < 10) score += 3;
-            if (change1d > -2 && change1d < 5) score += 1;
-            if (sma10 > sma20) score += 2;
-            if (rsiV >= 30 && rsiV <= 65) score += 1; // 과매수 아닌 건강 구간
-            if (rsiV < 30) score += 2; // 과매도 반등 기회
-            const isKR = sym.includes(".KS") || sym.includes(".KQ");
-            const assetInfo = [...US_ASSETS, ...KR_ASSETS].find(a => a.symbol === sym);
-            if (!assetInfo) continue;
-            picks.push({
-              symbol: sym, name: assetInfo.name,
-              market: isKR ? "kr" : "us",
-              symbolRaw: sym,
-              price: last, change: +change1d.toFixed(2),
-              score, change5d: +change5d.toFixed(2),
-              reason: score >= 8 ? "강한 상승 추세" : score >= 6 ? "긍정적 모멘텀" : score >= 4 ? "관심 구간" : "모니터링",
-            });
-          }
-        }
-      } catch {}
-    }
-    picks.sort((a, b) => b.score - a.score);
-    setDailyPicks(picks);
-
     // marketLoading 은 Stage A 끝에서 이미 해제됨 — 여기선 재진입 가드만 풉니다.
     fetchingRef.current = false;
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 경제 캘린더 KST 파트 헬퍼 ──
   // toLocaleString 트릭은 fragile (locale·browser 의존) — UTC+9 시프트 후 getUTC* 로 안전 추출.
@@ -5848,6 +5885,12 @@ function AppInner() {
   useEffect(() => {
     if (!["anomaly", "quant-report", "risk-map"].includes(tab)) return;
     if (marketIndices.length === 0 && !marketLoading) fetchMarketOverview();
+    // ★ 2026-08-10 (#215 회귀): 홈을 먼저 봤으면 지수가 이미 차 있어 위 호출이 스킵되는데,
+    //   비owner 는 dailyPicks 가 여전히 비어 있습니다. quant-report 는 직접 채웁니다.
+    if (tab === "quant-report" && Date.now() - picksAtRef.current > 5 * 60 * 1000) {
+      picksAtRef.current = Date.now();
+      fetchDailyPicks();
+    }
   }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 홈 탭 진입 시 즉시 로드 + 30초 간격 자동 갱신
@@ -10909,8 +10952,12 @@ function AppInner() {
           if (sp) mktScore += sp.change > 1 ? 10 : sp.change > 0.3 ? 5 : sp.change > -0.3 ? 0 : sp.change > -1 ? -5 : -10;
           if (fg) mktScore += fg > 70 ? 8 : fg > 55 ? 4 : fg > 40 ? 0 : fg > 25 ? -4 : -8;
           mktScore += advDecl > 60 ? 8 : advDecl > 50 ? 3 : advDecl > 40 ? -3 : -8;
-          if (buyPicks > 5) mktScore += 6; else if (buyPicks > 2) mktScore += 3;
-          if (sellPicks > 5) mktScore -= 6; else if (sellPicks > 2) mktScore -= 3;
+          // ★ 스캔 미완료(dailyPicks 빈 배열)면 0건이 점수를 끌어내리지 않게 가산 자체를 건너뜁니다
+          //   — 이 점수는 공유 텍스트에도 실려 나가므로 owner/일반 사용자 간 불일치 방지.
+          if (dailyPicks.length > 0) {
+            if (buyPicks > 5) mktScore += 6; else if (buyPicks > 2) mktScore += 3;
+            if (sellPicks > 5) mktScore -= 6; else if (sellPicks > 2) mktScore -= 3;
+          }
           mktScore = Math.max(0, Math.min(100, mktScore));
           const mktVerdict = mktScore >= 70 ? "강세" : mktScore >= 55 ? "약 강세" : mktScore >= 45 ? "혼조" : mktScore >= 30 ? "약세" : "강한 약세";
           const mktColor = mktScore >= 60 ? C.green : mktScore >= 45 ? C.yellow : C.red;
@@ -10980,7 +11027,7 @@ function AppInner() {
                     <div className="text-xl font-black mb-1.5" style={{ color: mktColor }}>{mktVerdict}</div>
                     <div className="text-base" style={{ color: C.text2, lineHeight: 1.6 }}>
                       {mktScore >= 60
-                        ? `상승 신호가 우세한 상태입니다. 상승 종목 ${upCount}개, 상승 신호 ${buyPicks}개가 감지되었습니다.`
+                        ? `상승 신호가 우세한 상태입니다. 상승 종목 ${upCount}개${dailyPicks.length > 0 ? `, 상승 신호 ${buyPicks}개가 감지되었습니다` : ""}.`
                         : mktScore >= 45
                         ? `상승·하락 신호가 혼재된 혼조 상태입니다.`
                         : `하락 신호가 우세한 상태입니다. 하락 종목 ${dnCount}개.`}
@@ -11059,13 +11106,16 @@ function AppInner() {
                       </div>
                     </div>
                   )}
-                  <div className="rounded-[10px] p-3" style={{ background: C.bg }}>
-                    <div className="text-sm mb-1" style={{ color: C.text3 }}>상승 신호 감지</div>
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-2xl font-black" style={{ color: C.blue }}>{buyPicks}</span>
-                      <span className="text-base" style={{ color: C.text3 }}>/ {dailyPicks.length} 종목</span>
+                  {/* 스캔 전(빈 배열)에는 "0 / 0 종목" 같은 거짓 수치 대신 타일을 숨깁니다 */}
+                  {dailyPicks.length > 0 && (
+                    <div className="rounded-[10px] p-3" style={{ background: C.bg }}>
+                      <div className="text-sm mb-1" style={{ color: C.text3 }}>상승 신호 감지</div>
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-2xl font-black" style={{ color: C.blue }}>{buyPicks}</span>
+                        <span className="text-base" style={{ color: C.text3 }}>/ {dailyPicks.length} 종목</span>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
@@ -11333,11 +11383,13 @@ function AppInner() {
                   }}>
                     공포탐욕 {fg}
                   </span>}
-                  <span className="text-base px-2.5 py-1 rounded" style={{
-                    background: C.card2, color: C.text3,
-                  }}>
-                    매수신호 {buyPicks}건
-                  </span>
+                  {dailyPicks.length > 0 && (
+                    <span className="text-base px-2.5 py-1 rounded" style={{
+                      background: C.card2, color: C.text3,
+                    }}>
+                      상승 신호 {buyPicks}건
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
