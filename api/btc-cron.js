@@ -13,6 +13,7 @@ import { runStrategyForBot, getStrategyNameForBot } from "./_shared/strategies/i
 import { getAllStoredStrategyParams } from "./_shared/dynamic-config.js";
 import { getMarketContext, getKlines, getTickerPrice } from "./_shared/binance-client.js";
 import { getOIChangeMap } from "./_shared/oi-tracker.js";
+import { fetchDerivOnchainContext } from "./_shared/onchain.js"; // ★ 2026-08-11 온체인·파생 1단계 — 표시(oc)·섀도(ocShadow) 전용, 매매 미개입
 import { loadUniverse, universeSymbolMap } from "./_shared/futures-universe.js";
 import { computeSRLevels, scaleSR } from "./_shared/sr-levels.js"; // ★ 지지·저항(매물대) — 표시 전용
 import { refineCompositeEntry } from "./_shared/strategies/_indicators.js"; // ★ MTF 소진·차트구조 진입 정제
@@ -62,6 +63,19 @@ const CRYPTO_ASSETS = [
 //   실거래는 별도 risk-manager 의 합산 노출 가드(자본 1.5배) 가 안전망.
 const MAX_POSITION_PER_ASSET = 0.35;     // 0.30 → 0.35
 const MAX_TOTAL_CRYPTO_EXPOSURE = 0.95;  // 0.80 → 0.95
+
+// ★ 2026-08-11 (대표 지시 — 온체인·파생 팩터 1단계) 섀도 규칙 상수 — **사전등록**(pre-registered).
+//   섀도 축적 기간 동안 이 상수·규칙의 사후 튜닝을 금지합니다(튜닝하면 섀도 검증이 무효).
+//   근거(고전 파생 해석):
+//   · OI_SURGE_PCT(+5%/24h) — OI 급증 기준. OI 증가 = 새 자금 유입.
+//   · TREND_CONFIRM(+3)   — OI 급증 + 신호 방향과 같은 24h 가격 흐름 = 새 자금이 추세를 확인.
+//   · SQUEEZE_CAUTION(−3) — OI 급증 + 신호 반대 방향 가격 흐름 = 반대 포지션 급증(청산 스퀴즈 경계).
+//   · CROWD_PENALTY(−2)   — 글로벌 롱숏 계정비 극단(LS_HIGH 초과 롱 쏠림 / LS_LOW 미만 숏 쏠림)과
+//                           신호가 같은 방향 = 군중 동조(역사적 역지표) 페널티.
+//   shadowScore = clamp(종합점수 + adj, 0, 100). 표시·매매 어디에도 쓰지 않는 순수 기록입니다.
+const OC_SHADOW = Object.freeze({
+  OI_SURGE_PCT: 5, TREND_CONFIRM: 3, SQUEEZE_CAUTION: 3, CROWD_PENALTY: 2, LS_HIGH: 2.0, LS_LOW: 0.5,
+});
 
 // 딜레이 헬퍼 (프록시 부하 분산용 소량 딜레이)
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
@@ -359,6 +373,22 @@ export default async function handler(req, res) {
       oiChangeMap = oi.changeMap || {};
       if (oi.fetched > 0) addLog(`📈 OI ${oi.fetched}심볼 조회, 변화 비교 ${Object.keys(oiChangeMap).length}건`);
     } catch { /* 무시 */ }
+
+    // ★ 2026-08-11 (대표 지시 — 온체인·파생 팩터 1단계): 사이클당 1회 컨텍스트 로드.
+    //   표시(oc)·섀도 기록(ocShadow) 전용 — 엔진이 소비하는 score/side/type 에는 어떤 경로로도
+    //   개입하지 않습니다(additive). 킬스위치 ZEPTA_ONCHAIN_FACTOR=0 이면 전체 생략,
+    //   실패해도 null → 기존 파이프라인 무영향(내부 KV 30분 캐시로 호출 수 최소화).
+    let derivOnchain = null;
+    if (process.env.ZEPTA_ONCHAIN_FACTOR !== "0") {
+      try {
+        const ocSymbols = ASSETS.map((a) => assetToBinanceSymbol(a, dynSymbolMap)).filter(Boolean);
+        derivOnchain = await fetchDerivOnchainContext(ocSymbols);
+        const _ocN = Object.values(derivOnchain?.bySymbol || {}).filter(Boolean).length;
+        if (_ocN > 0 || derivOnchain?.stableTrend) {
+          addLog(`🧬 파생·온체인 컨텍스트: ${_ocN}심볼 + 스테이블 ${derivOnchain?.stableTrend ? "1" : "0"}건 (표시·섀도 전용)`);
+        }
+      } catch { derivOnchain = null; }
+    }
 
     // ★ 2026-06-14 (감사 #3, 대표 승인): 시그널 풀 쓰기 배칭.
     //   기존: 에셋당 kv.get→modify→kv.set (런당 ~30-50종 × 2풀 = ~60-100 KV op) — KV 쓰기
@@ -774,6 +804,41 @@ export default async function handler(req, res) {
 
         // ── 종합 스코어 표시 풀 (코인 카드용 — 엔진 거래와 별개로 항상 적재) ──
         if (compositeSignal) {
+          // ★ 2026-08-11 온체인·파생 1단계 — 표시용(oc) + 섀도 병기(ocShadow). additive 필드만.
+          //   기존 필드(type/side/score/…)는 불변 — 엔진·표시 소비 경로 무영향.
+          let _oc = null, _ocShadow = null;
+          try {
+            const _d = derivOnchain?.bySymbol?.[futSymbol] || null;
+            const _st = derivOnchain?.stableTrend ?? null;
+            if (_d || _st) {
+              _oc = { oiChg24h: _d?.oiChg24h ?? null, lsRatio: _d?.lsRatio ?? null, stableTrend: _st };
+            }
+            // ── 섀도 규칙 적용 (OC_SHADOW 상수 사전등록 — 이후 튜닝 금지) ──
+            //   가격 흐름은 24시간 전 1h 종가 대비 최신 1h 종가(진짜 ~24h 창)로 판정 —
+            //   oiChg24h 와 동일한 24h 창으로 정렬합니다. (일봉 진행봉 기준은 UTC 00시 직후
+            //   수 분짜리 노이즈로 부호가 뒤집혀 표본을 오염시키는 문제가 있어 배포 전 정정.)
+            //   파생 데이터가 없으면 기록 자체를 하지 않음(null — 가짜 0 기록 금지).
+            //   adj=0 도 기록해 "보정 없음" 표본을 남김(섀도 평가 시 대조군).
+            if (_d && (Number.isFinite(_d.oiChg24h) || Number.isFinite(_d.lsRatio))) {
+              const _dir = compositeSignal.side === "LONG" ? 1 : -1;
+              const _cl1 = Array.isArray(candles1h) ? candles1h : [];
+              // 마지막 1h 봉(진행 중 ≈ 현재가) ↔ 24시간 전(25봉 전) 1h 종가 — 경과 23~24h.
+              const _pxNow = _cl1.length >= 25 ? Number(_cl1[_cl1.length - 1]?.close) : NaN;
+              const _pxPrev = _cl1.length >= 25 ? Number(_cl1[_cl1.length - 25]?.close) : NaN;
+              const _px24 = Number.isFinite(_pxPrev) && _pxPrev > 0 && Number.isFinite(_pxNow)
+                ? (_pxNow / _pxPrev - 1) * 100 : null;
+              let _adj = 0;
+              if (Number.isFinite(_d.oiChg24h) && _d.oiChg24h >= OC_SHADOW.OI_SURGE_PCT
+                && Number.isFinite(_px24) && _px24 !== 0) {
+                _adj += (Math.sign(_px24) === _dir) ? OC_SHADOW.TREND_CONFIRM : -OC_SHADOW.SQUEEZE_CAUTION;
+              }
+              if (Number.isFinite(_d.lsRatio)
+                && ((_d.lsRatio > OC_SHADOW.LS_HIGH && _dir === 1) || (_d.lsRatio < OC_SHADOW.LS_LOW && _dir === -1))) {
+                _adj -= OC_SHADOW.CROWD_PENALTY;
+              }
+              _ocShadow = { adj: _adj, score: Math.max(0, Math.min(100, compositeSignal.score + _adj)) };
+            }
+          } catch { _oc = null; _ocShadow = null; } // 어떤 실패도 풀 적재를 막지 않음
           newMtfEntries.push({
             ts: Date.now(), time: new Date().toISOString(), asset,
             type: compositeSignal.type, side: compositeSignal.side, score: compositeSignal.score,
@@ -781,6 +846,8 @@ export default async function handler(req, res) {
             breakdown: compositeSignal.breakdown, reason: compositeSignal.reason, source: "btc-cron-mtf",
             entryRefine: compositeSignal.entryRefine || null, // ★ MTF 소진·차트구조 정제 사유
             sr: srLevels, // ★ 지지·저항 — 코인 카드 매물대 표시용
+            oc: _oc,             // ★ 표시용 온체인·파생 컨텍스트 (데이터 없으면 null)
+            ocShadow: _ocShadow, // ★ 섀도 병행 기록 (표시·매매 미사용, 순수 기록)
           });
         }
       } catch (poolErr) {
