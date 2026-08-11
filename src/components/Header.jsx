@@ -242,13 +242,6 @@ export default memo(function Header({
     .filter((cat) => cat.directTab || (cat.items && cat.items.length > 0));
   const mobileMenuSections = getMobileMenuSections(isOwner, t);
 
-  // ★ 2026-06-08: 모바일 하단 탭바의 '메뉴' 버튼이 이 시트를 열도록 — 커스텀 이벤트 수신
-  useEffect(() => {
-    const open = () => setMobileOpen(true);
-    window.addEventListener("zepta:open-mobile-menu", open);
-    return () => window.removeEventListener("zepta:open-mobile-menu", open);
-  }, []);
-
   const navigate = useCallback((tabId, screenerMarket) => {
     // 외부 path (블로그처럼 정적 HTML) — 새 페이지로 이동
     if (typeof tabId === "string" && tabId.startsWith("/")) {
@@ -474,6 +467,8 @@ export default memo(function Header({
                       variant="ghost"
                       size="default"
                       onClick={toggle}
+                      aria-expanded={open}
+                      aria-haspopup="true"
                       className={cn(
                         "text-[14px] xl:text-[15px] font-semibold gap-1 xl:gap-1.5 px-3 xl:px-5",
                         (isActive || open)
@@ -482,7 +477,7 @@ export default memo(function Header({
                       )}
                     >
                       {cat.label}
-                      <ChevronDown className={cn("size-3.5 xl:size-4 opacity-50 transition-transform", open && "rotate-180")} />
+                      <ChevronDown aria-hidden="true" className={cn("size-3.5 xl:size-4 opacity-50 transition-transform", open && "rotate-180")} />
                     </Button>
                   )}
                 >
@@ -546,6 +541,7 @@ export default memo(function Header({
                 className="min-w-[220px]"
                 trigger={({ open, toggle }) => (
                   <Button variant="ghost" size="default" onClick={toggle}
+                    aria-expanded={open} aria-haspopup="true"
                     className="hidden lg:inline-flex gap-2.5 pl-1 pr-3 h-9 hover:bg-muted/50"
                   >
                     <Avatar size={32} />

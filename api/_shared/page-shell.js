@@ -120,7 +120,7 @@ export const DRAWER = `<div id="znav-overlay" onclick="zNavClose()"></div>
 export const FOOTER = `
   <footer>
     <p>© 2026 Zepta — <a href="/">홈</a> · <a href="/coin">코인 분석</a> · <a href="/briefing">마켓 브리핑</a> · <a href="/blog">블로그</a> · <a href="/about">소개</a> · <a href="/contact">문의</a></p>
-    <p style="margin-top:8px;font-size:12px;color:#474C5A">본 페이지의 정보는 투자 조언이 아니며 참고용입니다. 모든 투자의 책임은 본인에게 있습니다.</p>
+    <p style="margin-top:8px;font-size:12px;color:#8189A0">본 페이지의 정보는 투자 조언이 아니며 참고용입니다. 모든 투자의 책임은 본인에게 있습니다.</p>
   </footer>`;
 
 // 자체 퍼스트파티 비콘(/api/track) — GA4 대체 (코인 페이지와 동일 스니펫)

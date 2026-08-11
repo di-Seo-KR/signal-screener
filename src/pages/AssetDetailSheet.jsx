@@ -56,15 +56,16 @@ import { ChevronLeft, Star } from "lucide-react";
 import { useThemeTokens } from "../ui/theme.jsx";
 import {
   accentOf, Num, ChangeNum, SidePill, TimeframeChips, Segment,
-  IconButton, Disclaimer, Sparkline,
+  IconButton, Disclaimer, Sparkline, useKitText,
 } from "../components/mobileKit.jsx";
 
-// 기간 탭 기본값 — 시안과 동일
+// 기간 탭 기본값 — 시안과 동일. 라벨은 렌더 시 언어 설정(mobile.kit.range*)을 따르고,
+// 키 미등록·Provider 부재 시 여기 한국어 기본값으로 동작합니다.
 const DEFAULT_RANGES = [
-  { value: "1D", label: "1일" },
-  { value: "1W", label: "1주" },
-  { value: "1M", label: "1개월" },
-  { value: "1Y", label: "1년" },
+  { value: "1D", key: "mobile.kit.range1d", label: "1일" },
+  { value: "1W", key: "mobile.kit.range1w", label: "1주" },
+  { value: "1M", key: "mobile.kit.range1m", label: "1개월" },
+  { value: "1Y", key: "mobile.kit.range1y", label: "1년" },
 ];
 
 /** 섹션 껍데기 — 제목 + 카드. 시안의 카드 radius 16 / 내부 여백 규칙을 씁니다. */
@@ -94,6 +95,7 @@ function Panel({ children, style }) {
 /** 주요 레벨 한 행 — 태그 · 가격 · 거리% · 터치 횟수 */
 function LevelRow({ item, last }) {
   const C = useThemeTokens();
+  const tt = useKitText();
   const isRes = String(item.tag || "").toUpperCase().startsWith("R");
   const a = accentOf(C, isRes ? "down" : "up"); // 저항=빨강 / 지지=초록 (시안 규칙)
   const dist = Number(item.distancePct);
@@ -109,12 +111,13 @@ function LevelRow({ item, last }) {
       <Num size="14px" style={{ flex: 1, minWidth: 0 }}>{item.price ?? "—"}</Num>
       {Number.isFinite(dist) && (
         <span style={{ fontSize: "11px", color: C.text3, flexShrink: 0 }}>
-          현재가 대비 <Num size="11px" weight={700} color={C.text2}>{dist >= 0 ? "+" : ""}{dist.toFixed(2)}%</Num>
+          {tt("mobile.kit.vsPrice", "현재가 대비")} <Num size="11px" weight={700} color={C.text2}>{dist >= 0 ? "+" : ""}{dist.toFixed(2)}%</Num>
         </span>
       )}
       {Number.isFinite(Number(item.touches)) && (
+        // 숫자(Num 스타일)를 사이에 끼우기 위해 접두/접미 2키로 분리 — en 은 접미가 빈 문자열
         <span style={{ fontSize: "11px", color: C.text4, flexShrink: 0 }}>
-          터치 <Num size="11px" weight={700} color={C.text3}>{item.touches}</Num>회
+          {tt("mobile.kit.touchPrefix", "터치")} <Num size="11px" weight={700} color={C.text3}>{item.touches}</Num>{tt("mobile.kit.touchSuffix", "회")}
         </span>
       )}
     </div>
@@ -128,7 +131,10 @@ export default function AssetDetailSheet({
   signal, levels, indicators = [], news = [],
 }) {
   const C = useThemeTokens();
-  const rangeOptions = ranges && ranges.length ? ranges : DEFAULT_RANGES;
+  const tt = useKitText();
+  const rangeOptions = ranges && ranges.length
+    ? ranges
+    : DEFAULT_RANGES.map((r) => ({ value: r.value, label: tt(r.key, r.label) }));
   const sparkPoints = Array.isArray(spark?.points) ? spark.points : [];
   const levelItems = Array.isArray(levels?.items) ? levels.items : [];
   const pos = Number(levels?.positionPct);
@@ -152,7 +158,7 @@ export default function AssetDetailSheet({
         display: "flex", alignItems: "center", gap: "10px", padding: "10px 16px",
       }}>
         {onBack && (
-          <IconButton onClick={onBack} ariaLabel="뒤로 가기">
+          <IconButton onClick={onBack} ariaLabel={tt("mobile.kit.back", "뒤로 가기")}>
             <ChevronLeft size={18} />
           </IconButton>
         )}
@@ -162,7 +168,7 @@ export default function AssetDetailSheet({
         {onToggleFavorite && (
           <IconButton
             onClick={onToggleFavorite}
-            ariaLabel={isFavorite ? "관심종목에서 제거" : "관심종목에 추가"}
+            ariaLabel={isFavorite ? tt("mobile.kit.favRemove", "관심종목에서 제거") : tt("mobile.kit.favAdd", "관심종목에 추가")}
             color={isFavorite ? (C.yellowL || C.yellow) : C.text3}
           >
             <Star size={18} fill={isFavorite ? "currentColor" : "none"} />
@@ -213,7 +219,7 @@ export default function AssetDetailSheet({
 
         {/* ── 종합 신호 카드 — 시안의 accent 전체 보더 + 상단 그라데이션 ── */}
         {signal && (
-          <Section title="종합 신호">
+          <Section title={tt("mobile.kit.sectionSignal", "종합 신호")}>
             <div style={{
               background: `linear-gradient(180deg, ${sigAccent.bg}, transparent 42%), ${C.card}`,
               border: `1px solid ${sigAccent.base}`, borderRadius: "16px", padding: "14px 16px",
@@ -225,7 +231,7 @@ export default function AssetDetailSheet({
                 </div>
                 {Number.isFinite(Number(signal.score)) && (
                   <div style={{ textAlign: "right", lineHeight: 1, flexShrink: 0 }}>
-                    <div style={{ fontSize: "10px", color: C.text3, marginBottom: "3px" }}>점수</div>
+                    <div style={{ fontSize: "10px", color: C.text3, marginBottom: "3px" }}>{tt("mobile.kit.score", "점수")}</div>
                     <Num size="28px" weight={800} color={sigAccent.hi}>{signal.score}</Num>
                   </div>
                 )}
@@ -254,7 +260,7 @@ export default function AssetDetailSheet({
 
         {/* ── 주요 레벨 (지지·저항) ── */}
         {levelItems.length > 0 && (
-          <Section title="주요 레벨">
+          <Section title={tt("mobile.kit.sectionLevels", "주요 레벨")}>
             <Panel>
               {/* S/R 사이 현재가 위치 바 — positionPct 가 없으면 바만 숨기고 행은 그대로 표시 */}
               {hasPos && (
@@ -271,8 +277,8 @@ export default function AssetDetailSheet({
                     }} />
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: C.text4, marginTop: "3px" }}>
-                    <span>지지 구간</span>
-                    <span>저항 구간</span>
+                    <span>{tt("mobile.kit.supportZone", "지지 구간")}</span>
+                    <span>{tt("mobile.kit.resistanceZone", "저항 구간")}</span>
                   </div>
                 </div>
               )}
@@ -285,7 +291,7 @@ export default function AssetDetailSheet({
 
         {/* ── 보조지표 2×2 ── */}
         {indicators.length > 0 && (
-          <Section title="보조지표">
+          <Section title={tt("mobile.kit.sectionIndicators", "보조지표")}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "10px" }}>
               {indicators.map((ind, i) => {
                 const a = accentOf(C, ind.dir);
@@ -307,7 +313,7 @@ export default function AssetDetailSheet({
 
         {/* ── 관련 뉴스 ── */}
         {news.length > 0 && (
-          <Section title="관련 뉴스">
+          <Section title={tt("mobile.kit.sectionNews", "관련 뉴스")}>
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
               {news.map((n, i) => (
                 <Panel
@@ -336,7 +342,7 @@ export default function AssetDetailSheet({
         )}
 
         <Disclaimer>
-          표시되는 신호·레벨·지표는 과거 데이터를 요약한 참고 정보이며 투자 조언이 아닙니다. 투자 판단과 책임은 본인에게 있습니다.
+          {tt("mobile.kit.disclaimerDetail", "표시되는 신호·레벨·지표는 과거 데이터를 요약한 참고 정보이며 투자 조언이 아닙니다. 투자 판단과 책임은 본인에게 있습니다.")}
         </Disclaimer>
       </div>
     </div>

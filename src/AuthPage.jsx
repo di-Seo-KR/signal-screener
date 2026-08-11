@@ -211,8 +211,9 @@ export default function AuthPage({ theme = "dark", embedded = false, onClose }) 
           <form onSubmit={handleSubmit}>
             {mode === "signup" && (
               <div style={S.inputGroup}>
-                <label style={S.label}>닉네임</label>
+                <label htmlFor="auth-nickname" style={S.label}>닉네임</label>
                 <input
+                  id="auth-nickname"
                   type="text" placeholder="표시될 이름" value={displayName}
                   onChange={e => setDisplayName(e.target.value)}
                   style={S.input}
@@ -222,24 +223,28 @@ export default function AuthPage({ theme = "dark", embedded = false, onClose }) 
               </div>
             )}
             <div style={S.inputGroup}>
-              <label style={S.label}>이메일</label>
+              <label htmlFor="auth-email" style={S.label}>이메일</label>
               <input
+                id="auth-email"
                 type="email" placeholder="name@example.com" value={email}
                 onChange={e => setEmail(e.target.value)} required
+                aria-invalid={email ? !validateEmail(email) : undefined}
+                aria-describedby={email && !validateEmail(email) ? "auth-email-err" : undefined}
                 style={{...S.input, borderColor: email && !validateEmail(email) ? C.red : C.border}}
                 onFocus={e => e.target.style.borderColor = C.blue}
                 onBlur={e => e.target.style.borderColor = email && !validateEmail(email) ? C.red : C.border}
               />
               {email && !validateEmail(email) && (
-                <div style={{ color: C.red, fontSize: "14px", marginTop: "4px", fontWeight: 500 }}>
+                <div id="auth-email-err" style={{ color: C.red, fontSize: "14px", marginTop: "4px", fontWeight: 500 }}>
                   유효한 이메일 형식을 입력해주세요
                 </div>
               )}
             </div>
             {mode !== "reset" && (
               <div style={S.inputGroup}>
-                <label style={S.label}>비밀번호</label>
+                <label htmlFor="auth-password" style={S.label}>비밀번호</label>
                 <input
+                  id="auth-password"
                   type="password" placeholder={mode === "signup" ? "6자 이상" : "비밀번호 입력"}
                   value={password} onChange={e => setPassword(e.target.value)} required
                   style={S.input}

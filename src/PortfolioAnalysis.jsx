@@ -13,7 +13,7 @@
 //
 // 데이터: POST /api/portfolio-analysis { holdings | userId }
 // ══════════════════════════════════════════════════════════════════
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useThemeTokens, RADIUS } from "./ui/theme.jsx";
 import { useAuth } from "./AuthProvider.jsx";
 import { useIsMobile } from "./ui/useBreakpoint.jsx";
@@ -129,7 +129,7 @@ function DiversityGauge({ score, label, C }) {
 export default function PortfolioAnalysis({ portfolio = [] }) {
   const C = useThemeTokens();
   const isMobile = useIsMobile();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -148,6 +148,10 @@ export default function PortfolioAnalysis({ portfolio = [] }) {
   const [editMode, setEditMode] = useState(false);
   // 사용자가 한 번이라도 holdings 를 수정했는지 추적 (가이드 카드 숨김 조건)
   const [userTouched, setUserTouched] = useState(false);
+  // ★ 감사 #35: 현재 표시 중인 결과가 예시 포트폴리오(BTC·ETH·AAPL) 기준인지 추적.
+  //   showStarterGuide 는 '현재 입력' 기준이라 편집 직후 결과와 어긋날 수 있어,
+  //   분석 성공 시점의 holdings 로 판정해 결과 영역 배지에 사용합니다.
+  const [analyzedExample, setAnalyzedExample] = useState(false);
   const [newSymbol, setNewSymbol] = useState("");
   const [newQty, setNewQty] = useState("");
   const [newType, setNewType] = useState("crypto");
@@ -168,6 +172,8 @@ export default function PortfolioAnalysis({ portfolio = [] }) {
       const j = await res.json();
       if (!j.ok) throw new Error(j.error || "분석 실패");
       setData(j);
+      // 예시 데이터로 돌린 분석인지 결과와 함께 기록 (가짜 데이터 금지 — 결과 배지 근거)
+      setAnalyzedExample(isDefaultHoldings(manualHoldings));
     } catch (e) {
       setError(e.message || String(e));
     } finally {
@@ -175,7 +181,19 @@ export default function PortfolioAnalysis({ portfolio = [] }) {
     }
   }, [manualHoldings, user]);
 
-  useEffect(() => { runAnalysis(); /* 초기 자동 실행 */ }, []); // eslint-disable-line
+  // ★ 감사 #35: 로그인 사용자가 보유 종목 0건이면 예시(BTC·ETH·AAPL) 자동 분석을 돌리지 않고
+  //   빈 상태를 먼저 보여줍니다 (가짜 데이터 금지 원칙). 분석은 버튼으로만 실행됩니다.
+  // ★ 감사 배치3: /portfolio-analysis 직접 진입·새로고침 시 auth 세션 복원(비동기)보다
+  //   마운트가 빨라 user 가 아직 null 인 상태로 skip 판정이 무력화되던 레이스 수정 —
+  //   auth 복원 완료(authLoading=false) 이후 시점의 user 기준으로 1회만 판정합니다.
+  const skipAutoRun = !!user && fromPortfolio.length === 0;
+  const hasAutoRunRef = useRef(false);
+  useEffect(() => {
+    if (authLoading || hasAutoRunRef.current) return;
+    hasAutoRunRef.current = true; /* 판정은 1회만 — 이후 로그인/로그아웃 변화로 재실행하지 않음 */
+    if (skipAutoRun) return;
+    runAnalysis(); /* 초기 자동 실행 — 내 자산 보유 시 또는 비로그인 예시 미리 보기 */
+  }, [authLoading]); // eslint-disable-line
 
   const addHolding = () => {
     const sym = newSymbol.trim().toUpperCase();
@@ -258,7 +276,7 @@ export default function PortfolioAnalysis({ portfolio = [] }) {
             }}>
               {[
                 { n: "①", title: "보유 자산 입력", desc: "아래 ‘편집’ 버튼으로 본인 자산 추가" },
-                { n: "②", title: "분석 실행", desc: "‘내 자산 분석하기’ 누르면 약 2~3초 소요" },
+                { n: "②", title: "분석 실행", desc: "입력 후 ‘내 자산 분석하기’ 누르면 약 2~3초 소요" },
                 { n: "③", title: "결과 해석", desc: "배분·상관·분산점수 확인 후 리밸런싱" },
               ].map((step, i) => (
                 <div key={i} style={{
@@ -301,7 +319,10 @@ export default function PortfolioAnalysis({ portfolio = [] }) {
             letterSpacing: "-0.01em",
           }}
         >
-          {loading ? "분석 중…" : (
+          {loading ? "분석 중…" : showStarterGuide ? (
+            /* ★ 감사 #35: 예시 상태에선 '내 자산'이라는 표현이 오독을 유발해 문구 분리 */
+            <span>예시로 미리 보기</span>
+          ) : (
             <>
               <span>🚀</span>
               <span>내 자산 분석하기</span>
@@ -431,9 +452,38 @@ export default function PortfolioAnalysis({ portfolio = [] }) {
           </div>
         )}
 
+        {/* ★ 감사 #35: 초기 빈 상태 — 자동 실행을 건너뛴 경우 (로그인 + 보유 종목 0건) */}
+        {!data && !loading && !error && skipAutoRun && (
+          <div style={{ ...card, textAlign: "center", color: C.text2, padding: "28px 20px" }}>
+            <div style={{ fontSize: "15px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>
+              보유 종목을 추가하면 분석이 시작됩니다
+            </div>
+            <div style={{ fontSize: "13px", color: C.text3, lineHeight: 1.6 }}>
+              위 ‘편집’ 버튼으로 본인 종목을 추가하거나, ‘예시로 미리 보기’를 누르면
+              예시 포트폴리오 기준 결과를 확인할 수 있습니다.
+            </div>
+          </div>
+        )}
+
         {/* 결과 */}
         {data && !data.empty && (
           <>
+            {/* ★ 감사 #35: 예시 기준 결과 배지 — 예시로 분석된 동안 항구 노출 (가짜 데이터 금지) */}
+            {analyzedExample && (
+              <div style={{
+                padding: "10px 14px",
+                borderRadius: RADIUS.md,
+                background: `${C.yellow}12`,
+                border: `1px solid ${C.yellow}40`,
+                fontSize: "13px",
+                color: C.text1,
+                lineHeight: 1.5,
+              }}>
+                ℹ️ 아래 결과는 <strong>예시 포트폴리오 (BTC·ETH·AAPL)</strong> 기준입니다 —
+                실제 보유 자산이 아닙니다. 위 ‘편집’에서 본인 종목으로 바꿔 다시 분석해 보세요.
+              </div>
+            )}
+
             {/* 행 1: 종목 도넛 + 카테고리 도넛 */}
             <div style={{
               display: "grid",

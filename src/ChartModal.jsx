@@ -1293,6 +1293,11 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
   const candleSeriesRef = useRef(null);  // for real-time update
   const lastCandleRef = useRef(null);    // last candle data
   const liveIntervalRef = useRef(null);  // polling interval
+  const dialogRef = useRef(null);        // 다이얼로그 루트 — 열릴 때 포커스 진입 기준점 (a11y)
+  // onClose 는 소비처(App.jsx)에서 인라인 화살표로 넘어와 리렌더마다 identity 가 바뀝니다.
+  // 접근성 이펙트가 그때마다 재실행되며 포커스를 강탈하지 않도록 ref 로 최신 값만 유지합니다.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   const [timeframe, setTimeframe] = useState("1d");
   const [loading, setLoading] = useState(false);
@@ -1711,6 +1716,8 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
     let active = true;
 
     const fetchLive = async () => {
+      // 백그라운드 탭에서는 폴링을 건너뜁니다 (App.jsx 등 다른 폴러와 동일한 가드 패턴)
+      if (typeof document !== "undefined" && document.hidden) return;
       try {
         let price = null;
         if (isCrypto) {
@@ -1768,10 +1775,15 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
     const interval = isCrypto ? 5000 : 3000;
     liveIntervalRef.current = setInterval(fetchLive, interval);
 
+    // 탭 복귀 시 즉시 1회 갱신 (다른 폴러들과 동일 패턴 — 백그라운드 공백을 바로 메움)
+    const onVisible = () => { if (!document.hidden) fetchLive(); };
+    document.addEventListener("visibilitychange", onVisible);
+
     return () => {
       active = false;
       clearTimeout(initTimer);
       if (liveIntervalRef.current) clearInterval(liveIntervalRef.current);
+      document.removeEventListener("visibilitychange", onVisible);
       setLiveConnected(false);
     };
   }, [asset, isCrypto, showKRW, canShowKRW, krwRate, timeframe]);
@@ -1787,6 +1799,38 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       document.head.appendChild(style);
     }
     return () => { document.body.style.overflow = ""; };
+  }, []);
+
+  // 다이얼로그 접근성 — ESC 닫기 + 포커스 진입/복원 + Tab 순환 (App.jsx 종목 상세 시트와 동일 패턴)
+  useEffect(() => {
+    // 열릴 때 포커스를 다이얼로그 안으로 옮기고(스크린리더가 aria-label 을 읽음), 닫힐 때 복원합니다.
+    const prevFocus = document.activeElement;
+    dialogRef.current?.focus();
+
+    const onKey = (e) => {
+      if (e.key === "Escape") { onCloseRef.current?.(); return; }
+      if (e.key !== "Tab") return;
+      const root = dialogRef.current;
+      if (!root) return;
+      // Tab 이 전체화면 차트 뒤 배경 요소로 새지 않게 다이얼로그 안에서 순환시킵니다.
+      const f = Array.from(root.querySelectorAll(
+        'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
+      )).filter((el) => el.offsetParent !== null || el === document.activeElement);
+      if (!f.length) { e.preventDefault(); root.focus(); return; }
+      const first = f[0], last = f[f.length - 1];
+      const cur = document.activeElement;
+      if (e.shiftKey && (cur === first || cur === root)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (cur === last || cur === root)) { e.preventDefault(); first.focus(); }
+      else if (!root.contains(cur)) { e.preventDefault(); first.focus(); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      // 원래 요소가 이미 언마운트됐을 수 있어 문서 잔존 시에만 복원합니다.
+      if (prevFocus && document.contains(prevFocus)) prevFocus.focus?.();
+    };
+    // ChartModal 은 조건부 마운트(chartAsset && <ChartModal …>)라 마운트=열림이 보장되므로
+    // 마운트당 1회만 실행합니다. onClose 는 위 onCloseRef 로 항상 최신을 참조합니다.
   }, []);
 
   if (!asset) return null;
@@ -1808,8 +1852,9 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
 
   // ── Full-page layout ───────────────────────────────────────────
   return (
-    <div style={{
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={`${asset.name} 차트`} tabIndex={-1} style={{
       position: "fixed", inset: 0, zIndex: 11000, // E-4 정책: Modal 11000 > 탭바 10000 (모달 전수감사 P2)
+      outline: "none", /* tabIndex=-1 포커스 진입 시 외곽선 숨김 (내부 컨트롤은 브라우저 기본 유지) */
       background: CC.bg, display: "flex", flexDirection: "column",
       overflow: "hidden",
       /* iOS 세이프 에어리어 (노치/다이나믹 아일랜드) 대응 */
@@ -1825,7 +1870,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         {/* 1행: 뒤로 + 종목명 + LIVE 배지 */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "6px" : "8px", minWidth: 0, flex: 1 }}>
-            <button onClick={onClose} style={{
+            <button onClick={onClose} aria-label="차트 닫기" style={{
               background: CC.card, border: `1px solid ${CC.border}`, color: CC.text2, cursor: "pointer",
               fontSize: isMobile ? "14px" : "15px", padding: isMobile ? "8px 8px" : "6px 10px", borderRadius: "8px", fontWeight: 600, flexShrink: 0, minHeight: isMobile ? "40px" : "auto", minWidth: isMobile ? "40px" : "auto", display: "flex", alignItems: "center", justifyContent: "center",
             }}>←</button>

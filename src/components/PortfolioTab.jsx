@@ -283,7 +283,8 @@ export default memo(function PortfolioTab({
             const evalVal = cur ? item.qty * cur : null;
             const isPos = gainVal != null ? gainVal >= 0 : true;
             const mcColor = item.market === "us" ? C.blue : item.market === "kr" ? C.green : C.purple;
-            const mcBg = item.market === "us" ? "#1A2C4F" : item.market === "kr" ? "#1A2A1E" : "#1E1A2A";
+            // 다크 전용 hex 를 테마 알파 틴트로 교체 — 라이트 모드에서도 동작 (App.jsx 시장 배지와 동일 패턴)
+            const mcBg = item.market === "us" ? `${C.blue}1A` : item.market === "kr" ? `${C.green}1A` : `${C.purple}1A`;
             const flag = item.market === "us" ? "🇺🇸" : item.market === "kr" ? "🇰🇷" : "₿";
             return (
               <div key={idx} className="rounded-[16px] overflow-hidden" style={{
