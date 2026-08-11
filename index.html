@@ -411,6 +411,35 @@
     </style>
   </head>
   <body>
+    <!-- ★ 2026-08-11 부트 스플래시 (대표 실보고: "화면 보이기 전에 약관/블로그 쪽이 2초 보인다")
+         #root 안의 SEO 프리렌더 블록은 크롤러용인데, JS 번들이 로드되는 동안 사용자에게
+         그대로 노출되고 있었습니다. 첫 HTML 페인트부터 덮는 인라인 오버레이를 #root 밖에 두고
+         (React 마운트가 #root 내부만 교체하므로 살아남음), App 첫 이펙트가 제거합니다.
+         React 쪽 인증 스플래시(🐋 로딩 중...)와 같은 모양이라 전환이 이어져 보입니다.
+         JS 미실행 환경(크롤러·noscript)에서는 숨겨 프리렌더 콘텐츠가 정상 노출됩니다. -->
+    <div id="boot-splash" style="position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;background:#0A0B0F">
+      <div style="text-align:center">
+        <div style="font-size:48px;margin-bottom:12px">🐋</div>
+        <div style="color:#A1A6B2;font-size:18px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">로딩 중...</div>
+      </div>
+    </div>
+    <noscript><style>#boot-splash{display:none !important}</style></noscript>
+    <script>
+      // 라이트 테마 사용자에게 다크 스플래시가 번쩍이지 않게 저장된 테마를 즉시 반영합니다.
+      try {
+        if (localStorage.getItem("zepta:theme") === "light") {
+          var bs = document.getElementById("boot-splash");
+          bs.style.background = "#F6F8FC";
+          bs.lastElementChild.lastElementChild.style.color = "#4C5870";
+        }
+      } catch (e) {}
+      // 안전장치: 번들 로드가 실패해도 오버레이가 화면을 영원히 덮지 않게 10초 후 자동 해제
+      // (정상 부트에서는 App 첫 이펙트가 그 전에 제거합니다).
+      setTimeout(function () {
+        var b = document.getElementById("boot-splash");
+        if (b) b.style.display = "none";
+      }, 10000);
+    </script>
     <div id="root"></div>
     <!-- ★ SEO + Google OAuth Verification 인식용 정적 푸터.
          React 마운트 전에도 Google bot 이 privacy/terms 링크 발견 가능.

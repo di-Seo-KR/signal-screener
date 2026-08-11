@@ -7856,6 +7856,13 @@ function AppInner() {
     );
   };
 
+  // ★ 2026-08-11: index.html 의 부트 스플래시 제거 — React 가 첫 페인트를 그리는 순간
+  //   (인증 스플래시든 본화면이든) 인계가 끝났으므로 오버레이를 걷습니다.
+  //   부트 스플래시와 인증 스플래시가 같은 모양이라 전환이 이어져 보입니다.
+  useEffect(() => {
+    document.getElementById("boot-splash")?.remove();
+  }, []);
+
   // ── 인증 로딩 중이면 스플래시 (hooks 뒤에 배치해야 hook 수 일관) ──
   if (authLoading) {
     return (

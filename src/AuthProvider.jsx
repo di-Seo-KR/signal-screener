@@ -185,10 +185,15 @@ export default function AuthProvider({ children }) {
         }
         if (mounted) {
           setSession(existingSession);
-          // getUser()로 서버에서 최신 user_metadata 가져오기 (닉네임 등 동기화)
+          // ★ 2026-08-11 (대표 실보고 "로딩 중이 너무 오래"): getUser() 서버 왕복이 끝날 때까지
+          //   앱 전체가 스플래시에 갇혀 있었습니다. 로컬 세션의 user 로 즉시 열고,
+          //   최신 user_metadata(닉네임 등) 동기화는 백그라운드로 돌립니다 —
+          //   느린 회선에서 스플래시가 Supabase 왕복 시간만큼 길어지던 문제 해소.
           if (existingSession?.user) {
-            const { data: { user: freshUser } } = await supabase.auth.getUser();
-            setUser(freshUser ?? existingSession.user);
+            setUser(existingSession.user);
+            supabase.auth.getUser()
+              .then(({ data: { user: freshUser } }) => { if (mounted && freshUser) setUser(freshUser); })
+              .catch(() => { /* 백그라운드 동기화 실패 — 로컬 세션 user 유지 */ });
           } else {
             setUser(null);
           }
