@@ -10,8 +10,13 @@
 // B. 거래소 순입출금 (CryptoQuant, CRYPTOQUANT_API_KEY 필요) — 매도/매수 압력(방향).
 //    ※ 키 수령 후 라이브 계약(베이스/인증/응답) 확정 — 현재는 키 없으면 null(안전).
 //
+// C. 파생(선물) 컨텍스트 (바이낸스 futures/data, 키 불필요) — 2026-08-11 추가.
+//    OI 24h 변화율 + 글로벌 롱숏 계정비. 표시 + 섀도 병행 기록 전용(위 정책 동일 적용).
+//
 // 모든 함수는 throw 안 함 — 실패/미설정 시 null(호출부 무해).
 // ════════════════════════════════════════════════════════════════════
+
+import crypto from "node:crypto";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -112,4 +117,154 @@ export async function getOnchainContext(asset = null) {
   return { liquidity, netflow };
 }
 
-export default { fetchStablecoinLiquidity, fetchExchangeNetflow, cryptoquantEnabled, getOnchainContext };
+// ── C. 파생(선물) 컨텍스트 — 바이낸스 futures/data (무료·무서명) ──────────
+// ★ 2026-08-11 (대표 지시 — 온체인·파생 팩터 1단계): 시그널 "①표시 ②섀도 병행 기록" 전용.
+//   상단 정책(신규 알파는 shadow-first)에 따라 종합 스코어·매매 경로에는 개입하지 않습니다.
+//
+//   실 응답 포맷 curl 확인(2026-08-11, 파싱 근거 — 과거 3회 반복 사고 교훈):
+//   · GET /futures/data/openInterestHist?symbol=BTCUSDT&period=1h&limit=25
+//     → [{ symbol, sumOpenInterest:"106288.035…", sumOpenInterestValue:"…", timestamp }] (timestamp 오름차순, 숫자는 문자열)
+//   · GET /futures/data/globalLongShortAccountRatio?symbol=BTCUSDT&period=1h&limit=25
+//     → [{ symbol, longAccount:"0.6216", longShortRatio:"1.6427", shortAccount:"0.3784", timestamp }] (오름차순)
+//   OI 변화율은 sumOpenInterest(계약 수량) 기준 — sumOpenInterestValue(USD)는 가격 변동이
+//   섞여 순수 포지셔닝 변화가 아니게 됨. ※ oi-tracker.js 는 cron 간(수 분) diff 라 재사용 불가
+//   — 여기는 24h 지평이 필요해 openInterestHist 를 씁니다(읽기 전용 참조만).
+//
+//   바이낸스 직접 호출은 Vercel IP 차단(451) 이력 → binance-client.js 와 동일한 Fly.io
+//   프록시(BINANCE_PROXY_URL/SECRET, POST /binance/request 무서명 GET 래핑) 경유.
+//   binance-client.js 는 실매매 경로라 수정 금지 → 필요한 최소(무서명 GET)만 여기 복제.
+//   프록시 env 미설정(로컬 등)이면 직접 호출 폴백.
+
+const BINANCE_DATA_BASE = process.env.BINANCE_FAPI_BASE || "https://fapi.binance.com";
+
+/** 바이낸스 무서명 GET (프록시 인식). 실패 시 null — throw 안 함. */
+async function binanceDataGet(path, params = {}, { timeoutMs = 6000 } = {}) {
+  const proxyUrl = process.env.BINANCE_PROXY_URL || "";
+  const proxySecret = process.env.BINANCE_PROXY_SECRET || "";
+  if (proxyUrl && proxySecret) {
+    try {
+      // 프록시 내부 인증 서명 — binance-proxy/server.js signInternal 과 동일 규칙
+      const proxyPath = "/binance/request";
+      const bodyStr = JSON.stringify({ method: "GET", path, params, testnet: false, signed: false });
+      const timestamp = Date.now().toString();
+      const sig = crypto.createHmac("sha256", proxySecret)
+        .update(`${timestamp}\nPOST\n${proxyPath}\n${bodyStr}`).digest("hex");
+      const r = await fetch(`${proxyUrl}${proxyPath}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Proxy-Timestamp": timestamp, "X-Proxy-Signature": sig },
+        body: bodyStr,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      const wrapped = await r.json().catch(() => null);
+      // 프록시는 { ok, status, data } 로 래핑 — ok=false(바이낸스/프록시 오류)는 null
+      if (!wrapped || wrapped.ok === false) return null;
+      return wrapped.data ?? null;
+    } catch (e) {
+      console.warn(`[onchain] proxy ${path} 실패: ${e?.message}`);
+      return null;
+    }
+  }
+  const qs = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null && v !== "")
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
+  return jget(`${BINANCE_DATA_BASE}${path}${qs ? `?${qs}` : ""}`, { timeoutMs });
+}
+
+/** timestamp 오름차순 배열에서 마지막 값 + ~24h 전 베이스라인 추출. 24h±4h 밖이면 null. */
+function pick24hBaseline(arr) {
+  if (!Array.isArray(arr) || arr.length < 2) return null;
+  const last = arr[arr.length - 1];
+  const lastTs = Number(last?.timestamp);
+  if (!Number.isFinite(lastTs)) return null;
+  const target = lastTs - DAY_MS;
+  let best = null, bestGap = Infinity;
+  for (const e of arr) {
+    const t = Number(e?.timestamp);
+    if (!Number.isFinite(t)) continue;
+    const gap = Math.abs(t - target);
+    if (gap < bestGap) { bestGap = gap; best = e; }
+  }
+  // 24h 근접 베이스라인만 인정 — 아니면 "24h 변화"라는 라벨이 거짓이 됨(가짜 데이터 금지)
+  if (!best || bestGap > 4 * 3600 * 1000) return null;
+  return { last, base: best };
+}
+
+/** 단일 심볼 파생 지표 — { oiChg24h(%), lsRatio, lsChg } (산출 불가 필드는 null). */
+async function fetchSymbolDeriv(symbol) {
+  // period=1h·limit=25 → 마지막 버킷과 24h 전 버킷 비교 (심볼당 2콜)
+  const [oiArr, lsArr] = await Promise.all([
+    binanceDataGet("/futures/data/openInterestHist", { symbol, period: "1h", limit: 25 }),
+    binanceDataGet("/futures/data/globalLongShortAccountRatio", { symbol, period: "1h", limit: 25 }),
+  ]);
+  let oiChg24h = null;
+  const oiPick = pick24hBaseline(oiArr);
+  if (oiPick) {
+    const lastOi = Number(oiPick.last?.sumOpenInterest);
+    const baseOi = Number(oiPick.base?.sumOpenInterest);
+    if (Number.isFinite(lastOi) && Number.isFinite(baseOi) && baseOi > 0) {
+      oiChg24h = Number(((lastOi / baseOi - 1) * 100).toFixed(2));
+    }
+  }
+  let lsRatio = null, lsChg = null;
+  if (Array.isArray(lsArr) && lsArr.length > 0) {
+    const lastLs = Number(lsArr[lsArr.length - 1]?.longShortRatio);
+    if (Number.isFinite(lastLs)) lsRatio = Number(lastLs.toFixed(3));
+    const lsPick = pick24hBaseline(lsArr);
+    const baseLs = Number(lsPick?.base?.longShortRatio);
+    if (Number.isFinite(lastLs) && Number.isFinite(baseLs)) lsChg = Number((lastLs - baseLs).toFixed(3));
+  }
+  if (oiChg24h == null && lsRatio == null) return null; // 두 소스 모두 실패
+  return { oiChg24h, lsRatio, lsChg };
+}
+
+const DERIV_CACHE_KEY = "di:onchain:deriv-ctx";
+const DERIV_CACHE_FRESH_MS = 30 * 60 * 1000; // 30분 — btc-cron 10분 주기 대비 호출 수 1/3
+const DERIV_MAX_SYMBOLS = 60;  // 유니버스 50종 + 여유 (심볼당 2콜 상한 가드)
+const DERIV_CHUNK = 10;        // 동시 요청 심볼 수 (프록시 부하 분산)
+
+/**
+ * 파생·온체인 통합 컨텍스트 — 유니버스 심볼을 한 번에(KV 30분 캐시로 호출 수 최소화).
+ * @param {string[]} symbols 바이낸스 선물 심볼 (예: ["BTCUSDT", ...])
+ * @returns {Promise<{bySymbol: Object<string,{oiChg24h:number|null,lsRatio:number|null,lsChg:number|null}|null>,
+ *   stableTrend:{bias:number,chg7dPct:number,regime:string}|null, ts:number}>}
+ *   실패 필드는 null · throw 안 함(호출부 무해).
+ */
+export async function fetchDerivOnchainContext(symbols = []) {
+  const now = Date.now();
+  const want = [...new Set((Array.isArray(symbols) ? symbols : []).filter((s) => typeof s === "string" && s))]
+    .slice(0, DERIV_MAX_SYMBOLS);
+  // 글로벌 스테이블 유동성은 자체 KV 캐시(6h) 있음 — 심볼 조회와 병렬
+  const stablePromise = fetchStablecoinLiquidity().catch(() => null);
+  const bySymbol = {};
+  try {
+    if (want.length > 0) {
+      const kv = await getKvSafe();
+      let cached = null;
+      if (kv) { try { cached = await kv.get(DERIV_CACHE_KEY); } catch { cached = null; } }
+      const fresh = !!(cached && Number.isFinite(cached.ts) && now - cached.ts < DERIV_CACHE_FRESH_MS
+        && cached.bySymbol && typeof cached.bySymbol === "object"
+        && want.every((s) => s in cached.bySymbol));
+      if (fresh) {
+        for (const s of want) bySymbol[s] = cached.bySymbol[s] ?? null;
+      } else {
+        for (let i = 0; i < want.length; i += DERIV_CHUNK) {
+          const chunk = want.slice(i, i + DERIV_CHUNK);
+          const results = await Promise.allSettled(chunk.map((s) => fetchSymbolDeriv(s)));
+          chunk.forEach((s, j) => { bySymbol[s] = results[j].status === "fulfilled" ? results[j].value : null; });
+          // 첫 청크가 전멸(프록시/네트워크 다운)이면 잔여 청크 중단 — cron 지연 방지
+          if (i === 0 && chunk.every((s) => bySymbol[s] == null)) break;
+        }
+        // 1건 이상 성공했을 때만 캐시 — 전멸 결과를 30분 캐시하면 복구가 늦어짐
+        const okCount = Object.values(bySymbol).filter(Boolean).length;
+        if (kv && okCount > 0) { try { await kv.set(DERIV_CACHE_KEY, { ts: now, bySymbol }, { ex: 3600 }); } catch {} }
+      }
+    }
+  } catch (e) {
+    console.warn(`[onchain] deriv context 실패: ${e?.message}`);
+  }
+  const liq = await stablePromise;
+  const stableTrend = liq ? { bias: liq.bias, chg7dPct: liq.chg7dPct, regime: liq.regime } : null;
+  return { bySymbol, stableTrend, ts: now };
+}
+
+export default { fetchStablecoinLiquidity, fetchExchangeNetflow, cryptoquantEnabled, getOnchainContext, fetchDerivOnchainContext };

@@ -110,6 +110,9 @@ export default async function handler(req, res) {
           breakdown: normBreakdown(e.breakdown), // { 1w,1d,4h,1h: {side,score}|null }
           entryRefine: e.entryRefine || null, // ★ MTF 소진·차트구조 정제 { mult, reasons, before }
           sr: e.sr || null, // ★ 지지·저항 { s:[{p,t,d}], r:[{p,t,d}], piv, px, m } | null
+          // ★ 2026-08-11 온체인·파생 표시 컨텍스트 통과 (additive·표시 전용 — UI 는 sig.oc 를 읽음).
+          //   ocShadow(내부 섀도 평가용)는 의도적으로 통과시키지 않습니다(화면 미노출 원칙).
+          oc: e.oc || null,
         });
       }
     }

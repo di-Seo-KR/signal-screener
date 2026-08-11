@@ -918,15 +918,40 @@ function fmtLevelPrice(v) {
   return n.toFixed(6);
 }
 
+/** 주식 시세 표기 — KRX 는 원화 정수 관례, 미국 주식은 달러 소수 2자리 관례를 따릅니다. */
+function fmtStockPrice(v, market) {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  if (market === "kr") return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// KRX 6자리 코드 → 종목명 (홈 시그널 카드·상세 시트 공용).
+// 코드만으론 어떤 종목인지 읽히지 않아, 자산 마스터에 있는 종목은 종목명으로 표기합니다.
+const KR_NAME_BY_CODE = Object.fromEntries(
+  KR_ASSETS.map((a) => [a.symbol.replace(/\.(KS|KQ)$/, ""), a.name])
+);
+
+// ★ 홈 시그널 주식 축 킬스위치 (2026-08 신설, 기본 켜짐) — 빌드 시
+//   VITE_ZEPTA_STOCK_SIGNALS=0 으로 끄면 주식 탭·폴링이 모두 사라지고 기존 코인
+//   화면 그대로 동작합니다. 서버 쪽은 /api/stock-scores 엔드포인트의 ZEPTA_* 게이트가 담당.
+const STOCK_SIGNALS_ON = (import.meta.env.VITE_ZEPTA_STOCK_SIGNALS ?? "1") !== "0";
+// ★ 코인 상세 시트 온체인 카드 킬스위치 (기본 켜짐, VITE_ZEPTA_ONCHAIN_UI=0 으로 끔).
+const ONCHAIN_UI_ON = (import.meta.env.VITE_ZEPTA_ONCHAIN_UI ?? "1") !== "0";
+
 const DETAIL_TF = [["1w", "1주"], ["1d", "1일"], ["4h", "4시간"], ["1h", "1시간"]];
 
 /** coin-scores 산출 시각(ts, epoch ms) → "N분 전 집계" 실측 문구.
  *  ts 가 없거나 비정상이면 null — 신선도를 지어내지 않고 표기를 생략합니다.
- *  30분(생성 주기 10분의 3배) 이상 밀리면 "갱신 지연"을 덧붙여 정직하게 알립니다.
+ *  staleMin(기본 30분 = 코인 생성 주기 10분의 3배) 이상 밀리면 "갱신 지연"을
+ *  덧붙여 정직하게 알립니다. ⚠️ 주식 풀은 크론 주기가 다릅니다(vercel.json —
+ *  미국 30분·한국 60분): 30분 기준을 그대로 쓰면 KRX 정상 운영의 절반가량이
+ *  상시 "갱신 지연"으로 표기되므로, 주식 경로는 staleMin=90(한국 주기의 1.5배)을
+ *  넘겨 정시 운영을 지연으로 단정하지 않습니다.
  *  두 번째 인자로 i18n t() 를 넘기면 로케일 문구(tabs.home.aggregated*)로 표기합니다 —
  *  영어 화면에서 한국어 고정 문구가 섞이던 문제 방지. t 를 생략하면 기존 한국어
  *  문구 그대로라 아직 i18n 미적용 화면(상세 시트 asOfLabel)은 동작이 변하지 않습니다. */
-function coinScoreFreshness(ts, t) {
+function coinScoreFreshness(ts, t, staleMin = 30) {
   const n = Number(ts);
   if (!Number.isFinite(n) || n <= 0) return null;
   const min = Math.max(0, Math.round((Date.now() - n) / 60000));
@@ -936,26 +961,44 @@ function coinScoreFreshness(ts, t) {
       : t("tabs.home.aggregatedHourAgo", { n: Math.floor(min / 60) }))
     : (min < 1 ? "방금 집계" : min < 60 ? `${min}분 전 집계` : `${Math.floor(min / 60)}시간 전 집계`);
   const stale = t ? t("tabs.home.staleSuffix") : "갱신 지연";
-  return min >= 30 ? `${base} · ${stale}` : base;
+  return min >= staleMin ? `${base} · ${stale}` : base;
 }
+
+/** 풀 종류별 "갱신 지연" 임계(분) — 코인 30분(10분 주기×3), 주식 90분(한국 60분 주기×1.5). */
+const STALE_MIN_STOCK = 90;
 
 /** 상세 시트 기간 탭 → CoinGecko OHLC days 매핑 (탭마다 실제 다른 데이터를 불러옵니다). */
 const DETAIL_RANGE_DAYS = { "1D": "1", "1W": "7", "1M": "30", "1Y": "365" };
+
+/** 상세 시트 기간 탭 → 야후(/api/yahoo-batch) interval/range 매핑 (주식 전용).
+ *  ⚠️ 네 조합 모두 2026-08-11 라이브 curl 로 실제 응답을 확인했습니다
+ *  (5m/1d·30m/5d 는 미국·KRX 둘 다 동작). 야후가 거부하는 조합을 넣지 마세요. */
+const DETAIL_STOCK_RANGE = {
+  "1D": ["5m", "1d"], "1W": ["30m", "5d"], "1M": ["1d", "1mo"], "1Y": ["1d", "1y"],
+};
 
 // ★ 감사 배치3 (i18n): 두 번째 인자 t 를 받아 asOfLabel(집계 신선도 포함)을 로케일에
 //   맞춥니다 — EN 화면에서 상세 시트 기준시각 문구가 한국어로 남던 문제. t 를 생략하면
 //   기존 한국어 폴백 그대로 동작합니다(시트의 나머지 문구는 별도 i18n 과제).
 function buildAssetDetailProps(sig, t) {
   if (!sig) return null;
-  const ticker = String(sig.asset || sig.symbol || "").replace(/USDT$/i, "").toUpperCase();
+  // ★ 2026-08 주식 확장: stock-scores 엔트리는 market("us"|"kr") 필드로 구분합니다.
+  //   market 이 없거나 다른 값이면 기존 코인 경로 그대로 동작합니다(회귀 없음).
+  const market = sig.market === "us" || sig.market === "kr" ? sig.market : "crypto";
+  const isStock = market !== "crypto";
+  const ticker = isStock
+    ? String(sig.symbol || "").replace(/\.(KS|KQ)$/i, "").toUpperCase()
+    : String(sig.asset || sig.symbol || "").replace(/USDT$/i, "").toUpperCase();
   const dir = sig.side === "LONG" ? "up" : sig.side === "SHORT" ? "down" : "neutral";
+  // 가격 표기: 코인은 기존 규칙(6자리 소수까지), 주식은 시장 관례(₩ 정수 / $ 소수 2자리).
+  const fmtPx = isStock ? (v) => fmtStockPrice(v, market) : fmtLevelPrice;
 
   // ── 지지·저항: sr.s / sr.r 은 "가까운 순". 시안은 위(R2)→아래(S2) 순서입니다. ──
   const sr = sig.sr || null;
   const sArr = Array.isArray(sr?.s) ? sr.s : [];
   const rArr = Array.isArray(sr?.r) ? sr.r : [];
   const mkLevel = (x, tag) => ({
-    tag, price: fmtLevelPrice(x?.p),
+    tag, price: fmtPx(x?.p),
     distancePct: Number(x?.d), touches: Number(x?.t),
   });
   const levelItems = [
@@ -965,7 +1008,7 @@ function buildAssetDetailProps(sig, t) {
 
   // ── 매물대 POC — 서버가 이미 계산해 내려주는 거래량 프로파일(sr.vp)을 함께 표기합니다.
   //    (VAH/VAL 은 시트의 지지/저항 색 규칙과 의미가 어긋나 POC 만 — 최다 거래 가격대)
-  const pocPrice = fmtLevelPrice(sr?.vp?.poc);
+  const pocPrice = fmtPx(sr?.vp?.poc);
   if (pocPrice) {
     const pocN = Number(sr.vp.poc);
     const pxN = Number(sr?.px);
@@ -988,7 +1031,10 @@ function buildAssetDetailProps(sig, t) {
 
   // ── 타임프레임 정렬 + 근거 ──
   const bd = sig.breakdown || {};
-  const timeframes = DETAIL_TF.map(([k, label]) => ({
+  // 주식 breakdown 은 4h 등 일부 구간이 없을 수 있어 "응답에 있는 키만" 칩·지표로
+  // 만듭니다(없는 구간의 빈 칩을 그리지 않음). 코인은 기존 4구간 고정 그대로입니다.
+  const tfDefs = isStock ? DETAIL_TF.filter(([k]) => bd[k] != null) : DETAIL_TF;
+  const timeframes = tfDefs.map(([k, label]) => ({
     label,
     dir: bd[k]?.side === "LONG" ? "up" : bd[k]?.side === "SHORT" ? "down" : null,
   }));
@@ -999,7 +1045,10 @@ function buildAssetDetailProps(sig, t) {
   const rated = timeframes.filter((t) => t.dir);
   if (rated.length) {
     const aligned = timeframes.filter((t) => t.dir === dir).length;
-    reasons.push(`주·일·4시간·1시간 네 구간 중 ${aligned}개가 ${dir === "up" ? "상승" : "하락"} 방향입니다.`);
+    reasons.push(isStock
+      // 주식은 구간 수가 응답에 따라 다르므로 실제 구간 이름을 그대로 나열합니다.
+      ? `${tfDefs.map(([, l]) => l).join("·")} ${tfDefs.length}개 구간 중 ${aligned}개가 ${dir === "up" ? "상승" : "하락"} 방향입니다.`
+      : `주·일·4시간·1시간 네 구간 중 ${aligned}개가 ${dir === "up" ? "상승" : "하락"} 방향입니다.`);
   }
   const distParts = [];
   if (rArr[0] && Number.isFinite(Number(rArr[0].d))) distParts.push(`가장 가까운 저항까지 +${Math.abs(Number(rArr[0].d)).toFixed(1)}%`);
@@ -1007,37 +1056,103 @@ function buildAssetDetailProps(sig, t) {
   if (distParts.length) reasons.push(`${distParts.join(", ")} 남아 있습니다.`);
 
   // ── 보조지표 2×2 = 타임프레임별 점수 (칩은 방향만, 여기는 점수까지) ──
-  const indicators = DETAIL_TF.map(([k, label]) => {
+  const indicators = tfDefs.map(([k, label]) => {
     const x = bd[k];
     const sc = Number(x?.score);
     if (!x || !Number.isFinite(sc)) return null;
     return {
       label: `${label} 구간`, value: Math.round(sc),
-      note: x.side === "LONG" ? "롱 우위" : x.side === "SHORT" ? "숏 우위" : "중립",
+      // 주식은 현물이라 롱/숏 대신 상승/하락 우위로 서술합니다(파생 워딩 회피).
+      note: x.side === "LONG" ? (isStock ? "상승 우위" : "롱 우위")
+        : x.side === "SHORT" ? (isStock ? "하락 우위" : "숏 우위") : "중립",
       dir: x.side === "LONG" ? "up" : x.side === "SHORT" ? "down" : "neutral",
     };
   }).filter(Boolean);
 
-  const priceStr = fmtLevelPrice(sr?.px);
-  const known = CRYPTO_ASSETS.find((a) => a.symbol === ticker);
+  // ── 온체인 보조 카드 (코인 전용 · coin-scores 의 additive oc 필드) ──
+  //    값이 실려 온 항목만 카드를 만듭니다 — oc 자체가 없거나 값이 비면 카드도 없습니다
+  //    (지어내지 않음). ⚠️ ocShadow(내부 평가용)는 어떤 경로로도 화면에 올리지 않습니다.
+  if (ONCHAIN_UI_ON && !isStock && sig.oc && typeof sig.oc === "object") {
+    const pickNum = (...vals) => {
+      for (const v of vals) { const n = Number(v); if (Number.isFinite(n)) return n; }
+      return null;
+    };
+    // 미결제약정 24h 변화율(%) — 실제 계약 필드 oiChg24h(btc-cron _oc) 1순위,
+    // 나머지는 과거 표기 변형 방어용 폴백입니다.
+    const oiPct = pickNum(sig.oc.oiChg24h, sig.oc.oiChg24hPct, sig.oc.oi24hPct, sig.oc.oi24h);
+    if (oiPct != null) {
+      indicators.push({
+        label: t ? t("tabs.home.ocOiLabel") : "미결제약정 24h",
+        value: `${oiPct >= 0 ? "+" : ""}${oiPct.toFixed(1)}%`,
+        // 증감 색은 값 변화 방향 표기 관례(+초록/−빨강) — 방향성 해석은 덧붙이지 않습니다.
+        dir: oiPct > 0 ? "up" : oiPct < 0 ? "down" : "neutral",
+      });
+    }
+    // 롱숏 비율 — 1 초과면 롱 계정 우위, 미만이면 숏 계정 우위(사실 서술).
+    // ⚠️ 실제 백엔드 계약 필드는 lsRatio (api/_shared/onchain.js fetchSymbolDeriv →
+    //    btc-cron _oc 적재) — 반드시 1순위. 나머지는 과거 표기 변형 방어용 폴백입니다.
+    const lsr = pickNum(sig.oc.lsRatio, sig.oc.lsr, sig.oc.longShortRatio, sig.oc.ls);
+    if (lsr != null && lsr > 0) {
+      indicators.push({
+        label: t ? t("tabs.home.ocLsrLabel") : "롱숏 비율",
+        value: lsr.toFixed(2),
+        note: lsr > 1 ? (t ? t("tabs.home.longDominant") : "롱 우위")
+          : lsr < 1 ? (t ? t("tabs.home.shortDominant") : "숏 우위")
+          : (t ? t("tabs.home.neutral") : "중립"),
+        dir: lsr > 1 ? "up" : lsr < 1 ? "down" : "neutral",
+      });
+    }
+  }
+
+  const priceStr = fmtPx(sr?.px);
+  // known: 관심종목 토글이 가능한 자산 마스터 엔트리 — 코인은 CRYPTO_ASSETS,
+  // 주식은 US/KR 마스터에 있는 종목만(마스터 밖 종목은 별 버튼 숨김 — 코인과 동일 원칙).
+  const known = isStock
+    ? (() => {
+        const m = market === "us"
+          ? US_ASSETS.find((a) => a.symbol === ticker)
+          : KR_ASSETS.find((a) => a.symbol.replace(/\.(KS|KQ)$/, "") === ticker);
+        return m ? { symbol: ticker, name: m.name, symbolRaw: m.symbol } : undefined;
+      })()
+    : CRYPTO_ASSETS.find((a) => a.symbol === ticker);
   const score = Number(sig.score);
+  const dispName = isStock
+    ? ((market === "us" ? US_KO_NAMES[ticker] : undefined) || known?.name
+        || (typeof sig.name === "string" && sig.name ? sig.name : undefined))
+    : known ? (CRYPTO_KO_NAMES[known.id] || known.name) : undefined;
 
   return {
     ticker,
     known,
+    market,
     props: {
       symbol: ticker,
-      name: known ? (CRYPTO_KO_NAMES[known.id] || known.name) : undefined,
-      meta: "바이낸스 선물 · 무기한",
-      price: priceStr ? `$${priceStr}` : undefined,
+      name: dispName,
+      meta: isStock
+        ? (market === "us"
+          ? (t ? t("tabs.home.stockMetaUs") : "나스닥·NYSE · 기술적 지표 종합")
+          : (t ? t("tabs.home.stockMetaKr") : "KRX · 기술적 지표 종합"))
+        : "바이낸스 선물 · 무기한",
+      price: priceStr ? `${market === "kr" ? "₩" : "$"}${priceStr}` : undefined,
       // ⚠️ coin-scores 에 등락률 필드가 없어 등락 알약은 넣지 않습니다(0% 를 지어내지 않음).
       // 갱신 표기는 엔진 산출 시각(ts) 실측 — "10분 주기 갱신" 고정 문구는 크론이 멈춰도
       // 신선한 척 보여 제거했습니다. ts 가 없으면 경과 표기 자체를 생략합니다.
-      asOfLabel: priceStr
-        ? [t ? t("tabs.home.asOfDailyClose") : "최근 일봉 종가 기준", coinScoreFreshness(sig.ts, t)].filter(Boolean).join(" · ")
-        : undefined,
+      // 주식은 스코어 산출 기반(일봉/장중 혼합)을 단정할 수 없어 집계 신선도만 표기합니다.
+      // 지연 임계는 주식 크론 주기(미국 30분·한국 60분)에 맞춘 90분 — 정시 운영을
+      // "갱신 지연"으로 단정하지 않기 위함입니다.
+      asOfLabel: isStock
+        ? (coinScoreFreshness(sig.ts, t, STALE_MIN_STOCK) || undefined)
+        : (priceStr
+          ? [t ? t("tabs.home.asOfDailyClose") : "최근 일봉 종가 기준", coinScoreFreshness(sig.ts, t)].filter(Boolean).join(" · ")
+          : undefined),
       signal: Number.isFinite(score) ? {
-        dir, sideLabel: dir === "up" ? "롱 우위" : dir === "down" ? "숏 우위" : "중립",
+        dir,
+        // 주식은 상승/하락 우위, 코인은 롱/숏 우위 — 홈 카드와 같은 워딩 규칙입니다.
+        sideLabel: isStock
+          ? (dir === "up" ? (t ? t("tabs.home.upDominant") : "상승 우위")
+            : dir === "down" ? (t ? t("tabs.home.downDominant") : "하락 우위")
+            : (t ? t("tabs.home.neutral") : "중립"))
+          : (dir === "up" ? "롱 우위" : dir === "down" ? "숏 우위" : "중립"),
         score: Math.round(Math.max(0, Math.min(100, score))),
         timeframes: rated.length ? timeframes : [],
         reasons,
@@ -7138,6 +7253,45 @@ function AppInner() {
     return () => { cancelled = true; clearInterval(timer); };
   }, [tab, isOwner]);
 
+  // ── 오늘의 시그널 · 주식 축 (2026-08 주식+온체인 확장) ──
+  // 코인과 같은 패턴(5분 폴링 + localStorage 캐시)으로 주식 스코어 풀을 조회합니다.
+  //   GET /api/stock-scores?limit=12
+  //   → { ok, stocks:[{ symbol, market:"us"|"kr", side, score,
+  //        breakdown:{1w,1d,(4h),1h}, sr:{s,r,px}, ts }] }  — coin-scores 와 동일 스키마.
+  // 엔드포인트 부재(배포 전)·장애·빈 응답이면 빈 배열 유지 → 주식 세그먼트 자체가
+  // 나타나지 않고 기존 코인 화면 그대로입니다(가짜 데이터 금지).
+  const [homeSignalMarket, setHomeSignalMarket] = useState("crypto"); // "crypto" | "stock"
+  const [homeStockSignals, setHomeStockSignals] = useState(() => {
+    if (!STOCK_SIGNALS_ON) return [];
+    try {
+      const c = JSON.parse(localStorage.getItem("zepta:stock-scores:cache") || "null");
+      return Array.isArray(c?.stocks) ? c.stocks : [];
+    } catch { return []; }
+  });
+  useEffect(() => {
+    if (!STOCK_SIGNALS_ON || tab !== "home" || isOwner) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const r = await fetch("/api/stock-scores?limit=12");
+        if (!r.ok) return;
+        const j = await r.json();
+        if (cancelled || !j?.ok) return;
+        const arr = Array.isArray(j.stocks) ? j.stocks : Array.isArray(j.items) ? j.items : null;
+        if (!arr) return;
+        // market 필드 정규화 — 계약상 엔트리마다 market("us"|"kr")이 실립니다.
+        // 혹시 빠진 엔트리는 KRX 6자리 코드 형식 여부로만 분류합니다(형식 기반 판정).
+        const rows = arr.filter(Boolean).map((s) => s.market ? s
+          : { ...s, market: /^\d{6}(\.(KS|KQ))?$/i.test(String(s.symbol || "")) ? "kr" : "us" });
+        setHomeStockSignals(rows);
+        try { localStorage.setItem("zepta:stock-scores:cache", JSON.stringify({ ...j, stocks: rows })); } catch {}
+      } catch {}
+    };
+    load();
+    const timer = setInterval(load, 5 * 60 * 1000); // 코인과 동일한 5분 폴링
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [tab, isOwner]);
+
   // ── 종목 상세 시트 (2026-08 모바일 시안) ──
   // 홈 "오늘의 시그널" 카드를 누르면 그 종목 하나를 끝까지 읽는 화면을 띄웁니다.
   // 값은 이미 받아둔 coin-scores 엔트리에서 전부 파생 — 추가 fetch 가 없습니다.
@@ -7192,6 +7346,45 @@ function AppInner() {
   const [detailSpark, setDetailSpark] = useState(null); // { symbol, range, points }
   useEffect(() => {
     if (!detailSignal) { setDetailSpark(null); return; }
+
+    // ── 주식 분기 (2026-08 주식 확장): /api/yahoo-batch 로 실데이터 차트 ──
+    // 기간 탭 → interval/range 는 DETAIL_STOCK_RANGE(라이브 curl 검증 조합)만 씁니다.
+    if (detailSignal.market === "us" || detailSignal.market === "kr") {
+      const raw = String(detailSignal.symbol || "");
+      const dispTicker = raw.replace(/\.(KS|KQ)$/i, "").toUpperCase();
+      // 야후 심볼: 응답이 이미 야후 형식(005930.KS)이면 그대로, 아니면 자산 마스터의
+      // symbolRaw 로 보정합니다. 둘 다 없으면 코드 그대로 시도(미국 주식은 코드=야후 심볼).
+      const master = ALL_ASSETS.find((a) => a.market === detailSignal.market
+        && (a.symbol === dispTicker || a.symbolRaw === raw));
+      const yahooSym = /\.(KS|KQ)$/i.test(raw) ? raw : (master?.symbolRaw || raw);
+      if (!yahooSym) { setDetailSpark(null); return; }
+      if (detailSpark && detailSpark.symbol !== dispTicker) { setDetailSpark(null); return; }
+      if (detailSpark && detailSpark.symbol === dispTicker && detailSpark.range === detailRange) return;
+      const [iv, rg] = DETAIL_STOCK_RANGE[detailRange] || DETAIL_STOCK_RANGE["1M"];
+      let cancelled = false;
+      (async () => {
+        try {
+          const r = await fetch(`/api/yahoo-batch?symbols=${encodeURIComponent(yahooSym)}&interval=${iv}&range=${rg}`);
+          if (r.ok) {
+            const j = await r.json();
+            if (cancelled) return;
+            // 응답 계약(2026-08-11 라이브 확인): { results: { [symbol]: { closes:[...] } } }
+            const entry = j?.results?.[yahooSym]
+              || (j?.results && Object.keys(j.results).length === 1 ? Object.values(j.results)[0] : null);
+            const pts = Array.isArray(entry?.closes)
+              ? entry.closes.map(Number).filter(Number.isFinite)
+              : [];
+            if (pts.length >= 2) { setDetailSpark({ symbol: dispTicker, range: detailRange, points: pts }); return; }
+          }
+        } catch {}
+        // 실패 시: 코인 경로와 동일하게, 이미 그려 둔 기간이 있으면 탭 선택을 되돌립니다.
+        if (!cancelled) {
+          setDetailRange((cur) => (detailSpark && detailSpark.symbol === dispTicker ? detailSpark.range : cur));
+        }
+      })();
+      return () => { cancelled = true; };
+    }
+
     const ticker = String(detailSignal.asset || detailSignal.symbol || "").replace(/USDT$/i, "").toUpperCase();
     const knownAsset = CRYPTO_ASSETS.find((a) => a.symbol === ticker);
     if (!knownAsset) { setDetailSpark(null); return; }
@@ -8188,9 +8381,22 @@ function AppInner() {
           // ── 오늘의 시그널 (멀티TF 시그널 풀 — 없으면 섹션 자체를 렌더하지 않습니다) ──
           const TF_KO = { "1w": "주", "1d": "일", "4h": "4시간", "1h": "1시간" };
           const srFmt = fmtLevelPrice; // 상세 시트와 같은 표기 규칙 (모듈 상단 SSOT)
-          const signalRows = (Array.isArray(homeSignals) ? homeSignals : [])
+          // ★ 2026-08 주식 확장: [코인|주식] 세그먼트. 두 풀 모두 같은 필터를 거칩니다.
+          const signalRowsOf = (arr) => (Array.isArray(arr) ? arr : [])
             .filter(s => s && (s.side === "LONG" || s.side === "SHORT") && Number.isFinite(Number(s.score)))
             .slice(0, 3);
+          const coinSignalRows = signalRowsOf(homeSignals);
+          const stockSignalRows = STOCK_SIGNALS_ON
+            ? signalRowsOf(homeStockSignals).filter(s => s.market === "us" || s.market === "kr")
+            : [];
+          // 세그먼트는 두 풀이 모두 있을 때만 노출 — 주식 응답이 아직 없으면(배포 전·장애)
+          // 기존 코인 화면 그대로입니다. 선택한 풀이 비면 남은 풀로 자동 대체합니다.
+          const showSignalSegment = coinSignalRows.length > 0 && stockSignalRows.length > 0;
+          const activeSignalMarket =
+            homeSignalMarket === "stock" && stockSignalRows.length > 0 ? "stock"
+            : coinSignalRows.length > 0 ? "crypto"
+            : stockSignalRows.length > 0 ? "stock" : "crypto";
+          const signalRows = activeSignalMarket === "stock" ? stockSignalRows : coinSignalRows;
 
           return (
             <div className="tab-content" style={{ maxWidth: "860px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "18px" }}>
@@ -8257,15 +8463,39 @@ function AppInner() {
                 <section>
                   <MobileSectionHeader
                     title={t("tabs.home.todaySignals")}
-                    live
+                    // 주식 스코어는 장 마감 후 마지막 장중 데이터가 유지되는 설계(주말 60시간+)라
+                    // 실시간을 시사하는 펄스 점을 켜지 않습니다 — 캡션의 "N시간 전 집계"와
+                    // 모순되지 않도록 코인 풀 표시 중에만 켭니다.
+                    live={activeSignalMarket !== "stock"}
                     actionLabel={t("tabs.home.viewAll")}
-                    onAction={() => { window.location.href = "/coin"; }}
+                    // 전체 보기: 코인은 코인 목록 페이지, 주식은 스크리너 주식 필터로 이동합니다.
+                    onAction={activeSignalMarket === "stock"
+                      ? () => { setFilterMarket("stock"); setTab("screener"); }
+                      : () => { window.location.href = "/coin"; }}
                   />
+                  {/* [코인|주식] 세그먼트 — 두 풀이 모두 있을 때만 (mobileKit Segment) */}
+                  {showSignalSegment && (
+                    <Segment
+                      value={activeSignalMarket}
+                      onChange={setHomeSignalMarket}
+                      options={[
+                        { value: "crypto", label: t("tabs.home.segCoin") },
+                        { value: "stock", label: t("tabs.home.segStock") },
+                      ]}
+                      style={{ marginBottom: "10px" }}
+                    />
+                  )}
                   <div style={{ display: "flex", flexDirection: "column", gap: "9px" }}>
                     {signalRows.map((sig, i) => {
+                      const isStockSig = sig.market === "us" || sig.market === "kr";
                       const dir = sig.side === "LONG" ? "up" : "down";
                       const bd = sig.breakdown || {};
-                      const tfs = ["1w", "1d", "4h", "1h"].map(tf => ({
+                      // 주식 breakdown 은 4h 가 없을 수 있어 응답에 있는 키만 칩으로 만듭니다
+                      // (없는 구간의 "—" 빈 칩을 그리지 않음). 코인은 기존 4칩 고정 그대로.
+                      const tfKeys = isStockSig
+                        ? Object.keys(TF_KO).filter(k => bd[k] != null)
+                        : ["1w", "1d", "4h", "1h"];
+                      const tfs = tfKeys.map(tf => ({
                         label: TF_KO[tf],
                         dir: bd[tf]?.side === "LONG" ? "up" : bd[tf]?.side === "SHORT" ? "down" : null,
                       }));
@@ -8273,11 +8503,21 @@ function AppInner() {
                       const res = srFmt(sig.sr?.r?.[0]?.p);
                       // 지지·저항이 하나도 없으면 현재가 줄까지 통째로 숨깁니다(빈 칸 방지).
                       const px = (sup || res) ? srFmt(sig.sr?.px) : null;
+                      // 표기: KRX 는 6자리 코드 대신 종목명(마스터에 있으면), 미국은 티커 그대로.
+                      const symText = isStockSig
+                        ? (sig.market === "kr"
+                          ? (KR_NAME_BY_CODE[String(sig.symbol || "").replace(/\.(KS|KQ)$/i, "")]
+                            || String(sig.symbol || "—").replace(/\.(KS|KQ)$/i, ""))
+                          : String(sig.symbol || "—"))
+                        : String(sig.symbol || sig.asset || "—").replace("USDT", "");
                       return (
                         <SignalCard
                           key={`${sig.symbol || sig.asset || "sig"}-${i}`}
-                          symbol={String(sig.symbol || sig.asset || "—").replace("USDT", "")}
-                          sideLabel={sig.side === "LONG" ? t("tabs.home.longDominant") : t("tabs.home.shortDominant")}
+                          symbol={symText}
+                          // 주식은 현물이라 롱/숏 대신 상승/하락 우위로 서술합니다.
+                          sideLabel={sig.side === "LONG"
+                            ? t(isStockSig ? "tabs.home.upDominant" : "tabs.home.longDominant")
+                            : t(isStockSig ? "tabs.home.downDominant" : "tabs.home.shortDominant")}
                           dir={dir}
                           score={Math.round(Math.max(0, Math.min(100, Number(sig.score))))}
                           timeframes={tfs.some(x => x.dir) ? tfs : []}
@@ -8295,8 +8535,14 @@ function AppInner() {
                     {(() => {
                       const newestTs = signalRows.reduce((m, s) => Math.max(m, Number(s?.ts) || 0), 0);
                       // t 를 넘겨 신선도 문구도 로케일을 따릅니다 (영어 화면 혼합 언어 방지).
-                      const fresh = coinScoreFreshness(newestTs, t);
-                      return fresh ? `${t("tabs.home.signalSourceNote")} · ${fresh}` : t("tabs.home.signalSourceNote");
+                      // 지연 임계는 활성 풀의 크론 주기를 따릅니다 — 코인 30분 / 주식 90분
+                      // (주식 크론은 미국 30분·한국 60분 주기라 30분 기준이면 정상 운영도 지연 표기).
+                      const fresh = coinScoreFreshness(newestTs, t,
+                        activeSignalMarket === "stock" ? STALE_MIN_STOCK : 30);
+                      // 출처 캡션도 활성 풀을 따릅니다 (코인=바이낸스 / 주식=미국·한국 50종).
+                      const src = t(activeSignalMarket === "stock"
+                        ? "tabs.home.stockSignalSourceNote" : "tabs.home.signalSourceNote");
+                      return fresh ? `${src} · ${fresh}` : src;
                     })()}
                   </div>
                 </section>
@@ -13801,12 +14047,16 @@ function AppInner() {
           // t 를 넘겨 asOfLabel(기준시각·신선도)이 로케일을 따르게 합니다 (감사 배치3 i18n)
           const built = buildAssetDetailProps(detailSignal, t);
           if (!built) return null;
-          // 관심종목은 자산 마스터(CRYPTO_ASSETS)에 있는 코인만 토글합니다.
-          // 시그널 풀은 50종인데 마스터는 상위 10종이라, 매핑이 없으면 별 버튼을 숨깁니다
-          // (coingecko id 없이 담으면 관심목록에서 시세를 못 불러옵니다).
-          const wl = built.known
-            ? { symbol: built.known.symbol, name: CRYPTO_KO_NAMES[built.known.id] || built.known.name, market: "crypto", symbolRaw: built.known.id }
-            : null;
+          // 관심종목은 자산 마스터에 있는 종목만 토글합니다 — 코인은 CRYPTO_ASSETS,
+          // 주식은 US/KR 마스터(코인과 동일 원칙). 매핑이 없으면 별 버튼을 숨깁니다
+          // (마스터 밖 종목을 담으면 관심목록에서 시세를 못 불러옵니다).
+          const wl = built.market === "crypto"
+            ? (built.known
+              ? { symbol: built.known.symbol, name: CRYPTO_KO_NAMES[built.known.id] || built.known.name, market: "crypto", symbolRaw: built.known.id }
+              : null)
+            : (built.known
+              ? { symbol: built.known.symbol, name: built.known.name, market: built.market, symbolRaw: built.known.symbolRaw || built.known.symbol }
+              : null);
           const isFav = wl ? watchlist.some((w) => w.symbol === wl.symbol) : false;
           return (
             <div
