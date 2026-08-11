@@ -13,9 +13,42 @@
 // ════════════════════════════════════════════════════════════════════
 import React from "react";
 import { useThemeTokens } from "../ui/theme.jsx";
+import { useLanguage } from "../i18n/LanguageContext.jsx";
 
 /** 수치 전용 폰트 스택 — 시안의 JetBrains Mono. 표·리스트에서 자릿수를 고정합니다. */
 export const MONO = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace";
+
+/**
+ * i18n 안전 조회 훅 — 공용 컴포넌트의 내장 문구를 ko/en.json(mobile.kit.*)에 연결합니다.
+ * LanguageProvider 밖(프리뷰·테스트)이거나 키가 아직 없으면 한국어 기본값으로 동작하므로
+ * 배선 순서와 무관하게 깨지지 않습니다. AssetDetailSheet 등 시안 계열 화면이 함께 씁니다.
+ */
+export function useKitText() {
+  const ctx = useLanguage();
+  const t = ctx?.t;
+  return React.useCallback((key, fallback) => {
+    if (typeof t !== "function") return fallback;
+    const v = t(key);
+    // t() 는 미등록 키를 키 문자열 그대로 돌려줍니다 — 그 경우 기본값으로 대체합니다.
+    return v === key ? fallback : v;
+  }, [t]);
+}
+
+/** 데스크탑(정밀 포인터) 여부 — 모듈 로드 시 1회 판정. 터치 기기에선 hover 핸들러를
+ *  아예 붙이지 않아 탭 후 hover 잔상이 남지 않습니다(@media (hover: hover) 와 동일 판정). */
+const HOVER_OK = typeof window !== "undefined"
+  && typeof window.matchMedia === "function"
+  && window.matchMedia("(hover: hover)").matches;
+
+/** 클릭 가능한 카드 공용 hover 피드백 — 커서 모양만으로는 '눌리는 것'이 전달되지 않아
+ *  배경/보더를 살짝 강조합니다. clickable 이 없거나 터치 환경이면 빈 객체를 돌려줍니다. */
+function hoverProps(clickable, enter, leave) {
+  if (!clickable || !HOVER_OK) return {};
+  return {
+    onMouseEnter: (e) => enter(e.currentTarget.style),
+    onMouseLeave: (e) => leave(e.currentTarget.style),
+  };
+}
 
 /** 방향(up/down/neutral) → 시안 색 3종 세트. side 는 "LONG"|"SHORT"|null 도 허용합니다. */
 export function accentOf(C, dir) {
@@ -91,12 +124,17 @@ export function SignalCard({
 }) {
   const C = useThemeTokens();
   const a = accentOf(C, dir);
+  const tt = useKitText();
   return (
     <div
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(e); } } : undefined}
+      {...hoverProps(onClick,
+        // 왼쪽 3px accent 보더는 방향 정보라 건드리지 않고, 나머지 3면만 강조합니다.
+        (s) => { s.borderTopColor = C.border2; s.borderRightColor = C.border2; s.borderBottomColor = C.border2; },
+        (s) => { s.borderTopColor = C.border; s.borderRightColor = C.border; s.borderBottomColor = C.border; })}
       style={{
         background: `linear-gradient(180deg, ${a.bg}, transparent 42%), ${C.card}`,
         border: `1px solid ${C.border}`, borderLeft: `3px solid ${a.base}`,
@@ -111,17 +149,20 @@ export function SignalCard({
         </div>
         {score != null && (
           <div style={{ textAlign: "right", lineHeight: 1, flexShrink: 0 }}>
-            <div style={{ fontSize: "10px", color: C.text3, marginBottom: "2px" }}>종합 점수</div>
+            <div style={{ fontSize: "10px", color: C.text3, marginBottom: "2px" }}>{tt("mobile.kit.scoreLabel", "종합 점수")}</div>
             <Num size="20px" weight={800} color={a.hi}>{score}</Num>
           </div>
         )}
       </div>
       {timeframes.length > 0 && <TimeframeChips items={timeframes} style={{ marginTop: "9px" }} />}
       {(support || price || resistance) && (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px", marginTop: "9px", fontSize: "11px", color: C.text3 }}>
-          <span>지지 <Num size="11px" color={C.greenL || C.green}>{support ?? "—"}</Num></span>
+        // maxWidth 상한: 데스크탑 넓은 카드(860px)에서 space-between 이 값 사이를 300px 이상
+        // 벌려 놓아 라벨 없는 현재가가 무슨 숫자인지 읽히지 않던 문제의 가드입니다.
+        // 모바일 카드 폭(≤420px)에서는 기존과 동일하게 전폭을 씁니다.
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px", marginTop: "9px", fontSize: "11px", color: C.text3, maxWidth: "420px" }}>
+          <span>{tt("mobile.kit.support", "지지")} <Num size="11px" color={C.greenL || C.green}>{support ?? "—"}</Num></span>
           {price != null && <Num size="11px" weight={600} color={C.text2}>{price}</Num>}
-          <span>저항 <Num size="11px" color={C.redL || C.red}>{resistance ?? "—"}</Num></span>
+          <span>{tt("mobile.kit.resistance", "저항")} <Num size="11px" color={C.redL || C.red}>{resistance ?? "—"}</Num></span>
         </div>
       )}
     </div>
@@ -138,7 +179,13 @@ export function AssetRow({
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (e) => { if (e.key === "Enter") onClick(e); } : undefined}
+      // role="button" 은 Enter·Space 모두에 반응해야 합니다(ARIA button 패턴).
+      // preventDefault 는 Space 의 기본 동작(페이지 스크롤)을 막습니다 — SignalCard 와 동일 형태.
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(e); } } : undefined}
+      {...hoverProps(onClick,
+        (s) => { s.background = C.card2; },
+        // 원래 배경 미지정(ListCard 상속) — 빈 값으로 인라인 오버라이드를 제거해 원복합니다.
+        (s) => { s.background = ""; })}
       style={{
         display: "flex", alignItems: "center", gap: "12px", padding: "13px 14px",
         borderBottom: last ? "none" : `1px solid ${C.card2}`,
@@ -177,15 +224,23 @@ export function ListCard({ children, style }) {
   );
 }
 
-/** 지수 스트립 — 가로 스크롤, 스냅. 모바일에서 화면 밖으로 흘려보내는 게 시안 의도입니다. */
-export function IndexStrip({ items = [], style }) {
+/**
+ * 지수 스트립 — 가로 스크롤, 스냅. 모바일에서 화면 밖으로 흘려보내는 게 시안 의도입니다.
+ *  · layout="grid" : 데스크탑처럼 폭이 넉넉한 화면에서 스크롤 대신 자동 줄바꿈 그리드로 배치
+ *  · numSize       : 지수 숫자 크기 — 데스크탑 grid 전환 시 15px 가 작아 18~20px 권장
+ */
+export function IndexStrip({ items = [], numSize = "15px", layout = "scroll", style }) {
   const C = useThemeTokens();
   if (!items.length) return null;
+  const isGrid = layout === "grid";
   return (
     // ⚠️ 화면 끝까지 흘리는 bleed(음수 마진 + 같은 크기 패딩)를 쓰지 않습니다.
     //    홈 컨테이너의 좌우 여백이 16px 이 아니라, 프리뷰에서 첫 카드가 화면 왼쪽으로
     //    6px 잘려 나갔습니다(2026-08 실측). 부모 여백을 그대로 따르는 편이 안전합니다.
-    <div style={{
+    <div style={isGrid ? {
+      display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+      gap: "8px", ...style,
+    } : {
       display: "flex", gap: "8px", overflowX: "auto",
       paddingBottom: "2px", scrollSnapType: "x proximity",
       scrollbarWidth: "none", ...style,
@@ -196,14 +251,18 @@ export function IndexStrip({ items = [], style }) {
           role={ix.onClick ? "button" : undefined}
           tabIndex={ix.onClick ? 0 : undefined}
           onKeyDown={ix.onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); ix.onClick(e); } } : undefined}
+          {...hoverProps(ix.onClick,
+            (s) => { s.background = C.card2; s.borderColor = C.border2; },
+            (s) => { s.background = C.card; s.borderColor = C.border; })}
           style={{
-            flexShrink: 0, scrollSnapAlign: "start", background: C.card,
+            ...(isGrid ? {} : { flexShrink: 0, scrollSnapAlign: "start", minWidth: "108px" }),
+            background: C.card,
             border: `1px solid ${C.border}`, borderRadius: "12px",
-            padding: "10px 13px", minWidth: "108px",
+            padding: "10px 13px",
             cursor: ix.onClick ? "pointer" : "default",
           }}>
           <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700, whiteSpace: "nowrap" }}>{ix.label}</div>
-          <div style={{ marginTop: "3px" }}><Num size="15px" weight={800}>{ix.value}</Num></div>
+          <div style={{ marginTop: "3px" }}><Num size={numSize} weight={800}>{ix.value}</Num></div>
           <div>{typeof ix.change === "number" ? <ChangeNum value={ix.change} /> : <Num size="12px" color={C.text3}>{ix.change ?? "—"}</Num>}</div>
         </div>
       ))}
@@ -223,10 +282,21 @@ export function GaugeCard({
   const v = Number.isFinite(Number(value)) ? Math.max(0, Math.min(100, Number(value))) : null;
   const col = valueColor || C.yellowL || C.yellow;
   return (
-    <div onClick={onClick} style={{
-      background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px",
-      padding: "15px 16px", cursor: onClick ? "pointer" : "default", ...style,
-    }}>
+    // onClick 이 없으면 role/tabIndex/onKeyDown 전부 undefined — 비인터랙티브 사용처
+    // (예: IndicatorHub 의 GaugeIndicatorCard 는 바깥 래퍼가 버튼 역할)에서 중첩되지 않습니다.
+    <div
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(e); } } : undefined}
+      {...hoverProps(onClick,
+        // 노브 링(boxShadow)이 C.card 기준이라 배경은 유지하고 보더만 강조합니다.
+        (s) => { s.borderColor = C.border2; },
+        (s) => { s.borderColor = C.border; })}
+      style={{
+        background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px",
+        padding: "15px 16px", cursor: onClick ? "pointer" : "default", ...style,
+      }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
         <div style={{ fontSize: "14px", fontWeight: 800, color: C.text1 }}>{title}</div>
         {note && <div style={{ fontSize: "12px", color: C.text3 }}>{note}</div>}
@@ -333,11 +403,20 @@ export function EventCard({ icon, title, meta, badge, badgeTone = "down", onClic
   const C = useThemeTokens();
   const a = accentOf(C, badgeTone);
   return (
-    <div onClick={onClick} style={{
-      background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px",
-      padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px",
-      cursor: onClick ? "pointer" : "default", ...style,
-    }}>
+    // GaugeCard 와 동일 — 클릭 가능할 때만 button 3종 세트를 붙입니다(ARIA button 패턴).
+    <div
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick(e); } } : undefined}
+      {...hoverProps(onClick,
+        (s) => { s.background = C.card2; s.borderColor = C.border2; },
+        (s) => { s.background = C.card; s.borderColor = C.border; })}
+      style={{
+        background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px",
+        padding: "14px 16px", display: "flex", alignItems: "center", gap: "12px",
+        cursor: onClick ? "pointer" : "default", ...style,
+      }}>
       {icon && (
         <div style={{
           width: "40px", height: "40px", borderRadius: "12px", flexShrink: 0,
@@ -359,14 +438,15 @@ export function EventCard({ icon, title, meta, badge, badgeTone = "down", onClic
   );
 }
 
-/** 화면 하단 면책 — 시안이 모든 정보 화면 끝에 두는 한 줄. */
+/** 화면 하단 면책 — 시안이 모든 정보 화면 끝에 두는 한 줄. children 으로 오버라이드 가능. */
 export function Disclaimer({ children, style }) {
   const C = useThemeTokens();
+  const tt = useKitText();
   return (
     <div style={{
       fontSize: "10px", color: C.text4, textAlign: "center",
       padding: "0 20px", lineHeight: 1.5, ...style,
-    }}>{children || "표시되는 신호와 지표는 참고 정보이며 투자 조언이 아닙니다."}</div>
+    }}>{children || tt("mobile.kit.disclaimerDefault", "표시되는 신호와 지표는 참고 정보이며 투자 조언이 아닙니다.")}</div>
   );
 }
 
@@ -390,7 +470,7 @@ export function Sparkline({ points = [], dir = "up", height = 96, style }) {
 }
 
 export default {
-  MONO, accentOf, Num, ChangeNum, SidePill, TimeframeChips, SignalCard,
+  MONO, accentOf, useKitText, Num, ChangeNum, SidePill, TimeframeChips, SignalCard,
   AssetRow, ListCard, IndexStrip, GaugeCard, MobileSectionHeader,
   IconButton, Segment, EventCard, Disclaimer, Sparkline,
 };

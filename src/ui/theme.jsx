@@ -27,7 +27,14 @@ export const THEME_TOKENS = {
     yellow: "#FFB020", yellowBg: "#271F11",
     purple: "#9B6FFF", purpleBg: "#1B172C",
     orange: "#FF6B2C", orangeBg: "#271713",
-    text1: "#F4F5F7", text2: "#A1A6B2", text3: "#6E7585", text4: "#474C5A",
+    text1: "#F4F5F7", text2: "#A1A6B2", text3: "#6E7585",
+    // ★ 2026-08 접근성 상향 (감사 #32): 이전 #474C5A 는 bg 2.29 / card 2.12 / card2 1.96:1 로
+    //   면책 문구·캡션(10~12px)이 AA 4.5:1 의 절반 이하였습니다. #8189A0 은
+    //   bg 5.64 / card 5.22 / card2 4.82:1 — 세 배경 모두 AA 통과 (WCAG 2.1 공식 재계산 검증).
+    //   주의: 다크에선 text3(bg 4.26:1)보다 밝아집니다 — AA 를 지키면서 text3 보다 어두운 값은
+    //   존재하지 않아 '읽어야 하는 캡션'의 가독을 우선했습니다. 비활성 어포던스 구분은
+    //   text4 5.22 vs text2 7.47 (card 기준)로 유지됩니다.
+    text4: "#8189A0",
     // ★ 2026-08 모바일 디자인 시안 반영 — 강조 틴트(accent-hi).
     //   숫자·배지처럼 작은 면적에서 base 색은 어두워 눌려 보여, 한 단계 밝은 짝을 씁니다.
     greenL: "#34E89A", redL: "#FF6B7E", yellowL: "#FFC55A", purpleL: "#B793FF",
@@ -45,7 +52,10 @@ export const THEME_TOKENS = {
     orange: "#E8590C", orangeBg: "#FFF7ED",
     text1: "#0A1224", text2: "#4C5870",
     text3: "#5A6478", // WCAG AA (#F6F8FC 대비 5.4:1) — 이전 #7D889D 는 3.6:1 미달
-    text4: "#94A0B6",
+    // ★ 2026-08 접근성 상향 (감사 #32): 이전 #94A0B6 은 bg 2.48 / card 2.64 / card2 2.39:1 미달.
+    //   #646E86 은 bg 4.80 / card 5.10 / card2 4.63:1 — 세 배경 모두 AA 통과.
+    //   text3(#5A6478, bg 5.4:1)보다 밝아 위계(text3 > text4)는 라이트에서 유지됩니다.
+    text4: "#646E86",
     // ★ 강조 틴트 라이트 짝 — 밝은 배경에선 반대로 한 단계 진하게 잡아야 대비가 섭니다.
     greenL: "#047A50", redL: "#BE123C", yellowL: "#A96A00", purpleL: "#6D28D9",
     isDark: false,

@@ -4,7 +4,7 @@
 // v11.2: 퀀트 엔진 v3.9 하위전략 2차 안전필터 + 모바일 터치 UX 개선
 // v11.1: 다중 타임프레임 RSI 스크리닝 조건 + 퀀트 엔진 v3.8 하위전략 안전필터
 // v11.0: 토스증권 벤치마킹 기반 대개편 — 스크리너 프리셋, 글로벌 검색, 위험종목 필터, 실시간 티커
-import { useState, useEffect, useCallback, useRef, useMemo, Component, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, useId, Component, lazy, Suspense } from "react";
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
 import { LanguageProvider, useLanguage } from "./i18n/LanguageContext.jsx";
 import AuthPage from "./AuthPage.jsx";
@@ -295,7 +295,11 @@ const PortfolioAnalysis = lazy(() => import("./PortfolioAnalysis.jsx"));
 const Pricing = lazy(() => import("./Pricing.jsx"));
 const IndicatorHub = lazy(() => import("./pages/IndicatorHub.jsx")); // ★ 2026-07 정보 피벗 Phase 2 — 지표 허브
 const AssetDetailSheet = lazy(() => import("./pages/AssetDetailSheet.jsx")); // ★ 2026-08 모바일 시안 — 종목 상세 시트
-import { ALL_STRATEGIES } from "./strategies.js";
+// ★ 감사 배치3 (perf): strategies.js(압축 후 86KB)는 스캔 완료 후의 전략 알림 생성
+//   (generateStrategyAlerts)에서만 쓰입니다 — 정적 import 를 제거하고 해당 함수 안에서
+//   dynamic import 로 받아 첫 페인트 번들에서 분리했습니다. 나머지 소비처
+//   (StrategyPanel·BacktestPanel·QuantPortfolio·BTCTrading·PaperTrading)는 전부
+//   lazy 컴포넌트라 이 파일을 엔트리에 묶어두던 유일한 원인이 이 import 였습니다.
 import { IndicatorCard } from "./components/uiKit.jsx"; // ★ 디자인 시스템 v1 — 홈 ④ 첫 적용
 // ★ 2026-08 모바일 디자인 시안(Zepta Mobile App) 컴포넌트 세트 — src/components/mobileKit.jsx
 //   시안이 정의한 "정보 카드 문법"을 그대로 씁니다. 색은 전부 테마 토큰이라 라이트도 함께 동작.
@@ -938,7 +942,10 @@ function coinScoreFreshness(ts, t) {
 /** 상세 시트 기간 탭 → CoinGecko OHLC days 매핑 (탭마다 실제 다른 데이터를 불러옵니다). */
 const DETAIL_RANGE_DAYS = { "1D": "1", "1W": "7", "1M": "30", "1Y": "365" };
 
-function buildAssetDetailProps(sig) {
+// ★ 감사 배치3 (i18n): 두 번째 인자 t 를 받아 asOfLabel(집계 신선도 포함)을 로케일에
+//   맞춥니다 — EN 화면에서 상세 시트 기준시각 문구가 한국어로 남던 문제. t 를 생략하면
+//   기존 한국어 폴백 그대로 동작합니다(시트의 나머지 문구는 별도 i18n 과제).
+function buildAssetDetailProps(sig, t) {
   if (!sig) return null;
   const ticker = String(sig.asset || sig.symbol || "").replace(/USDT$/i, "").toUpperCase();
   const dir = sig.side === "LONG" ? "up" : sig.side === "SHORT" ? "down" : "neutral";
@@ -1027,7 +1034,7 @@ function buildAssetDetailProps(sig) {
       // 갱신 표기는 엔진 산출 시각(ts) 실측 — "10분 주기 갱신" 고정 문구는 크론이 멈춰도
       // 신선한 척 보여 제거했습니다. ts 가 없으면 경과 표기 자체를 생략합니다.
       asOfLabel: priceStr
-        ? ["최근 일봉 종가 기준", coinScoreFreshness(sig.ts)].filter(Boolean).join(" · ")
+        ? [t ? t("tabs.home.asOfDailyClose") : "최근 일봉 종가 기준", coinScoreFreshness(sig.ts, t)].filter(Boolean).join(" · ")
         : undefined,
       signal: Number.isFinite(score) ? {
         dir, sideLabel: dir === "up" ? "롱 우위" : dir === "down" ? "숏 우위" : "중립",
@@ -1767,11 +1774,18 @@ function SignalTag({ triggerKey, asset }) {
 // 서브 컴포넌트: SearchBar (글로벌 종목 검색 + 자동완성)
 // ════════════════════════════════════════════════════════════════════
 function SearchBar({ onSelect, placeholder = "종목 검색 (예: AAPL, 삼성전자, BTC...)", compact = false }) {
+  // ★ 감사 배치3 (i18n): listbox aria-label 이 한국어 하드코딩이라 EN 화면의 스크린리더
+  //   사용자만 한국어를 듣는 문제 → SearchBar 는 항상 LanguageProvider 하위에서 렌더되므로
+  //   useLanguage() 로 로케일 배선합니다.
+  const { t } = useLanguage();
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
   const inputRef = useRef(null);
   const dropRef = useRef(null);
+  // ★ 감사 배치3 (a11y): WAI-ARIA combobox 패턴용 고유 id — SearchBar 가 한 화면에
+  //   여러 개 뜰 수 있어(홈 compact + ⌘K 글로벌 검색) useId 로 인스턴스별 분리합니다.
+  const listboxId = `${useId()}-sb-listbox`;
 
   const suggestions = useMemo(() => {
     if (!query || query.length < 1) return [];
@@ -1834,6 +1848,13 @@ function SearchBar({ onSelect, placeholder = "종목 검색 (예: AAPL, 삼성�
           onFocus={() => setFocused(true)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
+          // ★ 감사 배치3 (a11y): combobox 시맨틱 — 스크린리더가 후보 개수·현재 선택
+          //   항목을 읽을 수 있게 합니다. 키보드 동작(handleKeyDown)은 기존 그대로.
+          role="combobox"
+          aria-expanded={showDrop}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-activedescendant={showDrop && selectedIdx >= 0 ? `${listboxId}-opt-${selectedIdx}` : undefined}
           style={{
             width: compact ? "120px" : "100%",
             padding: compact ? "6px 10px" : "13px 16px 13px 42px",
@@ -1856,7 +1877,7 @@ function SearchBar({ onSelect, placeholder = "종목 검색 (예: AAPL, 삼성�
         )}
       </div>
       {showDrop && (
-        <div ref={dropRef} style={{
+        <div ref={dropRef} id={listboxId} role="listbox" aria-label={t("tabs.home.searchResultsAria")} style={{
           position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, zIndex: 200,
           background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px",
           boxShadow: "0 8px 32px rgba(0,0,0,.5)", overflow: "hidden", maxHeight: "380px", overflowY: "auto",
@@ -1866,12 +1887,18 @@ function SearchBar({ onSelect, placeholder = "종목 검색 (예: AAPL, 삼성�
             const isActive = i === selectedIdx;
             return (
               <div key={`${asset.symbol}-${asset.market}-${i}`}
+                id={`${listboxId}-opt-${i}`}
+                role="option"
+                aria-selected={isActive}
                 onClick={() => { onSelect(asset); setQuery(""); setFocused(false); setSelectedIdx(-1); }}
                 onMouseEnter={() => setSelectedIdx(i)}
                 style={{
                   display: "flex", alignItems: "center", gap: "12px",
                   padding: "14px 16px", minHeight: "56px", cursor: "pointer",
                   background: isActive ? C.blueBg : "transparent",
+                  // 선택 하이라이트를 배경색 하나로만 표현하지 않도록 좌측 accent bar 병기
+                  // (색약 사용자 대응 — inset shadow 라 레이아웃 이동이 없습니다)
+                  boxShadow: isActive ? `inset 3px 0 0 ${C.blue}` : "none",
                   borderBottom: i < suggestions.length - 1 ? `1px solid ${C.border}` : "none",
                   transition: "background .15s",
                 }}>
@@ -5070,12 +5097,8 @@ function AppInner() {
   const [notiPerm, setNotiPerm] = useState(() => ("Notification" in window) ? Notification.permission : "unsupported");
   const scanCandleCache = useRef({}); // 스캔 중 수집된 캔들 데이터 캐시 {symbol: {closes, highs, lows, volumes}}
 
-  // 전략 이름 → 전략 객체 매핑 (generate() 호출용)
-  const STRATEGY_NAME_MAP = useMemo(() => {
-    const m = {};
-    for (const s of ALL_STRATEGIES) m[s.name] = s;
-    return m;
-  }, []);
+  // 전략 이름 → 전략 객체 매핑은 generateStrategyAlerts 안에서 dynamic import 후
+  // 지역 계산합니다 (감사 배치3 perf — strategies.js 를 첫 페인트 번들에서 분리).
 
   // ── 백테스트/전략 상태 ─────────────────────────────────────────
   const [btStrategy, setBtStrategy] = useState(null);
@@ -6075,7 +6098,19 @@ function AppInner() {
   // 진짜 퀀트 전략 기반 매매 알림 생성
   // 각 전략의 generate(candles) 함수를 실제 호출하여 BUY/SELL 시그널 감지
   // ═══════════════════════════════════════════════════════════════
-  const generateStrategyAlerts = useCallback((candleMap) => {
+  const generateStrategyAlerts = useCallback(async (candleMap) => {
+    // ★ 감사 배치3 (perf): 전략 엔진(86KB)은 이 함수가 처음 불릴 때(=스캔 완료 후)에만
+    //   동적 로드합니다. 브라우저 모듈 캐시 덕에 두 번째 호출부터는 비용이 없습니다.
+    //   호출부(runScan 말미)는 결과를 await 하지 않는 fire-and-forget 이라
+    //   async 전환이 시그니처 영향을 주지 않습니다.
+    let STRATEGY_NAME_MAP;
+    try {
+      const { ALL_STRATEGIES } = await import("./strategies.js");
+      STRATEGY_NAME_MAP = {};
+      for (const s of ALL_STRATEGIES) STRATEGY_NAME_MAP[s.name] = s;
+    } catch {
+      return; // 오프라인 등으로 청크 로드 실패 시 알림 생성만 조용히 생략 (스캔 결과는 무관)
+    }
     const newAlerts = [];
     const now = new Date();
     const RECENT_WINDOW = 5; // 최근 5봉 이내 시그널만 알림 대상
@@ -6254,7 +6289,7 @@ function AppInner() {
         }).catch(() => {});
       }
     }
-  }, [STRATEGY_NAME_MAP, settings]);
+  }, [settings]);
 
   // 전략 매매 알림 텔레그램 포맷 (실제 전략 시그널 기반)
   function formatStrategyAlertTelegram(alerts) {
@@ -7343,16 +7378,30 @@ function AppInner() {
   }, { invested: 0, current: 0, pnl: 0, hasPrices: false });
 
   // 뉴스 카테고리 필터 + 정렬
+  // ★ 감사 배치3 (오분류 수정): 종전 부분일치 정규식은 'sk' 가 SanDi**sk**·Ri**sk** 에
+  //   매칭돼 영어 기사를 '한국' 탭에 넣었고, us 탭은 "제외 or 포함" 구조라 전체의 88%
+  //   를 그대로 통과시켰습니다. → ① 수집기(api/_shared/news-sources.js NEWS_CATEGORIES)
+  //   가 붙여 준 category/categories 필드를 최우선으로 신뢰하고, ② 미분류 기사(RSS
+  //   폴백 경로는 category 가 빈 값)만 단어 경계(\b) 키워드로 보수적으로 판정합니다.
+  //   어느 축에도 해당하지 않는 기사는 오분류 대신 '전체' 탭에만 노출합니다.
+  //   (macro 카테고리는 국가 축이 아니라서 us/kr 어느 탭에도 강제 배정하지 않습니다)
   const filteredNews = useMemo(() => {
     if (newsCat === "all") return newsItems;
+    const wanted = { kr: "kr-stock", us: "us-stock", crypto: "crypto" }[newsCat];
     return newsItems.filter(n => {
+      // ① 수집기 분류가 있으면 그대로 사용 (네이버 풀 경로 — 키워드 추정 불필요)
+      const cats = [n.category, ...(Array.isArray(n.categories) ? n.categories : [])].filter(Boolean);
+      if (cats.length) return cats.includes(wanted);
+      // ② 미분류(RSS 폴백) — 제목·태그·매체명에서 단어 경계 키워드로 판정
       const title = (n.title || "").toLowerCase();
       const tags = (n.tags || []).map(t => t.toLowerCase()).join(" ");
       const src = (n.source || "").toLowerCase();
       const txt = title + " " + tags + " " + src;
-      if (newsCat === "crypto") return txt.match(/crypto|bitcoin|btc|ethereum|eth|solana|sol|코인|가상화폐|비트코인|이더리움|크립토|coingecko|트렌딩/);
-      if (newsCat === "kr") return txt.match(/코스피|코스닥|한국|삼성|현대|sk|lg|카카오|네이버|한화|포스코|🇰🇷/);
-      if (newsCat === "us") return !txt.match(/crypto|bitcoin|btc|ethereum|eth|solana|코인|가상화폐|비트코인|코스피|코스닥/) || txt.match(/s&p|nasdaq|nyse|미국|뉴욕증시|🇺🇸/);
+      // \b 는 ASCII 기준이라 "sk하이닉스"의 sk 는 잡고 "sandisk/risk" 는 거릅니다.
+      // eth/sol 도 종전에는 method/solution 등에 부분일치하던 것을 경계로 고정합니다.
+      if (newsCat === "crypto") return /crypto|bitcoin|\bbtc\b|ethereum|\beth\b|solana|\bsol\b|코인|가상화폐|가상자산|비트코인|이더리움|크립토/.test(txt);
+      if (newsCat === "kr") return /코스피|코스닥|한국|삼성|현대|\bsk\b|\blg\b|카카오|네이버|한화|포스코|하이닉스|🇰🇷/.test(txt);
+      if (newsCat === "us") return /s&p|nasdaq|nyse|\bdow\b|wall street|미국|뉴욕증시|나스닥|다우|월가|엔비디아|테슬라|애플|nvidia|tesla|\bapple\b|microsoft|amazon|broadcom|alphabet|🇺🇸/.test(txt);
       return true;
     });
   }, [newsItems, newsCat]);
@@ -8427,6 +8476,18 @@ function AppInner() {
                             updatedAt={tempUpdated}
                           />
                         )}
+                      </div>
+                    )}
+                    {/* ★ 감사 배치3 (고아 페이지): /index/market-temp(마켓 온도 지수 해설·산식,
+                        서버 렌더 공개 페이지)는 앱 어디에서도 링크되지 않아 검색엔진으로만
+                        도달 가능했습니다 — 게이지가 실제로 표시될 때만 해설 진입점을 병기합니다.
+                        (해설 페이지가 /index/alt-heat·/index/funding-squeeze 를 관련 링크로
+                        상호 연결하고 있어 이 한 곳으로 지수 해설 3종이 모두 도달 가능해집니다) */}
+                    {tempVal != null && (
+                      <div style={{ textAlign: "right" }}>
+                        <a href="/index/market-temp" style={{ fontSize: "12px", fontWeight: 700, color: C.blueL, textDecoration: "none" }}>
+                          {t("tabs.home.marketTempPageLink")}
+                        </a>
                       </div>
                     )}
                   </div>
@@ -13737,7 +13798,8 @@ function AppInner() {
 
         {/* ── 종목 상세 시트 (모바일 시안) — 전체 화면 오버레이 ── */}
         {detailSignal && (() => {
-          const built = buildAssetDetailProps(detailSignal);
+          // t 를 넘겨 asOfLabel(기준시각·신선도)이 로케일을 따르게 합니다 (감사 배치3 i18n)
+          const built = buildAssetDetailProps(detailSignal, t);
           if (!built) return null;
           // 관심종목은 자산 마스터(CRYPTO_ASSETS)에 있는 코인만 토글합니다.
           // 시그널 풀은 50종인데 마스터는 상위 10종이라, 매핑이 없으면 별 버튼을 숨깁니다
@@ -13827,6 +13889,10 @@ function AppInner() {
               { label: "서비스 소개", tab: "about" },
               { label: "블로그", href: "/blog" },
               { label: "투자 가이드", href: "/guide" },
+              // ★ 감사 배치3 (고아 페이지): /econ(경제지표 발표 결과, 하위 16종 포함)은
+              //   서버 렌더 공개 페이지인데 앱 어디에서도 링크되지 않아 검색엔진으로만
+              //   도달 가능했습니다 — 정보성 링크(블로그·가이드) 뒤에 진입점을 둡니다.
+              { label: "경제지표 결과", href: "/econ" },
               { label: "문의하기", tab: "contact" },
             ].map((item, i) => (
               <span key={item.tab || item.href} style={{ display: "flex", alignItems: "center" }}>

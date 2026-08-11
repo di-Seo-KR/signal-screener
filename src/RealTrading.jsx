@@ -110,9 +110,6 @@ function RealTradingInner({ onNavigate }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [density, setDensity] = useState(() => {
-    try { return localStorage.getItem("zepta:rt:density") || "pro"; } catch { return "pro"; }
-  });
   const [section, setSection] = useState("dashboard");
   const [confirm, setConfirm] = useState(null);
   const timerRef = useRef(null);
@@ -142,10 +139,6 @@ function RealTradingInner({ onNavigate }) {
       return () => style.remove();
     }
   }, []);
-
-  useEffect(() => {
-    try { localStorage.setItem("zepta:rt:density", density); } catch {}
-  }, [density]);
 
   const refresh = useCallback(async () => {
     if (!userId) return;

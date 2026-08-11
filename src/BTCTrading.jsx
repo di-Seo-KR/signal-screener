@@ -1190,6 +1190,9 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
               {cryptoPositions && cryptoPositions.length > 0 ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   {cryptoPositions.map((p, i) => {
+                    // ★ 2026-08-10 (감사 배치3): API 가 시세 미확보 종목에 priceStale 마커 +
+                    //   null 손익을 내려도 `|| 0` 강제 변환이 "+0.00%" 허위 표시를 만들던 문제.
+                    const stale = !!p.priceStale;
                     const pnl = parseFloat(p.unrealizedPL || 0);
                     const pnlPct = parseFloat(p.unrealizedPLPct || 0);
                     const avgPrice = parseFloat(p.avgPrice || p.avg_entry_price || 0);
@@ -1201,7 +1204,8 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                     return (
                       <div key={i} style={{
                         padding: "12px 14px", borderRadius: "10px", background: C.card2,
-                        border: `1px solid ${C.border}`, borderLeft: `3px solid ${pnl >= 0 ? C.green : C.red}`,
+                        border: `1px solid ${C.border}`,
+                        borderLeft: `3px solid ${stale ? C.border2 : pnl >= 0 ? C.green : C.red}`,
                       }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                           <span style={{ fontSize: "18px" }}>{assetIcon}</span>
@@ -1213,9 +1217,13 @@ export default function BTCTrading({ theme = "dark", user, botPreset, botAllocat
                           </div>
                           <div style={{ textAlign: "right" }}>
                             <div style={{ fontSize: "15px", fontWeight: 700, color: C.text1 }}>${parseFloat(p.marketValue || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</div>
-                            <div style={{ fontSize: "14px", fontWeight: 700, color: pnl >= 0 ? C.green : C.red }}>
-                              {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)
-                            </div>
+                            {stale ? (
+                              <div style={{ fontSize: "13px", fontWeight: 700, color: C.text3 }}>시세 미확보 · 원가 표시</div>
+                            ) : (
+                              <div style={{ fontSize: "14px", fontWeight: 700, color: pnl >= 0 ? C.green : C.red }}>
+                                {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)} ({pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}%)
+                              </div>
+                            )}
                           </div>
                         </div>
                         {curPrice > 0 && avgPrice > 0 && (
