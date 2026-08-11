@@ -7987,16 +7987,24 @@ function AppInner() {
   //   부트 스플래시와 인증 스플래시가 같은 모양이라 전환이 이어져 보입니다.
   useEffect(() => {
     document.getElementById("boot-splash")?.remove();
+    // 부트 워치독 재시도 플래그 초기화 — 정상 마운트했으므로 다음 부트는 깨끗한 상태에서 시작
+    try { sessionStorage.removeItem("zepta:boot-retry"); } catch {}
   }, []);
 
   // ── 인증 로딩 중이면 스플래시 (hooks 뒤에 배치해야 hook 수 일관) ──
   if (authLoading) {
+    // ★ 2026-08-12: index.html 부트 스플래시(v2 시그널 바)와 동일한 모양 —
+    //   부트 → 인증 스플래시 전환이 눈에 보이지 않게(유저 플로우 연속성, 대표 지시).
+    //   인증은 로컬 세션 복원만 기다리므로 보통 수백 ms 안에 지나갑니다.
     return (
-      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: "48px", marginBottom: "12px" }}>🐋</div>
-          <div style={{ color: C.text2, fontSize: "18px" }}>로딩 중...</div>
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "18px", background: C.bg }}>
+        <style>{`@keyframes bsBar { 0%,100%{transform:scaleY(.3)} 50%{transform:scaleY(1)} }`}</style>
+        <div style={{ display: "flex", gap: "7px", alignItems: "flex-end", height: "44px" }}>
+          {[["20px", C.blue, "0s"], ["32px", C.isDark ? "#8F80FF" : "#7565F0", ".15s"], ["44px", C.blueL, ".3s"]].map(([h, bg, d], i) => (
+            <div key={i} style={{ width: "10px", height: h, borderRadius: "5px", background: bg, transformOrigin: "bottom", animation: `bsBar 1.1s ease-in-out ${d} infinite` }} />
+          ))}
         </div>
+        <div style={{ color: C.text1, fontSize: "22px", fontWeight: 800, letterSpacing: "-0.03em" }}>Zepta</div>
       </div>
     );
   }
