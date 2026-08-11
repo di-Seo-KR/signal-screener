@@ -267,4 +267,127 @@ export async function fetchDerivOnchainContext(symbols = []) {
   return { bySymbol, stableTrend, ts: now };
 }
 
-export default { fetchStablecoinLiquidity, fetchExchangeNetflow, cryptoquantEnabled, getOnchainContext, fetchDerivOnchainContext };
+// ── D. 청산 이력 (Coinalyze — 무료 API, COINALYZE_API_KEY 필요) ──────────
+// ★ 2026-08-12 (대표 결정: 유료 보류, 무료 3축 진행): 알트 전체 청산 이력을 섀도 트랙에
+//   추가합니다. **기록 전용** — 섀도 보정 규칙(사전등록)은 1주 분포 관찰 후 별도 커밋으로
+//   붙입니다. 임계값 분포를 모른 채 규칙부터 박으면 사전등록 원칙이 무의미해집니다.
+//
+//   공식 OpenAPI 스펙(api.coinalyze.net/v1/doc/api-spec.json — 2026-08-12 직접 확인) 기준:
+//   · GET /v1/liquidation-history?symbols=BTCUSDT_PERP.A,…&interval=1hour&from=&to=&convert_to_usd=true
+//     → [{ symbol, history: [{ t(초 단위 구간 시작), l(롱 청산량), s(숏 청산량) }] }]
+//   · 인증: api_key 헤더(또는 쿼리). 분당 40콜 — symbols 는 HTTP 1회에 최대 20개지만
+//     "심볼당 1콜 소모" 규칙이라 예산은 심볼 수 기준으로 관리합니다.
+//   · 심볼 표기: 거래소 접미사(.A=Binance — /exchanges 로 런타임 확인) — 하드코딩하지 않고
+//     /future-markets 를 24h 캐시로 읽어 { BTCUSDT → BTCUSDT_PERP.A } 맵을 만듭니다.
+//   키 미설정 시 전부 null(무동작) — CryptoQuant 와 동일 패턴이라 배포에 안전합니다.
+
+const CA_BASE = "https://api.coinalyze.net/v1";
+const CA_MARKETS_KEY = "di:onchain:ca-markets";  // 심볼 맵 캐시 (24h)
+const CA_LIQ_KEY = "di:onchain:ca-liq";          // 청산 컨텍스트 캐시 (30분, 커서 포함)
+const CA_LIQ_FRESH_MS = 30 * 60 * 1000;
+const CA_CALL_BUDGET = 36;                       // 분당 40콜 한도 아래(여유 4)
+const CA_CHUNK = 18;                             // HTTP 1회 심볼 상한 20 아래
+
+export function coinalyzeEnabled() {
+  return Boolean(process.env.COINALYZE_API_KEY);
+}
+
+async function caGet(path, params = {}) {
+  const qs = Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null && v !== "")
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&");
+  return jget(`${CA_BASE}${path}${qs ? `?${qs}` : ""}`, {
+    timeoutMs: 8000,
+    headers: { api_key: process.env.COINALYZE_API_KEY },
+  });
+}
+
+/** 바이낸스 USDT 무기한 → Coinalyze 심볼 맵 (KV 24h 캐시). 실패 시 null. */
+async function loadCoinalyzeSymbolMap(kv) {
+  if (kv) {
+    try {
+      const cached = await kv.get(CA_MARKETS_KEY);
+      if (cached && typeof cached === "object" && Object.keys(cached).length > 0) return cached;
+    } catch {}
+  }
+  const [exchanges, markets] = await Promise.all([caGet("/exchanges"), caGet("/future-markets")]);
+  if (!Array.isArray(exchanges) || !Array.isArray(markets)) return null;
+  const binance = exchanges.find((e) => /^binance$/i.test(String(e?.name || "")));
+  if (!binance?.code) return null;
+  const map = {};
+  for (const m of markets) {
+    // 바이낸스 USDT 무기한만 — symbol_on_exchange 가 우리 유니버스 표기(BTCUSDT)와 일치
+    if (m?.exchange === binance.code && m?.is_perpetual && m?.quote_asset === "USDT" && m?.symbol_on_exchange && m?.symbol) {
+      map[m.symbol_on_exchange] = m.symbol;
+    }
+  }
+  if (Object.keys(map).length === 0) return null;
+  if (kv) { try { await kv.set(CA_MARKETS_KEY, map, { ex: 24 * 3600 }); } catch {} }
+  return map;
+}
+
+/**
+ * 심볼별 24h 청산 컨텍스트 — { bySymbol: { BTCUSDT: { liqLongUsd, liqShortUsd, liqLongShare } }, ts }
+ * liqLongShare = 롱 청산 비중(0~1) — 1에 가까우면 하락 캐스케이드로 롱이 쓸려나간 상태.
+ * 콜 예산(36/사이클) 초과분은 KV 커서 라운드로빈으로 다음 사이클에 커버합니다.
+ * 키 미설정·실패 시 bySymbol 빈 객체 — throw 하지 않습니다.
+ */
+export async function fetchLiquidationContext(symbols = []) {
+  const now = Date.now();
+  const empty = { bySymbol: {}, ts: now };
+  if (!coinalyzeEnabled()) return empty;
+  const want = [...new Set((Array.isArray(symbols) ? symbols : []).filter((s) => typeof s === "string" && s))];
+  if (want.length === 0) return empty;
+  try {
+    const kv = await getKvSafe();
+    let cached = null;
+    if (kv) { try { cached = await kv.get(CA_LIQ_KEY); } catch { cached = null; } }
+    const prev = (cached && typeof cached.bySymbol === "object" && cached.bySymbol) || {};
+    if (cached && Number.isFinite(cached.ts) && now - cached.ts < CA_LIQ_FRESH_MS
+      && want.every((s) => s in prev)) {
+      return { bySymbol: Object.fromEntries(want.map((s) => [s, prev[s] ?? null])), ts: cached.ts };
+    }
+    const map = await loadCoinalyzeSymbolMap(kv);
+    if (!map) return empty;
+    // 커서 라운드로빈 — 예산 안에서 이번 사이클 분량을 고르고, 나머지는 이전 캐시값 유지
+    const cursor = Number.isFinite(cached?.cursor) ? cached.cursor : 0;
+    const rotated = want.slice(cursor % want.length).concat(want.slice(0, cursor % want.length));
+    const batch = rotated.filter((s) => map[s]).slice(0, CA_CALL_BUDGET);
+    const bySymbol = { ...prev };
+    const from = Math.floor(now / 1000) - 25 * 3600;
+    const to = Math.floor(now / 1000);
+    for (let i = 0; i < batch.length; i += CA_CHUNK) {
+      const chunk = batch.slice(i, i + CA_CHUNK);
+      const rows = await caGet("/liquidation-history", {
+        symbols: chunk.map((s) => map[s]).join(","),
+        interval: "1hour", from, to, convert_to_usd: "true",
+      });
+      if (!Array.isArray(rows)) continue; // 429 등 — 이번 청크 스킵(이전 값 유지)
+      const byCa = new Map(rows.map((r) => [r?.symbol, r]));
+      for (const s of chunk) {
+        const hist = byCa.get(map[s])?.history;
+        if (!Array.isArray(hist) || hist.length === 0) { bySymbol[s] = bySymbol[s] ?? null; continue; }
+        let L = 0, S = 0;
+        for (const h of hist) {
+          const l = Number(h?.l), sh = Number(h?.s);
+          if (Number.isFinite(l)) L += l;
+          if (Number.isFinite(sh)) S += sh;
+        }
+        const total = L + S;
+        bySymbol[s] = {
+          liqLongUsd: Number(L.toFixed(0)),
+          liqShortUsd: Number(S.toFixed(0)),
+          liqLongShare: total > 0 ? Number((L / total).toFixed(3)) : null,
+        };
+      }
+    }
+    const nextCursor = (cursor + batch.length) % Math.max(1, want.length);
+    if (kv) { try { await kv.set(CA_LIQ_KEY, { ts: now, cursor: nextCursor, bySymbol }, { ex: 3600 }); } catch {} }
+    return { bySymbol: Object.fromEntries(want.map((s) => [s, bySymbol[s] ?? null])), ts: now };
+  } catch (e) {
+    console.warn(`[onchain] coinalyze liq 실패: ${e?.message}`);
+    return empty;
+  }
+}
+
+export default { fetchStablecoinLiquidity, fetchExchangeNetflow, cryptoquantEnabled, getOnchainContext, fetchDerivOnchainContext, coinalyzeEnabled, fetchLiquidationContext };

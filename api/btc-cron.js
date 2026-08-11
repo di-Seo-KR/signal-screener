@@ -13,7 +13,7 @@ import { runStrategyForBot, getStrategyNameForBot } from "./_shared/strategies/i
 import { getAllStoredStrategyParams } from "./_shared/dynamic-config.js";
 import { getMarketContext, getKlines, getTickerPrice } from "./_shared/binance-client.js";
 import { getOIChangeMap } from "./_shared/oi-tracker.js";
-import { fetchDerivOnchainContext } from "./_shared/onchain.js"; // ★ 2026-08-11 온체인·파생 1단계 — 표시(oc)·섀도(ocShadow) 전용, 매매 미개입
+import { fetchDerivOnchainContext, fetchLiquidationContext } from "./_shared/onchain.js"; // ★ 2026-08-11 온체인·파생 1단계 — 표시(oc)·섀도(ocShadow) 전용, 매매 미개입
 import { loadUniverse, universeSymbolMap } from "./_shared/futures-universe.js";
 import { computeSRLevels, scaleSR } from "./_shared/sr-levels.js"; // ★ 지지·저항(매물대) — 표시 전용
 import { refineCompositeEntry } from "./_shared/strategies/_indicators.js"; // ★ MTF 소진·차트구조 진입 정제
@@ -379,15 +379,22 @@ export default async function handler(req, res) {
     //   개입하지 않습니다(additive). 킬스위치 ZEPTA_ONCHAIN_FACTOR=0 이면 전체 생략,
     //   실패해도 null → 기존 파이프라인 무영향(내부 KV 30분 캐시로 호출 수 최소화).
     let derivOnchain = null;
+    let liqOnchain = null;
     if (process.env.ZEPTA_ONCHAIN_FACTOR !== "0") {
       try {
         const ocSymbols = ASSETS.map((a) => assetToBinanceSymbol(a, dynSymbolMap)).filter(Boolean);
-        derivOnchain = await fetchDerivOnchainContext(ocSymbols);
+        // ★ 2026-08-12: Coinalyze 청산 이력(무료, COINALYZE_API_KEY 없으면 무동작) 병렬 추가
+        //   — 기록 전용. 섀도 보정 규칙은 1주 분포 관찰 후 별도 사전등록 커밋으로 붙입니다.
+        [derivOnchain, liqOnchain] = await Promise.all([
+          fetchDerivOnchainContext(ocSymbols),
+          fetchLiquidationContext(ocSymbols).catch(() => null),
+        ]);
         const _ocN = Object.values(derivOnchain?.bySymbol || {}).filter(Boolean).length;
-        if (_ocN > 0 || derivOnchain?.stableTrend) {
-          addLog(`🧬 파생·온체인 컨텍스트: ${_ocN}심볼 + 스테이블 ${derivOnchain?.stableTrend ? "1" : "0"}건 (표시·섀도 전용)`);
+        const _lqN = Object.values(liqOnchain?.bySymbol || {}).filter(Boolean).length;
+        if (_ocN > 0 || derivOnchain?.stableTrend || _lqN > 0) {
+          addLog(`🧬 파생·온체인 컨텍스트: ${_ocN}심볼 + 스테이블 ${derivOnchain?.stableTrend ? "1" : "0"}건 + 청산 ${_lqN}심볼 (표시·섀도 전용)`);
         }
-      } catch { derivOnchain = null; }
+      } catch { derivOnchain = null; liqOnchain = null; }
     }
 
     // ★ 2026-06-14 (감사 #3, 대표 승인): 시그널 풀 쓰기 배칭.
@@ -810,8 +817,11 @@ export default async function handler(req, res) {
           try {
             const _d = derivOnchain?.bySymbol?.[futSymbol] || null;
             const _st = derivOnchain?.stableTrend ?? null;
-            if (_d || _st) {
-              _oc = { oiChg24h: _d?.oiChg24h ?? null, lsRatio: _d?.lsRatio ?? null, stableTrend: _st };
+            // ★ 2026-08-12: 24h 청산 컨텍스트(Coinalyze) — 기록 전용 additive 필드.
+            //   liqLongShare 1에 가까우면 롱 캐스케이드(하락 청산 쓸림) 직후 상태입니다.
+            const _lq = liqOnchain?.bySymbol?.[futSymbol] || null;
+            if (_d || _st || _lq) {
+              _oc = { oiChg24h: _d?.oiChg24h ?? null, lsRatio: _d?.lsRatio ?? null, stableTrend: _st, liq: _lq };
             }
             // ── 섀도 규칙 적용 (OC_SHADOW 상수 사전등록 — 이후 튜닝 금지) ──
             //   가격 흐름은 24시간 전 1h 종가 대비 최신 1h 종가(진짜 ~24h 창)로 판정 —
