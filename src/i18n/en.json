@@ -91,10 +91,27 @@
       "range1d": "1D",
       "range1w": "1W",
       "range1m": "1M",
+      "range3m": "3M",
       "range1y": "1Y",
       "disclaimerDefault": "Signals and indicators shown are for reference only and are not investment advice.",
       "disclaimerDetail": "Signals, levels, and indicators shown summarize past data for reference only and are not investment advice. Investment decisions and responsibility rest with you."
     }
+  },
+  "assetPopup": {
+    "close": "Close",
+    "asOfNow": "Analyzed just now · Zepta",
+    "asOf": "Analyzed {{m}} min ago · Zepta",
+    "signalCaption": "Composite signal score · technical aggregate",
+    "levelsTitle": "Support · Resistance",
+    "levelsCaption": "Based on 1Y price data",
+    "btTitle": "Backtest summary",
+    "btBadge": "Past simulation",
+    "emptyTitle": "Signal data is being prepared",
+    "emptyDesc": "Not enough analysis data for this asset yet. Add it to your watchlist and check back later."
+  },
+  "searchOverlay": {
+    "noResults": "No results for '{{q}}'",
+    "noResultsHint": "Try a company name, symbol, or ticker. Assets outside the supported list will not appear."
   },
   "theme": {
     "dark": "Dark",
@@ -786,9 +803,10 @@
       "refresh": "Refresh",
       "refreshing": "Loading...",
       "all": "All",
-      "us": "🇺🇸 US",
-      "kr": "🇰🇷 Korea",
-      "crypto": "₿ Crypto",
+      "us": "US",
+      "kr": "Korea",
+      "crypto": "Crypto",
+      "sentimentDisclaimer": "Sentiment labels are automated analysis for reference only — not investment advice.",
       "latest": "Latest",
       "positive": "Positive",
       "negative": "Negative",

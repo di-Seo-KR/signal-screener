@@ -18,39 +18,39 @@
   /* ── 색상 (Dark default — 2026 대개편: 모던 핀테크 미니멀 / Toss·Linear)
      네이비 → 뉴트럴 근접-블랙 + 헤어라인 보더 + 선명한 단일 블루 강조.
      녹/적(P&L 시맨틱)은 트레이딩 필수라 선명하게 유지. ── */
-  --z-bg:        #0A0B0F;
-  --z-bg-elev:   #111219;
-  --z-card:      #14151B;
-  --z-card-2:    #1B1D25;
-  --z-card-hi:   #23252F;
-  --z-border:    #23262F;   /* 헤어라인 — 미묘하지만 보임 */
-  --z-border-2:  #2E313C;
-  --z-border-hi: #3C414E;
+  --z-bg:        #0A0B10;
+  --z-bg-elev:   #0E0F16;
+  --z-card:      #12141B;
+  --z-card-2:    #1A1D26;
+  --z-card-hi:   #232734;
+  --z-border:    #232734;   /* 헤어라인 — 미묘하지만 보임 */
+  --z-border-2:  #2E3342;
+  --z-border-hi: #3A4050;
 
-  --z-text:      #F4F5F7;
-  --z-text-2:    #A1A6B2;
-  --z-text-3:    #6E7585;
-  --z-text-4:    #8189A0; /* WCAG AA — bg 5.64 / card 5.22 / card2 4.82:1 (이전 #474C5A 는 1.96~2.29:1 미달, 감사 #32) */
+  --z-text:      #EDEFF5;
+  --z-text-2:    #A6ACBF;
+  --z-text-3:    #6C7387;
+  --z-text-4:    #8A91A6; /* WCAG AA — bg 5.64 / card 5.22 / card2 4.82:1 (이전 #474C5A 는 1.96~2.29:1 미달, 감사 #32) */
 
-  --z-blue:      #4D7CFF;   /* 일렉트릭 블루 — 유일한 주 강조색 */
-  --z-blue-hi:   #6E92FF;
-  --z-blue-bg:   rgba(77, 124, 255, 0.14);
+  --z-blue:      #7C6BFF;   /* 일렉트릭 블루 — 유일한 주 강조색 */
+  --z-blue-hi:   #9D8FFF;
+  --z-blue-bg:   rgba(124, 107, 255, 0.12);
 
-  --z-green:     #10D884;
-  --z-green-hi:  #34E89A;
-  --z-green-bg:  rgba(16, 216, 132, 0.10);
+  --z-green:     #16C784;
+  --z-green-hi:  #3DDC97;
+  --z-green-bg:  rgba(22, 199, 132, 0.11);
 
-  --z-red:       #FF4D64;
-  --z-red-hi:    #FF6B7E;
-  --z-red-bg:    rgba(255, 77, 100, 0.10);
+  --z-red:       #F23D5C;
+  --z-red-hi:    #FF6478;
+  --z-red-bg:    rgba(242, 61, 92, 0.11);
 
-  --z-yellow:    #FFB020;
-  --z-yellow-hi: #FFC55A;
-  --z-yellow-bg: rgba(255, 176, 32, 0.10);
+  --z-yellow:    #F5A524;
+  --z-yellow-hi: #FFBE4D;
+  --z-yellow-bg: rgba(245, 165, 36, 0.13);
 
-  --z-purple:    #9B6FFF;
-  --z-purple-hi: #B793FF;
-  --z-purple-bg: rgba(155, 111, 255, 0.10);
+  --z-purple:    #9D8FFF;
+  --z-purple-hi: #B7ACFF;
+  --z-purple-bg: rgba(157, 143, 255, 0.11);
 
   --z-cyan:      #22D3EE;
   --z-cyan-bg:   rgba(34, 211, 238, 0.10);
@@ -188,38 +188,38 @@
 
 /* ── Light 테마 ── */
 [data-theme="light"] {
-  --z-bg:        #F6F8FC;
+  --z-bg:        #F4F5F9;
   --z-bg-elev:   #FFFFFF;
   --z-card:      #FFFFFF;
-  --z-card-2:    #F1F4F9;
-  --z-card-hi:   #E7ECF4;
-  --z-border:    #E2E6EF;
-  --z-border-2:  #D0D6E1;
+  --z-card-2:    #EEF0F6;
+  --z-card-hi:   #E5E8F0;
+  --z-border:    #E5E8F0;
+  --z-border-2:  #D5DAE6;
   --z-border-hi: #B7C0CE;
 
-  --z-text:      #0A1224;
-  --z-text-2:    #4C5870;
+  --z-text:      #171923;
+  --z-text-2:    #4C5265;
   --z-text-3:    #5A6478; /* WCAG AA — #F6F8FC bg 대비 5.4:1 (이전 #7D889D 는 3.6:1 미달) */
   --z-text-4:    #646E86; /* WCAG AA — bg 4.80 / card 5.10 / card2 4.63:1 (이전 #94A0B6 은 2.39~2.64:1 미달, 감사 #32) */
 
-  --z-blue:      #2563EB;
-  --z-blue-hi:   #3B82F6;
-  --z-blue-bg:   rgba(37, 99, 235, 0.10);
+  --z-blue:      #6553E8;
+  --z-blue-hi:   #7565F0;
+  --z-blue-bg:   rgba(101, 83, 232, 0.10);
 
-  --z-green:     #059B64;
-  --z-green-hi:  #10B77B;
-  --z-green-bg:  rgba(5, 155, 100, 0.10);
+  --z-green:     #0E9F6E;
+  --z-green-hi:  #16C784;
+  --z-green-bg:  rgba(14, 159, 110, 0.12);
 
-  --z-red:       #E11D48;
-  --z-red-hi:    #F43F5E;
-  --z-red-bg:    rgba(225, 29, 72, 0.08);
+  --z-red:       #DC2F49;
+  --z-red-hi:    #F23D5C;
+  --z-red-bg:    rgba(220, 47, 73, 0.10);
 
-  --z-yellow:    #D08300;
-  --z-yellow-hi: #F0A020;
-  --z-yellow-bg: rgba(208, 131, 0, 0.10);
+  --z-yellow:    #B87514;
+  --z-yellow-hi: #D08300;
+  --z-yellow-bg: rgba(184, 117, 20, 0.15);
 
-  --z-purple:    #7C3AED;
-  --z-purple-bg: rgba(124, 58, 237, 0.08);
+  --z-purple:    #7565F0;
+  --z-purple-bg: rgba(117, 101, 240, 0.10);
 
   --z-sh-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
   --z-sh:    0 2px 10px rgba(15, 23, 42, 0.08), 0 1px 2px rgba(15, 23, 42, 0.04);

@@ -49,6 +49,13 @@ function koreanDate(date) {
   return `${y}년 ${m}월 ${d}일`;
 }
 
+/** "YYYY-MM-DD" → 한국어 요일 (시안 1h 날짜 헤더용) */
+const WEEKDAYS_KO = ["일요일", "월요일", "화요일", "수요일", "목요일", "금요일", "토요일"];
+function koreanWeekday(date) {
+  const t = Date.parse(`${date}T00:00:00Z`);
+  return Number.isFinite(t) ? WEEKDAYS_KO[new Date(t).getUTCDay()] : "";
+}
+
 // ── ⑤ 뉴스 헤드라인 — news.js 의 Google News RSS 로직 복사(축약) ──
 const NEWS_TIMEOUT_MS = 2500;
 async function fetchGoogleNewsKo(q) {
@@ -141,15 +148,30 @@ function renderBriefingHtml({ date, temp, econEvents, news }) {
 
   const metaDesc = `${kd} 암호화폐 시장 상태 요약 — Zepta 마켓 온도 ${temp?.ok ? `${temp.temp}점(${temp.label})` : "집계 중"}, 상승/하락 신호 분포, 경제 일정, 주요 헤드라인을 매일 아침 정리합니다.`;
 
+  // ── 3줄 요약 (시안 1h 요약 카드) — 이미 집계된 실데이터에서만 도출, 전무하면 카드 생략 ──
+  const bullets = [];
+  if (temp?.ok) bullets.push(`마켓 온도 ${temp.temp}점(${temp.label}) — 신호 분포·펀딩·공포탐욕 가중 합산.`);
+  if (breadth) bullets.push(`유동성 상위 ${breadth.total}종 중 상승 신호 우세 ${breadth.long}종, 하락 신호 우세 ${breadth.short}종.`);
+  const firstEcon = econEvents[0];
+  if (firstEcon) bullets.push(`${firstEcon.date === date ? "오늘" : "내일"} ${firstEcon.event} 발표 예정${firstEcon.estimate != null ? ` — 컨센서스 ${firstEcon.estimate}` : ""}.`);
+  if (bullets.length < 3 && fng) bullets.push(`크립토 공포·탐욕 지수 ${fng.value}점${fng.label ? `(${fng.label})` : ""}.`);
+  const sumHtml = bullets.length > 0 ? `
+    <div class="sum-card">
+      <div class="sum-t">${bullets.length >= 3 ? "3줄 요약" : "요약"}</div>
+      <ul>
+${bullets.slice(0, 3).map((b) => `        <li>${escH(b)}</li>`).join("\n")}
+      </ul>
+    </div>` : "";
+
   // ── 온도 지수 히어로 ──
   const tempHero = temp?.ok ? `
     <div class="temp-hero">
-      <div class="t-val">${temp.temp}<span style="font-size:20px;color:#6E7585">/100</span></div>
+      <div class="t-val">${temp.temp}<span style="font-size:20px;color:#6C7387">/100</span></div>
       <div class="t-label ${temp.temp > 60 ? "red" : temp.temp < 40 ? "green" : "yellow"}">마켓 온도 · ${escH(temp.label)}</div>
       <div class="t-bar"><i style="width:${Math.max(2, Math.min(100, temp.temp))}%"></i></div>
       <div class="t-sub">신호 분포(60%) + 펀딩 상태(20%) + 공포·탐욕(20%) 가중 합산 · 산출 ${escH((temp.updatedAt || "").slice(0, 16).replace("T", " "))} UTC</div>
     </div>` : `
-    <div class="callout">이날 마켓 온도 지수는 집계되지 않았습니다.</div>`;
+    <div class="empty-card">이날 마켓 온도 지수는 집계되지 않았습니다.</div>`;
 
   // ── 시장 개요 (사실 서술) ──
   let overview = "";
@@ -184,7 +206,7 @@ function renderBriefingHtml({ date, temp, econEvents, news }) {
       const nameCell = page ? `<a href="${page}"><b>${escH(nm)}</b></a>` : `<b>${escH(nm)}</b>`;
       const sideCls = c.side === "LONG" ? "green" : "red";
       const sideKo = c.side === "LONG" ? "상승 우세" : "하락 우세";
-      return `      <tr><td>${nameCell}</td><td class="${sideCls}">${sideKo}</td><td><b>${Math.round(c.score)}점</b></td></tr>`;
+      return `      <tr><td>${nameCell}</td><td class="${sideCls}">${sideKo}</td><td><b class="mono">${Math.round(c.score)}점</b></td></tr>`;
     }).join("\n");
     topHtml = `
     <h2>이날 신호 강도 상위 5종</h2>
@@ -218,7 +240,7 @@ ${rows}
     const rows = econEvents.map((e) => {
       const when = e.date === date ? "오늘" : "내일";
       const t = kstTime(e.dt);
-      return `      <tr><td>${when}${t ? ` ${escH(t)}` : ""}</td><td><b>${escH(e.event)}</b></td><td>${e.estimate != null ? escH(String(e.estimate)) : "—"}</td><td>${e.previous != null ? escH(String(e.previous)) : "—"}</td></tr>`;
+      return `      <tr><td>${when}${t ? ` ${escH(t)}` : ""}</td><td><b>${escH(e.event)}</b></td><td class="mono">${e.estimate != null ? escH(String(e.estimate)) : "—"}</td><td class="mono">${e.previous != null ? escH(String(e.previous)) : "—"}</td></tr>`;
     }).join("\n");
     econHtml = `
     <h2>오늘·내일 주요 경제 일정</h2>
@@ -258,14 +280,16 @@ ${items}
   const relatedHtml = `
     <div class="related">
       <h3>더 살펴보기</h3>
-${relCoins.map((nm) => `      <a href="/coin/${nm.toLowerCase()}">${escH(nm)} 상세 분석·멀티 타임프레임 스코어</a>`).join("\n")}
-      <a href="/kimchi-premium">김치프리미엄 실시간 — 업비트·바이낸스 가격 차이</a>
-      <a href="/coin">코인 라이브 대시보드 — 유동성 상위 전 종목 스코어</a>
+${relCoins.map((nm) => `      <a href="/coin/${nm.toLowerCase()}"><span><span class="rt">${escH(nm)} 상세 분석</span><span class="rs">멀티 타임프레임 스코어</span></span></a>`).join("\n")}
+      <a href="/kimchi-premium"><span><span class="rt">김치프리미엄 실시간</span><span class="rs">업비트·바이낸스 가격 차이</span></span></a>
+      <a href="/coin"><span><span class="rt">코인 라이브 대시보드</span><span class="rs">유동성 상위 전 종목 스코어</span></span></a>
     </div>`;
 
   const bodyHtml = `    <div class="breadcrumb"><a href="/">홈</a> › <a href="/briefing">마켓 브리핑</a> › ${escH(date)}</div>
+    <div class="date-line">${escH(kd)} ${koreanWeekday(date)} · 07:00 발행</div>
     <h1>${escH(kd)} 코인 시장 브리핑</h1>
     <div class="meta-row">매일 아침 KST 07:00 발행 · Zepta 알고리즘 자동 집계</div>
+${sumHtml}
 ${tempHero}
 ${overview}
 ${topHtml}

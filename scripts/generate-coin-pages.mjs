@@ -19,89 +19,132 @@ const escA = (s) => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").rep
 const escH = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const jstr = (s) => JSON.stringify(String(s)); // JSON-LD 안전 문자열
 
+// ★ 2026-08 신규 화면 시안(1a 종목 상세·1f 스크리너) 시각 문법 이식:
+//   카드 어법 · 방향 강조(좌측 3px accent + 상단 그라데이션) · mono 수치 · 상태 배지 · 점선 빈 상태.
+//   색은 하드코딩 대신 :root CSS 변수로만 사용하며, 값은 src/ui/theme.jsx
+//   THEME_TOKENS.dark(디자인 시스템 v2, 2026-08-12 대표 확정 — accent 퍼플 #7C6BFF ·
+//   상승 #16C784 · 하락 #F23D5C)와 1:1 동기화합니다. 화면 시안(zepta-screens.dc.html)의
+//   v1 팔레트 예시색은 따르지 않습니다(SPA 와 정적 /coin 의 브랜드 팔레트 분열 방지).
+//   아래 rgba(...) 알파 틴트도 전부 위 토큰색에서 파생된 값 — 토큰 변경 시 함께 갱신.
+//   정적 페이지는 기존과 동일하게 다크 단일 테마입니다.
 const STYLE = `
+:root{
+--bg:#0A0B10;--card:#12141B;--card2:#1A1D26;--border:#232734;--border2:#2E3342;
+--text1:#EDEFF5;--text2:#A6ACBF;--text3:#6C7387;--text4:#8A91A6;
+--blue:#7C6BFF;--blue-l:#9D8FFF;--blue-bg:#18172D;
+--green:#16C784;--green-l:#3DDC97;--red:#F23D5C;--red-l:#FF6478;
+--yellow:#F5A524;--yellow-l:#FFBE4D;--yellow-bg:#291F13;--purple:#9D8FFF;--purple-l:#B7ACFF;
+--mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:#0A0B0F;color:#A1A6B2;line-height:1.85;word-break:keep-all;overflow-wrap:break-word}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background:var(--bg);color:var(--text2);line-height:1.85;word-break:keep-all;overflow-wrap:break-word}
 .wrap{max-width:820px;margin:0 auto;padding:40px 20px}
-nav{position:sticky;top:0;z-index:50;background:rgba(10,11,15,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid #23262F;padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;gap:16px}
-nav .brand{font-weight:800;font-size:18px;color:#F4F5F7;text-decoration:none;letter-spacing:-0.02em}
-nav .brand b{color:#4D7CFF;font-weight:800}
+nav{position:sticky;top:0;z-index:50;background:rgba(10,11,16,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 20px;height:56px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+nav .brand{font-weight:800;font-size:18px;color:var(--text1);text-decoration:none;letter-spacing:-0.02em}
+nav .brand b{color:var(--blue);font-weight:800}
 nav .nav-right{display:flex;align-items:center;gap:6px}
 nav .links{display:flex;gap:4px}
-nav .links a{padding:7px 11px;border-radius:9px;font-size:14px;font-weight:600;color:#A1A6B2;text-decoration:none;white-space:nowrap;transition:color .15s,background .15s}
-nav .links a:hover{color:#F4F5F7;background:#1B1D25}
-.znav-burger{width:40px;height:40px;border:1px solid #23262F;border-radius:10px;background:transparent;color:#F4F5F7;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
-.znav-burger:hover{background:#1B1D25}
+nav .links a{padding:7px 11px;border-radius:9px;font-size:14px;font-weight:600;color:var(--text2);text-decoration:none;white-space:nowrap;transition:color .15s,background .15s}
+nav .links a:hover{color:var(--text1);background:var(--card2)}
+.znav-burger{width:40px;height:40px;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--text1);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.znav-burger:hover{background:var(--card2)}
 #znav-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:opacity .2s;z-index:98}
-#znav-drawer{position:fixed;top:0;right:0;bottom:0;width:300px;max-width:85vw;background:#0F1014;border-left:1px solid #23262F;transform:translateX(102%);transition:transform .22s cubic-bezier(.2,.8,.2,1);z-index:99;overflow-y:auto;padding:0 16px 28px}
+#znav-drawer{position:fixed;top:0;right:0;bottom:0;width:300px;max-width:85vw;background:#0E0F16;border-left:1px solid var(--border);transform:translateX(102%);transition:transform .22s cubic-bezier(.2,.8,.2,1);z-index:99;overflow-y:auto;padding:0 16px 28px}
 body.znav-open #znav-overlay{opacity:1;pointer-events:auto}
 body.znav-open #znav-drawer{transform:translateX(0)}
-.znav-head{display:flex;align-items:center;justify-content:space-between;height:56px;border-bottom:1px solid #23262F;margin-bottom:10px}
-.znav-head .brand{font-weight:800;font-size:18px;color:#F4F5F7;text-decoration:none}
-.znav-head .brand b{color:#4D7CFF}
-.znav-head button{width:36px;height:36px;border:none;border-radius:9px;background:transparent;color:#A1A6B2;font-size:16px;cursor:pointer}
-.znav-head button:hover{background:#1B1D25;color:#F4F5F7}
+.znav-head{display:flex;align-items:center;justify-content:space-between;height:56px;border-bottom:1px solid var(--border);margin-bottom:10px}
+.znav-head .brand{font-weight:800;font-size:18px;color:var(--text1);text-decoration:none}
+.znav-head .brand b{color:var(--blue)}
+.znav-head button{width:36px;height:36px;border:none;border-radius:9px;background:transparent;color:var(--text2);font-size:16px;cursor:pointer}
+.znav-head button:hover{background:var(--card2);color:var(--text1)}
 .znav-group{margin:14px 0}
-.znav-title{font-size:11px;font-weight:800;color:#6E7585;letter-spacing:.06em;margin:0 10px 6px}
-.znav-group a{display:block;padding:10px 10px;border-radius:10px;font-size:15px;font-weight:600;color:#A1A6B2;text-decoration:none}
-.znav-group a:hover{color:#F4F5F7;background:#1B1D25}
+.znav-title{font-size:11px;font-weight:800;color:var(--text3);letter-spacing:.06em;margin:0 10px 6px}
+.znav-group a{display:block;padding:10px 10px;border-radius:10px;font-size:15px;font-weight:600;color:var(--text2);text-decoration:none}
+.znav-group a:hover{color:var(--text1);background:var(--card2)}
 @media(max-width:640px){nav .links{display:none}}
-.breadcrumb{font-size:13px;color:#6E7585;margin-bottom:18px}
-.breadcrumb a{color:#6E92FF;text-decoration:none}
-h1{font-size:30px;font-weight:800;color:#F4F5F7;margin-bottom:10px;letter-spacing:-0.02em;line-height:1.3}
-.meta-row{font-size:13px;color:#6E7585;margin-bottom:24px}
-h2{font-size:21px;font-weight:700;color:#F4F5F7;margin:36px 0 14px;letter-spacing:-0.01em}
+.breadcrumb{font-size:13px;color:var(--text3);margin-bottom:18px}
+.breadcrumb a{color:var(--blue-l);text-decoration:none}
+h1{font-size:30px;font-weight:800;color:var(--text1);margin-bottom:10px;letter-spacing:-0.02em;line-height:1.3}
+.meta-row{font-size:13px;color:var(--text3);margin-bottom:24px}
+.page-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:6px}
+.page-head .head-ico{width:38px;height:38px;border-radius:11px;background:rgba(124,107,255,.14);color:var(--blue-l);display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:800;flex-shrink:0;margin-top:5px}
+h2{font-size:21px;font-weight:700;color:var(--text1);margin:36px 0 14px;letter-spacing:-0.01em}
 p{font-size:16px;margin-bottom:14px}
-strong{color:#F4F5F7}
-a{color:#6E92FF;text-decoration:none}a:hover{text-decoration:underline}
-.callout{background:#131B31;border-left:3px solid #4D7CFF;padding:14px 18px;margin:18px 0;border-radius:6px;font-size:15px}
-.disc{background:#1a1206;border-left:3px solid #FFB020;padding:12px 16px;margin:22px 0;border-radius:6px;font-size:13px;color:#C9B68C}
-.facts{background:#14151B;border:1px solid #23262F;border-radius:12px;padding:4px 0;margin:18px 0;overflow:hidden}
-.facts .row{display:grid;grid-template-columns:130px 1fr;border-bottom:1px solid #23262F;padding:11px 18px;font-size:15px}
+strong{color:var(--text1)}
+a{color:var(--blue-l);text-decoration:none}a:hover{text-decoration:underline}
+.mono{font-family:var(--mono)}
+.callout{background:var(--blue-bg);border-left:3px solid var(--blue);padding:14px 18px;margin:18px 0;border-radius:10px;font-size:15px}
+.disc{background:var(--yellow-bg);border-left:3px solid var(--yellow);padding:12px 16px;margin:22px 0;border-radius:10px;font-size:13px;color:var(--text2)}
+.disc strong{color:var(--yellow-l)}
+.facts{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:4px 0;margin:18px 0;overflow:hidden}
+.facts .row{display:grid;grid-template-columns:130px 1fr;border-bottom:1px solid var(--border);padding:11px 18px;font-size:15px}
 .facts .row:last-child{border-bottom:none}
-.facts .row span{color:#6E7585}
-.facts .row b{color:#F4F5F7;font-weight:600}
-.signal{background:linear-gradient(135deg,#131B31 0%,#0a1530 100%);border:1px solid #4D7CFF40;border-radius:14px;padding:20px;margin:8px 0 26px}
-.signal-loading,.signal-na{color:#A1A6B2;font-size:15px;text-align:center;padding:8px 0}
-.signal-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:14px}
-.signal-label{font-size:13px;color:#A1A6B2}
-.signal-score{font-size:22px;font-weight:800}
-.tf-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-.tf{background:#0b1322;border:1px solid #23262F;border-radius:10px;padding:10px 6px;text-align:center}
-.tf span{display:block;font-size:12px;color:#6E7585;margin-bottom:4px}
-.tf b{font-size:15px;color:#F4F5F7;font-weight:700}
-.signal-note{font-size:12px;color:#6E7585;margin-top:12px}
-.green{color:#10D884}.red{color:#FF7B91}.yellow{color:#FFB020}
+.facts .row span{color:var(--text3)}
+.facts .row b{color:var(--text1);font-weight:600}
+.facts .row b.mono{font-weight:700;font-size:14px}
+.signal{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:15px 16px;margin:8px 0 26px}
+.signal.is-long{background:linear-gradient(180deg,rgba(22,199,132,.1),transparent 42%),var(--card);border-left:3px solid var(--green)}
+.signal.is-short{background:linear-gradient(180deg,rgba(242,61,92,.1),transparent 42%),var(--card);border-left:3px solid var(--red)}
+.signal.is-empty{border:none;background:transparent;padding:0}
+.signal-loading{color:var(--text2);font-size:15px;text-align:center;padding:8px 0}
+.signal-msg{color:var(--text2);font-size:14.5px;text-align:center;padding:8px 0;line-height:1.65}
+.signal-na{border:1.5px dashed var(--border);border-radius:16px;padding:26px 20px;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center}
+.signal-na .na-ico{width:52px;height:52px;border-radius:16px;background:var(--card2);display:flex;align-items:center;justify-content:center;color:var(--text3)}
+.signal-na .na-t{font-size:15px;font-weight:800;color:var(--text1);margin-top:8px}
+.signal-na .na-d{font-size:12.5px;color:var(--text4);line-height:1.65;max-width:420px}
+.sig-top{display:flex;align-items:center;gap:14px}
+.sig-donut{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sig-donut i{width:48px;height:48px;border-radius:50%;background:var(--card);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:18px;font-weight:800;font-style:normal}
+.is-long .sig-donut i{color:var(--green-l)}
+.is-short .sig-donut i{color:var(--red-l)}
+.sig-col{display:flex;flex-direction:column;gap:6px;min-width:0}
+.sig-badge{align-self:flex-start;font-size:12px;font-weight:800;padding:3px 10px;border-radius:8px}
+.is-long .sig-badge{background:rgba(22,199,132,.1);color:var(--green-l)}
+.is-short .sig-badge{background:rgba(242,61,92,.12);color:var(--red-l)}
+.sig-cap{font-size:11px;color:var(--text3)}
+.tf-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+.tf{background:var(--card2);border-radius:12px;padding:10px 6px;text-align:center}
+.tf span{display:block;font-size:11px;font-weight:700;color:var(--text3);margin-bottom:4px}
+.tf b{font-size:14px;font-weight:800;font-family:var(--mono);color:var(--text1)}
+.tf b.green{color:var(--green-l)}.tf b.red{color:var(--red-l)}
+.signal-note{font-size:11px;color:var(--text3);margin-top:11px;line-height:1.55}
+.green{color:var(--green-l)}.red{color:var(--red-l)}.yellow{color:var(--yellow-l)}
 ul{margin:0 0 16px 22px}li{margin-bottom:8px;font-size:16px}
-.related{background:#14151B;border:1px solid #23262F;border-radius:12px;padding:20px;margin-top:44px}
-.related h3{font-size:16px;color:#F4F5F7;margin-bottom:12px}
-.related a{display:block;padding:8px 0;font-size:15px;border-top:1px solid #23262F;color:#A1A6B2}
+.related{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;margin-top:44px}
+.related h3{font-size:16px;color:var(--text1);margin-bottom:12px}
+.related a{display:block;padding:8px 0;font-size:15px;border-top:1px solid var(--border);color:var(--text2)}
 .related a:first-of-type{border-top:none}
-.cta{background:linear-gradient(135deg,#131B31 0%,#0a1530 100%);border:1px solid #4D7CFF40;border-radius:14px;padding:24px;text-align:center;margin:34px 0}
-.cta a{display:inline-block;background:#4D7CFF;color:#fff;padding:11px 22px;border-radius:8px;font-weight:700;margin-top:8px}
-.coin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:24px 0}
-.coin-card{background:#14151B;border:1px solid #23262F;border-radius:12px;padding:16px;transition:border-color .2s,transform .2s}
-.coin-card:hover{border-color:#4D7CFF;transform:translateY(-2px)}
-.coin-card a{display:block;color:inherit}
-.coin-card .c-sym{font-size:16px;font-weight:700;color:#F4F5F7}
-.coin-card .c-ko{font-size:13px;color:#A1A6B2}
-.coin-card .c-score{font-size:14px;font-weight:700;margin-top:8px;color:#6E7585}
+.cta{background:var(--blue-bg);border:1px solid rgba(124,107,255,.25);border-radius:16px;padding:24px;text-align:center;margin:34px 0}
+.cta a{display:inline-block;background:var(--blue);color:#fff;padding:11px 22px;border-radius:10px;font-weight:700;margin-top:8px}
+.coin-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(164px,1fr));gap:10px;margin:24px 0}
+.coin-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 14px;transition:border-color .2s,transform .2s}
+.coin-card:hover{border-color:var(--blue);transform:translateY(-2px)}
+.coin-card.is-long{background:linear-gradient(180deg,rgba(22,199,132,.07),transparent 42%),var(--card);border-left:3px solid var(--green)}
+.coin-card.is-short{background:linear-gradient(180deg,rgba(242,61,92,.07),transparent 42%),var(--card);border-left:3px solid var(--red)}
+.coin-card a{display:block;color:inherit;text-decoration:none}
+.coin-card .c-sym{font-size:15px;font-weight:800;color:var(--text1);font-family:var(--mono)}
+.coin-card .c-ko{font-size:12px;color:var(--text2)}
+.coin-card .c-score{font-size:14px;font-weight:800;font-family:var(--mono);margin-top:8px;color:var(--text3)}
+.coin-card .c-score.up{color:var(--green-l)}
+.coin-card .c-score.down{color:var(--red-l)}
 .dash-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:20px 0}
-.live-note{background:#14151B;border:1px solid #23262F;border-radius:12px;padding:12px 16px;margin:0 0 16px;font-size:14px;color:#A1A6B2;text-align:center}
-.live-note a{color:#6E92FF;font-weight:600}
-.dash-stat{background:#14151B;border:1px solid #23262F;border-radius:12px;padding:14px 10px;text-align:center}
-.dash-stat .v{font-size:22px;font-weight:800;color:#F4F5F7;line-height:1.2}
-.dash-stat .l{font-size:12px;color:#6E7585;margin-top:2px}
+.live-note{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px 16px;margin:0 0 16px;font-size:14px;color:var(--text2);text-align:center}
+.live-note a{color:var(--blue-l);font-weight:600}
+.dash-stat{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 10px;text-align:center}
+.dash-stat .v{font-size:22px;font-weight:800;font-family:var(--mono);color:var(--text1);line-height:1.2}
+.dash-stat .v.green{color:var(--green-l)}.dash-stat .v.red{color:var(--red-l)}
+.dash-stat .l{font-size:11px;font-weight:700;color:var(--text3);margin-top:3px}
 .top-sigs{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 4px}
-.sig-pill{display:inline-flex;align-items:center;gap:6px;background:#14151B;border:1px solid #23262F;border-radius:999px;padding:8px 14px;font-size:14px;font-weight:700;color:#F4F5F7;text-decoration:none}
-.sig-pill b{font-weight:800}
-.c-side{display:inline-block;font-size:11px;font-weight:800;padding:1px 7px;border-radius:6px;margin-top:6px}
-.side-long{background:rgba(16,216,132,.12);color:#10D884}
-.side-short{background:rgba(255,77,100,.14);color:#FF7B91}
-.c-bar{height:4px;border-radius:4px;background:#23262F;overflow:hidden;margin-top:8px}
-.c-bar i{display:block;height:100%;border-radius:4px}
-footer{text-align:center;padding:40px 20px;color:#6E7585;font-size:14px;border-top:1px solid #23262F;margin-top:60px}
-footer a{color:#6E92FF;text-decoration:none;margin:0 6px}
+.sig-pill{display:inline-flex;align-items:center;gap:6px;background:var(--card);border:1px solid var(--border);border-radius:9999px;padding:8px 14px;font-size:13px;font-weight:700;color:var(--text1);text-decoration:none}
+.sig-pill b{font-weight:800;font-family:var(--mono)}
+.c-side{display:inline-block;font-size:10px;font-weight:800;padding:3px 8px;border-radius:8px;margin-top:8px}
+.side-long{background:rgba(22,199,132,.1);color:var(--green-l)}
+.side-short{background:rgba(242,61,92,.12);color:var(--red-l)}
+.c-bar{height:5px;border-radius:3px;background:var(--card2);overflow:hidden;margin-top:8px}
+.c-bar i{display:block;height:100%;border-radius:3px}
+.c-bar i.up{background:var(--green)}
+.c-bar i.down{background:var(--red)}
+footer{text-align:center;padding:40px 20px;color:var(--text3);font-size:14px;border-top:1px solid var(--border);margin-top:60px}
+footer a{color:var(--blue-l);text-decoration:none;margin:0 6px}
 @media(max-width:640px){h1{font-size:24px}.wrap{padding:24px 16px}p,li{font-size:15px}.facts .row{grid-template-columns:100px 1fr;font-size:14px}}
 `;
 
@@ -123,7 +166,7 @@ const DRAWER = `<div id="znav-overlay" onclick="zNavClose()"></div>\n  <aside id
 const FOOTER = `
   <footer>
     <p>© 2026 Zepta — <a href="/">홈</a> · <a href="/coin">코인 분석</a> · <a href="/blog">블로그</a> · <a href="/about">소개</a> · <a href="/contact">문의</a></p>
-    <p style="margin-top:8px;font-size:12px;color:#474C5A">본 페이지의 정보는 투자 조언이 아니며 참고용입니다. 모든 투자의 책임은 본인에게 있습니다.</p>
+    <p style="margin-top:8px;font-size:12px;color:var(--text4)">본 페이지의 정보는 투자 조언이 아니며 참고용입니다. 모든 투자의 책임은 본인에게 있습니다.</p>
   </footer>`;
 
 // ★ 2026-06-12 (대표 결정): GA4 제거 — 자체 퍼스트파티 비콘(/api/track)으로 교체.
@@ -152,13 +195,23 @@ function liveScript(sym, fut) {
     fetch('/api/real-trading/coin-scores').then(function(r){return r.json()}).then(function(d){
       var list=(d&&d.coins)||[],c=null,i;
       for(i=0;i<list.length;i++){var a=String(list[i].asset||'').replace(/^1000/,'');if(a===${jstr(sym)}||String(list[i].symbol||'')===${jstr(fut)}){c=list[i];break}}
-      if(!c){box.innerHTML='<div class="signal-na">${escH(sym)}는 현재 Zepta 실시간 분석 유니버스(바이낸스 USDⓈ-M 선물 거래대금 상위 코인, 6시간 주기 자동 재선별)에 포함돼 있지 않아 종합 스코어가 산출되지 않습니다. <a href="/coin">현재 분석 중인 코인 보기 →</a></div>';return}
-      var isLong=c.side==='LONG',side=isLong?'상승 모멘텀 우세':'하락 모멘텀 우세',cls=isLong?'green':'red',bd=c.breakdown||{};
+      if(!c){box.className='signal is-empty';box.innerHTML='<div class="signal-na">'+
+        '<div class="na-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></div>'+
+        '<div class="na-t">종합 스코어 미산출</div>'+
+        '<div class="na-d">${escH(sym)}는 현재 Zepta 실시간 분석 유니버스(바이낸스 USDⓈ-M 선물 거래대금 상위 코인, 6시간 주기 자동 재선별)에 포함돼 있지 않아 종합 스코어가 산출되지 않습니다.</div>'+
+        '<div class="na-d" style="margin-top:4px"><a href="/coin">현재 분석 중인 코인 보기 →</a></div></div>';return}
+      var isLong=c.side==='LONG',side=isLong?'상승 모멘텀 우세':'하락 모멘텀 우세',bd=c.breakdown||{};
+      var score=Math.round(c.score||0),deg=Math.round(Math.max(0,Math.min(100,score))*3.6);
       function tf(k,label){var x=bd[k];if(!x)return '<div class="tf"><span>'+label+'</span><b>—</b></div>';var s=x.side==='LONG'?'상승':'하락',cl=x.side==='LONG'?'green':'red';return '<div class="tf"><span>'+label+'</span><b class="'+cl+'">'+s+' '+Math.round(x.score)+'</b></div>'}
-      box.innerHTML='<div class="signal-head"><span class="signal-label">현재 Zepta 종합 시그널</span><span class="signal-score '+cls+'">'+side+' · '+Math.round(c.score)+'점</span></div>'+
+      box.className='signal '+(isLong?'is-long':'is-short');
+      box.innerHTML='<div class="sig-top">'+
+        '<div class="sig-donut" style="background:conic-gradient(var('+(isLong?'--green-l':'--red-l')+') 0 '+deg+'deg,var(--border) '+deg+'deg 360deg)"><i>'+score+'</i></div>'+
+        '<div class="sig-col"><span class="sig-badge">'+side+'</span>'+
+        '<span class="sig-cap">현재 Zepta 종합 시그널 · '+score+'점</span>'+
+        '<span class="sig-cap">주봉·일봉·4시간·1시간 가중 집계</span></div></div>'+
         '<div class="tf-row">'+tf('1w','주봉')+tf('1d','일봉')+tf('4h','4시간')+tf('1h','1시간')+'</div>'+
-        '<div class="signal-note">'+(c.reason?esc(c.reason):'')+' · 10분마다 자동 갱신</div>';
-    }).catch(function(){box.innerHTML='<div class="signal-na">실시간 시그널을 불러오지 못했습니다. 페이지를 새로고침해 주세요.</div>'});
+        '<div class="signal-note">'+(c.reason?esc(c.reason)+' · ':'')+'10분마다 자동 갱신</div>';
+    }).catch(function(){box.className='signal';box.innerHTML='<div class="signal-msg">실시간 시그널을 불러오지 못했습니다. 페이지를 새로고침해 주세요.</div>'});
   })();
   </script>`;
 }
@@ -209,7 +262,7 @@ function buildCoinPage(coin, idx) {
     + `\n      <a href="/blog/quant-strategies">퀀트 전략이란? 종류와 원리 정리</a>`
     + `\n      <a href="/blog/rsi-divergence">RSI 다이버전스로 추세 전환 신호 읽는 법</a>`;
 
-  const faqHtml = faq.map((f) => `    <h3 style="font-size:16px;color:#F4F5F7;margin:20px 0 6px">${escH(f.q)}</h3>\n    <p>${escH(f.a)}</p>`).join("\n");
+  const faqHtml = faq.map((f) => `    <h3 style="font-size:16px;color:var(--text1);margin:20px 0 6px">${escH(f.q)}</h3>\n    <p>${escH(f.a)}</p>`).join("\n");
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -247,11 +300,11 @@ function buildCoinPage(coin, idx) {
     <p>${escH(desc)}</p>
     <div class="facts">
       <div class="row"><span>한글 이름</span><b>${escH(ko)}</b></div>
-      <div class="row"><span>영문 / 티커</span><b>${escH(en)} / ${sym}</b></div>
+      <div class="row"><span>영문 / 티커</span><b>${escH(en)} / <span class="mono" style="color:inherit">${sym}</span></b></div>
       <div class="row"><span>분류</span><b>${escH(cat)}</b></div>
       <div class="row"><span>합의 방식</span><b>${escH(consensus)}</b></div>
       <div class="row"><span>출시 연도</span><b>${year}년</b></div>
-      <div class="row"><span>바이낸스 선물 심볼</span><b>${escH(fut)}</b></div>
+      <div class="row"><span>바이낸스 선물 심볼</span><b class="mono">${escH(fut)}</b></div>
     </div>
 
     <h2>Zepta는 ${escH(ko)}를 어떻게 분석하나요?</h2>
@@ -328,16 +381,21 @@ function buildHub() {
 <body>${NAV}
   <main class="wrap">
     <div class="breadcrumb"><a href="/">홈</a> › 코인 분석</div>
-    <h1>코인 라이브 대시보드</h1>
-    <div class="meta-row">유동성 상위 코인 자동 선별 · 주봉·일봉·4시간·1시간 종합 · 10분마다 자동 갱신 · 최종 갱신 ${BUILD_DATE}</div>
+    <div class="page-head">
+      <span class="head-ico" aria-hidden="true">↗</span>
+      <div>
+        <h1>코인 라이브 대시보드</h1>
+        <div class="meta-row">유동성 상위 코인 자동 선별 · 주봉·일봉·4시간·1시간 종합 · 10분마다 자동 갱신 · 최종 갱신 ${BUILD_DATE}</div>
+      </div>
+    </div>
 
     <p>Zepta는 바이낸스 선물에서 <strong>유동성 상위 코인 전체</strong>(약 50종, 자동 선별)를 네 개의 시간대(주봉·일봉·4시간·1시간)로 동시에 분석해, 지금 상승 모멘텀과 하락 모멘텀 중 어느 쪽 우세인지 하나의 <strong>종합 스코어</strong>로 보여줍니다.</p>
 
     <!-- 라이브 요약 스트립 -->
     <div class="dash-strip" id="dash-strip">
       <div class="dash-stat"><div class="v" id="st-total">—</div><div class="l">분석 종목</div></div>
-      <div class="dash-stat"><div class="v" id="st-long" style="color:#10D884">—</div><div class="l">상승 우위</div></div>
-      <div class="dash-stat"><div class="v" id="st-short" style="color:#FF7B91">—</div><div class="l">하락 우위</div></div>
+      <div class="dash-stat"><div class="v green" id="st-long">—</div><div class="l">상승 우위</div></div>
+      <div class="dash-stat"><div class="v red" id="st-short">—</div><div class="l">하락 우위</div></div>
       <div class="dash-stat"><div class="v" id="st-avg">—</div><div class="l">평균 스코어</div></div>
     </div>
 
@@ -386,17 +444,17 @@ ${cards}
       var sorted=list.slice().sort(function(a,b){return (b.score||0)-(a.score||0)});
       var top=sorted.slice(0,3),pills='';
       for(i=0;i<top.length;i++){var t=top[i],nm=esc(String(t.asset||'').replace(/^1000/,'')),lg=t.side==='LONG';
-        pills+='<span class="sig-pill">🔥 '+nm+' <b style="color:'+(lg?'#10D884':'#FF7B91')+'">'+(lg?'상승':'하락')+' '+Math.round(t.score)+'</b></span>'}
+        pills+='<span class="sig-pill"><span class="mono">'+nm+'</span> <b class="'+(lg?'green':'red')+'">'+(lg?'▲ 상승':'▼ 하락')+' '+Math.round(t.score)+'</b></span>'}
       var ts=document.getElementById('top-sigs');ts.innerHTML=pills;ts.style.display=pills?'flex':'none';
       // 그리드 전체를 라이브 유니버스로 재구성 (스코어 내림차순, 상세페이지 보유 시 링크)
       var html='';
-      for(i=0;i<sorted.length;i++){var c=sorted[i],a=String(c.asset||''),nm2=esc(a.replace(/^1000/,'')),lg2=c.side==='LONG';
+      for(i=0;i<sorted.length;i++){var c=sorted[i],a=String(c.asset||''),nm2=esc(a.replace(/^1000/,'')),lg2=c.side==='LONG',dir=lg2?'up':'down';
         var page=PAGES[a]||PAGES[c.symbol]||null;
         var inner='<div class="c-sym">'+nm2+'</div>'
-          +'<span class="c-side '+(lg2?'side-long':'side-short')+'">'+(lg2?'상승 우위':'하락 우위')+'</span>'
-          +'<div class="c-score" style="color:'+(lg2?'#10D884':'#FF7B91')+'">'+Math.round(c.score)+'점</div>'
-          +'<div class="c-bar"><i style="width:'+Math.max(4,Math.min(100,Math.round(c.score)))+'%;background:'+(lg2?'#10D884':'#FF7B91')+'"></i></div>';
-        html+='<div class="coin-card">'+(page?'<a href="'+page+'" style="text-decoration:none">'+inner+'</a>':inner)+'</div>'}
+          +'<span class="c-side '+(lg2?'side-long':'side-short')+'">'+(lg2?'▲ 상승 우위':'▼ 하락 우위')+'</span>'
+          +'<div class="c-score '+dir+'">'+Math.round(c.score)+'점</div>'
+          +'<div class="c-bar"><i class="'+dir+'" style="width:'+Math.max(4,Math.min(100,Math.round(c.score)))+'%"></i></div>';
+        html+='<div class="coin-card '+(lg2?'is-long':'is-short')+'">'+(page?'<a href="'+page+'">'+inner+'</a>':inner)+'</div>'}
       if(html)document.getElementById('coin-grid').innerHTML=html;
     }
     function load(){

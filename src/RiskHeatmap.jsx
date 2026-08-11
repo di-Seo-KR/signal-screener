@@ -1,21 +1,25 @@
-// Zepta — 리스크 컨트롤 타워 v3.1
+// Zepta — 리스크맵 v4 (시안 1e 적용)
 // 8-Point CP 시스템 — 모든 체크포인트 실시간 시장 데이터 기반 동적 산출
-// v3.1: 시세 미수신 시 하드코딩 폴백 수치 제거(필수 시세 게이트) +
-//       스파크라인을 의사난수 합성이 아닌 localStorage 실측 이력 기반으로 교체
+// v3.1 정직성 로직(필수 시세 게이트 · 하드코딩 폴백 금지 · localStorage 실측 추이 ·
+//      상태 서술 워딩)은 전부 유지 — v4 는 표현만 모바일 시안(1e) 문법으로 교체:
+//      종합 점수 히어로(좌측 3px 보더 + 상단 그라데이션 + mono 숫자 + 게이지 노브),
+//      리스크 항목 카드(등급 배지·수치·설명), 실측 추이 바 차트, 빈 상태 변형.
+// 색은 하드코딩 hex 대신 useThemeTokens() — 라이트 모드는 토큰이 처리합니다.
 import { useState, useMemo, useEffect } from "react";
-import { THEME_TOKENS } from "./ui/theme.jsx";
+import { useThemeTokens } from "./ui/theme.jsx";
 import { useIsMobile } from "./ui/useBreakpoint.jsx";
+import { Num, Segment, Disclaimer } from "./components/mobileKit.jsx";
 
-// ★ 디자인 토큰 SSOT — 다크 전용 패널
-const C = THEME_TOKENS.dark;
-// 모바일 감지는 useIsMobile (src/ui/useBreakpoint.jsx) SSOT 사용
-
-const SEV = {
-  CRITICAL: { label: "CRITICAL", color: "#FF4D64", glow: "#FF4D6433" },
-  HIGH:     { label: "HIGH",     color: "#FF6B2C", glow: "#FF6B2C33" },
-  MODERATE: { label: "MODERATE", color: "#FFB020", glow: "#FFB02033" },
-  LOW:      { label: "LOW",      color: "#10D884", glow: "#10D88433" },
-};
+// ── 등급 → 시안 색 세트 (base: 보더·바, hi: 텍스트 강조 짝, bg: 알파 틴트) ──
+// 라벨은 상태 서술만 (시안 1e 의 "중립 수준" 어법) — 운용 지시 워딩 금지.
+function sevOf(C) {
+  return {
+    CRITICAL: { label: "위험", base: C.red,    hi: C.redL || C.red,       bg: `${C.red}1A` },
+    HIGH:     { label: "높음", base: C.orange, hi: C.orange,              bg: `${C.orange}1A` },
+    MODERATE: { label: "중립", base: C.yellow, hi: C.yellowL || C.yellow, bg: `${C.yellow}1A` },
+    LOW:      { label: "낮음", base: C.green,  hi: C.greenL || C.green,   bg: `${C.green}1A` },
+  };
+}
 
 // ── 등급 산출에 반드시 필요한 시세 심볼 목록 ──
 // 하나라도 누락되면 임의 폴백 수치로 계산하지 않고 '데이터 없음' 상태를 표시합니다.
@@ -29,6 +33,13 @@ const HIST_MAX_DAYS = 30;
 function localDateKey() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// "YYYY-MM-DD" → "M/D" (추이 차트 축 라벨용)
+function shortDate(key) {
+  const parts = String(key).split("-");
+  if (parts.length !== 3) return key;
+  return `${Number(parts[1])}/${Number(parts[2])}`;
 }
 
 // localStorage 이력 로드 — 파싱 실패·비정상 형태는 빈 배열로 처리합니다
@@ -211,6 +222,11 @@ function assessRisks(mkt) {
   ];
 }
 
+// 점수 → 등급 키 (종합 점수·추이 차트 공용 임계값)
+function levelForScore(s) {
+  return s >= 75 ? "CRITICAL" : s >= 55 ? "HIGH" : s >= 35 ? "MODERATE" : "LOW";
+}
+
 function calcOverall(risks) {
   // '데이터 없음' CP 는 종합 점수 산출에서 제외합니다
   const scored = risks.filter(r => !r.noData);
@@ -218,26 +234,38 @@ function calcOverall(risks) {
   const avg = scored.reduce((a, r) => a + r.score, 0) / scored.length;
   const crit = scored.filter(r => r.severity === "CRITICAL").length;
   const adj = Math.min(100, avg + crit * 5);
-  return { score: Math.round(adj), level: adj >= 75 ? "CRITICAL" : adj >= 55 ? "HIGH" : adj >= 35 ? "MODERATE" : "LOW", crit };
+  return { score: Math.round(adj), level: levelForScore(adj), crit };
 }
 
 // 실측 이력 기반 미니 스파크라인 — localStorage 에 기록된 일자별 점수만 사용하며,
 // 기록이 2일치 미만이면 아무것도 그리지 않습니다 (합성·의사난수 데이터 사용 금지).
-function Sparkline({ points, width = 64, height = 20 }) {
+// 색은 토큰을 props 로 받습니다 (리스크 점수 상승 = upColor, 하락 = downColor).
+function MiniSparkline({ points, width = 64, height = 20, upColor, downColor }) {
   if (!Array.isArray(points) || points.length < 2) return null;
   const min = Math.min(...points), max = Math.max(...points);
   const range = max - min || 1;
   const path = points.map((v, i) => `${(i / (points.length - 1)) * width},${height - ((v - min) / range) * (height - 4) - 2}`).join(" ");
   const isUp = points[points.length - 1] > points[0];
   return (
-    <svg width={width} height={height} style={{ display: "block" }}>
-      <polyline points={path} fill="none" stroke={isUp ? C.red : C.green} strokeWidth="1.5" strokeLinecap="round" />
+    <svg width={width} height={height} style={{ display: "block" }} aria-hidden="true">
+      <polyline points={path} fill="none" stroke={isUp ? upColor : downColor} strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// 빈 상태 아이콘 — 시안 1e 의 방패 아웃라인
+function ShieldIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z" />
     </svg>
   );
 }
 
 export default function RiskHeatmap({ marketIndices = [], fearGreed = {}, onRetry }) {
+  const C = useThemeTokens();
   const isMobile = useIsMobile();
+  const SEVC = useMemo(() => sevOf(C), [C]);
   const [expandedCP, setExpandedCP] = useState(null);
   const [tab, setTab] = useState("dashboard"); // "dashboard" | "matrix" | "history"
   const [loadTimedOut, setLoadTimedOut] = useState(false);
@@ -281,7 +309,7 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {}, onRetr
   // 필수 시세가 모두 있을 때만 등급을 산출합니다
   const risks = useMemo(() => (isComplete ? assessRisks(mkt) : []), [isComplete, mkt]);
   const overall = useMemo(() => calcOverall(risks), [risks]);
-  const ov = SEV[overall.level];
+  const ov = SEVC[overall.level];
 
   // ── 리스크 점수 실측 이력 적재 (일자별 1건, 같은 날은 최신값으로 갱신, 30일 롤링) ──
   useEffect(() => {
@@ -309,55 +337,101 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {}, onRetr
   // 해당 CP 의 일자별 실측 점수 시계열 (기록된 유효값만)
   const seriesFor = (cpId) => history.map(h => h?.scores?.[cpId]).filter(v => Number.isFinite(v));
 
+  // 종합 점수 실측 시계열 (추이 바 차트용)
+  const overallSeries = useMemo(
+    () => history.filter(h => Number.isFinite(h?.overall)),
+    [history]
+  );
+
   const StatusDot = ({ status }) => (
-    <span style={{ width: "6px", height: "6px", borderRadius: "50%", display: "inline-block",
+    <span style={{ width: "6px", height: "6px", borderRadius: "50%", display: "inline-block", flexShrink: 0,
       background: status === "danger" ? C.red : status === "warn" ? C.yellow : C.green }} />
   );
 
-  // 면책 문구 (정상·게이트 상태 공통)
-  const disclaimer = (
-    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "10px", padding: "12px",
-      fontSize: "14px", color: C.text3, lineHeight: "1.5", marginTop: "12px" }}>
-      ⚠️ 리스크 점수는 VIX, 국채 수익률, 공포·탐욕 지수, 달러 인덱스, 원자재 가격 등 공개 시장 데이터를 기반으로 실시간 자동 산출됩니다.
-      투자 판단의 근거가 아닌 참고 자료로만 활용하시기 바랍니다.
+  // 등급 배지 — 시안 항목 카드의 우상단 칩 어법
+  const SevBadge = ({ sevKey }) => {
+    const sv = sevKey ? SEVC[sevKey] : null;
+    return (
+      <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 8px", borderRadius: "8px", whiteSpace: "nowrap",
+        background: sv ? sv.bg : C.card2, color: sv ? sv.hi : C.text3 }}>
+        {sv ? sv.label : "데이터 없음"}
+      </span>
+    );
+  };
+
+  const trendColor = (t) => (t === "악화" ? C.redL || C.red : t === "개선" ? C.greenL || C.green : C.text3);
+  const metricColor = (s) => (s === "danger" ? C.redL || C.red : s === "warn" ? C.yellowL || C.yellow : C.text1);
+
+  const dateStr = new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" });
+
+  // 페이지 헤더 — 시안 1e: 타이틀 + 우측 상태 알약 (상태 서술만)
+  const pageHeader = (statusPill) => (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "14px" }}>
+      <span style={{ fontSize: "22px", fontWeight: 800, color: C.text1 }}>리스크맵</span>
+      {statusPill}
     </div>
   );
 
+  // 면책 — 시안의 하단 한 줄 어법 (기존 정직성 문구 유지)
+  const disclaimer = (
+    <Disclaimer style={{ marginTop: "16px" }}>
+      리스크 점수는 VIX, 국채 수익률, 공포·탐욕 지수, 달러 인덱스, 원자재 가격 등 공개 시장 데이터를 기반으로
+      실시간 자동 산출됩니다. 투자 판단의 근거가 아닌 참고 자료로만 활용하시기 바랍니다.
+    </Disclaimer>
+  );
+
   // ── 렌더 게이트: 필수 시세가 준비되기 전에는 등급·게이지를 표시하지 않습니다 ──
+  // 시안 1e "빈 상태 — 수집 중" 변형: 스켈레톤 카드 4개 + 점선 안내 블록
   if (!isComplete) {
     return (
       <div className="tab-content">
-        <div style={{
-          background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px",
-          padding: "20px", marginBottom: "12px",
-        }}>
-          <div style={{ fontWeight: 800, fontSize: isMobile ? "16px" : "18px", marginBottom: "2px" }}>리스크 컨트롤 타워</div>
-          <div style={{ color: C.text3, fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
-            {new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })} 기준
-            <span style={{ fontSize: "12px", padding: "1px 6px", borderRadius: "4px", background: C.yellowBg, color: C.yellow, fontWeight: 600 }}>
-              {loadTimedOut ? "데이터 없음" : "로딩중"}
-            </span>
-          </div>
+        {pageHeader(
+          <span style={{ fontSize: "11px", fontWeight: 700, padding: "5px 11px", borderRadius: "9999px",
+            background: C.card, border: `1px solid ${C.border}`,
+            color: loadTimedOut ? (C.yellowL || C.yellow) : C.text2 }}>
+            {loadTimedOut ? "데이터 없음" : `수집 중 · ${dateStr} 기준`}
+          </span>
+        )}
+
+        {/* 스켈레톤 카드 — 수치·등급을 흉내내지 않는 무지 플레이스홀더입니다 */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "12px" }}>
+          {[[52, 38], [60, 34], [44, 42], [56, 30]].map(([w1, w2], i) => (
+            <div key={i} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px",
+              padding: "12px 13px", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div style={{ width: `${w1}%`, height: "9px", borderRadius: "5px", background: C.card2 }} />
+              <div style={{ width: `${w2}%`, height: "14px", borderRadius: "5px", background: C.card2 }} />
+            </div>
+          ))}
         </div>
 
-        <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px",
-          padding: "32px 20px", textAlign: "center" }}>
+        <div style={{ border: `1.5px dashed ${C.border2}`, borderRadius: "16px", display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center", gap: "6px", padding: "36px 24px", textAlign: "center" }}>
+          <div style={{ width: "52px", height: "52px", borderRadius: "16px", background: C.card2,
+            display: "flex", alignItems: "center", justifyContent: "center", color: C.text3 }}>
+            <ShieldIcon />
+          </div>
           {loadTimedOut ? (
             <>
-              <div style={{ fontSize: "15px", fontWeight: 700, marginBottom: "6px" }}>시세 데이터를 불러오지 못했습니다</div>
-              <div style={{ fontSize: "13px", color: C.text3, marginBottom: "4px" }}>
+              <div style={{ fontSize: "15px", fontWeight: 800, marginTop: "8px", color: C.text1 }}>시세 데이터를 불러오지 못했습니다</div>
+              <div style={{ fontSize: "12.5px", color: C.text3, lineHeight: 1.6, maxWidth: "260px", textWrap: "pretty" }}>
                 필수 시세가 준비되지 않아 리스크 등급을 산출하지 않습니다.
               </div>
-              <div style={{ fontSize: "12px", color: C.text3, marginBottom: "14px", wordBreak: "break-all" }}>
+              <div style={{ fontSize: "11px", color: C.text4, wordBreak: "break-all", maxWidth: "280px" }}>
                 누락 심볼: {missing.join(", ")}
               </div>
               <button onClick={() => (typeof onRetry === "function" ? onRetry() : window.location.reload())} style={{
-                padding: "10px 20px", borderRadius: "8px", fontSize: "14px", fontWeight: 600,
-                background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}`, cursor: "pointer", minHeight: "44px",
+                marginTop: "10px", padding: "10px 20px", borderRadius: "10px", fontSize: "14px", fontWeight: 700,
+                fontFamily: "inherit", background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}`,
+                cursor: "pointer", minHeight: "44px",
               }}>다시 시도</button>
             </>
           ) : (
-            <div style={{ fontSize: "14px", color: C.text3 }}>시장 데이터를 불러오는 중입니다…</div>
+            <>
+              <div style={{ fontSize: "15px", fontWeight: 800, marginTop: "8px", color: C.text1 }}>리스크 데이터를 수집하고 있어요</div>
+              <div style={{ fontSize: "12.5px", color: C.text3, lineHeight: 1.6, maxWidth: "260px", textWrap: "pretty" }}>
+                필수 시세가 모두 도착하면 종합 리스크 점수가 표시됩니다.
+              </div>
+            </>
           )}
         </div>
 
@@ -368,68 +442,71 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {}, onRetr
 
   return (
     <div className="tab-content">
-      {/* 종합 리스크 헤더 */}
+      {pageHeader(
+        <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "11px", fontWeight: 700,
+          padding: "5px 11px", borderRadius: "9999px", background: C.card, border: `1px solid ${C.border}`, color: C.text2 }}>
+          {/* 필수 시세 전체 수신 확인 후에만 도달하는 화면이므로 LIVE 로 표기합니다 */}
+          <span className="z-pulse" style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.green, flexShrink: 0 }} />
+          {dateStr} 기준 · <span style={{ color: C.greenL || C.green }}>LIVE</span>
+        </span>
+      )}
+
+      {/* ═══ 종합 리스크 점수 히어로 — 좌측 3px 보더 + 상단 등급색 그라데이션 ═══ */}
       <div style={{
-        background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px",
-        padding: "20px", marginBottom: "12px", position: "relative", overflow: "hidden",
+        background: `linear-gradient(180deg, ${ov.bg}, transparent 42%), ${C.card}`,
+        border: `1px solid ${C.border}`, borderLeft: `3px solid ${ov.base}`,
+        borderRadius: "16px", padding: "16px", marginBottom: "14px",
       }}>
-        {/* 배경 글로우 */}
-        <div style={{ position: "absolute", top: "-40px", right: "-40px", width: "160px", height: "160px",
-          borderRadius: "50%", background: ov.glow, filter: "blur(60px)", pointerEvents: "none" }} />
-
-        <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", position: "relative", marginBottom: "16px", gap: "12px", flexWrap: isMobile ? "wrap" : "nowrap" }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 800, fontSize: isMobile ? "16px" : "18px", marginBottom: "2px" }}>리스크 컨트롤 타워</div>
-            <div style={{ color: C.text3, fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
-              {new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "short" })} 기준
-              {/* 필수 시세 전체 수신 확인 후에만 도달하는 화면이므로 LIVE 로 표기합니다 */}
-              <span style={{ fontSize: "12px", padding: "1px 6px", borderRadius: "4px", background: C.greenBg, color: C.green, fontWeight: 600 }}>LIVE</span>
-            </div>
-          </div>
-          <div style={{ textAlign: "center", flexShrink: 0 }}>
-            <div style={{ position: "relative", width: isMobile ? "60px" : "72px", height: isMobile ? "60px" : "72px" }}>
-              <svg width={isMobile ? "60" : "72"} height={isMobile ? "60" : "72"} viewBox="0 0 72 72" style={{ transform: "rotate(-90deg)" }}>
-                <circle cx="36" cy="36" r="30" fill="none" stroke={C.card2} strokeWidth="6" />
-                <circle cx="36" cy="36" r="30" fill="none" stroke={ov.color} strokeWidth="6"
-                  strokeDasharray={`${overall.score * 1.885} 188.5`} strokeLinecap="round" />
-              </svg>
-              <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center",
-                fontWeight: 800, fontSize: "20px", color: ov.color }}>{overall.score}</div>
-            </div>
-            <div style={{ fontSize: "14px", fontWeight: 700, color: ov.color, marginTop: "2px",
-              padding: "1px 8px", borderRadius: "4px", background: ov.glow }}>{ov.label}</div>
-          </div>
+        <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>종합 리스크 점수</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginTop: "4px" }}>
+          <Num size="38px" weight={800} color={ov.hi}>{overall.score}</Num>
+          <Num size="13px" weight={600} color={C.text3}>/ 100</Num>
+          <span style={{ marginLeft: "auto", fontSize: "12px", fontWeight: 800, padding: "3px 10px",
+            borderRadius: "8px", background: ov.bg, color: ov.hi, whiteSpace: "nowrap" }}>{ov.label} 수준</span>
         </div>
-
-        {/* 카운트 바 */}
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: "6px" }}>
-          {Object.entries(SEV).map(([key, sev]) => {
+        {/* 게이지 — 낮음(초록) → 높음(빨강), 노브는 현재 점수 위치 */}
+        <div style={{ position: "relative", height: "16px", marginTop: "10px" }}>
+          <div style={{ position: "absolute", top: "5px", left: 0, right: 0, height: "6px", borderRadius: "9999px",
+            background: `linear-gradient(90deg, ${C.green}, ${C.yellow} 50%, ${C.red})` }} />
+          <div style={{ position: "absolute", top: "1px", left: `calc(${Math.max(0, Math.min(100, overall.score))}% - 7px)`,
+            width: "14px", height: "14px", borderRadius: "50%", background: ov.hi, boxShadow: `0 0 0 3px ${C.card}` }} />
+        </div>
+        <div style={{ fontSize: "11px", color: C.text3, marginTop: "10px" }}>
+          점수가 높을수록 시장 전반의 위험 요인이 많다는 뜻이에요.
+        </div>
+        {/* 등급 분포 — 기존 카운트 바 유지 (시안 칩 어법으로 래핑) */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "6px", marginTop: "12px" }}>
+          {Object.entries(SEVC).map(([key, sv]) => {
             const cnt = risks.filter(r => r.severity === key).length;
             return (
               <div key={key} style={{
-                background: cnt > 0 ? sev.glow : C.card2, borderRadius: "8px", padding: "8px",
-                textAlign: "center", border: `1px solid ${cnt > 0 ? sev.color + "30" : C.border}`,
+                background: cnt > 0 ? sv.bg : C.card2, borderRadius: "10px",
+                padding: "7px 4px", textAlign: "center",
               }}>
-                <div style={{ fontSize: "20px", fontWeight: 800, color: cnt > 0 ? sev.color : C.text3 }}>{cnt}</div>
-                <div style={{ fontSize: "12px", color: cnt > 0 ? sev.color : C.text3, fontWeight: 700 }}>{sev.label}</div>
+                <Num size="16px" weight={800} color={cnt > 0 ? sv.hi : C.text3}>{cnt}</Num>
+                <div style={{ fontSize: "10px", fontWeight: 700, color: cnt > 0 ? sv.hi : C.text3, marginTop: "1px" }}>{sv.label}</div>
               </div>
             );
           })}
         </div>
       </div>
 
-      {/* 서브 탭 */}
-      <div style={{ display: "flex", gap: isMobile ? "3px" : "4px", marginBottom: "12px", flexWrap: "wrap" }}>
-        {[["dashboard", "대시보드"], ["matrix", "매트릭스"], ["history", "추이 기록"]].map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)} style={{
-            padding: isMobile ? "8px 12px" : "7px 14px", borderRadius: "8px", fontSize: isMobile ? "12px" : "14px", fontWeight: 600,
-            background: tab === id ? C.blueBg : "transparent", color: tab === id ? C.blue : C.text3,
-            border: `1px solid ${tab === id ? C.blue : C.border2}`, cursor: "pointer", minHeight: "44px", display: "flex", alignItems: "center", justifyContent: "center",
-          }}>{label}</button>
-        ))}
-      </div>
+      {/* 서브 탭 — mobileKit Segment
+          minHeight 54px = 컨테이너 보더 1px×2 + 패딩 4px×2 + 버튼 44px.
+          Segment 버튼은 flex stretch 로 컨테이너를 채우므로, 이 화면이 유지하던
+          44px 권장 터치 타겟(WCAG 2.5.5)을 컨테이너 높이로 보장합니다. */}
+      <Segment
+        options={[
+          { value: "dashboard", label: "대시보드" },
+          { value: "matrix", label: "매트릭스" },
+          { value: "history", label: "추이 기록" },
+        ]}
+        value={tab}
+        onChange={setTab}
+        style={{ marginBottom: "14px", minHeight: "54px" }}
+      />
 
-      {/* ═══ 대시보드 뷰 ═══ */}
+      {/* ═══ 대시보드 뷰 — 리스크 항목 카드 (등급 배지·수치·설명) ═══ */}
       {tab === "dashboard" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {sorted.map(risk => {
@@ -437,21 +514,20 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {}, onRetr
             if (risk.noData) {
               return (
                 <div key={risk.id} style={{
-                  background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px",
-                  padding: "16px", borderLeft: `3px solid ${C.border2}`, opacity: 0.75,
+                  background: C.card, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.border2}`,
+                  borderRadius: "14px", padding: "12px 14px", opacity: 0.75,
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "12px" }}>
-                    <div style={{ fontSize: isMobile ? "18px" : "24px", width: isMobile ? "32px" : "36px", height: isMobile ? "32px" : "36px", borderRadius: "10px",
-                      background: C.card2, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <div style={{ fontSize: isMobile ? "16px" : "18px", width: isMobile ? "32px" : "36px", height: isMobile ? "32px" : "36px",
+                      borderRadius: "10px", background: C.card2, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                       {risk.icon}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px", flexWrap: "wrap" }}>
-                        <span style={{ fontWeight: 700, fontSize: isMobile ? "14px" : "16px" }}>{risk.name}</span>
-                        <span style={{ fontSize: "12px", fontWeight: 800, color: C.text3,
-                          padding: "1px 6px", borderRadius: "4px", background: C.card2 }}>데이터 없음</span>
+                        <span style={{ fontWeight: 800, fontSize: isMobile ? "14px" : "15px" }}>{risk.name}</span>
+                        <SevBadge sevKey={null} />
                       </div>
-                      <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div style={{ fontSize: "12px", color: C.text3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {risk.headline}
                       </div>
                     </div>
@@ -459,63 +535,65 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {}, onRetr
                 </div>
               );
             }
-            const sev = SEV[risk.severity];
+            const sv = SEVC[risk.severity];
             const isOpen = expandedCP === risk.id;
             return (
-              <div key={risk.id} onClick={() => setExpandedCP(isOpen ? null : risk.id)} style={{
-                background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px",
-                padding: "16px", cursor: "pointer", transition: "all .2s",
-                borderLeft: `3px solid ${sev.color}`,
-              }}>
-                <div style={{ display: "flex", alignItems: isMobile ? "flex-start" : "center", gap: isMobile ? "8px" : "12px", flexWrap: isMobile ? "wrap" : "nowrap" }}>
-                  <div style={{ fontSize: isMobile ? "18px" : "24px", width: isMobile ? "32px" : "36px", height: isMobile ? "32px" : "36px", borderRadius: "10px",
-                    background: sev.glow, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <div key={risk.id}
+                onClick={() => setExpandedCP(isOpen ? null : risk.id)}
+                role="button" tabIndex={0} aria-expanded={isOpen}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpandedCP(isOpen ? null : risk.id); } }}
+                style={{
+                  background: `linear-gradient(180deg, ${sv.bg}, transparent 42%), ${C.card}`,
+                  border: `1px solid ${C.border}`, borderLeft: `3px solid ${sv.base}`,
+                  borderRadius: "14px", padding: "12px 14px", cursor: "pointer", transition: "border-color .2s",
+                }}>
+                <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "12px" }}>
+                  <div style={{ fontSize: isMobile ? "16px" : "18px", width: isMobile ? "32px" : "36px", height: isMobile ? "32px" : "36px",
+                    borderRadius: "10px", background: sv.bg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     {risk.icon}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "2px", flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 700, fontSize: isMobile ? "14px" : "16px" }}>{risk.name}</span>
-                      <span style={{ fontSize: "12px", fontWeight: 800, color: sev.color,
-                        padding: "1px 6px", borderRadius: "4px", background: sev.glow }}>{sev.label}</span>
-                      <span style={{ fontSize: "14px", color: risk.trend === "악화" ? C.red : risk.trend === "개선" ? C.green : C.text3,
-                        fontWeight: 600 }}>
+                      <span style={{ fontWeight: 800, fontSize: isMobile ? "14px" : "15px" }}>{risk.name}</span>
+                      <SevBadge sevKey={risk.severity} />
+                      <span style={{ fontSize: "11px", color: trendColor(risk.trend), fontWeight: 700 }}>
                         {risk.trend === "악화" ? "↗ 악화" : risk.trend === "개선" ? "↘ 개선" : "→ 보합"}
                       </span>
                     </div>
-                    <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontSize: "12px", color: C.text3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {risk.headline}
                     </div>
                   </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: isMobile ? "18px" : "24px", color: sev.color }}>{risk.score}</div>
+                  <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
+                    <Num size={isMobile ? "18px" : "20px"} weight={800} color={sv.hi}>{risk.score}</Num>
                     {/* 실측 이력이 2일치 이상 쌓인 경우에만 표시됩니다 */}
-                    <Sparkline points={seriesFor(risk.id)} />
+                    <MiniSparkline points={seriesFor(risk.id)} upColor={C.red} downColor={C.green} />
                   </div>
                 </div>
 
                 {isOpen && (
-                  <div style={{ marginTop: "14px", paddingTop: "14px", borderTop: `1px solid ${C.border}` }}>
+                  <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: `1px solid ${C.border}` }}>
                     {/* 핵심 지표 */}
-                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: isMobile ? "6px" : "8px", marginBottom: "12px" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(3, 1fr)", gap: isMobile ? "6px" : "8px", marginBottom: "10px" }}>
                       {risk.keyMetrics.map((m, j) => (
                         <div key={j} style={{ background: C.card2, borderRadius: "10px", padding: "10px", textAlign: "center" }}>
-                          <div style={{ fontSize: "14px", color: C.text3, marginBottom: "4px", display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
+                          <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700, marginBottom: "4px",
+                            display: "flex", alignItems: "center", justifyContent: "center", gap: "4px" }}>
                             <StatusDot status={m.status} /> {m.label}
                           </div>
-                          <div style={{ fontWeight: 700, fontSize: "16px",
-                            color: m.status === "danger" ? C.red : m.status === "warn" ? C.yellow : C.text1 }}>{m.value}</div>
+                          <Num size="14px" weight={800} color={metricColor(m.status)}>{m.value}</Num>
                         </div>
                       ))}
                     </div>
                     {/* 포트폴리오 영향 */}
                     <div style={{ background: C.card2, borderRadius: "10px", padding: "10px 12px",
-                      fontSize: "14px", color: C.text2, display: "flex", alignItems: "center", gap: "6px" }}>
-                      <span style={{ color: C.yellow }}>💡</span> <b>포트폴리오 영향:</b> {risk.impact}
+                      fontSize: "12.5px", color: C.text2, lineHeight: 1.5 }}>
+                      <b style={{ color: C.text1 }}>포트폴리오 영향</b> · {risk.impact}
                     </div>
                     {/* 리스크 바 */}
                     <div style={{ marginTop: "10px" }}>
                       <div style={{ height: "4px", borderRadius: "4px", background: C.card2, overflow: "hidden" }}>
-                        <div style={{ width: `${risk.score}%`, height: "100%", borderRadius: "4px", background: sev.color,
+                        <div style={{ width: `${risk.score}%`, height: "100%", borderRadius: "4px", background: sv.base,
                           transition: "width .5s" }} />
                       </div>
                     </div>
@@ -527,68 +605,60 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {}, onRetr
         </div>
       )}
 
-      {/* ═══ 리스크 매트릭스 뷰 ═══ */}
+      {/* ═══ 매트릭스 뷰 — 시안 1e 의 2열 항목 카드 그리드 ═══ */}
       {tab === "matrix" && (
         <div>
-          {/* 히트맵 그리드 (모바일에서 1열, 데스크톱에서 2열) */}
-          <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: isMobile ? "6px" : "8px", marginBottom: "16px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "14px" }}>
             {sorted.map(risk => {
               // '데이터 없음' CP — 강도 표시 없이 상태만 표시합니다
               if (risk.noData) {
                 return (
                   <div key={risk.id} style={{
-                    background: C.card, borderRadius: "12px", padding: "14px",
-                    border: `1px solid ${C.border}`, opacity: 0.75,
+                    background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px",
+                    padding: "12px 13px", opacity: 0.75,
                   }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-                      <span style={{ fontSize: "18px" }}>{risk.icon}</span>
-                      <span style={{ fontWeight: 800, fontSize: "24px", color: C.text3 }}>–</span>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
+                      <span style={{ fontSize: "13px", fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{risk.name}</span>
+                      <SevBadge sevKey={null} />
                     </div>
-                    <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "2px" }}>{risk.name}</div>
-                    <div style={{ fontSize: "14px", color: C.text3, marginBottom: "6px",
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{risk.headline}</div>
-                    <span style={{ fontSize: "12px", fontWeight: 700, padding: "1px 6px", borderRadius: "4px",
-                      background: C.card2, color: C.text3 }}>데이터 없음</span>
+                    <div style={{ marginTop: "7px" }}><Num size="16px" weight={800} color={C.text3}>–</Num></div>
+                    <div style={{ fontSize: "11px", color: C.text3, marginTop: "3px", lineHeight: 1.45 }}>{risk.headline}</div>
                   </div>
                 );
               }
-              const sev = SEV[risk.severity];
-              const opacity = 0.4 + (risk.score / 100) * 0.6;
+              const sv = SEVC[risk.severity];
+              const isOpen = expandedCP === risk.id;
               return (
-                <div key={risk.id} onClick={() => setExpandedCP(expandedCP === risk.id ? null : risk.id)} style={{
-                  background: C.card, borderRadius: "12px", padding: "14px", cursor: "pointer",
-                  border: `1px solid ${sev.color}40`, position: "relative", overflow: "hidden",
-                  transition: "all .2s",
-                }}>
-                  {/* 배경 강도 바 */}
-                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: `${risk.score}%`,
-                    background: `linear-gradient(to top, ${sev.color}12, transparent)`, pointerEvents: "none" }} />
-
-                  <div style={{ position: "relative" }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-                      <span style={{ fontSize: "18px" }}>{risk.icon}</span>
-                      <span style={{ fontWeight: 800, fontSize: "24px", color: sev.color, opacity }}>{risk.score}</span>
-                    </div>
-                    <div style={{ fontWeight: 700, fontSize: "15px", marginBottom: "2px" }}>{risk.name}</div>
-                    <div style={{ fontSize: "14px", color: C.text3, marginBottom: "6px",
-                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{risk.headline}</div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <span style={{ fontSize: "12px", fontWeight: 700, padding: "1px 6px", borderRadius: "4px",
-                        background: sev.glow, color: sev.color }}>{sev.label}</span>
-                      <span style={{ fontSize: "12px", color: risk.trend === "악화" ? C.red : risk.trend === "개선" ? C.green : C.text3 }}>
-                        {risk.trend === "악화" ? "▲" : risk.trend === "개선" ? "▼" : "−"}
-                      </span>
-                    </div>
+                <div key={risk.id}
+                  onClick={() => setExpandedCP(isOpen ? null : risk.id)}
+                  role="button" tabIndex={0} aria-expanded={isOpen}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setExpandedCP(isOpen ? null : risk.id); } }}
+                  style={{
+                    background: `linear-gradient(180deg, ${sv.bg}, transparent 42%), ${C.card}`,
+                    border: `1px solid ${C.border}`, borderRadius: "14px",
+                    padding: "12px 13px", cursor: "pointer", transition: "border-color .2s",
+                  }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "6px" }}>
+                    <span style={{ fontSize: "13px", fontWeight: 800, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{risk.name}</span>
+                    <SevBadge sevKey={risk.severity} />
                   </div>
+                  <div style={{ marginTop: "7px", display: "flex", alignItems: "baseline", gap: "5px" }}>
+                    <Num size="16px" weight={800} color={sv.hi}>{risk.score}</Num>
+                    <span style={{ fontSize: "11px", color: trendColor(risk.trend), fontWeight: 700 }} aria-label={`추세 ${risk.trend}`}>
+                      {risk.trend === "악화" ? "▲" : risk.trend === "개선" ? "▼" : "−"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "11px", color: C.text3, marginTop: "3px", lineHeight: 1.45 }}>{risk.headline}</div>
 
-                  {expandedCP === risk.id && (
-                    <div style={{ position: "relative", marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${C.border}` }}>
+                  {isOpen && (
+                    <div style={{ marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${C.border}` }}>
                       {risk.keyMetrics.map((m, j) => (
-                        <div key={j} style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", padding: "3px 0" }}>
-                          <span style={{ color: C.text3, display: "flex", alignItems: "center", gap: "4px" }}>
+                        <div key={j} style={{ display: "flex", justifyContent: "space-between", gap: "6px", fontSize: "12px", padding: "3px 0" }}>
+                          <span style={{ color: C.text3, display: "flex", alignItems: "center", gap: "4px", minWidth: 0,
+                            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                             <StatusDot status={m.status} /> {m.label}
                           </span>
-                          <span style={{ fontWeight: 600, color: m.status === "danger" ? C.red : m.status === "warn" ? C.yellow : C.text2 }}>{m.value}</span>
+                          <Num size="12px" weight={700} color={metricColor(m.status)}>{m.value}</Num>
                         </div>
                       ))}
                     </div>
@@ -599,11 +669,11 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {}, onRetr
           </div>
 
           {/* 범례 */}
-          <div style={{ display: "flex", gap: "12px", justifyContent: "center", padding: "8px" }}>
-            {Object.entries(SEV).map(([key, sev]) => (
-              <div key={key} style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "14px", color: C.text3 }}>
-                <span style={{ width: "8px", height: "8px", borderRadius: "4px", background: sev.color }} />
-                {sev.label}
+          <div style={{ display: "flex", gap: "12px", justifyContent: "center", padding: "4px", flexWrap: "wrap" }}>
+            {Object.entries(SEVC).map(([key, sv]) => (
+              <div key={key} style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "11px", fontWeight: 700, color: C.text3 }}>
+                <span style={{ width: "8px", height: "8px", borderRadius: "4px", background: sv.base }} />
+                {sv.label}
               </div>
             ))}
           </div>
@@ -612,51 +682,78 @@ export default function RiskHeatmap({ marketIndices = [], fearGreed = {}, onRetr
 
       {/* ═══ 추이 기록 뷰 — localStorage 실측 이력 기반 ═══ */}
       {tab === "history" && (
-        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "16px" }}>
-            <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "4px" }}>📊 리스크 점수 추이</div>
-            <div style={{ fontSize: "12px", color: C.text3, marginBottom: "12px" }}>
-              이 브라우저에서 방문 시점에 산출된 점수를 일자별로 기록한 실측 이력입니다 (현재 {history.length}일 기록).
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {/* 종합 점수 추이 — 시안 1e 의 바 차트를 실측 기록으로 그립니다 */}
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "15px 16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px", marginBottom: "4px" }}>
+              <span style={{ fontSize: "14px", fontWeight: 800 }}>점수 추이</span>
+              <span style={{ fontSize: "11px", color: C.text3 }}>최근 {history.length}일 기록</span>
             </div>
-            {history.length < 2 ? (
-              <div style={{ padding: "20px 0", textAlign: "center", fontSize: "14px", color: C.text3 }}>
-                아직 기록된 이력이 충분하지 않습니다. 2일 이상 방문하면 실제 기록 기반 추이가 표시됩니다.
+            <div style={{ fontSize: "11px", color: C.text4, marginBottom: "12px", lineHeight: 1.5 }}>
+              이 브라우저에서 방문 시점에 산출된 점수를 일자별로 기록한 실측 이력입니다.
+            </div>
+            {overallSeries.length < 2 ? (
+              <div style={{ padding: "16px 0", textAlign: "center", fontSize: "13px", color: C.text3, lineHeight: 1.6 }}>
+                아직 기록된 이력이 충분하지 않습니다.<br />2일 이상 방문하면 실제 기록 기반 추이가 표시됩니다.
               </div>
             ) : (
-              risks.map(risk => {
-                const sev = risk.noData ? null : SEV[risk.severity];
-                return (
-                  <div key={risk.id} style={{ display: "flex", alignItems: "center", gap: "12px",
-                    padding: "8px 0", borderBottom: `1px solid ${C.border}` }}>
-                    <span style={{ fontSize: "18px", width: "28px", textAlign: "center" }}>{risk.icon}</span>
-                    <span style={{ fontWeight: 600, fontSize: "15px", width: "60px" }}>{risk.name}</span>
-                    <div style={{ flex: 1 }}>
-                      <Sparkline points={seriesFor(risk.id)} width={100} height={24} />
-                    </div>
-                    <span style={{ fontWeight: 700, fontSize: "16px", color: sev ? sev.color : C.text3, width: "32px", textAlign: "right" }}>
-                      {risk.noData ? "–" : risk.score}
-                    </span>
-                    <span style={{ fontSize: "12px", fontWeight: 700, padding: "2px 6px", borderRadius: "4px",
-                      background: sev ? sev.glow : C.card2, color: sev ? sev.color : C.text3, minWidth: "52px", textAlign: "center" }}>
-                      {sev ? sev.label : "데이터 없음"}
-                    </span>
-                  </div>
-                );
-              })
+              <>
+                <div style={{ display: "flex", gap: "4px", alignItems: "flex-end", height: "56px" }}>
+                  {overallSeries.map((h, i) => {
+                    const lv = SEVC[levelForScore(h.overall)];
+                    const isLast = i === overallSeries.length - 1;
+                    return (
+                      <div key={h.d} title={`${h.d} · ${h.overall}점`} style={{
+                        flex: 1, height: `${Math.max(4, Math.min(100, h.overall))}%`,
+                        background: isLast ? lv.hi : `${lv.base}66`, borderRadius: "3px",
+                      }} />
+                    );
+                  })}
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: C.text4, marginTop: "7px" }}>
+                  <span>{shortDate(overallSeries[0].d)}</span>
+                  <Num size="10px" weight={800} color={ov.hi}>오늘 {overall.score}</Num>
+                </div>
+              </>
             )}
           </div>
 
+          {/* CP 별 추이 — 실측 기록이 2일치 이상일 때만 행이 표시됩니다 */}
+          {overallSeries.length >= 2 && (
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "15px 16px" }}>
+              <div style={{ fontSize: "14px", fontWeight: 800, marginBottom: "8px" }}>항목별 추이</div>
+              {risks.map((risk, idx) => {
+                const sv = risk.noData ? null : SEVC[risk.severity];
+                return (
+                  <div key={risk.id} style={{ display: "flex", alignItems: "center", gap: "10px",
+                    padding: "9px 0", borderBottom: idx === risks.length - 1 ? "none" : `1px solid ${C.card2}` }}>
+                    <span style={{ fontSize: "16px", width: "26px", textAlign: "center", flexShrink: 0 }}>{risk.icon}</span>
+                    <span style={{ fontWeight: 700, fontSize: "13px", width: "62px", flexShrink: 0 }}>{risk.name}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <MiniSparkline points={seriesFor(risk.id)} width={100} height={24} upColor={C.red} downColor={C.green} />
+                    </div>
+                    <Num size="14px" weight={800} color={sv ? sv.hi : C.text3} style={{ display: "inline-block", width: "30px", textAlign: "right", flexShrink: 0 }}>
+                      {risk.noData ? "–" : risk.score}
+                    </Num>
+                    <SevBadge sevKey={risk.noData ? null : risk.severity} />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* 종합 요약 — 현재 상태의 사실 서술만 표시합니다 (운용 지시 워딩 금지) */}
-          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "16px" }}>
-            <div style={{ fontWeight: 700, fontSize: "16px", marginBottom: "10px" }}>💡 리스크 요약</div>
+          <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "15px 16px" }}>
+            <div style={{ fontSize: "14px", fontWeight: 800, marginBottom: "10px" }}>리스크 요약</div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {[
-                { icon: "🔴", text: `위험 구간(HIGH·CRITICAL) CP ${risks.filter(r => r.severity === "CRITICAL" || r.severity === "HIGH").length}개` },
-                { icon: "🟢", text: `안정 구간(LOW) CP ${risks.filter(r => r.severity === "LOW").length}개` },
-                { icon: "⚠️", text: `종합 리스크 ${overall.score}점 — ${overall.score > 65 ? "높음" : overall.score > 40 ? "보통" : "낮음"} 구간` },
+                { color: C.redL || C.red, text: `위험 구간(위험·높음) CP ${risks.filter(r => r.severity === "CRITICAL" || r.severity === "HIGH").length}개` },
+                { color: C.greenL || C.green, text: `안정 구간(낮음) CP ${risks.filter(r => r.severity === "LOW").length}개` },
+                { color: C.yellowL || C.yellow, text: `종합 리스크 ${overall.score}점 — ${overall.score > 65 ? "높음" : overall.score > 40 ? "보통" : "낮음"} 구간` },
               ].map((item, i) => (
-                <div key={i} style={{ display: "flex", gap: "8px", alignItems: "flex-start", fontSize: "15px", color: C.text2 }}>
-                  <span>{item.icon}</span> {item.text}
+                <div key={i} style={{ display: "flex", gap: "8px", alignItems: "center", fontSize: "13px", color: C.text2 }}>
+                  <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: item.color, flexShrink: 0 }} />
+                  {item.text}
                 </div>
               ))}
             </div>

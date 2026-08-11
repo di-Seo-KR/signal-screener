@@ -1,0 +1,403 @@
+{
+  "summary": "VeyricTheKerr 유튜브 50편 — 기술적 분석 방법론 추출 → 규칙화 가능 가설 도출 (리서치 전용, 코드 무수정)",
+  "agentCount": 9,
+  "logs": [
+    "유튜브 50편 — 8개 에이전트로 분할 수집",
+    "수집 완료 — 50편 중 자막 확보 50편"
+  ],
+  "result": {
+    "fetched": 50,
+    "withTranscript": 50,
+    "synthesis": {
+      "methodology": [
+        {
+          "concept": "자금관리 우선주의 (25% 상한·동일 베팅·영역 분산)",
+          "detail": "차트보다 베팅 구조가 선행한다는 것이 전체 채널의 제1원칙. 시드의 최대 25%만 투입, 매 게임 동일 금액 베팅, 기계적 손절(-25% 현물 / 선물 1~3%), 영역별 계좌 물리 분리 + 75% 현금계좌 불가침, 손익비는 단일 트레이드가 아니라 10~20게임 시퀀스 단위로 설계. '차트 분석은 손절 3회를 2회로 줄이는 마지막 도구'로 위치.",
+          "freq": 11,
+          "sources": [
+            "I-xffxCya-E",
+            "8dUzZot7qeg",
+            "ILgkF6JKFrM",
+            "aocSL0Z-eKE",
+            "WsOnuAxy_hE",
+            "etVEC1a7hcw",
+            "1AY2XKRFe7Q",
+            "9xlJ-4CTXZI",
+            "Pq4XjbQhOHk",
+            "8cpzKKhPLGg",
+            "EWNsykVGVQg"
+          ]
+        },
+        {
+          "concept": "확인 후 진입 (레벨 저격 금지, 리클레임·양봉·돌파 확인)",
+          "detail": "저점 지정가 '각질' 전면 금지. 피보 레벨 터치 후 상위 레벨 회복(리클레임), 양봉 전환, 1파 고점 돌파 등 '반등이 확인된 뒤' 진입. 손절은 단순 손실 차단이 아니라 '카운트/셋업이 틀렸다는 판정 신호'로 기능 — 재이탈 1회면 셋업 폐기.",
+          "freq": 6,
+          "sources": [
+            "8e4WZTRPFP4",
+            "EWNsykVGVQg",
+            "P3__wv6M9HQ",
+            "WfDBEJP40cI",
+            "KBT_8Sn8OyU",
+            "JOAyDWfKZzI"
+          ]
+        },
+        {
+          "concept": "매물대·지지저항·SR 플립",
+          "detail": "볼륨 프로파일로 매물대 존을 객관 설정, 뚫리면 지지↔저항 역할 전환(수평선·대각 추세선 공통). 체류 기간이 긴 가격대일수록 강한 존. 추세선+매물대 컨플루언스에서만 진입, 지지가 저항으로 변하면 전량 청산.",
+          "freq": 5,
+          "sources": [
+            "ePvwn-9SfR4",
+            "JOAyDWfKZzI",
+            "O4XOg4SyPck",
+            "HIrSCS7VFwk",
+            "hWv0EXK6pIU"
+          ]
+        },
+        {
+          "concept": "거래량 검증 — '레벨 도달 방식'이 1차 조건",
+          "detail": "같은 돌파 가격이라도 거래량 없이 슬금슬금 접근하면 무효 처리(주문 취소). 수렴 패턴은 거래량 감소해야 유효, 확산형은 증가해야 유효 — 조건과 다르면 패턴 자체를 기각. 거래량 재유입을 파동 시작의 확인 조건으로 사용.",
+          "freq": 5,
+          "sources": [
+            "WYAqbI5cZuc",
+            "EWNsykVGVQg",
+            "co_tW3iQVmg",
+            "c-11pfuyuKg",
+            "OdN9mJ5EPe4"
+          ]
+        },
+        {
+          "concept": "엘리어트 파동 구조 문법",
+          "detail": "내부 카운트(5-3-5 지그재그 / 3-3-5 플랫·불규칙 / 3-3-3 수렴·WXY)로 조정 유형 판별, 불변 법칙(3파 최단 금지, 1-4파 중첩 금지)으로 카운트를 기각하는 반증 중심 운용. C파=5파 vs WXY=3 종결 구분, 교번 규칙, '4파 수렴 구간 매매 금지' 같은 회피 룰 포함.",
+          "freq": 8,
+          "sources": [
+            "NygHShw3OuE",
+            "kb0XPAjYqKY",
+            "RRXpsPQfLHE",
+            "KN-176J9T4Q",
+            "417OCAOlA_c",
+            "co_tW3iQVmg",
+            "xU9Mc-lmwng",
+            "tWGJ1a-0hUA"
+          ]
+        },
+        {
+          "concept": "양방향 조건부 주문 설계 (응매매·또찌·히트 타점)",
+          "detail": "'틀렸을 때의 시나리오'를 진입 시점에 주문으로 선반영 — 손절가 아래 조건부 돌파 숏(응매매), 손절 위 동일 규모 재진입 트리거(또찌), 5:5 횡보 구간 양방향 스탑(히트). 포지션+손절+반대/재진입 주문을 하나의 번들로 동시 설정.",
+          "freq": 5,
+          "sources": [
+            "FHCHQbOdxdk",
+            "SnCs1KGqEyg",
+            "8cpzKKhPLGg",
+            "WfDBEJP40cI",
+            "f8EzhbqLeT4"
+          ]
+        },
+        {
+          "concept": "피보나치 되돌림·확장 규격",
+          "detail": "2파 0.382~0.618(0.618 최빈), 4파 0.236~0.382, 3파 확장 1.618/2.618, 불장 목표가 1.618/2.618 확장 + 0.382/0.618 재진입. 단 레벨 자체는 휩소 유발원이므로 반드시 '회복 확인'과 결합해 사용 — 레벨은 좌표, 진입은 확인.",
+          "freq": 5,
+          "sources": [
+            "FjJ4dRfzPGo",
+            "8e4WZTRPFP4",
+            "KN-176J9T4Q",
+            "ehkaxHB3-f0",
+            "P3__wv6M9HQ"
+          ]
+        },
+        {
+          "concept": "롱 편향 원칙 (숏 페이오프 상한)",
+          "detail": "숏은 이론상 최대 +100%(실전 ~90%)로 상한이 있고 롱은 무제한 — 손익비 구조상 메인 관점은 장세 무관 항상 롱, 숏은 헤지·단기 전용. 하락은 장대음봉으로 한 번에 쏟고 끝나므로 숏은 빠른 익절. 코인마진 1배 숏 헤지+펀딩비 수취가 유일한 장기 숏 용례.",
+          "freq": 3,
+          "sources": [
+            "YuiSDQfLe74",
+            "x_qKA0egGh8",
+            "0xSv2r0toj8"
+          ]
+        },
+        {
+          "concept": "레짐 인식과 변동성 수축",
+          "detail": "빅숏(-40~50%) 후에는 V반등 없이 박스권 — 박스 확정 전 매매 금지, 확정 후 하단 롱/상단 숏. 급등락 직전에는 '잔잔해짐'(수축)이 선행. 추세장=손실확정법(단방향), 횡보장=히트 매매(양방향)로 기법을 스위칭하고, 스위칭 신호 자체를 추세 반전 경고로 해석.",
+          "freq": 3,
+          "sources": [
+            "O4XOg4SyPck",
+            "f8EzhbqLeT4",
+            "8cpzKKhPLGg"
+          ]
+        },
+        {
+          "concept": "시간 축의 명시적 사용",
+          "detail": "가격만이 아니라 시간을 검증 조건으로 사용 — 갠 각도(1:1, 1:2)를 빠르게 벗어나야 정상 파동('시간 검증'), 파이존 체류 시 매매 금지. 시간대·요일 통계(9시 상승, 10시·15시 장대양봉, 수요일 상승·목요일 하락), 인터미디어 파동 1년 주기 등.",
+          "freq": 4,
+          "sources": [
+            "ZeMJtCXG2so",
+            "ehkaxHB3-f0",
+            "wi7WcxEqax8",
+            "417OCAOlA_c"
+          ]
+        }
+      ],
+      "hypotheses": [
+        {
+          "name": "H1. 피보 리클레임 진입 (레벨 저격 대체)",
+          "rule": "필요: ZigZag(θ%)로 상승 다리 감지(저점A→고점B) 후 조정 진행 중. [2파형] 가격이 0.618 되돌림 레벨 이하 터치 → 이후 0.5 레벨을 종가로 상향 회복 시 롱. [4파형] 0.382 터치 → 0.236 종가 회복 시 롱, 손절 0.382~0.5 사이 배치. 공통 무효: 진입 후 확인 레벨 재이탈(종가) 시 청산 + 해당 셋업 영구 폐기(재진입 금지 — '한 번의 손절로 임펄스 아님 판정').",
+          "timeframe": "4H 기본, 1H 병행 (본인이 알트 현물은 4H/1H만 사용한다고 명시)",
+          "expectedEdge": "레벨 지정가 매수 대비 휩소 반복 손절을 구조적으로 제거 — 원 데이터 주장 '레벨 각질은 10번 중 3승 7휩소'. 동일 좌표에서 진입 방식만 바꾼 A/B가 가능해 엣지 귀속이 깨끗함.",
+          "risk": "ZigZag θ에 따라 '다리' 정의가 달라져 그리드 과최적화 위험. 확인 진입은 평균 진입가가 불리 — 승률 개선분이 불리한 진입가+슬리피지를 상회해야만 순엣지. 피보 레벨 자체가 대중적이라 엣지 소멸 가능."
+        },
+        {
+          "name": "H2. 거래량 확인 돌파 필터 (기존 돌파 시그널 오버레이)",
+          "rule": "기존 돌파 시그널(레벨 L 상향 돌파)에 필터 부착: 돌파 캔들(또는 직전 3봉 합) 거래량 z-score ≥ k(기본 1.5, 20봉 롤링) AND 돌파 캔들 양봉일 때만 발화. 불충족 시 시그널 억제(='주문 취소'). 하방 돌파 숏은 대칭 적용 + 접근 중 반등봉 출현 시 억제. 무효: 필터 통과 후 돌파 레벨 종가 재이탈.",
+          "timeframe": "1H / 4H",
+          "expectedEdge": "'거래량 없이 슬금슬금 접근한 돌파는 회귀한다'는 반복 주장의 직접 코드화. 신규 전략이 아니라 필터라서 Zepta 기존 돌파류 시그널에 저비용 부착 가능하고, 억제된 신호의 후행 수익을 보면 필터 가치가 즉시 측정됨.",
+          "risk": "거래소별 거래량 왜곡(워시 트레이딩) 취약. k·롤링창 그리드 과최적화. 필터가 진짜 돌파까지 걸러 거래 수가 급감하면 통계 유의성 확보 곤란."
+        },
+        {
+          "name": "H3. SR 플립 리테스트 진입 (sr 스키마 재사용)",
+          "rule": "기존 sr 존(볼륨 프로파일 기반) 상단 R을 종가 돌파 → 가격이 R±버퍼로 회귀(리테스트) → 리테스트 봉이 존 위에서 종가 마감(지지 확인) 시 롱. 무효: 리테스트에서 존 하단 아래 종가 마감 → 셋업 폐기. 청산: 다음 상단 존 도달 시 부분익절 + 진입 존 하향 이탈(플립 역전) 시 전량 청산 — '지지가 저항으로 변하면 전부 매도' 그대로.",
+          "timeframe": "4H / 1D",
+          "expectedEdge": "SR 플립은 이 트레이더의 최다 반복 원칙 중 하나이며 '체류 기간이 길수록 강한 존' 주장으로 존 강도 가중치까지 정량화 가능. Zepta 리뉴얼 V2의 sr 스키마를 그대로 써서 신규 파라미터가 버퍼 하나뿐 — 과최적화 표면적이 작음.",
+          "risk": "존 폭·버퍼 정의 민감도. 리테스트 없이 급등하는 케이스는 전부 놓침(선택 편향으로 백테스트가 실제보다 좋아 보일 수 있음). 존 산출에 룩어헤드가 섞이면 전체 무효 — 기존 백테스트 룩어헤드 감사 과제와 병합 필요."
+        },
+        {
+          "name": "H4. 변동성 수축 후 양방향 돌파 (히트 타점 단순화)",
+          "rule": "수축 감지: BB밴드폭(또는 ATR)의 20봉 백분위 ≤ p10이 M봉 지속(='후잔'). 발화: 수축 박스 상단+버퍼에 롱 스탑 / 하단-버퍼에 숏 스탑 OCO. 손절: 진입가 대비 0.5~1%(본인 명시 규격 — 실장 시 ATR 배수로 정규화). 한쪽 체결 시 반대 취소. 무효: 미체결 상태에서 밴드폭 백분위 > p50 회복 시 양쪽 철회.",
+          "timeframe": "1H",
+          "expectedEdge": "방향 무예측 구조라 예측 오류 리스크가 없고, 변동성 수축 후 확장은 문헌상으로도 알려진 현상 — '파동은 박스 안에 갇혀 살 수 없다'의 코드화. 그의 5:5 구간 정의(남들이 매매하지 않는 자리)와 정합.",
+          "risk": "횡보 연장 시 양쪽 반복 휩소로 수수료·슬리피지·펀딩비 잠식 — 그가 '늘리기·쪼이기·모으기' 재량으로 막는 부분이 룰 버전에는 없음. 고정 % 손절은 심볼별 변동성 편차에 취약. 최대 연속 손절 시퀀스가 길 수 있음."
+        },
+        {
+          "name": "H5. 시간대·요일 필터 (검증 후 오버레이 전용)",
+          "rule": "검증 대상 주장(KST): 09시 상승 확률 최고 / 장대양봉은 10시·15시 집중 / 수요일 상승 최고·목요일 하락 최고. 필터 룰: 롱 시그널에 [목요일 신규 진입 금지 + 목 10시 전 포지션 종료], 숏 시그널에 [수요일 금지, 09시 금지, 10시·15시만 허용]. 현물 버전: 08시 진입 → 10시 판정(손실=청산 / 이익=반익절+본전 스탑).",
+          "timeframe": "1H 봉, KST 기준",
+          "expectedEdge": "참이면 모든 기존 전략에 무비용 오버레이 가능한 계절성 엣지. 검증 비용이 5개 가설 중 가장 낮아 빠른 확정/기각이 가능.",
+          "risk": "출처가 구독자 집계 통계로 원데이터·기간·거래소 미상 — 데이터 마이닝 산물일 가능성이 가장 높은 가설. 다중가설 보정 필수, 레짐 변화(거래 주체 이동)로 소멸이 빠를 수 있음. 단독 전략화 금지, 필터로만."
+        }
+      ],
+      "discretionary": [
+        "엘리어트 파동 카운팅 전반 — 파동 급(degree) 선택, 교번 규칙 적용, 카운트 채택/기각/교체 판단. 규칙표(불변 법칙)는 코드화 가능하지만 '어느 카운트를 메인으로 삼나'는 전적으로 재량 (NygHShw3OuE, KN-176J9T4Q, kb0XPAjYqKY, 417OCAOlA_c, tWGJ1a-0hUA)",
+        "더커파동 원형파 인식 — '비스무리하면 원형파로 인정'이라고 본인이 명시한 주관적 형태 판정. 갠 팬 피벗 배치도 수동 (ZeMJtCXG2so, ehkaxHB3-f0)",
+        "라이브 무빙 흡수 판독 — 캔들 마감 직전 아래꼬리 반복 = 매수 흡수, '고래면 쭉 올라가고 개미면 말리기만 반복' 같은 주체 구분 휴리스틱. 실시간 관찰 대응이지 사전 규칙이 아님 (HIrSCS7VFwk)",
+        "히트 타점 미세조정 레이어 — 늘리기·쪼이기·모으기, 도망가기·따라가기. 본인 스스로 '같은 관점인데 손절이 3번과 20번으로 갈리는 이유'라고 부른, 기법의 실제 수익원에 해당하는 재량 부분 (8cpzKKhPLGg)",
+        "역발상 센티먼트 판정 — '너도 나도 조심하면 바닥, 김밥집 아주머니가 외치면 고점' 류의 일화 기반 심리 앵커. 정량 프록시 없이는 코드화 불가 (wmj72Bz3JAE, CWTa14hFdS0)",
+        "리버스 프랙탈 읽기 — 본인이 '프랙탈은 정답지가 아니다, 심리의 반대를 느끼라는 것'이라고 명시한 감각적 대조 (hWv0EXK6pIU)",
+        "측정 이동 목표가 산출 — '잔잔거렸던 구간을 축으로 1:1 투영해 64K' 같은 계산은 축(횡보 구간) 선정이 수동 (hWv0EXK6pIU)",
+        "테마 순환 대장→후발주 선별, 밈코인·투기성 반등 종목 선택 — 테마 분류와 '커뮤니티 생존' 판정이 재량. 소액 사이징 규칙만 기계적 (OdN9mJ5EPe4, RxLti3ZXTac, tWGJ1a-0hUA)",
+        "상관 자산 sanity check — '이 카운트대로면 비트코인이 말도 안 되는 가격'이라는 현실성 기각, USDT.D 파동 해석 전반 (tWGJ1a-0hUA, Qh4zY4l0GsE)",
+        "웻지 vs 삼각수렴의 실전 위치 판정 — 반전/지속 확률표는 명확하나 '지금이 몇 파인가'에 종속되어 결국 카운팅 재량에 의존 (co_tW3iQVmg, c-11pfuyuKg, xU9Mc-lmwng, SnCs1KGqEyg)",
+        "'롱은 봉이 짧아지며 끝나고 숏은 길어지며 끝난다' — 방향별 추세 소멸 시그니처. 임계값 미정의로 현재는 재량이나, 캔들 실체 길이 추세로 정량화 시도 가능한 2순위 후보 (WYAqbI5cZuc, YuiSDQfLe74)",
+        "매매 스타일 고정과 정보 필터링(단기/스윙/장기별 뉴스 소비 규칙), 시드 조달 규율(대출 금지, 200만원 시작) — 트레이더 개인 규율이지 시그널이 아님 (iQHZJ70PCEk, WsOnuAxy_hE)",
+        "손실확정 영역 운용(무손절 10% 고정 베팅, 격리 고배율, 큰 저항대까지 홀드) — 규칙 자체는 명시적이나 Zepta 정보 서비스 원칙 및 자동매매 리스크 정책과 충돌하여 가설화 부적합, 기록만 (Pq4XjbQhOHk, 8cpzKKhPLGg)",
+        "데이터 노트: 0QLbmYHrFYA는 생활·심리 영상으로 기법 추출에서 제외했고, wi7WcxEqax8의 시간대 통계는 구독자 집계라 원출처 검증 불가 — H5를 '검증 후 사용' 전제로만 등재한 이유"
+      ],
+      "validationPlan": "H1 피보 리클레임: (1) ZigZag θ∈{3,5,8%}·확인레벨(0.5/0.236 고정) 사전등록 그리드로 BTC/ETH 4H 인샘플 — 비교 기준은 동일 좌표 '레벨 지정가 진입' 버전 대비 PF·승률 개선폭. (2) 교차심볼(유동성 상위 알트 10종, btc-cron 동적 유니버스 재사용) 부호 일관성 + OOS 통과 확인. (3) 홀드아웃 1회 소진 후 섀도 등재, 확인 진입의 불리한 평균 진입가를 슬리피지 모델에 명시 반영.\n\nH2 거래량 필터: (1) 기존 돌파 시그널에 필터 on/off A-B — k∈{1.0,1.5,2.0}·창 20봉 고정으로 사전등록, 신규 전략이 아니라 오버레이로만 평가. (2) 교차심볼 OOS + '억제된 신호의 후행 수익' 분석으로 필터가 버린 것이 실제로 나빴는지 직접 검정. (3) 홀드아웃 1회 → 통과 시 기존 돌파류 시그널에 섀도 오버레이, 거래 수 급감 시 유의성 미달로 자동 기각.\n\nH3 SR 플립: (1) sr 스키마 존을 그대로 사용해 신규 파라미터를 버퍼 1개로 제한, 그리드 사전등록. 시작 전 존 산출 룩어헤드 감사(기존 백테스트 룩어헤드 잔여 과제와 병합) 필수. (2) 교차심볼 OOS + 체류기간 가중 유/무 2안 비교. (3) 홀드아웃 1회 → 섀도, '리테스트 미발생 급등' 누락률을 병행 기록해 선택 편향 계량.\n\nH4 수축 돌파: (1) 수축 백분위 p∈{5,10,15}·지속 M∈{6,12}봉 사전등록 그리드, 손절은 고정 %가 아닌 ATR 배수로 정규화해 등록. (2) 교차심볼 OOS + 수수료·슬리피지·펀딩비 민감도 필수(휩소 잠식이 주 사망 원인이므로 비용 2배 스트레스 통과 조건). (3) 홀드아웃 1회 → 섀도, 최대 연속 손절 시퀀스 모니터링을 등재 조건에 포함.\n\nH5 시간대·요일: (1) 그리드 없음 — 주장 그대로(수 상승/목 하락/09·10·15시) 사전등록 후 전 기간 시간대·요일 수익 분포 검정, 다중가설 보정(Bonferroni) 적용. (2) 연도별 서브샘플·교차심볼 안정성 확인 — 특정 연도에만 유의하면 기각. (3) 유의 시에만 홀드아웃 1회 → 기존 전략 필터 오버레이로만 섀도(단독 전략 등재 금지).",
+      "copyStyle": [
+        "해석-무효조건 쌍 서술: 모든 방향 판단에 '이 선이 깨지면 이 해석은 폐기된다'를 반드시 붙임 (예: '수렴이 깨졌기 때문에 이제 수렴이 아니다', '파이존 재진입 시 손절'). Zepta 시그널 근거 문구에 무효화 레벨을 표준 필드로 병기하면 '그래서 롱이야 숏이야' 명확한 해석 원칙과 정합하면서 단정 표현도 피할 수 있음.",
+        "빈도·확률 수치 병기: '10번 중 3번 성공·7번 휩소', '70% 확률로 추세 지속', '95% 이상 4파에서 출몰'처럼 단정 대신 빈도 언어로 서술. 단, Zepta 카피에서는 수치를 그의 인용이 아니라 우리 실측 백테스트 값으로만 채울 것 — 검증 안 된 확률 수치 표기는 표현 원칙 위반.",
+        "입문자 비유 1문장 메커니즘 요약: '떨어지는 칼날을 잡지 마라', '가격을 얼려라', '스톱워치를 눌러버리는 것', '박스 안에 갇혀 살 수 없다' — 기법의 '왜'를 생활 비유로 압축하는 패턴은 퀀트팀의 '투자 입문자 눈높이' 원칙과 정확히 일치. 단 그의 카피 중 '무조건 수익으로 전환된다' 류의 보장성 표현은 표현 원칙 위반이므로 차용 금지."
+      ]
+    }
+  },
+  "workflowProgress": [
+    {
+      "type": "workflow_phase",
+      "index": 1,
+      "title": "Fetch"
+    },
+    {
+      "type": "workflow_phase",
+      "index": 2,
+      "title": "Synthesize"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 1,
+      "label": "fetch:1/8",
+      "phaseIndex": 1,
+      "phaseTitle": "Fetch",
+      "agentId": "a8b841cbf4a9581a1",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786450896828,
+      "queuedAt": 1786450896817,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "수집 경로: youtube.com 페이지 curl로 제목·설명·captionTrack…",
+      "promptPreview": "당신은 Zepta 퀀트팀(QUANT-RES)의 리서처입니다. 트레이딩 유튜버 VeyricTheKerr 의\n영상들에서 **기술적 분석 방법론**을 추출합니다. 코드 수정 금지 — 순수 리서치.\n\n## 대상 영상 (youtube.com/watch?v=ID)\n- KBT_8Sn8OyU\n- JOAyDWfKZzI\n- ePvwn-9SfR4\n- O4XOg4SyPck\n- NygHShw3OuE\n- I-xffxCya-E\n- FjJ4dRfzPGo\n\n## 수집 방법 (순서대로 시도, 성공하는 방법으로)\n1. WebFetch 로 https://www.youtube.com/watch?v=<ID> — 제목·설명 확보 (자막은 안 나옴)\n2. 자막: WebFetch 로 https://youtubetotranscript.com/transc…",
+      "lastProgressAt": 1786451179865,
+      "tokens": 87165,
+      "toolCalls": 16,
+      "durationMs": 283037,
+      "resultPreview": "{\"videos\":[{\"id\":\"KBT_8Sn8OyU\",\"title\":\"차트분석에서 추세선이란?\",\"gotTranscript\":true,\"techniques\":[\"상승 추세선 작도법: 저점 캔들의 아래꼬리에서 다음(더 높은) 저점 캔들의 아래꼬리까지 연결 — 꼬리와 꼬리를 잇는 것이 정석이며 캔들 몸통을 가로질러 그리면 안 됨\",\"하락 추세선 작도법: 고점 캔들의 위꼬리에서 다음(더 낮은) 고점 캔들의 위꼬리를 연결\",\"추세선 이탈 = 매수 금지 신호: 상승 추세선 라인 바깥(아래)으로 가격이 떨어지면 '하락할 수 있다'고 판단해 매수 대신 매도 시점으로 삼음\",\"상승 추세 중 매수 타이밍: 추세선에 닿아 지지받는 눌림 구간에서 매수\",\"하락 추세 전환 매수: 하락 추세선을 위로 돌파했을 때, 또는 조금 더…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 2,
+      "label": "fetch:2/8",
+      "phaseIndex": 1,
+      "phaseTitle": "Fetch",
+      "agentId": "a3389a581024602cd",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786450896829,
+      "queuedAt": 1786450896817,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "수집 경로: YouTube watch 페이지 파싱으로 7편 전부 제목·설명…",
+      "promptPreview": "당신은 Zepta 퀀트팀(QUANT-RES)의 리서처입니다. 트레이딩 유튜버 VeyricTheKerr 의\n영상들에서 **기술적 분석 방법론**을 추출합니다. 코드 수정 금지 — 순수 리서치.\n\n## 대상 영상 (youtube.com/watch?v=ID)\n- 4dT9vyv1ln8\n- Qh4zY4l0GsE\n- co_tW3iQVmg\n- 417OCAOlA_c\n- RxLti3ZXTac\n- FHCHQbOdxdk\n- 8e4WZTRPFP4\n\n## 수집 방법 (순서대로 시도, 성공하는 방법으로)\n1. WebFetch 로 https://www.youtube.com/watch?v=<ID> — 제목·설명 확보 (자막은 안 나옴)\n2. 자막: WebFetch 로 https://youtubetotranscript.com/transc…",
+      "lastProgressAt": 1786451235893,
+      "tokens": 88155,
+      "toolCalls": 12,
+      "durationMs": 339064,
+      "resultPreview": "{\"videos\":[{\"id\":\"4dT9vyv1ln8\",\"title\":\"차트분석 채널링을 이용한 투자전략\",\"gotTranscript\":true,\"techniques\":[\"패러럴 채널(평행 채널) 매매 — 트레이딩뷰 도구로 작도. 알트코인 현물은 시총이 작아 5분·15분봉을 쓰지 않고 4시간봉(차선 1시간봉) 기준으로 채널을 그림\",\"하락 추세 채널 작도법: 첫 번째 고점→두 번째 고점을 연결해 상단선을 만들고, 복사된 평행선을 하락 추세의 저점에 맞춰 채널 완성\",\"매수 타점 2가지: (1) 채널 하단 지지선 터치 시 매수, (2) 채널 상단 돌파 후 채널 위에서 지지(안착) 확인 시 매수\",\"청산 규칙: 채널 중간선에서 1차 익절, 채널 상단선에서 전량 매도. 중간선에서 지지받고 오르는 경우도 있으나 원…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 3,
+      "label": "fetch:3/8",
+      "phaseIndex": 1,
+      "phaseTitle": "Fetch",
+      "agentId": "a257aa496ff0b5929",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786450896830,
+      "queuedAt": 1786450896817,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "수집 방법: 직접 timedtext GET과 innertube 웹 클라이언트는 …",
+      "promptPreview": "당신은 Zepta 퀀트팀(QUANT-RES)의 리서처입니다. 트레이딩 유튜버 VeyricTheKerr 의\n영상들에서 **기술적 분석 방법론**을 추출합니다. 코드 수정 금지 — 순수 리서치.\n\n## 대상 영상 (youtube.com/watch?v=ID)\n- 8dUzZot7qeg\n- tOpKP_2y9_8\n- 0xSv2r0toj8\n- OdN9mJ5EPe4\n- tWGJ1a-0hUA\n- ddmNR8yqybY\n- WYAqbI5cZuc\n\n## 수집 방법 (순서대로 시도, 성공하는 방법으로)\n1. WebFetch 로 https://www.youtube.com/watch?v=<ID> — 제목·설명 확보 (자막은 안 나옴)\n2. 자막: WebFetch 로 https://youtubetotranscript.com/transc…",
+      "lastProgressAt": 1786451239228,
+      "tokens": 99914,
+      "toolCalls": 22,
+      "durationMs": 342398,
+      "resultPreview": "{\"videos\":[{\"id\":\"8dUzZot7qeg\",\"title\":\"95%가 선물매매에서 잃는 충격적인 이유\",\"gotTranscript\":true,\"techniques\":[\"시드 배분 2단계 규칙: 전체 시드의 25%만 선물 계좌에 입금(시드가 커지면 10%, 숙련자는 3%까지 축소 — 운용액이 크면 오히려 매매가 어려워진다는 이유). 입금한 뒤에도 풀배팅 금지 — 계좌 안에서 다시 '세 판'으로 나눠 배팅 구조를 짜야 함\",\"변동성 드래그(수학적 오류) 논증: 풀배팅으로 +100%, +100% 후 -50%, -50%면 원금 복귀, -60%가 두 번이면 손실 구간 진입. 풀배팅 구조에서는 10게임 중 9번을 이겨야 우상향 — 그래서 95%가 잃는다는 주장\",\"고정 수량 배팅 규칙: 첫 진입 시 25% …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 4,
+      "label": "fetch:4/8",
+      "phaseIndex": 1,
+      "phaseTitle": "Fetch",
+      "agentId": "a17ddd7edf74167c3",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786450896830,
+      "queuedAt": 1786450896817,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "7개 영상 전부 자막 확보 성공. 채널 소유자 VeyricTheKerr 확…",
+      "promptPreview": "당신은 Zepta 퀀트팀(QUANT-RES)의 리서처입니다. 트레이딩 유튜버 VeyricTheKerr 의\n영상들에서 **기술적 분석 방법론**을 추출합니다. 코드 수정 금지 — 순수 리서치.\n\n## 대상 영상 (youtube.com/watch?v=ID)\n- EWNsykVGVQg\n- WfDBEJP40cI\n- P3__wv6M9HQ\n- CWTa14hFdS0\n- iQHZJ70PCEk\n- kb0XPAjYqKY\n- RRXpsPQfLHE\n\n## 수집 방법 (순서대로 시도, 성공하는 방법으로)\n1. WebFetch 로 https://www.youtube.com/watch?v=<ID> — 제목·설명 확보 (자막은 안 나옴)\n2. 자막: WebFetch 로 https://youtubetotranscript.com/transc…",
+      "lastProgressAt": 1786451215358,
+      "tokens": 86189,
+      "toolCalls": 16,
+      "durationMs": 318528,
+      "resultPreview": "{\"videos\":[{\"id\":\"EWNsykVGVQg\",\"title\":\"리스크를 최소화 해주는 양봉매매기법\",\"gotTranscript\":true,\"techniques\":[\"양봉 매매(모멘텀 확인 진입): 음봉(떨어지는 칼날) 저점 매수 대신, 가격이 '동력'을 얻어 양봉으로 전환될 때만 진입. 근거 3가지 — (1) 동력이 생긴 상태라 수익 실현이 수월, (2) 손절가를 명확히 걸 수 있음, (3) 바닥권에서 물려서 기다릴 필요가 없음\",\"타임프레임: 알트코인은 비트코인과 달리 가벼워서 작은 봉이 무의미 — 1일봉·4시간봉 등 큰 봉 기준으로 타점을 설정\",\"타점·손절 설정: 미리 정한 타점 위로 올라올 때 매수, 손절은 진입가 대비 10% 이내(보통 5% 수준)로 고정\",\"타점 재설정 규칙: 가격이 타점…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 5,
+      "label": "fetch:5/8",
+      "phaseIndex": 1,
+      "phaseTitle": "Fetch",
+      "agentId": "a2fe5d71e4df0b189",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786450896830,
+      "queuedAt": 1786450896817,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "수집 방법: 유튜브 watch 페이지 curl로 7개 영상 모두 제목·설…",
+      "promptPreview": "당신은 Zepta 퀀트팀(QUANT-RES)의 리서처입니다. 트레이딩 유튜버 VeyricTheKerr 의\n영상들에서 **기술적 분석 방법론**을 추출합니다. 코드 수정 금지 — 순수 리서치.\n\n## 대상 영상 (youtube.com/watch?v=ID)\n- SnCs1KGqEyg\n- xU9Mc-lmwng\n- 0QLbmYHrFYA\n- wi7WcxEqax8\n- c-11pfuyuKg\n- ZeMJtCXG2so\n- ehkaxHB3-f0\n\n## 수집 방법 (순서대로 시도, 성공하는 방법으로)\n1. WebFetch 로 https://www.youtube.com/watch?v=<ID> — 제목·설명 확보 (자막은 안 나옴)\n2. 자막: WebFetch 로 https://youtubetotranscript.com/transc…",
+      "lastProgressAt": 1786451282602,
+      "tokens": 93367,
+      "toolCalls": 22,
+      "durationMs": 385772,
+      "resultPreview": "{\"videos\":[{\"id\":\"SnCs1KGqEyg\",\"title\":\"쐐기 패턴에서 효과적인 또찌매매기법\",\"gotTranscript\":true,\"techniques\":[\"또찌기법(찌른 데를 또 찌른다): 쐐기(웨지) 형태 — 특히 임펄스 5파 말단의 쐐기 — 에서 숏 진입 시, 손절 후 애매하게 한 번 더 고점을 찍고 내려가는 경우가 잦으므로, 진입과 동시에 (1)포지션 (2)손절가 (3)손절가 위쪽의 동일 배팅 규모 재진입(트리거) 주문을 '한 방에' 하나의 전략으로 미리 설정한다. 포지션 잡고 나중에 추가하는 것이 아니라 애초부터 번들로 건다.\",\"음매매(관점 무효화 트리거 매매)의 확장: 숏 관점의 무효화 레벨(이 선을 깨면 내 관점이 틀림)에 멍하니 기다리지 말고 반대 방향 트리거 주문을 걸어, …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 6,
+      "label": "fetch:6/8",
+      "phaseIndex": 1,
+      "phaseTitle": "Fetch",
+      "agentId": "a1a4f9f4e4d2ba830",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786450896831,
+      "queuedAt": 1786450896817,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "[수집 방법] WebFetch 로는 YouTube watch 페이지에서 제목 일…",
+      "promptPreview": "당신은 Zepta 퀀트팀(QUANT-RES)의 리서처입니다. 트레이딩 유튜버 VeyricTheKerr 의\n영상들에서 **기술적 분석 방법론**을 추출합니다. 코드 수정 금지 — 순수 리서치.\n\n## 대상 영상 (youtube.com/watch?v=ID)\n- KN-176J9T4Q\n- YuiSDQfLe74\n- ILgkF6JKFrM\n- WsOnuAxy_hE\n- 1AY2XKRFe7Q\n- Pq4XjbQhOHk\n- 8cpzKKhPLGg\n\n## 수집 방법 (순서대로 시도, 성공하는 방법으로)\n1. WebFetch 로 https://www.youtube.com/watch?v=<ID> — 제목·설명 확보 (자막은 안 나옴)\n2. 자막: WebFetch 로 https://youtubetotranscript.com/transc…",
+      "lastProgressAt": 1786451334052,
+      "tokens": 135750,
+      "toolCalls": 25,
+      "durationMs": 437221,
+      "resultPreview": "{\"videos\":[{\"id\":\"KN-176J9T4Q\",\"title\":\"엘리어트파동 핵심정리\",\"gotTranscript\":true,\"techniques\":[\"임펄스 기본 구조: 상승 5파(1·3·5 추세파, 2·4 조정파) + 조정 ABC 3파. 불변 법칙은 '어느 파동이든 연장 가능하나 3파가 가장 짧으면 안 된다' — 1파가 매우 길고 3파가 그보다 짧으면 5파 연장(확장)은 나올 수 없다고 판정\",\"교번 규칙: 2파와 4파는 같은 형태의 조정이 나오지 않는다. 2파에서 지그재그가 나왔으면 4파는 지그재그를 제외한 플랫/불규칙/수렴 중 하나로 예측 범위를 좁힘. 수렴 패턴은 95% 이상 4파에서 출몰(2파에서는 거의 안 나옴)\",\"2파 되돌림: 피보나치 0.382 또는 0.618이 일반적이며 0.618…"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 7,
+      "label": "fetch:7/8",
+      "phaseIndex": 1,
+      "phaseTitle": "Fetch",
+      "agentId": "a28bb2a074bfef10c",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786451179866,
+      "queuedAt": 1786450896817,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "7개 영상 전부 자막 확보 성공. 채널명 VeyricTheKerr 확인 완…",
+      "promptPreview": "당신은 Zepta 퀀트팀(QUANT-RES)의 리서처입니다. 트레이딩 유튜버 VeyricTheKerr 의\n영상들에서 **기술적 분석 방법론**을 추출합니다. 코드 수정 금지 — 순수 리서치.\n\n## 대상 영상 (youtube.com/watch?v=ID)\n- f8EzhbqLeT4\n- aocSL0Z-eKE\n- x_qKA0egGh8\n- etVEC1a7hcw\n- 9xlJ-4CTXZI\n- wmj72Bz3JAE\n- hWv0EXK6pIU\n\n## 수집 방법 (순서대로 시도, 성공하는 방법으로)\n1. WebFetch 로 https://www.youtube.com/watch?v=<ID> — 제목·설명 확보 (자막은 안 나옴)\n2. 자막: WebFetch 로 https://youtubetotranscript.com/transc…",
+      "lastProgressAt": 1786451469490,
+      "tokens": 96430,
+      "toolCalls": 15,
+      "durationMs": 289624,
+      "resultPreview": "{\"videos\":[{\"id\":\"f8EzhbqLeT4\",\"title\":\"빅숏이 발생 했을때 당황하지 말고 이 영상을 보세요\",\"gotTranscript\":true,\"techniques\":[\"빅숏 정의: 단일 급락으로 약 -40~-50% 이상 쏟아지는 경우(알트코인 OM·ACT 사례). 비트코인이 빅숏이 아니어도 개별 알트의 빅숏에 동일 플레이북 적용\",\"급락 전조 신호: 빅숏(또는 급등) 직전에는 가격이 '잔잔해진다'(변동성 수축·횡보). 이 잔잔한 구간에서 히트 타점(양방향 돌파 대비 타점)을 설정\",\"급락 직후 대응 금지 구간: 빅숏 후 V자 반등은 나오지 않는다는 전제. 첫 반등(꼬리 말리는 위꼬리 반등)~재하락 구간에서는 매수·매도·롱·숏 전부 금지. '떨어지는 칼 매수'와 '반등에 숏 재진입' 둘 …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 8,
+      "label": "fetch:8/8",
+      "phaseIndex": 1,
+      "phaseTitle": "Fetch",
+      "agentId": "a53d15a8cc794042c",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786451215360,
+      "queuedAt": 1786450896817,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "수집 경로: (1) WebFetch 직접 페이지 → 제목·설명만 확보 실패…",
+      "promptPreview": "당신은 Zepta 퀀트팀(QUANT-RES)의 리서처입니다. 트레이딩 유튜버 VeyricTheKerr 의\n영상들에서 **기술적 분석 방법론**을 추출합니다. 코드 수정 금지 — 순수 리서치.\n\n## 대상 영상 (youtube.com/watch?v=ID)\n- HIrSCS7VFwk\n\n## 수집 방법 (순서대로 시도, 성공하는 방법으로)\n1. WebFetch 로 https://www.youtube.com/watch?v=<ID> — 제목·설명 확보 (자막은 안 나옴)\n2. 자막: WebFetch 로 https://youtubetotranscript.com/transcript?v=<ID> 또는\n   https://r.jina.ai/https://www.youtube.com/watch?v=<ID> 등 프록시 시도.\n …",
+      "lastProgressAt": 1786451389968,
+      "tokens": 64216,
+      "toolCalls": 12,
+      "durationMs": 174608,
+      "resultPreview": "{\"videos\":[{\"id\":\"HIrSCS7VFwk\",\"title\":\"비트코인 지금 이런 현상 포착되면 더 내려간다\",\"gotTranscript\":true,\"techniques\":[\"차트 분석 2원 체계: ① 과거 데이터 기반 예측 — 이미 그려진 데이터에서 근거를 조합해 패턴·지표로 예측하는 방식(일반적인 차트 강의 대부분이 이 방식), ② '라이브 무빙' — 실시간으로 그려지는 캔들의 반응을 관찰하는 방식. ②는 예측이라기보다 '대응' 도구로 규정하며, 이 영상의 하방 시나리오 수정은 ② 라이브 무빙 관찰에 근거함\",\"캔들 마감 직전 아래꼬리 반복 = 흡수(absorption) 신호: 무빙상 분명히 더 밀려야 정상인 자리에서 캔들이 마감되기 전마다 아래꼬리를 만들며 '말려 올라오는' 현상이 반복되면, …"
+    },
+    {
+      "type": "workflow_agent",
+      "index": 9,
+      "label": "synthesize",
+      "phaseIndex": 2,
+      "phaseTitle": "Synthesize",
+      "agentId": "a86fbaaf805c55c18",
+      "model": "claude-fable-5",
+      "state": "done",
+      "startedAt": 1786451469503,
+      "queuedAt": 1786451469492,
+      "attempt": 1,
+      "lastToolName": "StructuredOutput",
+      "lastToolSummary": "H1 피보 리클레임: (1) ZigZag θ∈{3,5,8%}·확인레벨(0.5/0.236 …",
+      "promptPreview": "당신은 Zepta 퀀트팀(QUANT-PLAN)입니다. 아래는 트레이더 VeyricTheKerr 의\n유튜브 50편에서 추출한 기법 데이터입니다. 종합하세요.\n\n[\n {\n  \"id\": \"KBT_8Sn8OyU\",\n  \"title\": \"차트분석에서 추세선이란?\",\n  \"gotTranscript\": true,\n  \"techniques\": [\n   \"상승 추세선 작도법: 저점 캔들의 아래꼬리에서 다음(더 높은) 저점 캔들의 아래꼬리까지 연결 — 꼬리와 꼬리를 잇는 것이 정석이며 캔들 몸통을 가로질러 그리면 안 됨\",\n   \"하락 추세선 작도법: 고점 캔들의 위꼬리에서 다음(더 낮은) 고점 캔들의 위꼬리를 연결\",\n   \"추세선 이탈 = 매수 금지 신호: 상승 추세선 라인 바깥(아래)으로 가격이 떨어지면 '하락할 수 있…",
+      "lastProgressAt": 1786451771970,
+      "tokens": 92550,
+      "toolCalls": 1,
+      "durationMs": 302467,
+      "resultPreview": "{\"methodology\":[{\"concept\":\"자금관리 우선주의 (25% 상한·동일 베팅·영역 분산)\",\"detail\":\"차트보다 베팅 구조가 선행한다는 것이 전체 채널의 제1원칙. 시드의 최대 25%만 투입, 매 게임 동일 금액 베팅, 기계적 손절(-25% 현물 / 선물 1~3%), 영역별 계좌 물리 분리 + 75% 현금계좌 불가침, 손익비는 단일 트레이드가 아니라 10~20게임 시퀀스 단위로 설계. '차트 분석은 손절 3회를 2회로 줄이는 마지막 도구'로 위치.\",\"freq\":11,\"sources\":[\"I-xffxCya-E\",\"8dUzZot7qeg\",\"ILgkF6JKFrM\",\"aocSL0Z-eKE\",\"WsOnuAxy_hE\",\"etVEC1a7hcw\",\"1AY2XKRFe7Q\",\"9xlJ-4CTXZI\",\"…"
+    }
+  ],
+  "totalTokens": 843736,
+  "totalToolCalls": 141
+}
