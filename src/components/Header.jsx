@@ -309,7 +309,14 @@ export default memo(function Header({
                     </div>
                   ) : (
                     <div className="flex items-center justify-between">
-                      <SheetTitle className="font-extrabold"><span style={{ color: "var(--z-blue)" }}>Z</span>epta</SheetTitle>
+                      <SheetTitle className="flex items-center gap-2 font-extrabold">
+                        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"
+                          style={{ color: "var(--z-blue-hi)" }} fill="none" stroke="currentColor"
+                          strokeWidth="8" strokeLinecap="round">
+                          <path d="M12 28v8M24 19v17M36 10v26" />
+                        </svg>
+                        Zepta
+                      </SheetTitle>
                       <Button size="sm" onClick={() => { setShowAuthModal(true); setMobileOpen(false); }}>
                         로그인
                       </Button>
@@ -422,11 +429,16 @@ export default memo(function Header({
               </SheetContent>
             </Sheet>
 
-            {/* 로고 — ★ 2026-06-12 (대표 피드백): 블로그/정적페이지 텍스트 로고(Z 일렉트릭 블루
-                강조)로 통일. 아이콘 이미지 제거, 트렌디·깔끔 */}
-            <div onClick={() => navigate("home")} className="flex cursor-pointer select-none items-center lg:ml-6">
+            {/* 로고 — ★ 2026-08-12 브랜드 v2 (대표 확정 B-2 시그널 바): 심볼 + 워드마크.
+                심볼은 SVG 인라인(테마색 var(--z-blue-hi) 상속 — 다크 퍼플하이/라이트 딥퍼플 자동) */}
+            <div onClick={() => navigate("home")} className="flex cursor-pointer select-none items-center gap-2 lg:ml-6">
+              <svg width="22" height="22" viewBox="0 0 48 48" aria-hidden="true"
+                style={{ color: "var(--z-blue-hi)" }} fill="none" stroke="currentColor"
+                strokeWidth="8" strokeLinecap="round">
+                <path d="M12 28v8M24 19v17M36 10v26" />
+              </svg>
               <span className="text-lg font-extrabold tracking-tight text-foreground sm:text-xl" style={{ letterSpacing: "-0.02em" }}>
-                <span style={{ color: "var(--z-blue)" }}>Z</span>epta
+                Zepta
               </span>
             </div>
           </div>

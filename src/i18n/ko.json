@@ -91,10 +91,27 @@
       "range1d": "1일",
       "range1w": "1주",
       "range1m": "1개월",
+      "range3m": "3개월",
       "range1y": "1년",
       "disclaimerDefault": "표시되는 신호와 지표는 참고 정보이며 투자 조언이 아닙니다.",
       "disclaimerDetail": "표시되는 신호·레벨·지표는 과거 데이터를 요약한 참고 정보이며 투자 조언이 아닙니다. 투자 판단과 책임은 본인에게 있습니다."
     }
+  },
+  "assetPopup": {
+    "close": "닫기",
+    "asOfNow": "방금 분석 기준 · Zepta",
+    "asOf": "{{m}}분 전 분석 기준 · Zepta",
+    "signalCaption": "종합 신호 점수 · 기술 지표 종합",
+    "levelsTitle": "지지 · 저항 레벨",
+    "levelsCaption": "최근 1년 시세 기준",
+    "btTitle": "백테스트 요약",
+    "btBadge": "과거 시뮬레이션",
+    "emptyTitle": "신호 데이터를 준비하고 있어요",
+    "emptyDesc": "이 종목은 아직 분석 데이터가 부족해요. 관심 목록에 담아두고 나중에 다시 확인해 보세요."
+  },
+  "searchOverlay": {
+    "noResults": "'{{q}}' 결과가 없어요",
+    "noResultsHint": "종목명·심볼·티커로 검색해 보세요. 지원 목록에 없는 자산은 검색되지 않아요."
   },
   "theme": {
     "dark": "다크",
@@ -786,9 +803,10 @@
       "refresh": "새로고침",
       "refreshing": "로딩 중...",
       "all": "전체",
-      "us": "🇺🇸 미국",
-      "kr": "🇰🇷 한국",
-      "crypto": "₿ 크립토",
+      "us": "미국",
+      "kr": "한국",
+      "crypto": "코인",
+      "sentimentDisclaimer": "감성 분류는 자동 분석 결과로 참고용이며 투자 자문·권유가 아닙니다.",
       "latest": "최신순",
       "positive": "긍정",
       "negative": "부정",

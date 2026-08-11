@@ -223,9 +223,17 @@ export function buildEconResultPage(entry) {
     },
   ];
 
+  // ── 시안 1h 요약 카드 — 수치 한 줄 + 서프라이즈 + 이전치 대비 (실데이터 도출) ──
+  const sumBullets = [
+    `발표치 ${fmtVal(actual, unit)} · 예측치 ${estimate != null ? fmtVal(estimate, unit) : "집계 없음"} · 이전치 ${previous != null ? fmtVal(previous, unit) : "집계 없음"}`,
+    surprise,
+  ];
+  if (vsPrev) sumBullets.push(vsPrev);
+
   const bodyHtml = `    <div class="breadcrumb"><a href="/">홈</a> › <a href="/econ">경제지표 발표 결과</a> › ${escH(info.ko)}</div>
+    <div class="date-line">${escH(kdate)} 발표</div>
     <h1>미국 ${escH(info.ko)} — ${escH(kdate)} 발표 결과</h1>
-    <div class="meta-row">${escH(event)} · 발표일 ${escH(date)}</div>
+    <div class="tag-row"><span class="tag">미국</span><span class="tag">${escH(event)}</span></div>
 
     <div class="dash-strip">
       <div class="dash-stat"><div class="v">${escH(fmtVal(actual, unit))}</div><div class="l">발표치</div></div>
@@ -233,7 +241,12 @@ export function buildEconResultPage(entry) {
       <div class="dash-stat"><div class="v">${escH(previous != null ? fmtVal(previous, unit) : "—")}</div><div class="l">이전치</div></div>
     </div>
 
-    <div class="callout"><strong>서프라이즈</strong> — ${escH(surprise)}${vsPrev ? " " + escH(vsPrev) : ""}</div>
+    <div class="sum-card">
+      <div class="sum-t">${sumBullets.length >= 3 ? "3줄 요약" : "요약"}</div>
+      <ul>
+${sumBullets.map((b) => `        <li>${escH(b)}</li>`).join("\n")}
+      </ul>
+    </div>
 
     <h2>이 지표란?</h2>
     <p>${escH(info.about)}</p>
@@ -242,9 +255,9 @@ export function buildEconResultPage(entry) {
     <div class="facts">
       <div class="row"><span>지표</span><b>${escH(info.ko)} (${escH(event)})</b></div>
       <div class="row"><span>발표일</span><b>${escH(kdate)}</b></div>
-      <div class="row"><span>발표치</span><b>${escH(fmtVal(actual, unit))}</b></div>
-      <div class="row"><span>예측치</span><b>${escH(estimate != null ? fmtVal(estimate, unit) : "집계 없음")}</b></div>
-      <div class="row"><span>이전치</span><b>${escH(previous != null ? fmtVal(previous, unit) : "집계 없음")}</b></div>
+      <div class="row"><span>발표치</span><b class="mono">${escH(fmtVal(actual, unit))}</b></div>
+      <div class="row"><span>예측치</span><b${estimate != null ? ' class="mono"' : ""}>${escH(estimate != null ? fmtVal(estimate, unit) : "집계 없음")}</b></div>
+      <div class="row"><span>이전치</span><b${previous != null ? ' class="mono"' : ""}>${escH(previous != null ? fmtVal(previous, unit) : "집계 없음")}</b></div>
     </div>
     <p>${escH(surprise)} 발표치와 컨센서스의 차이(서프라이즈)는 발표 직후 시장 가격에 반영되는 경향이 관찰돼 왔으며, 같은 수치라도 당시의 금리·물가 국면에 따라 시장 반응은 달랐습니다.</p>
 
@@ -252,9 +265,9 @@ export function buildEconResultPage(entry) {
 
     <div class="related">
       <h3>더 살펴보기</h3>
-      <a href="/econ">경제지표 발표 결과 모음 — 전체 목록</a>
-      <a href="/econ-calendar">경제 캘린더 — 다가오는 발표 일정과 컨센서스</a>
-      <a href="/briefing">오늘의 코인 시장 브리핑</a>
+      <a href="/econ"><span><span class="rt">경제지표 발표 결과 모음</span><span class="rs">전체 목록</span></span></a>
+      <a href="/econ-calendar"><span><span class="rt">경제 캘린더</span><span class="rs">다가오는 발표 일정과 컨센서스</span></span></a>
+      <a href="/briefing"><span><span class="rt">오늘의 코인 시장 브리핑</span><span class="rs">매일 아침 KST 07:00 발행</span></span></a>
     </div>`;
 
   const html = renderPage({ title, metaDesc, canonical: urlPath, bodyHtml, jsonLd, ogType: "article" });
