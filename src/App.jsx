@@ -9392,9 +9392,12 @@ function AppInner() {
               : c.s.phase === "pre" ? t("tabs.screener.mktPre")
               : c.s.phase === "weekend" ? t("tabs.screener.mktWeekend")
               : t("tabs.screener.mktClosed"),
+            // ★ 정돈 패스: 휴장일 고지는 배지 아래 캡션 1곳에서만 — 여기 subText 에도 넣으면
+            //   같은 문구가 카드 안팎에 이중 노출됩니다(마감 카드에서 잘려 보이던 문제).
+            //   마감/주말은 다음 개장 카운트다운을 지어내지 않으므로 부가 문구 없이 비웁니다.
             subText: c.s.phase === "open" ? t("tabs.screener.mktToClose", { d: fmtDur(c.s.minsToClose) })
               : c.s.phase === "pre" ? t("tabs.screener.mktToOpen", { d: fmtDur(c.s.minsToOpen) })
-              : t("tabs.screener.mktHoursNote"),
+              : "",
             on: c.s.phase === "open",
           }));
           // 조건 편집 칩 라벨 — 스캔 결과가 있으면 실측 종목 수를 병기 (시안 "조건 편집 · N종목")
@@ -9430,7 +9433,7 @@ function AppInner() {
                     }} />
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize: mf(12), fontWeight: 800, color: C.text1, whiteSpace: "nowrap" }}>{c.label} {c.phaseText}</div>
-                      <div style={{ fontSize: mf(10), color: C.text3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.subText}</div>
+                      {c.subText && <div style={{ fontSize: mf(10), color: C.text3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.subText}</div>}
                     </div>
                   </div>
                 ))}
@@ -11755,10 +11758,14 @@ function AppInner() {
 
           return (
             <div className="tab-content">
-              {/* ── 헤더 — 시안 1c: 지표 타이틀 + 조회 월 알약(상태 표시 — 액션 아님) ── */}
+              {/* ── 헤더 — 시안 1c. ★ 정돈 패스: 조회 월 알약을 제거했습니다(아래 주간 내비가
+                   이미 "8.10 — 8.16"으로 기간을 보여줘 이중 표기였음). 헤더 우측은 이 화면의
+                   주요 액션(발표 결과 아카이브) 하나만 차지합니다 — 본문 점유 제거. ── */}
               <div className="flex items-center justify-between gap-2" style={{ marginBottom: "13px" }}>
                 <h1 style={{ margin: 0, fontSize: isMobile ? "22px" : "24px", fontWeight: 800, letterSpacing: "-0.01em", color: C.text1 }}>{t("tabs.indicators.title")}</h1>
-                <span style={{ fontSize: "12px", fontWeight: 800, padding: "5px 12px", borderRadius: "9999px", background: C.card, border: `1px solid ${C.border}`, color: C.text2, fontFamily: MONO }}>{t("tabs.indicators.monthPill", { y: calYear, m: calMonth + 1 })}</span>
+                {indicatorsView === "calendar" && (
+                  <HomeActionChip href="/econ" label={t("tabs.indicators.econArchiveLink")} />
+                )}
               </div>
 
               {/* 서브탭 [캘린더|뉴스] — mobileKit Segment (딥링크 URL 동기화) */}
@@ -11772,10 +11779,9 @@ function AppInner() {
                 style={{ marginBottom: "13px" }}
               />
 
-              {/* 캡션 + 발표 결과 아카이브(/econ 서버 렌더 SEO 페이지) 진입 승계 */}
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap", marginBottom: "16px" }}>
-                <span style={{ fontSize: "13px", color: C.text3 }}>{t("tabs.indicators.calendarCaption")}</span>
-                <HomeActionChip href="/econ" label={t("tabs.indicators.econArchiveLink")} />
+              {/* 캡션 — 아카이브 칩은 헤더로 승격(정돈 패스). 캡션만 한 줄로 남깁니다. */}
+              <div style={{ fontSize: "12.5px", color: C.text3, marginBottom: "14px", lineHeight: 1.5 }}>
+                {t("tabs.indicators.calendarCaption")}
               </div>
 
               <div className="grid gap-7 grid-cols-1 lg:grid-cols-[280px_1fr] items-start">
