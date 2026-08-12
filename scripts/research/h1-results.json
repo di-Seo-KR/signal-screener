@@ -1,0 +1,5751 @@
+{
+  "hypothesis": "H1 — 피보 되돌림 '리클레임 확인 진입'(W2: 0.618터치→0.5종가회복 / W4: 0.382터치→0.236종가회복)이 동일 좌표 '레벨 터치 즉시 지정가 진입' 대비 PF·승률 개선",
+  "source": "docs/research/veyric-ta-methodology-2026-08.json hypotheses[0]",
+  "preregistered": {
+    "thetaGrid": [
+      0.03,
+      0.05,
+      0.08
+    ],
+    "timeframes": [
+      "1h",
+      "4h"
+    ],
+    "setups": {
+      "W2": {
+        "name": "W2",
+        "touch": 0.618,
+        "conf": 0.5,
+        "sl": 0.786
+      },
+      "W4": {
+        "name": "W4",
+        "touch": 0.382,
+        "conf": 0.236,
+        "sl": 0.5
+      }
+    },
+    "timestopBars": 60,
+    "tp": "직전 고점 B(=L(0)) 인트라바 터치, 갭 상방이면 시가",
+    "reclaimExit": "익봉부터 TP → 확인레벨 재이탈 종가 → 60봉 종가. 재이탈 시 셋업 영구 폐기",
+    "baselineArm": "셋업 생성 익봉부터 L(touch) 지정가 (시가≤레벨이면 시가), SL 종가<L(sl), TP·타임스톱 동일",
+    "setupLifecycle": "pivot high 확정 봉 생성 / 생성봉 종가<L(sl)이면 미생성 / 미터치 종가>B 만료 / 새 pivot high 확정 시 미완료 셋업 대체 만료",
+    "insampleSymbols": [
+      "BTCUSDT",
+      "ETHUSDT"
+    ],
+    "crossvalSymbols": [
+      "SOLUSDT",
+      "XRPUSDT",
+      "BNBUSDT",
+      "DOGEUSDT",
+      "ADAUSDT",
+      "LINKUSDT"
+    ],
+    "period": {
+      "isStart": "2025-02-12",
+      "oosStart": "2026-02-12",
+      "end": "2026-08-12"
+    },
+    "bestThetaRule": "IS·insample(BTC+ETH)·양TF 합산 (PF_reclaim − PF_baseline) 최대 θ",
+    "passOOSRule": "OOS·전심볼·양TF 모두 PF_rec > PF_base AND winRate_rec > winRate_base AND 리클레임 거래수(IS+OOS) ≥ 30",
+    "fees": "수수료·슬리피지 미적용 (양 팔 동일 규약 — 상대 비교 목적)"
+  },
+  "generatedAt": "2026-08-12T12:21:44.265Z",
+  "excluded": [],
+  "thetaScoreIS": {
+    "0.03": 0.1499,
+    "0.05": 0.7418,
+    "0.08": 2.327
+  },
+  "bestTheta": 0.08,
+  "passOOS": false,
+  "oosDetail": {
+    "pfImproves": false,
+    "wrImproves": false,
+    "recTradesTotal": 354,
+    "minRequired": 30
+  },
+  "pooled": [
+    {
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "IS",
+      "group": "all",
+      "baseline": {
+        "trades": 2230,
+        "winRate": 0.3112,
+        "avgRetPct": 0.0194,
+        "medianRetPct": -0.924,
+        "pf": 1.0199
+      },
+      "reclaim": {
+        "trades": 1218,
+        "winRate": 0.3678,
+        "avgRetPct": -0.0467,
+        "medianRetPct": -0.3283,
+        "pf": 0.9205
+      },
+      "baselineOnly": {
+        "trades": 1087,
+        "winRate": 0.0386,
+        "avgRetPct": -1.1978,
+        "medianRetPct": -1.191,
+        "pf": 0.0932
+      },
+      "reclaimVsBaseline": {
+        "t": -1.0298,
+        "pApprox": 0.3031,
+        "n1": 1218,
+        "n2": 2230
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -20.847,
+        "pApprox": 0,
+        "n1": 1087,
+        "n2": 1218
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "group": "all",
+      "baseline": {
+        "trades": 670,
+        "winRate": 0.2701,
+        "avgRetPct": -0.0859,
+        "medianRetPct": -0.8236,
+        "pf": 0.9014
+      },
+      "reclaim": {
+        "trades": 336,
+        "winRate": 0.2708,
+        "avgRetPct": -0.1873,
+        "medianRetPct": -0.4202,
+        "pf": 0.6649
+      },
+      "baselineOnly": {
+        "trades": 353,
+        "winRate": 0.0142,
+        "avgRetPct": -1.0744,
+        "medianRetPct": -1.0292,
+        "pf": 0.0381
+      },
+      "reclaimVsBaseline": {
+        "t": -1.0108,
+        "pApprox": 0.3121,
+        "n1": 336,
+        "n2": 670
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -11.3035,
+        "pApprox": 0,
+        "n1": 353,
+        "n2": 336
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "IS",
+      "group": "all",
+      "baseline": {
+        "trades": 764,
+        "winRate": 0.2801,
+        "avgRetPct": -0.1213,
+        "medianRetPct": -1.4559,
+        "pf": 0.9178
+      },
+      "reclaim": {
+        "trades": 416,
+        "winRate": 0.2813,
+        "avgRetPct": -0.0302,
+        "medianRetPct": -0.5316,
+        "pf": 0.9605
+      },
+      "baselineOnly": {
+        "trades": 377,
+        "winRate": 0.0053,
+        "avgRetPct": -1.9635,
+        "medianRetPct": -1.8742,
+        "pf": 0.0128
+      },
+      "reclaimVsBaseline": {
+        "t": 0.5768,
+        "pApprox": 0.5641,
+        "n1": 416,
+        "n2": 764
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -16.5229,
+        "pApprox": 0,
+        "n1": 377,
+        "n2": 416
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "group": "all",
+      "baseline": {
+        "trades": 244,
+        "winRate": 0.2992,
+        "avgRetPct": -0.0963,
+        "medianRetPct": -1.1883,
+        "pf": 0.9249
+      },
+      "reclaim": {
+        "trades": 100,
+        "winRate": 0.18,
+        "avgRetPct": -0.0154,
+        "medianRetPct": -0.4556,
+        "pf": 0.9727
+      },
+      "baselineOnly": {
+        "trades": 146,
+        "winRate": 0.0068,
+        "avgRetPct": -1.8357,
+        "medianRetPct": -1.7358,
+        "pf": 0.0033
+      },
+      "reclaimVsBaseline": {
+        "t": 0.3246,
+        "pApprox": 0.7455,
+        "n1": 100,
+        "n2": 244
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -10.0082,
+        "pApprox": 0,
+        "n1": 146,
+        "n2": 100
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "IS",
+      "group": "all",
+      "baseline": {
+        "trades": 283,
+        "winRate": 0.2615,
+        "avgRetPct": -0.0227,
+        "medianRetPct": -1.4949,
+        "pf": 0.9872
+      },
+      "reclaim": {
+        "trades": 134,
+        "winRate": 0.2313,
+        "avgRetPct": 0.369,
+        "medianRetPct": -0.6496,
+        "pf": 1.5105
+      },
+      "baselineOnly": {
+        "trades": 154,
+        "winRate": 0.013,
+        "avgRetPct": -2.1203,
+        "medianRetPct": -2.0199,
+        "pf": 0.0877
+      },
+      "reclaimVsBaseline": {
+        "t": 1.0744,
+        "pApprox": 0.2826,
+        "n1": 134,
+        "n2": 283
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -7.7202,
+        "pApprox": 0,
+        "n1": 154,
+        "n2": 134
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "group": "all",
+      "baseline": {
+        "trades": 95,
+        "winRate": 0.3895,
+        "avgRetPct": 0.1536,
+        "medianRetPct": -0.8597,
+        "pf": 1.1157
+      },
+      "reclaim": {
+        "trades": 37,
+        "winRate": 0.1351,
+        "avgRetPct": -0.0401,
+        "medianRetPct": -0.4794,
+        "pf": 0.9397
+      },
+      "baselineOnly": {
+        "trades": 59,
+        "winRate": 0.1017,
+        "avgRetPct": -1.8062,
+        "medianRetPct": -1.7993,
+        "pf": 0.0713
+      },
+      "reclaimVsBaseline": {
+        "t": -0.3922,
+        "pApprox": 0.6949,
+        "n1": 37,
+        "n2": 95
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -4.4033,
+        "pApprox": 0,
+        "n1": 59,
+        "n2": 37
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "IS",
+      "group": "all",
+      "baseline": {
+        "trades": 1956,
+        "winRate": 0.3492,
+        "avgRetPct": -0.1158,
+        "medianRetPct": -1.0451,
+        "pf": 0.9115
+      },
+      "reclaim": {
+        "trades": 1009,
+        "winRate": 0.4757,
+        "avgRetPct": -0.0869,
+        "medianRetPct": 0,
+        "pf": 0.8787
+      },
+      "baselineOnly": {
+        "trades": 1017,
+        "winRate": 0.0688,
+        "avgRetPct": -1.6013,
+        "medianRetPct": -1.5172,
+        "pf": 0.1365
+      },
+      "reclaimVsBaseline": {
+        "t": 0.328,
+        "pApprox": 0.7429,
+        "n1": 1009,
+        "n2": 1956
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -17.9423,
+        "pApprox": 0,
+        "n1": 1017,
+        "n2": 1009
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "group": "all",
+      "baseline": {
+        "trades": 644,
+        "winRate": 0.3602,
+        "avgRetPct": 0.0964,
+        "medianRetPct": -0.9276,
+        "pf": 1.097
+      },
+      "reclaim": {
+        "trades": 340,
+        "winRate": 0.4735,
+        "avgRetPct": 0.065,
+        "medianRetPct": 0,
+        "pf": 1.1324
+      },
+      "baselineOnly": {
+        "trades": 326,
+        "winRate": 0.0521,
+        "avgRetPct": -1.2798,
+        "medianRetPct": -1.3548,
+        "pf": 0.1249
+      },
+      "reclaimVsBaseline": {
+        "t": -0.2668,
+        "pApprox": 0.7896,
+        "n1": 340,
+        "n2": 644
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -12.4899,
+        "pApprox": 0,
+        "n1": 326,
+        "n2": 340
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "IS",
+      "group": "all",
+      "baseline": {
+        "trades": 750,
+        "winRate": 0.3053,
+        "avgRetPct": -0.1014,
+        "medianRetPct": -1.6905,
+        "pf": 0.9448
+      },
+      "reclaim": {
+        "trades": 390,
+        "winRate": 0.3872,
+        "avgRetPct": -0.0655,
+        "medianRetPct": -0.4404,
+        "pf": 0.9364
+      },
+      "baselineOnly": {
+        "trades": 385,
+        "winRate": 0.0442,
+        "avgRetPct": -2.1477,
+        "medianRetPct": -2.1446,
+        "pf": 0.1289
+      },
+      "reclaimVsBaseline": {
+        "t": 0.1806,
+        "pApprox": 0.8567,
+        "n1": 390,
+        "n2": 750
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -11.2779,
+        "pApprox": 0,
+        "n1": 385,
+        "n2": 390
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "group": "all",
+      "baseline": {
+        "trades": 248,
+        "winRate": 0.2782,
+        "avgRetPct": -0.0379,
+        "medianRetPct": -1.4082,
+        "pf": 0.9744
+      },
+      "reclaim": {
+        "trades": 108,
+        "winRate": 0.2963,
+        "avgRetPct": 0.0219,
+        "medianRetPct": -0.4624,
+        "pf": 1.0286
+      },
+      "baselineOnly": {
+        "trades": 142,
+        "winRate": 0.0211,
+        "avgRetPct": -1.818,
+        "medianRetPct": -1.734,
+        "pf": 0.0493
+      },
+      "reclaimVsBaseline": {
+        "t": 0.2048,
+        "pApprox": 0.8377,
+        "n1": 108,
+        "n2": 248
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -8.1342,
+        "pApprox": 0,
+        "n1": 142,
+        "n2": 108
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "IS",
+      "group": "all",
+      "baseline": {
+        "trades": 292,
+        "winRate": 0.2432,
+        "avgRetPct": -0.3864,
+        "medianRetPct": -2.3062,
+        "pf": 0.8502
+      },
+      "reclaim": {
+        "trades": 146,
+        "winRate": 0.3151,
+        "avgRetPct": -0.001,
+        "medianRetPct": -0.9387,
+        "pf": 0.9993
+      },
+      "baselineOnly": {
+        "trades": 155,
+        "winRate": 0.0323,
+        "avgRetPct": -2.8206,
+        "medianRetPct": -2.9506,
+        "pf": 0.1158
+      },
+      "reclaimVsBaseline": {
+        "t": 0.8421,
+        "pApprox": 0.3997,
+        "n1": 146,
+        "n2": 292
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -6.6375,
+        "pApprox": 0,
+        "n1": 155,
+        "n2": 146
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "group": "all",
+      "baseline": {
+        "trades": 90,
+        "winRate": 0.2556,
+        "avgRetPct": -0.1873,
+        "medianRetPct": -2.0367,
+        "pf": 0.9089
+      },
+      "reclaim": {
+        "trades": 37,
+        "winRate": 0.1622,
+        "avgRetPct": -0.2132,
+        "medianRetPct": -0.7311,
+        "pf": 0.7932
+      },
+      "baselineOnly": {
+        "trades": 55,
+        "winRate": 0.0545,
+        "avgRetPct": -2.2631,
+        "medianRetPct": -2.6778,
+        "pf": 0.1421
+      },
+      "reclaimVsBaseline": {
+        "t": -0.039,
+        "pApprox": 0.9689,
+        "n1": 37,
+        "n2": 90
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -3.6676,
+        "pApprox": 0.0002,
+        "n1": 55,
+        "n2": 37
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "IS",
+      "group": "crossval",
+      "baseline": {
+        "trades": 1877,
+        "winRate": 0.3143,
+        "avgRetPct": 0.0361,
+        "medianRetPct": -0.9237,
+        "pf": 1.037
+      },
+      "reclaim": {
+        "trades": 1026,
+        "winRate": 0.3782,
+        "avgRetPct": -0.0591,
+        "medianRetPct": -0.3451,
+        "pf": 0.9024
+      },
+      "baselineOnly": {
+        "trades": 910,
+        "winRate": 0.044,
+        "avgRetPct": -1.1948,
+        "medianRetPct": -1.1896,
+        "pf": 0.1086
+      },
+      "reclaimVsBaseline": {
+        "t": -1.3462,
+        "pApprox": 0.1783,
+        "n1": 1026,
+        "n2": 1877
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -18.2325,
+        "pApprox": 0,
+        "n1": 910,
+        "n2": 1026
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "group": "crossval",
+      "baseline": {
+        "trades": 537,
+        "winRate": 0.2682,
+        "avgRetPct": -0.0786,
+        "medianRetPct": -0.8235,
+        "pf": 0.9095
+      },
+      "reclaim": {
+        "trades": 268,
+        "winRate": 0.2836,
+        "avgRetPct": -0.1698,
+        "medianRetPct": -0.4173,
+        "pf": 0.6966
+      },
+      "baselineOnly": {
+        "trades": 286,
+        "winRate": 0.014,
+        "avgRetPct": -1.0737,
+        "medianRetPct": -1.028,
+        "pf": 0.0383
+      },
+      "reclaimVsBaseline": {
+        "t": -0.8015,
+        "pApprox": 0.4228,
+        "n1": 268,
+        "n2": 537
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -10.1001,
+        "pApprox": 0,
+        "n1": 286,
+        "n2": 268
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "IS",
+      "group": "crossval",
+      "baseline": {
+        "trades": 637,
+        "winRate": 0.2857,
+        "avgRetPct": -0.0824,
+        "medianRetPct": -1.476,
+        "pf": 0.9446
+      },
+      "reclaim": {
+        "trades": 348,
+        "winRate": 0.2787,
+        "avgRetPct": -0.0967,
+        "medianRetPct": -0.5495,
+        "pf": 0.8775
+      },
+      "baselineOnly": {
+        "trades": 313,
+        "winRate": 0.0064,
+        "avgRetPct": -1.9596,
+        "medianRetPct": -1.8742,
+        "pf": 0.0154
+      },
+      "reclaimVsBaseline": {
+        "t": -0.0828,
+        "pApprox": 0.934,
+        "n1": 348,
+        "n2": 637
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -14.8016,
+        "pApprox": 0,
+        "n1": 313,
+        "n2": 348
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "group": "crossval",
+      "baseline": {
+        "trades": 196,
+        "winRate": 0.2653,
+        "avgRetPct": -0.2297,
+        "medianRetPct": -1.2951,
+        "pf": 0.8283
+      },
+      "reclaim": {
+        "trades": 78,
+        "winRate": 0.1795,
+        "avgRetPct": -0.0309,
+        "medianRetPct": -0.4558,
+        "pf": 0.9472
+      },
+      "baselineOnly": {
+        "trades": 120,
+        "winRate": 0.0083,
+        "avgRetPct": -1.8226,
+        "medianRetPct": -1.741,
+        "pf": 0.004
+      },
+      "reclaimVsBaseline": {
+        "t": 0.7068,
+        "pApprox": 0.4797,
+        "n1": 78,
+        "n2": 196
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -8.6132,
+        "pApprox": 0,
+        "n1": 120,
+        "n2": 78
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "IS",
+      "group": "crossval",
+      "baseline": {
+        "trades": 234,
+        "winRate": 0.2607,
+        "avgRetPct": -0.0181,
+        "medianRetPct": -1.5652,
+        "pf": 0.99
+      },
+      "reclaim": {
+        "trades": 116,
+        "winRate": 0.2328,
+        "avgRetPct": 0.3063,
+        "medianRetPct": -0.6747,
+        "pf": 1.4093
+      },
+      "baselineOnly": {
+        "trades": 123,
+        "winRate": 0.0163,
+        "avgRetPct": -2.1287,
+        "medianRetPct": -2.1738,
+        "pf": 0.107
+      },
+      "reclaimVsBaseline": {
+        "t": 0.8058,
+        "pApprox": 0.4204,
+        "n1": 116,
+        "n2": 234
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -6.6186,
+        "pApprox": 0,
+        "n1": 123,
+        "n2": 116
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "group": "crossval",
+      "baseline": {
+        "trades": 78,
+        "winRate": 0.3718,
+        "avgRetPct": 0.0559,
+        "medianRetPct": -0.8691,
+        "pf": 1.0431
+      },
+      "reclaim": {
+        "trades": 28,
+        "winRate": 0.1786,
+        "avgRetPct": 0.2947,
+        "medianRetPct": -0.4012,
+        "pf": 1.555
+      },
+      "baselineOnly": {
+        "trades": 51,
+        "winRate": 0.0784,
+        "avgRetPct": -1.8088,
+        "medianRetPct": -1.789,
+        "pf": 0.0398
+      },
+      "reclaimVsBaseline": {
+        "t": 0.4217,
+        "pApprox": 0.6732,
+        "n1": 28,
+        "n2": 78
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -4.5206,
+        "pApprox": 0,
+        "n1": 51,
+        "n2": 28
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "IS",
+      "group": "crossval",
+      "baseline": {
+        "trades": 1610,
+        "winRate": 0.3553,
+        "avgRetPct": -0.0939,
+        "medianRetPct": -1.0396,
+        "pf": 0.9286
+      },
+      "reclaim": {
+        "trades": 830,
+        "winRate": 0.488,
+        "avgRetPct": -0.0861,
+        "medianRetPct": 0,
+        "pf": 0.8811
+      },
+      "baselineOnly": {
+        "trades": 838,
+        "winRate": 0.074,
+        "avgRetPct": -1.5938,
+        "medianRetPct": -1.5143,
+        "pf": 0.1458
+      },
+      "reclaimVsBaseline": {
+        "t": 0.0791,
+        "pApprox": 0.937,
+        "n1": 830,
+        "n2": 1610
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -15.8031,
+        "pApprox": 0,
+        "n1": 838,
+        "n2": 830
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "group": "crossval",
+      "baseline": {
+        "trades": 506,
+        "winRate": 0.3458,
+        "avgRetPct": 0.0163,
+        "medianRetPct": -0.9354,
+        "pf": 1.0157
+      },
+      "reclaim": {
+        "trades": 260,
+        "winRate": 0.4769,
+        "avgRetPct": 0.0727,
+        "medianRetPct": 0,
+        "pf": 1.1551
+      },
+      "baselineOnly": {
+        "trades": 263,
+        "winRate": 0.0418,
+        "avgRetPct": -1.3704,
+        "medianRetPct": -1.3856,
+        "pf": 0.0926
+      },
+      "reclaimVsBaseline": {
+        "t": 0.4278,
+        "pApprox": 0.6688,
+        "n1": 260,
+        "n2": 506
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -12.5119,
+        "pApprox": 0,
+        "n1": 263,
+        "n2": 260
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "IS",
+      "group": "crossval",
+      "baseline": {
+        "trades": 628,
+        "winRate": 0.3025,
+        "avgRetPct": -0.1034,
+        "medianRetPct": -1.6905,
+        "pf": 0.9434
+      },
+      "reclaim": {
+        "trades": 322,
+        "winRate": 0.3944,
+        "avgRetPct": -0.0754,
+        "medianRetPct": -0.4151,
+        "pf": 0.9268
+      },
+      "baselineOnly": {
+        "trades": 327,
+        "winRate": 0.0428,
+        "avgRetPct": -2.0616,
+        "medianRetPct": -2.1178,
+        "pf": 0.1383
+      },
+      "reclaimVsBaseline": {
+        "t": 0.1299,
+        "pApprox": 0.8966,
+        "n1": 322,
+        "n2": 628
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -9.8698,
+        "pApprox": 0,
+        "n1": 327,
+        "n2": 322
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "group": "crossval",
+      "baseline": {
+        "trades": 194,
+        "winRate": 0.2577,
+        "avgRetPct": -0.1661,
+        "medianRetPct": -1.4984,
+        "pf": 0.89
+      },
+      "reclaim": {
+        "trades": 80,
+        "winRate": 0.3,
+        "avgRetPct": -0.0747,
+        "medianRetPct": -0.4624,
+        "pf": 0.909
+      },
+      "baselineOnly": {
+        "trades": 115,
+        "winRate": 0.0087,
+        "avgRetPct": -1.8982,
+        "medianRetPct": -1.7563,
+        "pf": 0.0203
+      },
+      "reclaimVsBaseline": {
+        "t": 0.2767,
+        "pApprox": 0.782,
+        "n1": 80,
+        "n2": 194
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -7.2161,
+        "pApprox": 0,
+        "n1": 115,
+        "n2": 80
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "IS",
+      "group": "crossval",
+      "baseline": {
+        "trades": 238,
+        "winRate": 0.2353,
+        "avgRetPct": -0.4346,
+        "medianRetPct": -2.2861,
+        "pf": 0.8332
+      },
+      "reclaim": {
+        "trades": 122,
+        "winRate": 0.3033,
+        "avgRetPct": -0.1661,
+        "medianRetPct": -0.9968,
+        "pf": 0.8891
+      },
+      "baselineOnly": {
+        "trades": 124,
+        "winRate": 0.0323,
+        "avgRetPct": -2.7854,
+        "medianRetPct": -2.7841,
+        "pf": 0.116
+      },
+      "reclaimVsBaseline": {
+        "t": 0.5299,
+        "pApprox": 0.5962,
+        "n1": 122,
+        "n2": 238
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -5.5049,
+        "pApprox": 0,
+        "n1": 124,
+        "n2": 122
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "group": "crossval",
+      "baseline": {
+        "trades": 74,
+        "winRate": 0.2568,
+        "avgRetPct": -0.2057,
+        "medianRetPct": -1.9725,
+        "pf": 0.8966
+      },
+      "reclaim": {
+        "trades": 29,
+        "winRate": 0.2069,
+        "avgRetPct": 0.1,
+        "medianRetPct": -0.7311,
+        "pf": 1.106
+      },
+      "baselineOnly": {
+        "trades": 47,
+        "winRate": 0.0426,
+        "avgRetPct": -2.4026,
+        "medianRetPct": -2.6223,
+        "pf": 0.0712
+      },
+      "reclaimVsBaseline": {
+        "t": 0.4097,
+        "pApprox": 0.682,
+        "n1": 29,
+        "n2": 74
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -4.2586,
+        "pApprox": 0,
+        "n1": 47,
+        "n2": 29
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "IS",
+      "group": "insample",
+      "baseline": {
+        "trades": 353,
+        "winRate": 0.2946,
+        "avgRetPct": -0.0695,
+        "medianRetPct": -0.9451,
+        "pf": 0.9268
+      },
+      "reclaim": {
+        "trades": 192,
+        "winRate": 0.3125,
+        "avgRetPct": 0.0192,
+        "medianRetPct": -0.2832,
+        "pf": 1.0387
+      },
+      "baselineOnly": {
+        "trades": 177,
+        "winRate": 0.0113,
+        "avgRetPct": -1.2136,
+        "medianRetPct": -1.2136,
+        "pf": 0.006
+      },
+      "reclaimVsBaseline": {
+        "t": 0.5832,
+        "pApprox": 0.5598,
+        "n1": 192,
+        "n2": 353
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -11.0712,
+        "pApprox": 0,
+        "n1": 177,
+        "n2": 192
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "group": "insample",
+      "baseline": {
+        "trades": 133,
+        "winRate": 0.2782,
+        "avgRetPct": -0.1152,
+        "medianRetPct": -0.8401,
+        "pf": 0.8694
+      },
+      "reclaim": {
+        "trades": 68,
+        "winRate": 0.2206,
+        "avgRetPct": -0.2566,
+        "medianRetPct": -0.4478,
+        "pf": 0.5393
+      },
+      "baselineOnly": {
+        "trades": 67,
+        "winRate": 0.0149,
+        "avgRetPct": -1.077,
+        "medianRetPct": -1.1071,
+        "pf": 0.0374
+      },
+      "reclaimVsBaseline": {
+        "t": -0.6632,
+        "pApprox": 0.5072,
+        "n1": 68,
+        "n2": 133
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -5.073,
+        "pApprox": 0,
+        "n1": 67,
+        "n2": 68
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "IS",
+      "group": "insample",
+      "baseline": {
+        "trades": 127,
+        "winRate": 0.252,
+        "avgRetPct": -0.3162,
+        "medianRetPct": -1.3928,
+        "pf": 0.7759
+      },
+      "reclaim": {
+        "trades": 68,
+        "winRate": 0.2941,
+        "avgRetPct": 0.3101,
+        "medianRetPct": -0.4917,
+        "pf": 1.4877
+      },
+      "baselineOnly": {
+        "trades": 64,
+        "winRate": 0,
+        "avgRetPct": -1.9827,
+        "medianRetPct": -1.8701,
+        "pf": 0
+      },
+      "reclaimVsBaseline": {
+        "t": 1.6019,
+        "pApprox": 0.1092,
+        "n1": 68,
+        "n2": 127
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -7.3621,
+        "pApprox": 0,
+        "n1": 64,
+        "n2": 68
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "group": "insample",
+      "baseline": {
+        "trades": 48,
+        "winRate": 0.4375,
+        "avgRetPct": 0.4484,
+        "medianRetPct": -0.7157,
+        "pf": 1.4239
+      },
+      "reclaim": {
+        "trades": 22,
+        "winRate": 0.1818,
+        "avgRetPct": 0.0397,
+        "medianRetPct": -0.4214,
+        "pf": 1.0813
+      },
+      "baselineOnly": {
+        "trades": 26,
+        "winRate": 0,
+        "avgRetPct": -1.8962,
+        "medianRetPct": -1.6418,
+        "pf": 0
+      },
+      "reclaimVsBaseline": {
+        "t": -0.7527,
+        "pApprox": 0.4517,
+        "n1": 22,
+        "n2": 48
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -5.0528,
+        "pApprox": 0,
+        "n1": 26,
+        "n2": 22
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "IS",
+      "group": "insample",
+      "baseline": {
+        "trades": 49,
+        "winRate": 0.2653,
+        "avgRetPct": -0.0446,
+        "medianRetPct": -1.2398,
+        "pf": 0.9708
+      },
+      "reclaim": {
+        "trades": 18,
+        "winRate": 0.2222,
+        "avgRetPct": 0.7728,
+        "medianRetPct": -0.3925,
+        "pf": 2.3854
+      },
+      "baselineOnly": {
+        "trades": 31,
+        "winRate": 0,
+        "avgRetPct": -2.0869,
+        "medianRetPct": -1.7773,
+        "pf": 0
+      },
+      "reclaimVsBaseline": {
+        "t": 0.9091,
+        "pApprox": 0.3633,
+        "n1": 18,
+        "n2": 49
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -3.8839,
+        "pApprox": 0.0001,
+        "n1": 31,
+        "n2": 18
+      }
+    },
+    {
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "group": "insample",
+      "baseline": {
+        "trades": 17,
+        "winRate": 0.4706,
+        "avgRetPct": 0.6018,
+        "medianRetPct": -0.7482,
+        "pf": 1.409
+      },
+      "reclaim": {
+        "trades": 9,
+        "winRate": 0,
+        "avgRetPct": -1.0819,
+        "medianRetPct": -0.8885,
+        "pf": 0
+      },
+      "baselineOnly": {
+        "trades": 8,
+        "winRate": 0.25,
+        "avgRetPct": -1.7897,
+        "medianRetPct": -2.267,
+        "pf": 0.2335
+      },
+      "reclaimVsBaseline": {
+        "t": -1.5911,
+        "pApprox": 0.1116,
+        "n1": 9,
+        "n2": 17
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -0.6897,
+        "pApprox": 0.4904,
+        "n1": 8,
+        "n2": 9
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "IS",
+      "group": "insample",
+      "baseline": {
+        "trades": 346,
+        "winRate": 0.3208,
+        "avgRetPct": -0.2176,
+        "medianRetPct": -1.0942,
+        "pf": 0.8287
+      },
+      "reclaim": {
+        "trades": 179,
+        "winRate": 0.419,
+        "avgRetPct": -0.0906,
+        "medianRetPct": -0.0974,
+        "pf": 0.8667
+      },
+      "baselineOnly": {
+        "trades": 179,
+        "winRate": 0.0447,
+        "avgRetPct": -1.636,
+        "medianRetPct": -1.5239,
+        "pf": 0.0913
+      },
+      "reclaimVsBaseline": {
+        "t": 0.6618,
+        "pApprox": 0.5081,
+        "n1": 179,
+        "n2": 346
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -8.825,
+        "pApprox": 0,
+        "n1": 179,
+        "n2": 179
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "group": "insample",
+      "baseline": {
+        "trades": 138,
+        "winRate": 0.413,
+        "avgRetPct": 0.3903,
+        "medianRetPct": -0.7253,
+        "pf": 1.4635
+      },
+      "reclaim": {
+        "trades": 80,
+        "winRate": 0.4625,
+        "avgRetPct": 0.0397,
+        "medianRetPct": -0.0003,
+        "pf": 1.0707
+      },
+      "baselineOnly": {
+        "trades": 63,
+        "winRate": 0.0952,
+        "avgRetPct": -0.9017,
+        "medianRetPct": -1.2376,
+        "pf": 0.2864
+      },
+      "reclaimVsBaseline": {
+        "t": -1.3487,
+        "pApprox": 0.1774,
+        "n1": 80,
+        "n2": 138
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -3.4409,
+        "pApprox": 0.0006,
+        "n1": 63,
+        "n2": 80
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "IS",
+      "group": "insample",
+      "baseline": {
+        "trades": 122,
+        "winRate": 0.3197,
+        "avgRetPct": -0.0907,
+        "medianRetPct": -1.6651,
+        "pf": 0.9518
+      },
+      "reclaim": {
+        "trades": 68,
+        "winRate": 0.3529,
+        "avgRetPct": -0.0188,
+        "medianRetPct": -0.5709,
+        "pf": 0.9818
+      },
+      "baselineOnly": {
+        "trades": 58,
+        "winRate": 0.0517,
+        "avgRetPct": -2.633,
+        "medianRetPct": -2.3085,
+        "pf": 0.0846
+      },
+      "reclaimVsBaseline": {
+        "t": 0.1423,
+        "pApprox": 0.8869,
+        "n1": 68,
+        "n2": 122
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -5.6575,
+        "pApprox": 0,
+        "n1": 58,
+        "n2": 68
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "group": "insample",
+      "baseline": {
+        "trades": 54,
+        "winRate": 0.3519,
+        "avgRetPct": 0.4225,
+        "medianRetPct": -1.2079,
+        "pf": 1.3058
+      },
+      "reclaim": {
+        "trades": 28,
+        "winRate": 0.2857,
+        "avgRetPct": 0.2977,
+        "medianRetPct": -0.4523,
+        "pf": 1.4865
+      },
+      "baselineOnly": {
+        "trades": 27,
+        "winRate": 0.0741,
+        "avgRetPct": -1.4763,
+        "medianRetPct": -1.6117,
+        "pf": 0.1816
+      },
+      "reclaimVsBaseline": {
+        "t": -0.1979,
+        "pApprox": 0.8431,
+        "n1": 28,
+        "n2": 54
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -3.3289,
+        "pApprox": 0.0009,
+        "n1": 27,
+        "n2": 28
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "IS",
+      "group": "insample",
+      "baseline": {
+        "trades": 54,
+        "winRate": 0.2778,
+        "avgRetPct": -0.1741,
+        "medianRetPct": -2.5329,
+        "pf": 0.9295
+      },
+      "reclaim": {
+        "trades": 24,
+        "winRate": 0.375,
+        "avgRetPct": 0.838,
+        "medianRetPct": -0.5036,
+        "pf": 1.8419
+      },
+      "baselineOnly": {
+        "trades": 31,
+        "winRate": 0.0323,
+        "avgRetPct": -2.9613,
+        "medianRetPct": -3.4015,
+        "pf": 0.1151
+      },
+      "reclaimVsBaseline": {
+        "t": 0.9469,
+        "pApprox": 0.3437,
+        "n1": 24,
+        "n2": 54
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -3.9876,
+        "pApprox": 0.0001,
+        "n1": 31,
+        "n2": 24
+      }
+    },
+    {
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "group": "insample",
+      "baseline": {
+        "trades": 16,
+        "winRate": 0.25,
+        "avgRetPct": -0.1022,
+        "medianRetPct": -2.9048,
+        "pf": 0.9567
+      },
+      "reclaim": {
+        "trades": 8,
+        "winRate": 0,
+        "avgRetPct": -1.3484,
+        "medianRetPct": -1.0396,
+        "pf": 0
+      },
+      "baselineOnly": {
+        "trades": 8,
+        "winRate": 0.125,
+        "avgRetPct": -1.4435,
+        "medianRetPct": -3.1355,
+        "pf": 0.5088
+      },
+      "reclaimVsBaseline": {
+        "t": -0.811,
+        "pApprox": 0.4173,
+        "n1": 8,
+        "n2": 16
+      },
+      "baselineOnlyVsReclaim": {
+        "t": -0.0472,
+        "pApprox": 0.9623,
+        "n1": 8,
+        "n2": 8
+      }
+    }
+  ],
+  "perSymbol": [
+    {
+      "symbol": "BTCUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "IS",
+      "baseline": {
+        "trades": 95,
+        "winRate": 0.2526,
+        "avgRetPct": -0.3101,
+        "medianRetPct": -0.9764,
+        "pf": 0.6679
+      },
+      "reclaim": {
+        "trades": 47,
+        "winRate": 0.1702,
+        "avgRetPct": -0.1453,
+        "medianRetPct": -0.3566,
+        "pf": 0.676
+      },
+      "baselineOnly": {
+        "trades": 49,
+        "winRate": 0.0204,
+        "avgRetPct": -1.0897,
+        "medianRetPct": -1.218,
+        "pf": 0.0111
+      },
+      "byType": {
+        "W2": {
+          "base": 65,
+          "rec": 33
+        },
+        "W4": {
+          "base": 30,
+          "rec": 14
+        }
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 51,
+        "winRate": 0.2941,
+        "avgRetPct": -0.0138,
+        "medianRetPct": -0.7662,
+        "pf": 0.9821
+      },
+      "reclaim": {
+        "trades": 27,
+        "winRate": 0.2222,
+        "avgRetPct": -0.2547,
+        "medianRetPct": -0.2515,
+        "pf": 0.4448
+      },
+      "baselineOnly": {
+        "trades": 25,
+        "winRate": 0,
+        "avgRetPct": -1.0816,
+        "medianRetPct": -1.0106,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 29,
+          "rec": 15
+        },
+        "W4": {
+          "base": 22,
+          "rec": 12
+        }
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "IS",
+      "baseline": {
+        "trades": 29,
+        "winRate": 0.2414,
+        "avgRetPct": -0.4206,
+        "medianRetPct": -1.2224,
+        "pf": 0.651
+      },
+      "reclaim": {
+        "trades": 16,
+        "winRate": 0.125,
+        "avgRetPct": -0.095,
+        "medianRetPct": -0.4621,
+        "pf": 0.8364
+      },
+      "baselineOnly": {
+        "trades": 13,
+        "winRate": 0,
+        "avgRetPct": -1.4659,
+        "medianRetPct": -1.8011,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 19,
+          "rec": 12
+        },
+        "W4": {
+          "base": 10,
+          "rec": 4
+        }
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 16,
+        "winRate": 0.4375,
+        "avgRetPct": 0.3345,
+        "medianRetPct": -0.7157,
+        "pf": 1.3644
+      },
+      "reclaim": {
+        "trades": 8,
+        "winRate": 0,
+        "avgRetPct": -0.4041,
+        "medianRetPct": -0.3299,
+        "pf": 0
+      },
+      "baselineOnly": {
+        "trades": 8,
+        "winRate": 0,
+        "avgRetPct": -1.6519,
+        "medianRetPct": -1.7681,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 10,
+          "rec": 6
+        },
+        "W4": {
+          "base": 6,
+          "rec": 2
+        }
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "IS",
+      "baseline": {
+        "trades": 14,
+        "winRate": 0.3571,
+        "avgRetPct": 0.5924,
+        "medianRetPct": -0.847,
+        "pf": 1.6092
+      },
+      "reclaim": {
+        "trades": 6,
+        "winRate": 0,
+        "avgRetPct": -0.6932,
+        "medianRetPct": -0.4491,
+        "pf": 0
+      },
+      "baselineOnly": {
+        "trades": 8,
+        "winRate": 0,
+        "avgRetPct": -1.4016,
+        "medianRetPct": -1.3454,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 11,
+          "rec": 5
+        },
+        "W4": {
+          "base": 3,
+          "rec": 1
+        }
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 6,
+        "winRate": 0.5,
+        "avgRetPct": -0.0408,
+        "medianRetPct": 0.4483,
+        "pf": 0.9738
+      },
+      "reclaim": {
+        "trades": 2,
+        "winRate": 0,
+        "avgRetPct": -0.6328,
+        "medianRetPct": -0.6328,
+        "pf": 0
+      },
+      "baselineOnly": {
+        "trades": 4,
+        "winRate": 0.5,
+        "avgRetPct": -1.0062,
+        "medianRetPct": -0.6512,
+        "pf": 0.52
+      },
+      "byType": {
+        "W2": {
+          "base": 5,
+          "rec": 2
+        },
+        "W4": {
+          "base": 1,
+          "rec": 0
+        }
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "IS",
+      "baseline": {
+        "trades": 97,
+        "winRate": 0.299,
+        "avgRetPct": -0.3007,
+        "medianRetPct": -1.0344,
+        "pf": 0.7597
+      },
+      "reclaim": {
+        "trades": 47,
+        "winRate": 0.3191,
+        "avgRetPct": -0.2119,
+        "medianRetPct": -0.2978,
+        "pf": 0.6849
+      },
+      "baselineOnly": {
+        "trades": 54,
+        "winRate": 0.037,
+        "avgRetPct": -1.5238,
+        "medianRetPct": -1.4829,
+        "pf": 0.081
+      },
+      "byType": {
+        "W2": {
+          "base": 58,
+          "rec": 29
+        },
+        "W4": {
+          "base": 39,
+          "rec": 18
+        }
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 48,
+        "winRate": 0.4167,
+        "avgRetPct": 0.5553,
+        "medianRetPct": -0.5984,
+        "pf": 1.7956
+      },
+      "reclaim": {
+        "trades": 30,
+        "winRate": 0.5,
+        "avgRetPct": 0.365,
+        "medianRetPct": 0.1916,
+        "pf": 1.9855
+      },
+      "baselineOnly": {
+        "trades": 21,
+        "winRate": 0.0952,
+        "avgRetPct": -0.6189,
+        "medianRetPct": -1.1648,
+        "pf": 0.3768
+      },
+      "byType": {
+        "W2": {
+          "base": 27,
+          "rec": 17
+        },
+        "W4": {
+          "base": 21,
+          "rec": 13
+        }
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "IS",
+      "baseline": {
+        "trades": 27,
+        "winRate": 0.2593,
+        "avgRetPct": -0.3123,
+        "medianRetPct": -1.5824,
+        "pf": 0.8163
+      },
+      "reclaim": {
+        "trades": 15,
+        "winRate": 0.2,
+        "avgRetPct": -0.2576,
+        "medianRetPct": -0.6093,
+        "pf": 0.7806
+      },
+      "baselineOnly": {
+        "trades": 12,
+        "winRate": 0,
+        "avgRetPct": -2.4112,
+        "medianRetPct": -2.3085,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 19,
+          "rec": 11
+        },
+        "W4": {
+          "base": 8,
+          "rec": 4
+        }
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 21,
+        "winRate": 0.3333,
+        "avgRetPct": -0.0855,
+        "medianRetPct": -1.4945,
+        "pf": 0.9442
+      },
+      "reclaim": {
+        "trades": 10,
+        "winRate": 0.2,
+        "avgRetPct": 0.0305,
+        "medianRetPct": -0.517,
+        "pf": 1.0482
+      },
+      "baselineOnly": {
+        "trades": 11,
+        "winRate": 0.0909,
+        "avgRetPct": -1.5184,
+        "medianRetPct": -1.8169,
+        "pf": 0.1839
+      },
+      "byType": {
+        "W2": {
+          "base": 12,
+          "rec": 8
+        },
+        "W4": {
+          "base": 9,
+          "rec": 2
+        }
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "IS",
+      "baseline": {
+        "trades": 13,
+        "winRate": 0.2308,
+        "avgRetPct": -0.5484,
+        "medianRetPct": -1.332,
+        "pf": 0.6773
+      },
+      "reclaim": {
+        "trades": 5,
+        "winRate": 0.2,
+        "avgRetPct": 0.6013,
+        "medianRetPct": -0.6093,
+        "pf": 1.7404
+      },
+      "baselineOnly": {
+        "trades": 8,
+        "winRate": 0,
+        "avgRetPct": -2.292,
+        "medianRetPct": -2.6256,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 9,
+          "rec": 4
+        },
+        "W4": {
+          "base": 4,
+          "rec": 1
+        }
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 6,
+        "winRate": 0.3333,
+        "avgRetPct": 0.8276,
+        "medianRetPct": -3.3836,
+        "pf": 1.2891
+      },
+      "reclaim": {
+        "trades": 2,
+        "winRate": 0,
+        "avgRetPct": -0.581,
+        "medianRetPct": -0.581,
+        "pf": 0
+      },
+      "baselineOnly": {
+        "trades": 4,
+        "winRate": 0.25,
+        "avgRetPct": -0.2639,
+        "medianRetPct": -3.3836,
+        "pf": 0.9189
+      },
+      "byType": {
+        "W2": {
+          "base": 5,
+          "rec": 2
+        },
+        "W4": {
+          "base": 1,
+          "rec": 0
+        }
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "IS",
+      "baseline": {
+        "trades": 258,
+        "winRate": 0.3101,
+        "avgRetPct": 0.0191,
+        "medianRetPct": -0.8991,
+        "pf": 1.02
+      },
+      "reclaim": {
+        "trades": 145,
+        "winRate": 0.3586,
+        "avgRetPct": 0.0726,
+        "medianRetPct": -0.2573,
+        "pf": 1.1418
+      },
+      "baselineOnly": {
+        "trades": 128,
+        "winRate": 0.0078,
+        "avgRetPct": -1.261,
+        "medianRetPct": -1.2069,
+        "pf": 0.0042
+      },
+      "byType": {
+        "W2": {
+          "base": 160,
+          "rec": 101
+        },
+        "W4": {
+          "base": 98,
+          "rec": 44
+        }
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 82,
+        "winRate": 0.2683,
+        "avgRetPct": -0.1783,
+        "medianRetPct": -0.8703,
+        "pf": 0.8128
+      },
+      "reclaim": {
+        "trades": 41,
+        "winRate": 0.2195,
+        "avgRetPct": -0.2579,
+        "medianRetPct": -0.6181,
+        "pf": 0.5852
+      },
+      "baselineOnly": {
+        "trades": 42,
+        "winRate": 0.0238,
+        "avgRetPct": -1.0743,
+        "medianRetPct": -1.1148,
+        "pf": 0.0585
+      },
+      "byType": {
+        "W2": {
+          "base": 55,
+          "rec": 30
+        },
+        "W4": {
+          "base": 27,
+          "rec": 11
+        }
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "IS",
+      "baseline": {
+        "trades": 98,
+        "winRate": 0.2551,
+        "avgRetPct": -0.2853,
+        "medianRetPct": -1.4216,
+        "pf": 0.8061
+      },
+      "reclaim": {
+        "trades": 52,
+        "winRate": 0.3462,
+        "avgRetPct": 0.4347,
+        "medianRetPct": -0.5026,
+        "pf": 1.6659
+      },
+      "baselineOnly": {
+        "trades": 51,
+        "winRate": 0,
+        "avgRetPct": -2.1145,
+        "medianRetPct": -1.9753,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 63,
+          "rec": 40
+        },
+        "W4": {
+          "base": 35,
+          "rec": 12
+        }
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 32,
+        "winRate": 0.4375,
+        "avgRetPct": 0.5053,
+        "medianRetPct": -0.7108,
+        "pf": 1.4481
+      },
+      "reclaim": {
+        "trades": 14,
+        "winRate": 0.2857,
+        "avgRetPct": 0.2933,
+        "medianRetPct": -0.5233,
+        "pf": 1.5472
+      },
+      "baselineOnly": {
+        "trades": 18,
+        "winRate": 0,
+        "avgRetPct": -2.0048,
+        "medianRetPct": -1.6418,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 20,
+          "rec": 11
+        },
+        "W4": {
+          "base": 12,
+          "rec": 3
+        }
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "IS",
+      "baseline": {
+        "trades": 35,
+        "winRate": 0.2286,
+        "avgRetPct": -0.2994,
+        "medianRetPct": -1.2769,
+        "pf": 0.8289
+      },
+      "reclaim": {
+        "trades": 12,
+        "winRate": 0.3333,
+        "avgRetPct": 1.5058,
+        "medianRetPct": -0.3925,
+        "pf": 4.0723
+      },
+      "baselineOnly": {
+        "trades": 23,
+        "winRate": 0,
+        "avgRetPct": -2.3252,
+        "medianRetPct": -2.2077,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 25,
+          "rec": 11
+        },
+        "W4": {
+          "base": 10,
+          "rec": 1
+        }
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 11,
+        "winRate": 0.4545,
+        "avgRetPct": 0.9523,
+        "medianRetPct": -0.7482,
+        "pf": 1.6673
+      },
+      "reclaim": {
+        "trades": 7,
+        "winRate": 0,
+        "avgRetPct": -1.2102,
+        "medianRetPct": -1.3045,
+        "pf": 0
+      },
+      "baselineOnly": {
+        "trades": 4,
+        "winRate": 0,
+        "avgRetPct": -2.5732,
+        "medianRetPct": -2.267,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 6,
+          "rec": 5
+        },
+        "W4": {
+          "base": 5,
+          "rec": 2
+        }
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "IS",
+      "baseline": {
+        "trades": 249,
+        "winRate": 0.3293,
+        "avgRetPct": -0.1852,
+        "medianRetPct": -1.1224,
+        "pf": 0.8551
+      },
+      "reclaim": {
+        "trades": 132,
+        "winRate": 0.4545,
+        "avgRetPct": -0.0474,
+        "medianRetPct": -0.0002,
+        "pf": 0.9305
+      },
+      "baselineOnly": {
+        "trades": 125,
+        "winRate": 0.048,
+        "avgRetPct": -1.6845,
+        "medianRetPct": -1.5652,
+        "pf": 0.0953
+      },
+      "byType": {
+        "W2": {
+          "base": 135,
+          "rec": 84
+        },
+        "W4": {
+          "base": 114,
+          "rec": 48
+        }
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 90,
+        "winRate": 0.4111,
+        "avgRetPct": 0.3024,
+        "medianRetPct": -0.8284,
+        "pf": 1.329
+      },
+      "reclaim": {
+        "trades": 50,
+        "winRate": 0.44,
+        "avgRetPct": -0.1555,
+        "medianRetPct": -0.0842,
+        "pf": 0.77
+      },
+      "baselineOnly": {
+        "trades": 42,
+        "winRate": 0.0952,
+        "avgRetPct": -1.043,
+        "medianRetPct": -1.397,
+        "pf": 0.2542
+      },
+      "byType": {
+        "W2": {
+          "base": 50,
+          "rec": 31
+        },
+        "W4": {
+          "base": 40,
+          "rec": 19
+        }
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "IS",
+      "baseline": {
+        "trades": 95,
+        "winRate": 0.3368,
+        "avgRetPct": -0.0277,
+        "medianRetPct": -1.6989,
+        "pf": 0.9857
+      },
+      "reclaim": {
+        "trades": 53,
+        "winRate": 0.3962,
+        "avgRetPct": 0.0487,
+        "medianRetPct": -0.5429,
+        "pf": 1.049
+      },
+      "baselineOnly": {
+        "trades": 46,
+        "winRate": 0.0652,
+        "avgRetPct": -2.6909,
+        "medianRetPct": -2.3898,
+        "pf": 0.1024
+      },
+      "byType": {
+        "W2": {
+          "base": 58,
+          "rec": 38
+        },
+        "W4": {
+          "base": 37,
+          "rec": 15
+        }
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 33,
+        "winRate": 0.3636,
+        "avgRetPct": 0.7458,
+        "medianRetPct": -1.1758,
+        "pf": 1.58
+      },
+      "reclaim": {
+        "trades": 18,
+        "winRate": 0.3333,
+        "avgRetPct": 0.4461,
+        "medianRetPct": -0.2818,
+        "pf": 1.7433
+      },
+      "baselineOnly": {
+        "trades": 16,
+        "winRate": 0.0625,
+        "avgRetPct": -1.4474,
+        "medianRetPct": -1.3564,
+        "pf": 0.18
+      },
+      "byType": {
+        "W2": {
+          "base": 21,
+          "rec": 14
+        },
+        "W4": {
+          "base": 12,
+          "rec": 4
+        }
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "IS",
+      "baseline": {
+        "trades": 41,
+        "winRate": 0.2927,
+        "avgRetPct": -0.0555,
+        "medianRetPct": -2.7579,
+        "pf": 0.9795
+      },
+      "reclaim": {
+        "trades": 19,
+        "winRate": 0.4211,
+        "avgRetPct": 0.9003,
+        "medianRetPct": -0.4213,
+        "pf": 1.8627
+      },
+      "baselineOnly": {
+        "trades": 23,
+        "winRate": 0.0435,
+        "avgRetPct": -3.1941,
+        "medianRetPct": -3.7548,
+        "pf": 0.1398
+      },
+      "byType": {
+        "W2": {
+          "base": 25,
+          "rec": 15
+        },
+        "W4": {
+          "base": 16,
+          "rec": 4
+        }
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 10,
+        "winRate": 0.2,
+        "avgRetPct": -0.6601,
+        "medianRetPct": -1.9715,
+        "pf": 0.6791
+      },
+      "reclaim": {
+        "trades": 6,
+        "winRate": 0,
+        "avgRetPct": -1.6043,
+        "medianRetPct": -1.4569,
+        "pf": 0
+      },
+      "baselineOnly": {
+        "trades": 4,
+        "winRate": 0,
+        "avgRetPct": -2.623,
+        "medianRetPct": -2.9085,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 6,
+          "rec": 5
+        },
+        "W4": {
+          "base": 4,
+          "rec": 1
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "IS",
+      "baseline": {
+        "trades": 309,
+        "winRate": 0.2977,
+        "avgRetPct": 0.0554,
+        "medianRetPct": -0.9601,
+        "pf": 1.0587
+      },
+      "reclaim": {
+        "trades": 161,
+        "winRate": 0.3602,
+        "avgRetPct": -0.097,
+        "medianRetPct": -0.4052,
+        "pf": 0.8456
+      },
+      "baselineOnly": {
+        "trades": 157,
+        "winRate": 0.0318,
+        "avgRetPct": -1.2096,
+        "medianRetPct": -1.2598,
+        "pf": 0.0745
+      },
+      "byType": {
+        "W2": {
+          "base": 196,
+          "rec": 113
+        },
+        "W4": {
+          "base": 113,
+          "rec": 48
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 95,
+        "winRate": 0.2947,
+        "avgRetPct": 0.0857,
+        "medianRetPct": -0.789,
+        "pf": 1.1023
+      },
+      "reclaim": {
+        "trades": 54,
+        "winRate": 0.3889,
+        "avgRetPct": 0.1189,
+        "medianRetPct": -0.2737,
+        "pf": 1.2952
+      },
+      "baselineOnly": {
+        "trades": 47,
+        "winRate": 0.0213,
+        "avgRetPct": -1.0115,
+        "medianRetPct": -1.0269,
+        "pf": 0.0905
+      },
+      "byType": {
+        "W2": {
+          "base": 62,
+          "rec": 39
+        },
+        "W4": {
+          "base": 33,
+          "rec": 15
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "IS",
+      "baseline": {
+        "trades": 107,
+        "winRate": 0.2804,
+        "avgRetPct": -0.22,
+        "medianRetPct": -1.476,
+        "pf": 0.8512
+      },
+      "reclaim": {
+        "trades": 63,
+        "winRate": 0.1905,
+        "avgRetPct": -0.1776,
+        "medianRetPct": -0.4543,
+        "pf": 0.7168
+      },
+      "baselineOnly": {
+        "trades": 47,
+        "winRate": 0,
+        "avgRetPct": -1.8544,
+        "medianRetPct": -1.6949,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 71,
+          "rec": 44
+        },
+        "W4": {
+          "base": 36,
+          "rec": 19
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 34,
+        "winRate": 0.2647,
+        "avgRetPct": -0.3836,
+        "medianRetPct": -1.7679,
+        "pf": 0.7679
+      },
+      "reclaim": {
+        "trades": 11,
+        "winRate": 0.3636,
+        "avgRetPct": 0.8993,
+        "medianRetPct": -0.2904,
+        "pf": 2.8165
+      },
+      "baselineOnly": {
+        "trades": 23,
+        "winRate": 0,
+        "avgRetPct": -2.246,
+        "medianRetPct": -2.3198,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 22,
+          "rec": 8
+        },
+        "W4": {
+          "base": 12,
+          "rec": 3
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "IS",
+      "baseline": {
+        "trades": 44,
+        "winRate": 0.2727,
+        "avgRetPct": -0.0524,
+        "medianRetPct": -1.3324,
+        "pf": 0.968
+      },
+      "reclaim": {
+        "trades": 22,
+        "winRate": 0.2273,
+        "avgRetPct": 0.1242,
+        "medianRetPct": -0.7186,
+        "pf": 1.1731
+      },
+      "baselineOnly": {
+        "trades": 23,
+        "winRate": 0,
+        "avgRetPct": -2.2871,
+        "medianRetPct": -2.2669,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 28,
+          "rec": 14
+        },
+        "W4": {
+          "base": 16,
+          "rec": 8
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 14,
+        "winRate": 0.4286,
+        "avgRetPct": 0.3198,
+        "medianRetPct": -0.7322,
+        "pf": 1.2635
+      },
+      "reclaim": {
+        "trades": 6,
+        "winRate": 0.1667,
+        "avgRetPct": 0.38,
+        "medianRetPct": -0.4261,
+        "pf": 1.8121
+      },
+      "baselineOnly": {
+        "trades": 8,
+        "winRate": 0,
+        "avgRetPct": -2.1241,
+        "medianRetPct": -1.5887,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 8,
+          "rec": 5
+        },
+        "W4": {
+          "base": 6,
+          "rec": 1
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "IS",
+      "baseline": {
+        "trades": 270,
+        "winRate": 0.3259,
+        "avgRetPct": -0.2102,
+        "medianRetPct": -1.1305,
+        "pf": 0.8401
+      },
+      "reclaim": {
+        "trades": 127,
+        "winRate": 0.4882,
+        "avgRetPct": -0.1832,
+        "medianRetPct": 0,
+        "pf": 0.7707
+      },
+      "baselineOnly": {
+        "trades": 151,
+        "winRate": 0.0927,
+        "avgRetPct": -1.342,
+        "medianRetPct": -1.4084,
+        "pf": 0.2253
+      },
+      "byType": {
+        "W2": {
+          "base": 150,
+          "rec": 84
+        },
+        "W4": {
+          "base": 120,
+          "rec": 43
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 100,
+        "winRate": 0.38,
+        "avgRetPct": 0.2282,
+        "medianRetPct": -0.8043,
+        "pf": 1.2543
+      },
+      "reclaim": {
+        "trades": 56,
+        "winRate": 0.625,
+        "avgRetPct": 0.2019,
+        "medianRetPct": 0.4205,
+        "pf": 1.5548
+      },
+      "baselineOnly": {
+        "trades": 50,
+        "winRate": 0.04,
+        "avgRetPct": -1.1119,
+        "medianRetPct": -1.2078,
+        "pf": 0.13
+      },
+      "byType": {
+        "W2": {
+          "base": 55,
+          "rec": 29
+        },
+        "W4": {
+          "base": 45,
+          "rec": 27
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "IS",
+      "baseline": {
+        "trades": 103,
+        "winRate": 0.3398,
+        "avgRetPct": 0.1805,
+        "medianRetPct": -1.5446,
+        "pf": 1.1057
+      },
+      "reclaim": {
+        "trades": 57,
+        "winRate": 0.3684,
+        "avgRetPct": -0.4122,
+        "medianRetPct": -0.6827,
+        "pf": 0.665
+      },
+      "baselineOnly": {
+        "trades": 48,
+        "winRate": 0.0625,
+        "avgRetPct": -1.7847,
+        "medianRetPct": -2.2735,
+        "pf": 0.2
+      },
+      "byType": {
+        "W2": {
+          "base": 59,
+          "rec": 40
+        },
+        "W4": {
+          "base": 44,
+          "rec": 17
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 37,
+        "winRate": 0.2973,
+        "avgRetPct": 0.2517,
+        "medianRetPct": -1.3634,
+        "pf": 1.1745
+      },
+      "reclaim": {
+        "trades": 15,
+        "winRate": 0.4,
+        "avgRetPct": 0.3831,
+        "medianRetPct": -0.5228,
+        "pf": 1.5608
+      },
+      "baselineOnly": {
+        "trades": 22,
+        "winRate": 0,
+        "avgRetPct": -2.0534,
+        "medianRetPct": -1.7262,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 24,
+          "rec": 13
+        },
+        "W4": {
+          "base": 13,
+          "rec": 2
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "IS",
+      "baseline": {
+        "trades": 47,
+        "winRate": 0.2553,
+        "avgRetPct": 0.0273,
+        "medianRetPct": -1.9661,
+        "pf": 1.0113
+      },
+      "reclaim": {
+        "trades": 23,
+        "winRate": 0.2609,
+        "avgRetPct": 0.1206,
+        "medianRetPct": -0.9971,
+        "pf": 1.1
+      },
+      "baselineOnly": {
+        "trades": 26,
+        "winRate": 0,
+        "avgRetPct": -3.2576,
+        "medianRetPct": -3.0486,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 27,
+          "rec": 13
+        },
+        "W4": {
+          "base": 20,
+          "rec": 10
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 12,
+        "winRate": 0.25,
+        "avgRetPct": -0.273,
+        "medianRetPct": -1.8956,
+        "pf": 0.873
+      },
+      "reclaim": {
+        "trades": 6,
+        "winRate": 0.1667,
+        "avgRetPct": -0.0746,
+        "medianRetPct": -0.8795,
+        "pf": 0.9094
+      },
+      "baselineOnly": {
+        "trades": 7,
+        "winRate": 0.1429,
+        "avgRetPct": -1.2423,
+        "medianRetPct": -1.9371,
+        "pf": 0.3914
+      },
+      "byType": {
+        "W2": {
+          "base": 7,
+          "rec": 5
+        },
+        "W4": {
+          "base": 5,
+          "rec": 1
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "IS",
+      "baseline": {
+        "trades": 279,
+        "winRate": 0.3011,
+        "avgRetPct": -0.0389,
+        "medianRetPct": -0.9337,
+        "pf": 0.9612
+      },
+      "reclaim": {
+        "trades": 155,
+        "winRate": 0.3419,
+        "avgRetPct": -0.238,
+        "medianRetPct": -0.3534,
+        "pf": 0.649
+      },
+      "baselineOnly": {
+        "trades": 131,
+        "winRate": 0.0534,
+        "avgRetPct": -1.0805,
+        "medianRetPct": -1.1305,
+        "pf": 0.1263
+      },
+      "byType": {
+        "W2": {
+          "base": 167,
+          "rec": 97
+        },
+        "W4": {
+          "base": 112,
+          "rec": 58
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 68,
+        "winRate": 0.25,
+        "avgRetPct": -0.1931,
+        "medianRetPct": -0.7892,
+        "pf": 0.7589
+      },
+      "reclaim": {
+        "trades": 27,
+        "winRate": 0.2593,
+        "avgRetPct": 0.0176,
+        "medianRetPct": -0.3437,
+        "pf": 1.0457
+      },
+      "baselineOnly": {
+        "trades": 42,
+        "winRate": 0.0238,
+        "avgRetPct": -0.9526,
+        "medianRetPct": -0.9714,
+        "pf": 0.0581
+      },
+      "byType": {
+        "W2": {
+          "base": 44,
+          "rec": 21
+        },
+        "W4": {
+          "base": 24,
+          "rec": 6
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "IS",
+      "baseline": {
+        "trades": 97,
+        "winRate": 0.2371,
+        "avgRetPct": -0.5591,
+        "medianRetPct": -1.6534,
+        "pf": 0.6416
+      },
+      "reclaim": {
+        "trades": 53,
+        "winRate": 0.2642,
+        "avgRetPct": -0.3194,
+        "medianRetPct": -0.6562,
+        "pf": 0.6525
+      },
+      "baselineOnly": {
+        "trades": 49,
+        "winRate": 0,
+        "avgRetPct": -1.9142,
+        "medianRetPct": -1.7076,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 63,
+          "rec": 39
+        },
+        "W4": {
+          "base": 34,
+          "rec": 14
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 31,
+        "winRate": 0.2903,
+        "avgRetPct": -0.3927,
+        "medianRetPct": -1.1628,
+        "pf": 0.6958
+      },
+      "reclaim": {
+        "trades": 13,
+        "winRate": 0.0769,
+        "avgRetPct": -0.4437,
+        "medianRetPct": -0.7297,
+        "pf": 0.3748
+      },
+      "baselineOnly": {
+        "trades": 18,
+        "winRate": 0.0556,
+        "avgRetPct": -1.5851,
+        "medianRetPct": -1.2951,
+        "pf": 0.0301
+      },
+      "byType": {
+        "W2": {
+          "base": 20,
+          "rec": 10
+        },
+        "W4": {
+          "base": 11,
+          "rec": 3
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "IS",
+      "baseline": {
+        "trades": 33,
+        "winRate": 0.3636,
+        "avgRetPct": 0.8899,
+        "medianRetPct": -0.8987,
+        "pf": 1.6052
+      },
+      "reclaim": {
+        "trades": 22,
+        "winRate": 0.2727,
+        "avgRetPct": 0.3479,
+        "medianRetPct": -0.6714,
+        "pf": 1.4734
+      },
+      "baselineOnly": {
+        "trades": 13,
+        "winRate": 0.0769,
+        "avgRetPct": -1.695,
+        "medianRetPct": -1.7872,
+        "pf": 0.2449
+      },
+      "byType": {
+        "W2": {
+          "base": 21,
+          "rec": 16
+        },
+        "W4": {
+          "base": 12,
+          "rec": 6
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 12,
+        "winRate": 0.5,
+        "avgRetPct": 0.2254,
+        "medianRetPct": -0.1973,
+        "pf": 1.2351
+      },
+      "reclaim": {
+        "trades": 5,
+        "winRate": 0,
+        "avgRetPct": -0.4134,
+        "medianRetPct": -0.4467,
+        "pf": 0
+      },
+      "baselineOnly": {
+        "trades": 7,
+        "winRate": 0.1429,
+        "avgRetPct": -1.5168,
+        "medianRetPct": -1.789,
+        "pf": 0.077
+      },
+      "byType": {
+        "W2": {
+          "base": 9,
+          "rec": 4
+        },
+        "W4": {
+          "base": 3,
+          "rec": 1
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "IS",
+      "baseline": {
+        "trades": 237,
+        "winRate": 0.3629,
+        "avgRetPct": -0.1677,
+        "medianRetPct": -1.0072,
+        "pf": 0.8728
+      },
+      "reclaim": {
+        "trades": 122,
+        "winRate": 0.5082,
+        "avgRetPct": -0.1153,
+        "medianRetPct": 0.003,
+        "pf": 0.8407
+      },
+      "baselineOnly": {
+        "trades": 121,
+        "winRate": 0.0744,
+        "avgRetPct": -1.6309,
+        "medianRetPct": -1.4364,
+        "pf": 0.1313
+      },
+      "byType": {
+        "W2": {
+          "base": 128,
+          "rec": 79
+        },
+        "W4": {
+          "base": 109,
+          "rec": 43
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 69,
+        "winRate": 0.2899,
+        "avgRetPct": -0.0768,
+        "medianRetPct": -0.9852,
+        "pf": 0.9207
+      },
+      "reclaim": {
+        "trades": 32,
+        "winRate": 0.4375,
+        "avgRetPct": -0.0212,
+        "medianRetPct": -0.1416,
+        "pf": 0.9539
+      },
+      "baselineOnly": {
+        "trades": 38,
+        "winRate": 0,
+        "avgRetPct": -1.3259,
+        "medianRetPct": -1.2647,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 39,
+          "rec": 24
+        },
+        "W4": {
+          "base": 30,
+          "rec": 8
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "IS",
+      "baseline": {
+        "trades": 96,
+        "winRate": 0.2396,
+        "avgRetPct": -0.6718,
+        "medianRetPct": -1.8427,
+        "pf": 0.6612
+      },
+      "reclaim": {
+        "trades": 48,
+        "winRate": 0.3542,
+        "avgRetPct": -0.2805,
+        "medianRetPct": -0.7166,
+        "pf": 0.7625
+      },
+      "baselineOnly": {
+        "trades": 52,
+        "winRate": 0.0385,
+        "avgRetPct": -2.1085,
+        "medianRetPct": -2.108,
+        "pf": 0.1376
+      },
+      "byType": {
+        "W2": {
+          "base": 56,
+          "rec": 33
+        },
+        "W4": {
+          "base": 40,
+          "rec": 15
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 28,
+        "winRate": 0.25,
+        "avgRetPct": -0.2917,
+        "medianRetPct": -1.4984,
+        "pf": 0.8239
+      },
+      "reclaim": {
+        "trades": 11,
+        "winRate": 0.0909,
+        "avgRetPct": -0.7642,
+        "medianRetPct": -0.6128,
+        "pf": 0.2446
+      },
+      "baselineOnly": {
+        "trades": 17,
+        "winRate": 0,
+        "avgRetPct": -2.2698,
+        "medianRetPct": -1.865,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 16,
+          "rec": 9
+        },
+        "W4": {
+          "base": 12,
+          "rec": 2
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "IS",
+      "baseline": {
+        "trades": 39,
+        "winRate": 0.2051,
+        "avgRetPct": -0.9055,
+        "medianRetPct": -2.789,
+        "pf": 0.6521
+      },
+      "reclaim": {
+        "trades": 24,
+        "winRate": 0.3333,
+        "avgRetPct": -0.4706,
+        "medianRetPct": -1.045,
+        "pf": 0.705
+      },
+      "baselineOnly": {
+        "trades": 16,
+        "winRate": 0.0625,
+        "avgRetPct": -2.5657,
+        "medianRetPct": -2.764,
+        "pf": 0.1494
+      },
+      "byType": {
+        "W2": {
+          "base": 27,
+          "rec": 19
+        },
+        "W4": {
+          "base": 12,
+          "rec": 5
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 12,
+        "winRate": 0.3333,
+        "avgRetPct": 0.2279,
+        "medianRetPct": -0.746,
+        "pf": 1.1404
+      },
+      "reclaim": {
+        "trades": 5,
+        "winRate": 0,
+        "avgRetPct": -0.6684,
+        "medianRetPct": -0.7311,
+        "pf": 0
+      },
+      "baselineOnly": {
+        "trades": 7,
+        "winRate": 0,
+        "avgRetPct": -2.7169,
+        "medianRetPct": -3.4296,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 9,
+          "rec": 4
+        },
+        "W4": {
+          "base": 3,
+          "rec": 1
+        }
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "IS",
+      "baseline": {
+        "trades": 149,
+        "winRate": 0.3691,
+        "avgRetPct": 0.2107,
+        "medianRetPct": -0.8506,
+        "pf": 1.247
+      },
+      "reclaim": {
+        "trades": 94,
+        "winRate": 0.3404,
+        "avgRetPct": 0.0387,
+        "medianRetPct": -0.3299,
+        "pf": 1.0852
+      },
+      "baselineOnly": {
+        "trades": 63,
+        "winRate": 0.0476,
+        "avgRetPct": -1.0388,
+        "medianRetPct": -1.129,
+        "pf": 0.1437
+      },
+      "byType": {
+        "W2": {
+          "base": 91,
+          "rec": 65
+        },
+        "W4": {
+          "base": 58,
+          "rec": 29
+        }
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 47,
+        "winRate": 0.234,
+        "avgRetPct": -0.3536,
+        "medianRetPct": -0.8954,
+        "pf": 0.6475
+      },
+      "reclaim": {
+        "trades": 23,
+        "winRate": 0.1739,
+        "avgRetPct": -0.2183,
+        "medianRetPct": -0.454,
+        "pf": 0.6222
+      },
+      "baselineOnly": {
+        "trades": 25,
+        "winRate": 0,
+        "avgRetPct": -1.0574,
+        "medianRetPct": -1.0313,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 29,
+          "rec": 17
+        },
+        "W4": {
+          "base": 18,
+          "rec": 6
+        }
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "IS",
+      "baseline": {
+        "trades": 46,
+        "winRate": 0.413,
+        "avgRetPct": 0.5108,
+        "medianRetPct": -0.6171,
+        "pf": 1.4727
+      },
+      "reclaim": {
+        "trades": 31,
+        "winRate": 0.1613,
+        "avgRetPct": -0.3255,
+        "medianRetPct": -0.3867,
+        "pf": 0.5123
+      },
+      "baselineOnly": {
+        "trades": 15,
+        "winRate": 0,
+        "avgRetPct": -1.8265,
+        "medianRetPct": -2.1903,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 25,
+          "rec": 18
+        },
+        "W4": {
+          "base": 21,
+          "rec": 13
+        }
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 13,
+        "winRate": 0.3846,
+        "avgRetPct": 0.5928,
+        "medianRetPct": -0.3648,
+        "pf": 1.646
+      },
+      "reclaim": {
+        "trades": 6,
+        "winRate": 0.3333,
+        "avgRetPct": 1.0491,
+        "medianRetPct": -0.1266,
+        "pf": 11.3177
+      },
+      "baselineOnly": {
+        "trades": 7,
+        "winRate": 0,
+        "avgRetPct": -1.6865,
+        "medianRetPct": -2.0597,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 8,
+          "rec": 5
+        },
+        "W4": {
+          "base": 5,
+          "rec": 1
+        }
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "IS",
+      "baseline": {
+        "trades": 19,
+        "winRate": 0.2632,
+        "avgRetPct": -0.0819,
+        "medianRetPct": -1.6148,
+        "pf": 0.9611
+      },
+      "reclaim": {
+        "trades": 9,
+        "winRate": 0,
+        "avgRetPct": -0.9001,
+        "medianRetPct": -0.7846,
+        "pf": 0
+      },
+      "baselineOnly": {
+        "trades": 10,
+        "winRate": 0.1,
+        "avgRetPct": -0.3875,
+        "medianRetPct": -2.1898,
+        "pf": 0.8622
+      },
+      "byType": {
+        "W2": {
+          "base": 14,
+          "rec": 6
+        },
+        "W4": {
+          "base": 5,
+          "rec": 3
+        }
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 6,
+        "winRate": 0.5,
+        "avgRetPct": 1.7284,
+        "medianRetPct": 1.2718,
+        "pf": 3.1599
+      },
+      "reclaim": {
+        "trades": 3,
+        "winRate": 0.3333,
+        "avgRetPct": 0.967,
+        "medianRetPct": -0.9088,
+        "pf": 2.5215
+      },
+      "baselineOnly": {
+        "trades": 3,
+        "winRate": 0,
+        "avgRetPct": -1.6004,
+        "medianRetPct": -0.9186,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 5,
+          "rec": 2
+        },
+        "W4": {
+          "base": 1,
+          "rec": 1
+        }
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "IS",
+      "baseline": {
+        "trades": 136,
+        "winRate": 0.3235,
+        "avgRetPct": -0.0064,
+        "medianRetPct": -1.0088,
+        "pf": 0.9944
+      },
+      "reclaim": {
+        "trades": 79,
+        "winRate": 0.4051,
+        "avgRetPct": -0.0023,
+        "medianRetPct": -0.1238,
+        "pf": 0.9963
+      },
+      "baselineOnly": {
+        "trades": 64,
+        "winRate": 0.0156,
+        "avgRetPct": -1.5824,
+        "medianRetPct": -1.442,
+        "pf": 0.0323
+      },
+      "byType": {
+        "W2": {
+          "base": 75,
+          "rec": 52
+        },
+        "W4": {
+          "base": 61,
+          "rec": 27
+        }
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 43,
+        "winRate": 0.2093,
+        "avgRetPct": -0.3705,
+        "medianRetPct": -1.215,
+        "pf": 0.6547
+      },
+      "reclaim": {
+        "trades": 22,
+        "winRate": 0.2273,
+        "avgRetPct": -0.4377,
+        "medianRetPct": -0.4595,
+        "pf": 0.3649
+      },
+      "baselineOnly": {
+        "trades": 23,
+        "winRate": 0,
+        "avgRetPct": -1.2602,
+        "medianRetPct": -1.2375,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 26,
+          "rec": 16
+        },
+        "W4": {
+          "base": 17,
+          "rec": 6
+        }
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "IS",
+      "baseline": {
+        "trades": 53,
+        "winRate": 0.2642,
+        "avgRetPct": -0.2608,
+        "medianRetPct": -1.5966,
+        "pf": 0.8449
+      },
+      "reclaim": {
+        "trades": 27,
+        "winRate": 0.2222,
+        "avgRetPct": -0.1783,
+        "medianRetPct": -0.6317,
+        "pf": 0.7456
+      },
+      "baselineOnly": {
+        "trades": 27,
+        "winRate": 0,
+        "avgRetPct": -2.2369,
+        "medianRetPct": -1.875,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 27,
+          "rec": 15
+        },
+        "W4": {
+          "base": 26,
+          "rec": 12
+        }
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 15,
+        "winRate": 0.3333,
+        "avgRetPct": 0.0418,
+        "medianRetPct": -0.7394,
+        "pf": 1.0328
+      },
+      "reclaim": {
+        "trades": 7,
+        "winRate": 0.4286,
+        "avgRetPct": 1.0909,
+        "medianRetPct": -0.1767,
+        "pf": 3.9239
+      },
+      "baselineOnly": {
+        "trades": 8,
+        "winRate": 0,
+        "avgRetPct": -1.4863,
+        "medianRetPct": -1.8468,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 8,
+          "rec": 6
+        },
+        "W4": {
+          "base": 7,
+          "rec": 1
+        }
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "IS",
+      "baseline": {
+        "trades": 18,
+        "winRate": 0.1667,
+        "avgRetPct": -0.8493,
+        "medianRetPct": -3.2813,
+        "pf": 0.7531
+      },
+      "reclaim": {
+        "trades": 7,
+        "winRate": 0.1429,
+        "avgRetPct": 0.1136,
+        "medianRetPct": -0.5832,
+        "pf": 1.1824
+      },
+      "baselineOnly": {
+        "trades": 11,
+        "winRate": 0.0909,
+        "avgRetPct": -1.8385,
+        "medianRetPct": -3.7697,
+        "pf": 0.5451
+      },
+      "byType": {
+        "W2": {
+          "base": 13,
+          "rec": 5
+        },
+        "W4": {
+          "base": 5,
+          "rec": 2
+        }
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 6,
+        "winRate": 0.5,
+        "avgRetPct": 1.6711,
+        "medianRetPct": -0.2801,
+        "pf": 2.5457
+      },
+      "reclaim": {
+        "trades": 4,
+        "winRate": 0.5,
+        "avgRetPct": 2.3327,
+        "medianRetPct": 1.985,
+        "pf": 7.3746
+      },
+      "baselineOnly": {
+        "trades": 2,
+        "winRate": 0,
+        "avgRetPct": -2.1725,
+        "medianRetPct": -2.1725,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 5,
+          "rec": 3
+        },
+        "W4": {
+          "base": 1,
+          "rec": 1
+        }
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "IS",
+      "baseline": {
+        "trades": 392,
+        "winRate": 0.3265,
+        "avgRetPct": 0.1106,
+        "medianRetPct": -0.8693,
+        "pf": 1.1175
+      },
+      "reclaim": {
+        "trades": 210,
+        "winRate": 0.4048,
+        "avgRetPct": -0.0349,
+        "medianRetPct": -0.2807,
+        "pf": 0.9429
+      },
+      "baselineOnly": {
+        "trades": 197,
+        "winRate": 0.0609,
+        "avgRetPct": -1.051,
+        "medianRetPct": -1.1643,
+        "pf": 0.1753
+      },
+      "byType": {
+        "W2": {
+          "base": 236,
+          "rec": 137
+        },
+        "W4": {
+          "base": 156,
+          "rec": 73
+        }
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 98,
+        "winRate": 0.2959,
+        "avgRetPct": -0.0615,
+        "medianRetPct": -0.8891,
+        "pf": 0.9316
+      },
+      "reclaim": {
+        "trades": 53,
+        "winRate": 0.283,
+        "avgRetPct": -0.2139,
+        "medianRetPct": -0.4546,
+        "pf": 0.6313
+      },
+      "baselineOnly": {
+        "trades": 48,
+        "winRate": 0.0208,
+        "avgRetPct": -1.1179,
+        "medianRetPct": -1.1042,
+        "pf": 0.0473
+      },
+      "byType": {
+        "W2": {
+          "base": 64,
+          "rec": 38
+        },
+        "W4": {
+          "base": 34,
+          "rec": 15
+        }
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "IS",
+      "baseline": {
+        "trades": 134,
+        "winRate": 0.2985,
+        "avgRetPct": -0.0307,
+        "medianRetPct": -1.4829,
+        "pf": 0.9797
+      },
+      "reclaim": {
+        "trades": 64,
+        "winRate": 0.3438,
+        "avgRetPct": 0.0127,
+        "medianRetPct": -0.5522,
+        "pf": 1.0155
+      },
+      "baselineOnly": {
+        "trades": 76,
+        "winRate": 0.0132,
+        "avgRetPct": -2.0266,
+        "medianRetPct": -1.9478,
+        "pf": 0.0232
+      },
+      "byType": {
+        "W2": {
+          "base": 85,
+          "rec": 43
+        },
+        "W4": {
+          "base": 49,
+          "rec": 21
+        }
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 35,
+        "winRate": 0.2,
+        "avgRetPct": -0.5992,
+        "medianRetPct": -1.6937,
+        "pf": 0.5919
+      },
+      "reclaim": {
+        "trades": 13,
+        "winRate": 0.0769,
+        "avgRetPct": -0.3301,
+        "medianRetPct": -0.4308,
+        "pf": 0.4726
+      },
+      "baselineOnly": {
+        "trades": 22,
+        "winRate": 0,
+        "avgRetPct": -1.7687,
+        "medianRetPct": -1.8751,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 24,
+          "rec": 11
+        },
+        "W4": {
+          "base": 11,
+          "rec": 2
+        }
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "IS",
+      "baseline": {
+        "trades": 52,
+        "winRate": 0.25,
+        "avgRetPct": -0.2248,
+        "medianRetPct": -1.4408,
+        "pf": 0.8839
+      },
+      "reclaim": {
+        "trades": 21,
+        "winRate": 0.3333,
+        "avgRetPct": 0.8876,
+        "medianRetPct": -0.327,
+        "pf": 2.3056
+      },
+      "baselineOnly": {
+        "trades": 33,
+        "winRate": 0,
+        "avgRetPct": -2.4777,
+        "medianRetPct": -1.883,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 32,
+          "rec": 13
+        },
+        "W4": {
+          "base": 20,
+          "rec": 8
+        }
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 15,
+        "winRate": 0.2667,
+        "avgRetPct": -0.3986,
+        "medianRetPct": -1.171,
+        "pf": 0.7293
+      },
+      "reclaim": {
+        "trades": 4,
+        "winRate": 0,
+        "avgRetPct": -0.5682,
+        "medianRetPct": -0.4858,
+        "pf": 0
+      },
+      "baselineOnly": {
+        "trades": 11,
+        "winRate": 0.0909,
+        "avgRetPct": -1.6722,
+        "medianRetPct": -1.7993,
+        "pf": 0.0222
+      },
+      "byType": {
+        "W2": {
+          "base": 11,
+          "rec": 4
+        },
+        "W4": {
+          "base": 4,
+          "rec": 0
+        }
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "IS",
+      "baseline": {
+        "trades": 332,
+        "winRate": 0.3886,
+        "avgRetPct": 0.1152,
+        "medianRetPct": -0.9403,
+        "pf": 1.0895
+      },
+      "reclaim": {
+        "trades": 176,
+        "winRate": 0.483,
+        "avgRetPct": -0.1297,
+        "medianRetPct": 0,
+        "pf": 0.8382
+      },
+      "baselineOnly": {
+        "trades": 166,
+        "winRate": 0.0602,
+        "avgRetPct": -1.719,
+        "medianRetPct": -1.6698,
+        "pf": 0.1194
+      },
+      "byType": {
+        "W2": {
+          "base": 175,
+          "rec": 106
+        },
+        "W4": {
+          "base": 157,
+          "rec": 70
+        }
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 99,
+        "winRate": 0.3737,
+        "avgRetPct": 0.1021,
+        "medianRetPct": -0.8293,
+        "pf": 1.1041
+      },
+      "reclaim": {
+        "trades": 54,
+        "winRate": 0.4444,
+        "avgRetPct": -0.0414,
+        "medianRetPct": -0.2826,
+        "pf": 0.9256
+      },
+      "baselineOnly": {
+        "trades": 47,
+        "winRate": 0.0213,
+        "avgRetPct": -1.4628,
+        "medianRetPct": -1.5024,
+        "pf": 0.07
+      },
+      "byType": {
+        "W2": {
+          "base": 61,
+          "rec": 34
+        },
+        "W4": {
+          "base": 38,
+          "rec": 20
+        }
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "IS",
+      "baseline": {
+        "trades": 128,
+        "winRate": 0.3516,
+        "avgRetPct": 0.3277,
+        "medianRetPct": -1.6269,
+        "pf": 1.1987
+      },
+      "reclaim": {
+        "trades": 63,
+        "winRate": 0.4762,
+        "avgRetPct": 0.3435,
+        "medianRetPct": 0,
+        "pf": 1.4226
+      },
+      "baselineOnly": {
+        "trades": 69,
+        "winRate": 0.029,
+        "avgRetPct": -2.1102,
+        "medianRetPct": -2.1446,
+        "pf": 0.0958
+      },
+      "byType": {
+        "W2": {
+          "base": 75,
+          "rec": 40
+        },
+        "W4": {
+          "base": 53,
+          "rec": 23
+        }
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 39,
+        "winRate": 0.2051,
+        "avgRetPct": -0.6863,
+        "medianRetPct": -1.7151,
+        "pf": 0.5958
+      },
+      "reclaim": {
+        "trades": 12,
+        "winRate": 0.3333,
+        "avgRetPct": 0.1952,
+        "medianRetPct": -0.348,
+        "pf": 1.2468
+      },
+      "baselineOnly": {
+        "trades": 27,
+        "winRate": 0.037,
+        "avgRetPct": -1.7,
+        "medianRetPct": -1.8771,
+        "pf": 0.0898
+      },
+      "byType": {
+        "W2": {
+          "base": 25,
+          "rec": 10
+        },
+        "W4": {
+          "base": 14,
+          "rec": 2
+        }
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "IS",
+      "baseline": {
+        "trades": 50,
+        "winRate": 0.22,
+        "avgRetPct": -0.7136,
+        "medianRetPct": -2.064,
+        "pf": 0.736
+      },
+      "reclaim": {
+        "trades": 21,
+        "winRate": 0.4762,
+        "avgRetPct": 0.9391,
+        "medianRetPct": -0.2462,
+        "pf": 1.7214
+      },
+      "baselineOnly": {
+        "trades": 32,
+        "winRate": 0.0313,
+        "avgRetPct": -2.8761,
+        "medianRetPct": -2.215,
+        "pf": 0.0652
+      },
+      "byType": {
+        "W2": {
+          "base": 32,
+          "rec": 12
+        },
+        "W4": {
+          "base": 18,
+          "rec": 9
+        }
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 15,
+        "winRate": 0.2,
+        "avgRetPct": -0.2004,
+        "medianRetPct": -1.5484,
+        "pf": 0.9038
+      },
+      "reclaim": {
+        "trades": 5,
+        "winRate": 0,
+        "avgRetPct": -1.5467,
+        "medianRetPct": -1.013,
+        "pf": 0
+      },
+      "baselineOnly": {
+        "trades": 10,
+        "winRate": 0,
+        "avgRetPct": -2.7547,
+        "medianRetPct": -2.5333,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 11,
+          "rec": 5
+        },
+        "W4": {
+          "base": 4,
+          "rec": 0
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "IS",
+      "baseline": {
+        "trades": 374,
+        "winRate": 0.2968,
+        "avgRetPct": -0.034,
+        "medianRetPct": -0.9652,
+        "pf": 0.9669
+      },
+      "reclaim": {
+        "trades": 194,
+        "winRate": 0.3505,
+        "avgRetPct": -0.092,
+        "medianRetPct": -0.4627,
+        "pf": 0.8565
+      },
+      "baselineOnly": {
+        "trades": 188,
+        "winRate": 0.0479,
+        "avgRetPct": -1.2961,
+        "medianRetPct": -1.1914,
+        "pf": 0.1001
+      },
+      "byType": {
+        "W2": {
+          "base": 232,
+          "rec": 134
+        },
+        "W4": {
+          "base": 142,
+          "rec": 60
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 130,
+        "winRate": 0.2385,
+        "avgRetPct": -0.1382,
+        "medianRetPct": -0.8198,
+        "pf": 0.8479
+      },
+      "reclaim": {
+        "trades": 64,
+        "winRate": 0.2344,
+        "avgRetPct": -0.5137,
+        "medianRetPct": -0.6141,
+        "pf": 0.3728
+      },
+      "baselineOnly": {
+        "trades": 70,
+        "winRate": 0.0143,
+        "avgRetPct": -1.1572,
+        "medianRetPct": -1.1579,
+        "pf": 0.0285
+      },
+      "byType": {
+        "W2": {
+          "base": 82,
+          "rec": 43
+        },
+        "W4": {
+          "base": 48,
+          "rec": 21
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "IS",
+      "baseline": {
+        "trades": 122,
+        "winRate": 0.2787,
+        "avgRetPct": 0.0091,
+        "medianRetPct": -1.3877,
+        "pf": 1.006
+      },
+      "reclaim": {
+        "trades": 60,
+        "winRate": 0.3833,
+        "avgRetPct": 0.4289,
+        "medianRetPct": -0.3339,
+        "pf": 1.6934
+      },
+      "baselineOnly": {
+        "trades": 67,
+        "winRate": 0,
+        "avgRetPct": -2.0724,
+        "medianRetPct": -2.0424,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 73,
+          "rec": 41
+        },
+        "W4": {
+          "base": 49,
+          "rec": 19
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 47,
+        "winRate": 0.2553,
+        "avgRetPct": 0.0655,
+        "medianRetPct": -1.1669,
+        "pf": 1.0567
+      },
+      "reclaim": {
+        "trades": 21,
+        "winRate": 0.2381,
+        "avgRetPct": -0.179,
+        "medianRetPct": -0.5196,
+        "pf": 0.7392
+      },
+      "baselineOnly": {
+        "trades": 28,
+        "winRate": 0,
+        "avgRetPct": -1.5871,
+        "medianRetPct": -1.585,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 30,
+          "rec": 16
+        },
+        "W4": {
+          "base": 17,
+          "rec": 5
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "IS",
+      "baseline": {
+        "trades": 41,
+        "winRate": 0.1707,
+        "avgRetPct": -0.6252,
+        "medianRetPct": -2.076,
+        "pf": 0.7005
+      },
+      "reclaim": {
+        "trades": 17,
+        "winRate": 0.1765,
+        "avgRetPct": 0.1214,
+        "medianRetPct": -0.8699,
+        "pf": 1.1633
+      },
+      "baselineOnly": {
+        "trades": 24,
+        "winRate": 0,
+        "avgRetPct": -2.4677,
+        "medianRetPct": -2.4527,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 26,
+          "rec": 10
+        },
+        "W4": {
+          "base": 15,
+          "rec": 7
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 18,
+        "winRate": 0.2778,
+        "avgRetPct": -0.0399,
+        "medianRetPct": -1.2912,
+        "pf": 0.9731
+      },
+      "reclaim": {
+        "trades": 5,
+        "winRate": 0.4,
+        "avgRetPct": 1.0605,
+        "medianRetPct": -0.8683,
+        "pf": 2.3351
+      },
+      "baselineOnly": {
+        "trades": 13,
+        "winRate": 0.0769,
+        "avgRetPct": -1.7513,
+        "medianRetPct": -2.2213,
+        "pf": 0.0863
+      },
+      "byType": {
+        "W2": {
+          "base": 13,
+          "rec": 5
+        },
+        "W4": {
+          "base": 5,
+          "rec": 0
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "IS",
+      "baseline": {
+        "trades": 332,
+        "winRate": 0.3584,
+        "avgRetPct": -0.1351,
+        "medianRetPct": -1.0589,
+        "pf": 0.9025
+      },
+      "reclaim": {
+        "trades": 172,
+        "winRate": 0.4651,
+        "avgRetPct": -0.1439,
+        "medianRetPct": 0,
+        "pf": 0.8022
+      },
+      "baselineOnly": {
+        "trades": 175,
+        "winRate": 0.1029,
+        "avgRetPct": -1.6677,
+        "medianRetPct": -1.5495,
+        "pf": 0.1612
+      },
+      "byType": {
+        "W2": {
+          "base": 178,
+          "rec": 104
+        },
+        "W4": {
+          "base": 154,
+          "rec": 68
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 103,
+        "winRate": 0.3786,
+        "avgRetPct": 0.1253,
+        "medianRetPct": -0.926,
+        "pf": 1.1156
+      },
+      "reclaim": {
+        "trades": 51,
+        "winRate": 0.4902,
+        "avgRetPct": 0.1061,
+        "medianRetPct": 0,
+        "pf": 1.2188
+      },
+      "baselineOnly": {
+        "trades": 55,
+        "winRate": 0.1091,
+        "avgRetPct": -1.3005,
+        "medianRetPct": -1.3096,
+        "pf": 0.1906
+      },
+      "byType": {
+        "W2": {
+          "base": 56,
+          "rec": 34
+        },
+        "W4": {
+          "base": 47,
+          "rec": 17
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "IS",
+      "baseline": {
+        "trades": 124,
+        "winRate": 0.2903,
+        "avgRetPct": -0.2111,
+        "medianRetPct": -1.6671,
+        "pf": 0.8896
+      },
+      "reclaim": {
+        "trades": 63,
+        "winRate": 0.3968,
+        "avgRetPct": -0.0647,
+        "medianRetPct": -0.4453,
+        "pf": 0.9365
+      },
+      "baselineOnly": {
+        "trades": 66,
+        "winRate": 0.0455,
+        "avgRetPct": -2.2385,
+        "medianRetPct": -2.1157,
+        "pf": 0.1234
+      },
+      "byType": {
+        "W2": {
+          "base": 74,
+          "rec": 44
+        },
+        "W4": {
+          "base": 50,
+          "rec": 19
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 40,
+        "winRate": 0.275,
+        "avgRetPct": -0.0008,
+        "medianRetPct": -1.3015,
+        "pf": 0.9994
+      },
+      "reclaim": {
+        "trades": 19,
+        "winRate": 0.4737,
+        "avgRetPct": 0.0346,
+        "medianRetPct": 0,
+        "pf": 1.0451
+      },
+      "baselineOnly": {
+        "trades": 22,
+        "winRate": 0,
+        "avgRetPct": -1.9087,
+        "medianRetPct": -1.7724,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 27,
+          "rec": 14
+        },
+        "W4": {
+          "base": 13,
+          "rec": 5
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "IS",
+      "baseline": {
+        "trades": 38,
+        "winRate": 0.2105,
+        "avgRetPct": -0.9345,
+        "medianRetPct": -2.4397,
+        "pf": 0.6518
+      },
+      "reclaim": {
+        "trades": 18,
+        "winRate": 0.1667,
+        "avgRetPct": -1.3791,
+        "medianRetPct": -1.804,
+        "pf": 0.3405
+      },
+      "baselineOnly": {
+        "trades": 21,
+        "winRate": 0,
+        "avgRetPct": -3.4118,
+        "medianRetPct": -2.9772,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 24,
+          "rec": 11
+        },
+        "W4": {
+          "base": 14,
+          "rec": 7
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 16,
+        "winRate": 0.1875,
+        "avgRetPct": -0.7797,
+        "medianRetPct": -2.18,
+        "pf": 0.6277
+      },
+      "reclaim": {
+        "trades": 5,
+        "winRate": 0.4,
+        "avgRetPct": 0.8913,
+        "medianRetPct": -0.3615,
+        "pf": 1.6796
+      },
+      "baselineOnly": {
+        "trades": 11,
+        "winRate": 0,
+        "avgRetPct": -2.5357,
+        "medianRetPct": -2.2215,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 14,
+          "rec": 5
+        },
+        "W4": {
+          "base": 2,
+          "rec": 0
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "IS",
+      "baseline": {
+        "trades": 374,
+        "winRate": 0.3209,
+        "avgRetPct": -0.0015,
+        "medianRetPct": -0.9266,
+        "pf": 0.9985
+      },
+      "reclaim": {
+        "trades": 212,
+        "winRate": 0.434,
+        "avgRetPct": 0.0634,
+        "medianRetPct": -0.2162,
+        "pf": 1.1127
+      },
+      "baselineOnly": {
+        "trades": 174,
+        "winRate": 0.023,
+        "avgRetPct": -1.3774,
+        "medianRetPct": -1.2196,
+        "pf": 0.0576
+      },
+      "byType": {
+        "W2": {
+          "base": 232,
+          "rec": 149
+        },
+        "W4": {
+          "base": 142,
+          "rec": 63
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 99,
+        "winRate": 0.2828,
+        "avgRetPct": 0.0342,
+        "medianRetPct": -0.7438,
+        "pf": 1.043
+      },
+      "reclaim": {
+        "trades": 47,
+        "winRate": 0.2979,
+        "avgRetPct": -0.0672,
+        "medianRetPct": -0.3063,
+        "pf": 0.8522
+      },
+      "baselineOnly": {
+        "trades": 54,
+        "winRate": 0,
+        "avgRetPct": -1.0823,
+        "medianRetPct": -0.9802,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 61,
+          "rec": 29
+        },
+        "W4": {
+          "base": 38,
+          "rec": 18
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "IS",
+      "baseline": {
+        "trades": 131,
+        "winRate": 0.2748,
+        "avgRetPct": 0.0367,
+        "medianRetPct": -1.5962,
+        "pf": 1.024
+      },
+      "reclaim": {
+        "trades": 77,
+        "winRate": 0.2727,
+        "avgRetPct": -0.2855,
+        "medianRetPct": -0.7388,
+        "pf": 0.7123
+      },
+      "baselineOnly": {
+        "trades": 59,
+        "winRate": 0.0169,
+        "avgRetPct": -1.9006,
+        "medianRetPct": -1.9492,
+        "pf": 0.0505
+      },
+      "byType": {
+        "W2": {
+          "base": 84,
+          "rec": 56
+        },
+        "W4": {
+          "base": 47,
+          "rec": 21
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 36,
+        "winRate": 0.2778,
+        "avgRetPct": -0.267,
+        "medianRetPct": -1.48,
+        "pf": 0.8015
+      },
+      "reclaim": {
+        "trades": 14,
+        "winRate": 0.0714,
+        "avgRetPct": -0.3415,
+        "medianRetPct": -0.5663,
+        "pf": 0.3887
+      },
+      "baselineOnly": {
+        "trades": 22,
+        "winRate": 0,
+        "avgRetPct": -1.9712,
+        "medianRetPct": -1.7365,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 23,
+          "rec": 10
+        },
+        "W4": {
+          "base": 13,
+          "rec": 4
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "IS",
+      "baseline": {
+        "trades": 45,
+        "winRate": 0.2667,
+        "avgRetPct": 0.1684,
+        "medianRetPct": -1.6593,
+        "pf": 1.0968
+      },
+      "reclaim": {
+        "trades": 25,
+        "winRate": 0.24,
+        "avgRetPct": 0.5017,
+        "medianRetPct": -0.6535,
+        "pf": 1.6319
+      },
+      "baselineOnly": {
+        "trades": 20,
+        "winRate": 0,
+        "avgRetPct": -2.1165,
+        "medianRetPct": -2.0956,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 28,
+          "rec": 18
+        },
+        "W4": {
+          "base": 17,
+          "rec": 7
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 13,
+        "winRate": 0.3846,
+        "avgRetPct": -0.4996,
+        "medianRetPct": -0.5466,
+        "pf": 0.6589
+      },
+      "reclaim": {
+        "trades": 5,
+        "winRate": 0.2,
+        "avgRetPct": 0.4218,
+        "medianRetPct": -0.316,
+        "pf": 2.1441
+      },
+      "baselineOnly": {
+        "trades": 9,
+        "winRate": 0.1111,
+        "avgRetPct": -2.075,
+        "medianRetPct": -2.0513,
+        "pf": 0.0192
+      },
+      "byType": {
+        "W2": {
+          "base": 9,
+          "rec": 4
+        },
+        "W4": {
+          "base": 4,
+          "rec": 1
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "IS",
+      "baseline": {
+        "trades": 303,
+        "winRate": 0.3498,
+        "avgRetPct": -0.1555,
+        "medianRetPct": -1.053,
+        "pf": 0.8842
+      },
+      "reclaim": {
+        "trades": 154,
+        "winRate": 0.5455,
+        "avgRetPct": 0.0888,
+        "medianRetPct": 0.0311,
+        "pf": 1.1419
+      },
+      "baselineOnly": {
+        "trades": 161,
+        "winRate": 0.0621,
+        "avgRetPct": -1.5973,
+        "medianRetPct": -1.5549,
+        "pf": 0.1378
+      },
+      "byType": {
+        "W2": {
+          "base": 163,
+          "rec": 95
+        },
+        "W4": {
+          "base": 140,
+          "rec": 59
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 92,
+        "winRate": 0.3478,
+        "avgRetPct": -0.1779,
+        "medianRetPct": -1.1438,
+        "pf": 0.8544
+      },
+      "reclaim": {
+        "trades": 45,
+        "winRate": 0.4667,
+        "avgRetPct": 0.3274,
+        "medianRetPct": 0,
+        "pf": 1.8733
+      },
+      "baselineOnly": {
+        "trades": 50,
+        "winRate": 0.04,
+        "avgRetPct": -1.7034,
+        "medianRetPct": -1.6744,
+        "pf": 0.0704
+      },
+      "byType": {
+        "W2": {
+          "base": 53,
+          "rec": 28
+        },
+        "W4": {
+          "base": 39,
+          "rec": 17
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "IS",
+      "baseline": {
+        "trades": 124,
+        "winRate": 0.2984,
+        "avgRetPct": -0.1693,
+        "medianRetPct": -1.8512,
+        "pf": 0.9139
+      },
+      "reclaim": {
+        "trades": 64,
+        "winRate": 0.4375,
+        "avgRetPct": -0.001,
+        "medianRetPct": -0.3512,
+        "pf": 0.9991
+      },
+      "baselineOnly": {
+        "trades": 65,
+        "winRate": 0.0615,
+        "avgRetPct": -1.9243,
+        "medianRetPct": -2.1047,
+        "pf": 0.2092
+      },
+      "byType": {
+        "W2": {
+          "base": 80,
+          "rec": 48
+        },
+        "W4": {
+          "base": 44,
+          "rec": 16
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 35,
+        "winRate": 0.2286,
+        "avgRetPct": -0.2056,
+        "medianRetPct": -1.3881,
+        "pf": 0.8626
+      },
+      "reclaim": {
+        "trades": 16,
+        "winRate": 0.0625,
+        "avgRetPct": -0.8718,
+        "medianRetPct": -0.6857,
+        "pf": 0.2057
+      },
+      "baselineOnly": {
+        "trades": 19,
+        "winRate": 0,
+        "avgRetPct": -1.829,
+        "medianRetPct": -1.736,
+        "pf": 0
+      },
+      "byType": {
+        "W2": {
+          "base": 24,
+          "rec": 15
+        },
+        "W4": {
+          "base": 11,
+          "rec": 1
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "IS",
+      "baseline": {
+        "trades": 46,
+        "winRate": 0.3043,
+        "avgRetPct": 0.3714,
+        "medianRetPct": -2.2288,
+        "pf": 1.1607
+      },
+      "reclaim": {
+        "trades": 29,
+        "winRate": 0.3103,
+        "avgRetPct": -0.2565,
+        "medianRetPct": -1.05,
+        "pf": 0.8427
+      },
+      "baselineOnly": {
+        "trades": 18,
+        "winRate": 0.0556,
+        "avgRetPct": -1.9852,
+        "medianRetPct": -2.2718,
+        "pf": 0.1724
+      },
+      "byType": {
+        "W2": {
+          "base": 27,
+          "rec": 18
+        },
+        "W4": {
+          "base": 19,
+          "rec": 11
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "segment": "OOS",
+      "baseline": {
+        "trades": 13,
+        "winRate": 0.2308,
+        "avgRetPct": -0.7096,
+        "medianRetPct": -2.6511,
+        "pf": 0.6995
+      },
+      "reclaim": {
+        "trades": 4,
+        "winRate": 0.25,
+        "avgRetPct": 0.1587,
+        "medianRetPct": -0.605,
+        "pf": 1.1914
+      },
+      "baselineOnly": {
+        "trades": 10,
+        "winRate": 0.1,
+        "avgRetPct": -2.5424,
+        "medianRetPct": -2.997,
+        "pf": 0.1077
+      },
+      "byType": {
+        "W2": {
+          "base": 9,
+          "rec": 3
+        },
+        "W4": {
+          "base": 4,
+          "rec": 1
+        }
+      }
+    }
+  ],
+  "scanStats": [
+    {
+      "symbol": "BTCUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "setupsCreated": 217,
+      "stillborn": 165,
+      "touched": 168,
+      "reclaimEntered": 84,
+      "baseFilled": 164,
+      "expiredUntouched": 33,
+      "deadPreEntry": 78,
+      "superseded": 25,
+      "skippedReclaim": 0,
+      "skippedBase": 1
+    },
+    {
+      "symbol": "BTCUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "setupsCreated": 69,
+      "stillborn": 63,
+      "touched": 52,
+      "reclaimEntered": 26,
+      "baseFilled": 52,
+      "expiredUntouched": 12,
+      "deadPreEntry": 26,
+      "superseded": 4,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "BTCUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "setupsCreated": 26,
+      "stillborn": 26,
+      "touched": 22,
+      "reclaimEntered": 9,
+      "baseFilled": 22,
+      "expiredUntouched": 1,
+      "deadPreEntry": 11,
+      "superseded": 5,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "BTCUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "setupsCreated": 240,
+      "stillborn": 152,
+      "touched": 171,
+      "reclaimEntered": 85,
+      "baseFilled": 162,
+      "expiredUntouched": 54,
+      "deadPreEntry": 70,
+      "superseded": 39,
+      "skippedReclaim": 0,
+      "skippedBase": 1
+    },
+    {
+      "symbol": "BTCUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "setupsCreated": 75,
+      "stillborn": 59,
+      "touched": 56,
+      "reclaimEntered": 28,
+      "baseFilled": 56,
+      "expiredUntouched": 10,
+      "deadPreEntry": 26,
+      "superseded": 10,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "BTCUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "setupsCreated": 25,
+      "stillborn": 27,
+      "touched": 21,
+      "reclaimEntered": 8,
+      "baseFilled": 21,
+      "expiredUntouched": 1,
+      "deadPreEntry": 10,
+      "superseded": 6,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "setupsCreated": 568,
+      "stillborn": 344,
+      "touched": 397,
+      "reclaimEntered": 207,
+      "baseFilled": 379,
+      "expiredUntouched": 133,
+      "deadPreEntry": 173,
+      "superseded": 73,
+      "skippedReclaim": 1,
+      "skippedBase": 1
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "setupsCreated": 181,
+      "stillborn": 145,
+      "touched": 143,
+      "reclaimEntered": 68,
+      "baseFilled": 139,
+      "expiredUntouched": 25,
+      "deadPreEntry": 68,
+      "superseded": 24,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "setupsCreated": 65,
+      "stillborn": 55,
+      "touched": 51,
+      "reclaimEntered": 20,
+      "baseFilled": 51,
+      "expiredUntouched": 10,
+      "deadPreEntry": 30,
+      "superseded": 3,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "setupsCreated": 603,
+      "stillborn": 261,
+      "touched": 391,
+      "reclaimEntered": 199,
+      "baseFilled": 380,
+      "expiredUntouched": 148,
+      "deadPreEntry": 147,
+      "superseded": 120,
+      "skippedReclaim": 2,
+      "skippedBase": 2
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "setupsCreated": 203,
+      "stillborn": 131,
+      "touched": 147,
+      "reclaimEntered": 79,
+      "baseFilled": 143,
+      "expiredUntouched": 40,
+      "deadPreEntry": 57,
+      "superseded": 31,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "ETHUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "setupsCreated": 71,
+      "stillborn": 53,
+      "touched": 58,
+      "reclaimEntered": 27,
+      "baseFilled": 57,
+      "expiredUntouched": 6,
+      "deadPreEntry": 27,
+      "superseded": 10,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "setupsCreated": 705,
+      "stillborn": 475,
+      "touched": 496,
+      "reclaimEntered": 248,
+      "baseFilled": 476,
+      "expiredUntouched": 147,
+      "deadPreEntry": 218,
+      "superseded": 111,
+      "skippedReclaim": 0,
+      "skippedBase": 1
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "setupsCreated": 233,
+      "stillborn": 171,
+      "touched": 170,
+      "reclaimEntered": 85,
+      "baseFilled": 165,
+      "expiredUntouched": 42,
+      "deadPreEntry": 82,
+      "superseded": 29,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "setupsCreated": 84,
+      "stillborn": 76,
+      "touched": 67,
+      "reclaimEntered": 31,
+      "baseFilled": 66,
+      "expiredUntouched": 9,
+      "deadPreEntry": 35,
+      "superseded": 10,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "setupsCreated": 679,
+      "stillborn": 325,
+      "touched": 438,
+      "reclaimEntered": 210,
+      "baseFilled": 423,
+      "expiredUntouched": 172,
+      "deadPreEntry": 179,
+      "superseded": 132,
+      "skippedReclaim": 3,
+      "skippedBase": 3
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "setupsCreated": 247,
+      "stillborn": 153,
+      "touched": 159,
+      "reclaimEntered": 80,
+      "baseFilled": 157,
+      "expiredUntouched": 68,
+      "deadPreEntry": 65,
+      "superseded": 36,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "SOLUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "setupsCreated": 92,
+      "stillborn": 68,
+      "touched": 72,
+      "reclaimEntered": 34,
+      "baseFilled": 68,
+      "expiredUntouched": 13,
+      "deadPreEntry": 34,
+      "superseded": 15,
+      "skippedReclaim": 1,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "setupsCreated": 621,
+      "stillborn": 455,
+      "touched": 421,
+      "reclaimEntered": 216,
+      "baseFilled": 413,
+      "expiredUntouched": 119,
+      "deadPreEntry": 175,
+      "superseded": 119,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "setupsCreated": 212,
+      "stillborn": 164,
+      "touched": 157,
+      "reclaimEntered": 81,
+      "baseFilled": 150,
+      "expiredUntouched": 30,
+      "deadPreEntry": 73,
+      "superseded": 35,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "setupsCreated": 77,
+      "stillborn": 73,
+      "touched": 59,
+      "reclaimEntered": 34,
+      "baseFilled": 55,
+      "expiredUntouched": 10,
+      "deadPreEntry": 22,
+      "superseded": 15,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "setupsCreated": 567,
+      "stillborn": 317,
+      "touched": 364,
+      "reclaimEntered": 178,
+      "baseFilled": 354,
+      "expiredUntouched": 132,
+      "deadPreEntry": 139,
+      "superseded": 128,
+      "skippedReclaim": 0,
+      "skippedBase": 2
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "setupsCreated": 221,
+      "stillborn": 155,
+      "touched": 152,
+      "reclaimEntered": 73,
+      "baseFilled": 146,
+      "expiredUntouched": 48,
+      "deadPreEntry": 65,
+      "superseded": 41,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "XRPUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "setupsCreated": 81,
+      "stillborn": 69,
+      "touched": 62,
+      "reclaimEntered": 35,
+      "baseFilled": 61,
+      "expiredUntouched": 12,
+      "deadPreEntry": 25,
+      "superseded": 10,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "setupsCreated": 300,
+      "stillborn": 224,
+      "touched": 225,
+      "reclaimEntered": 127,
+      "baseFilled": 215,
+      "expiredUntouched": 51,
+      "deadPreEntry": 89,
+      "superseded": 43,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "setupsCreated": 90,
+      "stillborn": 90,
+      "touched": 64,
+      "reclaimEntered": 39,
+      "baseFilled": 64,
+      "expiredUntouched": 15,
+      "deadPreEntry": 23,
+      "superseded": 13,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "setupsCreated": 34,
+      "stillborn": 26,
+      "touched": 27,
+      "reclaimEntered": 14,
+      "baseFilled": 27,
+      "expiredUntouched": 5,
+      "deadPreEntry": 12,
+      "superseded": 3,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "setupsCreated": 299,
+      "stillborn": 179,
+      "touched": 209,
+      "reclaimEntered": 112,
+      "baseFilled": 200,
+      "expiredUntouched": 64,
+      "deadPreEntry": 85,
+      "superseded": 47,
+      "skippedReclaim": 1,
+      "skippedBase": 1
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "setupsCreated": 107,
+      "stillborn": 81,
+      "touched": 74,
+      "reclaimEntered": 36,
+      "baseFilled": 73,
+      "expiredUntouched": 23,
+      "deadPreEntry": 35,
+      "superseded": 14,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "BNBUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "setupsCreated": 32,
+      "stillborn": 28,
+      "touched": 26,
+      "reclaimEntered": 13,
+      "baseFilled": 26,
+      "expiredUntouched": 4,
+      "deadPreEntry": 11,
+      "superseded": 4,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "setupsCreated": 834,
+      "stillborn": 566,
+      "touched": 572,
+      "reclaimEntered": 297,
+      "baseFilled": 550,
+      "expiredUntouched": 188,
+      "deadPreEntry": 237,
+      "superseded": 134,
+      "skippedReclaim": 1,
+      "skippedBase": 1
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "setupsCreated": 260,
+      "stillborn": 192,
+      "touched": 199,
+      "reclaimEntered": 89,
+      "baseFilled": 194,
+      "expiredUntouched": 37,
+      "deadPreEntry": 100,
+      "superseded": 39,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "setupsCreated": 100,
+      "stillborn": 80,
+      "touched": 79,
+      "reclaimEntered": 29,
+      "baseFilled": 77,
+      "expiredUntouched": 16,
+      "deadPreEntry": 49,
+      "superseded": 8,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "setupsCreated": 756,
+      "stillborn": 356,
+      "touched": 495,
+      "reclaimEntered": 248,
+      "baseFilled": 482,
+      "expiredUntouched": 181,
+      "deadPreEntry": 197,
+      "superseded": 143,
+      "skippedReclaim": 2,
+      "skippedBase": 2
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "setupsCreated": 282,
+      "stillborn": 180,
+      "touched": 196,
+      "reclaimEntered": 83,
+      "baseFilled": 192,
+      "expiredUntouched": 58,
+      "deadPreEntry": 100,
+      "superseded": 45,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "setupsCreated": 100,
+      "stillborn": 84,
+      "touched": 75,
+      "reclaimEntered": 27,
+      "baseFilled": 73,
+      "expiredUntouched": 19,
+      "deadPreEntry": 46,
+      "superseded": 10,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "setupsCreated": 847,
+      "stillborn": 559,
+      "touched": 589,
+      "reclaimEntered": 295,
+      "baseFilled": 575,
+      "expiredUntouched": 174,
+      "deadPreEntry": 260,
+      "superseded": 132,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "setupsCreated": 266,
+      "stillborn": 222,
+      "touched": 200,
+      "reclaimEntered": 91,
+      "baseFilled": 192,
+      "expiredUntouched": 41,
+      "deadPreEntry": 102,
+      "superseded": 40,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "setupsCreated": 92,
+      "stillborn": 84,
+      "touched": 66,
+      "reclaimEntered": 25,
+      "baseFilled": 66,
+      "expiredUntouched": 14,
+      "deadPreEntry": 39,
+      "superseded": 12,
+      "skippedReclaim": 0,
+      "skippedBase": 1
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "setupsCreated": 787,
+      "stillborn": 389,
+      "touched": 515,
+      "reclaimEntered": 247,
+      "baseFilled": 495,
+      "expiredUntouched": 182,
+      "deadPreEntry": 203,
+      "superseded": 175,
+      "skippedReclaim": 3,
+      "skippedBase": 7
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "setupsCreated": 280,
+      "stillborn": 186,
+      "touched": 200,
+      "reclaimEntered": 94,
+      "baseFilled": 189,
+      "expiredUntouched": 61,
+      "deadPreEntry": 92,
+      "superseded": 44,
+      "skippedReclaim": 2,
+      "skippedBase": 3
+    },
+    {
+      "symbol": "ADAUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "setupsCreated": 94,
+      "stillborn": 90,
+      "touched": 64,
+      "reclaimEntered": 27,
+      "baseFilled": 64,
+      "expiredUntouched": 19,
+      "deadPreEntry": 33,
+      "superseded": 15,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "1h",
+      "theta": 0.03,
+      "setupsCreated": 810,
+      "stillborn": 504,
+      "touched": 566,
+      "reclaimEntered": 307,
+      "baseFilled": 548,
+      "expiredUntouched": 174,
+      "deadPreEntry": 233,
+      "superseded": 114,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "1h",
+      "theta": 0.05,
+      "setupsCreated": 260,
+      "stillborn": 204,
+      "touched": 199,
+      "reclaimEntered": 104,
+      "baseFilled": 194,
+      "expiredUntouched": 42,
+      "deadPreEntry": 89,
+      "superseded": 30,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "1h",
+      "theta": 0.08,
+      "setupsCreated": 89,
+      "stillborn": 87,
+      "touched": 67,
+      "reclaimEntered": 34,
+      "baseFilled": 66,
+      "expiredUntouched": 17,
+      "deadPreEntry": 33,
+      "superseded": 6,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "4h",
+      "theta": 0.03,
+      "setupsCreated": 751,
+      "stillborn": 349,
+      "touched": 464,
+      "reclaimEntered": 226,
+      "baseFilled": 446,
+      "expiredUntouched": 220,
+      "deadPreEntry": 188,
+      "superseded": 135,
+      "skippedReclaim": 1,
+      "skippedBase": 2
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "4h",
+      "theta": 0.05,
+      "setupsCreated": 275,
+      "stillborn": 177,
+      "touched": 189,
+      "reclaimEntered": 93,
+      "baseFilled": 183,
+      "expiredUntouched": 56,
+      "deadPreEntry": 84,
+      "superseded": 48,
+      "skippedReclaim": 0,
+      "skippedBase": 0
+    },
+    {
+      "symbol": "LINKUSDT",
+      "tf": "4h",
+      "theta": 0.08,
+      "setupsCreated": 91,
+      "stillborn": 77,
+      "touched": 70,
+      "reclaimEntered": 39,
+      "baseFilled": 68,
+      "expiredUntouched": 15,
+      "deadPreEntry": 30,
+      "superseded": 9,
+      "skippedReclaim": 1,
+      "skippedBase": 0
+    }
+  ]
+}
