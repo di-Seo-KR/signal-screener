@@ -12,12 +12,12 @@ import { supabase } from "./supabaseClient.js";
 import { ga } from "./lib/analytics.js";
 import {
   Button, Card, Badge, Stat, Tabs, Dialog, Tooltip, Skeleton, Switch, Segmented,
-  Table, SectionHeader, KV, Progress, EmptyState, ToastProvider, useToast, Spinner,
+  SectionHeader, KV, Progress, EmptyState, ToastProvider, useToast, Spinner,
 } from "./ui/primitives.jsx";
 import {
   Play, Stop, Pause, Refresh, Power, Shield, Ghost, Gauge, Alert as AlertIcon,
   Check, Flask, Lock, Unlock, Settings, Sun, Moon, ChevronR, Zap, Activity, Target,
-  Wallet, TrendUp, TrendDown,
+  TrendUp, TrendDown,
 } from "./ui/icons.jsx";
 import { useTheme } from "./ui/theme.jsx";
 import { useBreakpoint } from "./ui/useBreakpoint.jsx";
@@ -272,7 +272,7 @@ function RealTradingInner({ onNavigate }) {
           <Lock size={32} />
           <div style={{ fontSize: 16, fontWeight: 800, marginTop: 12 }}>로그인이 필요합니다</div>
           <div style={{ fontSize: 14, color: "var(--z-text-2)", marginTop: 6 }}>
-            실전매매 관제센터는 인증된 사용자만 접근할 수 있습니다.
+            자동매매 콘솔은 인증된 사용자만 접근할 수 있습니다.
           </div>
         </Card>
       </div>
@@ -351,194 +351,91 @@ function RealTradingInner({ onNavigate }) {
   const rcMinRR = riskCfg.minNetRR ?? 1.8;
 
   // ═════════════════════════════════════════════════════════
-  // HEADER (REDESIGNED) — 모바일은 padding 절반
+  // ★ 2026-08-12 IA v3 (시안 1g): 콘솔형 상태 히어로
+  //   브랜딩 헤더 + KPI 카드 5장을 히어로 1장으로 통합 — 가동 상태·총자산·일 손익.
+  //   총자산·일 손익 노출 위치는 이 히어로 1곳뿐 (같은 정보 이중 노출 금지 규칙).
+  //   기간·낙폭·연속손실 수치는 리스크 패널(안전장치 카드)로 일원화.
+  //   ※ 시안의 uptime 은 서버가 내려주는 실데이터가 없어 생략 — 대신 실측 갱신 시각 표기.
   // ═════════════════════════════════════════════════════════
+  const statusPill = trulyLive
+    ? { dot: "var(--z-green)", label: "가동 중", color: "var(--z-green-hi)", pulse: true }
+    : halted
+      ? { dot: "var(--z-yellow)", label: "일시 정지 · 브레이커", color: "var(--z-yellow-hi)", pulse: false }
+      : killOn
+        ? { dot: "var(--z-text-3)", label: "대기 · 안전잠금", color: "var(--z-text-2)", pulse: false }
+        : { dot: "var(--z-text-3)", label: "대기", color: "var(--z-text-2)", pulse: false };
   const header = (
     <div style={{
-      background: trulyLive
-        ? "linear-gradient(135deg, rgba(239, 68, 68, 0.15) 0%, rgba(234, 51, 35, 0.08) 100%)"
-        : "linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(37, 99, 235, 0.06) 100%)",
-      border: trulyLive
-        ? "1px solid rgba(239, 68, 68, 0.25)"
-        : "1px solid rgba(59, 130, 246, 0.2)",
-      borderRadius: "var(--z-r-lg)",
-      padding: isMobile ? "14px 14px" : "24px 20px",
-      marginBottom: isMobile ? 14 : 20,
-      // ★ 2026-05-11 fix: 모바일에선 column 레이아웃 (제목 위 + 버튼 아래).
-      //   이전: flex-wrap 으로 버튼이 좌측 제목 영역을 침범해 "실전매매관제센터" 글자가 세로로 깨짐.
-      //   현재: 모바일은 헤더 전체 column, 버튼은 width 100% 로 다음 줄.
-      display: "flex",
-      flexDirection: isMobile ? "column" : "row",
-      alignItems: isMobile ? "stretch" : "center",
-      justifyContent: "space-between",
-      flexWrap: "wrap",
-      gap: isMobile ? 12 : 16,
-    }}>
-      <div style={{ flex: 1, minWidth: 0, width: isMobile ? "100%" : "auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14, marginBottom: isMobile ? 6 : 10 }}>
-          <div style={{
-            width: isMobile ? 38 : 48, height: isMobile ? 38 : 48, borderRadius: isMobile ? 10 : 14,
-            background: trulyLive
-              ? "linear-gradient(135deg, var(--z-red) 0%, #E53935 100%)"
-              : "linear-gradient(135deg, var(--z-blue) 0%, #1E40AF 100%)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: trulyLive
-              ? "0 8px 24px rgba(239, 68, 68, 0.35), inset 0 1px 0 rgba(255,255,255,0.2)"
-              : "0 8px 24px rgba(59, 130, 246, 0.25), inset 0 1px 0 rgba(255,255,255,0.15)",
-            position: "relative", flexShrink: 0,
-          }}>
-            {trulyLive && (
-              <div className="rt-pulse" style={{
-                position: "absolute", inset: 0, borderRadius: isMobile ? 10 : 14,
-                background: "rgba(239, 68, 68, 0.3)",
-              }} />
-            )}
-            <Power size={isMobile ? 18 : 24} color="#fff" style={{ position: "relative", zIndex: 1 }} />
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: isMobile ? 18 : 28, fontWeight: 900, letterSpacing: "-0.03em", lineHeight: 1 }}>
-              실전매매 관제센터
-            </div>
-            {/* 모바일: 부제(브랜딩) 생략 — 최상단 간소화 */}
-            {!isMobile && (
-              <div style={{ fontSize: 15, color: "var(--z-text-3)", marginTop: 4 }}>
-                Zepta Investment Platform
-              </div>
-            )}
-          </div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
-          {trulyLive ? (
-            <Badge
-              tone="red"
-              dot
-              solid
-              className="rt-pulse"
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                padding: "6px 12px",
-              }}
-            >
-              🔴 LIVE
-            </Badge>
-          ) : (
-            <Badge
-              tone="default"
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                padding: "6px 12px",
-              }}
-            >
-              ⊙ STANDBY
-            </Badge>
-          )}
-          {halted && (
-            <Badge
-              tone="yellow"
-              style={{
-                fontSize: 14,
-                fontWeight: 700,
-                padding: "6px 12px",
-              }}
-            >
-              ⚡ BREAKER
-            </Badge>
-          )}
-          {/* 2026-05-29 — 알파랩 발굴·튜닝 전략 자동 반영 안내 (실거래 배선 연결) */}
-          <Badge
-            tone="purple"
-            title="알파랩이 2시간마다 발굴·검증한 최적 전략 파라미터가 자동매매 신호에 반영됩니다"
-            style={{ fontSize: 13, fontWeight: 700, padding: "6px 12px" }}
-          >
-            🧬 AI 자동 튜닝
-          </Badge>
-          <div style={{ fontSize: isMobile ? 13 : 14, color: "var(--z-text-2)", marginLeft: 4 }}>
-            {!isMobile && "· Binance USDⓈ-M Futures"}
-            {lastRefresh && <> {!isMobile ? "· " : ""}<span style={{ color: "var(--z-text-3)" }}>{fmtTime(lastRefresh)} 기준</span></>}
-          </div>
-        </div>
-      </div>
-
-      {/* ★ 2026-05-11 fix: 모바일 버튼 행 — width 100%, 두 버튼 1:1 grid */}
-      <div style={{
-        display: isMobile ? "grid" : "flex",
-        gridTemplateColumns: isMobile ? "1fr 1fr" : undefined,
-        gap: 8,
-        flexWrap: isMobile ? undefined : "wrap",
-        width: isMobile ? "100%" : "auto",
-      }}>
-        {/* Alpha Lab 진입 버튼 — 사용자 직접 URL 입력 없이 한 클릭으로 */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            try { window.location.href = "/alpha-lab"; } catch {}
-          }}
-          leftIcon={<Target size={14} />}
-          style={{
-            whiteSpace: "nowrap", minHeight: 44,
-            background: "linear-gradient(135deg, rgba(168, 85, 247, 0.12), rgba(147, 51, 234, 0.06))",
-            border: "1px solid rgba(168, 85, 247, 0.3)",
-            color: "var(--z-purple)",
-            justifyContent: "center",
-          }}
-        >
-          🧬 Alpha Lab
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={refresh}
-          leftIcon={loading ? <Spinner size={14} /> : <Refresh size={14} />}
-          style={{ whiteSpace: "nowrap", minHeight: 44, justifyContent: "center" }}
-        >
-          새로고침
-        </Button>
-      </div>
-    </div>
-  );
-
-  // ═════════════════════════════════════════════════════════
-  // KPI BAR (재설계 — 모바일: 1 큰 hero + 4 작은 셀, 데스크탑: 기존 5분할)
-  // ═════════════════════════════════════════════════════════
-  const heroEquity = (
-    <div style={{
-      position: "relative", overflow: "hidden",
       background: "var(--z-card)",
       border: "1px solid var(--z-border)",
       borderRadius: "var(--z-r-lg)",
-      padding: isMobile ? "16px 16px 16px 18px" : "22px 24px 22px 26px",
-      display: "flex", flexDirection: "column",
-      justifyContent: isMobile ? "flex-start" : "space-between",
-      gap: isMobile ? 14 : 18,
-      gridRow: isMobile ? undefined : "span 2",
+      padding: isMobile ? "16px 16px" : "18px 22px",
+      marginBottom: isMobile ? 14 : 16,
+      display: "flex", flexDirection: "column", gap: isMobile ? 14 : 12,
     }}>
-      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: "var(--z-blue)" }} />
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: isMobile ? 10 : 0 }}>
-        <div style={{
-          width: isMobile ? 36 : 44, height: isMobile ? 36 : 44, borderRadius: 12,
-          background: "linear-gradient(135deg, var(--z-blue) 0%, #1E40AF 100%)",
-          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-          boxShadow: "0 4px 12px rgba(59, 130, 246, 0.3)",
-        }}>
-          <Wallet size={isMobile ? 16 : 20} color="#fff" />
+      {/* 1행: 타이틀 + OWNER + 상태 필 + (우측) 보조 액션 */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <Power size={isMobile ? 16 : 18} color={trulyLive ? "var(--z-green-hi)" : "var(--z-text-3)"} style={{ flexShrink: 0 }} />
+        <div style={{ fontSize: isMobile ? 17 : 19, fontWeight: 900, letterSpacing: "-0.02em", lineHeight: 1 }}>
+          자동매매 콘솔
         </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 14, color: "var(--z-text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
-            보유 자산 <span style={{ textTransform: "none", fontWeight: 500, fontSize: 11.5, opacity: 0.8 }}>· 마진 잔고</span>
+        <span style={{
+          fontSize: 10, fontWeight: 800, padding: "3px 8px", borderRadius: 8,
+          background: "rgba(255, 176, 32, 0.13)", color: "var(--z-yellow-hi)", letterSpacing: "0.05em",
+        }}>OWNER</span>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 7,
+          background: "var(--z-card-2)", border: "1px solid var(--z-border)",
+          borderRadius: 9999, padding: "5px 12px",
+        }}>
+          <span className={statusPill.pulse ? "rt-pulse" : undefined}
+            style={{ width: 7, height: 7, borderRadius: "50%", background: statusPill.dot, flexShrink: 0 }} />
+          <span style={{ fontSize: 12, fontWeight: 800, color: statusPill.color, whiteSpace: "nowrap" }}>{statusPill.label}</span>
+          {lastRefresh && (
+            <span style={{ fontSize: 10.5, color: "var(--z-text-3)", fontFamily: "var(--z-font-mono)", whiteSpace: "nowrap" }}>
+              {fmtTime(lastRefresh)}
+            </span>
+          )}
+        </div>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+          {/* Alpha Lab 진입 — 알파랩 발굴·튜닝 전략이 자동매매 신호에 반영됨 (기존 기능 유지) */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              try { window.location.href = "/alpha-lab"; } catch {}
+            }}
+            leftIcon={<Target size={13} />}
+            title="알파랩이 2시간마다 발굴·검증한 최적 전략 파라미터가 자동매매 신호에 반영됩니다"
+            style={{ whiteSpace: "nowrap", color: "var(--z-purple)" }}
+          >
+            🧬 Alpha Lab
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={refresh}
+            leftIcon={loading ? <Spinner size={13} /> : <Refresh size={13} />}
+            style={{ whiteSpace: "nowrap" }}
+          >
+            새로고침
+          </Button>
+        </div>
+      </div>
+      {/* 2행: 총자산 · 오늘 매매손익 */}
+      <div style={{ display: "flex", gap: isMobile ? 20 : 32, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 11.5, color: "var(--z-text-3)", fontWeight: 700 }}>총자산 · 마진 잔고</div>
+          <div style={{
+            fontSize: isMobile ? 28 : 32, fontWeight: 900, lineHeight: 1.05,
+            fontFamily: "var(--z-font-mono)", letterSpacing: "-0.02em", marginTop: 3,
+          }}>
+            {/* 상태 3종 규칙: 스켈레톤은 '로딩 중'일 때만 — 로딩 종료 후 null 이면 fmtUsd 가 '—'(빈 상태) 표시 */}
+            {loading && marginBalance == null ? <Skeleton width={150} height={isMobile ? 28 : 32} /> : fmtUsd(marginBalance)}
           </div>
-          <div style={{ fontSize: isMobile ? 28 : 40, fontWeight: 900, marginTop: 4, lineHeight: 1, fontFamily: "var(--z-font-mono)", letterSpacing: "-0.02em" }}>
-            {loading && marginBalance == null ? (
-              <Skeleton width={140} height={isMobile ? 28 : 40} />
-            ) : (
-              fmtUsd(marginBalance)
-            )}
-          </div>
-          {/* 바이낸스 '마진 잔고' = 지갑잔고 + 미실현. 안 맞아 보이던 차이를 분해해 투명하게 표시 */}
+          {/* 바이낸스 '마진 잔고' = 지갑잔고 + 미실현 — 분해해 투명하게 표시 (기존 표기 유지) */}
           {marginBalance != null && unrealizedPnl != null && (
-            <div style={{ fontSize: 11.5, color: "var(--z-text-3)", marginTop: 5, lineHeight: 1.3 }}>
+            <div style={{ fontSize: 11.5, color: "var(--z-text-3)", marginTop: 4 }}>
               지갑 {fmtUsd(equity, 2)}
               <span style={{ color: unrealizedPnl > 0 ? "var(--z-green-hi)" : unrealizedPnl < 0 ? "var(--z-red-hi)" : "var(--z-text-3)" }}>
                 {" "}· 미실현 {unrealizedPnl >= 0 ? "+" : ""}{fmtUsd(unrealizedPnl, 2)}
@@ -546,257 +443,57 @@ function RealTradingInner({ onNavigate }) {
             </div>
           )}
         </div>
-        {/* 모바일: 일손익을 hero 우측에 inline 표시 (스크롤 없이 한눈에) */}
-        {isMobile && (
+        <div>
+          <div style={{ fontSize: 11.5, color: "var(--z-text-3)", fontWeight: 700 }}>오늘 매매손익 · 입금 제외</div>
           <div style={{
-            textAlign: "right",
-            paddingLeft: 8,
-            borderLeft: "1px solid rgba(59, 130, 246, 0.15)",
+            fontSize: isMobile ? 22 : 26, fontWeight: 900, lineHeight: 1.1,
+            fontFamily: "var(--z-font-mono)", letterSpacing: "-0.01em", marginTop: 3,
+            color: todayPnlUsd == null ? "var(--z-text-3)" : todayPnlUsd >= 0 ? "var(--z-green-hi)" : "var(--z-red-hi)",
           }}>
-            <div style={{ fontSize: 14, color: "var(--z-text-3)", fontWeight: 600 }}>오늘</div>
-            {/* ★ 2026-06-06: 입금 부풀림 제거 — 메인 hero(todayPnlPct)와 동일하게 입출금 제외값 사용.
-                 이전엔 raw dayLossPct 라 입금이 수익으로 잡혀 모바일만 +79% 식으로 오도됨. */}
-            <div style={{
-              fontSize: 16, fontWeight: 800, lineHeight: 1.2,
-              color: todayPnlUsd == null ? "var(--z-text)" : todayPnlUsd < 0 ? "var(--z-red-hi)" : todayPnlUsd > 0 ? "var(--z-green-hi)" : "var(--z-text)",
-              fontFamily: "var(--z-font-mono)",
-            }}>
-              {todayPnlPct != null ? fmtPct(todayPnlPct) : "집계 중"}
-            </div>
-          </div>
-        )}
-      </div>
-      <div style={{
-        display: "grid", gap: 10, gridTemplateColumns: "1fr 1fr",
-        paddingTop: 10, borderTop: "1px solid rgba(59, 130, 246, 0.1)",
-      }}>
-        <div title="오늘 0시 기준 시작 잔고입니다. 오늘 손익은 이 금액과 비교해 계산돼요.">
-          <div style={{ fontSize: 14, color: "var(--z-text-3)", marginBottom: 4 }}>오늘 시작 잔고</div>
-          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)" }}>
-            {breaker.dayStartEquity ? fmtUsd(breaker.dayStartEquity) : "—"}
-          </div>
-        </div>
-        <div title="낙폭(최대 하락폭)을 계산하는 기준선 — 최근 30일 중 가장 높았던 잔고입니다.">
-          <div style={{ fontSize: 14, color: "var(--z-text-3)", marginBottom: 4 }}>
-            낙폭 기준선 (30일 최고) ⓘ
-            {breaker.equityHigh && breaker.equityHigh30d && breaker.equityHigh > breaker.equityHigh30d && (
-              <span style={{ marginLeft: 6, fontSize: 14, color: "var(--z-text-3)" }}>
-                · 역대 {fmtUsd(breaker.equityHigh)}
+            {todayPnlUsd == null ? "집계 중" : `${todayPnlUsd >= 0 ? "+" : ""}${fmtUsd(todayPnlUsd, 1)}`}
+            {todayPnlPct != null && (
+              <span style={{ fontSize: isMobile ? 12.5 : 14, fontWeight: 800, marginLeft: 6, opacity: 0.85 }}>
+                {fmtPct(todayPnlPct, 1)}
               </span>
             )}
           </div>
-          <div style={{ fontSize: 14, fontWeight: 700, fontFamily: "var(--z-font-mono)", color: "var(--z-green-hi)" }}>
-            {mddBaseline ? fmtUsd(mddBaseline) : "—"}
-          </div>
         </div>
       </div>
     </div>
   );
-
-  // 4개 보조 메트릭 카드 빌더 — 프리미엄 다크 (2026-05-29 재디자인)
-  //   탁한 그라디언트 배경 제거 → 솔리드 카드 + 좌측 얇은 accent 바 + 색은 숫자에만.
-  //   tip: label 옆 ⓘ + hover/길게누르기 툴팁.
-  const renderMetricCard = ({ label, value, color, hint, accent, tip }) => (
-    <div title={tip || undefined} style={{
-      position: "relative", overflow: "hidden",
-      background: "var(--z-card)",
-      border: "1px solid var(--z-border)",
-      borderRadius: "var(--z-r-lg)",
-      padding: isMobile ? "15px 15px 15px 17px" : "18px 18px 18px 20px",
-      display: "flex", flexDirection: "column", gap: isMobile ? 7 : 9,
-      minHeight: isMobile ? "auto" : "100%",
-    }}>
-      {accent && <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: accent }} />}
-      <div style={{
-        fontSize: isMobile ? 12.5 : 13, color: "var(--z-text-3)",
-        fontWeight: 600, letterSpacing: 0.1,
-        display: "flex", alignItems: "center", gap: 3,
-      }}>
-        {label}
-        {tip && <span style={{ opacity: 0.45, fontSize: 11, cursor: "help" }}>ⓘ</span>}
-      </div>
-      <div style={{
-        fontSize: isMobile ? 22 : 27, fontWeight: 800, lineHeight: 1.0,
-        color: color || "var(--z-text)", fontFamily: "var(--z-font-mono)", letterSpacing: "-0.015em",
-      }}>
-        {value}
-      </div>
-      {hint && (
-        <div style={{ fontSize: isMobile ? 11.5 : 12.5, color: "var(--z-text-3)", lineHeight: 1.4 }}>
-          {hint}
-        </div>
-      )}
-    </div>
-  );
-
-  const metricCards = [
-    {
-      key: "pnl",
-      // ★ 2026-06-03: 입금 부풀림 제거 — dayLossPct(raw) 대신 todayPnlPct(투입자본 기준, 입출금 제외).
-      el: !isMobile ? renderMetricCard({
-        label: "오늘 손익", value: todayPnlPct != null ? fmtPct(todayPnlPct) : "집계 중",
-        tip: "오늘 시작 잔고 대비 순수 매매손익(입금/출금 제외)입니다.",
-        color: todayPnlUsd == null ? "var(--z-text)" : todayPnlUsd > 0 ? "var(--z-green-hi)" : todayPnlUsd < 0 ? "var(--z-red-hi)" : "var(--z-text)",
-        hint: todayPnlUsd != null
-          ? <>{todayPnlUsd >= 0 ? "+" : ""}{fmtUsd(todayPnlUsd, 1)} · 입금 제외</>
-          : "입금 내역 집계 중",
-        accent: todayPnlUsd == null ? "var(--z-text-3)" : todayPnlUsd > 0 ? "var(--z-green)" : todayPnlUsd < 0 ? "var(--z-red)" : "var(--z-text-3)",
-      }) : null, // 모바일에선 hero 안에 흡수됨
-    },
-    {
-      key: "mdd",
-      el: renderMetricCard({
-        label: "최대 낙폭", value: fmtPct(mddPct),
-        tip: "고점(30일 최고 잔고) 대비 지금까지 가장 크게 떨어진 폭입니다. 작을수록 안정적이에요.",
-        color: mddPct < -10 ? "var(--z-red-hi)" : mddPct < -5 ? "var(--z-yellow-hi)" : "var(--z-purple)",
-        hint: <>자동정지 한도 <span style={{ fontWeight: 700 }}>-{mddLimitPct.toFixed(0)}%</span></>,
-        accent: mddPct < -8 ? "var(--z-red)" : "var(--z-purple)",
-      }),
-    },
-    {
-      key: "open",
-      // ★ 2026-05-09 대표 지시: 동시 거래 개수 제한 표기 제거.
-      //   실제 한도는 maxConcurrentPositions 10 + 합산 노셔널 cap (자본의 1.5배) 으로
-      //   자연 제한. 개수 자체는 제한 아님 (= 노셔널 안에서 무제한).
-      el: renderMetricCard({
-        label: "진행 거래", value: positions.length,
-        tip: "지금 열려 있는 포지션(매매) 개수입니다.",
-        color: "var(--z-text)",
-        hint: "포지션 총액 한도 내에서 자동 진입",
-        accent: positions.length > 0 ? "var(--z-blue)" : "var(--z-text-3)",
-      }),
-    },
-    {
-      key: "loss",
-      el: renderMetricCard({
-        label: "연속 손실", value: `${breaker.consecLosses || 0}회`,
-        tip: "연달아 손실이 난 횟수입니다. 한도에 닿으면 봇이 잠시 매매를 멈추고 쉬어갑니다.",
-        color: (breaker.consecLosses || 0) >= 3 ? "var(--z-red-hi)" : "var(--z-text)",
-        hint: "연속 손실 시 자동 휴식",
-        accent: (breaker.consecLosses || 0) >= 3 ? "var(--z-red)" : "var(--z-text-3)",
-      }),
-    },
-  ].filter(m => m.el);
 
   // ═════════════════════════════════════════════════════════
-  // ★ 2026-06-03: Toss형 히어로 (모바일) — 큰 카드·여백·핵심만 (대표 지시: 획기적 개편)
-  //   보유자산 + 오늘 매매손익(입금 제외) + 상태칩 1줄. 4개 보조카드는 운영메트릭/수익카드로 이관.
+  // ★ 2026-08-12 IA v3 (1g): 기존 KPI 바(heroEquity + 보조 4카드)·Toss 히어로 폐지.
+  //   총자산·일 손익 → 상태 히어로 / 낙폭·연속손실·시작잔고 → 안전장치(리스크 패널) /
+  //   진행 거래 수 → 보유 포지션 카드 헤더 — 전부 기존 노출처와 중복이라 통합.
   // ═════════════════════════════════════════════════════════
-  const sigShort = coinScores?.counts?.short ?? 0;
-  const sigLong = coinScores?.counts?.long ?? 0;
-  const tossChipStyle = {
-    fontSize: 12.5, fontWeight: 700, padding: "7px 12px", borderRadius: 999,
-    background: "var(--z-card-2)", border: "1px solid var(--z-border)", color: "var(--z-text-2)",
-    whiteSpace: "nowrap",
-  };
-  const tossHero = (
-    <div style={{
-      borderRadius: 22, padding: "22px 20px",
-      // ★ bento '주요 타일' — 미묘한 블루 액센트 글로우(배경 그라데이션, blur 아님 → 안전)
-      background: "radial-gradient(130% 110% at 0% 0%, rgba(59,130,246,0.16), transparent 52%), linear-gradient(165deg, var(--z-card) 0%, var(--z-card-2) 120%)",
-      border: "1px solid var(--z-border)",
-      boxShadow: "0 12px 32px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.06)",
-      display: "flex", flexDirection: "column", gap: 16,
-    }}>
-      {/* 보유 자산 */}
-      <div>
-        <div style={{ fontSize: 13, color: "var(--z-text-3)", fontWeight: 600 }}>보유 자산 · 마진 잔고</div>
-        <div style={{ fontSize: 40, fontWeight: 900, lineHeight: 1.02, fontFamily: "var(--z-font-mono)", letterSpacing: "-0.025em", marginTop: 3 }}>
-          {marginBalance == null ? <Skeleton width={170} height={40} /> : fmtUsd(marginBalance)}
-        </div>
-        {marginBalance != null && unrealizedPnl != null && (
-          <div style={{ fontSize: 12.5, color: "var(--z-text-3)", marginTop: 7 }}>
-            지갑 {fmtUsd(equity, 2)}
-            <span style={{ color: unrealizedPnl > 0 ? "var(--z-green-hi)" : unrealizedPnl < 0 ? "var(--z-red-hi)" : "var(--z-text-3)" }}>
-              {" "}· 미실현 {unrealizedPnl >= 0 ? "+" : ""}{fmtUsd(unrealizedPnl, 2)}
-            </span>
-          </div>
-        )}
-      </div>
-      {/* 오늘 매매손익 — 입금 제외 (강조 pill) */}
-      <div style={{
-        borderRadius: 16, padding: "15px 17px",
-        background: todayPnlUsd == null ? "var(--z-card-2)"
-          : todayPnlUsd >= 0 ? "rgba(16,216,132,0.10)" : "rgba(255,77,100,0.10)",
-        border: `1px solid ${todayPnlUsd == null ? "var(--z-border)" : todayPnlUsd >= 0 ? "rgba(16,216,132,0.25)" : "rgba(255,77,100,0.25)"}`,
-        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-      }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 14, color: "var(--z-text-2)", fontWeight: 700 }}>오늘 매매손익</div>
-          <div style={{ fontSize: 10.5, color: "var(--z-text-3)", marginTop: 2 }}>입금 제외 · 실현 기준</div>
-        </div>
-        <div style={{ textAlign: "right", whiteSpace: "nowrap", flexShrink: 0 }}>
-          <div style={{
-            fontSize: 23, fontWeight: 900, fontFamily: "var(--z-font-mono)", letterSpacing: "-0.01em", lineHeight: 1.05,
-            color: todayPnlUsd == null ? "var(--z-text-3)" : todayPnlUsd >= 0 ? "var(--z-green-hi)" : "var(--z-red-hi)",
-          }}>
-            {todayPnlUsd == null ? "집계 중" : `${todayPnlUsd >= 0 ? "▲ +" : "▼ −"}${fmtUsd(Math.abs(todayPnlUsd), 1)}`}
-          </div>
-          {todayPnlPct != null && (
-            <div style={{ fontSize: 12.5, fontWeight: 700, marginTop: 2, fontFamily: "var(--z-font-mono)",
-              color: todayPnlUsd >= 0 ? "var(--z-green-hi)" : "var(--z-red-hi)", opacity: 0.85 }}>
-              {todayPnlPct >= 0 ? "+" : ""}{todayPnlPct.toFixed(1)}%
-            </div>
-          )}
-        </div>
-      </div>
-      {/* 상태 칩 1줄 */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-        <span style={{ ...tossChipStyle, color: trulyLive ? "var(--z-green-hi)" : killOn ? "var(--z-text-2)" : "var(--z-yellow-hi)" }}>
-          {trulyLive ? "🟢 가동중" : killOn ? "⊙ 대기" : "⚡ 정지"}
-        </span>
-        <span style={tossChipStyle}>📉 신호 {sigShort}숏{sigLong > 0 ? ` · ${sigLong}롱` : ""}</span>
-        <span style={tossChipStyle}>💼 포지션 {positions.length}개</span>
-      </div>
-    </div>
-  );
-
-  const kpiBar = (
-    <div style={{ marginBottom: 20 }}>
-      {/* hero */}
-      <div style={{ marginBottom: isMobile ? 10 : 12 }}>
-        {!isMobile ? (
-          <div style={{ display: "grid", gap: 12, gridTemplateColumns: "2fr 1fr 1fr" }}>
-            {heroEquity}
-            {metricCards.find(m => m.key === "pnl")?.el}
-            {metricCards.find(m => m.key === "mdd")?.el}
-            {metricCards.find(m => m.key === "open")?.el}
-            {metricCards.find(m => m.key === "loss")?.el}
-          </div>
-        ) : (
-          // 모바일: Toss형 단일 히어로 카드 (큰 숫자·여백·상태칩) — 4개 보조카드 그리드 폐지
-          tossHero
-        )}
-      </div>
-    </div>
-  );
 
   // ═════════════════════════════════════════════════════════
   // CONTROL PANEL (REDESIGNED - PROMINENT BUTTONS)
   // ═════════════════════════════════════════════════════════
+  // ★ 2026-08-12 IA v3 (1g): 킬스위치 카드 — 우측 리스크 레일에 배치되므로 항상 세로 스택.
+  //   버튼·핸들러·확인 다이얼로그는 기존 그대로 (배치만 변경).
   const controlPanel = (
     <div style={{
-      background: "linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(79, 70, 229, 0.04) 100%)",
-      border: "1px solid rgba(99, 102, 241, 0.2)",
+      background: "var(--z-card)",
+      border: "1px solid rgba(239, 68, 68, 0.28)",
       borderRadius: "var(--z-r-lg)",
-      // iPhone 16 (393pt) 기준 — 모바일에선 가용 폭 절약 위해 padding 축소
-      padding: isMobile ? "14px 12px" : "20px",
-      marginBottom: isMobile ? 14 : 20,
-      display: "flex", flexDirection: "column", gap: isMobile ? 12 : 16,
+      padding: isMobile ? "14px 14px" : "16px",
+      display: "flex", flexDirection: "column", gap: 12,
     }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Settings size={18} color="var(--z-text-2)" />
           <div style={{ fontSize: 14, fontWeight: 700, color: "var(--z-text-2)" }}>
-            매매 제어 센터
+            매매 제어 · 킬스위치
           </div>
         </div>
         {trulyLive ? (
-          <Badge tone="green" dot style={{ fontSize: 14, fontWeight: 700, padding: "6px 10px" }}>
+          <Badge tone="green" dot style={{ fontSize: 13, fontWeight: 700, padding: "5px 10px" }}>
             ✓ 실거래 중
           </Badge>
         ) : (
-          <Badge tone="default" style={{ fontSize: 14, fontWeight: 700, padding: "6px 10px" }}>
+          <Badge tone="default" style={{ fontSize: 13, fontWeight: 700, padding: "5px 10px" }}>
             ⊙ 대기 중
           </Badge>
         )}
@@ -805,11 +502,7 @@ function RealTradingInner({ onNavigate }) {
       <div style={{
         display: "grid",
         gap: 10,
-        // 모바일: 시작/중지 1행, 일시정지/재개 1행, 긴급정지 별도 1행 (위험 액션 분리)
-        // 데스크탑: 1열로 정렬 [시작 / 일시정지 / 빈 / 긴급정지]
-        gridTemplateColumns: isMobile
-          ? "1fr"
-          : "1fr 1fr auto 1fr",
+        gridTemplateColumns: "1fr",
         alignItems: "stretch",
       }}>
         {/* PRIMARY ACTION: START/STOP */}
@@ -900,9 +593,7 @@ function RealTradingInner({ onNavigate }) {
           </Button>
         )}
 
-        <div style={{ display: isMobile ? "none" : "flex" }} />
-
-        {/* EMERGENCY ACTION: STOP ALL */}
+        {/* EMERGENCY ACTION: STOP ALL — 발동 시 모든 포지션 시장가 청산 (확인 다이얼로그 필수) */}
         <Button
           variant="danger"
           size="lg"
@@ -1001,7 +692,9 @@ function RealTradingInner({ onNavigate }) {
   );
 
   // ═════════════════════════════════════════════════════════
-  // OPEN POSITIONS — 모바일은 카드 형식 (Table 가로 스크롤 회피)
+  // OPEN POSITIONS — ★ 2026-08-12 IA v3 (1g): 데스크탑·모바일 공통 카드 형식.
+  //   방향 보더 레일(롱=초록/숏=빨강) + 미실현 손익 + SL/TP 거리 — 기존 posPlans 배선 재사용.
+  //   (이전 데스크탑 Table 은 카드 그리드로 통일 — 표현만 변경, 데이터 동일)
   // ═════════════════════════════════════════════════════════
   const renderPositionCard = (p, idx) => {
     const isLong = p.positionAmt > 0;
@@ -1014,6 +707,7 @@ function RealTradingInner({ onNavigate }) {
         padding: 14,
         background: "var(--z-card-2)",
         border: `1px solid var(--z-border)`,
+        borderLeft: `3px solid ${isLong ? "var(--z-green)" : "var(--z-red)"}`,
         borderRadius: "var(--z-r-md)",
         display: "flex",
         flexDirection: "column",
@@ -1113,10 +807,10 @@ function RealTradingInner({ onNavigate }) {
 
   const positionsCard = (
     <Card
-      title="진행 중 거래"
+      title="보유 포지션"
       icon={<Activity size={16} />}
       actions={<Badge tone={positions.length > 0 ? "blue" : "default"}>{positions.length}</Badge>}
-      pad={positions.length === 0 || isMobile ? 0 : undefined}
+      pad={0}
     >
       {positions.length === 0 ? (
         <div style={{
@@ -1141,57 +835,14 @@ function RealTradingInner({ onNavigate }) {
             실거래가 활성화되고 시그널이 발생하면<br />여기에 포지션이 표시됩니다.
           </div>
         </div>
-      ) : isMobile ? (
-        // ★ 모바일 — 카드 그리드 (Table 가로 스크롤 회피)
-        <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+      ) : (
+        // ★ 1g: 데스크탑·모바일 공통 카드 그리드 — 방향 레일 + SL/TP 거리 (Table 폐지, 데이터 동일)
+        <div style={{
+          padding: 12, display: "grid", gap: 10,
+          gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(300px, 1fr))",
+        }}>
           {positions.map((p, i) => renderPositionCard(p, i))}
         </div>
-      ) : (
-        // 데스크탑 — 기존 Table 유지
-        <Table
-          columns={[
-            { key: "symbol", label: "심볼",
-              render: (p) => (
-                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-                  <span style={{ fontWeight: 700 }}>{p.symbol}</span>
-                  <Badge tone={p.positionAmt > 0 ? "green" : "red"} size="sm">
-                    {p.positionAmt > 0 ? "LONG" : "SHORT"}
-                  </Badge>
-                </div>
-              )
-            },
-            { key: "qty", label: "수량", mono: true, align: "right",
-              render: (p) => Math.abs(p.positionAmt) },
-            { key: "entry", label: "진입가", mono: true, align: "right",
-              render: (p) => fmtUsd(p.entryPrice) },
-            { key: "mark", label: "현재가", mono: true, align: "right",
-              render: (p) => fmtUsd(p.markPrice) },
-            { key: "lev", label: "레버리지", align: "right",
-              render: (p) => `${p.leverage}×` },
-            { key: "pnl", label: "손익", mono: true, align: "right",
-              render: (p) => (
-                <span style={{ color: p.unRealizedProfit >= 0 ? "var(--z-green-hi)" : "var(--z-red-hi)", fontWeight: 700 }}>
-                  {fmtUsd(p.unRealizedProfit)}
-                </span>
-              )
-            },
-            { key: "tpsl", label: "익절 / 손절", align: "right",
-              render: (p) => {
-                const plan = posPlans[p.symbol];
-                if (!plan) return "—";
-                if (!plan.hasPlan) return <span style={{ color: "var(--z-text-3)", fontSize: 12 }}>수동</span>;
-                return (
-                  <div style={{ fontFamily: "var(--z-font-mono)", fontSize: 12, lineHeight: 1.5 }}>
-                    <div style={{ color: "var(--z-green-hi)" }}>{fmtUsd(plan.tpPrice)}</div>
-                    <div style={{ color: "var(--z-red-hi)" }}>{fmtUsd(plan.slPrice)}</div>
-                  </div>
-                );
-              }
-            },
-          ]}
-          rows={positions}
-          emptyText="없음"
-        />
       )}
     </Card>
   );
@@ -1553,13 +1204,65 @@ function RealTradingInner({ onNavigate }) {
   );
 
   // ═════════════════════════════════════════════════════════
-  // LAYOUT
+  // ★ 2026-08-12 IA v3 (1g) 공용 카드 — 모바일 탭/데스크탑 그리드에서 재사용 (이중 정의 방지)
+  // ═════════════════════════════════════════════════════════
+  // 1g ③ 시그널 후보 큐 — 엔진이 보는 종합 스코어 상위 후보 (coin-scores 기존 배선 그대로)
+  const signalQueueCard = (
+    <Card title="시그널 후보 큐" icon={<Target size={16} />}
+      subtitle="주·일·4h·1h 가중 종합 + 매물대 — 엔진이 보는 후보 순위, 10분 갱신 · 카드 탭하면 상세">
+      <SignalCoinBoard coins={coinScores.coins} counts={coinScores.counts} loading={coinScores.loading} isMobile={isMobile} variant="full" />
+    </Card>
+  );
+  // 1g ⑤ 체결 타임라인 — recentOrders 단일 노출 (이전 '최근 거래'+'최근 주문' 이중 노출 통합)
+  const fillsCard = (
+    <Card title="최근 체결" icon={<Activity size={16} />}
+      subtitle="최근 10건 (체결·미체결·청산 포함)">
+      <TradeHistoryTable orders={orders || []} maxRows={10} isMobile={isMobile} />
+    </Card>
+  );
+  // 1g ⑥ 리스크 패널 보조 — 마진 사용률·노출·보유시간 (기존 위젯 재사용)
+  const opsMetricsCard = (
+    <Card title="운영 메트릭" icon={<Activity size={16} />}
+      subtitle="포지션 운영 상태 한눈에 — 마진 사용률 80% 이상 시 빨강 경고">
+      <OperationalMetrics positions={positions} orders={orders || []} equity={equity || 0} isMobile={isMobile} />
+    </Card>
+  );
+  // 1g ④ 성과 — 기간별 수익 + 자산 곡선 (기존 배선 그대로)
+  const periodCard = (
+    <Card title="기간별 수익" icon={<TrendUp size={16} />}
+      subtitle="일·주·월·누적 수익률 + 금액 한눈에 (입출금 제외 순수 매매손익)">
+      <PeriodReturnsCard equity={equity} breaker={breaker} transfers={transfers} isMobile={isMobile} />
+    </Card>
+  );
+  const perfCard = (
+    <Card title="포트폴리오 성과" icon={<TrendUp size={16} />}
+      subtitle="자동매매 30일 자산 곡선 + 누적 거래 메트릭">
+      <EquityCurveChart
+        history={breaker.equityHistory || []}
+        currentEquity={equity}
+        peakEquity={breaker.equityHigh30d || breaker.equityHigh}
+        isMobile={isMobile}
+      />
+      <div style={{ marginTop: 14 }}>
+        <LiveMetricsRow orders={orders || []} realized={closedTrades} isMobile={isMobile} />
+      </div>
+    </Card>
+  );
+  // 1g 면책 캡션 (owner 전용 화면)
+  const ownerDisclaimer = (
+    <div style={{ fontSize: 11, color: "var(--z-text-3)", textAlign: "center", padding: "4px 0 8px", lineHeight: 1.5 }}>
+      자동매매는 오너 계정 전용 기능이며 손실 위험이 있습니다.
+    </div>
+  );
+
+  // ═════════════════════════════════════════════════════════
+  // LAYOUT — ★ 1g: 데스크탑은 단일 콘솔 플로우(탭 없음), 모바일만 [대시보드|상세분석]
+  //   기존 '포지션' 탭은 대시보드로 흡수 — 판독 순서: 히어로→포지션→큐→성과→체결→리스크
   // ═════════════════════════════════════════════════════════
   const tabs = [
     { id: "dashboard", label: "대시보드" },
-    // 모바일: 무거운 분석 카드(차트·도넛·거래내역·히트맵)는 별도 탭으로 분리 → 대시보드 짧게 유지
+    // 모바일: 무거운 분석 카드(차트·거래내역·운영 메트릭)는 별도 탭으로 분리 → 대시보드 짧게 유지
     ...(isMobile ? [{ id: "analysis", label: "상세분석" }] : []),
-    { id: "positions", label: `포지션 (${positions.length})` },
   ];
 
   return (
@@ -1575,7 +1278,7 @@ function RealTradingInner({ onNavigate }) {
         {header}
 
         {/* 바이낸스 키 등록 — 미연결 시 최상단에 강조 노출. 연결됨이면 작은 상태 카드 */}
-        <div style={{ margin: "0 0 16px" }}>
+        <div style={{ margin: "0 0 14px" }}>
           <BinanceConnect
             userId={userId}
             theme="dark"
@@ -1584,117 +1287,59 @@ function RealTradingInner({ onNavigate }) {
           />
         </div>
 
-        {kpiBar}
-        {controlPanel}
-
-        <div style={{ margin: "18px 0 12px" }}>
-          <Tabs value={section} onChange={setSection} items={tabs} variant="underline" />
-        </div>
+        {isMobile && (
+          <div style={{ margin: "0 0 12px" }}>
+            <Tabs value={section} onChange={setSection} items={tabs} variant="underline" />
+          </div>
+        )}
 
         {section === "dashboard" && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {/* Widget 7: 시스템 상태 표시등 (대시보드 진입 즉시 보이게 상단) */}
+            {/* 시스템 상태 표시등 — 엔진 heartbeat 가드 상태 (진입 즉시 확인) */}
             <SystemStatusIndicator status={status?.systemHealth || {}} isMobile={isMobile} />
 
-            {/* ★ 2026-06-03 정보위계: '오늘 얼마 벌었나'를 최상단으로 — 진입 즉시 핵심부터 (대표 지시: 딱딱딱) */}
-            {/* ★ 2026-05-11: 기간별 수익 (일/주/월/누적) — 가장 먼저 보고 싶은 정보 */}
-            <Card title="기간별 수익" icon={<TrendUp size={16} />}
-              subtitle="일·주·월·누적 수익률 + 금액 한눈에 (입출금 제외 순수 매매손익)">
-              <PeriodReturnsCard equity={equity} breaker={breaker} transfers={transfers} isMobile={isMobile} />
-            </Card>
-
-            {/* ★ 2026-06-12 리뉴얼 V2: 시그널 종목 카드 — 종합 스코어 + 매물대(지지·저항) (대표 지시) */}
-            <Card title="코인별 종합 스코어" icon={<Target size={16} />}
-              subtitle="주·일·4h·1h 가중 종합 + 최근 60일 매물대 — 10분 갱신 · 카드 탭하면 상세">
-              <SignalCoinBoard coins={coinScores.coins} counts={coinScores.counts} loading={coinScores.loading} isMobile={isMobile} variant="full" />
-            </Card>
-
-            {/* ★ 2026-05-11: 운영 메트릭 (평균 보유, 24h 거래, 마진 사용률, 노출, 미실현 손익) */}
-            <Card title="운영 메트릭" icon={<Activity size={16} />}
-              subtitle="포지션 운영 상태 한눈에 — 마진 사용률 80% 이상 시 빨강 경고">
-              <OperationalMetrics positions={positions} orders={orders || []} equity={equity || 0} isMobile={isMobile} />
-            </Card>
-
-            {/* 안전장치(서킷브레이커)는 핵심이라 모바일 대시보드에도 노출 */}
-            {isMobile && breakerCard}
-
-            {/* ── 무거운 분석 카드: 데스크톱은 대시보드에 그대로, 모바일은 '상세분석' 탭으로 분리 ── */}
-            {!isMobile && (
+            {isMobile ? (
+              // ★ 1g 모바일: 히어로 아래 [제어 → 포지션 → 후보 큐 → 리스크] 순 — 컴팩트 콘솔
               <>
-                {/* Widget 1: 30일 자산 추이 라인 차트 + Widget 2: 라이브 성과 메트릭 */}
-                <Card title="포트폴리오 성과" icon={<TrendUp size={16} />}
-                  subtitle="자동매매 30일 자산 곡선 + 누적 거래 메트릭">
-                  <EquityCurveChart
-                    history={breaker.equityHistory || []}
-                    currentEquity={equity}
-                    peakEquity={breaker.equityHigh30d || breaker.equityHigh}
-                    isMobile={isMobile}
-                  />
-                  <div style={{ marginTop: 14 }}>
-                    <LiveMetricsRow orders={orders || []} realized={closedTrades} isMobile={isMobile} />
-                  </div>
-                </Card>
-
-                {/* ★ 2026-06-03 군더더기 정리(대표 지시): 포트폴리오 분산(도넛)·일별 손익 히트맵 제거. */}
-                <div style={{ display: "grid", gap: 14, gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)" }}>
+                {controlPanel}
+                {positionsCard}
+                {signalQueueCard}
+                {breakerCard}
+              </>
+            ) : (
+              // ★ 1g 데스크탑: 좌(포지션+체결) / 우(제어·리스크 레일) 2열 → 아래 풀폭 운영 메트릭·큐·성과
+              <>
+                <div style={{ display: "grid", gap: 14, gridTemplateColumns: "minmax(0, 1.5fr) minmax(0, 1fr)", alignItems: "start" }}>
                   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                    <Card title="최근 거래" icon={<Activity size={16} />}
-                      subtitle="최근 10건 (체결·미체결·청산 포함)">
-                      <TradeHistoryTable orders={orders || []} maxRows={10} isMobile={isMobile} />
-                    </Card>
+                    {positionsCard}
+                    {fillsCard}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                    {controlPanel}
                     {breakerCard}
                   </div>
                 </div>
+                {/* 운영 메트릭은 데스크탑 5열 고정 그리드(OperationalMetrics)라 좁은 우측 레일에선
+                   라벨 줄바꿈·값 넘침 발생 → 리스크 레일 바로 아래 풀폭 배치 (레일의 보조 패널 역할 유지) */}
+                {opsMetricsCard}
+                {signalQueueCard}
+                {periodCard}
+                {perfCard}
               </>
             )}
+            {ownerDisclaimer}
           </div>
         )}
         {section === "analysis" && isMobile && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <Card title="포트폴리오 성과" icon={<TrendUp size={16} />}
-              subtitle="30일 자산 곡선 + 누적 거래 메트릭">
-              <EquityCurveChart
-                history={breaker.equityHistory || []}
-                currentEquity={equity}
-                peakEquity={breaker.equityHigh30d || breaker.equityHigh}
-                isMobile={isMobile}
-              />
-              <div style={{ marginTop: 14 }}>
-                <LiveMetricsRow orders={orders || []} realized={closedTrades} isMobile={isMobile} />
-              </div>
-            </Card>
-            {/* ★ 2026-06-03 군더더기 정리: 분산(도넛)·히트맵 제거, 자산곡선·최근거래만 유지. */}
-            <Card title="최근 거래" icon={<Activity size={16} />}
-              subtitle="최근 10건 (체결·미체결·청산 포함)">
-              <TradeHistoryTable orders={orders || []} maxRows={10} isMobile={isMobile} />
-            </Card>
+            {periodCard}
+            {perfCard}
+            {fillsCard}
+            {opsMetricsCard}
           </div>
         )}
-        {section === "positions" && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {positionsCard}
-            {orders.length > 0 && (
-              <Card title="최근 주문" icon={<Activity size={16} />} pad={0}>
-                <Table
-                  columns={[
-                    { key: "time", label: "시간", render: (o) => fmtTime(o.time), mono: true },
-                    { key: "symbol", label: "심볼", render: (o) => <b>{o.symbol}</b> },
-                    { key: "side", label: "방향",
-                      render: (o) => <Badge tone={o.side === "LONG" || o.side === "BUY" ? "green" : "red"} size="sm">{o.side}</Badge> },
-                    { key: "qty", label: "수량", mono: true, align: "right" },
-                    { key: "price", label: "체결가", mono: true, align: "right",
-                      render: (o) => fmtUsd(o.avgPrice || o.price) },
-                    { key: "status", label: "상태",
-                      render: (o) => <Badge size="sm">{o.status || "—"}</Badge> },
-                  ]}
-                  rows={orders.slice(0, 20)}
-                />
-              </Card>
-            )}
-          </div>
-        )}
+        {/* ★ 1g: 기존 '포지션' 탭 폐지 — 포지션 카드는 대시보드로 흡수,
+           '최근 주문' 테이블은 동일 orders 데이터의 이중 노출이라 '최근 체결'(fillsCard)로 통합. */}
         {/* ★ 2026-06-03 군더더기 정리(대표 지시): 기술/운영 로그류(Shadow·엔진로그·Reconcile)
            섹션 제거 — 탭/진입로가 없어 이미 비노출이던 죽은 코드. */}
         {section === "config" && (

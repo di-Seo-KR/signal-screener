@@ -2051,8 +2051,20 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
                 gap: "8px",
                 flexWrap: "wrap",
               }}>
-                실전매매 관제센터
-                {realStatus?.phase1Enabled && !realStatus?.killswitchOn && !realStatus?.halted && (
+                {/* ★ 2026-08-12 IA v3 (1g): 콘솔 명칭·OWNER 배지 정렬 — 진입처와 목적지 이름 통일 */}
+                자동매매 콘솔
+                <span style={{
+                  fontSize: "10px",
+                  fontWeight: 800,
+                  color: c.yellow,
+                  background: `${c.yellow}15`,
+                  padding: "2px 7px",
+                  borderRadius: "8px",
+                  letterSpacing: "0.05em",
+                }}>OWNER</span>
+                {/* 상태 칩은 상호 배타 1개만 — 콘솔(RealTrading) statusPill 과 동일 우선순위:
+                   가동 중 > 일시 정지(halted) > 안전잠금(killswitchOn). 칩 스택 금지(밀도 규칙). */}
+                {realStatus?.phase1Enabled && !realStatus?.killswitchOn && !realStatus?.halted ? (
                   <span style={{
                     fontSize: "11px",
                     fontWeight: 700,
@@ -2061,9 +2073,17 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
                     padding: "2px 8px",
                     borderRadius: "999px",
                     border: `1px solid ${c.green}30`,
-                  }}>● 자동매매 가동중</span>
-                )}
-                {realStatus?.killswitchOn && (
+                  }}>● 가동 중</span>
+                ) : realStatus?.halted ? (
+                  <span style={{
+                    fontSize: "11px",
+                    fontWeight: 700,
+                    color: c.yellow,
+                    background: `${c.yellow}15`,
+                    padding: "2px 8px",
+                    borderRadius: "999px",
+                  }}>⚡ 일시 정지</span>
+                ) : realStatus?.killswitchOn ? (
                   <span style={{
                     fontSize: "11px",
                     fontWeight: 700,
@@ -2072,7 +2092,7 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
                     padding: "2px 8px",
                     borderRadius: "999px",
                   }}>안전잠금</span>
-                )}
+                ) : null}
               </div>
               {realStatus ? (
                 <div style={{
@@ -2096,7 +2116,7 @@ export default function AutoTrading({ theme = "dark", user, isOwner = false, onN
                 </div>
               ) : (
                 <div style={{ fontSize: "12px", color: c.text3 }}>
-                  실시간 포지션·자동 청산·엔진 로그 보기 →
+                  실시간 포지션·시그널 후보 큐·리스크 패널 보기 →
                 </div>
               )}
             </div>

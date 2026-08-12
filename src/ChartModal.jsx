@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createChart, CrosshairMode, LineStyle } from "lightweight-charts";
 import { useIsMobile } from "./ui/useBreakpoint.jsx";
+import { BottomSheet } from "./ui/bottom-sheet.jsx";
+// 시안 1f 문법: 수치 mono 고정 + i18n 안전 조회(useKitText — 미등록 키는 한국어 기본값)
+import { MONO, useKitText } from "./components/mobileKit.jsx";
 // 백엔드와 *같은* 캔들패턴 모듈 공유 — 차트에 보이는 신호 = 스코어에 반영되는 신호 (이중 구현 금지)
 import { computeTimingSignals } from "../api/_shared/timing-signals.js"; // 합류 타점 엔진 v2 (검증 요소만)
 
@@ -117,9 +120,9 @@ const TF_CONFIG = {
   "1h":  { label: "1시간", interval: "1h",  range: "6mo" },
   "2h":  { label: "2시간", interval: "1h",  range: "6mo" },  // Aggregate from 1h
   "4h":  { label: "4시간", interval: "1h",  range: "1y" },   // Aggregate from 1h
-  "1d":  { label: "날봉",  interval: "1d",  range: "1y" },   // 최근 1년 (더 세밀한 캔들)
-  "1wk": { label: "주봉",  interval: "1wk", range: "5y" },   // 최근 5년
-  "1mo": { label: "월봉",  interval: "1mo", range: "max" },  // 상장일부터 전체
+  "1d":  { label: "1일",  interval: "1d",  range: "1y" },   // 최근 1년 (더 세밀한 캔들)
+  "1wk": { label: "1주",  interval: "1wk", range: "5y" },   // 최근 5년
+  "1mo": { label: "1개월", interval: "1mo", range: "max" },  // 상장일부터 전체
 };
 
 // ── 캔들패턴 시그널 지원 TF — 1h 미만 저TF 는 통계적으로 무효(모듈이 빈 events 반환) ──
@@ -133,9 +136,9 @@ const CRYPTO_TF = {
   "1h":  { label: "1시간", days: "30" },
   "2h":  { label: "2시간", days: "90" },
   "4h":  { label: "4시간", days: "180" },
-  "1d":  { label: "날봉",  days: "max" },   // 상장일부터 전체
-  "1wk": { label: "주봉",  days: "max" },   // 상장일부터 전체
-  "1mo": { label: "월봉",  days: "max" },   // 상장일부터 전체
+  "1d":  { label: "1일",  days: "max" },   // 상장일부터 전체
+  "1wk": { label: "1주",  days: "max" },   // 상장일부터 전체
+  "1mo": { label: "1개월", days: "max" },   // 상장일부터 전체
 };
 
 // ── Aggregate candles for 10m/2h/4h (from smaller intervals) ──
@@ -157,12 +160,34 @@ function aggregateCandles(candles, factor) {
   return result;
 }
 
+// ── 지지·저항 레벨 (시안 1f 밴드 오버레이용) ────────────────────
+// runDiagnosis 의 피벗 로직과 같은 기준(±2봉 로컬 극값, 최근 60봉)으로
+// 현재가에 가장 가까운 지지·저항을 1개씩 반환합니다. 산출 불가 시 null (정직 생략).
+function calcSRLevels(candles) {
+  const n = candles?.length || 0;
+  if (n < 20) return null;
+  const highs = candles.map(c => c.high);
+  const lows = candles.map(c => c.low);
+  const last = candles[n - 1].close;
+  const lookback = Math.min(n, 60);
+  const supports = [], resistances = [];
+  for (let i = n - lookback + 2; i < n - 2; i++) {
+    if (lows[i] <= lows[i - 1] && lows[i] <= lows[i - 2] && lows[i] <= lows[i + 1] && lows[i] <= lows[i + 2]) supports.push(lows[i]);
+    if (highs[i] >= highs[i - 1] && highs[i] >= highs[i - 2] && highs[i] >= highs[i + 1] && highs[i] >= highs[i + 2]) resistances.push(highs[i]);
+  }
+  const support = supports.filter(s => s < last).sort((a, b) => b - a)[0] ?? null;
+  const resistance = resistances.filter(r => r > last).sort((a, b) => a - b)[0] ?? null;
+  if (support == null && resistance == null) return null;
+  return { support, resistance };
+}
+
 // ── colors — dark / light
-// Zepta tokens.css 와 동기화
+// Zepta tokens.css 와 동기화 (·Bg 는 배지/알약용 저알파 변형)
 const CC_DARK = {
   bg: "#070B14", card: "#101828", card2: "#161F33",
   border: "#1E2A42", border2: "#2A3A58",
   blue: "#3B82F6", green: "#10D884", red: "#FF4D64", yellow: "#FFB020",
+  greenBg: "#10D8841F", redBg: "#FF4D641F", yellowBg: "#FFB02024",
   text1: "#F1F5FB", text2: "#9AA7BD", text3: "#64728C",
   gridColor: "#1E2A42", crossColor: "#3B4D6D", labelBg: "#3B82F6", chartText: "#9AA7BD",
 };
@@ -170,16 +195,17 @@ const CC_LIGHT = {
   bg: "#F6F8FC", card: "#FFFFFF", card2: "#F1F4F9",
   border: "#E2E6EF", border2: "#D0D6E1",
   blue: "#2563EB", green: "#059B64", red: "#E11D48", yellow: "#D08300",
+  greenBg: "#059B641A", redBg: "#E11D481A", yellowBg: "#D083001F",
   text1: "#0A1224", text2: "#4C5870", text3: "#7D889D",
   gridColor: "#E2E6EF", crossColor: "#B7C0CE", labelBg: "#2563EB", chartText: "#7D889D",
 };
 
-// Chart options (theme-aware)
-function makeChartOptions(height, width, tf, cc) {
+// Chart options (theme-aware) — bg 를 넘기면 카드 위에 얹는 차트 배경으로 씁니다 (시안 1f 카드형)
+function makeChartOptions(height, width, tf, cc, bg) {
   const intra = isIntraday(tf);
   return {
     layout: {
-      background: { color: cc.bg },
+      background: { color: bg || cc.bg },
       textColor: cc.chartText,
       fontFamily: "'Pretendard', 'Apple SD Gothic Neo', system-ui, sans-serif",
     },
@@ -1279,6 +1305,44 @@ function runDiagnosis(candles) {
   };
 }
 
+// ── 시안 1f 스위치 (40×24 알약) — role="switch" + 키보드 기본 동작(button) ──
+function Switch({ checked, onChange, disabled, ariaLabel, CC }) {
+  return (
+    <button type="button" role="switch" aria-checked={checked} aria-label={ariaLabel} disabled={disabled}
+      onClick={onChange}
+      style={{
+        width: "40px", height: "24px", borderRadius: "9999px", border: "none", padding: 0,
+        cursor: disabled ? "not-allowed" : "pointer", flexShrink: 0,
+        background: checked ? CC.blue : CC.border2, position: "relative",
+        transition: "background .15s ease", opacity: disabled ? 0.45 : 1,
+      }}>
+      <span style={{
+        position: "absolute", top: "2px", left: checked ? "18px" : "2px",
+        width: "20px", height: "20px", borderRadius: "50%", background: "#fff",
+        transition: "left .15s ease", boxShadow: "0 1px 2px rgba(0,0,0,.25)",
+      }} />
+    </button>
+  );
+}
+
+// 점수 톤 공용 헬퍼 — runDiagnosis verdict 경계(58 이상 상승 / 42 미만 하락)와 동일한 단일 기준.
+// 칩·방향 알약·게이지·카테고리 그리드가 전부 이 함수를 쓰므로 같은 점수 = 같은 색 (명확한 해석 원칙).
+function scoreTone(CC, score) {
+  if (score >= 58) return { bg: CC.greenBg, fg: CC.green };
+  if (score < 42) return { bg: CC.redBg, fg: CC.red };
+  return { bg: CC.yellowBg, fg: CC.yellow };
+}
+
+// 설정 시트 공용 스타일
+const sheetRow = (CC) => ({
+  display: "flex", alignItems: "center", justifyContent: "space-between",
+  gap: "12px", padding: "11px 0", borderBottom: `1px solid ${CC.border}`,
+});
+const numInput = (CC) => ({
+  width: "60px", padding: "4px 6px", borderRadius: "6px", fontSize: "14px",
+  background: CC.card2, color: CC.text1, border: `1px solid ${CC.border2}`, outline: "none",
+});
+
 // ── Full-page chart component ────────────────────────────────────
 // 모바일 감지는 useIsMobile (src/ui/useBreakpoint.jsx) SSOT 사용
 
@@ -1316,6 +1380,16 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
   const [fundingRates, setFundingRates] = useState(null);  // 펀딩 스퀴즈 요소용 (v4.1 — 코인 1h/4h 한정)
   const [recentSignals, setRecentSignals] = useState([]); // 근거 패널용 최근 시그널 (최신순 최대 3개)
   const [latestScore, setLatestScore] = useState(null); // 마지막 확정봉 종합 점수 (게이지)
+  const [showSR, setShowSR] = useState(true);        // 지지·저항 밴드 오버레이 (시안 1f — 기본 ON)
+  const [srLevels, setSrLevels] = useState(null);    // { support, resistance } — 로드된 캔들 피벗 기준
+  const [showTimingDetail, setShowTimingDetail] = useState(false); // 타이밍 마커 근거 접기 (기본 접힘)
+
+  // i18n 안전 조회 — 키 미등록 시 한국어 기본값 (mobileKit.useKitText 재사용)
+  const tt = useKitText();
+
+  // 설정 시트 열림 여부 — ESC 가 모달 전체를 닫지 않고 시트만 닫도록 ref 로 최신값 유지
+  const sheetOpenRef = useRef(false);
+  sheetOpenRef.current = showSettings;
 
   // ── Customizable indicator settings ──
   const [settings, setSettings] = useState(() => {
@@ -1418,7 +1492,8 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
 
   const buildCharts = useCallback(async (tf) => {
     const candles = await fetchData(tf);
-    if (!candles) return;
+    // 로드 실패 시 이전 TF 의 지지·저항 레벨이 SR 푸터에 잔존하지 않도록 리셋 (stale 방지)
+    if (!candles) { setSrLevels(null); return; }
 
     Object.values(chartObjs.current).forEach(c => { try { c.remove(); } catch {} });
     chartObjs.current = {};
@@ -1438,8 +1513,8 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
 
     const containerW = containerRef.current?.clientWidth || 600;
 
-    // ── Main chart ───
-    const mainChart = createChart(mainRef.current, makeChartOptions(mainH, containerW, tf, CC));
+    // ── Main chart ─── (시안 1f: 차트가 카드 위에 얹히므로 배경을 카드색으로)
+    const mainChart = createChart(mainRef.current, makeChartOptions(mainH, containerW, tf, CC, CC.card));
     chartObjs.current.main = mainChart;
 
     // Apply log scale if enabled
@@ -1539,6 +1614,18 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       setDiagData(null);
     }
 
+    // ── 지지·저항 밴드 오버레이 (시안 1f) — 로드된 캔들의 피벗 레벨 → 점선 프라이스라인 ──
+    //    KRW 환산이 적용된 candles 기준이라 표시 통화와 항상 일치합니다.
+    try {
+      const sr = calcSRLevels(candles);
+      setSrLevels(sr);
+      if (showSR && sr) {
+        const lineBase = { lineWidth: 1, lineStyle: LineStyle.Dashed, axisLabelVisible: true };
+        if (sr.resistance != null) candleSeries.createPriceLine({ ...lineBase, price: sr.resistance, color: CC.red, title: tt("chart.v3.resistance", "저항") });
+        if (sr.support != null) candleSeries.createPriceLine({ ...lineBase, price: sr.support, color: CC.green, title: tt("chart.v3.support", "지지") });
+      }
+    } catch { setSrLevels(null); }
+
     // Volume histogram
     if (showVol) {
       const volSeries = mainChart.addHistogramSeries({
@@ -1597,7 +1684,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
     // ── RSI chart ───
     if (showRSI && rsiRef.current) {
       const rsiPeriod = settings.rsi?.period || 14;
-      const rsiChart = createChart(rsiRef.current, makeChartOptions(subH, containerW, tf, CC));
+      const rsiChart = createChart(rsiRef.current, makeChartOptions(subH, containerW, tf, CC, CC.card));
       chartObjs.current.rsi = rsiChart;
       const rsi = calcRSI(closes, rsiPeriod);
       // Store the current RSI value
@@ -1620,7 +1707,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
 
     // ── MACD chart ───
     if (showMACD && macdRef.current) {
-      const macdChart = createChart(macdRef.current, makeChartOptions(subH, containerW, tf, CC));
+      const macdChart = createChart(macdRef.current, makeChartOptions(subH, containerW, tf, CC, CC.card));
       chartObjs.current.macd = macdChart;
       const { macdLine, signalLine, histogram } = calcMACD(closes);
 
@@ -1663,7 +1750,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         applyTvRange();
       }
     });
-  }, [fetchData, settings, logScale, showSignals, fundingRates]);
+  }, [fetchData, settings, logScale, showSignals, fundingRates, showSR, CC, tt]);
 
   useEffect(() => {
     if (!asset) return;
@@ -1672,7 +1759,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       clearTimeout(timer);
       Object.values(chartObjs.current).forEach(c => { try { c.remove(); } catch {} });
     };
-  }, [asset, timeframe, settings, showKRW, theme, logScale, showSignals, fundingRates]);
+  }, [asset, timeframe, settings, showKRW, theme, logScale, showSignals, fundingRates, showSR]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -1808,7 +1895,11 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
     dialogRef.current?.focus();
 
     const onKey = (e) => {
-      if (e.key === "Escape") { onCloseRef.current?.(); return; }
+      if (e.key === "Escape") {
+        // 설정 시트가 열려 있으면 시트만 닫습니다 (모달까지 이중으로 닫히는 것 방지)
+        if (sheetOpenRef.current) { setShowSettings(false); return; }
+        onCloseRef.current?.(); return;
+      }
       if (e.key !== "Tab") return;
       const root = dialogRef.current;
       if (!root) return;
@@ -1850,7 +1941,18 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
   const tfOrder = ["1m", "5m", "10m", "30m", "1h", "2h", "4h", "1d", "1wk", "1mo"];
   const tfLabels = isCrypto ? CRYPTO_TF : TF_CONFIG;
 
-  // ── Full-page layout ───────────────────────────────────────────
+  // ── 시안 1f 파생 표시값 (실데이터만 — 값이 없으면 해당 요소는 렌더하지 않음) ──
+  const changeVal = liveChange != null ? liveChange : (asset.weekChange != null ? Number(asset.weekChange) : null);
+  const px = livePrice; // 레벨 거리 기준가 — 실시간 폴링·KRW 환산이 동일하게 반영된 값
+  const supDist = srLevels?.support != null && px ? ((srLevels.support - px) / px) * 100 : null;
+  const resDist = srLevels?.resistance != null && px ? ((srLevels.resistance - px) / px) * 100 : null;
+  const diagUp = !!diagData && diagData.score >= 58;   // runDiagnosis 판정 등급과 동일 경계
+  const diagDown = !!diagData && diagData.score < 42;  // 42 는 verdict "신호 혼조"(중립) — <= 로 두면 배지·문구 모순
+  const diagColor = diagUp ? CC.green : diagDown ? CC.red : CC.yellow;
+  const diagBg = diagUp ? CC.greenBg : diagDown ? CC.redBg : CC.yellowBg;
+  const diagArrow = diagUp ? "▲" : diagDown ? "▼" : "•";
+
+  // ── Full-page layout (시안 1f: 헤더 → TF 칩 한 줄 → 캔들 카드+밴드 토글 → 신호 요약 배지 → 면책) ──
   return (
     <div ref={dialogRef} role="dialog" aria-modal="true" aria-label={`${asset.name} 차트`} tabIndex={-1} style={{
       position: "fixed", inset: 0, zIndex: 11000, // E-4 정책: Modal 11000 > 탭바 10000 (모달 전수감사 P2)
@@ -1861,543 +1963,335 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       paddingTop: "env(safe-area-inset-top, 0px)",
       paddingBottom: "env(safe-area-inset-bottom, 0px)",
     }}>
-      {/* Top bar — 모바일 잘림 방지: 2줄 레이아웃, 최소 높이 보장 */}
+      {/* ── 헤더 (시안 1f): 종목·코드 / 현재가·등락 알약 / 닫기 — KRW 토글은 설정 시트로 수납 ── */}
       <div style={{
-        display: "flex", flexDirection: "column", gap: isMobile ? "5px" : "6px",
-        padding: isMobile ? "8px 10px 6px" : "10px 12px 8px", borderBottom: `1px solid ${CC.border}`,
+        display: "flex", alignItems: "center", gap: "10px",
+        padding: isMobile ? "10px 14px" : "12px 16px", borderBottom: `1px solid ${CC.border}`,
         background: `${CC.bg}f5`, backdropFilter: "blur(8px)", flexShrink: 0,
       }}>
-        {/* 1행: 뒤로 + 종목명 + LIVE 배지 */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "6px" : "8px", minWidth: 0, flex: 1 }}>
-            <button onClick={onClose} aria-label="차트 닫기" style={{
-              background: CC.card, border: `1px solid ${CC.border}`, color: CC.text2, cursor: "pointer",
-              fontSize: isMobile ? "14px" : "15px", padding: isMobile ? "8px 8px" : "6px 10px", borderRadius: "8px", fontWeight: 600, flexShrink: 0, minHeight: isMobile ? "40px" : "auto", minWidth: isMobile ? "40px" : "auto", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>←</button>
-            <span style={{ fontSize: isMobile ? "16px" : "18px", flexShrink: 0 }}>
-              {asset.market === "us" ? "\uD83C\uDDFA\uD83C\uDDF8" : asset.market === "kr" ? "\uD83C\uDDF0\uD83C\uDDF7" : "\u20BF"}
-            </span>
-            <div style={{ minWidth: 0, overflow: "hidden" }}>
-              <div style={{ color: CC.text1, fontWeight: 700, fontSize: isMobile ? "15px" : "18px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{asset.name}</div>
-              <div style={{ color: CC.text3, fontSize: isMobile ? "12px" : "14px" }}>{asset.symbol}</div>
-            </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: "8px", minWidth: 0 }}>
+            <span style={{ fontSize: isMobile ? "16px" : "17px", fontWeight: 800, color: CC.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{asset.name}</span>
+            <span style={{ fontSize: "11px", color: CC.text3, fontFamily: MONO, flexShrink: 0 }}>{asset.symbol}</span>
           </div>
-          {liveConnected && (
-            <span style={{
-              display: "inline-flex", alignItems: "center", gap: "3px", flexShrink: 0,
-              fontSize: "12px", fontWeight: 700, color: CC.green,
-              background: CC.greenBg, padding: "2px 6px", borderRadius: "4px",
-              animation: "livePulse 1.5s ease-in-out infinite",
-            }}>
-              <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: CC.green, display: "inline-block" }} />
-              LIVE
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "3px", flexWrap: "wrap" }}>
+            <span style={{ fontSize: isMobile ? "20px" : "22px", fontWeight: 800, fontFamily: MONO, letterSpacing: "-0.02em", color: CC.text1, fontVariantNumeric: "tabular-nums" }}>
+              {livePrice != null
+                ? (showKRW && canShowKRW
+                    ? `₩${Math.round(livePrice).toLocaleString("ko-KR")}`
+                    : fmtPrice(livePrice, asset.market))
+                : formatPriceWithKRW(asset.price)}
             </span>
-          )}
-        </div>
-        {/* 2행: 가격 + 등락률 + KRW 토글 */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: isMobile ? "6px" : "12px", flexWrap: isMobile ? "wrap" : "nowrap" }}>
-          <span style={{ color: CC.text1, fontWeight: 700, fontSize: isMobile ? "16px" : "18px" }}>
-            {livePrice != null
-              ? (showKRW && canShowKRW
-                  ? `₩${Math.round(livePrice).toLocaleString("ko-KR")}`
-                  : fmtPrice(livePrice, asset.market))
-              : formatPriceWithKRW(asset.price)}
-          </span>
-          <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "4px" : "6px", minHeight: isMobile ? "40px" : "auto" }}>
-            {liveChange != null ? (
-              <span style={{ fontSize: isMobile ? "14px" : "15px", fontWeight: 600, color: liveChange >= 0 ? CC.green : CC.red }}>
-                {liveChange >= 0 ? "\u25B2" : "\u25BC"} {Math.abs(liveChange).toFixed(2)}%
-              </span>
-            ) : asset.weekChange != null ? (
-              <span style={{ fontSize: isMobile ? "14px" : "15px", fontWeight: 600, color: asset.weekChange >= 0 ? CC.green : CC.red }}>
-                {asset.weekChange >= 0 ? "\u25B2" : "\u25BC"} {Math.abs(asset.weekChange)}%
-              </span>
-            ) : null}
-            {canShowKRW && (
-              <button onClick={() => setShowKRW(!showKRW)} style={{
-                fontSize: isMobile ? "12px" : "14px", padding: isMobile ? "6px 8px" : "3px 7px", borderRadius: "6px", cursor: "pointer",
-                background: showKRW ? CC.blue + "33" : "transparent",
-                color: showKRW ? CC.blue : CC.text3,
-                border: `1px solid ${showKRW ? CC.blue : CC.border}`,
-                minHeight: isMobile ? "40px" : "auto", display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                {showKRW ? "\u20A9 KRW" : "$ USD"}
-              </button>
+            {changeVal != null && (
+              <span style={{
+                fontSize: "11.5px", fontWeight: 800, fontFamily: MONO, padding: "3px 9px", borderRadius: "9999px",
+                background: changeVal >= 0 ? CC.greenBg : CC.redBg, color: changeVal >= 0 ? CC.green : CC.red,
+              }}>{changeVal >= 0 ? "+" : ""}{Number(changeVal).toFixed(2)}%</span>
+            )}
+            {liveConnected && (
+              <span role="status" aria-label={tt("chart.v3.live", "실시간 갱신 중")} title={tt("chart.v3.live", "실시간 갱신 중")} style={{
+                width: "7px", height: "7px", borderRadius: "50%", background: CC.green,
+                display: "inline-block", animation: "livePulse 1.5s ease-in-out infinite", flexShrink: 0,
+              }} />
             )}
           </div>
         </div>
+        <button onClick={onClose} aria-label={tt("chart.v3.close", "차트 닫기")} style={{
+          width: "36px", height: "36px", borderRadius: "11px", flexShrink: 0, padding: 0,
+          background: CC.card, border: `1px solid ${CC.border}`, color: CC.text2, cursor: "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <line x1="6" y1="6" x2="18" y2="18" /><line x1="18" y1="6" x2="6" y2="18" />
+          </svg>
+        </button>
       </div>
 
       {/* Scrollable body */}
       <div ref={containerRef} style={{ flex: 1, overflowY: "auto", overflowX: "hidden", padding: "10px 12px", WebkitOverflowScrolling: "touch" }}>
 
-        {/* OHLC crosshair info */}
-        {ohlcInfo && (
-          <div style={{
-            display: "flex", gap: "12px", marginBottom: "8px",
-            background: CC.card, borderRadius: "10px", padding: "8px 12px",
-            fontSize: "14px", flexWrap: "wrap", border: `1px solid ${CC.border}`,
-          }}>
-            {[["O", ohlcInfo.open], ["H", ohlcInfo.high], ["L", ohlcInfo.low], ["C", ohlcInfo.close]].map(([label, val]) => (
-              <span key={label} style={{ color: CC.text3 }}>
-                <span style={{ marginRight: "4px" }}>{label}</span>
-                <span style={{ color: CC.text1, fontWeight: 600 }}>{formatPriceWithKRW(val)}</span>
-              </span>
-            ))}
-            {ohlcInfo.volume != null && ohlcInfo.volume > 0 && (
-              <span style={{ color: CC.text3 }}>
-                V <span style={{ color: CC.text1, fontWeight: 600 }}>{ohlcInfo.volume >= 1e9 ? `${(ohlcInfo.volume / 1e9).toFixed(1)}B` : ohlcInfo.volume >= 1e6 ? `${(ohlcInfo.volume / 1e6).toFixed(1)}M` : ohlcInfo.volume.toLocaleString()}</span>
-              </span>
-            )}
+        {/* ── TF 칩 한 줄 + 설정 진입 (컨트롤 다이어트 — 나머지 컨트롤은 시트 수납) ── */}
+        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
+          <div className="zc-tfrow" role="group" aria-label={tt("chart.v3.tfGroup", "타임프레임 선택")} style={{ display: "flex", gap: "5px", overflowX: "auto", flex: 1, scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
+            {tfOrder.map(key => {
+              const cfg = tfLabels[key];
+              if (!cfg) return null;
+              const on = timeframe === key;
+              return (
+                <button key={key} onClick={() => setTimeframe(key)} aria-pressed={on} style={{
+                  flexShrink: 0, padding: "7px 12px", borderRadius: "9px", fontSize: "12px",
+                  fontWeight: on ? 800 : 700, cursor: "pointer", minHeight: "36px",
+                  background: on ? CC.blue : CC.card, color: on ? "#fff" : CC.text3,
+                  border: `1px solid ${on ? CC.blue : CC.border}`,
+                }}>{tt(`chart.tf.${key}`, cfg.label)}</button>
+              );
+            })}
           </div>
-        )}
-
-        {/* Timeframe buttons — 10 granularities */}
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(5, 1fr)" : "repeat(10, 1fr)", gap: isMobile ? "3px" : "4px", marginBottom: "8px" }}>
-          {tfOrder.map(key => {
-            const cfg = tfLabels[key];
-            if (!cfg) return null;
-            return (
-              <button key={key} onClick={() => setTimeframe(key)} style={{
-                padding: isMobile ? "8px 4px" : "5px 10px", borderRadius: "8px", fontSize: isMobile ? "12px" : "14px", cursor: "pointer", fontWeight: 600,
-                background: timeframe === key ? CC.blue : CC.card,
-                color: timeframe === key ? "#fff" : CC.text3,
-                border: `1px solid ${timeframe === key ? CC.blue : CC.border}`,
-                minHeight: isMobile ? "40px" : "auto",
-              }}>{cfg.label}</button>
-            );
-          })}
-        </div>
-
-        {/* Log scale toggle button */}
-        <div style={{ display: "flex", gap: "4px", marginBottom: "8px", flexWrap: "wrap" }}>
-          <button onClick={() => setLogScale(p => !p)} style={{
-            padding: isMobile ? "8px 10px" : "5px 10px", borderRadius: "8px", fontSize: isMobile ? "14px" : "14px", cursor: "pointer", fontWeight: 600,
-            background: logScale ? `${CC.yellow}22` : CC.card,
-            color: logScale ? CC.yellow : CC.text3,
-            border: `1px solid ${logScale ? CC.yellow : CC.border}`,
-            minHeight: isMobile ? "40px" : "auto",
-          }}>📐 로그</button>
-          {/* 캔들패턴 시그널 토글 — 검증된 패턴의 ▲롱/▼숏 마커 표시 */}
-          <button onClick={() => setShowSignals(p => !p)} style={{
-            padding: isMobile ? "8px 10px" : "5px 10px", borderRadius: "8px", fontSize: isMobile ? "14px" : "14px", cursor: "pointer", fontWeight: 600,
-            background: showSignals ? `${CC.green}22` : CC.card,
-            color: showSignals ? CC.green : CC.text3,
-            border: `1px solid ${showSignals ? CC.green : CC.border}`,
-            minHeight: isMobile ? "40px" : "auto",
-          }}>🎯 시그널</button>
-        </div>
-
-        {/* Indicator quick toggles + settings gear */}
-        <div style={{ display: "flex", gap: isMobile ? "3px" : "5px", marginBottom: showSettings ? "0px" : "12px", flexWrap: "wrap", alignItems: "center" }}>
-          {(settings.maList || []).map((ma, idx) => (
-            <button key={`ma-${idx}`} onClick={() => {
-              const newList = [...settings.maList];
-              newList[idx] = { ...newList[idx], enabled: !newList[idx].enabled };
-              updateSettings({ ...settings, maList: newList });
-            }} style={{
-              padding: isMobile ? "6px 8px" : "4px 9px", borderRadius: "8px", fontSize: isMobile ? "12px" : "14px", cursor: "pointer", fontWeight: 600,
-              background: ma.enabled ? `${ma.color}22` : "transparent",
-              color: ma.enabled ? ma.color : CC.text3,
-              border: `1px solid ${ma.enabled ? `${ma.color}88` : CC.border}`,
-              minHeight: isMobile ? "40px" : "auto", display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <span style={{ display: "inline-block", width: "7px", height: "7px", borderRadius: "50%", background: ma.enabled ? ma.color : CC.text3, marginRight: "4px", verticalAlign: "middle" }} />
-              MA{ma.period}
-            </button>
-          ))}
-          {[
-            { key: "bb", label: "BB", color: "#60a5fa" },
-            { key: "vol", label: "\uAC70\uB798\uB7C9", color: "#1f6feb" },
-            { key: "rsi", label: "RSI", color: "#f472b6" },
-            { key: "macd", label: "MACD", color: "#34d399" },
-          ].map(({ key, label, color }) => (
-            <button key={key} onClick={() => {
-              updateSettings({ ...settings, [key]: { ...settings[key], enabled: !settings[key]?.enabled } });
-            }} style={{
-              padding: "4px 9px", borderRadius: "8px", fontSize: "14px", cursor: "pointer", fontWeight: 600,
-              background: settings[key]?.enabled ? `${color}22` : "transparent",
-              color: settings[key]?.enabled ? color : CC.text3,
-              border: `1px solid ${settings[key]?.enabled ? `${color}88` : CC.border}`,
-            }}>
-              <span style={{ display: "inline-block", width: "7px", height: "7px", borderRadius: "50%", background: settings[key]?.enabled ? color : CC.text3, marginRight: "4px", verticalAlign: "middle" }} />
-              {label}
-            </button>
-          ))}
-          {/* Settings gear button */}
-          <button onClick={() => setShowSettings(!showSettings)} style={{
-            padding: "4px 9px", borderRadius: "8px", fontSize: "16px", cursor: "pointer",
-            background: showSettings ? CC.card2 : "transparent",
-            color: showSettings ? CC.blue : CC.text3,
-            border: `1px solid ${showSettings ? CC.blue : CC.border}`,
-            marginLeft: "auto",
-          }} title="보조지표 설정">{"\u2699\uFE0F"}</button>
-        </div>
-
-        {/* Settings panel (collapsible) */}
-        {showSettings && (
-          <div style={{
-            background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "12px",
-            padding: "14px", marginBottom: "12px",
+          <button onClick={() => setShowSettings(true)} aria-label={tt("chart.v3.sheetTitle", "차트 설정")} aria-haspopup="dialog" title={tt("chart.v3.sheetTitle", "차트 설정")} style={{
+            flexShrink: 0, width: "36px", height: "36px", borderRadius: "9px", cursor: "pointer", padding: 0,
+            background: CC.card, color: CC.text2, border: `1px solid ${CC.border}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <div style={{ fontSize: "15px", fontWeight: 700, color: CC.text1, marginBottom: "12px" }}>
-              {"\u2699\uFE0F"} 보조지표 설정
-            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.09a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.09a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            </svg>
+          </button>
+        </div>
 
-            {/* MA settings */}
-            <div style={{ marginBottom: "12px" }}>
-              <div style={{ fontSize: "14px", color: CC.text3, marginBottom: "6px", fontWeight: 600 }}>이동평균선 (MA)</div>
-              {(settings.maList || []).map((ma, idx) => (
-                <div key={idx} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                  <input type="checkbox" checked={ma.enabled} onChange={() => {
-                    const newList = [...settings.maList];
-                    newList[idx] = { ...newList[idx], enabled: !newList[idx].enabled };
-                    updateSettings({ ...settings, maList: newList });
-                  }} style={{ accentColor: ma.color }} />
-                  <span style={{ fontSize: "14px", color: CC.text2, width: "28px" }}>MA</span>
-                  <input type="number" value={ma.period} min={1} max={500} onChange={e => {
-                    const newList = [...settings.maList];
-                    newList[idx] = { ...newList[idx], period: parseInt(e.target.value) || 5 };
-                    updateSettings({ ...settings, maList: newList });
-                  }} style={{
-                    width: "60px", padding: "4px 6px", borderRadius: "6px", fontSize: "14px",
-                    background: CC.card2, color: CC.text1, border: `1px solid ${CC.border2}`, outline: "none",
-                  }} />
-                  <input type="color" value={ma.color} onChange={e => {
-                    const newList = [...settings.maList];
-                    newList[idx] = { ...newList[idx], color: e.target.value };
-                    updateSettings({ ...settings, maList: newList });
-                  }} style={{ width: "28px", height: "24px", border: "none", cursor: "pointer", background: "transparent" }} />
-                  <button onClick={() => {
-                    const newList = settings.maList.filter((_, i) => i !== idx);
-                    updateSettings({ ...settings, maList: newList });
-                  }} style={{
-                    background: "transparent", border: "none", color: CC.red, cursor: "pointer", fontSize: "16px", padding: "2px",
-                  }}>{"\u2715"}</button>
-                </div>
+        {/* ── 캔들+거래량 카드 (타이밍 마커 포함) — 푸터에 지지·저항 밴드 토글 (시안 1f) ── */}
+        <div style={{ background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "16px", padding: "10px 10px 4px", marginBottom: "10px" }}>
+          {/* OHLC 크로스헤어 정보 (호버/터치 시에만) */}
+          {ohlcInfo && !loading && (
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", padding: "0 4px 8px", fontSize: "12px", fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>
+              {[["O", ohlcInfo.open], ["H", ohlcInfo.high], ["L", ohlcInfo.low], ["C", ohlcInfo.close]].map(([label, val]) => (
+                <span key={label} style={{ color: CC.text3 }}>
+                  {label} <span style={{ color: CC.text1, fontWeight: 600 }}>{formatPriceWithKRW(val)}</span>
+                </span>
               ))}
-              <button onClick={() => {
-                const colors = ["#facc15","#38bdf8","#f97316","#a855f7","#34d399","#f472b6","#fb923c","#60a5fa"];
-                const c = colors[(settings.maList || []).length % colors.length];
-                updateSettings({ ...settings, maList: [...(settings.maList || []), { enabled: true, period: 10, color: c, width: 2 }] });
-              }} style={{
-                fontSize: "14px", padding: "4px 10px", borderRadius: "6px", cursor: "pointer",
-                background: CC.card2, color: CC.blue, border: `1px solid ${CC.border2}`, fontWeight: 600,
-              }}>+ MA 추가</button>
-            </div>
-
-            {/* BB settings */}
-            <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "10px", flexWrap: "wrap" }}>
-              <span style={{ fontSize: "14px", color: CC.text2, fontWeight: 600 }}>BB</span>
-              <label style={{ fontSize: "14px", color: CC.text3 }}>기간
-                <input type="number" value={settings.bb?.period || 20} min={5} max={100} onChange={e => {
-                  updateSettings({ ...settings, bb: { ...settings.bb, period: parseInt(e.target.value) || 20 } });
-                }} style={{
-                  width: "50px", padding: "3px 5px", borderRadius: "6px", fontSize: "14px", marginLeft: "4px",
-                  background: CC.card2, color: CC.text1, border: `1px solid ${CC.border2}`, outline: "none",
-                }} />
-              </label>
-              <label style={{ fontSize: "14px", color: CC.text3 }}>배수
-                <input type="number" value={settings.bb?.mult || 2} min={0.5} max={5} step={0.5} onChange={e => {
-                  updateSettings({ ...settings, bb: { ...settings.bb, mult: parseFloat(e.target.value) || 2 } });
-                }} style={{
-                  width: "50px", padding: "3px 5px", borderRadius: "6px", fontSize: "14px", marginLeft: "4px",
-                  background: CC.card2, color: CC.text1, border: `1px solid ${CC.border2}`, outline: "none",
-                }} />
-              </label>
-            </div>
-
-            {/* RSI settings */}
-            <div style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "10px" }}>
-              <span style={{ fontSize: "14px", color: CC.text2, fontWeight: 600 }}>RSI</span>
-              <label style={{ fontSize: "14px", color: CC.text3 }}>기간
-                <input type="number" value={settings.rsi?.period || 14} min={2} max={50} onChange={e => {
-                  updateSettings({ ...settings, rsi: { ...settings.rsi, period: parseInt(e.target.value) || 14 } });
-                }} style={{
-                  width: "50px", padding: "3px 5px", borderRadius: "6px", fontSize: "14px", marginLeft: "4px",
-                  background: CC.card2, color: CC.text1, border: `1px solid ${CC.border2}`, outline: "none",
-                }} />
-              </label>
-            </div>
-
-            {/* Reset button */}
-            <button onClick={() => updateSettings(DEFAULT_SETTINGS)} style={{
-              fontSize: "14px", padding: "5px 12px", borderRadius: "6px", cursor: "pointer",
-              background: "transparent", color: CC.text3, border: `1px solid ${CC.border2}`,
-            }}>기본값으로 초기화</button>
-          </div>
-        )}
-
-        {/* Chart area */}
-        {loading && (
-          <div style={{ textAlign: "center", padding: "80px", color: CC.text3 }}>
-            <div style={{ fontSize: "28px", marginBottom: "8px", animation: "pulse 1s infinite" }}>\uD83D\uDCE1</div>
-            <div>\uCC28\uD2B8 \uB370\uC774\uD130 \uB85C\uB529 \uC911...</div>
-          </div>
-        )}
-        {error && !loading && (
-          <div style={{ textAlign: "center", padding: "60px", color: CC.red }}>
-            <div style={{ fontSize: "24px", marginBottom: "8px" }}>\u26A0\uFE0F</div>
-            <div style={{ marginBottom: "12px" }}>{error}</div>
-            <button onClick={() => buildCharts(timeframe)} style={{
-              padding: "9px 20px", borderRadius: "10px", fontSize: "15px", fontWeight: 700,
-              background: CC.blue, color: "#fff", border: "none", cursor: "pointer",
-            }}>\uB2E4\uC2DC \uC2DC\uB3C4</button>
-          </div>
-        )}
-        <div style={{ display: loading ? "none" : "block" }}>
-          <div ref={mainRef} style={{
-            width: "100%", borderRadius: "10px", overflow: "hidden",
-            touchAction: "pan-y", WebkitOverflowScrolling: "auto",
-          }} />
-          {settings.rsi?.enabled && (
-            <>
-              <div style={{
-                color: "#f472b6", fontSize: "14px", fontWeight: 600, padding: "8px 0 4px 4px",
-                display: "flex", alignItems: "center", gap: "6px", justifyContent: "space-between",
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                  <span style={{ width: "10px", height: "3px", background: "#f472b6", borderRadius: "4px", display: "inline-block" }} />
-                  RSI({settings.rsi?.period || 14})
-                </div>
-                {currentRSI != null && (
-                  <span style={{
-                    fontSize: "15px", fontWeight: 700, padding: "2px 8px", borderRadius: "6px",
-                    background: currentRSI >= 70 ? `${CC.red}22` : currentRSI <= 30 ? `${CC.green}22` : `${CC.text3}22`,
-                    color: currentRSI >= 70 ? CC.red : currentRSI <= 30 ? CC.green : CC.text2,
-                  }}>{currentRSI.toFixed(1)}</span>
-                )}
-              </div>
-              <div ref={rsiRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden", touchAction: "pan-y" }} />
-            </>
-          )}
-          {settings.macd?.enabled && (
-            <>
-              <div style={{
-                fontSize: "14px", fontWeight: 600, padding: "8px 0 4px 4px",
-                display: "flex", alignItems: "center", gap: "10px", color: CC.text3,
-              }}>
-                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <span style={{ width: "10px", height: "3px", background: "#38bdf8", borderRadius: "4px", display: "inline-block" }} />
-                  <span style={{ color: "#38bdf8" }}>MACD</span>
+              {ohlcInfo.volume != null && ohlcInfo.volume > 0 && (
+                <span style={{ color: CC.text3 }}>
+                  V <span style={{ color: CC.text1, fontWeight: 600 }}>{ohlcInfo.volume >= 1e9 ? `${(ohlcInfo.volume / 1e9).toFixed(1)}B` : ohlcInfo.volume >= 1e6 ? `${(ohlcInfo.volume / 1e6).toFixed(1)}M` : ohlcInfo.volume.toLocaleString()}</span>
                 </span>
-                <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                  <span style={{ width: "10px", height: "3px", background: "#fb923c", borderRadius: "4px", display: "inline-block" }} />
-                  <span style={{ color: "#fb923c" }}>Signal</span>
-                </span>
-              </div>
-              <div ref={macdRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden", touchAction: "pan-y" }} />
-            </>
+              )}
+            </div>
           )}
-        </div>
 
-        {/* Legend */}
-        <div style={{
-          marginTop: "12px", padding: "10px 12px",
-          background: CC.card, borderRadius: "10px", border: `1px solid ${CC.border}`,
-          display: "flex", gap: "12px", flexWrap: "wrap", fontSize: "14px",
-        }}>
-          {[
-            ...(settings.maList || []).filter(m => m.enabled).map(m => ({ color: m.color, label: `MA${m.period}` })),
-            ...(settings.bb?.enabled ? [{ color: "#60a5fa", label: `BB(${settings.bb?.period || 20},${settings.bb?.mult || 2})` }] : []),
-            ...(settings.rsi?.enabled ? [{ color: "#f472b6", label: `RSI(${settings.rsi?.period || 14})` }] : []),
-            ...(settings.macd?.enabled ? [{ color: "#38bdf8", label: "MACD" }, { color: "#fb923c", label: "Signal" }] : []),
-          ].map(({ color, label }) => (
-            <span key={label} style={{ display: "flex", alignItems: "center", gap: "5px", color: CC.text3 }}>
-              <span style={{ width: "16px", height: "3px", background: color, display: "inline-block", borderRadius: "4px" }} />
-              {label}
-            </span>
-          ))}
-          {showKRW && canShowKRW && <span style={{ color: CC.blue, fontWeight: 600, marginLeft: "auto" }}>KRW 환산</span>}
-        </div>
-
-        {/* ── 캔들패턴 시그널 근거 패널 — "그래서 롱이야 숏이야?" 원칙 ── */}
-        {!loading && !error && showSignals && (
-          <div style={{
-            marginTop: "12px", padding: "10px 12px",
-            background: CC.card, borderRadius: "10px", border: `1px solid ${CC.border}`,
-            fontSize: "14px",
-          }}>
-            <div style={{ fontWeight: 700, color: CC.text1, marginBottom: "6px" }}>🎯 종합 타점 점수 <span style={{ color: CC.text3, fontWeight: 400, fontSize: "12px" }}>— 지표·패턴 총동원, 검증 17요소 합류</span></div>
-            {!SIGNAL_TFS.includes(timeframe) ? (
-              <div style={{ color: CC.text3 }}>타점 시그널은 1시간봉 이상에서 제공됩니다 (저TF는 통계적으로 무효)</div>
-            ) : (
+          {/* 로딩 — 시안 1f 빈 상태 문법 (점 3개 + 안내 2줄) */}
+          {loading && (
+            <div style={{ height: "230px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+              <div style={{ display: "flex", gap: "5px" }} aria-hidden="true">
+                {[0, 1, 2].map(i => (
+                  <span key={i} style={{ width: "7px", height: "7px", borderRadius: "50%", background: CC.blue, animation: `zcBlink 1.2s ${i * 0.2}s infinite` }} />
+                ))}
+              </div>
+              <div style={{ fontSize: "13.5px", fontWeight: 800, color: CC.text1 }}>{tt("chart.v3.loadingTitle", "차트 데이터를 준비하고 있어요")}</div>
+              <div style={{ fontSize: "11.5px", color: CC.text3 }}>{tt("chart.v3.loadingSub", "거래량이 적은 종목은 몇 초 더 걸릴 수 있어요")}</div>
+            </div>
+          )}
+          {error && !loading && (
+            <div style={{ textAlign: "center", padding: "48px 12px" }}>
+              <div style={{ marginBottom: "12px", fontSize: "13px", fontWeight: 600, color: CC.red }}>{error}</div>
+              <button onClick={() => buildCharts(timeframe)} style={{
+                padding: "9px 20px", borderRadius: "10px", fontSize: "14px", fontWeight: 700,
+                background: CC.blue, color: "#fff", border: "none", cursor: "pointer",
+              }}>{tt("chart.v3.retry", "다시 시도")}</button>
+            </div>
+          )}
+          <div style={{ display: loading ? "none" : "block" }}>
+            <div ref={mainRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden", touchAction: "pan-y", WebkitOverflowScrolling: "auto" }} />
+            {settings.rsi?.enabled && (
               <>
-                {latestScore && (
-                  <div style={{ marginBottom: "6px" }}>
-                    <span style={{ color: CC.text2, fontSize: "13px" }}>현재(마지막 확정봉) </span>
-                    <span style={{ fontWeight: 800, fontSize: "16px", color: latestScore.longScore >= 1.7 ? "#16A34A" : latestScore.longScore >= (latestScore.threshold || 0.75) ? CC.green : CC.text2 }}>
-                      롱 {Math.min(100, Math.round(latestScore.longScore / 2.5 * 100))}점
-                    </span>
-                    <span style={{ color: CC.text3, fontSize: "12px" }}> /100 · 진입선 68</span>
-                    {latestScore.longScore === 0 && latestScore.recent && (
-                      <span style={{ color: CC.green, fontSize: "12px", fontWeight: 600 }}> · 최근 발화 {Math.min(100, Math.round(latestScore.recent.score / 2.5 * 100))}점 ({latestScore.recent.barsAgo}봉 전)</span>
-                    )}
-                    {latestScore.reasons?.length > 0 && (
-                      <span style={{ color: CC.text3, fontSize: "12px" }}> — {latestScore.reasons.join(" · ")}</span>
-                    )}
+                <div style={{
+                  color: "#f472b6", fontSize: "12px", fontWeight: 600, padding: "8px 0 4px 4px",
+                  display: "flex", alignItems: "center", gap: "6px", justifyContent: "space-between",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ width: "10px", height: "3px", background: "#f472b6", borderRadius: "4px", display: "inline-block" }} />
+                    RSI({settings.rsi?.period || 14})
                   </div>
-                )}
-                {recentSignals.length === 0 ? (
-                  <div style={{ color: CC.text3 }}>이 구간 발화된 타점 시그널 없음</div>
-                ) : (
-                  recentSignals.map((s, idx) => (
-                    s.kind === "exit" ? (
-                      <div key={`x-${s.i}-${idx}`} style={{ marginBottom: "4px", color: "#F59E0B" }}>
-                        <span style={{ fontWeight: 700 }}>■ 청산</span>
-                        <span style={{ color: CC.text2 }}> — {(s.reasons || []).join(" + ")}</span>
-                      </div>
-                    ) : (
-                      <div key={`${s.i}-${idx}`} style={{ marginBottom: "4px", color: s.dir > 0 ? CC.green : CC.red }}>
-                        <span style={{ fontWeight: 700 }}>{s.dir > 0 ? "▲ 롱 진입" : "▼ 숏(단기)"} {Math.min(100, Math.round(s.score / 2.5 * 100))}점</span>
-                        <span style={{ color: CC.text2 }}> — {(s.reasons || []).join(" + ")}</span>
-                      </div>
-                    )
-                  ))
-                )}
+                  {currentRSI != null && (
+                    <span style={{
+                      fontSize: "13px", fontWeight: 700, padding: "2px 8px", borderRadius: "6px", fontFamily: MONO,
+                      background: currentRSI >= 70 ? CC.redBg : currentRSI <= 30 ? CC.greenBg : `${CC.text3}22`,
+                      color: currentRSI >= 70 ? CC.red : currentRSI <= 30 ? CC.green : CC.text2,
+                    }}>{currentRSI.toFixed(1)}</span>
+                  )}
+                </div>
+                <div ref={rsiRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden", touchAction: "pan-y" }} />
               </>
             )}
-            <div style={{ color: CC.text3, fontSize: "12px", marginTop: "6px" }}>
-              상장 이후 전체(약세장 포함) 딥 실측+홀드아웃 통과 요소만 점수화 · 롱은 EMA200 위에서만(레짐 게이트) · ▼숏=OBV 분산(약세장 한정·단기 성격, 유일 검증 숏) · ■청산=EMA20 이탈 리스크 규칙 · 1h는 펀딩 기반 요소(서버 연동 예정)라 4h/일봉 권장 · 수익 보장 아님
-            </div>
-          </div>
-        )}
-
-        {/* ── 투자진단 패널 ─────────────────────────────────────── */}
-        {!loading && !error && diagData && (
-          <div style={{ marginTop: "16px" }}>
-            {/* Dropdown toggle */}
-            <button onClick={() => setShowDiagnosis(p => !p)} style={{
-              width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
-              background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "12px",
-              padding: "14px 18px", cursor: "pointer", marginBottom: showDiagnosis ? "12px" : "0",
-              transition: "all 0.2s",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <span style={{ fontSize: "18px" }}>🩺</span>
-                <span style={{ fontSize: "16px", fontWeight: 700, color: CC.text1 }}>투자진단</span>
-                <span style={{
-                  fontSize: "14px", fontWeight: 700, padding: "3px 8px", borderRadius: "6px",
-                  background: diagData.score >= 70 ? CC.greenBg : diagData.score >= 40 ? CC.yellowBg : CC.redBg,
-                  color: diagData.score >= 70 ? CC.green : diagData.score >= 40 ? CC.yellow : CC.red,
-                }}>{diagData.score}점 · {diagData.verdict}</span>
+            {settings.macd?.enabled && (
+              <>
+                <div style={{
+                  fontSize: "12px", fontWeight: 600, padding: "8px 0 4px 4px",
+                  display: "flex", alignItems: "center", gap: "10px", color: CC.text3,
+                }}>
+                  <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                    <span style={{ width: "10px", height: "3px", background: "#38bdf8", borderRadius: "4px", display: "inline-block" }} />
+                    <span style={{ color: "#38bdf8" }}>MACD</span>
+                  </span>
+                  <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                    <span style={{ width: "10px", height: "3px", background: "#fb923c", borderRadius: "4px", display: "inline-block" }} />
+                    <span style={{ color: "#fb923c" }}>Signal</span>
+                  </span>
+                </div>
+                <div ref={macdRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden", touchAction: "pan-y" }} />
+              </>
+            )}
+            {/* 오버레이 범례 — 메인 차트 위 MA/BB 선 식별용 (서브차트는 자체 라벨 보유 → 중복 표기 제거) */}
+            {((settings.maList || []).some(m => m.enabled) || settings.bb?.enabled) && (
+              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "center", padding: "8px 4px 0", fontSize: "11px", color: CC.text3 }}>
+                {(settings.maList || []).filter(m => m.enabled).map(m => (
+                  <span key={`MA${m.period}`} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                    <span style={{ width: "14px", height: "3px", background: m.color, display: "inline-block", borderRadius: "4px" }} />
+                    MA{m.period}
+                  </span>
+                ))}
+                {settings.bb?.enabled && (
+                  <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>
+                    <span style={{ width: "14px", height: "3px", background: "#60a5fa", display: "inline-block", borderRadius: "4px" }} />
+                    BB({settings.bb?.period || 20},{settings.bb?.mult || 2})
+                  </span>
+                )}
+                {showKRW && canShowKRW && <span style={{ color: CC.blue, fontWeight: 700, marginLeft: "auto" }}>{tt("chart.v3.krwOn", "KRW 환산")}</span>}
               </div>
-              <span style={{
-                fontSize: "16px", color: CC.text3,
-                transform: showDiagnosis ? "rotate(180deg)" : "rotate(0deg)",
-                transition: "transform 0.2s",
-              }}>▼</span>
+            )}
+          </div>
+
+          {/* 지지·저항 밴드 토글 (시안 1f 차트 카드 푸터) — 실데이터 피벗 레벨 오버레이 */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "9px", padding: "10px 4px 8px", borderTop: `1px solid ${CC.border}` }}>
+            <span style={{ fontSize: "12px", fontWeight: 700, color: CC.text2, whiteSpace: "nowrap" }}>{tt("chart.v3.srBands", "지지 · 저항 밴드")}</span>
+            <span style={{ fontSize: "10px", color: CC.text3 }}>
+              {/* null 사유는 봉 부족(n<20)·유효 피벗 부재 두 경우 — 특정 사유 단정 대신 중립 표기 */}
+              {srLevels ? tt("chart.v3.srBasis", "최근 60봉 피벗 기준") : tt("chart.v3.srNone", "레벨 산출 불가 — 유효 피벗 없음")}
+            </span>
+            <span style={{ marginLeft: "auto" }}>
+              <Switch checked={showSR} disabled={!srLevels} onChange={() => setShowSR(v => !v)} ariaLabel={tt("chart.v3.srBands", "지지 · 저항 밴드")} CC={CC} />
+            </span>
+          </div>
+        </div>
+
+        {/* ── 하단 신호 요약 배지 (시안 1f) — 신호 상태·종합 점수·카테고리 칩·주요 레벨 거리.
+               탭하면 투자진단 상세로 확장 (일봉 이상에서만 산출 — 없는 구간은 정직하게 미표시) ── */}
+        {!loading && !error && diagData && (
+          <div style={{ background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "16px", marginBottom: "10px", overflow: "hidden" }}>
+            <button onClick={() => setShowDiagnosis(p => !p)} aria-expanded={showDiagnosis} style={{
+              width: "100%", background: "transparent", border: "none", cursor: "pointer",
+              padding: "13px 14px", textAlign: "left", fontFamily: "inherit", display: "block",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <span style={{
+                  fontSize: "11px", fontWeight: 800, padding: "3px 9px", borderRadius: "8px",
+                  background: diagBg, color: diagColor, whiteSpace: "nowrap",
+                }}>{diagArrow} {diagData.verdict}</span>
+                <span style={{ fontSize: "11px", color: CC.text3 }}>{tt("chart.v3.totalScore", "종합 점수")}</span>
+                <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ fontSize: "20px", fontWeight: 800, fontFamily: MONO, color: diagColor }}>{diagData.score}</span>
+                  <span aria-hidden="true" style={{ fontSize: "11px", color: CC.text3, display: "inline-block", transform: showDiagnosis ? "rotate(180deg)" : "none", transition: "transform .2s" }}>▼</span>
+                </span>
+              </div>
+              {/* 접힘 상태 전용 요약 — 확장하면 본문 카테고리 그리드와 동일 정보라 숨김 (이중 노출 방지) */}
+              {!showDiagnosis && (
+                <>
+                  <div style={{ display: "flex", gap: "5px", marginTop: "9px", flexWrap: "wrap" }}>
+                    {diagData.categories.map(cat => {
+                      const tone = scoreTone(CC, cat.score);
+                      return (
+                        <span key={cat.name} style={{
+                          fontSize: "10px", fontWeight: 700, padding: "3px 8px", borderRadius: "6px",
+                          background: tone.bg, color: tone.fg, fontVariantNumeric: "tabular-nums",
+                        }}>{cat.name} {cat.score}</span>
+                      );
+                    })}
+                  </div>
+                  {(supDist != null || resDist != null) && (
+                    <div style={{ marginTop: "8px", fontSize: "11px", color: CC.text3, fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>
+                      {supDist != null && <>{tt("chart.v3.support", "지지")} {supDist.toFixed(1)}%</>}
+                      {supDist != null && resDist != null && <> · </>}
+                      {resDist != null && <>{tt("chart.v3.resistance", "저항")} +{resDist.toFixed(1)}%</>}
+                    </div>
+                  )}
+                </>
+              )}
             </button>
 
             {showDiagnosis && (
-              <>
-                {/* 종합 점수 */}
-                <div style={{
-                  background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "12px",
-                  padding: "18px", marginBottom: "12px",
-                  borderTop: "none", borderTopLeftRadius: "0", borderTopRightRadius: "0",
-                }}>
-                  {/* Score gauge */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "16px" }}>
-                    <div style={{ position: "relative", width: "80px", height: "80px", flexShrink: 0 }}>
-                      <svg viewBox="0 0 80 80" width="80" height="80">
-                        <circle cx="40" cy="40" r="34" fill="none" stroke={CC.border} strokeWidth="7" />
-                        <circle cx="40" cy="40" r="34" fill="none"
-                          stroke={diagData.score >= 70 ? CC.green : diagData.score >= 40 ? CC.yellow : CC.red}
-                          strokeWidth="7" strokeLinecap="round"
-                          strokeDasharray={`${(diagData.score / 100) * 213.6} 213.6`}
-                          transform="rotate(-90 40 40)"
-                          style={{ transition: "stroke-dasharray 0.8s ease" }}
-                        />
-                        <text x="40" y="37" textAnchor="middle" fill={CC.text1} fontSize="18" fontWeight="800">{diagData.score}</text>
-                        <text x="40" y="50" textAnchor="middle" fill={CC.text3} fontSize="9">/100</text>
-                      </svg>
+              <div style={{ borderTop: `1px solid ${CC.border}`, padding: "14px" }}>
+                {/* 점수 게이지 + 요약 */}
+                <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "12px" }}>
+                  <div style={{ position: "relative", width: "80px", height: "80px", flexShrink: 0 }}>
+                    <svg viewBox="0 0 80 80" width="80" height="80" role="img" aria-label={`종합 점수 ${diagData.score}점`}>
+                      <circle cx="40" cy="40" r="34" fill="none" stroke={CC.border} strokeWidth="7" />
+                      <circle cx="40" cy="40" r="34" fill="none"
+                        stroke={scoreTone(CC, diagData.score).fg}
+                        strokeWidth="7" strokeLinecap="round"
+                        strokeDasharray={`${(diagData.score / 100) * 213.6} 213.6`}
+                        transform="rotate(-90 40 40)"
+                        style={{ transition: "stroke-dasharray 0.8s ease" }}
+                      />
+                      <text x="40" y="37" textAnchor="middle" fill={CC.text1} fontSize="18" fontWeight="800">{diagData.score}</text>
+                      <text x="40" y="50" textAnchor="middle" fill={CC.text3} fontSize="9">/100</text>
+                    </svg>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: "16px", fontWeight: 800, marginBottom: "4px", color: diagColor }}>{diagData.verdict}</div>
+                    <div style={{ fontSize: "13px", color: CC.text2, lineHeight: "1.5" }}>{diagData.summary}</div>
+                  </div>
+                </div>
+
+                {/* 적정가치 추정 */}
+                {diagData.fairValue != null && (
+                  <div style={{
+                    background: CC.bg, borderRadius: "10px", padding: "12px", marginBottom: "12px",
+                    border: `1px solid ${CC.border}`,
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
+                      <span style={{ fontSize: "13px", color: CC.text3, fontWeight: 600 }}>{tt("chart.v3.fairValue", "적정가치 추정")}</span>
+                      <span style={{ fontSize: "11px", color: CC.text3, background: CC.card2, padding: "2px 6px", borderRadius: "4px" }}>{diagData.fairValueMethod}</span>
                     </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{
-                        fontSize: "18px", fontWeight: 800, marginBottom: "4px",
-                        color: diagData.score >= 70 ? CC.green : diagData.score >= 40 ? CC.yellow : CC.red,
-                      }}>{diagData.verdict}</div>
-                      <div style={{ fontSize: "14px", color: CC.text2, lineHeight: "1.5" }}>{diagData.summary}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+                      <div>
+                        <div style={{ fontSize: "13px", color: CC.text3 }}>{tt("chart.v3.fairValueLabel", "적정가치")}</div>
+                        <div style={{ fontSize: "17px", fontWeight: 700, color: CC.text1, fontFamily: MONO }}>{formatPrice(diagData.fairValue)}</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "13px", color: CC.text3 }}>{tt("chart.v3.vsFair", "현재가 vs 적정가")}</div>
+                        {(() => {
+                          const premium = diagData.currentPrice && diagData.fairValue
+                            ? ((diagData.currentPrice - diagData.fairValue) / diagData.fairValue) * 100
+                            : 0;
+                          const isOver = premium > 0;
+                          return (
+                            <div style={{
+                              fontSize: "17px", fontWeight: 700, fontFamily: MONO,
+                              color: Math.abs(premium) < 5 ? CC.yellow : isOver ? CC.red : CC.green,
+                            }}>
+                              {isOver ? "+" : ""}{premium.toFixed(1)}%
+                              <span style={{ fontSize: "13px", marginLeft: "4px", fontWeight: 500 }}>
+                                {Math.abs(premium) < 5 ? "적정" : isOver ? "고평가" : "저평가"}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </div>
                     </div>
                   </div>
+                )}
 
-                  {/* Fair value section */}
-                  {diagData.fairValue != null && (
-                    <div style={{
-                      background: CC.bg, borderRadius: "10px", padding: "12px", marginBottom: "12px",
-                      border: `1px solid ${CC.border}`,
-                    }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-                        <span style={{ fontSize: "14px", color: CC.text3, fontWeight: 600 }}>💰 적정가치 추정</span>
-                        <span style={{ fontSize: "12px", color: CC.text3, background: CC.card2, padding: "2px 6px", borderRadius: "4px" }}>{diagData.fairValueMethod}</span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-                        <div>
-                          <div style={{ fontSize: "14px", color: CC.text3 }}>적정가치</div>
-                          <div style={{ fontSize: "18px", fontWeight: 700, color: CC.text1 }}>{formatPrice(diagData.fairValue)}</div>
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: "14px", color: CC.text3 }}>현재가 vs 적정가</div>
-                          {(() => {
-                            const premium = diagData.currentPrice && diagData.fairValue
-                              ? ((diagData.currentPrice - diagData.fairValue) / diagData.fairValue) * 100
-                              : 0;
-                            const isOver = premium > 0;
-                            return (
-                              <div style={{
-                                fontSize: "18px", fontWeight: 700,
-                                color: Math.abs(premium) < 5 ? CC.yellow : isOver ? CC.red : CC.green,
-                              }}>
-                                {isOver ? "+" : ""}{premium.toFixed(1)}%
-                                <span style={{ fontSize: "14px", marginLeft: "4px", fontWeight: 500 }}>
-                                  {Math.abs(premium) < 5 ? "적정" : isOver ? "고평가" : "저평가"}
-                                </span>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Category scores */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-                    {diagData.categories.map(cat => (
+                {/* 카테고리 점수 */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: diagData.signals.length > 0 ? "12px" : 0 }}>
+                  {diagData.categories.map(cat => {
+                    const tone = scoreTone(CC, cat.score);
+                    return (
                       <div key={cat.name} style={{
                         background: CC.bg, borderRadius: "10px", padding: "10px 12px",
                         border: `1px solid ${CC.border}`,
                       }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-                          <span style={{ fontSize: "14px", color: CC.text3, fontWeight: 600 }}>{cat.icon} {cat.name}</span>
+                          <span style={{ fontSize: "13px", color: CC.text3, fontWeight: 600 }}>{cat.name}</span>
                           <span style={{
-                            fontSize: "15px", fontWeight: 700,
-                            color: cat.score >= 70 ? CC.green : cat.score >= 40 ? CC.yellow : CC.red,
+                            fontSize: "14px", fontWeight: 700, fontFamily: MONO,
+                            color: tone.fg,
                           }}>{cat.score}</span>
                         </div>
-                        <div style={{
-                          height: "4px", background: CC.border, borderRadius: "4px", overflow: "hidden",
-                        }}>
+                        <div style={{ height: "4px", background: CC.border, borderRadius: "4px", overflow: "hidden" }}>
                           <div style={{
                             height: "100%", borderRadius: "4px", transition: "width 0.6s ease",
                             width: `${cat.score}%`,
-                            background: cat.score >= 70 ? CC.green : cat.score >= 40 ? CC.yellow : CC.red,
+                            background: tone.fg,
                           }} />
                         </div>
-                        <div style={{ fontSize: "14px", color: CC.text3, marginTop: "4px" }}>{cat.detail}</div>
+                        <div style={{ fontSize: "12px", color: CC.text3, marginTop: "4px" }}>{cat.detail}</div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
 
-                {/* 상세 시그널 목록 */}
+                {/* 감지된 시그널 — 상태 서술만 (강세/약세/중립, 행동 지시 없음) */}
                 {diagData.signals.length > 0 && (
-                  <div style={{
-                    background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "12px",
-                    padding: "16px", marginBottom: "12px",
-                    borderTop: "none", borderTopLeftRadius: "0", borderTopRightRadius: "0",
-                  }}>
-                    <div style={{ fontSize: "15px", fontWeight: 700, marginBottom: "10px" }}>{"\uD83D\uDCCB"} 감지된 시그널</div>
+                  <div style={{ background: CC.bg, border: `1px solid ${CC.border}`, borderRadius: "10px", padding: "12px" }}>
+                    <div style={{ fontSize: "14px", fontWeight: 700, marginBottom: "8px", color: CC.text1 }}>{tt("chart.v3.detectedSignals", "감지된 시그널")}</div>
                     {diagData.signals.map((sig, i) => (
                       <div key={i} style={{
                         display: "flex", alignItems: "flex-start", gap: "10px",
@@ -2408,26 +2302,194 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                           flexShrink: 0, marginTop: "2px",
                           background: sig.type === "bullish" ? CC.greenBg : sig.type === "bearish" ? CC.redBg : CC.yellowBg,
                           color: sig.type === "bullish" ? CC.green : sig.type === "bearish" ? CC.red : CC.yellow,
-                        }}>{sig.type === "bullish" ? "매수" : sig.type === "bearish" ? "매도" : "중립"}</span>
+                        }}>{sig.type === "bullish" ? "강세" : sig.type === "bearish" ? "약세" : "중립"}</span>
                         <div>
-                          <div style={{ fontSize: "14px", fontWeight: 600, color: CC.text1 }}>{sig.name}</div>
-                          <div style={{ fontSize: "14px", color: CC.text3, marginTop: "2px" }}>{sig.detail}</div>
+                          <div style={{ fontSize: "13px", fontWeight: 600, color: CC.text1 }}>{sig.name}</div>
+                          <div style={{ fontSize: "13px", color: CC.text3, marginTop: "2px" }}>{sig.detail}</div>
                         </div>
                       </div>
                     ))}
                   </div>
                 )}
-              </>
+              </div>
             )}
           </div>
         )}
 
-        <div style={{ height: "30px" }} />
+        {/* ── 타이밍 마커 근거 (접기) — 차트 ▲▼ 마커의 산출 근거. "그래서 롱이야 숏이야?" 원칙 ── */}
+        {!loading && !error && showSignals && SIGNAL_TFS.includes(timeframe) && (latestScore || recentSignals.length > 0) && (
+          <div style={{ background: CC.card, border: `1px solid ${CC.border}`, borderRadius: "16px", marginBottom: "10px", overflow: "hidden" }}>
+            <button onClick={() => setShowTimingDetail(p => !p)} aria-expanded={showTimingDetail} style={{
+              width: "100%", display: "flex", alignItems: "center", gap: "8px",
+              background: "transparent", border: "none", cursor: "pointer",
+              padding: "12px 14px", textAlign: "left", fontFamily: "inherit",
+            }}>
+              <span style={{ fontSize: "13px", fontWeight: 700, color: CC.text1, whiteSpace: "nowrap" }}>{tt("chart.v3.timing", "타이밍 마커")}</span>
+              {latestScore && (
+                <span style={{
+                  fontSize: "12px", fontFamily: MONO, fontVariantNumeric: "tabular-nums", fontWeight: 700,
+                  color: latestScore.longScore >= 1.7 ? "#16A34A" : latestScore.longScore >= (latestScore.threshold || 0.75) ? CC.green : CC.text2,
+                }}>
+                  {tt("chart.v3.long", "롱")} {Math.min(100, Math.round(latestScore.longScore / 2.5 * 100))}
+                  <span style={{ color: CC.text3, fontWeight: 400 }}>/100 · {tt("chart.v3.entryLine", "진입선")} 68</span>
+                </span>
+              )}
+              <span aria-hidden="true" style={{ marginLeft: "auto", fontSize: "11px", color: CC.text3, display: "inline-block", transform: showTimingDetail ? "rotate(180deg)" : "none", transition: "transform .2s" }}>▼</span>
+            </button>
+            {showTimingDetail && (
+              <div style={{ borderTop: `1px solid ${CC.border}`, padding: "12px 14px", fontSize: "13px" }}>
+                {latestScore?.reasons?.length > 0 && (
+                  <div style={{ marginBottom: "6px", color: CC.text2 }}>
+                    <span style={{ color: CC.text3, fontSize: "12px" }}>{tt("chart.v3.lastBar", "현재(마지막 확정봉)")} — </span>
+                    {latestScore.reasons.join(" · ")}
+                  </div>
+                )}
+                {latestScore && latestScore.longScore === 0 && latestScore.recent && (
+                  <div style={{ marginBottom: "6px", color: CC.green, fontSize: "12px", fontWeight: 600 }}>
+                    {tt("chart.v3.recentFire", "최근 발화")} {Math.min(100, Math.round(latestScore.recent.score / 2.5 * 100))}점 ({latestScore.recent.barsAgo}봉 전)
+                  </div>
+                )}
+                {recentSignals.length === 0 ? (
+                  <div style={{ color: CC.text3 }}>{tt("chart.v3.noSignals", "이 구간 발화된 타점 시그널 없음")}</div>
+                ) : (
+                  recentSignals.map((s, idx) => (
+                    s.kind === "exit" ? (
+                      <div key={`x-${s.i}-${idx}`} style={{ marginBottom: "4px", color: "#F59E0B" }}>
+                        <span style={{ fontWeight: 700 }}>■ {tt("chart.v3.exit", "청산")}</span>
+                        <span style={{ color: CC.text2 }}> — {(s.reasons || []).join(" + ")}</span>
+                      </div>
+                    ) : (
+                      <div key={`${s.i}-${idx}`} style={{ marginBottom: "4px", color: s.dir > 0 ? CC.green : CC.red }}>
+                        <span style={{ fontWeight: 700 }}>{s.dir > 0 ? "▲ 롱 진입" : "▼ 숏(단기)"} {Math.min(100, Math.round(s.score / 2.5 * 100))}점</span>
+                        <span style={{ color: CC.text2 }}> — {(s.reasons || []).join(" + ")}</span>
+                      </div>
+                    )
+                  ))
+                )}
+                <div style={{ color: CC.text3, fontSize: "11px", marginTop: "8px", lineHeight: 1.5 }}>
+                  상장 이후 전체(약세장 포함) 딥 실측+홀드아웃 통과 요소만 점수화 · 롱은 EMA200 위에서만(레짐 게이트) · ▼숏=OBV 분산(약세장 한정·단기 성격, 유일 검증 숏) · ■청산=EMA20 이탈 리스크 규칙 · 1h는 펀딩 기반 요소(서버 연동 예정)라 4h/일봉 권장 · 수익 보장 아님
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── 면책 (시안 1f 하단 문구) ── */}
+        <div style={{ fontSize: "10px", color: CC.text3, textAlign: "center", padding: "2px 8px 8px", lineHeight: 1.5 }}>
+          {tt("chart.v3.disclaimer", "마커는 신호 발생·소멸 시점 표기이며 매매 지시가 아닙니다. 본 정보는 참고용 지표이며 투자 자문·권유가 아닙니다.")}
+        </div>
+
+        <div style={{ height: "24px" }} />
       </div>
+
+      {/* ── 설정 시트 — 시안 1f 밖 컨트롤 전량 수납 (KRW·로그·마커·보조지표). 로직은 기존 그대로 ── */}
+      <BottomSheet open={showSettings} onClose={() => setShowSettings(false)} title={tt("chart.v3.sheetTitle", "차트 설정")}>
+        <div style={{ fontSize: "12px", fontWeight: 700, color: CC.text3, marginBottom: "2px" }}>{tt("chart.v3.displaySection", "표시 옵션")}</div>
+        {canShowKRW && (
+          <div style={sheetRow(CC)}>
+            <span style={{ fontSize: "14px", fontWeight: 600, color: CC.text1 }}>{tt("chart.v3.krwToggle", "원화(₩) 환산")}</span>
+            <Switch checked={showKRW} onChange={() => setShowKRW(v => !v)} ariaLabel={tt("chart.v3.krwToggle", "원화(₩) 환산")} CC={CC} />
+          </div>
+        )}
+        <div style={sheetRow(CC)}>
+          <span style={{ fontSize: "14px", fontWeight: 600, color: CC.text1 }}>{tt("chart.v3.logScale", "로그 스케일")}</span>
+          <Switch checked={logScale} onChange={() => setLogScale(p => !p)} ariaLabel={tt("chart.v3.logScale", "로그 스케일")} CC={CC} />
+        </div>
+        <div style={sheetRow(CC)}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: "14px", fontWeight: 600, color: CC.text1 }}>{tt("chart.v3.markers", "타이밍 마커 (▲▼)")}</div>
+            <div style={{ fontSize: "11px", color: CC.text3, marginTop: "2px" }}>{tt("chart.v3.markersCaption", "1시간봉 이상에서 표시 — 저TF는 통계적으로 무효")}</div>
+          </div>
+          <Switch checked={showSignals} onChange={() => setShowSignals(p => !p)} ariaLabel={tt("chart.v3.markers", "타이밍 마커 (▲▼)")} CC={CC} />
+        </div>
+
+        <div style={{ fontSize: "12px", fontWeight: 700, color: CC.text3, margin: "16px 0 2px" }}>{tt("chart.v3.indicators", "보조지표")}</div>
+        {(settings.maList || []).map((ma, idx) => (
+          <div key={idx} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "8px 0" }}>
+            <input type="checkbox" checked={ma.enabled} aria-label={`MA${ma.period}`} onChange={() => {
+              const newList = [...settings.maList];
+              newList[idx] = { ...newList[idx], enabled: !newList[idx].enabled };
+              updateSettings({ ...settings, maList: newList });
+            }} style={{ accentColor: ma.color, width: "18px", height: "18px" }} />
+            <span style={{ fontSize: "14px", color: CC.text2, width: "28px" }}>MA</span>
+            <input type="number" value={ma.period} min={1} max={500} aria-label={tt("chart.v3.period", "기간")} onChange={e => {
+              const newList = [...settings.maList];
+              newList[idx] = { ...newList[idx], period: parseInt(e.target.value) || 5 };
+              updateSettings({ ...settings, maList: newList });
+            }} style={numInput(CC)} />
+            <input type="color" value={ma.color} aria-label={`MA${ma.period} 색상`} onChange={e => {
+              const newList = [...settings.maList];
+              newList[idx] = { ...newList[idx], color: e.target.value };
+              updateSettings({ ...settings, maList: newList });
+            }} style={{ width: "28px", height: "24px", border: "none", cursor: "pointer", background: "transparent", padding: 0 }} />
+            <button onClick={() => {
+              const newList = settings.maList.filter((_, i) => i !== idx);
+              updateSettings({ ...settings, maList: newList });
+            }} aria-label={`MA${ma.period} 삭제`} style={{
+              background: "transparent", border: "none", color: CC.red, cursor: "pointer", fontSize: "16px", padding: "4px", marginLeft: "auto",
+            }}>✕</button>
+          </div>
+        ))}
+        <button onClick={() => {
+          const colors = ["#facc15", "#38bdf8", "#f97316", "#a855f7", "#34d399", "#f472b6", "#fb923c", "#60a5fa"];
+          const c = colors[(settings.maList || []).length % colors.length];
+          updateSettings({ ...settings, maList: [...(settings.maList || []), { enabled: true, period: 10, color: c, width: 2 }] });
+        }} style={{
+          fontSize: "13px", padding: "6px 12px", borderRadius: "8px", cursor: "pointer", margin: "2px 0 8px",
+          background: CC.card2, color: CC.blue, border: `1px solid ${CC.border2}`, fontWeight: 600,
+        }}>{tt("chart.v3.addMa", "+ MA 추가")}</button>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", flexWrap: "wrap", borderTop: `1px solid ${CC.border}` }}>
+          <input type="checkbox" checked={!!settings.bb?.enabled} aria-label="볼린저 밴드" onChange={() => {
+            updateSettings({ ...settings, bb: { ...settings.bb, enabled: !settings.bb?.enabled } });
+          }} style={{ width: "18px", height: "18px", accentColor: "#60a5fa" }} />
+          <span style={{ fontSize: "14px", color: CC.text2, fontWeight: 600 }}>BB</span>
+          <label style={{ fontSize: "13px", color: CC.text3 }}>{tt("chart.v3.period", "기간")}
+            <input type="number" value={settings.bb?.period || 20} min={5} max={100} onChange={e => {
+              updateSettings({ ...settings, bb: { ...settings.bb, period: parseInt(e.target.value) || 20 } });
+            }} style={{ ...numInput(CC), width: "50px", marginLeft: "4px" }} />
+          </label>
+          <label style={{ fontSize: "13px", color: CC.text3 }}>{tt("chart.v3.mult", "배수")}
+            <input type="number" value={settings.bb?.mult || 2} min={0.5} max={5} step={0.5} onChange={e => {
+              updateSettings({ ...settings, bb: { ...settings.bb, mult: parseFloat(e.target.value) || 2 } });
+            }} style={{ ...numInput(CC), width: "50px", marginLeft: "4px" }} />
+          </label>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 0" }}>
+          <input type="checkbox" checked={!!settings.vol?.enabled} aria-label={tt("chart.v3.volume", "거래량")} onChange={() => {
+            updateSettings({ ...settings, vol: { ...settings.vol, enabled: !settings.vol?.enabled } });
+          }} style={{ width: "18px", height: "18px", accentColor: "#1f6feb" }} />
+          <span style={{ fontSize: "14px", color: CC.text2, fontWeight: 600 }}>{tt("chart.v3.volume", "거래량")}</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", flexWrap: "wrap" }}>
+          <input type="checkbox" checked={!!settings.rsi?.enabled} aria-label="RSI" onChange={() => {
+            updateSettings({ ...settings, rsi: { ...settings.rsi, enabled: !settings.rsi?.enabled } });
+          }} style={{ width: "18px", height: "18px", accentColor: "#f472b6" }} />
+          <span style={{ fontSize: "14px", color: CC.text2, fontWeight: 600 }}>RSI</span>
+          <label style={{ fontSize: "13px", color: CC.text3 }}>{tt("chart.v3.period", "기간")}
+            <input type="number" value={settings.rsi?.period || 14} min={2} max={50} onChange={e => {
+              updateSettings({ ...settings, rsi: { ...settings.rsi, period: parseInt(e.target.value) || 14 } });
+            }} style={{ ...numInput(CC), width: "50px", marginLeft: "4px" }} />
+          </label>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 0" }}>
+          <input type="checkbox" checked={!!settings.macd?.enabled} aria-label="MACD" onChange={() => {
+            updateSettings({ ...settings, macd: { ...settings.macd, enabled: !settings.macd?.enabled } });
+          }} style={{ width: "18px", height: "18px", accentColor: "#34d399" }} />
+          <span style={{ fontSize: "14px", color: CC.text2, fontWeight: 600 }}>MACD</span>
+        </div>
+
+        <button onClick={() => updateSettings(DEFAULT_SETTINGS)} style={{
+          fontSize: "13px", padding: "7px 14px", borderRadius: "8px", cursor: "pointer", marginTop: "10px",
+          background: "transparent", color: CC.text3, border: `1px solid ${CC.border2}`,
+        }}>{tt("chart.v3.reset", "기본값으로 초기화")}</button>
+      </BottomSheet>
 
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
         @keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+        @keyframes zcBlink { 0%,100%{opacity:.25} 50%{opacity:1} }
+        .zc-tfrow::-webkit-scrollbar { display: none; }
       `}</style>
     </div>
   );

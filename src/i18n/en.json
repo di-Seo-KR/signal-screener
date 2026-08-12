@@ -14,7 +14,8 @@
     "edit": "Edit",
     "more": "More",
     "settings": "Settings",
-    "refresh": "Refresh"
+    "refresh": "Refresh",
+    "scrollTop": "Back to top"
   },
   "nav": {
     "home": "Home",
@@ -37,7 +38,9 @@
     "tradingCat": "Trading",
     "market": "Market",
     "indicators": "Indicators",
-    "my": "MY"
+    "my": "MY",
+    "coin": "Crypto",
+    "stocks": "Stocks"
   },
   "header": {
     "login": "Login",
@@ -111,7 +114,14 @@
   },
   "searchOverlay": {
     "noResults": "No results for '{{q}}'",
-    "noResultsHint": "Try a company name, symbol, or ticker. Assets outside the supported list will not appear."
+    "noResultsHint": "Try a company name, symbol, or ticker. Assets outside the supported list will not appear.",
+    "catScreener": "Screener",
+    "catSignalBoard": "Signal Board",
+    "catCoin": "Coin Analysis",
+    "catEcon": "Econ Calendar",
+    "closeAria": "Close search",
+    "popularStocks": "Popular Assets",
+    "crypto": "Crypto"
   },
   "theme": {
     "dark": "Dark",
@@ -121,7 +131,9 @@
     "loginRequired": "Login Required",
     "loginRequired_desc": "The Live Trading Control Center is only accessible to authenticated users.",
     "logout_confirm": "Are you sure you want to logout?",
-    "logoutSuccess": "You have been logged out"
+    "logoutSuccess": "You have been logged out",
+    "modalTitle": "Sign in to Zepta",
+    "modalDesc": "Log in to use the investing service"
   },
   "timeframes": {
     "1m": "1m",
@@ -482,7 +494,13 @@
     "dataSync": "Data Sync",
     "syncPin": "Sync PIN (4+ digits)",
     "upload": "Upload",
-    "download": "Download"
+    "download": "Download",
+    "heroTitle": "Live Trading Alerts",
+    "heroDesc": "Detects signals from 41 quant strategies in real time",
+    "notifTitle": "Zepta notifications enabled",
+    "notifBody": "You'll be notified here when a strategy trading signal is detected 🚀",
+    "autoScanEvery": "Runs automatically every {{m}} minutes",
+    "recentSignals": "{{n}} recent signals"
   },
   "sentiment": {
     "title": "Social Sentiment Analysis",
@@ -536,7 +554,48 @@
     "darkMode": "Dark Mode",
     "lightMode": "Light Mode",
     "logout": "Logout",
-    "logoutConfirm": "Are you sure you want to logout?"
+    "logoutConfirm": "Are you sure you want to logout?",
+    "editProfile": "Edit profile",
+    "guestTitle": "Sign in to get your own signal alerts",
+    "guestDesc": "Your watchlist, saved conditions, and alerts are stored safely in your account.",
+    "guestStart": "Get started",
+    "guestLogin": "Sign in",
+    "savedConditions": "Saved Filters",
+    "streakDays": "Day Streak",
+    "daysUnit": "{{n}}d",
+    "shortcutWatchlist": "Manage watchlist",
+    "shortcutWatchlistHint": "Home watchlist section",
+    "shortcutSaved": "Saved screener conditions",
+    "shortcutAlerts": "Notification history",
+    "language": "Language",
+    "langKo": "한국어",
+    "langEn": "English",
+    "themeDark": "Dark",
+    "themeLight": "Light",
+    "ownerConsole": "Trading Console (owner)",
+    "consoleAuto": "Auto-trading (paper)",
+    "consoleReal": "Live trading",
+    "consoleMarketing": "Marketing dashboard",
+    "consoleSim": "Simulation",
+    "consoleLive": "Live",
+    "supportTitle": "Support",
+    "supportGuide": "Investing Guide",
+    "supportContact": "Contact Us",
+    "avatarAlt": "User avatar",
+    "backToMy": "Back",
+    "xpToNext": "{{xp}} XP to next level",
+    "reportShareText": "[Zepta Investment Report]\n{{name}} · {{watch}} watchlist | {{bots}} bots | day {{days}}\nStart free 👉 https://zepta.app",
+    "reportShareTitle": "Zepta Report Card",
+    "investorFallback": "Investor",
+    "copiedToast": "Copied!",
+    "shareBtn": "Share",
+    "todayEngage": "Today's Interactive Content",
+    "contentShortcuts": "Content Shortcuts",
+    "shortcutScreener": "Screener (sectors & all assets)",
+    "inviteDesc2": "Market signals and data analysis, free to use",
+    "inviteShareText": "An investing app that puts market signals and data in one view. It's free — try it 👉 https://zepta.app",
+    "copiedShort": "Copied!",
+    "linkCopied": "Link copied!"
   },
   "info": {
     "about": "About Us",
@@ -701,9 +760,9 @@
       "longDominant": "Long bias",
       "shortDominant": "Short bias",
       "updating": "Updating…",
-      "briefingLink": "Read today's full briefing →",
+      "briefingLink": "Full briefing",
       "todaySignals": "Today's Signals",
-      "viewAll": "View all →",
+      "viewAll": "View all",
       "signalSourceNote": "Top Binance futures coins",
       "segCoin": "Coins",
       "segStock": "Stocks",
@@ -718,11 +777,11 @@
       "asOfDailyClose": "Based on latest daily close",
       "staleSuffix": "update delayed",
       "topNews": "Top News",
-      "more": "More →",
+      "more": "More",
       "noNews": "No news to show yet.",
       "sentiPositive": "Positive",
       "sentiNegative": "Negative",
-      "fullSchedule": "Full schedule →",
+      "fullSchedule": "Full schedule",
       "noEvents": "No major economic events scheduled.",
       "tomorrow": "Tomorrow",
       "important": "High",
@@ -731,20 +790,24 @@
       "fgStock": "Fear & Greed Index (Stocks)",
       "fgCrypto": "Fear & Greed Index (Crypto)",
       "marketTempCoin": "Zepta Market Temp (Crypto)",
-      "marketTempPageLink": "How the Market Temp index works →",
+      "marketTempPageLink": "How Market Temp works",
       "tempDescCalm": "Market energy is low and calm",
       "tempDescMild": "Mildly warm and stable conditions",
       "tempDescHot": "Trading activity is heating up",
       "tempDescOverheat": "Overheating signals are appearing",
       "watchlistSummary": "Watchlist Summary",
       "bigMovers": "Today's Big Movers (Stocks & Crypto)",
-      "screenerLink": "Screener →",
+      "screenerLink": "Screener",
       "loadingQuotes": "Loading market data…",
       "quotePreparing": "Quote pending",
       "marketReport": "Market Report",
       "marketReportDesc": "A daily market summary built from index, sentiment, and breadth data.",
       "goView": "View →",
-      "disclaimer": "Signals and indicators shown are for reference only and are not investment advice."
+      "disclaimer": "Signals and indicators shown are for reference only and are not investment advice.",
+      "coinIndicatorsLink": "Crypto indicators",
+      "asOfShort": "As of {{time}}",
+      "ownerConsole": "Trading Console",
+      "ownerConsoleDesc": "Positions, signal queue and risk status in one view"
     },
     "screener": {
       "title": "Stock Screener",
@@ -769,7 +832,83 @@
       "results": "Scan Results",
       "noResults": "No stocks match these conditions",
       "or": "OR",
-      "and": "AND"
+      "and": "AND",
+      "marketKr": "Korea",
+      "marketUs": "US",
+      "mktOpen": "market open",
+      "mktPre": "pre-market",
+      "mktClosed": "market closed",
+      "mktWeekend": "weekend",
+      "mktToClose": "closes in {{d}}",
+      "mktToOpen": "opens in {{d}}",
+      "mktHoursNote": "Regular session hours · holidays not reflected",
+      "durHM": "{{h}}h {{m}}m",
+      "durM": "{{m}}m",
+      "signalsTitle": "Stock Signals",
+      "sigAll": "All",
+      "sortByScore": "By score",
+      "sigEmptyTitle": "Compiling stock signals",
+      "sigEmptyDesc": "Computed every 30–60 min during market hours for top-liquidity US and Korean stocks. Please check back shortly.",
+      "sigFilterEmpty": "No signals in the selected market right now",
+      "findByCondition": "Find by Conditions",
+      "editConditions": "Edit conditions",
+      "editConditionsCount": "Edit conditions · {{n}} found",
+      "applyScan": "Scan · {{n}} conditions",
+      "reset": "Reset",
+      "idleTitle": "Pick a preset to scan instantly",
+      "idleDesc": "Tap one preset chip above to scan {{n}} assets across US and Korean stocks plus crypto. Fine-tune anytime via 'Edit conditions'.",
+      "valueTitle": "Undervalued Stock Finder",
+      "valueDesc": "Composite analysis of PER · PBR · dividend yield · analyst targets · 52-week position",
+      "searchPlaceholder": "Search assets (e.g. Bitcoin, NVDA, Samsung)",
+      "searchAria": "Search assets",
+      "clearSearch": "Clear search",
+      "searchNoMatch": "No assets match '{{q}}'",
+      "searchResultMeta": "{{n}} results for '{{q}}' · tap an asset to open its analysis",
+      "selectConditionsHint": "Pick at least one screening condition above, then start the scan",
+      "saveConditionsTitle": "Save the current conditions to run again from 'Saved Screeners'",
+      "saveConditions": "Save conditions",
+      "errorsCount": "{{n}} errors",
+      "sortScore": "Quant Score",
+      "sortChange": "Change",
+      "sortVolume": "Volume",
+      "sortSignals": "Signals",
+      "sortBySuffix": "By {{label}}",
+      "sortLabel": "Sort",
+      "sortSheetTitle": "Sort by",
+      "noMatchTitle": "No assets match your conditions",
+      "noMatchDesc1": "No assets in the market satisfy all of these conditions right now",
+      "noMatchDesc2": "Pick one of the suggestions below to relax the conditions",
+      "relaxToOr": "Switch AND → OR mode (show if any condition matches)",
+      "relaxHalve": "Cut conditions {{from}} → {{to}}",
+      "relaxMarket": "Expand market filter → All",
+      "resetAllConditions": "Reset all conditions",
+      "relaxFallback": "Pick one of the suggested conditions and scan again",
+      "lastScanAt": "Last scan: {{time}}",
+      "colAsset": "Asset",
+      "colPrice": "Price",
+      "colChange": "Change",
+      "colSignals": "Signals",
+      "colScore": "Score",
+      "marketEmptyTitle": "No signals in the selected market",
+      "marketEmptyDesc": "Try another market filter ({{n}} found in total)",
+      "marketEmptyCta": "Expand market filter → All (view all {{n}})",
+      "valueScanBtn": "Value Scan",
+      "valueScanMeta": "Last scan: {{time}} · {{total}} analyzed · {{found}} undervalued found",
+      "valueSortTotal": "Overall",
+      "valueSortDiv": "Dividend↓",
+      "valueSortUpside": "Target↓",
+      "valueStrong": "Deeply undervalued",
+      "valueUndervalued": "Undervalued",
+      "valuePossible": "Possibly undervalued",
+      "valueWatch": "Watch",
+      "scorePts": "{{n}} pts",
+      "divShort": "Div",
+      "targetShort": "Target",
+      "top50Only": "Showing top 50 only ({{n}} total)",
+      "valueEmptyDesc1": " — tap to analyze US & Korean stocks",
+      "valueEmptyDesc2": "with a combined valuation model",
+      "valueBasis": "Based on PER · PBR · dividend yield · forward PE · analyst targets · 52-week position · MA200 gap",
+      "valueMarketEmpty": "No stocks meet the value criteria in this market — try another filter"
     },
     "quantReport": {
       "title": "Quant Report",
@@ -795,7 +934,81 @@
       "noBuySignals": "No Bullish Signals",
       "messagesBullish": "Bullish signals are dominant. {{upCount}} rising stocks, {{buyPicks}} bullish signals detected.",
       "messagesMixed": "Signals are mixed between bullish and bearish.",
-      "messagesBearish": "Bearish signals are dominant. {{dnCount}} falling stocks."
+      "messagesBearish": "Bearish signals are dominant. {{dnCount}} falling stocks.",
+      "marketReportTitle": "Market Report",
+      "asOfTime": "As of {{time}}",
+      "shareTitle": "Zepta Market Report",
+      "shareText": "[Zepta Market Report] {{time}}\n\nMarket score: {{score}}/100 ({{verdict}})\n{{up}} up · {{dn}} down\n\nComposite of indices, fear & greed, and breadth\n👉 https://zepta.app",
+      "copied": "Report copied!",
+      "emptyTitle": "Compiling the report",
+      "emptyDesc": "We gather index and signal data into one summary. It appears as soon as data is ready.",
+      "overallScore": "Overall Market Score",
+      "verdictStrongBull": "Bullish",
+      "verdictWeakBull": "Mildly bullish",
+      "verdictMixed": "Mixed",
+      "verdictWeakBear": "Bearish",
+      "verdictStrongBear": "Strongly bearish",
+      "messagesBullishNoScan": "Bullish signals are dominant. {{upCount}} rising stocks.",
+      "noData": "No data",
+      "upFlatDown": "{{up}} up · {{flat}} flat · {{dn}} down",
+      "vixHigh": "High volatility",
+      "vixMid": "Moderate",
+      "vixLow": "Calm",
+      "scannedOf": "/ {{n}} stocks scanned",
+      "usStocks": "US Stocks",
+      "krStocks": "Korean Stocks",
+      "cryptoName": "Crypto",
+      "upOfTotal": "{{up}}/{{total}} up",
+      "breadthDesc": "{{pct}}% of the {{total}} tracked assets are rising",
+      "noAggregated": "No assets aggregated",
+      "sectorPerf": "Sector Performance",
+      "sectorCellMeta": "{{count}} stocks · {{pct}}% up",
+      "sector": {
+        "semi": "Semiconductors",
+        "bigTech": "Big Tech",
+        "software": "Software",
+        "fintech": "Fintech",
+        "healthcare": "Healthcare",
+        "energy": "Energy",
+        "consumer": "Consumer",
+        "financials": "Financials",
+        "evClean": "EV/Clean",
+        "chinaAdr": "China ADR"
+      },
+      "surgeTop5": "Top 5 Surges",
+      "plungeTop5": "Top 5 Plunges",
+      "todayBuySignalStocks": "Today's Bullish-Signal Stocks",
+      "perStockStrategies": "Quant Strategies by Stock",
+      "touchForBacktest": "Tap a stock → backtest detail",
+      "diagScore": "Diagnosis {{score}} pts",
+      "backtestBadge": "Backtest",
+      "todaySummaryTitle": "Today's Market Snapshot",
+      "sumBull": "Bullish signals are dominant",
+      "sumMixed": "Mixed zone — no clear direction",
+      "sumBear": "Bearish signals are dominant",
+      "sumAnomaly": "{{n}} anomalies — sharp movers detected",
+      "sumBuySignals": "{{n}} bullish signals detected",
+      "sumSellSignals": "{{n}} bearish signals detected",
+      "sumExtremeFear": "Fear & Greed is in extreme fear",
+      "sumExtremeGreed": "Fear & Greed is in extreme greed",
+      "sumVixHigh": "VIX {{v}} — high-volatility zone",
+      "sumPortfolioLoss": "Your portfolio is in a loss zone",
+      "sumAlpha": "+{{a}}% excess return vs the market",
+      "overallStatusTitle": "Overall Market Status",
+      "statusStrongBull": "The market is in a bullish phase. S&P 500 {{sp}}, with {{pct}}% of stocks rising — bullish signals dominate. Bullish signals were detected on {{buyPicks}} stocks.",
+      "statusOverheatNote": "The Fear & Greed index is in extreme greed — an overheated zone.",
+      "statusWeakBull": "The market shows mild strength. {{upCount}} stocks are rising versus {{dnCount}} falling, but no firm direction has formed yet. {{fgPart}} is also being observed.",
+      "statusFgPart": "the Fear & Greed reading of {{fg}} ({{label}})",
+      "statusFgFallback": "market sentiment",
+      "statusMixed": "The market is mixed. Rising ({{upCount}}) and falling ({{dnCount}}) stocks are evenly matched, with no clear direction. Breaks of key support/resistance zones have not been confirmed yet.",
+      "statusWeakBear": "The market is weak. Falling stocks ({{dnCount}}) dominate and sentiment is contracting. Bearish signals prevail.",
+      "statusFearNote": "The fear gauge is in a low zone.",
+      "statusStrongBear": "The market is strongly bearish. Most stocks are declining under heavy selling pressure, and volatility is elevated.",
+      "chipScore": "Score {{score}}/100",
+      "chipAdv": "Breadth {{pct}}%",
+      "chipFg": "Fear&Greed {{fg}}",
+      "chipBuy": "{{n}} bullish signals",
+      "disclaimer": "This screen is a market data summary — not a stock recommendation or investment solicitation. Investment decisions and responsibility are your own."
     },
     "news": {
       "title": "Market News",
@@ -818,7 +1031,67 @@
       "timeAgo": "{{time}} ago",
       "minutesAgo": "{{minutes}} minutes ago",
       "hoursAgo": "{{hours}} hours ago",
-      "daysAgo": "{{days}} days ago"
+      "daysAgo": "{{days}} days ago",
+      "sortLabel": "Sort",
+      "emptyFilterTitle": "No news matches your filters",
+      "emptyFilterDesc": "No news in the selected category. Try adjusting the filter.",
+      "resetFilter": "Reset filters",
+      "emptyTitle": "No news fetched yet",
+      "emptyDesc": "We'll gather today's market news in one place",
+      "refreshAria": "Refresh news",
+      "loadingBtn": "Loading...",
+      "refreshNow": "Refresh now",
+      "catUs": "US",
+      "catKr": "Korea",
+      "catCrypto": "Crypto",
+      "catMacro": "Macro",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "dateMd": "{{m}}/{{d}}",
+      "readings": "Reading",
+      "blogAll": "All posts →"
+    },
+    "coin": {
+      "title": "Crypto",
+      "ctxTemp": "Market Temp",
+      "ctxFearGreed": "Fear & Greed",
+      "ctxKimchi": "Kimchi Premium",
+      "ctxFunding": "Avg Funding",
+      "derivTitle": "Derivatives",
+      "sampleNote": "{{n}} coins · 24h",
+      "oiAvg": "OI 24h avg",
+      "oiUp": "OI expanding",
+      "oiDown": "OI contracting",
+      "globalLs": "Avg long/short",
+      "stable": "Stablecoin liquidity",
+      "liq24h": "24h liquidations",
+      "liqLong": "Long {{n}}%",
+      "liqShort": "Short {{n}}%",
+      "signalsTitle": "Crypto Signals",
+      "sortByScore": "By score",
+      "tf1w": "W",
+      "tf1d": "D",
+      "tf4h": "4H",
+      "tf1h": "1H",
+      "emptyTitle": "Aggregating signals",
+      "emptyDesc": "Scores are computed every 10 minutes across top-liquidity coins. Please check back shortly.",
+      "retry": "Retry",
+      "indexLinksLabel": "Index guides",
+      "indexTempLink": "Market Temp",
+      "indexFundingLink": "Funding Squeeze",
+      "indexAltLink": "Alt Heat",
+      "indexDetailLink": "Full guide & methodology",
+      "asOf": "as of {{time}}",
+      "disclaimer": "This information is for reference only and is not investment advice or a solicitation.",
+      "findByConditions": "Find coins by conditions"
+    },
+    "indicators": {
+      "title": "Indicators",
+      "calendarTab": "Calendar",
+      "newsTab": "News",
+      "monthPill": "{{m}}/{{y}}",
+      "calendarCaption": "US economic release schedule and results, shown in Korea Standard Time",
+      "econArchiveLink": "Results archive"
     },
     "sentiment": {
       "title": "Social Sentiment",
@@ -835,7 +1108,33 @@
       "detected": "Detected",
       "surge": "Surge",
       "plunge": "Plunge",
-      "highRisk": "High Risk"
+      "highRisk": "High Risk",
+      "all": "All",
+      "emptyTitle": "No anomalies",
+      "emptyFilterTitle": "No results for this filter",
+      "emptyDesc1": "No statistical outliers detected in the market right now",
+      "emptyDesc2": "You'll be alerted on 2σ+ moves or 3x+ volume spikes",
+      "emptyFilterDesc": "Try another filter or view all",
+      "volRatio": "Volume Ratio",
+      "ma200Gap": "MA200 Gap",
+      "weeklyChange": "Weekly Change",
+      "detectedAt": "Detected: {{time}}",
+      "history": "Detection History",
+      "historyReset": "Clear",
+      "historyClearConfirm": "Delete all anomaly detection history?",
+      "historyEmpty": "No anomaly history recorded yet",
+      "criteria": "Detection Criteria",
+      "critPrice": "Abnormal price move",
+      "critPriceDesc": "2σ+ vs market average and a 3%+ move",
+      "critVolume": "Volume spike",
+      "critVolumeDesc": "Volume 3x+ the 5-day average",
+      "critGap": "Sharp gap",
+      "critGapDesc": "3%+ gap vs previous close",
+      "critHigh": "High-risk grade",
+      "critHighDesc": "Extreme 3σ+ move vs average",
+      "reasonChange": "Move {{chg}}% ({{mult}}x the average)",
+      "reasonVolume": "Volume spike {{ratio}}x",
+      "reasonGap": "Gap {{gap}}%"
     },
     "profile": {
       "investReport": "My Investment Report",
@@ -855,7 +1154,639 @@
       "cpi": "CPI",
       "nfp": "NFP",
       "gdp": "GDP",
-      "todayEvents": "Today's Economic Events"
+      "todayEvents": "Today's Economic Events",
+      "filterAll": "All",
+      "employment": "Jobs",
+      "yearMonth": "{{m}}/{{y}}",
+      "weekN": "Week {{n}}",
+      "prevWeek": "Previous week",
+      "nextWeek": "Next week",
+      "weeklyAiSummary": "This Week's AI Summary",
+      "scheduledOn": "release is scheduled on the {{d}} ({{day}})",
+      "scheduledSoon": "release is coming up soon",
+      "resultUp": "Above",
+      "resultDown": "Below",
+      "resultDone": "Released",
+      "resultScheduled": "Scheduled",
+      "impHigh": "High",
+      "impMid": "Medium",
+      "dayFilterNotice": "Showing only {{m}}/{{d}} events",
+      "viewAllX": "View all ✕",
+      "emptyDayTitle": "No events on the selected date",
+      "emptyFilterTitle": "No events match this filter",
+      "emptyDesc": "Major releases cluster on weekdays. Check other dates or filters for remaining events.",
+      "viewAllEvents": "View all events",
+      "colForecast": "Forecast",
+      "colPrevious": "Previous",
+      "colActual": "Actual",
+      "noAggregate": "No data",
+      "awaitingRelease": "Awaiting release",
+      "scheduledAtHour": "Due at {{h}}:00",
+      "guideCollapse": "Hide guide ▲",
+      "guideExpand": "💡 View interpretation guide ▼",
+      "guideTitle": "Interpretation Guide",
+      "whatIsThis": "{{name}} — what is this?",
+      "riskAssetVerdict": "{{dir}} for risk assets (stocks & crypto)",
+      "actualVsForecast": "Actual {{actual}} vs forecast {{est}}",
+      "prevParen": "(prev {{prev}})",
+      "ifHigher": "If above forecast",
+      "ifLower": "If below forecast",
+      "guideDisclaimer": "General market interpretation · for reference only, not investment advice",
+      "relatedRiskMap": "Related: Risk Map →",
+      "verdictGood": "Typically bullish",
+      "verdictBad": "Typically bearish",
+      "verdictNeutral": "Neutral",
+      "verdictMatch": "In line with forecast — no surprise",
+      "disclaimer": "This information is for reference only — not investment advice or solicitation.",
+      "guide": {
+        "CPI": {
+          "name": "Consumer Price Index",
+          "desc": "Inflation as felt by US consumers — the flagship gauge the Fed leans on for rate decisions.",
+          "high": "Hotter-than-expected inflation → rate cuts pushed back → typically bearish for stocks & crypto",
+          "low": "Cooling inflation → stronger rate-cut hopes → typically bullish"
+        },
+        "PCE": {
+          "name": "PCE Price Index",
+          "desc": "The Fed's officially preferred inflation gauge — same family as CPI.",
+          "high": "Persistent price pressure → tightening fears → typically bearish",
+          "low": "Cooling prices → rate-cut hopes → typically bullish"
+        },
+        "PPI": {
+          "name": "Producer Price Index",
+          "desc": "Wholesale prices received by businesses — read as a leading indicator for CPI.",
+          "high": "Rising producer prices → reflation fears → typically bearish",
+          "low": "Easing price pressure → typically bullish"
+        },
+        "FOMC": {
+          "name": "Fed Rate Decision",
+          "desc": "The Federal Reserve's benchmark rate decision — the single biggest event for global asset markets.",
+          "high": "Higher-than-expected rate (hawkish) → tighter liquidity → typically bearish",
+          "low": "Lower rate / cut (dovish) → more liquidity → typically bullish",
+          "note": "When in line with expectations, the statement and dot plot (future path) move markets more than the rate itself."
+        },
+        "NFP": {
+          "name": "Nonfarm Payrolls",
+          "desc": "Jobs added in the US over a month — the flagship gauge of economic strength.",
+          "high": "Strong hiring → solid economy → typically bullish",
+          "low": "Slowing hiring → recession fears → typically bearish",
+          "note": "Too-strong numbers can flip the reaction on 'delayed rate cut' fears."
+        },
+        "GDP": {
+          "name": "Gross Domestic Product",
+          "desc": "Growth of the entire US economy — the overall report card of the cycle.",
+          "high": "Solid growth → earnings hopes → typically bullish",
+          "low": "Slowing growth → recession fears → typically bearish",
+          "note": "An overheated surprise can also be read as rate pressure."
+        },
+        "RETAIL": {
+          "name": "Retail Sales",
+          "desc": "US consumer spending — a direct read on consumption, ~70% of the US economy.",
+          "high": "Solid spending → healthy economy → typically bullish",
+          "low": "Weak spending → slowdown fears → typically bearish",
+          "note": "In inflationary phases, hot spending can be read the other way as rate pressure."
+        },
+        "ISM": {
+          "name": "ISM Manufacturing Index",
+          "desc": "Manufacturing purchasing managers' sentiment. Above 50 = expansion, below = contraction.",
+          "high": "Manufacturing expansion → healthy economy → typically bullish",
+          "low": "Manufacturing contraction → slowdown → typically bearish"
+        },
+        "UNEMP": {
+          "name": "Unemployment Rate",
+          "desc": "The share of people without jobs. Lower means a stronger labor market.",
+          "high": "Rising unemployment → slowdown fears → typically bearish",
+          "low": "Solid employment → healthy economy → typically bullish"
+        },
+        "CLAIMS": {
+          "name": "Initial Jobless Claims",
+          "desc": "People newly filing for unemployment benefits in a week — the labor market's weekly bulletin.",
+          "high": "Rising claims → labor weakening → typically bearish",
+          "low": "Falling claims → solid employment → typically bullish"
+        },
+        "OTHER": {
+          "name": "Economic Indicator",
+          "desc": "A key US economic indicator. The surprise vs forecast is what moves markets.",
+          "high": "Above forecast → healthy-economy signal → typically bullish",
+          "low": "Below forecast → slowdown signal → typically bearish"
+        }
+      }
+    }
+  },
+  "diag": {
+    "verdictLabel": {
+      "strongUp": "Strong bullish signals",
+      "up": "Bullish signals dominant",
+      "slightUp": "Slightly bullish signals",
+      "neutral": "Neutral",
+      "slightDown": "Slightly bearish signals",
+      "down": "Bearish signals dominant",
+      "strongDown": "Strong bearish signals"
+    },
+    "cat": {
+      "trend": "Trend",
+      "momentum": "Momentum",
+      "flow": "Flow",
+      "position": "Position",
+      "volatility": "Volatility",
+      "fundamental": "Fundamental"
+    },
+    "market": {
+      "us": "US",
+      "kr": "KR",
+      "crypto": "Crypto"
+    },
+    "seg": {
+      "all": "All",
+      "stock": "Stocks",
+      "crypto": "Crypto"
+    },
+    "tripleBull": "Triple bullish",
+    "comboBull": "Multi bullish",
+    "tripleBear": "Triple bearish",
+    "comboBear": "Multi bearish",
+    "accumulation": "Accumulation",
+    "distribution": "Distribution",
+    "flowShort": "Flow",
+    "signalSummary": "Signal summary",
+    "buyPressure": "buying pressure",
+    "sellPressure": "selling pressure",
+    "macdBullTurn": "MACD bullish turn",
+    "macdBearTurn": "MACD bearish turn",
+    "rsiBullTurn": "RSI bullish turn",
+    "rsiBearTurn": "RSI bearish turn",
+    "viewChart": "View chart",
+    "detailsLink": "Details",
+    "ind": {
+      "rsiWeekly": "RSI(14) weekly",
+      "rsiDaily": "RSI(14) daily",
+      "mtfOversold": "MTF oversold",
+      "mtfOverbought": "MTF overbought",
+      "vsMa200": "vs 200-day MA",
+      "volRatio": "Volume ratio",
+      "stochK": "Stochastic %K",
+      "stochastic": "Stochastic",
+      "vs52wLow": "vs 52w low",
+      "pos52w": "52w position",
+      "plusDiDominant": "+DI dominant",
+      "minusDiDominant": "-DI dominant",
+      "weakTrend": "Weak trend",
+      "squeezeImminent": "Volatility burst imminent",
+      "normalState": "Normal",
+      "accumStrong": "Strong accumulation",
+      "distWarning": "Distribution warning",
+      "oversold": "Oversold",
+      "overbought": "Overbought",
+      "weak": "Weak",
+      "strong": "Strong"
+    },
+    "tags": {
+      "macdBullDiv": "MACD bullish divergence",
+      "macdBearDiv": "MACD bearish divergence",
+      "rsiBullDiv": "RSI bullish divergence",
+      "rsiBearDiv": "RSI bearish divergence",
+      "obvAccumDiv": "OBV accumulation divergence",
+      "obvDistDiv": "OBV distribution divergence",
+      "pocNear": "Near POC ({{price}})"
+    },
+    "refreshing": "Refreshing...",
+    "releaseToRefresh": "Release to refresh",
+    "pullDown": "Pull down",
+    "searchPlaceholder": "Search assets (e.g. AAPL, Samsung, BTC...)",
+    "searchShort": "Search name or ticker",
+    "searchLong": "Enter name or ticker (e.g. NVDA, Samsung Electronics)",
+    "dirUp": "bullish",
+    "dirDown": "bearish",
+    "mtfAlignedTf": "{{aligned}} of {{total}} timeframes ({{tfList}}) point {{dir}}.",
+    "mtfAlignedDefault": "{{aligned}} of the four timeframes (W·D·4H·1H) point {{dir}}.",
+    "toResistance": "+{{pct}}% to nearest resistance",
+    "toSupport": "−{{pct}}% to support",
+    "remaining": "{{parts}} remaining.",
+    "tfBand": "{{label}} frame",
+    "binancePerp": "Binance Futures · Perpetual",
+    "shareText": "[Zepta Diagnosis] {{name}}({{symbol}}) — composite {{score}} pts · {{verdict}}\n\nComposite technical-indicator score. Investment decisions and responsibility are your own.\n👉 https://zepta.app",
+    "shareDiagTitle": "{{name}} technical diagnosis",
+    "shareDiag": "Share diagnosis",
+    "diagCopied": "Diagnosis copied to clipboard!",
+    "shareBriefingTitle": "Zepta Market Briefing",
+    "shareBriefingText": "Check real-time global market conditions",
+    "linkCopied": "Link copied",
+    "loginToSaveConditions": "Sign in to save your conditions",
+    "selectConditionsFirst": "Select conditions to save first",
+    "conditionsSaved": "Conditions saved — rerun them anytime from 'Saved screens'",
+    "myConditions": "My conditions ({{n}})",
+    "scanResults": "Scan results",
+    "matchedCount": "{{n}} assets matched",
+    "lastUpdatedAt": "last updated {{time}}",
+    "trendStrong": "strong",
+    "trendSlightUp": "slightly up",
+    "trendSlightDown": "slightly down",
+    "trendWeak": "weak",
+    "usMarketTodayPrefix": "US markets are trending",
+    "usMarketTodaySuffix": "today",
+    "tgAutoSent": "Auto alert sent",
+    "tgSendFailed": "Telegram send failed",
+    "sync": {
+      "pinRequired": "PIN must be 4+ digits",
+      "uploading": "Uploading...",
+      "downloading": "Downloading...",
+      "done": "Sync complete",
+      "uploadFailed": "Upload failed",
+      "noData": "No data"
+    },
+    "landing": {
+      "heroTitle": "Quant strategies auto-analyze key support zones",
+      "heroDesc": "Stocks, crypto, and FX. Start free and pick from validated strategies.",
+      "startFree": "Start for free",
+      "explore": "Explore",
+      "trustStrategies": "Validated strategies",
+      "trustStrategiesValue": "9",
+      "trustLive": "Live data",
+      "trustSecurity": "Security",
+      "trustPayment": "Payment",
+      "trustPaymentValue": "Free during beta"
+    },
+    "menu": {
+      "alphaLab": "Alpha Lab",
+      "botRanking": "Bot ranking",
+      "copyTrading": "Copy trading",
+      "strategyCompare": "Strategy compare",
+      "assetAnalysis": "Asset analysis",
+      "savedConditions": "Saved screens",
+      "membership": "Membership"
+    },
+    "preMarket": "Pre",
+    "afterHours": "After",
+    "analyzing": "Analyzing technical indicators...",
+    "majorSupportZone": "Key support zones",
+    "confidenceStrength": "Evidence strength",
+    "btDisclaimer": "Simulated results based on historical data; future returns are not guaranteed. Fees and slippage are not reflected.",
+    "sharpe": "Sharpe",
+    "winRate": "Win rate",
+    "tradesSuffix": " trades",
+    "quantStrategy": "Quant strategy",
+    "analyzedJustNow": "analyzed just now",
+    "analyzedMinAgo": "analyzed {{n}} min ago",
+    "stratBullTarget": "Bullish technical signals dominant. Upper reference level {{target}}(+{{upside}}%), lower risk level {{stop}}.",
+    "stratBullNoTarget": "Uptrend detected. Below {{stop}}, the signal may weaken.",
+    "stratBear": "Bearish signals dominant. {{support}} is observed as the key support level.",
+    "stratMixed": "Mixed zone. Signals are blended between support {{support}} and resistance {{resistance}}.",
+    "targetPrice": "Target",
+    "stopPrice": "Stop loss",
+    "bullAligned": "Bullish alignment",
+    "bearAligned": "Bearish alignment",
+    "mixed": "Mixed",
+    "scoreStrong": "Strong",
+    "scoreSomewhatStrong": "Somewhat strong",
+    "scoreWeak": "Weak",
+    "fin": {
+      "companyInfo": "Company info",
+      "earningsSummary": "Earnings summary",
+      "revenue": "Revenue",
+      "operatingIncome": "Operating income",
+      "netIncome": "Net income",
+      "grossMargin": "Gross margin",
+      "operatingMargin": "Operating margin",
+      "netMargin": "Net margin",
+      "quarterlyTrend": "Quarterly trend",
+      "valuation": "Valuation",
+      "undervalued": "Undervalued",
+      "fair": "Fair",
+      "overvalued": "Overvalued",
+      "veryOvervalued": "Very overvalued",
+      "slightlyOvervalued": "Slightly overvalued",
+      "veryUndervalued": "Very undervalued",
+      "slightlyUndervalued": "Slightly undervalued",
+      "fairRange": "Fair range",
+      "marketCap": "Mkt cap",
+      "dividendYield": "Div yield",
+      "beta": "Beta",
+      "trillionWon": "T KRW",
+      "hundredMillionWon": "0.1B KRW",
+      "profitabilityHealth": "Profitability & financial health",
+      "debtRatio": "Debt/Equity",
+      "currentRatio": "Current ratio",
+      "estRevenue": "Est. revenue",
+      "estEps": "Est. EPS",
+      "fairValueAnalysis": "Fair value analysis",
+      "compositeFairValue": "Composite fair value",
+      "priceGap": "Gap vs price"
+    },
+    "rec": {
+      "buy": "Buy",
+      "strongBuy": "Strong buy",
+      "hold": "Hold",
+      "sell": "Sell",
+      "underperform": "Underweight",
+      "overweight": "Overweight"
+    },
+    "analystConsensus": "Analyst consensus",
+    "analystCount": "{{n}} analysts",
+    "highest": "High",
+    "lowest": "Low",
+    "currentMarker": "Now",
+    "targetMarker": "Target",
+    "nextEarnings": "next earnings",
+    "nextEarningsAnnouncement": "Next earnings date",
+    "technicalIndicators": "Technical indicators",
+    "flowSection": "Money flow",
+    "popupDisclaimer": "Displayed targets, stops, support/resistance levels, and scores are reference information computed from historical prices — not investment advice. Investment decisions and responsibility are your own.",
+    "model": {
+      "techMeanReversion": "Technical mean reversion",
+      "statMeanReversion": "Statistical mean reversion",
+      "analystTarget": "Analyst target",
+      "fib52w": "52w Fibonacci midpoint"
+    },
+    "presets": {
+      "momentum_up": {
+        "name": "Sustained uptrend",
+        "desc": "Strong upward momentum assets"
+      },
+      "undervalued_growth": {
+        "name": "Undervalued growth",
+        "desc": "Undervalued relative to growth"
+      },
+      "value_cheap": {
+        "name": "Still-cheap value",
+        "desc": "Possible rebound near 52w low"
+      },
+      "dividend_steady": {
+        "name": "Steady dividends",
+        "desc": "Stable dividends + low volatility"
+      },
+      "money_maker": {
+        "name": "Money makers",
+        "desc": "High profitability + uptrend"
+      },
+      "reversal": {
+        "name": "Value breakout",
+        "desc": "Rebound signals detected"
+      },
+      "future_dividend": {
+        "name": "Future dividend kings",
+        "desc": "Dividend growth potential"
+      },
+      "growth_expect": {
+        "name": "Growth candidates",
+        "desc": "High-growth momentum assets"
+      },
+      "double_buy": {
+        "name": "Dual buying",
+        "desc": "Simultaneous institutional + foreign buying signal"
+      },
+      "high_yield_underval": {
+        "name": "High-yield undervalued",
+        "desc": "High-return undervalued assets"
+      },
+      "stable_growth": {
+        "name": "Stable growth",
+        "desc": "Low volatility + steady rise"
+      }
+    },
+    "quizPool": [
+      {
+        "q": "If the VIX is above 30, the market is in a state of?",
+        "options": [
+          "Fear",
+          "Greed",
+          "Neutral"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "What is a golden cross?",
+        "options": [
+          "Short MA > long MA",
+          "Short MA < long MA",
+          "Volume surge"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "A high PER means the stock is?",
+        "options": [
+          "Overvalued",
+          "Undervalued",
+          "Normal"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "RSI below 30 means?",
+        "options": [
+          "Oversold",
+          "Overbought",
+          "Neutral"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Which body sets the US benchmark rate?",
+        "options": [
+          "SEC",
+          "Fed (FOMC)",
+          "IMF"
+        ],
+        "answer": 1
+      },
+      {
+        "q": "When does the KOSPI market open?",
+        "options": [
+          "8 AM",
+          "9 AM",
+          "10 AM"
+        ],
+        "answer": 1
+      },
+      {
+        "q": "When the dollar strengthens, the won usually?",
+        "options": [
+          "Weakens",
+          "Strengthens",
+          "No relation"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Breaking above the upper Bollinger Band signals?",
+        "options": [
+          "Overbought",
+          "Oversold",
+          "Trend reversal"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "How many companies are in the S&P 500?",
+        "options": [
+          "100",
+          "500",
+          "1000"
+        ],
+        "answer": 1
+      },
+      {
+        "q": "Bond prices and interest rates are?",
+        "options": [
+          "Inversely related",
+          "Directly related",
+          "Unrelated"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "A MACD golden cross is a?",
+        "options": [
+          "Buy signal",
+          "Sell signal",
+          "Wait signal"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Which sector benefits from rising oil prices?",
+        "options": [
+          "Energy",
+          "Tech",
+          "Utilities"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "Largest company by market cap? (2025)",
+        "options": [
+          "Apple",
+          "Microsoft",
+          "NVIDIA"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "The Nasdaq index is characterized by?",
+        "options": [
+          "Tech-heavy",
+          "Industrials-heavy",
+          "Financials-heavy"
+        ],
+        "answer": 0
+      }
+    ],
+    "buyLevels": {
+      "noPrice": "Cannot compute key support zones — no current price",
+      "ma50Bounce": "Bounce entry at the 50-day moving average (MA50)",
+      "near52wLow": "Strong support near the 52-week low",
+      "recentLowBounce": "Bounce opportunity at the recent low",
+      "ma200Support": "Support at the 200-day moving average (MA200)",
+      "fib382": "Fibonacci 38.2% retracement level",
+      "pullback8": "Mid-term correction target — 8% pullback",
+      "fib618": "Fibonacci 61.8% retracement (strong support)",
+      "safeMargin5": "5% safety margin above the 52-week low",
+      "pullback15": "Extreme correction target — 15% pullback",
+      "supportN": "Support {{n}}",
+      "summaryRange": "Key support zones formed at -{{min}}% to -{{max}}% below the current price",
+      "noData": "Cannot compute key support zones — insufficient data"
+    }
+  },
+  "nickname": {
+    "title": "Nickname",
+    "notSet": "Not set",
+    "placeholder": "Enter nickname",
+    "generate": "Generate",
+    "saving": "Saving...",
+    "required": "Please enter a nickname",
+    "saveFailed": "Save failed"
+  },
+  "footer": {
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "about": "About",
+    "blog": "Blog",
+    "guide": "Investing Guide",
+    "econResults": "Econ Data Results",
+    "contact": "Contact",
+    "ceoLine": "CEO: Dongin Seo",
+    "contactLine": "Contact: donginseo0421@gmail.com",
+    "disclaimerTitle": "Investment Disclaimer",
+    "disclaimerP1": "Zepta is an investment information and data service — not a licensed investment adviser or discretionary manager. All information, signals, and data are provided for reference only and are not stock recommendations or investment solicitations.",
+    "disclaimerP2": "All investment decisions and their outcomes (profits and losses) are your own responsibility; Zepta makes no guarantee against investment losses. Past backtest and simulation performance does not guarantee future returns."
+  },
+  "watchDock": {
+    "toggleAria": "Toggle watchlist panel",
+    "addedToast": "{{name}} added",
+    "loginPrompt1": "Log in to see your watchlist",
+    "loginPrompt2": "from any screen",
+    "emptyHint1": "Add assets with the search above",
+    "emptyHint2": "to see live quotes and quant diagnosis",
+    "removeAria": "Remove {{name}}",
+    "footNote": "Tap an asset for detailed analysis · for reference, not investment advice"
+  },
+  "seo": {
+    "home": {
+      "title": "Zepta — Investing Intelligence Platform",
+      "desc": "Real-time stock/crypto screener, market signals & data analysis, news, economic calendar, and risk management"
+    },
+    "screener": {
+      "title": "Stock Signals & Screener | Zepta",
+      "desc": "US & Korean stock signals with condition-based screening — momentum, volatility, and flow filters"
+    },
+    "autoTrading": {
+      "title": "AI Auto-Trading | Zepta",
+      "desc": "Crypto auto-trading bots powered by 9 quant strategies"
+    },
+    "portfolio": {
+      "title": "Portfolio | Zepta",
+      "desc": "Real-time portfolio tracking and benchmark comparison"
+    },
+    "coin": {
+      "title": "Coin Signals & Indicators | Zepta",
+      "desc": "Coin signals with kimchi premium, funding, open interest, and long/short ratios on one screen"
+    },
+    "econCalendar": {
+      "title": "Economic Calendar | Zepta",
+      "desc": "Key economic release schedule and impact analysis"
+    },
+    "indicators": {
+      "title": "Indicators — Econ Calendar & Market News | Zepta",
+      "desc": "Key economic releases and live market news on one screen"
+    },
+    "sentiment": {
+      "title": "Social Sentiment | Zepta",
+      "desc": "Real-time trading sentiment from StockTwits & Reddit"
+    },
+    "alerts": {
+      "title": "Trading Alerts | Zepta",
+      "desc": "Real-time AI trading signal alerts with Telegram integration"
+    },
+    "anomaly": {
+      "title": "Anomaly Detection | Zepta",
+      "desc": "Real-time statistical market anomaly detection"
+    },
+    "strategy": {
+      "title": "Strategy Analysis | Zepta",
+      "desc": "Detailed analysis and performance comparison of 41 quant strategies"
+    },
+    "backtest": {
+      "title": "Backtest | Zepta",
+      "desc": "Historical return simulation per strategy"
+    },
+    "quantPort": {
+      "title": "Quant Portfolio | Zepta",
+      "desc": "Automated strategy-based portfolio construction"
+    },
+    "riskMap": {
+      "title": "Risk Map | Zepta",
+      "desc": "Comprehensive market risk heatmap"
+    },
+    "quantReport": {
+      "title": "Quant Report | Zepta",
+      "desc": "Market summary combining indices, sentiment, and breadth"
+    },
+    "profile": {
+      "title": "Profile | Zepta",
+      "desc": "Investment report card and account settings"
+    },
+    "about": {
+      "title": "About | Zepta",
+      "desc": "About the Zepta investing intelligence platform"
     }
   }
 }

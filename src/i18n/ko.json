@@ -14,7 +14,8 @@
     "edit": "편집",
     "more": "더보기",
     "settings": "설정",
-    "refresh": "새로고침"
+    "refresh": "새로고침",
+    "scrollTop": "맨 위로"
   },
   "nav": {
     "home": "홈",
@@ -37,7 +38,9 @@
     "tradingCat": "트레이딩",
     "market": "시장",
     "indicators": "지표",
-    "my": "MY"
+    "my": "MY",
+    "coin": "코인",
+    "stocks": "주식"
   },
   "header": {
     "login": "로그인",
@@ -111,7 +114,14 @@
   },
   "searchOverlay": {
     "noResults": "'{{q}}' 결과가 없어요",
-    "noResultsHint": "종목명·심볼·티커로 검색해 보세요. 지원 목록에 없는 자산은 검색되지 않아요."
+    "noResultsHint": "종목명·심볼·티커로 검색해 보세요. 지원 목록에 없는 자산은 검색되지 않아요.",
+    "catScreener": "스크리너",
+    "catSignalBoard": "시그널 보드",
+    "catCoin": "코인 분석",
+    "catEcon": "경제 일정",
+    "closeAria": "검색 닫기",
+    "popularStocks": "인기 종목",
+    "crypto": "크립토"
   },
   "theme": {
     "dark": "다크",
@@ -121,7 +131,9 @@
     "loginRequired": "로그인이 필요합니다",
     "loginRequired_desc": "실전매매 관제센터는 인증된 사용자만 접근할 수 있습니다.",
     "logout_confirm": "로그아웃 하시겠습니까?",
-    "logoutSuccess": "로그아웃되었습니다"
+    "logoutSuccess": "로그아웃되었습니다",
+    "modalTitle": "Zepta 로그인",
+    "modalDesc": "투자 서비스를 이용하려면 로그인하세요"
   },
   "timeframes": {
     "1m": "1분",
@@ -482,7 +494,13 @@
     "dataSync": "데이터 동기화",
     "syncPin": "동기화 PIN (4자리 이상)",
     "upload": "업로드",
-    "download": "다운로드"
+    "download": "다운로드",
+    "heroTitle": "실시간 매매 알림",
+    "heroDesc": "41개 퀀트 전략의 시그널을 실시간으로 감지합니다",
+    "notifTitle": "Zepta 알림 활성화",
+    "notifBody": "전략 매매 시그널이 감지되면 여기로 알림이 옵니다 🚀",
+    "autoScanEvery": "{{m}}분 간격으로 자동 실행",
+    "recentSignals": "최근 {{n}}건 시그널"
   },
   "sentiment": {
     "title": "소셜 센티먼트 분석",
@@ -536,7 +554,48 @@
     "darkMode": "다크 모드",
     "lightMode": "라이트 모드",
     "logout": "로그아웃",
-    "logoutConfirm": "로그아웃 하시겠습니까?"
+    "logoutConfirm": "로그아웃 하시겠습니까?",
+    "editProfile": "프로필 편집",
+    "guestTitle": "로그인하고 나만의 신호 알림을 받아보세요",
+    "guestDesc": "관심 자산 · 저장 조건 · 알림이 계정에 안전하게 보관돼요.",
+    "guestStart": "시작하기",
+    "guestLogin": "로그인",
+    "savedConditions": "저장 조건",
+    "streakDays": "연속 접속",
+    "daysUnit": "{{n}}일",
+    "shortcutWatchlist": "관심종목 관리",
+    "shortcutWatchlistHint": "홈 관심종목 섹션",
+    "shortcutSaved": "저장한 스크리너 조건",
+    "shortcutAlerts": "알림 내역",
+    "language": "언어",
+    "langKo": "한국어",
+    "langEn": "English",
+    "themeDark": "다크",
+    "themeLight": "라이트",
+    "ownerConsole": "매매 콘솔 (owner)",
+    "consoleAuto": "자동매매 (모의)",
+    "consoleReal": "실전매매",
+    "consoleMarketing": "마케팅 대시보드",
+    "consoleSim": "시뮬레이션",
+    "consoleLive": "실거래",
+    "supportTitle": "고객지원",
+    "supportGuide": "투자 가이드",
+    "supportContact": "문의하기",
+    "avatarAlt": "사용자 프로필",
+    "backToMy": "전체",
+    "xpToNext": "다음 레벨까지 {{xp}} XP",
+    "reportShareText": "[Zepta AI 투자 성적표]\n{{name}}님 · 관심종목 {{watch}}개 | 봇 {{bots}}개 | {{days}}일째\n무료 시작 👉 https://zepta.app",
+    "reportShareTitle": "Zepta 성적표",
+    "investorFallback": "투자자",
+    "copiedToast": "복사되었습니다!",
+    "shareBtn": "공유하기",
+    "todayEngage": "오늘의 참여 콘텐츠",
+    "contentShortcuts": "콘텐츠 바로가기",
+    "shortcutScreener": "스크리너 (섹터·전체 종목 탐색)",
+    "inviteDesc2": "시장 신호와 데이터 분석을 무료로 이용할 수 있어요",
+    "inviteShareText": "시장 신호와 데이터를 한눈에 보는 투자 정보 앱이야. 무료인데 한번 써봐 👉 https://zepta.app",
+    "copiedShort": "복사됨!",
+    "linkCopied": "링크 복사!"
   },
   "info": {
     "about": "서비스 소개",
@@ -701,9 +760,9 @@
       "longDominant": "롱 우위",
       "shortDominant": "숏 우위",
       "updating": "갱신 중…",
-      "briefingLink": "오늘의 브리핑 전문 보기 →",
+      "briefingLink": "브리핑 전문 보기",
       "todaySignals": "오늘의 시그널",
-      "viewAll": "전체 보기 →",
+      "viewAll": "전체 보기",
       "signalSourceNote": "바이낸스 선물 상위 코인",
       "segCoin": "코인",
       "segStock": "주식",
@@ -718,11 +777,11 @@
       "asOfDailyClose": "최근 일봉 종가 기준",
       "staleSuffix": "갱신 지연",
       "topNews": "톱 뉴스",
-      "more": "더보기 →",
+      "more": "더보기",
       "noNews": "표시할 뉴스가 아직 없습니다.",
       "sentiPositive": "긍정",
       "sentiNegative": "부정",
-      "fullSchedule": "전체 일정 →",
+      "fullSchedule": "전체 일정",
       "noEvents": "예정된 주요 지표 일정이 없습니다.",
       "tomorrow": "내일",
       "important": "중요",
@@ -731,20 +790,24 @@
       "fgStock": "공포·탐욕 지수 (주식)",
       "fgCrypto": "공포·탐욕 지수 (크립토)",
       "marketTempCoin": "Zepta 마켓 온도 (코인)",
-      "marketTempPageLink": "마켓 온도 지수 해설·산식 보기 →",
+      "marketTempPageLink": "마켓 온도 해설·산식",
       "tempDescCalm": "시장 에너지가 낮은 차분한 흐름입니다",
       "tempDescMild": "완만한 온기가 도는 안정적 흐름입니다",
       "tempDescHot": "거래 열기가 달아오른 흐름입니다",
       "tempDescOverheat": "과열 신호가 나타나는 뜨거운 흐름입니다",
       "watchlistSummary": "관심종목 요약",
       "bigMovers": "오늘 변동 큰 종목 (주식·코인)",
-      "screenerLink": "스크리너 →",
+      "screenerLink": "스크리너",
       "loadingQuotes": "시세 데이터를 불러오는 중입니다…",
       "quotePreparing": "시세 준비 중",
       "marketReport": "시장 리포트",
       "marketReportDesc": "지수·심리·수급 지표를 모아 만든 오늘의 시장 요약 리포트입니다.",
       "goView": "보러가기 →",
-      "disclaimer": "표시되는 신호와 지표는 참고 정보이며 투자 조언이 아닙니다."
+      "disclaimer": "표시되는 신호와 지표는 참고 정보이며 투자 조언이 아닙니다.",
+      "coinIndicatorsLink": "코인 지표",
+      "asOfShort": "{{time}} 기준",
+      "ownerConsole": "자동매매 콘솔",
+      "ownerConsoleDesc": "포지션·시그널 큐·리스크 상태를 한 화면에서 봅니다"
     },
     "screener": {
       "title": "주식 골라보기",
@@ -769,7 +832,83 @@
       "results": "스캔 결과",
       "noResults": "조건에 맞는 종목이 없습니다",
       "or": "OR",
-      "and": "AND"
+      "and": "AND",
+      "marketKr": "한국",
+      "marketUs": "미국",
+      "mktOpen": "장중",
+      "mktPre": "장전",
+      "mktClosed": "장 마감",
+      "mktWeekend": "주말 휴장",
+      "mktToClose": "마감까지 {{d}}",
+      "mktToOpen": "개장까지 {{d}}",
+      "mktHoursNote": "정규장 시각 기준 · 휴장일 미반영",
+      "durHM": "{{h}}시간 {{m}}분",
+      "durM": "{{m}}분",
+      "signalsTitle": "주식 시그널",
+      "sigAll": "전체",
+      "sortByScore": "점수순",
+      "sigEmptyTitle": "주식 시그널을 집계하고 있어요",
+      "sigEmptyDesc": "미국·한국 유동성 상위 종목을 대상으로 장중 30~60분 주기로 산출돼요. 잠시 후 다시 확인해 주세요.",
+      "sigFilterEmpty": "선택한 시장에는 지금 시그널이 없어요",
+      "findByCondition": "조건으로 찾기",
+      "editConditions": "조건 편집",
+      "editConditionsCount": "조건 편집 · {{n}}종목",
+      "applyScan": "스캔 · 조건 {{n}}개",
+      "reset": "초기화",
+      "idleTitle": "프리셋을 고르면 바로 스캔해요",
+      "idleDesc": "위의 프리셋 칩 하나를 누르면 미국·한국 주식과 크립토 {{n}}개 자산을 검사해요. 세부 조건은 '조건 편집'에서 바꿀 수 있어요.",
+      "valueTitle": "저평가 종목 통합 조회",
+      "valueDesc": "PER · PBR · 배당률 · 애널리스트 목표가 · 52주 위치 종합 분석",
+      "searchPlaceholder": "종목 검색 (예: 비트코인, NVDA, 삼성전자)",
+      "searchAria": "종목 검색",
+      "clearSearch": "검색어 지우기",
+      "searchNoMatch": "'{{q}}' 와 일치하는 종목이 없어요",
+      "searchResultMeta": "'{{q}}' 검색 결과 {{n}}종목 · 종목을 누르면 상세 분석이 열려요",
+      "selectConditionsHint": "위에서 스크리닝 조건을 1개 이상 선택한 후 스캔을 시작하세요",
+      "saveConditionsTitle": "현재 선택한 조건을 저장하고 '저장한 조건'에서 다시 실행",
+      "saveConditions": "조건 저장",
+      "errorsCount": "{{n}}개 오류",
+      "sortScore": "퀀트점수",
+      "sortChange": "변동률",
+      "sortVolume": "거래량",
+      "sortSignals": "시그널",
+      "sortBySuffix": "{{label}}순",
+      "sortLabel": "정렬",
+      "sortSheetTitle": "정렬 방식",
+      "noMatchTitle": "조건에 맞는 종목이 없어요",
+      "noMatchDesc1": "지금 시장에서는 이 조건을 모두 만족하는 종목이 없어요",
+      "noMatchDesc2": "아래 추천 중 하나를 골라 조건을 완화해 보세요",
+      "relaxToOr": "AND → OR 모드로 변경 (하나라도 맞으면 표시)",
+      "relaxHalve": "조건 {{from}}개 → {{to}}개로 줄이기",
+      "relaxMarket": "시장 필터 → 전체로 확장",
+      "resetAllConditions": "조건 전체 초기화",
+      "relaxFallback": "추천 조건 중 하나를 선택해 다시 스캔해보세요",
+      "lastScanAt": "마지막 스캔: {{time}}",
+      "colAsset": "종목",
+      "colPrice": "현재가",
+      "colChange": "등락",
+      "colSignals": "신호 요약",
+      "colScore": "점수",
+      "marketEmptyTitle": "선택한 시장에 시그널 없음",
+      "marketEmptyDesc": "다른 시장 필터를 선택해보세요 (전체 {{n}}건 발견)",
+      "marketEmptyCta": "시장 필터 → 전체로 확장 ({{n}}건 모두 보기)",
+      "valueScanBtn": "저평가 스캔",
+      "valueScanMeta": "마지막 스캔: {{time}} · 전체 {{total}}개 분석 · 저평가 {{found}}개 발견",
+      "valueSortTotal": "종합",
+      "valueSortDiv": "배당↓",
+      "valueSortUpside": "목표가↓",
+      "valueStrong": "강력 저평가",
+      "valueUndervalued": "저평가",
+      "valuePossible": "저평가 가능성",
+      "valueWatch": "주의 관찰",
+      "scorePts": "{{n}}점",
+      "divShort": "배당",
+      "targetShort": "목표",
+      "top50Only": "상위 50개만 표시 (전체 {{n}}개)",
+      "valueEmptyDesc1": "을 눌러 미국·한국 주식의",
+      "valueEmptyDesc2": "밸류에이션을 종합 분석합니다",
+      "valueBasis": "PER · PBR · 배당수익률 · Forward PE · 애널리스트 목표가 · 52주 위치 · 200일선 괴리 기반",
+      "valueMarketEmpty": "선택한 시장에 저평가 기준 충족 종목 없음 — 필터를 변경해보세요"
     },
     "quantReport": {
       "title": "퀀트 리포트",
@@ -795,7 +934,81 @@
       "noBuySignals": "상승 신호 없음",
       "messagesBullish": "상승 신호가 우세한 상태입니다. 상승 종목 {{upCount}}개, 상승 신호 {{buyPicks}}개가 감지되었습니다.",
       "messagesMixed": "상승·하락 신호가 혼재된 혼조 상태입니다.",
-      "messagesBearish": "하락 신호가 우세한 상태입니다. 하락 종목 {{dnCount}}개."
+      "messagesBearish": "하락 신호가 우세한 상태입니다. 하락 종목 {{dnCount}}개.",
+      "marketReportTitle": "시장 리포트",
+      "asOfTime": "{{time}} 기준",
+      "shareTitle": "Zepta 시장 리포트",
+      "shareText": "[Zepta 시장 리포트] {{time}}\n\n시장 점수: {{score}}/100 ({{verdict}})\n상승 {{up}}개 · 하락 {{dn}}개\n\n지수·공포탐욕·상승비율 합산 스코어\n👉 https://zepta.app",
+      "copied": "리포트가 복사되었습니다!",
+      "emptyTitle": "리포트를 집계하고 있어요",
+      "emptyDesc": "시장 지수와 신호 데이터를 모아 요약해요. 데이터가 준비되면 바로 표시돼요.",
+      "overallScore": "시장 종합 점수",
+      "verdictStrongBull": "강세",
+      "verdictWeakBull": "약 강세",
+      "verdictMixed": "혼조",
+      "verdictWeakBear": "약세",
+      "verdictStrongBear": "강한 약세",
+      "messagesBullishNoScan": "상승 신호가 우세한 상태입니다. 상승 종목 {{upCount}}개.",
+      "noData": "집계 없음",
+      "upFlatDown": "상승 {{up}} · 보합 {{flat}} · 하락 {{dn}}",
+      "vixHigh": "고변동 구간",
+      "vixMid": "보통 수준",
+      "vixLow": "안정 구간",
+      "scannedOf": "/ {{n}} 종목 스캔",
+      "usStocks": "미국 주식",
+      "krStocks": "한국 주식",
+      "cryptoName": "크립토",
+      "upOfTotal": "{{up}}/{{total}} 상승",
+      "breadthDesc": "추적 중인 {{total}}개 종목 중 {{pct}}%가 상승 중입니다",
+      "noAggregated": "집계된 종목이 없습니다",
+      "sectorPerf": "섹터 퍼포먼스",
+      "sectorCellMeta": "{{count}}종목 · {{pct}}% 상승",
+      "sector": {
+        "semi": "반도체",
+        "bigTech": "빅테크",
+        "software": "소프트웨어",
+        "fintech": "핀테크",
+        "healthcare": "헬스케어",
+        "energy": "에너지",
+        "consumer": "소비재",
+        "financials": "금융",
+        "evClean": "EV/클린",
+        "chinaAdr": "중국ADR"
+      },
+      "surgeTop5": "급등 TOP 5",
+      "plungeTop5": "급락 TOP 5",
+      "todayBuySignalStocks": "오늘 상승 신호 종목",
+      "perStockStrategies": "종목별 퀀트 전략",
+      "touchForBacktest": "종목 터치 → 백테스트 상세",
+      "diagScore": "진단 {{score}}점",
+      "backtestBadge": "백테스트",
+      "todaySummaryTitle": "오늘의 시장 상태 요약",
+      "sumBull": "상승 신호가 우세한 구간입니다",
+      "sumMixed": "혼조 구간 — 뚜렷한 방향성이 없습니다",
+      "sumBear": "하락 신호가 우세한 구간입니다",
+      "sumAnomaly": "이상 탐지 {{n}}건 — 급등락 종목이 포착됐습니다",
+      "sumBuySignals": "상승 신호 {{n}}건이 감지됐습니다",
+      "sumSellSignals": "하락 신호 {{n}}건이 감지됐습니다",
+      "sumExtremeFear": "공포탐욕 지수가 극단적 공포 구간입니다",
+      "sumExtremeGreed": "공포탐욕 지수가 극단적 탐욕 구간입니다",
+      "sumVixHigh": "VIX {{v}} — 고변동성 구간입니다",
+      "sumPortfolioLoss": "포트폴리오가 손실 구간입니다",
+      "sumAlpha": "시장 대비 +{{a}}% 초과 수익",
+      "overallStatusTitle": "시장 상태 종합",
+      "statusStrongBull": "현재 시장은 강세 국면입니다. S&P500 {{sp}}, 상승종목 비율 {{pct}}%로 상승 신호가 우세한 환경입니다. {{buyPicks}}개 종목에서 상승 신호가 감지된 상태입니다.",
+      "statusOverheatNote": "공포탐욕 지수는 극단적 탐욕, 즉 과열 구간에 해당합니다.",
+      "statusWeakBull": "시장은 약한 강세를 보이고 있습니다. 상승 종목이 {{upCount}}개로 하락 종목({{dnCount}}개)보다 많으나, 확실한 방향성은 아직 형성되지 않았습니다. {{fgPart}} 함께 관측되고 있습니다.",
+      "statusFgPart": "공포탐욕 {{fg}}({{label}}) 지표가",
+      "statusFgFallback": "시장 심리 지표가",
+      "statusMixed": "혼조 장세입니다. 상승({{upCount}})과 하락({{dnCount}}) 종목이 팽팽하게 대치하고 있으며, 뚜렷한 방향성이 없습니다. 주요 지지·저항 구간 돌파 여부가 아직 확인되지 않은 상태입니다.",
+      "statusWeakBear": "약세 장세입니다. 하락 종목({{dnCount}}개)이 우세하며 시장 심리가 위축되고 있습니다. 하락 신호가 우세한 상태입니다.",
+      "statusFearNote": "공포 지수가 낮은 구간입니다.",
+      "statusStrongBear": "강한 약세 장세입니다. 대부분의 종목이 하락세이며, 매도 압력이 강한 구간입니다. 변동성이 확대된 상태입니다.",
+      "chipScore": "시장점수 {{score}}/100",
+      "chipAdv": "상승률 {{pct}}%",
+      "chipFg": "공포탐욕 {{fg}}",
+      "chipBuy": "상승 신호 {{n}}건",
+      "disclaimer": "본 화면은 시장 데이터 요약이며 종목 추천이나 투자 권유가 아닙니다. 투자 판단과 책임은 본인에게 있습니다."
     },
     "news": {
       "title": "마켓 뉴스",
@@ -818,7 +1031,67 @@
       "timeAgo": "{{time}} 전",
       "minutesAgo": "{{minutes}}분 전",
       "hoursAgo": "{{hours}}시간 전",
-      "daysAgo": "{{days}}일 전"
+      "daysAgo": "{{days}}일 전",
+      "sortLabel": "정렬",
+      "emptyFilterTitle": "조건에 맞는 뉴스가 없어요",
+      "emptyFilterDesc": "선택한 카테고리의 뉴스가 없어요. 필터를 조정해 보세요.",
+      "resetFilter": "필터 초기화",
+      "emptyTitle": "아직 받아온 뉴스가 없어요",
+      "emptyDesc": "오늘의 시장 뉴스를 한 번에 모아드릴게요",
+      "refreshAria": "뉴스 새로고침",
+      "loadingBtn": "불러오는 중...",
+      "refreshNow": "지금 새로고침",
+      "catUs": "미국",
+      "catKr": "한국",
+      "catCrypto": "코인",
+      "catMacro": "매크로",
+      "today": "오늘",
+      "yesterday": "어제",
+      "dateMd": "{{m}}월 {{d}}일",
+      "readings": "읽을거리",
+      "blogAll": "블로그 전체 →"
+    },
+    "coin": {
+      "title": "코인",
+      "ctxTemp": "마켓 온도",
+      "ctxFearGreed": "공포·탐욕",
+      "ctxKimchi": "김치 프리미엄",
+      "ctxFunding": "평균 펀딩비",
+      "derivTitle": "파생 지표",
+      "sampleNote": "{{n}}종 표본 · 24h",
+      "oiAvg": "OI 24h 평균",
+      "oiUp": "미결제 확대",
+      "oiDown": "미결제 축소",
+      "globalLs": "롱숏 비율 평균",
+      "stable": "스테이블 유동성",
+      "liq24h": "24h 청산",
+      "liqLong": "롱 {{n}}%",
+      "liqShort": "숏 {{n}}%",
+      "signalsTitle": "코인 시그널",
+      "sortByScore": "점수순",
+      "tf1w": "주",
+      "tf1d": "일",
+      "tf4h": "4시간",
+      "tf1h": "1시간",
+      "emptyTitle": "시그널을 집계하고 있어요",
+      "emptyDesc": "유동성 상위 코인을 대상으로 10분 주기로 산출돼요. 잠시 후 다시 확인해 주세요.",
+      "retry": "다시 시도",
+      "indexLinksLabel": "지수 해설",
+      "indexTempLink": "마켓 온도",
+      "indexFundingLink": "펀딩 스퀴즈",
+      "indexAltLink": "알트 과열",
+      "indexDetailLink": "해설·산식 전체 보기",
+      "asOf": "{{time}} 기준",
+      "disclaimer": "본 정보는 참고용 지표이며 투자 자문·권유가 아닙니다.",
+      "findByConditions": "조건으로 코인 찾기"
+    },
+    "indicators": {
+      "title": "지표",
+      "calendarTab": "캘린더",
+      "newsTab": "뉴스",
+      "monthPill": "{{y}}년 {{m}}월",
+      "calendarCaption": "미국 주요 경제 지표의 발표 일정과 결과를 한국 시간 기준으로 보여드려요",
+      "econArchiveLink": "발표 결과 아카이브"
     },
     "sentiment": {
       "title": "소셜 센티먼트",
@@ -835,7 +1108,33 @@
       "detected": "감지됨",
       "surge": "급등",
       "plunge": "급락",
-      "highRisk": "고위험"
+      "highRisk": "고위험",
+      "all": "전체",
+      "emptyTitle": "이상 징후 없음",
+      "emptyFilterTitle": "해당 필터 결과 없음",
+      "emptyDesc1": "현재 시장에서 통계적 이상치가 감지되지 않았습니다",
+      "emptyDesc2": "2σ 이상 변동, 3x 이상 거래량 폭증 시 알림됩니다",
+      "emptyFilterDesc": "다른 필터를 선택하거나 전체 보기를 이용하세요",
+      "volRatio": "거래량 비율",
+      "ma200Gap": "MA200 괴리",
+      "weeklyChange": "주간 변동",
+      "detectedAt": "감지: {{time}}",
+      "history": "탐지 히스토리",
+      "historyReset": "초기화",
+      "historyClearConfirm": "이상 탐지 히스토리를 전부 삭제하시겠습니까?",
+      "historyEmpty": "아직 기록된 이상 탐지 히스토리가 없습니다",
+      "criteria": "탐지 기준",
+      "critPrice": "가격 이상 변동",
+      "critPriceDesc": "전체 평균 대비 2σ 이상 + 3% 이상 변동",
+      "critVolume": "거래량 폭증",
+      "critVolumeDesc": "5일 평균 대비 3배 이상 거래량",
+      "critGap": "급격한 갭",
+      "critGapDesc": "전일 종가 대비 3% 이상 갭 발생",
+      "critHigh": "고위험 등급",
+      "critHighDesc": "평균 대비 3σ 이상 극단적 변동",
+      "reasonChange": "변동률 {{chg}}% (평균의 {{mult}}배)",
+      "reasonVolume": "거래량 {{ratio}}x 폭증",
+      "reasonGap": "갭 {{gap}}%"
     },
     "profile": {
       "investReport": "내 투자 성적표",
@@ -855,7 +1154,639 @@
       "cpi": "CPI",
       "nfp": "NFP",
       "gdp": "GDP",
-      "todayEvents": "오늘의 경제 이벤트"
+      "todayEvents": "오늘의 경제 이벤트",
+      "filterAll": "전체",
+      "employment": "고용",
+      "yearMonth": "{{y}}년 {{m}}월",
+      "weekN": "{{n}}주차",
+      "prevWeek": "이전 주",
+      "nextWeek": "다음 주",
+      "weeklyAiSummary": "이번주 AI 요약",
+      "scheduledOn": "발표가 {{d}}일({{day}}) 예정되어 있어요",
+      "scheduledSoon": "발표가 곧 예정되어 있어요",
+      "resultUp": "상승",
+      "resultDown": "하락",
+      "resultDone": "발표완료",
+      "resultScheduled": "예정",
+      "impHigh": "높음",
+      "impMid": "중간",
+      "dayFilterNotice": "{{m}}월 {{d}}일 일정만 보는 중",
+      "viewAllX": "전체 보기 ✕",
+      "emptyDayTitle": "선택한 날짜에 일정이 없어요",
+      "emptyFilterTitle": "해당 필터에 맞는 일정이 없어요",
+      "emptyDesc": "주요 발표는 주중에 몰려 있어요. 다른 날짜나 필터에서 남은 일정을 확인할 수 있어요.",
+      "viewAllEvents": "전체 일정 보기",
+      "colForecast": "예측",
+      "colPrevious": "이전",
+      "colActual": "발표",
+      "noAggregate": "집계 없음",
+      "awaitingRelease": "발표 대기",
+      "scheduledAtHour": "{{h}}시 예정",
+      "guideCollapse": "해석 가이드 접기 ▲",
+      "guideExpand": "💡 해석 가이드 보기 ▼",
+      "guideTitle": "해석 가이드",
+      "whatIsThis": "{{name}} — 이게 뭐예요?",
+      "riskAssetVerdict": "위험자산(주식·코인)에 {{dir}}",
+      "actualVsForecast": "발표 {{actual}} vs 예측 {{est}}",
+      "prevParen": "(이전 {{prev}})",
+      "ifHigher": "예상보다 높으면",
+      "ifLower": "예상보다 낮으면",
+      "guideDisclaimer": "일반적인 시장 해석 · 참고용이며 투자 권유가 아닙니다",
+      "relatedRiskMap": "관련 화면: 리스크맵 →",
+      "verdictGood": "통상 호재",
+      "verdictBad": "통상 악재",
+      "verdictNeutral": "중립",
+      "verdictMatch": "예상치에 부합 — 서프라이즈 없음",
+      "disclaimer": "본 정보는 참고용 지표이며 투자 자문·권유가 아닙니다.",
+      "guide": {
+        "CPI": {
+          "name": "소비자물가지수",
+          "desc": "미국 소비자가 체감하는 물가 상승률. 연준 금리 결정의 핵심 근거가 되는 인플레이션 대표 지표예요.",
+          "high": "물가가 예상보다 뜨겁다 → 금리 인하가 멀어진다 → 주식·코인에 통상 악재",
+          "low": "물가 둔화 → 금리 인하 기대 강화 → 통상 호재"
+        },
+        "PCE": {
+          "name": "개인소비지출 물가",
+          "desc": "연준이 공식적으로 가장 중시하는 물가 지표. CPI와 같은 인플레이션 계열이에요.",
+          "high": "물가 압력 지속 → 긴축 우려 → 통상 악재",
+          "low": "물가 둔화 → 금리 인하 기대 → 통상 호재"
+        },
+        "PPI": {
+          "name": "생산자물가지수",
+          "desc": "기업이 받는 도매 물가. 소비자물가(CPI)의 선행 지표로 읽혀요.",
+          "high": "생산 단계 물가 상승 → 인플레 재점화 우려 → 통상 악재",
+          "low": "물가 압력 완화 → 통상 호재"
+        },
+        "FOMC": {
+          "name": "연준 금리 결정",
+          "desc": "미국 중앙은행(연준)의 기준금리 결정. 글로벌 자산시장 방향을 좌우하는 최대 이벤트예요.",
+          "high": "예상보다 높은 금리(매파) → 유동성 축소 → 통상 악재",
+          "low": "예상보다 낮은 금리·인하(비둘기) → 유동성 확대 → 통상 호재",
+          "note": "예상에 부합하면 금리 자체보다 성명서·점도표(향후 경로)가 시장을 움직여요."
+        },
+        "NFP": {
+          "name": "비농업 고용",
+          "desc": "미국에서 한 달간 늘어난 일자리 수. 경기 체력을 보여주는 대표 고용 지표예요.",
+          "high": "고용 호조 → 경기 탄탄 → 통상 호재",
+          "low": "고용 둔화 → 경기 침체 우려 → 통상 악재",
+          "note": "단, 지나친 호조는 '금리 인하 지연' 우려로 반대로 움직일 때도 있어요."
+        },
+        "GDP": {
+          "name": "국내총생산",
+          "desc": "미국 경제 전체의 성장률. 경기 방향의 종합 성적표예요.",
+          "high": "성장 견조 → 기업 실적 기대 → 통상 호재",
+          "low": "성장 둔화 → 침체 우려 → 통상 악재",
+          "note": "과열 수준의 서프라이즈는 금리 부담으로 해석되기도 해요."
+        },
+        "RETAIL": {
+          "name": "소매판매",
+          "desc": "미국 소비자들의 지출 규모. 미국 경제의 70%를 차지하는 소비 경기를 직접 보여줘요.",
+          "high": "소비 견조 → 경기 호조 → 통상 호재",
+          "low": "소비 위축 → 경기 둔화 우려 → 통상 악재",
+          "note": "인플레 국면에선 '소비 과열 → 금리 부담'으로 반대 해석될 수 있어요."
+        },
+        "ISM": {
+          "name": "ISM 제조업 지수",
+          "desc": "제조업 구매관리자들의 체감 경기. 50 위면 확장, 아래면 위축이에요.",
+          "high": "제조업 확장 → 경기 호조 → 통상 호재",
+          "low": "제조업 위축 → 경기 둔화 → 통상 악재"
+        },
+        "UNEMP": {
+          "name": "실업률",
+          "desc": "일자리를 구하지 못한 사람의 비율. 낮을수록 고용시장이 튼튼하다는 뜻이에요.",
+          "high": "실업 증가 → 경기 둔화 우려 → 통상 악재",
+          "low": "고용 탄탄 → 경기 호조 → 통상 호재"
+        },
+        "CLAIMS": {
+          "name": "신규 실업수당 청구",
+          "desc": "한 주간 새로 실업수당을 신청한 사람 수. 고용시장의 주간 속보예요.",
+          "high": "실업 신청 증가 → 고용 악화 신호 → 통상 악재",
+          "low": "실업 신청 감소 → 고용 탄탄 → 통상 호재"
+        },
+        "OTHER": {
+          "name": "경제지표",
+          "desc": "미국 주요 경제지표예요. 예상치와의 차이(서프라이즈)가 시장을 움직여요.",
+          "high": "예상 상회 → 경기 호조 신호 → 통상 호재",
+          "low": "예상 하회 → 경기 둔화 신호 → 통상 악재"
+        }
+      }
+    }
+  },
+  "diag": {
+    "verdictLabel": {
+      "strongUp": "상승 신호 강함",
+      "up": "상승 신호 우세",
+      "slightUp": "상승 신호 다소 우세",
+      "neutral": "중립",
+      "slightDown": "하락 신호 다소 우세",
+      "down": "하락 신호 우세",
+      "strongDown": "하락 신호 강함"
+    },
+    "cat": {
+      "trend": "추세",
+      "momentum": "모멘텀",
+      "flow": "수급",
+      "position": "위치",
+      "volatility": "변동성",
+      "fundamental": "펀더멘털"
+    },
+    "market": {
+      "us": "미국",
+      "kr": "한국",
+      "crypto": "코인"
+    },
+    "seg": {
+      "all": "전체",
+      "stock": "주식",
+      "crypto": "크립토"
+    },
+    "tripleBull": "3중 강세",
+    "comboBull": "복합 강세",
+    "tripleBear": "3중 약세",
+    "comboBear": "복합 약세",
+    "accumulation": "매집",
+    "distribution": "분산",
+    "flowShort": "수급",
+    "signalSummary": "신호 요약",
+    "buyPressure": "매수세",
+    "sellPressure": "매도세",
+    "macdBullTurn": "MACD 상승전환",
+    "macdBearTurn": "MACD 하락전환",
+    "rsiBullTurn": "RSI 상승전환",
+    "rsiBearTurn": "RSI 하락전환",
+    "viewChart": "차트 보기",
+    "detailsLink": "상세 정보",
+    "ind": {
+      "rsiWeekly": "RSI(14) 주간",
+      "rsiDaily": "RSI(14) 일간",
+      "mtfOversold": "MTF 과매도",
+      "mtfOverbought": "MTF 과매수",
+      "vsMa200": "200일선 대비",
+      "volRatio": "거래량 비율",
+      "stochK": "스토캐스틱%K",
+      "stochastic": "스토캐스틱",
+      "vs52wLow": "52주 저가 대비",
+      "pos52w": "52주 위치",
+      "plusDiDominant": "+DI 우세",
+      "minusDiDominant": "-DI 우세",
+      "weakTrend": "추세 약함",
+      "squeezeImminent": "변동성 폭발 임박",
+      "normalState": "정상 상태",
+      "accumStrong": "매집 강세",
+      "distWarning": "분산 경고",
+      "oversold": "과매도",
+      "overbought": "과매수",
+      "weak": "약세",
+      "strong": "강세"
+    },
+    "tags": {
+      "macdBullDiv": "MACD 상승 다이버전스",
+      "macdBearDiv": "MACD 하락 다이버전스",
+      "rsiBullDiv": "RSI 상승 다이버전스",
+      "rsiBearDiv": "RSI 하락 다이버전스",
+      "obvAccumDiv": "OBV 매집 다이버전스",
+      "obvDistDiv": "OBV 분산 다이버전스",
+      "pocNear": "POC 근접 ({{price}})"
+    },
+    "refreshing": "새로고침 중...",
+    "releaseToRefresh": "놓으면 새로고침",
+    "pullDown": "아래로 당기기",
+    "searchPlaceholder": "종목 검색 (예: AAPL, 삼성전자, BTC...)",
+    "searchShort": "종목명·티커 검색",
+    "searchLong": "종목명 또는 티커 입력 (예: NVDA, 삼성전자)",
+    "dirUp": "상승",
+    "dirDown": "하락",
+    "mtfAlignedTf": "{{tfList}} {{total}}개 구간 중 {{aligned}}개가 {{dir}} 방향입니다.",
+    "mtfAlignedDefault": "주·일·4시간·1시간 네 구간 중 {{aligned}}개가 {{dir}} 방향입니다.",
+    "toResistance": "가장 가까운 저항까지 +{{pct}}%",
+    "toSupport": "지지까지 −{{pct}}%",
+    "remaining": "{{parts}} 남아 있습니다.",
+    "tfBand": "{{label}} 구간",
+    "binancePerp": "바이낸스 선물 · 무기한",
+    "shareText": "[Zepta 진단] {{name}}({{symbol}}) — 종합 {{score}}점 · {{verdict}}\n\n기술적 지표 종합 스코어입니다. 투자 판단과 책임은 본인에게 있습니다.\n👉 https://zepta.app",
+    "shareDiagTitle": "{{name}} 기술적 진단",
+    "shareDiag": "진단 결과 공유",
+    "diagCopied": "진단 결과가 복사되었습니다!",
+    "shareBriefingTitle": "Zepta 마켓 브리핑",
+    "shareBriefingText": "실시간 글로벌 시장 현황을 확인하세요",
+    "linkCopied": "링크가 복사되었습니다",
+    "loginToSaveConditions": "로그인 후 조건을 저장할 수 있어요",
+    "selectConditionsFirst": "저장할 조건을 먼저 선택하세요",
+    "conditionsSaved": "조건을 저장했어요 — '저장한 조건'에서 다시 실행할 수 있어요",
+    "myConditions": "내 조건 {{n}}개",
+    "scanResults": "스캔 결과",
+    "matchedCount": "조건 충족 {{n}}종목",
+    "lastUpdatedAt": "마지막 {{time}} 갱신",
+    "trendStrong": "강세",
+    "trendSlightUp": "소폭 상승",
+    "trendSlightDown": "소폭 하락",
+    "trendWeak": "약세",
+    "usMarketTodayPrefix": "오늘 미국 증시는",
+    "usMarketTodaySuffix": "흐름",
+    "tgAutoSent": "자동 알림 전송 완료",
+    "tgSendFailed": "텔레그램 전송 실패",
+    "sync": {
+      "pinRequired": "PIN 4자리 이상 필요",
+      "uploading": "업로드 중...",
+      "downloading": "다운로드 중...",
+      "done": "동기화 완료",
+      "uploadFailed": "업로드 실패",
+      "noData": "데이터 없음"
+    },
+    "landing": {
+      "heroTitle": "퀀트 전략이 주요 지지 구간을 자동 분석합니다",
+      "heroDesc": "주식 · 코인 · 외환까지. 무료로 시작하고 검증된 전략을 골라 쓰세요.",
+      "startFree": "무료로 시작하기",
+      "explore": "둘러보기",
+      "trustStrategies": "검증 전략",
+      "trustStrategiesValue": "9개",
+      "trustLive": "라이브 데이터",
+      "trustSecurity": "보안",
+      "trustPayment": "결제",
+      "trustPaymentValue": "베타 무료"
+    },
+    "menu": {
+      "alphaLab": "알파 랩",
+      "botRanking": "봇 랭킹",
+      "copyTrading": "카피트레이딩",
+      "strategyCompare": "전략 비교",
+      "assetAnalysis": "자산 분석",
+      "savedConditions": "저장한 조건",
+      "membership": "멤버십"
+    },
+    "preMarket": "프리",
+    "afterHours": "애프터",
+    "analyzing": "기술적 지표 분석 중...",
+    "majorSupportZone": "주요 지지 구간",
+    "confidenceStrength": "근거 강도",
+    "btDisclaimer": "과거 데이터 기준 시뮬레이션 결과이며 미래 수익을 보장하지 않습니다. 수수료·슬리피지는 반영되지 않았습니다.",
+    "sharpe": "샤프",
+    "winRate": "승률",
+    "tradesSuffix": "회",
+    "quantStrategy": "퀀트 전략",
+    "analyzedJustNow": "방금 분석",
+    "analyzedMinAgo": "{{n}}분 전 분석",
+    "stratBullTarget": "기술적 상승 신호 우세. 상단 참고 레벨 {{target}}(+{{upside}}%), 하단 리스크 레벨 {{stop}}.",
+    "stratBullNoTarget": "상승 추세 감지. {{stop}} 하회 시 신호 약화 가능성이 있는 구간입니다.",
+    "stratBear": "하락 신호 우세. {{support}} 이 주요 지지 레벨로 관측됩니다.",
+    "stratMixed": "혼조 구간. 지지 {{support}}·저항 {{resistance}} 사이에서 신호가 혼재된 상태입니다.",
+    "targetPrice": "목표가",
+    "stopPrice": "손절가",
+    "bullAligned": "상승 정렬",
+    "bearAligned": "하락 정렬",
+    "mixed": "혼조",
+    "scoreStrong": "강함",
+    "scoreSomewhatStrong": "다소 강함",
+    "scoreWeak": "약함",
+    "fin": {
+      "companyInfo": "기업 정보",
+      "earningsSummary": "실적 요약",
+      "revenue": "매출",
+      "operatingIncome": "영업이익",
+      "netIncome": "순이익",
+      "grossMargin": "매출총이익률",
+      "operatingMargin": "영업이익률",
+      "netMargin": "순이익률",
+      "quarterlyTrend": "분기별 추이",
+      "valuation": "밸류에이션",
+      "undervalued": "저평가",
+      "fair": "적정",
+      "overvalued": "고평가",
+      "veryOvervalued": "매우 고평가",
+      "slightlyOvervalued": "약간 고평가",
+      "veryUndervalued": "매우 저평가",
+      "slightlyUndervalued": "약간 저평가",
+      "fairRange": "적정 범위",
+      "marketCap": "시총",
+      "dividendYield": "배당률",
+      "beta": "베타",
+      "trillionWon": "조",
+      "hundredMillionWon": "억",
+      "profitabilityHealth": "수익성 & 재무건전성",
+      "debtRatio": "부채비율",
+      "currentRatio": "유동비율",
+      "estRevenue": "예상매출",
+      "estEps": "예상EPS",
+      "fairValueAnalysis": "적정주가 분석",
+      "compositeFairValue": "종합 적정주가",
+      "priceGap": "현재가 괴리"
+    },
+    "rec": {
+      "buy": "매수",
+      "strongBuy": "적극 매수",
+      "hold": "보유",
+      "sell": "매도",
+      "underperform": "비중축소",
+      "overweight": "비중확대"
+    },
+    "analystConsensus": "애널리스트 컨센서스",
+    "analystCount": "{{n}}명",
+    "highest": "최고",
+    "lowest": "최저",
+    "currentMarker": "현재",
+    "targetMarker": "목표",
+    "nextEarnings": "다음 실적",
+    "nextEarningsAnnouncement": "다음 실적 발표",
+    "technicalIndicators": "기술적 지표",
+    "flowSection": "수급 흐름",
+    "popupDisclaimer": "표시되는 목표가·손절가·지지/저항 레벨과 점수는 과거 시세를 계산한 참고 정보이며 투자 조언이 아닙니다. 투자 판단과 책임은 본인에게 있습니다.",
+    "model": {
+      "techMeanReversion": "기술적 평균회귀",
+      "statMeanReversion": "통계적 평균회귀",
+      "analystTarget": "애널리스트 목표가",
+      "fib52w": "52주 피보나치 중심"
+    },
+    "presets": {
+      "momentum_up": {
+        "name": "연속 상승세",
+        "desc": "강한 상승 모멘텀 종목"
+      },
+      "undervalued_growth": {
+        "name": "저평가 성장주",
+        "desc": "성장성 대비 저평가 종목"
+      },
+      "value_cheap": {
+        "name": "아직 저렴한 가치주",
+        "desc": "52주 저점 근처 반등 가능"
+      },
+      "dividend_steady": {
+        "name": "꾸준한 배당주",
+        "desc": "안정적 배당 + 저변동성"
+      },
+      "money_maker": {
+        "name": "돈 잘버는 회사",
+        "desc": "높은 수익성 + 상승 추세"
+      },
+      "reversal": {
+        "name": "저평가 탈출",
+        "desc": "반등 시그널 포착"
+      },
+      "future_dividend": {
+        "name": "미래의 배당왕",
+        "desc": "배당 성장 잠재력"
+      },
+      "growth_expect": {
+        "name": "성장 기대주",
+        "desc": "고성장 모멘텀 종목"
+      },
+      "double_buy": {
+        "name": "쌍끌이 매수",
+        "desc": "기관 + 외인 동시 매수 시그널"
+      },
+      "high_yield_underval": {
+        "name": "고수익 저평가",
+        "desc": "수익률 높은 저평가 종목"
+      },
+      "stable_growth": {
+        "name": "안정 성장주",
+        "desc": "낮은 변동성 + 꾸준한 상승"
+      }
+    },
+    "quizPool": [
+      {
+        "q": "VIX 지수가 30 이상이면 시장은?",
+        "options": [
+          "공포 상태",
+          "탐욕 상태",
+          "중립"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "골든크로스란?",
+        "options": [
+          "단기MA > 장기MA",
+          "단기MA < 장기MA",
+          "거래량 급증"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "PER이 높으면 주식은?",
+        "options": [
+          "고평가",
+          "저평가",
+          "정상"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "RSI가 30 이하면?",
+        "options": [
+          "과매도",
+          "과매수",
+          "중립"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "미국 기준금리를 결정하는 기관은?",
+        "options": [
+          "SEC",
+          "Fed (FOMC)",
+          "IMF"
+        ],
+        "answer": 1
+      },
+      {
+        "q": "코스피 시장이 열리는 시간은?",
+        "options": [
+          "오전 8시",
+          "오전 9시",
+          "오전 10시"
+        ],
+        "answer": 1
+      },
+      {
+        "q": "달러 강세 시 원화는?",
+        "options": [
+          "약세",
+          "강세",
+          "무관"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "볼린저 밴드 상단 돌파 시?",
+        "options": [
+          "과매수 신호",
+          "과매도 신호",
+          "추세 전환"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "S&P 500에 포함된 기업 수는?",
+        "options": [
+          "100개",
+          "500개",
+          "1000개"
+        ],
+        "answer": 1
+      },
+      {
+        "q": "채권 가격과 금리의 관계는?",
+        "options": [
+          "반비례",
+          "비례",
+          "무관"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "MACD 골든크로스 발생 시?",
+        "options": [
+          "매수 신호",
+          "매도 신호",
+          "관망"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "원유 가격 상승 시 수혜 섹터?",
+        "options": [
+          "에너지",
+          "기술",
+          "유틸리티"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "시가총액 1위 기업은? (2025)",
+        "options": [
+          "Apple",
+          "Microsoft",
+          "NVIDIA"
+        ],
+        "answer": 0
+      },
+      {
+        "q": "나스닥 지수의 특징은?",
+        "options": [
+          "기술주 중심",
+          "산업주 중심",
+          "금융주 중심"
+        ],
+        "answer": 0
+      }
+    ],
+    "buyLevels": {
+      "noPrice": "현재가 정보 부재로 주요 지지 구간 계산 불가",
+      "ma50Bounce": "50일 이동평균선(MA50) 반등 진입",
+      "near52wLow": "52주 저점 근처 강한 지지",
+      "recentLowBounce": "최근 저점 반등 기회",
+      "ma200Support": "200일 이동평균선(MA200) 지지",
+      "fib382": "피보나치 38.2% 되돌림 레벨",
+      "pullback8": "중기 조정 목표 8% 풀백",
+      "fib618": "피보나치 61.8% 되돌림 (강력한 지지)",
+      "safeMargin5": "52주 저점 위 5% 안전 마진",
+      "pullback15": "극단적 조정 목표 15% 풀백",
+      "supportN": "{{n}}차 지지",
+      "summaryRange": "현재가 대비 -{{min}}%~-{{max}}% 영역에 주요 지지 구간 형성",
+      "noData": "충분한 데이터 부재로 주요 지지 구간 계산 불가"
+    }
+  },
+  "nickname": {
+    "title": "닉네임",
+    "notSet": "미설정",
+    "placeholder": "닉네임 입력",
+    "generate": "생성",
+    "saving": "저장중...",
+    "required": "닉네임을 입력해주세요",
+    "saveFailed": "저장 실패"
+  },
+  "footer": {
+    "privacy": "개인정보 처리방침",
+    "terms": "이용약관",
+    "about": "서비스 소개",
+    "blog": "블로그",
+    "guide": "투자 가이드",
+    "econResults": "경제지표 결과",
+    "contact": "문의하기",
+    "ceoLine": "대표: 서동인",
+    "contactLine": "문의: donginseo0421@gmail.com",
+    "disclaimerTitle": "투자 면책 고지",
+    "disclaimerP1": "Zepta는 투자 정보·데이터 제공 서비스이며, 투자자문업·투자일임업자가 아닙니다. 제공되는 모든 정보·시그널·데이터는 투자 판단의 단순 참고용으로, 종목 추천이나 투자 권유가 아닙니다.",
+    "disclaimerP2": "모든 투자 결정과 그 결과(손익)는 사용자 본인의 책임이며, Zepta는 투자 손실에 대해 어떠한 보증도 하지 않습니다. 과거의 백테스트·시뮬레이션 성과가 미래의 수익을 보장하지 않습니다."
+  },
+  "watchDock": {
+    "toggleAria": "관심종목 패널 열기/닫기",
+    "addedToast": "{{name}} 추가됨",
+    "loginPrompt1": "로그인하면 관심종목을",
+    "loginPrompt2": "어느 화면에서든 볼 수 있어요",
+    "emptyHint1": "위 검색으로 종목을 추가하면",
+    "emptyHint2": "실시간 시세와 퀀트 진단이 떠요",
+    "removeAria": "{{name}} 제거",
+    "footNote": "종목을 누르면 상세 분석이 열려요 · 참고용, 투자 권유 아님"
+  },
+  "seo": {
+    "home": {
+      "title": "Zepta — 투자 정보 플랫폼",
+      "desc": "실시간 주식/코인 스크리너, 시장 신호·데이터 분석, 뉴스·경제 캘린더, 리스크 관리"
+    },
+    "screener": {
+      "title": "주식 시그널·스크리너 | Zepta",
+      "desc": "미국·한국 주식 시그널과 조건 기반 스크리닝 — 모멘텀, 변동성, 수급 조건으로 종목 탐색"
+    },
+    "autoTrading": {
+      "title": "AI 자동매매 | Zepta",
+      "desc": "9개 퀀트 전략 기반 암호화폐 자동매매 봇"
+    },
+    "portfolio": {
+      "title": "포트폴리오 | Zepta",
+      "desc": "실시간 포트폴리오 추적 및 벤치마크 비교"
+    },
+    "coin": {
+      "title": "코인 시그널·지표 | Zepta",
+      "desc": "코인 시그널과 김치 프리미엄·펀딩비·미결제약정·롱숏 비율 등 파생 지표를 한 화면에"
+    },
+    "econCalendar": {
+      "title": "경제 캘린더 | Zepta",
+      "desc": "주요 경제 지표 발표 일정 및 영향 분석"
+    },
+    "indicators": {
+      "title": "지표 — 경제 캘린더·마켓 뉴스 | Zepta",
+      "desc": "주요 경제 지표 발표 일정과 실시간 마켓 뉴스를 한 화면에"
+    },
+    "sentiment": {
+      "title": "소셜 센티먼트 | Zepta",
+      "desc": "StockTwits · Reddit 기반 실시간 투자 심리 분석"
+    },
+    "alerts": {
+      "title": "매매 알림 | Zepta",
+      "desc": "실시간 AI 매매 신호 알림 및 텔레그램 연동"
+    },
+    "anomaly": {
+      "title": "이상 탐지 | Zepta",
+      "desc": "통계 기반 시장 이상 징후 실시간 탐지"
+    },
+    "strategy": {
+      "title": "전략 분석 | Zepta",
+      "desc": "41개 퀀트 전략 상세 분석 및 성과 비교"
+    },
+    "backtest": {
+      "title": "백테스트 | Zepta",
+      "desc": "전략별 과거 수익률 시뮬레이션"
+    },
+    "quantPort": {
+      "title": "퀀트 포트폴리오 | Zepta",
+      "desc": "전략 기반 포트폴리오 자동 구성"
+    },
+    "riskMap": {
+      "title": "리스크 맵 | Zepta",
+      "desc": "시장 리스크 종합 분석 히트맵"
+    },
+    "quantReport": {
+      "title": "퀀트 리포트 | Zepta",
+      "desc": "지수·투자심리·상승종목 비율을 합산한 시장 요약 리포트"
+    },
+    "profile": {
+      "title": "프로필 | Zepta",
+      "desc": "투자 성적표 및 계정 설정"
+    },
+    "about": {
+      "title": "서비스 소개 | Zepta",
+      "desc": "Zepta 투자 정보 플랫폼 소개"
     }
   }
 }
