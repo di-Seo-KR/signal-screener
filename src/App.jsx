@@ -4997,6 +4997,19 @@ function AppInner() {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, []);
 
+  // ★ 2026-08-12 (대표 실보고: "MY 누르면 가끔 아래쪽부터 보임"): 위 scrollTo 는 클릭
+  //   "시점"에만 실행돼, iOS 모멘텀 스크롤이 진행 중이면 관성이 이겨서 새 탭이 중간
+  //   위치에서 열렸습니다. 새 탭 콘텐츠가 실제로 커밋된 "이후"에 한 번 더 고정합니다.
+  //   브라우저의 SPA 히스토리 스크롤 복원도 수동으로 전환(이중 안전).
+  useEffect(() => {
+    try { if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual"; } catch {}
+  }, []);
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "instant" });
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [tab]);
+
   // ── 브라우저 뒤로가기/앞으로가기 지원 ──
   useEffect(() => {
     const onPopState = () => {
