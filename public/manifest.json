@@ -1,44 +1,46 @@
 {
-  "name": "Zepta — AI 퀀트 투자 플랫폼",
+  "name": "Zepta — 투자 정보 플랫폼",
   "short_name": "Zepta",
-  "description": "AI 퀀트 투자 플랫폼 — 실시간 스크리너, 9개 자동매매 전략, 포트폴리오 관리, 리스크 분석",
+  "description": "주식·코인 시장 신호와 데이터 분석 — 시그널, 스크리너, 경제 캘린더, 마켓 뉴스",
   "id": "/",
   "scope": "/",
   "start_url": "/",
   "lang": "ko",
   "dir": "ltr",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui", "browser"],
+  "display_override": [
+    "standalone",
+    "minimal-ui",
+    "browser"
+  ],
   "orientation": "portrait",
-  "background_color": "#0A0B0F",
-  "theme_color": "#0A0B0F",
-  "categories": ["finance", "business", "utilities"],
+  "background_color": "#0A0B10",
+  "theme_color": "#0A0B10",
+  "categories": [
+    "finance",
+    "business",
+    "utilities"
+  ],
   "icons": [
     {
-      "src": "/favicon-32.png",
+      "src": "/favicon-32.png?v=2",
       "sizes": "32x32",
       "type": "image/png"
     },
     {
-      "src": "/zepta-icon-192.png",
+      "src": "/zepta-icon-v2-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/zepta-icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "/zepta-icon-512.png",
+      "src": "/zepta-icon-v2-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/zepta-icon-512.png",
+      "src": "/zepta-icon-maskable-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
