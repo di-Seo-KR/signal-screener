@@ -327,7 +327,7 @@ import {
 //   색은 전부 모듈 C 토큰 — 칩 텍스트는 시안대로 다크 blueL(#9D8FFF)/라이트 blue(#6553E8)
 //   (라이트 blueL 은 틴트 배경 위 4.5:1 미달이라 blue 를 써야 AA 통과).
 // ════════════════════════════════════════════════════════════════════
-function HomeActionChip({ label, onClick, href, disabled = false, style }) {
+function HomeActionChip({ label, onClick, href, disabled = false, ariaLabel, style }) {
   const common = {
     display: "inline-flex", alignItems: "center", height: "28px", padding: "0 11px",
     borderRadius: "9999px", border: "none", background: `${C.blue}1F`,
@@ -336,8 +336,8 @@ function HomeActionChip({ label, onClick, href, disabled = false, style }) {
     fontFamily: "inherit", textDecoration: "none", flexShrink: 0, lineHeight: 1,
     opacity: disabled ? 0.55 : 1, ...style,
   };
-  if (href) return <a href={href} style={common}>{label}</a>;
-  return <button type="button" onClick={onClick} disabled={disabled} style={common}>{label}</button>;
+  if (href) return <a href={href} aria-label={ariaLabel} style={common}>{label}</a>;
+  return <button type="button" onClick={onClick} disabled={disabled} aria-label={ariaLabel} style={common}>{label}</button>;
 }
 
 /** 홈 섹션 카드 — 헤더 행이 카드 "안"에 들어가고 본문과 1px 경계(C.card2)로 구분됩니다.
@@ -8920,10 +8920,15 @@ function AppInner() {
               <HomeSection
                 title={t("tabs.home.marketBriefing") || "마켓 브리핑"}
                 live={marketIndices.length > 0}
+                // ★ 정돈 패스(대표 "컴포넌트 과다" 지시): 이 카드의 주요 액션은 "브리핑 전문
+                //   보기" 하나로 집중합니다. 수동 새로고침은 30초 자동 폴링이 이미 담당하므로
+                //   헤더에서 아이콘 전용(라벨 없음)으로 축소해 시각 무게를 낮췄습니다.
                 action={{
-                  label: marketLoading ? t("tabs.home.updating") : `↻ ${t("tabs.home.refresh")}`,
+                  label: marketLoading ? "···" : "↻",
+                  ariaLabel: t("tabs.home.refresh"),
                   onClick: marketLoading ? undefined : fetchMarketOverview,
                   disabled: marketLoading,
+                  style: { width: "28px", padding: 0, justifyContent: "center", fontSize: "13px" },
                 }}
               >
                 {marketIndices.length === 0 ? (
