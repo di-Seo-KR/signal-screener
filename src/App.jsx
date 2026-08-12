@@ -4,7 +4,7 @@
 // v11.2: 퀀트 엔진 v3.9 하위전략 2차 안전필터 + 모바일 터치 UX 개선
 // v11.1: 다중 타임프레임 RSI 스크리닝 조건 + 퀀트 엔진 v3.8 하위전략 안전필터
 // v11.0: 토스증권 벤치마킹 기반 대개편 — 스크리너 프리셋, 글로벌 검색, 위험종목 필터, 실시간 티커
-import { useState, useEffect, useCallback, useRef, useMemo, useId, Component, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, useId, Component, Fragment, lazy, Suspense } from "react";
 import AuthProvider, { useAuth } from "./AuthProvider.jsx";
 import { LanguageProvider, useLanguage } from "./i18n/LanguageContext.jsx";
 import AuthPage from "./AuthPage.jsx";
@@ -39,6 +39,7 @@ const generateRandomNickname = () => {
 
 /* ── 닉네임 에디터 컴포넌트 ── */
 function NicknameEditor({ user, supabase, onUpdate }) {
+  const { t } = useLanguage();
   const [editing, setEditing] = useState(false);
   const [nickname, setNickname] = useState(user?.user_metadata?.nickname || "");
   const [loading, setLoading] = useState(false);
@@ -52,7 +53,7 @@ function NicknameEditor({ user, supabase, onUpdate }) {
 
   const handleSave = async (nickValue = nickname) => {
     if (!nickValue.trim()) {
-      setError("닉네임을 입력해주세요");
+      setError(t("nickname.required"));
       return;
     }
     setLoading(true);
@@ -65,7 +66,7 @@ function NicknameEditor({ user, supabase, onUpdate }) {
       setEditing(false);
       if (onUpdate) onUpdate();
     } catch (err) {
-      setError(err?.message || "저장 실패");
+      setError(err?.message || t("nickname.saveFailed"));
     } finally {
       setLoading(false);
     }
@@ -89,10 +90,10 @@ function NicknameEditor({ user, supabase, onUpdate }) {
 
   return (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden" }}>
-      <div className="px-5 py-3.5 text-sm font-bold text-muted-foreground uppercase tracking-wider">닉네임</div>
+      <div className="px-5 py-3.5 text-sm font-bold text-muted-foreground uppercase tracking-wider">{t("nickname.title")}</div>
       {!editing ? (
         <div className="flex justify-between items-center px-5 py-3.5 border-t" style={{ borderTopColor: `${C.border}20` }}>
-          <span className="text-base font-semibold text-foreground">{user?.user_metadata?.nickname || "미설정"}</span>
+          <span className="text-base font-semibold text-foreground">{user?.user_metadata?.nickname || t("nickname.notSet")}</span>
           <button
             onClick={() => setEditing(true)}
             style={{
@@ -100,7 +101,7 @@ function NicknameEditor({ user, supabase, onUpdate }) {
               background: C.blue, color: "#fff", border: "none", cursor: "pointer",
             }}
           >
-            편집
+            {t("common.edit")}
           </button>
         </div>
       ) : (
@@ -110,7 +111,7 @@ function NicknameEditor({ user, supabase, onUpdate }) {
               type="text"
               value={nickname}
               onChange={(e) => { setNickname(e.target.value); setError(null); }}
-              placeholder="닉네임 입력"
+              placeholder={t("nickname.placeholder")}
               style={{
                 flex: 1, padding: "8px 12px", borderRadius: "8px",
                 border: `1px solid ${C.border}40`, background: "transparent",
@@ -128,7 +129,7 @@ function NicknameEditor({ user, supabase, onUpdate }) {
                 cursor: loading ? "not-allowed" : "pointer", opacity: loading ? 0.6 : 1,
               }}
             >
-              🎲 생성
+              🎲 {t("nickname.generate")}
             </button>
           </div>
           {error && <div style={{ fontSize: "14px", color: "#ef4444", marginBottom: "10px" }}>{error}</div>}
@@ -143,7 +144,7 @@ function NicknameEditor({ user, supabase, onUpdate }) {
                 opacity: isDirty && !loading ? 1 : 0.5,
               }}
             >
-              {loading ? "저장중..." : "저장"}
+              {loading ? t("nickname.saving") : t("common.save")}
             </button>
             <button
               onClick={handleCancel}
@@ -154,7 +155,7 @@ function NicknameEditor({ user, supabase, onUpdate }) {
                 cursor: "pointer",
               }}
             >
-              취소
+              {t("common.cancel")}
             </button>
           </div>
         </div>
@@ -245,22 +246,29 @@ class ErrorBoundary extends Component {
   }
   render() {
     if (this.state.hasError) {
+      // ★ i18n: ErrorBoundary 는 LanguageProvider 바깥·크래시 상황에서 렌더되므로
+      //   t() 대신 localStorage 의 언어 설정으로 직접 분기합니다(컨텍스트 의존 금지).
+      let bLang = "ko";
+      try { bLang = localStorage.getItem("zepta:lang") || "ko"; } catch {}
+      const bMsg = bLang === "en"
+        ? { title: "The app hit an error", desc: "This is a temporary error. Refreshing should fix it.", reload: "Refresh", detail: "Error details" }
+        : { title: "앱 오류가 발생했습니다", desc: "일시적인 오류입니다. 새로고침하면 정상 작동합니다.", reload: "새로고침", detail: "오류 상세" };
       return (
         <div style={{
           minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center",
           justifyContent: "center", background: "#0A0E17", color: "#F7F8FA", padding: "24px", textAlign: "center",
         }}>
           <div style={{ fontSize: "48px", marginBottom: "16px" }}>⚠️</div>
-          <h2 style={{ fontWeight: 800, fontSize: "20px", marginBottom: "8px" }}>앱 오류가 발생했습니다</h2>
+          <h2 style={{ fontWeight: 800, fontSize: "20px", marginBottom: "8px" }}>{bMsg.title}</h2>
           <p style={{ color: "#6B7D8E", fontSize: "16px", marginBottom: "20px", maxWidth: "360px" }}>
-            일시적인 오류입니다. 새로고침하면 정상 작동합니다.
+            {bMsg.desc}
           </p>
           <button onClick={() => window.location.reload()} style={{
             padding: "12px 28px", borderRadius: "12px", fontSize: "16px", fontWeight: 700,
             background: "#3182F6", color: "#fff", border: "none", cursor: "pointer",
-          }}>새로고침</button>
+          }}>{bMsg.reload}</button>
           <details style={{ marginTop: "16px", fontSize: "14px", color: "#6B7D8E", maxWidth: "360px" }}>
-            <summary style={{ cursor: "pointer" }}>오류 상세</summary>
+            <summary style={{ cursor: "pointer" }}>{bMsg.detail}</summary>
             <pre style={{ textAlign: "left", fontSize: "14px", whiteSpace: "pre-wrap", wordBreak: "break-all", marginTop: "8px" }}>
               {this.state.error?.message}
             </pre>
@@ -293,7 +301,8 @@ const Onboarding = lazy(() => import("./Onboarding.jsx"));
 const PortfolioAnalysis = lazy(() => import("./PortfolioAnalysis.jsx"));
 // PLAN-BIZ Q3 #1 (2026-05-11) — 구독 모델 (Free / Pro / Premium)
 const Pricing = lazy(() => import("./Pricing.jsx"));
-const IndicatorHub = lazy(() => import("./pages/IndicatorHub.jsx")); // ★ 2026-07 정보 피벗 Phase 2 — 지표 허브
+// ★ 2026-08-12 IA v3: 지표 허브(IndicatorHub) 페이지 폐지 — 게이지 그리드는 코인 탭
+//   컨텍스트 카드·홈 스냅샷이 흡수, /indicators 는 캘린더+뉴스 서브탭 화면으로 재구성.
 const AssetDetailSheet = lazy(() => import("./pages/AssetDetailSheet.jsx")); // ★ 2026-08 모바일 시안 — 종목 상세 시트
 // ★ 감사 배치3 (perf): strategies.js(압축 후 86KB)는 스캔 완료 후의 전략 알림 생성
 //   (generateStrategyAlerts)에서만 쓰입니다 — 정적 import 를 제거하고 해당 함수 안에서
@@ -308,6 +317,81 @@ import {
   MobileSectionHeader, IconButton, Segment, EventCard, Disclaimer, Num,
   MONO, accentOf, ChangeNum, Sparkline,
 } from "./components/mobileKit.jsx";
+
+// ════════════════════════════════════════════════════════════════════
+// ★ 2026-08-12 IA v3 — 홈 섹션 카드 문법 (시안 zepta-ia-v3 1d · 설계서 v3 1장)
+//   대표 지시: "섹션 = 카드 컨테이너로 명확히 구분 + 텍스트 링크 전부 칩/버튼화".
+//   헤더 규격(통일안): 제목 15/800 + LIVE 도트(7px, 실시간 섹션만) + 우측 액션 정확히
+//   1개(높이 28px 알약 칩). mobileKit 의 MobileSectionHeader 는 "떠 있는 제목 + 텍스트
+//   버튼" 문법이라 홈에서는 이 카드 문법으로 대체합니다(다른 탭은 각 슬라이스가 정리).
+//   색은 전부 모듈 C 토큰 — 칩 텍스트는 시안대로 다크 blueL(#9D8FFF)/라이트 blue(#6553E8)
+//   (라이트 blueL 은 틴트 배경 위 4.5:1 미달이라 blue 를 써야 AA 통과).
+// ════════════════════════════════════════════════════════════════════
+function HomeActionChip({ label, onClick, href, disabled = false, style }) {
+  const common = {
+    display: "inline-flex", alignItems: "center", height: "28px", padding: "0 11px",
+    borderRadius: "9999px", border: "none", background: `${C.blue}1F`,
+    color: C.isDark ? C.blueL : C.blue, fontSize: "11.5px", fontWeight: 800,
+    whiteSpace: "nowrap", cursor: disabled ? "default" : "pointer",
+    fontFamily: "inherit", textDecoration: "none", flexShrink: 0, lineHeight: 1,
+    opacity: disabled ? 0.55 : 1, ...style,
+  };
+  if (href) return <a href={href} style={common}>{label}</a>;
+  return <button type="button" onClick={onClick} disabled={disabled} style={common}>{label}</button>;
+}
+
+/** 홈 섹션 카드 — 헤더 행이 카드 "안"에 들어가고 본문과 1px 경계(C.card2)로 구분됩니다.
+ *  action: { label, onClick?, href?, disabled? } — 헤더 우측 액션은 정확히 1개만 받습니다.
+ *  리스트형 본문(행이 자체 패딩·구분선을 가짐)은 bodyStyle={{ padding: 0 }} 로 쓰세요. */
+function HomeSection({ title, live = false, action, children, bodyStyle, style }) {
+  return (
+    <section style={{
+      background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px",
+      overflow: "hidden", ...style,
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: "7px", minHeight: "46px",
+        padding: "8px 14px", borderBottom: `1px solid ${C.card2}`,
+      }}>
+        <h2 style={{
+          margin: 0, fontSize: "15px", fontWeight: 800, color: C.text1,
+          minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>{title}</h2>
+        {/* z-pulse: tokens.css 의 기존 2초 pulse 유틸(신규 keyframe 없음) */}
+        {live && <span className="z-pulse" aria-hidden="true" style={{ width: "7px", height: "7px", borderRadius: "50%", background: C.green, flexShrink: 0 }} />}
+        <span style={{ flex: 1 }} />
+        {action && <HomeActionChip {...action} />}
+      </div>
+      <div style={{ padding: "12px 14px", ...bodyStyle }}>{children}</div>
+    </section>
+  );
+}
+
+/** MY 설정 알약 세그먼트 (★ 2026-08-12 IA v3 시안 1e) — 테마·언어 2옵션 토글 전용.
+ *  값·핸들러는 호출부 배선(toggleTheme / setLang) 그대로 — 표현만 시안 알약입니다.
+ *  활성 알약은 C.blue 바탕 + 흰 글자(기존 프리셋 버튼과 같은 조합, AA 통과). */
+function SettingPills({ options, value, onSelect, ariaLabel }) {
+  return (
+    <div role="radiogroup" aria-label={ariaLabel} style={{
+      display: "inline-flex", gap: "2px", background: C.bg, border: `1px solid ${C.border}`,
+      borderRadius: "9999px", padding: "3px", flexShrink: 0,
+    }}>
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <button key={o.value} type="button" role="radio" aria-checked={on}
+            onClick={() => { if (!on) onSelect(o.value); }}
+            style={{
+              border: "none", borderRadius: "9999px", padding: "5px 13px", minHeight: "30px",
+              fontSize: "12px", fontWeight: on ? 800 : 700, fontFamily: "inherit", lineHeight: 1,
+              background: on ? C.blue : "transparent", color: on ? "#fff" : C.text3,
+              cursor: on ? "default" : "pointer",
+            }}>{o.label}</button>
+        );
+      })}
+    </div>
+  );
+}
 
 // 공용 lazy fallback — 탭 전환 시 0.1~0.3초 노출
 function LazyTabFallback() {
@@ -968,6 +1052,30 @@ function coinScoreFreshness(ts, t, staleMin = 30) {
 /** 풀 종류별 "갱신 지연" 임계(분) — 코인 30분(10분 주기×3), 주식 90분(한국 60분 주기×1.5). */
 const STALE_MIN_STOCK = 90;
 
+/** 정규장 세션 상태 (★ 2026-08-12 IA v3 시안 1b 장 상태 배지).
+ *  현재 시각을 해당 시장 타임존으로 환산해(Intl — 미국 서머타임 자동 반영) 요일·시각만으로
+ *  장전/장중/장후를 판정합니다. 시계 기반의 결정적 산출이라 외부 fetch 가 없습니다.
+ *  ⚠️ 공휴일(휴장일) 캘린더는 배선이 없어 반영하지 못합니다 — 화면 캡션에
+ *  "정규장 시각 기준"을 병기해 공휴일 오표기를 단정으로 만들지 않습니다.
+ *  Intl 타임존 미지원 등 산출 실패 시 null — 배지 자체를 생략합니다(지어내지 않음). */
+function marketSessionOf(tz, openMin, closeMin, now = new Date()) {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz, weekday: "short", hour: "2-digit", minute: "2-digit", hour12: false,
+    }).formatToParts(now);
+    const get = (type) => parts.find((p) => p.type === type)?.value;
+    const wd = get("weekday");
+    if (wd === "Sat" || wd === "Sun") return { phase: "weekend" };
+    // hour12:false 라도 일부 엔진은 자정을 "24"로 내보냅니다 — %24 로 정규화.
+    const mins = (Number(get("hour")) % 24) * 60 + Number(get("minute"));
+    if (!Number.isFinite(mins)) return null;
+    if (mins < openMin) return { phase: "pre", minsToOpen: openMin - mins };
+    if (mins < closeMin) return { phase: "open", minsToClose: closeMin - mins };
+    // 장 마감 후 다음 개장까지는 날짜 경계(익영업일)를 넘어 카운트다운을 지어내지 않습니다.
+    return { phase: "closed" };
+  } catch { return null; }
+}
+
 /** 상세 시트 기간 탭 → CoinGecko OHLC days 매핑 (탭마다 실제 다른 데이터를 불러옵니다). */
 const DETAIL_RANGE_DAYS = { "1D": "1", "1W": "7", "1M": "30", "1Y": "365" };
 
@@ -1046,15 +1154,20 @@ function buildAssetDetailProps(sig, t) {
   const rated = timeframes.filter((t) => t.dir);
   if (rated.length) {
     const aligned = timeframes.filter((t) => t.dir === dir).length;
+    const dirWord = dir === "up"
+      ? (t ? t("diag.dirUp") : "상승")
+      : (t ? t("diag.dirDown") : "하락");
     reasons.push(isStock
       // 주식은 구간 수가 응답에 따라 다르므로 실제 구간 이름을 그대로 나열합니다.
-      ? `${tfDefs.map(([, l]) => l).join("·")} ${tfDefs.length}개 구간 중 ${aligned}개가 ${dir === "up" ? "상승" : "하락"} 방향입니다.`
-      : `주·일·4시간·1시간 네 구간 중 ${aligned}개가 ${dir === "up" ? "상승" : "하락"} 방향입니다.`);
+      ? (t ? t("diag.mtfAlignedTf", { tfList: tfDefs.map(([, l]) => l).join("·"), total: tfDefs.length, aligned, dir: dirWord })
+           : `${tfDefs.map(([, l]) => l).join("·")} ${tfDefs.length}개 구간 중 ${aligned}개가 ${dirWord} 방향입니다.`)
+      : (t ? t("diag.mtfAlignedDefault", { aligned, dir: dirWord })
+           : `주·일·4시간·1시간 네 구간 중 ${aligned}개가 ${dirWord} 방향입니다.`));
   }
   const distParts = [];
-  if (rArr[0] && Number.isFinite(Number(rArr[0].d))) distParts.push(`가장 가까운 저항까지 +${Math.abs(Number(rArr[0].d)).toFixed(1)}%`);
-  if (sArr[0] && Number.isFinite(Number(sArr[0].d))) distParts.push(`지지까지 −${Math.abs(Number(sArr[0].d)).toFixed(1)}%`);
-  if (distParts.length) reasons.push(`${distParts.join(", ")} 남아 있습니다.`);
+  if (rArr[0] && Number.isFinite(Number(rArr[0].d))) distParts.push(t ? t("diag.toResistance", { pct: Math.abs(Number(rArr[0].d)).toFixed(1) }) : `가장 가까운 저항까지 +${Math.abs(Number(rArr[0].d)).toFixed(1)}%`);
+  if (sArr[0] && Number.isFinite(Number(sArr[0].d))) distParts.push(t ? t("diag.toSupport", { pct: Math.abs(Number(sArr[0].d)).toFixed(1) }) : `지지까지 −${Math.abs(Number(sArr[0].d)).toFixed(1)}%`);
+  if (distParts.length) reasons.push(t ? t("diag.remaining", { parts: distParts.join(", ") }) : `${distParts.join(", ")} 남아 있습니다.`);
 
   // ── 보조지표 2×2 = 타임프레임별 점수 (칩은 방향만, 여기는 점수까지) ──
   const indicators = tfDefs.map(([k, label]) => {
@@ -1062,10 +1175,11 @@ function buildAssetDetailProps(sig, t) {
     const sc = Number(x?.score);
     if (!x || !Number.isFinite(sc)) return null;
     return {
-      label: `${label} 구간`, value: Math.round(sc),
+      label: t ? t("diag.tfBand", { label }) : `${label} 구간`, value: Math.round(sc),
       // 주식은 현물이라 롱/숏 대신 상승/하락 우위로 서술합니다(파생 워딩 회피).
-      note: x.side === "LONG" ? (isStock ? "상승 우위" : "롱 우위")
-        : x.side === "SHORT" ? (isStock ? "하락 우위" : "숏 우위") : "중립",
+      note: x.side === "LONG" ? (isStock ? (t ? t("tabs.home.upDominant") : "상승 우위") : (t ? t("tabs.home.longDominant") : "롱 우위"))
+        : x.side === "SHORT" ? (isStock ? (t ? t("tabs.home.downDominant") : "하락 우위") : (t ? t("tabs.home.shortDominant") : "숏 우위"))
+        : (t ? t("tabs.home.neutral") : "중립"),
       dir: x.side === "LONG" ? "up" : x.side === "SHORT" ? "down" : "neutral",
     };
   }).filter(Boolean);
@@ -1133,7 +1247,7 @@ function buildAssetDetailProps(sig, t) {
         ? (market === "us"
           ? (t ? t("tabs.home.stockMetaUs") : "나스닥·NYSE · 기술적 지표 종합")
           : (t ? t("tabs.home.stockMetaKr") : "KRX · 기술적 지표 종합"))
-        : "바이낸스 선물 · 무기한",
+        : (t ? t("diag.binancePerp") : "바이낸스 선물 · 무기한"),
       price: priceStr ? `${market === "kr" ? "₩" : "$"}${priceStr}` : undefined,
       // ⚠️ coin-scores 에 등락률 필드가 없어 등락 알약은 넣지 않습니다(0% 를 지어내지 않음).
       // 갱신 표기는 엔진 산출 시각(ts) 실측 — "10분 주기 갱신" 고정 문구는 크론이 멈춰도
@@ -1153,7 +1267,9 @@ function buildAssetDetailProps(sig, t) {
           ? (dir === "up" ? (t ? t("tabs.home.upDominant") : "상승 우위")
             : dir === "down" ? (t ? t("tabs.home.downDominant") : "하락 우위")
             : (t ? t("tabs.home.neutral") : "중립"))
-          : (dir === "up" ? "롱 우위" : dir === "down" ? "숏 우위" : "중립"),
+          : (dir === "up" ? (t ? t("tabs.home.longDominant") : "롱 우위")
+            : dir === "down" ? (t ? t("tabs.home.shortDominant") : "숏 우위")
+            : (t ? t("tabs.home.neutral") : "중립")),
         score: Math.round(Math.max(0, Math.min(100, score))),
         timeframes: rated.length ? timeframes : [],
         reasons,
@@ -1192,8 +1308,12 @@ const matchMarketFilter = (asset, filter) => {
   if (filter === "stock") return asset?.market === "us" || asset?.market === "kr";
   return asset?.market === filter;
 };
-// 시장 → 표시용 배지 라벨 (홈 인기 종목 등 공용)
-const MARKET_BADGE = { us: "🇺🇸 미국", kr: "🇰🇷 한국", crypto: "₿ 코인" };
+// 시장 → 표시용 배지 라벨 (홈 인기 종목 등 공용) — 국기/심볼 + 로케일 시장명
+const MARKET_BADGE_ICON = { us: "🇺🇸", kr: "🇰🇷", crypto: "₿" };
+function marketBadgeLabel(mkt, t) {
+  const k = MARKET_BADGE_ICON[mkt] ? mkt : "us";
+  return `${MARKET_BADGE_ICON[k]} ${t ? t(`diag.market.${k}`) : { us: "미국", kr: "한국", crypto: "코인" }[k]}`;
+}
 
 // 고위험 종목 (레버리지/인버스 ETF, 페니스톡 등)
 const RISKY_SYMBOLS = new Set([
@@ -1761,6 +1881,7 @@ function isTouchTap() { return !_touchState.moved; }
 // 서브 컴포넌트: PullToRefresh (모바일 아래로 당겨서 새로고침)
 // ════════════════════════════════════════════════════════════════════
 function PullToRefresh({ onRefresh, children }) {
+  const { t } = useLanguage();
   const containerRef = useRef(null);
   const [pulling, setPulling] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
@@ -1824,7 +1945,7 @@ function PullToRefresh({ onRefresh, children }) {
             {refreshing ? "⏳" : pullDistance >= THRESHOLD ? "↻" : "↓"}
           </div>
           <span style={{ marginLeft: "8px", fontSize: "18px", color: C.text3, fontWeight: 600 }}>
-            {refreshing ? "새로고침 중..." : pullDistance >= THRESHOLD ? "놓으면 새로고침" : "아래로 당기기"}
+            {refreshing ? t("diag.refreshing") : pullDistance >= THRESHOLD ? t("diag.releaseToRefresh") : t("diag.pullDown")}
           </span>
         </div>
       )}
@@ -1851,6 +1972,7 @@ const TAG_COLORS = {
 };
 
 function SignalTag({ triggerKey, asset }) {
+  const { t } = useLanguage();
   const meta = CONDITION_META[triggerKey];
   let color = TAG_COLORS[triggerKey] || C.blue;
   if (!meta) return null;
@@ -1858,22 +1980,22 @@ function SignalTag({ triggerKey, asset }) {
   let label = meta.label;
   let icon = meta.icon;
   if (triggerKey === "macd_divergence" && asset?.macdDivType) {
-    label = asset.macdDivType === "bullish" ? "MACD 상승 다이버전스" : "MACD 하락 다이버전스";
+    label = asset.macdDivType === "bullish" ? t("diag.tags.macdBullDiv") : t("diag.tags.macdBearDiv");
     color = asset.macdDivType === "bullish" ? C.green : C.red;
     icon = asset.macdDivType === "bullish" ? "📈" : "📉";
   }
   if (triggerKey === "rsi_divergence" && asset?.rsiDivType) {
-    label = asset.rsiDivType === "bullish" ? "RSI 상승 다이버전스" : "RSI 하락 다이버전스";
+    label = asset.rsiDivType === "bullish" ? t("diag.tags.rsiBullDiv") : t("diag.tags.rsiBearDiv");
     color = asset.rsiDivType === "bullish" ? C.green : C.red;
     icon = asset.rsiDivType === "bullish" ? "📈" : "📉";
   }
   if (triggerKey === "obv_divergence" && asset?.obvDivType) {
-    label = asset.obvDivType === "bullish" ? "OBV 매집 다이버전스" : "OBV 분산 다이버전스";
+    label = asset.obvDivType === "bullish" ? t("diag.tags.obvAccumDiv") : t("diag.tags.obvDistDiv");
     color = asset.obvDivType === "bullish" ? C.green : C.red;
     icon = asset.obvDivType === "bullish" ? "📊" : "📊";
   }
   if (triggerKey === "near_poc" && asset?.pocPrice) {
-    label = `POC 근접 ($${asset.pocPrice})`;
+    label = t("diag.tags.pocNear", { price: `$${asset.pocPrice}` });
   }
   return (
     <span title={meta.desc} style={{
@@ -1889,11 +2011,13 @@ function SignalTag({ triggerKey, asset }) {
 // ════════════════════════════════════════════════════════════════════
 // 서브 컴포넌트: SearchBar (글로벌 종목 검색 + 자동완성)
 // ════════════════════════════════════════════════════════════════════
-function SearchBar({ onSelect, placeholder = "종목 검색 (예: AAPL, 삼성전자, BTC...)", compact = false }) {
+function SearchBar({ onSelect, placeholder, compact = false }) {
   // ★ 감사 배치3 (i18n): listbox aria-label 이 한국어 하드코딩이라 EN 화면의 스크린리더
   //   사용자만 한국어를 듣는 문제 → SearchBar 는 항상 LanguageProvider 하위에서 렌더되므로
   //   useLanguage() 로 로케일 배선합니다.
   const { t } = useLanguage();
+  // placeholder 기본값도 로케일 문구 (미지정 시)
+  if (placeholder == null) placeholder = t("diag.searchPlaceholder");
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const [selectedIdx, setSelectedIdx] = useState(-1);
@@ -2461,19 +2585,34 @@ function quickDiagnosis(asset) {
 // ── 표시용 상태 라벨 (표현 3원칙: 행동 지시 → 상태 서술) ─────────────
 // quickDiagnosis 의 verdict 밴드를 사용자 화면·공유 텍스트가 공유하는 단일 매핑.
 // "매수/매도" 같은 행동 지시 대신 신호 상태만 서술합니다 (유사투자자문 리스크 + 대표 지시).
-function verdictLabel(verdict) {
-  switch (verdict) {
-    case "적극 매수": return "상승 신호 강함";
-    case "매수": return "상승 신호 우세";
-    case "매수 우위": return "상승 신호 다소 우세";
-    case "매수 관망": return "상승 신호 다소 우세"; // opinion 밴드(58~68)도 동일 어휘로 서술
-    case "중립": return "중립";
-    case "매도 관망": return "하락 신호 다소 우세";
-    case "매도 우위": return "하락 신호 다소 우세";
-    case "매도": return "하락 신호 우세";
-    case "적극 매도": return "하락 신호 강함";
-    default: return verdict || "중립";
-  }
+// ★ i18n: verdict 내부 값(한국어)은 quickDiagnosis 의 시맨틱 키로 유지하고,
+//   표시 문자열만 t() 로 로케일화합니다. t 미전달 시 기존 한국어 폴백(하위 호환).
+const VERDICT_LABEL_KEYS = {
+  "적극 매수": ["strongUp", "상승 신호 강함"],
+  "매수": ["up", "상승 신호 우세"],
+  "매수 우위": ["slightUp", "상승 신호 다소 우세"],
+  "매수 관망": ["slightUp", "상승 신호 다소 우세"], // opinion 밴드(58~68)도 동일 어휘로 서술
+  "중립": ["neutral", "중립"],
+  "매도 관망": ["slightDown", "하락 신호 다소 우세"],
+  "매도 우위": ["slightDown", "하락 신호 다소 우세"],
+  "매도": ["down", "하락 신호 우세"],
+  "적극 매도": ["strongDown", "하락 신호 강함"],
+};
+function verdictLabel(verdict, t) {
+  const entry = VERDICT_LABEL_KEYS[verdict];
+  if (!entry) return verdict || (t ? t("diag.verdictLabel.neutral") : "중립");
+  return t ? t(`diag.verdictLabel.${entry[0]}`) : entry[1];
+}
+
+// 진단 카테고리(6축) 표시 라벨 — quickDiagnosis 의 한국어 축 이름은 내부 키로 유지,
+// 렌더 시에만 로케일 라벨로 변환합니다.
+const DIAG_CAT_KEYS = {
+  "추세": "trend", "모멘텀": "momentum", "수급": "flow",
+  "위치": "position", "변동성": "volatility", "펀더멘털": "fundamental",
+};
+function catLabel(name, t) {
+  const k = DIAG_CAT_KEYS[name];
+  return k && t ? t(`diag.cat.${k}`) : name;
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -2513,24 +2652,32 @@ const ECON_GUIDE = {
 };
 
 // 발표 후: 발표치 vs 예측치 → 위험자산 관점 결론 (호재/악재/중립)
-function econVerdict(evt) {
-  const g = ECON_GUIDE[evt.type] || ECON_GUIDE.OTHER;
+// ★ i18n: t 를 넘기면 라벨·해설을 로케일 사전(tabs.econCalendar.*)에서 읽고,
+//   tone("good"|"bad"|"neutral") 토큰으로 색 분기합니다(문자열 비교 제거).
+function econVerdict(evt, t) {
+  const gType = ECON_GUIDE[evt.type] ? evt.type : "OTHER";
+  const g = ECON_GUIDE[gType];
   if (evt.actual == null || evt.estimate == null) return null;
+  const gk = (field) => (t ? t(`tabs.econCalendar.guide.${gType}.${field}`) : g[field === "name" ? "ko" : field]);
+  const noteStr = g.note ? gk("note") : null;
   // 동일(또는 ±0.5% 이내) → 예상 부합
   const base = Math.abs(evt.estimate) > 1e-9 ? Math.abs(evt.estimate) : 1;
   const surprise = (evt.actual - evt.estimate) / base;
-  if (Math.abs(surprise) < 0.005) return { dir: "중립", emoji: "⚖️", reason: "예상치에 부합 — 서프라이즈 없음" + (g.note ? `. ${g.note}` : "") };
+  if (Math.abs(surprise) < 0.005) return { tone: "neutral", dir: t ? t("tabs.econCalendar.verdictNeutral") : "중립", emoji: "⚖️", reason: (t ? t("tabs.econCalendar.verdictMatch") : "예상치에 부합 — 서프라이즈 없음") + (noteStr ? `. ${noteStr}` : "") };
   const higher = evt.actual > evt.estimate;
   const good = g.inverted ? !higher : higher;
   return {
-    dir: good ? "통상 호재" : "통상 악재",
+    tone: good ? "good" : "bad",
+    dir: good ? (t ? t("tabs.econCalendar.verdictGood") : "통상 호재") : (t ? t("tabs.econCalendar.verdictBad") : "통상 악재"),
     emoji: good ? "📈" : "📉",
-    reason: higher ? g.high : g.low,
-    note: g.note || null,
+    reason: higher ? gk("high") : gk("low"),
+    note: noteStr,
   };
 }
 
-function calcBuyLevels(asset) {
+function calcBuyLevels(asset, t) {
+  // ★ i18n: t 가 있으면 사유·요약을 로케일 사전(diag.buyLevels.*)에서 읽습니다(ko 폴백 유지).
+  const L = (key, fallback, params) => (t ? t(`diag.buyLevels.${key}`, params) : fallback);
   // 필요한 데이터 추출
   const currentPrice = asset.price || 0;
   const ma50 = asset.ma50 || null;
@@ -2541,7 +2688,7 @@ function calcBuyLevels(asset) {
   if (!currentPrice || currentPrice <= 0) {
     return {
       levels: [],
-      summary: "현재가 정보 부재로 주요 지지 구간 계산 불가"
+      summary: L("noPrice", "현재가 정보 부재로 주요 지지 구간 계산 불가")
     };
   }
 
@@ -2555,17 +2702,17 @@ function calcBuyLevels(asset) {
 
   if (ma50 && currentPrice > ma50) {
     priceL1 = ma50;
-    rationaleL1 = "50일 이동평균선(MA50) 반등 진입";
+    rationaleL1 = L("ma50Bounce", "50일 이동평균선(MA50) 반등 진입");
     confidenceL1 = 75;
   } else if (weeklyLow && weeklyLow > 0) {
     // 52주 저점 기반: 현재가 대비 3% 하락
     priceL1 = Math.max(weeklyLow, currentPrice * 0.97);
-    rationaleL1 = "52주 저점 근처 강한 지지";
+    rationaleL1 = L("near52wLow", "52주 저점 근처 강한 지지");
     confidenceL1 = 70;
   } else {
     // 최근 저점 기반: 3% 풀백
     priceL1 = currentPrice * 0.97;
-    rationaleL1 = "최근 저점 반등 기회";
+    rationaleL1 = L("recentLowBounce", "최근 저점 반등 기회");
     confidenceL1 = 55;
   }
 
@@ -2576,7 +2723,7 @@ function calcBuyLevels(asset) {
 
     levels.push({
       price: Math.round(priceL1 * 100) / 100,
-      label: "1차 지지",
+      label: L("supportN", "1차 지지", { n: 1 }),
       type: "aggressive",
       confidence: confidenceL1,
       rationale: rationaleL1,
@@ -2591,24 +2738,24 @@ function calcBuyLevels(asset) {
 
   if (ma200 && ma200 < currentPrice) {
     priceL2 = ma200;
-    rationaleL2 = "200일 이동평균선(MA200) 지지";
+    rationaleL2 = L("ma200Support", "200일 이동평균선(MA200) 지지");
     confidenceL2 = 80;
   } else if (weeklyHigh && weeklyLow && weeklyHigh > weeklyLow) {
     // Fibonacci 38.2% 되돌림
     const fibLevel = weeklyLow + (weeklyHigh - weeklyLow) * 0.382;
     if (fibLevel < currentPrice) {
       priceL2 = fibLevel;
-      rationaleL2 = "피보나치 38.2% 되돌림 레벨";
+      rationaleL2 = L("fib382", "피보나치 38.2% 되돌림 레벨");
       confidenceL2 = 65;
     } else {
       priceL2 = currentPrice * 0.92;
-      rationaleL2 = "중기 조정 목표 8% 풀백";
+      rationaleL2 = L("pullback8", "중기 조정 목표 8% 풀백");
       confidenceL2 = 50;
     }
   } else {
     // 폴백: 8% 풀백
     priceL2 = currentPrice * 0.92;
-    rationaleL2 = "중기 조정 목표 8% 풀백";
+    rationaleL2 = L("pullback8", "중기 조정 목표 8% 풀백");
     confidenceL2 = 50;
   }
 
@@ -2619,7 +2766,7 @@ function calcBuyLevels(asset) {
 
     levels.push({
       price: Math.round(priceL2 * 100) / 100,
-      label: "2차 지지",
+      label: L("supportN", "2차 지지", { n: 2 }),
       type: "scale-in",
       confidence: confidenceL2,
       rationale: rationaleL2,
@@ -2637,22 +2784,22 @@ function calcBuyLevels(asset) {
     const fib618 = weeklyLow + (weeklyHigh - weeklyLow) * 0.618;
     if (fib618 < currentPrice) {
       priceL3 = fib618;
-      rationaleL3 = "피보나치 61.8% 되돌림 (강력한 지지)";
+      rationaleL3 = L("fib618", "피보나치 61.8% 되돌림 (강력한 지지)");
       confidenceL3 = 85;
     } else {
       // 52주 저점 위 5%
       priceL3 = weeklyLow * 1.05;
-      rationaleL3 = "52주 저점 위 5% 안전 마진";
+      rationaleL3 = L("safeMargin5", "52주 저점 위 5% 안전 마진");
       confidenceL3 = 75;
     }
   } else if (weeklyLow && weeklyLow > 0) {
     priceL3 = weeklyLow * 1.05;
-    rationaleL3 = "52주 저점 위 5% 안전 마진";
+    rationaleL3 = L("safeMargin5", "52주 저점 위 5% 안전 마진");
     confidenceL3 = 75;
   } else {
     // 폴백: 15% 풀백
     priceL3 = currentPrice * 0.85;
-    rationaleL3 = "극단적 조정 목표 15% 풀백";
+    rationaleL3 = L("pullback15", "극단적 조정 목표 15% 풀백");
     confidenceL3 = 45;
   }
 
@@ -2663,7 +2810,7 @@ function calcBuyLevels(asset) {
 
     levels.push({
       price: Math.round(priceL3 * 100) / 100,
-      label: "3차 지지",
+      label: L("supportN", "3차 지지", { n: 3 }),
       type: "bottom",
       confidence: confidenceL3,
       rationale: rationaleL3,
@@ -2682,7 +2829,7 @@ function calcBuyLevels(asset) {
       levels.splice(i - 1, 2, keep);
     }
   }
-  levels.forEach((lv, i) => { lv.label = `${i + 1}차 지지`; });
+  levels.forEach((lv, i) => { lv.label = L("supportN", `${i + 1}차 지지`, { n: i + 1 }); });
 
   // ── 요약 문구 생성 ──
   let summary = "";
@@ -2697,14 +2844,14 @@ function calcBuyLevels(asset) {
       levels[1].discount,
       levels[2].discount
     );
-    summary = `현재가 대비 -${minDiscount.toFixed(1)}%~-${maxDiscount.toFixed(1)}% 영역에 주요 지지 구간 형성`;
+    summary = L("summaryRange", `현재가 대비 -${minDiscount.toFixed(1)}%~-${maxDiscount.toFixed(1)}% 영역에 주요 지지 구간 형성`, { min: minDiscount.toFixed(1), max: maxDiscount.toFixed(1) });
   } else if (levels.length > 0) {
     const discounts = levels.map(l => l.discount);
     const minDiscount = Math.min(...discounts);
     const maxDiscount = Math.max(...discounts);
-    summary = `현재가 대비 -${minDiscount.toFixed(1)}%~-${maxDiscount.toFixed(1)}% 구간에 주요 지지 형성`;
+    summary = L("summaryRange", `현재가 대비 -${minDiscount.toFixed(1)}%~-${maxDiscount.toFixed(1)}% 구간에 주요 지지 형성`, { min: minDiscount.toFixed(1), max: maxDiscount.toFixed(1) });
   } else {
-    summary = "충분한 데이터 부재로 주요 지지 구간 계산 불가";
+    summary = L("noData", "충분한 데이터 부재로 주요 지지 구간 계산 불가");
   }
 
   return {
@@ -3067,12 +3214,13 @@ function calcAdvancedLevels(closes, highs, lows, volumes, techData, fairValue, a
 // 서브 컴포넌트: AssetCard
 // ════════════════════════════════════════════════════════════════════
 function AssetCard({ asset, onChart, isMobile = false }) {
+  const { t } = useLanguage();
   const [expanded, setExpanded] = useState(false);
   const isPos = asset.weekChange >= 0;
   // 다크 전용 hex 하드코딩 → 테마 알파 틴트 (라이트 모드 대비 유지)
   const mcBg = asset.market === "us" ? `${C.blue}1A` : asset.market === "kr" ? `${C.green}1A` : `${C.purple}1A`;
   const mcColor = asset.market === "us" ? C.blue : asset.market === "kr" ? C.green : C.purple;
-  const mcLabel = asset.market === "us" ? "미국" : asset.market === "kr" ? "한국" : "코인";
+  const mcLabel = asset.market === "us" ? t("diag.market.us") : asset.market === "kr" ? t("diag.market.kr") : t("diag.market.crypto");
 
   // 퀵 진단 (항상 계산 — 카드 미리보기 + 정렬용)
   const diag = useMemo(() => quickDiagnosis(asset), [asset]);
@@ -3092,8 +3240,8 @@ function AssetCard({ asset, onChart, isMobile = false }) {
       {(() => {
         const bd = [asset.macdDivType === "bullish", asset.rsiDivType === "bullish", asset.obvDivType === "bullish"].filter(Boolean).length;
         const sd = [asset.macdDivType === "bearish", asset.rsiDivType === "bearish", asset.obvDivType === "bearish"].filter(Boolean).length;
-        if (bd >= 2) return <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: `${C.green}28`, color: C.green, border: `1px solid ${C.green}44`, lineHeight: 1.6 }}>{bd === 3 ? "⚡3중 강세" : "복합 강세"}</span>;
-        if (sd >= 2) return <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: `${C.red}28`, color: C.red, border: `1px solid ${C.red}44`, lineHeight: 1.6 }}>{sd === 3 ? "⚡3중 약세" : "복합 약세"}</span>;
+        if (bd >= 2) return <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: `${C.green}28`, color: C.green, border: `1px solid ${C.green}44`, lineHeight: 1.6 }}>{bd === 3 ? `⚡${t("diag.tripleBull")}` : t("diag.comboBull")}</span>;
+        if (sd >= 2) return <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 7px", borderRadius: "6px", background: `${C.red}28`, color: C.red, border: `1px solid ${C.red}44`, lineHeight: 1.6 }}>{sd === 3 ? `⚡${t("diag.tripleBear")}` : t("diag.comboBear")}</span>;
         return null;
       })()}
       {/* 수급 미니 인디케이터 (CMF/MFI) */}
@@ -3102,14 +3250,14 @@ function AssetCard({ asset, onChart, isMobile = false }) {
           fontSize: "11px", fontWeight: 700, padding: "1px 6px", borderRadius: "4px", lineHeight: 1.6,
           background: asset.cmf > 0.1 ? `${C.green}22` : asset.cmf < -0.1 ? `${C.red}22` : `${C.yellow}18`,
           color: asset.cmf > 0.1 ? C.green : asset.cmf < -0.1 ? C.red : C.yellow,
-        }}>{asset.cmf > 0 ? "매집" : "분산"}</span>
+        }}>{asset.cmf > 0 ? t("diag.accumulation") : t("diag.distribution")}</span>
       )}
       {asset.mfi != null && (asset.mfi < 25 || asset.mfi > 75) && (
         <span title={`MFI: ${asset.mfi}`} style={{
           fontSize: "11px", fontWeight: 700, padding: "1px 6px", borderRadius: "4px", lineHeight: 1.6,
           background: asset.mfi < 20 ? `${C.purple}22` : asset.mfi < 25 ? `${C.green}18` : asset.mfi > 80 ? `${C.red}22` : `${C.yellow}18`,
           color: asset.mfi < 20 ? C.purple : asset.mfi < 25 ? C.green : asset.mfi > 80 ? C.red : C.yellow,
-        }}>{asset.mfi < 25 ? "수급▲" : "수급▼"}</span>
+        }}>{asset.mfi < 25 ? `${t("diag.flowShort")}▲` : `${t("diag.flowShort")}▼`}</span>
       )}
     </div>
   );
@@ -3147,23 +3295,23 @@ function AssetCard({ asset, onChart, isMobile = false }) {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "6px" }}>
-                    <span style={{ fontSize: "16px", fontWeight: 700, color: C.text3 }}>🩺 신호 요약</span>
+                    <span style={{ fontSize: "16px", fontWeight: 700, color: C.text3 }}>🩺 {t("diag.signalSummary")}</span>
                     <span style={{
                       fontSize: "16px", fontWeight: 700,
                       color: diag.score >= 70 ? C.green : diag.score >= 40 ? C.yellow : C.red,
-                    }}>{verdictLabel(diag.verdict)}</span>
+                    }}>{verdictLabel(diag.verdict, t)}</span>
                     <span style={{
                       fontSize: "15px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px",
                       background: diag.opinionColor === "green" ? `${C.green}18` : diag.opinionColor === "red" ? `${C.red}18` : `${C.yellow}18`,
                       color: diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow,
-                    }}>{verdictLabel(diag.opinion)}</span>
+                    }}>{verdictLabel(diag.opinion, t)}</span>
                   </div>
                   {/* 카테고리 미니 바 — ★ 2026-06-12 (대표 피드백): 라벨 폭 36→50px + 줄바꿈 방지
                       (모멘텀·펀더멘털이 '모멘↵텀'으로 깨지던 문제) */}
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: "8px 10px" }}>
                     {diag.categories.map(cat => (
                       <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
-                        <span style={{ fontSize: "13px", color: C.text3, width: "50px", flexShrink: 0, whiteSpace: "nowrap", wordBreak: "keep-all" }}>{cat.name}</span>
+                        <span style={{ fontSize: "13px", color: C.text3, width: "50px", flexShrink: 0, whiteSpace: "nowrap", wordBreak: "keep-all" }}>{catLabel(cat.name, t)}</span>
                         <div style={{ flex: 1, height: "4px", background: C.border, borderRadius: "4px", overflow: "hidden" }}>
                           <div style={{
                             height: "100%", borderRadius: "4px",
@@ -3199,7 +3347,7 @@ function AssetCard({ asset, onChart, isMobile = false }) {
               background: C.bg, borderRadius: "10px", border: `1px solid ${C.border}`,
               alignItems: "center", flexWrap: "wrap",
             }}>
-              <span style={{ fontSize: "15px", fontWeight: 700, color: C.text3, whiteSpace: "nowrap" }}>💧 수급</span>
+              <span style={{ fontSize: "15px", fontWeight: 700, color: C.text3, whiteSpace: "nowrap" }}>💧 {t("diag.cat.flow")}</span>
               {asset.cmf != null && (
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", flex: "1 1 120px", minWidth: "120px" }}>
                   <span style={{ fontSize: "14px", color: C.text3, width: "24px" }}>CMF</span>
@@ -3240,28 +3388,28 @@ function AssetCard({ asset, onChart, isMobile = false }) {
                   fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "6px",
                   background: asset.macdDivType === "bullish" ? `${C.green}22` : `${C.red}22`,
                   color: asset.macdDivType === "bullish" ? C.green : C.red,
-                }}>{asset.macdDivType === "bullish" ? "📈 MACD 상승전환" : "📉 MACD 하락전환"}</span>
+                }}>{asset.macdDivType === "bullish" ? `📈 ${t("diag.macdBullTurn")}` : `📉 ${t("diag.macdBearTurn")}`}</span>
               )}
               {asset.rsiDivType && (
                 <span style={{
                   fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "6px",
                   background: asset.rsiDivType === "bullish" ? `${C.green}22` : `${C.red}22`,
                   color: asset.rsiDivType === "bullish" ? C.green : C.red,
-                }}>{asset.rsiDivType === "bullish" ? "📈 RSI 상승전환" : "📉 RSI 하락전환"}</span>
+                }}>{asset.rsiDivType === "bullish" ? `📈 ${t("diag.rsiBullTurn")}` : `📉 ${t("diag.rsiBearTurn")}`}</span>
               )}
               {asset.obvDivType && (
                 <span style={{
                   fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "6px",
                   background: asset.obvDivType === "bullish" ? `${C.green}22` : `${C.red}22`,
                   color: asset.obvDivType === "bullish" ? C.green : C.red,
-                }}>{asset.obvDivType === "bullish" ? "📊 OBV 매집" : "📊 OBV 분산"}</span>
+                }}>{asset.obvDivType === "bullish" ? `📊 OBV ${t("diag.accumulation")}` : `📊 OBV ${t("diag.distribution")}`}</span>
               )}
               {asset.adx != null && asset.adx >= 25 && (
                 <span style={{
                   fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "6px",
                   background: asset.plusDI > asset.minusDI ? `${C.green}22` : `${C.red}22`,
                   color: asset.plusDI > asset.minusDI ? C.green : C.red,
-                }}>{asset.plusDI > asset.minusDI ? "🔼" : "🔽"} ADX {asset.adx} ({asset.plusDI > asset.minusDI ? "매수세" : "매도세"})</span>
+                }}>{asset.plusDI > asset.minusDI ? "🔼" : "🔽"} ADX {asset.adx} ({asset.plusDI > asset.minusDI ? t("diag.buyPressure") : t("diag.sellPressure")})</span>
               )}
               {asset.bbSqueeze && (
                 <span style={{
@@ -3274,23 +3422,23 @@ function AssetCard({ asset, onChart, isMobile = false }) {
           {/* ── 지표 상세 ── */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: "8px", marginBottom: "12px" }}>
             {[
-              { label: "RSI(14) 주간", value: asset.rsi ?? "—",  color: asset.rsi != null && asset.rsi <= 30 ? C.purple : asset.rsi != null && asset.rsi >= 70 ? C.red : C.text2 },
-              { label: "RSI(14) 일간", value: asset.dailyRsi ?? "—", color: asset.dailyRsi != null && asset.dailyRsi <= 30 ? C.purple : asset.dailyRsi != null && asset.dailyRsi >= 70 ? C.red : C.text2,
-                sub: asset.rsi != null && asset.dailyRsi != null ? (asset.rsi <= 30 && asset.dailyRsi <= 30 ? "MTF 과매도 ✓" : asset.rsi >= 70 && asset.dailyRsi >= 70 ? "MTF 과매수 ✓" : null) : null },
-              { label: "200일선 대비", value: asset.ma200Dist != null ? `${asset.ma200Dist > 0 ? "+" : ""}${asset.ma200Dist}%` : "—" },
-              { label: "거래량 비율", value: `${asset.volRatio}x`, color: asset.volRatio >= 2 ? C.red : C.text2 },
-              { label: "스토캐스틱%K", value: asset.stoch ? `${asset.stoch.k.toFixed(1)}` : "—", color: asset.stoch?.k < 20 ? C.purple : C.text2 },
+              { label: t("diag.ind.rsiWeekly"), value: asset.rsi ?? "—",  color: asset.rsi != null && asset.rsi <= 30 ? C.purple : asset.rsi != null && asset.rsi >= 70 ? C.red : C.text2 },
+              { label: t("diag.ind.rsiDaily"), value: asset.dailyRsi ?? "—", color: asset.dailyRsi != null && asset.dailyRsi <= 30 ? C.purple : asset.dailyRsi != null && asset.dailyRsi >= 70 ? C.red : C.text2,
+                sub: asset.rsi != null && asset.dailyRsi != null ? (asset.rsi <= 30 && asset.dailyRsi <= 30 ? `${t("diag.ind.mtfOversold")} ✓` : asset.rsi >= 70 && asset.dailyRsi >= 70 ? `${t("diag.ind.mtfOverbought")} ✓` : null) : null },
+              { label: t("diag.ind.vsMa200"), value: asset.ma200Dist != null ? `${asset.ma200Dist > 0 ? "+" : ""}${asset.ma200Dist}%` : "—" },
+              { label: t("diag.ind.volRatio"), value: `${asset.volRatio}x`, color: asset.volRatio >= 2 ? C.red : C.text2 },
+              { label: t("diag.ind.stochK"), value: asset.stoch ? `${asset.stoch.k.toFixed(1)}` : "—", color: asset.stoch?.k < 20 ? C.purple : C.text2 },
               { label: "Williams %R", value: asset.wr != null ? `${asset.wr}` : "—", color: asset.wr != null && asset.wr < -80 ? C.purple : C.text2 },
-              { label: "52주 저가 대비", value: asset.low52w ? `${(((asset.price - asset.low52w) / asset.low52w) * 100) >= 0 ? "+" : ""}${(((asset.price - asset.low52w) / asset.low52w) * 100).toFixed(1)}%` : "—",
+              { label: t("diag.ind.vs52wLow"), value: asset.low52w ? `${(((asset.price - asset.low52w) / asset.low52w) * 100) >= 0 ? "+" : ""}${(((asset.price - asset.low52w) / asset.low52w) * 100).toFixed(1)}%` : "—",
                 color: asset.low52w ? ((asset.price - asset.low52w) / asset.low52w * 100 < 5 ? C.purple : C.text2) : C.text2 },
               { label: "CMF", value: asset.cmf != null ? `${asset.cmf > 0 ? "+" : ""}${asset.cmf.toFixed(3)}` : "—", color: asset.cmf != null ? (asset.cmf > 0.1 ? C.green : asset.cmf < -0.1 ? C.red : C.text2) : C.text2 },
               { label: "MFI(14)", value: asset.mfi != null ? `${asset.mfi}` : "—", color: asset.mfi != null ? (asset.mfi < 20 ? C.purple : asset.mfi > 80 ? C.red : C.text2) : C.text2 },
               { label: "ADX", value: asset.adx != null ? `${asset.adx}` : "—",
                 color: asset.adx != null ? (asset.adx >= 25 ? (asset.plusDI > asset.minusDI ? C.green : C.red) : C.text3) : C.text2,
-                sub: asset.adx != null && asset.adx >= 25 ? (asset.plusDI > asset.minusDI ? "+DI 우세" : "-DI 우세") : asset.adx != null ? "추세 약함" : null },
+                sub: asset.adx != null && asset.adx >= 25 ? (asset.plusDI > asset.minusDI ? t("diag.ind.plusDiDominant") : t("diag.ind.minusDiDominant")) : asset.adx != null ? t("diag.ind.weakTrend") : null },
               { label: "TTM Squeeze", value: asset.bbSqueeze ? "ON" : "OFF",
                 color: asset.bbSqueeze ? C.yellow : C.text3,
-                sub: asset.bbSqueeze ? "변동성 폭발 임박" : "정상 상태" },
+                sub: asset.bbSqueeze ? t("diag.ind.squeezeImminent") : t("diag.ind.normalState") },
             ].map(({ label, value, color, sub }) => (
               <div key={label} style={{ background: C.bg, borderRadius: "10px", padding: "10px 12px" }}>
                 <div style={{ fontSize: "15px", color: C.text3, marginBottom: "4px" }}>{label}</div>
@@ -3304,7 +3452,7 @@ function AssetCard({ asset, onChart, isMobile = false }) {
               padding: "10px 20px", borderRadius: "10px", fontSize: "18px", fontWeight: 600, minHeight: "44px",
               background: C.blueBg, color: C.blue, border: `1px solid ${C.blue}44`, cursor: "pointer",
               transition: "background 0.15s ease",
-            }}>📈 차트 보기</button>
+            }}>📈 {t("diag.viewChart")}</button>
             <a href={asset.market === "crypto"
                 ? `https://www.coingecko.com/en/coins/${asset.symbolRaw}`
                 : `https://finance.yahoo.com/quote/${asset.symbolRaw || asset.symbol}`}
@@ -3313,7 +3461,7 @@ function AssetCard({ asset, onChart, isMobile = false }) {
                 padding: "10px 20px", borderRadius: "10px", fontSize: "18px", fontWeight: 600, minHeight: "44px",
                 background: C.card, color: C.text3, border: `1px solid ${C.border2}`, textDecoration: "none",
                 display: "inline-flex", alignItems: "center",
-              }}>🔗 상세 정보</a>
+              }}>🔗 {t("diag.detailsLink")}</a>
           </div>
         </div>
   );
@@ -3340,7 +3488,7 @@ function AssetCard({ asset, onChart, isMobile = false }) {
         {diag && (
           <div style={{ display: "flex", alignItems: "center", gap: "9px", marginTop: "9px" }}>
             {/* 상태 서술 배지 — 표현 3원칙 verdictLabel 유지 */}
-            <span style={{ fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "8px", background: acc.bg, color: acc.hi, whiteSpace: "nowrap", flexShrink: 0 }}>{verdictLabel(diag.opinion)}</span>
+            <span style={{ fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "8px", background: acc.bg, color: acc.hi, whiteSpace: "nowrap", flexShrink: 0 }}>{verdictLabel(diag.opinion, t)}</span>
             {scoreBar(null)}
             <span className="z-num" style={{ fontFamily: MONO, fontVariantNumeric: "tabular-nums", fontSize: "13px", fontWeight: 800, color: acc.hi }}>{diag.score}</span>
           </div>
@@ -3373,7 +3521,7 @@ function AssetCard({ asset, onChart, isMobile = false }) {
         <span style={{ textAlign: "right" }}>{chg}</span>
         <span style={{ justifySelf: "center" }}>
           {diag
-            ? <span style={{ fontSize: "10px", fontWeight: 800, padding: "3px 9px", borderRadius: "8px", background: acc.bg, color: acc.hi, whiteSpace: "nowrap" }}>{verdictLabel(diag.opinion)}</span>
+            ? <span style={{ fontSize: "10px", fontWeight: 800, padding: "3px 9px", borderRadius: "8px", background: acc.bg, color: acc.hi, whiteSpace: "nowrap" }}>{verdictLabel(diag.opinion, t)}</span>
             : <span style={{ fontSize: "11px", color: C.text4 }}>—</span>}
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: "9px", justifyContent: "flex-end" }}>
@@ -3418,7 +3566,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
   // ★ 2026-08 시안 1a: 추이 차트 기간 탭 — 데이터는 이미 받는 1y 일봉(closes)을 슬라이스만 합니다.
   //   (일봉 소스라 1D 탭은 만들지 않습니다 — 없는 해상도를 지어내지 않기)
   const [chartRange, setChartRange] = useState("1M");
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
 
   // 팝업 열릴 때 배경 스크롤 차단
   useEffect(() => {
@@ -3597,7 +3745,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             ? Math.sqrt(closes.slice(-20).reduce((a, v) => a + (v - ma20) ** 2, 0) / 20)
             : 0;
           const techFV = ma200 * 0.35 + ma50 * 0.30 + ma20 * 0.20 + (ma20 + bb20Std * 0.5) * 0.075 + (ma20 - bb20Std * 0.5) * 0.075;
-          models.push({ name: "기술적 평균회귀", value: techFV, weight: 0.20, icon: "📐" });
+          models.push({ name: t("diag.model.techMeanReversion"), value: techFV, weight: 0.20, icon: "📐" });
         }
 
         // 모델 2: 통계적 적정가 (Z-Score 기반 평균회귀)
@@ -3607,14 +3755,14 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           const zScore = std60 > 0 ? (last - mean60) / std60 : 0;
           // 평균회귀 목표: z-score를 0으로 되돌림
           const statFV = mean60 + std60 * Math.max(-1, Math.min(1, zScore * 0.3));
-          models.push({ name: "통계적 평균회귀", value: statFV, weight: 0.15, icon: "📊" });
+          models.push({ name: t("diag.model.statMeanReversion"), value: statFV, weight: 0.15, icon: "📊" });
         }
 
         // 모델 3: 애널리스트 컨센서스 (Yahoo Finance)
         if (analystQ.targetMean && analystQ.analystCount >= 3) {
-          models.push({ name: `애널리스트 컨센서스 (${analystQ.analystCount}명)`, value: analystQ.targetMean, weight: 0.30, icon: "🏦" });
+          models.push({ name: `${t("diag.analystConsensus")} (${t("diag.analystCount", { n: analystQ.analystCount })})`, value: analystQ.targetMean, weight: 0.30, icon: "🏦" });
         } else if (analystQ.targetMedian && analystQ.analystCount >= 1) {
-          models.push({ name: `애널리스트 목표가 (${analystQ.analystCount}명)`, value: analystQ.targetMedian, weight: 0.20, icon: "🏦" });
+          models.push({ name: `${t("diag.model.analystTarget")} (${t("diag.analystCount", { n: analystQ.analystCount })})`, value: analystQ.targetMedian, weight: 0.20, icon: "🏦" });
         }
 
         // 모델 4: PER 기반 적정가 (Forward EPS × 섹터 평균 PER)
@@ -3624,7 +3772,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           const targetPE = currentPE > 35 ? currentPE * 0.85 : currentPE < 10 ? currentPE * 1.15 : currentPE;
           const perFV = analystQ.forwardEps * Math.min(35, Math.max(12, targetPE));
           if (perFV > 0 && isFinite(perFV)) {
-            models.push({ name: "Forward PER 밸류에이션", value: perFV, weight: 0.20, icon: "💹" });
+            models.push({ name: `Forward PER ${t("diag.fin.valuation")}`, value: perFV, weight: 0.20, icon: "💹" });
           }
         } else if (analystQ.trailingEps && analystQ.trailingEps > 0 && analystQ.trailingPE) {
           // Trailing EPS fallback
@@ -3632,7 +3780,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           const adjPE = historicalPE > 40 ? historicalPE * 0.8 : historicalPE < 8 ? historicalPE * 1.2 : historicalPE;
           const perFV = analystQ.trailingEps * adjPE;
           if (perFV > 0 && isFinite(perFV)) {
-            models.push({ name: "Trailing PER 밸류에이션", value: perFV, weight: 0.15, icon: "💹" });
+            models.push({ name: `Trailing PER ${t("diag.fin.valuation")}`, value: perFV, weight: 0.15, icon: "💹" });
           }
         }
 
@@ -3642,7 +3790,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           const targetPBR = currentPBR > 10 ? currentPBR * 0.85 : currentPBR < 1 ? Math.max(1, currentPBR * 1.2) : currentPBR;
           const pbrFV = analystQ.bookValue * targetPBR;
           if (pbrFV > 0 && isFinite(pbrFV)) {
-            models.push({ name: "PBR 밸류에이션", value: pbrFV, weight: 0.10, icon: "📘" });
+            models.push({ name: `PBR ${t("diag.fin.valuation")}`, value: pbrFV, weight: 0.10, icon: "📘" });
           }
         }
 
@@ -3653,7 +3801,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           const fib50 = low52w + range52 * 0.5;
           const fib618 = low52w + range52 * 0.618;
           const rangeFV = fib50 * 0.6 + fib618 * 0.4;
-          models.push({ name: "52주 피보나치 중심", value: rangeFV, weight: 0.10, icon: "🎯" });
+          models.push({ name: t("diag.model.fib52w"), value: rangeFV, weight: 0.10, icon: "🎯" });
         }
 
         // ── 가중평균 종합 적정주가 계산 ──
@@ -3797,7 +3945,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
     return e;
   }, [asset, techData, fundamentals]);
   const diag = useMemo(() => quickDiagnosis(enriched), [enriched]);
-  const buyLevels = useMemo(() => calcBuyLevels(enriched), [enriched]);
+  const buyLevels = useMemo(() => calcBuyLevels(enriched, t), [enriched, t]);
 
   // ★ 2026-08 시안 1a: 방향 강조 색 세트(좌측 3px 보더 + 상단 그라데이션 + 배지 공용).
   //   opinionColor(green/red/yellow)를 시안 accent 문법으로 옮깁니다 — 하드코딩 hex 없음.
@@ -3878,7 +4026,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           {ext && (ext.price) && (
             <div style={{ marginTop: "6px", fontSize: "13px", color: C.text3, display: "flex", alignItems: "center", gap: "6px" }}>
               <span style={{ background: C.card, border: `1px solid ${C.border}`, padding: "2px 8px", borderRadius: "6px", fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>
-                {ext.isPreMarket ? "프리" : "애프터"} ${Number(ext.price).toFixed(2)}
+                {ext.isPreMarket ? t("diag.preMarket") : t("diag.afterHours")} ${Number(ext.price).toFixed(2)}
                 {ext.change != null && (
                   <span style={{ color: ext.change >= 0 ? (C.greenL || C.green) : (C.redL || C.red), marginLeft: "4px" }}>
                     {ext.change >= 0 ? "+" : ""}{ext.change.toFixed(2)}%
@@ -3902,7 +4050,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               border: `1px solid ${C.border}`,
             }}>
               <div style={{ fontSize: "20px", marginBottom: "8px", animation: "spin 1s linear infinite" }}>⏳</div>
-              <div style={{ fontSize: "14px", color: C.text3 }}>기술적 지표 분석 중...</div>
+              <div style={{ fontSize: "14px", color: C.text3 }}>{t("diag.analyzing")}</div>
             </div>
           ) : !techData ? (
             /* ★ 시안 1a 빈 상태 — 분석 데이터 부족: 가짜 수치 대신 상태 안내 + 관심 등록 CTA(기존 토글 배선) */
@@ -3942,7 +4090,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 </div>
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
                   {/* 상태 배지 — 표현 3원칙(상태 서술) verdictLabel 유지 */}
-                  <span style={{ alignSelf: "flex-start", fontSize: "12px", fontWeight: 800, padding: "3px 10px", borderRadius: "8px", background: acc.bg, color: acc.hi }}>{verdictLabel(diag.verdict)}</span>
+                  <span style={{ alignSelf: "flex-start", fontSize: "12px", fontWeight: 800, padding: "3px 10px", borderRadius: "8px", background: acc.bg, color: acc.hi }}>{verdictLabel(diag.verdict, t)}</span>
                   <span style={{ fontSize: "12px", color: C.text3 }}>{t("assetPopup.signalCaption")}</span>
                   {diag.signals.length > 0 && (
                     <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
@@ -3959,13 +4107,13 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               </div>
               {/* 신호 상태 서술 + 근거 (표현 3원칙 — 상태만) */}
               <div style={{ fontSize: "12px", color: C.text3, lineHeight: 1.55, marginBottom: "11px" }}>
-                <span style={{ fontWeight: 800, color: acc.hi }}>{verdictLabel(diag.opinion)}</span> · {diag.rationale}
+                <span style={{ fontWeight: 800, color: acc.hi }}>{verdictLabel(diag.opinion, t)}</span> · {diag.rationale}
               </div>
               {/* 카테고리 점수 바 — 기존 기능 유지(시안 문법 정리) */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(134px, 1fr))", gap: "9px 12px" }}>
                 {diag.categories.map(cat => (
                   <div key={cat.name} style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
-                    <span style={{ fontSize: "12px", color: C.text3, width: "52px", flexShrink: 0, whiteSpace: "nowrap", wordBreak: "keep-all" }}>{cat.name}</span>
+                    <span style={{ fontSize: "12px", color: C.text3, width: "52px", flexShrink: 0, whiteSpace: "nowrap", wordBreak: "keep-all" }}>{catLabel(cat.name, t)}</span>
                     <div style={{ flex: 1, height: "4px", background: C.card2, borderRadius: "9999px", overflow: "hidden" }}>
                       <div style={{
                         height: "100%", borderRadius: "9999px",
@@ -3983,7 +4131,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               {buyLevels.levels.length > 0 && (
                 <div style={{ marginTop: "12px", padding: isMobile ? "12px" : "14px", borderRadius: "12px", background: C.card2, border: `1px solid ${C.border}` }}>
                   <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-start" : "center", justifyContent: "space-between", gap: isMobile ? 2 : 8, marginBottom: "10px" }}>
-                    <span style={{ fontSize: "14px", fontWeight: 800, color: C.text1, whiteSpace: "nowrap" }}>주요 지지 구간</span>
+                    <span style={{ fontSize: "14px", fontWeight: 800, color: C.text1, whiteSpace: "nowrap" }}>{t("diag.majorSupportZone")}</span>
                     <span style={{ fontSize: "12px", color: C.text3, wordBreak: "keep-all", lineHeight: 1.4 }}>{buyLevels.summary}</span>
                   </div>
                   <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: "8px" }}>
@@ -4009,7 +4157,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                                 <div style={{ flex: 1, height: "3px", borderRadius: "4px", background: `${C.border}40`, overflow: "hidden" }}>
                                   <div style={{ height: "100%", width: `${lv.confidence}%`, background: lvColors[li], borderRadius: "4px" }} />
                                 </div>
-                                <span style={{ fontSize: "12px", color: C.text3, whiteSpace: "nowrap" }}>근거 강도 {lv.confidence}</span>
+                                <span style={{ fontSize: "12px", color: C.text3, whiteSpace: "nowrap" }}>{t("diag.confidenceStrength")} {lv.confidence}</span>
                               </div>
                             </div>
                           </div>
@@ -4029,7 +4177,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                             <div style={{ height: "3px", borderRadius: "4px", background: `${C.border}40`, overflow: "hidden" }}>
                               <div style={{ height: "100%", width: `${lv.confidence}%`, background: lvColors[li], borderRadius: "4px" }} />
                             </div>
-                            <div style={{ fontSize: "14px", color: C.text3, marginTop: "2px" }}>근거 강도 {lv.confidence}</div>
+                            <div style={{ fontSize: "14px", color: C.text3, marginTop: "2px" }}>{t("diag.confidenceStrength")} {lv.confidence}</div>
                           </div>
                         </div>
                       );
@@ -4134,7 +4282,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               </div>
               {/* 백테스트 고지 — 성과 전시에는 시뮬레이션 한계 고지를 반드시 동반 (2026-08 전수 감사) */}
               <div style={{ fontSize: "12px", color: C.text4, lineHeight: 1.5, marginBottom: "10px" }}>
-                과거 데이터 기준 시뮬레이션 결과이며 미래 수익을 보장하지 않습니다. 수수료·슬리피지는 반영되지 않았습니다.
+                {t("diag.btDisclaimer")}
               </div>
               {bt.map((s, i) => {
                 const isTop = i === 0;
@@ -4153,15 +4301,15 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                     <div style={{ fontSize: "12px", color: C.text3, marginBottom: "6px" }}>{s.desc}</div>
                     <div style={{ display: "flex", gap: "6px", flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : "visible", paddingBottom: isMobile ? "4px" : 0 }}>
                       <span style={{ fontSize: "12px", padding: "3px 8px", borderRadius: "6px", background: C.card, color: C.text3, whiteSpace: "nowrap" }}>
-                        샤프 <Num size="12px" color={s.sharpe >= 1 ? (C.greenL || C.green) : s.sharpe >= 0 ? (C.yellowL || C.yellow) : (C.redL || C.red)}>{s.sharpe}</Num>
+                        {t("diag.sharpe")} <Num size="12px" color={s.sharpe >= 1 ? (C.greenL || C.green) : s.sharpe >= 0 ? (C.yellowL || C.yellow) : (C.redL || C.red)}>{s.sharpe}</Num>
                       </span>
                       <span style={{ fontSize: "12px", padding: "3px 8px", borderRadius: "6px", background: C.card, color: C.text3, whiteSpace: "nowrap" }}>
-                        승률 <Num size="12px" color={s.winRate >= 60 ? (C.greenL || C.green) : s.winRate >= 40 ? (C.yellowL || C.yellow) : (C.redL || C.red)}>{s.winRate}%</Num>
+                        {t("diag.winRate")} <Num size="12px" color={s.winRate >= 60 ? (C.greenL || C.green) : s.winRate >= 40 ? (C.yellowL || C.yellow) : (C.redL || C.red)}>{s.winRate}%</Num>
                       </span>
                       <span style={{ fontSize: "12px", padding: "3px 8px", borderRadius: "6px", background: C.card, color: C.text3, whiteSpace: "nowrap" }}>
                         MDD <Num size="12px" color={s.maxDD <= 10 ? (C.greenL || C.green) : s.maxDD <= 20 ? (C.yellowL || C.yellow) : (C.redL || C.red)}>-{s.maxDD}%</Num>
                       </span>
-                      <span style={{ fontSize: "12px", padding: "3px 8px", borderRadius: "6px", background: C.card, color: C.text3, whiteSpace: "nowrap" }}><Num size="12px" color={C.text2}>{s.trades}</Num>회</span>
+                      <span style={{ fontSize: "12px", padding: "3px 8px", borderRadius: "6px", background: C.card, color: C.text3, whiteSpace: "nowrap" }}><Num size="12px" color={C.text2}>{s.trades}</Num>{t("diag.tradesSuffix")}</span>
                     </div>
                   </div>
                 );
@@ -4174,10 +4322,10 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "15px 16px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", gap: "8px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
-                  <span style={{ fontSize: "14px", fontWeight: 800, color: C.text1 }}>퀀트 전략</span>
-                  <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "9999px", background: acc.bg, color: acc.hi, whiteSpace: "nowrap" }}>{verdictLabel(diag.opinion)}</span>
+                  <span style={{ fontSize: "14px", fontWeight: 800, color: C.text1 }}>{t("diag.quantStrategy")}</span>
+                  <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "9999px", background: acc.bg, color: acc.hi, whiteSpace: "nowrap" }}>{verdictLabel(diag.opinion, t)}</span>
                 </div>
-                {freshMin != null && <span style={{ fontSize: "12px", color: C.text4, flexShrink: 0 }}>{freshMin < 1 ? "방금" : `${freshMin}분 전`} 분석</span>}
+                {freshMin != null && <span style={{ fontSize: "12px", color: C.text4, flexShrink: 0 }}>{freshMin < 1 ? t("diag.analyzedJustNow") : t("diag.analyzedMinAgo", { n: freshMin })}</span>}
               </div>
               <div style={{
                 fontSize: "13px", color: C.text2, lineHeight: 1.7, marginBottom: "14px",
@@ -4185,22 +4333,22 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 borderLeft: `3px solid ${acc.base}`,
               }}>
                 {isBullish && targetPrice
-                  ? `기술적 상승 신호 우세. 상단 참고 레벨 ${fmtP(targetPrice)}(+${upside}%), 하단 리스크 레벨 ${fmtP(stopLoss)}.${riskReward ? ` R:R 1:${riskReward}.` : ""}`
+                  ? t("diag.stratBullTarget", { target: fmtP(targetPrice), upside, stop: fmtP(stopLoss) }) + (riskReward ? ` R:R 1:${riskReward}.` : "")
                   : isBullish
-                  ? `상승 추세 감지. ${fmtP(stopLoss)} 하회 시 신호 약화 가능성이 있는 구간입니다.`
+                  ? t("diag.stratBullNoTarget", { stop: fmtP(stopLoss) })
                   : isBearish
-                  ? `하락 신호 우세. ${fmtP(sup1?.price || stopLoss)} 이 주요 지지 레벨로 관측됩니다.`
-                  : `혼조 구간. 지지 ${fmtP(sup1?.price || stopLoss)}·저항 ${fmtP(res1?.price)} 사이에서 신호가 혼재된 상태입니다.`}
+                  ? t("diag.stratBear", { support: fmtP(sup1?.price || stopLoss) })
+                  : t("diag.stratMixed", { support: fmtP(sup1?.price || stopLoss), resistance: fmtP(res1?.price) })}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "8px", marginBottom: "8px" }}>
                 <div style={{ background: C.card2, borderRadius: "12px", padding: "10px 12px" }}>
-                  <div style={{ fontSize: "12px", color: C.text3, fontWeight: 700 }}>목표가</div>
+                  <div style={{ fontSize: "12px", color: C.text3, fontWeight: 700 }}>{t("diag.targetPrice")}</div>
                   <Num size="16px" weight={800} color={C.greenL || C.green} style={{ display: "block", marginTop: "3px" }}>{fmtP(targetPrice || techData.analystTarget)}</Num>
                   {upside && <Num size="12px" color={C.greenL || C.green} style={{ display: "block", marginTop: "2px" }}>+{upside}%</Num>}
                   {lv?.targetSources && <div style={{ fontSize: "11px", color: C.text4, marginTop: "4px", lineHeight: 1.4 }}>{lv.targetSources.slice(0, 3).join(" · ")}</div>}
                 </div>
                 <div style={{ background: C.card2, borderRadius: "12px", padding: "10px 12px" }}>
-                  <div style={{ fontSize: "12px", color: C.text3, fontWeight: 700 }}>손절가</div>
+                  <div style={{ fontSize: "12px", color: C.text3, fontWeight: 700 }}>{t("diag.stopPrice")}</div>
                   <Num size="16px" weight={800} color={C.redL || C.red} style={{ display: "block", marginTop: "3px" }}>{fmtP(stopLoss)}</Num>
                   {downside > 0 && <Num size="12px" color={C.redL || C.red} style={{ display: "block", marginTop: "2px" }}>-{downside}%</Num>}
                   {lv?.stopSources && <div style={{ fontSize: "11px", color: C.text4, marginTop: "4px", lineHeight: 1.4 }}>{lv.stopSources.slice(0, 3).join(" · ")}</div>}
@@ -4214,12 +4362,12 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                   </div>
                 )}
                 <div style={{ flex: 1, padding: "9px 10px", borderRadius: "12px", background: C.card2, textAlign: "center" }}>
-                  <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>추세</div>
-                  <div style={{ fontSize: "13px", fontWeight: 800, color: C.text1, marginTop: "2px" }}>{isBullish ? "상승 정렬" : isBearish ? "하락 정렬" : "혼조"}</div>
+                  <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>{t("diag.cat.trend")}</div>
+                  <div style={{ fontSize: "13px", fontWeight: 800, color: C.text1, marginTop: "2px" }}>{isBullish ? t("diag.bullAligned") : isBearish ? t("diag.bearAligned") : t("diag.mixed")}</div>
                 </div>
                 <div style={{ flex: 1, padding: "9px 10px", borderRadius: "12px", background: C.card2, textAlign: "center" }}>
-                  <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>종합점수</div>
-                  <div style={{ fontSize: "13px", fontWeight: 800, color: C.text1, marginTop: "2px" }}>{diag.score >= 70 ? "강함" : diag.score >= 55 ? "다소 강함" : diag.score >= 40 ? "중립" : "약함"}</div>
+                  <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>{t("mobile.kit.scoreLabel")}</div>
+                  <div style={{ fontSize: "13px", fontWeight: 800, color: C.text1, marginTop: "2px" }}>{diag.score >= 70 ? t("diag.scoreStrong") : diag.score >= 55 ? t("diag.scoreSomewhatStrong") : diag.score >= 40 ? t("diag.verdictLabel.neutral") : t("diag.scoreWeak")}</div>
                 </div>
               </div>
             </div>
@@ -4267,7 +4415,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           <div style={{ padding: "14px 16px 0" }}>
             {/* ── 섹션 헤더 ── */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-              <span style={{ fontSize: "16px", fontWeight: 800, color: C.text1 }}>기업 정보</span>
+              <span style={{ fontSize: "16px", fontWeight: 800, color: C.text1 }}>{t("diag.fin.companyInfo")}</span>
               <span style={{ fontSize: "15px", color: C.text3, background: C.card2, padding: "2px 8px", borderRadius: "4px" }}>
                 {fd?.fiscal_date || (fd ? "Financial Datasets" : "Yahoo Finance")}
               </span>
@@ -4282,13 +4430,13 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             {/* ── 1. 실적 요약 (Financial Datasets만) ── */}
             {fd && fd.revenue != null && (
               <div style={{ background: C.card, borderRadius: "12px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>실적 요약</div>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>{t("diag.fin.earningsSummary")}</div>
                 {/* 매출/영업이익/순이익 */}
                 <div style={{ display: "flex", gap: "0", marginBottom: "12px" }}>
                   {[
-                    { label: "매출", value: fd.revenue, growth: fd.revGrowthYoY },
-                    { label: "영업이익", value: fd.operatingIncome, growth: null },
-                    { label: "순이익", value: fd.netIncome, growth: fd.niGrowthYoY },
+                    { label: t("diag.fin.revenue"), value: fd.revenue, growth: fd.revGrowthYoY },
+                    { label: t("diag.fin.operatingIncome"), value: fd.operatingIncome, growth: null },
+                    { label: t("diag.fin.netIncome"), value: fd.netIncome, growth: fd.niGrowthYoY },
                   ].map((item, idx) => (
                     <div key={item.label} style={{
                       flex: 1, textAlign: "center", position: "relative",
@@ -4311,9 +4459,9 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 {(fd.grossMargin != null || fd.operatingMargin != null || fd.netMargin != null) && (
                   <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                     {[
-                      { label: "매출총이익률", value: fd.grossMargin, color: C.blue },
-                      { label: "영업이익률", value: fd.operatingMargin, color: C.green },
-                      { label: "순이익률", value: fd.netMargin, color: fd.netMargin >= 0 ? C.purple : C.red },
+                      { label: t("diag.fin.grossMargin"), value: fd.grossMargin, color: C.blue },
+                      { label: t("diag.fin.operatingMargin"), value: fd.operatingMargin, color: C.green },
+                      { label: t("diag.fin.netMargin"), value: fd.netMargin, color: fd.netMargin >= 0 ? C.purple : C.red },
                     ].filter(m => m.value != null).map(m => (
                       <div key={m.label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         <span style={{ fontSize: "15px", color: C.text3, width: "64px", flexShrink: 0 }}>{m.label}</span>
@@ -4335,9 +4483,9 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 {(fd.revGrowthQoQ != null || fd.revGrowthYoY != null) && (
                   <div style={{ display: "flex", gap: "8px", marginTop: "10px" }}>
                     {[
-                      { label: "매출 QoQ", value: fd.revGrowthQoQ },
-                      { label: "매출 YoY", value: fd.revGrowthYoY },
-                      { label: "순이익 YoY", value: fd.niGrowthYoY },
+                      { label: `${t("diag.fin.revenue")} QoQ`, value: fd.revGrowthQoQ },
+                      { label: `${t("diag.fin.revenue")} YoY`, value: fd.revGrowthYoY },
+                      { label: `${t("diag.fin.netIncome")} YoY`, value: fd.niGrowthYoY },
                     ].filter(g => g.value != null).map(g => (
                       <div key={g.label} style={{
                         flex: 1, textAlign: "center", padding: "6px 4px", borderRadius: "8px",
@@ -4358,7 +4506,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                   const maxNI = Math.max(...qr.filter(q => q.netIncome).map(q => Math.abs(q.netIncome)), 1);
                   return (
                     <div style={{ marginTop: "12px" }}>
-                      <div style={{ fontSize: "15px", color: C.text3, marginBottom: "8px" }}>분기별 추이</div>
+                      <div style={{ fontSize: "15px", color: C.text3, marginBottom: "8px" }}>{t("diag.fin.quarterlyTrend")}</div>
                       <div style={{ display: "flex", gap: "6px", alignItems: "flex-end", height: "60px" }}>
                         {qr.map((q, i) => {
                           const revPct = maxRev > 0 ? Math.abs(q.revenue) / maxRev : 0;
@@ -4390,8 +4538,8 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                         })}
                       </div>
                       <div style={{ display: "flex", gap: "12px", justifyContent: "center", marginTop: "6px" }}>
-                        <span style={{ fontSize: "14px", color: C.text3 }}><span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "4px", background: `${C.blue}80`, marginRight: "3px", verticalAlign: "middle" }} />매출</span>
-                        <span style={{ fontSize: "14px", color: C.text3 }}><span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "4px", background: `${C.green}80`, marginRight: "3px", verticalAlign: "middle" }} />순이익</span>
+                        <span style={{ fontSize: "14px", color: C.text3 }}><span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "4px", background: `${C.blue}80`, marginRight: "3px", verticalAlign: "middle" }} />{t("diag.fin.revenue")}</span>
+                        <span style={{ fontSize: "14px", color: C.text3 }}><span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "4px", background: `${C.green}80`, marginRight: "3px", verticalAlign: "middle" }} />{t("diag.fin.netIncome")}</span>
                       </div>
                     </div>
                   );
@@ -4402,12 +4550,12 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             {/* ── 2. 밸류에이션 ── */}
             {(per != null || pbr != null || psr != null || evEbitda != null) && (
               <div style={{ background: C.card, borderRadius: "12px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>밸류에이션</div>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>{t("diag.fin.valuation")}</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "0" }}>
                   {[
-                    { label: "PER", value: per, desc: per ? (per < 15 ? "저평가" : per < 25 ? "적정" : per < 40 ? "고평가" : "매우 고평가") : null,
+                    { label: "PER", value: per, desc: per ? (per < 15 ? t("diag.fin.undervalued") : per < 25 ? t("diag.fin.fair") : per < 40 ? t("diag.fin.overvalued") : t("diag.fin.veryOvervalued")) : null,
                       color: per ? (per < 15 ? C.green : per < 25 ? C.text1 : per < 40 ? C.yellow : C.red) : C.text3 },
-                    { label: "PBR", value: pbr, desc: pbr ? (pbr < 1 ? "저평가" : pbr < 3 ? "적정" : "고평가") : null,
+                    { label: "PBR", value: pbr, desc: pbr ? (pbr < 1 ? t("diag.fin.undervalued") : pbr < 3 ? t("diag.fin.fair") : t("diag.fin.overvalued")) : null,
                       color: pbr ? (pbr < 1 ? C.green : pbr < 3 ? C.text1 : C.yellow) : C.text3 },
                     { label: "PSR", value: psr, desc: null, color: C.text1 },
                     { label: "EV/EBITDA", value: evEbitda, desc: null, color: C.text1 },
@@ -4432,11 +4580,11 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                   {[
                     // ★ 2026-06-12 (대표 제보): KR 종목은 야후가 ₩값을 주는데 $로 표기되던 버그 — 시장별 통화
                     { label: "EPS", value: eps, fmt: v => asset.market === "kr" ? `₩${Math.round(v).toLocaleString()}` : `$${v.toFixed(2)}` },
-                    { label: "시총", value: mcap, fmt: v => asset.market === "kr"
-                        ? (v >= 1e12 ? `${(v/1e12).toFixed(1)}조` : `${(v/1e8).toFixed(0)}억`)
+                    { label: t("diag.fin.marketCap"), value: mcap, fmt: v => asset.market === "kr"
+                        ? (v >= 1e12 ? `${(v/1e12).toFixed(1)}${t("diag.fin.trillionWon")}` : `${(v/1e8).toFixed(0)}${t("diag.fin.hundredMillionWon")}`)
                         : (v >= 1e12 ? `$${(v/1e12).toFixed(1)}T` : v >= 1e9 ? `$${(v/1e9).toFixed(0)}B` : `$${(v/1e6).toFixed(0)}M`) },
-                    { label: "배당률", value: divYield, fmt: v => `${(v * 100).toFixed(2)}%` },
-                    { label: "베타", value: beta, fmt: v => v.toFixed(2) },
+                    { label: t("diag.fin.dividendYield"), value: divYield, fmt: v => `${(v * 100).toFixed(2)}%` },
+                    { label: t("diag.fin.beta"), value: beta, fmt: v => v.toFixed(2) },
                   ].filter(v => v.value != null).map(item => (
                     <div key={item.label} style={{ flex: 1, textAlign: "center" }}>
                       <div style={{ fontSize: "14px", color: C.text3 }}>{item.label}</div>
@@ -4450,13 +4598,13 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             {/* ── 3. 수익성 & 재무 건전성 ── */}
             {(roe != null || roa != null || dte != null || cr != null) && (
               <div style={{ background: C.card, borderRadius: "12px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>수익성 & 재무건전성</div>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>{t("diag.fin.profitabilityHealth")}</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   {[
                     { label: "ROE", value: roe, scale: 100, suffix: "%", good: v => v > 15, bad: v => v < 0, barMax: 40, barColor: C.green },
                     { label: "ROA", value: roa, scale: 100, suffix: "%", good: v => v > 8, bad: v => v < 0, barMax: 25, barColor: C.blue },
-                    { label: "부채비율", value: dte, scale: 1, suffix: "", good: v => v < 1, bad: v => v > 3, barMax: 5, barColor: C.orange, invert: true },
-                    { label: "유동비율", value: cr, scale: 1, suffix: "", good: v => v > 1.5, bad: v => v < 1, barMax: 4, barColor: C.purple },
+                    { label: t("diag.fin.debtRatio"), value: dte, scale: 1, suffix: "", good: v => v < 1, bad: v => v > 3, barMax: 5, barColor: C.orange, invert: true },
+                    { label: t("diag.fin.currentRatio"), value: cr, scale: 1, suffix: "", good: v => v > 1.5, bad: v => v < 1, barMax: 4, barColor: C.purple },
                   ].filter(m => m.value != null).map(m => {
                     const displayVal = m.scale !== 1 ? m.value * m.scale : m.value;
                     const barPct = Math.min(Math.abs(displayVal) / m.barMax * 100, 100);
@@ -4497,14 +4645,18 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               const curPct = ((curP - minP) / rangeP) * 100;
               const tgtPct = tgt ? ((tgt - minP) / rangeP) * 100 : null;
 
-              const recLabels = { buy: "매수", strongBuy: "적극 매수", strong_buy: "적극 매수", hold: "보유", sell: "매도", underperform: "비중축소", overweight: "비중확대" };
+              const recLabels = {
+                buy: t("diag.rec.buy"), strongBuy: t("diag.rec.strongBuy"), strong_buy: t("diag.rec.strongBuy"),
+                hold: t("diag.rec.hold"), sell: t("diag.rec.sell"),
+                underperform: t("diag.rec.underperform"), overweight: t("diag.rec.overweight"),
+              };
               const recColors = { buy: C.green, strongBuy: C.green, strong_buy: C.green, hold: C.yellow, sell: C.red, underperform: C.red, overweight: C.green };
 
               return (
               <div style={{ background: C.card, borderRadius: "12px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                  <span style={{ fontSize: "16px", fontWeight: 700, color: C.text3 }}>애널리스트 컨센서스</span>
-                  {cnt > 0 && <span style={{ fontSize: "15px", color: C.text3, background: C.card2, padding: "2px 6px", borderRadius: "4px" }}>{cnt}명</span>}
+                  <span style={{ fontSize: "16px", fontWeight: 700, color: C.text3 }}>{t("diag.analystConsensus")}</span>
+                  {cnt > 0 && <span style={{ fontSize: "15px", color: C.text3, background: C.card2, padding: "2px 6px", borderRadius: "4px" }}>{t("diag.analystCount", { n: cnt })}</span>}
                 </div>
 
                 {/* 투자의견 배지 */}
@@ -4518,7 +4670,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                     </span>
                     {recScore && (
                       <span style={{ fontSize: "15px", color: C.text3 }}>
-                        점수 {recScore.toFixed(1)}/5
+                        {t("mobile.kit.score")} {recScore.toFixed(1)}/5
                       </span>
                     )}
                   </div>
@@ -4528,9 +4680,9 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 {tgt && (
                   <div style={{ display: "flex", gap: "0", marginBottom: "12px" }}>
                     {[
-                      { label: "목표가", value: tgt, main: true },
-                      { label: "최고", value: tgtHigh },
-                      { label: "최저", value: tgtLow },
+                      { label: t("diag.targetPrice"), value: tgt, main: true },
+                      { label: t("diag.highest"), value: tgtHigh },
+                      { label: t("diag.lowest"), value: tgtLow },
                     ].filter(v => v.value).map((item, idx) => (
                       <div key={item.label} style={{
                         flex: 1, textAlign: "center",
@@ -4570,7 +4722,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                       position: "absolute", top: "6px", left: `${Math.min(Math.max(curPct, 2), 98)}%`, transform: "translateX(-50%)",
                       display: "flex", flexDirection: "column", alignItems: "center",
                     }}>
-                      <div style={{ fontSize: "14px", fontWeight: 700, color: C.text2, whiteSpace: "nowrap" }}>현재</div>
+                      <div style={{ fontSize: "14px", fontWeight: 700, color: C.text2, whiteSpace: "nowrap" }}>{t("diag.currentMarker")}</div>
                       <div style={{ width: "3px", height: "16px", background: C.text1, borderRadius: "4px" }} />
                     </div>
                     {/* 목표가 마커 */}
@@ -4579,7 +4731,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                         position: "absolute", top: "6px", left: `${Math.min(Math.max(tgtPct, 2), 98)}%`, transform: "translateX(-50%)",
                         display: "flex", flexDirection: "column", alignItems: "center",
                       }}>
-                        <div style={{ fontSize: "14px", fontWeight: 700, color: C.blue, whiteSpace: "nowrap" }}>목표</div>
+                        <div style={{ fontSize: "14px", fontWeight: 700, color: C.blue, whiteSpace: "nowrap" }}>{t("diag.targetMarker")}</div>
                         <div style={{ width: "3px", height: "16px", background: C.blue, borderRadius: "4px" }} />
                       </div>
                     )}
@@ -4589,8 +4741,8 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 {/* Financial Datasets 추가 정보 */}
                 {fd?.estRevenue && (
                   <div style={{ display: "flex", gap: "12px", paddingTop: "8px", borderTop: `1px solid ${C.border}40` }}>
-                    {fd.estRevenue && <span style={{ fontSize: "15px", color: C.text3 }}>예상매출 <span style={{ fontWeight: 700, color: C.text1 }}>{fmtMoney(fd.estRevenue)}</span></span>}
-                    {fd.estEps && <span style={{ fontSize: "15px", color: C.text3 }}>예상EPS <span style={{ fontWeight: 700, color: C.text1 }}>${fd.estEps.toFixed(2)}</span></span>}
+                    {fd.estRevenue && <span style={{ fontSize: "15px", color: C.text3 }}>{t("diag.fin.estRevenue")} <span style={{ fontWeight: 700, color: C.text1 }}>{fmtMoney(fd.estRevenue)}</span></span>}
+                    {fd.estEps && <span style={{ fontSize: "15px", color: C.text3 }}>{t("diag.fin.estEps")} <span style={{ fontWeight: 700, color: C.text1 }}>${fd.estEps.toFixed(2)}</span></span>}
                   </div>
                 )}
               </div>
@@ -4607,17 +4759,17 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               const fmtFv = (v) => asset.market === "kr" ? `₩${Math.round(v).toLocaleString()}` : `$${v.toFixed(2)}`;
               return (
               <div style={{ background: C.card, borderRadius: "12px", padding: "16px", marginBottom: "8px", border: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>적정주가 분석</div>
+                <div style={{ fontSize: "16px", fontWeight: 700, color: C.text3, marginBottom: "10px" }}>{t("diag.fin.fairValueAnalysis")}</div>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "10px" }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: "15px", color: C.text3 }}>종합 적정주가</div>
+                    <div style={{ fontSize: "15px", color: C.text3 }}>{t("diag.fin.compositeFairValue")}</div>
                     <div style={{ fontSize: "20px", fontWeight: 800, color: C.text1 }}>{fmtFv(fv)}</div>
                   </div>
                   <div style={{
                     padding: "6px 14px", borderRadius: "10px", textAlign: "center",
                     background: fp > 10 ? `${C.red}15` : fp > 5 ? `${C.yellow}15` : fp < -10 ? `${C.green}15` : fp < -5 ? `${C.green}10` : `${C.text3}10`,
                   }}>
-                    <div style={{ fontSize: "15px", color: C.text3 }}>현재가 괴리</div>
+                    <div style={{ fontSize: "15px", color: C.text3 }}>{t("diag.fin.priceGap")}</div>
                     <div style={{
                       fontSize: "18px", fontWeight: 800,
                       color: fp > 5 ? C.red : fp < -5 ? C.green : C.yellow,
@@ -4626,7 +4778,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                       fontSize: "14px", fontWeight: 700,
                       color: fp > 5 ? C.red : fp < -5 ? C.green : C.yellow,
                     }}>
-                      {fp > 15 ? "매우 고평가" : fp > 10 ? "고평가" : fp > 5 ? "약간 고평가" : fp < -15 ? "매우 저평가" : fp < -10 ? "저평가" : fp < -5 ? "약간 저평가" : "적정 범위"}
+                      {fp > 15 ? t("diag.fin.veryOvervalued") : fp > 10 ? t("diag.fin.overvalued") : fp > 5 ? t("diag.fin.slightlyOvervalued") : fp < -15 ? t("diag.fin.veryUndervalued") : fp < -10 ? t("diag.fin.undervalued") : fp < -5 ? t("diag.fin.slightlyUndervalued") : t("diag.fin.fairRange")}
                     </div>
                   </div>
                 </div>
@@ -4656,7 +4808,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             {/* 데이터 출처 */}
             <div style={{ fontSize: "14px", color: C.text3, textAlign: "right", opacity: 0.5, marginTop: "2px" }}>
               via {fd ? "Financial Datasets API" : "Yahoo Finance"}
-              {techData?.earningsDate && ` · 다음 실적 ${new Date(techData.earningsDate * 1000).toLocaleDateString("ko-KR")}`}
+              {techData?.earningsDate && ` · ${t("diag.nextEarnings")} ${new Date(techData.earningsDate * 1000).toLocaleDateString(lang === "en" ? "en-US" : "ko-KR")}`}
             </div>
             </>
             )}
@@ -4670,18 +4822,18 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
         {techData && (
           <div style={{ padding: "14px 16px 0" }}>
             <div style={{ background: C.card, borderRadius: "16px", padding: "16px", border: `1px solid ${C.border}` }}>
-              <div style={{ fontSize: "14px", fontWeight: 800, color: C.text1, marginBottom: "10px" }}>기술적 지표</div>
+              <div style={{ fontSize: "14px", fontWeight: 800, color: C.text1, marginBottom: "10px" }}>{t("diag.technicalIndicators")}</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))", gap: "6px" }}>
                 {[
                   { label: "RSI(14)", value: techData.rsi, color: techData.rsi <= 30 ? C.purple : techData.rsi >= 70 ? C.red : C.text2 },
-                  { label: "200일선 괴리", value: techData.ma200Dist != null ? `${techData.ma200Dist > 0 ? "+" : ""}${techData.ma200Dist}%` : "—", color: techData.ma200Dist > 10 ? C.red : techData.ma200Dist < -10 ? C.green : C.text2 },
-                  { label: "거래량 비율", value: `${techData.volRatio}x`, color: techData.volRatio >= 2 ? C.red : C.text2 },
-                  { label: "스토캐스틱", value: techData.stoch ? `${techData.stoch.k}` : "—", color: techData.stoch?.k < 20 ? C.purple : techData.stoch?.k > 80 ? C.red : C.text2 },
+                  { label: t("diag.ind.vsMa200"), value: techData.ma200Dist != null ? `${techData.ma200Dist > 0 ? "+" : ""}${techData.ma200Dist}%` : "—", color: techData.ma200Dist > 10 ? C.red : techData.ma200Dist < -10 ? C.green : C.text2 },
+                  { label: t("diag.ind.volRatio"), value: `${techData.volRatio}x`, color: techData.volRatio >= 2 ? C.red : C.text2 },
+                  { label: t("diag.ind.stochastic"), value: techData.stoch ? `${techData.stoch.k}` : "—", color: techData.stoch?.k < 20 ? C.purple : techData.stoch?.k > 80 ? C.red : C.text2 },
                   { label: "W%R", value: techData.wr != null ? `${techData.wr}` : "—", color: techData.wr < -80 ? C.purple : techData.wr > -20 ? C.red : C.text2 },
-                  { label: "52주 위치", value: techData.high52w && techData.low52w ? `${((techData.price - techData.low52w) / (techData.high52w - techData.low52w) * 100).toFixed(0)}%` : "—" },
-                  { label: "CMF", value: enriched.cmf != null ? `${enriched.cmf > 0 ? "+" : ""}${enriched.cmf.toFixed(3)}` : "—", color: enriched.cmf != null ? (enriched.cmf > 0.1 ? C.green : enriched.cmf < -0.1 ? C.red : C.text2) : C.text2, sub: enriched.cmf != null ? (enriched.cmf > 0.1 ? "매집 강세" : enriched.cmf < -0.1 ? "분산 경고" : "중립") : null },
-                  { label: "MFI(14)", value: enriched.mfi != null ? `${Math.round(enriched.mfi)}` : "—", color: enriched.mfi != null ? (enriched.mfi < 20 ? C.purple : enriched.mfi > 80 ? C.red : C.text2) : C.text2, sub: enriched.mfi != null ? (enriched.mfi < 20 ? "과매도" : enriched.mfi > 80 ? "과매수" : enriched.mfi < 40 ? "약세" : enriched.mfi > 60 ? "강세" : "중립") : null },
-                  { label: "ADX", value: enriched.adx != null ? `${enriched.adx}` : "—", color: enriched.adx != null ? (enriched.adx >= 25 ? (enriched.plusDI > enriched.minusDI ? C.green : C.red) : C.text3) : C.text2, sub: enriched.adx != null ? (enriched.adx >= 25 ? (enriched.plusDI > enriched.minusDI ? "+DI 우세" : "-DI 우세") : "추세 약함") : null },
+                  { label: t("diag.ind.pos52w"), value: techData.high52w && techData.low52w ? `${((techData.price - techData.low52w) / (techData.high52w - techData.low52w) * 100).toFixed(0)}%` : "—" },
+                  { label: "CMF", value: enriched.cmf != null ? `${enriched.cmf > 0 ? "+" : ""}${enriched.cmf.toFixed(3)}` : "—", color: enriched.cmf != null ? (enriched.cmf > 0.1 ? C.green : enriched.cmf < -0.1 ? C.red : C.text2) : C.text2, sub: enriched.cmf != null ? (enriched.cmf > 0.1 ? t("diag.ind.accumStrong") : enriched.cmf < -0.1 ? t("diag.ind.distWarning") : t("tabs.home.neutral")) : null },
+                  { label: "MFI(14)", value: enriched.mfi != null ? `${Math.round(enriched.mfi)}` : "—", color: enriched.mfi != null ? (enriched.mfi < 20 ? C.purple : enriched.mfi > 80 ? C.red : C.text2) : C.text2, sub: enriched.mfi != null ? (enriched.mfi < 20 ? t("diag.ind.oversold") : enriched.mfi > 80 ? t("diag.ind.overbought") : enriched.mfi < 40 ? t("diag.ind.weak") : enriched.mfi > 60 ? t("diag.ind.strong") : t("tabs.home.neutral")) : null },
+                  { label: "ADX", value: enriched.adx != null ? `${enriched.adx}` : "—", color: enriched.adx != null ? (enriched.adx >= 25 ? (enriched.plusDI > enriched.minusDI ? C.green : C.red) : C.text3) : C.text2, sub: enriched.adx != null ? (enriched.adx >= 25 ? (enriched.plusDI > enriched.minusDI ? t("diag.ind.plusDiDominant") : t("diag.ind.minusDiDominant")) : t("diag.ind.weakTrend")) : null },
                 ].map(({ label, value, color, sub }) => (
                   <div key={label} style={{ background: C.card2, borderRadius: "10px", padding: "8px 10px", textAlign: "center" }}>
                     <div style={{ fontSize: "14px", color: C.text3, marginBottom: "3px" }}>{label}</div>
@@ -4694,7 +4846,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               {(enriched.cmf != null || enriched.mfi != null) && (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginTop: "10px", paddingTop: "10px", borderTop: `1px solid ${C.border}40` }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                    <span style={{ fontSize: "15px", fontWeight: 700, color: C.text3 }}>수급 흐름</span>
+                    <span style={{ fontSize: "15px", fontWeight: 700, color: C.text3 }}>{t("diag.flowSection")}</span>
                     {enriched.macdDivType && (
                       <span style={{ fontSize: "14px", fontWeight: 700, padding: "2px 7px", borderRadius: "6px",
                         background: enriched.macdDivType === "bullish" ? `${C.green}18` : `${C.red}18`,
@@ -4745,7 +4897,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               {/* 실적 발표일 */}
               {techData.earningsDate && (
                 <div style={{ marginTop: "8px", paddingTop: "8px", borderTop: `1px solid ${C.border}40`, fontSize: "15px", color: C.text3, textAlign: "center" }}>
-                  📅 다음 실적 발표 <span style={{ fontWeight: 700, color: C.text2 }}>{new Date(techData.earningsDate * 1000).toLocaleDateString("ko-KR", { year: "numeric", month: "short", day: "numeric" })}</span>
+                  📅 {t("diag.nextEarningsAnnouncement")} <span style={{ fontWeight: 700, color: C.text2 }}>{new Date(techData.earningsDate * 1000).toLocaleDateString(lang === "en" ? "en-US" : "ko-KR", { year: "numeric", month: "short", day: "numeric" })}</span>
                 </div>
               )}
             </div>
@@ -4758,7 +4910,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             flex: 1, padding: "12px 0", borderRadius: "12px", fontSize: "15px", fontWeight: 800,
             background: C.blue, color: "#fff", border: "none", cursor: "pointer", fontFamily: "inherit",
             display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
-          }}>📈 차트 보기</button>
+          }}>📈 {t("diag.viewChart")}</button>
           <a href={asset.market === "crypto"
               ? `https://www.coingecko.com/en/coins/${asset.id || asset.symbolRaw || asset.symbol.toLowerCase()}`
               : `https://finance.yahoo.com/quote/${asset.symbolRaw || asset.symbol}`}
@@ -4768,7 +4920,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               background: C.card, color: C.text2, border: `1px solid ${C.border}`,
               textDecoration: "none", textAlign: "center",
               display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
-            }}>🔗 상세 정보</a>
+            }}>🔗 {t("diag.detailsLink")}</a>
         </div>
         {/* 공유 버튼 — 바이럴 */}
         <div style={{ padding: "0 16px 16px" }}>
@@ -4776,11 +4928,11 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
             // ★ 2026-08-10 (전수 감사): techData.overallScore 는 존재하지 않는 필드라 항상
             //   "0점 (매도)" 로 공유되던 실버그. 화면 게이지와 같은 diag 를 단일 진실원천으로 쓰고,
             //   출처 문구도 실제 산출 방식(기술적 지표 종합)으로 정정. 라벨은 상태 서술(3원칙).
-            const shareText = `[Zepta 진단] ${asset.name}(${asset.symbol}) — 종합 ${diag.score}점 · ${verdictLabel(diag.verdict)}\n\n기술적 지표 종합 스코어입니다. 투자 판단과 책임은 본인에게 있습니다.\n👉 https://zepta.app`;
+            const shareText = t("diag.shareText", { name: asset.name, symbol: asset.symbol, score: diag.score, verdict: verdictLabel(diag.verdict, t) });
             if (navigator.share) {
-              navigator.share({ title: `${asset.name} 기술적 진단`, text: shareText, url: "https://zepta.app" }).catch(() => {});
+              navigator.share({ title: t("diag.shareDiagTitle", { name: asset.name }), text: shareText, url: "https://zepta.app" }).catch(() => {});
             } else {
-              navigator.clipboard.writeText(shareText).then(() => showToast("진단 결과가 복사되었습니다!", "success")).catch(() => {});
+              navigator.clipboard.writeText(shareText).then(() => showToast(t("diag.diagCopied"), "success")).catch(() => {});
             }
           }} style={{
             width: "100%", padding: "10px 0", borderRadius: "12px", fontSize: "14px", fontWeight: 700, fontFamily: "inherit",
@@ -4790,12 +4942,12 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           }}
           onMouseEnter={e => { e.currentTarget.style.background = C.card2; e.currentTarget.style.color = C.text2; }}
           onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = C.text3; }}
-          >📤 진단 결과 공유</button>
+          >📤 {t("diag.shareDiag")}</button>
         </div>
         {/* 면책 — 이 팝업은 전역 푸터 면책을 가리는 오버레이라 화면 내 고지가 필요합니다 (2026-08 전수 감사) */}
         <div style={{ padding: "0 16px 18px" }}>
           <Disclaimer style={{ fontSize: "12px", textAlign: "center", padding: 0 }}>
-            표시되는 목표가·손절가·지지/저항 레벨과 점수는 과거 시세를 계산한 참고 정보이며 투자 조언이 아닙니다. 투자 판단과 책임은 본인에게 있습니다.
+            {t("diag.popupDisclaimer")}
           </Disclaimer>
         </div>
       </div>
@@ -4847,7 +4999,9 @@ const OWNER_ONLY_TABS = new Set([
 ]);
 
 function AppInner() {
-  const { t } = useLanguage();
+  // ★ 2026-08-12 IA v3 (시안 1e): MY 설정 섹션의 언어 토글이 lang/setLang 을 씁니다 —
+  //   LanguageContext 의 기존 switchLang(localStorage 영속 포함) 배선을 그대로 노출.
+  const { t, lang, setLang } = useLanguage();
   const { user, loading: authLoading, signOut, refreshUser } = useAuth();
   const isOwner = (user?.email || "").toLowerCase() === OWNER_EMAIL;
   const [themeMode, setThemeMode] = useState(loadTheme);
@@ -4937,16 +5091,28 @@ function AppInner() {
   // ★ 2026-07 정보 피벗 Phase 2: indicators(지표 허브) 추가.
   const validTabs = ["home","auto-trading","real-trading","alpha-lab","portfolio","portfolio-analysis","screener","alerts","notifications","saved-screeners","news","quant-portfolio","quant-port","risk-map","backtest","backtest-compare","copy-trading","sentiment","strategy","anomaly","quant-report","econ-calendar","indicators","leaderboard","reports","bot-report","profile","mypage","dev","pricing","about","privacy","terms","contact","marketing"];
 
+  // ★ 2026-08-12 IA v3 (설계서 v3 0장·8장 — 대표 확정 "자산군 이원화"): 하단 탭이
+  //   [홈 · 코인 · 주식 · 지표 · MY] 로 재편됩니다. 내부 탭 id(news/screener)는 setTab
+  //   배선 수십 곳과 Header.jsx gnbCategoryMap 호환을 위해 그대로 두고, 사용자에게
+  //   보이는 "URL 경로"만 새 IA 로 이원화합니다.
+  //   · /crypto ↔ news(코인 탭) · /stocks ↔ screener(주식 탭)
+  //   · 구 URL(/news·/screener·?tab=)은 계속 해석(북마크 무효화 금지) + 진입 직후
+  //     replaceState 로 새 경로 정정. sessionStorage 복원값은 내부 id 라 그대로 호환.
+  const TAB_TO_PATH = { news: "crypto", screener: "stocks" }; // 내부 id → 새 경로
+  const PATH_TO_TAB = { crypto: "news", stocks: "screener" }; // 새 경로 → 내부 id
+
   // ── 경로 → tab 변환 ──
   //   /reports             → "reports"
   //   /reports/stable-quant → "bot-report" (botId 별도 state)
-  //   그 외                 → validTabs 매칭
+  //   /crypto·/stocks      → IA v3 새 경로 (내부 id 로 역매핑)
+  //   그 외                 → validTabs 매칭 (구 경로 /news·/screener 포함)
   const resolvePathToTab = (rawPath) => {
     const path = String(rawPath || "").replace(/^\//, "").replace(/\/$/, "");
     if (!path) return { tab: null, botId: null };
     const reportsMatch = path.match(/^reports\/([a-zA-Z0-9_-]+)$/);
     if (reportsMatch) return { tab: "bot-report", botId: reportsMatch[1] };
     if (path === "reports") return { tab: "reports", botId: null };
+    if (PATH_TO_TAB[path]) return { tab: PATH_TO_TAB[path], botId: null };
     if (validTabs.includes(path)) return { tab: path, botId: null };
     return { tab: null, botId: null };
   };
@@ -4960,9 +5126,10 @@ function AppInner() {
       // 1순위: URL pathname (/screener, /auto-trading, /reports/<botId> 등)
       const resolved = resolvePathToTab(window.location.pathname);
       if (resolved.tab) return resolved.tab;
-      // 2순위: URL ?tab= 파라미터 (레거시 호환)
+      // 2순위: URL ?tab= 파라미터 (레거시 호환 — IA v3 새 이름 crypto/stocks 도 수용)
       const p = new URLSearchParams(window.location.search);
-      const t = p.get("tab");
+      const t0 = p.get("tab");
+      const t = t0 ? (PATH_TO_TAB[t0] || t0) : null;
       if (t && validTabs.includes(t)) return t;
       // 사이트링크 검색박스(?q=) 진입 → 스크리너로 (검색어는 assetQuery 가 시드)
       if (p.get("q")) return "screener";
@@ -4984,11 +5151,11 @@ function AppInner() {
     setReportBotId(botId);
     try {
       sessionStorage.setItem("zepta_tab", actualTab);
-      // URL을 경로 기반으로 업데이트 (페이지 리로드 없이)
+      // URL을 경로 기반으로 업데이트 (페이지 리로드 없이) — IA v3 새 경로 우선
       let newPath;
       if (actualTab === "home") newPath = "/";
       else if (actualTab === "bot-report" && botId) newPath = `/reports/${botId}`;
-      else newPath = `/${actualTab}`;
+      else newPath = `/${TAB_TO_PATH[actualTab] || actualTab}`;
       if (window.location.pathname !== newPath) {
         window.history.pushState({ tab: actualTab, botId }, "", newPath);
       }
@@ -5027,45 +5194,100 @@ function AppInner() {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
+  // ── IA v3 구 URL 정정: /news·/screener 로 들어온 세션의 주소창을 새 경로로 교체 ──
+  //   탭 해석은 위 initializer 가 이미 끝냈으므로 여기서는 주소만 replaceState 로
+  //   조용히 바꿉니다(리로드·히스토리 오염 없음, 쿼리·해시 보존 — 북마크 무효화 금지).
+  useEffect(() => {
+    try {
+      const path = window.location.pathname.replace(/^\//, "").replace(/\/$/, "");
+      if (TAB_TO_PATH[path]) {
+        window.history.replaceState(
+          { tab: path, botId: null }, "",
+          `/${TAB_TO_PATH[path]}${window.location.search}${window.location.hash}`
+        );
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ★ IA v3 (설계서 v3 4장): 지표 탭 서브뷰 [캘린더|뉴스].
+  //   딥링크 /indicators?view=news 를 시드로 받고, 홈의 "톱 뉴스 더보기"가
+  //   setIndicatorsView("news") → setTab("indicators") 로 직행합니다.
+  //   렌더 소비(서브탭 UI)는 슬라이스 2(지표 탭 재구성)가 담당 — prop 계약: view.
+  const [indicatorsView, setIndicatorsView] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("view") === "news" ? "news" : "calendar";
+    } catch { return "calendar"; }
+  });
+  // ★ 서브탭 ↔ URL 동기화: setTab 은 pushState("/indicators") 만 하므로, 홈 "뉴스 더보기"로
+  //   들어오면 ?view=news 가 URL 에 남지 않아 새로고침·공유 시 캘린더로 착지했습니다
+  //   (적대 리뷰 지적). 지표 탭에 있는 동안 현재 서브뷰를 replaceState 로 반영합니다.
+  useEffect(() => {
+    if (tab !== "indicators") return;
+    try {
+      const want = indicatorsView === "news" ? "/indicators?view=news" : "/indicators";
+      if (window.location.pathname + window.location.search !== want) {
+        window.history.replaceState({ tab: "indicators", view: indicatorsView }, "", want);
+      }
+    } catch {}
+  }, [tab, indicatorsView]);
+
+  // ★ IA v3 (설계서 v3 4장): 구 경제 캘린더 탭(econ-calendar)은 지표 탭 캘린더 서브탭이
+  //   흡수했습니다. 수십 곳의 기존 setTab("econ-calendar") 배선·북마크(/econ-calendar)는
+  //   그대로 두고, 진입 시 여기서 지표 탭으로 정정합니다(캘린더 서브탭 강제 — 기능 동일).
+  //   ⚠️ setTab(pushState)이 아니라 replaceState — 뒤로가기가 /econ-calendar 로 돌아와
+  //   다시 밀려나는 히스토리 루프를 만들지 않기 위함입니다.
+  useEffect(() => {
+    if (tab === "econ-calendar") {
+      setIndicatorsView("calendar");
+      setTabRaw("indicators");
+      try {
+        sessionStorage.setItem("zepta_tab", "indicators");
+        window.history.replaceState({ tab: "indicators", botId: null }, "", "/indicators");
+      } catch {}
+    }
+  }, [tab]);
+
+  // 서브탭 전환 — 딥링크(/indicators?view=news)가 공유·복원되도록 주소만 조용히 동기화.
+  const setIndicatorsViewWithUrl = useCallback((v) => {
+    setIndicatorsView(v);
+    try {
+      window.history.replaceState(window.history.state, "",
+        v === "news" ? "/indicators?view=news" : "/indicators");
+    } catch {}
+  }, []);
+
   // ── 탭별 SEO 메타 정보 (제목, 설명, OG 태그용) ──
-  const TAB_META = {
-    home: { title: "Zepta — 투자 정보 플랫폼", desc: "실시간 주식/코인 스크리너, 시장 신호·데이터 분석, 뉴스·경제 캘린더, 리스크 관리" },
-    // ★ 2026-08-02 (주식+코인 양축): 실제 스캔 범위(미국·한국 주식 + 코인)에 맞춰 카피 정합
-    screener: { title: "주식·코인 스크리너 | Zepta", desc: "조건 기반 주식·코인 스크리닝 — 모멘텀, 변동성, 수급 조건으로 종목 필터링" },
-    "auto-trading": { title: "AI 자동매매 | Zepta", desc: "9개 퀀트 전략 기반 암호화폐 자동매매 봇" },
-    portfolio: { title: "포트폴리오 | Zepta", desc: "실시간 포트폴리오 추적 및 벤치마크 비교" },
-    news: { title: "마켓 뉴스 | Zepta", desc: "키워드 기반 감성 분류가 포함된 실시간 글로벌 투자 뉴스" },
-    "econ-calendar": { title: "경제 캘린더 | Zepta", desc: "주요 경제 지표 발표 일정 및 영향 분석" },
-    indicators: { title: "지표 허브 | Zepta", desc: "주식·코인 핵심 시장 지표를 한 화면에 — 국내증시 온도, 환율 압력, 공포·탐욕, 마켓 온도 요약과 해석" },
-    sentiment: { title: "소셜 센티먼트 | Zepta", desc: "StockTwits · Reddit 기반 실시간 투자 심리 분석" },
-    alerts: { title: "매매 알림 | Zepta", desc: "실시간 AI 매매 신호 알림 및 텔레그램 연동" },
-    anomaly: { title: "이상 탐지 | Zepta", desc: "통계 기반 시장 이상 징후 실시간 탐지" },
-    strategy: { title: "전략 분석 | Zepta", desc: "41개 퀀트 전략 상세 분석 및 성과 비교" },
-    backtest: { title: "백테스트 | Zepta", desc: "전략별 과거 수익률 시뮬레이션" },
-    "quant-port": { title: "퀀트 포트폴리오 | Zepta", desc: "전략 기반 포트폴리오 자동 구성" },
-    "risk-map": { title: "리스크 맵 | Zepta", desc: "시장 리스크 종합 분석 히트맵" },
-    "quant-report": { title: "퀀트 리포트 | Zepta", desc: "지수·투자심리·상승종목 비율을 합산한 시장 요약 리포트" },
-    profile: { title: "프로필 | Zepta", desc: "투자 성적표 및 계정 설정" },
-    about: { title: "서비스 소개 | Zepta", desc: "Zepta 투자 정보 플랫폼 소개" }
-  };
+  // ★ i18n: 탭 키 → seo.<slug>.title/desc 사전 조회 (한/영 로케일 대응 — 대표 지시)
+  const TAB_META = Object.fromEntries([
+    ["home", "home"],
+    // ★ 2026-08-12 IA v3 (자산군 이원화): screener=주식 탭(/stocks) · news=코인 탭(/crypto).
+    //   내부 id 는 유지하고 노출 메타만 새 탭 정체성에 맞춥니다.
+    ["screener", "screener"], ["auto-trading", "autoTrading"], ["portfolio", "portfolio"],
+    ["news", "coin"], ["econ-calendar", "econCalendar"], ["indicators", "indicators"],
+    ["sentiment", "sentiment"], ["alerts", "alerts"], ["anomaly", "anomaly"],
+    ["strategy", "strategy"], ["backtest", "backtest"], ["quant-port", "quantPort"],
+    ["risk-map", "riskMap"], ["quant-report", "quantReport"], ["profile", "profile"],
+    ["about", "about"],
+  ].map(([tabId, slug]) => [tabId, { title: t(`seo.${slug}.title`), desc: t(`seo.${slug}.desc`) }]));
 
   // ── GNB 카테고리 상태 ──
-  // ★ 2026-07 정보 피벗 Phase 1: 홈 / 뉴스(직행) / 시장 / 지표 / MY (+owner 트레이딩)
-  //   Header.jsx 의 gnbCategoryMap 과 반드시 동기 유지해야 합니다.
+  // ★ 2026-08-12 IA v3: 홈 / 코인 / 주식 / 지표 / MY (+owner 트레이딩)
+  //   Header.jsx 의 gnbCategoryMap 과 반드시 동기 유지해야 합니다 (동일 그룹 재편 반영 —
+  //   anomaly·risk-map·quant-report 는 지표 축, saved-screeners 는 MY 축으로 이동).
   const gnbCategoryMap = {
     "home": "home",
-    // 뉴스 — 단일 직행 탭
-    "news": "news",
-    // 시장 (시장을 본다)
-    "screener": "market",
-    "anomaly": "market",
-    "saved-screeners": "market",
-    "risk-map": "market",
-    "quant-report": "market",
-    // 지표 (거시·심리)
-    "indicators": "indicators", // ★ Phase 2 — 지표 허브
+    // 코인 — 구 뉴스 슬롯이 코인 탭으로 (설계서 v3 2장)
+    "news": "coin",
+    // 주식 — 구 '시장'(스크리너) 승계 (설계서 v3 3장)
+    "screener": "stock",
+    // 지표 — 캘린더|뉴스 + 시장 상태 도구 (자산군 불문)
+    "indicators": "indicators",
     "econ-calendar": "indicators",
     "sentiment": "indicators",
+    "anomaly": "indicators",
+    "risk-map": "indicators",
+    "quant-report": "indicators",
     // 트레이딩 (내부 운영 전용) — 전략 검증 도구 포함
     "auto-trading": "ai-quant",
     "real-trading": "ai-quant",
@@ -5077,9 +5299,10 @@ function AppInner() {
     "reports": "ai-quant",
     "bot-report": "ai-quant",
     "strategy": "ai-quant",
-    // MY (개인화)
+    // MY (개인화) — ★ IA v3: saved-screeners 가 시장 → MY 로 이동
     "portfolio": "my",
     "portfolio-analysis": "my",
+    "saved-screeners": "my",
     "quant-port": "my",
     "quant-portfolio": "my",
     "notifications": "my",
@@ -5292,6 +5515,10 @@ function AppInner() {
   const [sortBy, setSortBy]           = useState("rsi");
   // 모바일 스크리너 — 정렬 ActionSheet open
   const [sortSheetOpen, setSortSheetOpen] = useState(false);
+  // ★ 2026-08-12 IA v3 (시안 1b): 조건 편집 바텀 시트 — 기존 인라인 details 조건 패널을
+  //   시트로 수납(핸들러 보존). 탭 이탈 시 닫아 재진입 잔상을 막습니다.
+  const [condSheetOpen, setCondSheetOpen] = useState(false);
+  useEffect(() => { setCondSheetOpen(false); }, [tab]);
   const [scanErrors, setScanErrors]   = useState([]);
   const [activePreset, setActivePreset] = useState(null);
   const [lastScan, setLastScan]       = useState(null);
@@ -5444,8 +5671,10 @@ function AppInner() {
   }, [watchlist, watchlistKey, user]);
 
   // ── 자체 애널리틱스: SPA 라우트 전환 페이지뷰 (GA 대체) ──
+  //   IA v3: 주소창과 동일한 새 경로(/crypto·/stocks)로 기록합니다.
   useEffect(() => {
-    ga.pageView(tab === "home" ? "/" : `/${tab}`);
+    ga.pageView(tab === "home" ? "/" : `/${TAB_TO_PATH[tab] || tab}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
   // ── 내 정보: 운용 현황 요약 로드 (모의봇 + 실전, 진입 시 1회) ──
@@ -5502,7 +5731,8 @@ function AppInner() {
     // canonical URL 동적 설정
     const canonical = document.querySelector('link[rel="canonical"]');
     if (canonical) {
-      const canonicalUrl = tab === "home" ? "https://zepta.app/" : `https://zepta.app/${tab}`;
+      // IA v3: canonical 은 새 경로(/crypto·/stocks) 기준 — 구 경로와 중복 색인 방지
+      const canonicalUrl = tab === "home" ? "https://zepta.app/" : `https://zepta.app/${TAB_TO_PATH[tab] || tab}`;
       canonical.setAttribute("href", canonicalUrl);
     }
   }, [marketIndices, tab, selectedAsset, hotAssets]);
@@ -5518,15 +5748,15 @@ function AppInner() {
       const reasons = [];
       // 1) 가격 변동 이상: 2σ 이상
       if (Math.abs(asset.change) > avgChange + 2 * stdDev && Math.abs(asset.change) >= 3) {
-        reasons.push(`변동률 ${asset.change >= 0 ? "+" : ""}${asset.change}% (평균의 ${(Math.abs(asset.change) / Math.max(avgChange, 0.1)).toFixed(1)}배)`);
+        reasons.push(t("tabs.anomaly.reasonChange", { chg: `${asset.change >= 0 ? "+" : ""}${asset.change}`, mult: (Math.abs(asset.change) / Math.max(avgChange, 0.1)).toFixed(1) }));
       }
       // 2) 거래량 스파이크 (volume 비율 기반)
       if (asset.volRatio && asset.volRatio > 3) {
-        reasons.push(`거래량 ${asset.volRatio.toFixed(1)}x 폭증`);
+        reasons.push(t("tabs.anomaly.reasonVolume", { ratio: asset.volRatio.toFixed(1) }));
       }
       // 3) 급격한 갭
       if (asset.gap && Math.abs(asset.gap) > 3) {
-        reasons.push(`갭 ${asset.gap > 0 ? "+" : ""}${asset.gap.toFixed(1)}%`);
+        reasons.push(t("tabs.anomaly.reasonGap", { gap: `${asset.gap > 0 ? "+" : ""}${asset.gap.toFixed(1)}` }));
       }
       if (reasons.length > 0) {
         detected.push({
@@ -5554,7 +5784,7 @@ function AppInner() {
         return merged;
       });
     }
-  }, [hotAssets]);
+  }, [hotAssets, t]); // t: 언어 전환 시 사유 칩 재생성
 
   // ── 포트폴리오 벤치마킹 계산 ──
   useEffect(() => {
@@ -6295,9 +6525,11 @@ function AppInner() {
     };
   }, [tab]);
 
-  // 경제 캘린더 탭 진입 시 즉시 로드 + 발표 시간대 자동 갱신
+  // 경제 캘린더 진입 시 즉시 로드 + 발표 시간대 자동 갱신
+  // ★ 2026-08-12 IA v3: 캘린더 화면이 지표 탭의 캘린더 서브탭으로 이동 — 트리거도 이동.
+  //   (구 /econ-calendar 진입은 아래 리다이렉트 효과가 지표 탭으로 정정합니다)
   useEffect(() => {
-    if (tab !== "econ-calendar") return;
+    if (!(tab === "indicators" && indicatorsView === "calendar")) return;
     fetchEconCalendar();
     // 발표 시간대(KST 21:00~02:00)에는 30초 간격, 그 외 5분 간격 자동 갱신
     const hourKST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" })).getHours();
@@ -6305,7 +6537,7 @@ function AppInner() {
     const interval = isAnnouncementWindow ? 30000 : 300000;
     const iv = setInterval(fetchEconCalendar, interval);
     return () => clearInterval(iv);
-  }, [tab]);
+  }, [tab, indicatorsView]);
 
   // ── 전략 매매 알림 생성 함수 ──────────────────────────────────
   // 스크리닝 결과에서 전략 포트폴리오 종목의 시그널을 찾아 알림 생성
@@ -6756,8 +6988,8 @@ function AppInner() {
     if (settings.autoSend && settings.botToken && settings.chatId && sorted.length > 0) {
       try {
         await sendTelegramAlert(settings.botToken, settings.chatId, sorted, conditions);
-        setTgStatus("✅ 자동 알림 전송 완료");
-      } catch { setTgStatus("❌ 텔레그램 전송 실패"); }
+        setTgStatus(`✅ ${t("diag.tgAutoSent")}`);
+      } catch { setTgStatus(`❌ ${t("diag.tgSendFailed")}`); }
     }
   }, [scanning, conditions, mode, sortBy, settings]);
 
@@ -6772,19 +7004,19 @@ function AppInner() {
 
   // ── 현재 스크리너 조건 저장 (전수 감사 — 저장→재실행 루프 완성) ──
   const saveCurrentScreener = useCallback(async () => {
-    if (!user?.id) { showToast("로그인 후 조건을 저장할 수 있어요", "info"); return; }
-    if (!conditions.length) { showToast("저장할 조건을 먼저 선택하세요", "info"); return; }
-    const name = `내 조건 ${conditions.length}개 · ${new Date().toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}`;
+    if (!user?.id) { showToast(t("diag.loginToSaveConditions"), "info"); return; }
+    if (!conditions.length) { showToast(t("diag.selectConditionsFirst"), "info"); return; }
+    const name = `${t("diag.myConditions", { n: conditions.length })} · ${new Date().toLocaleTimeString(lang === "en" ? "en-US" : "ko-KR", { hour: "2-digit", minute: "2-digit" })}`;
     try {
       const r = await fetch("/api/screeners/save", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ uid: user.id, screener: { name, conditions: {}, conditionKeys: conditions, mode } }),
       });
       const j = await r.json();
-      if (j?.ok) showToast("조건을 저장했어요 — '저장한 조건'에서 다시 실행할 수 있어요", "success");
-      else showToast(j?.error || "저장 실패", "error");
-    } catch { showToast("저장 실패", "error"); }
-  }, [user, conditions, mode, showToast]);
+      if (j?.ok) showToast(t("diag.conditionsSaved"), "success");
+      else showToast(j?.error || t("nickname.saveFailed"), "error");
+    } catch { showToast(t("nickname.saveFailed"), "error"); }
+  }, [user, conditions, mode, showToast, t, lang]);
 
   // ── 저장한 스크리너 열기 → 조건 주입 후 자동 스캔 (전수 감사 — 저장 루프 완성) ──
   useEffect(() => {
@@ -7308,18 +7540,80 @@ function AppInner() {
   }, []);
 
   // ★ 2026-07 정보 피벗 Phase 1: 비owner 새 홈의 '톱 뉴스 3행' 블록도 같은 데이터를
-  //   재사용 — 홈 진입 시 뉴스가 비어 있으면 1회 로드 (뉴스 탭은 기존대로 매 진입 갱신)
+  //   재사용 — 홈 진입 시 뉴스가 비어 있으면 1회 로드.
+  // ★ 2026-08-12 IA v3 (설계서 v3 4장): 뉴스 피드가 뉴스 탭 → 지표 탭 뉴스 서브탭으로
+  //   이동 — 갱신 트리거도 함께 이동합니다 (서브탭 진입마다 갱신, 기존 뉴스 탭과 동일 정책).
   useEffect(() => {
-    if (tab === "news") fetchNews();
-    else if (tab === "home" && !isOwner && newsItems.length === 0) fetchNews();
-  }, [tab, isOwner]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (tab === "indicators" && indicatorsView === "news") fetchNews();
+    else if (tab === "home" && newsItems.length === 0) fetchNews(); // v3: 홈 단일화로 owner 도 톱뉴스 사용
+  }, [tab, indicatorsView, isOwner]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ══ 코인 탭 (IA v3 — 구 뉴스 슬롯, 시안 1a · 설계서 v3 2장) 데이터 배선 ══════════
+  // ① 시장 컨텍스트(온도·공포탐욕·김프·펀딩) + 스테이블 — GET /api/indicators/summary.
+  //    기존 지표 허브가 쓰던 동일 엔드포인트(김프·펀딩 배선 승계). 실패 시 null 유지 —
+  //    컨텍스트 구역만 조용히 생략하고 시그널 리스트는 정상 동작합니다(부분 실패 원칙).
+  const [coinCtx, setCoinCtx] = useState(null); // null=미적재 | indicators 배열
+  const fetchCoinCtx = useCallback(async () => {
+    // ★ 실패 시 빈 배열로 확정 — null 을 유지하면 스켈레톤이 영구 셔머링되어
+    //   "로딩 중"이라는 거짓 상태를 보여줍니다(적대 리뷰 지적). 빈 배열이면 구역만
+    //   생략되고, 5분 폴링이 성공하는 순간 자연 복구됩니다.
+    try {
+      const r = await fetch("/api/indicators/summary");
+      if (!r.ok) { setCoinCtx((prev) => prev ?? []); return; }
+      const j = await r.json();
+      if (j?.ok && Array.isArray(j.indicators)) setCoinCtx(j.indicators);
+      else setCoinCtx((prev) => prev ?? []);
+    } catch { setCoinCtx((prev) => prev ?? []); }
+  }, []);
+  useEffect(() => {
+    if (tab !== "news") return;
+    fetchCoinCtx();
+    const iv = setInterval(fetchCoinCtx, 5 * 60 * 1000);
+    return () => clearInterval(iv);
+  }, [tab, fetchCoinCtx]);
+  // 컨텍스트 카드 탭 → 산식·해설 확장 시트 (indicators/summary 의 desc/detail 실데이터)
+  const [coinCtxSheet, setCoinCtxSheet] = useState(null);
+  useEffect(() => { setCoinCtxSheet(null); }, [tab]);
+
+  // ② 코인 시그널 풀 전체 — 홈 미리보기(limit=12)와 같은 소스의 전 유니버스 조회.
+  //    GET /api/real-trading/coin-scores?limit=60 (엔드포인트 상한 60 = 유동성 상위 풀 전체).
+  //    파생 지표 바(OI·롱숏·24h 청산)도 이 응답의 oc 필드를 집계해 그립니다 — 추가 fetch 없음.
+  const [coinTabSignals, setCoinTabSignals] = useState(() => {
+    // 홈·시그널 보드와 같은 캐시 키 — 첫 페인트에서 빈 화면이 깜빡이지 않게 합니다.
+    try {
+      const c = JSON.parse(localStorage.getItem("zepta:coin-scores:cache") || "null");
+      return Array.isArray(c?.coins) ? c.coins : [];
+    } catch { return []; }
+  });
+  const [coinTabStatus, setCoinTabStatus] = useState("idle"); // idle | loading | ready | error
+  const fetchCoinTabSignals = useCallback(async () => {
+    setCoinTabStatus((prev) => (prev === "ready" ? "ready" : "loading"));
+    try {
+      const r = await fetch("/api/real-trading/coin-scores?limit=60");
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      if (!j?.ok || !Array.isArray(j.coins)) throw new Error("bad payload");
+      setCoinTabSignals(j.coins);
+      setCoinTabStatus("ready");
+      try { localStorage.setItem("zepta:coin-scores:cache", JSON.stringify(j)); } catch {}
+    } catch {
+      // 캐시가 이미 화면에 있으면 유지(ready), 아무것도 없으면 error 로 재시도 안내
+      setCoinTabStatus((prev) => (prev === "ready" ? "ready" : "error"));
+    }
+  }, []);
+  useEffect(() => {
+    if (tab !== "news") return;
+    fetchCoinTabSignals();
+    const iv = setInterval(fetchCoinTabSignals, 5 * 60 * 1000); // 생성 주기 10분 → 5분 폴링
+    return () => clearInterval(iv);
+  }, [tab, fetchCoinTabSignals]);
 
   // ── Zepta 마켓 온도 (비owner 새 홈 ④ 시장 지표 스냅샷) ──
   // 계약: GET /api/market-temp → { ok, temp: 0~100, label, updatedAt }
   // 백엔드 병렬 구현 중 — 실패/404 시 온도 부분만 조용히 숨깁니다 (null 유지).
   const [marketTemp, setMarketTemp] = useState(null);
   useEffect(() => {
-    if (tab !== "home" || isOwner) return;
+    if (tab !== "home") return; // ★ v3: 홈 단일화 — owner 도 같은 홈을 보므로 게이트 해제
     let cancelled = false;
     (async () => {
       try {
@@ -7343,7 +7637,7 @@ function AppInner() {
   //   실패/결측 시 null 유지 — 해당 카드만 조용히 숨깁니다 (값 조작 금지).
   const [stockIndicator, setStockIndicator] = useState(null);
   useEffect(() => {
-    if (tab !== "home" || isOwner) return;
+    if (tab !== "home") return; // ★ v3: 홈 단일화 — owner 도 같은 홈을 보므로 게이트 해제
     let cancelled = false;
     (async () => {
       try {
@@ -7375,7 +7669,7 @@ function AppInner() {
     } catch { return []; }
   });
   useEffect(() => {
-    if (tab !== "home" || isOwner) return;
+    if (tab !== "home") return; // ★ v3: 홈 단일화 — owner 도 같은 홈을 보므로 게이트 해제
     let cancelled = false;
     const load = async () => {
       try {
@@ -7408,7 +7702,7 @@ function AppInner() {
     } catch { return []; }
   });
   useEffect(() => {
-    if (!STOCK_SIGNALS_ON || tab !== "home" || isOwner) return;
+    if (!STOCK_SIGNALS_ON || tab !== "home") return;
     let cancelled = false;
     const load = async () => {
       try {
@@ -7430,6 +7724,45 @@ function AppInner() {
     const timer = setInterval(load, 5 * 60 * 1000); // 코인과 동일한 5분 폴링
     return () => { cancelled = true; clearInterval(timer); };
   }, [tab, isOwner]);
+
+  // ── 주식 탭 시그널 풀 (★ 2026-08-12 IA v3 시안 1b · 설계서 v3 3장) ──
+  // 홈 미리보기(limit=12)와 같은 소스의 전 유니버스 조회 — GET /api/stock-scores?limit=60
+  // (엔드포인트 상한 60 = 미국·한국 유니버스 51종 전체 커버). 코인 탭(fetchCoinTabSignals)과
+  // 동일 패턴: 5분 폴링 + localStorage 캐시(홈 미리보기와 키 공유 — 첫 페인트 깜빡임 방지).
+  const [stockTabSignals, setStockTabSignals] = useState(() => {
+    if (!STOCK_SIGNALS_ON) return [];
+    try {
+      const c = JSON.parse(localStorage.getItem("zepta:stock-scores:cache") || "null");
+      return Array.isArray(c?.stocks) ? c.stocks : [];
+    } catch { return []; }
+  });
+  const [stockTabStatus, setStockTabStatus] = useState("idle"); // idle | loading | ready | error
+  const [stockSigFilter, setStockSigFilter] = useState("all"); // all | us | kr — 시안 1b 필터 칩
+  const fetchStockTabSignals = useCallback(async () => {
+    setStockTabStatus((prev) => (prev === "ready" ? "ready" : "loading"));
+    try {
+      const r = await fetch("/api/stock-scores?limit=60");
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const j = await r.json();
+      const arr = Array.isArray(j?.stocks) ? j.stocks : Array.isArray(j?.items) ? j.items : null;
+      if (!j?.ok || !arr) throw new Error("bad payload");
+      // market 필드 정규화 — 홈 폴링과 같은 규칙(누락 엔트리는 KRX 6자리 코드 형식으로만 판정).
+      const rows = arr.filter(Boolean).map((s) => s.market ? s
+        : { ...s, market: /^\d{6}(\.(KS|KQ))?$/i.test(String(s.symbol || "")) ? "kr" : "us" });
+      setStockTabSignals(rows);
+      setStockTabStatus("ready");
+      try { localStorage.setItem("zepta:stock-scores:cache", JSON.stringify({ ...j, stocks: rows })); } catch {}
+    } catch {
+      // 캐시가 이미 화면에 있으면 유지(ready), 아무것도 없으면 error 로 재시도 안내
+      setStockTabStatus((prev) => (prev === "ready" ? "ready" : "error"));
+    }
+  }, []);
+  useEffect(() => {
+    if (!STOCK_SIGNALS_ON || tab !== "screener") return;
+    fetchStockTabSignals();
+    const iv = setInterval(fetchStockTabSignals, 5 * 60 * 1000); // 크론 주기(30~60분)보다 촘촘한 폴링
+    return () => clearInterval(iv);
+  }, [tab, fetchStockTabSignals]);
 
   // ── 종목 상세 시트 (2026-08 모바일 시안) ──
   // 홈 "오늘의 시그널" 카드를 누르면 그 종목 하나를 끝까지 읽는 화면을 띄웁니다.
@@ -7572,8 +7905,9 @@ function AppInner() {
     return () => { cancelled = true; };
   }, [tab, user?.id]);
 
-  // ── 스크리너 시장 필터 딥링크 (GNB '주식 분석' · 지표 허브 진입 버튼) ──
-  // ★ 2026-08-02: Header/IndicatorHub 가 zepta:screener-market 이벤트로 필터를 전달합니다.
+  // ── 스크리너 시장 필터 딥링크 (GNB '주식 분석' 진입 버튼) ──
+  // ★ 2026-08-02: Header 가 zepta:screener-market 이벤트로 필터를 전달합니다.
+  //   (구 지표 허브의 동일 이벤트 발신처는 IA v3 에서 페이지 폐지로 제거 — 수신부는 유지)
   useEffect(() => {
     const onScreenerMarket = (e) => {
       const m = e?.detail;
@@ -7582,6 +7916,13 @@ function AppInner() {
     window.addEventListener("zepta:screener-market", onScreenerMarket);
     return () => window.removeEventListener("zepta:screener-market", onScreenerMarket);
   }, []);
+
+  // ★ IA v3: 주식 탭은 주식 전용 화면이므로 진입 시 코인/전체 필터를 주식으로 정정합니다.
+  //   (코인 조건 검색은 코인 탭 진입점이 crypto 를 시드해 같은 스크리너를 엽니다)
+  useEffect(() => {
+    if (tab !== "screener") return;
+    setFilterMarket((prev) => (prev === "crypto" || prev === "all" ? "stock" : prev));
+  }, [tab]);
 
   // ── 소셜 센티먼트 ──
   const fetchSentiment = useCallback(async (sym) => {
@@ -7627,13 +7968,14 @@ function AppInner() {
         setGlobalSearchOpen(false);
       }
       // 탭 단축키 (1-5) — 입력창 포커스 시 제외
+      // ★ 2026-08-12 IA v3: 하단 탭 [홈·코인·주식·지표·MY] 순서를 그대로 미러링.
+      //   owner 의 '3' → 자동매매 콘솔 특례는 유지 (대표 주 사용 흐름).
       if (!isInputFocused) {
         if (e.key === "1") setTab("home");
-        else if (e.key === "2") setTab("screener");
-        // ★ 2026-07 정보 서비스 피벗: 비owner 는 '3' 단축키로 뉴스 이동
-        else if (e.key === "3") setTab(isOwner ? "auto-trading" : "news");
-        else if (e.key === "4") setTab("portfolio");
-        else if (e.key === "5") setTab("news");
+        else if (e.key === "2") setTab("news"); // 코인 탭 (내부 id 유지)
+        else if (e.key === "3") setTab(isOwner ? "auto-trading" : "screener"); // 주식 탭
+        else if (e.key === "4") setTab("indicators");
+        else if (e.key === "5") setTab("profile");
       }
     };
     document.addEventListener("keydown", handleKeyDown);
@@ -7650,32 +7992,32 @@ function AppInner() {
 
   // ── 포트폴리오 동기화 ─────────────────────────────────────────
   const syncUpload = useCallback(async () => {
-    if (!syncPin || syncPin.length < 4) { setSyncStatus("❌ PIN 4자리 이상 필요"); return; }
-    setSyncStatus("⏳ 업로드 중...");
+    if (!syncPin || syncPin.length < 4) { setSyncStatus(`❌ ${t("diag.sync.pinRequired")}`); return; }
+    setSyncStatus(`⏳ ${t("diag.sync.uploading")}`);
     try {
       const r = await fetch(`/api/sync?pin=${encodeURIComponent(syncPin)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ portfolio, settings: { ...settings, syncPin } }),
       });
-      if (r.ok) setSyncStatus("✅ 동기화 완료");
-      else setSyncStatus("❌ 업로드 실패");
+      if (r.ok) setSyncStatus(`✅ ${t("diag.sync.done")}`);
+      else setSyncStatus(`❌ ${t("diag.sync.uploadFailed")}`);
     } catch (e) { setSyncStatus(`❌ ${e.message}`); }
-  }, [syncPin, portfolio, settings]);
+  }, [syncPin, portfolio, settings, t]);
 
   const syncDownload = useCallback(async () => {
-    if (!syncPin || syncPin.length < 4) { setSyncStatus("❌ PIN 4자리 이상 필요"); return; }
-    setSyncStatus("⏳ 다운로드 중...");
+    if (!syncPin || syncPin.length < 4) { setSyncStatus(`❌ ${t("diag.sync.pinRequired")}`); return; }
+    setSyncStatus(`⏳ ${t("diag.sync.downloading")}`);
     try {
       const r = await fetch(`/api/sync?pin=${encodeURIComponent(syncPin)}`);
       if (r.ok) {
         const data = await r.json();
         if (data.portfolio?.length) { setPortfolio(data.portfolio); savePortfolio(data.portfolio); }
         if (data.settings) { setSettings(p => ({ ...p, ...data.settings })); saveSettings({ ...settings, ...data.settings }); }
-        setSyncStatus(`✅ 동기화 완료 (${data.updatedAt ? new Date(data.updatedAt).toLocaleString("ko-KR") : ""})`);
-      } else setSyncStatus("❌ 데이터 없음");
+        setSyncStatus(`✅ ${t("diag.sync.done")} (${data.updatedAt ? new Date(data.updatedAt).toLocaleString(lang === "en" ? "en-US" : "ko-KR") : ""})`);
+      } else setSyncStatus(`❌ ${t("diag.sync.noData")}`);
     } catch (e) { setSyncStatus(`❌ ${e.message}`); }
-  }, [syncPin, settings]);
+  }, [syncPin, settings, t, lang]);
 
   // ── 통화 변환 헬퍼 ──────────────────────────────────────────────
   const toDisplay = (val, market) => {
@@ -7892,22 +8234,9 @@ function AppInner() {
     const todayKey = new Date().toISOString().slice(0, 10);
     const quizKey = `zepta:quiz:${todayKey}`;
 
-    const quizPool = [
-      { q: "VIX 지수가 30 이상이면 시장은?", options: ["공포 상태", "탐욕 상태", "중립"], answer: 0 },
-      { q: "골든크로스란?", options: ["단기MA > 장기MA", "단기MA < 장기MA", "거래량 급증"], answer: 0 },
-      { q: "PER이 높으면 주식은?", options: ["고평가", "저평가", "정상"], answer: 0 },
-      { q: "RSI가 30 이하면?", options: ["과매도", "과매수", "중립"], answer: 0 },
-      { q: "미국 기준금리를 결정하는 기관은?", options: ["SEC", "Fed (FOMC)", "IMF"], answer: 1 },
-      { q: "코스피 시장이 열리는 시간은?", options: ["오전 8시", "오전 9시", "오전 10시"], answer: 1 },
-      { q: "달러 강세 시 원화는?", options: ["약세", "강세", "무관"], answer: 0 },
-      { q: "볼린저 밴드 상단 돌파 시?", options: ["과매수 신호", "과매도 신호", "추세 전환"], answer: 0 },
-      { q: "S&P 500에 포함된 기업 수는?", options: ["100개", "500개", "1000개"], answer: 1 },
-      { q: "채권 가격과 금리의 관계는?", options: ["반비례", "비례", "무관"], answer: 0 },
-      { q: "MACD 골든크로스 발생 시?", options: ["매수 신호", "매도 신호", "관망"], answer: 0 },
-      { q: "원유 가격 상승 시 수혜 섹터?", options: ["에너지", "기술", "유틸리티"], answer: 0 },
-      { q: "시가총액 1위 기업은? (2025)", options: ["Apple", "Microsoft", "NVIDIA"], answer: 0 },
-      { q: "나스닥 지수의 특징은?", options: ["기술주 중심", "산업주 중심", "금융주 중심"], answer: 0 },
-    ];
+    // ★ i18n: 퀴즈 문항·보기를 로케일 사전으로 이관 — t() 는 배열/객체 값을 그대로 반환합니다.
+    //   answer 인덱스는 ko/en 사전 양쪽에 동일하게 유지해야 합니다 (패리티 검사 대상).
+    const quizPool = t("diag.quizPool");
 
     const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
     const todayQuiz = quizPool[dayOfYear % quizPool.length];
@@ -8408,7 +8737,11 @@ function AppInner() {
       <PullToRefresh onRefresh={async () => {
         if (tab === "home") await fetchMarketOverview();
         else if (tab === "portfolio") await fetchPortfolioPrices();
-        else if (tab === "news") await fetchNews();
+        // ★ IA v3: "news" 내부 id = 코인 탭 — 시그널 풀 + 시장 컨텍스트 동시 갱신
+        else if (tab === "news") await Promise.all([fetchCoinTabSignals(), fetchCoinCtx()]);
+        // ★ IA v3: "screener" 내부 id = 주식 탭 — 시그널 풀 갱신 (스캔 결과는 수동 액션 유지)
+        else if (tab === "screener") await fetchStockTabSignals();
+        else if (tab === "indicators") await (indicatorsView === "news" ? fetchNews() : fetchEconCalendar());
         else window.location.reload();
       }}>
       <main className="px-4 py-4 pb-8 sm:px-6 sm:py-6 sm:pb-10" style={{ maxWidth: "1400px", margin: "0 auto" }}>
@@ -8417,16 +8750,17 @@ function AppInner() {
             TAB: 홈 (토스 스타일 — 깔끔하고 정보 밀도 최적화)
         ═══════════════════════════════════════════════════════════ */}
         {/* ═══════════════════════════════════════════════════════════
-            TAB: 홈 (비owner) — 2026-07 정보 피벗 Phase 1 새 홈 6블록을
-            2026-08 모바일 디자인 시안(mobileKit) 문법으로 재작성한 화면입니다.
-            브랜드 헤더 · 인사/헤드라인
-            ① 마켓 브리핑(IndexStrip) ★오늘의 시그널(SignalCard) ② 톱 뉴스 3행
-            ③ 경제 캘린더(EventCard+ListCard) ④ 시장 지표 스냅샷(GaugeCard+IndicatorCard)
-            ⑤ 관심종목/인기 종목(ListCard+AssetRow) ⑥ 시장 리포트 진입 · Disclaimer
-            블록 구성과 데이터 소스는 그대로 두고 표현만 시안으로 옮겼습니다.
+            TAB: 홈 (비owner) — ★ 2026-08-12 IA v3 (시안 1d): 모든 섹션을
+            HomeSection 카드 컨테이너(헤더 행 내장 + 액션 칩 1개)로 감쌌습니다.
+            인사/헤드라인
+            ① 마켓 브리핑(IndexStrip) ★오늘의 시그널(SignalCard, [코인|주식] 세그먼트)
+            ② 톱 뉴스 3행 → 지표 탭(뉴스) ③ 경제 캘린더 → 지표 탭(캘린더)
+            ④ 시장 지표 스냅샷(GaugeCard+IndicatorCard) → 코인 탭
+            ⑤ 관심종목/인기 종목(AssetRow) → 주식 탭 ⑥ 시장 리포트 진입 · Disclaimer
+            블록 구성과 데이터 소스는 그대로 — 표현·진입점만 v3 로 재구성했습니다.
             (owner 는 아래 기존 홈 그대로 유지)
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "home" && !isOwner && (() => {
+        {tab === "home" && (() => {
           const idxOf = (sym) => marketIndices.find(i => i.symbol === sym);
           const indexCards = [
             { idx: idxOf("^GSPC"), symbol: "^GSPC", name: "S&P 500", flag: "🇺🇸", market: "us" },
@@ -8467,7 +8801,7 @@ function AppInner() {
           const tempUpdated = (() => {
             if (!marketTemp?.updatedAt) return null;
             const d = new Date(marketTemp.updatedAt);
-            return isNaN(d.getTime()) ? null : `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")} 기준`;
+            return isNaN(d.getTime()) ? null : t("tabs.home.asOfShort", { time: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` });
           })();
           const hasSnapshot = fgVal != null || fgCryptoVal != null || !!stockIndicator || tempVal != null;
           // ⑤ 관심종목 요약(로그인+보유 시) / 인기 종목(기존 주요종목 데이터 재사용)
@@ -8533,7 +8867,7 @@ function AppInner() {
           }));
 
           // ── 오늘의 시그널 (멀티TF 시그널 풀 — 없으면 섹션 자체를 렌더하지 않습니다) ──
-          const TF_KO = { "1w": "주", "1d": "일", "4h": "4시간", "1h": "1시간" };
+          const TF_KO = { "1w": t("tabs.coin.tf1w"), "1d": t("tabs.coin.tf1d"), "4h": t("tabs.coin.tf4h"), "1h": t("tabs.coin.tf1h") };
           const srFmt = fmtLevelPrice; // 상세 시트와 같은 표기 규칙 (모듈 상단 SSOT)
           // ★ 2026-08 주식 확장: [코인|주식] 세그먼트. 두 풀 모두 같은 필터를 거칩니다.
           const signalRowsOf = (arr) => (Array.isArray(arr) ? arr : [])
@@ -8552,8 +8886,9 @@ function AppInner() {
             : stockSignalRows.length > 0 ? "stock" : "crypto";
           const signalRows = activeSignalMarket === "stock" ? stockSignalRows : coinSignalRows;
 
+          // 섹션 간격 — 시안 1d 모바일 12px / 데스크탑은 기존 18px 유지
           return (
-            <div className="tab-content" style={{ maxWidth: "860px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "18px" }}>
+            <div className="tab-content" style={{ maxWidth: "860px", margin: "0 auto", display: "flex", flexDirection: "column", gap: isMobile ? "12px" : "18px" }}>
 
               {/* ── 인사 + 헤드라인 + 알림 (상태 서술만 — 행동 지시 없음) ──
                    시안의 브랜드 헤더는 네이티브 앱 전제라 워드마크를 직접 그리지만,
@@ -8571,7 +8906,7 @@ function AppInner() {
                       : t("tabs.home.headlineLoading")}
                   </div>
                 </div>
-                <IconButton ariaLabel="알림" badge={alertBadge > 0} onClick={() => setTab("notifications")} style={{ flexShrink: 0, marginTop: "2px" }}>
+                <IconButton ariaLabel={t("nav.alerts")} badge={alertBadge > 0} onClick={() => setTab("notifications")} style={{ flexShrink: 0, marginTop: "2px" }}>
                   <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                     strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -8580,14 +8915,17 @@ function AppInner() {
                 </IconButton>
               </div>
 
-              {/* ── ① 마켓 브리핑 — 6지수 가로 스크롤 스트립 ── */}
-              <section>
-                <MobileSectionHeader
-                  title={t("tabs.home.marketBriefing") || "마켓 브리핑"}
-                  live={marketIndices.length > 0}
-                  actionLabel={marketLoading ? t("tabs.home.updating") : t("tabs.home.refresh")}
-                  onAction={marketLoading ? undefined : fetchMarketOverview}
-                />
+              {/* ── ① 마켓 브리핑 — 6지수 스트립 (시안 1d "시장 현황" 카드 문법) ──
+                   섹션 = 카드 컨테이너 + 통일 헤더(제목·LIVE 도트·액션 칩 1개). */}
+              <HomeSection
+                title={t("tabs.home.marketBriefing") || "마켓 브리핑"}
+                live={marketIndices.length > 0}
+                action={{
+                  label: marketLoading ? t("tabs.home.updating") : `↻ ${t("tabs.home.refresh")}`,
+                  onClick: marketLoading ? undefined : fetchMarketOverview,
+                  disabled: marketLoading,
+                }}
+              >
                 {marketIndices.length === 0 ? (
                   <div style={{ display: "flex", gap: "8px", overflow: "hidden" }}>
                     {[0, 1, 2, 3].map(i => (
@@ -8605,28 +8943,30 @@ function AppInner() {
                     style={!isMobile ? { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", overflowX: "visible" } : undefined}
                   />
                 )}
-                <div style={{ marginTop: "10px", textAlign: "right" }}>
-                  <a href="/briefing" style={{ fontSize: "13px", fontWeight: 700, color: C.blueL, textDecoration: "none" }}>
-                    {t("tabs.home.briefingLink")}
-                  </a>
+                {/* 브리핑 전문(서버 렌더 SEO 페이지) 진입 — 텍스트 링크 → 칩 (1d "텍스트 링크 금지") */}
+                <div style={{ marginTop: "10px", display: "flex", justifyContent: "flex-end" }}>
+                  <HomeActionChip href="/briefing" label={t("tabs.home.briefingLink")} />
                 </div>
-              </section>
+              </HomeSection>
 
               {/* ── ★ 오늘의 시그널 (멀티TF 시그널 풀 · 데이터 없으면 섹션 자체가 사라집니다) ── */}
               {signalRows.length > 0 && (
-                <section>
-                  <MobileSectionHeader
-                    title={t("tabs.home.todaySignals")}
-                    // 주식 스코어는 장 마감 후 마지막 장중 데이터가 유지되는 설계(주말 60시간+)라
-                    // 실시간을 시사하는 펄스 점을 켜지 않습니다 — 캡션의 "N시간 전 집계"와
-                    // 모순되지 않도록 코인 풀 표시 중에만 켭니다.
-                    live={activeSignalMarket !== "stock"}
-                    actionLabel={t("tabs.home.viewAll")}
-                    // 전체 보기: 코인은 코인 목록 페이지, 주식은 스크리너 주식 필터로 이동합니다.
-                    onAction={activeSignalMarket === "stock"
+                <HomeSection
+                  title={t("tabs.home.todaySignals")}
+                  // 주식 스코어는 장 마감 후 마지막 장중 데이터가 유지되는 설계(주말 60시간+)라
+                  // 실시간을 시사하는 펄스 점을 켜지 않습니다 — 캡션의 "N시간 전 집계"와
+                  // 모순되지 않도록 코인 풀 표시 중에만 켭니다.
+                  live={activeSignalMarket !== "stock"}
+                  // ★ IA v3: "전체 보기"는 활성 세그먼트를 따라 코인/주식 "탭"으로 갑니다
+                  //   (설계서 v3 0장 — 구 /coin 정적 대시보드 역할은 코인 탭이 대체.
+                  //    주식은 기존 스크리너 주식 필터 시드 유지 → 주식 탭).
+                  action={{
+                    label: t("tabs.home.viewAll"),
+                    onClick: activeSignalMarket === "stock"
                       ? () => { setFilterMarket("stock"); setTab("screener"); }
-                      : () => { window.location.href = "/coin"; }}
-                  />
+                      : () => setTab("news"),
+                  }}
+                >
                   {/* [코인|주식] 세그먼트 — 두 풀이 모두 있을 때만 (mobileKit Segment) */}
                   {showSignalSegment && (
                     <Segment
@@ -8699,22 +9039,25 @@ function AppInner() {
                       return fresh ? `${src} · ${fresh}` : src;
                     })()}
                   </div>
-                </section>
+                </HomeSection>
               )}
 
-              {/* ── ② 톱 뉴스 3행 (뉴스 탭 데이터 재사용 — 타임라인 행 스타일) ── */}
-              <div style={cardBase}>
-                <MobileSectionHeader
-                  title={`📰 ${t("tabs.home.topNews")}`}
-                  actionLabel={t("tabs.home.more")}
-                  onAction={() => setTab("news")}
-                />
+              {/* ── ② 톱 뉴스 3행 (뉴스 데이터 재사용 — 타임라인 행 스타일) ──
+                   ★ IA v3: "더보기"는 지표 탭 뉴스 서브탭으로 (설계서 v3 1장 구역 4). */}
+              <HomeSection
+                title={t("tabs.home.topNews")}
+                action={{
+                  label: t("tabs.home.more"),
+                  onClick: () => { setIndicatorsView("news"); setTab("indicators"); },
+                }}
+                bodyStyle={topNews.length > 0 ? { padding: 0 } : undefined}
+              >
                 {newsLoading && topNews.length === 0 ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                     {[1, 2, 3].map(i => <Skeleton key={i} width="100%" height="40px" />)}
                   </div>
                 ) : topNews.length === 0 ? (
-                  <div style={{ fontSize: "14px", color: C.text3, padding: "10px 0" }}>{t("tabs.home.noNews")}</div>
+                  <div style={{ fontSize: "14px", color: C.text3 }}>{t("tabs.home.noNews")}</div>
                 ) : (
                   topNews.map((n, i) => {
                     const senti = analyzeSentiment(n.title);
@@ -8725,7 +9068,7 @@ function AppInner() {
                       // 긴 언론사명이 제목을 압착하던 문제와 색 점만으로 감성을 전달하던 문제를 함께 해소합니다.
                       <a key={i} href={n.url || n.link || "#"} target="_blank" rel="noopener" style={{
                         display: "flex", alignItems: "flex-start", gap: "10px",
-                        padding: "10px 4px", textDecoration: "none",
+                        padding: "11px 14px", textDecoration: "none",
                         borderBottom: i < topNews.length - 1 ? `1px solid ${C.card2}` : "none",
                       }}>
                         {/* 시간 + 감성 도트 (도트는 장식 — 감성은 아래 텍스트 배지가 전달) */}
@@ -8747,80 +9090,71 @@ function AppInner() {
                     );
                   })
                 )}
-              </div>
+              </HomeSection>
 
               {/* ── Google AdSense (②아래 — 기존 홈 슬롯 재배치) ── */}
               <div style={{ minHeight: 0, overflow: "hidden" }}>
                 <GoogleAd format="responsive" slot="home-main" style={{ margin: "4px 0" }} />
               </div>
 
-              {/* ── ③ 경제 캘린더 — 오늘·내일 상위 3 (첫 건은 시안 EventCard) ── */}
-              <section>
-                <MobileSectionHeader
-                  title={`📅 ${t("tabs.home.economicCalendar")} (KST)`}
-                  actionLabel={t("tabs.home.fullSchedule")}
-                  onAction={() => setTab("econ-calendar")}
-                />
+              {/* ── ③ 경제 캘린더 — 오늘·내일 상위 3 (시안 1d "다음 일정" 카드 문법) ──
+                   ★ IA v3: "전체 일정"은 지표 탭(캘린더 서브탭)으로 (설계서 v3 1장 구역 5).
+                   이전의 '첫 건만 EventCard 강조 + 나머지 별도 ListCard' 이중 구조를
+                   행 규격 하나로 통일 — 같은 정보의 표현 변주를 줄입니다(밀도 절제). */}
+              <HomeSection
+                title={`${t("tabs.home.economicCalendar")} (KST)`}
+                action={{
+                  label: t("tabs.home.fullSchedule"),
+                  onClick: () => { setIndicatorsView("calendar"); setTab("indicators"); },
+                }}
+                bodyStyle={calRows.length > 0 ? { padding: 0 } : undefined}
+              >
                 {calRows.length === 0 ? (
-                  <div style={{ ...cardBase, fontSize: "14px", color: C.text3 }}>{t("tabs.home.noEvents")}</div>
-                ) : (() => {
-                  const fmtRow = (evt) => {
-                    const k = kstParts(evt.date);
-                    return {
-                      dayLabel: evt.daysUntil === 0 ? t("tabs.home.today") : evt.daysUntil === 1 ? t("tabs.home.tomorrow")
-                        : (k.valid ? `${String(k.month + 1).padStart(2, "0")}.${String(k.date).padStart(2, "0")}` : "—"),
-                      hhmm: k.valid ? `${String(k.hour).padStart(2, "0")}:${String(k.min).padStart(2, "0")}` : "--:--",
-                      tail: evt.estimate != null ? `${t("tabs.home.forecastCol")} ${evt.estimate}${evt.unit}` : evt.importance === "high" ? t("tabs.home.important") : "",
-                    };
-                  };
-                  const head = calRows[0];
-                  const headMeta = fmtRow(head);
-                  const rest = calRows.slice(1);
+                  <div style={{ fontSize: "14px", color: C.text3 }}>{t("tabs.home.noEvents")}</div>
+                ) : calRows.map((evt, i) => {
+                  const k = kstParts(evt.date);
+                  const dayLabel = evt.daysUntil === 0 ? t("tabs.home.today") : evt.daysUntil === 1 ? t("tabs.home.tomorrow")
+                    : (k.valid ? `${String(k.month + 1).padStart(2, "0")}.${String(k.date).padStart(2, "0")}` : "—");
+                  const hhmm = k.valid ? `${String(k.hour).padStart(2, "0")}:${String(k.min).padStart(2, "0")}` : "--:--";
+                  // 트레일링은 1개만(375px 행 넘침 방지 — 기존 로직 유지): 예측치 우선, 없으면 '중요' 배지
+                  const tail = evt.estimate != null ? `${t("tabs.home.forecastCol")} ${evt.estimate}${evt.unit}` : "";
                   return (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                      <EventCard
-                        icon={head.icon || "📅"}
-                        title={head.name}
-                        meta={`${headMeta.dayLabel} ${headMeta.hhmm}${headMeta.tail ? ` · ${headMeta.tail}` : ""}`}
-                        badge={head.importance === "high" ? t("tabs.home.important") : (head.daysUntil === 0 ? t("tabs.home.today") : null)}
-                        badgeTone={head.importance === "high" ? "down" : "neutral"}
-                        onClick={() => setTab("econ-calendar")}
-                      />
-                      {rest.length > 0 && (
-                        <ListCard>
-                          {rest.map((evt, i) => {
-                            const m = fmtRow(evt);
-                            return (
-                              <div key={`${evt.name}-${i}`} style={{
-                                display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px",
-                                borderBottom: i < rest.length - 1 ? `1px solid ${C.card2}` : "none",
-                              }}>
-                                <span style={{
-                                  fontSize: "11px", fontWeight: 800, padding: "3px 8px", borderRadius: "6px", flexShrink: 0,
-                                  background: evt.daysUntil === 0 ? `${C.red}1A` : `${C.blue}1A`,
-                                  color: evt.daysUntil === 0 ? C.redL : C.blueL,
-                                }}>{m.dayLabel}</span>
-                                <Num size="12px" weight={600} color={C.text3} style={{ flexShrink: 0 }}>{m.hhmm}</Num>
-                                <span style={{ flex: 1, minWidth: 0, fontSize: "14px", fontWeight: 600, color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{evt.icon} {evt.name}</span>
-                                <span style={{ fontSize: "12px", color: C.text3, flexShrink: 0 }}>{m.tail}</span>
-                              </div>
-                            );
-                          })}
-                        </ListCard>
-                      )}
+                    <div key={`${evt.name}-${i}`} style={{
+                      display: "flex", alignItems: "center", gap: "10px", padding: "12px 14px",
+                      borderBottom: i < calRows.length - 1 ? `1px solid ${C.card2}` : "none",
+                    }}>
+                      <span style={{
+                        fontSize: "11px", fontWeight: 800, padding: "3px 8px", borderRadius: "6px", flexShrink: 0,
+                        background: evt.daysUntil === 0 ? `${C.red}1A` : `${C.blue}1A`,
+                        color: evt.daysUntil === 0 ? C.redL : C.blueL,
+                      }}>{dayLabel}</span>
+                      <Num size="12px" weight={600} color={C.text3} style={{ flexShrink: 0 }}>{hhmm}</Num>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: "14px", fontWeight: 600, color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{evt.icon} {evt.name}</span>
+                      {tail ? (
+                        <span style={{ fontSize: "12px", color: C.text3, flexShrink: 0 }}>{tail}</span>
+                      ) : evt.importance === "high" ? (
+                        <span style={{
+                          fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "9999px",
+                          background: `${C.red}1A`, color: C.redL, flexShrink: 0,
+                        }}>{t("tabs.home.important")}</span>
+                      ) : null}
                     </div>
                   );
-                })()}
-              </section>
+                })}
+              </HomeSection>
 
-              {/* ── ④ 시장 지표 스냅샷 — 공포·탐욕은 시안 GaugeCard, 온도류는 uiKit IndicatorCard ── */}
+              {/* ── ④ 시장 지표 스냅샷 — 공포·탐욕은 시안 GaugeCard, 온도류는 uiKit IndicatorCard ──
+                   ★ IA v3: 지표 허브(게이지 그리드)는 폐지 — 게이지는 이 스냅샷과 코인 탭
+                   컨텍스트 구역이 흡수합니다(설계서 v3 4장). 헤더 액션은 코인 탭 1개로
+                   통일하고, 게이지 카드 개별 클릭(구 허브 진입)은 목적지가 사라져 뗐습니다. */}
               {hasSnapshot && (
-                <section>
-                  <MobileSectionHeader
-                    title={`🌡️ ${t("tabs.home.marketSnapshot")}`}
-                    actionLabel={t("tabs.home.indicatorHubLink")}
-                    onAction={() => setTab("indicators")}
-                  />
+                <HomeSection
+                  title={t("tabs.home.marketSnapshot")}
+                  action={{
+                    label: t("tabs.home.coinIndicatorsLink"),
+                    onClick: () => setTab("news"),
+                  }}
+                >
                   <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                     {/* 공포·탐욕 — 주식/크립토 각각 게이지. 값이 없는 쪽은 카드째 빠집니다. */}
                     {(fgVal != null || fgCryptoVal != null) && (
@@ -8834,7 +9168,6 @@ function AppInner() {
                             gradient={fgRamp}
                             scaleLeft={`0 ${t("tabs.home.fear")}`}
                             scaleRight={`${t("tabs.home.greed")} 100`}
-                            onClick={() => setTab("indicators")}
                           />
                         )}
                         {fgCryptoVal != null && (
@@ -8846,7 +9179,6 @@ function AppInner() {
                             gradient={fgRamp}
                             scaleLeft={`0 ${t("tabs.home.fear")}`}
                             scaleRight={`${t("tabs.home.greed")} 100`}
-                            onClick={() => setTab("indicators")}
                           />
                         )}
                       </div>
@@ -8884,33 +9216,35 @@ function AppInner() {
                         (해설 페이지가 /index/alt-heat·/index/funding-squeeze 를 관련 링크로
                         상호 연결하고 있어 이 한 곳으로 지수 해설 3종이 모두 도달 가능해집니다) */}
                     {tempVal != null && (
-                      <div style={{ textAlign: "right" }}>
-                        <a href="/index/market-temp" style={{ fontSize: "12px", fontWeight: 700, color: C.blueL, textDecoration: "none" }}>
-                          {t("tabs.home.marketTempPageLink")}
-                        </a>
+                      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                        {/* 해설 페이지(서버 렌더 SEO) 진입 — 텍스트 링크 → 칩 (1d 규격) */}
+                        <HomeActionChip href="/index/market-temp" label={t("tabs.home.marketTempPageLink")} />
                       </div>
                     )}
                   </div>
-                </section>
+                </HomeSection>
               )}
 
-              {/* ── ⑤ 관심종목 요약 (로그인+보유 시) / 인기 종목 (기존 주요종목 데이터 재사용) ── */}
-              <section>
-                <MobileSectionHeader
-                  title={watchRows ? `⭐ ${t("tabs.home.watchlistSummary")}` : `🔥 ${t("tabs.home.bigMovers")}`}
-                  actionLabel={t("tabs.home.screenerLink")}
-                  onAction={() => setTab("screener")}
-                />
+              {/* ── ⑤ 관심종목 요약 (로그인+보유 시) / 인기 종목 (기존 주요종목 데이터 재사용) ──
+                   ★ IA v3: 스크리너는 주식 탭 안으로 — 액션은 주식 탭 진입 1개 (설계서 v3 3장). */}
+              <HomeSection
+                title={watchRows ? t("tabs.home.watchlistSummary") : t("tabs.home.bigMovers")}
+                action={{
+                  label: t("tabs.home.screenerLink"),
+                  onClick: () => setTab("screener"),
+                }}
+                bodyStyle={(watchRows || popularRows).length > 0 ? { padding: 0 } : undefined}
+              >
                 {(watchRows || popularRows).length === 0 ? (
-                  <div style={{ ...cardBase, fontSize: "14px", color: C.text3 }}>{t("tabs.home.loadingQuotes")}</div>
+                  <div style={{ fontSize: "14px", color: C.text3 }}>{t("tabs.home.loadingQuotes")}</div>
                 ) : (
-                  <ListCard>
+                  <>
                     {(watchRows || popularRows).map((row, i, arr) => {
                       const hot = watchRows ? row.hot : row;
                       const name = row.name || row.symbol;
                       // ★ 2026-08-02 양축 확장: 이모지 하나 대신 시장 구분 배지 (기존 검색 결과 배지 스타일 재사용)
                       const mkt = row.market || hot?.market || "us";
-                      const mktLabel = MARKET_BADGE[mkt] || MARKET_BADGE.us;
+                      const mktLabel = marketBadgeLabel(mkt, t);
                       const chg = hot && Number.isFinite(Number(hot.change)) ? Number(hot.change) : null;
                       // 시안의 38px 심볼 타일 — 글로벌 검색 결과와 같은 규칙
                       // (한국 주식은 숫자 코드라 종목명 앞 2글자, 그 외는 티커 앞 4글자).
@@ -8939,17 +9273,20 @@ function AppInner() {
                         />
                       );
                     })}
-                  </ListCard>
+                  </>
                 )}
-              </section>
+              </HomeSection>
 
               {/* ── Google AdSense (⑤아래 — 기존 홈 슬롯 재배치) ── */}
               <div style={{ minHeight: 0, overflow: "hidden" }}>
                 <GoogleAd format="responsive" slot="home-main" style={{ margin: "4px 0" }} />
               </div>
 
-              {/* ── ⑥ 시장 리포트 진입 카드 ── */}
-              <div onClick={() => setTab("quant-report")} style={{
+              {/* ── ⑥ 시장 리포트 진입 카드 (카드 전체가 단일 액션 — 키보드 접근 보강) ── */}
+              <div onClick={() => setTab("quant-report")}
+              role="button" tabIndex={0}
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setTab("quant-report"); } }}
+              style={{
                 ...cardBase, cursor: "pointer", display: "flex", alignItems: "center", gap: "14px",
                 background: `linear-gradient(135deg, ${C.card} 0%, ${C.blueBg} 100%)`,
               }}
@@ -8967,1605 +9304,138 @@ function AppInner() {
                 <span style={{ fontSize: "14px", fontWeight: 700, color: C.blueL, flexShrink: 0 }}>{t("tabs.home.goView")}</span>
               </div>
 
+              {/* ── owner 전용: 매매 콘솔 진입 (구 owner 홈 폐지의 대체 동선) ──
+                   일반 사용자에겐 렌더 자체가 없습니다(isOwner 게이트). 홈 → 콘솔 1탭. */}
+              {isOwner && (
+                <div
+                  role="button" tabIndex={0}
+                  onClick={() => setTab("real-trading")}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setTab("real-trading"); } }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "12px", cursor: "pointer",
+                    background: `linear-gradient(180deg, ${C.purpleBg}, transparent 60%), ${C.card}`,
+                    border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.purple}`,
+                    borderRadius: "16px", padding: "14px 16px",
+                  }}>
+                  <div style={{
+                    width: "44px", height: "44px", borderRadius: "12px", flexShrink: 0,
+                    background: `${C.purple}22`, color: C.purpleL,
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px",
+                  }}>🤖</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "7px", marginBottom: "2px" }}>
+                      <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>{t("tabs.home.ownerConsole")}</span>
+                      <span style={{
+                        fontSize: "10px", fontWeight: 800, padding: "2px 6px", borderRadius: "6px",
+                        background: `${C.purple}22`, color: C.purpleL, letterSpacing: ".04em",
+                      }}>OWNER</span>
+                    </div>
+                    <div style={{ fontSize: "13px", color: C.text3, lineHeight: 1.4 }}>{t("tabs.home.ownerConsoleDesc")}</div>
+                  </div>
+                  <span aria-hidden="true" style={{ fontSize: "17px", color: C.text4, flexShrink: 0 }}>›</span>
+                </div>
+              )}
+
               {/* ── 면책 (시안: 모든 정보 화면 끝의 한 줄) ── */}
               <Disclaimer style={{ marginTop: "2px" }}>{t("tabs.home.disclaimer")}</Disclaimer>
             </div>
           );
         })()}
 
-        {tab === "home" && isOwner && (
-          <div className="tab-content">
-            {/* 2컬럼 그리드 (데스크톱) / 1컬럼 (모바일) */}
-            <div className="home-grid">
-            <div className="home-left card-stagger" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-
-            {/* ── 개인화 인사 + 스트릭 ─── */}
-            {/* ★ 비로그인 유저는 인사 카드 스킵 — 빈 그리팅 어색함 해소 + 헤로/추천이 첫 카드로 */}
-            {user && (() => {
-              const hour = new Date().getHours();
-              const greetText = hour < 12 ? (t("tabs.home.goodMorning") || "좋은 아침이에요") : hour < 18 ? (t("tabs.home.goodAfternoon") || "좋은 오후에요") : (t("tabs.home.goodEvening") || "좋은 저녁이에요");
-              const displayName = user?.user_metadata?.nickname || user?.email?.split("@")[0] || "";
-              // 스트릭 계산
-              const todayKey = new Date().toISOString().slice(0, 10);
-              const streakData = (() => {
-                try {
-                  const stored = JSON.parse(localStorage.getItem("zepta:streak") || "{}");
-                  if (stored.lastDate === todayKey) return stored;
-                  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-                  const newStreak = stored.lastDate === yesterday ? (stored.count || 0) + 1 : 1;
-                  const updated = { lastDate: todayKey, count: newStreak };
-                  localStorage.setItem("zepta:streak", JSON.stringify(updated));
-                  syncUserDataToSupabase();
-                  return updated;
-                } catch { return { count: 1 }; }
-              })();
-              return (
-                <div className="hero-gradient" style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "20px 24px", borderRadius: "24px",
-                  border: `1px solid ${C.blue}18`,
-                  boxShadow: `0 4px 20px rgba(0,0,0,${C.isDark ? 0.2 : 0.08}), inset 0 1px 0 ${C.blue}20`,
-                  overflow: "hidden",
-                  position: "relative",
-                }}>
-                  <div>
-                    <div style={{ fontSize: "19px", fontWeight: 800, color: C.text1, marginBottom: "4px", letterSpacing: "-0.5px" }}>
-                      {displayName ? `${displayName}님, ${greetText}` : greetText} 👋
-                    </div>
-                    <div style={{ fontSize: "14px", color: C.text3, fontWeight: 500 }}>
-                      {new Date().toLocaleDateString("ko-KR", { month: "long", day: "numeric", weekday: "long" })}
-                    </div>
-                  </div>
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: "8px",
-                    padding: "8px 16px", borderRadius: "12px",
-                    background: streakData.count > 3
-                      ? `linear-gradient(135deg, ${C.orange}30 0%, #FF6B3520 50%, ${C.red}20 100%)`
-                      : `${C.orange}20`,
-                    border: `1px solid ${streakData.count > 3 ? C.red : C.orange}35`,
-                    boxShadow: `0 0 12px ${streakData.count > 3 ? C.red : C.orange}30`,
-                    animation: streakData.count > 0 ? "streakPulse 2s ease-in-out infinite" : "none",
-                  }}>
-                    <span style={{ fontSize: "20px", display: "inline-block" }}>🔥</span>
-                    <div>
-                      <div style={{ fontSize: "18px", fontWeight: 800, color: streakData.count > 3 ? C.red : C.orange, lineHeight: 1, fontVariantNumeric: "tabular-nums" }}>{streakData.count}</div>
-                      <div style={{ fontSize: "12px", color: C.text3, fontWeight: 600 }}>{t("tabs.home.streakDays") || "일 연속"}</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* ── 비로그인 유저 웰컴 배너 — 가입 유도 + 신뢰 시그널
-                 2026-05-12 v3: AI 단어 노출 보정 (핀테크 표준 어휘) + TrustRow 신뢰 시그널 추가 */}
-            {!user && (
-              <div style={{
-                background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.purpleBg} 50%, ${C.blueBg} 100%)`,
-                borderRadius: "20px", padding: isMobile ? "20px" : "28px 32px",
-                border: `1px solid ${C.purple}20`,
-                boxShadow: `0 4px 24px rgba(155,111,255,0.12)`,
-                position: "relative", overflow: "hidden",
-              }}>
-                <div style={{ position: "absolute", top: "-30px", right: "-20px", fontSize: "100px", opacity: 0.06 }}>🚀</div>
-                <h2 style={{ fontSize: isMobile ? "20px" : "24px", fontWeight: 900, color: C.text1, marginBottom: "8px", letterSpacing: "-0.02em" }}>
-                  퀀트 전략이 주요 지지 구간을 자동 분석합니다
-                </h2>
-                <p style={{ fontSize: "15px", color: C.text2, marginBottom: "16px", lineHeight: 1.55, wordBreak: "keep-all" }}>
-                  주식 · 코인 · 외환까지. 무료로 시작하고 검증된 전략을 골라 쓰세요.
-                </p>
-                <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "16px" }}>
-                  <button onClick={() => setShowAuthModal(true)} style={{
-                    padding: "12px 28px", borderRadius: "12px", fontSize: "15px", fontWeight: 800,
-                    background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`,
-                    color: "#fff", border: "none", cursor: "pointer",
-                    boxShadow: `0 4px 16px ${C.blue}30`,
-                    transition: "all 0.2s",
-                  }}>무료로 시작하기</button>
-                  <button onClick={() => setTab("screener")} style={{
-                    padding: "12px 28px", borderRadius: "12px", fontSize: "15px", fontWeight: 700,
-                    background: `${C.card2}`, color: C.text2,
-                    border: `1px solid ${C.border}`,
-                    cursor: "pointer", transition: "all 0.2s",
-                  }}>둘러보기</button>
-                </div>
-                {/* ── 신뢰 시그널 — 4개 메트릭 (MKT-LEAD 2026-05-12) */}
-                <div style={{
-                  display: "flex",
-                  gap: isMobile ? "8px" : "10px",
-                  overflowX: isMobile ? "auto" : "visible",
-                  scrollbarWidth: "none",
-                  WebkitOverflowScrolling: "touch",
-                  flexWrap: isMobile ? "nowrap" : "wrap",
-                  paddingTop: "8px",
-                  borderTop: `1px solid ${C.purple}25`,
-                }}>
-                  {[
-                    { icon: "🧪", label: "검증 전략", value: "9개" },
-                    { icon: "📡", label: "라이브 데이터", value: "Yahoo · Binance" },
-                    { icon: "🔒", label: "보안", value: "TLS 1.3 · Supabase Auth" },
-                    // ★ 2026-06-14 (대표 지시): 가짜 베타 가입자 추산값 제거 — '베타 무료' 정직 표기.
-                    { icon: "💳", label: "결제", value: "베타 무료" },
-                  ].map((it, i) => (
-                    <div key={i} style={{
-                      display: "inline-flex", alignItems: "center", gap: "8px",
-                      padding: "8px 12px",
-                      background: `${C.card}cc`,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: "999px",
-                      flexShrink: 0, whiteSpace: "nowrap",
-                      backdropFilter: "blur(8px)",
-                      WebkitBackdropFilter: "blur(8px)",
-                    }}>
-                      <span style={{ fontSize: "14px", lineHeight: 1 }}>{it.icon}</span>
-                      <span style={{ fontSize: "10px", fontWeight: 700, color: C.text3, letterSpacing: 0.3, textTransform: "uppercase" }}>{it.label}</span>
-                      <span style={{ fontSize: "12px", fontWeight: 800, color: C.text1, letterSpacing: "-0.01em" }}>{it.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* ── 모바일 빠른 접근 버튼 ─── */}
-            {isMobile && (
-              <div style={{
-                display: "flex", gap: "8px", overflowX: "auto",
-                scrollbarWidth: "none", msOverflowStyle: "none",
-                WebkitOverflowScrolling: "touch", paddingBottom: "4px",
-              }} className="hscroll">
-                {[
-                  // ★ 2026-05-12 v2: 한국 핀테크 컨벤션 재정비 — 토스/카카오/미래에셋 reference
-                  //   원칙: 짧은 명사형, AI 마케팅 단어 제거, 업계 표준 외래어 유지 (백테스트/카피트레이딩)
-                  // ★ 2026-07 정보 서비스 피벗: 매매 관련 버튼은 내부 운영(owner) 전용
-                  { icon: "🔍", label: "스크리너", tab: "screener" },
-                  { icon: "🤖", label: "자동매매", tab: "auto-trading", ownerOnly: true },
-                  { icon: "🧬", label: "알파 랩", tab: "alpha-lab", ownerOnly: true },
-                  { icon: "🏆", label: "봇 랭킹", tab: "leaderboard", ownerOnly: true },
-                  { icon: "🔗", label: "카피트레이딩", tab: "copy-trading", ownerOnly: true },
-                  { icon: "📊", label: "전략 분석", tab: "strategy", ownerOnly: true },
-                  { icon: "🎯", label: "백테스트", tab: "backtest", ownerOnly: true },
-                  { icon: "⚖️", label: "전략 비교", tab: "backtest-compare", ownerOnly: true },
-                  { icon: "💼", label: "자산 분석", tab: "portfolio-analysis" },
-                  { icon: "💾", label: "저장한 조건", tab: "saved-screeners" },
-                  { icon: "🔔", label: "알림", tab: "notifications" },
-                  { icon: "👑", label: "멤버십", tab: "pricing", ownerOnly: true },
-                  { icon: "📰", label: "뉴스", tab: "news" },
-                  { icon: "📅", label: "경제 일정", tab: "econ-calendar" },
-                ].filter((item) => !item.ownerOnly || isOwner).map((item) => (
-                  <button key={item.tab} onClick={() => setTab(item.tab)} style={{
-                    display: "flex", flexDirection: "column", alignItems: "center", gap: "6px",
-                    padding: "12px 16px", borderRadius: "16px", border: "none",
-                    background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
-                    boxShadow: `0 2px 8px rgba(0,0,0,${C.isDark ? '0.3' : '0.08'})`,
-                    cursor: "pointer", flexShrink: 0, minWidth: "72px",
-                    transition: "all 0.15s ease", color: C.text1, fontWeight: 600,
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 4px 16px rgba(0,0,0,${C.isDark ? '0.4' : '0.12'})`; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 2px 8px rgba(0,0,0,${C.isDark ? '0.3' : '0.08'})`; }}>
-                    <span style={{ fontSize: "24px" }}>{item.icon}</span>
-                    <span style={{ fontSize: "12px", fontWeight: 700, color: C.text2, whiteSpace: "nowrap" }}>{item.label}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* ── 마켓 브리핑 (3×2 그리드 — 6개 지수 동등 표시) · 2026-06-12 대표 지시: 최상단 ─── */}
-            {(() => {
-              const sp = marketIndices.find(i => i.symbol === "^GSPC");
-              const nq = marketIndices.find(i => i.symbol === "^IXIC");
-              const dj = marketIndices.find(i => i.symbol === "^DJI");
-              const ks = marketIndices.find(i => i.symbol === "^KS11");
-              const kq = marketIndices.find(i => i.symbol === "^KQ11");
-              const fx = marketIndices.find(i => i.symbol === "USDKRW=X");
-              const upCount = hotAssets.filter(h => h.change > 0).length;
-              const dnCount = hotAssets.filter(h => h.change < 0).length;
-              const total = Math.max(upCount + dnCount, 1);
-              const upPct = Math.round((upCount / total) * 100);
-              const fgVal = fearGreed.stock?.value;
-              const fgColor = fgVal ? (fgVal <= 25 ? C.red : fgVal <= 40 ? "#FF8C42" : fgVal <= 60 ? C.yellow : fgVal <= 75 ? C.green : C.green) : C.text3;
-              const fgLabel = fgVal ? (fgVal <= 25 ? t("tabs.home.extremeFear") || "극도의 공포" : fgVal <= 40 ? t("tabs.home.fear") || "공포" : fgVal <= 60 ? t("tabs.home.neutral") || "중립" : fgVal <= 75 ? t("tabs.home.greed") || "탐욕" : t("tabs.home.extremeGreed") || "극도의 탐욕") : "—";
-
-              const indexCards = [
-                { idx: sp, symbol: "^GSPC", name: "S&P 500", flag: "🇺🇸", market: "us" },
-                { idx: nq, symbol: "^IXIC", name: "NASDAQ", flag: "🇺🇸", market: "us" },
-                { idx: dj, symbol: "^DJI", name: t("tabs.home.dowLabel") || "다우존스", flag: "🇺🇸", market: "us" },
-                { idx: ks, symbol: "^KS11", name: t("tabs.home.kospiLabel") || "코스피", flag: "🇰🇷", market: "kr" },
-                { idx: kq, symbol: "^KQ11", name: t("tabs.home.kosdaqLabel") || "코스닥", flag: "🇰🇷", market: "kr" },
-                { idx: fx, symbol: "USDKRW=X", name: "KRW/USD", flag: "💱", market: "fx" },
-              ];
-
-              return (
-                <div style={{
-                  background: C.isDark
-                    ? `linear-gradient(135deg, ${C.card} 0%, ${C.card}ee 50%, ${C.card2}88 100%)`
-                    : C.card,
-                  borderRadius: "20px", overflow: "hidden",
-                  border: `1px solid ${C.isDark ? `${C.border}30` : `${C.border}60`}`,
-                  boxShadow: `0 4px 24px rgba(0,0,0,${C.isDark ? 0.3 : 0.08}), inset 0 1px 0 ${C.border}15`,
-                  backdropFilter: "blur(12px)",
-                  WebkitBackdropFilter: "blur(12px)",
-                  position: "relative",
-                }}>
-                  {/* 상단 선 */}
-                  <div style={{
-                    position: "absolute", top: 0, left: 0, right: 0, height: "1px",
-                    background: `linear-gradient(90deg, transparent 0%, ${C.blue}40 50%, transparent 100%)`,
-                  }} />
-                  <div style={{ padding: "20px 24px" }}>
-                    {/* 헤더 */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <span style={{ fontSize: "16px", color: C.text1, fontWeight: 800, letterSpacing: "-0.5px" }}>{t("tabs.home.marketBriefing")}</span>
-                        {marketIndices.length > 0 && (
-                          <span style={{ display: "inline-flex", alignItems: "center", gap: "3px", padding: "2px 7px", borderRadius: "6px", background: `${C.green}12`, fontSize: "12px", fontWeight: 700, color: C.green }}>
-                            <span style={{ width: "4px", height: "4px", borderRadius: "50%", background: C.green, animation: "livePulse 1.5s ease-in-out infinite" }} /> LIVE
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ display: "flex", gap: "8px" }}>
-                        <button
-                          onClick={() => {
-                            if (navigator.share) {
-                              navigator.share({
-                                title: "Zepta 마켓 브리핑",
-                                text: "실시간 글로벌 시장 현황을 확인하세요",
-                                url: window.location.href
-                              }).catch(() => {});
-                            } else {
-                              navigator.clipboard.writeText(window.location.href);
-                              showToast("링크가 복사되었습니다", "success");
-                            }
-                          }}
-                          style={{
-                            background: "none", border: "none", fontSize: "16px", color: C.text3,
-                            cursor: "pointer", fontWeight: 500, padding: "4px 8px", borderRadius: "6px",
-                            transition: "all .2s",
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}15`; e.currentTarget.style.color = C.blue; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = "none"; e.currentTarget.style.color = C.text3; }}
-                        >
-                          📤
-                        </button>
-                        <button onClick={fetchMarketOverview} disabled={marketLoading} style={{
-                          background: "none", border: "none", fontSize: "14px", color: C.text3, cursor: "pointer", fontWeight: 500, padding: "2px 6px",
-                        }}>{marketLoading ? "..." : "↻"}</button>
-                      </div>
-                    </div>
-
-                    {/* 3×2 그리드 (데스크톱) / 수평 스크롤 (모바일): 6개 지수 카드 */}
-                    <div style={{
-                      display: isMobile ? "flex" : "grid",
-                      gridTemplateColumns: !isMobile ? "repeat(3, 1fr)" : undefined,
-                      gap: isMobile ? "10px" : "12px",
-                      overflowX: isMobile ? "auto" : "visible",
-                      scrollSnapType: isMobile ? "x mandatory" : "none",
-                      WebkitOverflowScrolling: "touch",
-                      paddingBottom: isMobile ? "8px" : "0",
-                      scrollbarWidth: "none",
-                      msOverflowStyle: "none",
-                      marginBottom: "14px",
-                    }} className="hscroll">
-                      {/* ★ 2026-06-12 (대표 피드백): 갱신 때마다 스켈레톤으로 갈아끼워 숫자가
-                          사라졌다 나타나던 깜빡임 제거 — 데이터가 이미 있으면 유지한 채 값만
-                          제자리 교체(거래앱처럼). 스켈레톤은 최초 로드(데이터 0)에만. */}
-                      {marketLoading && marketIndices.length === 0 ? (
-                        // 스켈레톤 로더 표시
-                        Array.from({ length: 6 }).map((_, i) => (
-                          <div key={`skeleton-${i}`} style={{
-                            padding: "14px 16px",
-                            borderRadius: "16px",
-                            background: C.card2,
-                            minWidth: isMobile ? "140px" : undefined,
-                            flexShrink: isMobile ? 0 : undefined,
-                          }}>
-                            <Skeleton width="80px" height="12px" />
-                            <div style={{ marginTop: "10px" }}>
-                              <Skeleton width="100%" height="24px" />
-                            </div>
-                            <div style={{ marginTop: "6px" }}>
-                              <Skeleton width="60px" height="16px" />
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        indexCards.map((item) => {
-                        const isUp = item.idx?.change >= 0;
-                        return (
-                          <div
-                            key={item.symbol}
-                            onClick={() => item.idx && setChartAsset({ symbol: item.idx.symbol, name: item.name, market: item.market, symbolRaw: item.idx.symbol })}
-                            style={{
-                              cursor: item.idx ? "pointer" : "default",
-                              padding: "14px 16px",
-                              borderRadius: "16px",
-                              background: `${isUp ? C.green : C.red}08`,
-                              borderLeft: `3px solid ${isUp ? C.green : C.red}`,
-                              border: `1px solid ${isUp ? C.green : C.red}18`,
-                              borderLeftWidth: "3px",
-                              transition: "all .2s ease",
-                              position: "relative",
-                              overflow: "hidden",
-                              minWidth: isMobile ? "140px" : undefined,
-                              flexShrink: isMobile ? 0 : undefined,
-                              scrollSnapAlign: isMobile ? "start" : undefined,
-                            }}
-                            onMouseEnter={(e) => {
-                              if (item.idx) {
-                                e.currentTarget.style.transform = "translateY(-3px)";
-                                e.currentTarget.style.background = `${isUp ? C.green : C.red}12`;
-                                e.currentTarget.style.boxShadow = `0 6px 20px ${isUp ? C.green : C.red}25, inset 0 1px 0 ${isUp ? C.green : C.red}10`;
-                              }
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.transform = "translateY(0)";
-                              e.currentTarget.style.background = `${isUp ? C.green : C.red}08`;
-                              e.currentTarget.style.boxShadow = "none";
-                            }}
-                          >
-                            <div style={{ fontSize: "12px", color: C.text3, fontWeight: 600, marginBottom: "7px" }}>
-                              {item.flag} {item.name}
-                            </div>
-                            <div style={{
-                              fontSize: "28px",
-                              fontWeight: 800,
-                              color: C.text1,
-                              letterSpacing: "-0.5px",
-                              marginBottom: "3px",
-                              lineHeight: 1,
-                            }}>
-                              {item.idx ? (
-                                item.symbol === "USDKRW=X"
-                                  ? `₩${Math.round(item.idx.price).toLocaleString()}`
-                                  : item.idx.price?.toLocaleString(undefined, { maximumFractionDigits: 0 })
-                              ) : "—"}
-                            </div>
-                            <div style={{
-                              fontSize: "16px",
-                              fontWeight: 800,
-                              color: isUp ? C.green : C.red,
-                              letterSpacing: "-0.3px",
-                            }}>
-                              {item.idx ? `${isUp ? "+" : ""}${item.idx.change}%` : "—"}
-                            </div>
-                          </div>
-                        );
-                      })
-                      )}
-                    </div>
-
-                    {/* 마켓 한줄 요약 */}
-                    {marketIndices.length > 0 && (() => {
-                      const sp = marketIndices.find(i => i.symbol === "^GSPC");
-                      const nq = marketIndices.find(i => i.symbol === "^IXIC");
-                      const spChg = sp?.change || 0;
-                      const nqChg = nq?.change || 0;
-                      const avgChg = (spChg + nqChg) / 2;
-                      const sentiment = avgChg > 0.5 ? "강세" : avgChg > 0 ? "소폭 상승" : avgChg > -0.5 ? "소폭 하락" : "약세";
-                      const emoji = avgChg > 0.5 ? "🚀" : avgChg > 0 ? "📈" : avgChg > -0.5 ? "📉" : "⚠️";
-                      return (
-                        <div style={{
-                          padding: "12px 16px", borderRadius: "12px", fontSize: "14px",
-                          background: `linear-gradient(90deg, ${avgChg >= 0 ? C.greenBg : C.redBg} 0%, transparent 100%)`,
-                          color: C.text2, fontWeight: 600,
-                          borderLeft: `3px solid ${avgChg >= 0 ? C.green : C.red}`,
-                          marginBottom: "14px",
-                        }}>
-                          {emoji} 오늘 미국 증시는 <span style={{ color: avgChg >= 0 ? C.green : C.red, fontWeight: 800 }}>{sentiment}</span> 흐름
-                          {sp && <span> · S&P 500 {spChg >= 0 ? "+" : ""}{spChg.toFixed(2)}%</span>}
-                        </div>
-                      );
-                    })()}
-
-                    {/* 하단: 등락 바 + 투자심리 */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "16px", paddingTop: "16px", borderTop: `1px solid ${C.border}15` }}>
-                      {/* 등락 바 */}
-                      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "8px" }}>
-                        <span style={{ fontSize: "12px", fontWeight: 700, color: C.green, minWidth: "32px" }}>{upCount}↑</span>
-                        <div style={{ flex: 1, height: "6px", borderRadius: "4px", background: C.card2, overflow: "hidden", display: "flex", boxShadow: `inset 0 1px 2px rgba(0,0,0,0.2)` }}>
-                          <div style={{ width: `${upPct}%`, background: C.green, borderRadius: "4px 0 0 3px", transition: "width .5s" }} />
-                          <div style={{ flex: 1, background: C.red, borderRadius: "0 3px 3px 0" }} />
-                        </div>
-                        <span style={{ fontSize: "12px", fontWeight: 700, color: C.red, minWidth: "32px", textAlign: "right" }}>{dnCount}↓</span>
-                      </div>
-                      {/* 투자심리 배지 — 더 큰 숫자 + 글로우 */}
-                      {fgVal && (
-                        <div style={{
-                          display: "flex", flexDirection: "column", alignItems: "center", gap: "2px",
-                          padding: "8px 14px", borderRadius: "12px",
-                          background: `${fgColor}15`,
-                          border: `1px solid ${fgColor}30`,
-                          boxShadow: `0 0 12px ${fgColor}25, inset 0 1px 0 ${fgColor}15`,
-                          minWidth: "80px",
-                        }}>
-                          <span style={{ fontSize: "24px", fontWeight: 900, color: fgColor, lineHeight: 1, letterSpacing: "-0.5px" }}>{fgVal}</span>
-                          <span style={{ fontSize: "12px", fontWeight: 700, color: fgColor, opacity: 0.9 }}>{fgLabel}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* ★ 리뉴얼 V2 — 라이브 시그널 보드 (2026-06-12 대표 지시: 마켓 브리핑 아래로) */}
-            <HomeSignalBoard isMobile={isMobile} onNavigate={isOwner ? setTab : null} />
-
-            {/* ── AI 퀀트 전략 하이라이트 (★ 2026-07 정보 서비스 피벗: 내부 운영 전용) ─── */}
-            {isOwner && (
-            <div onClick={() => { setTab("auto-trading"); }} className="ui-card-premium" style={{
-              cursor: "pointer", transition: "all .2s",
-              position: "relative", overflow: "hidden",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = `0 12px 40px ${C.purple}25`; }}
-            onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = ""; }}>
-              <div style={{ position: "absolute", top: "-20px", right: "-10px", fontSize: "80px", opacity: 0.06 }}>🤖</div>
-              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                <div style={{
-                  width: "48px", height: "48px", borderRadius: "12px",
-                  background: `linear-gradient(135deg, ${C.purple}, #6D28D9)`,
-                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", flexShrink: 0,
-                }}>🤖</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 800, fontSize: "18px", color: C.text1, marginBottom: "4px" }}>AI 퀀트 전략</div>
-                  <div style={{ fontSize: "16px", color: C.text3, lineHeight: 1.4 }}>
-                    AI 기반 자동매매 · 주식/크립토 통합 · 실시간 시그널
-                  </div>
-                </div>
-                <div style={{
-                  padding: "8px 16px", borderRadius: "10px", fontSize: "16px", fontWeight: 700,
-                  background: `${C.purple}20`, color: C.purple, flexShrink: 0,
-                }}>바로가기 →</div>
-              </div>
-            </div>
-            )}
-
-            {/* ── 전략 운용(내부 운영 전용) + 리스크 바로가기 위젯 ─── */}
-            <div style={{ display: "grid", gridTemplateColumns: isOwner ? "1fr 1fr" : "1fr", gap: "12px" }}>
-              {isOwner && (
-              <div onClick={() => { setTab("quant-port"); }} style={{
-                background: `linear-gradient(135deg, ${C.card} 0%, ${C.greenBg} 100%)`,
-                borderRadius: "16px", padding: "20px", cursor: "pointer", transition: "all .2s",
-                border: `1px solid ${C.border}20`,
-              }}
-              onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
-              onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
-                <div style={{ fontSize: "24px", marginBottom: "8px" }}>📊</div>
-                <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "5px", color: C.text1 }}>전략 운용</div>
-                <div style={{ fontSize: "16px", color: C.text3 }}>41개 전략 포트폴리오</div>
-                <div style={{ fontSize: "16px", color: C.green, fontWeight: 600, marginTop: "6px" }}>
-                  실시간 수익률 추적 →
-                </div>
-              </div>
-              )}
-              <div onClick={() => { setTab("risk-map"); }} style={{
-                background: `linear-gradient(135deg, ${C.card} 0%, ${C.redBg} 100%)`,
-                borderRadius: "16px", padding: "20px", cursor: "pointer", transition: "all .2s",
-                border: `1px solid ${C.border}20`,
-              }}
-              onMouseEnter={e => e.currentTarget.style.transform = "translateY(-2px)"}
-              onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
-                <div style={{ fontSize: "24px", marginBottom: "8px" }}>🛡️</div>
-                <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "5px", color: C.text1 }}>리스크 관리</div>
-                <div style={{ fontSize: "16px", color: C.text3 }}>8-Point 히트맵</div>
-                <div style={{ fontSize: "16px", color: C.red, fontWeight: 600, marginTop: "6px" }}>
-                  위험 수준 확인 →
-                </div>
-              </div>
-            </div>
-
-            {/* ── AI 시장 한줄 인사이트 (공유 유도 → 바이럴 유입) ─── */}
-            {marketIndices.length > 0 && (() => {
-              const sp = marketIndices.find(i => i.symbol === "^GSPC");
-              const nq = marketIndices.find(i => i.symbol === "^IXIC");
-              const ks = marketIndices.find(i => i.symbol === "^KS11");
-              const spChg = sp?.change || 0;
-              const nqChg = nq?.change || 0;
-              const insights = [];
-              if (Math.abs(spChg) > 1.5) insights.push(`S&P 500이 ${spChg > 0 ? "+" : ""}${spChg.toFixed(1)}% ${spChg > 0 ? "급등" : "급락"}했습니다. ${spChg > 0 ? "기술주 주도의 강세장이 지속" : "투자 심리 위축에 주의"}이 필요합니다.`);
-              else if (Math.abs(nqChg) > 2) insights.push(`나스닥이 ${nqChg > 0 ? "+" : ""}${nqChg.toFixed(1)}% ${nqChg > 0 ? "상승" : "하락"}하며 ${nqChg > 0 ? "AI·반도체 섹터가 주도" : "성장주 약세가 뚜렷"}합니다.`);
-              else insights.push(`미국 증시가 ${Math.abs(spChg) < 0.3 ? "보합권에서 움직이고 있습니다. 방향성 확인이 필요" : spChg > 0 ? "소폭 상승하며 안정적 흐름을 유지" : "소폭 하락하며 관망세가 짙어지고 있"}합니다.`);
-              if (ks) {
-                const ksChg = ks.change || 0;
-                insights.push(`코스피 ${ksChg >= 0 ? "+" : ""}${ksChg.toFixed(1)}% · ${ksChg > 1 ? "외국인 순매수 주도 강세" : ksChg < -1 ? "외국인 매도 압력 상승" : "기관·외국인 혼조세 지속"}`);
-              }
-              const shareText = `[Zepta AI 인사이트] ${insights[0]} ${insights[1] || ""}\n\nhttps://zepta.app`;
-
-              return (
-                <div style={{
-                  background: `linear-gradient(135deg, ${C.isDark ? '#0A1628' : '#F0F4FF'} 0%, ${C.isDark ? '#141024' : '#F5F0FF'} 100%)`,
-                  borderRadius: "16px", padding: isMobile ? "16px" : "18px 20px",
-                  border: `1px solid ${C.purple}12`,
-                  position: "relative", overflow: "hidden",
-                }}>
-                  <div style={{ position: "absolute", bottom: "-15px", right: "10px", fontSize: "60px", opacity: 0.04, pointerEvents: "none" }}>🤖</div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "10px" }}>
-                    <div style={{
-                      width: "28px", height: "28px", borderRadius: "8px",
-                      background: `linear-gradient(135deg, ${C.blue}25, ${C.purple}20)`,
-                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px",
-                    }}>🤖</div>
-                    <span style={{ fontWeight: 800, fontSize: "14px", color: C.text1 }}>AI 시장 인사이트</span>
-                    <span style={{ fontSize: "12px", color: C.text3, marginLeft: "auto" }}>방금 업데이트</span>
-                  </div>
-                  {insights.map((txt, i) => (
-                    <div key={i} style={{
-                      fontSize: "14px", color: i === 0 ? C.text1 : C.text2,
-                      fontWeight: i === 0 ? 600 : 500, lineHeight: 1.5,
-                      marginBottom: i < insights.length - 1 ? "6px" : "0",
-                    }}>{txt}</div>
-                  ))}
-                  <div style={{ display: "flex", gap: "8px", marginTop: "12px" }}>
-                    <button onClick={() => {
-                      if (navigator.share) navigator.share({ title: "Zepta AI 인사이트", text: shareText });
-                      else { navigator.clipboard?.writeText(shareText); }
-                    }} style={{
-                      padding: "6px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
-                      background: `${C.blue}12`, color: C.blue, border: `1px solid ${C.blue}20`,
-                      cursor: "pointer", transition: "all .15s",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = `${C.blue}20`}
-                    onMouseLeave={e => e.currentTarget.style.background = `${C.blue}12`}
-                    >공유하기 📤</button>
-                    <button onClick={() => setTab("news")} style={{
-                      padding: "6px 14px", borderRadius: "8px", fontSize: "12px", fontWeight: 700,
-                      background: `${C.card2}60`, color: C.text2, border: `1px solid ${C.border}20`,
-                      cursor: "pointer", transition: "all .15s",
-                    }}>뉴스 더보기 →</button>
-                  </div>
-                </div>
-              );
-            })()}
-
-
-            {/* ── 이상 탐지 알림 (Anomaly Detection) ─── */}
-            {anomalies.length > 0 && (
-              <div style={{
-                borderRadius: "20px", overflow: "hidden", position: "relative",
-                border: `1px solid ${anomalies[0].anomalyType === "surge" ? C.green : C.red}18`,
-              }}>
-                {/* 배경 그라데이션 */}
-                <div style={{ position: "absolute", inset: 0,
-                  background: `linear-gradient(160deg, ${C.card} 0%, ${anomalies[0].anomalyType === "surge" ? '#071A12' : '#1A0710'} 60%, ${C.card} 100%)`,
-                  pointerEvents: "none" }} />
-                <div style={{ position: "absolute", top: "-30px", right: "10%", width: "120px", height: "120px",
-                  borderRadius: "50%", background: `${C.yellow}06`, filter: "blur(40px)", pointerEvents: "none" }} />
-
-                <div style={{ position: "relative", padding: "20px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
-                    <div style={{
-                      width: "32px", height: "32px", borderRadius: "10px",
-                      background: `linear-gradient(135deg, ${C.yellow}30, ${C.orange}20)`,
-                      display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px",
-                    }}>⚡</div>
-                    <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{t("tabs.home.anomalyDetection")}</span>
-                    <span style={{
-                      fontSize: "14px", padding: "2px 10px", borderRadius: "10px", fontWeight: 700,
-                      background: `${C.red}18`, color: C.red, letterSpacing: "0.3px",
-                    }}>{anomalies.length}{t("tabs.home.count") || "건"}</span>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    {anomalies.slice(0, 3).map((a, i) => (
-                      <div key={a.symbol} onClick={() => { setSelectedAsset(a); }} style={{
-                        display: "flex", alignItems: "center", justifyContent: "space-between",
-                        padding: "12px", cursor: "pointer", borderRadius: "12px",
-                        transition: "all .2s", background: `${C.card2}30`,
-                        border: `1px solid ${C.border}10`,
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.background = `${C.card2}70`; e.currentTarget.style.transform = "translateX(2px)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.background = `${C.card2}30`; e.currentTarget.style.transform = "none"; }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            width: "40px", height: "40px", borderRadius: "12px", flexShrink: 0,
-                            background: a.anomalyType === "surge"
-                              ? `linear-gradient(135deg, ${C.green}20, ${C.green}08)`
-                              : `linear-gradient(135deg, ${C.red}20, ${C.red}08)`,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: "20px",
-                          }}>{a.anomalyType === "surge" ? "🚀" : "💥"}</div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 700, fontSize: "16px", color: C.text1, marginBottom: "2px" }}>{a.name}</div>
-                            <div style={{ fontSize: "14px", color: C.text3, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                              {a.anomalyReasons[0]}
-                            </div>
-                          </div>
-                        </div>
-                        <div style={{ textAlign: "right", flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "2px" }}>
-                          <div style={{
-                            fontWeight: 800, fontSize: "18px", color: a.change >= 0 ? C.green : C.red,
-                            letterSpacing: "-0.3px",
-                          }}>
-                            {a.change >= 0 ? "+" : ""}{a.change}%
-                          </div>
-                          {a.severity === "high" && (
-                            <span style={{
-                              fontSize: "12px", color: C.red, fontWeight: 700,
-                              padding: "1px 6px", borderRadius: "4px", background: `${C.red}15`,
-                            }}>{t("tabs.home.severe")}</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* ── 포트폴리오 벤치마킹 ─── */}
-            {benchmarkData && (
-              <div onClick={() => { setTab("portfolio"); }} style={{
-                background: C.card, borderRadius: "16px", padding: "18px 20px", cursor: "pointer",
-                border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`, transition: "transform .15s",
-              }}
-              onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
-              onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ fontSize: "18px" }}>📊</span>
-                    <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{t("tabs.home.myPortfolio")}</span>
-                  </div>
-                  <span style={{ fontSize: "16px", color: C.text3 }}>{portfolio.length}{t("tabs.home.items")} →</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: "12px", marginBottom: "12px" }}>
-                  <span style={{ fontWeight: 800, fontSize: "24px", color: C.text1 }}>
-                    {benchmarkData.myReturn >= 0 ? "+" : ""}{benchmarkData.myReturn.toFixed(2)}%
-                  </span>
-                  {benchmarkData.alpha != null && (
-                    <span style={{
-                      fontSize: "16px", fontWeight: 700, padding: "3px 10px", borderRadius: "8px",
-                      background: benchmarkData.beatsSP ? C.greenBg : C.redBg,
-                      color: benchmarkData.beatsSP ? C.green : C.red,
-                    }}>
-                      vs S&P {benchmarkData.alpha >= 0 ? "+" : ""}{benchmarkData.alpha.toFixed(1)}%
-                    </span>
-                  )}
-                </div>
-                {/* 벤치마크 비교 바 */}
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  {[
-                    { label: "내 수익", value: benchmarkData.myReturn, color: benchmarkData.myReturn >= 0 ? C.green : C.red },
-                    ...(benchmarkData.spReturn != null ? [{ label: "S&P 500", value: benchmarkData.spReturn, color: C.blue }] : []),
-                    ...(benchmarkData.ksReturn != null ? [{ label: "코스피", value: benchmarkData.ksReturn, color: C.purple }] : []),
-                  ].map(b => (
-                    <div key={b.label} style={{ flex: 1, textAlign: "center" }}>
-                      <div style={{ fontSize: "16px", color: C.text3, marginBottom: "4px" }}>{b.label}</div>
-                      <div style={{
-                        height: "4px", borderRadius: "4px", background: C.card2, overflow: "hidden",
-                      }}>
-                        <div style={{
-                          width: `${Math.min(Math.max(Math.abs(b.value) * 5, 5), 100)}%`,
-                          height: "100%", borderRadius: "4px", background: b.color, transition: "width .5s",
-                        }} />
-                      </div>
-                      <div style={{ fontSize: "16px", fontWeight: 700, color: b.color, marginTop: "3px" }}>
-                        {b.value >= 0 ? "+" : ""}{b.value.toFixed(1)}%
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-
-            {/* ── 오늘의 신호 강도 상위 ─── */}
-            {dailyPicks.length > 0 && (
-              <div className="ui-card" style={{
-                borderRadius: "20px", overflow: "hidden", position: "relative",
-              }}>
-                <div style={{ position: "relative", padding: "20px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <span style={{ fontWeight: 800, fontSize: "18px", color: C.text1 }}>{t("tabs.home.todayPicks") || "오늘의 신호 강도 상위"}</span>
-                    </div>
-                    <button onClick={() => setPicksExpanded(!picksExpanded)} style={{
-                      fontSize: "14px", color: C.blue, background: `${C.blue}10`, border: `1px solid ${C.blue}25`,
-                      borderRadius: "8px", cursor: "pointer", fontWeight: 600, padding: "4px 12px",
-                      transition: "all .15s",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = `${C.blue}20`}
-                    onMouseLeave={e => e.currentTarget.style.background = `${C.blue}10`}
-                    >{picksExpanded ? (t("tabs.home.collapse") || "접기") : `${t("tabs.home.seeMore") || "더보기"} (${dailyPicks.length})`}</button>
-                  </div>
-                  <div style={{
-                    display: isMobile ? "flex" : "flex",
-                    flexDirection: isMobile ? "row" : "column",
-                    gap: isMobile ? "12px" : "4px",
-                    overflowX: isMobile ? "auto" : "visible",
-                    scrollSnapType: isMobile ? "x mandatory" : "none",
-                    WebkitOverflowScrolling: "touch",
-                    paddingBottom: isMobile ? "4px" : "0",
-                    scrollbarWidth: "none",
-                    msOverflowStyle: "none",
-                  }} className={isMobile ? "hscroll" : ""}>
-                    {dailyPicks.slice(0, picksExpanded ? 15 : 5).map((pick, i) => {
-                      const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
-                      const isPos = pick.change >= 0;
-                      const isTop3 = i < 3;
-                      return (
-                        <div key={pick.symbol} onClick={() => { setSelectedAsset(pick); }}
-                          style={{
-                            display: "flex", alignItems: "center", justifyContent: "space-between",
-                            padding: "12px", cursor: "pointer", borderRadius: "12px",
-                            transition: "all .2s", background: isTop3 ? `${C.card2}40` : "transparent",
-                            border: `1px solid ${isTop3 ? C.border + '12' : 'transparent'}`,
-                            minWidth: isMobile ? "280px" : undefined,
-                            flexShrink: isMobile ? 0 : undefined,
-                            scrollSnapAlign: isMobile ? "start" : undefined,
-                            flexDirection: isMobile ? "column" : "row",
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.background = `${C.card2}70`; e.currentTarget.style.transform = "translateX(2px)"; }}
-                          onMouseLeave={e => { e.currentTarget.style.background = isTop3 ? `${C.card2}40` : "transparent"; e.currentTarget.style.transform = "none"; }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: 0 }}>
-                            <div style={{
-                              width: "30px", height: "30px", borderRadius: "10px", flexShrink: 0,
-                              background: isTop3
-                                ? `linear-gradient(135deg, ${C.blue}30, ${C.purple}20)`
-                                : `${C.card2}80`,
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: "14px", fontWeight: 800, color: isTop3 ? C.blue : C.text3,
-                            }}>{i + 1}</div>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontWeight: 600, fontSize: "16px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{flag} {pick.name}</div>
-                            </div>
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-                            <span style={{
-                              fontSize: "12px", padding: "3px 8px", borderRadius: "6px", fontWeight: 600,
-                              background: pick.score >= 7 ? `${C.green}15` : pick.score >= 5 ? `${C.blue}15` : `${C.yellow}15`,
-                              color: pick.score >= 7 ? C.green : pick.score >= 5 ? C.blue : C.yellow,
-                              whiteSpace: "nowrap", maxWidth: "100px", overflow: "hidden", textOverflow: "ellipsis",
-                            }}>{pick.reason}</span>
-                            <span style={{
-                              fontSize: "15px", fontWeight: 700, color: isPos ? C.green : C.red,
-                              minWidth: "52px", textAlign: "right", letterSpacing: "-0.3px",
-                            }}>
-                              {isPos ? "+" : ""}{pick.change}%
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {/* 공유 버튼 */}
-                  <button onClick={() => {
-                    const top5 = dailyPicks.slice(0, 5).map((p, i) => `${i + 1}. ${p.name} (${p.symbol}) ${p.change >= 0 ? "+" : ""}${p.change}%`).join("\n");
-                    const txt = `[Zepta AI ${t("tabs.home.todayPicks") || "오늘의 신호 강도 상위"}]\n\n${top5}\n\n${t("tabs.home.shareDesc") || "AI 퀀트가 다양한 시장 신호를 분석해 실시간으로 찾아낸 종목입니다"}\n👉 https://zepta.app`;
-                    if (navigator.share) navigator.share({ title: `Zepta AI ${t("tabs.home.todayPicks") || "오늘의 신호 강도 상위"}`, text: txt, url: "https://zepta.app" }).catch(() => {});
-                    else navigator.clipboard.writeText(txt).then(() => showToast(t("tabs.home.copied") || "추천 종목이 복사되었습니다!", "success")).catch(() => {});
-                  }} style={{
-                    width: "100%", padding: "10px 0", marginTop: "12px", borderRadius: "12px",
-                    fontSize: "14px", fontWeight: 600, color: C.text3, background: `${C.card2}40`,
-                    border: `1px solid ${C.border}20`, cursor: "pointer",
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
-                    transition: "all .15s",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.color = C.blue; e.currentTarget.style.background = `${C.blue}10`; e.currentTarget.style.borderColor = `${C.blue}30`; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = C.text3; e.currentTarget.style.background = `${C.card2}40`; e.currentTarget.style.borderColor = `${C.border}20`; }}
-                  >📤 {t("tabs.home.shareRecommendation") || "오늘의 신호 강도 상위 공유"}</button>
-                </div>
-              </div>
-            )}
-
-            {/* ── Google AdSense (Home - Responsive) ─── */}
-            <div style={{ minHeight: 0, overflow: "hidden" }}>
-              <GoogleAd format="responsive" slot="home-main" style={{ margin: "20px 0" }} />
-            </div>
-
-            {/* ── 주요 종목 (통합: 전체 / 급등 / 급락 탭) ─── */}
-            {hotAssets.length > 0 && (() => {
-              const sorted = [...hotAssets].sort((a, b) => b.change - a.change);
-              const baseAssets = hideRisky ? [...hotAssets].filter(a => !RISKY_SYMBOLS.has(a.symbol?.replace(".KS",""))) : hotAssets;
-              const baseSorted = hideRisky ? sorted.filter(a => !RISKY_SYMBOLS.has(a.symbol?.replace(".KS",""))) : sorted;
-              const displayAssets = hotViewMode === "gainers" ? baseSorted.filter(a => a.change > 0).slice(0, hotExpanded ? 30 : 8)
-                : hotViewMode === "losers" ? baseSorted.filter(a => a.change < 0).slice(0, hotExpanded ? 30 : 8)
-                : baseAssets.slice(0, hotExpanded ? 50 : 10);
-              return (
-                <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                      {[["all", t("tabs.home.all")], ["gainers", t("tabs.home.gainers")], ["losers", t("tabs.home.losers")]].map(([k, l]) => (
-                        <button key={k} onClick={() => setHotViewMode(k)} style={{
-                          padding: "5px 12px", borderRadius: "8px", fontSize: "18px", fontWeight: 700,
-                          background: hotViewMode === k ? (k === "gainers" ? C.greenBg : k === "losers" ? C.redBg : C.blueBg) : "transparent",
-                          color: hotViewMode === k ? (k === "gainers" ? C.green : k === "losers" ? C.red : C.blue) : C.text3,
-                          border: "none", cursor: "pointer", transition: "all .15s",
-                        }}>{l}</button>
-                      ))}
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <label style={{ display: "flex", alignItems: "center", gap: "5px", cursor: "pointer", fontSize: "16px", color: C.text3 }}>
-                        <span onClick={() => setHideRisky(!hideRisky)} style={{
-                          width: "32px", height: "18px", borderRadius: "8px", position: "relative",
-                          background: hideRisky ? C.blue : C.card2, border: `1px solid ${hideRisky ? C.blue : C.border2}`,
-                          transition: "all 0.2s", display: "inline-block", cursor: "pointer",
-                        }}>
-                          <span style={{
-                            position: "absolute", top: "2px", left: hideRisky ? "15px" : "2px",
-                            width: "12px", height: "12px", borderRadius: "50%", background: "#fff",
-                            transition: "left 0.2s", boxShadow: "0 1px 2px rgba(0,0,0,0.2)",
-                          }} />
-                        </span>
-                        {t("tabs.home.hideRiskyAssets")}
-                      </label>
-                      <button onClick={() => setHotExpanded(!hotExpanded)} style={{
-                        fontSize: "16px", color: C.blue, background: "none", border: "none", cursor: "pointer", fontWeight: 600,
-                      }}>{hotExpanded ? t("tabs.home.collapse") : t("tabs.home.seeMore")}</button>
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column" }}>
-                    {displayAssets.map((asset, i) => {
-                      const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
-                      const isPos = asset.change >= 0;
-                      const ext = extendedHours[asset.symbolRaw || asset.symbol];
-                      return (
-                        <div key={asset.symbol} onClick={() => { setSelectedAsset(asset); }}
-                          style={{
-                            display: "flex", alignItems: "center", justifyContent: "space-between",
-                            padding: "12px 8px", cursor: "pointer", borderRadius: "10px",
-                            transition: "background .15s",
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = C.card2 + "60"}
-                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "12px", flex: 1, minWidth: 0 }}>
-                            <div style={{
-                              width: "36px", height: "36px", borderRadius: "10px", flexShrink: 0,
-                              background: asset.market === "us" ? `${C.blue}14` : asset.market === "kr" ? `${C.green}14` : `${C.purple}14`,
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              fontWeight: 800, fontSize: "15px",
-                              color: asset.market === "us" ? C.blue : asset.market === "kr" ? C.green : C.purple,
-                            }}>{asset.symbol.replace(".KS","").slice(0,3)}</div>
-                            <div style={{ minWidth: 0 }}>
-                              <div style={{ fontWeight: 600, fontSize: "18px", color: C.text1 }}>{asset.name}</div>
-                              <div style={{ fontSize: "16px", color: C.text3 }}>{flag} {asset.symbol.replace(".KS","")}</div>
-                            </div>
-                          </div>
-                          <div style={{ textAlign: "right" }}>
-                            <div style={{ fontWeight: 600, fontSize: "18px", color: C.text1 }}>{fmtPrice(asset.price, asset.market)}</div>
-                            <div style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "flex-end" }}>
-                              <span style={{ fontSize: "18px", fontWeight: 600, color: isPos ? C.green : C.red }}>
-                                {isPos ? "+" : ""}{asset.change}%
-                              </span>
-                              {ext && (
-                                <span style={{ fontSize: "16px", color: C.purple, fontWeight: 600 }}>
-                                  {ext.isPreMarket ? "PRE" : "AH"} {ext.change != null ? `${ext.change >= 0 ? "+" : ""}${ext.change.toFixed(1)}%` : ""}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {displayAssets.length === 0 && (
-                      <div style={{ textAlign: "center", padding: "16px", color: C.text3, fontSize: "18px" }}>
-                        해당 종목이 없습니다
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-
-            </div>{/* end home-left */}
-            <div className="home-right" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-
-            {/* ── 오늘의 마켓 예측 (유저 리텐션 훅 — ★ 2026-07 정보 피벗: 공용 렌더러로 추출, mypage 와 공유) ─── */}
-            {renderMarketPredictionCard()}
-
-            {/* ── 오늘의 마켓 퀴즈 (리텐션 훅 — ★ 2026-07 정보 피벗: 공용 렌더러로 추출, mypage 와 공유) ─── */}
-            {renderMarketQuizCard()}
-
-            {/* ── 관심종목 (v10.3 유저별 격리) ─── */}
-            <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: watchlist.length > 0 ? "14px" : "0" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{t("tabs.home.watchlist")}</span>
-                  {watchlist.length > 0 && <span style={{ fontSize: "16px", padding: "2px 8px", borderRadius: "10px", background: C.blueBg, color: C.blue, fontWeight: 700 }}>{watchlist.length}</span>}
-                </div>
-                {user && <SearchBar compact placeholder={t("tabs.home.addAssetPlaceholder")} onSelect={(asset) => {
-                  if (!watchlist.some(w => w.symbol === asset.symbol)) {
-                    setWatchlist(prev => [...prev, { symbol: asset.symbol, name: asset.name, market: asset.market, symbolRaw: asset.symbolRaw || asset.symbol, id: asset.id }]);
-                                     }
-                }} />}
-              </div>
-              {!user ? (
-                <div style={{ textAlign: "center", padding: "32px 16px 20px" }}>
-                  <div style={{ width: "56px", height: "56px", borderRadius: "16px", background: C.blueBg, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px", fontSize: "24px" }}>🔒</div>
-                  <div style={{ fontSize: "18px", fontWeight: 700, color: C.text1, marginBottom: "6px" }}>{t("tabs.home.loginToManageWatchlist")}</div>
-                  <div style={{ fontSize: "18px", color: C.text3, lineHeight: 1.6, marginBottom: "16px" }}>{t("tabs.home.realtimeQuantDescription")}</div>
-                  <button onClick={() => setShowAuthModal(true)} style={{
-                    padding: "10px 24px", borderRadius: "10px", fontSize: "18px", fontWeight: 700,
-                    background: C.blue, color: "#fff", border: "none", cursor: "pointer",
-                  }}>{t("tabs.home.loginOrSignup")}</button>
-                </div>
-              ) : watchlist.length === 0 ? (
-                <div style={{
-                  textAlign: "center",
-                  padding: "48px 24px",
-                  background: `linear-gradient(135deg, ${C.blueBg}20 0%, ${C.card2}40 100%)`,
-                  borderRadius: "16px",
-                  border: `1px solid ${C.border}20`,
-                  marginBottom: "16px",
-                }}>
-                  <div style={{
-                    width: "64px",
-                    height: "64px",
-                    borderRadius: "16px",
-                    background: C.blueBg,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    margin: "0 auto 16px",
-                    fontSize: "32px",
-                    boxShadow: `0 4px 16px ${C.blue}20`,
-                  }}>
-                    📌
-                  </div>
-                  <div style={{ fontSize: "18px", fontWeight: 800, color: C.text1, marginBottom: "8px" }}>관심종목을 추가하세요</div>
-                  <div style={{ fontSize: "15px", color: C.text3, lineHeight: 1.6, marginBottom: "24px" }}>
-                    종목을 추가하면 실시간 시세, 퀀트 분석, 및 거래 신호를 한눈에 확인할 수 있습니다.
-                  </div>
-                  <div style={{ display: "flex", gap: "8px", justifyContent: "center", marginTop: "20px", flexWrap: "wrap" }}>
-                    {["NVDA","AAPL","TSLA","MSFT"].map(s => {
-                      const a = hotAssets.find(h => h.symbol === s);
-                      return a ? (
-                        <button
-                          key={s}
-                          onClick={() => {
-                            setWatchlist(prev => [...prev, { symbol: a.symbol, name: a.name, market: a.market, symbolRaw: a.symbolRaw || a.symbol }]);
-                                                       showToast(`${a.name} 추가됨`, "success");
-                          }}
-                          style={{
-                            padding: "8px 16px",
-                            borderRadius: "10px",
-                            fontSize: "14px",
-                            fontWeight: 600,
-                            background: C.blue,
-                            color: "#fff",
-                            border: "none",
-                            cursor: "pointer",
-                            transition: "all .2s",
-                          }}
-                          onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 4px 12px ${C.blue}40`; }}
-                          onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
-                        >
-                          + {a.name}
-                        </button>
-                      ) : null;
-                    })}
-                  </div>
-                  <button
-                    onClick={() => setTab("screener")}
-                    style={{
-                      marginTop: "16px",
-                      padding: "10px 20px",
-                      borderRadius: "10px",
-                      fontSize: "15px",
-                      fontWeight: 700,
-                      background: `${C.blue}15`,
-                      color: C.blue,
-                      border: `1.5px solid ${C.blue}30`,
-                      cursor: "pointer",
-                      transition: "all .2s",
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}25`; e.currentTarget.style.borderColor = C.blue; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = `${C.blue}15`; e.currentTarget.style.borderColor = `${C.blue}30`; }}
-                  >
-                    스크리너로 종목 찾기 →
-                  </button>
-                </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column" }}>
-                  {watchlist.map(w => {
-                    const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
-                    const ext = extendedHours[w.symbolRaw || w.symbol];
-                    const flag = w.market === "us" ? "🇺🇸" : w.market === "kr" ? "🇰🇷" : "₿";
-                    const diag = hot ? quickDiagnosis(hot) : null;
-                    const diagColor = diag ? (diag.score >= 60 ? C.green : diag.score >= 40 ? C.yellow : C.red) : C.text3;
-                    return (
-                      <div key={w.symbol} onClick={() => { setSelectedAsset(w); }}
-                        style={{
-                          display: "flex", alignItems: "center", justifyContent: "space-between",
-                          padding: "12px 8px", cursor: "pointer", borderRadius: "10px",
-                          transition: "background .15s",
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = `${C.card2}80`}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
-                          {/* 퀀트 점수 미니뱃지 */}
-                          {diag ? (
-                            <div style={{
-                              width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0,
-                              background: `${diagColor}14`, display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: "16px", fontWeight: 800, color: diagColor,
-                            }}>{diag.score}</div>
-                          ) : (
-                            <span style={{ fontSize: mf(14), width: "32px", textAlign: "center", flexShrink: 0 }}>{flag}</span>
-                          )}
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 600, fontSize: "18px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.name || w.symbol}</div>
-                            {diag && <div style={{ fontSize: "15px", color: diagColor, fontWeight: 600, marginTop: "1px" }}>{diag.opinion}</div>}
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          {hot && (
-                            <div style={{ textAlign: "right" }}>
-                              <div style={{ fontWeight: 600, fontSize: "18px", color: C.text1 }}>{fmtPrice(hot.price, w.market)}</div>
-                              <div style={{ display: "flex", alignItems: "center", gap: "3px", justifyContent: "flex-end" }}>
-                                <span style={{ fontSize: mf(11), fontWeight: 600, color: hot.change >= 0 ? C.green : C.red }}>
-                                  {hot.change >= 0 ? "+" : ""}{hot.change}%
-                                </span>
-                                {ext && (
-                                  <span style={{ fontSize: mf(9), color: C.purple, fontWeight: 600 }}>
-                                    {ext.isPreMarket ? "PRE" : "AH"} {ext.change != null ? `${ext.change >= 0 ? "+" : ""}${ext.change.toFixed(1)}%` : ""}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                          <button onClick={(e) => { e.stopPropagation(); setWatchlist(prev => prev.filter(x => x.symbol !== w.symbol)); }}
-                            style={{ width: "24px", height: "24px", borderRadius: "8px", border: "none",
-                              background: "transparent", color: C.text3, fontSize: mf(10), cursor: "pointer",
-                              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, opacity: 0.4,
-                              transition: "opacity .15s, background .15s",
-                            }}
-                            onMouseEnter={e => { e.currentTarget.style.opacity = "1"; e.currentTarget.style.background = `${C.red}15`; e.currentTarget.style.color = C.red; }}
-                            onMouseLeave={e => { e.currentTarget.style.opacity = "0.4"; e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = C.text3; }}>✕</button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* ── 관심종목 투자 진단 + 주요 지지 구간 (v9 고도화) ─── */}
-            {watchlist.length > 0 && hotAssets.length > 0 && (() => {
-              const watchDiags = watchlist.map(w => {
-                const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
-                if (!hot) return null;
-                const d = quickDiagnosis(hot);
-                const buyLvls = calcBuyLevels(hot);
-                return { ...w, ...hot, diag: d, buyLevels: buyLvls };
-              }).filter(Boolean).sort((a, b) => b.diag.score - a.diag.score);
-              if (!watchDiags.length) return null;
-              return (
-                <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                    <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>📊 투자 진단 & 주요 지지 구간</span>
-                    <span style={{ fontSize: mf(11), color: C.text3 }}>실시간 분석</span>
-                  </div>
-                  {watchDiags.map((w, i) => {
-                    const d = w.diag;
-                    const bl = w.buyLevels;
-                    const opColor = d.opinionColor === "green" ? C.green : d.opinionColor === "red" ? C.red : C.yellow;
-                    return (
-                      <div key={w.symbol} style={{ marginBottom: i < watchDiags.length - 1 ? "8px" : 0 }}>
-                        {/* 종목 헤더 */}
-                        <div onClick={() => setSelectedAsset(w)} style={{
-                          display: "flex", alignItems: "center", justifyContent: "space-between",
-                          padding: "12px 8px", cursor: "pointer", borderRadius: "10px",
-                          transition: "background .15s",
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = `${C.card2}80`}
-                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                          <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
-                            <div style={{
-                              width: "36px", height: "36px", borderRadius: "50%", flexShrink: 0,
-                              background: `${opColor}18`, display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: "18px", fontWeight: 800, color: opColor,
-                            }}>{d.score}</div>
-                            <div style={{ minWidth: 0, flex: 1 }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <span style={{ fontWeight: 600, fontSize: "18px", color: C.text1 }}>{w.name}</span>
-                                <span style={{ fontSize: "16px", color: C.text3 }}>${w.price?.toLocaleString(undefined, {maximumFractionDigits: 2})}</span>
-                              </div>
-                              <div style={{ fontSize: mf(11), color: C.text3, marginTop: "2px" }}>{d.rationale}</div>
-                            </div>
-                          </div>
-                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                            <span style={{ fontSize: "16px", fontWeight: 700, color: w.change >= 0 ? C.green : C.red }}>
-                              {w.change >= 0 ? "+" : ""}{w.change?.toFixed(2)}%
-                            </span>
-                            <span style={{
-                              fontSize: "16px", fontWeight: 700, padding: "4px 10px", borderRadius: "8px",
-                              background: `${opColor}18`, color: opColor, whiteSpace: "nowrap",
-                            }}>{d.opinion}</span>
-                          </div>
-                        </div>
-
-                        {/* 4축 미니 바 + 주요 지지 구간 */}
-                        <div style={{ padding: "6px 12px 10px", display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-start" }}>
-                          {/* 4축 진단 미니바 */}
-                          <div style={{ display: "flex", gap: "6px", flex: "1 1 160px", minWidth: 0 }}>
-                            {d.categories.map(c => {
-                              const catColor = c.score >= 60 ? C.green : c.score >= 40 ? C.yellow : C.red;
-                              return (
-                                <div key={c.name} style={{ flex: 1, minWidth: 0, textAlign: "center" }}>
-                                  <div style={{ fontSize: "15px", color: C.text3, marginBottom: "3px" }}>{c.name}</div>
-                                  <div style={{ height: "4px", borderRadius: "4px", background: `${C.border}40`, overflow: "hidden" }}>
-                                    <div style={{ height: "100%", width: `${c.score}%`, background: catColor, borderRadius: "4px", transition: "width .5s" }} />
-                                  </div>
-                                  <div style={{ fontSize: "15px", fontWeight: 700, color: catColor, marginTop: "2px" }}>{c.score}</div>
-                                </div>
-                              );
-                            })}
-                          </div>
-
-                          {/* 주요 지지 구간 3단계 */}
-                          {bl.levels.length > 0 && (
-                            <div style={{ display: "flex", gap: "4px", flex: "1 1 auto", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                              {bl.levels.map((lv, li) => {
-                                const lvColor = li === 0 ? C.blue : li === 1 ? C.purple : C.green;
-                                return (
-                                  <div key={li} style={{
-                                    padding: "4px 8px", borderRadius: "8px",
-                                    background: `${lvColor}15`, textAlign: "center", minWidth: "58px", flex: "1 1 58px",
-                                  }}>
-                                    <div style={{ fontSize: "14px", color: lvColor, fontWeight: 700 }}>{lv.label}</div>
-                                    <div style={{ fontSize: "16px", fontWeight: 800, color: C.text1, marginTop: "1px" }}>
-                                      ${lv.price < 1 ? lv.price.toFixed(4) : lv.price.toLocaleString(undefined, {maximumFractionDigits: 2})}
-                                    </div>
-                                    <div style={{ fontSize: "14px", color: C.red }}>-{lv.discount}%</div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
-
-            {/* ── 퀀트 리포트 ─── */}
-            {marketIndices.length > 0 && (() => {
-              const sp = marketIndices.find(i => i.symbol === "^GSPC");
-              const nq = marketIndices.find(i => i.symbol === "^IXIC");
-              const ks = marketIndices.find(i => i.symbol === "^KS11");
-              const kq = marketIndices.find(i => i.symbol === "^KQ11");
-              const fg = fearGreed.stock?.value;
-
-              // 종목별 상승/하락 카운트
-              const upCount = hotAssets.filter(a => a.change > 0).length;
-              const dnCount = hotAssets.filter(a => a.change < 0).length;
-              const flatCount = hotAssets.length - upCount - dnCount;
-              const advDecl = hotAssets.length > 0 ? (upCount / hotAssets.length * 100) : 50;
-
-              // 추천종목 기반 매수/매도 신호
-              const buyPicks = dailyPicks.filter(p => p.score >= 6).length;
-              const sellPicks = dailyPicks.filter(p => p.score <= 3).length;
-
-              // 종합 시장 점수 (0~100)
-              let mktScore = 50;
-              if (sp) mktScore += sp.change > 1 ? 10 : sp.change > 0.3 ? 5 : sp.change > -0.3 ? 0 : sp.change > -1 ? -5 : -10;
-              if (fg) mktScore += fg > 70 ? 8 : fg > 55 ? 4 : fg > 40 ? 0 : fg > 25 ? -4 : -8;
-              mktScore += advDecl > 60 ? 8 : advDecl > 50 ? 3 : advDecl > 40 ? -3 : -8;
-              if (buyPicks > 5) mktScore += 6; else if (buyPicks > 2) mktScore += 3;
-              if (sellPicks > 5) mktScore -= 6; else if (sellPicks > 2) mktScore -= 3;
-              mktScore = Math.max(0, Math.min(100, mktScore));
-
-              const mktVerdict = mktScore >= 70 ? t("tabs.home.strongBullish") : mktScore >= 55 ? t("tabs.home.weakBullish") : mktScore >= 45 ? t("tabs.home.mixed") : mktScore >= 30 ? t("tabs.home.bearish") : t("tabs.home.strongBearish");
-              const mktColor = mktScore >= 60 ? C.green : mktScore >= 45 ? C.yellow : C.red;
-              const now = new Date();
-              const reportTime = now.toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit" });
-
-              return (
-                <div onClick={() => { setTab("quant-report"); }} style={{ background: `linear-gradient(135deg, ${C.card}, ${mktScore >= 55 ? (C.isDark ? "#0d2818" : "#e8f5e9") : mktScore < 45 ? (C.isDark ? "#28100d" : "#fce4ec") : (C.isDark ? "#1a1a0d" : "#fff8e1")})`, borderRadius: "16px", padding: "20px", cursor: "pointer", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px" }}>
-                    <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{t("tabs.home.quantReport")}</span>
-                    <span style={{ fontSize: mf(11), color: C.text3 }}>{reportTime} {t("tabs.home.asOf")} →</span>
-                  </div>
-
-                  {/* 시장 점수 게이지 */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "16px" }}>
-                    <div style={{ position: "relative", width: "60px", height: "60px", flexShrink: 0 }}>
-                      <svg viewBox="0 0 60 60" width="60" height="60">
-                        <circle cx="30" cy="30" r="25" fill="none" stroke={C.border} strokeWidth="4" />
-                        <circle cx="30" cy="30" r="25" fill="none" stroke={mktColor} strokeWidth="4" strokeLinecap="round"
-                          strokeDasharray={`${(mktScore / 100) * 157} 157`} transform="rotate(-90 30 30)" />
-                        <text x="30" y="28" textAnchor="middle" fill={C.text1} fontSize="15" fontWeight="800">{mktScore}</text>
-                        <text x="30" y="39" textAnchor="middle" fill={C.text3} fontSize="8">/100</text>
-                      </svg>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: "18px", fontWeight: 800, color: mktColor, marginBottom: "5px" }}>{mktVerdict}</div>
-                      <div style={{ fontSize: "16px", color: C.text3, lineHeight: 1.5 }}>
-                        {sp ? `S&P ${sp.change >= 0 ? "+" : ""}${sp.change}%` : ""}{nq ? ` · ${t("tabs.home.nasdaqLabel")} ${nq.change >= 0 ? "+" : ""}${nq.change}%` : ""}
-                        {ks ? ` · ${t("tabs.home.kospiLabel")} ${ks.change >= 0 ? "+" : ""}${ks.change}%` : ""}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 지표 그리드 */}
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "14px" }}>
-                    <div style={{ padding: "10px 12px", borderRadius: "10px", background: `${C.green}10` }}>
-                      <div style={{ fontSize: mf(11), color: C.text3, marginBottom: "3px" }}>{t("tabs.home.risingAssets")}</div>
-                      <div style={{ fontSize: "18px", fontWeight: 700, color: C.green }}>{upCount}개 <span style={{ fontSize: "16px", color: C.text3 }}>/ {hotAssets.length}</span></div>
-                    </div>
-                    <div style={{ padding: "10px 12px", borderRadius: "10px", background: `${C.red}10` }}>
-                      <div style={{ fontSize: mf(11), color: C.text3, marginBottom: "3px" }}>{t("tabs.home.fallingAssets")}</div>
-                      <div style={{ fontSize: "18px", fontWeight: 700, color: C.red }}>{dnCount}개 <span style={{ fontSize: "16px", color: C.text3 }}>/ {hotAssets.length}</span></div>
-                    </div>
-                    <div style={{ padding: "10px 12px", borderRadius: "10px", background: `${C.yellow}10` }}>
-                      <div style={{ fontSize: mf(11), color: C.text3, marginBottom: "3px" }}>{t("tabs.home.fearGreedLabel")}</div>
-                      <div style={{ fontSize: "18px", fontWeight: 700, color: fg ? (fg > 60 ? C.green : fg > 40 ? C.yellow : C.red) : C.text3 }}>{fg || "—"} <span style={{ fontSize: "16px", color: C.text3 }}>{fg ? (fg <= 25 ? t("tabs.home.extremeFear") : fg <= 40 ? t("tabs.home.fear") : fg <= 60 ? t("tabs.home.neutral") : fg <= 75 ? t("tabs.home.greed") : t("tabs.home.extremeGreed")) : ""}</span></div>
-                    </div>
-                    <div style={{ padding: "10px 12px", borderRadius: "10px", background: `${C.blue}10` }}>
-                      <div style={{ fontSize: mf(11), color: C.text3, marginBottom: "3px" }}>{t("tabs.home.recommendedBuy")}</div>
-                      <div style={{ fontSize: "18px", fontWeight: 700, color: C.blue }}>{buyPicks}개 <span style={{ fontSize: "16px", color: C.text3 }}>/ {dailyPicks.length}</span></div>
-                    </div>
-                  </div>
-
-                  {/* 요약 */}
-                  <div style={{ fontSize: "16px", color: C.text3, lineHeight: 1.6, padding: "10px 0 0", borderTop: `1px solid ${C.border}20` }}>
-                    {mktScore >= 60
-                      ? `상승 신호 우세 — 상승 종목 ${upCount}개, 신호 ${buyPicks}개 감지`
-                      : mktScore >= 45
-                      ? `혼조 장세 — 상승·하락 신호 혼재`
-                      : `약세 장세 — 하락 신호 우세, 하락 종목 ${dnCount}개`
-                    }
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* ── 포트폴리오 미니 (토스 자산 카드 스타일) ─── */}
-            {portfolio.length > 0 && (() => {
-              let totalValue = 0, totalCost = 0;
-              for (const item of portfolio) {
-                const curPrice = portfolioPrices[item.symbol] || 0;
-                const qty = parseFloat(item.qty) || 0;
-                const avg = parseFloat(item.avgPrice) || 0;
-                totalValue += curPrice * qty;
-                totalCost += avg * qty;
-              }
-              const pnl = totalCost > 0 ? ((totalValue - totalCost) / totalCost * 100) : 0;
-              const pnlAmt = totalValue - totalCost;
-              return (
-                <div onClick={() => { setTab("portfolio"); }} style={{
-                  background: C.card, borderRadius: "16px", padding: "20px 22px", cursor: "pointer",
-                  transition: "transform .15s", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`,
-                }}
-                onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
-                onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                    <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>{t("tabs.home.myPortfolio")}</span>
-                    <span style={{ fontSize: "18px", color: C.text3 }}>{portfolio.length}개 →</span>
-                  </div>
-                  {totalValue > 0 ? (
-                    <div style={{ display: "flex", alignItems: "baseline", gap: "10px", flexWrap: "wrap" }}>
-                      <span style={{ fontWeight: 800, fontSize: "24px", color: C.text1, letterSpacing: "-0.5px" }}>
-                        {currency === "KRW" ? `₩${Math.round(totalValue * krwRate).toLocaleString()}` : `$${totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
-                      </span>
-                      <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                        <span style={{ fontSize: "18px", fontWeight: 700, color: pnl >= 0 ? C.green : C.red }}>
-                          {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}%
-                        </span>
-                        <span style={{ fontSize: "16px", color: C.text3 }}>
-                          ({pnlAmt >= 0 ? "+" : ""}{currency === "KRW" ? `₩${Math.round(Math.abs(pnlAmt) * krwRate).toLocaleString()}` : `$${Math.abs(pnlAmt).toLocaleString(undefined, { maximumFractionDigits: 0 })}`})
-                        </span>
-                      </div>
-                    </div>
-                  ) : portfolio.length > 0 ? (
-                    // 보유 종목은 있는데 가격 아직 안 옴 → 스켈레톤
-                    <div style={{ display: "flex", alignItems: "baseline", gap: "10px" }}>
-                      <Skeleton width="140px" height="28px" />
-                      <Skeleton width="80px" height="20px" />
-                    </div>
-                  ) : (
-                    // 보유 종목 자체가 없음 → 친화적 엠티 스테이트
-                    <div style={{ fontSize: "15px", color: C.text3, lineHeight: 1.5 }}>
-                      관심 종목을 추가하면 한눈에 수익률을 볼 수 있어요 ✨
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            {/* ── 경제 캘린더 (정렬/필터/년월일 표시) ─── */}
-            {econEvents.length > 0 && (() => {
-              const showEvents = econExpanded ? filteredEconEvents : filteredEconEvents.slice(0, 6);
-              const filterTabs = [
-                { key: "all", label: "전체" },
-                { key: "upcoming", label: "예정" },
-                { key: "past", label: "지난" },
-                { key: "FOMC", label: "FOMC" },
-                { key: "CPI", label: "CPI" },
-                { key: "NFP", label: "고용" },
-                { key: "GDP", label: "GDP" },
-                { key: "PCE", label: "PCE" },
-              ];
-
-              return (
-                <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
-                  {/* 헤더 */}
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                    <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>경제 캘린더 <span style={{ fontSize: "16px", fontWeight: 500, color: C.text3 }}>(KST)</span></span>
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      {/* 정렬 토글 */}
-                      <button onClick={() => setEconSort(p => p === "date-asc" ? "date-desc" : p === "date-desc" ? "type" : "date-asc")}
-                        style={{
-                          background: C.card2, border: "none", borderRadius: "6px", padding: "4px 8px",
-                          fontSize: mf(10), fontWeight: 600, color: C.text3, cursor: "pointer",
-                        }}
-                        title="정렬 변경">
-                        {econSort === "date-asc" ? "날짜순 ↑" : econSort === "date-desc" ? "날짜순 ↓" : "유형별"}
-                      </button>
-                      <button onClick={() => setEconExpanded(p => !p)} style={{
-                        background: "none", border: "none", fontSize: mf(11), color: C.blue, cursor: "pointer", padding: "4px 6px", fontWeight: 600,
-                      }}>{econExpanded ? "접기" : `더보기 (${filteredEconEvents.length})`}</button>
-                    </div>
-                  </div>
-
-                  {/* 필터 탭 */}
-                  <div style={{ display: "flex", gap: "4px", marginBottom: "10px", overflow: "auto", paddingBottom: "2px" }}>
-                    {filterTabs.map(ft => (
-                      <button key={ft.key} onClick={() => setEconFilter(ft.key)} style={{
-                        padding: "4px 10px", borderRadius: "6px", fontSize: mf(11), fontWeight: 600, flexShrink: 0,
-                        background: econFilter === ft.key ? C.blueBg : "transparent",
-                        color: econFilter === ft.key ? C.blue : C.text3,
-                        border: `1px solid ${econFilter === ft.key ? `${C.blue}44` : "transparent"}`,
-                        cursor: "pointer",
-                      }}>{ft.label}</button>
-                    ))}
-                  </div>
-
-                  {/* 테이블 헤더 */}
-                  <div style={{
-                    display: "grid", gridTemplateColumns: isMobile ? "60px 1fr 50px" : "90px 1fr 48px 48px 48px",
-                    gap: "4px", padding: "6px 6px", marginBottom: "2px",
-                    fontSize: mf(10), fontWeight: 700, color: C.text3, letterSpacing: "0.02em",
-                    borderBottom: `1px solid ${C.border}20`,
-                  }}>
-                    <span>날짜</span>
-                    <span>이벤트</span>
-                    <span style={{ textAlign: "right" }}>실제</span>
-                    {!isMobile && <span style={{ textAlign: "right" }}>예상</span>}
-                    {!isMobile && <span style={{ textAlign: "right" }}>이전</span>}
-                  </div>
-
-                  {/* 이벤트 리스트 */}
-                  {showEvents.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "20px", color: C.text3, fontSize: "16px" }}>
-                      해당 필터에 맞는 이벤트가 없습니다
-                    </div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      {showEvents.map((evt, i) => {
-                        const statusColor = evt.status === "오늘" ? C.red : evt.status === "임박" ? C.yellow : evt.status === "완료" || evt.status === "어제" ? C.text3 : C.text2;
-                        // CPI, PCE, PPI, 실업률 → 낮을수록 호재(역방향)
-                        const invertedIndicator = /CPI|PCE|PPI|Unemployment/i.test(evt.event);
-                        const hasActual = evt.actual != null && evt.estimate != null;
-                        const beat = hasActual ? (invertedIndicator ? evt.actual < evt.estimate : evt.actual > evt.estimate) : null;
-                        const miss = hasActual ? (invertedIndicator ? evt.actual > evt.estimate : evt.actual < evt.estimate) : null;
-                        const surprise = hasActual ? Math.abs(evt.actual - evt.estimate).toFixed(1) : null;
-                        const isPast = evt.daysUntil < 0;
-                        // 한국 시간 기준 날짜 표시 (안전한 KST 시프트 헬퍼)
-                        const k = kstParts(evt.date);
-                        const y = k.valid ? k.year : "—";
-                        const m = k.valid ? String(k.month + 1).padStart(2, "0") : "--";
-                        const d = k.valid ? String(k.date).padStart(2, "0") : "--";
-                        const dayName = k.valid ? ["일","월","화","수","목","금","토"][k.day] : "";
-                        const kstHour = k.valid ? String(k.hour).padStart(2, "0") : "--";
-                        const kstMin = k.valid ? String(k.min).padStart(2, "0") : "--";
-
-                        return (
-                          <div key={`${evt.event}-${y}${m}${d}-${i}`} style={{
-                            display: "grid", gridTemplateColumns: isMobile ? "60px 1fr 50px" : "90px 1fr 48px 48px 48px",
-                            gap: "4px", alignItems: "center",
-                            padding: "9px 8px",
-                            opacity: isPast ? 0.65 : 1,
-                            borderBottom: i < showEvents.length - 1 ? `1px solid ${C.border}10` : "none",
-                            background: evt.status === "오늘" ? `${C.red}08` : "transparent",
-                            borderRadius: evt.status === "오늘" ? "8px" : "0",
-                            transition: "background .15s",
-                          }}
-                          onMouseEnter={e => { if (evt.status !== "오늘") e.currentTarget.style.background = `${C.card2}80`; }}
-                          onMouseLeave={e => { if (evt.status !== "오늘") e.currentTarget.style.background = "transparent"; }}>
-                            {/* 날짜: YYYY.MM.DD (요일) */}
-                            <div style={{ flexShrink: 0 }}>
-                              <div style={{ fontSize: "16px", fontWeight: 700, color: C.text1, fontVariantNumeric: "tabular-nums" }}>
-                                {y}.{m}.{d}
-                              </div>
-                              <div style={{ display: "flex", alignItems: "center", gap: "4px", marginTop: "1px" }}>
-                                <span style={{ fontSize: mf(10), color: C.text3 }}>{dayName} {kstHour}:{kstMin}</span>
-                                <span style={{
-                                  fontSize: "14px", fontWeight: 700, padding: "1px 4px", borderRadius: "4px",
-                                  background: evt.status === "오늘" ? C.redBg : evt.status === "임박" ? C.yellowBg : evt.status === "예정" ? C.blueBg : C.card2,
-                                  color: evt.status === "오늘" ? C.red : evt.status === "임박" ? C.yellow : evt.status === "예정" ? C.blue : C.text3,
-                                }}>{evt.status}</span>
-                              </div>
-                            </div>
-
-                            {/* 이벤트명 + 아이콘 */}
-                            <div style={{ minWidth: 0, overflow: "hidden" }}>
-                              <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                                <span style={{ fontSize: "18px", flexShrink: 0 }}>{evt.icon}</span>
-                                <span style={{
-                                  fontWeight: 600, fontSize: "16px", color: C.text1,
-                                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                                }}>{evt.name}</span>
-                              </div>
-                              {evt.daysUntil > 0 && (
-                                <div style={{ fontSize: mf(10), color: C.text3, marginTop: "1px" }}>{evt.daysUntil}일 후</div>
-                              )}
-                            </div>
-
-                            {/* 실제 */}
-                            <div style={{ textAlign: "right" }}>
-                              {evt.actual != null ? (
-                                <div>
-                                  <div style={{
-                                    fontSize: "16px", fontWeight: 700, fontVariantNumeric: "tabular-nums",
-                                    color: beat ? C.green : miss ? C.red : C.text1,
-                                  }}>
-                                    {evt.actual}{evt.unit}
-                                    {beat && <span style={{ fontSize: mf(9), marginLeft: "1px" }}>▲</span>}
-                                    {miss && <span style={{ fontSize: mf(9), marginLeft: "1px" }}>▼</span>}
-                                  </div>
-                                  {surprise && surprise !== "0.0" && (
-                                    <div style={{ fontSize: "14px", fontWeight: 600, color: beat ? C.green : C.red, opacity: 0.8 }}>
-                                      {beat ? "호재" : "악재"} {surprise}p
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                isPast ? <span style={{ fontSize: mf(10), color: C.yellow }}>발표 대기</span> :
-                                <span style={{ fontSize: mf(11), color: C.text3 }}>—</span>
-                              )}
-                            </div>
-
-                            {/* 예상 */}
-                            {!isMobile && <div style={{ textAlign: "right" }}>
-                              {evt.estimate != null ? (
-                                <span style={{ fontSize: "16px", color: C.text2, fontVariantNumeric: "tabular-nums" }}>
-                                  {evt.estimate}{evt.unit}
-                                </span>
-                              ) : (
-                                <span style={{ fontSize: mf(11), color: C.text3 }}>—</span>
-                              )}
-                            </div>}
-
-                            {/* 이전 */}
-                            {!isMobile && <div style={{ textAlign: "right" }}>
-                              {evt.previous != null ? (
-                                <span style={{ fontSize: "16px", color: C.text3, fontVariantNumeric: "tabular-nums" }}>
-                                  {evt.previous}{evt.unit}
-                                </span>
-                              ) : (
-                                <span style={{ fontSize: mf(11), color: C.text3 }}>—</span>
-                              )}
-                            </div>}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* 요약 바 */}
-                  {filteredEconEvents.length > 6 && !econExpanded && (
-                    <div style={{ textAlign: "center", paddingTop: "8px" }}>
-                      <button onClick={() => setEconExpanded(true)} style={{
-                        background: C.card2, border: "none", borderRadius: "8px", padding: "6px 16px",
-                        fontSize: "16px", fontWeight: 600, color: C.text2, cursor: "pointer",
-                      }}>+ {filteredEconEvents.length - 6}개 더 보기</button>
-                    </div>
-                  )}
-                </div>
-              );
-            })()}
-
-            </div>{/* end home-right */}
-            </div>{/* end home-grid */}
-
-            {/* 홈 하단 광고 제거 — 다른 탭으로 분산 배치 */}
-
-            {/* ═══ 하단 전체너비 섹션 (그리드 밖) ═══ */}
-
-            {/* ── 섹터 히트맵 (접기/펼치기) ─── */}
-            {sectorPerf.length > 0 && (
-              <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
-                <div onClick={() => toggleSection("sector")} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
-                  <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>섹터 성과</span>
-                  <span style={{ fontSize: "16px", color: C.text3 }}>{homeSection.sector ? "▲" : "▼"}</span>
-                </div>
-                {!homeSection.sector && (
-                  <div style={{ display: "flex", gap: "6px", marginTop: "8px", overflow: "auto", paddingBottom: "2px" }}>
-                    {sectorPerf.slice(0, 5).map(sec => (
-                      <div key={sec.symbol} style={{
-                        padding: "6px 10px", borderRadius: "8px", fontSize: mf(11), fontWeight: 600, flexShrink: 0,
-                        background: sec.change1d >= 0 ? C.greenBg : C.redBg,
-                        color: sec.change1d >= 0 ? C.green : C.red,
-                      }}>{sec.icon} {sec.change1d >= 0 ? "+" : ""}{sec.change1d}%</div>
-                    ))}
-                  </div>
-                )}
-                {homeSection.sector && (
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: "6px", marginTop: "10px" }}>
-                    {sectorPerf.map(sec => {
-                      const intensity = Math.min(Math.abs(sec.change1d) / 3, 1);
-                      const bg = sec.change1d >= 0
-                        ? `rgba(5, 192, 114, ${0.08 + intensity * 0.22})`
-                        : `rgba(240, 68, 82, ${0.08 + intensity * 0.22})`;
-                      return (
-                        <div key={sec.symbol} onClick={() => setChartAsset({ symbol: sec.symbol, name: `${sec.name} ETF`, market: "us", symbolRaw: sec.symbol })}
-                          style={{ background: bg, borderRadius: "10px", padding: "10px 6px", textAlign: "center", cursor: "pointer" }}>
-                          <div style={{ fontSize: "18px" }}>{sec.icon}</div>
-                          <div style={{ fontSize: mf(10), fontWeight: 600, color: C.text2, margin: "2px 0" }}>{sec.name}</div>
-                          <div style={{ fontSize: "18px", fontWeight: 800, color: sec.change1d >= 0 ? C.green : C.red }}>
-                            {sec.change1d >= 0 ? "+" : ""}{sec.change1d}%
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* ── 전체 종목 (접기/펼치기) ─── */}
-            <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
-              <div onClick={() => toggleSection("allAssets")} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }}>
-                <span style={{ fontWeight: 700, fontSize: "18px", color: C.text1 }}>전체 종목</span>
-                <span style={{ fontSize: "16px", color: C.text3 }}>{ALL_ASSETS.length}개 {homeSection.allAssets ? "▲" : "▼"}</span>
-              </div>
-              {homeSection.allAssets && (
-                <>
-                  <div style={{ display: "flex", gap: "6px", margin: "10px 0", flexWrap: "wrap" }}>
-                    {[["all","전체"], ["stock","📈 주식"], ["us","🇺🇸 미국"], ["kr","🇰🇷 한국"], ["crypto","₿ 크립토"]].map(([v, l]) => (
-                      <button key={v} onClick={() => setFilterMarket(v)} style={{
-                        padding: "5px 12px", borderRadius: "8px", fontSize: mf(11), fontWeight: 600,
-                        background: filterMarket === v ? C.blueBg : "transparent",
-                        color: filterMarket === v ? C.blue : C.text3, border: `1px solid ${filterMarket === v ? C.blue : C.border2}`,
-                      }}>{l}</button>
-                    ))}
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(150px, 1fr))", gap: "4px", maxHeight: "280px", overflow: "auto" }}>
-                    {ALL_ASSETS.filter(a => matchMarketFilter(a, filterMarket)).map((asset, i) => {
-                      const flag = asset.market === "us" ? "🇺🇸" : asset.market === "kr" ? "🇰🇷" : "₿";
-                      return (
-                        <div key={`${asset.symbol}-${i}`}
-                          onTouchStart={onTouchCardStart} onTouchMove={onTouchCardMove}
-                          onClick={() => { if (isTouchTap()) { setSelectedAsset(asset); } }}
-                          style={{
-                            padding: "8px 10px", borderRadius: "8px", cursor: "pointer",
-                            display: "flex", alignItems: "center", gap: "6px", transition: "background .15s",
-                          }}
-                          onMouseEnter={e => e.currentTarget.style.background = C.card2}
-                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                          <span style={{ fontSize: mf(11) }}>{flag}</span>
-                          <div style={{ minWidth: 0, overflow: "hidden" }}>
-                            <div style={{ fontWeight: 600, fontSize: "16px", color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{asset.name}</div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* ★ 2026-05-09 — 홈 안 푸터 제거. 글로벌 footer (line ~12550)
-                만 유지. 이전엔 홈 페이지에서 푸터가 두 번 그려져 중복. */}
-          </div>
-        )}
+        {/* ★ 2026-08-13 IA v3 (대표 지시 "로그인 후 화면들이 또 다 달라서"):
+            owner 전용 홈(구 대시보드 1,578줄)을 폐지하고 홈을 v3 단일 화면으로 통일했습니다.
+            로그인 여부는 화면 구조가 아니라 "개인화 섹션 유무"로만 갈립니다(관심종목 등).
+            구 owner 홈의 매매 정보는 자동매매 콘솔(RealTrading, 시안 1g)이 수납하며,
+            홈·MY 의 owner 전용 진입 카드가 그 목적지로 연결합니다. */}
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 스크리너
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "screener" && (
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 주식 (내부 id "screener") — ★ 2026-08-12 IA v3 (시안 1b · 설계서 v3 3장)
+            헤더(제목+신선도 알약) → 장 상태 배지 2칸 → 종목 빠른 검색
+            → 주식 시그널 리스트(stock-scores 전 유니버스 · 전체/미국/한국 필터 칩)
+            → "조건으로 찾기" 스크리너(프리셋 칩 한 줄 + 조건 편집 시트) → 결과.
+            구 버튼 그리드·인라인 details 조건 패널은 전면 대체 — 조건 칩·스캔·저장
+            핸들러는 전부 바텀 시트로 이동(기능 보존, 버튼 다이어트).
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "screener" && (() => {
+          // ── 주식 시그널 리스트 파생 (점수순 고정 — 코인 탭과 같은 문법) ──
+          const stockPool = STOCK_SIGNALS_ON && Array.isArray(stockTabSignals) ? stockTabSignals : [];
+          const stockRowsAll = stockPool
+            .filter(s => s && (s.side === "LONG" || s.side === "SHORT")
+              && Number.isFinite(Number(s.score)) && (s.market === "us" || s.market === "kr"))
+            .slice()
+            .sort((a, b) => Number(b.score) - Number(a.score));
+          const stockRows = stockRowsAll.filter(s => stockSigFilter === "all" || s.market === stockSigFilter);
+          const stockNewestTs = stockRowsAll.reduce((m, s) => Math.max(m, Number(s?.ts) || 0), 0);
+          const stockFresh = coinScoreFreshness(stockNewestTs, t, STALE_MIN_STOCK);
+          const STOCK_TF_LABEL = { "1w": t("tabs.coin.tf1w"), "1d": t("tabs.coin.tf1d"), "4h": t("tabs.coin.tf4h"), "1h": t("tabs.coin.tf1h") };
+          // ── 장 상태 배지 (marketSessionOf — 정규장 시각 기준, 휴장일 캘린더 미배선) ──
+          const krSession = marketSessionOf("Asia/Seoul", 9 * 60, 15 * 60 + 30);
+          const usSession = marketSessionOf("America/New_York", 9 * 60 + 30, 16 * 60);
+          const fmtDur = (min) => {
+            const h = Math.floor(min / 60), m = min % 60;
+            return h > 0 ? t("tabs.screener.durHM", { h, m }) : t("tabs.screener.durM", { m });
+          };
+          const sessionCells = [
+            { key: "kr", label: t("tabs.screener.marketKr"), s: krSession },
+            { key: "us", label: t("tabs.screener.marketUs"), s: usSession },
+          ].filter(c => c.s).map(c => ({
+            ...c,
+            phaseText: c.s.phase === "open" ? t("tabs.screener.mktOpen")
+              : c.s.phase === "pre" ? t("tabs.screener.mktPre")
+              : c.s.phase === "weekend" ? t("tabs.screener.mktWeekend")
+              : t("tabs.screener.mktClosed"),
+            subText: c.s.phase === "open" ? t("tabs.screener.mktToClose", { d: fmtDur(c.s.minsToClose) })
+              : c.s.phase === "pre" ? t("tabs.screener.mktToOpen", { d: fmtDur(c.s.minsToOpen) })
+              : t("tabs.screener.mktHoursNote"),
+            on: c.s.phase === "open",
+          }));
+          // 조건 편집 칩 라벨 — 스캔 결과가 있으면 실측 종목 수를 병기 (시안 "조건 편집 · N종목")
+          const editChipLabel = results.length > 0
+            ? t("tabs.screener.editConditionsCount", { n: filtered.length })
+            : t("tabs.screener.editConditions");
+          return (
           <div className="tab-content">
-            {/* ── 스크리너 헤더 (그래디언트 히어로 스타일) — 모바일 압축 ── */}
-            <div style={{
-              background: `linear-gradient(135deg, ${C.blueBg} 0%, ${C.card} 100%)`,
-              borderRadius: isMobile ? 18 : 24,
-              padding: isMobile ? "18px 18px" : "28px",
-              marginBottom: isMobile ? 14 : 20,
-              boxShadow: `0 4px 16px ${C.blue}15`,
-            }}>
-              <div style={{ fontWeight: 800, fontSize: isMobile ? 19 : 24, color: C.text1 }}>{t("tabs.screener.title")}</div>
-              <div style={{ fontSize: mf(14), color: C.text3, marginTop: "4px" }}>{t("tabs.screener.subtitle")}</div>
+            {/* ── 헤더 — 시안 1b: 타이틀 + 신선도 알약(실측 ts — 없으면 생략) ── */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "13px" }}>
+              <h1 style={{ margin: 0, fontSize: isMobile ? "22px" : "24px", fontWeight: 800, color: C.text1, letterSpacing: "-0.01em" }}>{t("nav.stocks")}</h1>
+              {stockFresh && (
+                <span style={{
+                  fontSize: mf(11), fontWeight: 800, padding: "6px 11px", borderRadius: "9999px",
+                  background: `${C.blue}1F`, color: C.isDark ? C.blueL : C.blue, whiteSpace: "nowrap", flexShrink: 0,
+                }}>↻ {stockFresh}</span>
+              )}
             </div>
+
+            {/* ── 장 상태 배지 2칸 (시안 1b) — 시계 기반 결정적 산출, Intl 실패 시 생략 ── */}
+            {sessionCells.length > 0 && (
+              <div style={{ display: "flex", gap: "8px", marginBottom: "13px" }}>
+                {sessionCells.map(c => (
+                  <div key={c.key} style={{
+                    flex: 1, display: "flex", alignItems: "center", gap: "8px", minWidth: 0,
+                    background: C.card, border: `1px solid ${C.border}`, borderRadius: "12px", padding: "10px 12px",
+                  }}>
+                    <span className={c.on ? "z-pulse" : undefined} aria-hidden="true" style={{
+                      width: "7px", height: "7px", borderRadius: "50%", flexShrink: 0,
+                      background: c.on ? C.green : C.border2,
+                    }} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: mf(12), fontWeight: 800, color: C.text1, whiteSpace: "nowrap" }}>{c.label} {c.phaseText}</div>
+                      <div style={{ fontSize: mf(10), color: C.text3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.subText}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* ★ 휴장일 캘린더 미배선 고지 — 장중/개장전 분기에서도 항상 보이게 배지 아래 상시 노출.
+                 (분기별 subText 안에만 두면 정작 오표기가 나는 공휴일 낮에 안 보였습니다 — 적대 리뷰 지적) */}
+            {sessionCells.length > 0 && (
+              <div style={{ fontSize: mf(10), color: C.text4, marginTop: "-8px", marginBottom: "13px" }}>
+                {t("tabs.screener.mktHoursNote")}
+              </div>
+            )}
 
             {/* ── 종목 빠른 검색 — 사이트링크 검색박스(?q=) 실연동 진입점 ──
                  ★ 2026-08 모바일 시안 Discover 패턴: 카드 배경 + 돋보기 아이콘(SVG).
@@ -10584,8 +9454,8 @@ function AppInner() {
                 <input
                   value={assetQuery}
                   onChange={(e) => setAssetQuery(e.target.value.slice(0, 40))}
-                  placeholder="종목 검색 (예: 비트코인, NVDA, 삼성전자)"
-                  aria-label="종목 검색"
+                  placeholder={t("tabs.screener.searchPlaceholder")}
+                  aria-label={t("tabs.screener.searchAria")}
                   style={{
                     width: "100%", boxSizing: "border-box", padding: "13px 38px 13px 42px", borderRadius: 14,
                     background: C.card, border: `1px solid ${C.border}`, color: C.text1, fontSize: mf(15), outline: "none",
@@ -10594,7 +9464,7 @@ function AppInner() {
                   onBlur={(e) => { e.currentTarget.style.borderColor = C.border; }}
                 />
                 {assetQuery && (
-                  <button onClick={() => setAssetQuery("")} aria-label="검색어 지우기" style={{
+                  <button onClick={() => setAssetQuery("")} aria-label={t("tabs.screener.clearSearch")} style={{
                     position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
                     background: "none", border: "none", color: C.text3, fontSize: 18, cursor: "pointer", lineHeight: 1, padding: 4,
                   }}>✕</button>
@@ -10605,13 +9475,13 @@ function AppInner() {
                 const matches = ALL_ASSETS.filter((a) => a.searchKey.includes(q)).slice(0, 24);
                 if (matches.length === 0) {
                   return <div style={{ marginTop: 10, padding: "14px", textAlign: "center", fontSize: mf(14), color: C.text3, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }}>
-                    '{assetQuery}' 와 일치하는 종목이 없어요
+                    {t("tabs.screener.searchNoMatch", { q: assetQuery })}
                   </div>;
                 }
-                const marketLabel = { us: "미국", kr: "한국", crypto: "코인" };
+                const marketLabel = { us: t("tabs.news.catUs"), kr: t("tabs.news.catKr"), crypto: t("tabs.news.catCrypto") };
                 return (
                   <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: mf(13), color: C.text3, marginBottom: 8 }}>'{assetQuery}' 검색 결과 {matches.length}종목 · 종목을 누르면 상세 분석이 열려요</div>
+                    <div style={{ fontSize: mf(13), color: C.text3, marginBottom: 8 }}>{t("tabs.screener.searchResultMeta", { q: assetQuery, n: matches.length })}</div>
                     <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(auto-fill, minmax(220px, 1fr))", gap: 8 }}>
                       {matches.map((a) => (
                         <button key={`${a.market}-${a.symbol}`} onClick={() => setSelectedAsset(a)} style={{
@@ -10633,18 +9503,121 @@ function AppInner() {
               })()}
             </div>
 
-            {/* ── 스크리너 프리셋 (토스 스타일) ── */}
-            <div style={{ marginBottom: "16px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                <div style={{ fontWeight: 700, fontSize: mf(16), color: C.text1 }}>프리셋 선택</div>
+            {/* ── 주식 시그널 (시안 1b — stock-scores 전 유니버스, 점수순 고정) ──
+                 홈 미리보기(3개)와 달리 전체 풀을 보여주는 유일한 위치입니다(설계서 v3 3장).
+                 킬스위치 VITE_ZEPTA_STOCK_SIGNALS=0 이면 섹션째 사라집니다. */}
+            {STOCK_SIGNALS_ON && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "18px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+                  {/* 주식 스코어는 장 마감 후 마지막 장중 데이터가 유지되는 설계라 실시간 펄스
+                      점을 켜지 않습니다(홈과 동일 원칙) — 신선도는 상단 알약이 전달합니다. */}
+                  <h2 style={{ margin: 0, fontSize: mf(14), fontWeight: 800, color: C.text1, whiteSpace: "nowrap" }}>{t("tabs.screener.signalsTitle")}</h2>
+                  <span style={{ flex: 1 }} />
+                  {/* 정렬은 점수순 고정 — 상태 서술 알약(죽은 드롭다운을 두지 않습니다) */}
+                  {stockRows.length > 0 && (
+                    <span style={{
+                      fontSize: mf(11), fontWeight: 800, padding: "5px 11px", borderRadius: "9999px",
+                      background: C.card, border: `1px solid ${C.border}`, color: C.text3, whiteSpace: "nowrap",
+                    }}>{t("tabs.screener.sortByScore")}</span>
+                  )}
+                </div>
+                {/* [전체|미국|한국] 필터 칩 — 건수는 실제 풀에서 집계 (mobileKit Segment) */}
+                {stockRowsAll.length > 0 && (
+                  <Segment
+                    value={stockSigFilter}
+                    onChange={setStockSigFilter}
+                    options={[
+                      { value: "all", label: t("tabs.screener.sigAll"), count: stockRowsAll.length },
+                      { value: "us", label: t("tabs.screener.marketUs"), count: stockRowsAll.filter(s => s.market === "us").length },
+                      { value: "kr", label: t("tabs.screener.marketKr"), count: stockRowsAll.filter(s => s.market === "kr").length },
+                    ]}
+                  />
+                )}
+                {stockRowsAll.length === 0 ? (
+                  stockTabStatus === "loading" || stockTabStatus === "idle" ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "9px" }}>
+                      {[0, 1, 2].map(i => <Skeleton key={`stk-skel-${i}`} width="100%" height="72px" />)}
+                    </div>
+                  ) : (
+                    /* 빈 상태 — 집계 전·전체 실패 공용. 문구는 실제 산출 주기(크론 30~60분) 서술 */
+                    <div style={{ border: `1.5px dashed ${C.border2}`, borderRadius: "16px", padding: "30px 24px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+                      <div style={{ fontSize: mf(15), fontWeight: 800, color: C.text1 }}>{t("tabs.screener.sigEmptyTitle")}</div>
+                      <div style={{ fontSize: mf(12), color: C.text3, lineHeight: 1.6, maxWidth: "260px" }}>{t("tabs.screener.sigEmptyDesc")}</div>
+                      <button onClick={fetchStockTabSignals} style={{
+                        marginTop: "10px", padding: "11px 18px", borderRadius: "12px",
+                        background: `${C.blue}1F`, color: C.isDark ? C.blueL : C.blue, border: "none",
+                        fontSize: mf(13), fontWeight: 800, fontFamily: "inherit", cursor: "pointer", minHeight: "44px",
+                      }}>{t("tabs.coin.retry")}</button>
+                    </div>
+                  )
+                ) : (
+                  <div style={isMobile
+                    ? { display: "flex", flexDirection: "column", gap: "9px" }
+                    : { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "10px", alignItems: "start" }}>
+                    {stockRows.map((sig, i) => {
+                      const dir = sig.side === "LONG" ? "up" : "down";
+                      const bd = sig.breakdown || {};
+                      // 주식 breakdown 은 4h 가 없을 수 있어 응답에 있는 키만 칩으로 (홈과 동일 규칙)
+                      const tfs = Object.keys(STOCK_TF_LABEL).filter(k => bd[k] != null).map(tf => ({
+                        label: STOCK_TF_LABEL[tf],
+                        dir: bd[tf]?.side === "LONG" ? "up" : bd[tf]?.side === "SHORT" ? "down" : null,
+                      }));
+                      const sup = fmtLevelPrice(sig.sr?.s?.[0]?.p);
+                      const res = fmtLevelPrice(sig.sr?.r?.[0]?.p);
+                      const px = (sup || res) ? fmtLevelPrice(sig.sr?.px) : null;
+                      // KRX 는 6자리 코드 대신 종목명(마스터에 있으면), 미국은 티커 그대로 (홈과 동일)
+                      const symText = sig.market === "kr"
+                        ? (KR_NAME_BY_CODE[String(sig.symbol || "").replace(/\.(KS|KQ)$/i, "")]
+                          || String(sig.symbol || "—").replace(/\.(KS|KQ)$/i, ""))
+                        : String(sig.symbol || "—");
+                      return (
+                        <SignalCard
+                          key={`${sig.symbol || "sig"}-${i}`}
+                          symbol={symText}
+                          // 주식은 현물이라 롱/숏 대신 상승/하락 우위로 서술 (표현 3원칙 — 홈과 동일)
+                          sideLabel={t(sig.side === "LONG" ? "tabs.home.upDominant" : "tabs.home.downDominant")}
+                          dir={dir}
+                          score={Math.round(Math.max(0, Math.min(100, Number(sig.score))))}
+                          timeframes={tfs.some(x => x.dir) ? tfs : []}
+                          support={sup}
+                          price={px}
+                          resistance={res}
+                          onClick={() => setDetailSignal(sig)}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
+                {/* 필터 결과 0건 — 풀은 있으나 선택 시장에 시그널이 없는 경우(칩 건수와 일치) */}
+                {stockRowsAll.length > 0 && stockRows.length === 0 && (
+                  <div style={{ fontSize: mf(12), color: C.text3, textAlign: "center", padding: "14px 0" }}>
+                    {t("tabs.screener.sigFilterEmpty")}
+                  </div>
+                )}
+                {stockRows.length > 0 && (
+                  <div style={{ fontSize: mf(11), color: C.text4 }}>
+                    {/* 신선도(실측 ts)는 헤더 알약이 전달 — 여기는 출처만 서술해 이중 노출을 피합니다 */}
+                    {t("tabs.home.stockSignalSourceNote")}
+                  </div>
+                )}
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(200px, 1fr))", gap: "10px" }}>
+            )}
+
+            {/* ── 조건으로 찾기 (스크리너) — 시안 1b: 프리셋 칩 한 줄 + "조건 편집" 버튼 1개.
+                 구 2열 프리셋 버튼 그리드 + 인라인 상세 조건 패널 전면 대체(버튼 다이어트).
+                 프리셋 클릭 → 조건 주입 → 기존 자동 스캔 effect 가 즉시 실행(제로 클릭 결과). */}
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden", marginBottom: "13px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "7px", minHeight: "46px", padding: "8px 14px", borderBottom: `1px solid ${C.card2}` }}>
+                <h2 style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: C.text1, whiteSpace: "nowrap" }}>{t("tabs.screener.findByCondition")}</h2>
+                <span style={{ flex: 1 }} />
+                <HomeActionChip label={editChipLabel} onClick={() => setCondSheetOpen(true)} />
+              </div>
+              {/* 프리셋 칩 한 줄 — 가로 스크롤. 핸들러는 구 그리드와 동일(토글 + 조건·모드 주입) */}
+              <div style={{ display: "flex", gap: "6px", overflowX: "auto", padding: "12px 14px", WebkitOverflowScrolling: "touch" }}>
                 {SCREENER_PRESETS.map(preset => {
                   const isActive = activePreset === preset.id;
-                  const presetColor = preset.color === "green" ? C.green : preset.color === "blue" ? C.blue : preset.color === "red" ? C.red : preset.color === "yellow" ? C.yellow : C.purple;
-                  const presetBg = preset.color === "green" ? C.greenBg : preset.color === "blue" ? C.blueBg : preset.color === "red" ? C.redBg : preset.color === "yellow" ? C.yellowBg : C.purpleBg;
                   return (
-                    <button key={preset.id} onClick={() => {
+                    <button key={preset.id} title={t(`diag.presets.${preset.id}.desc`)} onClick={() => {
                       if (isActive) {
                         setActivePreset(null);
                         setConditions([]);
@@ -10655,89 +9628,57 @@ function AppInner() {
                         setMode(preset.mode);
                       }
                     }} style={{
-                      padding: isMobile ? "10px 12px" : "12px 14px", borderRadius: "12px", textAlign: "left", cursor: "pointer", minHeight: "44px", display: "flex", flexDirection: "column", justifyContent: "center",
-                      background: isActive ? presetBg : `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
-                      border: `1px solid ${isActive ? `${presetColor}40` : `${C.border}20`}`,
-                      transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)", position: "relative", overflow: "hidden",
-                      boxShadow: isActive ? `0 8px 20px ${presetColor}40, inset 0 1px 0 ${presetColor}30` : "none",
-                    }}
-                    onMouseEnter={e => {
-                      if (!isActive) {
-                        e.currentTarget.style.transform = "scale(1.02) translateY(-3px)";
-                        e.currentTarget.style.boxShadow = `0 12px 24px ${presetColor}30`;
-                        e.currentTarget.style.borderColor = `${presetColor}50`;
-                      } else {
-                        e.currentTarget.style.boxShadow = `0 12px 28px ${presetColor}50, inset 0 1px 0 ${presetColor}40`;
-                      }
-                    }}
-                    onMouseLeave={e => {
-                      if (!isActive) {
-                        e.currentTarget.style.transform = "scale(1) translateY(0)";
-                        e.currentTarget.style.boxShadow = "none";
-                        e.currentTarget.style.borderColor = `${C.border}20`;
-                      } else {
-                        e.currentTarget.style.boxShadow = `0 8px 20px ${presetColor}40, inset 0 1px 0 ${presetColor}30`;
-                      }
-                    }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-                        <span style={{ fontSize: mf(17) }}>{preset.icon}</span>
-                        <span style={{ fontWeight: 700, fontSize: mf(15), color: isActive ? presetColor : C.text1 }}>{preset.name}</span>
-                        {preset.popular && <span style={{ fontSize: "12px", padding: "2px 6px", borderRadius: "4px", background: `${C.red}20`, color: C.red, fontWeight: 700 }}>{t("tabs.screener.popular")}</span>}
-                      </div>
-                      <div style={{ fontSize: mf(13), color: isActive ? presetColor : C.text3, lineHeight: 1.4 }}>{preset.desc}</div>
-                      {isActive && <div style={{ position: "absolute", top: "8px", right: "8px", width: "20px", height: "20px", borderRadius: "50%", background: presetColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", color: "#fff" }}>✓</div>}
-                    </button>
+                      flexShrink: 0, padding: "8px 14px", borderRadius: "9999px", minHeight: "36px",
+                      fontSize: mf(12), fontWeight: isActive ? 800 : 700, fontFamily: "inherit", cursor: "pointer",
+                      background: isActive ? C.blue : C.card2, color: isActive ? "#fff" : C.text2,
+                      border: `1px solid ${isActive ? C.blue : C.border}`, whiteSpace: "nowrap",
+                    }}>{preset.icon} {t(`diag.presets.${preset.id}.name`)}</button>
                   );
                 })}
               </div>
-
-              {/* ── 프리셋 선택 후 스캔 버튼 (프리셋 바로 아래) ── */}
-              {activePreset && (
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "12px", flexWrap: "wrap" }}>
-                  <button onClick={runScan} disabled={scanning || conditions.length === 0} style={{
-                    padding: isMobile ? "12px 16px" : "10px 20px", borderRadius: "10px", fontSize: mf(15), fontWeight: 700,
-                    background: scanning ? C.card2 : `linear-gradient(135deg, ${C.blue} 0%, ${C.purple} 100%)`, color: scanning ? C.text3 : "#fff",
-                    border: "none", cursor: scanning ? "not-allowed" : "pointer", minWidth: isMobile ? "100%" : "100px", minHeight: "44px",
-                    transition: "all 0.3s ease", boxShadow: !scanning ? `0 4px 12px ${C.blue}40` : "none",
-                  }}
-                  onMouseEnter={e => { if (!scanning) { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 8px 20px ${C.blue}50`; } }}
-                  onMouseLeave={e => { if (!scanning) { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 4px 12px ${C.blue}40`; } }}>
-                    {scanning
-                      ? <span style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "center" }}>
-                          <span style={{ animation: "pulse 1s infinite" }}>⏳</span> {scanProgress.done}/{scanProgress.total}
-                        </span>
-                      : `🔍 스캔하기`}
-                  </button>
-                  {scanning && (
-                    <div style={{ flex: 1, minWidth: "80px" }}>
-                      <div style={{ height: "4px", background: C.border2, borderRadius: "4px", overflow: "hidden" }}>
-                        <div style={{ height: "100%", background: C.blue, borderRadius: "4px", width: `${scanProgress.total ? (scanProgress.done / scanProgress.total) * 100 : 0}%`, transition: "width .3s" }} />
-                      </div>
-                    </div>
-                  )}
-                  {lastScan && !scanning && (
-                    <span style={{ fontSize: mf(16), color: C.text3 }}>마지막: {lastScan.toLocaleTimeString("ko-KR")}</span>
-                  )}
-                  <span style={{ fontSize: "16px", color: C.text3 }}>{conditions.length}{t("tabs.screener.conditionsAppliedCount")}</span>
+              {/* 스캔 진행률 — 프리셋 자동 스캔·시트 스캔 공용 (실측 done/total) */}
+              {scanning && (
+                <div style={{ padding: "0 14px 12px" }}>
+                  <div style={{ fontSize: mf(11), color: C.text3, fontWeight: 700, marginBottom: "6px" }}>
+                    {t("tabs.screener.scanning")} {scanProgress.done}/{scanProgress.total}
+                  </div>
+                  <div style={{ height: "4px", background: C.border2, borderRadius: "4px", overflow: "hidden" }}>
+                    <div style={{ height: "100%", background: C.blue, borderRadius: "4px", width: `${scanProgress.total ? (scanProgress.done / scanProgress.total) * 100 : 0}%`, transition: "width .3s" }} />
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* ── 직접 조건 설정 (접이식) ── */}
-            <details style={{ marginBottom: "16px" }} open={!activePreset}>
-              <summary style={{
-                padding: "14px 20px", borderRadius: "12px", cursor: "pointer",
-                background: C.card, border: `1px solid ${C.border}20`,
-                fontWeight: 700, fontSize: "18px", color: C.text1,
-                display: "flex", alignItems: "center", gap: "8px", listStyle: "none",
-              }}>
-                <span>⚙️ {t("tabs.screener.customSettings")}</span>
-                <span style={{ fontSize: mf(16), color: C.text3, fontWeight: 500, marginLeft: "auto" }}>
-                  {conditions.length > 0 ? `${conditions.length}${t("tabs.screener.conditionsApplied")}` : t("tabs.screener.selectConditions")}
-                </span>
-              </summary>
-            <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "0 0 18px 18px", padding: "22px 24px", marginTop: "-1px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: "16px" }}>
+            {/* ── 조건 편집 바텀 시트 (시안 1b) — 구 인라인 details 조건 패널을 시트로
+                 이동했습니다. 조건 칩 토글·OR/AND·스캔·조건 저장·오류 목록 핸들러 전부
+                 보존 — 화면 상시 점유만 제거(버튼 다이어트). ── */}
+            <BottomSheet
+              open={condSheetOpen}
+              onClose={() => setCondSheetOpen(false)}
+              title={t("tabs.screener.editConditions")}
+              description={conditions.length > 0 ? `${conditions.length}${t("tabs.screener.conditionsApplied")}` : t("tabs.screener.selectConditions")}
+              footer={
+                <div style={{ display: "flex", gap: "9px" }}>
+                  <button onClick={() => { setConditions([]); setActivePreset(null); setMode("or"); }} style={{
+                    height: "46px", padding: "0 18px", borderRadius: "12px", background: "transparent",
+                    border: `1px solid ${C.border2}`, color: C.text2, fontSize: mf(14), fontWeight: 700,
+                    fontFamily: "inherit", cursor: "pointer",
+                  }}>{t("tabs.screener.reset")}</button>
+                  {/* 적용 = 기존 runScan — 시트를 닫고 스캔 시작(진행률은 스크리너 카드가 표시) */}
+                  <button onClick={() => { setCondSheetOpen(false); runScan(); }} disabled={scanning || conditions.length === 0} style={{
+                    flex: 1, height: "46px", borderRadius: "12px", border: "none",
+                    background: scanning || conditions.length === 0 ? C.card2 : C.blue,
+                    color: scanning || conditions.length === 0 ? C.text3 : "#fff",
+                    fontSize: mf(14), fontWeight: 800, fontFamily: "inherit",
+                    cursor: scanning || conditions.length === 0 ? "not-allowed" : "pointer",
+                  }}>
+                    {scanning ? `${scanProgress.done}/${scanProgress.total}` : t("tabs.screener.applyScan", { n: conditions.length })}
+                  </button>
+                </div>
+              }
+            >
+            <div style={{ padding: "2px 2px 10px" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: "12px" }}>
                 <div style={{ display: "flex", gap: "6px" }}>
                   {["or", "and"].map(m => (
                     <button key={m} onClick={() => setMode(m)} style={{
@@ -10816,8 +9757,8 @@ function AppInner() {
                 })}
               </div>
 
-              {/* 구조적 시그널 */}
-              <div style={{ fontSize: "15px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>구조적 시그널</div>
+              {/* 구조적 시그널 — i18n 키(tabs.screener.structural) 기존 보유분 연결 */}
+              <div style={{ fontSize: "15px", color: C.text3, fontWeight: 600, letterSpacing: ".05em", marginBottom: "8px", marginTop: "12px" }}>{t("tabs.screener.structural")}</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "7px", marginBottom: "18px" }}>
                 {["near_52w_low","near_52w_high","death_cross","golden_cross","mean_reversion","near_poc"].map(key => {
                   const meta = CONDITION_META[key];
@@ -10841,74 +9782,52 @@ function AppInner() {
               {conditions.length === 0 && !scanning && !results.length && (
                 <div style={{
                   textAlign: "center", padding: "14px", borderRadius: "10px", marginBottom: "10px",
-                  background: C.blueBg, border: `1px solid ${C.blue}33`, fontSize: "18px", color: C.blue,
+                  background: C.blueBg, border: `1px solid ${C.blue}33`, fontSize: mf(13), color: C.isDark ? C.blueL : C.blue,
                 }}>
-                  💡 위에서 스크리닝 조건을 1개 이상 선택한 후 스캔을 시작하세요
+                  💡 {t("tabs.screener.selectConditionsHint")}
                 </div>
               )}
-              <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
-                <button onClick={runScan} disabled={scanning || conditions.length === 0} style={{
-                  padding: isMobile ? "14px 16px" : "11px 24px", borderRadius: "12px", fontSize: mf(18), fontWeight: 700,
-                  background: scanning ? C.card2 : conditions.length === 0 ? C.card2 : C.blue,
-                  color: scanning || conditions.length === 0 ? C.text3 : "#fff", border: "none",
-                  minWidth: isMobile ? "100%" : "120px", minHeight: "48px", opacity: conditions.length === 0 ? 0.6 : 1,
-                }}>
-                  {scanning
-                    ? <span style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }}>
-                        <span style={{ animation: "pulse 1s infinite" }}>⏳</span> {scanProgress.done}/{scanProgress.total}
-                      </span>
-                    : `🔍 ${ALL_ASSETS.length}종목 스캔 ${conditions.length > 0 ? `(${conditions.length}개 조건)` : ""}`}
+              {/* 스캔 버튼은 시트 footer("스캔 · 조건 N개")로 일원화 — 여기는 보조 액션(저장)만 */}
+              {conditions.length > 0 && !scanning && (
+                <button onClick={saveCurrentScreener} title={t("tabs.screener.saveConditionsTitle")} style={{
+                  width: "100%", padding: "12px 14px", borderRadius: "12px", fontSize: mf(14), fontWeight: 700,
+                  background: "transparent", color: C.isDark ? C.blueL : C.blue, border: `1px solid ${C.blue}55`, minHeight: "46px", cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "6px", whiteSpace: "nowrap", fontFamily: "inherit",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}14`; }}
+                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+                  💾 {t("tabs.screener.saveConditions")}
                 </button>
-                {conditions.length > 0 && !scanning && (
-                  <button onClick={saveCurrentScreener} title="현재 선택한 조건을 저장하고 '저장한 조건'에서 다시 실행" style={{
-                    padding: isMobile ? "12px 14px" : "11px 18px", borderRadius: "12px", fontSize: mf(16), fontWeight: 700,
-                    background: "transparent", color: C.blue, border: `1px solid ${C.blue}55`, minHeight: "48px", cursor: "pointer",
-                    display: "inline-flex", alignItems: "center", gap: "6px", whiteSpace: "nowrap",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.background = `${C.blue}14`; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
-                    💾 조건 저장
-                  </button>
-                )}
-                {scanning && (
-                  <div style={{ flex: 1, minWidth: "120px" }}>
-                    <div style={{ height: "4px", background: C.border2, borderRadius: "4px", overflow: "hidden" }}>
-                      <div style={{
-                        height: "100%", background: C.blue, borderRadius: "4px",
-                        width: `${scanProgress.total ? (scanProgress.done / scanProgress.total) * 100 : 0}%`, transition: "width .3s",
-                      }} />
-                    </div>
-                  </div>
-                )}
-                {lastScan && !scanning && (
-                  <span style={{ fontSize: mf(16), color: C.text3 }}>마지막: {lastScan.toLocaleTimeString("ko-KR")}</span>
-                )}
-              </div>
+              )}
 
               {scanErrors.length > 0 && (
                 <details style={{ marginTop: "10px" }}>
-                  <summary style={{ fontSize: "16px", color: C.text3, cursor: "pointer" }}>⚠️ {scanErrors.length}개 오류</summary>
-                  <div style={{ marginTop: "6px", fontSize: "16px", color: C.red, lineHeight: 1.6, maxHeight: "80px", overflow: "auto" }}>
+                  <summary style={{ fontSize: mf(13), color: C.text3, cursor: "pointer" }}>⚠️ {t("tabs.screener.errorsCount", { n: scanErrors.length })}</summary>
+                  <div style={{ marginTop: "6px", fontSize: mf(12), color: C.red, lineHeight: 1.6, maxHeight: "80px", overflow: "auto" }}>
                     {scanErrors.map((e, i) => <div key={i}>{e}</div>)}
                   </div>
                 </details>
               )}
             </div>
-            </details>
+            </BottomSheet>
 
             {/* 결과 필터 — 모바일: 필터 가로 스크롤 + 정렬은 ActionSheet 트리거 */}
             {results.length > 0 && (() => {
               const sortOptions = [
-                { v: "score", l: "퀀트점수" }, { v: "rsi", l: "RSI" },
-                { v: "change", l: "변동률" }, { v: "vol", l: "거래량" },
-                { v: "signals", l: "시그널" },
+                { v: "score", l: t("tabs.screener.sortScore") }, { v: "rsi", l: "RSI" },
+                { v: "change", l: t("tabs.screener.sortChange") }, { v: "vol", l: t("tabs.screener.sortVolume") },
+                { v: "signals", l: t("tabs.screener.sortSignals") },
               ];
               const curSort = sortOptions.find(o => o.v === sortBy);
               // ★ 2026-08 모바일 시안: 시장 필터를 mobileKit Segment 로 교체.
               //   값(all/stock/us/kr/crypto)·필터 로직(matchMarketFilter)은 그대로,
               //   각 칸의 건수는 정렬된 결과에서 실제로 세어 표시합니다.
-              const MARKET_SEG_LABEL = { all: "전체", stock: "주식", us: "미국", kr: "한국", crypto: "크립토" };
-              const marketSegOptions = MARKET_FILTERS.map(m => ({
+              const MARKET_SEG_LABEL = { all: t("diag.seg.all"), stock: t("diag.seg.stock"), us: t("diag.market.us"), kr: t("diag.market.kr"), crypto: t("diag.seg.crypto") };
+              // ★ IA v3 정합(대표 "짬뽕 금지"): 주식 탭에서는 코인 세그먼트를 노출하지 않습니다.
+              //   코인 조건 검색은 코인 탭의 "조건으로 코인 찾기" 진입점이 담당 — 기능 이동이지 제거 아님.
+              //   (필터 로직 matchMarketFilter·값 자체는 그대로라 코인 탭 진입 시 crypto 필터가 정상 동작)
+              const STOCK_SEG_FILTERS = MARKET_FILTERS.filter(m => m !== "crypto" && m !== "all");
+              const marketSegOptions = STOCK_SEG_FILTERS.map(m => ({
                 value: m,
                 label: MARKET_SEG_LABEL[m] || m,
                 count: sortedResults.filter(a => matchMarketFilter(a, m)).length,
@@ -10926,9 +9845,9 @@ function AppInner() {
                       display: "flex", alignItems: "center", justifyContent: "center", fontSize: "15px", fontWeight: 800, flexShrink: 0,
                     }}>{presetMeta?.icon || "🔍"}</span>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: isMobile ? "17px" : "18px", fontWeight: 800, color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{presetMeta?.name || "스캔 결과"}</div>
+                      <div style={{ fontSize: isMobile ? "17px" : "18px", fontWeight: 800, color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{presetMeta ? t(`diag.presets.${presetMeta.id}.name`) : t("diag.scanResults")}</div>
                       <div style={{ fontSize: "11px", color: C.text3 }}>
-                        조건 충족 {filtered.length}종목{lastScan ? ` · 마지막 ${lastScan.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })} 갱신` : ""}
+                        {t("diag.matchedCount", { n: filtered.length })}{lastScan ? ` · ${t("diag.lastUpdatedAt", { time: lastScan.toLocaleTimeString(lang === "en" ? "en-US" : "ko-KR", { hour: "2-digit", minute: "2-digit" }) })}` : ""}
                       </div>
                     </div>
                     {isMobile && (
@@ -10938,7 +9857,7 @@ function AppInner() {
                         background: C.card, color: C.text3, border: `1px solid ${C.border}`,
                         display: "inline-flex", alignItems: "center", gap: 5, minHeight: 32, flexShrink: 0, whiteSpace: "nowrap", cursor: "pointer",
                       }}>
-                        <span style={{ color: C.blueL || C.blue, fontWeight: 800 }}>{curSort?.l || "—"}순</span>
+                        <span style={{ color: C.blueL || C.blue, fontWeight: 800 }}>{t("tabs.screener.sortBySuffix", { label: curSort?.l || "—" })}</span>
                         <span style={{ fontSize: 9, color: C.text3 }}>▼</span>
                       </button>
                     )}
@@ -10946,7 +9865,7 @@ function AppInner() {
                   <Segment options={marketSegOptions} value={filterMarket} onChange={setFilterMarket} />
                   {!isMobile && (
                     <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap" }}>
-                      <span style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>정렬</span>
+                      <span style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>{t("tabs.screener.sortLabel")}</span>
                       {sortOptions.map(({ v, l }) => (
                         <button key={v} onClick={() => setSortBy(v)} style={{
                           padding: "6px 12px", borderRadius: "9999px", fontSize: "12px", fontWeight: 700,
@@ -10961,7 +9880,7 @@ function AppInner() {
                     <ActionSheet
                       open={sortSheetOpen}
                       onClose={() => setSortSheetOpen(false)}
-                      title="정렬 방식"
+                      title={t("tabs.screener.sortSheetTitle")}
                       value={sortBy}
                       items={sortOptions.map(({ v, l }) => ({
                         id: v, label: l, onSelect: () => setSortBy(v),
@@ -10982,14 +9901,15 @@ function AppInner() {
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                 ) : "📡"}</div>
                 <div style={{ fontWeight: 800, fontSize: mf(15), margin: "14px 0 6px", color: C.text1 }}>
-                  {lastScan ? "조건에 맞는 종목이 없어요" : "스캔 대기 중"}
+                  {lastScan ? t("tabs.screener.noMatchTitle") : t("tabs.screener.idleTitle")}
                 </div>
                 <div style={{ color: C.text3, fontSize: mf(13), lineHeight: 1.6, maxWidth: "280px", margin: "0 auto" }}>
                   {lastScan ? (
-                    <>지금 시장에서는 이 조건을 모두 만족하는 종목이 없어요<br />아래 추천 중 하나를 골라 조건을 완화해 보세요</>
+                    <>{t("tabs.screener.noMatchDesc1")}<br />{t("tabs.screener.noMatchDesc2")}</>
                   ) : (
-                    <>조건 선택 후 <strong style={{ color: C.blueL || C.blue }}>스캔 시작</strong>을 눌러주세요<br />
-                    미국 · 한국 주식 + 크립토 {US_ASSETS.length + KR_ASSETS.length + CRYPTO_ASSETS.length}개 자산 분석</>
+                    /* 새 플로우 안내(시안 1b): 프리셋 칩 = 즉시 스캔 · 세부 조정은 조건 편집 시트.
+                       자산 수는 실제 유니버스 합계(하드코딩 아님). */
+                    t("tabs.screener.idleDesc", { n: US_ASSETS.length + KR_ASSETS.length + CRYPTO_ASSETS.length })
                   )}
                 </div>
 
@@ -11013,7 +9933,7 @@ function AppInner() {
                         }}
                       >
                         <span>🔀</span>
-                        <span>AND → OR 모드로 변경 (하나라도 맞으면 표시)</span>
+                        <span>{t("tabs.screener.relaxToOr")}</span>
                       </button>
                     )}
                     {/* 진단 2: 조건이 4개 이상 → 절반으로 줄이기 */}
@@ -11029,7 +9949,7 @@ function AppInner() {
                         }}
                       >
                         <span>✂️</span>
-                        <span>조건 {conditions.length}개 → {Math.ceil(conditions.length / 2)}개로 줄이기</span>
+                        <span>{t("tabs.screener.relaxHalve", { from: conditions.length, to: Math.ceil(conditions.length / 2) })}</span>
                       </button>
                     )}
                     {/* 진단 3: 시장 필터가 적용중 → 전체로 확장 */}
@@ -11045,7 +9965,7 @@ function AppInner() {
                         }}
                       >
                         <span>🌍</span>
-                        <span>시장 필터 → 전체로 확장</span>
+                        <span>{t("tabs.screener.relaxMarket")}</span>
                       </button>
                     )}
                     {/* 진단 4: 조건 1개 이상 → 전체 초기화 fallback */}
@@ -11059,7 +9979,7 @@ function AppInner() {
                           minHeight: "44px",
                         }}
                       >
-                        조건 전체 초기화
+                        {t("tabs.screener.resetAllConditions")}
                       </button>
                     )}
                     {/* 진단 5: 모든 진단이 false 인 경우 — 기본 안내 */}
@@ -11071,7 +9991,7 @@ function AppInner() {
                         fontSize: mf(14), fontWeight: 600,
                         textAlign: "center",
                       }}>
-                        💡 추천 조건 중 하나를 선택해 다시 스캔해보세요
+                        💡 {t("tabs.screener.relaxFallback")}
                       </div>
                     )}
                   </div>
@@ -11079,8 +9999,8 @@ function AppInner() {
 
                 {lastScan && (
                   <div style={{ fontSize: "16px", color: C.text3, marginTop: "12px" }}>
-                    마지막 스캔: {lastScan.toLocaleTimeString("ko-KR")}
-                    {scanErrors.length > 0 && <span style={{ color: C.yellow, marginLeft: "8px" }}>⚠️ {scanErrors.length}건 오류</span>}
+                    {t("tabs.screener.lastScanAt", { time: lastScan.toLocaleTimeString(lang === "en" ? "en-US" : "ko-KR") })}
+                    {scanErrors.length > 0 && <span style={{ color: C.yellow, marginLeft: "8px" }}>⚠️ {t("tabs.screener.errorsCount", { n: scanErrors.length })}</span>}
                   </div>
                 )}
               </div>
@@ -11102,9 +10022,9 @@ function AppInner() {
                   padding: "11px 18px", borderBottom: `1px solid ${C.border}`,
                   fontSize: "11px", fontWeight: 800, color: C.text3, letterSpacing: ".05em",
                 }}>
-                  <span>종목</span>
-                  <span style={{ textAlign: "right" }}>현재가</span>
-                  {[["change", "등락", "right"], ["signals", "신호 요약", "center"], ["score", "점수", "right"]].map(([v, l, align]) => (
+                  <span>{t("tabs.screener.colAsset")}</span>
+                  <span style={{ textAlign: "right" }}>{t("tabs.screener.colPrice")}</span>
+                  {[["change", t("tabs.screener.colChange"), "right"], ["signals", t("tabs.screener.colSignals"), "center"], ["score", t("tabs.screener.colScore"), "right"]].map(([v, l, align]) => (
                     <button key={v} onClick={() => setSortBy(v)} style={{
                       background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit",
                       fontSize: "11px", fontWeight: 800, letterSpacing: ".05em",
@@ -11121,8 +10041,7 @@ function AppInner() {
             {/* ── Google AdSense (Screener - In-Feed) ─── */}
             {results.length > 0 && <GoogleAd format="in-feed" slot="screener-results" style={{ margin: "16px 0" }} />}
 
-            {/* 시안 1f 하단 면책 — 상태 서술 문구 (mobileKit 공용, i18n 기본값) */}
-            {results.length > 0 && <Disclaimer style={{ marginTop: "4px" }} />}
+            {/* 면책은 탭 하단 1회로 일원화 (이중 노출 방지 — IA v3) */}
 
             {!scanning && results.length > 0 && filtered.length === 0 && (
               <div style={{ border: `1.5px dashed ${C.border2}`, borderRadius: "16px", padding: "32px 24px", textAlign: "center" }}>
@@ -11132,8 +10051,8 @@ function AppInner() {
                 }} aria-hidden="true">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
                 </div>
-                <div style={{ fontWeight: 800, fontSize: mf(15), color: C.text1, margin: "14px 0 4px" }}>선택한 시장에 시그널 없음</div>
-                <div style={{ fontSize: mf(13), color: C.text3, marginBottom: "16px", lineHeight: 1.6 }}>다른 시장 필터를 선택해보세요 (전체 {results.length}건 발견)</div>
+                <div style={{ fontWeight: 800, fontSize: mf(15), color: C.text1, margin: "14px 0 4px" }}>{t("tabs.screener.marketEmptyTitle")}</div>
+                <div style={{ fontSize: mf(13), color: C.text3, marginBottom: "16px", lineHeight: 1.6 }}>{t("tabs.screener.marketEmptyDesc", { n: results.length })}</div>
                 <button
                   onClick={() => setFilterMarket("all")}
                   style={{
@@ -11142,21 +10061,30 @@ function AppInner() {
                     cursor: "pointer", minHeight: "44px",
                   }}
                 >
-                  시장 필터 → 전체로 확장 ({results.length}건 모두 보기)
+                  {t("tabs.screener.marketEmptyCta", { n: results.length })}
                 </button>
               </div>
             )}
 
 
             {/* ═══════════════════════════════════════════════════════
-                저평가 종목 통합 조회
+                저평가 종목 통합 조회 — ★ IA v3 밀도 절제: 기능은 그대로 두고
+                접이식(details)으로 수납했습니다(시안 1b 는 시그널+스크리너가 주역).
             ═══════════════════════════════════════════════════════ */}
-            <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "16px", padding: "22px 24px", marginTop: "20px" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: mf(18), marginBottom: "3px", color: C.text1 }}>💎 저평가 종목 통합 조회</div>
-                  <div style={{ fontSize: mf(16), color: C.text3 }}>PER · PBR · 배당률 · 애널리스트 목표가 · 52주 위치 종합 분석</div>
+            <details style={{ marginTop: "20px" }}>
+              <summary style={{
+                listStyle: "none", cursor: "pointer", background: C.card, border: `1px solid ${C.border}`,
+                borderRadius: "16px", padding: "13px 16px", display: "flex", alignItems: "center", gap: "10px",
+              }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 800, fontSize: mf(14), color: C.text1 }}>💎 {t("tabs.screener.valueTitle")}</div>
+                  <div style={{ fontSize: mf(11), color: C.text3, marginTop: "2px" }}>{t("tabs.screener.valueDesc")}</div>
                 </div>
+                <span style={{ fontSize: "12px", color: C.text3, flexShrink: 0 }} aria-hidden="true">▾</span>
+              </summary>
+            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "18px 16px", marginTop: "8px" }}>
+              {/* 제목·설명은 summary 가 전달 — 본문은 실행 버튼부터(이중 노출 방지) */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
                 <button onClick={runValueScan} disabled={valueScanning} style={{
                   padding: isMobile ? "12px 16px" : "10px 20px", borderRadius: "12px", fontSize: mf(17), fontWeight: 700,
                   background: valueScanning ? C.card2 : C.green, color: valueScanning ? C.text3 : "#fff",
@@ -11166,7 +10094,7 @@ function AppInner() {
                     ? <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
                         <span style={{ animation: "pulse 1s infinite" }}>⏳</span> {valueScanProgress.done}/{valueScanProgress.total}
                       </span>
-                    : "💎 저평가 스캔"}
+                    : `💎 ${t("tabs.screener.valueScanBtn")}`}
                 </button>
               </div>
 
@@ -11182,14 +10110,14 @@ function AppInner() {
 
               {valueLastScan && !valueScanning && (
                 <div style={{ fontSize: mf(16), color: C.text3, marginBottom: "10px" }}>
-                  마지막 스캔: {valueLastScan.toLocaleTimeString("ko-KR")} · 전체 {valueResults.length}개 분석 · 저평가 {filteredValue.length}개 발견
+                  {t("tabs.screener.valueScanMeta", { time: valueLastScan.toLocaleTimeString(lang === "en" ? "en-US" : "ko-KR"), total: valueResults.length, found: filteredValue.length })}
                 </div>
               )}
 
               {/* 필터 + 정렬 */}
               {valueResults.length > 0 && (
                 <div style={{ display: "flex", gap: "6px", alignItems: "center", marginBottom: "12px", flexWrap: "wrap" }}>
-                  {[["all","전체"], ["us","🇺🇸 미국"], ["kr","🇰🇷 한국"]].map(([v, l]) => (
+                  {[["all", t("tabs.home.all")], ["us", t("tabs.quantReport.us")], ["kr", t("tabs.quantReport.kr")]].map(([v, l]) => (
                     <button key={v} onClick={() => setValueFilter(v)} style={{
                       padding: "4px 10px", borderRadius: "8px", fontSize: mf(16), fontWeight: 600,
                       background: valueFilter === v ? C.greenBg : "transparent",
@@ -11197,8 +10125,8 @@ function AppInner() {
                     }}>{l}</button>
                   ))}
                   <div style={{ marginLeft: "auto", display: "flex", gap: "4px", alignItems: "center" }}>
-                    <span style={{ fontSize: mf(16), color: C.text3 }}>정렬</span>
-                    {[["score","종합"], ["per","PER↑"], ["pbr","PBR↑"], ["div","배당↓"], ["upside","목표가↓"]].map(([v, l]) => (
+                    <span style={{ fontSize: mf(16), color: C.text3 }}>{t("tabs.screener.sortLabel")}</span>
+                    {[["score", t("tabs.screener.valueSortTotal")], ["per","PER↑"], ["pbr","PBR↑"], ["div", t("tabs.screener.valueSortDiv")], ["upside", t("tabs.screener.valueSortUpside")]].map(([v, l]) => (
                       <button key={v} onClick={() => setValueSortBy(v)} style={{
                         padding: "3px 7px", borderRadius: "6px", fontSize: mf(15), fontWeight: 600,
                         background: valueSortBy === v ? C.greenBg : "transparent", color: valueSortBy === v ? C.green : C.text3,
@@ -11214,7 +10142,7 @@ function AppInner() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   {filteredValue.slice(0, 50).map((s, i) => {
                     const scoreColor = s.score >= 80 ? C.green : s.score >= 65 ? C.blue : C.yellow;
-                    const scoreLabel = s.score >= 80 ? "강력 저평가" : s.score >= 70 ? "저평가" : s.score >= 60 ? "저평가 가능성" : "주의 관찰";
+                    const scoreLabel = s.score >= 80 ? t("tabs.screener.valueStrong") : s.score >= 70 ? t("tabs.screener.valueUndervalued") : s.score >= 60 ? t("tabs.screener.valuePossible") : t("tabs.screener.valueWatch");
                     return (
                       <div key={s.symbol} onClick={() => { setSelectedAsset({ symbol: s.symbol, name: s.name }); }} style={{
                         background: C.card2, borderRadius: "12px", padding: isMobile ? "12px 12px" : "12px 14px",
@@ -11234,7 +10162,7 @@ function AppInner() {
                             <span style={{
                               padding: "2px 8px", borderRadius: "6px", fontSize: "16px", fontWeight: 700,
                               background: `${scoreColor}22`, color: scoreColor,
-                            }}>{s.score}점</span>
+                            }}>{t("tabs.screener.scorePts", { n: s.score })}</span>
                           </div>
                         </div>
                         {/* 지표 행 */}
@@ -11251,12 +10179,12 @@ function AppInner() {
                           )}
                           {s.divYield > 0 && (
                             <span style={{ fontSize: mf(15), padding: "2px 6px", borderRadius: "4px", background: s.divYield > 3 ? `${C.yellow}18` : `${C.text3}18`, color: s.divYield > 3 ? C.yellow : C.text3 }}>
-                              배당 {s.divYield.toFixed(1)}%
+                              {t("tabs.screener.divShort")} {s.divYield.toFixed(1)}%
                             </span>
                           )}
                           {s.upside != null && (
                             <span style={{ fontSize: mf(15), padding: "2px 6px", borderRadius: "4px", background: s.upside > 15 ? `${C.green}18` : s.upside > 0 ? `${C.blue}18` : `${C.red}18`, color: s.upside > 15 ? C.green : s.upside > 0 ? C.blue : C.red }}>
-                              목표 {s.upside > 0 ? "+" : ""}{s.upside.toFixed(0)}%
+                              {t("tabs.screener.targetShort")} {s.upside > 0 ? "+" : ""}{s.upside.toFixed(0)}%
                             </span>
                           )}
                           {s.fpe != null && s.per != null && s.fpe < s.per * 0.85 && (
@@ -11276,7 +10204,7 @@ function AppInner() {
                   })}
                   {filteredValue.length > 50 && (
                     <div style={{ textAlign: "center", fontSize: mf(16), color: C.text3, padding: "8px" }}>
-                      상위 50개만 표시 (전체 {filteredValue.length}개)
+                      {t("tabs.screener.top50Only", { n: filteredValue.length })}
                     </div>
                   )}
                 </div>
@@ -11286,24 +10214,29 @@ function AppInner() {
                 <div style={{ textAlign: "center", padding: "24px", color: C.text3 }}>
                   <div style={{ fontSize: mf(36), marginBottom: "10px" }}>💎</div>
                   <div style={{ fontSize: mf(17), lineHeight: 1.7 }}>
-                    <strong style={{ color: C.green }}>저평가 스캔</strong>을 눌러 미국·한국 주식의<br />
-                    밸류에이션을 종합 분석합니다
+                    <strong style={{ color: C.green }}>{t("tabs.screener.valueScanBtn")}</strong>{t("tabs.screener.valueEmptyDesc1")}<br />
+                    {t("tabs.screener.valueEmptyDesc2")}
                   </div>
                   <div style={{ fontSize: mf(16), marginTop: "8px", color: C.text3 }}>
-                    PER · PBR · 배당수익률 · Forward PE · 애널리스트 목표가 · 52주 위치 · 200일선 괴리 기반
+                    {t("tabs.screener.valueBasis")}
                   </div>
                 </div>
               )}
 
               {!valueScanning && valueResults.length > 0 && filteredValue.length === 0 && (
                 <div style={{ textAlign: "center", padding: "20px", color: C.text3, fontSize: mf(17) }}>
-                  선택한 시장에 저평가 기준 충족 종목 없음 — 필터를 변경해보세요
+                  {t("tabs.screener.valueMarketEmpty")}
                 </div>
               )}
             </div>
+            </details>
+
+            {/* 시안 1b 하단 면책 — 시그널·스크리너 공용 1회(이중 노출 방지) */}
+            <Disclaimer style={{ marginTop: "14px" }}>{t("tabs.coin.disclaimer")}</Disclaimer>
 
           </div>
-        )}
+          );
+        })()}
 
         {/* ═══════════════════════════════════════════════════════════
             TAB: 포트폴리오
@@ -11361,7 +10294,7 @@ function AppInner() {
                 <div>
                   <h2 style={{ margin: 0, fontSize: isMobile ? mf(20) : "24px", fontWeight: 800, color: C.text1 }}>{t("tabs.home.anomalyDetection")}</h2>
                   <div style={{ fontSize: "16px", color: C.text3, marginTop: "2px" }}>
-                    통계적 이상치 기반 실시간 시장 모니터링
+                    {t("tabs.anomaly.subtitle")}
                   </div>
                 </div>
                 <div style={{ marginLeft: "auto", textAlign: "right" }}>
@@ -11369,16 +10302,16 @@ function AppInner() {
                     fontSize: "32px", fontWeight: 800,
                     color: anomalies.length > 0 ? C.red : C.green,
                   }}>{anomalies.length}</div>
-                  <div style={{ fontSize: "16px", color: C.text3 }}>감지됨</div>
+                  <div style={{ fontSize: "16px", color: C.text3 }}>{t("tabs.anomaly.detected")}</div>
                 </div>
               </div>
 
               {/* 통계 요약 3칸 — 대형화 및 색상 강화 */}
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: "12px" }}>
                 {[
-                  { label: "급등", value: anomalies.filter(a => a.anomalyType === "surge").length, icon: "🚀", color: C.green },
-                  { label: "급락", value: anomalies.filter(a => a.anomalyType === "crash").length, icon: "💥", color: C.red },
-                  { label: "고위험", value: anomalies.filter(a => a.severity === "high").length, icon: "🔴", color: C.yellow },
+                  { label: t("tabs.anomaly.surge"), value: anomalies.filter(a => a.anomalyType === "surge").length, icon: "🚀", color: C.green },
+                  { label: t("tabs.anomaly.plunge"), value: anomalies.filter(a => a.anomalyType === "crash").length, icon: "💥", color: C.red },
+                  { label: t("tabs.anomaly.highRisk"), value: anomalies.filter(a => a.severity === "high").length, icon: "🔴", color: C.yellow },
                 ].map((s, i) => (
                   <div key={i} style={{
                     background: `linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,
@@ -11397,10 +10330,10 @@ function AppInner() {
             {/* 필터 탭 */}
             <div style={{ display: "flex", gap: "8px", flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : "visible", paddingBottom: isMobile ? "8px" : "0" }}>
               {[
-                { key: "all", label: "전체", icon: "📊" },
-                { key: "surge", label: "급등", icon: "🚀" },
-                { key: "crash", label: "급락", icon: "💥" },
-                { key: "high", label: "고위험", icon: "🔴" },
+                { key: "all", label: t("tabs.anomaly.all"), icon: "📊" },
+                { key: "surge", label: t("tabs.anomaly.surge"), icon: "🚀" },
+                { key: "crash", label: t("tabs.anomaly.plunge"), icon: "💥" },
+                { key: "high", label: t("tabs.anomaly.highRisk"), icon: "🔴" },
               ].map(f => {
                 const count = f.key === "all" ? anomalies.length
                   : f.key === "high" ? anomalies.filter(a => a.severity === "high").length
@@ -11437,12 +10370,12 @@ function AppInner() {
                     {anomalies.length === 0 ? "✅" : "🔍"}
                   </div>
                   <div style={{ fontWeight: 700, fontSize: "18px", color: C.text1, marginBottom: "8px" }}>
-                    {anomalies.length === 0 ? "이상 징후 없음" : "해당 필터 결과 없음"}
+                    {anomalies.length === 0 ? t("tabs.anomaly.emptyTitle") : t("tabs.anomaly.emptyFilterTitle")}
                   </div>
                   <div style={{ color: C.text3, fontSize: "18px", lineHeight: 1.7 }}>
                     {anomalies.length === 0
-                      ? <>현재 시장에서 통계적 이상치가 감지되지 않았습니다<br/>2σ 이상 변동, 3x 이상 거래량 폭증 시 알림됩니다</>
-                      : <>다른 필터를 선택하거나 전체 보기를 이용하세요</>}
+                      ? <>{t("tabs.anomaly.emptyDesc1")}<br/>{t("tabs.anomaly.emptyDesc2")}</>
+                      : <>{t("tabs.anomaly.emptyFilterDesc")}</>}
                   </div>
                 </div>
               );
@@ -11520,9 +10453,9 @@ function AppInner() {
                         }}>
                           {[
                             a.rsi != null && { label: "RSI", value: a.rsi.toFixed(1), color: a.rsi > 70 ? C.red : a.rsi < 30 ? C.green : C.text2 },
-                            a.volRatio != null && { label: "거래량 비율", value: `${a.volRatio.toFixed(1)}x`, color: a.volRatio > 3 ? C.red : C.text2 },
-                            a.ma200Dist != null && { label: "MA200 괴리", value: `${a.ma200Dist > 0 ? "+" : ""}${a.ma200Dist.toFixed(1)}%`, color: a.ma200Dist > 20 ? C.red : a.ma200Dist < -20 ? C.green : C.text2 },
-                            a.weeklyChange != null && { label: "주간 변동", value: `${a.weeklyChange > 0 ? "+" : ""}${a.weeklyChange.toFixed(1)}%`, color: a.weeklyChange >= 0 ? C.green : C.red },
+                            a.volRatio != null && { label: t("tabs.anomaly.volRatio"), value: `${a.volRatio.toFixed(1)}x`, color: a.volRatio > 3 ? C.red : C.text2 },
+                            a.ma200Dist != null && { label: t("tabs.anomaly.ma200Gap"), value: `${a.ma200Dist > 0 ? "+" : ""}${a.ma200Dist.toFixed(1)}%`, color: a.ma200Dist > 20 ? C.red : a.ma200Dist < -20 ? C.green : C.text2 },
+                            a.weeklyChange != null && { label: t("tabs.anomaly.weeklyChange"), value: `${a.weeklyChange > 0 ? "+" : ""}${a.weeklyChange.toFixed(1)}%`, color: a.weeklyChange >= 0 ? C.green : C.red },
                             a.stochasticK != null && { label: "Stoch K", value: a.stochasticK.toFixed(1), color: a.stochasticK > 80 ? C.red : a.stochasticK < 20 ? C.green : C.text2 },
                             a.williamsR != null && { label: "Williams %R", value: a.williamsR.toFixed(1), color: a.williamsR > -20 ? C.red : a.williamsR < -80 ? C.green : C.text2 },
                           ].filter(Boolean).map((ind, ii) => (
@@ -11535,7 +10468,7 @@ function AppInner() {
 
                         {/* 감지 시간 */}
                         <div style={{ fontSize: "16px", color: C.text3, marginTop: "10px", textAlign: "right" }}>
-                          감지: {a.detectedAt ? new Date(a.detectedAt).toLocaleTimeString("ko-KR") : "-"}
+                          {t("tabs.anomaly.detectedAt", { time: a.detectedAt ? new Date(a.detectedAt).toLocaleTimeString(lang === "en" ? "en-US" : "ko-KR") : "-" })}
                         </div>
                       </div>
                     );
@@ -11550,20 +10483,20 @@ function AppInner() {
               border: `1px solid ${C.border}20`,
             }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
-                <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: C.text1 }}>📜 탐지 히스토리</h3>
+                <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 700, color: C.text1 }}>📜 {t("tabs.anomaly.history")}</h3>
                 {anomalyHistory.length > 0 && (
                   <button onClick={() => {
-                    if (!confirm("이상 탐지 히스토리를 전부 삭제하시겠습니까?")) return;
+                    if (!confirm(t("tabs.anomaly.historyClearConfirm"))) return;
                     setAnomalyHistory([]); try { localStorage.removeItem("di_anomaly_history"); } catch {}
                   }} style={{
                     padding: "4px 12px", borderRadius: "8px", fontSize: "16px",
                     background: `${C.red}15`, color: C.red, border: "none", cursor: "pointer", fontWeight: 600,
-                  }}>초기화</button>
+                  }}>{t("tabs.anomaly.historyReset")}</button>
                 )}
               </div>
               {anomalyHistory.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "24px 0", color: C.text3, fontSize: "18px" }}>
-                  아직 기록된 이상 탐지 히스토리가 없습니다
+                  {t("tabs.anomaly.historyEmpty")}
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "300px", overflowY: "auto" }}>
@@ -11592,13 +10525,13 @@ function AppInner() {
               background: C.card, borderRadius: "16px", padding: "18px 20px",
               border: `1px solid ${C.border}20`,
             }}>
-              <h3 style={{ margin: "0 0 12px", fontSize: "18px", fontWeight: 700, color: C.text1 }}>📐 탐지 기준</h3>
+              <h3 style={{ margin: "0 0 12px", fontSize: "18px", fontWeight: 700, color: C.text1 }}>📐 {t("tabs.anomaly.criteria")}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {[
-                  { icon: "📈", title: "가격 이상 변동", desc: "전체 평균 대비 2σ 이상 + 3% 이상 변동" },
-                  { icon: "📊", title: "거래량 폭증", desc: "5일 평균 대비 3배 이상 거래량" },
-                  { icon: "⬆️", title: "급격한 갭", desc: "전일 종가 대비 3% 이상 갭 발생" },
-                  { icon: "🔴", title: "고위험 등급", desc: "평균 대비 3σ 이상 극단적 변동" },
+                  { icon: "📈", title: t("tabs.anomaly.critPrice"), desc: t("tabs.anomaly.critPriceDesc") },
+                  { icon: "📊", title: t("tabs.anomaly.critVolume"), desc: t("tabs.anomaly.critVolumeDesc") },
+                  { icon: "⬆️", title: t("tabs.anomaly.critGap"), desc: t("tabs.anomaly.critGapDesc") },
+                  { icon: "🔴", title: t("tabs.anomaly.critHigh"), desc: t("tabs.anomaly.critHighDesc") },
                 ].map((c, i) => (
                   <div key={i} style={{
                     padding: "12px", borderRadius: "12px",
@@ -11685,10 +10618,10 @@ function AppInner() {
             if (sellPicks > 5) mktScore -= 6; else if (sellPicks > 2) mktScore -= 3;
           }
           mktScore = Math.max(0, Math.min(100, mktScore));
-          const mktVerdict = mktScore >= 70 ? "강세" : mktScore >= 55 ? "약 강세" : mktScore >= 45 ? "혼조" : mktScore >= 30 ? "약세" : "강한 약세";
+          const mktVerdict = mktScore >= 70 ? t("tabs.quantReport.verdictStrongBull") : mktScore >= 55 ? t("tabs.quantReport.verdictWeakBull") : mktScore >= 45 ? t("tabs.quantReport.verdictMixed") : mktScore >= 30 ? t("tabs.quantReport.verdictWeakBear") : t("tabs.quantReport.verdictStrongBear");
           const mktColor = mktScore >= 60 ? C.green : mktScore >= 45 ? C.yellow : C.red;
           const now = new Date();
-          const reportTime = now.toLocaleString("ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
+          const reportTime = now.toLocaleString(lang === "en" ? "en-US" : "ko-KR", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" });
 
           // 섹터별 분류
           const usStocks = hotAssets.filter(a => a.market === "us");
@@ -11722,20 +10655,20 @@ function AppInner() {
             <div className="tab-content flex flex-col gap-3" style={{ maxWidth: "1200px", margin: "0 auto" }}>
               {/* ── 헤더 — 시안 1b: 타이틀 + 기준 시각 알약 + 공유(기존 로직 유지) ── */}
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span style={{ fontSize: "22px", fontWeight: 800, letterSpacing: "-0.01em", color: C.text1 }}>시장 리포트</span>
+                <span style={{ fontSize: "22px", fontWeight: 800, letterSpacing: "-0.01em", color: C.text1 }}>{t("tabs.quantReport.marketReportTitle")}</span>
                 <div className="flex items-center gap-2">
-                  <span style={{ fontSize: "11px", fontWeight: 700, padding: "5px 11px", borderRadius: "9999px", background: C.card, border: `1px solid ${C.border}`, color: C.text2 }}>{reportTime} 기준</span>
+                  <span style={{ fontSize: "11px", fontWeight: 700, padding: "5px 11px", borderRadius: "9999px", background: C.card, border: `1px solid ${C.border}`, color: C.text2 }}>{t("tabs.quantReport.asOfTime", { time: reportTime })}</span>
                   <button onClick={() => {
-                    const shareText = `[Zepta 시장 리포트] ${reportTime}\n\n시장 점수: ${mktScore}/100 (${mktVerdict})\n상승 ${upCount}개 · 하락 ${dnCount}개\n\n지수·공포탐욕·상승비율 합산 스코어\n👉 https://zepta.app`;
+                    const shareText = t("tabs.quantReport.shareText", { time: reportTime, score: mktScore, verdict: mktVerdict, up: upCount, dn: dnCount });
                     if (navigator.share) {
-                      navigator.share({ title: "Zepta 시장 리포트", text: shareText, url: "https://zepta.app" }).catch(() => {});
+                      navigator.share({ title: t("tabs.quantReport.shareTitle"), text: shareText, url: "https://zepta.app" }).catch(() => {});
                     } else {
-                      navigator.clipboard.writeText(shareText).then(() => showToast("리포트가 복사되었습니다!", "success")).catch(() => {});
+                      navigator.clipboard.writeText(shareText).then(() => showToast(t("tabs.quantReport.copied"), "success")).catch(() => {});
                     }
                   }} style={{
                     fontSize: "12px", fontWeight: 800, padding: "5px 12px", borderRadius: "9999px",
                     background: `${C.blue}1A`, color: C.blueL || C.blue, border: "none", cursor: "pointer", fontFamily: "inherit",
-                  }}>📤 공유</button>
+                  }}>📤 {t("tabs.quantReport.share")}</button>
                 </div>
               </div>
 
@@ -11751,8 +10684,8 @@ function AppInner() {
                     <div style={{ width: "52px", height: "52px", borderRadius: "16px", background: C.card2, display: "flex", alignItems: "center", justifyContent: "center", color: C.text3 }}>
                       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 14" /></svg>
                     </div>
-                    <div style={{ fontSize: "15px", fontWeight: 800, color: C.text1, marginTop: "8px" }}>리포트를 집계하고 있어요</div>
-                    <div style={{ fontSize: "12.5px", color: C.text3, lineHeight: 1.6, maxWidth: "240px" }}>시장 지수와 신호 데이터를 모아 요약해요. 데이터가 준비되면 바로 표시돼요.</div>
+                    <div style={{ fontSize: "15px", fontWeight: 800, color: C.text1, marginTop: "8px" }}>{t("tabs.quantReport.emptyTitle")}</div>
+                    <div style={{ fontSize: "12.5px", color: C.text3, lineHeight: 1.6, maxWidth: "240px" }}>{t("tabs.quantReport.emptyDesc")}</div>
                   </div>
                 </>
               ) : (
@@ -11763,7 +10696,7 @@ function AppInner() {
                 border: `1px solid ${C.border}`, borderLeft: `3px solid ${mktColor}`,
                 borderRadius: "16px", padding: "16px",
               }}>
-                <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>시장 종합 점수</div>
+                <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>{t("tabs.quantReport.overallScore")}</div>
                 <div className="flex items-baseline gap-2" style={{ marginTop: "4px" }}>
                   <Num size="38px" weight={800} color={mktColorHi}>{mktScore}</Num>
                   <Num size="13px" color={C.text3}>/ 100</Num>
@@ -11775,24 +10708,26 @@ function AppInner() {
                 </div>
                 <div style={{ fontSize: "13px", color: C.text2, marginTop: "10px", lineHeight: 1.6 }}>
                   {mktScore >= 60
-                    ? `상승 신호가 우세한 상태입니다. 상승 종목 ${upCount}개${dailyPicks.length > 0 ? `, 상승 신호 ${buyPicks}개가 감지되었습니다` : ""}.`
+                    ? (dailyPicks.length > 0
+                        ? t("tabs.quantReport.messagesBullish", { upCount, buyPicks })
+                        : t("tabs.quantReport.messagesBullishNoScan", { upCount }))
                     : mktScore >= 45
-                    ? `상승·하락 신호가 혼재된 혼조 상태입니다.`
-                    : `하락 신호가 우세한 상태입니다. 하락 종목 ${dnCount}개.`}
+                    ? t("tabs.quantReport.messagesMixed")
+                    : t("tabs.quantReport.messagesBearish", { dnCount })}
                 </div>
-                <div style={{ fontSize: "11px", color: C.text3, marginTop: "6px" }}>지수 · 투자심리 · 상승 종목 비율 합산 점수</div>
+                <div style={{ fontSize: "11px", color: C.text3, marginTop: "6px" }}>{t("tabs.quantReport.aiAnalysis")}</div>
               </div>
 
               {/* ── 주요 지수 — 시안 타일(모바일 스크롤 / 데스크탑 그리드) ── */}
               {marketIndices.length > 0 && (
                 <div>
-                  <MobileSectionHeader title="주요 지수" style={{ marginBottom: "8px" }} />
+                  <MobileSectionHeader title={t("tabs.quantReport.marketIndices")} style={{ marginBottom: "8px" }} />
                   <IndexStrip layout={isMobile ? "scroll" : "grid"} numSize={isMobile ? "15px" : "18px"} items={[
                     sp && { label: "S&P 500", value: typeof sp.price === "number" ? sp.price.toLocaleString(undefined, { maximumFractionDigits: 0 }) : sp.price, change: sp.change },
-                    nq && { label: "나스닥", value: typeof nq.price === "number" ? nq.price.toLocaleString(undefined, { maximumFractionDigits: 0 }) : nq.price, change: nq.change },
-                    dji && { label: "다우존스", value: typeof dji.price === "number" ? dji.price.toLocaleString(undefined, { maximumFractionDigits: 0 }) : dji.price, change: dji.change },
-                    ks && { label: "코스피", value: typeof ks.price === "number" ? ks.price.toLocaleString(undefined, { maximumFractionDigits: 0 }) : ks.price, change: ks.change },
-                    kq && { label: "코스닥", value: typeof kq.price === "number" ? kq.price.toLocaleString(undefined, { maximumFractionDigits: 0 }) : kq.price, change: kq.change },
+                    nq && { label: t("tabs.home.nasdaqLabel"), value: typeof nq.price === "number" ? nq.price.toLocaleString(undefined, { maximumFractionDigits: 0 }) : nq.price, change: nq.change },
+                    dji && { label: t("tabs.home.dowLabel"), value: typeof dji.price === "number" ? dji.price.toLocaleString(undefined, { maximumFractionDigits: 0 }) : dji.price, change: dji.change },
+                    ks && { label: t("tabs.home.kospiLabel"), value: typeof ks.price === "number" ? ks.price.toLocaleString(undefined, { maximumFractionDigits: 0 }) : ks.price, change: ks.change },
+                    kq && { label: t("tabs.home.kosdaqLabel"), value: typeof kq.price === "number" ? kq.price.toLocaleString(undefined, { maximumFractionDigits: 0 }) : kq.price, change: kq.change },
                     vix && { label: "VIX", value: typeof vix.price === "number" ? vix.price.toFixed(1) : vix.price, change: vix.change },
                   ].filter(Boolean)} />
                 </div>
@@ -11800,14 +10735,14 @@ function AppInner() {
 
               {/* ── 핵심 지표 타일 — 시안 2열 그리드, mono 수치 + 상태 서술 ── */}
               <div>
-                <MobileSectionHeader title="센티먼트 지표" style={{ marginBottom: "8px" }} />
+                <MobileSectionHeader title={t("tabs.quantReport.sentimentIndicators")} style={{ marginBottom: "8px" }} />
                 <div className={isMobile ? "grid grid-cols-2 gap-2.5" : "grid grid-cols-4 gap-2.5"}>
                   <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "12px 14px" }}>
-                    <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>공포탐욕 지수</div>
+                    <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>{t("tabs.quantReport.fearGreedIndex")}</div>
                     <div style={{ marginTop: "3px" }}>
                       <Num size="18px" weight={800} color={fg ? (fg > 60 ? (C.greenL || C.green) : fg > 40 ? (C.yellowL || C.yellow) : (C.redL || C.red)) : C.text3}>{fg || "—"}</Num>
                     </div>
-                    <div style={{ fontSize: "11px", fontWeight: 700, marginTop: "2px", color: C.text3 }}>{fg ? (fg <= 25 ? "극도의 공포" : fg <= 40 ? "공포" : fg <= 60 ? "중립" : fg <= 75 ? "탐욕" : "극도의 탐욕") : "집계 없음"}</div>
+                    <div style={{ fontSize: "11px", fontWeight: 700, marginTop: "2px", color: C.text3 }}>{fg ? (fg <= 25 ? t("tabs.home.extremeFear") : fg <= 40 ? t("tabs.home.fear") : fg <= 60 ? t("tabs.home.neutral") : fg <= 75 ? t("tabs.home.greed") : t("tabs.home.extremeGreed")) : t("tabs.quantReport.noData")}</div>
                     {fg && (
                       <div style={{ position: "relative", height: "12px", marginTop: "6px" }}>
                         <div style={{ position: "absolute", top: "3px", left: 0, right: 0, height: "6px", borderRadius: "9999px", background: `linear-gradient(90deg, ${C.red}, ${C.yellow}, ${C.green})` }} />
@@ -11817,7 +10752,7 @@ function AppInner() {
                   </div>
                   {hotAssets.length > 0 && (
                     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "12px 14px" }}>
-                      <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>상승/하락 비율</div>
+                      <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>{t("tabs.quantReport.upDownRatio")}</div>
                       <div style={{ marginTop: "3px" }}>
                         <Num size="18px" weight={800} color={advDecl > 55 ? (C.greenL || C.green) : advDecl < 45 ? (C.redL || C.red) : (C.yellowL || C.yellow)}>{advDecl.toFixed(0)}%</Num>
                       </div>
@@ -11825,26 +10760,26 @@ function AppInner() {
                         <div className="h-full" style={{ width: `${advDecl}%`, background: C.green }} />
                         <div className="h-full flex-1" style={{ background: C.red }} />
                       </div>
-                      <div style={{ fontSize: "11px", fontWeight: 700, marginTop: "4px", color: C.text3 }}>상승 {upCount} · 보합 {flatCount} · 하락 {dnCount}</div>
+                      <div style={{ fontSize: "11px", fontWeight: 700, marginTop: "4px", color: C.text3 }}>{t("tabs.quantReport.upFlatDown", { up: upCount, flat: flatCount, dn: dnCount })}</div>
                     </div>
                   )}
                   {vix && (
                     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "12px 14px" }}>
-                      <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>VIX (변동성)</div>
+                      <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>{t("tabs.quantReport.vixVolatility")}</div>
                       <div style={{ marginTop: "3px" }}>
                         <Num size="18px" weight={800} color={vix.price > 30 ? (C.redL || C.red) : vix.price > 20 ? (C.yellowL || C.yellow) : (C.greenL || C.green)}>{vix.price?.toFixed(1)}</Num>
                       </div>
-                      <div style={{ fontSize: "11px", fontWeight: 700, marginTop: "2px", color: vix.price > 30 ? (C.redL || C.red) : vix.price > 20 ? (C.yellowL || C.yellow) : (C.greenL || C.green) }}>{vix.price > 30 ? "고변동 구간" : vix.price > 20 ? "보통 수준" : "안정 구간"}</div>
+                      <div style={{ fontSize: "11px", fontWeight: 700, marginTop: "2px", color: vix.price > 30 ? (C.redL || C.red) : vix.price > 20 ? (C.yellowL || C.yellow) : (C.greenL || C.green) }}>{vix.price > 30 ? t("tabs.quantReport.vixHigh") : vix.price > 20 ? t("tabs.quantReport.vixMid") : t("tabs.quantReport.vixLow")}</div>
                     </div>
                   )}
                   {/* 스캔 전(빈 배열)에는 "0 / 0 종목" 같은 거짓 수치 대신 타일을 숨깁니다 */}
                   {dailyPicks.length > 0 && (
                     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "12px 14px" }}>
-                      <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>상승 신호 감지</div>
+                      <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>{t("tabs.quantReport.buySignals")}</div>
                       <div style={{ marginTop: "3px" }}>
                         <Num size="18px" weight={800} color={C.blueL || C.blue}>{buyPicks}</Num>
                       </div>
-                      <div style={{ fontSize: "11px", fontWeight: 700, marginTop: "2px", color: C.text3 }}>/ {dailyPicks.length} 종목 스캔</div>
+                      <div style={{ fontSize: "11px", fontWeight: 700, marginTop: "2px", color: C.text3 }}>{t("tabs.quantReport.scannedOf", { n: dailyPicks.length })}</div>
                     </div>
                   )}
                 </div>
@@ -11853,21 +10788,21 @@ function AppInner() {
               {/* ── 시장별 현황 — 시안 태그 칩 + 상태 서술 + 등락 칩 ── */}
               {hotAssets.length > 0 && (
                 <div>
-                  <MobileSectionHeader title="시장별 현황" style={{ marginBottom: "8px" }} />
+                  <MobileSectionHeader title={t("tabs.quantReport.marketStatus")} style={{ marginBottom: "8px" }} />
                   <div className={isMobile ? "flex flex-col gap-2.5" : "grid grid-cols-3 gap-2.5"}>
                     {[
-                      { tag: "US", name: "미국 주식", color: C.blue, hi: C.blueL || C.blue, total: usStocks.length, up: usUp, movers: usGainers },
-                      { tag: "KR", name: "한국 주식", color: C.green, hi: C.greenL || C.green, total: krStocks.length, up: krUp, movers: krGainers },
-                      { tag: "₿", name: "크립토", color: C.purple, hi: C.purpleL || C.purple, total: cryptos.length, up: cryptoUp, movers: cryptoGainers },
+                      { tag: "US", name: t("tabs.quantReport.usStocks"), color: C.blue, hi: C.blueL || C.blue, total: usStocks.length, up: usUp, movers: usGainers },
+                      { tag: "KR", name: t("tabs.quantReport.krStocks"), color: C.green, hi: C.greenL || C.green, total: krStocks.length, up: krUp, movers: krGainers },
+                      { tag: "₿", name: t("tabs.quantReport.cryptoName"), color: C.purple, hi: C.purpleL || C.purple, total: cryptos.length, up: cryptoUp, movers: cryptoGainers },
                     ].map(m => (
                       <div key={m.name} style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "14px 15px" }}>
                         <div className="flex items-center gap-2">
                           <span style={{ width: "30px", height: "30px", borderRadius: "9px", background: `${m.color}1A`, color: m.hi, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 800, flexShrink: 0 }}>{m.tag}</span>
                           <span style={{ fontSize: "14px", fontWeight: 800, color: C.text1 }}>{m.name}</span>
-                          <Num size="12px" color={C.text2} style={{ marginLeft: "auto" }}>{m.total > 0 ? `${m.up}/${m.total} 상승` : "—"}</Num>
+                          <Num size="12px" color={C.text2} style={{ marginLeft: "auto" }}>{m.total > 0 ? t("tabs.quantReport.upOfTotal", { up: m.up, total: m.total }) : "—"}</Num>
                         </div>
                         <div style={{ fontSize: "12px", color: C.text3, marginTop: "8px" }}>
-                          {m.total > 0 ? `추적 중인 ${m.total}개 종목 중 ${(m.up / m.total * 100).toFixed(0)}%가 상승 중입니다` : "집계된 종목이 없습니다"}
+                          {m.total > 0 ? t("tabs.quantReport.breadthDesc", { total: m.total, pct: (m.up / m.total * 100).toFixed(0) }) : t("tabs.quantReport.noAggregated")}
                         </div>
                         {m.total > 0 && (
                           <div style={{ height: "4px", borderRadius: "9999px", background: C.card2, overflow: "hidden", marginTop: "8px" }}>
@@ -11891,30 +10826,31 @@ function AppInner() {
 
               {/* 섹터별 퍼포먼스 히트맵 (v9.1) */}
               {hotAssets.length > 0 && (() => {
+                // 섹터 키는 i18n 토큰(tabs.quantReport.sector.*) — 표시 라벨은 t() 로 해석
                 const sectors = {
-                  "반도체": ["NVDA","AMD","INTC","AVGO","QCOM","MU","TSM","ASML","ARM","SMCI","MRVL","LRCX","KLAC","AMAT","ON","TXN","ADI"],
-                  "빅테크": ["AAPL","MSFT","GOOGL","AMZN","META","NFLX","TSLA"],
-                  "소프트웨어": ["CRM","ORCL","ADBE","NOW","SNOW","DDOG","NET","PLTR","PANW","CRWD"],
-                  "핀테크": ["COIN","SQ","PYPL","AFRM","SOFI","HOOD","MSTR"],
-                  "헬스케어": ["UNH","JNJ","LLY","NVO","ABBV","PFE","MRK","AMGN"],
-                  "에너지": ["XOM","CVX","LNG","COP","SLB","OXY","EOG"],
-                  "소비재": ["WMT","COST","HD","MCD","DIS","SBUX","NKE"],
-                  "금융": ["JPM","GS","BAC","V","MA","BLK","MS"],
-                  "EV/클린": ["RIVN","LCID","LI","NIO","XPEV","ENPH","FSLR"],
-                  "중국ADR": ["BABA","JD","PDD","BIDU","NTES"],
+                  semi: ["NVDA","AMD","INTC","AVGO","QCOM","MU","TSM","ASML","ARM","SMCI","MRVL","LRCX","KLAC","AMAT","ON","TXN","ADI"],
+                  bigTech: ["AAPL","MSFT","GOOGL","AMZN","META","NFLX","TSLA"],
+                  software: ["CRM","ORCL","ADBE","NOW","SNOW","DDOG","NET","PLTR","PANW","CRWD"],
+                  fintech: ["COIN","SQ","PYPL","AFRM","SOFI","HOOD","MSTR"],
+                  healthcare: ["UNH","JNJ","LLY","NVO","ABBV","PFE","MRK","AMGN"],
+                  energy: ["XOM","CVX","LNG","COP","SLB","OXY","EOG"],
+                  consumer: ["WMT","COST","HD","MCD","DIS","SBUX","NKE"],
+                  financials: ["JPM","GS","BAC","V","MA","BLK","MS"],
+                  evClean: ["RIVN","LCID","LI","NIO","XPEV","ENPH","FSLR"],
+                  chinaAdr: ["BABA","JD","PDD","BIDU","NTES"],
                 };
-                const sectorData = Object.entries(sectors).map(([name, syms]) => {
+                const sectorData = Object.entries(sectors).map(([key, syms]) => {
                   const matched = syms.map(s => hotAssets.find(a => a.symbol === s)).filter(Boolean);
                   if (matched.length === 0) return null;
                   const avgChange = matched.reduce((s, a) => s + (a.change || 0), 0) / matched.length;
                   const upRatio = matched.filter(a => a.change > 0).length / matched.length;
-                  return { name, avgChange: +avgChange.toFixed(2), count: matched.length, upRatio };
+                  return { name: t(`tabs.quantReport.sector.${key}`), avgChange: +avgChange.toFixed(2), count: matched.length, upRatio };
                 }).filter(Boolean).sort((a, b) => b.avgChange - a.avgChange);
                 if (sectorData.length === 0) return null;
                 const maxAbs = Math.max(...sectorData.map(s => Math.abs(s.avgChange)), 1);
                 return (
                   <div className="rounded-[16px] p-5" style={{ background: C.card, border: `1px solid ${C.border}` }}>
-                    <div style={{ fontSize: "15px", fontWeight: 800, color: C.text1, marginBottom: "12px" }}>섹터 퍼포먼스</div>
+                    <div style={{ fontSize: "15px", fontWeight: 800, color: C.text1, marginBottom: "12px" }}>{t("tabs.quantReport.sectorPerf")}</div>
                     <div className="grid gap-1.5" style={{ gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(140px, 1fr))" }}>
                       {sectorData.map(s => {
                         const intensity = Math.min(Math.abs(s.avgChange) / maxAbs, 1);
@@ -11930,7 +10866,7 @@ function AppInner() {
                               {s.avgChange >= 0 ? "+" : ""}{s.avgChange}%
                             </div>
                             <div className="text-xs mt-0.5" style={{ color: C.text3 }}>
-                              {s.count}종목 · {(s.upRatio * 100).toFixed(0)}% 상승
+                              {t("tabs.quantReport.sectorCellMeta", { count: s.count, pct: (s.upRatio * 100).toFixed(0) })}
                             </div>
                           </div>
                         );
@@ -11944,8 +10880,8 @@ function AppInner() {
               {hotAssets.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {[
-                    { title: "급등 TOP 5", dot: C.green, rows: topGainers },
-                    { title: "급락 TOP 5", dot: C.red, rows: topLosers },
+                    { title: t("tabs.quantReport.surgeTop5"), dot: C.green, rows: topGainers },
+                    { title: t("tabs.quantReport.plungeTop5"), dot: C.red, rows: topLosers },
                   ].map(sec => (
                     <ListCard key={sec.title}>
                       <div className="flex items-center gap-2" style={{ padding: "13px 14px", borderBottom: `1px solid ${C.card2}` }}>
@@ -11972,7 +10908,7 @@ function AppInner() {
               {/* ── 오늘 상승 신호 종목 — 시안 리스트(이름·티커 / ▲점수 / 가격·등락) ── */}
               {topPicks.length > 0 && (
                 <div>
-                  <MobileSectionHeader title="오늘 상승 신호 종목" live style={{ marginBottom: "8px" }} />
+                  <MobileSectionHeader title={t("tabs.quantReport.todayBuySignalStocks")} live style={{ marginBottom: "8px" }} />
                   <ListCard>
                     {topPicks.map((pick, i) => {
                       const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
@@ -12009,8 +10945,8 @@ function AppInner() {
               {topPicks.length > 0 && (
                 <div className="rounded-[16px] p-5" style={{ background: C.card, border: `1px solid ${C.border}` }}>
                   <div className="flex items-center justify-between mb-3">
-                    <span style={{ fontSize: "15px", fontWeight: 800, color: C.text1 }}>종목별 퀀트 전략</span>
-                    <span className="text-sm" style={{ color: C.text3 }}>종목 터치 → 백테스트 상세</span>
+                    <span style={{ fontSize: "15px", fontWeight: 800, color: C.text1 }}>{t("tabs.quantReport.perStockStrategies")}</span>
+                    <span className="text-sm" style={{ color: C.text3 }}>{t("tabs.quantReport.touchForBacktest")}</span>
                   </div>
                   {topPicks.map((pick, i) => {
                     const flag = pick.market === "kr" ? "🇰🇷" : "🇺🇸";
@@ -12034,17 +10970,17 @@ function AppInner() {
                               <span className="text-sm font-bold px-1.5 py-0.5 rounded" style={{
                                 background: d.opinionColor === "green" ? `${C.green}18` : d.opinionColor === "red" ? `${C.red}18` : `${C.yellow}18`,
                                 color: d.opinionColor === "green" ? C.green : d.opinionColor === "red" ? C.red : C.yellow,
-                              }}>{verdictLabel(d.opinion)}</span>
+                              }}>{verdictLabel(d.opinion, t)}</span>
                             )}
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-sm" style={{ color: C.text3 }}>{pick.reason}</span>
-                            {d && <span className="text-sm" style={{ color: C.text3 }}>진단 {d.score}점</span>}
+                            {d && <span className="text-sm" style={{ color: C.text3 }}>{t("tabs.quantReport.diagScore", { score: d.score })}</span>}
                           </div>
                         </div>
                         <div className="text-right flex-shrink-0">
                           <div><ChangeNum value={pick.change} size="14px" /></div>
-                          <div className="text-sm font-bold px-2.5 py-0.5 rounded text-center mt-1" style={{ color: C.blueL || C.blue, background: `${C.blue}12`, border: `1px solid ${C.blue}30` }}>📊 백테스트</div>
+                          <div className="text-sm font-bold px-2.5 py-0.5 rounded text-center mt-1" style={{ color: C.blueL || C.blue, background: `${C.blue}12`, border: `1px solid ${C.blue}30` }}>📊 {t("tabs.quantReport.backtestBadge")}</div>
                         </div>
                       </div>
                     );
@@ -12054,23 +10990,23 @@ function AppInner() {
 
               {/* 오늘의 시장 상태 요약 (표현 3원칙 — 행동 지시 대신 상태 서술만) */}
               <div className="rounded-[16px] p-5" style={{ background: C.card, border: `1px solid ${C.border}` }}>
-                <div style={{ fontSize: "15px", fontWeight: 800, color: C.text1, marginBottom: "10px" }}>오늘의 시장 상태 요약</div>
+                <div style={{ fontSize: "15px", fontWeight: 800, color: C.text1, marginBottom: "10px" }}>{t("tabs.quantReport.todaySummaryTitle")}</div>
                 <div className="flex flex-col gap-2">
                   {(() => {
                     const actions = [];
-                    if (mktScore >= 60) actions.push({ icon: "🟢", text: "상승 신호가 우세한 구간입니다", color: C.green });
-                    else if (mktScore >= 45) actions.push({ icon: "🟡", text: "혼조 구간 — 뚜렷한 방향성이 없습니다", color: C.yellow });
-                    else actions.push({ icon: "🔴", text: "하락 신호가 우세한 구간입니다", color: C.red });
-                    if (anomalies.length > 0) actions.push({ icon: "⚡", text: `이상 탐지 ${anomalies.length}건 — 급등락 종목이 포착됐습니다`, color: C.yellow });
-                    if (buyPicks > 3) actions.push({ icon: "🎯", text: `상승 신호 ${buyPicks}건이 감지됐습니다`, color: C.green });
-                    if (sellPicks > 3) actions.push({ icon: "🛡️", text: `하락 신호 ${sellPicks}건이 감지됐습니다`, color: C.red });
-                    if (fg && fg <= 25) actions.push({ icon: "💎", text: "공포탐욕 지수가 극단적 공포 구간입니다", color: C.purple });
-                    if (fg && fg >= 75) actions.push({ icon: "⚠️", text: "공포탐욕 지수가 극단적 탐욕 구간입니다", color: C.red });
+                    if (mktScore >= 60) actions.push({ icon: "🟢", text: t("tabs.quantReport.sumBull"), color: C.green });
+                    else if (mktScore >= 45) actions.push({ icon: "🟡", text: t("tabs.quantReport.sumMixed"), color: C.yellow });
+                    else actions.push({ icon: "🔴", text: t("tabs.quantReport.sumBear"), color: C.red });
+                    if (anomalies.length > 0) actions.push({ icon: "⚡", text: t("tabs.quantReport.sumAnomaly", { n: anomalies.length }), color: C.yellow });
+                    if (buyPicks > 3) actions.push({ icon: "🎯", text: t("tabs.quantReport.sumBuySignals", { n: buyPicks }), color: C.green });
+                    if (sellPicks > 3) actions.push({ icon: "🛡️", text: t("tabs.quantReport.sumSellSignals", { n: sellPicks }), color: C.red });
+                    if (fg && fg <= 25) actions.push({ icon: "💎", text: t("tabs.quantReport.sumExtremeFear"), color: C.purple });
+                    if (fg && fg >= 75) actions.push({ icon: "⚠️", text: t("tabs.quantReport.sumExtremeGreed"), color: C.red });
                     const vix = marketIndices.find(i => i.symbol === "^VIX");
-                    if (vix?.price > 30) actions.push({ icon: "🌊", text: `VIX ${vix.price.toFixed(1)} — 고변동성 구간입니다`, color: C.red });
+                    if (vix?.price > 30) actions.push({ icon: "🌊", text: t("tabs.quantReport.sumVixHigh", { v: vix.price.toFixed(1) }), color: C.red });
                     if (portfolio.length > 0 && benchmarkData) {
-                      if (benchmarkData.myReturn < -5) actions.push({ icon: "📊", text: "포트폴리오가 손실 구간입니다", color: C.yellow });
-                      else if (benchmarkData.alpha > 3) actions.push({ icon: "🏆", text: `시장 대비 +${benchmarkData.alpha.toFixed(1)}% 초과 수익`, color: C.green });
+                      if (benchmarkData.myReturn < -5) actions.push({ icon: "📊", text: t("tabs.quantReport.sumPortfolioLoss"), color: C.yellow });
+                      else if (benchmarkData.alpha > 3) actions.push({ icon: "🏆", text: t("tabs.quantReport.sumAlpha", { a: benchmarkData.alpha.toFixed(1) }), color: C.green });
                     }
                     return actions.map((a, i) => (
                       <div key={i} className="flex items-center gap-2.5" style={{
@@ -12090,24 +11026,24 @@ function AppInner() {
                 background: `linear-gradient(180deg, ${mktColor}14, transparent 42%), ${C.card}`,
                 border: `1px solid ${C.border}`, borderLeft: `3px solid ${mktColor}`,
               }}>
-                <div style={{ fontSize: "15px", fontWeight: 800, color: C.text1, marginBottom: "10px" }}>시장 상태 종합</div>
+                <div style={{ fontSize: "15px", fontWeight: 800, color: C.text1, marginBottom: "10px" }}>{t("tabs.quantReport.overallStatusTitle")}</div>
                 <div style={{ fontSize: "14px", color: C.text2, lineHeight: 1.8 }}>
                   {mktScore >= 70
-                    ? `현재 시장은 강세 국면입니다. S&P500 ${sp ? `${sp.change >= 0 ? "+" : ""}${sp.change}%` : ""}, 상승종목 비율 ${advDecl.toFixed(0)}%로 상승 신호가 우세한 환경입니다. ${buyPicks}개 종목에서 상승 신호가 감지된 상태입니다.${fg && fg > 75 ? " 공포탐욕 지수는 극단적 탐욕, 즉 과열 구간에 해당합니다." : ""}`
+                    ? t("tabs.quantReport.statusStrongBull", { sp: sp ? `${sp.change >= 0 ? "+" : ""}${sp.change}%` : "", pct: advDecl.toFixed(0), buyPicks }) + (fg && fg > 75 ? " " + t("tabs.quantReport.statusOverheatNote") : "")
                     : mktScore >= 55
-                    ? `시장은 약한 강세를 보이고 있습니다. 상승 종목이 ${upCount}개로 하락 종목(${dnCount}개)보다 많으나, 확실한 방향성은 아직 형성되지 않았습니다. ${fg ? `공포탐욕 ${fg}(${fg <= 40 ? "공포" : fg <= 60 ? "중립" : "탐욕"}) 지표가` : "시장 심리 지표가"} 함께 관측되고 있습니다.`
+                    ? t("tabs.quantReport.statusWeakBull", { upCount, dnCount, fgPart: fg ? t("tabs.quantReport.statusFgPart", { fg, label: fg <= 40 ? t("tabs.home.fear") : fg <= 60 ? t("tabs.home.neutral") : t("tabs.home.greed") }) : t("tabs.quantReport.statusFgFallback") })
                     : mktScore >= 45
-                    ? `혼조 장세입니다. 상승(${upCount})과 하락(${dnCount}) 종목이 팽팽하게 대치하고 있으며, 뚜렷한 방향성이 없습니다. 주요 지지·저항 구간 돌파 여부가 아직 확인되지 않은 상태입니다.`
+                    ? t("tabs.quantReport.statusMixed", { upCount, dnCount })
                     : mktScore >= 30
-                    ? `약세 장세입니다. 하락 종목(${dnCount}개)이 우세하며 시장 심리가 위축되고 있습니다. 하락 신호가 우세한 상태입니다.${fg && fg <= 30 ? " 공포 지수가 낮은 구간입니다." : ""}`
-                    : `강한 약세 장세입니다. 대부분의 종목이 하락세이며, 매도 압력이 강한 구간입니다. 변동성이 확대된 상태입니다.`}
+                    ? t("tabs.quantReport.statusWeakBear", { dnCount }) + (fg && fg <= 30 ? " " + t("tabs.quantReport.statusFearNote") : "")
+                    : t("tabs.quantReport.statusStrongBear")}
                 </div>
                 <div className="flex gap-2 mt-3.5 flex-wrap">
-                  <span style={{ fontSize: "12px", fontWeight: 800, padding: "4px 10px", borderRadius: "8px", background: `${mktColor}1A`, color: mktColorHi, fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>시장점수 {mktScore}/100</span>
-                  <span style={{ fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "8px", background: C.card2, color: C.text3, fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>상승률 {advDecl.toFixed(0)}%</span>
-                  {fg && <span style={{ fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "8px", background: C.card2, color: C.text3, fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>공포탐욕 {fg}</span>}
+                  <span style={{ fontSize: "12px", fontWeight: 800, padding: "4px 10px", borderRadius: "8px", background: `${mktColor}1A`, color: mktColorHi, fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{t("tabs.quantReport.chipScore", { score: mktScore })}</span>
+                  <span style={{ fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "8px", background: C.card2, color: C.text3, fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{t("tabs.quantReport.chipAdv", { pct: advDecl.toFixed(0) })}</span>
+                  {fg && <span style={{ fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "8px", background: C.card2, color: C.text3, fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{t("tabs.quantReport.chipFg", { fg })}</span>}
                   {dailyPicks.length > 0 && (
-                    <span style={{ fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "8px", background: C.card2, color: C.text3, fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>상승 신호 {buyPicks}건</span>
+                    <span style={{ fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "8px", background: C.card2, color: C.text3, fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{t("tabs.quantReport.chipBuy", { n: buyPicks })}</span>
                   )}
                 </div>
               </div>
@@ -12116,7 +11052,7 @@ function AppInner() {
 
               {/* 면책 — quant-report 는 공개 탭이므로 탭 내부 고지 필수 (2026-08 전수 감사) */}
               <Disclaimer style={{ fontSize: "13px", padding: "0 4px" }}>
-                본 화면은 시장 데이터 요약이며 종목 추천이나 투자 권유가 아닙니다. 투자 판단과 책임은 본인에게 있습니다.
+                {t("tabs.quantReport.disclaimer")}
               </Disclaimer>
             </div>
           );
@@ -12137,22 +11073,331 @@ function AppInner() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════
-            TAB: 뉴스
+            TAB: 코인 (/crypto · 내부 id "news") — ★ 2026-08-12 IA v3 (시안 1a ·
+            설계서 v3 2장). 구 뉴스 슬롯을 자산군 이원화에 따라 코인 탭으로 재편.
+            ① 시장 컨텍스트 4카드(온도·공포탐욕·김프·펀딩 — indicators/summary,
+               탭 → 산식·해설 확장 시트. 구 지표 허브 게이지 데이터를 흡수)
+            ② 파생 지표 바(coin-scores oc 유니버스 집계: OI 24h·롱숏·24h 청산
+               롱/숏 게이지(Coinalyze 실데이터) + 스테이블 유동성)
+            ③ 코인 시그널 카드 리스트(전 유니버스, 점수순 — 홈 미리보기와 동일 소스·카드 문법)
+            ④ 신선도 캡션(실측 ts) + 면책. 뉴스 피드는 지표 탭 뉴스 서브탭으로 이동.
+            청산 "맵"(가격대 클러스터)은 데이터 소스 확보 전 — 24h 요약까지만(가짜 금지).
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "news" && (
-          <div className="tab-content">
-            {/* ★ 2026-08 시안 1d: 그라데이션 히어로 → 타이틀 + 보조 설명 헤더 (fetch·상태 로직은 그대로) */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap", marginBottom: "13px" }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: "8px", minWidth: 0, flexWrap: "wrap" }}>
-                <span style={{ fontSize: isMobile ? "22px" : "24px", fontWeight: 800, color: C.text1 }}>{t("tabs.news.title")}</span>
-                <span style={{ fontSize: mf(12), color: C.text3 }}>{t("tabs.news.subtitle")}</span>
+        {tab === "news" && (() => {
+          // tone → 텍스트 하이라이트 색 (uiKit toneColor 의 텍스트 대비 보정판 — AA)
+          const toneHi = (tone) => tone === "up" ? (C.greenL || C.green)
+            : tone === "down" ? (C.redL || C.red)
+            : tone === "hot" ? C.orange
+            : tone === "cold" ? (C.blueL || C.blue) : C.text3;
+          const ctxById = {};
+          (coinCtx || []).forEach(ind => { if (ind?.id) ctxById[ind.id] = ind; });
+          // ① 컨텍스트 4카드 — 값이 실린 지표만 (부분 실패는 해당 카드만 생략)
+          const ctxCards = [
+            { id: "market-temp", label: t("tabs.coin.ctxTemp") },
+            { id: "fear-greed", label: t("tabs.coin.ctxFearGreed") },
+            { id: "kimchi", label: t("tabs.coin.ctxKimchi") },
+            { id: "funding-avg", label: t("tabs.coin.ctxFunding") },
+          ].map(c => ({ ...c, ind: ctxById[c.id] })).filter(c => c.ind && c.ind.value != null);
+          // ② 파생 지표 — 시그널 풀의 oc 필드(btc-cron 적재 실데이터)를 표본이 있는 것만 집계
+          const pool = Array.isArray(coinTabSignals) ? coinTabSignals : [];
+          const ocOf = (s) => (s && s.oc && typeof s.oc === "object") ? s.oc : null;
+          const oiVals = pool.map(s => Number(ocOf(s)?.oiChg24h)).filter(Number.isFinite);
+          const lsVals = pool.map(s => Number(ocOf(s)?.lsRatio)).filter(v => Number.isFinite(v) && v > 0);
+          const avgOf = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+          const oiAvg = oiVals.length ? avgOf(oiVals) : null;
+          const lsAvg = lsVals.length ? avgOf(lsVals) : null;
+          let liqLongUsd = 0, liqShortUsd = 0, liqSampled = 0;
+          pool.forEach(s => {
+            const lq = ocOf(s)?.liq;
+            const L = Number(lq?.liqLongUsd), S = Number(lq?.liqShortUsd);
+            if (Number.isFinite(L) && Number.isFinite(S)) { liqLongUsd += L; liqShortUsd += S; liqSampled++; }
+          });
+          const liqTotal = liqLongUsd + liqShortUsd;
+          const liqLongPct = liqTotal > 0 ? Math.round((liqLongUsd / liqTotal) * 100) : null;
+          const fmtUsdCompact = (v) => v >= 1e9 ? `$${(v / 1e9).toFixed(1)}B`
+            : v >= 1e6 ? `$${Math.round(v / 1e6)}M`
+            : `$${Math.round(v / 1e3).toLocaleString()}K`;
+          const stableInd = ctxById["stablecoin-liquidity"];
+          const derivRows = [];
+          if (oiAvg != null) derivRows.push({
+            k: t("tabs.coin.oiAvg"),
+            v: `${oiAvg >= 0 ? "+" : ""}${oiAvg.toFixed(1)}%`,
+            s: oiAvg > 0 ? t("tabs.coin.oiUp") : oiAvg < 0 ? t("tabs.coin.oiDown") : t("tabs.home.neutral"),
+            c: oiAvg > 0 ? (C.greenL || C.green) : oiAvg < 0 ? (C.redL || C.red) : C.text3,
+          });
+          if (lsAvg != null) derivRows.push({
+            k: t("tabs.coin.globalLs"),
+            v: lsAvg.toFixed(2),
+            s: lsAvg > 1 ? t("tabs.home.longDominant") : lsAvg < 1 ? t("tabs.home.shortDominant") : t("tabs.home.neutral"),
+            c: lsAvg > 1 ? (C.greenL || C.green) : lsAvg < 1 ? (C.redL || C.red) : C.text3,
+          });
+          if (stableInd && stableInd.value != null) derivRows.push({
+            k: t("tabs.coin.stable"),
+            v: `${stableInd.value}${stableInd.unit || ""}`,
+            s: stableInd.label || "—",
+            c: toneHi(stableInd.tone),
+          });
+          const derivSampled = Math.max(oiVals.length, lsVals.length, liqSampled);
+          const hasDeriv = derivRows.length > 0 || (liqLongPct != null);
+          // ③ 시그널 리스트 — score 내림차순 (설계서: 전 유니버스, 점수순)
+          const rows = pool
+            .filter(s => s && (s.side === "LONG" || s.side === "SHORT") && Number.isFinite(Number(s.score)))
+            .slice()
+            .sort((a, b) => Number(b.score) - Number(a.score));
+          const newestTs = rows.reduce((m, s) => Math.max(m, Number(s?.ts) || 0), 0);
+          const fresh = coinScoreFreshness(newestTs, t);
+          const TF_LABEL = { "1w": t("tabs.coin.tf1w"), "1d": t("tabs.coin.tf1d"), "4h": t("tabs.coin.tf4h"), "1h": t("tabs.coin.tf1h") };
+          // updatedAt(ISO) → "MM.DD HH:MM 기준" (확장 시트용 — 파싱 실패 시 표기 생략)
+          const fmtCtxUpdated = (iso) => {
+            if (!iso) return null;
+            const d = new Date(iso);
+            if (isNaN(d.getTime())) return null;
+            const p = (n) => String(n).padStart(2, "0");
+            return t("tabs.coin.asOf", { time: `${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}` });
+          };
+          // 자체 지수 해설(서버 렌더 SEO 페이지) — 구 지표 허브의 진입 링크 승계 (설계서 v3 4장)
+          const INDEX_PAGE_BY_ID = { "market-temp": "/index/market-temp", "funding-squeeze": "/index/funding-squeeze", "alt-heat": "/index/alt-heat" };
+          const ctxSkeleton = coinCtx === null;
+          return (
+            <div className="tab-content">
+              {/* ── 헤더 — 시안 1a: 타이틀 + 신선도 알약(실측 ts — 없으면 생략) ── */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "13px" }}>
+                <h1 style={{ margin: 0, fontSize: isMobile ? "22px" : "24px", fontWeight: 800, color: C.text1, letterSpacing: "-0.01em" }}>{t("tabs.coin.title")}</h1>
+                {fresh && (
+                  <span style={{
+                    fontSize: mf(11), fontWeight: 800, padding: "6px 11px", borderRadius: "9999px",
+                    background: `${C.blue}1F`, color: C.isDark ? C.blueL : C.blue, whiteSpace: "nowrap", flexShrink: 0,
+                  }}>↻ {fresh}</span>
+                )}
               </div>
+
+              <div style={!isMobile
+                ? { display: "grid", gridTemplateColumns: "340px minmax(0, 1fr)", gap: "16px", alignItems: "start" }
+                : { display: "flex", flexDirection: "column", gap: "13px" }}>
+
+                {/* ── 좌측(데스크탑) / 상단(모바일): 컨텍스트 + 파생 지표 ── */}
+                <div className={!isMobile ? "lg:sticky lg:top-20" : undefined} style={{ display: "flex", flexDirection: "column", gap: "13px" }}>
+                  {/* ① 시장 컨텍스트 미니 카드 4 — 탭 → 산식·해설 시트 */}
+                  {ctxSkeleton ? (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "9px" }}>
+                      {[0, 1, 2, 3].map(i => <Skeleton key={`ctx-skel-${i}`} width="100%" height="72px" />)}
+                    </div>
+                  ) : ctxCards.length > 0 && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "9px" }}>
+                      {ctxCards.map(({ id, label, ind }) => (
+                        <div key={id}
+                          role="button" tabIndex={0}
+                          aria-label={`${label} ${ind.value}${ind.unit || ""} — ${ind.label || ""}`}
+                          onClick={() => setCoinCtxSheet(ind)}
+                          onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCoinCtxSheet(ind); } }}
+                          style={{
+                            background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px",
+                            padding: "11px 13px", cursor: "pointer", WebkitTapHighlightColor: "transparent",
+                          }}>
+                          <div style={{ fontSize: mf(10), color: C.text3, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
+                          <div style={{ marginTop: "3px" }}><Num size="17px" weight={800}>{ind.value}{ind.unit || ""}</Num></div>
+                          <div style={{ fontSize: mf(10), fontWeight: 700, marginTop: "2px", color: toneHi(ind.tone), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ind.label || "—"}</div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* ② 파생 지표 바 — oc 표본이 하나도 없으면 카드째 생략(빈 껍데기 금지) */}
+                  {hasDeriv && (
+                    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", padding: "13px 14px" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "9px" }}>
+                        <span style={{ fontSize: mf(13), fontWeight: 800, color: C.text1 }}>{t("tabs.coin.derivTitle")}</span>
+                        {derivSampled > 0 && <span style={{ fontSize: mf(10), color: C.text3 }}>{t("tabs.coin.sampleNote", { n: derivSampled })}</span>}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {derivRows.map((d) => (
+                          <div key={d.k} style={{ display: "flex", alignItems: "baseline", gap: "8px", fontSize: mf(12) }}>
+                            <span style={{ width: "96px", flexShrink: 0, color: C.text3, fontWeight: 700 }}>{d.k}</span>
+                            <Num size={mf(12)} weight={800}>{d.v}</Num>
+                            <span style={{ marginLeft: "auto", fontWeight: 700, color: d.c }}>{d.s}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {/* 24h 청산 요약 게이지 — Coinalyze 실데이터(oc.liq) 합산. 표본 없으면 생략 */}
+                      {liqLongPct != null && (
+                        <div style={{ marginTop: derivRows.length > 0 ? "11px" : 0, paddingTop: derivRows.length > 0 ? "11px" : 0, borderTop: derivRows.length > 0 ? `1px solid ${C.card2}` : "none" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "8px", fontSize: mf(11), marginBottom: "6px" }}>
+                            <span style={{ color: C.text3, fontWeight: 700 }}>{t("tabs.coin.liq24h")} <Num size={mf(11)} weight={800}>{fmtUsdCompact(liqTotal)}</Num></span>
+                            <span style={{ whiteSpace: "nowrap" }}>
+                              <Num size={mf(11)} weight={800} color={C.redL || C.red}>{t("tabs.coin.liqLong", { n: liqLongPct })}</Num>
+                              <span style={{ color: C.text4 }}> · </span>
+                              <Num size={mf(11)} weight={800} color={C.greenL || C.green}>{t("tabs.coin.liqShort", { n: 100 - liqLongPct })}</Num>
+                            </span>
+                          </div>
+                          {/* 롱 청산 = 하락 쓸림(빨강) / 숏 청산 = 상승 쓸림(초록) — 비중은 위 텍스트가 전달(색 단독 전달 아님) */}
+                          <div aria-hidden="true" style={{ display: "flex", height: "8px", borderRadius: "4px", overflow: "hidden", gap: "2px" }}>
+                            <span style={{ width: `${liqLongPct}%`, background: C.red, opacity: .85 }} />
+                            <span style={{ flex: 1, background: C.green, opacity: .85 }} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* 지수 해설 링크 — 구 지표 허브 게이지(펀딩 스퀴즈·알트 과열 포함)의 진입점 승계.
+                      /index/* 서버 렌더 SEO 페이지가 현재값+산식을 보여줍니다(고아 페이지 방지). */}
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                    <span style={{ fontSize: mf(11), color: C.text3, fontWeight: 700 }}>{t("tabs.coin.indexLinksLabel")}</span>
+                    <HomeActionChip href="/index/market-temp" label={t("tabs.coin.indexTempLink")} />
+                    <HomeActionChip href="/index/funding-squeeze" label={t("tabs.coin.indexFundingLink")} />
+                    <HomeActionChip href="/index/alt-heat" label={t("tabs.coin.indexAltLink")} />
+                  </div>
+                </div>
+
+                {/* ── 우측(데스크탑) / 하단(모바일): 코인 시그널 리스트 ── */}
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
+                    {rows.length > 0 && <span className="z-pulse" aria-hidden="true" style={{ width: "7px", height: "7px", borderRadius: "50%", background: C.green, flexShrink: 0 }} />}
+                    <h2 style={{ margin: 0, fontSize: mf(14), fontWeight: 800, color: C.text1, whiteSpace: "nowrap" }}>{t("tabs.coin.signalsTitle")}</h2>
+                    <span style={{ flex: 1 }} />
+                    {/* 정렬은 점수순 고정 — 상태 서술 알약(죽은 드롭다운을 두지 않습니다) */}
+                    {rows.length > 0 && (
+                      <span style={{
+                        fontSize: mf(11), fontWeight: 800, padding: "5px 11px", borderRadius: "9999px",
+                        background: C.card, border: `1px solid ${C.border}`, color: C.text3, whiteSpace: "nowrap",
+                      }}>{t("tabs.coin.sortByScore")}</span>
+                    )}
+                  </div>
+
+                  {rows.length === 0 ? (
+                    coinTabStatus === "loading" || coinTabStatus === "idle" ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "9px" }}>
+                        {[0, 1, 2].map(i => <Skeleton key={`cs-skel-${i}`} width="100%" height="96px" />)}
+                      </div>
+                    ) : (
+                      /* 빈 상태(시안 1a) — 집계 전·전체 실패 공용. 문구는 실제 산출 주기 서술 */
+                      <div style={{ border: `1.5px dashed ${C.border2}`, borderRadius: "16px", padding: "36px 24px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+                        <div style={{ fontSize: mf(15), fontWeight: 800, color: C.text1 }}>{t("tabs.coin.emptyTitle")}</div>
+                        <div style={{ fontSize: mf(12), color: C.text3, lineHeight: 1.6, maxWidth: "260px" }}>{t("tabs.coin.emptyDesc")}</div>
+                        <button onClick={fetchCoinTabSignals} style={{
+                          marginTop: "10px", padding: "11px 18px", borderRadius: "12px",
+                          background: `${C.blue}1F`, color: C.isDark ? C.blueL : C.blue, border: "none",
+                          fontSize: mf(13), fontWeight: 800, fontFamily: "inherit", cursor: "pointer", minHeight: "44px",
+                        }}>{t("tabs.coin.retry")}</button>
+                      </div>
+                    )
+                  ) : (
+                    <div style={isMobile
+                      ? { display: "flex", flexDirection: "column", gap: "9px" }
+                      : { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "10px", alignItems: "start" }}>
+                      {rows.map((sig, i) => {
+                        const dir = sig.side === "LONG" ? "up" : "down";
+                        const bd = sig.breakdown || {};
+                        const tfs = ["1w", "1d", "4h", "1h"].map(tf => ({
+                          label: TF_LABEL[tf],
+                          dir: bd[tf]?.side === "LONG" ? "up" : bd[tf]?.side === "SHORT" ? "down" : null,
+                        }));
+                        const sup = fmtLevelPrice(sig.sr?.s?.[0]?.p);
+                        const res = fmtLevelPrice(sig.sr?.r?.[0]?.p);
+                        const px = (sup || res) ? fmtLevelPrice(sig.sr?.px) : null;
+                        return (
+                          <Fragment key={`${sig.symbol || sig.asset || "sig"}-${i}`}>
+                            <SignalCard
+                              symbol={String(sig.symbol || sig.asset || "—").replace("USDT", "")}
+                              sideLabel={t(sig.side === "LONG" ? "tabs.home.longDominant" : "tabs.home.shortDominant")}
+                              dir={dir}
+                              score={Math.round(Math.max(0, Math.min(100, Number(sig.score))))}
+                              timeframes={tfs.some(x => x.dir) ? tfs : []}
+                              support={sup}
+                              price={px}
+                              resistance={res}
+                              onClick={() => setDetailSignal(sig)}
+                            />
+                            {/* ── Google AdSense (기존 뉴스 탭 in-feed 슬롯 승계 — 3번째 카드 뒤) ──
+                                미채움 시 GoogleAd 가 0 높이로 접히므로, 그리드 자리는 항상
+                                전폭 래퍼가 차지해 카드 사이 구멍이 생기지 않게 합니다. */}
+                            {i === 2 && (
+                              <div style={!isMobile ? { gridColumn: "1 / -1" } : undefined}>
+                                <GoogleAd format="in-feed" slot="news-feed" />
+                              </div>
+                            )}
+                          </Fragment>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {rows.length > 0 && (
+                    <div style={{ fontSize: mf(11), color: C.text4 }}>
+                      {/* 신선도(실측 ts)는 헤더 알약과 동일 값 — 여기는 출처만 서술해 이중 노출을 피합니다 */}
+                      {t("tabs.home.signalSourceNote")}
+                    </div>
+                  )}
+
+                  {/* ★ IA v3: 코인 조건 검색 진입점 — 주식 탭에서 걷어낸 코인 세그먼트의 대체 경로.
+                       같은 스크리너를 crypto 필터로 열어 기능을 보존합니다(이동이지 제거 아님). */}
+                  <button
+                    onClick={() => { setFilterMarket("crypto"); setTab("screener"); }}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: "7px",
+                      width: "100%", padding: "12px", borderRadius: "12px", cursor: "pointer",
+                      background: C.card, border: `1px solid ${C.border}`, color: C.text2,
+                      fontSize: mf(13), fontWeight: 700, fontFamily: "inherit",
+                    }}>
+                    {t("tabs.coin.findByConditions")}
+                    <span aria-hidden="true" style={{ color: C.blueL }}>→</span>
+                  </button>
+                </div>
+              </div>
+
+              <Disclaimer style={{ marginTop: "14px" }}>{t("tabs.coin.disclaimer")}</Disclaimer>
+
+              {/* ── 컨텍스트 지표 확장 시트 — indicators/summary 의 desc/detail 실데이터 ── */}
+              <BottomSheet open={!!coinCtxSheet} onClose={() => setCoinCtxSheet(null)} title={coinCtxSheet?.title || ""}>
+                {coinCtxSheet && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "4px 2px 10px" }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
+                      <Num size="28px" weight={800} color={toneHi(coinCtxSheet.tone)}>{coinCtxSheet.value}{coinCtxSheet.unit || ""}</Num>
+                      {coinCtxSheet.label && <span style={{ fontSize: mf(13), fontWeight: 800, color: toneHi(coinCtxSheet.tone) }}>{coinCtxSheet.label}</span>}
+                    </div>
+                    {coinCtxSheet.desc && <div style={{ fontSize: mf(13), color: C.text2, lineHeight: 1.6 }}>{coinCtxSheet.desc}</div>}
+                    {coinCtxSheet.detail && <div style={{ fontSize: mf(12), color: C.text3, lineHeight: 1.6, whiteSpace: "pre-line" }}>{coinCtxSheet.detail}</div>}
+                    {fmtCtxUpdated(coinCtxSheet.updatedAt) && (
+                      <div style={{ fontSize: mf(11), color: C.text4 }}>{fmtCtxUpdated(coinCtxSheet.updatedAt)}</div>
+                    )}
+                    {INDEX_PAGE_BY_ID[coinCtxSheet.id] && (
+                      <div><HomeActionChip href={INDEX_PAGE_BY_ID[coinCtxSheet.id]} label={t("tabs.coin.indexDetailLink")} /></div>
+                    )}
+                  </div>
+                )}
+              </BottomSheet>
+            </div>
+          );
+        })()}
+
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: 지표 — 뉴스 서브탭 (/indicators?view=news)
+            ★ 2026-08-12 IA v3 (시안 1c · 설계서 v3 4장): 구 뉴스 탭 구현을
+            코드 이동(기능 보존) — 카테고리 칩·감성 정렬·요약 바·타임라인·
+            빈 상태·읽을거리 전부 그대로, 헤더만 지표 탭 공통 규격으로 교체.
+        ═══════════════════════════════════════════════════════════ */}
+        {tab === "indicators" && indicatorsView === "news" && (
+          <div className="tab-content">
+            {/* 헤더 — 시안 1c: 타이틀 + 우측 액션 1개(새로고침 칩) */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "13px" }}>
+              <h1 style={{ margin: 0, fontSize: isMobile ? "22px" : "24px", fontWeight: 800, color: C.text1, letterSpacing: "-0.01em" }}>{t("tabs.indicators.title")}</h1>
               <button onClick={fetchNews} disabled={newsLoading} style={{
                 padding: "8px 15px", borderRadius: "9999px", fontSize: mf(13), fontWeight: 800, fontFamily: "inherit",
                 background: newsLoading ? C.card2 : `${C.blue}1F`, color: newsLoading ? C.text3 : (C.blueL || C.blue),
                 border: "none", cursor: newsLoading ? "default" : "pointer", flexShrink: 0,
               }}>{newsLoading ? t("tabs.news.refreshing") : t("tabs.news.refresh")}</button>
             </div>
+
+            {/* 서브탭 [캘린더|뉴스] — mobileKit Segment (딥링크 URL 동기화) */}
+            <Segment
+              value={indicatorsView}
+              onChange={setIndicatorsViewWithUrl}
+              options={[
+                { value: "calendar", label: t("tabs.indicators.calendarTab") },
+                { value: "news", label: t("tabs.indicators.newsTab") },
+              ]}
+              style={{ marginBottom: "13px" }}
+            />
 
             {/* 카테고리 칩 — 값·핸들러 유지, 시안 알약 문법 (모바일 가로 스크롤) */}
             <div className={isMobile ? "hscroll" : ""} style={{ display: "flex", gap: "6px", flexWrap: isMobile ? "nowrap" : "wrap", overflowX: isMobile ? "auto" : "visible", WebkitOverflowScrolling: "touch", marginBottom: "10px" }}>
@@ -12174,7 +11419,7 @@ function AppInner() {
 
             {/* 감성 정렬 — 시안의 도트 알약 (기존 newsSort 값·핸들러 유지) */}
             <div style={{ display: "flex", gap: "6px", alignItems: "center", flexWrap: "wrap", marginBottom: "13px" }}>
-              <span style={{ fontSize: mf(11), color: C.text3, fontWeight: 700 }}>정렬</span>
+              <span style={{ fontSize: mf(11), color: C.text3, fontWeight: 700 }}>{t("tabs.news.sortLabel")}</span>
               {[
                 ["time", t("tabs.news.latest"), C.blue, C.blueL || C.blue],
                 ["positive", t("tabs.news.positive"), C.green, C.greenL || C.green],
@@ -12230,25 +11475,25 @@ function AppInner() {
                   <div style={{ width: "52px", height: "52px", borderRadius: "16px", background: C.card2, color: C.text3, display: "flex", alignItems: "center", justifyContent: "center" }} aria-hidden="true">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /><line x1="8" y1="11" x2="14" y2="11" /></svg>
                   </div>
-                  <div style={{ fontSize: mf(15), fontWeight: 800, color: C.text1, marginTop: "8px" }}>조건에 맞는 뉴스가 없어요</div>
+                  <div style={{ fontSize: mf(15), fontWeight: 800, color: C.text1, marginTop: "8px" }}>{t("tabs.news.emptyFilterTitle")}</div>
                   {/* 감성(newsSort)은 정렬만 하므로 빈 결과의 원인은 카테고리 필터뿐 — 문구를 실제 동작에 맞춤 */}
-                  <div style={{ fontSize: mf(12), color: C.text3, lineHeight: 1.6, maxWidth: "260px" }}>선택한 카테고리의 뉴스가 없어요. 필터를 조정해 보세요.</div>
+                  <div style={{ fontSize: mf(12), color: C.text3, lineHeight: 1.6, maxWidth: "260px" }}>{t("tabs.news.emptyFilterDesc")}</div>
                   <button onClick={() => { setNewsCat("all"); setNewsSort("time"); }} style={{
                     marginTop: "10px", padding: "11px 18px", borderRadius: "12px",
                     background: `${C.blue}1F`, color: C.blueL || C.blue, border: "none",
                     fontSize: mf(13), fontWeight: 800, fontFamily: "inherit", cursor: "pointer", minHeight: "44px",
-                  }}>필터 초기화</button>
+                  }}>{t("tabs.news.resetFilter")}</button>
                 </div>
               ) : (
                 <div style={{ border: `1.5px dashed ${C.border2}`, borderRadius: "16px", padding: "36px 24px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
                   <div style={{ width: "52px", height: "52px", borderRadius: "16px", background: C.card2, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "22px" }} aria-hidden="true">📰</div>
-                  <div style={{ fontSize: mf(15), fontWeight: 800, color: C.text1, marginTop: "8px" }}>아직 받아온 뉴스가 없어요</div>
-                  <div style={{ fontSize: mf(12), color: C.text3, lineHeight: 1.6, maxWidth: "260px" }}>오늘의 시장 뉴스를 한 번에 모아드릴게요</div>
-                  <button onClick={fetchNews} disabled={newsLoading} aria-label="뉴스 새로고침" style={{
+                  <div style={{ fontSize: mf(15), fontWeight: 800, color: C.text1, marginTop: "8px" }}>{t("tabs.news.emptyTitle")}</div>
+                  <div style={{ fontSize: mf(12), color: C.text3, lineHeight: 1.6, maxWidth: "260px" }}>{t("tabs.news.emptyDesc")}</div>
+                  <button onClick={fetchNews} disabled={newsLoading} aria-label={t("tabs.news.refreshAria")} style={{
                     marginTop: "10px", padding: "11px 18px", borderRadius: "12px",
                     background: newsLoading ? C.card2 : `${C.blue}1F`, color: newsLoading ? C.text3 : (C.blueL || C.blue), border: "none",
                     fontSize: mf(13), fontWeight: 800, fontFamily: "inherit", cursor: newsLoading ? "default" : "pointer", minHeight: "44px",
-                  }}>{newsLoading ? "불러오는 중..." : "지금 새로고침"}</button>
+                  }}>{newsLoading ? t("tabs.news.loadingBtn") : t("tabs.news.refreshNow")}</button>
                 </div>
               )
             ) : (
@@ -12263,7 +11508,7 @@ function AppInner() {
                   const sentHi = sentiment === "positive" ? (C.greenL || C.green) : sentiment === "negative" ? (C.redL || C.red) : C.text3;
                   const sentLabel = sentiment === "positive" ? t("tabs.news.positive") : sentiment === "negative" ? t("tabs.news.negative") : t("tabs.news.neutral");
                   const catKey = news.category || (Array.isArray(news.categories) ? news.categories[0] : null);
-                  const catLabel = ({ "us-stock": "미국", "kr-stock": "한국", "crypto": "코인", "macro": "매크로" })[catKey] || null;
+                  const catLabel = ({ "us-stock": t("tabs.news.catUs"), "kr-stock": t("tabs.news.catKr"), "crypto": t("tabs.news.catCrypto"), "macro": t("tabs.news.catMacro") })[catKey] || null;
                   const pubDate = new Date(news.date || news.publishedAt || news.pubDate || 0);
                   const validDate = !isNaN(pubDate.getTime()) && pubDate.getTime() > 0;
                   const hhmm = validDate ? `${String(pubDate.getHours()).padStart(2, "0")}:${String(pubDate.getMinutes()).padStart(2, "0")}` : "--:--";
@@ -12271,9 +11516,9 @@ function AppInner() {
                   const dateLabelOf = (d) => {
                     const today = new Date(); const yst = new Date(Date.now() - 86400000);
                     const same = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-                    if (same(d, today)) return "오늘";
-                    if (same(d, yst)) return "어제";
-                    return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+                    if (same(d, today)) return t("tabs.news.today");
+                    if (same(d, yst)) return t("tabs.news.yesterday");
+                    return t("tabs.news.dateMd", { m: d.getMonth() + 1, d: d.getDate() });
                   };
                   const showDateDivider = newsSort === "time" && validDate && (() => {
                     if (i === 0) return true;
@@ -12342,8 +11587,8 @@ function AppInner() {
             {/* ── 읽을거리 — 블로그 아티클 진입 (★ 2026-07 정보 피벗 Phase 1) ── */}
             <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "16px", padding: "20px", marginTop: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
-                <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>📚 읽을거리</span>
-                <a href="/blog" style={{ fontSize: "13px", fontWeight: 700, color: C.blue, textDecoration: "none" }}>블로그 전체 →</a>
+                <span style={{ fontWeight: 800, fontSize: "16px", color: C.text1 }}>📚 {t("tabs.news.readings")}</span>
+                <a href="/blog" style={{ fontSize: "13px", fontWeight: 700, color: C.blue, textDecoration: "none" }}>{t("tabs.news.blogAll")}</a>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(2, 1fr)", gap: "8px" }}>
                 {[
@@ -12373,32 +11618,33 @@ function AppInner() {
         )}
 
         {/* ═══════════════════════════════════════════════════════════
-            TAB: 지표 허브 (/indicators) — 2026-07 정보 피벗 Phase 2
+            TAB: 지표 — 캘린더 서브탭 (/indicators)
+            ★ 2026-08-12 IA v3 (시안 1c · 설계서 v3 4장): 구 경제 캘린더 탭 구현을
+            코드 이동(기능 보존) — 주간 스트립·미니캘린더·AI 요약·해석 펼침 전부
+            그대로, 헤더만 지표 탭 공통 규격([캘린더|뉴스] 서브탭)으로 교체.
+            구 지표 허브(IndicatorHub 게이지 그리드)는 폐지 — 게이지 데이터는 코인 탭
+            컨텍스트 카드·홈 스냅샷이 흡수했고 /index/* 해설 링크는 코인 탭이 승계.
         ═══════════════════════════════════════════════════════════ */}
-        {tab === "indicators" && (
-          <Suspense fallback={<LazyTabFallback />}><IndicatorHub onNavigate={setTab} /></Suspense>
-        )}
-
-        {/* ═══════════════════════════════════════════════════════════
-            TAB: 경제 캘린더 (토스증권 스타일)
-        ═══════════════════════════════════════════════════════════ */}
-        {tab === "econ-calendar" && (() => {
+        {tab === "indicators" && indicatorsView === "calendar" && (() => {
           // 오늘 기준 캘린더 데이터
           const today = new Date();
           const firstDay = new Date(calYear, calMonth, 1).getDay(); // 0=일
           const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
-          const monthNames = ["1월","2월","3월","4월","5월","6월","7월","8월","9월","10월","11월","12월"];
+          const calLocale = lang === "en" ? "en-US" : "ko-KR";
+          // 요일 짧은 표기 — 2024-01-01(월) 기준 결정적 산출 (로케일 대응)
+          const weekdayShortMon = Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(calLocale, { weekday: "short" }));
+          const weekdayShortSun = Array.from({ length: 7 }, (_, i) => new Date(2023, 11, 31 + i).toLocaleDateString(calLocale, { weekday: "short" }));
 
           // 주차별 이벤트 그룹화
           const getWeekOfMonth = (date) => Math.ceil((date.getDate() + new Date(date.getFullYear(), date.getMonth(), 1).getDay()) / 7);
           const eventsByWeek = {};
           const calFilterTabs = [
-            { key: "all", label: "전체" },
-            { key: "경제지표", label: "경제지표" },
-            { key: "FOMC", label: "FOMC" },
-            { key: "CPI", label: "CPI" },
-            { key: "NFP", label: "고용" },
-            { key: "GDP", label: "GDP" },
+            { key: "all", label: t("tabs.econCalendar.filterAll") },
+            { key: "경제지표", label: t("tabs.econCalendar.economicIndicators") },
+            { key: "FOMC", label: t("tabs.econCalendar.fomc") },
+            { key: "CPI", label: t("tabs.econCalendar.cpi") },
+            { key: "NFP", label: t("tabs.econCalendar.employment") },
+            { key: "GDP", label: t("tabs.econCalendar.gdp") },
           ];
 
           // 이벤트 필터링
@@ -12434,8 +11680,8 @@ function AppInner() {
             if (!k.valid) return; // invalid 이벤트는 그룹화에서 제외
             const wk = kstWeekOf(k);
             const weekKey = `${k.year}-${String(k.month+1).padStart(2,"0")}-W${wk}`;
-            const monthLabel = `${k.year}년 ${k.month+1}월`;
-            const weekLabel = `${wk}주차`;
+            const monthLabel = t("tabs.econCalendar.yearMonth", { y: k.year, m: k.month + 1 });
+            const weekLabel = t("tabs.econCalendar.weekN", { n: wk });
             if (!eventsByWeek[weekKey]) eventsByWeek[weekKey] = { monthLabel, weekLabel, events: [] };
             eventsByWeek[weekKey].events.push(evt);
           });
@@ -12469,7 +11715,7 @@ function AppInner() {
           const stripMon = new Date(stripAnchor.getFullYear(), stripAnchor.getMonth(), stripAnchor.getDate() - ((stripAnchor.getDay() + 6) % 7));
           const stripDays = Array.from({ length: 7 }, (_, i) => {
             const dd = new Date(stripMon.getFullYear(), stripMon.getMonth(), stripMon.getDate() + i);
-            return { y: dd.getFullYear(), m: dd.getMonth(), d: dd.getDate(), w: ["월", "화", "수", "목", "금", "토", "일"][i] };
+            return { y: dd.getFullYear(), m: dd.getMonth(), d: dd.getDate(), w: weekdayShortMon[i] };
           });
           const eventDayKeys = new Set();
           calEventsAllDays.forEach(evt => {
@@ -12489,12 +11735,28 @@ function AppInner() {
 
           return (
             <div className="tab-content">
-              {/* ── 헤더 — 시안 1c: 타이틀 + 조회 월 알약 ── */}
-              <div className="flex items-center justify-between gap-2" style={{ marginBottom: "4px" }}>
-                <span style={{ fontSize: "22px", fontWeight: 800, letterSpacing: "-0.01em", color: C.text1 }}>경제 캘린더</span>
-                <span style={{ fontSize: "12px", fontWeight: 800, padding: "5px 12px", borderRadius: "9999px", background: C.card, border: `1px solid ${C.border}`, color: C.text2, fontFamily: MONO }}>{calYear}년 {calMonth + 1}월</span>
+              {/* ── 헤더 — 시안 1c: 지표 타이틀 + 조회 월 알약(상태 표시 — 액션 아님) ── */}
+              <div className="flex items-center justify-between gap-2" style={{ marginBottom: "13px" }}>
+                <h1 style={{ margin: 0, fontSize: isMobile ? "22px" : "24px", fontWeight: 800, letterSpacing: "-0.01em", color: C.text1 }}>{t("tabs.indicators.title")}</h1>
+                <span style={{ fontSize: "12px", fontWeight: 800, padding: "5px 12px", borderRadius: "9999px", background: C.card, border: `1px solid ${C.border}`, color: C.text2, fontFamily: MONO }}>{t("tabs.indicators.monthPill", { y: calYear, m: calMonth + 1 })}</span>
               </div>
-              <div style={{ fontSize: "13px", color: C.text3, marginBottom: "16px" }}>미국 주요 경제 지표의 발표 일정과 결과를 한국 시간 기준으로 보여드려요</div>
+
+              {/* 서브탭 [캘린더|뉴스] — mobileKit Segment (딥링크 URL 동기화) */}
+              <Segment
+                value={indicatorsView}
+                onChange={setIndicatorsViewWithUrl}
+                options={[
+                  { value: "calendar", label: t("tabs.indicators.calendarTab") },
+                  { value: "news", label: t("tabs.indicators.newsTab") },
+                ]}
+                style={{ marginBottom: "13px" }}
+              />
+
+              {/* 캡션 + 발표 결과 아카이브(/econ 서버 렌더 SEO 페이지) 진입 승계 */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap", marginBottom: "16px" }}>
+                <span style={{ fontSize: "13px", color: C.text3 }}>{t("tabs.indicators.calendarCaption")}</span>
+                <HomeActionChip href="/econ" label={t("tabs.indicators.econArchiveLink")} />
+              </div>
 
               <div className="grid gap-7 grid-cols-1 lg:grid-cols-[280px_1fr] items-start">
 
@@ -12504,10 +11766,10 @@ function AppInner() {
                   {isMobile && (
                     <div>
                       <div className="flex items-center justify-between" style={{ marginBottom: "8px" }}>
-                        <button onClick={() => moveWeek(-1)} aria-label="이전 주"
+                        <button onClick={() => moveWeek(-1)} aria-label={t("tabs.econCalendar.prevWeek")}
                           className="bg-transparent border-none text-lg cursor-pointer p-1" style={{ color: C.text2 }}>‹</button>
                         <Num size="12px" weight={800} color={C.text2}>{stripMon.getMonth() + 1}.{stripMon.getDate()} – {stripDays[6].m + 1}.{stripDays[6].d}</Num>
-                        <button onClick={() => moveWeek(1)} aria-label="다음 주"
+                        <button onClick={() => moveWeek(1)} aria-label={t("tabs.econCalendar.nextWeek")}
                           className="bg-transparent border-none text-lg cursor-pointer p-1" style={{ color: C.text2 }}>›</button>
                       </div>
                       <div className="grid" style={{ gridTemplateColumns: "repeat(7, 1fr)", gap: "5px" }}>
@@ -12543,13 +11805,13 @@ function AppInner() {
                     <div className="flex items-center justify-between mb-4">
                       <button onClick={() => { setCalSelectedDay(null); if (calMonth === 0) { setCalMonth(11); setCalYear(y => y-1); } else setCalMonth(m => m-1); }}
                         className="bg-transparent border-none text-lg cursor-pointer p-1" style={{color: C.text2}}>‹</button>
-                      <span style={{ fontSize: "15px", fontWeight: 800, color: C.text1 }}>{calYear}년 {monthNames[calMonth]}</span>
+                      <span style={{ fontSize: "15px", fontWeight: 800, color: C.text1 }}>{new Date(calYear, calMonth, 1).toLocaleDateString(calLocale, { year: "numeric", month: "long" })}</span>
                       <button onClick={() => { setCalSelectedDay(null); if (calMonth === 11) { setCalMonth(0); setCalYear(y => y+1); } else setCalMonth(m => m+1); }}
                         className="bg-transparent border-none text-lg cursor-pointer p-1" style={{color: C.text2}}>›</button>
                     </div>
                     {/* 요일 헤더 */}
                     <div className="grid gap-1 mb-1" style={{ gridTemplateColumns: "repeat(7, 1fr)" }}>
-                      {["월","화","수","목","금","토","일"].map(d => (
+                      {weekdayShortMon.map(d => (
                         <div key={d} className="text-center py-1" style={{ fontSize: "10px", fontWeight: 700, color: C.text3 }}>{d}</div>
                       ))}
                     </div>
@@ -12596,22 +11858,22 @@ function AppInner() {
                     }}>
                       <div className="flex items-center gap-2 mb-3">
                         <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: C.red }} />
-                        <span style={{ fontSize: "14px", fontWeight: 800, color: C.text1 }}>오늘의 경제 이벤트</span>
+                        <span style={{ fontSize: "14px", fontWeight: 800, color: C.text1 }}>{t("tabs.econCalendar.todayEvents")}</span>
                       </div>
                       <div style={{ fontSize: "13px", color: C.text1, lineHeight: 1.55 }}>
                         {importantToday.map((evt, i) => {
                           const k = kstParts(evt.date);
                           const timeStr = k.valid ? `${String(k.hour).padStart(2,"0")}:${String(k.min).padStart(2,"0")}` : "—";
                           const resultStr = evt.actual && evt.estimate
-                            ? (parseFloat(evt.actual) > parseFloat(evt.estimate) ? "상승 💚" : "하락 📉")
-                            : evt.status === "완료" ? "발표완료" : "예정";
+                            ? (parseFloat(evt.actual) > parseFloat(evt.estimate) ? `${t("tabs.econCalendar.resultUp")} 💚` : `${t("tabs.econCalendar.resultDown")} 📉`)
+                            : evt.status === "완료" ? t("tabs.econCalendar.resultDone") : t("tabs.econCalendar.resultScheduled");
                           return (
                             <div key={i} style={{ marginBottom: i < importantToday.length - 1 ? "10px" : 0 }}>
                               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "8px" }}>
                                 <div style={{ flex: 1 }}>
                                   <strong>{evt.icon} {evt.name}</strong>
                                   <div style={{ fontSize: "12px", color: C.text2, marginTop: "3px" }}>
-                                    <span style={{ fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{timeStr}</span> {evt.importance === "high" ? "🔴 높음" : "🟡 중간"}
+                                    <span style={{ fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{timeStr}</span> {evt.importance === "high" ? `🔴 ${t("tabs.econCalendar.impHigh")}` : `🟡 ${t("tabs.econCalendar.impMid")}`}
                                   </div>
                                 </div>
                                 <div style={{ fontSize: "13px", fontWeight: 700, color: evt.actual && parseFloat(evt.actual) > parseFloat(evt.estimate) ? (C.greenL || C.green) : (C.redL || C.red) }}>
@@ -12633,15 +11895,15 @@ function AppInner() {
                       borderRadius: "16px", padding: "14px 16px",
                     }}>
                       <div className="flex items-center gap-1.5 mb-3">
-                        <span style={{ fontSize: "14px", fontWeight: 800, color: C.blueL || C.blue }}>✦ 이번주 AI 요약</span>
+                        <span style={{ fontSize: "14px", fontWeight: 800, color: C.blueL || C.blue }}>✦ {t("tabs.econCalendar.weeklyAiSummary")}</span>
                       </div>
                       <div style={{ fontSize: "13.5px", color: C.text1, lineHeight: 1.6 }}>
                         {importantThisWeek.map((evt, i) => {
                           const k = kstParts(evt.date);
-                          const dayName = k.valid ? ["일","월","화","수","목","금","토"][k.day] : "";
+                          const dayName = k.valid ? weekdayShortSun[k.day] : "";
                           return (
                             <div key={i} style={{ marginBottom: i < importantThisWeek.length - 1 ? "8px" : 0 }}>
-                              <strong>{evt.name}</strong> 발표가 {k.valid ? `${k.date}일(${dayName})` : "곧"} 예정되어 있어요
+                              <strong>{evt.name}</strong> {k.valid ? t("tabs.econCalendar.scheduledOn", { d: k.date, day: dayName }) : t("tabs.econCalendar.scheduledSoon")}
                             </div>
                           );
                         })}
@@ -12672,12 +11934,12 @@ function AppInner() {
                       padding: "10px 14px", borderRadius: 12, background: C.blueBg, border: `1px solid ${C.blue}30`,
                     }}>
                       <span style={{ fontSize: 14, fontWeight: 700, color: C.blue }}>
-                        📌 {calMonth + 1}월 {calSelectedDay}일 일정만 보는 중
+                        📌 {t("tabs.econCalendar.dayFilterNotice", { m: calMonth + 1, d: calSelectedDay })}
                       </span>
                       <button onClick={() => setCalSelectedDay(null)} style={{
                         marginLeft: "auto", padding: "6px 12px", borderRadius: 8, border: `1px solid ${C.blue}40`,
                         background: "transparent", color: C.blue, fontSize: 13, fontWeight: 700, cursor: "pointer", minHeight: 32,
-                      }}>전체 보기 ✕</button>
+                      }}>{t("tabs.econCalendar.viewAllX")}</button>
                     </div>
                   )}
 
@@ -12687,10 +11949,10 @@ function AppInner() {
                       <div style={{ width: "52px", height: "52px", borderRadius: "16px", background: C.card2, display: "flex", alignItems: "center", justifyContent: "center", color: C.text3 }}>
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
                       </div>
-                      <div style={{ fontSize: "15px", fontWeight: 800, color: C.text1, marginTop: "8px" }}>{calSelectedDay != null ? "선택한 날짜에 일정이 없어요" : "해당 필터에 맞는 일정이 없어요"}</div>
-                      <div style={{ fontSize: "12.5px", color: C.text3, lineHeight: 1.6, maxWidth: "260px" }}>주요 발표는 주중에 몰려 있어요. 다른 날짜나 필터에서 남은 일정을 확인할 수 있어요.</div>
+                      <div style={{ fontSize: "15px", fontWeight: 800, color: C.text1, marginTop: "8px" }}>{calSelectedDay != null ? t("tabs.econCalendar.emptyDayTitle") : t("tabs.econCalendar.emptyFilterTitle")}</div>
+                      <div style={{ fontSize: "12.5px", color: C.text3, lineHeight: 1.6, maxWidth: "260px" }}>{t("tabs.econCalendar.emptyDesc")}</div>
                       {(calSelectedDay != null || econFilter !== "all") && (
-                        <button onClick={() => { setCalSelectedDay(null); setEconFilter("all"); }} style={{ marginTop: "10px", padding: "11px 18px", borderRadius: "12px", background: `${C.blue}1A`, color: C.blueL || C.blue, border: "none", fontSize: "13px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer" }}>전체 일정 보기</button>
+                        <button onClick={() => { setCalSelectedDay(null); setEconFilter("all"); }} style={{ marginTop: "10px", padding: "11px 18px", borderRadius: "12px", background: `${C.blue}1A`, color: C.blueL || C.blue, border: "none", fontSize: "13px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer" }}>{t("tabs.econCalendar.viewAllEvents")}</button>
                       )}
                     </div>
                   ) : weekGroups.map((group, gi) => {
@@ -12709,7 +11971,7 @@ function AppInner() {
                         {group.events.map((evt, i) => {
                           const k = kstParts(evt.date);
                           const d = k.valid ? k.date : "—";
-                          const dayName = k.valid ? ["일","월","화","수","목","금","토"][k.day] : "";
+                          const dayName = k.valid ? weekdayShortSun[k.day] : "";
                           const invertedIndicator = /CPI|PCE|PPI|Unemployment|Jobless/i.test(evt.event); // 낮을수록 호재 계열
                           const hasActual = evt.actual != null && evt.estimate != null;
                           const beat = hasActual ? (invertedIndicator ? evt.actual < evt.estimate : evt.actual > evt.estimate) : null;
@@ -12720,12 +11982,14 @@ function AppInner() {
                           const kstMin = k.valid ? String(k.min).padStart(2, "0") : "--";
 
                           // ★ 2026-06-12 (대표 지시): 행 클릭 → 지표 해석 펼침 ("그래서 호재야 악재야?")
-                          const guide = ECON_GUIDE[evt.type] || ECON_GUIDE.OTHER;
-                          const verdict = econVerdict(evt);
+                          const gType = ECON_GUIDE[evt.type] ? evt.type : "OTHER";
+                          const guideT = (field) => t(`tabs.econCalendar.guide.${gType}.${field}`);
+                          const guideHasNote = !!ECON_GUIDE[gType].note;
+                          const verdict = econVerdict(evt, t);
                           const rowKey = `${evt.event}-${evt.date?.getTime?.() ?? i}`;
                           const expanded = econExpandedKey === rowKey;
-                          const verdictColor = verdict ? (verdict.dir === "통상 호재" ? C.green : verdict.dir === "통상 악재" ? C.red : C.yellow) : C.text3;
-                          const verdictHi = verdict ? (verdict.dir === "통상 호재" ? (C.greenL || C.green) : verdict.dir === "통상 악재" ? (C.redL || C.red) : (C.yellowL || C.yellow)) : C.text3;
+                          const verdictColor = verdict ? (verdict.tone === "good" ? C.green : verdict.tone === "bad" ? C.red : C.yellow) : C.text3;
+                          const verdictHi = verdict ? (verdict.tone === "good" ? (C.greenL || C.green) : verdict.tone === "bad" ? (C.redL || C.red) : (C.yellowL || C.yellow)) : C.text3;
                           // 중요도 배지 — 색+텍스트 병기(색만으로 전달하지 않음, 시안 배지 어법)
                           const impBg = evt.importance === "high" ? `${C.red}1A` : `${C.yellow}1A`;
                           const impColor = evt.importance === "high" ? (C.redL || C.red) : (C.yellowL || C.yellow);
@@ -12746,28 +12010,28 @@ function AppInner() {
                                 </div>
                                 <span style={{ fontSize: "9.5px", fontWeight: 800, padding: "2px 6px", borderRadius: "6px", background: C.card2, color: C.text3, flexShrink: 0 }}>{evt.country || "US"}</span>
                                 <span className="flex-1 min-w-0" style={{ fontSize: "13.5px", fontWeight: 700, color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{evt.name}</span>
-                                <span style={{ fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "8px", background: impBg, color: impColor, flexShrink: 0 }}>{evt.importance === "high" ? "높음" : "중간"}</span>
+                                <span style={{ fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "8px", background: impBg, color: impColor, flexShrink: 0 }}>{evt.importance === "high" ? t("tabs.econCalendar.impHigh") : t("tabs.econCalendar.impMid")}</span>
                               </div>
 
                               {/* 행 2: 예측 · 이전 · 발표 (시안 3분할 박스, mono 수치) */}
                               <div className="flex gap-2" style={{ marginTop: "10px" }}>
                                 <div style={{ flex: 1, background: C.card2, borderRadius: "10px", padding: "7px 10px" }}>
-                                  <div style={{ fontSize: "9.5px", color: C.text3, fontWeight: 700 }}>예측</div>
+                                  <div style={{ fontSize: "9.5px", color: C.text3, fontWeight: 700 }}>{t("tabs.econCalendar.colForecast")}</div>
                                   <div style={{ marginTop: "1px" }}><Num size="13px" weight={800}>{evt.estimate != null ? `${evt.estimate}${evt.unit}` : "—"}</Num></div>
                                 </div>
                                 <div style={{ flex: 1, background: C.card2, borderRadius: "10px", padding: "7px 10px" }}>
-                                  <div style={{ fontSize: "9.5px", color: C.text3, fontWeight: 700 }}>이전</div>
+                                  <div style={{ fontSize: "9.5px", color: C.text3, fontWeight: 700 }}>{t("tabs.econCalendar.colPrevious")}</div>
                                   <div style={{ marginTop: "1px" }}><Num size="13px" weight={800} color={C.text2}>{evt.previous != null ? `${evt.previous}${evt.unit}` : "—"}</Num></div>
                                 </div>
                                 <div style={{ flex: 1, background: C.card2, borderRadius: "10px", padding: "7px 10px" }}>
-                                  <div style={{ fontSize: "9.5px", color: C.text3, fontWeight: 700 }}>발표</div>
+                                  <div style={{ fontSize: "9.5px", color: C.text3, fontWeight: 700 }}>{t("tabs.econCalendar.colActual")}</div>
                                   {evt.actual != null ? (
                                     <div style={{ marginTop: "1px" }}><Num size="13px" weight={800} color={beat ? (C.greenL || C.green) : miss ? (C.redL || C.red) : C.text1}>{evt.actual}{evt.unit}</Num></div>
                                   ) : (
                                     <div style={{ fontSize: "11px", fontWeight: 700, color: C.text3, marginTop: "3px" }}>
                                       {/* 3일 넘게 지난 지표에 "발표 대기"(아직 발표 전)는 사실과 다른 서술 —
                                           수치를 못 채운 상태를 "집계 없음"으로 정직하게 표기합니다. */}
-                                      {isPast ? (evt.daysUntil < -3 ? "집계 없음" : "발표 대기") : `${kstHour}시 예정`}
+                                      {isPast ? (evt.daysUntil < -3 ? t("tabs.econCalendar.noAggregate") : t("tabs.econCalendar.awaitingRelease")) : t("tabs.econCalendar.scheduledAtHour", { h: kstHour })}
                                     </div>
                                   )}
                                 </div>
@@ -12775,7 +12039,7 @@ function AppInner() {
 
                               {/* 행 3: 해석 토글 — ★ 2026-06-12 (대표 피드백): 펼침 어포던스 항상 노출 유지 */}
                               <div style={{ fontSize: "11px", fontWeight: 700, color: C.blueL || C.blue, marginTop: "10px" }}>
-                                {expanded ? "해석 가이드 접기 ▲" : "💡 해석 가이드 보기 ▼"}
+                                {expanded ? t("tabs.econCalendar.guideCollapse") : t("tabs.econCalendar.guideExpand")}
                               </div>
 
                               {/* ── 해석 패널 (펼침) — 시안 블루 틴트 패널 */}
@@ -12783,20 +12047,20 @@ function AppInner() {
                                 <div onClick={(e) => e.stopPropagation()} style={{ marginTop: "11px", background: `${C.blue}0F`, border: `1px solid ${C.blue}40`, borderRadius: "12px", padding: "12px 13px", cursor: "default" }}>
                                   <div className="flex items-center gap-1.5">
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={C.blueL || C.blue} strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><line x1="12" y1="11" x2="12" y2="16" /><line x1="12" y1="8" x2="12" y2="8.01" /></svg>
-                                    <span style={{ fontSize: "11px", fontWeight: 800, color: C.blueL || C.blue }}>해석 가이드</span>
+                                    <span style={{ fontSize: "11px", fontWeight: 800, color: C.blueL || C.blue }}>{t("tabs.econCalendar.guideTitle")}</span>
                                   </div>
                                   {/* 지표 설명 */}
-                                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text1, marginTop: 8, marginBottom: 4 }}>{guide.ko} — 이게 뭐예요?</div>
-                                  <div style={{ fontSize: 13, color: C.text2, lineHeight: 1.55, wordBreak: "keep-all" }}>{guide.desc}</div>
+                                  <div style={{ fontSize: 13, fontWeight: 700, color: C.text1, marginTop: 8, marginBottom: 4 }}>{t("tabs.econCalendar.whatIsThis", { name: guideT("name") })}</div>
+                                  <div style={{ fontSize: 13, color: C.text2, lineHeight: 1.55, wordBreak: "keep-all" }}>{guideT("desc")}</div>
 
                                   {verdict ? (
                                     /* 발표 후 — 명확한 결론 */
                                     <div style={{ marginTop: 10, padding: "10px 12px", borderRadius: 10, background: `${verdictColor}12`, border: `1px solid ${verdictColor}30` }}>
                                       <div style={{ fontSize: 14, fontWeight: 800, color: verdictHi }}>
-                                        {verdict.emoji} 위험자산(주식·코인)에 {verdict.dir}
+                                        {verdict.emoji} {t("tabs.econCalendar.riskAssetVerdict", { dir: verdict.dir })}
                                       </div>
                                       <div style={{ fontSize: 13, color: C.text2, marginTop: 4, lineHeight: 1.5, wordBreak: "keep-all" }}>
-                                        발표 {evt.actual}{evt.unit} vs 예측 {evt.estimate}{evt.unit}{evt.previous != null ? ` (이전 ${evt.previous}${evt.unit})` : ""} — {verdict.reason}
+                                        {t("tabs.econCalendar.actualVsForecast", { actual: `${evt.actual}${evt.unit}`, est: `${evt.estimate}${evt.unit}` })}{evt.previous != null ? ` ${t("tabs.econCalendar.prevParen", { prev: `${evt.previous}${evt.unit}` })}` : ""} — {verdict.reason}
                                       </div>
                                       {verdict.note && <div style={{ fontSize: 12, color: C.text3, marginTop: 4, lineHeight: 1.5, wordBreak: "keep-all" }}>💡 {verdict.note}</div>}
                                     </div>
@@ -12804,20 +12068,20 @@ function AppInner() {
                                     /* 발표 전 — 방향 가이드 */
                                     <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
                                       <div style={{ fontSize: 13, lineHeight: 1.5, wordBreak: "keep-all" }}>
-                                        <span style={{ fontWeight: 800, color: C.redL || C.red }}>예상보다 높으면</span>
-                                        <span style={{ color: C.text2 }}> → {guide.high}</span>
+                                        <span style={{ fontWeight: 800, color: C.redL || C.red }}>{t("tabs.econCalendar.ifHigher")}</span>
+                                        <span style={{ color: C.text2 }}> → {guideT("high")}</span>
                                       </div>
                                       <div style={{ fontSize: 13, lineHeight: 1.5, wordBreak: "keep-all" }}>
-                                        <span style={{ fontWeight: 800, color: C.greenL || C.green }}>예상보다 낮으면</span>
-                                        <span style={{ color: C.text2 }}> → {guide.low}</span>
+                                        <span style={{ fontWeight: 800, color: C.greenL || C.green }}>{t("tabs.econCalendar.ifLower")}</span>
+                                        <span style={{ color: C.text2 }}> → {guideT("low")}</span>
                                       </div>
-                                      {guide.note && <div style={{ fontSize: 12, color: C.text3, lineHeight: 1.5, wordBreak: "keep-all" }}>💡 {guide.note}</div>}
+                                      {guideHasNote && <div style={{ fontSize: 12, color: C.text3, lineHeight: 1.5, wordBreak: "keep-all" }}>💡 {guideT("note")}</div>}
                                     </div>
                                   )}
 
-                                  <div style={{ fontSize: 11, color: C.text3, marginTop: 8 }}>일반적인 시장 해석 · 참고용이며 투자 권유가 아닙니다</div>
+                                  <div style={{ fontSize: 11, color: C.text3, marginTop: 8 }}>{t("tabs.econCalendar.guideDisclaimer")}</div>
                                   {/* 시안의 "관련" 링크 — 실제 배선(리스크맵 탭 이동)으로 연결 */}
-                                  <button onClick={(e) => { e.stopPropagation(); setTab("risk-map"); }} style={{ display: "block", background: "none", border: "none", padding: 0, marginTop: 8, fontSize: 11, fontWeight: 700, color: C.blueL || C.blue, cursor: "pointer", fontFamily: "inherit" }}>관련 화면: 리스크맵 →</button>
+                                  <button onClick={(e) => { e.stopPropagation(); setTab("risk-map"); }} style={{ display: "block", background: "none", border: "none", padding: 0, marginTop: 8, fontSize: 11, fontWeight: 700, color: C.blueL || C.blue, cursor: "pointer", fontFamily: "inherit" }}>{t("tabs.econCalendar.relatedRiskMap")}</button>
                                 </div>
                               )}
                             </div>
@@ -12831,7 +12095,7 @@ function AppInner() {
               </div>
 
               {/* 화면 하단 면책 — 시안 공통 한 줄 */}
-              <Disclaimer style={{ marginTop: "16px" }}>본 정보는 참고용 지표이며 투자 자문·권유가 아닙니다.</Disclaimer>
+              <Disclaimer style={{ marginTop: "16px" }}>{t("tabs.econCalendar.disclaimer")}</Disclaimer>
             </div>
           );
         })()}
@@ -12854,11 +12118,11 @@ function AppInner() {
                 fontSize: "28px",
                 color: C.text1,
                 marginBottom: "8px",
-              }}>🚨 실시간 매매 알림</div>
+              }}>🚨 {t("alerts.heroTitle")}</div>
               <div style={{
                 fontSize: "16px",
                 color: C.text2,
-              }}>41개 퀀트 전략의 시그널을 실시간으로 감지합니다</div>
+              }}>{t("alerts.heroDesc")}</div>
             </div>
 
             {/* ── 전략 매매 알림 피드 ── */}
@@ -12872,18 +12136,18 @@ function AppInner() {
             }} className="rounded-[16px]">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <div className="font-bold text-lg">🚨 전략 매매 알림</div>
+                  <div className="font-bold text-lg">🚨 {t("alerts.tradeAlerts")}</div>
                   <div className="text-base text-muted-foreground mt-0.5">
-                    41개 퀀트 전략의 generate() 함수로 실제 매매 시그널을 감지합니다
+                    {t("alerts.description")}
                   </div>
                 </div>
                 {tradeAlerts.length > 0 && (
                   <button onClick={() => {
-                    if (!confirm("매매 알림을 전부 삭제하시겠습니까?")) return;
+                    if (!confirm(t("alerts.deleteConfirm"))) return;
                     setTradeAlerts([]); setAlertBadge(0);
                   }} className="px-3 py-1.5 rounded-lg text-sm font-semibold cursor-pointer" style={{
                     background: C.card2, color: C.text3, border: `1px solid ${C.border2}`,
-                  }}>전체 삭제</button>
+                  }}>{t("alerts.deleteAll")}</button>
                 )}
               </div>
 
@@ -12893,13 +12157,13 @@ function AppInner() {
                   <input type="checkbox" checked={settings.strategyAlerts !== false}
                     onChange={e => setSettings(p => ({ ...p, strategyAlerts: e.target.checked }))}
                     className="cursor-pointer" />
-                  <span>전략 매매 알림 활성화</span>
+                  <span>{t("alerts.enableStrategyAlerts")}</span>
                 </label>
                 <label className="flex items-center gap-1.5 cursor-pointer text-sm text-muted-foreground">
                   <input type="checkbox" checked={settings.autoSend}
                     onChange={e => setSettings(p => ({ ...p, autoSend: e.target.checked }))}
                     className="cursor-pointer" />
-                  <span>텔레그램 동시 발송</span>
+                  <span>{t("alerts.enableTelegram")}</span>
                 </label>
               </div>
 
@@ -12913,12 +12177,12 @@ function AppInner() {
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <span style={{ fontSize: "18px" }}>{notiPerm === "granted" ? "🔔" : notiPerm === "denied" ? "🔕" : "🔔"}</span>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: "15px" }}>브라우저 푸시 알림</div>
+                      <div style={{ fontWeight: 700, fontSize: "15px" }}>{t("alerts.pushNotification")}</div>
                       <div style={{ fontSize: "14px", color: C.text3 }}>
-                        {notiPerm === "granted" ? "활성화됨 — 매매 시그널 발생 시 알림이 표시됩니다"
-                          : notiPerm === "denied" ? "차단됨 — 브라우저 설정에서 알림을 허용해주세요"
-                          : notiPerm === "unsupported" ? "이 브라우저에서 지원되지 않습니다"
-                          : "허용하면 백그라운드에서도 매매 알림을 받을 수 있습니다"}
+                        {notiPerm === "granted" ? `${t("alerts.enabled")} — ${t("alerts.enabledDesc")}`
+                          : notiPerm === "denied" ? `${t("alerts.blocked")} — ${t("alerts.blockedDesc")}`
+                          : notiPerm === "unsupported" ? t("alerts.unsupported")
+                          : t("alerts.allowAlert")}
                       </div>
                     </div>
                   </div>
@@ -12927,8 +12191,8 @@ function AppInner() {
                       const perm = await Notification.requestPermission();
                       setNotiPerm(perm);
                       if (perm === "granted") {
-                        new Notification("Zepta 알림 활성화", {
-                          body: "전략 매매 시그널이 감지되면 여기로 알림이 옵니다 🚀",
+                        new Notification(t("alerts.notifTitle"), {
+                          body: t("alerts.notifBody"),
                           icon: "/favicon.ico",
                         });
                       }
@@ -12953,13 +12217,13 @@ function AppInner() {
                     onMouseLeave={e => {
                       e.currentTarget.style.boxShadow = `0 4px 16px ${C.blue}30`;
                       e.currentTarget.style.transform = "translateY(0)";
-                    }}>알림 허용</button>
+                    }}>{t("alerts.allowBtn")}</button>
                   )}
                   {notiPerm === "granted" && (
                     <span style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "16px", fontWeight: 700, background: C.green + "20", color: C.green }}>ON</span>
                   )}
                   {notiPerm === "denied" && (
-                    <span style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "16px", fontWeight: 700, background: C.red + "20", color: C.red }}>차단됨</span>
+                    <span style={{ padding: "4px 10px", borderRadius: "6px", fontSize: "16px", fontWeight: 700, background: C.red + "20", color: C.red }}>{t("alerts.blocked_status")}</span>
                   )}
                 </div>
               </div>
@@ -12973,11 +12237,11 @@ function AppInner() {
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <span style={{ fontSize: "18px" }}>{settings.autoScanEnabled ? "🔄" : "⏸️"}</span>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: "18px" }}>자동 스캔</div>
+                      <div style={{ fontWeight: 700, fontSize: "18px" }}>{t("alerts.autoScan")}</div>
                       <div style={{ fontSize: "16px", color: C.text3 }}>
                         {settings.autoScanEnabled
-                          ? `${settings.autoScanInterval || 30}분 간격으로 자동 실행`
-                          : "비활성화됨"}
+                          ? t("alerts.autoScanEvery", { m: settings.autoScanInterval || 30 })
+                          : t("alerts.disabled")}
                       </div>
                     </div>
                   </div>
@@ -12990,7 +12254,7 @@ function AppInner() {
                 {settings.autoScanEnabled && (
                   <>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                      <span style={{ fontSize: "16px", color: C.text2, minWidth: "50px" }}>간격</span>
+                      <span style={{ fontSize: "16px", color: C.text2, minWidth: "50px" }}>{t("alerts.interval")}</span>
                       <div style={{ display: "flex", gap: "6px", flex: 1 }}>
                         {[15, 30, 60, 120].map(m => (
                           <button key={m} onClick={() => setSettings(p => ({ ...p, autoScanInterval: m }))} style={{
@@ -12998,14 +12262,14 @@ function AppInner() {
                             background: (settings.autoScanInterval || 30) === m ? C.blueBg : "transparent",
                             color: (settings.autoScanInterval || 30) === m ? C.blue : C.text3,
                             border: `1px solid ${(settings.autoScanInterval || 30) === m ? C.blue + "40" : C.border2}`,
-                          }}>{m < 60 ? `${m}분` : `${m / 60}시간`}</button>
+                          }}>{m < 60 ? t("alerts.intervalMin", { m }) : t("alerts.intervalHour", { h: m / 60 })}</button>
                         ))}
                       </div>
                     </div>
                     {nextAutoScan && (
                       <div style={{ fontSize: "16px", color: C.text3, display: "flex", alignItems: "center", gap: "4px" }}>
-                        <span>⏰</span> 다음 스캔: {nextAutoScan.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
-                        {scanning && <span style={{ color: C.blue, fontWeight: 600 }}> — 스캔 중...</span>}
+                        <span>⏰</span> {t("alerts.nextScan")}: {nextAutoScan.toLocaleTimeString(lang === "en" ? "en-US" : "ko-KR", { hour: "2-digit", minute: "2-digit" })}
+                        {scanning && <span style={{ color: C.blue, fontWeight: 600 }}> — {t("alerts.scanning")}</span>}
                       </div>
                     )}
                   </>
@@ -13015,12 +12279,12 @@ function AppInner() {
               {/* 마켓 타입 필터 */}
               {tradeAlerts.length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginBottom: "12px" }}>
-                  <div style={{ fontSize: "16px", color: C.text3, fontWeight: 600, alignSelf: "center", marginRight: "4px" }}>마켓:</div>
+                  <div style={{ fontSize: "16px", color: C.text3, fontWeight: 600, alignSelf: "center", marginRight: "4px" }}>{t("alerts.marketFilter")}</div>
                   {[
-                    ["all", "전체"],
-                    ["us", "🇺🇸 미국"],
-                    ["kr", "🇰🇷 한국"],
-                    ["crypto", "₿ 크립토"],
+                    ["all", t("alerts.all")],
+                    ["us", t("alerts.us")],
+                    ["kr", t("alerts.kr")],
+                    ["crypto", t("alerts.crypto")],
                   ].map(([v, l]) => (
                     <button key={v} onClick={() => setAlertMarketFilter(v)} style={{
                       padding: "5px 12px", borderRadius: "8px", fontSize: "16px", fontWeight: 600,
@@ -13036,11 +12300,11 @@ function AppInner() {
               {/* 시그널 타입 필터 탭 */}
               {tradeAlerts.length > 0 && (
                 <div style={{ display: "flex", gap: "6px", marginBottom: "12px" }}>
-                  <div style={{ fontSize: "16px", color: C.text3, fontWeight: 600, alignSelf: "center", marginRight: "4px" }}>시그널:</div>
+                  <div style={{ fontSize: "16px", color: C.text3, fontWeight: 600, alignSelf: "center", marginRight: "4px" }}>{t("alerts.signalFilter")}</div>
                   {[
-                    ["all", "전체", tradeAlerts.length],
-                    ["buy", "매수", tradeAlerts.filter(a => a.action === "매수").length],
-                    ["sell", "매도", tradeAlerts.filter(a => a.action !== "매수").length],
+                    ["all", t("alerts.all"), tradeAlerts.length],
+                    ["buy", t("alerts.buy"), tradeAlerts.filter(a => a.action === "매수").length],
+                    ["sell", t("alerts.sell"), tradeAlerts.filter(a => a.action !== "매수").length],
                   ].map(([v, l, cnt]) => (
                     <button key={v} onClick={() => setAlertFilter(v)} style={{
                       padding: "6px 14px", borderRadius: "8px", fontSize: "16px", fontWeight: 600,
@@ -13057,8 +12321,8 @@ function AppInner() {
               {tradeAlerts.length === 0 ? (
                 <div style={{ textAlign: "center", padding: "40px 24px", color: C.text3 }}>
                   <div style={{ fontSize: "40px", marginBottom: "12px" }}>🔕</div>
-                  <div style={{ fontSize: "18px", fontWeight: 600, marginBottom: "4px" }}>아직 전략 매매 알림이 없습니다</div>
-                  <div style={{ fontSize: "16px" }}>스크리너를 실행하면 41개 퀀트 전략이 실제 generate() 시그널을 감지합니다</div>
+                  <div style={{ fontSize: "18px", fontWeight: 600, marginBottom: "4px" }}>{t("alerts.noAlerts")}</div>
+                  <div style={{ fontSize: "16px" }}>{t("alerts.noAlertsDesc")}</div>
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px", maxHeight: "520px", overflow: "auto" }}>
@@ -13105,7 +12369,7 @@ function AppInner() {
                               padding: "2px 8px", borderRadius: "6px", fontSize: "15px", fontWeight: 700,
                               background: isBuy ? C.greenBg : C.redBg,
                               color: isBuy ? C.green : C.red,
-                            }}>{isBuy ? "📈 매수" : "📉 매도"}</span>
+                            }}>{isBuy ? `📈 ${t("alerts.buy_badge")}` : `📉 ${t("alerts.sell_badge")}`}</span>
                             <span style={{ fontSize: "16px", fontWeight: 700, color: C.blue }}>{alert.strategy}</span>
                           </div>
                           <span style={{ fontSize: "15px", color: C.text3 }}>{timeStr}</span>
@@ -13134,7 +12398,7 @@ function AppInner() {
                           <span style={{ fontWeight: 600 }}>{alert.reason}</span>
                           {alert.recentSignalCount > 1 && (
                             <span style={{ padding: "1px 5px", borderRadius: "4px", fontSize: "14px", fontWeight: 700, background: isBuy ? C.greenBg : C.redBg, color: isBuy ? C.green : C.red }}>
-                              최근 {alert.recentSignalCount}건 시그널
+                              {t("alerts.recentSignals", { n: alert.recentSignalCount })}
                             </span>
                           )}
                         </div>
@@ -13147,10 +12411,10 @@ function AppInner() {
 
             {/* ── 텔레그램 설정 ── */}
             <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "16px", padding: "22px 24px", marginBottom: "12px" }}>
-              <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "16px" }}>📱 텔레그램 연동</div>
+              <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "16px" }}>📱 {t("alerts.telegram")}</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                 <div>
-                  <div style={{ fontSize: "16px", color: C.text3, marginBottom: "6px", fontWeight: 600 }}>봇 토큰</div>
+                  <div style={{ fontSize: "16px", color: C.text3, marginBottom: "6px", fontWeight: 600 }}>{t("alerts.botToken")}</div>
                   <input value={settings.botToken} onChange={e => setSettings(p => ({ ...p, botToken: e.target.value }))}
                     placeholder="123456789:ABCdefGHIjklMNOpqrSTUvwxyz" type="password" style={{
                       width: "100%", padding: "10px 12px", borderRadius: "10px", fontSize: "16px",
@@ -13158,7 +12422,7 @@ function AppInner() {
                     }} />
                 </div>
                 <div>
-                  <div style={{ fontSize: "16px", color: C.text3, marginBottom: "6px", fontWeight: 600 }}>채팅 ID</div>
+                  <div style={{ fontSize: "16px", color: C.text3, marginBottom: "6px", fontWeight: 600 }}>{t("alerts.chatId")}</div>
                   <input value={settings.chatId} onChange={e => setSettings(p => ({ ...p, chatId: e.target.value }))}
                     placeholder="1234567890" type="password" style={{
                       width: "100%", padding: "10px 12px", borderRadius: "10px", fontSize: "16px",
@@ -13171,21 +12435,21 @@ function AppInner() {
                 <button onClick={() => {
                   if (!settings.botToken || !settings.chatId) return;
                   (async () => {
-                    setTgStatus("⏳ 전송 중...");
+                    setTgStatus(`⏳ ${t("alerts.sending")}`);
                     try {
                       const r = await fetch(`https://api.telegram.org/bot${settings.botToken}/sendMessage`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ chat_id: settings.chatId, text: "🚨 *Zepta 테스트*\n\n텔레그램 연결 테스트 성공!", parse_mode: "Markdown" }),
                       });
-                      if (r.ok) setTgStatus("✅ 텔레그램 연결 완료");
-                      else setTgStatus("❌ 전송 실패");
+                      if (r.ok) setTgStatus(`✅ ${t("alerts.connectionSuccess")}`);
+                      else setTgStatus(`❌ ${t("alerts.sendFailed")}`);
                     } catch (e) { setTgStatus(`❌ ${e.message}`); }
                   })();
                 }} style={{
                   padding: "9px 20px", borderRadius: "10px", fontSize: "18px", fontWeight: 700,
                   background: C.blue, color: "#fff", border: "none",
-                }}>📤 연결 테스트</button>
+                }}>📤 {t("alerts.testConnection")}</button>
               </div>
 
               {tgStatus && (
@@ -13197,9 +12461,9 @@ function AppInner() {
 
             {/* ── 동기화 ── */}
             <div style={{ background: C.card, border: `1px solid ${C.border}20`, borderRadius: "16px", padding: "22px 24px" }}>
-              <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "16px" }}>🔄 데이터 동기화</div>
+              <div style={{ fontWeight: 700, fontSize: "18px", marginBottom: "16px" }}>🔄 {t("alerts.dataSync")}</div>
               <div style={{ marginBottom: "12px" }}>
-                <div style={{ fontSize: "16px", color: C.text3, marginBottom: "6px", fontWeight: 600 }}>동기화 PIN (4자리 이상)</div>
+                <div style={{ fontSize: "16px", color: C.text3, marginBottom: "6px", fontWeight: 600 }}>{t("alerts.syncPin")}</div>
                 <input value={syncPin} onChange={e => setSyncPin(e.target.value)} type="password" placeholder="1234"
                   style={{
                     width: "100%", padding: "10px 12px", borderRadius: "10px", fontSize: "18px",
@@ -13210,11 +12474,11 @@ function AppInner() {
                 <button onClick={syncUpload} style={{
                   padding: "9px 20px", borderRadius: "10px", fontSize: "18px", fontWeight: 700,
                   background: C.blue, color: "#fff", border: "none", flex: 1,
-                }}>📤 업로드</button>
+                }}>📤 {t("alerts.upload")}</button>
                 <button onClick={syncDownload} style={{
                   padding: "9px 20px", borderRadius: "10px", fontSize: "18px", fontWeight: 700,
                   background: C.green, color: "#fff", border: "none", flex: 1,
-                }}>📥 다운로드</button>
+                }}>📥 {t("alerts.download")}</button>
               </div>
               {syncStatus && (
                 <div style={{ fontSize: "16px", color: syncStatus.includes("✅") ? C.green : C.red, fontWeight: 600 }}>
@@ -13244,11 +12508,11 @@ function AppInner() {
                 fontSize: "28px",
                 color: C.text1,
                 marginBottom: "8px",
-              }}>💬 소셜 센티먼트 분석</div>
+              }}>💬 {t("sentiment.title")}</div>
               <div style={{
                 fontSize: "16px",
                 color: C.text2,
-              }}>StockTwits · Reddit(WSB) 기반 실시간 투자 심리</div>
+              }}>{t("sentiment.subtitle")}</div>
             </div>
 
             {/* 검색 헤더 */}
@@ -13256,7 +12520,7 @@ function AppInner() {
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"12px"}}>
                 <div>
                   <div style={{fontWeight:800,fontSize:"18px",marginBottom:"4px",color:C.text1}}>{t("sentiment.title")}</div>
-                  <div style={{fontSize:"14px",color:C.text3}}>StockTwits · Reddit(WSB) 기반 실시간 투자 심리</div>
+                  <div style={{fontSize:"14px",color:C.text3}}>{t("sentiment.subtitle")}</div>
                 </div>
                 <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
                   <input value={sentimentSymbol} onChange={e=>setSentimentSymbol(e.target.value.toUpperCase())}
@@ -13267,7 +12531,7 @@ function AppInner() {
                     padding:"8px 16px",borderRadius:"8px",fontSize:"14px",fontWeight:700,
                     background:sentimentLoading?C.card2:`linear-gradient(135deg,${C.purple},#6D28D9)`,
                     color:"#fff",border:"none",cursor:sentimentLoading?"default":"pointer",
-                  }}>{sentimentLoading?"분석 중...":"분석"}</button>
+                  }}>{sentimentLoading?t("sentiment.analyzing"):t("sentiment.analyze")}</button>
                 </div>
               </div>
               {/* 빠른 심볼 버튼 — 모바일에서 수평 스크롤 가능 */}
@@ -13285,7 +12549,7 @@ function AppInner() {
             {sentimentLoading && (
               <div style={{textAlign:"center",padding:"60px 24px",color:C.text3}}>
                 <div style={{fontSize:"40px",marginBottom:"12px",animation:"pulse 1.5s infinite"}}>💬</div>
-                <div>소셜 데이터 수집 중...</div>
+                <div>{t("sentiment.collecting")}</div>
               </div>
             )}
 
@@ -13304,7 +12568,7 @@ function AppInner() {
                   boxShadow:"0 4px 20px rgba(0,0,0,0.2)",
                 }}>
                   <div style={{fontSize:"16px",color:C.text3,marginBottom:"12px",fontWeight:600}}>
-                    {sentimentData.symbol} 종합 센티먼트
+                    {sentimentData.symbol} {t("sentiment.sentiment")}
                   </div>
                   <div style={{
                     fontSize:isMobile?"48px":"64px",
@@ -13331,9 +12595,9 @@ function AppInner() {
                     <div style={{width:`${sentimentData.sentiment.bearish}%`,background:`linear-gradient(90deg, ${C.red} 0%, ${C.red}80 100%)`,transition:"width 0.5s",boxShadow:`0 0 8px ${C.red}40`}} />
                   </div>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:"14px"}}>
-                    <span style={{color:C.green,fontWeight:600}}>긍정 {sentimentData.sentiment.bullish}%</span>
-                    <span style={{color:C.text3}}>중립 {sentimentData.sentiment.neutral}%</span>
-                    <span style={{color:C.red,fontWeight:600}}>부정 {sentimentData.sentiment.bearish}%</span>
+                    <span style={{color:C.green,fontWeight:600}}>{t("sentiment.bullish")} {sentimentData.sentiment.bullish}%</span>
+                    <span style={{color:C.text3}}>{t("sentiment.neutral")} {sentimentData.sentiment.neutral}%</span>
+                    <span style={{color:C.red,fontWeight:600}}>{t("sentiment.bearish")} {sentimentData.sentiment.bearish}%</span>
                   </div>
                 </div>
               )}
@@ -13362,13 +12626,13 @@ function AppInner() {
                 }}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"12px"}}>
                     <div style={{fontWeight:700,fontSize:"15px"}}>{src.name}</div>
-                    <span style={{fontSize:"14px",color:C.text3}}>{src.total}개 포스트 분석</span>
+                    <span style={{fontSize:"14px",color:C.text3}}>{src.total}{t("sentiment.posts")}</span>
                   </div>
                   {/* 소스 센티먼트 바 */}
                   <div style={{display:"flex",gap:"8px",marginBottom:"16px"}}>
-                    {[{label:"긍정",val:src.bullish,color:C.green,bg:C.greenBg},
-                      {label:"중립",val:src.neutral,color:C.text3,bg:C.card2},
-                      {label:"부정",val:src.bearish,color:C.red,bg:C.redBg}].map(s=>(
+                    {[{label:t("sentiment.bullish"),val:src.bullish,color:C.green,bg:C.greenBg},
+                      {label:t("sentiment.neutral"),val:src.neutral,color:C.text3,bg:C.card2},
+                      {label:t("sentiment.bearish"),val:src.bearish,color:C.red,bg:C.redBg}].map(s=>(
                       <div key={s.label} style={{flex:1,background:s.bg,borderRadius:"8px",padding:"10px",textAlign:"center"}}>
                         <div style={{fontSize:"18px",fontWeight:800,color:s.color}}>{s.val}%</div>
                         <div style={{fontSize:"15px",color:s.color,fontWeight:600}}>{s.label}</div>
@@ -13408,7 +12672,7 @@ function AppInner() {
                   margin:"0 auto",
                   boxShadow:"0 2px 12px rgba(0,0,0,0.2)",
                 }}>
-                  <div style={{fontWeight:700,fontSize:"18px",marginBottom:"12px"}}>트렌딩 심볼</div>
+                  <div style={{fontWeight:700,fontSize:"18px",marginBottom:"12px"}}>{t("sentiment.trending")}</div>
                   <div style={{display:"flex",flexWrap:"wrap",gap:"8px"}}>
                     {sentimentData.trending.map((t,i)=>(
                       <button key={i} onClick={()=>{setSentimentSymbol(t.symbol);fetchSentiment(t.symbol);}} style={{
@@ -13428,8 +12692,8 @@ function AppInner() {
               {(!sentimentData.sources || sentimentData.sources.length === 0) && !sentimentData.sentiment && (
                 <div style={{textAlign:"center",padding:"40px 24px",color:C.text3}}>
                   <div style={{fontSize:"40px",marginBottom:"8px"}}>📭</div>
-                  <div>'{sentimentData.symbol}'에 대한 센티먼트 데이터가 없습니다</div>
-                  <div style={{fontSize:"16px",marginTop:"4px"}}>다른 심볼을 검색해보세요</div>
+                  <div>{t("sentiment.noData", { symbol: sentimentData.symbol })}</div>
+                  <div style={{fontSize:"16px",marginTop:"4px"}}>{t("sentiment.tryOther")}</div>
                 </div>
               )}
             </>)}
@@ -13438,8 +12702,8 @@ function AppInner() {
             {!sentimentLoading && !sentimentData && (
               <div style={{textAlign:"center",padding:"60px 24px",color:C.text3}}>
                 <div style={{fontSize:"48px",marginBottom:"12px"}}>💬</div>
-                <div style={{fontWeight:600,fontSize:"18px",marginBottom:"4px"}}>소셜 센티먼트 분석</div>
-                <div style={{fontSize:"16px"}}>심볼을 입력하고 "분석" 버튼을 클릭하세요</div>
+                <div style={{fontWeight:600,fontSize:"18px",marginBottom:"4px"}}>{t("sentiment.title")}</div>
+                <div style={{fontSize:"16px"}}>{t("sentiment.initialState")}</div>
               </div>
             )}
 
@@ -13591,9 +12855,14 @@ function AppInner() {
         {/* ═══════════════════════════════════════════════════════════
             TAB: 전체 (더보기) — 토스 스타일 서비스 허브
         ═══════════════════════════════════════════════════════════ */}
+        {/* ═══════════════════════════════════════════════════════════
+            TAB: MY — ★ 2026-08-12 IA v3 리뉴얼 (시안 1e · 설계서 v3 5장)
+            프로필 헤더(비로그인=가입 CTA) → 스탯 3열 → 바로가기 →
+            설정(테마·언어 토글 — 최초 UI 노출) → (owner) 매매 콘솔 → 고객지원 → 로그아웃.
+            데이터 배선(watchlist·savedScreenerCount·streakInfo·profilePerf)은 전부 기존 그대로.
+        ═══════════════════════════════════════════════════════════ */}
         {tab === "profile" && (() => {
-          // ★ 2026-08 모바일 시안 My page: 아바타 카드 + 3열 스탯.
-          //   스탯은 "실제로 값이 있는 칸"만 렌더합니다 — 없는 지표를 0 으로 지어내지 않습니다.
+          // 스탯은 "실제로 값이 있는 칸"만 렌더합니다 — 없는 지표를 0 으로 지어내지 않습니다.
           //   · 관심종목: App state(watchlist) — 로그인 사용자면 항상 실측값
           //   · 저장한 조건: /api/screeners/list (조회 실패 시 null → 칸 자체를 숨김)
           //   · 연속 접속: 공용 streak effect 의 streakInfo (기록 없으면 칸을 숨김 — 0 을 지어내지 않음)
@@ -13602,237 +12871,262 @@ function AppInner() {
             return Number.isFinite(n) && n > 0 ? n : null;
           })();
           const statCells = [
-            { label: "관심종목", value: `${watchlist.length}` },
-            savedScreenerCount != null ? { label: "저장한 조건", value: `${savedScreenerCount}` } : null,
-            streakCount != null ? { label: "연속 접속", value: `${streakCount}일` } : null,
+            { label: t("profile.watchlistCount"), value: `${watchlist.length}` },
+            savedScreenerCount != null ? { label: t("profile.savedConditions"), value: `${savedScreenerCount}` } : null,
+            streakCount != null ? { label: t("profile.streakDays"), value: t("profile.daysUnit", { n: streakCount }) } : null,
           ].filter(Boolean);
+          // 바로가기 — 실제 목적지가 있는 항목만 배선합니다.
+          //   · 관심종목: 전용 관리 화면이 없어 관리 UI 가 있는 홈 관심종목 섹션으로 (죽은 링크 금지)
+          //   · 저장한 조건: saved-screeners 탭(SavedScreeners — 재실행 루프)
+          //   · 알림: notifications 탭 (전략 알림 내역)
+          const shortcutRows = [
+            {
+              key: "watchlist", label: t("profile.shortcutWatchlist"), hint: t("profile.shortcutWatchlistHint"),
+              onGo: () => setTab("home"),
+              icon: <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />,
+            },
+            {
+              key: "saved", label: t("profile.shortcutSaved"), hint: null,
+              onGo: () => setTab("saved-screeners"),
+              icon: <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />,
+            },
+            {
+              key: "alerts", label: t("profile.shortcutAlerts"), hint: null,
+              onGo: () => setTab("notifications"),
+              icon: <><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" /></>,
+            },
+          ];
           return (
-          <div className="tab-content" style={{ maxWidth: "720px", margin: "0 auto" }}>
+          <div className="tab-content" style={{ maxWidth: "720px", margin: "0 auto", display: "flex", flexDirection: "column", gap: "12px" }}>
+            {/* 페이지 타이틀 — 시안 1e */}
+            <h1 style={{ margin: 0, fontSize: isMobile ? "22px" : "24px", fontWeight: 800, color: C.text1, letterSpacing: "-0.01em" }}>{t("nav.my")}</h1>
 
-            {/* ── 상단: 유저 영역 (시안 My page 패턴) ── */}
+            {/* ── ① 프로필 헤더 / 비로그인 가입 CTA (시안 1e) ── */}
             {user ? (
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "16px" }}>
+              <div style={{
+                background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px",
+                padding: "15px", display: "flex", alignItems: "center", gap: "13px",
+              }}>
                 <div style={{
-                  background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px",
-                  padding: "16px", display: "flex", alignItems: "center", gap: "14px",
+                  width: "52px", height: "52px", borderRadius: "50%", flexShrink: 0,
+                  background: `linear-gradient(135deg, ${C.blueL || C.blue}, ${C.blue})`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "21px", fontWeight: 800, color: "#fff", overflow: "hidden",
                 }}>
-                  <div style={{
-                    width: "54px", height: "54px", borderRadius: "50%", flexShrink: 0,
-                    background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: "21px", fontWeight: 900, color: "#fff", overflow: "hidden",
-                  }}>
-                    {(user?.user_metadata?.avatar_url)
-                      ? <img src={user.user_metadata.avatar_url} alt="사용자 프로필" width="54" height="54" style={{ width: 54, height: 54, borderRadius: "50%", objectFit: "cover" }} />
-                      : (user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()
-                    }
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: "18px", fontWeight: 800, color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                      {user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User"}
-                    </div>
-                    {/* ★ 2026-06-12 (대표 지시): 레벨/티어 표기 제거 — 이메일로 대체 */}
-                    <div style={{ fontSize: "12px", color: C.text3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.email || ""}</div>
-                  </div>
-                  <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-                    <button onClick={() => setTab("mypage")} style={{
-                      padding: "7px 14px", borderRadius: "10px", fontSize: "14px", fontWeight: 600,
-                      background: C.card2, border: `1px solid ${C.border}`, color: C.text2, cursor: "pointer",
-                    }}>내 정보</button>
-                    <button onClick={toggleTheme} aria-label="테마 전환" style={{
-                      padding: "7px 12px", borderRadius: "10px", fontSize: "14px", fontWeight: 600,
-                      background: C.card2, border: `1px solid ${C.border}`, color: C.text2, cursor: "pointer",
-                    }}>{themeMode === "dark" ? "🌙" : "☀️"}</button>
-                  </div>
+                  {(user?.user_metadata?.avatar_url)
+                    ? <img src={user.user_metadata.avatar_url} alt={t("profile.avatarAlt")} width="52" height="52" style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover" }} />
+                    : (user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.email || "U")[0].toUpperCase()
+                  }
                 </div>
-                {statCells.length > 0 && (
-                  <div style={{
-                    background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px",
-                    display: "grid", gridTemplateColumns: `repeat(${statCells.length}, 1fr)`, overflow: "hidden",
-                  }}>
-                    {statCells.map((s, i) => (
-                      <div key={s.label} style={{
-                        padding: "14px 8px", textAlign: "center",
-                        borderLeft: i > 0 ? `1px solid ${C.card2}` : "none",
-                      }}>
-                        <Num size="20px" weight={800}>{s.value}</Num>
-                        <div style={{ fontSize: "11px", color: C.text3, marginTop: "3px" }}>{s.label}</div>
-                      </div>
-                    ))}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: "16px", fontWeight: 800, color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {user?.user_metadata?.nickname || user?.user_metadata?.display_name || user?.email?.split("@")[0] || "User"}
                   </div>
-                )}
+                  {/* ★ 2026-06-12 (대표 지시): 레벨/티어 표기 제거 — 이메일로 대체 */}
+                  <div style={{ fontSize: "12px", color: C.text3, marginTop: "2px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user?.email || ""}</div>
+                </div>
+                {/* 헤더 액션은 1개만 — 테마 버튼은 아래 설정 섹션으로 이동(시안 1e) */}
+                <button onClick={() => setTab("mypage")} style={{
+                  flexShrink: 0, padding: "7px 12px", borderRadius: "9999px", fontSize: "12px", fontWeight: 800,
+                  background: C.card2, border: `1px solid ${C.border2}`, color: C.text2, cursor: "pointer",
+                  fontFamily: "inherit", whiteSpace: "nowrap",
+                }}>{t("profile.editProfile")}</button>
               </div>
             ) : (
+              /* 비로그인 가입 CTA — 시안 1e: 헤드라인 + 설명 + [시작하기|로그인] */
               <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                marginBottom: "20px", padding: "16px", borderRadius: "16px",
-                background: `linear-gradient(135deg, ${C.blueBg}, ${C.purpleBg})`,
-                border: `1px solid ${C.blue}15`,
+                background: `radial-gradient(260px 160px at 0% 0%, ${C.blue}2E, transparent 70%), ${C.card}`,
+                border: `1px solid ${C.blue}59`, borderRadius: "18px", padding: "18px 16px",
               }}>
-                <div>
-                  <div style={{ fontSize: "16px", fontWeight: 800, color: C.text1, marginBottom: "4px" }}>로그인하고 시작하세요</div>
-                  <div style={{ fontSize: "12px", color: C.text3 }}>관심종목·포트폴리오 동기화, 맞춤 시장 신호까지</div>
+                <div style={{ fontSize: "17px", fontWeight: 800, color: C.text1, lineHeight: 1.35 }}>{t("profile.guestTitle")}</div>
+                <div style={{ fontSize: "12px", color: C.text2, lineHeight: 1.6, marginTop: "6px" }}>{t("profile.guestDesc")}</div>
+                <div style={{ display: "flex", gap: "8px", marginTop: "14px" }}>
+                  <button onClick={() => setShowAuthModal(true)} style={{
+                    flex: 1, height: "44px", borderRadius: "12px", background: C.blue, color: "#fff",
+                    border: "none", fontSize: "14px", fontWeight: 800, fontFamily: "inherit", cursor: "pointer",
+                  }}>{t("profile.guestStart")}</button>
+                  <button onClick={() => setShowAuthModal(true)} style={{
+                    height: "44px", padding: "0 16px", borderRadius: "12px", background: "transparent",
+                    border: `1px solid ${C.border2}`, color: C.text2, fontSize: "13px", fontWeight: 700,
+                    fontFamily: "inherit", cursor: "pointer",
+                  }}>{t("profile.guestLogin")}</button>
                 </div>
-                <button onClick={() => setShowAuthModal(true)} style={{
-                  padding: "10px 20px", borderRadius: "12px", fontSize: "14px", fontWeight: 700,
-                  background: C.blue, color: "#fff", border: "none", cursor: "pointer",
-                  whiteSpace: "nowrap",
-                }}>로그인</button>
               </div>
             )}
 
-            {/* ── 운용 현황 (2026-06-12 대표 지시: 그리드 메뉴·레벨·투자서비스 대신
-                 모의투자 봇·실전매매 실적을 간단 구분 표시 — 메뉴는 햄버거 사이드바로 일원화) ── */}
-            {(() => {
-              const botsObj = profilePerf.bots;
-              const botRows = botsObj ? Object.entries(botsObj).map(([id, b]) => ({
-                id,
-                pl: Number(b?.perf?.realizedPL || 0) + Number(b?.snapshot?.unrealizedPL || 0),
-                positions: Number(b?.snapshot?.positionCount || 0),
-                trades: Number(b?.perf?.tradeCount || 0),
-              })) : [];
-              const totalPl = botRows.reduce((a, r) => a + r.pl, 0);
-              const totalPos = botRows.reduce((a, r) => a + r.positions, 0);
-              const top = [...botRows].sort((a, b) => b.pl - a.pl).slice(0, 3);
-              const nameKo = (id) => ({
-                "btc-alpha": "BTC 알파", "highcap-momentum": "대형주 모멘텀", "defi-infra": "DeFi 인프라",
-                "meme-trend": "밈 트렌드", "l2-emerging": "L2 신흥", "crypto-diversity": "크립토 분산",
-                "crypto-swing": "크립토 스윙", "balanced-quant": "밸런스 퀀트", "aggressive-quant": "공격형 퀀트",
-              }[id] || id);
-              return (
-                <>
-                  {/* 모의투자 봇 운용 현황 (★ 2026-07 정보 서비스 피벗: 내부 운영 전용) */}
-                  {isOwner && user && (
-                  <div onClick={() => setTab("auto-trading")} style={{
-                    background: C.card, borderRadius: "16px", padding: "16px 20px",
-                    border: `1px solid ${C.border}${C.isDark ? '18' : '40'}`, marginBottom: "12px", cursor: "pointer",
+            {/* ── ② 활동 스탯 3열 (시안 1e — 값 있는 칸만, 로그인 시) ── */}
+            {user && statCells.length > 0 && (
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${statCells.length}, 1fr)`, gap: "9px" }}>
+                {statCells.map((s) => (
+                  <div key={s.label} style={{
+                    background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px",
+                    padding: "12px 8px", textAlign: "center",
                   }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                      <span style={{ fontSize: "14px", fontWeight: 800, color: C.text1 }}>🤖 모의투자 봇 운용 현황</span>
-                      <span style={{ fontSize: "11px", fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: `${C.yellow}15`, color: C.yellow }}>시뮬레이션</span>
-                    </div>
-                    {!botsObj ? (
-                      <div style={{ fontSize: "13px", color: C.text3, padding: "6px 0" }}>{profilePerf.loading ? "불러오는 중…" : "데이터 없음"}</div>
-                    ) : (
-                      <>
-                        <div style={{ display: "flex", gap: 16, marginBottom: 10 }}>
-                          <div><span className="z-num" style={{ fontSize: 18, fontWeight: 800, color: C.text1 }}>{botRows.length}</span><span style={{ fontSize: 12, color: C.text3 }}> 봇</span></div>
-                          <div><span className="z-num" style={{ fontSize: 18, fontWeight: 800, color: C.text1 }}>{totalPos}</span><span style={{ fontSize: 12, color: C.text3 }}> 포지션</span></div>
-                          <div style={{ marginLeft: "auto", textAlign: "right" }}>
-                            <span className="z-num" style={{ fontSize: 18, fontWeight: 800, color: totalPl >= 0 ? C.green : C.red, fontVariantNumeric: "tabular-nums" }}>
-                              {totalPl >= 0 ? "+" : ""}${Math.round(totalPl).toLocaleString()}
-                            </span>
-                            <div style={{ fontSize: 11, color: C.text3 }}>누적 손익(실현+평가)</div>
-                          </div>
-                        </div>
-                        {top.map(r => (
-                          <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderTop: `1px solid ${C.border}12` }}>
-                            <span style={{ fontSize: 13, fontWeight: 600, color: C.text2, flex: 1 }}>{nameKo(r.id)}</span>
-                            <span style={{ fontSize: 11, color: C.text3 }}>{r.trades}회</span>
-                            <span className="z-num" style={{ fontSize: 13, fontWeight: 700, color: r.pl >= 0 ? C.green : C.red, minWidth: 70, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                              {r.pl >= 0 ? "+" : ""}${Math.round(r.pl).toLocaleString()}
-                            </span>
-                          </div>
-                        ))}
-                        <div style={{ fontSize: 11, color: C.text3, marginTop: 8 }}>가상 자금 기준 시뮬레이션 · 누르면 자동매매로 이동</div>
-                      </>
-                    )}
+                    <Num size="18px" weight={800}>{s.value}</Num>
+                    <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700, marginTop: "2px" }}>{s.label}</div>
                   </div>
-                  )}
+                ))}
+              </div>
+            )}
 
-                  {/* 실전매매 실적 (오너 전용) */}
-                  {isOwner && user && (
-                    <div onClick={() => setTab("real-trading")} style={{
-                      background: C.card, borderRadius: "16px", padding: "16px 20px",
-                      border: `1px solid ${C.red}25`, marginBottom: "16px", cursor: "pointer",
-                    }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-                        <span style={{ fontSize: "14px", fontWeight: 800, color: C.text1 }}>⚡ 실전매매 실적</span>
-                        <span style={{ fontSize: "11px", fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: `${C.red}15`, color: C.red }}>실거래</span>
-                      </div>
-                      {!profilePerf.real ? (
-                        <div style={{ fontSize: "13px", color: C.text3, padding: "6px 0" }}>{profilePerf.loading ? "불러오는 중…" : "연결 안 됨"}</div>
-                      ) : (
-                        <div style={{ display: "flex", gap: 16 }}>
-                          <div>
-                            <div className="z-num" style={{ fontSize: 18, fontWeight: 800, color: C.text1, fontVariantNumeric: "tabular-nums" }}>${Number(profilePerf.real.equity || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-                            <div style={{ fontSize: 11, color: C.text3 }}>잔고</div>
-                          </div>
-                          <div>
-                            <div className="z-num" style={{ fontSize: 18, fontWeight: 800, color: (profilePerf.real.unrealizedPnl || 0) >= 0 ? C.green : C.red, fontVariantNumeric: "tabular-nums" }}>
-                              {(profilePerf.real.unrealizedPnl || 0) >= 0 ? "+" : ""}${Number(profilePerf.real.unrealizedPnl || 0).toFixed(1)}
-                            </div>
-                            <div style={{ fontSize: 11, color: C.text3 }}>미실현 손익</div>
-                          </div>
-                          <div style={{ marginLeft: "auto", textAlign: "right" }}>
-                            <div className="z-num" style={{ fontSize: 18, fontWeight: 800, color: C.text1 }}>{profilePerf.real.positions}</div>
-                            <div style={{ fontSize: 11, color: C.text3 }}>포지션</div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* 마케팅 대시보드 진입점 (오너 전용) — 2026-06-12 대표 "어디서 봐?" */}
-                  {isOwner && user && (
-                    <div onClick={() => setTab("marketing")} style={{
-                      background: C.card, borderRadius: "16px", padding: "14px 20px",
-                      border: `1px solid ${C.blue}25`, marginBottom: "16px", cursor: "pointer",
-                      display: "flex", alignItems: "center", gap: 12,
-                    }}>
-                      <span style={{ fontSize: 20 }}>📊</span>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: "14px", fontWeight: 800, color: C.text1 }}>마케팅 대시보드</div>
-                        <div style={{ fontSize: "12px", color: C.text3 }}>방문·유입·전환 지표 (자체 수집, GA 대체)</div>
-                      </div>
-                      <span style={{ fontSize: "14px", color: C.text3 }}>›</span>
-                    </div>
-                  )}
-                </>
-              );
-            })()}
-
-            {/* ── 고객지원 / 정보 (시안 리스트 카드 문법) ── */}
-            <div style={{ marginBottom: "16px" }}>
+            {/* ── ③ 바로가기 (시안 1e — 로그인 시: 계정 종속 데이터 목적지) ── */}
+            {user && (
               <ListCard>
-                <div style={{ padding: "14px 16px", fontSize: "13px", fontWeight: 800, color: C.text3, letterSpacing: "0.02em" }}>고객지원</div>
-                {[
-                  { icon: "📋", label: "서비스 소개", tab: "about" },
-                  { icon: "📖", label: "투자 가이드", href: "/guide" }, // ★ guide 는 정적 페이지 — setTab 하면 빈 화면이던 죽은 링크 수정
-                  { icon: "🔒", label: "개인정보 처리방침", tab: "privacy" },
-                  { icon: "📄", label: "이용약관", tab: "terms" },
-                  { icon: "✉️", label: "문의하기", tab: "contact" },
-                ].map((item, i, arr) => (
-                  <div key={i} onClick={() => { if (item.href) window.location.href = item.href; else setTab(item.tab); }}
-                    role="button" tabIndex={0}
-                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (item.href) window.location.href = item.href; else setTab(item.tab); } }}
+                {shortcutRows.map((r, i) => (
+                  <div key={r.key} onClick={r.onGo} role="button" tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); r.onGo(); } }}
                     style={{
-                      display: "flex", alignItems: "center", gap: "14px",
-                      padding: "14px 16px", borderTop: `1px solid ${C.card2}`, cursor: "pointer",
-                      transition: "background .1s",
+                      display: "flex", alignItems: "center", gap: "11px", padding: "13px 14px",
+                      borderTop: i > 0 ? `1px solid ${C.card2}` : "none", cursor: "pointer", transition: "background .1s",
                     }}
                     onMouseEnter={e => e.currentTarget.style.background = C.card2}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                   >
-                    <span style={{ fontSize: "16px", width: "24px", textAlign: "center" }}>{item.icon}</span>
-                    <span style={{ fontSize: "15px", fontWeight: 600, color: C.text2, flex: 1 }}>{item.label}</span>
-                    <span style={{ fontSize: "14px", color: C.text3 }}>›</span>
+                    <span aria-hidden="true" style={{
+                      width: "34px", height: "34px", borderRadius: "10px", background: `${C.blue}1F`,
+                      display: "flex", alignItems: "center", justifyContent: "center", color: C.isDark ? C.blueL : C.blue, flexShrink: 0,
+                    }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{r.icon}</svg>
+                    </span>
+                    <span style={{ flex: 1, fontSize: "13.5px", fontWeight: 700, color: C.text1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.label}</span>
+                    {r.hint && <span style={{ fontSize: "11px", color: C.text3, flexShrink: 0 }}>{r.hint}</span>}
+                    <span style={{ fontSize: "13px", color: C.text3, flexShrink: 0 }} aria-hidden="true">›</span>
                   </div>
                 ))}
               </ListCard>
-            </div>
+            )}
 
-            {/* ── 로그아웃 (로그인 시에만) ── */}
+            {/* ── ④ 설정 — 테마·언어 토글 (설계서 v3 5장: 최초 UI 노출).
+                 테마 = 기존 ThemeProvider 동기 toggleTheme, 언어 = LanguageContext setLang. ── */}
+            <ListCard>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "11px 14px", borderBottom: `1px solid ${C.card2}` }}>
+                <span style={{ flex: 1, fontSize: "13.5px", fontWeight: 700, color: C.text1 }}>{t("profile.theme")}</span>
+                <SettingPills
+                  ariaLabel={t("profile.theme")}
+                  value={themeMode}
+                  onSelect={() => toggleTheme()}
+                  options={[
+                    { value: "dark", label: t("profile.themeDark") },
+                    { value: "light", label: t("profile.themeLight") },
+                  ]}
+                />
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "11px 14px" }}>
+                <span style={{ flex: 1, fontSize: "13.5px", fontWeight: 700, color: C.text1 }}>{t("profile.language")}</span>
+                <SettingPills
+                  ariaLabel={t("profile.language")}
+                  value={lang}
+                  onSelect={(v) => setLang(v)}
+                  options={[
+                    { value: "ko", label: t("profile.langKo") },
+                    { value: "en", label: t("profile.langEn") },
+                  ]}
+                />
+              </div>
+            </ListCard>
+
+            {/* ── ⑤ 매매 콘솔 (owner 전용 — 설계서 v3 5장: 진입 카드 1개로 통합).
+                 구 3장 카드(모의봇 상세·실전 실적·마케팅)를 리스트 행 3개로 압축 —
+                 profilePerf 배선·목적지(auto-trading/real-trading/marketing)는 그대로,
+                 상세 수치는 각 콘솔 화면이 담당합니다. 비owner 는 렌더 자체가 없습니다. ── */}
+            {isOwner && user && (() => {
+              const botsObj = profilePerf.bots;
+              const botRows = botsObj ? Object.entries(botsObj).map(([id, b]) => ({
+                id,
+                pl: Number(b?.perf?.realizedPL || 0) + Number(b?.snapshot?.unrealizedPL || 0),
+              })) : [];
+              const totalPl = botRows.reduce((a, r) => a + r.pl, 0);
+              const consoleRows = [
+                {
+                  key: "auto", icon: "🤖", label: t("profile.consoleAuto"), badge: t("profile.consoleSim"), badgeColor: C.yellow,
+                  // 누적 손익(실현+평가) — 데이터 없으면 값 미표기(지어내지 않음)
+                  value: botsObj
+                    ? `${totalPl >= 0 ? "+" : ""}$${Math.round(totalPl).toLocaleString()}`
+                    : (profilePerf.loading ? "…" : null),
+                  valueColor: botsObj ? (totalPl >= 0 ? C.greenL || C.green : C.redL || C.red) : C.text3,
+                  onGo: () => setTab("auto-trading"),
+                },
+                {
+                  key: "real", icon: "⚡", label: t("profile.consoleReal"), badge: t("profile.consoleLive"), badgeColor: C.red,
+                  value: profilePerf.real
+                    ? `$${Number(profilePerf.real.equity || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                    : (profilePerf.loading ? "…" : null),
+                  valueColor: C.text1,
+                  onGo: () => setTab("real-trading"),
+                },
+                {
+                  key: "mkt", icon: "📊", label: t("profile.consoleMarketing"), badge: null,
+                  value: null, onGo: () => setTab("marketing"),
+                },
+              ];
+              return (
+                <ListCard>
+                  <div style={{ padding: "12px 14px", fontSize: "12px", fontWeight: 800, color: C.text3, letterSpacing: "0.02em" }}>{t("profile.ownerConsole")}</div>
+                  {consoleRows.map((r) => (
+                    <div key={r.key} onClick={r.onGo} role="button" tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); r.onGo(); } }}
+                      style={{
+                        display: "flex", alignItems: "center", gap: "10px", padding: "13px 14px",
+                        borderTop: `1px solid ${C.card2}`, cursor: "pointer", transition: "background .1s",
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = C.card2}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                    >
+                      <span style={{ fontSize: "16px", width: "24px", textAlign: "center", flexShrink: 0 }} aria-hidden="true">{r.icon}</span>
+                      <span style={{ fontSize: "13.5px", fontWeight: 700, color: C.text1, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.label}</span>
+                      {r.badge && (
+                        <span style={{ fontSize: "10px", fontWeight: 800, padding: "2px 7px", borderRadius: "9999px", background: `${r.badgeColor}1F`, color: r.badgeColor, flexShrink: 0 }}>{r.badge}</span>
+                      )}
+                      <span style={{ flex: 1 }} />
+                      {r.value != null && (
+                        <Num size="13px" weight={800} color={r.valueColor}>{r.value}</Num>
+                      )}
+                      <span style={{ fontSize: "13px", color: C.text3, flexShrink: 0 }} aria-hidden="true">›</span>
+                    </div>
+                  ))}
+                </ListCard>
+              );
+            })()}
+
+            {/* ── ⑥ 고객지원 / 정보 (시안 1e 리스트 카드 문법 — 라벨 i18n 이관) ── */}
+            <ListCard>
+              <div style={{ padding: "12px 14px", fontSize: "12px", fontWeight: 800, color: C.text3, letterSpacing: "0.02em" }}>{t("profile.supportTitle")}</div>
+              {[
+                { icon: "📋", label: t("info.about"), tab: "about" },
+                { icon: "📖", label: t("profile.supportGuide"), href: "/guide" }, // ★ guide 는 정적 페이지 — setTab 하면 빈 화면이던 죽은 링크 수정
+                { icon: "🔒", label: t("info.privacy"), tab: "privacy" },
+                { icon: "📄", label: t("info.terms"), tab: "terms" },
+                { icon: "✉️", label: t("profile.supportContact"), tab: "contact" },
+              ].map((item, i) => (
+                <div key={i} onClick={() => { if (item.href) window.location.href = item.href; else setTab(item.tab); }}
+                  role="button" tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); if (item.href) window.location.href = item.href; else setTab(item.tab); } }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: "12px",
+                    padding: "13px 14px", borderTop: `1px solid ${C.card2}`, cursor: "pointer",
+                    transition: "background .1s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = C.card2}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                >
+                  <span style={{ fontSize: "16px", width: "24px", textAlign: "center" }} aria-hidden="true">{item.icon}</span>
+                  <span style={{ fontSize: "13.5px", fontWeight: 700, color: C.text1, flex: 1 }}>{item.label}</span>
+                  <span style={{ fontSize: "13px", color: C.text3 }} aria-hidden="true">›</span>
+                </div>
+              ))}
+            </ListCard>
+
+            {/* ── ⑦ 로그아웃 (로그인 시에만 — 기존 confirm 핸들러 유지) ── */}
             {user && (
-              <button onClick={() => { if (confirm("로그아웃 하시겠습니까?")) { signOut(); setTab("home"); } }} style={{
+              <button onClick={() => { if (confirm(t("profile.logoutConfirm"))) { signOut(); setTab("home"); } }} style={{
                 width: "100%", padding: "14px", borderRadius: "12px", fontSize: "15px", fontWeight: 700,
-                background: `${C.red}08`, color: C.red, border: `1px solid ${C.red}15`, cursor: "pointer",
-                marginBottom: "8px",
-              }}>로그아웃</button>
+                background: `${C.red}08`, color: C.redL || C.red, border: `1px solid ${C.red}15`, cursor: "pointer",
+                fontFamily: "inherit",
+              }}>{t("profile.logout")}</button>
             )}
 
             {/* 푸터 */}
-            <div style={{ textAlign: "center", padding: "8px 0 24px" }}>
+            <div style={{ textAlign: "center", padding: "4px 0 24px" }}>
               <span style={{ fontSize: "12px", color: C.text3 }}>Zepta v11.3 · donginseo0421@gmail.com</span>
             </div>
           </div>
@@ -13850,8 +13144,8 @@ function AppInner() {
                 padding: "6px 10px", borderRadius: "8px", border: "none",
                 background: C.card, cursor: "pointer", fontSize: "14px", color: C.text2,
                 display: "flex", alignItems: "center", gap: "4px",
-              }}>← 전체</button>
-              <span style={{ fontSize: "18px", fontWeight: 800, color: C.text1 }}>내 정보</span>
+              }}>← {t("profile.backToMy")}</button>
+              <span style={{ fontSize: "18px", fontWeight: 800, color: C.text1 }}>{t("header.myInfo")}</span>
             </div>
 
             {/* XP 레벨 카드 */}
@@ -13876,7 +13170,7 @@ function AppInner() {
                       border: "3px solid rgba(255,255,255,0.3)",
                     }}>
                       {(user?.user_metadata?.avatar_url)
-                        ? <img src={user.user_metadata.avatar_url} alt="사용자 프로필" width="72" height="72" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover" }} />
+                        ? <img src={user.user_metadata.avatar_url} alt={t("profile.avatarAlt")} width="72" height="72" style={{ width: 72, height: 72, borderRadius: "50%", objectFit: "cover" }} />
                         : displayName[0].toUpperCase()}
                     </div>
                     <div style={{ position: "absolute", bottom: "-4px", right: "-8px", background: C.card, border: `2px solid ${xpInfo.tier.color}`, borderRadius: "8px", padding: "1px 6px", fontSize: "12px", fontWeight: 800, color: xpInfo.tier.color }}>{xpInfo.tier.icon} Lv.{xpInfo.level}</div>
@@ -13893,7 +13187,7 @@ function AppInner() {
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "12px", color: C.text3 }}>
                       <span>{xpInfo.currentLevelXp}/{xpInfo.nextLevelXp} XP</span>
-                      <span>다음 레벨까지 {xpInfo.nextLevelXp - xpInfo.currentLevelXp} XP</span>
+                      <span>{t("profile.xpToNext", { xp: xpInfo.nextLevelXp - xpInfo.currentLevelXp })}</span>
                     </div>
                   </div>
                 </div>
@@ -13905,11 +13199,11 @@ function AppInner() {
 
             {/* 계정 정보 */}
             <div style={{ background: C.card, border: `1px solid ${C.border}` }} className="rounded-[16px] overflow-hidden">
-              <div className="px-5 py-3.5 text-sm font-bold text-muted-foreground uppercase tracking-wider">계정 정보</div>
+              <div className="px-5 py-3.5 text-sm font-bold text-muted-foreground uppercase tracking-wider">{t("profile.accountInfo")}</div>
               {[
-                { label: "이메일", value: user?.email || "—" },
-                { label: "로그인 방식", value: user?.app_metadata?.provider === "google" ? "Google" : user?.app_metadata?.provider || "이메일" },
-                { label: "가입일", value: user?.created_at ? new Date(user.created_at).toLocaleDateString("ko-KR") : "—" },
+                { label: t("profile.email"), value: user?.email || "—" },
+                { label: t("profile.loginMethod"), value: user?.app_metadata?.provider === "google" ? "Google" : user?.app_metadata?.provider || t("profile.emailLogin") },
+                { label: t("profile.joinDate"), value: user?.created_at ? new Date(user.created_at).toLocaleDateString(lang === "en" ? "en-US" : "ko-KR") : "—" },
               ].map((item, i) => (
                 <div key={i} className="flex justify-between items-center px-5 py-3.5 border-t" style={{ borderTopColor: `${C.border}20` }}>
                   <span style={{ fontSize: "14px", color: C.text3 }}>{item.label}</span>
@@ -13920,12 +13214,12 @@ function AppInner() {
 
             {/* 투자 성적표 */}
             <div style={{ background: `linear-gradient(135deg, ${C.blue}12, ${C.purple}12)`, borderRadius: "16px", padding: "24px", textAlign: "center", border: `1px solid ${C.blue}20` }}>
-              <div style={{ fontSize: "16px", fontWeight: 800, color: C.text1, marginBottom: "16px" }}>내 투자 성적표</div>
+              <div style={{ fontSize: "16px", fontWeight: 800, color: C.text1, marginBottom: "16px" }}>{t("profile.investmentPerformance")}</div>
               <div style={{ display: "flex", justifyContent: "center", gap: "24px", marginBottom: "16px" }}>
                 {[
-                  { val: watchlist.length, label: "관심종목", color: C.blue },
-                  { val: (() => { try { return JSON.parse(localStorage.getItem(`zepta_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })(), label: "운영봇", color: C.purple },
-                  { val: (() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })(), label: "투자일", color: C.green },
+                  { val: watchlist.length, label: t("profile.watchlistCount"), color: C.blue },
+                  { val: (() => { try { return JSON.parse(localStorage.getItem(`zepta_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })(), label: t("profile.activeBots"), color: C.purple },
+                  { val: (() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })(), label: t("profile.investmentDays"), color: C.green },
                 ].map((s, i) => (
                   <div key={i} className="text-center">
                     <div style={{ fontSize: "32px", fontWeight: 900, color: s.color }}>{s.val}</div>
@@ -13936,30 +13230,30 @@ function AppInner() {
               <button onClick={() => {
                 const days = (() => { try { return Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86400000); } catch { return 0; } })();
                 const bots = (() => { try { return JSON.parse(localStorage.getItem(`zepta_${user.id.slice(0,8)}_active_bots`) || "[]").length; } catch { return 0; } })();
-                const txt = `[Zepta AI 투자 성적표]\n${user?.user_metadata?.nickname || "투자자"}님 · 관심종목 ${watchlist.length}개 | 봇 ${bots}개 | ${days}일째\n무료 시작 👉 https://zepta.app`;
-                if (navigator.share) navigator.share({ title: "Zepta 성적표", text: txt }).catch(() => {});
-                else navigator.clipboard.writeText(txt).then(() => showToast("복사되었습니다!", "success")).catch(() => {});
+                const txt = t("profile.reportShareText", { name: user?.user_metadata?.nickname || t("profile.investorFallback"), watch: watchlist.length, bots, days });
+                if (navigator.share) navigator.share({ title: t("profile.reportShareTitle"), text: txt }).catch(() => {});
+                else navigator.clipboard.writeText(txt).then(() => showToast(t("profile.copiedToast"), "success")).catch(() => {});
               }} style={{
                 padding: "10px 24px", borderRadius: "10px", fontSize: "14px", fontWeight: 700,
                 background: `linear-gradient(135deg, ${C.blue}, ${C.purple})`, color: "#fff",
                 border: "none", cursor: "pointer",
-              }}>📤 공유하기</button>
+              }}>📤 {t("profile.shareBtn")}</button>
             </div>
 
             {/* ── 오늘의 참여 콘텐츠 (★ 2026-07 정보 피벗 Phase 1: 새 홈 6블록 상한으로
                  홈에서 빠진 '마켓 예측·퀴즈'를 기능 삭제 없이 이곳으로 이관) ── */}
-            <div style={{ fontSize: "14px", fontWeight: 800, color: C.text3, letterSpacing: "0.4px", margin: "8px 4px 0" }}>오늘의 참여 콘텐츠</div>
+            <div style={{ fontSize: "14px", fontWeight: 800, color: C.text3, letterSpacing: "0.4px", margin: "8px 4px 0" }}>{t("profile.todayEngage")}</div>
             {renderMarketPredictionCard()}
             {renderMarketQuizCard()}
 
             {/* ── 콘텐츠 바로가기 — 새 홈에서 빠진 정보 블록의 상위 화면 진입 링크 목록 ── */}
             <div style={{ background: C.card, borderRadius: "16px", overflow: "hidden", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
-              <div style={{ padding: "14px 20px", fontSize: "14px", fontWeight: 800, color: C.text1 }}>콘텐츠 바로가기</div>
+              <div style={{ padding: "14px 20px", fontSize: "14px", fontWeight: 800, color: C.text1 }}>{t("profile.contentShortcuts")}</div>
               {[
-                { icon: "⚡", label: "이상 탐지", tab: "anomaly" },
-                { icon: "🗺️", label: "리스크맵", tab: "risk-map" },
-                { icon: "🔍", label: "스크리너 (섹터·전체 종목 탐색)", tab: "screener" },
-                { icon: "📊", label: "시장 리포트", tab: "quant-report" },
+                { icon: "⚡", label: t("nav.anomaly"), tab: "anomaly" },
+                { icon: "🗺️", label: t("nav.riskMap"), tab: "risk-map" },
+                { icon: "🔍", label: t("profile.shortcutScreener"), tab: "screener" },
+                { icon: "📊", label: t("tabs.quantReport.marketReportTitle"), tab: "quant-report" },
               ].map((item, i) => (
                 // 고객지원 리스트와 동일한 키보드 접근성 처리 (role/tabIndex/onKeyDown)
                 <div key={i} onClick={() => setTab(item.tab)}
@@ -13981,19 +13275,20 @@ function AppInner() {
 
             {/* 친구 초대 */}
             <div style={{ background: C.card, borderRadius: "16px", padding: "20px", border: `1px solid ${C.border}${C.isDark ? '18' : '40'}` }}>
-              <div style={{ fontSize: "14px", fontWeight: 800, color: C.text1, marginBottom: "10px" }}>친구 초대</div>
-              {/* "AI 퀀트 전략" 표현은 룰베이스 산출을 AI 로 표기하는 역량 과장이라 사실 서술로 정정했습니다. */}
-              <div style={{ fontSize: "14px", color: C.text3, marginBottom: "12px" }}>시장 신호와 데이터 분석을 무료로 이용할 수 있어요</div>
+              <div style={{ fontSize: "14px", fontWeight: 800, color: C.text1, marginBottom: "10px" }}>{t("profile.invite")}</div>
+              {/* "AI 퀀트 전략" 표현은 룰베이스 산출을 AI 로 표기하는 역량 과장이라 사실 서술로 정정했습니다.
+                  (구 profile.inviteDesc 키는 AI 문구가 남아 있어 재사용하지 않고 inviteDesc2 로 분리) */}
+              <div style={{ fontSize: "14px", color: C.text3, marginBottom: "12px" }}>{t("profile.inviteDesc2")}</div>
               <div style={{ display: "flex", gap: "8px" }}>
                 <button onClick={() => {
-                  const txt = "시장 신호와 데이터를 한눈에 보는 투자 정보 앱이야. 무료인데 한번 써봐 👉 https://zepta.app";
+                  const txt = t("profile.inviteShareText");
                   if (navigator.share) navigator.share({ text: txt }).catch(() => {});
-                  else navigator.clipboard.writeText(txt).then(() => showToast("복사됨!", "success")).catch(() => {});
-                }} style={{ flex: 1, padding: "10px", borderRadius: "10px", fontSize: "14px", fontWeight: 700, background: C.blue, color: "#fff", border: "none", cursor: "pointer" }}>공유하기</button>
-                <button onClick={() => navigator.clipboard.writeText("https://zepta.app").then(() => showToast("링크 복사!", "success")).catch(() => {})} style={{
+                  else navigator.clipboard.writeText(txt).then(() => showToast(t("profile.copiedShort"), "success")).catch(() => {});
+                }} style={{ flex: 1, padding: "10px", borderRadius: "10px", fontSize: "14px", fontWeight: 700, background: C.blue, color: "#fff", border: "none", cursor: "pointer" }}>{t("profile.shareBtn")}</button>
+                <button onClick={() => navigator.clipboard.writeText("https://zepta.app").then(() => showToast(t("profile.linkCopied"), "success")).catch(() => {})} style={{
                   flex: 1, padding: "10px", borderRadius: "10px", fontSize: "14px", fontWeight: 700,
                   background: "transparent", color: C.text2, border: `1px solid ${C.border}30`, cursor: "pointer",
-                }}>링크 복사</button>
+                }}>{t("profile.copyLink")}</button>
               </div>
             </div>
           </div>
@@ -14383,16 +13678,16 @@ function AppInner() {
             marginBottom: isMobile ? "16px" : "20px",
           }}>
             {[
-              { label: "개인정보 처리방침", tab: "privacy", bold: true },
-              { label: "이용약관", tab: "terms" },
-              { label: "서비스 소개", tab: "about" },
-              { label: "블로그", href: "/blog" },
-              { label: "투자 가이드", href: "/guide" },
+              { label: t("footer.privacy"), tab: "privacy", bold: true },
+              { label: t("footer.terms"), tab: "terms" },
+              { label: t("footer.about"), tab: "about" },
+              { label: t("footer.blog"), href: "/blog" },
+              { label: t("footer.guide"), href: "/guide" },
               // ★ 감사 배치3 (고아 페이지): /econ(경제지표 발표 결과, 하위 16종 포함)은
               //   서버 렌더 공개 페이지인데 앱 어디에서도 링크되지 않아 검색엔진으로만
               //   도달 가능했습니다 — 정보성 링크(블로그·가이드) 뒤에 진입점을 둡니다.
-              { label: "경제지표 결과", href: "/econ" },
-              { label: "문의하기", tab: "contact" },
+              { label: t("footer.econResults"), href: "/econ" },
+              { label: t("footer.contact"), tab: "contact" },
             ].map((item, i) => (
               <span key={item.tab || item.href} style={{ display: "flex", alignItems: "center" }}>
                 {!isMobile && i > 0 && <span style={{ margin: "0 10px", color: C.text2, opacity: 0.25 }}>|</span>}
@@ -14431,26 +13726,22 @@ function AppInner() {
               <span style={{ fontWeight: 600, fontSize: isMobile ? "14px" : "16px", color: C.text1 }}>Zepta</span>
             </div>
             <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: isMobile ? "2px" : "0" }}>
-              <span>대표: 서동인</span>
+              <span>{t("footer.ceoLine")}</span>
               {!isMobile && <span style={{ margin: "0 8px", opacity: 0.3 }}>·</span>}
-              <span>문의: donginseo0421@gmail.com</span>
+              <span>{t("footer.contactLine")}</span>
             </div>
           </div>
 
           {/* 하단: 면책 + 저작권 — 법적 안전장치 강화 (2026-05-09) */}
           <div style={{ fontSize: isMobile ? "12px" : "14px", color: C.text3, lineHeight: 1.7 }}>
             <p style={{ margin: "0 0 6px", fontWeight: 600 }}>
-              ⚠️ 투자 면책 고지
+              ⚠️ {t("footer.disclaimerTitle")}
             </p>
             <p style={{ margin: "0 0 6px" }}>
-              Zepta는 투자 정보·데이터 제공 서비스이며, 투자자문업·투자일임업자가 아닙니다.
-              제공되는 모든 정보·시그널·데이터는 투자 판단의 단순 참고용으로,
-              종목 추천이나 투자 권유가 아닙니다.
+              {t("footer.disclaimerP1")}
             </p>
             <p style={{ margin: "0 0 6px" }}>
-              모든 투자 결정과 그 결과(손익)는 사용자 본인의 책임이며,
-              Zepta는 투자 손실에 대해 어떠한 보증도 하지 않습니다.
-              과거의 백테스트·시뮬레이션 성과가 미래의 수익을 보장하지 않습니다.
+              {t("footer.disclaimerP2")}
             </p>
             <p style={{ margin: 0 }}>© 2025-2026 Zepta. All rights reserved.</p>
           </div>
@@ -14490,7 +13781,7 @@ function AppInner() {
           }}
           onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.background = C.blue; e.currentTarget.style.color = "#fff"; e.currentTarget.style.boxShadow = `0 6px 20px ${C.blue}40`; }}
           onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.background = `${C.card}E0`; e.currentTarget.style.color = C.text2; e.currentTarget.style.boxShadow = `0 4px 12px ${C.bg}80`; }}
-          title="맨 위로"
+          title={t("common.scrollTop")}
         >
           ↑
         </button>
@@ -14500,7 +13791,7 @@ function AppInner() {
       {!isMobile && (
         <>
           {/* 가장자리 핸들 — 어느 탭에서든 보임 */}
-          <button onClick={toggleWatchDock} aria-label="관심종목 패널 열기/닫기" style={{
+          <button onClick={toggleWatchDock} aria-label={t("watchDock.toggleAria")} style={{
             position: "fixed", right: watchDockOpen ? "300px" : 0, top: "50%", transform: "translateY(-50%)",
             width: "28px", height: "92px", borderRadius: "10px 0 0 10px", border: `1px solid ${C.border}`,
             borderRight: "none", background: C.card, color: watchlist.length ? C.yellow : C.text3,
@@ -14524,13 +13815,13 @@ function AppInner() {
             }}>
               <div style={{ padding: "14px 14px 10px", borderBottom: `1px solid ${C.border}30`, flexShrink: 0 }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: user ? 10 : 0 }}>
-                  <span style={{ fontWeight: 800, fontSize: "15px", color: C.text1 }}>⭐ 관심종목 {watchlist.length > 0 && <span style={{ color: C.blue }}>{watchlist.length}</span>}</span>
-                  <button onClick={toggleWatchDock} aria-label="닫기" style={{ background: "none", border: "none", color: C.text3, fontSize: "16px", cursor: "pointer", padding: 4 }}>✕</button>
+                  <span style={{ fontWeight: 800, fontSize: "15px", color: C.text1 }}>⭐ {t("tabs.home.watchlist")} {watchlist.length > 0 && <span style={{ color: C.blue }}>{watchlist.length}</span>}</span>
+                  <button onClick={toggleWatchDock} aria-label={t("common.close")} style={{ background: "none", border: "none", color: C.text3, fontSize: "16px", cursor: "pointer", padding: 4 }}>✕</button>
                 </div>
-                {user && <SearchBar compact placeholder="종목 추가" onSelect={(asset) => {
+                {user && <SearchBar compact placeholder={t("tabs.home.addAssetPlaceholder")} onSelect={(asset) => {
                   if (!watchlist.some(w => w.symbol === asset.symbol)) {
                     setWatchlist(prev => [...prev, { symbol: asset.symbol, name: asset.name, market: asset.market, symbolRaw: asset.symbolRaw || asset.symbol, id: asset.id }]);
-                    showToast(`${asset.name} 추가됨`, "success");
+                    showToast(t("watchDock.addedToast", { name: asset.name }), "success");
                   }
                 }} />}
               </div>
@@ -14538,12 +13829,12 @@ function AppInner() {
               <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "6px 8px" }}>
                 {!user ? (
                   <div style={{ textAlign: "center", padding: "32px 14px", color: C.text3, fontSize: "13px", lineHeight: 1.6 }}>
-                    로그인하면 관심종목을<br />어느 화면에서든 볼 수 있어요
-                    <div><button onClick={() => setShowAuthModal(true)} style={{ marginTop: 12, padding: "8px 18px", borderRadius: 9, background: C.blue, color: "#fff", border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>로그인</button></div>
+                    {t("watchDock.loginPrompt1")}<br />{t("watchDock.loginPrompt2")}
+                    <div><button onClick={() => setShowAuthModal(true)} style={{ marginTop: 12, padding: "8px 18px", borderRadius: 9, background: C.blue, color: "#fff", border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{t("header.login")}</button></div>
                   </div>
                 ) : watchlist.length === 0 ? (
                   <div style={{ textAlign: "center", padding: "32px 14px", color: C.text3, fontSize: "13px", lineHeight: 1.6 }}>
-                    📌 위 검색으로 종목을 추가하면<br />실시간 시세와 퀀트 진단이 떠요
+                    📌 {t("watchDock.emptyHint1")}<br />{t("watchDock.emptyHint2")}
                   </div>
                 ) : watchlist.map(w => {
                   const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
@@ -14562,7 +13853,7 @@ function AppInner() {
                       }}>{diag ? diag.score : (w.market === "us" ? "🇺🇸" : w.market === "kr" ? "🇰🇷" : "₿")}</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 700, fontSize: 13, color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.name || w.symbol}</div>
-                        {diag && <div style={{ fontSize: 11, color: diagColor, fontWeight: 600 }}>{verdictLabel(diag.opinion)}</div>}
+                        {diag && <div style={{ fontSize: 11, color: diagColor, fontWeight: 600 }}>{verdictLabel(diag.opinion, t)}</div>}
                       </div>
                       {hot && (
                         <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -14571,7 +13862,7 @@ function AppInner() {
                         </div>
                       )}
                       <button onClick={(e) => { e.stopPropagation(); setWatchlist(prev => prev.filter(x => x.symbol !== w.symbol)); }}
-                        aria-label={`${w.name || w.symbol} 제거`} style={{
+                        aria-label={t("watchDock.removeAria", { name: w.name || w.symbol })} style={{
                           width: 20, height: 20, borderRadius: 6, border: "none", background: "transparent",
                           color: C.text3, fontSize: 10, cursor: "pointer", opacity: 0.35, flexShrink: 0,
                         }}
@@ -14583,7 +13874,7 @@ function AppInner() {
               </div>
 
               <div style={{ padding: "8px 14px", borderTop: `1px solid ${C.border}30`, fontSize: "11px", color: C.text3, flexShrink: 0 }}>
-                종목을 누르면 상세 분석이 열려요 · 참고용, 투자 권유 아님
+                {t("watchDock.footNote")}
               </div>
             </div>
           )}
@@ -14610,16 +13901,18 @@ function AppInner() {
           justifyContent: "space-around",
           zIndex: 10000,
         }}>
-          {/* ★ 2026-07 정보 피벗 Phase 1: 홈/뉴스/시장/지표/MY — 새 GNB 5축과 동기화.
-              활성 판정은 카테고리 일치(gnbCategoryMap 재편으로 뉴스는 독립 카테고리라
-              이중 점등 특례가 불필요해졌습니다). 전체 메뉴 시트는 상단 햄버거로 진입. */}
+          {/* ★ 2026-08-12 IA v3 (설계서 v3 0장): [홈 · 코인 · 주식 · 지표 · MY] 자산군 이원화.
+              내부 id 는 유지(news=코인 탭 /crypto, screener=주식 탭 /stocks) — 라벨·아이콘만
+              새 IA. 활성 판정은 gnbCategoryMap 카테고리 일치 그대로. 라벨은 i18n(nav.*). */}
           {[
-            { id: "home", cat: "home", label: "홈", icon: (active) => <svg width="21" height="21" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><path d={active ? "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10.5z" : "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-4.5v-6h-3v6H4a1 1 0 0 1-1-1V10.5z"} />{active && <rect x="9" y="14" width="6" height="7" rx="0.5" fill={C.isDark ? C.bg : "#fff"} />}</svg> },
-            { id: "news", cat: "news", label: "뉴스", icon: (active) => <svg width="21" height="21" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="18" rx="2" fill={active ? "currentColor" : "none"} /><path d="M8 7h8M8 11h5M8 15h7" stroke={active ? (C.isDark ? C.bg : "#fff") : "currentColor"} strokeWidth="1.8" fill="none" /></svg> },
-            { id: "screener", cat: "market", label: "시장", icon: (active) => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="7" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1}/><circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" /></svg> },
-            // ★ Phase 2: '지표' 직행 대상 econ-calendar → indicators(지표 허브)
-            { id: "indicators", cat: "indicators", label: "지표", icon: (active) => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="2" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1} /><rect x="3" y="4" width="18" height="17" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" /></svg> },
-            { id: "profile", cat: "my", label: "MY", icon: (active) => <svg width="21" height="21" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1} /><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg> },
+            { id: "home", cat: "home", label: t("nav.home"), icon: (active) => <svg width="21" height="21" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><path d={active ? "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10.5z" : "M3 10.5L12 3l9 7.5V20a1 1 0 0 1-1 1h-4.5v-6h-3v6H4a1 1 0 0 1-1-1V10.5z"} />{active && <rect x="9" y="14" width="6" height="7" rx="0.5" fill={C.isDark ? C.bg : "#fff"} />}</svg> },
+            // 코인 — 동전 실루엣 (원 + 통화 기호 획). 활성 시 15% 틴트 채움(기존 문법).
+            { id: "news", cat: "coin", label: t("nav.coin"), icon: (active) => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1} /><circle cx="12" cy="12" r="9" /><path d="M14.8 9.7h-3.9a1.75 1.75 0 0 0 0 3.5h2.2a1.75 1.75 0 0 1 0 3.5H9.2" /><path d="M12 7.6v1.9M12 16.9v-2" /></svg> },
+            // 주식 — 상승 추세선. 선형 아이콘이라 활성은 굵기 강조(라벨 색·aria-current 병행).
+            { id: "screener", cat: "stock", label: t("nav.stocks"), icon: (active) => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.4" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17" /><polyline points="16 7 22 7 22 13" /></svg> },
+            // 지표 — 캘린더 (IA v3: 지표 탭 = 경제 캘린더 + 뉴스)
+            { id: "indicators", cat: "indicators", label: t("nav.indicators"), icon: (active) => <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="17" rx="2" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1} /><rect x="3" y="4" width="18" height="17" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="16" y1="2" x2="16" y2="6" /></svg> },
+            { id: "profile", cat: "my", label: t("nav.my"), icon: (active) => <svg width="21" height="21" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "2.2" : "1.8"} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4" fill={active ? "currentColor" : "none"} opacity={active ? 0.15 : 1} /><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" /></svg> },
           ].map(item => {
             const isActive = item.cat === gnbCategory;
             return (
@@ -14682,11 +13975,13 @@ function AppInner() {
           { symbol: "SOL-USD", name: "솔라나", icon: "◎" },
         ];
         const categories = [
-          { label: "스크리너", tab: "screener", icon: "🔍" },
+          // ★ IA v3: 스크리너 = 주식 탭 안 — 목적지 동일(내부 id screener), 라벨 유지
+          { label: t("searchOverlay.catScreener"), tab: "screener", icon: "🔍" },
           // ★ 2026-07 정보 서비스 피벗: 비owner 는 홈 시그널 보드로
-          { label: "시그널 보드", tab: isOwner ? "real-trading" : "home", icon: "📡" },
-          { label: "코인 분석", href: "/coin", icon: "🪙" },
-          { label: "경제 일정", tab: "econ-calendar", icon: "📅" },
+          { label: t("searchOverlay.catSignalBoard"), tab: isOwner ? "real-trading" : "home", icon: "📡" },
+          // ★ IA v3: 구 /coin 정적 대시보드(전체 리로드) → 코인 탭 인앱 전환 (SEO 페이지는 유지)
+          { label: t("searchOverlay.catCoin"), tab: "news", icon: "🪙" },
+          { label: t("searchOverlay.catEcon"), tab: "econ-calendar", icon: "📅" },
         ];
         return (
           <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: isMobile ? "5vh" : "12vh" }}
@@ -14696,9 +13991,9 @@ function AppInner() {
               {/* 검색 헤더 + 닫기 */}
               <div style={{ padding: "14px 16px 10px", display: "flex", alignItems: "center", gap: 8 }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <SearchBar onSelect={(asset) => { setSelectedAsset(asset); setGlobalSearchOpen(false); }} placeholder={isMobile ? "종목명·티커 검색" : "종목명 또는 티커 입력 (예: NVDA, 삼성전자)"} />
+                  <SearchBar onSelect={(asset) => { setSelectedAsset(asset); setGlobalSearchOpen(false); }} placeholder={isMobile ? t("diag.searchShort") : t("diag.searchLong")} />
                 </div>
-                <button onClick={() => setGlobalSearchOpen(false)} aria-label="검색 닫기" style={{
+                <button onClick={() => setGlobalSearchOpen(false)} aria-label={t("searchOverlay.closeAria")} style={{
                   flexShrink: 0, width: 38, height: 38, borderRadius: 12, border: `1px solid ${C.border}`,
                   background: C.card, color: C.text3, fontSize: 16, cursor: "pointer", lineHeight: 1,
                 }}>✕</button>
@@ -14729,7 +14024,7 @@ function AppInner() {
 
               {/* ★ 시안 1g 인기 종목 — 순위 + 종목명 + 실측 등락(hotAssets, 없으면 심볼 표기) 3열 타일 */}
               <div style={{ padding: "14px 16px 6px" }}>
-                <div style={{ fontSize: "13px", fontWeight: 800, color: C.text3, marginBottom: "9px" }}>인기 종목</div>
+                <div style={{ fontSize: "13px", fontWeight: 800, color: C.text3, marginBottom: "9px" }}>{t("searchOverlay.popularStocks")}</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" }}>
                   {popularStocks.map((s, si) => {
                     const asset = ALL_ASSETS.find(a => a.symbol === s.symbol);
@@ -14761,12 +14056,13 @@ function AppInner() {
 
               {/* 크립토 바로가기 — 시안 1g 타일 문법 */}
               <div style={{ padding: "6px 16px 14px" }}>
-                <div style={{ fontSize: "13px", fontWeight: 800, color: C.text3, marginBottom: "9px" }}>크립토</div>
+                <div style={{ fontSize: "13px", fontWeight: 800, color: C.text3, marginBottom: "9px" }}>{t("searchOverlay.crypto")}</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: "8px" }}>
                   {cryptoQuick.map(c => {
                     const asset = ALL_ASSETS.find(a => a.symbol === c.symbol || a.symbol === c.symbol.replace("-USD", "/USD"));
+                    // ★ IA v3: 자산 미등재 폴백은 /coin 전체 리로드 대신 코인 탭 인앱 전환
                     return (
-                      <button key={c.symbol} onClick={() => { if (asset) { setSelectedAsset(asset); setGlobalSearchOpen(false); } else { window.location.href = "/coin"; }}} style={{
+                      <button key={c.symbol} onClick={() => { if (asset) { setSelectedAsset(asset); } else { setTab("news"); } setGlobalSearchOpen(false); }} style={{
                         display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "10px 6px",
                         borderRadius: "12px", background: C.card, border: `1px solid ${C.border}`, cursor: "pointer",
                         transition: "all 0.12s", minWidth: 0, minHeight: 64, fontFamily: "inherit",
@@ -14809,8 +14105,8 @@ function AppInner() {
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 <img src="/zepta-icon-192.png" alt="Zepta" width="32" height="32" style={{ flexShrink: 0 }} />
                 <div>
-                  <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: C.text1 }}>Zepta 로그인</h3>
-                  <p style={{ margin: "2px 0 0", fontSize: "16px", color: C.text3 }}>투자 서비스를 이용하려면 로그인하세요</p>
+                  <h3 style={{ margin: 0, fontSize: "18px", fontWeight: 800, color: C.text1 }}>{t("auth.modalTitle")}</h3>
+                  <p style={{ margin: "2px 0 0", fontSize: "16px", color: C.text3 }}>{t("auth.modalDesc")}</p>
                 </div>
               </div>
               <button onClick={() => setShowAuthModal(false)} style={{

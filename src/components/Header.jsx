@@ -18,13 +18,12 @@ import {
 import { Separator } from "@/components/ui/separator";
 import {
   Menu, X, Search, ChevronDown, ChevronRight, Sun, Moon, LogOut, User,
-  Bot, BarChart3, Shield, Briefcase, Newspaper, MessageSquare,
+  Bot, Shield, Briefcase, MessageSquare,
   CalendarDays, Bell, Zap, Target, FileText, LineChart,
   LayoutDashboard, TrendingUp, Activity, BookOpen,
   // ★ 2026-05-11: 신규 페이지 아이콘
   Sparkles, Trophy, Share2, GitCompare, PieChart, Save, Crown,
-  Coins, // ★ 2026-06-08: 코인별 분석 페이지(/coin)
-  Gauge, // ★ 2026-07 정보 피벗 Phase 2: 지표 허브(/indicators)
+  Coins, // ★ 2026-08-12 IA v3: 코인 축 아이콘 (GNB 직행 + 시트)
 } from "lucide-react";
 
 /* ═══════════════════════════════════════════════════════════════
@@ -87,37 +86,42 @@ function CssDropdownItem({ children, onClick, className, variant }) {
 }
 
 /* ── 네비게이션 데이터 정의 (다국어 대응 — t 함수 주입) ── */
-/* ★ 2026-07 정보 피벗 Phase 1 (대표 지시): GNB 5메뉴 재편.
-   홈 / 뉴스(단일 직행 탭) / 시장 / 지표 / MY — 정보 소비 동선 중심.
-   트레이딩 카테고리는 내부 운영(owner) 전용으로 기존 그대로 유지(비owner 비노출).
-   어떤 탭 id 도 삭제하지 않고 메뉴 배치만 재편했습니다 (라우팅·북마크 호환). */
+/* ★ 2026-08-12 IA v3 (대표 확정 — docs/design/screen-spec-v3.md §0, 시안 1h 플로우 맵):
+   GNB 를 하단 탭과 동일한 5축 [홈 · 코인 · 주식 · 지표 · MY]로 재편 (자산군 이원화).
+   코인·주식은 1클릭 직행, 장기꼬리 목적지는 지표·MY 드롭다운에 수납 (밀도 절제).
+   기존 목적지는 하나도 삭제하지 않고 새 축으로 "매핑"만 했습니다:
+     · 구 '시장' 카테고리 → 주식 축으로 승계 (스펙 §0 표 "시장 → 주식")
+     · 이상 탐지·리스크 맵·시장 리포트·시장 심리 → 지표 (자산군 불문 시장 상태 도구)
+     · '저장한 조건' → MY (스펙 §3 "저장한 조건은 MY 로")
+     · '경제 일정' 별도 항목 → 지표 탭 캘린더 서브탭이 흡수 (스펙 §4, 이중 노출 제거;
+       /econ-calendar URL 자체는 App.jsx validTabs 에 그대로 유효)
+     · /coin SEO 대시보드 → 유저 진입로 미수록 (역할은 코인 탭이 단일 목적지로 대체, 스펙 §2;
+       페이지 자체는 sitemap·검색 유입으로 유지, 인앱 진입은 코인 탭 컨텍스트 카드로 후속)
+   탭 id 는 기존 id 를 그대로 사용합니다 — 스펙 §8 "기존 URL 유지 + 리다이렉트
+   (/news → /crypto, /screener → /stocks 등)" 계약에 따라 v3 이후에도 유효해야 합니다:
+     · "news"       = 코인 탭 슬롯 (구 뉴스 자리 → 코인 시그널+지표)
+     · "screener"   = 주식 탭 슬롯 (주식 시그널 + 스크리너 한 화면)
+     · "indicators" = 지표 탭 (캘린더|뉴스 서브탭)
+   트레이딩 카테고리는 내부 운영(owner) 전용 그대로 유지(비owner 비노출). */
 const getNavCategories = (t) => [
   { id: "home", label: t("nav.home"), catId: "home", icon: LayoutDashboard, directTab: "home" },
-  // ★ 뉴스: 카테고리가 아닌 단일 직행 탭
-  { id: "news-direct", label: t("nav.news"), catId: "news", icon: Newspaper, directTab: "news" },
-  {
-    // ★ 2026-08-02 (주식+코인 양축 확장, 대표 지시): '시장' 항목을 주식 축 포함으로 재정비.
-    //   스크리너(주식+코인 전체) → 주식 분석 → 코인 분석 순으로 두 축을 나란히 노출합니다.
-    //   '주식 분석'은 전용 화면이 없어 스크리너에 주식(미국+한국) 필터를 걸어 진입합니다
-    //   (screenerMarket → zepta:screener-market 이벤트 → App.jsx 의 filterMarket).
-    //   기존 항목은 하나도 제거하지 않고 순서만 조정했습니다.
-    id: "market", label: t("nav.market"), catId: "market", icon: BarChart3,
-    items: [
-      { id: "screener", label: t("nav.screener"), icon: Search },
-      { id: "screener", key: "screener-stock", label: "주식 분석", icon: TrendingUp, screenerMarket: "stock" },
-      { id: "/coin", label: "코인 분석", icon: Coins },
-      { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
-      { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
-      { id: "quant-report", label: "시장 리포트", icon: FileText },
-      { id: "saved-screeners", label: "저장한 조건", icon: Save },
-    ],
-  },
+  // ★ 코인 — 직행 (v3 코인 탭: 코인 시그널 + 코인 지표. 구 뉴스 슬롯)
+  //   라벨은 App.jsx 하단 탭바와 동일한 정식 내비 키(nav.coin/nav.stocks) 사용 (리뷰 반영 —
+  //   EN 모드에서 GNB "Coins" vs 하단 탭 "Crypto" 로 갈라지던 표기 통일.
+  //   tabs.home.segCoin/segStock 은 홈 '오늘의 시그널' 세그먼트 전용 키로 유지).
+  { id: "coin", label: t("nav.coin"), catId: "coin", icon: Coins, directTab: "news" },
+  // ★ 주식 — 직행 (v3 주식 탭: 주식 시그널 + 스크리너). 현행 통합 스크리너에는
+  //   주식(미국+한국) 필터를 걸어 진입합니다 (screenerMarket → zepta:screener-market
+  //   이벤트 → App.jsx 의 filterMarket). 코인 필터·진입점은 코인 탭으로 이동 (스펙 §3).
+  { id: "stock", label: t("nav.stocks"), catId: "stock", icon: TrendingUp, directTab: "screener", screenerMarket: "stock" },
   {
     id: "indicators", label: t("nav.indicators"), catId: "indicators", icon: Activity,
-    // ★ 2026-07 정보 피벗 Phase 2: 지표 허브를 첫 항목으로 추가 (기존 2종 유지)
+    // ★ IA v3: 첫 항목 = v3 지표 탭(캘린더|뉴스). 나머지는 시장 상태 도구 승계분.
     items: [
-      { id: "indicators", label: "지표 허브", icon: Gauge },
-      { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
+      { id: "indicators", label: `${t("tabs.indicators.calendarTab")} · ${t("tabs.indicators.newsTab")}`, icon: CalendarDays },
+      { id: "quant-report", label: t("tabs.home.marketReport"), icon: FileText },
+      { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
+      { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
       { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
     ],
   },
@@ -140,36 +144,43 @@ const getNavCategories = (t) => [
     id: "my", label: t("nav.my"), catId: "my", icon: User,
     items: [
       { id: "portfolio", label: t("nav.portfolio"), icon: Briefcase },
-      { id: "portfolio-analysis", label: "자산 분석", icon: PieChart },
-      { id: "notifications", label: "🔔 알림", icon: Bell },
-      { id: "profile", label: "내 정보", icon: User },
+      { id: "portfolio-analysis", label: t("diag.menu.assetAnalysis"), icon: PieChart },
+      { id: "saved-screeners", label: t("diag.menu.savedConditions"), icon: Save }, // ★ IA v3: 시장 → MY 이동 (스펙 §3)
+      { id: "notifications", label: `🔔 ${t("nav.alerts")}`, icon: Bell },
+      { id: "profile", label: t("header.myInfo"), icon: User },
       { id: "pricing", label: "👑 멤버십", icon: Crown, ownerOnly: true }, // ★ 내부 운영 전용
     ],
   },
 ];
 
-/* 모바일 메뉴 섹션 (3열 그리드용)
+/* 모바일 메뉴 시트 섹션 (리스트 문법)
+   ★ 2026-08-12 IA v3: 하단 탭 5축 [홈·코인·주식·지표·MY]과 동일한 계층으로 재편.
+     코인/주식 첫 항목은 하단 탭바와 같은 목적지지만, 시트가 "전체 메뉴" 역할이라
+     의도적으로 중복 수록합니다 (기존 뉴스 항목과 동일한 관례).
    ★ real-trading 은 owner 전용 큰 배너로 분리 (Sheet 상단) — 여기 셀에서는 제외 */
 const getMobileMenuSections = (isOwner, t) => [
   {
-    // ★ 2026-07 정보 피벗 Phase 1: 시장(시장을 본다) — 뉴스는 직행 탭이지만
-    //   시트 안에서도 찾을 수 있도록 첫 항목으로 포함 (하단 탭바에도 별도 존재)
-    section: t("nav.market"), items: [
-      { id: "news", label: t("nav.news"), icon: Newspaper },
-      { id: "screener", label: t("nav.screener"), icon: Search },
-      // ★ 2026-08-02 주식+코인 양축 — 데스크톱 GNB 와 동일 구성
-      { id: "screener", key: "screener-stock", label: "주식 분석", icon: TrendingUp, screenerMarket: "stock" },
-      { id: "/coin", label: "코인 분석", icon: Coins },
-      { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
-      { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
-      { id: "quant-report", label: "시장 리포트", icon: FileText },
-      { id: "saved-screeners", label: "저장한 조건", icon: Save },
+    // ★ 코인 축 — v3 코인 탭("news" 슬롯). /coin SEO 대시보드 항목은 리뷰 반영으로 제거:
+    //   스펙 §0·§2 "구 /coin 의 역할은 코인 탭이 대체(단일 목적지)" — 겹치는 콘텐츠의
+    //   이중 목적지를 두지 않습니다. SEO 페이지 자체는 sitemap·검색 유입으로 유지되며,
+    //   인앱 진입이 필요해지면 스펙 §2·§4의 '코인 탭 컨텍스트 카드' 링크로 후속 이관.
+    section: t("nav.coin"), items: [
+      { id: "news", label: t("tabs.coin.signalsTitle"), icon: Coins },
     ],
   },
   {
+    // ★ 주식 축 — 주식 시그널 + 스크리너 한 화면 (주식 필터를 걸어 진입, 스펙 §3)
+    section: t("nav.stocks"), items: [
+      { id: "screener", label: t("nav.screener"), icon: Search, screenerMarket: "stock" },
+    ],
+  },
+  {
+    // ★ 지표 — 첫 항목 = v3 지표 탭(캘린더|뉴스). 시장 상태 도구 승계분 수납.
     section: t("nav.indicators"), items: [
-      { id: "indicators", label: "지표 허브", icon: Gauge }, // ★ Phase 2
-      { id: "econ-calendar", label: t("nav.econ"), icon: CalendarDays },
+      { id: "indicators", label: `${t("tabs.indicators.calendarTab")} · ${t("tabs.indicators.newsTab")}`, icon: CalendarDays },
+      { id: "quant-report", label: t("tabs.home.marketReport"), icon: FileText },
+      { id: "anomaly", label: t("nav.anomaly"), icon: Zap },
+      { id: "risk-map", label: t("nav.riskMap"), icon: Shield },
       { id: "sentiment", label: t("nav.sentiment"), icon: MessageSquare },
     ],
   },
@@ -189,11 +200,21 @@ const getMobileMenuSections = (isOwner, t) => [
   {
     section: t("nav.my"), items: [
       { id: "portfolio", label: t("nav.portfolio"), icon: Briefcase },
-      { id: "portfolio-analysis", label: "자산 분석", icon: PieChart },
-      { id: "notifications", label: "🔔 알림", icon: Bell },
-      { id: "profile", label: "내 정보", icon: User },
-      { id: "/blog", label: "블로그", icon: BookOpen },
+      { id: "portfolio-analysis", label: t("diag.menu.assetAnalysis"), icon: PieChart },
+      { id: "saved-screeners", label: t("diag.menu.savedConditions"), icon: Save }, // ★ IA v3: 시장 → MY 이동 (스펙 §3)
+      { id: "notifications", label: `🔔 ${t("nav.alerts")}`, icon: Bell },
+      { id: "profile", label: t("header.myInfo"), icon: User },
       { id: "pricing", label: "👑 멤버십", icon: Crown, ownerOnly: true }, // ★ 내부 운영 전용
+    ],
+  },
+  {
+    // ★ IA v3 (리뷰 반영): 정책·지원 문서(about/privacy/terms/contact)는 시트에서 제거 —
+    //   동일 목적지가 이미 MY 탭 고객지원 리스트(스펙 §5-6 배정 위치)와 푸터에 있어
+    //   3중 노출이었습니다. 진입은 그 두 곳으로 일원화하고(같은 정보 이중 노출 금지),
+    //   본 섹션은 정적 콘텐츠(블로그) 바로가기만 수록합니다.
+    //   섹션명은 기존 키(profile.contentShortcuts) 재사용 — 신규 i18n 키 없이 ko/en 패리티.
+    section: t("profile.contentShortcuts"), items: [
+      { id: "/blog", label: t("footer.blog"), icon: BookOpen },
     ],
   },
 ]
@@ -201,29 +222,34 @@ const getMobileMenuSections = (isOwner, t) => [
   .map((sec) => ({ ...sec, items: sec.items.filter((it) => !it.ownerOnly || isOwner) }))
   .filter((sec) => sec.items.length > 0);
 
-/* ── GNB 카테고리 매핑 ── */
-/* ★ 2026-07 정보 피벗 Phase 1: 홈/뉴스/시장/지표/MY (+owner 트레이딩) 재편.
-   App.jsx 의 gnbCategoryMap 과 반드시 동기 유지해야 합니다. */
+/* ── GNB 카테고리 매핑 (탭 id → GNB 활성 축) ── */
+/* ★ 2026-08-12 IA v3: 홈/코인/주식/지표/MY (+owner 트레이딩).
+   App.jsx 의 gnbCategoryMap(하단 탭바 활성 판정)과 논리 그룹을 동기 유지해야 합니다. */
 const gnbCategoryMap = {
   home: "home",
-  // 뉴스 — 단일 직행 탭
-  news: "news",
-  // 시장 (시장을 본다)
-  screener: "market", anomaly: "market", "saved-screeners": "market",
-  "risk-map": "market", "quant-report": "market",
-  // 지표 (거시·심리)
-  indicators: "indicators", // ★ Phase 2 — 지표 허브
-  "econ-calendar": "indicators", sentiment: "indicators",
+  // 코인 — 구 뉴스 슬롯이 코인 탭으로 (스펙 §2)
+  news: "coin",
+  // 주식 — 구 '시장'(스크리너) 승계 (스펙 §0)
+  screener: "stock",
+  // 지표 — 캘린더|뉴스 + 시장 상태 도구 (자산군 불문)
+  indicators: "indicators", "econ-calendar": "indicators", sentiment: "indicators",
+  anomaly: "indicators", "risk-map": "indicators", "quant-report": "indicators",
   // 트레이딩 (내부 운영 전용) — 전략 검증 도구 포함
   "auto-trading": "ai-quant", "real-trading": "ai-quant",
   "alpha-lab": "ai-quant", backtest: "ai-quant", "backtest-compare": "ai-quant",
   "copy-trading": "ai-quant", "leaderboard": "ai-quant", "reports": "ai-quant",
   "bot-report": "ai-quant", strategy: "ai-quant",
-  // MY (개인화)
-  portfolio: "my", "portfolio-analysis": "my",
+  // MY (개인화) — ★ IA v3: saved-screeners 가 시장 → MY 로 이동
+  portfolio: "my", "portfolio-analysis": "my", "saved-screeners": "my",
   "quant-port": "my", "quant-portfolio": "my",
   notifications: "my", alerts: "my", pricing: "my",
   profile: "my", mypage: "my",
+  // ★ 콘텐츠·정책 정적 화면 (리뷰 반영): 어느 GNB 축에도 속하지 않는 sentinel "content" 로
+  //   명시 매핑 — `|| "home"` 폴백이 홈 버튼에 잘못된 활성 스타일 + aria-current="page"
+  //   (스크린리더 오정보)를 부여하는 것을 차단합니다. App.jsx 하단 탭바의 gnbCategoryMap
+  //   에도 동일 매핑이 필요합니다 (동기 유지 규칙 — 파일 배정상 후속 반영 대상).
+  about: "content", privacy: "content", terms: "content", contact: "content",
+  marketing: "content",
 };
 
 export default memo(function Header({
@@ -318,7 +344,7 @@ export default memo(function Header({
                         Zepta
                       </SheetTitle>
                       <Button size="sm" onClick={() => { setShowAuthModal(true); setMobileOpen(false); }}>
-                        로그인
+                        {t("header.login")}
                       </Button>
                     </div>
                   )}
@@ -370,8 +396,9 @@ export default memo(function Header({
                       <div className="overflow-hidden rounded-xl border border-border/40 bg-card">
                         {group.items.map((item) => {
                           const Icon = item.icon;
-                          // 같은 탭을 다른 필터로 여는 항목(주식 분석)은 활성 표시에서 제외 — 중복 하이라이트 방지
-                          const isActive = tab === item.id && !item.screenerMarket;
+                          // ★ IA v3: 스크리너 항목이 하나로 합쳐져(주식 축) 과거의
+                          //   screenerMarket 중복 하이라이트 특례가 불필요해졌습니다.
+                          const isActive = tab === item.id;
                           return (
                             <button
                               key={item.key || item.id}
@@ -379,6 +406,7 @@ export default memo(function Header({
                                 if (item.locked && requireLogin?.(item.id)) { setMobileOpen(false); return; }
                                 navigate(item.id, item.screenerMarket);
                               }}
+                              aria-current={isActive ? "page" : undefined}
                               className={cn(
                                 "flex w-full items-center gap-3 border-b border-muted px-3.5 py-3.5 text-left text-[14px] font-semibold transition-colors last:border-b-0",
                                 isActive
@@ -448,14 +476,15 @@ export default memo(function Header({
             {NAV_CATEGORIES.map((cat) => {
               const isActive = activeCategory === cat.catId;
 
-              /* 홈, AI 퀀트: 직접 이동 */
+              /* 홈·코인·주식: 1클릭 직행 (★ IA v3 — 주식은 스크리너에 주식 필터를 걸어 진입) */
               if (cat.directTab) {
                 return (
                   <Button
                     key={cat.id}
                     variant="ghost"
                     size="default"
-                    onClick={() => navigate(cat.directTab)}
+                    onClick={() => navigate(cat.directTab, cat.screenerMarket)}
+                    aria-current={isActive ? "page" : undefined}
                     className={cn(
                       "text-[14px] xl:text-[15px] font-semibold px-3 xl:px-5",
                       isActive && cat.catId === "ai-quant"
@@ -470,7 +499,7 @@ export default memo(function Header({
                 );
               }
 
-              /* 분석, 운용, 정보: CSS 드롭다운 */
+              /* 지표 · 트레이딩(owner) · MY: CSS 드롭다운 */
               return (
                 <CssDropdown
                   key={cat.id}
@@ -503,7 +532,7 @@ export default memo(function Header({
                           navigate(item.id, item.screenerMarket);
                           close();
                         }}
-                        className={cn(tab === item.id && !item.screenerMarket && "bg-primary/10 text-primary")}
+                        className={cn(tab === item.id && "bg-primary/10 text-primary")}
                       >
                         <Icon className="size-4" />
                         {item.label}
@@ -584,7 +613,7 @@ export default memo(function Header({
                       <Briefcase className="size-4" /><span>{t("nav.portfolio")}</span>
                     </CssDropdownItem>
                     <CssDropdownItem onClick={() => { navigate("/blog"); close(); }}>
-                      <BookOpen className="size-4" /><span>블로그</span>
+                      <BookOpen className="size-4" /><span>{t("footer.blog")}</span>
                     </CssDropdownItem>
                     <div className="border-t border-border/20 my-1" />
                     <CssDropdownItem onClick={() => { toggleTheme(); close(); }}>
