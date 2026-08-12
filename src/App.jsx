@@ -9407,10 +9407,12 @@ function AppInner() {
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "13px" }}>
               <h1 style={{ margin: 0, fontSize: isMobile ? "22px" : "24px", fontWeight: 800, color: C.text1, letterSpacing: "-0.01em" }}>{t("nav.stocks")}</h1>
               {stockFresh && (
+                // ★ 정돈 패스: 코인 탭과 동일 규격 — 신선도는 중립 톤(정보), 액션 색 미사용
                 <span style={{
-                  fontSize: mf(11), fontWeight: 800, padding: "6px 11px", borderRadius: "9999px",
-                  background: `${C.blue}1F`, color: C.isDark ? C.blueL : C.blue, whiteSpace: "nowrap", flexShrink: 0,
-                }}>↻ {stockFresh}</span>
+                  fontSize: mf(11), fontWeight: 700, padding: "6px 11px", borderRadius: "9999px",
+                  background: C.card, border: `1px solid ${C.border}`, color: C.text3,
+                  whiteSpace: "nowrap", flexShrink: 0,
+                }}>{stockFresh}</span>
               )}
             </div>
 
@@ -11169,10 +11171,13 @@ function AppInner() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "13px" }}>
                 <h1 style={{ margin: 0, fontSize: isMobile ? "22px" : "24px", fontWeight: 800, color: C.text1, letterSpacing: "-0.01em" }}>{t("tabs.coin.title")}</h1>
                 {fresh && (
+                  // ★ 정돈 패스: 신선도는 "정보"이지 액션이 아닙니다 — 액션 칩과 같은 강조색을
+                  //   쓰면 누를 수 있는 것처럼 읽혀 화면이 시끄러워집니다. 중립 톤으로 낮춥니다.
                   <span style={{
-                    fontSize: mf(11), fontWeight: 800, padding: "6px 11px", borderRadius: "9999px",
-                    background: `${C.blue}1F`, color: C.isDark ? C.blueL : C.blue, whiteSpace: "nowrap", flexShrink: 0,
-                  }}>↻ {fresh}</span>
+                    fontSize: mf(11), fontWeight: 700, padding: "6px 11px", borderRadius: "9999px",
+                    background: C.card, border: `1px solid ${C.border}`, color: C.text3,
+                    whiteSpace: "nowrap", flexShrink: 0,
+                  }}>{fresh}</span>
                 )}
               </div>
 
@@ -11188,8 +11193,10 @@ function AppInner() {
                       {[0, 1, 2, 3].map(i => <Skeleton key={`ctx-skel-${i}`} width="100%" height="72px" />)}
                     </div>
                   ) : ctxCards.length > 0 && (
+                    // ★ 정돈 패스: 카드 수가 홀수(김프 미수신 등)면 마지막 카드를 전폭으로 늘려
+                    //   우측에 빈 칸이 남지 않게 합니다. 3개=2열+전폭, 4개=2×2.
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "9px" }}>
-                      {ctxCards.map(({ id, label, ind }) => (
+                      {ctxCards.map(({ id, label, ind }, ctxIdx) => (
                         <div key={id}
                           role="button" tabIndex={0}
                           aria-label={`${label} ${ind.value}${ind.unit || ""} — ${ind.label || ""}`}
@@ -11198,12 +11205,28 @@ function AppInner() {
                           style={{
                             background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px",
                             padding: "11px 13px", cursor: "pointer", WebkitTapHighlightColor: "transparent",
+                            // 홀수 개일 때 마지막 카드가 2열을 모두 차지 → 빈 칸 제거
+                            ...(ctxCards.length % 2 === 1 && ctxIdx === ctxCards.length - 1
+                              ? { gridColumn: "1 / -1" } : null),
                           }}>
                           <div style={{ fontSize: mf(10), color: C.text3, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
                           <div style={{ marginTop: "3px" }}><Num size="17px" weight={800}>{ind.value}{ind.unit || ""}</Num></div>
                           <div style={{ fontSize: mf(10), fontWeight: 700, marginTop: "2px", color: toneHi(ind.tone), whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ind.label || "—"}</div>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {/* 지수 해설 링크 — 컨텍스트 카드 바로 아래(맥락 인접). 구 지표 허브 게이지
+                      (펀딩 스퀴즈·알트 과열)의 진입점 승계 — /index/* 가 현재값+산식을 보여줍니다.
+                      ★ 정돈 패스: 시그널 리스트와 파생 카드 사이에 떠 있던 위치를 카드 옆으로 옮겨
+                      "이 칩이 무엇의 해설인지" 가 바로 읽히게 했습니다. */}
+                  {ctxCards.length > 0 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                      <span style={{ fontSize: mf(11), color: C.text3, fontWeight: 700 }}>{t("tabs.coin.indexLinksLabel")}</span>
+                      <HomeActionChip href="/index/market-temp" label={t("tabs.coin.indexTempLink")} />
+                      <HomeActionChip href="/index/funding-squeeze" label={t("tabs.coin.indexFundingLink")} />
+                      <HomeActionChip href="/index/alt-heat" label={t("tabs.coin.indexAltLink")} />
                     </div>
                   )}
 
@@ -11244,14 +11267,6 @@ function AppInner() {
                     </div>
                   )}
 
-                  {/* 지수 해설 링크 — 구 지표 허브 게이지(펀딩 스퀴즈·알트 과열 포함)의 진입점 승계.
-                      /index/* 서버 렌더 SEO 페이지가 현재값+산식을 보여줍니다(고아 페이지 방지). */}
-                  <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: mf(11), color: C.text3, fontWeight: 700 }}>{t("tabs.coin.indexLinksLabel")}</span>
-                    <HomeActionChip href="/index/market-temp" label={t("tabs.coin.indexTempLink")} />
-                    <HomeActionChip href="/index/funding-squeeze" label={t("tabs.coin.indexFundingLink")} />
-                    <HomeActionChip href="/index/alt-heat" label={t("tabs.coin.indexAltLink")} />
-                  </div>
                 </div>
 
                 {/* ── 우측(데스크탑) / 하단(모바일): 코인 시그널 리스트 ── */}
