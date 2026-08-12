@@ -1,0 +1,3375 @@
+{
+  "hypothesis": "H4 — BB(20,2) 밴드폭 20봉 백분위 ≤ p10 이 M봉 지속(수축) 후 박스 상단/하단 OCO 돌파 진입이 '수축 무관 동일 박스 돌파' 대비 성과 우위",
+  "source": "docs/research/veyric-ta-methodology-2026-08.json hypotheses[3]",
+  "preregistered": {
+    "mGrid": [
+      3,
+      6
+    ],
+    "bufferGrid": [
+      0.001,
+      0.0025
+    ],
+    "tf": "1h",
+    "bbPeriod": 20,
+    "bbMult": 2,
+    "pctWindow": 20,
+    "squeezeP": 0.1,
+    "recoverP": 0.5,
+    "atrPeriod": 14,
+    "slAtrMult": 1,
+    "tpAtrMult": 2,
+    "timeStopBars": 24,
+    "maxPendingBars": 24,
+    "insampleSymbols": [
+      "BTCUSDT",
+      "ETHUSDT"
+    ],
+    "crossvalSymbols": [
+      "SOLUSDT",
+      "XRPUSDT",
+      "BNBUSDT",
+      "DOGEUSDT",
+      "ADAUSDT",
+      "LINKUSDT"
+    ],
+    "period": {
+      "isStart": "2025-02-12",
+      "oosStart": "2026-02-12",
+      "end": "2026-08-12"
+    },
+    "bestCellRule": "IS·insample(BTC+ETH) 풀링 (PF_수축 − PF_기준) 최대 셀",
+    "passOOSRule": "OOS·전심볼 풀링 PF_수축 > PF_기준 AND PF_수축 > 1.0 AND 수축군 체결 IS+OOS ≥ 30",
+    "entryExit": "OCO 스탑 진입(갭=시가), 진입봉 SL 우선 보수 규약, SL=1×ATR(발주봉)·TP=2×ATR·24봉 타임스톱, 수수료 미적용(참고용 왕복 0.1% 별도 산출), 셋업 독립 평가(중복 허용), 세그먼트 귀속=발주봉 openTime",
+    "baselineNote": "기준군 = 수축 무관 매 적격봉 동일 M봉 박스 OCO. 철회는 양군 공통 24봉 대기 상한, p50 회복 철회는 수축군 전용(원 가설 규격). 24봉 대기 상한은 원 가설에 없는 운영 규약(양군 공통 부여) — caveat."
+  },
+  "generatedAt": "2026-08-12T12:19:38.222Z",
+  "excluded": [],
+  "cellScoresIS": [
+    {
+      "M": 3,
+      "buffer": 0.001,
+      "score": 0.1012,
+      "sqPF_IS": 0.8634,
+      "basePF_IS": 0.7622,
+      "sqTrades_IS": 563
+    },
+    {
+      "M": 3,
+      "buffer": 0.0025,
+      "score": 0.1054,
+      "sqPF_IS": 0.7448,
+      "basePF_IS": 0.6394,
+      "sqTrades_IS": 542
+    },
+    {
+      "M": 6,
+      "buffer": 0.001,
+      "score": 0.1096,
+      "sqPF_IS": 0.7228,
+      "basePF_IS": 0.6132,
+      "sqTrades_IS": 294
+    },
+    {
+      "M": 6,
+      "buffer": 0.0025,
+      "score": 0.2142,
+      "sqPF_IS": 0.7067,
+      "basePF_IS": 0.4925,
+      "sqTrades_IS": 276
+    }
+  ],
+  "bestCell": {
+    "M": 6,
+    "buffer": 0.0025
+  },
+  "passOOS": false,
+  "oosDetail": {
+    "contribPositive": true,
+    "profitable": false,
+    "sqTradesTotal": 1795,
+    "minRequired": 30,
+    "oosSqueezePF": 0.5928,
+    "oosBaselinePF": 0.5498,
+    "oosSqueezeAvgRetPct": -0.2502,
+    "oosBaselineAvgRetPct": -0.2946,
+    "oosSqueezeMaxConsecLosses": 34,
+    "oosFeeStressSqueezePF": 0.4943
+  },
+  "pooled": [
+    {
+      "M": 3,
+      "buffer": 0.001,
+      "segment": "IS",
+      "group": "all",
+      "squeeze": {
+        "setups": 2349,
+        "cancelRecover": 32,
+        "cancelTime": 7,
+        "dataEnd": 0,
+        "ambiguous": 49,
+        "fillRate": 0.9834,
+        "trades": 2310,
+        "winRate": 0.2883,
+        "avgRetPct": -0.1715,
+        "medianRetPct": -0.7784,
+        "pf": 0.778,
+        "maxConsecLosses": 38,
+        "feeStress": {
+          "trades": 2310,
+          "winRate": 0.2857,
+          "avgRetPct": -0.2715,
+          "medianRetPct": -0.8784,
+          "pf": 0.6782,
+          "maxConsecLosses": 38
+        }
+      },
+      "baseline": {
+        "setups": 70080,
+        "cancelTime": 611,
+        "dataEnd": 0,
+        "ambiguous": 1013,
+        "fillRate": 0.9913,
+        "trades": 69469,
+        "winRate": 0.2909,
+        "avgRetPct": -0.164,
+        "medianRetPct": -0.7922,
+        "pf": 0.7891,
+        "maxConsecLosses": 142,
+        "feeStress": {
+          "trades": 69469,
+          "winRate": 0.289,
+          "avgRetPct": -0.264,
+          "medianRetPct": -0.8922,
+          "pf": 0.6889,
+          "maxConsecLosses": 142
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": -0.22,
+        "pApprox": 0.8259,
+        "n1": 2310,
+        "n2": 69469
+      }
+    },
+    {
+      "M": 3,
+      "buffer": 0.001,
+      "segment": "OOS",
+      "group": "all",
+      "squeeze": {
+        "setups": 1178,
+        "cancelRecover": 16,
+        "cancelTime": 2,
+        "dataEnd": 6,
+        "ambiguous": 19,
+        "fillRate": 0.9796,
+        "trades": 1154,
+        "winRate": 0.2938,
+        "avgRetPct": -0.1006,
+        "medianRetPct": -0.6092,
+        "pf": 0.8224,
+        "maxConsecLosses": 30,
+        "feeStress": {
+          "trades": 1154,
+          "winRate": 0.292,
+          "avgRetPct": -0.2006,
+          "medianRetPct": -0.7092,
+          "pf": 0.6851,
+          "maxConsecLosses": 30
+        }
+      },
+      "baseline": {
+        "setups": 34752,
+        "cancelTime": 308,
+        "dataEnd": 167,
+        "ambiguous": 451,
+        "fillRate": 0.9863,
+        "trades": 34277,
+        "winRate": 0.2796,
+        "avgRetPct": -0.1402,
+        "medianRetPct": -0.6459,
+        "pf": 0.7673,
+        "maxConsecLosses": 199,
+        "feeStress": {
+          "trades": 34277,
+          "winRate": 0.2782,
+          "avgRetPct": -0.2402,
+          "medianRetPct": -0.7459,
+          "pf": 0.644,
+          "maxConsecLosses": 199
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": 1.1105,
+        "pApprox": 0.2668,
+        "n1": 1154,
+        "n2": 34277
+      }
+    },
+    {
+      "M": 3,
+      "buffer": 0.0025,
+      "segment": "IS",
+      "group": "all",
+      "squeeze": {
+        "setups": 2349,
+        "cancelRecover": 68,
+        "cancelTime": 13,
+        "dataEnd": 0,
+        "ambiguous": 30,
+        "fillRate": 0.9655,
+        "trades": 2268,
+        "winRate": 0.2513,
+        "avgRetPct": -0.2611,
+        "medianRetPct": -0.8141,
+        "pf": 0.6769,
+        "maxConsecLosses": 31,
+        "feeStress": {
+          "trades": 2268,
+          "winRate": 0.25,
+          "avgRetPct": -0.3611,
+          "medianRetPct": -0.9141,
+          "pf": 0.5911,
+          "maxConsecLosses": 31
+        }
+      },
+      "baseline": {
+        "setups": 70080,
+        "cancelTime": 1030,
+        "dataEnd": 0,
+        "ambiguous": 641,
+        "fillRate": 0.9853,
+        "trades": 69050,
+        "winRate": 0.2585,
+        "avgRetPct": -0.2517,
+        "medianRetPct": -0.8269,
+        "pf": 0.6887,
+        "maxConsecLosses": 271,
+        "feeStress": {
+          "trades": 69050,
+          "winRate": 0.2572,
+          "avgRetPct": -0.3517,
+          "medianRetPct": -0.9269,
+          "pf": 0.6016,
+          "maxConsecLosses": 271
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": -0.28,
+        "pApprox": 0.7795,
+        "n1": 2268,
+        "n2": 69050
+      }
+    },
+    {
+      "M": 3,
+      "buffer": 0.0025,
+      "segment": "OOS",
+      "group": "all",
+      "squeeze": {
+        "setups": 1178,
+        "cancelRecover": 33,
+        "cancelTime": 5,
+        "dataEnd": 5,
+        "ambiguous": 12,
+        "fillRate": 0.9635,
+        "trades": 1135,
+        "winRate": 0.2396,
+        "avgRetPct": -0.2258,
+        "medianRetPct": -0.6386,
+        "pf": 0.6302,
+        "maxConsecLosses": 28,
+        "feeStress": {
+          "trades": 1135,
+          "winRate": 0.2388,
+          "avgRetPct": -0.3258,
+          "medianRetPct": -0.7386,
+          "pf": 0.5256,
+          "maxConsecLosses": 28
+        }
+      },
+      "baseline": {
+        "setups": 34752,
+        "cancelTime": 524,
+        "dataEnd": 165,
+        "ambiguous": 273,
+        "fillRate": 0.9802,
+        "trades": 34063,
+        "winRate": 0.2408,
+        "avgRetPct": -0.2219,
+        "medianRetPct": -0.6661,
+        "pf": 0.648,
+        "maxConsecLosses": 246,
+        "feeStress": {
+          "trades": 34063,
+          "winRate": 0.2398,
+          "avgRetPct": -0.3219,
+          "medianRetPct": -0.7661,
+          "pf": 0.5443,
+          "maxConsecLosses": 246
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": -0.1144,
+        "pApprox": 0.9089,
+        "n1": 1135,
+        "n2": 34063
+      }
+    },
+    {
+      "M": 6,
+      "buffer": 0.001,
+      "segment": "IS",
+      "group": "all",
+      "squeeze": {
+        "setups": 1298,
+        "cancelRecover": 36,
+        "cancelTime": 13,
+        "dataEnd": 0,
+        "ambiguous": 7,
+        "fillRate": 0.9622,
+        "trades": 1249,
+        "winRate": 0.2586,
+        "avgRetPct": -0.2678,
+        "medianRetPct": -0.8044,
+        "pf": 0.6631,
+        "maxConsecLosses": 30,
+        "feeStress": {
+          "trades": 1249,
+          "winRate": 0.2562,
+          "avgRetPct": -0.3678,
+          "medianRetPct": -0.9044,
+          "pf": 0.5769,
+          "maxConsecLosses": 30
+        }
+      },
+      "baseline": {
+        "setups": 70080,
+        "cancelTime": 1974,
+        "dataEnd": 0,
+        "ambiguous": 469,
+        "fillRate": 0.9718,
+        "trades": 68106,
+        "winRate": 0.2558,
+        "avgRetPct": -0.2723,
+        "medianRetPct": -0.835,
+        "pf": 0.6652,
+        "maxConsecLosses": 217,
+        "feeStress": {
+          "trades": 68106,
+          "winRate": 0.2544,
+          "avgRetPct": -0.3723,
+          "medianRetPct": -0.935,
+          "pf": 0.5806,
+          "maxConsecLosses": 218
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": 0.1037,
+        "pApprox": 0.9174,
+        "n1": 1249,
+        "n2": 68106
+      }
+    },
+    {
+      "M": 6,
+      "buffer": 0.001,
+      "segment": "OOS",
+      "group": "all",
+      "squeeze": {
+        "setups": 628,
+        "cancelRecover": 19,
+        "cancelTime": 6,
+        "dataEnd": 2,
+        "ambiguous": 10,
+        "fillRate": 0.957,
+        "trades": 601,
+        "winRate": 0.2612,
+        "avgRetPct": -0.1496,
+        "medianRetPct": -0.6193,
+        "pf": 0.7403,
+        "maxConsecLosses": 32,
+        "feeStress": {
+          "trades": 601,
+          "winRate": 0.2612,
+          "avgRetPct": -0.2496,
+          "medianRetPct": -0.7193,
+          "pf": 0.616,
+          "maxConsecLosses": 32
+        }
+      },
+      "baseline": {
+        "setups": 34752,
+        "cancelTime": 929,
+        "dataEnd": 161,
+        "ambiguous": 254,
+        "fillRate": 0.9686,
+        "trades": 33662,
+        "winRate": 0.2476,
+        "avgRetPct": -0.2125,
+        "medianRetPct": -0.6644,
+        "pf": 0.6606,
+        "maxConsecLosses": 229,
+        "feeStress": {
+          "trades": 33662,
+          "winRate": 0.2465,
+          "avgRetPct": -0.3125,
+          "medianRetPct": -0.7644,
+          "pf": 0.5545,
+          "maxConsecLosses": 229
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": 1.3204,
+        "pApprox": 0.1867,
+        "n1": 601,
+        "n2": 33662
+      }
+    },
+    {
+      "M": 6,
+      "buffer": 0.0025,
+      "segment": "IS",
+      "group": "all",
+      "squeeze": {
+        "setups": 1298,
+        "cancelRecover": 68,
+        "cancelTime": 20,
+        "dataEnd": 0,
+        "ambiguous": 5,
+        "fillRate": 0.9322,
+        "trades": 1210,
+        "winRate": 0.2496,
+        "avgRetPct": -0.2956,
+        "medianRetPct": -0.8236,
+        "pf": 0.6362,
+        "maxConsecLosses": 28,
+        "feeStress": {
+          "trades": 1210,
+          "winRate": 0.2479,
+          "avgRetPct": -0.3956,
+          "medianRetPct": -0.9236,
+          "pf": 0.5544,
+          "maxConsecLosses": 28
+        }
+      },
+      "baseline": {
+        "setups": 70080,
+        "cancelTime": 2803,
+        "dataEnd": 0,
+        "ambiguous": 332,
+        "fillRate": 0.96,
+        "trades": 67277,
+        "winRate": 0.2255,
+        "avgRetPct": -0.3532,
+        "medianRetPct": -0.8632,
+        "pf": 0.5811,
+        "maxConsecLosses": 284,
+        "feeStress": {
+          "trades": 67277,
+          "winRate": 0.2245,
+          "avgRetPct": -0.4532,
+          "medianRetPct": -0.9632,
+          "pf": 0.5077,
+          "maxConsecLosses": 284
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": 1.305,
+        "pApprox": 0.1919,
+        "n1": 1210,
+        "n2": 67277
+      }
+    },
+    {
+      "M": 6,
+      "buffer": 0.0025,
+      "segment": "OOS",
+      "group": "all",
+      "squeeze": {
+        "setups": 628,
+        "cancelRecover": 31,
+        "cancelTime": 10,
+        "dataEnd": 2,
+        "ambiguous": 6,
+        "fillRate": 0.9315,
+        "trades": 585,
+        "winRate": 0.2188,
+        "avgRetPct": -0.2502,
+        "medianRetPct": -0.6417,
+        "pf": 0.5928,
+        "maxConsecLosses": 34,
+        "feeStress": {
+          "trades": 585,
+          "winRate": 0.2188,
+          "avgRetPct": -0.3502,
+          "medianRetPct": -0.7417,
+          "pf": 0.4943,
+          "maxConsecLosses": 34
+        }
+      },
+      "baseline": {
+        "setups": 34752,
+        "cancelTime": 1398,
+        "dataEnd": 153,
+        "ambiguous": 141,
+        "fillRate": 0.9554,
+        "trades": 33201,
+        "winRate": 0.2091,
+        "avgRetPct": -0.2946,
+        "medianRetPct": -0.6851,
+        "pf": 0.5498,
+        "maxConsecLosses": 277,
+        "feeStress": {
+          "trades": 33201,
+          "winRate": 0.2083,
+          "avgRetPct": -0.3946,
+          "medianRetPct": -0.7851,
+          "pf": 0.462,
+          "maxConsecLosses": 277
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": 0.9602,
+        "pApprox": 0.3369,
+        "n1": 585,
+        "n2": 33201
+      }
+    },
+    {
+      "M": 3,
+      "buffer": 0.001,
+      "segment": "IS",
+      "group": "crossval",
+      "squeeze": {
+        "setups": 1774,
+        "cancelRecover": 23,
+        "cancelTime": 4,
+        "dataEnd": 0,
+        "ambiguous": 32,
+        "fillRate": 0.9848,
+        "trades": 1747,
+        "winRate": 0.2839,
+        "avgRetPct": -0.2013,
+        "medianRetPct": -0.8796,
+        "pf": 0.7589,
+        "maxConsecLosses": 30,
+        "feeStress": {
+          "trades": 1747,
+          "winRate": 0.2816,
+          "avgRetPct": -0.3013,
+          "medianRetPct": -0.9796,
+          "pf": 0.6677,
+          "maxConsecLosses": 30
+        }
+      },
+      "baseline": {
+        "setups": 52560,
+        "cancelTime": 378,
+        "dataEnd": 0,
+        "ambiguous": 707,
+        "fillRate": 0.9928,
+        "trades": 52182,
+        "winRate": 0.2951,
+        "avgRetPct": -0.171,
+        "medianRetPct": -0.8912,
+        "pf": 0.7955,
+        "maxConsecLosses": 137,
+        "feeStress": {
+          "trades": 52182,
+          "winRate": 0.2937,
+          "avgRetPct": -0.271,
+          "medianRetPct": -0.9912,
+          "pf": 0.7011,
+          "maxConsecLosses": 137
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": -0.7401,
+        "pApprox": 0.4593,
+        "n1": 1747,
+        "n2": 52182
+      }
+    },
+    {
+      "M": 3,
+      "buffer": 0.001,
+      "segment": "OOS",
+      "group": "crossval",
+      "squeeze": {
+        "setups": 877,
+        "cancelRecover": 12,
+        "cancelTime": 1,
+        "dataEnd": 5,
+        "ambiguous": 14,
+        "fillRate": 0.9795,
+        "trades": 859,
+        "winRate": 0.2969,
+        "avgRetPct": -0.0833,
+        "medianRetPct": -0.6382,
+        "pf": 0.8584,
+        "maxConsecLosses": 22,
+        "feeStress": {
+          "trades": 859,
+          "winRate": 0.2969,
+          "avgRetPct": -0.1833,
+          "medianRetPct": -0.7382,
+          "pf": 0.7216,
+          "maxConsecLosses": 22
+        }
+      },
+      "baseline": {
+        "setups": 26064,
+        "cancelTime": 207,
+        "dataEnd": 121,
+        "ambiguous": 311,
+        "fillRate": 0.9874,
+        "trades": 25736,
+        "winRate": 0.282,
+        "avgRetPct": -0.1387,
+        "medianRetPct": -0.6804,
+        "pf": 0.7787,
+        "maxConsecLosses": 152,
+        "feeStress": {
+          "trades": 25736,
+          "winRate": 0.2809,
+          "avgRetPct": -0.2387,
+          "medianRetPct": -0.7804,
+          "pf": 0.6583,
+          "maxConsecLosses": 152
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": 1.2671,
+        "pApprox": 0.2051,
+        "n1": 859,
+        "n2": 25736
+      }
+    },
+    {
+      "M": 3,
+      "buffer": 0.0025,
+      "segment": "IS",
+      "group": "crossval",
+      "squeeze": {
+        "setups": 1774,
+        "cancelRecover": 42,
+        "cancelTime": 6,
+        "dataEnd": 0,
+        "ambiguous": 18,
+        "fillRate": 0.9729,
+        "trades": 1726,
+        "winRate": 0.252,
+        "avgRetPct": -0.2942,
+        "medianRetPct": -0.9209,
+        "pf": 0.662,
+        "maxConsecLosses": 25,
+        "feeStress": {
+          "trades": 1726,
+          "winRate": 0.2514,
+          "avgRetPct": -0.3942,
+          "medianRetPct": -1.0209,
+          "pf": 0.5829,
+          "maxConsecLosses": 25
+        }
+      },
+      "baseline": {
+        "setups": 52560,
+        "cancelTime": 586,
+        "dataEnd": 0,
+        "ambiguous": 440,
+        "fillRate": 0.9889,
+        "trades": 51974,
+        "winRate": 0.265,
+        "avgRetPct": -0.2596,
+        "medianRetPct": -0.9194,
+        "pf": 0.7005,
+        "maxConsecLosses": 203,
+        "feeStress": {
+          "trades": 51974,
+          "winRate": 0.2639,
+          "avgRetPct": -0.3596,
+          "medianRetPct": -1.0194,
+          "pf": 0.6176,
+          "maxConsecLosses": 203
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": -0.8586,
+        "pApprox": 0.3906,
+        "n1": 1726,
+        "n2": 51974
+      }
+    },
+    {
+      "M": 3,
+      "buffer": 0.0025,
+      "segment": "OOS",
+      "group": "crossval",
+      "squeeze": {
+        "setups": 877,
+        "cancelRecover": 24,
+        "cancelTime": 3,
+        "dataEnd": 5,
+        "ambiguous": 9,
+        "fillRate": 0.9635,
+        "trades": 845,
+        "winRate": 0.2473,
+        "avgRetPct": -0.2081,
+        "medianRetPct": -0.679,
+        "pf": 0.6699,
+        "maxConsecLosses": 24,
+        "feeStress": {
+          "trades": 845,
+          "winRate": 0.2462,
+          "avgRetPct": -0.3081,
+          "medianRetPct": -0.779,
+          "pf": 0.5635,
+          "maxConsecLosses": 24
+        }
+      },
+      "baseline": {
+        "setups": 26064,
+        "cancelTime": 337,
+        "dataEnd": 119,
+        "ambiguous": 190,
+        "fillRate": 0.9825,
+        "trades": 25608,
+        "winRate": 0.2453,
+        "avgRetPct": -0.2201,
+        "medianRetPct": -0.7011,
+        "pf": 0.6636,
+        "maxConsecLosses": 185,
+        "feeStress": {
+          "trades": 25608,
+          "winRate": 0.2445,
+          "avgRetPct": -0.3201,
+          "medianRetPct": -0.8011,
+          "pf": 0.5614,
+          "maxConsecLosses": 185
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": 0.2858,
+        "pApprox": 0.775,
+        "n1": 845,
+        "n2": 25608
+      }
+    },
+    {
+      "M": 6,
+      "buffer": 0.001,
+      "segment": "IS",
+      "group": "crossval",
+      "squeeze": {
+        "setups": 988,
+        "cancelRecover": 24,
+        "cancelTime": 9,
+        "dataEnd": 0,
+        "ambiguous": 5,
+        "fillRate": 0.9666,
+        "trades": 955,
+        "winRate": 0.2597,
+        "avgRetPct": -0.3009,
+        "medianRetPct": -0.9044,
+        "pf": 0.6508,
+        "maxConsecLosses": 31,
+        "feeStress": {
+          "trades": 955,
+          "winRate": 0.2576,
+          "avgRetPct": -0.4009,
+          "medianRetPct": -1.0044,
+          "pf": 0.5716,
+          "maxConsecLosses": 31
+        }
+      },
+      "baseline": {
+        "setups": 52560,
+        "cancelTime": 1340,
+        "dataEnd": 0,
+        "ambiguous": 318,
+        "fillRate": 0.9745,
+        "trades": 51220,
+        "winRate": 0.2611,
+        "avgRetPct": -0.2809,
+        "medianRetPct": -0.9271,
+        "pf": 0.6777,
+        "maxConsecLosses": 198,
+        "feeStress": {
+          "trades": 51220,
+          "winRate": 0.26,
+          "avgRetPct": -0.3809,
+          "medianRetPct": -1.0271,
+          "pf": 0.5971,
+          "maxConsecLosses": 198
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": -0.3816,
+        "pApprox": 0.7027,
+        "n1": 955,
+        "n2": 51220
+      }
+    },
+    {
+      "M": 6,
+      "buffer": 0.001,
+      "segment": "OOS",
+      "group": "crossval",
+      "squeeze": {
+        "setups": 468,
+        "cancelRecover": 11,
+        "cancelTime": 3,
+        "dataEnd": 2,
+        "ambiguous": 7,
+        "fillRate": 0.9658,
+        "trades": 452,
+        "winRate": 0.2611,
+        "avgRetPct": -0.1464,
+        "medianRetPct": -0.641,
+        "pf": 0.7547,
+        "maxConsecLosses": 26,
+        "feeStress": {
+          "trades": 452,
+          "winRate": 0.2611,
+          "avgRetPct": -0.2464,
+          "medianRetPct": -0.741,
+          "pf": 0.6326,
+          "maxConsecLosses": 26
+        }
+      },
+      "baseline": {
+        "setups": 26064,
+        "cancelTime": 651,
+        "dataEnd": 117,
+        "ambiguous": 157,
+        "fillRate": 0.9705,
+        "trades": 25296,
+        "winRate": 0.2506,
+        "avgRetPct": -0.2121,
+        "medianRetPct": -0.7005,
+        "pf": 0.6741,
+        "maxConsecLosses": 172,
+        "feeStress": {
+          "trades": 25296,
+          "winRate": 0.2498,
+          "avgRetPct": -0.3121,
+          "medianRetPct": -0.8005,
+          "pf": 0.57,
+          "maxConsecLosses": 172
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": 1.1498,
+        "pApprox": 0.2502,
+        "n1": 452,
+        "n2": 25296
+      }
+    },
+    {
+      "M": 6,
+      "buffer": 0.0025,
+      "segment": "IS",
+      "group": "crossval",
+      "squeeze": {
+        "setups": 988,
+        "cancelRecover": 42,
+        "cancelTime": 12,
+        "dataEnd": 0,
+        "ambiguous": 4,
+        "fillRate": 0.9453,
+        "trades": 934,
+        "winRate": 0.2473,
+        "avgRetPct": -0.3318,
+        "medianRetPct": -0.9226,
+        "pf": 0.6222,
+        "maxConsecLosses": 22,
+        "feeStress": {
+          "trades": 934,
+          "winRate": 0.2463,
+          "avgRetPct": -0.4318,
+          "medianRetPct": -1.0226,
+          "pf": 0.5472,
+          "maxConsecLosses": 22
+        }
+      },
+      "baseline": {
+        "setups": 52560,
+        "cancelTime": 1829,
+        "dataEnd": 0,
+        "ambiguous": 213,
+        "fillRate": 0.9652,
+        "trades": 50731,
+        "winRate": 0.235,
+        "avgRetPct": -0.3574,
+        "medianRetPct": -0.9496,
+        "pf": 0.6026,
+        "maxConsecLosses": 214,
+        "feeStress": {
+          "trades": 50731,
+          "winRate": 0.2342,
+          "avgRetPct": -0.4574,
+          "medianRetPct": -1.0496,
+          "pf": 0.5313,
+          "maxConsecLosses": 214
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": 0.4846,
+        "pApprox": 0.628,
+        "n1": 934,
+        "n2": 50731
+      }
+    },
+    {
+      "M": 6,
+      "buffer": 0.0025,
+      "segment": "OOS",
+      "group": "crossval",
+      "squeeze": {
+        "setups": 468,
+        "cancelRecover": 20,
+        "cancelTime": 6,
+        "dataEnd": 2,
+        "ambiguous": 5,
+        "fillRate": 0.9402,
+        "trades": 440,
+        "winRate": 0.225,
+        "avgRetPct": -0.2404,
+        "medianRetPct": -0.6643,
+        "pf": 0.6193,
+        "maxConsecLosses": 30,
+        "feeStress": {
+          "trades": 440,
+          "winRate": 0.225,
+          "avgRetPct": -0.3404,
+          "medianRetPct": -0.7643,
+          "pf": 0.5198,
+          "maxConsecLosses": 30
+        }
+      },
+      "baseline": {
+        "setups": 26064,
+        "cancelTime": 953,
+        "dataEnd": 107,
+        "ambiguous": 100,
+        "fillRate": 0.9593,
+        "trades": 25004,
+        "winRate": 0.215,
+        "avgRetPct": -0.295,
+        "medianRetPct": -0.7199,
+        "pf": 0.5654,
+        "maxConsecLosses": 207,
+        "feeStress": {
+          "trades": 25004,
+          "winRate": 0.2145,
+          "avgRetPct": -0.395,
+          "medianRetPct": -0.8199,
+          "pf": 0.4784,
+          "maxConsecLosses": 207
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": 0.9804,
+        "pApprox": 0.3269,
+        "n1": 440,
+        "n2": 25004
+      }
+    },
+    {
+      "M": 3,
+      "buffer": 0.001,
+      "segment": "IS",
+      "group": "insample",
+      "squeeze": {
+        "setups": 575,
+        "cancelRecover": 9,
+        "cancelTime": 3,
+        "dataEnd": 0,
+        "ambiguous": 17,
+        "fillRate": 0.9791,
+        "trades": 563,
+        "winRate": 0.302,
+        "avgRetPct": -0.0788,
+        "medianRetPct": -0.5282,
+        "pf": 0.8634,
+        "maxConsecLosses": 27,
+        "feeStress": {
+          "trades": 563,
+          "winRate": 0.2984,
+          "avgRetPct": -0.1788,
+          "medianRetPct": -0.6282,
+          "pf": 0.7236,
+          "maxConsecLosses": 27
+        }
+      },
+      "baseline": {
+        "setups": 17520,
+        "cancelTime": 233,
+        "dataEnd": 0,
+        "ambiguous": 306,
+        "fillRate": 0.9867,
+        "trades": 17287,
+        "winRate": 0.2783,
+        "avgRetPct": -0.1429,
+        "medianRetPct": -0.5709,
+        "pf": 0.7622,
+        "maxConsecLosses": 112,
+        "feeStress": {
+          "trades": 17287,
+          "winRate": 0.2747,
+          "avgRetPct": -0.2429,
+          "medianRetPct": -0.6709,
+          "pf": 0.6393,
+          "maxConsecLosses": 112
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": 1.1475,
+        "pApprox": 0.2512,
+        "n1": 563,
+        "n2": 17287
+      }
+    },
+    {
+      "M": 3,
+      "buffer": 0.001,
+      "segment": "OOS",
+      "group": "insample",
+      "squeeze": {
+        "setups": 301,
+        "cancelRecover": 4,
+        "cancelTime": 1,
+        "dataEnd": 1,
+        "ambiguous": 5,
+        "fillRate": 0.9801,
+        "trades": 295,
+        "winRate": 0.2847,
+        "avgRetPct": -0.151,
+        "medianRetPct": -0.5371,
+        "pf": 0.6998,
+        "maxConsecLosses": 16,
+        "feeStress": {
+          "trades": 295,
+          "winRate": 0.278,
+          "avgRetPct": -0.251,
+          "medianRetPct": -0.6371,
+          "pf": 0.5634,
+          "maxConsecLosses": 16
+        }
+      },
+      "baseline": {
+        "setups": 8688,
+        "cancelTime": 101,
+        "dataEnd": 46,
+        "ambiguous": 140,
+        "fillRate": 0.9831,
+        "trades": 8541,
+        "winRate": 0.2725,
+        "avgRetPct": -0.1448,
+        "medianRetPct": -0.5641,
+        "pf": 0.7268,
+        "maxConsecLosses": 123,
+        "feeStress": {
+          "trades": 8541,
+          "winRate": 0.2702,
+          "avgRetPct": -0.2448,
+          "medianRetPct": -0.6641,
+          "pf": 0.594,
+          "maxConsecLosses": 123
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": -0.1087,
+        "pApprox": 0.9135,
+        "n1": 295,
+        "n2": 8541
+      }
+    },
+    {
+      "M": 3,
+      "buffer": 0.0025,
+      "segment": "IS",
+      "group": "insample",
+      "squeeze": {
+        "setups": 575,
+        "cancelRecover": 26,
+        "cancelTime": 7,
+        "dataEnd": 0,
+        "ambiguous": 12,
+        "fillRate": 0.9426,
+        "trades": 542,
+        "winRate": 0.2491,
+        "avgRetPct": -0.1557,
+        "medianRetPct": -0.579,
+        "pf": 0.7448,
+        "maxConsecLosses": 19,
+        "feeStress": {
+          "trades": 542,
+          "winRate": 0.2454,
+          "avgRetPct": -0.2557,
+          "medianRetPct": -0.679,
+          "pf": 0.6269,
+          "maxConsecLosses": 19
+        }
+      },
+      "baseline": {
+        "setups": 17520,
+        "cancelTime": 444,
+        "dataEnd": 0,
+        "ambiguous": 201,
+        "fillRate": 0.9747,
+        "trades": 17076,
+        "winRate": 0.2386,
+        "avgRetPct": -0.2277,
+        "medianRetPct": -0.6046,
+        "pf": 0.6394,
+        "maxConsecLosses": 141,
+        "feeStress": {
+          "trades": 17076,
+          "winRate": 0.2368,
+          "avgRetPct": -0.3277,
+          "medianRetPct": -0.7046,
+          "pf": 0.5369,
+          "maxConsecLosses": 141
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": 1.2706,
+        "pApprox": 0.2039,
+        "n1": 542,
+        "n2": 17076
+      }
+    },
+    {
+      "M": 3,
+      "buffer": 0.0025,
+      "segment": "OOS",
+      "group": "insample",
+      "squeeze": {
+        "setups": 301,
+        "cancelRecover": 9,
+        "cancelTime": 2,
+        "dataEnd": 0,
+        "ambiguous": 3,
+        "fillRate": 0.9635,
+        "trades": 290,
+        "winRate": 0.2172,
+        "avgRetPct": -0.2771,
+        "medianRetPct": -0.5756,
+        "pf": 0.4982,
+        "maxConsecLosses": 19,
+        "feeStress": {
+          "trades": 290,
+          "winRate": 0.2172,
+          "avgRetPct": -0.3771,
+          "medianRetPct": -0.6756,
+          "pf": 0.4019,
+          "maxConsecLosses": 19
+        }
+      },
+      "baseline": {
+        "setups": 8688,
+        "cancelTime": 187,
+        "dataEnd": 46,
+        "ambiguous": 83,
+        "fillRate": 0.9732,
+        "trades": 8455,
+        "winRate": 0.2274,
+        "avgRetPct": -0.2274,
+        "medianRetPct": -0.5821,
+        "pf": 0.5928,
+        "maxConsecLosses": 120,
+        "feeStress": {
+          "trades": 8455,
+          "winRate": 0.2254,
+          "avgRetPct": -0.3274,
+          "medianRetPct": -0.6821,
+          "pf": 0.485,
+          "maxConsecLosses": 120
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": -0.9335,
+        "pApprox": 0.3506,
+        "n1": 290,
+        "n2": 8455
+      }
+    },
+    {
+      "M": 6,
+      "buffer": 0.001,
+      "segment": "IS",
+      "group": "insample",
+      "squeeze": {
+        "setups": 310,
+        "cancelRecover": 12,
+        "cancelTime": 4,
+        "dataEnd": 0,
+        "ambiguous": 2,
+        "fillRate": 0.9484,
+        "trades": 294,
+        "winRate": 0.2551,
+        "avgRetPct": -0.1605,
+        "medianRetPct": -0.5417,
+        "pf": 0.7228,
+        "maxConsecLosses": 21,
+        "feeStress": {
+          "trades": 294,
+          "winRate": 0.2517,
+          "avgRetPct": -0.2605,
+          "medianRetPct": -0.6417,
+          "pf": 0.6014,
+          "maxConsecLosses": 21
+        }
+      },
+      "baseline": {
+        "setups": 17520,
+        "cancelTime": 634,
+        "dataEnd": 0,
+        "ambiguous": 151,
+        "fillRate": 0.9638,
+        "trades": 16886,
+        "winRate": 0.2397,
+        "avgRetPct": -0.2462,
+        "medianRetPct": -0.6076,
+        "pf": 0.6132,
+        "maxConsecLosses": 130,
+        "feeStress": {
+          "trades": 16886,
+          "winRate": 0.2372,
+          "avgRetPct": -0.3462,
+          "medianRetPct": -0.7076,
+          "pf": 0.5142,
+          "maxConsecLosses": 130
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": 1.1943,
+        "pApprox": 0.2324,
+        "n1": 294,
+        "n2": 16886
+      }
+    },
+    {
+      "M": 6,
+      "buffer": 0.001,
+      "segment": "OOS",
+      "group": "insample",
+      "squeeze": {
+        "setups": 160,
+        "cancelRecover": 8,
+        "cancelTime": 3,
+        "dataEnd": 0,
+        "ambiguous": 3,
+        "fillRate": 0.9313,
+        "trades": 149,
+        "winRate": 0.2617,
+        "avgRetPct": -0.1595,
+        "medianRetPct": -0.5401,
+        "pf": 0.6898,
+        "maxConsecLosses": 13,
+        "feeStress": {
+          "trades": 149,
+          "winRate": 0.2617,
+          "avgRetPct": -0.2595,
+          "medianRetPct": -0.6401,
+          "pf": 0.5587,
+          "maxConsecLosses": 13
+        }
+      },
+      "baseline": {
+        "setups": 8688,
+        "cancelTime": 278,
+        "dataEnd": 44,
+        "ambiguous": 97,
+        "fillRate": 0.9629,
+        "trades": 8366,
+        "winRate": 0.2386,
+        "avgRetPct": -0.2137,
+        "medianRetPct": -0.5818,
+        "pf": 0.6127,
+        "maxConsecLosses": 123,
+        "feeStress": {
+          "trades": 8366,
+          "winRate": 0.2363,
+          "avgRetPct": -0.3137,
+          "medianRetPct": -0.6818,
+          "pf": 0.5005,
+          "maxConsecLosses": 123
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": 0.6541,
+        "pApprox": 0.5131,
+        "n1": 149,
+        "n2": 8366
+      }
+    },
+    {
+      "M": 6,
+      "buffer": 0.0025,
+      "segment": "IS",
+      "group": "insample",
+      "squeeze": {
+        "setups": 310,
+        "cancelRecover": 26,
+        "cancelTime": 8,
+        "dataEnd": 0,
+        "ambiguous": 1,
+        "fillRate": 0.8903,
+        "trades": 276,
+        "winRate": 0.2572,
+        "avgRetPct": -0.1731,
+        "medianRetPct": -0.5769,
+        "pf": 0.7067,
+        "maxConsecLosses": 19,
+        "feeStress": {
+          "trades": 276,
+          "winRate": 0.2536,
+          "avgRetPct": -0.2731,
+          "medianRetPct": -0.6769,
+          "pf": 0.5892,
+          "maxConsecLosses": 19
+        }
+      },
+      "baseline": {
+        "setups": 17520,
+        "cancelTime": 974,
+        "dataEnd": 0,
+        "ambiguous": 119,
+        "fillRate": 0.9444,
+        "trades": 16546,
+        "winRate": 0.1965,
+        "avgRetPct": -0.3403,
+        "medianRetPct": -0.6377,
+        "pf": 0.4925,
+        "maxConsecLosses": 173,
+        "feeStress": {
+          "trades": 16546,
+          "winRate": 0.1949,
+          "avgRetPct": -0.4403,
+          "medianRetPct": -0.7377,
+          "pf": 0.4137,
+          "maxConsecLosses": 173
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": 2.2492,
+        "pApprox": 0.0245,
+        "n1": 276,
+        "n2": 16546
+      }
+    },
+    {
+      "M": 6,
+      "buffer": 0.0025,
+      "segment": "OOS",
+      "group": "insample",
+      "squeeze": {
+        "setups": 160,
+        "cancelRecover": 11,
+        "cancelTime": 4,
+        "dataEnd": 0,
+        "ambiguous": 1,
+        "fillRate": 0.9063,
+        "trades": 145,
+        "winRate": 0.2,
+        "avgRetPct": -0.2799,
+        "medianRetPct": -0.583,
+        "pf": 0.5026,
+        "maxConsecLosses": 18,
+        "feeStress": {
+          "trades": 145,
+          "winRate": 0.2,
+          "avgRetPct": -0.3799,
+          "medianRetPct": -0.683,
+          "pf": 0.4089,
+          "maxConsecLosses": 18
+        }
+      },
+      "baseline": {
+        "setups": 8688,
+        "cancelTime": 445,
+        "dataEnd": 46,
+        "ambiguous": 41,
+        "fillRate": 0.9435,
+        "trades": 8197,
+        "winRate": 0.191,
+        "avgRetPct": -0.2933,
+        "medianRetPct": -0.6018,
+        "pf": 0.494,
+        "maxConsecLosses": 138,
+        "feeStress": {
+          "trades": 8197,
+          "winRate": 0.1895,
+          "avgRetPct": -0.3933,
+          "medianRetPct": -0.7018,
+          "pf": 0.4047,
+          "maxConsecLosses": 138
+        }
+      },
+      "squeezeVsBaseline": {
+        "t": 0.1697,
+        "pApprox": 0.8652,
+        "n1": 145,
+        "n2": 8197
+      }
+    }
+  ],
+  "perSymbol": [
+    {
+      "symbol": "BTCUSDT",
+      "M": 3,
+      "buffer": 0.001,
+      "IS": {
+        "squeeze": {
+          "setups": 271,
+          "cancelRecover": 5,
+          "cancelTime": 2,
+          "dataEnd": 0,
+          "ambiguous": 7,
+          "invalid": 0,
+          "trades": 264,
+          "winRate": 0.2803,
+          "avgRetPct": -0.1098,
+          "medianRetPct": -0.4384,
+          "pf": 0.7439,
+          "maxConsecLosses": 19
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 160,
+          "dataEnd": 0,
+          "ambiguous": 156,
+          "trades": 8600,
+          "winRate": 0.2651,
+          "avgRetPct": -0.1247,
+          "medianRetPct": -0.4587,
+          "pf": 0.7221,
+          "maxConsecLosses": 65
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 152,
+          "cancelRecover": 4,
+          "cancelTime": 0,
+          "dataEnd": 0,
+          "ambiguous": 2,
+          "invalid": 0,
+          "trades": 148,
+          "winRate": 0.3176,
+          "avgRetPct": -0.0518,
+          "medianRetPct": -0.4534,
+          "pf": 0.8737,
+          "maxConsecLosses": 11
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 37,
+          "dataEnd": 22,
+          "ambiguous": 60,
+          "trades": 4285,
+          "winRate": 0.2761,
+          "avgRetPct": -0.1126,
+          "medianRetPct": -0.4923,
+          "pf": 0.7512,
+          "maxConsecLosses": 98
+        }
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "M": 3,
+      "buffer": 0.0025,
+      "IS": {
+        "squeeze": {
+          "setups": 271,
+          "cancelRecover": 20,
+          "cancelTime": 5,
+          "dataEnd": 0,
+          "ambiguous": 4,
+          "invalid": 0,
+          "trades": 246,
+          "winRate": 0.2195,
+          "avgRetPct": -0.1874,
+          "medianRetPct": -0.4638,
+          "pf": 0.5953,
+          "maxConsecLosses": 14
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 325,
+          "dataEnd": 0,
+          "ambiguous": 89,
+          "trades": 8435,
+          "winRate": 0.2277,
+          "avgRetPct": -0.1867,
+          "medianRetPct": -0.4805,
+          "pf": 0.6034,
+          "maxConsecLosses": 90
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 152,
+          "cancelRecover": 7,
+          "cancelTime": 0,
+          "dataEnd": 0,
+          "ambiguous": 1,
+          "invalid": 0,
+          "trades": 145,
+          "winRate": 0.2138,
+          "avgRetPct": -0.2446,
+          "medianRetPct": -0.5043,
+          "pf": 0.4942,
+          "maxConsecLosses": 18
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 83,
+          "dataEnd": 24,
+          "ambiguous": 34,
+          "trades": 4237,
+          "winRate": 0.2263,
+          "avgRetPct": -0.1971,
+          "medianRetPct": -0.5092,
+          "pf": 0.5901,
+          "maxConsecLosses": 93
+        }
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "M": 6,
+      "buffer": 0.001,
+      "IS": {
+        "squeeze": {
+          "setups": 156,
+          "cancelRecover": 9,
+          "cancelTime": 3,
+          "dataEnd": 0,
+          "ambiguous": 2,
+          "invalid": 0,
+          "trades": 144,
+          "winRate": 0.2569,
+          "avgRetPct": -0.0948,
+          "medianRetPct": -0.425,
+          "pf": 0.7679,
+          "maxConsecLosses": 21
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 407,
+          "dataEnd": 0,
+          "ambiguous": 81,
+          "trades": 8353,
+          "winRate": 0.2338,
+          "avgRetPct": -0.185,
+          "medianRetPct": -0.477,
+          "pf": 0.6043,
+          "maxConsecLosses": 95
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 80,
+          "cancelRecover": 6,
+          "cancelTime": 1,
+          "dataEnd": 0,
+          "ambiguous": 1,
+          "invalid": 0,
+          "trades": 73,
+          "winRate": 0.2877,
+          "avgRetPct": -0.1053,
+          "medianRetPct": -0.4684,
+          "pf": 0.7579,
+          "maxConsecLosses": 9
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 110,
+          "dataEnd": 20,
+          "ambiguous": 52,
+          "trades": 4214,
+          "winRate": 0.2468,
+          "avgRetPct": -0.1637,
+          "medianRetPct": -0.5051,
+          "pf": 0.6504,
+          "maxConsecLosses": 92
+        }
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "M": 6,
+      "buffer": 0.0025,
+      "IS": {
+        "squeeze": {
+          "setups": 156,
+          "cancelRecover": 23,
+          "cancelTime": 6,
+          "dataEnd": 0,
+          "ambiguous": 1,
+          "invalid": 0,
+          "trades": 127,
+          "winRate": 0.2677,
+          "avgRetPct": -0.1025,
+          "medianRetPct": -0.4395,
+          "pf": 0.7536,
+          "maxConsecLosses": 12
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 654,
+          "dataEnd": 0,
+          "ambiguous": 50,
+          "trades": 8106,
+          "winRate": 0.1917,
+          "avgRetPct": -0.2565,
+          "medianRetPct": -0.4936,
+          "pf": 0.4786,
+          "maxConsecLosses": 94
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 80,
+          "cancelRecover": 8,
+          "cancelTime": 2,
+          "dataEnd": 0,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 70,
+          "winRate": 0.1714,
+          "avgRetPct": -0.33,
+          "medianRetPct": -0.4985,
+          "pf": 0.369,
+          "maxConsecLosses": 19
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 211,
+          "dataEnd": 24,
+          "ambiguous": 19,
+          "trades": 4109,
+          "winRate": 0.1913,
+          "avgRetPct": -0.2517,
+          "medianRetPct": -0.5186,
+          "pf": 0.4952,
+          "maxConsecLosses": 130
+        }
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "M": 3,
+      "buffer": 0.001,
+      "IS": {
+        "squeeze": {
+          "setups": 304,
+          "cancelRecover": 4,
+          "cancelTime": 1,
+          "dataEnd": 0,
+          "ambiguous": 10,
+          "invalid": 0,
+          "trades": 299,
+          "winRate": 0.3211,
+          "avgRetPct": -0.0514,
+          "medianRetPct": -0.8073,
+          "pf": 0.9273,
+          "maxConsecLosses": 14
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 73,
+          "dataEnd": 0,
+          "ambiguous": 150,
+          "trades": 8687,
+          "winRate": 0.2914,
+          "avgRetPct": -0.161,
+          "medianRetPct": -0.8184,
+          "pf": 0.7859,
+          "maxConsecLosses": 56
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 149,
+          "cancelRecover": 0,
+          "cancelTime": 1,
+          "dataEnd": 1,
+          "ambiguous": 3,
+          "invalid": 0,
+          "trades": 147,
+          "winRate": 0.2517,
+          "avgRetPct": -0.2509,
+          "medianRetPct": -0.6278,
+          "pf": 0.5794,
+          "maxConsecLosses": 14
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 64,
+          "dataEnd": 24,
+          "ambiguous": 80,
+          "trades": 4256,
+          "winRate": 0.2688,
+          "avgRetPct": -0.1772,
+          "medianRetPct": -0.6634,
+          "pf": 0.7085,
+          "maxConsecLosses": 61
+        }
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "M": 3,
+      "buffer": 0.0025,
+      "IS": {
+        "squeeze": {
+          "setups": 304,
+          "cancelRecover": 6,
+          "cancelTime": 2,
+          "dataEnd": 0,
+          "ambiguous": 8,
+          "invalid": 0,
+          "trades": 296,
+          "winRate": 0.2736,
+          "avgRetPct": -0.1295,
+          "medianRetPct": -0.8022,
+          "pf": 0.8233,
+          "maxConsecLosses": 18
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 119,
+          "dataEnd": 0,
+          "ambiguous": 112,
+          "trades": 8641,
+          "winRate": 0.2493,
+          "avgRetPct": -0.2677,
+          "medianRetPct": -0.8379,
+          "pf": 0.6603,
+          "maxConsecLosses": 111
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 149,
+          "cancelRecover": 2,
+          "cancelTime": 2,
+          "dataEnd": 0,
+          "ambiguous": 2,
+          "invalid": 0,
+          "trades": 145,
+          "winRate": 0.2207,
+          "avgRetPct": -0.3096,
+          "medianRetPct": -0.6422,
+          "pf": 0.5013,
+          "maxConsecLosses": 14
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 104,
+          "dataEnd": 22,
+          "ambiguous": 49,
+          "trades": 4218,
+          "winRate": 0.2285,
+          "avgRetPct": -0.2577,
+          "medianRetPct": -0.6801,
+          "pf": 0.5948,
+          "maxConsecLosses": 73
+        }
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "M": 6,
+      "buffer": 0.001,
+      "IS": {
+        "squeeze": {
+          "setups": 154,
+          "cancelRecover": 3,
+          "cancelTime": 1,
+          "dataEnd": 0,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 150,
+          "winRate": 0.2533,
+          "avgRetPct": -0.2235,
+          "medianRetPct": -0.8152,
+          "pf": 0.699,
+          "maxConsecLosses": 12
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 227,
+          "dataEnd": 0,
+          "ambiguous": 70,
+          "trades": 8533,
+          "winRate": 0.2454,
+          "avgRetPct": -0.3061,
+          "medianRetPct": -0.8511,
+          "pf": 0.6183,
+          "maxConsecLosses": 82
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 80,
+          "cancelRecover": 2,
+          "cancelTime": 2,
+          "dataEnd": 0,
+          "ambiguous": 2,
+          "invalid": 0,
+          "trades": 76,
+          "winRate": 0.2368,
+          "avgRetPct": -0.2115,
+          "medianRetPct": -0.622,
+          "pf": 0.6416,
+          "maxConsecLosses": 8
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 168,
+          "dataEnd": 24,
+          "ambiguous": 45,
+          "trades": 4152,
+          "winRate": 0.2303,
+          "avgRetPct": -0.2645,
+          "medianRetPct": -0.6831,
+          "pf": 0.5845,
+          "maxConsecLosses": 69
+        }
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "M": 6,
+      "buffer": 0.0025,
+      "IS": {
+        "squeeze": {
+          "setups": 154,
+          "cancelRecover": 3,
+          "cancelTime": 2,
+          "dataEnd": 0,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 149,
+          "winRate": 0.2483,
+          "avgRetPct": -0.2334,
+          "medianRetPct": -0.8106,
+          "pf": 0.6842,
+          "maxConsecLosses": 12
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 320,
+          "dataEnd": 0,
+          "ambiguous": 69,
+          "trades": 8440,
+          "winRate": 0.2012,
+          "avgRetPct": -0.4208,
+          "medianRetPct": -0.8706,
+          "pf": 0.5002,
+          "maxConsecLosses": 128
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 80,
+          "cancelRecover": 3,
+          "cancelTime": 2,
+          "dataEnd": 0,
+          "ambiguous": 1,
+          "invalid": 0,
+          "trades": 75,
+          "winRate": 0.2267,
+          "avgRetPct": -0.2332,
+          "medianRetPct": -0.6243,
+          "pf": 0.6113,
+          "maxConsecLosses": 14
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 234,
+          "dataEnd": 22,
+          "ambiguous": 22,
+          "trades": 4088,
+          "winRate": 0.1908,
+          "avgRetPct": -0.3352,
+          "medianRetPct": -0.6997,
+          "pf": 0.4931,
+          "maxConsecLosses": 115
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "M": 3,
+      "buffer": 0.001,
+      "IS": {
+        "squeeze": {
+          "setups": 283,
+          "cancelRecover": 2,
+          "cancelTime": 0,
+          "dataEnd": 0,
+          "ambiguous": 3,
+          "invalid": 0,
+          "trades": 281,
+          "winRate": 0.2705,
+          "avgRetPct": -0.2596,
+          "medianRetPct": -0.9733,
+          "pf": 0.7054,
+          "maxConsecLosses": 16
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 68,
+          "dataEnd": 0,
+          "ambiguous": 136,
+          "trades": 8692,
+          "winRate": 0.2845,
+          "avgRetPct": -0.1949,
+          "medianRetPct": -0.9629,
+          "pf": 0.7745,
+          "maxConsecLosses": 60
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 143,
+          "cancelRecover": 1,
+          "cancelTime": 0,
+          "dataEnd": 1,
+          "ambiguous": 3,
+          "invalid": 0,
+          "trades": 141,
+          "winRate": 0.3404,
+          "avgRetPct": 0.0402,
+          "medianRetPct": -0.6359,
+          "pf": 1.0713,
+          "maxConsecLosses": 9
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 30,
+          "dataEnd": 24,
+          "ambiguous": 81,
+          "trades": 4290,
+          "winRate": 0.2862,
+          "avgRetPct": -0.1335,
+          "medianRetPct": -0.7226,
+          "pf": 0.797,
+          "maxConsecLosses": 54
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "M": 3,
+      "buffer": 0.0025,
+      "IS": {
+        "squeeze": {
+          "setups": 283,
+          "cancelRecover": 4,
+          "cancelTime": 0,
+          "dataEnd": 0,
+          "ambiguous": 2,
+          "invalid": 0,
+          "trades": 279,
+          "winRate": 0.2366,
+          "avgRetPct": -0.3918,
+          "medianRetPct": -1.0046,
+          "pf": 0.5773,
+          "maxConsecLosses": 17
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 85,
+          "dataEnd": 0,
+          "ambiguous": 95,
+          "trades": 8675,
+          "winRate": 0.2527,
+          "avgRetPct": -0.3008,
+          "medianRetPct": -0.9832,
+          "pf": 0.6661,
+          "maxConsecLosses": 64
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 143,
+          "cancelRecover": 1,
+          "cancelTime": 1,
+          "dataEnd": 1,
+          "ambiguous": 3,
+          "invalid": 0,
+          "trades": 140,
+          "winRate": 0.2929,
+          "avgRetPct": -0.1219,
+          "medianRetPct": -0.6513,
+          "pf": 0.8002,
+          "maxConsecLosses": 9
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 49,
+          "dataEnd": 21,
+          "ambiguous": 55,
+          "trades": 4274,
+          "winRate": 0.2438,
+          "avgRetPct": -0.24,
+          "medianRetPct": -0.7468,
+          "pf": 0.6542,
+          "maxConsecLosses": 72
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "M": 6,
+      "buffer": 0.001,
+      "IS": {
+        "squeeze": {
+          "setups": 159,
+          "cancelRecover": 2,
+          "cancelTime": 2,
+          "dataEnd": 0,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 155,
+          "winRate": 0.2452,
+          "avgRetPct": -0.3552,
+          "medianRetPct": -1.0022,
+          "pf": 0.6014,
+          "maxConsecLosses": 19
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 212,
+          "dataEnd": 0,
+          "ambiguous": 53,
+          "trades": 8548,
+          "winRate": 0.2391,
+          "avgRetPct": -0.3449,
+          "medianRetPct": -0.9899,
+          "pf": 0.6223,
+          "maxConsecLosses": 65
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 81,
+          "cancelRecover": 3,
+          "cancelTime": 0,
+          "dataEnd": 0,
+          "ambiguous": 3,
+          "invalid": 0,
+          "trades": 78,
+          "winRate": 0.3077,
+          "avgRetPct": -0.0373,
+          "medianRetPct": -0.6355,
+          "pf": 0.934,
+          "maxConsecLosses": 9
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 93,
+          "dataEnd": 25,
+          "ambiguous": 52,
+          "trades": 4226,
+          "winRate": 0.2563,
+          "avgRetPct": -0.1976,
+          "medianRetPct": -0.7369,
+          "pf": 0.709,
+          "maxConsecLosses": 95
+        }
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "M": 6,
+      "buffer": 0.0025,
+      "IS": {
+        "squeeze": {
+          "setups": 159,
+          "cancelRecover": 3,
+          "cancelTime": 2,
+          "dataEnd": 0,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 154,
+          "winRate": 0.2338,
+          "avgRetPct": -0.4088,
+          "medianRetPct": -1.0118,
+          "pf": 0.5503,
+          "maxConsecLosses": 15
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 261,
+          "dataEnd": 0,
+          "ambiguous": 28,
+          "trades": 8499,
+          "winRate": 0.212,
+          "avgRetPct": -0.4391,
+          "medianRetPct": -1.0082,
+          "pf": 0.5357,
+          "maxConsecLosses": 87
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 81,
+          "cancelRecover": 5,
+          "cancelTime": 0,
+          "dataEnd": 0,
+          "ambiguous": 3,
+          "invalid": 0,
+          "trades": 76,
+          "winRate": 0.1711,
+          "avgRetPct": -0.3708,
+          "medianRetPct": -0.7134,
+          "pf": 0.4537,
+          "maxConsecLosses": 10
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 139,
+          "dataEnd": 17,
+          "ambiguous": 40,
+          "trades": 4188,
+          "winRate": 0.2139,
+          "avgRetPct": -0.3103,
+          "medianRetPct": -0.7593,
+          "pf": 0.5671,
+          "maxConsecLosses": 106
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "M": 3,
+      "buffer": 0.001,
+      "IS": {
+        "squeeze": {
+          "setups": 310,
+          "cancelRecover": 2,
+          "cancelTime": 2,
+          "dataEnd": 0,
+          "ambiguous": 5,
+          "invalid": 0,
+          "trades": 306,
+          "winRate": 0.3235,
+          "avgRetPct": -0.0699,
+          "medianRetPct": -0.777,
+          "pf": 0.9065,
+          "maxConsecLosses": 11
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 81,
+          "dataEnd": 0,
+          "ambiguous": 99,
+          "trades": 8679,
+          "winRate": 0.299,
+          "avgRetPct": -0.1551,
+          "medianRetPct": -0.8111,
+          "pf": 0.8033,
+          "maxConsecLosses": 70
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 149,
+          "cancelRecover": 0,
+          "cancelTime": 0,
+          "dataEnd": 1,
+          "ambiguous": 3,
+          "invalid": 0,
+          "trades": 148,
+          "winRate": 0.2838,
+          "avgRetPct": -0.1505,
+          "medianRetPct": -0.6038,
+          "pf": 0.7297,
+          "maxConsecLosses": 14
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 33,
+          "dataEnd": 15,
+          "ambiguous": 45,
+          "trades": 4296,
+          "winRate": 0.2868,
+          "avgRetPct": -0.1004,
+          "medianRetPct": -0.609,
+          "pf": 0.8211,
+          "maxConsecLosses": 69
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "M": 3,
+      "buffer": 0.0025,
+      "IS": {
+        "squeeze": {
+          "setups": 310,
+          "cancelRecover": 5,
+          "cancelTime": 3,
+          "dataEnd": 0,
+          "ambiguous": 4,
+          "invalid": 0,
+          "trades": 302,
+          "winRate": 0.2748,
+          "avgRetPct": -0.1973,
+          "medianRetPct": -0.8082,
+          "pf": 0.7494,
+          "maxConsecLosses": 13
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 123,
+          "dataEnd": 0,
+          "ambiguous": 51,
+          "trades": 8637,
+          "winRate": 0.2673,
+          "avgRetPct": -0.2464,
+          "medianRetPct": -0.836,
+          "pf": 0.6997,
+          "maxConsecLosses": 73
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 149,
+          "cancelRecover": 3,
+          "cancelTime": 0,
+          "dataEnd": 1,
+          "ambiguous": 2,
+          "invalid": 0,
+          "trades": 145,
+          "winRate": 0.2552,
+          "avgRetPct": -0.1913,
+          "medianRetPct": -0.6185,
+          "pf": 0.6684,
+          "maxConsecLosses": 10
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 50,
+          "dataEnd": 13,
+          "ambiguous": 28,
+          "trades": 4281,
+          "winRate": 0.2464,
+          "avgRetPct": -0.1804,
+          "medianRetPct": -0.6288,
+          "pf": 0.694,
+          "maxConsecLosses": 93
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "M": 6,
+      "buffer": 0.001,
+      "IS": {
+        "squeeze": {
+          "setups": 175,
+          "cancelRecover": 2,
+          "cancelTime": 3,
+          "dataEnd": 0,
+          "ambiguous": 2,
+          "invalid": 0,
+          "trades": 170,
+          "winRate": 0.2412,
+          "avgRetPct": -0.3597,
+          "medianRetPct": -0.8254,
+          "pf": 0.5687,
+          "maxConsecLosses": 15
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 274,
+          "dataEnd": 0,
+          "ambiguous": 38,
+          "trades": 8486,
+          "winRate": 0.2679,
+          "avgRetPct": -0.245,
+          "medianRetPct": -0.8337,
+          "pf": 0.7002,
+          "maxConsecLosses": 91
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 78,
+          "cancelRecover": 3,
+          "cancelTime": 1,
+          "dataEnd": 0,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 74,
+          "winRate": 0.2568,
+          "avgRetPct": -0.1828,
+          "medianRetPct": -0.6112,
+          "pf": 0.6842,
+          "maxConsecLosses": 7
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 109,
+          "dataEnd": 10,
+          "ambiguous": 22,
+          "trades": 4225,
+          "winRate": 0.253,
+          "avgRetPct": -0.171,
+          "medianRetPct": -0.6307,
+          "pf": 0.7081,
+          "maxConsecLosses": 94
+        }
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "M": 6,
+      "buffer": 0.0025,
+      "IS": {
+        "squeeze": {
+          "setups": 175,
+          "cancelRecover": 5,
+          "cancelTime": 3,
+          "dataEnd": 0,
+          "ambiguous": 1,
+          "invalid": 0,
+          "trades": 167,
+          "winRate": 0.2395,
+          "avgRetPct": -0.362,
+          "medianRetPct": -0.8372,
+          "pf": 0.5647,
+          "maxConsecLosses": 8
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 366,
+          "dataEnd": 0,
+          "ambiguous": 20,
+          "trades": 8394,
+          "winRate": 0.2411,
+          "avgRetPct": -0.3249,
+          "medianRetPct": -0.8538,
+          "pf": 0.6161,
+          "maxConsecLosses": 154
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 78,
+          "cancelRecover": 7,
+          "cancelTime": 2,
+          "dataEnd": 0,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 69,
+          "winRate": 0.2174,
+          "avgRetPct": -0.3064,
+          "medianRetPct": -0.6285,
+          "pf": 0.5013,
+          "maxConsecLosses": 9
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 146,
+          "dataEnd": 10,
+          "ambiguous": 12,
+          "trades": 4188,
+          "winRate": 0.2092,
+          "avgRetPct": -0.2784,
+          "medianRetPct": -0.6484,
+          "pf": 0.5527,
+          "maxConsecLosses": 144
+        }
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "M": 3,
+      "buffer": 0.001,
+      "IS": {
+        "squeeze": {
+          "setups": 295,
+          "cancelRecover": 5,
+          "cancelTime": 0,
+          "dataEnd": 0,
+          "ambiguous": 8,
+          "invalid": 0,
+          "trades": 290,
+          "winRate": 0.2828,
+          "avgRetPct": -0.1073,
+          "medianRetPct": -0.5012,
+          "pf": 0.7965,
+          "maxConsecLosses": 10
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 64,
+          "dataEnd": 0,
+          "ambiguous": 75,
+          "trades": 8696,
+          "winRate": 0.3021,
+          "avgRetPct": -0.0874,
+          "medianRetPct": -0.5146,
+          "pf": 0.8367,
+          "maxConsecLosses": 68
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 148,
+          "cancelRecover": 6,
+          "cancelTime": 0,
+          "dataEnd": 1,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 141,
+          "winRate": 0.2482,
+          "avgRetPct": -0.154,
+          "medianRetPct": -0.4895,
+          "pf": 0.6551,
+          "maxConsecLosses": 10
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 37,
+          "dataEnd": 18,
+          "ambiguous": 47,
+          "trades": 4289,
+          "winRate": 0.2763,
+          "avgRetPct": -0.1027,
+          "medianRetPct": -0.4751,
+          "pf": 0.7662,
+          "maxConsecLosses": 74
+        }
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "M": 3,
+      "buffer": 0.0025,
+      "IS": {
+        "squeeze": {
+          "setups": 295,
+          "cancelRecover": 12,
+          "cancelTime": 0,
+          "dataEnd": 0,
+          "ambiguous": 3,
+          "invalid": 0,
+          "trades": 283,
+          "winRate": 0.258,
+          "avgRetPct": -0.1545,
+          "medianRetPct": -0.5224,
+          "pf": 0.7208,
+          "maxConsecLosses": 17
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 143,
+          "dataEnd": 0,
+          "ambiguous": 32,
+          "trades": 8617,
+          "winRate": 0.2615,
+          "avgRetPct": -0.1707,
+          "medianRetPct": -0.5345,
+          "pf": 0.6973,
+          "maxConsecLosses": 83
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 148,
+          "cancelRecover": 8,
+          "cancelTime": 0,
+          "dataEnd": 1,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 139,
+          "winRate": 0.1942,
+          "avgRetPct": -0.2272,
+          "medianRetPct": -0.4928,
+          "pf": 0.52,
+          "maxConsecLosses": 14
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 74,
+          "dataEnd": 16,
+          "ambiguous": 31,
+          "trades": 4254,
+          "winRate": 0.2372,
+          "avgRetPct": -0.1627,
+          "medianRetPct": -0.4845,
+          "pf": 0.6465,
+          "maxConsecLosses": 85
+        }
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "M": 6,
+      "buffer": 0.001,
+      "IS": {
+        "squeeze": {
+          "setups": 171,
+          "cancelRecover": 6,
+          "cancelTime": 0,
+          "dataEnd": 0,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 165,
+          "winRate": 0.303,
+          "avgRetPct": -0.0918,
+          "medianRetPct": -0.4721,
+          "pf": 0.8204,
+          "maxConsecLosses": 11
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 252,
+          "dataEnd": 0,
+          "ambiguous": 27,
+          "trades": 8508,
+          "winRate": 0.2754,
+          "avgRetPct": -0.1539,
+          "medianRetPct": -0.5302,
+          "pf": 0.7226,
+          "maxConsecLosses": 84
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 82,
+          "cancelRecover": 2,
+          "cancelTime": 1,
+          "dataEnd": 0,
+          "ambiguous": 1,
+          "invalid": 0,
+          "trades": 79,
+          "winRate": 0.2532,
+          "avgRetPct": -0.0571,
+          "medianRetPct": -0.4546,
+          "pf": 0.8625,
+          "maxConsecLosses": 7
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 118,
+          "dataEnd": 20,
+          "ambiguous": 26,
+          "trades": 4206,
+          "winRate": 0.2444,
+          "avgRetPct": -0.1548,
+          "medianRetPct": -0.4852,
+          "pf": 0.6613,
+          "maxConsecLosses": 91
+        }
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "M": 6,
+      "buffer": 0.0025,
+      "IS": {
+        "squeeze": {
+          "setups": 171,
+          "cancelRecover": 17,
+          "cancelTime": 1,
+          "dataEnd": 0,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 153,
+          "winRate": 0.281,
+          "avgRetPct": -0.0972,
+          "medianRetPct": -0.5101,
+          "pf": 0.8159,
+          "maxConsecLosses": 17
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 414,
+          "dataEnd": 0,
+          "ambiguous": 12,
+          "trades": 8346,
+          "winRate": 0.2376,
+          "avgRetPct": -0.2307,
+          "medianRetPct": -0.5492,
+          "pf": 0.6046,
+          "maxConsecLosses": 108
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 82,
+          "cancelRecover": 3,
+          "cancelTime": 2,
+          "dataEnd": 0,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 77,
+          "winRate": 0.2078,
+          "avgRetPct": -0.156,
+          "medianRetPct": -0.4884,
+          "pf": 0.6582,
+          "maxConsecLosses": 11
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 211,
+          "dataEnd": 16,
+          "ambiguous": 7,
+          "trades": 4117,
+          "winRate": 0.2094,
+          "avgRetPct": -0.2095,
+          "medianRetPct": -0.4957,
+          "pf": 0.5604,
+          "maxConsecLosses": 111
+        }
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "M": 3,
+      "buffer": 0.001,
+      "IS": {
+        "squeeze": {
+          "setups": 294,
+          "cancelRecover": 3,
+          "cancelTime": 0,
+          "dataEnd": 0,
+          "ambiguous": 5,
+          "invalid": 0,
+          "trades": 291,
+          "winRate": 0.3024,
+          "avgRetPct": -0.1282,
+          "medianRetPct": -1.0092,
+          "pf": 0.8583,
+          "maxConsecLosses": 13
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 52,
+          "dataEnd": 0,
+          "ambiguous": 120,
+          "trades": 8708,
+          "winRate": 0.3141,
+          "avgRetPct": -0.1281,
+          "medianRetPct": -1.0321,
+          "pf": 0.8595,
+          "maxConsecLosses": 59
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 155,
+          "cancelRecover": 0,
+          "cancelTime": 1,
+          "dataEnd": 1,
+          "ambiguous": 3,
+          "invalid": 0,
+          "trades": 153,
+          "winRate": 0.281,
+          "avgRetPct": -0.1319,
+          "medianRetPct": -0.7197,
+          "pf": 0.7973,
+          "maxConsecLosses": 8
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 42,
+          "dataEnd": 23,
+          "ambiguous": 51,
+          "trades": 4279,
+          "winRate": 0.2762,
+          "avgRetPct": -0.1604,
+          "medianRetPct": -0.7569,
+          "pf": 0.7596,
+          "maxConsecLosses": 76
+        }
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "M": 3,
+      "buffer": 0.0025,
+      "IS": {
+        "squeeze": {
+          "setups": 294,
+          "cancelRecover": 8,
+          "cancelTime": 1,
+          "dataEnd": 0,
+          "ambiguous": 1,
+          "invalid": 0,
+          "trades": 285,
+          "winRate": 0.2772,
+          "avgRetPct": -0.1927,
+          "medianRetPct": -1.0338,
+          "pf": 0.7931,
+          "maxConsecLosses": 15
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 80,
+          "dataEnd": 0,
+          "ambiguous": 69,
+          "trades": 8680,
+          "winRate": 0.2838,
+          "avgRetPct": -0.226,
+          "medianRetPct": -1.0509,
+          "pf": 0.7606,
+          "maxConsecLosses": 71
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 155,
+          "cancelRecover": 3,
+          "cancelTime": 2,
+          "dataEnd": 1,
+          "ambiguous": 2,
+          "invalid": 0,
+          "trades": 149,
+          "winRate": 0.2685,
+          "avgRetPct": -0.1706,
+          "medianRetPct": -0.7515,
+          "pf": 0.7433,
+          "maxConsecLosses": 21
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 68,
+          "dataEnd": 28,
+          "ambiguous": 18,
+          "trades": 4248,
+          "winRate": 0.2347,
+          "avgRetPct": -0.2579,
+          "medianRetPct": -0.7695,
+          "pf": 0.6311,
+          "maxConsecLosses": 75
+        }
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "M": 6,
+      "buffer": 0.001,
+      "IS": {
+        "squeeze": {
+          "setups": 170,
+          "cancelRecover": 6,
+          "cancelTime": 1,
+          "dataEnd": 0,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 163,
+          "winRate": 0.2883,
+          "avgRetPct": -0.2368,
+          "medianRetPct": -1.0529,
+          "pf": 0.7462,
+          "maxConsecLosses": 14
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 209,
+          "dataEnd": 0,
+          "ambiguous": 50,
+          "trades": 8551,
+          "winRate": 0.2772,
+          "avgRetPct": -0.264,
+          "medianRetPct": -1.063,
+          "pf": 0.7241,
+          "maxConsecLosses": 72
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 79,
+          "cancelRecover": 1,
+          "cancelTime": 0,
+          "dataEnd": 1,
+          "ambiguous": 1,
+          "invalid": 0,
+          "trades": 77,
+          "winRate": 0.2078,
+          "avgRetPct": -0.2805,
+          "medianRetPct": -0.7255,
+          "pf": 0.5834,
+          "maxConsecLosses": 8
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 115,
+          "dataEnd": 30,
+          "ambiguous": 19,
+          "trades": 4199,
+          "winRate": 0.2508,
+          "avgRetPct": -0.2209,
+          "medianRetPct": -0.7651,
+          "pf": 0.6774,
+          "maxConsecLosses": 96
+        }
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "M": 6,
+      "buffer": 0.0025,
+      "IS": {
+        "squeeze": {
+          "setups": 170,
+          "cancelRecover": 8,
+          "cancelTime": 2,
+          "dataEnd": 0,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 160,
+          "winRate": 0.2813,
+          "avgRetPct": -0.207,
+          "medianRetPct": -1.0392,
+          "pf": 0.7774,
+          "maxConsecLosses": 14
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 269,
+          "dataEnd": 0,
+          "ambiguous": 43,
+          "trades": 8491,
+          "winRate": 0.2477,
+          "avgRetPct": -0.3515,
+          "medianRetPct": -1.0756,
+          "pf": 0.6436,
+          "maxConsecLosses": 79
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 79,
+          "cancelRecover": 1,
+          "cancelTime": 1,
+          "dataEnd": 1,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 76,
+          "winRate": 0.2763,
+          "avgRetPct": -0.1625,
+          "medianRetPct": -0.7112,
+          "pf": 0.7448,
+          "maxConsecLosses": 10
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 157,
+          "dataEnd": 26,
+          "ambiguous": 5,
+          "trades": 4161,
+          "winRate": 0.2137,
+          "avgRetPct": -0.3137,
+          "medianRetPct": -0.7786,
+          "pf": 0.5607,
+          "maxConsecLosses": 106
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "M": 3,
+      "buffer": 0.001,
+      "IS": {
+        "squeeze": {
+          "setups": 300,
+          "cancelRecover": 6,
+          "cancelTime": 1,
+          "dataEnd": 0,
+          "ambiguous": 2,
+          "invalid": 0,
+          "trades": 293,
+          "winRate": 0.2628,
+          "avgRetPct": -0.334,
+          "medianRetPct": -1.0681,
+          "pf": 0.6627,
+          "maxConsecLosses": 17
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 54,
+          "dataEnd": 0,
+          "ambiguous": 128,
+          "trades": 8706,
+          "winRate": 0.2896,
+          "avgRetPct": -0.2394,
+          "medianRetPct": -1.0564,
+          "pf": 0.752,
+          "maxConsecLosses": 58
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 140,
+          "cancelRecover": 2,
+          "cancelTime": 0,
+          "dataEnd": 0,
+          "ambiguous": 3,
+          "invalid": 0,
+          "trades": 138,
+          "winRate": 0.3043,
+          "avgRetPct": -0.0489,
+          "medianRetPct": -0.8277,
+          "pf": 0.931,
+          "maxConsecLosses": 14
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 28,
+          "dataEnd": 20,
+          "ambiguous": 41,
+          "trades": 4296,
+          "winRate": 0.2893,
+          "avgRetPct": -0.1694,
+          "medianRetPct": -0.8869,
+          "pf": 0.7817,
+          "maxConsecLosses": 75
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "M": 3,
+      "buffer": 0.0025,
+      "IS": {
+        "squeeze": {
+          "setups": 300,
+          "cancelRecover": 7,
+          "cancelTime": 1,
+          "dataEnd": 0,
+          "ambiguous": 4,
+          "invalid": 0,
+          "trades": 292,
+          "winRate": 0.2568,
+          "avgRetPct": -0.3221,
+          "medianRetPct": -1.0657,
+          "pf": 0.6745,
+          "maxConsecLosses": 16
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 74,
+          "dataEnd": 0,
+          "ambiguous": 92,
+          "trades": 8686,
+          "winRate": 0.2658,
+          "avgRetPct": -0.3143,
+          "medianRetPct": -1.0706,
+          "pf": 0.6834,
+          "maxConsecLosses": 75
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 140,
+          "cancelRecover": 5,
+          "cancelTime": 0,
+          "dataEnd": 0,
+          "ambiguous": 2,
+          "invalid": 0,
+          "trades": 135,
+          "winRate": 0.2296,
+          "avgRetPct": -0.2928,
+          "medianRetPct": -0.8648,
+          "pf": 0.6332,
+          "maxConsecLosses": 14
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 47,
+          "dataEnd": 18,
+          "ambiguous": 21,
+          "trades": 4279,
+          "winRate": 0.2657,
+          "avgRetPct": -0.2472,
+          "medianRetPct": -0.9067,
+          "pf": 0.6913,
+          "maxConsecLosses": 53
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "M": 6,
+      "buffer": 0.001,
+      "IS": {
+        "squeeze": {
+          "setups": 164,
+          "cancelRecover": 3,
+          "cancelTime": 1,
+          "dataEnd": 0,
+          "ambiguous": 2,
+          "invalid": 0,
+          "trades": 160,
+          "winRate": 0.25,
+          "avgRetPct": -0.3166,
+          "medianRetPct": -1.0591,
+          "pf": 0.6793,
+          "maxConsecLosses": 19
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 192,
+          "dataEnd": 0,
+          "ambiguous": 84,
+          "trades": 8568,
+          "winRate": 0.2602,
+          "avgRetPct": -0.3328,
+          "medianRetPct": -1.0725,
+          "pf": 0.6657,
+          "maxConsecLosses": 122
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 71,
+          "cancelRecover": 1,
+          "cancelTime": 1,
+          "dataEnd": 1,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 68,
+          "winRate": 0.2647,
+          "avgRetPct": -0.2194,
+          "medianRetPct": -0.8251,
+          "pf": 0.7092,
+          "maxConsecLosses": 18
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 108,
+          "dataEnd": 17,
+          "ambiguous": 5,
+          "trades": 4219,
+          "winRate": 0.252,
+          "avgRetPct": -0.2911,
+          "medianRetPct": -0.9188,
+          "pf": 0.6426,
+          "maxConsecLosses": 102
+        }
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "M": 6,
+      "buffer": 0.0025,
+      "IS": {
+        "squeeze": {
+          "setups": 164,
+          "cancelRecover": 3,
+          "cancelTime": 2,
+          "dataEnd": 0,
+          "ambiguous": 3,
+          "invalid": 0,
+          "trades": 159,
+          "winRate": 0.239,
+          "avgRetPct": -0.3525,
+          "medianRetPct": -1.088,
+          "pf": 0.6485,
+          "maxConsecLosses": 12
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 246,
+          "dataEnd": 0,
+          "ambiguous": 69,
+          "trades": 8514,
+          "winRate": 0.2344,
+          "avgRetPct": -0.4176,
+          "medianRetPct": -1.091,
+          "pf": 0.5937,
+          "maxConsecLosses": 125
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 71,
+          "cancelRecover": 2,
+          "cancelTime": 1,
+          "dataEnd": 1,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 67,
+          "winRate": 0.2537,
+          "avgRetPct": -0.2314,
+          "medianRetPct": -0.8325,
+          "pf": 0.7003,
+          "maxConsecLosses": 17
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 158,
+          "dataEnd": 17,
+          "ambiguous": 2,
+          "trades": 4169,
+          "winRate": 0.2322,
+          "avgRetPct": -0.3549,
+          "medianRetPct": -0.9278,
+          "pf": 0.5755,
+          "maxConsecLosses": 74
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "M": 3,
+      "buffer": 0.001,
+      "IS": {
+        "squeeze": {
+          "setups": 292,
+          "cancelRecover": 5,
+          "cancelTime": 1,
+          "dataEnd": 0,
+          "ambiguous": 9,
+          "invalid": 0,
+          "trades": 286,
+          "winRate": 0.2587,
+          "avgRetPct": -0.3186,
+          "medianRetPct": -1.0393,
+          "pf": 0.6702,
+          "maxConsecLosses": 15
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 59,
+          "dataEnd": 0,
+          "ambiguous": 149,
+          "trades": 8701,
+          "winRate": 0.2811,
+          "avgRetPct": -0.2211,
+          "medianRetPct": -1.0423,
+          "pf": 0.7677,
+          "maxConsecLosses": 79
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 142,
+          "cancelRecover": 3,
+          "cancelTime": 0,
+          "dataEnd": 1,
+          "ambiguous": 2,
+          "invalid": 0,
+          "trades": 138,
+          "winRate": 0.3261,
+          "avgRetPct": -0.0455,
+          "medianRetPct": -0.724,
+          "pf": 0.9242,
+          "maxConsecLosses": 9
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 37,
+          "dataEnd": 21,
+          "ambiguous": 46,
+          "trades": 4286,
+          "winRate": 0.2769,
+          "avgRetPct": -0.1657,
+          "medianRetPct": -0.7564,
+          "pf": 0.7482,
+          "maxConsecLosses": 64
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "M": 3,
+      "buffer": 0.0025,
+      "IS": {
+        "squeeze": {
+          "setups": 292,
+          "cancelRecover": 6,
+          "cancelTime": 1,
+          "dataEnd": 0,
+          "ambiguous": 4,
+          "invalid": 0,
+          "trades": 285,
+          "winRate": 0.207,
+          "avgRetPct": -0.5132,
+          "medianRetPct": -1.0911,
+          "pf": 0.5044,
+          "maxConsecLosses": 20
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 81,
+          "dataEnd": 0,
+          "ambiguous": 101,
+          "trades": 8679,
+          "winRate": 0.259,
+          "avgRetPct": -0.299,
+          "medianRetPct": -1.0606,
+          "pf": 0.6942,
+          "maxConsecLosses": 78
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 142,
+          "cancelRecover": 4,
+          "cancelTime": 0,
+          "dataEnd": 1,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 137,
+          "winRate": 0.2409,
+          "avgRetPct": -0.2522,
+          "medianRetPct": -0.7603,
+          "pf": 0.6212,
+          "maxConsecLosses": 12
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 49,
+          "dataEnd": 23,
+          "ambiguous": 37,
+          "trades": 4272,
+          "winRate": 0.2437,
+          "avgRetPct": -0.2323,
+          "medianRetPct": -0.7678,
+          "pf": 0.659,
+          "maxConsecLosses": 102
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "M": 6,
+      "buffer": 0.001,
+      "IS": {
+        "squeeze": {
+          "setups": 149,
+          "cancelRecover": 5,
+          "cancelTime": 2,
+          "dataEnd": 0,
+          "ambiguous": 1,
+          "invalid": 0,
+          "trades": 142,
+          "winRate": 0.2254,
+          "avgRetPct": -0.4696,
+          "medianRetPct": -1.123,
+          "pf": 0.551,
+          "maxConsecLosses": 19
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 201,
+          "dataEnd": 0,
+          "ambiguous": 66,
+          "trades": 8559,
+          "winRate": 0.2469,
+          "avgRetPct": -0.3439,
+          "medianRetPct": -1.0682,
+          "pf": 0.6525,
+          "maxConsecLosses": 88
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 77,
+          "cancelRecover": 1,
+          "cancelTime": 0,
+          "dataEnd": 0,
+          "ambiguous": 2,
+          "invalid": 0,
+          "trades": 76,
+          "winRate": 0.2763,
+          "avgRetPct": -0.1143,
+          "medianRetPct": -0.7045,
+          "pf": 0.8141,
+          "maxConsecLosses": 9
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 108,
+          "dataEnd": 15,
+          "ambiguous": 33,
+          "trades": 4221,
+          "winRate": 0.2469,
+          "avgRetPct": -0.2372,
+          "medianRetPct": -0.7705,
+          "pf": 0.6529,
+          "maxConsecLosses": 100
+        }
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "M": 6,
+      "buffer": 0.0025,
+      "IS": {
+        "squeeze": {
+          "setups": 149,
+          "cancelRecover": 6,
+          "cancelTime": 2,
+          "dataEnd": 0,
+          "ambiguous": 0,
+          "invalid": 0,
+          "trades": 141,
+          "winRate": 0.2057,
+          "avgRetPct": -0.5849,
+          "medianRetPct": -1.1322,
+          "pf": 0.459,
+          "maxConsecLosses": 18
+        },
+        "baseline": {
+          "setups": 8760,
+          "cancelTime": 273,
+          "dataEnd": 0,
+          "ambiguous": 41,
+          "trades": 8487,
+          "winRate": 0.2372,
+          "avgRetPct": -0.3776,
+          "medianRetPct": -1.0739,
+          "pf": 0.6223,
+          "maxConsecLosses": 121
+        }
+      },
+      "OOS": {
+        "squeeze": {
+          "setups": 77,
+          "cancelRecover": 2,
+          "cancelTime": 0,
+          "dataEnd": 0,
+          "ambiguous": 2,
+          "invalid": 0,
+          "trades": 75,
+          "winRate": 0.2267,
+          "avgRetPct": -0.2213,
+          "medianRetPct": -0.7363,
+          "pf": 0.6585,
+          "maxConsecLosses": 19
+        },
+        "baseline": {
+          "setups": 4344,
+          "cancelTime": 142,
+          "dataEnd": 21,
+          "ambiguous": 34,
+          "trades": 4181,
+          "winRate": 0.2117,
+          "avgRetPct": -0.3022,
+          "medianRetPct": -0.7812,
+          "pf": 0.5711,
+          "maxConsecLosses": 166
+        }
+      }
+    }
+  ]
+}
