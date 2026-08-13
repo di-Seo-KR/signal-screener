@@ -201,6 +201,9 @@ export default memo(function PortfolioTab({
             margin: "0 auto 28px",
             textAlign: "left",
           }}>
+            {/* ★ 2026-08-13 감사(#9): 번호는 여기(icon)에서만 붙입니다.
+                i18n 문구에도 "1️⃣"가 들어 있어 "1️⃣ 1️⃣ 우측 상단…"으로 두 번 찍혔습니다
+                (ko/en step1~3 에서 이모지 제거 — 번호 표기의 단일 소스는 이 배열). */}
             {[
               { icon: "1️⃣", text: t("portfolio.step1") || "종목을 검색하여 추가" },
               { icon: "2️⃣", text: t("portfolio.step2") || "매수 가격과 수량 입력" },

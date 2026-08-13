@@ -15,6 +15,28 @@
 //        + FF 가 이번 주 실값(컨센서스·발표시각) 덮어쓰기 + actual 은 BLS/FRED/KV/API.
 // KV 키: di:econ:actuals — 발표 수치 영구 저장
 //        di:econ:estimates — FF 에서 한 번 관측한 컨센서스 영구 저장(주 경과 후에도 유지)
+//
+// ★ 2026-08-13 (감사 #1 — 같은 사고 4번째): 미발표 지표가 '발표 완료'로 표시되던 문제.
+//   모든 actual 귀속 로직이 '날짜'(e.date <= todayStr)만 비교해서, 발표일 당일
+//   오전에도 그 날 행이 '이미 지난 발표'로 뽑혔고 → BLS/FRED/벤더가 들고 있는
+//   직전 회차 수치(= previous)가 당일 actual 로 흘러들어갔습니다.
+//   이제 판정 기준은 '발표 시각'(dt 우선, 없으면 ET 관례시각 추정)이며,
+//   응답 조립 마지막에 하드 가드가 미발표 actual 을 강제로 null 로 되돌리고
+//   (건수는 payload.unreleasedGuarded / ?debug=1 로 노출) 발표 전에 KV 로
+//   새어 들어간 오염 키는 삭제합니다.
+//
+// ★ 2026-08-13 (감사 #1 리뷰 후속 2건):
+//   ① 발표시각 판정 규칙을 api/_shared/econ-release-time.js 로 분리했습니다.
+//      하류(api/agents/econ-results.js)가 같은 규칙을 쓸 수 있어야 '날짜만
+//      비교' 결함이 영구 페이지 쪽에서 재현되지 않습니다. 동시에 벤더가
+//      date 필드에 담아 보내는 실제 발표시각(UTC)을 버리지 않고 살립니다
+//      — 이전엔 그 시각을 잘라내고 08:30 ET 로 추정해, 09:15/10:00 ET 발표
+//      지표의 가드가 실제보다 45~90분 먼저 열렸습니다.
+//   ② 자가치유가 '아직 발표 전 키'만 지워서, 이전 재발 때 di:econ:actuals 에
+//      굳은 과거 오염분은 그대로 남아 계속 발행됐습니다. 이제 과거분도
+//      스윕합니다(아래 '과거 오염 KV 자가치유' 블록).
+
+import { estimateReleaseMs, isReleasedEvent } from "./_shared/econ-release-time.js";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -74,10 +96,11 @@ export default async function handler(req, res) {
     kvEstimates = est || {};
   } catch { /* KV 없으면 캐싱 없이 진행 */ }
 
-  const saveActualsToKV = async (newActuals) => {
-    if (!kv || Object.keys(newActuals).length === 0) return;
-    let updated = false;
-    for (const [key, val] of Object.entries(newActuals)) {
+  // forceWrite: 오염 키 삭제(purge)로 kvActuals 가 이미 변경된 경우 기록을 강제합니다.
+  const saveActualsToKV = async (newActuals, forceWrite = false) => {
+    if (!kv) return;
+    let updated = forceWrite;
+    for (const [key, val] of Object.entries(newActuals || {})) {
       if (val != null && kvActuals[key] == null) {
         kvActuals[key] = val;
         updated = true;
@@ -93,7 +116,7 @@ export default async function handler(req, res) {
     fetchFinnhub(fmtDate(from), fmtDate(to)),
     fetchFMP(fmtDate(from), fmtDate(to)),
     fetchBLSActuals(),
-    fetchFREDActuals(todayStr, getCuratedEvents2026()),
+    fetchFREDActuals(getCuratedEvents2026()),
     fetchForexFactory(),
   ]);
 
@@ -159,13 +182,15 @@ export default async function handler(req, res) {
   //   역산해 채우면 ISM·소비자심리 등 BLS/FRED 에 없는 민간지표까지 무키로 커버
   //   (한 발표 사이클 지연). 채운 값은 di:econ:actuals 에 영구 저장돼 누적된다.
   const ffBackfill = {};
+  const nowMs = now.getTime();
   const CYCLE_MAX = 45 * 86400000; // 직전 회차 가드 — 주간·월간만 (한 사이클 건너뛴 오귀속 방지)
   for (const f of ffEvents) {
     if (f.previous == null) continue;
     const prior = baseEvents.filter(e =>
       e.event === f.event && e.actual == null &&
       Date.parse(e.date) < Date.parse(f.date) - D3 &&
-      Date.parse(f.date) - Date.parse(e.date) <= CYCLE_MAX);
+      Date.parse(f.date) - Date.parse(e.date) <= CYCLE_MAX &&
+      isReleasedEvent(e, nowMs)); // 미발표 행에는 previous 를 절대 붙이지 않습니다
     if (prior.length > 0) {
       const t = prior[prior.length - 1]; // 직전 회차
       t.actual = f.previous;
@@ -199,14 +224,81 @@ export default async function handler(req, res) {
   }
 
   // API 소스에서 actual 있는 것도 수집
+  //   ★ 2026-08-13 감사 #1: 일부 벤더는 발표 전 행의 actual 칸에 previous 를 채워
+  //     내려줍니다. 발표 시각이 지나지 않은 건은 여기서부터 받지 않습니다.
   const apiSourceActuals = {};
+  const apiPrereleaseDropped = [];
   for (const evt of [...finnhubEvents, ...fmpEvents]) {
     if (evt.actual != null && evt.date && evt.event) {
       const key = `${evt.date}::${evt.event}`;
+      if (!isReleasedEvent(evt, nowMs)) { apiPrereleaseDropped.push(key); continue; }
       if (allActuals[key] == null) allActuals[key] = evt.actual;
       apiSourceActuals[key] = evt.actual;
     }
   }
+
+  // ══════════════════════════════════════════════════════════════
+  // ★ 과거 오염 KV 자가치유 (2026-08-13 감사 #1 리뷰 후속)
+  //   아래 하드 가드는 '아직 발표 전' 키만 잡습니다. 이전 3회 재발 때
+  //   di:econ:actuals 에 굳어 버린 과거 오염분은 발표 시각이 이미 지나
+  //   가드에 걸리지 않아 영구히 남고, 하류 크론(api/agents/econ-results.js)이
+  //   이 KV 를 직접 읽어 /econ/{date}-{slug} 영구 페이지로 발행합니다.
+  //   영구·불변 산출물이라 사후 정정이 불가능하므로 여기서 끊습니다.
+  //
+  //   오염의 지문: actual 이 그 회차의 previous(= 직전 회차 발표치)와 같습니다.
+  //   다만 '동결·보합'이라 정상적으로 같은 경우도 있어, 지문만으로 지우지 않고
+  //     ① 지금 살아 있는 소스(BLS·FRED·벤더, 전부 발표시각 통과분)가 다른 값을
+  //        들고 있으면 → 오염 확정. 실측으로 덮어써 교정합니다.
+  //     ② 어떤 소스도 재확인해 주지 못하면 → 진위 판정 불가. 발행을 멈추고
+  //        di:econ:actuals:quarantine 으로 격리합니다(삭제가 아니라 보존 —
+  //        대표가 ?debug=1 로 건수·키를 확인하고 되돌릴 수 있습니다).
+  //     ③ 소스가 같은 값을 재확인해 주면 정상으로 보고 그대로 둡니다.
+  //   한 키는 평생 한 번만 격리합니다(격리 기록에 있으면 재격리 없음) —
+  //   나중에 살아 있는 소스가 값을 되살려도 매 요청 격리/복원이 반복되지 않게.
+  //   킬스위치: ZEPTA_ECON_KV_SWEEP=off
+  // ══════════════════════════════════════════════════════════════
+  const kvSweepOn = process.env.ZEPTA_ECON_KV_SWEEP !== "off";
+  const kvHeal = { suspects: 0, corrected: [], quarantined: [], quarantineTotal: 0 };
+  let quarantineMap = {};
+  if (kv && kvSweepOn) {
+    try { quarantineMap = (await kv.get("di:econ:actuals:quarantine")) || {}; } catch {}
+    // 지금 살아 있는 소스가 들고 있는 값 (뒤쪽이 더 권위 있음 — FF 역산 < 벤더 < FRED < BLS)
+    const freshByKey = {};
+    for (const dict of [ffBackfill, apiSourceActuals, fredActuals, blsActuals]) {
+      for (const [k, v] of Object.entries(dict)) if (v != null) freshByKey[k] = v;
+    }
+    for (const [k, v] of Object.entries(kvActuals)) {
+      if (v == null) continue;
+      const p = kvEstimates[k]?.p;
+      if (p == null || Number(v) !== Number(p)) continue; // 오염 지문 불일치 → 손대지 않음
+      kvHeal.suspects++;
+      const fresh = freshByKey[k];
+      if (fresh != null && Number(fresh) !== Number(v)) {
+        kvActuals[k] = fresh;
+        allActuals[k] = fresh;
+        kvHeal.corrected.push({ key: k, from: v, to: fresh });
+      } else if (fresh == null && !quarantineMap[k]) {
+        quarantineMap[k] = { value: v, previous: p, at: now.toISOString() };
+        delete kvActuals[k];
+        delete allActuals[k];
+        kvHeal.quarantined.push(k);
+      }
+    }
+    kvHeal.quarantineTotal = Object.keys(quarantineMap).length;
+
+    // 무성 실패 방지 — 손댄 게 있으면 반드시 로그
+    for (const c of kvHeal.corrected) {
+      console.warn(`[econ-calendar] 과거 오염 actual 교정: ${c.key} ${c.from} → ${c.to} (previous 유출분을 실측으로 대체)`);
+    }
+    if (kvHeal.quarantined.length > 0) {
+      console.warn(
+        `[econ-calendar] 과거 오염 의심 actual 격리 ${kvHeal.quarantined.length}건 ` +
+        `(actual === previous 인데 어떤 소스도 재확인 못 함): ${kvHeal.quarantined.slice(0, 10).join(", ")}`
+      );
+      try { await kv.set("di:econ:actuals:quarantine", quarantineMap); } catch {}
+    }
+  }
+  const justQuarantined = new Set(kvHeal.quarantined);
 
   // ── baseEvents에 actual 값 병합 ──
   const finalEvents = baseEvents.map(e => {
@@ -220,20 +312,95 @@ export default async function handler(req, res) {
 
   // ── 이름 폴백 적용 — curated 에 없는 행(FF 런타임 추가 등)의 '발표 대기' 해소 ──
   //   FRED 먼저, BLS 가 나중(BLS 가 더 정확 — 같은 이벤트면 BLS 가 덮어씀)
+  //   ★ 2026-08-13 감사 #1 (재발 4번째의 주범): 후보 조건이 e.date <= todayStr 라
+  //     '오늘 21:30 KST 발표 예정' 행까지 '가장 최근 과거 이벤트'로 뽑혔습니다.
+  //     그 결과 BLS/FRED 가 들고 있는 직전 회차 수치(= previous)가 당일 행의
+  //     actual 로 붙어 미발표 지표가 '발표 완료'로 보였습니다. 발표 시각 기준으로 교체.
   const byNameKeyed = {};
   for (const dict of [fredByName, blsByName]) {
     for (const [name, val] of Object.entries(dict)) {
-      const cands = finalEvents.filter(e => e.event === name && (e.actual == null || dict === blsByName) && e.date <= todayStr);
+      const cands = finalEvents
+        .filter(e => e.event === name && (e.actual == null || dict === blsByName) && isReleasedEvent(e, nowMs))
+        // FF 런타임 추가분은 배열 끝에 붙어 배열 순서 ≠ 시간 순서 — 발표 시각으로 정렬
+        .sort((a, b) => (estimateReleaseMs(a) ?? 0) - (estimateReleaseMs(b) ?? 0));
       if (cands.length > 0) {
-        const target = cands[cands.length - 1]; // 가장 최근 과거 이벤트
+        const target = cands[cands.length - 1]; // 가장 최근 '이미 발표된' 이벤트
         target.actual = val;
         byNameKeyed[`${target.date}::${target.event}`] = val;
       }
     }
   }
 
+  // ══════════════════════════════════════════════════════════════
+  // ★ 하드 가드 — 미발표 지표의 actual 강제 null (최후 방어선)
+  //   위의 개별 경로 수정과 별개로, 어떤 소스가 오염돼도(벤더가 previous 를
+  //   actual 칸에 채워 보내든, 과거 KV 에 잘못 적재됐든) 발표 시각이 아직
+  //   오지 않은 이벤트의 수치는 화면에 나가지 않게 여기서 한 번 더 막습니다.
+  //   (2026-08-13 실측: Core PPI 0.2 / PPI -0.3 — 둘 다 previous 와 동일한데
+  //    발표시각 08:30 ET 는 아직 미래였습니다. 같은 사고 4번째.)
+  // ══════════════════════════════════════════════════════════════
+  const eventDtByKey = {};
+  for (const e of finalEvents) {
+    if (e?.date && e?.event && e.dt) eventDtByKey[`${e.date}::${e.event}`] = e.dt;
+  }
+  const guardHits = [];
+  const guardedEvents = finalEvents.map(e => {
+    if (e.actual == null) return e;
+    const relMs = estimateReleaseMs(e);
+    if (relMs == null || relMs <= nowMs) return e; // 시각 미상 = 차단 근거 없음 → 통과
+    guardHits.push({
+      key: `${e.date}::${e.event}`,
+      actual: e.actual,
+      previous: e.previous ?? null,
+      // previous 와 동일한 값이면 상류가 previous 를 흘린 것이 거의 확실합니다
+      samePrevious: e.previous != null && Number(e.previous) === Number(e.actual),
+      releaseAt: new Date(relMs).toISOString(),
+      timeSource: e.dt ? "dt" : "추정(ET 관례시각)",
+    });
+    return { ...e, actual: null };
+  });
+
+  // 무성 실패 방지 — 가드가 걸리면 반드시 로그를 남깁니다.
+  for (const h of guardHits) {
+    console.warn(
+      `[econ-calendar] 미발표 actual 차단: ${h.key} actual=${h.actual}` +
+      (h.samePrevious ? ` (previous=${h.previous} 와 동일 — 상류 previous 유출 의심)` : "") +
+      ` 발표예정=${h.releaseAt} (${h.timeSource})`
+    );
+  }
+
+  // 오염 키 정리 — 미발표인데 KV(di:econ:actuals)에 이미 적재된 값은 무효입니다.
+  //   놔두면 발표 시각이 지난 뒤 가드가 풀리면서 '직전 회차 수치'가 그 날의
+  //   발표치로 굳어버립니다(KV 는 한 번 채워지면 덮어쓰지 않는 구조).
+  const poisonedKeys = guardHits.map(h => h.key).filter(k => kvActuals[k] != null);
+  for (const k of poisonedKeys) {
+    delete kvActuals[k];
+    delete allActuals[k];
+    console.warn(`[econ-calendar] 오염 KV actual 삭제: ${k} (발표 전 적재분)`);
+  }
+
   // ── KV에 새로운 actual 저장 (FF 역산 백필 포함) ──
-  await saveActualsToKV({ ...apiSourceActuals, ...fredActuals, ...blsActuals, ...byNameKeyed, ...ffBackfill });
+  //   저장 대상도 '이미 발표된 키' 로 한정 — 오염된 값이 영구 적재되지 않도록.
+  const releasedOnly = (dict) => {
+    const out = {};
+    for (const [k, v] of Object.entries(dict || {})) {
+      if (v == null) continue;
+      const sep = k.indexOf("::");
+      if (sep < 0) continue;
+      // 방금 격리한 키는 같은 요청에서 되쓰지 않습니다(격리와 저장이 서로를 무효화하지
+      // 않도록). 다음 요청에서 살아 있는 소스가 다시 공급하면 그때 정상 적재됩니다.
+      if (justQuarantined.has(k)) continue;
+      const probe = { date: k.slice(0, sep), event: k.slice(sep + 2), dt: eventDtByKey[k] };
+      if (!isReleasedEvent(probe, nowMs)) continue;
+      out[k] = v;
+    }
+    return out;
+  };
+  await saveActualsToKV(
+    releasedOnly({ ...apiSourceActuals, ...fredActuals, ...blsActuals, ...byNameKeyed, ...ffBackfill }),
+    // 삭제·교정·격리 중 하나라도 있었으면 기록 강제
+    poisonedKeys.length > 0 || kvHeal.corrected.length > 0 || kvHeal.quarantined.length > 0,
+  );
 
   const sourceList = [
     source,
@@ -245,10 +412,15 @@ export default async function handler(req, res) {
   ].filter(Boolean);
 
   const payload = {
-    events: finalEvents,
+    events: guardedEvents,
     source: sourceList.join("+"),
     updatedAt: now.toISOString(),
     actualsCount: Object.keys(allActuals).length,
+    // ★ 2026-08-13: 가드 동작 건수 상시 노출 — 무성 실패 방지(0 이면 정상)
+    unreleasedGuarded: guardHits.length,
+    // 과거 오염 KV 자가치유 결과(이번 요청) — 상세는 ?debug=1
+    kvCorrected: kvHeal.corrected.length,
+    kvQuarantined: kvHeal.quarantined.length,
   };
   // ?debug=1 — 소스별 기여·오류 진단 (FRED 키 재설정 시 1분 검증용)
   if (req.query?.debug === "1") {
@@ -261,12 +433,32 @@ export default async function handler(req, res) {
       ffError, // ★ 2026-08-10: FF 무성 실패(레이트리밋 등) 사유 노출
       ffBackfill: Object.keys(ffBackfill).length,
       kvActualsTotal: Object.keys(kvActuals).length,
+      // ★ 2026-08-13 감사 #1: 미발표 actual 가드 진단
+      unreleasedGuard: {
+        count: guardHits.length,
+        samePreviousCount: guardHits.filter(h => h.samePrevious).length, // 상류 previous 유출 의심 건수
+        purgedKvKeys: poisonedKeys,
+        hits: guardHits.slice(0, 20),
+      },
+      apiPrereleaseDropped: apiPrereleaseDropped.slice(0, 20), // 벤더가 발표 전 actual 을 준 건
+      // ★ 2026-08-13 리뷰 후속: 과거 오염분 스윕 결과 (대표 확인용)
+      //   suspects        = KV 에서 actual === previous 인 키 수(정상 '보합' 포함)
+      //   corrected       = 살아 있는 소스가 다른 값을 들고 있어 실측으로 교정한 건
+      //   quarantinedNow  = 아무 소스도 재확인 못 해 이번에 발행을 멈춘 건
+      //   quarantineTotal = 지금까지 격리된 누적 건수(di:econ:actuals:quarantine)
+      kvSweep: {
+        enabled: kvSweepOn,
+        suspects: kvHeal.suspects,
+        corrected: kvHeal.corrected.slice(0, 20),
+        quarantinedNow: kvHeal.quarantined.slice(0, 20),
+        quarantineTotal: kvHeal.quarantineTotal,
+      },
     };
   }
   // ── 실패본 캐싱 차단 (감사 P0 후속) ──
   //   미래 일정이 하나도 없는 응답은 골격 소진·전 소스 실패 상태이므로,
   //   엣지에 최대 25분 재배포되지 않도록 캐시를 끕니다.
-  if (!finalEvents.some(e => e.date >= todayStr)) {
+  if (!guardedEvents.some(e => e.date >= todayStr)) {
     res.setHeader("Cache-Control", "no-store");
   }
   return res.status(200).json(payload);
@@ -389,7 +581,7 @@ async function fetchBLSActuals() {
     if (json.status !== "REQUEST_SUCCEEDED") return { actuals, byName };
 
     const curatedEvents = getCuratedEvents2026();
-    const todayStr = `${curYear}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
+    const nowMs = now.getTime(); // 날짜가 아니라 발표 '시각' 으로 귀속 판정
 
     // 응답을 시리즈 ID 로 색인 — 같은 시리즈에서 YoY/MoM 두 config 가 읽도록
     const byId = {};
@@ -444,9 +636,12 @@ async function fetchBLSActuals() {
 
       if (actual == null || isNaN(actual)) continue;
 
-      // curated 이벤트에서 actual이 null인 가장 최근 과거 이벤트와 매칭
+      // curated 이벤트에서 actual이 null인 '이미 발표된' 가장 최근 이벤트와 매칭
+      //   ★ 2026-08-13 감사 #1: 이전엔 e.date <= todayStr(날짜 비교)라 발표일 당일
+      //     오전에도 그 날 행이 뽑혔고, BLS 가 들고 있는 직전 회차 수치(= previous)가
+      //     당일 actual 로 둔갑했습니다. 발표 시각 기준으로 교체합니다.
       const matching = curatedEvents.filter(e =>
-        e.event === config.match && e.actual == null && e.date <= todayStr
+        e.event === config.match && e.actual == null && isReleasedEvent(e, nowMs)
       );
       if (matching.length > 0) {
         const target = matching[matching.length - 1];
@@ -470,9 +665,13 @@ async function fetchBLSActuals() {
 //     (이전에 "키 넣어도 안 되던" 원인: 당시 큐레이션에 발표치가 하드코딩돼
 //      있어 채울 빈칸이 없었고, 이름 완전일치 매칭이라 효과가 안 보였음)
 // ══════════════════════════════════════════════════════════════
-async function fetchFREDActuals(todayStr, curated) {
+//   ★ 2026-08-13 리뷰 후속: 첫 인자였던 todayStr 을 제거했습니다.
+//     발표 '시각' 판정으로 바뀌면서 본문에서 쓰이지 않는 죽은 인자가 됐고,
+//     남겨 두면 "이 함수는 날짜 기준으로 판정한다"는 오해를 부릅니다.
+async function fetchFREDActuals(curated) {
   const actuals = {};
   const byName = {};
+  const nowMs = Date.now(); // 날짜가 아니라 발표 '시각' 으로 귀속 여부를 판정합니다
   const fredKey = process.env.FRED_API_KEY;
   if (!fredKey) return { actuals, byName, error: "FRED_API_KEY 미설정" };
   let firstError = null;
@@ -540,9 +739,11 @@ async function fetchFREDActuals(todayStr, curated) {
       if (actual == null || isNaN(actual)) return;
 
       // ① curated 이름 매칭 (GDP 는 접두 매칭 — Q1 Advance 등)
+      //   ★ 2026-08-13 감사 #1: 날짜 비교 → 발표 시각 비교(isReleasedEvent)로 교체.
+      //     발표 전 행에 직전 회차 값이 붙던 경로를 원천 차단합니다.
       const matchingEvents = curated.filter(e =>
         (series.gdpPrefix ? e.event.startsWith("GDP Growth Rate") : e.event === series.eventMatch)
-        && e.actual == null && e.date <= todayStr
+        && e.actual == null && isReleasedEvent(e, nowMs)
       );
       if (matchingEvents.length > 0) {
         const target = matchingEvents[matchingEvents.length - 1];

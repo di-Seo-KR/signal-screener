@@ -30,6 +30,7 @@ import {
   acquireCollectLock,
   releaseCollectLock,
 } from "./_shared/news-sources.js";
+import { decodeEntities } from "./_shared/html-entities.js";
 
 // 풀이 이 시간보다 오래 갱신되지 않았으면 요청 경로에서 1회 lazy 수집을 시도합니다.
 const POOL_STALE_MS = 30 * 60 * 1000; // 30분
@@ -63,22 +64,11 @@ const MARKET_KEYWORDS_EN = [
 // RSS 원문의 "S&amp;P500" 류가 화면에 그대로 노출되는 문제를 막습니다.
 // 반드시 파싱 직후·관련도 판정 이전에 적용해야 합니다 — 키워드에 "S&P" 가
 // 들어 있어 미디코딩 상태로는 isRelevant()/extractKeywords() 매칭도 함께
-// 실패하기 때문입니다. 외부 의존성 없이 주요 명명 엔티티와 숫자 엔티티
-// (10진·16진)만 처리하며, 이중 이스케이프(&amp;amp;)는 한 단계씩 풀립니다.
-const NAMED_ENTITIES = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
-function decodeEntities(s) {
-  if (!s) return s;
-  return String(s)
-    .replace(/&#x([0-9a-f]+);/gi, (m, hex) => {
-      const cp = parseInt(hex, 16);
-      return cp > 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
-    })
-    .replace(/&#(\d+);/g, (m, dec) => {
-      const cp = parseInt(dec, 10);
-      return cp > 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
-    })
-    .replace(/&(amp|lt|gt|quot|apos|nbsp);/gi, (m, name) => NAMED_ENTITIES[name.toLowerCase()]);
-}
+// 실패하기 때문입니다.
+//   ★ 2026-08-13 리뷰: 같은 15줄이 api/social-sentiment.js·_shared/briefing.js
+//     에도 복사돼 있어 규칙이 따로 표류했습니다(한쪽만 고치면 다른 화면에서
+//     같은 '엔티티 노출' 결함이 재발). api/_shared/html-entities.js 로 단일화.
+// decodeEntities 는 위 import 로 들어옵니다.
 
 function isRelevant(title, desc, lang) {
   const text = `${title} ${desc}`.toLowerCase();

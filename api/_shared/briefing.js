@@ -22,6 +22,7 @@
 
 import { getMarketTempCached } from "./market-temp.js";
 import { renderPage, escH, escA, SITE, DISCLAIMER_LINE } from "./page-shell.js";
+import { decodeEntities } from "./html-entities.js";
 
 export const BRIEFING_KEY = (date) => `di:briefing:${date}`;
 export const BRIEFING_INDEX_KEY = "di:briefing:index";
@@ -70,17 +71,16 @@ async function fetchGoogleNewsKo(q) {
     const xml = await resp.text();
     const items = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
     // ★ 2026-08-10 (전수 감사): RSS 제목의 HTML 엔티티(&amp; 등)가 브리핑 페이지에
-    //   그대로 노출되던 문제 — api/news.js 의 decodeEntities 와 같은 규칙으로 해제합니다.
-    const NAMED = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " " };
-    const decodeEnt = (s) => String(s || "")
-      .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCodePoint(parseInt(h, 16)))
-      .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
-      .replace(/&(amp|lt|gt|quot|apos|nbsp);/g, (_, n) => NAMED[n]);
+    //   그대로 노출되던 문제 — 서버측에서 해제합니다.
+    //   ★ 2026-08-13 리뷰: 여기 있던 사본은 코드포인트 범위 검사가 없어
+    //     깨진 엔티티(&#1114112; 등) 한 건에 String.fromCodePoint 가 RangeError 를
+    //     던지면 브리핑 뉴스 수집 전체가 죽을 수 있었습니다.
+    //     규칙을 api/_shared/html-entities.js 로 단일화했습니다.
     for (const item of items.slice(0, 8)) {
-      const title = decodeEnt((item.match(/<title>(.*?)<\/title>/) || [])[1]);
+      const title = decodeEntities((item.match(/<title>(.*?)<\/title>/) || [])[1]);
       const link = (item.match(/<link\/>(.*?)<pubDate>/) || item.match(/<link>(.*?)<\/link>/) || [])[1];
       const pubDate = (item.match(/<pubDate>(.*?)<\/pubDate>/) || [])[1];
-      const source = decodeEnt((item.match(/<source[^>]*>(.*?)<\/source>/) || [])[1]);
+      const source = decodeEntities((item.match(/<source[^>]*>(.*?)<\/source>/) || [])[1]);
       if (title) out.push({ title: title.trim(), url: (link || "").trim(), date: pubDate || "", source: source || "Google News" });
     }
   } catch { /* 실패 → 빈 배열 (섹션 생략) */ }
