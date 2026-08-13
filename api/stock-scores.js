@@ -10,14 +10,28 @@
 //   기준 스코어가 유지된다 — ts(스캔 시각)와 dataTs(데이터 시각)를 분리 표기:
 //   마감 시장 재스캔 런에서 ts 는 갱신돼도 dataTs 는 마지막 반영 캔들 시각 그대로.
 //
-// GET ?limit=60
+// GET ?limit=60&offset=0&market=us|kr&side=LONG|SHORT&q=<검색어>
+//   ★ 2026-08-13 (유니버스 51→1016종 확대에 맞춘 개편)
+//     · limit 상한을 60 → 300 으로 올리고 offset 페이지네이션을 추가했습니다.
+//       유니버스가 20배가 됐는데 응답이 60종에서 잘리면 확대분이 화면에 영원히
+//       안 나옵니다(확대 작업 자체가 무의미해짐). 반대로 1016종을 한 번에
+//       내리면 엔트리당 ~740B × 1016 ≈ 730KB 라 모바일에서 부담이므로,
+//       "상한을 올리되 페이지로 나눠 받는" 방식으로 잡았습니다.
+//     · market/side/q 서버측 필터 — 클라이언트가 전량을 받아 거르지 않도록.
+//     · **counts 를 슬라이스 *전* 기준으로 계산**하도록 정정했습니다. 기존에는
+//       slice(0,limit) 이후 배열로 세어서 "상승 N / 전체 M" 이 화면에 보이는
+//       페이지 크기를 따라다녔습니다(대표 점검 #4 "28/41 인데 실제 39" 와 동일 계열).
+//       이제 counts 는 필터 적용 후 **전집합** 기준이고, 이번 응답에 실제로 담긴
+//       건수는 returned 로 따로 내려갑니다.
 // → {
 //     ok, stocks: [{ asset, symbol, name, market:"us"|"kr", side:"LONG"|"SHORT",
 //                    type, score(0~100), confidence(0~1 — coin-scores 와 동일 정규화),
 //                    family, timeframe:"MTF", reason, ts(스캔 시각 ms),
 //                    dataTs(마지막 반영 캔들 시각 ms | null),
 //                    breakdown{1w,1d,4h,1h}, sr, marketState }],
-//     counts: { long, short, total }, updatedAt, meta
+//     counts: { long, short, total },   // 필터 적용 후 전집합 기준 (페이지 아님)
+//     page: { offset, limit, returned, hasMore },
+//     updatedAt, meta
 //   }
 
 async function getKv() {
@@ -53,8 +67,17 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   try {
+    // 페이지 파라미터 — 상한 300 은 응답 크기(엔트리 ~740B × 300 ≈ 220KB)에서 온 값
     const _lim = parseInt(req.query?.limit, 10);
-    const limit = Math.min(Number.isFinite(_lim) && _lim > 0 ? _lim : 60, 60); // 유니버스 51종 전체 커버
+    const limit = Math.min(Number.isFinite(_lim) && _lim > 0 ? _lim : 60, 300);
+    const _off = parseInt(req.query?.offset, 10);
+    const offset = Number.isFinite(_off) && _off > 0 ? _off : 0;
+    // 서버측 필터 — 클라이언트가 1016종을 통째로 받아 거르는 낭비를 막습니다
+    const fMarket = ["us", "kr"].includes(String(req.query?.market || "").toLowerCase())
+      ? String(req.query.market).toLowerCase() : null;
+    const fSide = ["LONG", "SHORT"].includes(String(req.query?.side || "").toUpperCase())
+      ? String(req.query.side).toUpperCase() : null;
+    const fq = String(req.query?.q || "").trim().toLowerCase().slice(0, 40) || null;
     const kv = await getKv();
     const pool = (await kv.get(POOL_KEY)) || [];
 
@@ -99,20 +122,37 @@ export default async function handler(req, res) {
       }
     }
 
-    const stocks = Array.from(byAsset.values())
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit);
+    // 필터 → 정렬 → 페이지. counts 는 **페이지를 자르기 전** 전집합에서 셉니다
+    // (자른 뒤에 세면 "상승 N / 전체 M" 이 페이지 크기를 따라다니는 #4 계열 버그가 됩니다).
+    const filtered = Array.from(byAsset.values()).filter((s) => {
+      if (fMarket && s.market !== fMarket) return false;
+      if (fSide && s.side !== fSide) return false;
+      if (fq) {
+        const hay = `${s.symbol || ""} ${s.asset || ""} ${s.name || ""}`.toLowerCase();
+        if (!hay.includes(fq)) return false;
+      }
+      return true;
+    });
 
     const counts = {
-      long: stocks.filter((s) => s.side === "LONG").length,
-      short: stocks.filter((s) => s.side === "SHORT").length,
-      total: stocks.length,
+      long: filtered.filter((s) => s.side === "LONG").length,
+      short: filtered.filter((s) => s.side === "SHORT").length,
+      total: filtered.length,
     };
+
+    const sorted = filtered.sort((a, b) => b.score - a.score);
+    const stocks = sorted.slice(offset, offset + limit);
 
     return res.status(200).json({
       ok: true,
       stocks,
       counts,
+      page: {
+        offset,
+        limit,
+        returned: stocks.length,
+        hasMore: offset + stocks.length < counts.total,
+      },
       updatedAt: new Date().toISOString(),
       meta: {
         // 정직 고지 — 스코어 산출 근거와 한계

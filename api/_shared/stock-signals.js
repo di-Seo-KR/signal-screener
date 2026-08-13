@@ -19,6 +19,15 @@
 //   - TF 는 야후가 실제 제공하는 것만 정직하게: 1wk(주봉)·1d(일봉)·1h(1시간).
 //     4h 는 야후에 없으므로 1h 완결 캔들을 거래일 단위 정방향 4개씩 묶어
 //     집계합니다(아래 aggregate4h 주석 참조). 1h 부족 시 4h 없이 3TF 로 동작.
+//
+// ★ 2026-08-13 (대표 지시 "51종밖에 지원 안 하는데 전 종목"): 유니버스를 51종 →
+//   1,016종으로 확대하면서 이 모듈에 3가지를 추가했습니다.
+//     ① 유니버스 데이터 분리(_shared/stock-universe.js) — 여기서 재수출
+//     ② 호출 통계(readFetchStats) + 429 백오프 — 레이트리밋을 추정이 아니라 실측으로
+//     ③ scanStockSymbol 반환에 status — "호출 실패"와 "상장 초기 봉 부족"을 구분
+//     ④ (리뷰 수리) 인증 경로 방어 — 타임아웃 5초 + in-flight 중복 제거 + 실패 쿨다운.
+//        동시성이 12로 올라가면서 콜드 스타트에 인증 요청이 최대 36건 동시 발사되고,
+//        그중 하나라도 무한정 매달리면 크론이 커서를 저장하지 못한 채 강제 종료됩니다.
 // ════════════════════════════════════════════════════════════════════
 
 import {
@@ -28,63 +37,35 @@ import {
 } from "./strategies/_indicators.js";
 import { computeSRLevels } from "./sr-levels.js";
 
-// ── 유니버스 — src/App.jsx fetchDailyPicks 의 pickList 와 동일(순서 포함) ──
-//   "오늘의 종목 추천" 50종과 같은 목록을 서버측에 하드코딩. 이름은 App.jsx 의
-//   US_ASSETS/KR_ASSETS 매핑에서 복사. (실측 51종 = 미국 31 + 한국 20 —
-//   pickList 원본과 1:1 동일 유지가 우선이라 그대로 둡니다.)
-export const STOCK_UNIVERSE = [
-  { symbol: "NVDA", name: "NVIDIA", market: "us" },
-  { symbol: "AAPL", name: "Apple", market: "us" },
-  { symbol: "TSLA", name: "Tesla", market: "us" },
-  { symbol: "MSFT", name: "Microsoft", market: "us" },
-  { symbol: "GOOGL", name: "Alphabet", market: "us" },
-  { symbol: "AMZN", name: "Amazon", market: "us" },
-  { symbol: "META", name: "Meta", market: "us" },
-  { symbol: "AMD", name: "AMD", market: "us" },
-  { symbol: "AVGO", name: "Broadcom", market: "us" },
-  { symbol: "COIN", name: "Coinbase", market: "us" },
-  { symbol: "NFLX", name: "Netflix", market: "us" },
-  { symbol: "CRM", name: "Salesforce", market: "us" },
-  { symbol: "PLTR", name: "Palantir", market: "us" },
-  { symbol: "MSTR", name: "MicroStrategy", market: "us" },
-  { symbol: "SOFI", name: "SoFi", market: "us" },
-  { symbol: "HOOD", name: "Robinhood", market: "us" },
-  { symbol: "ARM", name: "ARM Holdings", market: "us" },
-  { symbol: "SMCI", name: "Super Micro", market: "us" },
-  { symbol: "TSM", name: "TSMC", market: "us" },
-  { symbol: "APP", name: "AppLovin", market: "us" },
-  { symbol: "RDDT", name: "Reddit", market: "us" },
-  { symbol: "BABA", name: "Alibaba", market: "us" },
-  { symbol: "JPM", name: "JPMorgan", market: "us" },
-  { symbol: "LLY", name: "Eli Lilly", market: "us" },
-  { symbol: "BA", name: "Boeing", market: "us" },
-  { symbol: "DIS", name: "Disney", market: "us" },
-  { symbol: "IONQ", name: "IonQ", market: "us" },
-  { symbol: "CPNG", name: "Coupang", market: "us" },
-  { symbol: "SHOP", name: "Shopify", market: "us" },
-  { symbol: "CRWD", name: "CrowdStrike", market: "us" },
-  { symbol: "BITX", name: "BTC 2x 레버리지", market: "us" },
-  { symbol: "005930.KS", name: "삼성전자", market: "kr" },
-  { symbol: "000660.KS", name: "SK하이닉스", market: "kr" },
-  { symbol: "035420.KS", name: "NAVER", market: "kr" },
-  { symbol: "068270.KS", name: "셀트리온", market: "kr" },
-  { symbol: "373220.KS", name: "LG에너지솔루션", market: "kr" },
-  { symbol: "005380.KS", name: "현대차", market: "kr" },
-  { symbol: "000270.KS", name: "기아", market: "kr" },
-  { symbol: "035720.KS", name: "카카오", market: "kr" },
-  { symbol: "051910.KS", name: "LG화학", market: "kr" },
-  { symbol: "006400.KS", name: "삼성SDI", market: "kr" },
-  { symbol: "207940.KS", name: "삼성바이오로직스", market: "kr" },
-  { symbol: "259960.KS", name: "크래프톤", market: "kr" },
-  { symbol: "352820.KS", name: "하이브", market: "kr" },
-  { symbol: "105560.KS", name: "KB금융", market: "kr" },
-  { symbol: "055550.KS", name: "신한지주", market: "kr" },
-  { symbol: "042660.KS", name: "한화오션", market: "kr" },
-  { symbol: "329180.KS", name: "HD현대중공업", market: "kr" },
-  { symbol: "009540.KS", name: "HD한국조선해양", market: "kr" },
-  { symbol: "196170.KQ", name: "알테오젠", market: "kr" },
-  { symbol: "042700.KS", name: "한미반도체", market: "kr" },
-];
+// ── 유니버스 ──
+//   ★ 2026-08-13 (대표 지시 "51종밖에 지원 안 하는데 전 종목"): 51종 → 1,016종.
+//   목록 자체는 정적 데이터라 리뷰 단위를 분리하려고 _shared/stock-universe.js 로
+//   옮겼습니다(등재 근거·검증 방법은 그 파일 헤더에 기록). 기존 import 경로
+//   (`from "./_shared/stock-signals.js"`)를 깨지 않도록 여기서 그대로 재수출합니다.
+export { STOCK_UNIVERSE } from "./stock-universe.js";
+
+// 스코어 산출 최소 봉 수 — scoreStockTF 의 하한과 동일 상수를 크론이 재사용합니다
+// (상장 직후 종목을 호출 없이 걸러내는 판정에 사용).
+export const MIN_BARS = 62;
+
+// 상장 직후라 아직 일봉이 MIN_BARS 개도 안 쌓인 종목인지 — 야후 호출 0회로 판정.
+//   거래일 수 ≤ 평일 수 이므로 "평일 수 < MIN_BARS" 면 봉 수 부족이 *확정*입니다
+//   (휴장일을 몰라도 안전한 하한 판정 — 반대로 평일이 충분하면 실제 스캔이
+//   최종 판정을 하므로 종목이 영구히 누락될 일은 없습니다).
+export function isTooNewToScore(listedAt, now = Date.now()) {
+  if (!listedAt) return false;
+  const t0 = Date.parse(`${listedAt}T00:00:00Z`);
+  if (!Number.isFinite(t0)) return false;   // 형식 이상 — 스캔에서 최종 판정
+  if (t0 > now) return true;                // 상장 예정
+  const days = Math.floor((now - t0) / 86400000);
+  if (days >= MIN_BARS * 2) return false;   // 평일만 세도 확실히 충분 — 루프 생략
+  let weekdays = 0;
+  for (let i = 0; i <= days; i++) {
+    const d = new Date(t0 + i * 86400000).getUTCDay();
+    if (d !== 0 && d !== 6) weekdays++;
+  }
+  return weekdays < MIN_BARS;
+}
 
 // TF 가중치 — 코인 종합 스코어(btc-cron, 대표 지시 2026-06-03)와 동일:
 //   주 0.30 · 일 0.25 · 4h 0.25 · 1h 0.20 (부호 가중합 → 합의 시 점수↑, 갈리면 상쇄)
@@ -95,54 +76,130 @@ export const TF_WEIGHTS = { "1w": 0.30, "1d": 0.25, "4h": 0.25, "1h": 0.20 };
 // ════════════════════════════════════════════════════════
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
 
+// ── 호출 통계 (레이트리밋 관측용) ──
+//   유니버스가 1,000종대로 커지면서 "야후가 실제로 조여오는가"를 눈으로 봐야
+//   합니다. 크론이 런 단위로 읽어 응답에 그대로 실어 정직하게 보고합니다.
+//   (지어낸 안전 마진 대신 실측 429 카운트로 판단하기 위한 계기판)
+//   ★ 2026-08-13 리뷰 수리 — 필드별 집계 대상을 분리해 정직하게 표기합니다.
+//     · calls / ok / r404 / other / err / retried — v8 chart 호출만
+//     · auth / authOk / authErr — 인증 플로우(fc.yahoo.com·finance.yahoo.com·getcrumb)만.
+//       authOk 는 "응답이 도착함" 기준입니다. fc.yahoo.com 은 3xx·404 로도 쿠키를 주므로
+//       HTTP 상태로 성공을 판정하지 않습니다(지어낸 성공률 대신 도착 여부만 셉니다).
+//     · r429 — 두 경로 합산. 레이트리밋은 경로를 가리지 않고, 크론의 적응 백오프가
+//       인증 429 도 보고 반응해야 하기 때문입니다.
+//     이전에는 인증 호출이 어디에도 안 잡혀 대표 보고용 yahoo 지표에서 보이지 않았습니다.
+const _stats = { calls: 0, ok: 0, r429: 0, r404: 0, other: 0, err: 0, retried: 0, auth: 0, authOk: 0, authErr: 0 };
+export function readFetchStats() { return { ..._stats }; }
+export function resetFetchStats() { for (const k of Object.keys(_stats)) _stats[k] = 0; }
+
 let _cookie = null;
 let _crumb = null;
 let _expires = 0;
+//   ★ 2026-08-13 리뷰 수리 ① 타임아웃: 인증 요청에는 타임아웃이 없어서, 야후 인증
+//     엔드포인트가 지연되면 undici 기본 헤더 타임아웃(300초)까지 워커가 묶입니다.
+//     그러면 크론이 maxDuration 300초를 태우고 강제 종료돼 **커서 저장까지 날아가**
+//     분할 스캔이 그 런 동안 전혀 전진하지 못합니다(차트 호출은 8초 타임아웃이
+//     있는데 인증 경로만 무방비였음).
+//     인증 플로우는 최대 4요청(fc → finance 폴백 → crumb 호스트 2개)이 순차라
+//     최악 지연이 4×5초 = 20초로 묶입니다(스텁 검증 실측 20.0초). 210초 예산 안이고,
+//     아래 in-flight 공유 덕분에 런당 1회만 발생합니다.
+const AUTH_TIMEOUT_MS = 5000;
+//   ★ 리뷰 수리 ② in-flight 중복 제거: 콜드 스타트 시점엔 워커 12개가 동시에
+//     _expires=0 을 보고 전원이 인증에 진입합니다(첫 차트 호출 전에 최대 36건).
+//     진행 중 프라미스를 공유해 런당 1회로 축약합니다.
+let _authInflight = null;
+//   ★ 리뷰 수리 ③ 실패 쿨다운: 인증이 실패하면 crumb 캐시가 비어 심볼마다 인증
+//     플로우를 다시 돌게 됩니다(400종 런이면 최대 1,200건 추가 요청). 실패 결과도
+//     짧게 캐시해 폭주를 막습니다 — 차트는 crumb 없이도 응답하므로 스캔은 계속됩니다.
+let _authFallback = null;
+let _authFallbackUntil = 0;
+const AUTH_FAIL_COOLDOWN_MS = 60 * 1000;
+
+// 인증 경로 전용 fetch — 타임아웃 + 통계 카운트. 실패 시 예외 대신 null 을 돌려줍니다.
+async function fetchAuthReq(url, headers, opts = {}) {
+  _stats.auth++;
+  try {
+    const r = await fetch(url, { ...opts, headers, signal: AbortSignal.timeout(AUTH_TIMEOUT_MS) });
+    _stats.authOk++;
+    if (r.status === 429) _stats.r429++;
+    return r;
+  } catch { _stats.authErr++; return null; }
+}
+
+async function runYahooAuth() {
+  const now = Date.now();
+  let cookies = "";
+  const r1 = await fetchAuthReq("https://fc.yahoo.com", { "User-Agent": UA }, { redirect: "manual" });
+  if (r1) cookies = r1.headers.get("set-cookie") || "";
+  if (!cookies) {
+    const r2 = await fetchAuthReq("https://finance.yahoo.com/", { "User-Agent": UA }, { redirect: "manual" });
+    if (r2) cookies = r2.headers.get("set-cookie") || "";
+  }
+
+  for (const host of ["query2.finance.yahoo.com", "query1.finance.yahoo.com"]) {
+    const crumbRes = await fetchAuthReq(`https://${host}/v1/test/getcrumb`, { "User-Agent": UA, "Cookie": cookies });
+    if (!crumbRes?.ok) continue;
+    let crumb = "";
+    try { crumb = await crumbRes.text(); } catch { crumb = ""; } // 본문 읽는 중 타임아웃 — 다음 호스트로
+    if (crumb) {
+      _cookie = cookies; _crumb = crumb; _expires = now + 8 * 60 * 1000;
+      _authFallback = null; _authFallbackUntil = 0;
+      return { cookie: _cookie, crumb: _crumb };
+    }
+  }
+  // 2026-08-11 실측: v8 chart 는 crumb 없이도 응답함 — 인증 실패 시 crumb 없이 진행(폴백)
+  _authFallback = { cookie: cookies, crumb: "" };
+  _authFallbackUntil = now + AUTH_FAIL_COOLDOWN_MS;
+  return _authFallback;
+}
 
 async function getYahooAuth() {
   const now = Date.now();
   if (_cookie && _crumb && now < _expires) return { cookie: _cookie, crumb: _crumb };
-
-  let cookies = "";
+  if (_authFallback && now < _authFallbackUntil) return _authFallback; // 최근 실패 — 쿨다운 동안 재시도 안 함
+  if (_authInflight) return _authInflight;                             // 이미 누가 인증 중 — 결과를 나눠 씁니다
+  _authInflight = runYahooAuth().catch(() => ({ cookie: "", crumb: "" }));
   try {
-    const r1 = await fetch("https://fc.yahoo.com", { redirect: "manual", headers: { "User-Agent": UA } });
-    cookies = r1.headers.get("set-cookie") || "";
-  } catch {}
-  if (!cookies) {
-    try {
-      const r2 = await fetch("https://finance.yahoo.com/", { redirect: "manual", headers: { "User-Agent": UA } });
-      cookies = r2.headers.get("set-cookie") || "";
-    } catch {}
+    return await _authInflight;
+  } finally {
+    _authInflight = null;
   }
-
-  for (const host of ["query2.finance.yahoo.com", "query1.finance.yahoo.com"]) {
-    try {
-      const crumbRes = await fetch(`https://${host}/v1/test/getcrumb`, {
-        headers: { "User-Agent": UA, "Cookie": cookies },
-      });
-      if (crumbRes.ok) {
-        const crumb = await crumbRes.text();
-        _cookie = cookies; _crumb = crumb; _expires = now + 8 * 60 * 1000;
-        return { cookie: _cookie, crumb: _crumb };
-      }
-    } catch {}
-  }
-  // 2026-08-11 실측: v8 chart 는 crumb 없이도 응답함 — 인증 실패 시 crumb 없이 진행(폴백)
-  return { cookie: cookies, crumb: "" };
 }
 
 // 단일 심볼 차트 1회 호출 (yahoo.js fetchOne 패턴 — host 폴백 + 타임아웃)
+//   ★ 2026-08-13 유니버스 확대: 429/5xx 를 삼키지 않고 카운트하고, 429 는 짧은
+//     지터 백오프 후 1회만 재시도합니다(런 전체를 늦추지 않는 선).
+//     실측(2026-08-13): 단발 1,118심볼 연속 조회(동시성 12)는 429 0건이었지만,
+//     400심볼 런을 쉬는 시간 없이 3회 연달아 돌리자(누적 약 2,700콜) 야후가
+//     본격적으로 조이기 시작했습니다. 그래서 ① 이미 조여오는 게 확인된 뒤엔
+//     재시도를 멈추고(재시도가 오히려 호출을 2배로 늘림) ② 크론이 런을 중단해
+//     다음 런에서 이어받게 합니다. 정기 크론은 런 간격이 30분이라 이 구간과는
+//     듀티사이클이 전혀 다르지만, 안전장치는 실측대로 둡니다.
+const RETRY_429_UNTIL = 10; // 429 누적이 이보다 많으면 재시도 포기(확실히 조이는 상태)
 async function fetchChartJson(symbol, interval, range, auth) {
   for (const host of ["query2.finance.yahoo.com", "query1.finance.yahoo.com"]) {
     const crumbQ = auth.crumb ? `&crumb=${encodeURIComponent(auth.crumb)}` : "";
     const url = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?interval=${interval}&range=${range}${crumbQ}&includePrePost=false`;
-    try {
-      const r = await fetch(url, {
-        headers: { "User-Agent": UA, "Accept": "application/json", "Cookie": auth.cookie || "" },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (r.ok) return r.json();
-    } catch {}
+    for (let attempt = 0; attempt < 2; attempt++) {
+      _stats.calls++;
+      try {
+        const r = await fetch(url, {
+          headers: { "User-Agent": UA, "Accept": "application/json", "Cookie": auth.cookie || "" },
+          signal: AbortSignal.timeout(8000),
+        });
+        if (r.ok) { _stats.ok++; return r.json(); }
+        if (r.status === 429) {
+          _stats.r429++;
+          if (attempt === 0 && _stats.r429 <= RETRY_429_UNTIL) {
+            _stats.retried++;
+            await new Promise((s) => setTimeout(s, 400 + Math.random() * 600));
+            continue;
+          }
+        } else if (r.status === 404) { _stats.r404++; return null; } // 상장폐지·오탈자 — 호스트 폴백해도 동일
+        else _stats.other++;
+      } catch { _stats.err++; }
+      break; // 429 재시도 외에는 다음 호스트로
+    }
   }
   return null;
 }
@@ -243,7 +300,7 @@ export function aggregate4h(candles1h) {
 // 점수 변환도 공유 규칙 재사용: scaleScore(|net|) → 0~100, gradeConfidence → A/B/C.
 // ════════════════════════════════════════════════════════
 export function scoreStockTF({ closes, highs, lows, volumes }, tf = "1d") {
-  if (!Array.isArray(closes) || closes.length < 62) return null; // 코인 sigForTF 와 동일 최소 봉 수
+  if (!Array.isArray(closes) || closes.length < MIN_BARS) return null; // 코인 sigForTF 와 동일 최소 봉 수
   const L = closes.length - 1;
   const price = closes[L];
   const prev = closes[L - 1];
@@ -398,7 +455,14 @@ export function scoreStockTF({ closes, highs, lows, volumes }, tf = "1d") {
 // 완결봉 정책(코인 btc-cron 과 동일 계열):
 //   1w — 마지막(형성 중인 이번 주) 봉 제외, 1h/4h — 개장 중이면 형성 중 마지막 봉
 //   제외(리페인팅 방지), 1d — 진행봉 포함(코인 sig1d 경로와 동일, 반응성 보존).
-// 반환: { entry, marketState } | null (일봉 데이터 부족 등 스캔 불가 시 null)
+// 반환: { status, entry, marketState }
+//   status "ok"                — 스캔 성공 (entry 는 방향 합의 없으면 null)
+//   status "fetch-failed"      — 야후 응답 자체를 못 받음 (일시 장애·차단)
+//   status "insufficient-data" — 응답은 받았으나 일봉이 MIN_BARS 개 미만
+//                                (상장 직후 종목 — 봉이 쌓이면 자동 편입)
+//   ★ 2026-08-13: 예전엔 두 실패를 모두 bare null 로 반환해 크론이 "호출 실패"와
+//     "상장 초기라 봉 부족"을 구분하지 못했습니다(1,016종으로 늘리면 신규 상장이
+//     상시 섞이므로 실패 리포트가 오염됨). 사유를 분리해 정직하게 보고합니다.
 // ════════════════════════════════════════════════════════
 export async function scanStockSymbol({ symbol, name, market }) {
   const auth = await getYahooAuth();
@@ -413,7 +477,10 @@ export async function scanStockSymbol({ symbol, name, market }) {
   const jsonH = rH.status === "fulfilled" ? rH.value : null;
 
   const candles1d = jsonD ? parseChartCandles(jsonD) : null;
-  if (!candles1d || candles1d.length < 62) return null; // 일봉은 필수(스코어+지지저항 기준)
+  if (!jsonD || !candles1d) return { status: "fetch-failed", entry: null, marketState: null };
+  if (candles1d.length < MIN_BARS) { // 일봉은 필수(스코어+지지저항 기준)
+    return { status: "insufficient-data", entry: null, marketState: deriveMarketState(jsonD), bars: candles1d.length };
+  }
 
   const marketState = deriveMarketState(jsonD) ?? deriveMarketState(jsonH) ?? null;
   const marketOpen = marketState === "REGULAR";
@@ -432,10 +499,10 @@ export async function scanStockSymbol({ symbol, name, market }) {
     volumes: cs.map((c) => c.volume || 0),
   });
 
-  const sigW = candles1w && candles1w.length >= 62 ? scoreStockTF(toArrays(candles1w), "1w") : null;
+  const sigW = candles1w && candles1w.length >= MIN_BARS ? scoreStockTF(toArrays(candles1w), "1w") : null;
   const sigD = scoreStockTF(toArrays(candles1d), "1d");
-  const sig4 = candles4h.length >= 62 ? scoreStockTF(toArrays(candles4h), "4h") : null;
-  const sig1 = candles1h && candles1h.length >= 62 ? scoreStockTF(toArrays(candles1h), "1h") : null;
+  const sig4 = candles4h.length >= MIN_BARS ? scoreStockTF(toArrays(candles4h), "4h") : null;
+  const sig1 = candles1h && candles1h.length >= MIN_BARS ? scoreStockTF(toArrays(candles1h), "1h") : null;
 
   // ── 종합 — btc-cron compositeSignal 과 동일 공식(부호 가중합, 임계 ±0.5) ──
   const signed = (s) => (!s ? 0 : (s.type === "BUY" ? 1 : s.type === "SELL" ? -1 : 0) * (parseFloat(s.score) || 0));
@@ -443,7 +510,7 @@ export async function scanStockSymbol({ symbol, name, market }) {
     + TF_WEIGHTS["4h"] * signed(sig4) + TF_WEIGHTS["1h"] * signed(sig1);
   const compScore = Math.round(Math.min(100, Math.abs(raw)));
   const compType = raw > 0.5 ? "BUY" : raw < -0.5 ? "SELL" : null;
-  if (!compType) return { entry: null, marketState }; // 방향 합의 없음 — 코인 풀과 동일하게 미적재
+  if (!compType) return { status: "ok", entry: null, marketState }; // 방향 합의 없음 — 코인 풀과 동일하게 미적재
 
   const tfTag = (s) => (!s ? "—" : `${s.type === "BUY" ? "롱" : "숏"}${Math.round(s.score)}`);
   const breakdown = {
@@ -488,5 +555,5 @@ export async function scanStockSymbol({ symbol, name, market }) {
     sr,
     marketState,                 // "REGULAR" | "CLOSED" | null — 장 마감 후엔 마지막 데이터 기준 유지(정직 표기)
   };
-  return { entry, marketState };
+  return { status: "ok", entry, marketState };
 }

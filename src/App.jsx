@@ -737,6 +737,218 @@ const US_ASSETS = [
   { symbol: "DEO", name: "Diageo" }, { symbol: "UL", name: "Unilever" },
   { symbol: "SONY", name: "Sony" }, { symbol: "TD", name: "TD Bank" }, { symbol: "RY", name: "Royal Bank Canada" },
   { symbol: "MUFG", name: "Mitsubishi UFJ" }, { symbol: "SMFG", name: "Sumitomo Mitsui" },
+  // ── 2026-08-13 시그널 유니버스와 동기화 (대표 지시 "나머지도 다 올려줘") ──
+  //   조건 검색은 원래 이 목록만 스캔해서, 시그널 쪽에만 등재된 신규 상장 종목
+  //   (SPCX·MDA·SKHY·BTGO 등)을 조건 검색에서는 찾을 수 없었습니다. 두 목록의
+  //   차집합을 여기로 보강해 "시그널에 있는데 검색은 안 되는" 상태를 없앱니다.
+  //   출처는 api/_shared/stock-universe.js(전량 야후 실응답 검증본)입니다.
+  { symbol: "A", name: "Agilent Technologies" }, { symbol: "AADX", name: "Applied Aerospace & Defense" },
+  { symbol: "ACGL", name: "Arch Capital" }, { symbol: "ACHR", name: "Archer Aviation" },
+  { symbol: "ADM", name: "Archer-Daniels-Midland" }, { symbol: "ADP", name: "ADP" },
+  { symbol: "AEE", name: "Ameren" }, { symbol: "AES", name: "AES" },
+  { symbol: "AFL", name: "Aflac" }, { symbol: "AII", name: "American Integrity Insurance Group, Inc." },
+  { symbol: "AIZ", name: "Assurant" }, { symbol: "AJG", name: "Arthur J. Gallagher" },
+  { symbol: "AKAM", name: "Akamai Technologies" }, { symbol: "AKTS", name: "Aktis Oncology" },
+  { symbol: "ALGN", name: "Align Technology" }, { symbol: "ALH", name: "Alliance Laundry" },
+  { symbol: "ALLE", name: "Allegion" }, { symbol: "ALMR", name: "Alamar Biosciences, Inc." },
+  { symbol: "AMBQ", name: "Ambiq Micro, Inc." }, { symbol: "AMCR", name: "Amcor" },
+  { symbol: "AMP", name: "Ameriprise Financial" }, { symbol: "ANDG", name: "Andersen Group Inc." },
+  { symbol: "ANET", name: "Arista Networks" }, { symbol: "AON", name: "Aon" },
+  { symbol: "AOS", name: "A. O. Smith" }, { symbol: "APA", name: "APA" },
+  { symbol: "APH", name: "Amphenol" }, { symbol: "APMD", name: "Apnimed, Inc." },
+  { symbol: "APTV", name: "Aptiv" }, { symbol: "ARE", name: "Alexandria Real Estate" },
+  { symbol: "ARES", name: "Ares Management" }, { symbol: "ARQQ", name: "Arqit Quantum" },
+  { symbol: "ARX", name: "Accelerant" }, { symbol: "ARXS", name: "Arxis" },
+  { symbol: "ASTS", name: "AST SpaceMobile" }, { symbol: "ATO", name: "Atmos Energy" },
+  { symbol: "ATTO", name: "Attovia Therapeutics" }, { symbol: "AUGO", name: "Aura Minerals Inc." },
+  { symbol: "AVB", name: "AvalonBay Communities" }, { symbol: "AVEX", name: "AEVEX" },
+  { symbol: "AVLN", name: "Avalyn Pharma" }, { symbol: "AVY", name: "Avery Dennison" },
+  { symbol: "AWK", name: "American Water Works" }, { symbol: "BALL", name: "Ball" },
+  { symbol: "BAX", name: "Baxter International" }, { symbol: "BBAI", name: "BigBear.ai" },
+  { symbol: "BBNX", name: "Beta Bionics, Inc." }, { symbol: "BBY", name: "Best Buy" },
+  { symbol: "BDX", name: "Becton, Dickinson and" }, { symbol: "BEKE", name: "KE Holdings" },
+  { symbol: "BEN", name: "Franklin Resources" }, { symbol: "BETA", name: "BETA Technologies" },
+  { symbol: "BF-B", name: "Brown-Forman" }, { symbol: "BG", name: "Bunge Global SA" },
+  { symbol: "BLDR", name: "Builders FirstSource" }, { symbol: "BLLN", name: "BillionToOne, Inc." },
+  { symbol: "BLSH", name: "Bullish" }, { symbol: "BLSM", name: "BlossomHill Therapeutics, Inc." },
+  { symbol: "BMNR", name: "Bitmine Immersion Technologies" }, { symbol: "BNY", name: "BNY Mellon" },
+  { symbol: "BOBS", name: "Bob's Discount Furniture" }, { symbol: "BR", name: "Broadridge Financial Solutions" },
+  { symbol: "BRCB", name: "Black Rock Coffee Bar, Inc." }, { symbol: "BRO", name: "Brown & Brown" },
+  { symbol: "BRVE", name: "Braveheart Bio" }, { symbol: "BSP", name: "Bending Spoons" },
+  { symbol: "BTBT", name: "Bit Digital" }, { symbol: "BTGO", name: "BitGo Holdings, Inc." },
+  { symbol: "BUD", name: "Anheuser-Busch InBev SA/NV" }, { symbol: "BXDC", name: "Blackstone Digital" },
+  { symbol: "BXP", name: "BXP" }, { symbol: "CAH", name: "Cardinal Health" },
+  { symbol: "CAI", name: "Caris Life Sciences" }, { symbol: "CARR", name: "Carrier Global" },
+  { symbol: "CASY", name: "Casey's General Stores" }, { symbol: "CBC", name: "Central Bancompany" },
+  { symbol: "CBOE", name: "Cboe Global Markets" }, { symbol: "CBRE", name: "CBRE" },
+  { symbol: "CBRS", name: "Cerebras" }, { symbol: "CCI", name: "Crown Castle" },
+  { symbol: "CCJ", name: "Cameco" }, { symbol: "CCL", name: "Carnival" },
+  { symbol: "CDNL", name: "Cardinal Infrastructure Group Inc." }, { symbol: "CDW", name: "CDW" },
+  { symbol: "CF", name: "CF Industries" }, { symbol: "CHA", name: "Chagee" },
+  { symbol: "CHD", name: "Church & Dwight" }, { symbol: "CHRW", name: "C.H. Robinson Worldwide" },
+  { symbol: "CHTR", name: "Charter Communications" }, { symbol: "CHYM", name: "Chime" },
+  { symbol: "CI", name: "Cigna" }, { symbol: "CIEN", name: "Ciena" },
+  { symbol: "CIFR", name: "Cipher Digital" }, { symbol: "CINF", name: "Cincinnati Financial" },
+  { symbol: "CLSK", name: "CleanSpark" }, { symbol: "CLX", name: "Clorox" },
+  { symbol: "CMS", name: "CMS Energy" }, { symbol: "CNC", name: "Centene" },
+  { symbol: "CNP", name: "CenterPoint Energy" }, { symbol: "COAG", name: "Hemab Therapeutics" },
+  { symbol: "COF", name: "Capital One Financial" }, { symbol: "COHR", name: "Coherent" },
+  { symbol: "COO", name: "Cooper Companies" }, { symbol: "COR", name: "Cencora" },
+  { symbol: "CPAY", name: "Corpay" }, { symbol: "CPT", name: "Camden Property Trust" },
+  { symbol: "CRCL", name: "Circle Internet" }, { symbol: "CRH", name: "CRH" },
+  { symbol: "CRL", name: "Charles River Laboratories" }, { symbol: "CRWV", name: "CoreWeave" },
+  { symbol: "CSQR", name: "Csquare" }, { symbol: "CSX", name: "CSX" },
+  { symbol: "CTAS", name: "Cintas" }, { symbol: "CTSH", name: "Cognizant Technology Solutions" },
+  { symbol: "CTVA", name: "Corteva" }, { symbol: "CVNA", name: "Carvana" },
+  { symbol: "CVS", name: "CVS Health" }, { symbol: "DAL", name: "Delta Air Lines" },
+  { symbol: "DELL", name: "Dell Technologies" }, { symbol: "DGNX", name: "Diginex Limited" },
+  { symbol: "DGX", name: "Quest Diagnostics" }, { symbol: "DLR", name: "Digital Realty Trust" },
+  { symbol: "DOC", name: "Healthpeak Properties" }, { symbol: "DPC", name: "DPC" },
+  { symbol: "DPZ", name: "Domino's Pizza" }, { symbol: "DRI", name: "Darden Restaurants" },
+  { symbol: "DTE", name: "DTE Energy" }, { symbol: "DVA", name: "DaVita" },
+  { symbol: "EBAY", name: "eBay" }, { symbol: "ECHO", name: "EchoStar" },
+  { symbol: "EFX", name: "Equifax" }, { symbol: "EG", name: "Everest" },
+  { symbol: "EIX", name: "Edison International" }, { symbol: "ELV", name: "Elevance Health" },
+  { symbol: "EME", name: "EMCOR" }, { symbol: "EQPT", name: "EquipmentShare.com" },
+  { symbol: "EQR", name: "Equity Residential" }, { symbol: "EQT", name: "EQT" },
+  { symbol: "ERIE", name: "Erie Indemnity" }, { symbol: "EROC", name: "ERock" },
+  { symbol: "EROK", name: "EagleRock Land LLC" }, { symbol: "ES", name: "Eversource Energy" },
+  { symbol: "ESS", name: "Essex Property Trust" }, { symbol: "ETOR", name: "eToro" },
+  { symbol: "ETR", name: "Entergy" }, { symbol: "EVMN", name: "Evommune, Inc." },
+  { symbol: "EVRG", name: "Evergy" }, { symbol: "EXE", name: "Expand Energy" },
+  { symbol: "EXPD", name: "Expeditors International of" }, { symbol: "EXPE", name: "Expedia" },
+  { symbol: "EXR", name: "Extra Space Storage" }, { symbol: "FDS", name: "FactSet Research Systems" },
+  { symbol: "FDXF", name: "FedEx Freight" }, { symbol: "FE", name: "FirstEnergy" },
+  { symbol: "FERG", name: "Ferguson Enterprises" }, { symbol: "FFIV", name: "F5, Inc." },
+  { symbol: "FICO", name: "Fair Isaac" }, { symbol: "FIG", name: "Figma" },
+  { symbol: "FIGR", name: "Figure Technology Solutions" }, { symbol: "FIX", name: "Comfort Systems USA" },
+  { symbol: "FLEX", name: "Flex" }, { symbol: "FLOC", name: "Flowco" },
+  { symbol: "FLY", name: "Firefly Aerospace" }, { symbol: "FOIL", name: "Londian Wason New Energy Tech Inc." },
+  { symbol: "FOX", name: "Fox" }, { symbol: "FOXA", name: "Fox" },
+  { symbol: "FPS", name: "Forgent Power Solutions" }, { symbol: "FRMI", name: "Fermi" },
+  { symbol: "FRNM", name: "Freenome, Inc." }, { symbol: "FRT", name: "Federal Realty Investment" },
+  { symbol: "FRVO", name: "Fervo Energy" }, { symbol: "FTV", name: "Fortive" },
+  { symbol: "FUTU", name: "Futu" }, { symbol: "GDDY", name: "GoDaddy" },
+  { symbol: "GEMI", name: "Gemini Space Station" }, { symbol: "GEN", name: "Gen Digital" },
+  { symbol: "GENB", name: "Generate Biomedicines" }, { symbol: "GIS", name: "General Mills" },
+  { symbol: "GL", name: "Globe Life" }, { symbol: "GLW", name: "Corning" },
+  { symbol: "GLXY", name: "Galaxy Digital" }, { symbol: "GMRS", name: "GMR Solutions" },
+  { symbol: "GNRC", name: "Generac" }, { symbol: "GOOG", name: "Alphabet" },
+  { symbol: "GWW", name: "W.W. Grainger" }, { symbol: "HAS", name: "Hasbro" },
+  { symbol: "HAWK", name: "HawkEye 360" }, { symbol: "HBAN", name: "Huntington Bancshares" },
+  { symbol: "HCA", name: "HCA Healthcare" }, { symbol: "HDB", name: "HDFC Bank" },
+  { symbol: "HIG", name: "Hartford Insurance" }, { symbol: "HLT", name: "Hilton Worldwide" },
+  { symbol: "HNGE", name: "Hinge Health" }, { symbol: "HONA", name: "Honeywell Aerospace" },
+  { symbol: "HPE", name: "Hewlett Packard Enterprise" }, { symbol: "HPQ", name: "HP Inc." },
+  { symbol: "HRL", name: "Hormel Foods" }, { symbol: "HSBC", name: "HSBC" },
+  { symbol: "HSIC", name: "Henry Schein" }, { symbol: "HST", name: "Host Hotels & Resorts" },
+  { symbol: "HSY", name: "Hershey" }, { symbol: "HTFL", name: "Heartflow" },
+  { symbol: "HUBB", name: "Hubbell" }, { symbol: "HUM", name: "Humana" },
+  { symbol: "HUT", name: "Hut 8" }, { symbol: "HWM", name: "Howmet Aerospace" },
+  { symbol: "IBN", name: "ICICI Bank" }, { symbol: "IEX", name: "IDEX" },
+  { symbol: "IFF", name: "Intl Flavors & Fragrances" }, { symbol: "INCY", name: "Incyte" },
+  { symbol: "INFY", name: "Infosys" }, { symbol: "INIO", name: "Innio" },
+  { symbol: "INVH", name: "Invitation Homes" }, { symbol: "IP", name: "International Paper" },
+  { symbol: "IQ", name: "iQIYI" }, { symbol: "IQV", name: "IQVIA" },
+  { symbol: "IRM", name: "Iron Mountain" }, { symbol: "IT", name: "Gartner" },
+  { symbol: "ITG", name: "ITG" }, { symbol: "IVZ", name: "Invesco" },
+  { symbol: "J", name: "Jacobs Solutions" }, { symbol: "JAN", name: "Janus Living" },
+  { symbol: "JBHT", name: "J.B. Hunt Transport Services" }, { symbol: "JBL", name: "Jabil" },
+  { symbol: "JCAP", name: "Jefferson Capital, Inc." }, { symbol: "JCI", name: "Johnson Controls International" },
+  { symbol: "JKHY", name: "Jack Henry & Associates" }, { symbol: "JMKE", name: "Jersey Mike's Subs" },
+  { symbol: "JOBY", name: "Joby Aviation" }, { symbol: "KARD", name: "Kardigan" },
+  { symbol: "KB", name: "KB Financial" }, { symbol: "KEYS", name: "Keysight Technologies" },
+  { symbol: "KIM", name: "Kimco Realty" }, { symbol: "KLAR", name: "Klarna" },
+  { symbol: "KLRA", name: "Kailera Therapeutics" }, { symbol: "KMI", name: "Kinder Morgan" },
+  { symbol: "KMTS", name: "Kestra Medical Technologies, Ltd." }, { symbol: "KR", name: "Kroger" },
+  { symbol: "KRMN", name: "Karman" }, { symbol: "L", name: "Loews" },
+  { symbol: "LBRX", name: "LB Pharmaceuticals" }, { symbol: "LCLN", name: "Lincoln International" },
+  { symbol: "LDOS", name: "Leidos" }, { symbol: "LEU", name: "Centrus Energy" },
+  { symbol: "LFTO", name: "Liftoff Mobile" }, { symbol: "LGN", name: "Legence" },
+  { symbol: "LH", name: "Labcorp" }, { symbol: "LHX", name: "L3Harris Technologies" },
+  { symbol: "LIFE", name: "Ethos Technologies Inc." }, { symbol: "LII", name: "Lennox International" },
+  { symbol: "LIME", name: "Neutron Holdings, Inc." }, { symbol: "LITE", name: "Lumentum" },
+  { symbol: "LMND", name: "Lemonade" }, { symbol: "LMRI", name: "Lumexa Imaging" },
+  { symbol: "LNT", name: "Alliant Energy" }, { symbol: "LPL", name: "LG Display" },
+  { symbol: "LTGO", name: "Latigo Biotherapeutics" }, { symbol: "LUNR", name: "Intuitive Machines" },
+  { symbol: "LUV", name: "Southwest Airlines" }, { symbol: "LVS", name: "Las Vegas Sands" },
+  { symbol: "LYB", name: "LyondellBasell Industries" }, { symbol: "LYV", name: "Live Nation Entertainment" },
+  { symbol: "MAA", name: "Mid-America Apartment" }, { symbol: "MAIR", name: "Madison Air Solutions" },
+  { symbol: "MANE", name: "Veradermics, Incorporated" }, { symbol: "MAS", name: "Masco" },
+  { symbol: "MAZE", name: "Maze Therapeutics, Inc." }, { symbol: "MCK", name: "McKesson" },
+  { symbol: "MDA", name: "MDA Space Ltd." }, { symbol: "MDLN", name: "Medline" },
+  { symbol: "MGM", name: "MGM Resorts International" }, { symbol: "MH", name: "McGraw Hill" },
+  { symbol: "MIAX", name: "Miami International" }, { symbol: "MKC", name: "McCormick" },
+  { symbol: "MMED", name: "MiniMed" }, { symbol: "MNTN", name: "MNTN, Inc." },
+  { symbol: "MO", name: "Altria" }, { symbol: "MOS", name: "Mosaic" },
+  { symbol: "MPLT", name: "MapLight Therapeutics, Inc." }, { symbol: "MRSH", name: "Marsh & McLennan Companies" },
+  { symbol: "MSI", name: "Motorola Solutions" }, { symbol: "MTB", name: "M&T Bank" },
+  { symbol: "MTD", name: "Mettler-Toledo International" }, { symbol: "MWH", name: "SOLV Energy" },
+  { symbol: "NAVN", name: "Navan" }, { symbol: "NCLH", name: "Norwegian Cruise Line" },
+  { symbol: "NDAQ", name: "Nasdaq" }, { symbol: "NDSN", name: "Nordson" },
+  { symbol: "NHP", name: "National Healthcare Properties" }, { symbol: "NI", name: "NiSource" },
+  { symbol: "NIQ", name: "NIQ Global Intelligence" }, { symbol: "NNE", name: "NANO Nuclear Energy" },
+  { symbol: "NP", name: "Neptune Insurance" }, { symbol: "NRG", name: "NRG Energy" },
+  { symbol: "NSC", name: "Norfolk Southern" }, { symbol: "NTAP", name: "NetApp" },
+  { symbol: "NTSK", name: "Netskope" }, { symbol: "NUE", name: "Nucor" },
+  { symbol: "NVR", name: "NVR" }, { symbol: "NWS", name: "News" },
+  { symbol: "NWSA", name: "News" }, { symbol: "OFRM", name: "Once Upon A Farm, PBC" },
+  { symbol: "OKE", name: "ONEOK" }, { symbol: "OKLO", name: "Oklo" },
+  { symbol: "OMC", name: "Omnicom" }, { symbol: "OMDA", name: "Omada Health, Inc." },
+  { symbol: "OPEN", name: "Opendoor Technologies" }, { symbol: "PAYP", name: "PayPay" },
+  { symbol: "PAYX", name: "Paychex" }, { symbol: "PBLS", name: "Parabilis Medicines" },
+  { symbol: "PEG", name: "Public Service Enterprise" }, { symbol: "PFG", name: "Principal Financial" },
+  { symbol: "PICS", name: "PicS N.V." }, { symbol: "PKG", name: "Packaging Corporation of" },
+  { symbol: "PKX", name: "POSCO" }, { symbol: "PNR", name: "Pentair" },
+  { symbol: "PNW", name: "Pinnacle West Capital" }, { symbol: "PODD", name: "Insulet" },
+  { symbol: "PPL", name: "PPL" }, { symbol: "PS", name: "Pershing Square" },
+  { symbol: "PSA", name: "Public Storage" }, { symbol: "PSKY", name: "Paramount Skydance" },
+  { symbol: "PTC", name: "PTC" }, { symbol: "PTRN", name: "Pattern" },
+  { symbol: "Q", name: "Qnity Electronics" }, { symbol: "QNT", name: "Quantinuum" },
+  { symbol: "RDW", name: "Redwire" }, { symbol: "REG", name: "Regency Centers" },
+  { symbol: "RJF", name: "Raymond James Financial" }, { symbol: "RKLB", name: "Rocket Lab" },
+  { symbol: "RL", name: "Ralph Lauren" }, { symbol: "ROL", name: "Rollins" },
+  { symbol: "ROP", name: "Roper Technologies" }, { symbol: "SAIL", name: "SailPoint" },
+  { symbol: "SBET", name: "Sharplink" }, { symbol: "SFD", name: "Smithfield Foods" },
+  { symbol: "SHG", name: "Shinhan Financial" }, { symbol: "SION", name: "Sionna Therapeutics, Inc." },
+  { symbol: "SJM", name: "J. M. Smucker" }, { symbol: "SKHY", name: "SK hynix (US)" },
+  { symbol: "SLDE", name: "Slide Insurance" }, { symbol: "SMA", name: "SmartStop Self Storage" },
+  { symbol: "SMR", name: "NuScale Power" }, { symbol: "SNA", name: "Snap-on" },
+  { symbol: "SNDK", name: "Sandisk" }, { symbol: "SOLV", name: "Solventum" },
+  { symbol: "SPCX", name: "SpaceX" }, { symbol: "SPG", name: "Simon Property" },
+  { symbol: "SPTX", name: "Seaport Therapeutics, Inc." }, { symbol: "SRE", name: "Sempra" },
+  { symbol: "STDN", name: "Standard Nuclear, Inc." }, { symbol: "STE", name: "STERIS" },
+  { symbol: "STLD", name: "Steel Dynamics" }, { symbol: "STUB", name: "StubHub" },
+  { symbol: "STX", name: "Seagate Technology" }, { symbol: "STZ", name: "Constellation Brands" },
+  { symbol: "SUJA", name: "Suja Life, Inc." }, { symbol: "SW", name: "Smurfit Westrock" },
+  { symbol: "SWK", name: "Stanley Black & Decker" }, { symbol: "SWMR", name: "Swarmer, Inc" },
+  { symbol: "SYF", name: "Synchrony Financial" }, { symbol: "TAP", name: "Molson Coors Beverage" },
+  { symbol: "TCOM", name: "Trip.com" }, { symbol: "TDY", name: "Teledyne Technologies" },
+  { symbol: "TECH", name: "Bio-Techne" }, { symbol: "TEL", name: "TE Connectivity" },
+  { symbol: "TEM", name: "Tempus AI" }, { symbol: "TER", name: "Teradyne" },
+  { symbol: "TKO", name: "TKO" }, { symbol: "TPL", name: "Texas Pacific Land" },
+  { symbol: "TPR", name: "Tapestry" }, { symbol: "TRGP", name: "Targa Resources" },
+  { symbol: "TRMB", name: "Trimble" }, { symbol: "TSN", name: "Tyson Foods" },
+  { symbol: "TT", name: "Trane Technologies" }, { symbol: "TTE", name: "TotalEnergies SE" },
+  { symbol: "TXT", name: "Textron" }, { symbol: "UDR", name: "UDR" },
+  { symbol: "UEC", name: "Uranium Energy" }, { symbol: "UHS", name: "Universal Health Services" },
+  { symbol: "ULTA", name: "Ulta Beauty" }, { symbol: "UNP", name: "Union Pacific" },
+  { symbol: "VG", name: "Venture Global" }, { symbol: "VIA", name: "Via Transportation" },
+  { symbol: "VICI", name: "VICI Properties" }, { symbol: "VLTO", name: "Veralto" },
+  { symbol: "VOGX", name: "Vogenx, Inc." }, { symbol: "VOYG", name: "Voyager Technologies" },
+  { symbol: "VRT", name: "Vertiv" }, { symbol: "VTR", name: "Ventas" },
+  { symbol: "VTRS", name: "Viatris" }, { symbol: "WAT", name: "Waters" },
+  { symbol: "WBI", name: "WaterBridge Infrastructure" }, { symbol: "WDC", name: "Western Digital" },
+  { symbol: "WEC", name: "WEC Energy" }, { symbol: "WELL", name: "Welltower" },
+  { symbol: "WF", name: "Woori Financial" }, { symbol: "WLTH", name: "Wealthfront" },
+  { symbol: "WMB", name: "Williams Companies" }, { symbol: "WRB", name: "W. R. Berkley" },
+  { symbol: "WSM", name: "Williams-Sonoma" }, { symbol: "WST", name: "West Pharmaceutical Services" },
+  { symbol: "WULF", name: "TeraWulf" }, { symbol: "WY", name: "Weyerhaeuser" },
+  { symbol: "WYFI", name: "WhiteFiber, Inc." }, { symbol: "XE", name: "X-Energy" },
+  { symbol: "XEL", name: "Xcel Energy" }, { symbol: "XYZ", name: "Block" },
+  { symbol: "YMM", name: "Full Truck Alliance" }, { symbol: "YSS", name: "York Space Systems" },
+  { symbol: "YSWY", name: "Yesway" }, { symbol: "ZTO", name: "ZTO Express (Cayman)" },
+
 ];
 
 const KR_ASSETS = [
@@ -911,6 +1123,110 @@ const KR_ASSETS = [
   { symbol: "217190.KQ", name: "제너셈" }, { symbol: "060370.KQ", name: "LS마린솔루션" },
   { symbol: "383310.KQ", name: "에코프로에이치엔" }, { symbol: "336260.KQ", name: "두산퓨얼셀" },
   { symbol: "377190.KQ", name: "디엘이앤씨" }, { symbol: "025320.KQ", name: "시노펙스" },
+  // ── 2026-08-13 시그널 유니버스와 동기화 (대표 지시 "나머지도 다 올려줘") ──
+  //   조건 검색은 원래 이 목록만 스캔해서, 시그널 쪽에만 등재된 신규 상장 종목
+  //   (SPCX·MDA·SKHY·BTGO 등)을 조건 검색에서는 찾을 수 없었습니다. 두 목록의
+  //   차집합을 여기로 보강해 "시그널에 있는데 검색은 안 되는" 상태를 없앱니다.
+  //   출처는 api/_shared/stock-universe.js(전량 야후 실응답 검증본)입니다.
+  { symbol: "000250.KQ", name: "삼천당제약" }, { symbol: "0009K0.KQ", name: "Aimed Bio" },
+  { symbol: "001440.KS", name: "대한전선" }, { symbol: "003380.KQ", name: "하림지주" },
+  { symbol: "003690.KS", name: "코리안리" }, { symbol: "0039P0.KQ", name: "Madup" },
+  { symbol: "006730.KQ", name: "서부T&D" }, { symbol: "007340.KS", name: "DN오토모티브" },
+  { symbol: "007390.KQ", name: "네이처셀" }, { symbol: "007660.KS", name: "이수페타시스" },
+  { symbol: "008930.KS", name: "한미사이언스" }, { symbol: "009970.KS", name: "영원무역홀딩스" },
+  { symbol: "010170.KQ", name: "대한광통신" }, { symbol: "012210.KQ", name: "Sammi Metal Products Co., Ltd." },
+  { symbol: "0126Z0.KS", name: "SAMSUNG EPIS HOLDINGS" }, { symbol: "012750.KS", name: "에스원" },
+  { symbol: "014620.KQ", name: "성광벤드" }, { symbol: "019210.KQ", name: "와이지-원" },
+  { symbol: "022100.KS", name: "포스코DX" }, { symbol: "023160.KQ", name: "태광" },
+  { symbol: "027360.KQ", name: "아주IB투자" }, { symbol: "028300.KQ", name: "HLB" },
+  { symbol: "030530.KQ", name: "원익홀딩스" }, { symbol: "031330.KQ", name: "에스에이엠티" },
+  { symbol: "031980.KQ", name: "피에스케이홀딩스" }, { symbol: "032500.KQ", name: "케이엠더블유" },
+  { symbol: "032820.KQ", name: "우리기술" }, { symbol: "033100.KQ", name: "제룡전기" },
+  { symbol: "033160.KQ", name: "엠케이전자" }, { symbol: "033790.KQ", name: "피노" },
+  { symbol: "035250.KS", name: "강원랜드" }, { symbol: "035900.KQ", name: "JYP Ent." },
+  { symbol: "036810.KQ", name: "에프에스티" }, { symbol: "036930.KQ", name: "주성엔지니어링" },
+  { symbol: "037460.KQ", name: "삼지전자" }, { symbol: "038500.KQ", name: "삼표시멘트" },
+  { symbol: "041830.KQ", name: "인바디" }, { symbol: "043260.KQ", name: "성호전자" },
+  { symbol: "044490.KQ", name: "태웅" }, { symbol: "045100.KQ", name: "한양이엔지" },
+  { symbol: "047040.KS", name: "대우건설" }, { symbol: "050890.KQ", name: "쏠리드" },
+  { symbol: "052400.KQ", name: "코나아이" }, { symbol: "053610.KQ", name: "프로텍" },
+  { symbol: "056080.KQ", name: "유진로봇" }, { symbol: "058470.KQ", name: "리노공업" },
+  { symbol: "059090.KQ", name: "미코" }, { symbol: "060250.KQ", name: "NHN KCP" },
+  { symbol: "061090.KQ", name: "SENA" }, { symbol: "062040.KS", name: "산일전기" },
+  { symbol: "064400.KS", name: "LG씨엔에스" }, { symbol: "064760.KQ", name: "티씨케이" },
+  { symbol: "065350.KQ", name: "신성델타테크" }, { symbol: "066970.KS", name: "엘앤에프" },
+  { symbol: "068760.KQ", name: "셀트리온제약" }, { symbol: "074600.KQ", name: "원익QnC" },
+  { symbol: "077360.KQ", name: "덕산하이메탈" }, { symbol: "080220.KQ", name: "제주반도체" },
+  { symbol: "082270.KQ", name: "젬백스" }, { symbol: "082740.KS", name: "한화엔진" },
+  { symbol: "082920.KQ", name: "비츠로셀" }, { symbol: "083450.KQ", name: "GST" },
+  { symbol: "083650.KQ", name: "비에이치아이" }, { symbol: "084370.KQ", name: "유진테크" },
+  { symbol: "085620.KS", name: "미래에셋생명" }, { symbol: "085660.KQ", name: "차바이오텍" },
+  { symbol: "086280.KS", name: "현대글로비스" }, { symbol: "086450.KQ", name: "동국제약" },
+  { symbol: "087010.KQ", name: "펩트론" }, { symbol: "089030.KQ", name: "테크윙" },
+  { symbol: "089970.KQ", name: "브이엠" }, { symbol: "090360.KQ", name: "로보스타" },
+  { symbol: "090710.KQ", name: "휴림로봇" }, { symbol: "094170.KQ", name: "동운아나텍" },
+  { symbol: "095610.KQ", name: "테스" }, { symbol: "096530.KQ", name: "씨젠" },
+  { symbol: "098460.KQ", name: "고영" }, { symbol: "099320.KQ", name: "쎄트렉아이" },
+  { symbol: "100790.KQ", name: "미래에셋벤처투자" }, { symbol: "101160.KQ", name: "월덱스" },
+  { symbol: "101490.KQ", name: "에스앤에스텍" }, { symbol: "102710.KQ", name: "이엔에프테크놀로지" },
+  { symbol: "103590.KS", name: "일진전기" }, { symbol: "104830.KQ", name: "원익머트리얼즈" },
+  { symbol: "108490.KQ", name: "로보티즈" }, { symbol: "111770.KS", name: "영원무역" },
+  { symbol: "115180.KQ", name: "큐리언트" }, { symbol: "119850.KQ", name: "지엔씨에너지" },
+  { symbol: "121600.KQ", name: "나노신소재" }, { symbol: "122640.KQ", name: "예스티" },
+  { symbol: "122870.KQ", name: "와이지엔터테인먼트" }, { symbol: "124500.KQ", name: "아이티센글로벌" },
+  { symbol: "125020.KQ", name: "TC Materials Co.,Ltd." }, { symbol: "125490.KQ", name: "HALLACAST" },
+  { symbol: "126340.KQ", name: "비나텍" }, { symbol: "127120.KQ", name: "제이에스링크" },
+  { symbol: "131290.KQ", name: "티에스이" }, { symbol: "137400.KQ", name: "피엔티" },
+  { symbol: "139130.KS", name: "iM금융지주" }, { symbol: "140410.KQ", name: "메지온" },
+  { symbol: "144960.KQ", name: "뉴파워프라즈마" }, { symbol: "153890.KQ", name: "Justek" },
+  { symbol: "161580.KQ", name: "필옵틱스" }, { symbol: "166090.KQ", name: "하나머티리얼즈" },
+  { symbol: "170920.KQ", name: "엘티씨" }, { symbol: "171090.KQ", name: "선익시스템" },
+  { symbol: "174900.KQ", name: "앱클론" }, { symbol: "175330.KS", name: "JB금융지주" },
+  { symbol: "178320.KQ", name: "서진시스템" }, { symbol: "183300.KQ", name: "코미코" },
+  { symbol: "189300.KQ", name: "인텔리안테크" }, { symbol: "195940.KQ", name: "HK이노엔" },
+  { symbol: "204270.KQ", name: "제이앤티씨" }, { symbol: "204320.KS", name: "HL만도" },
+  { symbol: "213420.KQ", name: "덕산네오룩스" }, { symbol: "214370.KQ", name: "케어젠" },
+  { symbol: "214450.KQ", name: "파마리서치" }, { symbol: "217590.KS", name: "TMC" },
+  { symbol: "218410.KQ", name: "RFHIC" }, { symbol: "219130.KQ", name: "타이거일렉" },
+  { symbol: "222080.KQ", name: "SFA넥셀" }, { symbol: "222800.KQ", name: "심텍" },
+  { symbol: "226950.KQ", name: "올릭스" }, { symbol: "232140.KQ", name: "와이씨" },
+  { symbol: "237690.KQ", name: "에스티팜" }, { symbol: "241710.KQ", name: "코스메카코리아" },
+  { symbol: "247540.KQ", name: "에코프로비엠" }, { symbol: "252990.KQ", name: "샘씨엔에스" },
+  { symbol: "253590.KQ", name: "네오셈" }, { symbol: "263750.KQ", name: "펄어비스" },
+  { symbol: "267270.KS", name: "HD건설기계" }, { symbol: "272290.KQ", name: "이녹스첨단소재" },
+  { symbol: "277810.KQ", name: "레인보우로보틱스" }, { symbol: "278470.KS", name: "에이피알" },
+  { symbol: "279570.KS", name: "Kbank" }, { symbol: "281740.KQ", name: "레이크머티리얼즈" },
+  { symbol: "295310.KQ", name: "에이치브이엠" }, { symbol: "310210.KQ", name: "보로노이" },
+  { symbol: "319400.KQ", name: "현대무벡스" }, { symbol: "319660.KQ", name: "피에스케이" },
+  { symbol: "323280.KQ", name: "태성" }, { symbol: "332570.KQ", name: "PS일렉트로닉스" },
+  { symbol: "336260.KS", name: "두산퓨얼셀" }, { symbol: "347700.KQ", name: "스피어" },
+  { symbol: "347850.KQ", name: "디앤디파마텍" }, { symbol: "348370.KQ", name: "엔켐" },
+  { symbol: "353200.KS", name: "대덕전자" }, { symbol: "356860.KQ", name: "티엘비" },
+  { symbol: "358570.KQ", name: "지아이이노베이션" }, { symbol: "365660.KQ", name: "LHC" },
+  { symbol: "375500.KS", name: "DL이앤씨" }, { symbol: "376900.KQ", name: "로킷헬스케어" },
+  { symbol: "387690.KQ", name: "REMEDI" }, { symbol: "388210.KQ", name: "씨엠티엑스" },
+  { symbol: "388720.KQ", name: "유일로보틱스" }, { symbol: "394420.KQ", name: "RecensMedical" },
+  { symbol: "397030.KQ", name: "에이프릴바이오" }, { symbol: "399720.KQ", name: "가온칩스" },
+  { symbol: "417200.KQ", name: "LS머트리얼즈" }, { symbol: "420770.KQ", name: "기가비스" },
+  { symbol: "425420.KQ", name: "티에프이" }, { symbol: "437730.KQ", name: "삼현" },
+  { symbol: "439260.KS", name: "Daehan Shipbuilding Co., Ltd." }, { symbol: "439960.KQ", name: "코스모로보틱스" },
+  { symbol: "440110.KQ", name: "파두" }, { symbol: "443060.KS", name: "HD현대마린솔루션" },
+  { symbol: "445680.KQ", name: "큐리옥스바이오시스템즈" }, { symbol: "448900.KQ", name: "PIM Korea Co., Ltd." },
+  { symbol: "450080.KS", name: "에코프로머티" }, { symbol: "454910.KS", name: "두산로보틱스" },
+  { symbol: "456160.KQ", name: "지투지바이오" }, { symbol: "458870.KQ", name: "씨어스" },
+  { symbol: "459550.KQ", name: "ALT Co., Ltd." }, { symbol: "460930.KQ", name: "현대힘스" },
+  { symbol: "463020.KQ", name: "NEWEN AI" }, { symbol: "466100.KQ", name: "클로봇" },
+  { symbol: "468530.KQ", name: "PROTEINA" }, { symbol: "469610.KQ", name: "Innotech Co., Ltd." },
+  { symbol: "475040.KQ", name: "StradVision" }, { symbol: "475430.KQ", name: "KISTRON Co., Ltd." },
+  { symbol: "475830.KQ", name: "오름테라퓨틱" }, { symbol: "476060.KQ", name: "온코닉테라퓨틱스" },
+  { symbol: "476830.KQ", name: "알지노믹스" }, { symbol: "477850.KQ", name: "MakinaRocks" },
+  { symbol: "478340.KQ", name: "Nara Space" }, { symbol: "481070.KQ", name: "AU BRANDZ" },
+  { symbol: "482630.KQ", name: "SAMYANG NC Chem" }, { symbol: "483650.KS", name: "달바글로벌" },
+  { symbol: "484590.KQ", name: "SAMYANG COMTECH" }, { symbol: "484810.KQ", name: "TXR" },
+  { symbol: "486990.KQ", name: "노타" }, { symbol: "488900.KQ", name: "Vitzro Nextech" },
+  { symbol: "489460.KQ", name: "BIOBIJOU Co.,Ltd." }, { symbol: "489790.KS", name: "한화비전" },
+  { symbol: "490470.KQ", name: "세미파이브" }, { symbol: "491000.KQ", name: "리브스메드" },
+
 ];
 
 const CRYPTO_ASSETS = [
@@ -1026,6 +1342,39 @@ const ONCHAIN_UI_ON = (import.meta.env.VITE_ZEPTA_ONCHAIN_UI ?? "1") !== "0";
 
 const DETAIL_TF = [["1w", "1주"], ["1d", "1일"], ["4h", "4시간"], ["1h", "1시간"]];
 
+// ── 시그널 방향 확신도 게이팅 (2026-08-13 감사 #13) ──────────────────────
+//   코인·주식 종합 스코어는 "타임프레임별 방향에 부호를 준 가중합의 절대값"(0~100)입니다
+//   (api/_shared/stock-signals.js · btc-cron compositeSignal 동일 공식).
+//   즉 값이 작을수록 구간끼리 서로 상쇄돼 방향 합의가 사실상 없다는 뜻인데, 화면은
+//   3~8점에도 "상승 우위 / 하락 우위"를 단정해 붙였습니다(대표 실측: CPNG 3 · META 4 · NVDA 6).
+//   → 확신도 기준 미만이면 방향 라벨 대신 "방향성 불명확"으로 서술합니다.
+//     대표 "명확한 해석 원칙"과 정합합니다 — 말할 수 있을 땐 분명히, 근거가 없으면 단정하지 않음.
+const SIGNAL_DIR_MIN_SCORE = 20; // 종합 스코어(0~100) 확신도 하한
+const SIGNAL_DIR_MIN_TFS = 2;    // 방향이 잡힌 타임프레임 최소 개수(MTF 표본)
+function signalConviction(sig) {
+  const raw = Number(sig?.score);
+  const score = Number.isFinite(raw) ? Math.round(Math.max(0, Math.min(100, raw))) : null;
+  // breakdown 이 아예 없는 엔트리(coin-scores 의 1d 폴백 풀 등)는 MTF 합의를 잴 수
+  // 없으므로 표본 조건을 적용하지 않고 스코어 기준만 봅니다 — 없는 근거로 과하게
+  // 가리지 않되, breakdown 이 있는 정상 엔트리는 구간 표본까지 확인합니다.
+  const hasBreakdown = !!(sig && sig.breakdown && typeof sig.breakdown === "object");
+  const ratedTfs = hasBreakdown
+    ? Object.values(sig.breakdown).filter((x) => x && (x.side === "LONG" || x.side === "SHORT")).length
+    : 0;
+  const sampleOk = hasBreakdown ? ratedTfs >= SIGNAL_DIR_MIN_TFS : true;
+  const side = sig?.side === "LONG" ? "up" : sig?.side === "SHORT" ? "down" : null;
+  const confident = !!side && score != null && score >= SIGNAL_DIR_MIN_SCORE && sampleOk;
+  return { dir: confident ? side : "neutral", confident, score, ratedTfs };
+}
+// 방향 라벨 — 주식은 현물이라 상승/하락 우위, 코인은 롱/숏 우위(기존 워딩 규칙 유지).
+// 확신도 미달이면 두 시장 모두 "방향성 불명확".
+function signalSideLabel(sig, isStock, t) {
+  const { confident, dir } = signalConviction(sig);
+  if (!confident) return t ? t("diag.directionUnclear") : "방향성 불명확";
+  if (dir === "up") return isStock ? (t ? t("tabs.home.upDominant") : "상승 우위") : (t ? t("tabs.home.longDominant") : "롱 우위");
+  return isStock ? (t ? t("tabs.home.downDominant") : "하락 우위") : (t ? t("tabs.home.shortDominant") : "숏 우위");
+}
+
 /** coin-scores 산출 시각(ts, epoch ms) → "N분 전 집계" 실측 문구.
  *  ts 가 없거나 비정상이면 null — 신선도를 지어내지 않고 표기를 생략합니다.
  *  staleMin(기본 30분 = 코인 생성 주기 10분의 3배) 이상 밀리면 "갱신 지연"을
@@ -1098,7 +1447,11 @@ function buildAssetDetailProps(sig, t) {
   const ticker = isStock
     ? String(sig.symbol || "").replace(/\.(KS|KQ)$/i, "").toUpperCase()
     : String(sig.asset || sig.symbol || "").replace(/USDT$/i, "").toUpperCase();
-  const dir = sig.side === "LONG" ? "up" : sig.side === "SHORT" ? "down" : "neutral";
+  // 엔진이 산출한 원방향 — 근거 문장("N개 구간이 상승 방향")은 이 값을 그대로 서술합니다.
+  const rawDir = sig.side === "LONG" ? "up" : sig.side === "SHORT" ? "down" : "neutral";
+  // ★ #13: 표시용 방향은 확신도 게이팅 통과 시에만 up/down (미달이면 neutral = 방향성 불명확).
+  const conv = signalConviction(sig);
+  const dir = conv.dir;
   // 가격 표기: 코인은 기존 규칙(6자리 소수까지), 주식은 시장 관례(₩ 정수 / $ 소수 2자리).
   const fmtPx = isStock ? (v) => fmtStockPrice(v, market) : fmtLevelPrice;
 
@@ -1153,8 +1506,10 @@ function buildAssetDetailProps(sig, t) {
   const reasons = [];
   const rated = timeframes.filter((t) => t.dir);
   if (rated.length) {
-    const aligned = timeframes.filter((t) => t.dir === dir).length;
-    const dirWord = dir === "up"
+    // 근거 문장은 엔진 원방향(rawDir) 기준의 사실 서술 — 표시 방향이 게이팅으로
+    // "불명확"이 되어도, 몇 개 구간이 어느 쪽이었는지는 그대로 알려 줍니다(#13).
+    const aligned = timeframes.filter((t) => t.dir === rawDir).length;
+    const dirWord = rawDir === "up"
       ? (t ? t("diag.dirUp") : "상승")
       : (t ? t("diag.dirDown") : "하락");
     reasons.push(isStock
@@ -1163,6 +1518,8 @@ function buildAssetDetailProps(sig, t) {
            : `${tfDefs.map(([, l]) => l).join("·")} ${tfDefs.length}개 구간 중 ${aligned}개가 ${dirWord} 방향입니다.`)
       : (t ? t("diag.mtfAlignedDefault", { aligned, dir: dirWord })
            : `주·일·4시간·1시간 네 구간 중 ${aligned}개가 ${dirWord} 방향입니다.`));
+    // 확신도 미달이면 왜 방향을 단정하지 않는지 한 줄로 설명합니다(#13).
+    if (!conv.confident) reasons.push(t ? t("diag.lowConvictionNote") : "구간별 신호가 서로 상쇄돼 방향을 단정하지 않습니다");
   }
   const distParts = [];
   if (rArr[0] && Number.isFinite(Number(rArr[0].d))) distParts.push(t ? t("diag.toResistance", { pct: Math.abs(Number(rArr[0].d)).toFixed(1) }) : `가장 가까운 저항까지 +${Math.abs(Number(rArr[0].d)).toFixed(1)}%`);
@@ -1263,13 +1620,8 @@ function buildAssetDetailProps(sig, t) {
       signal: Number.isFinite(score) ? {
         dir,
         // 주식은 상승/하락 우위, 코인은 롱/숏 우위 — 홈 카드와 같은 워딩 규칙입니다.
-        sideLabel: isStock
-          ? (dir === "up" ? (t ? t("tabs.home.upDominant") : "상승 우위")
-            : dir === "down" ? (t ? t("tabs.home.downDominant") : "하락 우위")
-            : (t ? t("tabs.home.neutral") : "중립"))
-          : (dir === "up" ? (t ? t("tabs.home.longDominant") : "롱 우위")
-            : dir === "down" ? (t ? t("tabs.home.shortDominant") : "숏 우위")
-            : (t ? t("tabs.home.neutral") : "중립")),
+        // 확신도 미달(#13)이면 두 시장 모두 "방향성 불명확"으로 서술합니다.
+        sideLabel: signalSideLabel(sig, isStock, t),
         score: Math.round(Math.max(0, Math.min(100, score))),
         timeframes: rated.length ? timeframes : [],
         reasons,
@@ -1303,6 +1655,9 @@ const ALL_ASSETS = [
 //   기존 값(all/us/kr/crypto)에 "stock"(미국+한국 주식 묶음)을 추가했습니다.
 //   GNB '주식 분석'·지표 허브의 주식 진입점이 이 값으로 스크리너에 딥링크합니다.
 const MARKET_FILTERS = ["all", "stock", "us", "kr", "crypto"];
+// ★ 2026-08-13 (대표 지시 — "카드가 쭉 나열돼 스크롤이 너무 불편"): 시그널 리스트
+//   초기 렌더 개수 · "더 보기" 1회 증분 폭 (주식/코인 공용 SSOT).
+const SIG_PAGE = 12;
 const matchMarketFilter = (asset, filter) => {
   if (filter === "all" || !filter) return true;
   if (filter === "stock") return asset?.market === "us" || asset?.market === "kr";
@@ -2226,8 +2581,53 @@ function SearchBar({ onSelect, placeholder, compact = false }) {
 }
 
 // ════════════════════════════════════════════════════════════════════
+// ── 진단 입력 충족도 (2026-08-13 감사 #5) ─────────────────────────────
+//   quickDiagnosis 는 6축을 모두 50 에서 출발시켜 가중 합산합니다. 그래서 지표가
+//   하나도 실리지 않은 자산(홈 hotAssets 원본 등)도 "종합 50점 · 중립"이라는
+//   실재하지 않는 진단이 만들어졌습니다(대표 실측: NVDA·LG엔솔·현대차·삼성SDI 전부 50점).
+//   축별로 "실제 입력이 하나라도 있는지"를 세고, 기준 미만이면 점수를 지어내지 않고
+//   진단 자체를 보류합니다(관심종목 도크에서 TSMC 라벨만 사라지던 불일치도 같은 경로 —
+//   데이터 없음/시세만 있음을 모두 '진단 미산출' 한 가지 상태로 통일).
+//   ★ 리뷰 수리(2026-08-13): 임계(2축)만으로는 "근거의 2/3 가 기본값"인 점수가 그대로
+//     나옵니다(예: 추세·수급만 있는 자산 → 나머지 4축이 50 으로 합산돼 총점 ≈ 50 "중립").
+//     축별 충족 여부를 그대로 돌려주고, quickDiagnosis 가 **입력이 있는 축만 남겨 가중치를
+//     재정규화**합니다. 반환 axesWithData(N/6)는 근거 폭 표기용으로 유지합니다.
+const DIAG_MIN_AXES = 2; // 6축 중 최소 2축에 입력이 있어야 종합 점수를 산출합니다
+const DIAG_AXES_TOTAL = 6;
+function diagInputCoverage(asset) {
+  if (!asset || typeof asset !== "object") {
+    return { enough: false, axes: 0, trend: false, momentum: false, flow: false, position: false, volatility: false, fundamental: false };
+  }
+  const num = (v) => typeof v === "number" && Number.isFinite(v);
+  const trend = num(asset.ma200Dist)
+    || (num(asset.fiftyDayAvg ?? asset.ma50) && num(asset.twoHundredDayAvg ?? asset.ma200))
+    || num(asset.weekChange);
+  // ★ 재정규화 도입 후에는 이 플래그가 "그 축을 총점에 포함할지"를 정하므로, 실제로
+  //   점수를 움직이는 입력을 빠짐없이 세야 합니다(macdDivType 이 빠져 있었습니다).
+  const momentum = num(asset.rsi) || num(asset.macdHist) || num(asset.mfi)
+    || num(asset.stoch?.k) || num(asset.wr) || !!asset.rsiDivType || !!asset.macdDivType;
+  const flow = num(asset.volRatio) || num(asset.cmf) || !!asset.obvDivType
+    || !!asset.adxBullish || !!asset.adxBearish;
+  const position = (num(asset.low52w) && num(asset.high52w)) || !!asset.nearPOC;
+  const volatility = num(asset.bbWidth) || num(asset.atr14Pct);
+  const fundamental = num(asset.forwardPE) || num(asset.trailingPE) || num(asset.peRatio)
+    || num(asset.fairPremium) || num(asset.operatingMargin) || num(asset.revGrowthYoY) || num(asset.roe);
+  const axes = [trend, momentum, flow, position, volatility, fundamental].filter(Boolean).length;
+  return { enough: axes >= DIAG_MIN_AXES, axes, trend, momentum, flow, position, volatility, fundamental };
+}
+
 // ── 퀵 투자진단 v2.2 (카드용 — API 호출 없이 기존 데이터로 즉시 계산, v4.1 최적화) ──
 function quickDiagnosis(asset) {
+  // ★ #5: 입력이 모자라면 기본값 50 을 진단으로 포장하지 않고 미산출 상태를 돌려줍니다.
+  //   호출부는 diag.insufficient / diag.score == null 로 "진단 미산출"을 렌더합니다.
+  const cov = diagInputCoverage(asset);
+  if (!cov.enough) {
+    return {
+      score: null, verdict: null, opinion: null, opinionColor: "neutral",
+      rationale: null, signals: [], keySignals: [], categories: [],
+      hasFundData: false, insufficient: true, axesWithData: cov.axes,
+    };
+  }
   const signals = [];
   let trendScore = 50, momScore = 50, supScore = 50, posScore = 50;
 
@@ -2507,7 +2907,6 @@ function quickDiagnosis(asset) {
         : mkt === "kr"     ? { t: 0.20, m: 0.18, s: 0.18, p: 0.10, v: 0.08, f: 0.26 } // v4.0: KR 모멘텀 16→18, 펀더 28→26
         :                    { t: 0.22, m: 0.16, s: 0.14, p: 0.13, v: 0.08, f: 0.27 };
     }
-    totalScore = Math.round(trendScore * w.t + momScore * w.m + supScore * w.s + posScore * w.p + volScore * w.v + fundScore * w.f);
   } else {
     // 기술적 지표만 (5축) — 변동성 레짐 3단계 적응
     if (volRegime === "extreme" || volRegime === "high") {
@@ -2524,7 +2923,22 @@ function quickDiagnosis(asset) {
         : mkt === "kr"     ? { t: 0.28, m: 0.22, s: 0.25, p: 0.13, v: 0.12 }
         :                    { t: 0.30, m: 0.22, s: 0.18, p: 0.18, v: 0.12 };
     }
-    totalScore = Math.round(trendScore * w.t + momScore * w.m + supScore * w.s + posScore * w.p + volScore * w.v);
+  }
+  // ★ 리뷰 수리: 입력이 없는 축은 50(중립 기본값)이 그대로 가중 합산돼 "근거의 2/3 가
+  //   기본값"인 총점이 나올 수 있었습니다(부분 보강 자산 — 봉 수 부족으로 ma200·52주만
+  //   빠지는 종목 등). 입력이 있는 축만 남기고 없는 축의 몫을 남은 축에 비례 분배합니다
+  //   (= 가중치 재정규화). 축이 하나도 안 남는 경우는 cov.enough(≥2축)가 이미 막습니다.
+  {
+    const axisScore = { t: trendScore, m: momScore, s: supScore, p: posScore, v: volScore, f: fundScore };
+    const axisHas = { t: cov.trend, m: cov.momentum, s: cov.flow, p: cov.position, v: cov.volatility, f: cov.fundamental };
+    let wSum = 0, acc = 0;
+    for (const k of ["t", "m", "s", "p", "v", "f"]) {
+      const wk = w[k]; // 5축(펀더 없음) 분기에서는 w.f 가 undefined
+      if (!wk || !axisHas[k]) continue;
+      wSum += wk;
+      acc += axisScore[k] * wk;
+    }
+    totalScore = wSum > 0 ? Math.round(acc / wSum) : 50;
   }
 
   // v4.0: 변동성 레짐 적응 판정 임계값 — 고변동 시 매수 기준 상향, 중간 변동성 +1
@@ -2570,16 +2984,18 @@ function quickDiagnosis(asset) {
   // 핵심 시그널 요약 (최대 4개)
   const keySignals = signals.slice(0, 4).map(s => s.name);
 
+  // ★ 리뷰 수리: 입력이 없는 축은 총점 계산에서 빠지므로 카테고리 막대에서도 뺍니다.
+  //   (빼지 않으면 50% 막대가 "중립 판정"처럼 보여, 근거가 없다는 사실이 가려집니다)
   const categories = [
-    { name: "추세", score: trendScore },
-    { name: "모멘텀", score: momScore },
-    { name: "수급", score: supScore },
-    { name: "위치", score: posScore },
-    { name: "변동성", score: volScore },
-  ];
-  if (hasFundData) categories.push({ name: "펀더멘털", score: fundScore });
+    { name: "추세", score: trendScore, has: cov.trend },
+    { name: "모멘텀", score: momScore, has: cov.momentum },
+    { name: "수급", score: supScore, has: cov.flow },
+    { name: "위치", score: posScore, has: cov.position },
+    { name: "변동성", score: volScore, has: cov.volatility },
+    { name: "펀더멘털", score: fundScore, has: hasFundData && cov.fundamental },
+  ].filter(c => c.has).map(({ name, score }) => ({ name, score }));
 
-  return { score: totalScore, verdict, opinion, opinionColor, rationale, signals, keySignals, categories, hasFundData };
+  return { score: totalScore, verdict, opinion, opinionColor, rationale, signals, keySignals, categories, hasFundData, insufficient: false, axesWithData: cov.axes };
 }
 
 // ── 표시용 상태 라벨 (표현 3원칙: 행동 지시 → 상태 서술) ─────────────
@@ -2613,6 +3029,18 @@ const DIAG_CAT_KEYS = {
 function catLabel(name, t) {
   const k = DIAG_CAT_KEYS[name];
   return k && t ? t(`diag.cat.${k}`) : name;
+}
+
+// ── 진단 미산출 배지 (2026-08-13 감사 #5) ────────────────────────────
+//   지표가 모자라 점수를 산출하지 못한 상태를 모든 화면이 같은 어휘로 서술합니다.
+//   (전에는 어떤 자리는 기본값 50 을, 어떤 자리는 라벨을 통째로 비워 원인을 알 수 없었습니다)
+function DiagUnavailablePill({ t, fontSize = "10px", style }) {
+  return (
+    <span title={t ? t("diag.unavailableDesc") : undefined} style={{
+      fontSize, fontWeight: 800, padding: "3px 8px", borderRadius: "8px",
+      background: C.card2, color: C.text3, whiteSpace: "nowrap", flexShrink: 0, ...style,
+    }}>{t ? t("diag.unavailable") : "진단 미산출"}</span>
+  );
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -3262,7 +3690,8 @@ function AssetCard({ asset, onChart, isMobile = false }) {
     </div>
   );
   // 점수 진행바 — 시안의 64px 미니 바(데스크탑) / 가변 폭(모바일)
-  const scoreBar = (w) => diag && (
+  // ★ #5: 진단 미산출이면 0% 막대를 그리지 않습니다(점수가 있는 척 보이지 않게)
+  const scoreBar = (w) => diag && !diag.insufficient && (
     <div style={{ width: w, flex: w ? undefined : 1, height: "5px", borderRadius: "3px", background: C.card2, overflow: "hidden" }}>
       <div style={{ width: `${Math.max(0, Math.min(100, diag.score))}%`, height: "100%", borderRadius: "3px", background: acc.base }} />
     </div>
@@ -3272,7 +3701,18 @@ function AssetCard({ asset, onChart, isMobile = false }) {
   const expandedPanel = expanded && (
         <div style={{ borderTop: `1px solid ${C.border}`, padding: "14px 18px", background: C.card2 }}>
           {/* ── 투자진단 ── */}
-          {diag && (
+          {/* ★ #5: 입력이 모자라면 게이지·점수·의견을 그리지 않고 미산출 상태만 서술합니다 */}
+          {diag?.insufficient && (
+            <div style={{
+              background: C.bg, borderRadius: "12px", padding: "14px", marginBottom: "12px",
+              border: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap",
+            }}>
+              <span style={{ fontSize: "16px", fontWeight: 700, color: C.text3 }}>🩺 {t("diag.signalSummary")}</span>
+              <DiagUnavailablePill t={t} fontSize="13px" />
+              <span style={{ fontSize: "14px", color: C.text3 }}>{t("diag.unavailableDesc")}</span>
+            </div>
+          )}
+          {diag && !diag.insufficient && (
             <div style={{
               background: C.bg, borderRadius: "12px", padding: "14px", marginBottom: "12px",
               border: `1px solid ${C.border}`,
@@ -3305,6 +3745,13 @@ function AssetCard({ asset, onChart, isMobile = false }) {
                       background: diag.opinionColor === "green" ? `${C.green}18` : diag.opinionColor === "red" ? `${C.red}18` : `${C.yellow}18`,
                       color: diag.opinionColor === "green" ? C.green : diag.opinionColor === "red" ? C.red : C.yellow,
                     }}>{verdictLabel(diag.opinion, t)}</span>
+                    {/* ★ 리뷰 수리: 6축이 다 차지 않은 진단은 근거 폭을 함께 서술합니다
+                        (점수는 입력이 있는 축만으로 재정규화해 산출됩니다) */}
+                    {diag.axesWithData < DIAG_AXES_TOTAL && (
+                      <span style={{ fontSize: "13px", fontWeight: 700, color: C.text3, whiteSpace: "nowrap" }}>
+                        {t("diag.axesBasis", { n: diag.axesWithData, total: DIAG_AXES_TOTAL })}
+                      </span>
+                    )}
                   </div>
                   {/* 카테고리 미니 바 — ★ 2026-06-12 (대표 피드백): 라벨 폭 36→50px + 줄바꿈 방지
                       (모멘텀·펀더멘털이 '모멘↵텀'으로 깨지던 문제) */}
@@ -3487,10 +3934,14 @@ function AssetCard({ asset, onChart, isMobile = false }) {
         </div>
         {diag && (
           <div style={{ display: "flex", alignItems: "center", gap: "9px", marginTop: "9px" }}>
-            {/* 상태 서술 배지 — 표현 3원칙 verdictLabel 유지 */}
-            <span style={{ fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "8px", background: acc.bg, color: acc.hi, whiteSpace: "nowrap", flexShrink: 0 }}>{verdictLabel(diag.opinion, t)}</span>
-            {scoreBar(null)}
-            <span className="z-num" style={{ fontFamily: MONO, fontVariantNumeric: "tabular-nums", fontSize: "13px", fontWeight: 800, color: acc.hi }}>{diag.score}</span>
+            {/* 상태 서술 배지 — 표현 3원칙 verdictLabel 유지 (미산출이면 그 사실을 서술) */}
+            {diag.insufficient
+              ? <DiagUnavailablePill t={t} />
+              : <>
+                  <span style={{ fontSize: "10px", fontWeight: 800, padding: "3px 8px", borderRadius: "8px", background: acc.bg, color: acc.hi, whiteSpace: "nowrap", flexShrink: 0 }}>{verdictLabel(diag.opinion, t)}</span>
+                  {scoreBar(null)}
+                  <span className="z-num" style={{ fontFamily: MONO, fontVariantNumeric: "tabular-nums", fontSize: "13px", fontWeight: 800, color: acc.hi }}>{diag.score}</span>
+                </>}
           </div>
         )}
         {extraChips && <div style={{ marginTop: "8px" }}>{extraChips}</div>}
@@ -3520,13 +3971,15 @@ function AssetCard({ asset, onChart, isMobile = false }) {
         <span className="z-num" style={{ fontFamily: MONO, fontVariantNumeric: "tabular-nums", fontSize: "13.5px", color: C.text1, textAlign: "right" }}>{fmtPrice(asset.price, asset.market)}</span>
         <span style={{ textAlign: "right" }}>{chg}</span>
         <span style={{ justifySelf: "center" }}>
-          {diag
+          {diag && !diag.insufficient
             ? <span style={{ fontSize: "10px", fontWeight: 800, padding: "3px 9px", borderRadius: "8px", background: acc.bg, color: acc.hi, whiteSpace: "nowrap" }}>{verdictLabel(diag.opinion, t)}</span>
-            : <span style={{ fontSize: "11px", color: C.text4 }}>—</span>}
+            : <DiagUnavailablePill t={t} />}
         </span>
         <div style={{ display: "flex", alignItems: "center", gap: "9px", justifyContent: "flex-end" }}>
           {scoreBar("64px")}
-          {diag && <span className="z-num" style={{ fontFamily: MONO, fontVariantNumeric: "tabular-nums", fontSize: "14px", fontWeight: 800, color: acc.hi, minWidth: "26px", textAlign: "right" }}>{diag.score}</span>}
+          {diag && !diag.insufficient
+            ? <span className="z-num" style={{ fontFamily: MONO, fontVariantNumeric: "tabular-nums", fontSize: "14px", fontWeight: 800, color: acc.hi, minWidth: "26px", textAlign: "right" }}>{diag.score}</span>
+            : <span style={{ fontSize: "12px", color: C.text4, minWidth: "26px", textAlign: "right" }}>—</span>}
         </div>
       </div>
       {expandedPanel}
@@ -4077,21 +4530,28 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               borderRadius: "16px", padding: "15px 16px",
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: "14px", marginBottom: "14px" }}>
-                {/* 도넛 — conic-gradient 를 실제 점수(diag.score)로 채웁니다 */}
+                {/* 도넛 — conic-gradient 를 실제 점수(diag.score)로 채웁니다.
+                    ★ #5: 미산출이면 0점처럼 보이는 빈 도넛 대신 "—"만 둡니다 */}
                 <div style={{
                   width: "64px", height: "64px", borderRadius: "50%", flexShrink: 0,
-                  background: `conic-gradient(${acc.base} ${diag.score * 3.6}deg, ${C.card2} 0)`,
+                  background: diag.insufficient ? C.card2 : `conic-gradient(${acc.base} ${diag.score * 3.6}deg, ${C.card2} 0)`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
                   <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: C.card, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", lineHeight: 1 }}>
-                    <Num size="18px" weight={800} color={acc.hi}>{diag.score}</Num>
-                    <span style={{ fontSize: "8px", color: C.text3 }}>/100</span>
+                    {diag.insufficient
+                      ? <span style={{ fontSize: "16px", fontWeight: 800, color: C.text4 }}>—</span>
+                      : <>
+                          <Num size="18px" weight={800} color={acc.hi}>{diag.score}</Num>
+                          <span style={{ fontSize: "8px", color: C.text3 }}>/100</span>
+                        </>}
                   </div>
                 </div>
                 <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
                   {/* 상태 배지 — 표현 3원칙(상태 서술) verdictLabel 유지 */}
-                  <span style={{ alignSelf: "flex-start", fontSize: "12px", fontWeight: 800, padding: "3px 10px", borderRadius: "8px", background: acc.bg, color: acc.hi }}>{verdictLabel(diag.verdict, t)}</span>
-                  <span style={{ fontSize: "12px", color: C.text3 }}>{t("assetPopup.signalCaption")}</span>
+                  {diag.insufficient
+                    ? <DiagUnavailablePill t={t} fontSize="12px" style={{ alignSelf: "flex-start" }} />
+                    : <span style={{ alignSelf: "flex-start", fontSize: "12px", fontWeight: 800, padding: "3px 10px", borderRadius: "8px", background: acc.bg, color: acc.hi }}>{verdictLabel(diag.verdict, t)}</span>}
+                  <span style={{ fontSize: "12px", color: C.text3 }}>{diag.insufficient ? t("diag.unavailableDesc") : t("assetPopup.signalCaption")}</span>
                   {diag.signals.length > 0 && (
                     <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
                       {diag.signals.map((sig, i) => (
@@ -4105,10 +4565,12 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                   )}
                 </div>
               </div>
-              {/* 신호 상태 서술 + 근거 (표현 3원칙 — 상태만) */}
-              <div style={{ fontSize: "12px", color: C.text3, lineHeight: 1.55, marginBottom: "11px" }}>
-                <span style={{ fontWeight: 800, color: acc.hi }}>{verdictLabel(diag.opinion, t)}</span> · {diag.rationale}
-              </div>
+              {/* 신호 상태 서술 + 근거 (표현 3원칙 — 상태만). 미산출이면 이 줄 자체를 생략 */}
+              {!diag.insufficient && (
+                <div style={{ fontSize: "12px", color: C.text3, lineHeight: 1.55, marginBottom: "11px" }}>
+                  <span style={{ fontWeight: 800, color: acc.hi }}>{verdictLabel(diag.opinion, t)}</span> · {diag.rationale}
+                </div>
+              )}
               {/* 카테고리 점수 바 — 기존 기능 유지(시안 문법 정리) */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(134px, 1fr))", gap: "9px 12px" }}>
                 {diag.categories.map(cat => (
@@ -4196,8 +4658,11 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           const lv = techData.advancedLevels;
           const bt = techData.backtestStrategies || [];
           const p = techData.price;
-          const isBullish = diag.score >= 55;
-          const isBearish = diag.score < 40;
+          // ★ #5: 진단 미산출(score=null)일 때 `null < 40` 이 true 가 돼 "하락 정렬"로
+          //   오분류되던 자리입니다 — 점수가 있을 때만 방향을 판정합니다.
+          const hasDiagScore = typeof diag.score === "number";
+          const isBullish = hasDiagScore && diag.score >= 55;
+          const isBearish = hasDiagScore && diag.score < 40;
           const fmtP = (v) => !v ? "—" : asset.market === "kr" ? `₩${Math.round(v).toLocaleString()}` : `$${v.toFixed(2)}`;
           const targetPrice = lv?.targetPrice;
           const stopLoss = lv?.stopLoss || p * 0.92;
@@ -4323,7 +4788,9 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px", gap: "8px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", minWidth: 0 }}>
                   <span style={{ fontSize: "14px", fontWeight: 800, color: C.text1 }}>{t("diag.quantStrategy")}</span>
-                  <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "9999px", background: acc.bg, color: acc.hi, whiteSpace: "nowrap" }}>{verdictLabel(diag.opinion, t)}</span>
+                  {hasDiagScore
+                    ? <span style={{ fontSize: "11px", fontWeight: 800, padding: "2px 8px", borderRadius: "9999px", background: acc.bg, color: acc.hi, whiteSpace: "nowrap" }}>{verdictLabel(diag.opinion, t)}</span>
+                    : <DiagUnavailablePill t={t} fontSize="11px" />}
                 </div>
                 {freshMin != null && <span style={{ fontSize: "12px", color: C.text4, flexShrink: 0 }}>{freshMin < 1 ? t("diag.analyzedJustNow") : t("diag.analyzedMinAgo", { n: freshMin })}</span>}
               </div>
@@ -4367,7 +4834,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
                 </div>
                 <div style={{ flex: 1, padding: "9px 10px", borderRadius: "12px", background: C.card2, textAlign: "center" }}>
                   <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>{t("mobile.kit.scoreLabel")}</div>
-                  <div style={{ fontSize: "13px", fontWeight: 800, color: C.text1, marginTop: "2px" }}>{diag.score >= 70 ? t("diag.scoreStrong") : diag.score >= 55 ? t("diag.scoreSomewhatStrong") : diag.score >= 40 ? t("diag.verdictLabel.neutral") : t("diag.scoreWeak")}</div>
+                  <div style={{ fontSize: "13px", fontWeight: 800, color: C.text1, marginTop: "2px" }}>{!hasDiagScore ? "—" : diag.score >= 70 ? t("diag.scoreStrong") : diag.score >= 55 ? t("diag.scoreSomewhatStrong") : diag.score >= 40 ? t("diag.verdictLabel.neutral") : t("diag.scoreWeak")}</div>
                 </div>
               </div>
             </div>
@@ -4922,7 +5389,10 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
               display: "flex", alignItems: "center", justifyContent: "center", gap: "6px",
             }}>🔗 {t("diag.detailsLink")}</a>
         </div>
-        {/* 공유 버튼 — 바이럴 */}
+        {/* 공유 버튼 — 바이럴.
+            ★ #5: 진단 미산출이면 공유 텍스트에 "null점"이 실려 나가므로 버튼째 숨깁니다
+            (없는 점수를 외부로 퍼뜨리지 않음). */}
+        {!diag.insufficient && (
         <div style={{ padding: "0 16px 16px" }}>
           <button onClick={() => {
             // ★ 2026-08-10 (전수 감사): techData.overallScore 는 존재하지 않는 필드라 항상
@@ -4944,6 +5414,7 @@ function AssetDetailPopup({ asset, onClose, onChart, hotAssets = [], extendedHou
           onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = C.text3; }}
           >📤 {t("diag.shareDiag")}</button>
         </div>
+        )}
         {/* 면책 — 이 팝업은 전역 푸터 면책을 가리는 오버레이라 화면 내 고지가 필요합니다 (2026-08 전수 감사) */}
         <div style={{ padding: "0 16px 18px" }}>
           <Disclaimer style={{ fontSize: "12px", textAlign: "center", padding: 0 }}>
@@ -5256,6 +5727,45 @@ function AppInner() {
         v === "news" ? "/indicators?view=news" : "/indicators");
     } catch {}
   }, []);
+
+  // ★ 2026-08-13 (대표 실보고: "주식 탭 시그널 카드가 쭉 나열돼 스크롤이 너무 길고,
+  //   맨 아래 스크리너까지 내려가야 한다"): 주식 탭 서브뷰 [시그널 | 조건 검색].
+  //   지표 탭과 같은 Segment 컴포넌트·같은 위치(헤더 바로 아래) 규격이며,
+  //   딥링크도 같은 ?view= 패턴을 씁니다 — /stocks · /stocks?view=screener.
+  //   기존 상태·핸들러는 전부 보존하고 "어느 뷰에 그리는가"만 나눕니다(기능 제거 없음).
+  const [stocksView, setStocksView] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("view") === "screener" ? "screener" : "signals";
+    } catch { return "signals"; }
+  });
+  // 주소 조립 — 사이트링크 검색박스 딥링크(?q=) 등 기존 쿼리를 보존한 채 view 만 갱신합니다.
+  const stocksUrlFor = useCallback((v) => {
+    let qs = "";
+    try {
+      const p = new URLSearchParams(window.location.search);
+      if (v === "screener") p.set("view", "screener"); else p.delete("view");
+      qs = p.toString();
+    } catch {}
+    return `/stocks${qs ? `?${qs}` : ""}`;
+  }, []);
+  // 주식 탭에 있는 동안 현재 서브뷰를 주소에 반영 — 새로고침·공유 시 같은 뷰로 착지합니다
+  //   (setTab 은 "/stocks" 만 pushState 하므로 지표 탭과 동일하게 여기서 보정).
+  useEffect(() => {
+    if (tab !== "screener") return;
+    try {
+      const want = stocksUrlFor(stocksView);
+      if (window.location.pathname + window.location.search !== want) {
+        window.history.replaceState({ tab: "screener", view: stocksView }, "", want);
+      }
+    } catch {}
+  }, [tab, stocksView, stocksUrlFor]);
+  const setStocksViewWithUrl = useCallback((v) => {
+    setStocksView(v);
+    try { window.history.replaceState(window.history.state, "", stocksUrlFor(v)); } catch {}
+    // 서브탭을 바꾸면 새 뷰의 첫 화면부터 보이도록 최상단으로 (탭 전환과 같은 규칙).
+    // 스크롤이 남아 있으면 "무엇을 하는 화면인지"가 아니라 화면 중간부터 읽히게 됩니다.
+    try { window.scrollTo({ top: 0, behavior: "instant" }); } catch { window.scrollTo(0, 0); }
+  }, [stocksUrlFor]);
 
   // ── 탭별 SEO 메타 정보 (제목, 설명, OG 태그용) ──
   // ★ i18n: 탭 키 → seo.<slug>.title/desc 사전 조회 (한/영 로케일 대응 — 대표 지시)
@@ -5829,8 +6339,9 @@ function AppInner() {
   const sortedResults = useMemo(() => {
     return [...results].sort((a, b) => {
       if (sortBy === "score") {
+        // ★ #5: 미산출(score=null)은 NaN 비교로 정렬을 흐트러뜨리므로 항상 뒤로 보냅니다
         const da = quickDiagnosis(a), db = quickDiagnosis(b);
-        return db.score - da.score;
+        return (typeof db.score === "number" ? db.score : -1) - (typeof da.score === "number" ? da.score : -1);
       }
       if (sortBy === "rsi")     return (a.rsi ?? 999) - (b.rsi ?? 999);
       if (sortBy === "change")  return a.weekChange - b.weekChange;
@@ -7586,6 +8097,8 @@ function AppInner() {
     } catch { return []; }
   });
   const [coinTabStatus, setCoinTabStatus] = useState("idle"); // idle | loading | ready | error
+  // 코인 리스트도 주식 탭과 같은 "더 보기" 증분 규칙 (동일 스크롤 피로 — 대표 지시)
+  const [coinSigShown, setCoinSigShown] = useState(SIG_PAGE);
   const fetchCoinTabSignals = useCallback(async () => {
     setCoinTabStatus((prev) => (prev === "ready" ? "ready" : "loading"));
     try {
@@ -7726,9 +8239,14 @@ function AppInner() {
   }, [tab, isOwner]);
 
   // ── 주식 탭 시그널 풀 (★ 2026-08-12 IA v3 시안 1b · 설계서 v3 3장) ──
-  // 홈 미리보기(limit=12)와 같은 소스의 전 유니버스 조회 — GET /api/stock-scores?limit=60
-  // (엔드포인트 상한 60 = 미국·한국 유니버스 51종 전체 커버). 코인 탭(fetchCoinTabSignals)과
-  // 동일 패턴: 5분 폴링 + localStorage 캐시(홈 미리보기와 키 공유 — 첫 페인트 깜빡임 방지).
+  // 홈 미리보기(limit=12)와 같은 소스 — GET /api/stock-scores?limit=60&offset=N[&market=us|kr]
+  // ★ 2026-08-13 리뷰 수리: 유니버스가 51종 → 1,016종으로 확대되면서(api/_shared/stock-universe.js)
+  //   "limit=60 한 페이지"는 (1) 나머지 수백 종에 도달할 방법이 없고 (2) 페이지 크기를 풀 규모로
+  //   읽히게 만드는 허위 표기였습니다. 엔드포인트가 이미 제공하는 offset 페이지네이션과
+  //   전집합 기준 counts 를 그대로 씁니다 — 화면의 종목 수는 전부 서버 집계이고, 페이지 배열
+  //   길이로 세는 곳은 한 군데도 없습니다. 코인 탭(fetchCoinTabSignals)과 동일하게 5분 폴링 +
+  //   localStorage 캐시(홈 미리보기와 키 공유 — 첫 페인트 깜빡임 방지)를 유지합니다.
+  const STOCK_PAGE = 60; // 서버 페이지 크기 (엔드포인트 상한 300 — 모바일 응답 크기 때문에 60씩)
   const [stockTabSignals, setStockTabSignals] = useState(() => {
     if (!STOCK_SIGNALS_ON) return [];
     try {
@@ -7738,10 +8256,21 @@ function AppInner() {
   });
   const [stockTabStatus, setStockTabStatus] = useState("idle"); // idle | loading | ready | error
   const [stockSigFilter, setStockSigFilter] = useState("all"); // all | us | kr — 시안 1b 필터 칩
-  const fetchStockTabSignals = useCallback(async () => {
-    setStockTabStatus((prev) => (prev === "ready" ? "ready" : "loading"));
+  // ★ 2026-08-13 (대표 지시 — 스크롤 피로): 시그널 리스트는 초기 SIG_PAGE 개만 그리고
+  //   "더 보기"로 증분합니다(무한 스크롤 강요 금지 — 사용자가 멈출 지점을 통제).
+  const [stockSigShown, setStockSigShown] = useState(SIG_PAGE);
+  // 서버 페이지 상태 — hasMore 는 응답 page.hasMore 그대로, 건수는 counts.total(전집합) 그대로.
+  const [stockPageMore, setStockPageMore] = useState(false);
+  const [stockPageLoading, setStockPageLoading] = useState(false);
+  const [stockCounts, setStockCounts] = useState({ all: null, us: null, kr: null }); // null = 미집계
+  const stockOffsetRef = useRef(0); // 현재까지 받아온 마지막 페이지의 offset
+  const fetchStockTabSignals = useCallback(async ({ append = false } = {}) => {
+    const mkt = stockSigFilter === "us" || stockSigFilter === "kr" ? stockSigFilter : null;
+    const offset = append ? stockOffsetRef.current + STOCK_PAGE : 0;
+    if (append) setStockPageLoading(true);
+    else setStockTabStatus((prev) => (prev === "ready" ? "ready" : "loading"));
     try {
-      const r = await fetch("/api/stock-scores?limit=60");
+      const r = await fetch(`/api/stock-scores?limit=${STOCK_PAGE}&offset=${offset}${mkt ? `&market=${mkt}` : ""}`);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
       const arr = Array.isArray(j?.stocks) ? j.stocks : Array.isArray(j?.items) ? j.items : null;
@@ -7749,20 +8278,69 @@ function AppInner() {
       // market 필드 정규화 — 홈 폴링과 같은 규칙(누락 엔트리는 KRX 6자리 코드 형식으로만 판정).
       const rows = arr.filter(Boolean).map((s) => s.market ? s
         : { ...s, market: /^\d{6}(\.(KS|KQ))?$/i.test(String(s.symbol || "")) ? "kr" : "us" });
-      setStockTabSignals(rows);
+      stockOffsetRef.current = offset;
+      setStockTabSignals((prev) => {
+        if (!append) return rows;
+        // 페이지 경계에서 풀이 갱신돼도 같은 종목이 두 번 그려지지 않게 자산 키로 중복 제거
+        const seen = new Set(prev.map((s) => s.asset || s.symbol));
+        return [...prev, ...rows.filter((s) => !seen.has(s.asset || s.symbol))];
+      });
+      setStockPageMore(!!j?.page?.hasMore);
+      // 건수는 **서버 전집합 집계만** 신뢰합니다 (페이지 배열 길이로 세지 않습니다)
+      const total = j?.counts?.total;
+      if (typeof total === "number" && Number.isFinite(total)) {
+        setStockCounts((prev) => ({ ...prev, [stockSigFilter]: total }));
+      }
       setStockTabStatus("ready");
-      try { localStorage.setItem("zepta:stock-scores:cache", JSON.stringify({ ...j, stocks: rows })); } catch {}
+      // 홈 미리보기와 공유하는 캐시는 "전체 · 첫 페이지"일 때만 갱신합니다
+      // (시장 필터가 걸린 페이지로 덮어쓰면 홈 미리보기가 한쪽 시장으로 왜곡됩니다)
+      if (!mkt && offset === 0) {
+        try { localStorage.setItem("zepta:stock-scores:cache", JSON.stringify({ ...j, stocks: rows })); } catch {}
+      }
     } catch {
       // 캐시가 이미 화면에 있으면 유지(ready), 아무것도 없으면 error 로 재시도 안내
       setStockTabStatus((prev) => (prev === "ready" ? "ready" : "error"));
+    } finally {
+      if (append) setStockPageLoading(false);
     }
-  }, []);
+  }, [stockSigFilter]);
   useEffect(() => {
     if (!STOCK_SIGNALS_ON || tab !== "screener") return;
+    // 시장 칩을 바꾸면 이 effect 가 다시 돌아 서버 필터로 첫 페이지를 다시 받습니다.
     fetchStockTabSignals();
-    const iv = setInterval(fetchStockTabSignals, 5 * 60 * 1000); // 크론 주기(30~60분)보다 촘촘한 폴링
+    const iv = setInterval(() => {
+      // "더 보기"로 확장 중이면 자동 갱신이 뒤 페이지를 통째로 날려버리므로 건너뜁니다.
+      // (데이터 시각은 헤더 신선도 알약이 실측 ts 로 계속 서술합니다)
+      if (stockOffsetRef.current > 0) return;
+      fetchStockTabSignals();
+    }, 5 * 60 * 1000); // 크론 주기(30~60분)보다 촘촘한 폴링
     return () => clearInterval(iv);
   }, [tab, fetchStockTabSignals]);
+  // ── 시장별 건수 (전체·미국·한국) — 칩 라벨 전용 ──
+  //   limit=1 로 counts 만 받아옵니다(응답 1건 ≈ 1KB · 엣지 60초 캐시). 페이지 배열 길이로
+  //   세면 크론이 한 바퀴 돌 때마다 "전체 60" 같은 페이지 크기가 풀 규모로 읽힙니다.
+  useEffect(() => {
+    if (!STOCK_SIGNALS_ON || tab !== "screener") return;
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(["all", "us", "kr"].map(async (k) => {
+        try {
+          const r = await fetch(`/api/stock-scores?limit=1${k === "all" ? "" : `&market=${k}`}`);
+          if (!r.ok) return [k, null];
+          const j = await r.json();
+          const n = j?.counts?.total;
+          return [k, typeof n === "number" && Number.isFinite(n) ? n : null];
+        } catch { return [k, null]; }
+      }));
+      if (cancelled) return;
+      setStockCounts((prev) => {
+        const next = { ...prev };
+        for (const [k, v] of entries) if (v != null) next[k] = v;
+        return next;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [tab]);
 
   // ── 종목 상세 시트 (2026-08 모바일 시안) ──
   // 홈 "오늘의 시그널" 카드를 누르면 그 종목 하나를 끝까지 읽는 화면을 띄웁니다.
@@ -7919,9 +8497,22 @@ function AppInner() {
 
   // ★ IA v3: 주식 탭은 주식 전용 화면이므로 진입 시 코인/전체 필터를 주식으로 정정합니다.
   //   (코인 조건 검색은 코인 탭 진입점이 crypto 를 시드해 같은 스크리너를 엽니다)
+  // ★ 2026-08-13 수정: 코인 탭 CTA 가 setFilterMarket("crypto") → setTab("screener") 를
+  //   같은 커밋에서 실행하면 아래 정정이 곧바로 crypto 를 덮어써, "조건으로 코인 찾기"로
+  //   들어가도 주식 결과가 나왔습니다. 진입 의도를 ref 로 1회만 전달해 그때만 건너뜁니다.
+  const screenerMarketSeedRef = useRef(null);
   useEffect(() => {
     if (tab !== "screener") return;
+    const seed = screenerMarketSeedRef.current;
+    screenerMarketSeedRef.current = null;
+    if (seed && MARKET_FILTERS.includes(seed)) { setFilterMarket(seed); return; }
     setFilterMarket((prev) => (prev === "crypto" || prev === "all" ? "stock" : prev));
+  }, [tab]);
+
+  // 탭을 떠났다 돌아오면 "더 보기" 증분을 초기값으로 되돌립니다(다음 진입도 짧은 첫 화면).
+  useEffect(() => {
+    setStockSigShown(SIG_PAGE);
+    setCoinSigShown(SIG_PAGE);
   }, [tab]);
 
   // ── 소셜 센티먼트 ──
@@ -8811,9 +9402,17 @@ function AppInner() {
           // ★ 2026-08-02 (대표 지시 "주식+코인 양축"): 이전엔 변동률 절대값 상위만 뽑아
           //   변동성이 큰 코인이 목록을 독점하는 일이 잦았습니다. 미국 주식·한국 주식·코인
           //   버킷에서 각각 변동률 상위를 뽑아 라운드로빈으로 섞습니다(버킷 소진 시 자동 축소).
+          // ★ 2026-08-13 감사(#11): 제목이 "오늘 변동 큰 종목"인데 ETH +0.24% · SOL −0.22%
+          //   처럼 사실상 무변동인 종목이 상위에 올라왔습니다. 홈이 추적하는 크립토 풀이
+          //   BTC/ETH/SOL 3종뿐이라, 버킷 라운드로빈이 변동폭과 무관하게 3종을 그대로
+          //   끌어올렸기 때문입니다. → 최소 변동폭(±1.0%) 미만은 목록에서 제외해
+          //   "변동 큰"이라는 표기를 실제 데이터와 일치시킵니다(미달 시 목록 자체를 비움).
+          const MOVER_MIN_ABS_PCT = 1.0;
           const popularRows = (() => {
             const byAbsChg = (m) => hotAssets
-              .filter(a => a.market === m)
+              .filter(a => a.market === m
+                && Number.isFinite(Number(a.change))
+                && Math.abs(Number(a.change)) >= MOVER_MIN_ABS_PCT)
               .sort((a, b) => Math.abs(b.change || 0) - Math.abs(a.change || 0));
             const buckets = [byAbsChg("us"), byAbsChg("kr"), byAbsChg("crypto")];
             const LIMIT = 6;
@@ -8968,7 +9567,9 @@ function AppInner() {
                   action={{
                     label: t("tabs.home.viewAll"),
                     onClick: activeSignalMarket === "stock"
-                      ? () => { setFilterMarket("stock"); setTab("screener"); }
+                      // ★ 2026-08-13: 주식 "전체 보기"는 주식 탭의 시그널 서브뷰로 착지합니다
+                      //   (조건 검색이 아니라 시그널 전체 목록을 보러 가는 동선).
+                      ? () => { screenerMarketSeedRef.current = "stock"; setStocksView("signals"); setTab("screener"); }
                       : () => setTab("news"),
                   }}
                 >
@@ -8987,7 +9588,10 @@ function AppInner() {
                   <div style={{ display: "flex", flexDirection: "column", gap: "9px" }}>
                     {signalRows.map((sig, i) => {
                       const isStockSig = sig.market === "us" || sig.market === "kr";
-                      const dir = sig.side === "LONG" ? "up" : "down";
+                      // ★ #13: 확신도 게이팅 — 종합 스코어가 낮아 구간 신호가 상쇄된 건은
+                      //   방향 라벨 대신 "방향성 불명확"(중립 색)으로 서술합니다.
+                      const conv = signalConviction(sig);
+                      const dir = conv.dir;
                       const bd = sig.breakdown || {};
                       // 주식 breakdown 은 4h 가 없을 수 있어 응답에 있는 키만 칩으로 만듭니다
                       // (없는 구간의 "—" 빈 칩을 그리지 않음). 코인은 기존 4칩 고정 그대로.
@@ -9014,11 +9618,9 @@ function AppInner() {
                           key={`${sig.symbol || sig.asset || "sig"}-${i}`}
                           symbol={symText}
                           // 주식은 현물이라 롱/숏 대신 상승/하락 우위로 서술합니다.
-                          sideLabel={sig.side === "LONG"
-                            ? t(isStockSig ? "tabs.home.upDominant" : "tabs.home.longDominant")
-                            : t(isStockSig ? "tabs.home.downDominant" : "tabs.home.shortDominant")}
+                          sideLabel={signalSideLabel(sig, isStockSig, t)}
                           dir={dir}
-                          score={Math.round(Math.max(0, Math.min(100, Number(sig.score))))}
+                          score={conv.score}
                           timeframes={tfs.some(x => x.dir) ? tfs : []}
                           support={sup}
                           price={px}
@@ -9038,7 +9640,10 @@ function AppInner() {
                       // (주식 크론은 미국 30분·한국 60분 주기라 30분 기준이면 정상 운영도 지연 표기).
                       const fresh = coinScoreFreshness(newestTs, t,
                         activeSignalMarket === "stock" ? STALE_MIN_STOCK : 30);
-                      // 출처 캡션도 활성 풀을 따릅니다 (코인=바이낸스 / 주식=미국·한국 50종).
+                      // 출처 캡션도 활성 풀을 따릅니다 (코인=바이낸스 / 주식=미국·한국 유니버스).
+                      // ★ #10: 종목 수는 캡션에 하드코딩하지 않습니다 — 유니버스는 서버에서
+                      //   바뀌고(2026-08-13 51→1,016) 클라는 그 값을 알 수 없어, 고정 숫자는
+                      //   곧바로 허위 표기가 됩니다. 실제 집계 수는 주식 탭 필터 칩(풀 실측)만 씁니다.
                       const src = t(activeSignalMarket === "stock"
                         ? "tabs.home.stockSignalSourceNote" : "tabs.home.signalSourceNote");
                       return fresh ? `${src} · ${fresh}` : src;
@@ -9236,12 +9841,19 @@ function AppInner() {
                 title={watchRows ? t("tabs.home.watchlistSummary") : t("tabs.home.bigMovers")}
                 action={{
                   label: t("tabs.home.screenerLink"),
-                  onClick: () => setTab("screener"),
+                  // 라벨이 "스크리너"이므로 주식 탭의 조건 검색 서브뷰로 직행합니다
+                  onClick: () => { setStocksView("screener"); setTab("screener"); },
                 }}
                 bodyStyle={(watchRows || popularRows).length > 0 ? { padding: 0 } : undefined}
               >
                 {(watchRows || popularRows).length === 0 ? (
-                  <div style={{ fontSize: "14px", color: C.text3 }}>{t("tabs.home.loadingQuotes")}</div>
+                  /* 시세 자체가 없으면 "불러오는 중", 시세는 있는데 임계 미달이면
+                     "변동 큰 종목 없음"으로 서술합니다(#11 — 무변동을 큰 변동으로 포장 금지) */
+                  <div style={{ fontSize: "14px", color: C.text3 }}>
+                    {hotAssets.length === 0
+                      ? t("tabs.home.loadingQuotes")
+                      : t("tabs.home.noBigMovers", { pct: MOVER_MIN_ABS_PCT.toFixed(1) })}
+                  </div>
                 ) : (
                   <>
                     {(watchRows || popularRows).map((row, i, arr) => {
@@ -9358,11 +9970,14 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {/* ═══════════════════════════════════════════════════════════
             TAB: 주식 (내부 id "screener") — ★ 2026-08-12 IA v3 (시안 1b · 설계서 v3 3장)
-            헤더(제목+신선도 알약) → 장 상태 배지 2칸 → 종목 빠른 검색
-            → 주식 시그널 리스트(stock-scores 전 유니버스 · 전체/미국/한국 필터 칩)
-            → "조건으로 찾기" 스크리너(프리셋 칩 한 줄 + 조건 편집 시트) → 결과.
-            구 버튼 그리드·인라인 details 조건 패널은 전면 대체 — 조건 칩·스캔·저장
-            핸들러는 전부 바텀 시트로 이동(기능 보존, 버튼 다이어트).
+            ★ 2026-08-13 재구성 (대표 지시): 한 화면에 세로로 이어 붙였던 시그널 리스트
+            + 스크리너를 지표 탭과 같은 서브탭으로 분리했습니다(기능 제거 없이 "수납").
+              헤더(제목 + 신선도 알약) → 서브탭 [시그널 | 조건 검색]
+              · 시그널 뷰  : 장 상태 배지 2칸 → 종목 빠른 검색 → 시그널 리스트
+                             (초기 12개 + "더 보기" 증분 — 무한 스크롤 강요 금지)
+              · 조건 검색 뷰: 프리셋 칩 + 조건 편집 시트 → 결과 필터 → 결과 → 저평가 조회
+            서브탭 상태는 ?view= 로 URL 동기화(/stocks · /stocks?view=screener).
+            기존 상태·핸들러(conditions·runScan·filterMarket·저장 등)는 전부 그대로입니다.
         ═══════════════════════════════════════════════════════════ */}
         {tab === "screener" && (() => {
           // ── 주식 시그널 리스트 파생 (점수순 고정 — 코인 탭과 같은 문법) ──
@@ -9372,7 +9987,25 @@ function AppInner() {
               && Number.isFinite(Number(s.score)) && (s.market === "us" || s.market === "kr"))
             .slice()
             .sort((a, b) => Number(b.score) - Number(a.score));
+          // 시장 필터는 서버(market=us|kr)가 이미 적용합니다 — 여기 필터는 페이지 전환 중
+          // 남아 있는 이전 시장 엔트리를 걸러내는 방어선입니다.
           const stockRows = stockRowsAll.filter(s => stockSigFilter === "all" || s.market === stockSigFilter);
+          // ★ 2026-08-13: 초기 SIG_PAGE 개만 렌더 — 나머지는 "더 보기"로 증분합니다.
+          const stockRowsShown = stockRows.slice(0, stockSigShown);
+          // 남은 개수는 **서버 전집합 집계(counts.total)** 기준입니다. 받아온 배열 길이로 세면
+          // "60건 중 12건 표시"처럼 페이지 크기가 풀 규모로 읽힙니다(리뷰 지적 #10 후속).
+          const stockLocalRest = stockRows.length - stockRowsShown.length;        // 이미 받아둔 잔여
+          const stockTotalCount = stockCounts[stockSigFilter];                    // null = 아직 미집계
+          const stockPoolRest = stockTotalCount != null
+            ? Math.max(0, stockTotalCount - stockRowsShown.length) : stockLocalRest;
+          const stockCanMore = stockLocalRest > 0 || stockPageMore;               // 로컬 잔여 또는 다음 서버 페이지
+          const stockMoreN = Math.max(stockLocalRest, stockPoolRest);             // 0 이면 건수 없이 "더 보기"
+          // 서브탭은 시그널 풀이 살아 있을 때만 의미가 있습니다 — 킬스위치
+          // (VITE_ZEPTA_STOCK_SIGNALS=0)로 시그널이 꺼지면 서브탭 없이 한 화면으로
+          // 되돌아갑니다("시그널" 탭만 눌렀는데 빈 화면"인 상태를 만들지 않기).
+          const stockSubTabsOn = STOCK_SIGNALS_ON;
+          const isSignalsView = !stockSubTabsOn || stocksView !== "screener";
+          const isScreenerView = !stockSubTabsOn || stocksView === "screener";
           const stockNewestTs = stockRowsAll.reduce((m, s) => Math.max(m, Number(s?.ts) || 0), 0);
           const stockFresh = coinScoreFreshness(stockNewestTs, t, STALE_MIN_STOCK);
           const STOCK_TF_LABEL = { "1w": t("tabs.coin.tf1w"), "1d": t("tabs.coin.tf1d"), "4h": t("tabs.coin.tf4h"), "1h": t("tabs.coin.tf1h") };
@@ -9409,7 +10042,12 @@ function AppInner() {
             {/* ── 헤더 — 시안 1b: 타이틀 + 신선도 알약(실측 ts — 없으면 생략) ── */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "13px" }}>
               <h1 style={{ margin: 0, fontSize: isMobile ? "22px" : "24px", fontWeight: 800, color: C.text1, letterSpacing: "-0.01em" }}>{t("nav.stocks")}</h1>
-              {stockFresh && (
+              {/* 신선도 알약은 시그널 데이터의 집계 시각이라 시그널 뷰에서만 노출합니다
+                  (조건 검색 뷰의 결과 시각은 "마지막 갱신" 캡션이 따로 전달 — 이중 노출 방지).
+                  ★ 리뷰 수리: 기존 `!isScreenerView` 는 죽은 조건이었습니다 — 킬스위치 ON 에서는
+                  두 뷰가 배타라 항상 참, OFF 축퇴에서는 stockPool 이 비어 stockFresh 자체가
+                  null 이라 어차피 안 그려집니다. 없는 의도를 추측하게 만들지 않도록 지웠습니다. */}
+              {isSignalsView && stockFresh && (
                 // ★ 정돈 패스: 코인 탭과 동일 규격 — 신선도는 중립 톤(정보), 액션 색 미사용
                 <span style={{
                   fontSize: mf(11), fontWeight: 700, padding: "6px 11px", borderRadius: "9999px",
@@ -9419,6 +10057,21 @@ function AppInner() {
               )}
             </div>
 
+            {/* ── 서브탭 [시그널 | 조건 검색] — 지표 탭과 같은 mobileKit Segment·같은 위치.
+                 딥링크 URL 동기화(/stocks · /stocks?view=screener). ── */}
+            {stockSubTabsOn && (
+              <Segment
+                value={stocksView === "screener" ? "screener" : "signals"}
+                onChange={setStocksViewWithUrl}
+                options={[
+                  { value: "signals", label: t("tabs.screener.viewSignals") },
+                  { value: "screener", label: t("tabs.screener.viewScreener") },
+                ]}
+                style={{ marginBottom: "13px" }}
+              />
+            )}
+
+            {isSignalsView && (<>
             {/* ── 장 상태 배지 2칸 (시안 1b) — 시계 기반 결정적 산출, Intl 실패 시 생략 ── */}
             {sessionCells.length > 0 && (
               <div style={{ display: "flex", gap: "8px", marginBottom: "13px" }}>
@@ -9518,42 +10171,61 @@ function AppInner() {
                  킬스위치 VITE_ZEPTA_STOCK_SIGNALS=0 이면 섹션째 사라집니다. */}
             {STOCK_SIGNALS_ON && (
               <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "18px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-                  {/* 주식 스코어는 장 마감 후 마지막 장중 데이터가 유지되는 설계라 실시간 펄스
-                      점을 켜지 않습니다(홈과 동일 원칙) — 신선도는 상단 알약이 전달합니다. */}
-                  <h2 style={{ margin: 0, fontSize: mf(14), fontWeight: 800, color: C.text1, whiteSpace: "nowrap" }}>{t("tabs.screener.signalsTitle")}</h2>
-                  <span style={{ flex: 1 }} />
-                  {/* 정렬은 점수순 고정 — 상태 서술 알약(죽은 드롭다운을 두지 않습니다) */}
-                  {stockRows.length > 0 && (
-                    <span style={{
-                      fontSize: mf(11), fontWeight: 800, padding: "5px 11px", borderRadius: "9999px",
-                      background: C.card, border: `1px solid ${C.border}`, color: C.text3, whiteSpace: "nowrap",
-                    }}>{t("tabs.screener.sortByScore")}</span>
-                  )}
-                </div>
-                {/* [전체|미국|한국] 필터 칩 — 건수는 실제 풀에서 집계 (mobileKit Segment) */}
-                {stockRowsAll.length > 0 && (
-                  <Segment
-                    value={stockSigFilter}
-                    onChange={setStockSigFilter}
-                    options={[
-                      { value: "all", label: t("tabs.screener.sigAll"), count: stockRowsAll.length },
-                      { value: "us", label: t("tabs.screener.marketUs"), count: stockRowsAll.filter(s => s.market === "us").length },
-                      { value: "kr", label: t("tabs.screener.marketKr"), count: stockRowsAll.filter(s => s.market === "kr").length },
-                    ]}
-                  />
+                {/* ★ 2026-08-13 정돈: 섹션 제목("주식 시그널")은 서브탭 [시그널]이 이미
+                    전달하므로 h2 를 걷어내고, 시장 필터와 정렬 상태를 한 줄로 묶었습니다
+                    (같은 정보 이중 노출 금지 · 세로 높이 절약).
+                    주식 스코어는 장 마감 후 마지막 장중 데이터가 유지되는 설계라 실시간
+                    펄스 점을 켜지 않습니다 — 신선도는 헤더 알약이 전달합니다. */}
+                {/* 칩은 "선택한 시장이 0건"일 때도 남깁니다 — 사라지면 전체로 되돌아갈 길이 없습니다 */}
+                {(stockRowsAll.length > 0 || (stockCounts.all || 0) > 0) && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", justifyContent: "space-between" }}>
+                    {/* [전체|미국|한국] 필터 칩 — 건수는 **서버 전집합 집계(counts.total)** 입니다.
+                        받아온 페이지 배열로 세면 유니버스가 1,016종이어도 "전체 60"으로 고정돼
+                        페이지 크기가 풀 규모로 읽힙니다(캡션에서 지운 "주요 50종"과 같은 종류의
+                        허위 표기). 아직 집계 전이면 숫자를 지어내지 않고 라벨만 보여줍니다. */}
+                    <Segment
+                      value={stockSigFilter}
+                      onChange={(v) => {
+                        // 시장을 바꾸면 페이지 커서도 처음으로 — 새 시장의 첫 페이지는
+                        // 위 effect(fetchStockTabSignals 의 deps)에서 곧바로 다시 받아옵니다.
+                        stockOffsetRef.current = 0;
+                        setStockPageMore(false);
+                        setStockSigFilter(v);
+                        setStockSigShown(SIG_PAGE);
+                      }}
+                      options={[
+                        { value: "all", label: t("tabs.screener.sigAll"), count: stockCounts.all ?? undefined },
+                        { value: "us", label: t("tabs.screener.marketUs"), count: stockCounts.us ?? undefined },
+                        { value: "kr", label: t("tabs.screener.marketKr"), count: stockCounts.kr ?? undefined },
+                      ]}
+                      style={{ minWidth: 0 }}
+                    />
+                    {/* 정렬은 점수순 고정 — 상태 서술 알약(죽은 드롭다운을 두지 않습니다) */}
+                    {stockRows.length > 0 && (
+                      <span style={{
+                        fontSize: mf(11), fontWeight: 800, padding: "5px 11px", borderRadius: "9999px",
+                        background: C.card, border: `1px solid ${C.border}`, color: C.text3, whiteSpace: "nowrap",
+                      }}>{t("tabs.screener.sortByScore")}</span>
+                    )}
+                  </div>
                 )}
                 {stockRowsAll.length === 0 ? (
                   stockTabStatus === "loading" || stockTabStatus === "idle" ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: "9px" }}>
                       {[0, 1, 2].map(i => <Skeleton key={`stk-skel-${i}`} width="100%" height="72px" />)}
                     </div>
+                  ) : stockSigFilter !== "all" && (stockCounts.all || 0) > 0 ? (
+                    /* 풀은 살아 있는데 선택 시장만 0건 — "집계 중"으로 잘못 서술하지 않습니다
+                       (시장 필터가 서버측이라 그 시장이 비면 배열 자체가 비어 옵니다) */
+                    <div style={{ fontSize: mf(12), color: C.text3, textAlign: "center", padding: "22px 0" }}>
+                      {t("tabs.screener.sigFilterEmpty")}
+                    </div>
                   ) : (
                     /* 빈 상태 — 집계 전·전체 실패 공용. 문구는 실제 산출 주기(크론 30~60분) 서술 */
                     <div style={{ border: `1.5px dashed ${C.border2}`, borderRadius: "16px", padding: "30px 24px", textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
                       <div style={{ fontSize: mf(15), fontWeight: 800, color: C.text1 }}>{t("tabs.screener.sigEmptyTitle")}</div>
                       <div style={{ fontSize: mf(12), color: C.text3, lineHeight: 1.6, maxWidth: "260px" }}>{t("tabs.screener.sigEmptyDesc")}</div>
-                      <button onClick={fetchStockTabSignals} style={{
+                      <button onClick={() => fetchStockTabSignals()} style={{
                         marginTop: "10px", padding: "11px 18px", borderRadius: "12px",
                         background: `${C.blue}1F`, color: C.isDark ? C.blueL : C.blue, border: "none",
                         fontSize: mf(13), fontWeight: 800, fontFamily: "inherit", cursor: "pointer", minHeight: "44px",
@@ -9564,8 +10236,10 @@ function AppInner() {
                   <div style={isMobile
                     ? { display: "flex", flexDirection: "column", gap: "9px" }
                     : { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "10px", alignItems: "start" }}>
-                    {stockRows.map((sig, i) => {
-                      const dir = sig.side === "LONG" ? "up" : "down";
+                    {stockRowsShown.map((sig, i) => {
+                      // ★ #13: 홈과 같은 확신도 게이팅 규칙(방향 단정 금지 임계 공용)
+                      const conv = signalConviction(sig);
+                      const dir = conv.dir;
                       const bd = sig.breakdown || {};
                       // 주식 breakdown 은 4h 가 없을 수 있어 응답에 있는 키만 칩으로 (홈과 동일 규칙)
                       const tfs = Object.keys(STOCK_TF_LABEL).filter(k => bd[k] != null).map(tf => ({
@@ -9585,9 +10259,9 @@ function AppInner() {
                           key={`${sig.symbol || "sig"}-${i}`}
                           symbol={symText}
                           // 주식은 현물이라 롱/숏 대신 상승/하락 우위로 서술 (표현 3원칙 — 홈과 동일)
-                          sideLabel={t(sig.side === "LONG" ? "tabs.home.upDominant" : "tabs.home.downDominant")}
+                          sideLabel={signalSideLabel(sig, true, t)}
                           dir={dir}
-                          score={Math.round(Math.max(0, Math.min(100, Number(sig.score))))}
+                          score={conv.score}
                           timeframes={tfs.some(x => x.dir) ? tfs : []}
                           support={sup}
                           price={px}
@@ -9598,6 +10272,28 @@ function AppInner() {
                     })}
                   </div>
                 )}
+                {/* ── "더 보기" 증분 (대표 지시: 무한 스크롤 강요 금지) — 남은 개수는 실측 ── */}
+                {/* 이미 받아둔 잔여가 있으면 렌더만 늘리고, 다 그렸으면 다음 서버 페이지를
+                    받아옵니다(offset += 60) — 60건에서 막히지 않고 유니버스 끝까지 도달합니다. */}
+                {stockCanMore && (
+                  <button
+                    onClick={() => {
+                      if (stockLocalRest <= 0) fetchStockTabSignals({ append: true });
+                      setStockSigShown(n => n + SIG_PAGE);
+                    }}
+                    disabled={stockPageLoading}
+                    style={{
+                      width: "100%", padding: "12px", borderRadius: "12px", minHeight: "46px",
+                      cursor: stockPageLoading ? "default" : "pointer",
+                      background: C.card, border: `1px solid ${C.border}`, color: C.text2,
+                      fontSize: mf(13), fontWeight: 800, fontFamily: "inherit",
+                      opacity: stockPageLoading ? 0.6 : 1,
+                    }}>
+                    {stockPageLoading ? t("tabs.screener.showMoreLoading")
+                      : stockMoreN > 0 ? t("tabs.screener.showMore", { n: stockMoreN })
+                      : t("tabs.screener.showMorePlain")}
+                  </button>
+                )}
                 {/* 필터 결과 0건 — 풀은 있으나 선택 시장에 시그널이 없는 경우(칩 건수와 일치) */}
                 {stockRowsAll.length > 0 && stockRows.length === 0 && (
                   <div style={{ fontSize: mf(12), color: C.text3, textAlign: "center", padding: "14px 0" }}>
@@ -9606,19 +10302,26 @@ function AppInner() {
                 )}
                 {stockRows.length > 0 && (
                   <div style={{ fontSize: mf(11), color: C.text4 }}>
-                    {/* 신선도(실측 ts)는 헤더 알약이 전달 — 여기는 출처만 서술해 이중 노출을 피합니다 */}
+                    {/* 신선도(실측 ts)는 헤더 알약이 전달 — 여기는 출처만 서술해 이중 노출을 피합니다.
+                        ★ #10: 종목 수는 위 [전체|미국|한국] 칩의 **서버 전집합 집계(counts.total)**
+                        가 유일한 출처입니다. 캡션의 "주요 50종" 하드코딩이 칩과 어긋났고,
+                        유니버스는 서버에서 바뀌므로(2026-08-13 51→1,016) 숫자를 박지 않습니다. */}
                     {t("tabs.home.stockSignalSourceNote")}
                   </div>
                 )}
               </div>
             )}
+            </>)}
 
+            {isScreenerView && (<>
             {/* ── 조건으로 찾기 (스크리너) — 시안 1b: 프리셋 칩 한 줄 + "조건 편집" 버튼 1개.
                  구 2열 프리셋 버튼 그리드 + 인라인 상세 조건 패널 전면 대체(버튼 다이어트).
                  프리셋 클릭 → 조건 주입 → 기존 자동 스캔 effect 가 즉시 실행(제로 클릭 결과). */}
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "16px", overflow: "hidden", marginBottom: "13px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "7px", minHeight: "46px", padding: "8px 14px", borderBottom: `1px solid ${C.card2}` }}>
-                <h2 style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: C.text1, whiteSpace: "nowrap" }}>{t("tabs.screener.findByCondition")}</h2>
+                {/* ★ 2026-08-13 정돈: 카드 제목이 서브탭 라벨("조건 검색")과 같은 말이라
+                    카드가 실제로 담고 있는 것(프리셋 칩)으로 바꿔 중복을 없앴습니다. */}
+                <h2 style={{ margin: 0, fontSize: "15px", fontWeight: 800, color: C.text1, whiteSpace: "nowrap" }}>{t("tabs.screener.presetTitle")}</h2>
                 <span style={{ flex: 1 }} />
                 <HomeActionChip label={editChipLabel} onClick={() => setCondSheetOpen(true)} />
               </div>
@@ -9836,7 +10539,10 @@ function AppInner() {
               // ★ IA v3 정합(대표 "짬뽕 금지"): 주식 탭에서는 코인 세그먼트를 노출하지 않습니다.
               //   코인 조건 검색은 코인 탭의 "조건으로 코인 찾기" 진입점이 담당 — 기능 이동이지 제거 아님.
               //   (필터 로직 matchMarketFilter·값 자체는 그대로라 코인 탭 진입 시 crypto 필터가 정상 동작)
-              const STOCK_SEG_FILTERS = MARKET_FILTERS.filter(m => m !== "crypto" && m !== "all");
+              //   ★ 2026-08-13: 단, 코인 탭 CTA 로 진입해 실제로 crypto 필터가 걸린 동안에는
+              //   그 상태를 표현할 칸이 없으면 "아무것도 선택 안 된 세그먼트"가 되어 지금 무엇이
+              //   걸려 있는지 읽히지 않습니다. 그때만 코인 칸을 함께 노출합니다.
+              const STOCK_SEG_FILTERS = MARKET_FILTERS.filter(m => m !== "all" && (m !== "crypto" || filterMarket === "crypto"));
               const marketSegOptions = STOCK_SEG_FILTERS.map(m => ({
                 value: m,
                 label: MARKET_SEG_LABEL[m] || m,
@@ -10240,6 +10946,7 @@ function AppInner() {
               )}
             </div>
             </details>
+            </>)}
 
             {/* 시안 1b 하단 면책 — 시그널·스크리너 공용 1회(이중 노출 방지) */}
             <Disclaimer style={{ marginTop: "14px" }}>{t("tabs.coin.disclaimer")}</Disclaimer>
@@ -10611,21 +11318,37 @@ function AppInner() {
           const kq = marketIndices.find(i => i.symbol === "^KQ11");
           const vix = marketIndices.find(i => i.symbol === "^VIX");
           const fg = fearGreed.stock?.value;
-          const upCount = hotAssets.filter(a => a.change > 0).length;
-          const dnCount = hotAssets.filter(a => a.change < 0).length;
-          const flatCount = hotAssets.length - upCount - dnCount;
-          const advDecl = hotAssets.length > 0 ? (upCount / hotAssets.length * 100) : 50;
-          const buyPicks = dailyPicks.filter(p => p.score >= 6).length;
-          const sellPicks = dailyPicks.filter(p => p.score <= 3).length;
+          // ★ 2026-08-13 감사(#4): 같은 화면에 성격이 다른 두 모수가 이름 없이 섞여 나와
+          //   "상승 신호 28 / 41 종목 스캔"과 아래 시장별 현황 합계(21+15+3=39)가
+          //   서로 어긋나 보였습니다. 두 모수를 여기서 **한 번만** 정의하고, 화면 문구에도
+          //   각각 어떤 모수인지 명시합니다(분자·분모 정의의 단일 소스).
+          //   · signalScan : dailyPicks — 지표 점수까지 산출된 "신호 스캔" 모수
+          //   · breadth    : hotAssets  — 당일 등락만 집계된 "시세 집계" 모수
+          //   ★ 리뷰 수리: 이전엔 upCount/buyPicks 같은 지역변수를 남겨 둬 같은 값에 이름이
+          //     두 벌이었습니다(한쪽만 고치는 드리프트 위험). 지역변수를 없애고 전 사용처를
+          //     breadth.* / signalScan.* 로 통일했습니다.
+          const breadthUp = hotAssets.filter(a => a.change > 0).length;
+          const breadthDn = hotAssets.filter(a => a.change < 0).length;
+          const signalScan = {
+            total: dailyPicks.length,
+            bull: dailyPicks.filter(p => p.score >= 6).length,
+            bear: dailyPicks.filter(p => p.score <= 3).length,
+          };
+          const breadth = {
+            total: hotAssets.length, up: breadthUp, dn: breadthDn,
+            flat: hotAssets.length - breadthUp - breadthDn,
+            // 상승 종목 비율(%) — 분모는 breadth.total(시세 집계) 하나뿐입니다
+            advPct: hotAssets.length > 0 ? (breadthUp / hotAssets.length * 100) : 50,
+          };
           let mktScore = 50;
           if (sp) mktScore += sp.change > 1 ? 10 : sp.change > 0.3 ? 5 : sp.change > -0.3 ? 0 : sp.change > -1 ? -5 : -10;
           if (fg) mktScore += fg > 70 ? 8 : fg > 55 ? 4 : fg > 40 ? 0 : fg > 25 ? -4 : -8;
-          mktScore += advDecl > 60 ? 8 : advDecl > 50 ? 3 : advDecl > 40 ? -3 : -8;
+          mktScore += breadth.advPct > 60 ? 8 : breadth.advPct > 50 ? 3 : breadth.advPct > 40 ? -3 : -8;
           // ★ 스캔 미완료(dailyPicks 빈 배열)면 0건이 점수를 끌어내리지 않게 가산 자체를 건너뜁니다
           //   — 이 점수는 공유 텍스트에도 실려 나가므로 owner/일반 사용자 간 불일치 방지.
-          if (dailyPicks.length > 0) {
-            if (buyPicks > 5) mktScore += 6; else if (buyPicks > 2) mktScore += 3;
-            if (sellPicks > 5) mktScore -= 6; else if (sellPicks > 2) mktScore -= 3;
+          if (signalScan.total > 0) {
+            if (signalScan.bull > 5) mktScore += 6; else if (signalScan.bull > 2) mktScore += 3;
+            if (signalScan.bear > 5) mktScore -= 6; else if (signalScan.bear > 2) mktScore -= 3;
           }
           mktScore = Math.max(0, Math.min(100, mktScore));
           const mktVerdict = mktScore >= 70 ? t("tabs.quantReport.verdictStrongBull") : mktScore >= 55 ? t("tabs.quantReport.verdictWeakBull") : mktScore >= 45 ? t("tabs.quantReport.verdictMixed") : mktScore >= 30 ? t("tabs.quantReport.verdictWeakBear") : t("tabs.quantReport.verdictStrongBear");
@@ -10669,7 +11392,8 @@ function AppInner() {
                 <div className="flex items-center gap-2">
                   <span style={{ fontSize: "11px", fontWeight: 700, padding: "5px 11px", borderRadius: "9999px", background: C.card, border: `1px solid ${C.border}`, color: C.text2 }}>{t("tabs.quantReport.asOfTime", { time: reportTime })}</span>
                   <button onClick={() => {
-                    const shareText = t("tabs.quantReport.shareText", { time: reportTime, score: mktScore, verdict: mktVerdict, up: upCount, dn: dnCount });
+                    // 공유 텍스트도 화면과 같은 모수 표기를 씁니다(시세 집계 N종 중 상승/하락)
+                    const shareText = t("tabs.quantReport.shareText", { time: reportTime, score: mktScore, verdict: mktVerdict, up: breadth.up, dn: breadth.dn, breadthTotal: breadth.total });
                     if (navigator.share) {
                       navigator.share({ title: t("tabs.quantReport.shareTitle"), text: shareText, url: "https://zepta.app" }).catch(() => {});
                     } else {
@@ -10717,13 +11441,15 @@ function AppInner() {
                   <div style={{ position: "absolute", top: "1px", left: `calc(${mktScore}% - 7px)`, width: "14px", height: "14px", borderRadius: "50%", background: mktColorHi, boxShadow: `0 0 0 3px ${C.card}` }} />
                 </div>
                 <div style={{ fontSize: "13px", color: C.text2, marginTop: "10px", lineHeight: 1.6 }}>
+                  {/* ★ 리뷰 수리(#4 후속): 서술 문장도 어느 모수인지 라벨을 답니다 —
+                      "상승 종목 N개"(시세 집계)와 "상승 신호 M개"(신호 스캔)는 분모가 다릅니다. */}
                   {mktScore >= 60
-                    ? (dailyPicks.length > 0
-                        ? t("tabs.quantReport.messagesBullish", { upCount, buyPicks })
-                        : t("tabs.quantReport.messagesBullishNoScan", { upCount }))
+                    ? (signalScan.total > 0
+                        ? t("tabs.quantReport.messagesBullish", { breadthTotal: breadth.total, upCount: breadth.up, scanTotal: signalScan.total, buyPicks: signalScan.bull })
+                        : t("tabs.quantReport.messagesBullishNoScan", { breadthTotal: breadth.total, upCount: breadth.up }))
                     : mktScore >= 45
                     ? t("tabs.quantReport.messagesMixed")
-                    : t("tabs.quantReport.messagesBearish", { dnCount })}
+                    : t("tabs.quantReport.messagesBearish", { breadthTotal: breadth.total, dnCount: breadth.dn })}
                 </div>
                 <div style={{ fontSize: "11px", color: C.text3, marginTop: "6px" }}>{t("tabs.quantReport.aiAnalysis")}</div>
               </div>
@@ -10764,13 +11490,13 @@ function AppInner() {
                     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "12px 14px" }}>
                       <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>{t("tabs.quantReport.upDownRatio")}</div>
                       <div style={{ marginTop: "3px" }}>
-                        <Num size="18px" weight={800} color={advDecl > 55 ? (C.greenL || C.green) : advDecl < 45 ? (C.redL || C.red) : (C.yellowL || C.yellow)}>{advDecl.toFixed(0)}%</Num>
+                        <Num size="18px" weight={800} color={breadth.advPct > 55 ? (C.greenL || C.green) : breadth.advPct < 45 ? (C.redL || C.red) : (C.yellowL || C.yellow)}>{breadth.advPct.toFixed(0)}%</Num>
                       </div>
                       <div className="flex mt-1.5 h-1.5 rounded overflow-hidden" style={{ background: C.card2 }}>
-                        <div className="h-full" style={{ width: `${advDecl}%`, background: C.green }} />
+                        <div className="h-full" style={{ width: `${breadth.advPct}%`, background: C.green }} />
                         <div className="h-full flex-1" style={{ background: C.red }} />
                       </div>
-                      <div style={{ fontSize: "11px", fontWeight: 700, marginTop: "4px", color: C.text3 }}>{t("tabs.quantReport.upFlatDown", { up: upCount, flat: flatCount, dn: dnCount })}</div>
+                      <div style={{ fontSize: "11px", fontWeight: 700, marginTop: "4px", color: C.text3 }}>{t("tabs.quantReport.upFlatDown", { up: breadth.up, flat: breadth.flat, dn: breadth.dn })}</div>
                     </div>
                   )}
                   {vix && (
@@ -10782,14 +11508,15 @@ function AppInner() {
                       <div style={{ fontSize: "11px", fontWeight: 700, marginTop: "2px", color: vix.price > 30 ? (C.redL || C.red) : vix.price > 20 ? (C.yellowL || C.yellow) : (C.greenL || C.green) }}>{vix.price > 30 ? t("tabs.quantReport.vixHigh") : vix.price > 20 ? t("tabs.quantReport.vixMid") : t("tabs.quantReport.vixLow")}</div>
                     </div>
                   )}
-                  {/* 스캔 전(빈 배열)에는 "0 / 0 종목" 같은 거짓 수치 대신 타일을 숨깁니다 */}
-                  {dailyPicks.length > 0 && (
+                  {/* 스캔 전(빈 배열)에는 "0 / 0 종목" 같은 거짓 수치 대신 타일을 숨깁니다.
+                      분자·분모는 signalScan 단일 정의를 따릅니다(#4) — 캡션도 "신호 스캔" 모수임을 명시. */}
+                  {signalScan.total > 0 && (
                     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "12px 14px" }}>
                       <div style={{ fontSize: "11px", color: C.text3, fontWeight: 700 }}>{t("tabs.quantReport.buySignals")}</div>
                       <div style={{ marginTop: "3px" }}>
-                        <Num size="18px" weight={800} color={C.blueL || C.blue}>{buyPicks}</Num>
+                        <Num size="18px" weight={800} color={C.blueL || C.blue}>{signalScan.bull}</Num>
                       </div>
-                      <div style={{ fontSize: "11px", fontWeight: 700, marginTop: "2px", color: C.text3 }}>{t("tabs.quantReport.scannedOf", { n: dailyPicks.length })}</div>
+                      <div style={{ fontSize: "11px", fontWeight: 700, marginTop: "2px", color: C.text3 }}>{t("tabs.quantReport.scannedOf", { n: signalScan.total })}</div>
                     </div>
                   )}
                 </div>
@@ -10798,7 +11525,12 @@ function AppInner() {
               {/* ── 시장별 현황 — 시안 태그 칩 + 상태 서술 + 등락 칩 ── */}
               {hotAssets.length > 0 && (
                 <div>
-                  <MobileSectionHeader title={t("tabs.quantReport.marketStatus")} style={{ marginBottom: "8px" }} />
+                  <MobileSectionHeader title={t("tabs.quantReport.marketStatus")} style={{ marginBottom: "4px" }} />
+                  {/* ★ #4: 아래 US/KR/코인 건수의 합계가 곧 이 섹션의 모수(시세 집계 종목 수)임을
+                      명시합니다 — 위 "신호 스캔" 모수와 다른 값이어도 어긋나 보이지 않도록. */}
+                  <div style={{ fontSize: "11px", color: C.text3, marginBottom: "8px" }}>
+                    {t("tabs.quantReport.breadthScope", { n: breadth.total })}
+                  </div>
                   <div className={isMobile ? "flex flex-col gap-2.5" : "grid grid-cols-3 gap-2.5"}>
                     {[
                       { tag: "US", name: t("tabs.quantReport.usStocks"), color: C.blue, hi: C.blueL || C.blue, total: usStocks.length, up: usUp, movers: usGainers },
@@ -10976,16 +11708,28 @@ function AppInner() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5 mb-0.5">
                             <span className="font-bold text-lg" style={{ color: C.text1 }}>{flag} {pick.name}</span>
-                            {d && (
+                            {/* ★ #5: 지표가 없으면 라벨을 통째로 비우지 않고 상태를 서술합니다
+                                (같은 목록에서 어떤 종목만 라벨이 사라지던 불일치 제거).
+                                ★ 리뷰 수리: 지표 보강은 owner 게이트 뒤라 공개 /quant-report 는
+                                전 행이 '진단 미산출' 알약으로 채워졌습니다 — 같은 알약을 5~10줄
+                                반복하는 대신, 이 목록이 이미 들고 있는 실측 신호 점수(pick.score)를
+                                보여줍니다. 없는 진단을 지어내지 않으면서 정보량은 살립니다. */}
+                            {d && !d.insufficient ? (
                               <span className="text-sm font-bold px-1.5 py-0.5 rounded" style={{
                                 background: d.opinionColor === "green" ? `${C.green}18` : d.opinionColor === "red" ? `${C.red}18` : `${C.yellow}18`,
                                 color: d.opinionColor === "green" ? C.green : d.opinionColor === "red" ? C.red : C.yellow,
                               }}>{verdictLabel(d.opinion, t)}</span>
+                            ) : Number.isFinite(Number(pick.score)) ? (
+                              <span className="text-sm font-bold px-1.5 py-0.5 rounded" style={{
+                                background: `${C.blue}14`, color: C.blueL || C.blue,
+                              }}>{t("tabs.quantReport.pickScoreChip", { score: pick.score })}</span>
+                            ) : (
+                              <DiagUnavailablePill t={t} fontSize="12px" />
                             )}
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-sm" style={{ color: C.text3 }}>{pick.reason}</span>
-                            {d && <span className="text-sm" style={{ color: C.text3 }}>{t("tabs.quantReport.diagScore", { score: d.score })}</span>}
+                            {d && !d.insufficient && <span className="text-sm" style={{ color: C.text3 }}>{t("tabs.quantReport.diagScore", { score: d.score })}</span>}
                           </div>
                         </div>
                         <div className="text-right flex-shrink-0">
@@ -11008,8 +11752,9 @@ function AppInner() {
                     else if (mktScore >= 45) actions.push({ icon: "🟡", text: t("tabs.quantReport.sumMixed"), color: C.yellow });
                     else actions.push({ icon: "🔴", text: t("tabs.quantReport.sumBear"), color: C.red });
                     if (anomalies.length > 0) actions.push({ icon: "⚡", text: t("tabs.quantReport.sumAnomaly", { n: anomalies.length }), color: C.yellow });
-                    if (buyPicks > 3) actions.push({ icon: "🎯", text: t("tabs.quantReport.sumBuySignals", { n: buyPicks }), color: C.green });
-                    if (sellPicks > 3) actions.push({ icon: "🛡️", text: t("tabs.quantReport.sumSellSignals", { n: sellPicks }), color: C.red });
+                    // 건수만 말하면 분모가 사라집니다 — "신호 스캔 N종 중" 을 함께 서술합니다
+                    if (signalScan.bull > 3) actions.push({ icon: "🎯", text: t("tabs.quantReport.sumBuySignals", { n: signalScan.bull, total: signalScan.total }), color: C.green });
+                    if (signalScan.bear > 3) actions.push({ icon: "🛡️", text: t("tabs.quantReport.sumSellSignals", { n: signalScan.bear, total: signalScan.total }), color: C.red });
                     if (fg && fg <= 25) actions.push({ icon: "💎", text: t("tabs.quantReport.sumExtremeFear"), color: C.purple });
                     if (fg && fg >= 75) actions.push({ icon: "⚠️", text: t("tabs.quantReport.sumExtremeGreed"), color: C.red });
                     const vix = marketIndices.find(i => i.symbol === "^VIX");
@@ -11038,22 +11783,23 @@ function AppInner() {
               }}>
                 <div style={{ fontSize: "15px", fontWeight: 800, color: C.text1, marginBottom: "10px" }}>{t("tabs.quantReport.overallStatusTitle")}</div>
                 <div style={{ fontSize: "14px", color: C.text2, lineHeight: 1.8 }}>
+                  {/* 값은 전부 breadth.* / signalScan.* 단일 정의에서 옵니다 — 문구에도 모수 명시 */}
                   {mktScore >= 70
-                    ? t("tabs.quantReport.statusStrongBull", { sp: sp ? `${sp.change >= 0 ? "+" : ""}${sp.change}%` : "", pct: advDecl.toFixed(0), buyPicks }) + (fg && fg > 75 ? " " + t("tabs.quantReport.statusOverheatNote") : "")
+                    ? t("tabs.quantReport.statusStrongBull", { sp: sp ? `${sp.change >= 0 ? "+" : ""}${sp.change}%` : "", pct: breadth.advPct.toFixed(0), breadthTotal: breadth.total, scanTotal: signalScan.total, buyPicks: signalScan.bull }) + (fg && fg > 75 ? " " + t("tabs.quantReport.statusOverheatNote") : "")
                     : mktScore >= 55
-                    ? t("tabs.quantReport.statusWeakBull", { upCount, dnCount, fgPart: fg ? t("tabs.quantReport.statusFgPart", { fg, label: fg <= 40 ? t("tabs.home.fear") : fg <= 60 ? t("tabs.home.neutral") : t("tabs.home.greed") }) : t("tabs.quantReport.statusFgFallback") })
+                    ? t("tabs.quantReport.statusWeakBull", { breadthTotal: breadth.total, upCount: breadth.up, dnCount: breadth.dn, fgPart: fg ? t("tabs.quantReport.statusFgPart", { fg, label: fg <= 40 ? t("tabs.home.fear") : fg <= 60 ? t("tabs.home.neutral") : t("tabs.home.greed") }) : t("tabs.quantReport.statusFgFallback") })
                     : mktScore >= 45
-                    ? t("tabs.quantReport.statusMixed", { upCount, dnCount })
+                    ? t("tabs.quantReport.statusMixed", { breadthTotal: breadth.total, upCount: breadth.up, dnCount: breadth.dn })
                     : mktScore >= 30
-                    ? t("tabs.quantReport.statusWeakBear", { dnCount }) + (fg && fg <= 30 ? " " + t("tabs.quantReport.statusFearNote") : "")
+                    ? t("tabs.quantReport.statusWeakBear", { breadthTotal: breadth.total, dnCount: breadth.dn }) + (fg && fg <= 30 ? " " + t("tabs.quantReport.statusFearNote") : "")
                     : t("tabs.quantReport.statusStrongBear")}
                 </div>
                 <div className="flex gap-2 mt-3.5 flex-wrap">
                   <span style={{ fontSize: "12px", fontWeight: 800, padding: "4px 10px", borderRadius: "8px", background: `${mktColor}1A`, color: mktColorHi, fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{t("tabs.quantReport.chipScore", { score: mktScore })}</span>
-                  <span style={{ fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "8px", background: C.card2, color: C.text3, fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{t("tabs.quantReport.chipAdv", { pct: advDecl.toFixed(0) })}</span>
+                  <span style={{ fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "8px", background: C.card2, color: C.text3, fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{t("tabs.quantReport.chipAdv", { pct: breadth.advPct.toFixed(0), total: breadth.total })}</span>
                   {fg && <span style={{ fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "8px", background: C.card2, color: C.text3, fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{t("tabs.quantReport.chipFg", { fg })}</span>}
-                  {dailyPicks.length > 0 && (
-                    <span style={{ fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "8px", background: C.card2, color: C.text3, fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{t("tabs.quantReport.chipBuy", { n: buyPicks })}</span>
+                  {signalScan.total > 0 && (
+                    <span style={{ fontSize: "12px", fontWeight: 700, padding: "4px 10px", borderRadius: "8px", background: C.card2, color: C.text3, fontFamily: MONO, fontVariantNumeric: "tabular-nums" }}>{t("tabs.quantReport.chipBuy", { n: signalScan.bull, total: signalScan.total })}</span>
                   )}
                 </div>
               </div>
@@ -11154,6 +11900,9 @@ function AppInner() {
             .filter(s => s && (s.side === "LONG" || s.side === "SHORT") && Number.isFinite(Number(s.score)))
             .slice()
             .sort((a, b) => Number(b.score) - Number(a.score));
+          // ★ 2026-08-13 (대표 지시 — 스크롤 피로): 주식 탭과 같은 "더 보기" 증분 규칙.
+          const rowsShown = rows.slice(0, coinSigShown);
+          const rowsRest = rows.length - rowsShown.length;
           const newestTs = rows.reduce((m, s) => Math.max(m, Number(s?.ts) || 0), 0);
           const fresh = coinScoreFreshness(newestTs, t);
           const TF_LABEL = { "1w": t("tabs.coin.tf1w"), "1d": t("tabs.coin.tf1d"), "4h": t("tabs.coin.tf4h"), "1h": t("tabs.coin.tf1h") };
@@ -11308,8 +12057,10 @@ function AppInner() {
                     <div style={isMobile
                       ? { display: "flex", flexDirection: "column", gap: "9px" }
                       : { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "10px", alignItems: "start" }}>
-                      {rows.map((sig, i) => {
-                        const dir = sig.side === "LONG" ? "up" : "down";
+                      {rowsShown.map((sig, i) => {
+                        // ★ #13: 코인 풀도 같은 확신도 게이팅(종합 스코어 = 구간 부호 가중합의 절대값)
+                        const conv = signalConviction(sig);
+                        const dir = conv.dir;
                         const bd = sig.breakdown || {};
                         const tfs = ["1w", "1d", "4h", "1h"].map(tf => ({
                           label: TF_LABEL[tf],
@@ -11322,9 +12073,9 @@ function AppInner() {
                           <Fragment key={`${sig.symbol || sig.asset || "sig"}-${i}`}>
                             <SignalCard
                               symbol={String(sig.symbol || sig.asset || "—").replace("USDT", "")}
-                              sideLabel={t(sig.side === "LONG" ? "tabs.home.longDominant" : "tabs.home.shortDominant")}
+                              sideLabel={signalSideLabel(sig, false, t)}
                               dir={dir}
-                              score={Math.round(Math.max(0, Math.min(100, Number(sig.score))))}
+                              score={conv.score}
                               timeframes={tfs.some(x => x.dir) ? tfs : []}
                               support={sup}
                               price={px}
@@ -11345,6 +12096,15 @@ function AppInner() {
                     </div>
                   )}
 
+                  {/* ── "더 보기" 증분 (무한 스크롤 강요 금지) — 남은 개수는 실측 ── */}
+                  {rowsRest > 0 && (
+                    <button onClick={() => setCoinSigShown(n => n + SIG_PAGE)} style={{
+                      width: "100%", padding: "12px", borderRadius: "12px", minHeight: "46px", cursor: "pointer",
+                      background: C.card, border: `1px solid ${C.border}`, color: C.text2,
+                      fontSize: mf(13), fontWeight: 800, fontFamily: "inherit",
+                    }}>{t("tabs.coin.showMore", { n: rowsRest })}</button>
+                  )}
+
                   {rows.length > 0 && (
                     <div style={{ fontSize: mf(11), color: C.text4 }}>
                       {/* 신선도(실측 ts)는 헤더 알약과 동일 값 — 여기는 출처만 서술해 이중 노출을 피합니다 */}
@@ -11355,7 +12115,9 @@ function AppInner() {
                   {/* ★ IA v3: 코인 조건 검색 진입점 — 주식 탭에서 걷어낸 코인 세그먼트의 대체 경로.
                        같은 스크리너를 crypto 필터로 열어 기능을 보존합니다(이동이지 제거 아님). */}
                   <button
-                    onClick={() => { setFilterMarket("crypto"); setTab("screener"); }}
+                    // ★ 2026-08-13: 조건 검색 서브뷰로 직행 + crypto 필터를 ref 로 시드합니다
+                    //   (setFilterMarket 직접 호출은 주식 탭 진입 정정 이펙트가 덮어썼습니다).
+                    onClick={() => { screenerMarketSeedRef.current = "crypto"; setStocksView("screener"); setTab("screener"); }}
                     style={{
                       display: "flex", alignItems: "center", justifyContent: "center", gap: "7px",
                       width: "100%", padding: "12px", borderRadius: "12px", cursor: "pointer",
@@ -11658,8 +12420,7 @@ function AppInner() {
           const weekdayShortMon = Array.from({ length: 7 }, (_, i) => new Date(2024, 0, 1 + i).toLocaleDateString(calLocale, { weekday: "short" }));
           const weekdayShortSun = Array.from({ length: 7 }, (_, i) => new Date(2023, 11, 31 + i).toLocaleDateString(calLocale, { weekday: "short" }));
 
-          // 주차별 이벤트 그룹화
-          const getWeekOfMonth = (date) => Math.ceil((date.getDate() + new Date(date.getFullYear(), date.getMonth(), 1).getDay()) / 7);
+          // 주차별 이벤트 그룹화 (주차 산정은 아래 kstWeekOf 단일 정의를 씁니다)
           const eventsByWeek = {};
           const calFilterTabs = [
             { key: "all", label: t("tabs.econCalendar.filterAll") },
@@ -11691,13 +12452,13 @@ function AppInner() {
           }
 
           // 주차 계산용 헬퍼 (KST 기준 — kstParts 결과 사용)
-          const kstWeekOf = (k) => {
-            // 해당 월 1일의 KST 요일 + 일자로 주차 계산
-            // (실제 Date 객체 없이 산술만 — 안전)
-            const firstDayKstShift = new Date(Date.UTC(k.year, k.month, 1) + 9 * 3600000);
-            const firstDayKey = firstDayKstShift.getUTCDay();
-            return Math.ceil((k.date + firstDayKey) / 7);
-          };
+          // ★ 2026-08-13 감사(#14): 기존 식은 "월 1일의 요일"을 더해 달력 격자의 '행 번호'를
+          //   냈습니다. 2026-08-01 이 토요일이라 1일 혼자 1행을 차지 → 8/12 가 3주차,
+          //   8/26 이 5주차로 밀렸습니다(대표 실측). 서비스가 쓰는 정의는 "월 1일부터 7일
+          //   단위"이므로 일자만으로 산정합니다: 1~7=1주차, 8~14=2주차, 15~21=3주차,
+          //   22~28=4주차, 29~31=5주차. (요일·월 시작 요일에 영향받지 않아 경계가 안정적)
+          const weekOfMonthByDate = (dateNum) => Math.ceil(dateNum / 7);
+          const kstWeekOf = (k) => weekOfMonthByDate(k.date);
           calEvents.forEach(evt => {
             const k = kstParts(evt.date);
             if (!k.valid) return; // invalid 이벤트는 그룹화에서 제외
@@ -11983,8 +12744,12 @@ function AppInner() {
                     </div>
                   ) : weekGroups.map((group, gi) => {
                     // 주차별 ID 생성 (날짜 클릭 → 스크롤 대상)
-                    const firstEvtDate = group.events[0]?.date ? new Date(group.events[0].date.toLocaleString("en-US", { timeZone: "Asia/Seoul" })) : null;
-                    const weekId = firstEvtDate ? `econ-week-${firstEvtDate.getFullYear()}-${String(firstEvtDate.getMonth()+1).padStart(2,"0")}-W${Math.ceil((firstEvtDate.getDate() + new Date(firstEvtDate.getFullYear(), firstEvtDate.getMonth(), 1).getDay()) / 7)}` : `econ-week-${gi}`;
+                    // ★ 2026-08-13 감사(#14): 여기에 옛 주차 식이 한 번 더 복제돼 있어
+                    //   헤더 라벨과 앵커가 어긋날 수 있었습니다 → kstParts + kstWeekOf 단일 소스로 통일.
+                    const firstEvtK = group.events[0]?.date ? kstParts(group.events[0].date) : null;
+                    const weekId = firstEvtK?.valid
+                      ? `econ-week-${firstEvtK.year}-${String(firstEvtK.month + 1).padStart(2, "0")}-W${kstWeekOf(firstEvtK)}`
+                      : `econ-week-${gi}`;
                     return (
                     <div key={gi} id={weekId} className="mb-8" style={{ scrollMarginTop: "80px" }}>{/* 간격 보강 (대표 피드백) */}
                       {/* 주차 헤더 */}
@@ -12543,11 +13308,11 @@ function AppInner() {
 
             {/* 검색 헤더 */}
             <div style={{background:`linear-gradient(135deg, ${C.card} 0%, ${C.card2} 100%)`,border:`1px solid ${C.border}20`,borderRadius:"16px",padding:"22px 24px",marginBottom:"12px",boxShadow:"0 2px 12px rgba(0,0,0,0.2)"}}>
+              {/* ★ 2026-08-13 감사(#8): 히어로 헤더와 같은 제목·부제를 이 카드가 한 번 더
+                  렌더해 화면에 2회 중복 노출됐습니다. 제목·부제는 위 히어로가 단독 소유하고,
+                  이 카드는 "무엇을 조작하는 영역인지"만 알리는 라벨을 둡니다. */}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:"12px"}}>
-                <div>
-                  <div style={{fontWeight:800,fontSize:"18px",marginBottom:"4px",color:C.text1}}>{t("sentiment.title")}</div>
-                  <div style={{fontSize:"14px",color:C.text3}}>{t("sentiment.subtitle")}</div>
-                </div>
+                <div style={{fontWeight:800,fontSize:"18px",color:C.text1}}>{t("sentiment.searchTitle")}</div>
                 <div style={{display:"flex",gap:"8px",alignItems:"center"}}>
                   <input value={sentimentSymbol} onChange={e=>setSentimentSymbol(e.target.value.toUpperCase())}
                     placeholder="SPY" onKeyDown={e=>{if(e.key==="Enter")fetchSentiment(sentimentSymbol);}}
@@ -12790,7 +13555,8 @@ function AppInner() {
         ═══════════════════════════════════════════════════════════ */}
         {tab === "saved-screeners" && (
           <Suspense fallback={<LazyTabFallback />}>
-            <SavedScreeners onNavigate={setTab} onOpenScreener={(keys) => { setPendingScreenerKeys(keys); setTab("screener"); }} />
+            {/* 저장한 조건 열기 = 조건 주입 + 자동 스캔 → 결과가 있는 조건 검색 서브뷰로 착지 */}
+            <SavedScreeners onNavigate={setTab} onOpenScreener={(keys) => { setPendingScreenerKeys(keys); setStocksView("screener"); setTab("screener"); }} />
           </Suspense>
         )}
 
@@ -13862,10 +14628,23 @@ function AppInner() {
                   <div style={{ textAlign: "center", padding: "32px 14px", color: C.text3, fontSize: "13px", lineHeight: 1.6 }}>
                     📌 {t("watchDock.emptyHint1")}<br />{t("watchDock.emptyHint2")}
                   </div>
-                ) : watchlist.map(w => {
-                  const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
-                  const diag = hot ? quickDiagnosis(hot) : null;
-                  const diagColor = diag ? (diag.score >= 60 ? C.green : diag.score >= 40 ? C.yellow : C.red) : C.text3;
+                ) : (() => {
+                  // ★ 2026-08-13 감사(#5): 여기가 "NVDA·LG엔솔·현대차·삼성SDI 전부 50점,
+                  //   TSMC 만 라벨 없음"이 나온 자리입니다. 지표 미보강 자산은 기본값 50 이
+                  //   진단처럼 찍혔고, 시세조차 없으면(hot 없음) 라벨이 통째로 사라졌습니다.
+                  //   → 두 경우를 "진단 미산출" 한 가지 상태로 통일합니다.
+                  // ★ 리뷰 수리: 지표 보강이 owner 게이트 뒤라 비owner 세션은 **모든 행**이
+                  //   같은 '진단 미산출' 알약으로 채워집니다(정보량 0 + 밀도 악화). 목록에
+                  //   산출된 행이 하나도 없으면 진단 줄 자체를 접고 종목 코드를 보여줍니다.
+                  //   한 행이라도 산출되면 기존대로 진단/미산출을 함께 표기해 비교가 됩니다.
+                  const rows = watchlist.map(w => {
+                    const hot = hotAssets.find(h => h.symbol === w.symbol || h.symbol === w.symbolRaw);
+                    const diag = hot ? quickDiagnosis(hot) : null;
+                    return { w, hot, diag, scored: !!(diag && !diag.insufficient) };
+                  });
+                  const anyScored = rows.some(r => r.scored);
+                  return rows.map(({ w, hot, diag, scored: diagScored }) => {
+                  const diagColor = diagScored ? (diag.score >= 60 ? C.green : diag.score >= 40 ? C.yellow : C.red) : C.text3;
                   return (
                     <div key={w.symbol} onClick={() => setSelectedAsset(w)} style={{
                       display: "flex", alignItems: "center", gap: 8, padding: "9px 8px",
@@ -13876,10 +14655,15 @@ function AppInner() {
                       <div style={{
                         width: 28, height: 28, borderRadius: 8, flexShrink: 0, fontSize: 13, fontWeight: 800,
                         background: `${diagColor}14`, color: diagColor, display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>{diag ? diag.score : (w.market === "us" ? "🇺🇸" : w.market === "kr" ? "🇰🇷" : "₿")}</div>
+                      }}>{diagScored ? diag.score : (w.market === "us" ? "🇺🇸" : w.market === "kr" ? "🇰🇷" : "₿")}</div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 700, fontSize: 13, color: C.text1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{w.name || w.symbol}</div>
-                        {diag && <div style={{ fontSize: 11, color: diagColor, fontWeight: 600 }}>{verdictLabel(diag.opinion, t)}</div>}
+                        {/* 목록 전체가 미산출이면 같은 알약을 반복하지 않고 종목 코드를 보여줍니다 */}
+                        <div style={{ fontSize: 11, color: anyScored ? diagColor : C.text3, fontWeight: 600, fontFamily: anyScored ? "inherit" : MONO }}>
+                          {anyScored
+                            ? (diagScored ? verdictLabel(diag.opinion, t) : t("diag.unavailable"))
+                            : String(w.symbol || "").replace(/\.(KS|KQ)$/i, "")}
+                        </div>
                       </div>
                       {hot && (
                         <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -13896,7 +14680,8 @@ function AppInner() {
                         onMouseLeave={e => { e.currentTarget.style.opacity = "0.35"; e.currentTarget.style.color = C.text3; }}>✕</button>
                     </div>
                   );
-                })}
+                  });
+                })()}
               </div>
 
               <div style={{ padding: "8px 14px", borderTop: `1px solid ${C.border}30`, fontSize: "11px", color: C.text3, flexShrink: 0 }}>

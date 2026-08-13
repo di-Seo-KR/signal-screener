@@ -5,7 +5,10 @@
       "has": [{ "type": "host", "value": "zepta.vercel.app" }],
       "destination": "https://zepta.app/$1",
       "permanent": true
-    }
+    },
+    { "source": "/stock", "destination": "/stocks", "permanent": true },
+    { "source": "/report", "destination": "/quant-report", "permanent": true },
+    { "source": "/riskmap", "destination": "/risk-map", "permanent": true }
   ],
   "rewrites": [
     { "source": "/api/yahoo-ohlc", "destination": "/api/yahoo?_mode=ohlc" },
@@ -38,6 +41,9 @@
     { "source": "/blog/realistic-roi-expectation", "destination": "/blog/realistic-roi-expectation.html" },
     { "source": "/blog/build-vs-buy-trading-bot", "destination": "/blog/build-vs-buy-trading-bot.html" },
     { "source": "/blog/free-crypto-trading-bot-no-code", "destination": "/blog/free-crypto-trading-bot-no-code.html" },
+    { "source": "/stocks", "destination": "/stocks.html" },
+    { "source": "/crypto", "destination": "/crypto.html" },
+    { "source": "/indicators", "destination": "/indicators.html" },
     { "source": "/screener", "destination": "/screener.html" },
     { "source": "/auto-trading", "destination": "/auto-trading.html" },
     { "source": "/real-trading", "destination": "/real-trading.html" },
@@ -74,7 +80,7 @@
     { "source": "/index/:slug", "destination": "/api/index-page?slug=:slug" },
     { "source": "/sitemap-briefings.xml", "destination": "/api/sitemap-briefings" },
     { "source": "/sitemap-econ.xml", "destination": "/api/sitemap-econ" },
-    { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon)(?!about)(?!guide)(?!privacy)(?!terms)(?!contact)(?!blog)(?!coin)(?!screener)(?!auto-trading)(?!real-trading)(?!alpha-lab)(?!portfolio-analysis)(?!portfolio)(?!backtest-compare)(?!backtest)(?!strategy)(?!risk-map)(?!sentiment)(?!econ-calendar)(?!news)(?!anomaly)(?!alerts)(?!quant-portfolio)(?!quant-port)(?!quant-report)(?!notifications)(?!saved-screeners)(?!leaderboard)(?!reports)(?!copy-trading)(?!pricing)(?!profile).*)", "destination": "/index.html" }
+    { "source": "/((?!api/)(?!assets/)(?!ads\\.txt)(?!robots\\.txt)(?!sitemap\\.xml)(?!favicon)(?!about)(?!guide)(?!privacy)(?!terms)(?!contact)(?!blog)(?!coin)(?!stocks)(?!crypto)(?!indicators)(?!screener)(?!auto-trading)(?!real-trading)(?!alpha-lab)(?!portfolio-analysis)(?!portfolio)(?!backtest-compare)(?!backtest)(?!strategy)(?!risk-map)(?!sentiment)(?!econ-calendar)(?!news)(?!anomaly)(?!alerts)(?!quant-portfolio)(?!quant-port)(?!quant-report)(?!notifications)(?!saved-screeners)(?!leaderboard)(?!reports)(?!copy-trading)(?!pricing)(?!profile).*)", "destination": "/index.html" }
   ],
   "headers": [
     {
@@ -145,7 +151,7 @@
     },
     {
       "path": "/api/stock-signals-cron",
-      "schedule": "0,30 0-7,13-21 * * 1-5"
+      "schedule": "0,30 0-7,13-22 * * 1-5"
     },
     {
       "path": "/api/quant-research",
