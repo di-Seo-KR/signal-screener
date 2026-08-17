@@ -240,6 +240,10 @@
     {
       "path": "/api/agents/news-collect",
       "schedule": "*/20 * * * *"
+    },
+    {
+      "path": "/api/agents/swing-alert",
+      "schedule": "30 13,22 * * *"
     }
   ]
 }

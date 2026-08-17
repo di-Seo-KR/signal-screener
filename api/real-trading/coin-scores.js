@@ -54,6 +54,18 @@ function toSymbol(asset) {
   return b ? `${b}USDT` : "—";
 }
 
+// stability 공개 형상 — 내부 산출근거 flipTs(확정 전환 타임스탬프 배열, 최대 50개)는
+//   응답에서 제외합니다. 문서 스키마 { sideSince, pendingSide, flips24h } 와 실제 응답을
+//   일치시키고, 심볼당 최대 ~400B 의 불필요한 페이로드를 방지합니다 (stock-scores.js 동일 규칙).
+function pubStability(st) {
+  if (!st || typeof st !== "object") return null;
+  return {
+    sideSince: st.sideSince ?? null,
+    pendingSide: st.pendingSide ?? null,
+    flips24h: st.flips24h ?? 0,
+  };
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   // ★ 2026-06-12: 홈/코인페이지 공개 노출 대비 CDN 캐시 — 생성 주기 10분이라 60s 캐시 무손실,
@@ -113,6 +125,10 @@ export default async function handler(req, res) {
           // ★ 2026-08-11 온체인·파생 표시 컨텍스트 통과 (additive·표시 전용 — UI 는 sig.oc 를 읽음).
           //   ocShadow(내부 섀도 평가용)는 의도적으로 통과시키지 않습니다(화면 미노출 원칙).
           oc: e.oc || null,
+          // ★ 2026-08-17 side 라벨 히스테리시스 상태 통과 — { sideSince, pendingSide, flips24h }
+          //   (btc-cron 표시 풀에서 부여. 없으면 null — 킬스위치 OFF·구 엔트리 하위호환.
+          //    내부 산출근거 flipTs 는 pubStability 가 제거 — 공개 응답 미노출)
+          stability: pubStability(e.stability),
         });
       }
     }
@@ -136,6 +152,7 @@ export default async function handler(req, res) {
             family: e.family || null, timeframe: e.timeframe || "1d",
             reason: (e.reason || "").slice(0, 140), ts: e.ts || 0, breakdown: null,
             sr: e.sr || null, // ★ 지지·저항 (1d 폴백 풀에도 동일 주입됨)
+            stability: pubStability(e.stability), // ★ 스키마 일관 — 거래 풀엔 없어 항상 null(히스테리시스 미적용 풀)
           });
         }
       }

@@ -1,21 +1,22 @@
 // ══════════════════════════════════════════════════════════════════
-// Zepta — Alpha Lab 페이지
+// Zepta — Alpha Lab 페이지 (2026-08-17 전면 재구성)
 // ──────────────────────────────────────────────────────────────────
-// 24/7 알파 추적 시스템의 통합 모니터링 화면.
+// 콘셉트: "알파의 수명주기를 보여주는 연구실"
+//   후보 발굴 → 사전등록 검증 → 섀도 축적 → 실거래 반영(승급/기각)의
+//   전 과정을 실데이터로 노출. 기각 기록도 그대로 공개(과학적 정직성).
 //
-// 표시 항목:
-//   1) 시장 레짐 + 현재 strategy family 가중치
-//   2) Strategy leaderboard (Sharpe / PF / 거래수 / 상태)
-//   3) 최근 자동 promote/demote 이벤트
-//   4) Strategy 별 누적 PnL (history 기반 라인 차트)
-//   5) 새 후보 strategy (continuous-backtest 가 발굴)
+// 첫 화면 카드 3개(밀도 규칙 — 정돈 패스 원칙, 상세는 펼침):
+//   1) 수명주기 파이프라인 — 단계별 실측 카운트 + 섀도 축적 트랙 + 수명주기 로그
+//   2) 검증 아카이브 — 가설별 결론 카드(p값·표본 실측치, "기각도 성과" 톤)
+//   3) 실전 전략 현황판 — 실전 9종 위상(가동/관찰/차단) + 순위표·레짐·가중치 상세
 //
-// API: GET /api/agents/alpha-status (단일 호출로 모든 데이터)
-// 갱신: 60초 polling
+// API: GET /api/agents/alpha-status (단일 호출 — 60초 polling)
+//   응답 필드 실존 확인(라이브 curl, 2026-08-17):
+//   ok/generatedAt/leaderboard{strategies}/historyTail/candidates/weights{weights}
+//   /regime{regime,avgHurst,avgER,activeTickers,t}/statuses{id:{status,reason,updatedAt}}
+//   /params{id:{sharpe,oosSharpe,tunedAt,…}}/events[{ts,type,family,reason,from,to,…}]
 //
-// 2026-05-11 PLAN-BIZ #1: 어려운 용어 → 친화 카피 + Public Mode 추가
-//   - 비로그인 시: 오늘 잘 작동한 알파 TOP 3 carousel + 가입 CTA
-//   - 회원: 절대 수치(PnL/Sharpe 등) 포함 전체 leaderboard
+// i18n: 모든 UI 문자열 t("alphalab.*") — ko/en 패리티 (src/i18n/*.json alphalab 슬라이스)
 // ══════════════════════════════════════════════════════════════════
 import React, { useEffect, useMemo, useState } from "react";
 import { useThemeTokens, FONT, RADIUS } from "./ui/theme.jsx";
@@ -23,69 +24,72 @@ import { useIsMobile } from "./ui/useBreakpoint.jsx";
 import { ga } from "./lib/analytics.js";
 import { useAuth } from "./AuthProvider.jsx";
 import { LoadingBlock } from "./ui/primitives.jsx";
+import { useLanguage } from "./i18n/LanguageContext.jsx";
 
 const REFRESH_MS = 60_000;
 
-const STATUS_LABEL = {
-  active:   { label: "운영중", emoji: "🟢", desc: "정식 운영 — 시그널 100% 반영" },
-  watch:    { label: "관찰중", emoji: "🟡", desc: "조심스럽게 — 가중치 절반 적용" },
-  disabled: { label: "비활성", emoji: "🔴", desc: "실거래 차단 (shadow 만 운영)" },
-};
-
-const REGIME_LABEL = {
-  trending:       { label: "추세장", desc: "한 방향으로 흐름이 잡혀있어요" },
-  mean_reverting: { label: "역추세장", desc: "박스권 움직임, 회귀 전략 우세" },
-  transitional:   { label: "혼조", desc: "방향성 불명확, 보수적 운영" },
-  unknown:        { label: "데이터 부족", desc: "Hurst 산출 불가" },
-};
-
-const VOL_LABEL = {
-  vol_explosive:  "변동성 폭발",
-  vol_compressed: "변동성 압축",
-  vol_normal:     "변동성 정상",
-  unknown:        "변동성 미상",
-};
-
-const STRATEGY_KO = {
-  "trend-follow":      "추세 추종",
-  "mean-revert":       "평균 회귀",
-  "breakout":          "돌파 매매",
-  "momentum-rotation": "모멘텀 로테이션",
-  "volatility-arb":    "변동성 차익",
-  "hurst-trend":       "허스트 추세",
-  "defi-momentum":     "DeFi 모멘텀",
-  "ensemble":          "앙상블 합의",
-  "supertrend":        "슈퍼트렌드",
-};
-
-// G-1 — 옛 데이터의 raw ID ("trend", "unknown") 만 숨기고, 나머지는 한글 fallback 으로 표시.
-// 2026-05-12 hotfix: 필터가 너무 공격적이면 strategy 응답 키가 STRATEGY_KO 와 100% 일치
-// 안 할 때 전략 순위표가 통째로 비어 보이는 critical issue 발생 → fallback 라벨 패턴 도입.
-const KNOWN_STRATEGY_IDS = new Set(Object.keys(STRATEGY_KO));
+// G-1 — 옛 데이터의 raw ID ("trend", "unknown") 만 숨기고, 나머지는 fallback 라벨로 표시.
 const BLOCKED_RAW_IDS = new Set(["trend", "unknown", "default", "n/a", "null", "undefined"]);
 const isValidStrategyId = (id) =>
   typeof id === "string" && id.length > 0 && !BLOCKED_RAW_IDS.has(id.toLowerCase());
-const strategyLabel = (id) => STRATEGY_KO[id] || "AI 전략";
 
-// 어려운 지표 → 입문자 친화 툴팁 설명 (PLAN-BIZ #1)
-const METRIC_TOOLTIP = {
-  sharpe: "위험 대비 수익률 — 같은 변동성에서 얼마나 안정적으로 벌었는지. 1.0 이상이면 양호, 2.0 이상이면 매우 우수.",
-  pf: "손익비 (Profit Factor) — 번 돈을 잃은 돈으로 나눈 값. 1.5 이상이면 건강한 전략.",
-  mdd: "최대 낙폭 — 운영 기간 중 가장 크게 잃었던 비율. 작을수록 안정적.",
-  winRate: "승률 — 전체 거래 중 이긴 거래의 비율. 단, 승률이 낮아도 손익비가 좋으면 수익 가능.",
-  hurst: "허스트 지수 — 0.5보다 크면 추세 지속, 작으면 박스권. 시장의 방향성을 측정.",
-  atrRatio: "ATR 비율 — 평소 변동성 대비 현재 변동성. 1.5x 이상이면 변동성 폭발 구간.",
-};
+// 전략 표시명 — i18n(alphalab.strategyNames.*), 미등록 id 는 fallback.
+function strategyLabel(t, id) {
+  const key = `alphalab.strategyNames.${id}`;
+  const v = t(key);
+  return v === key ? t("alphalab.strategyNames.fallback") : v;
+}
+
+// ────────────────────────────────────────────────
+// 검증 아카이브 정적 메타 — 문구·수치는 i18n(alphalab.archive.items.*).
+// ★ 절대 규칙 1(가짜 수치 금지): 아래 항목의 모든 수치는 실측 결과 요약입니다.
+//   수치 원본(2026-08-17 확인):
+//   h1     scripts/research/h1-results.json  (2026-08-12, passOOS=false, recTradesTotal=354,
+//          OOS 1h reclaim PF 0.9397 vs baseline 1.1157, reclaimVsBaseline p≈0.6949)
+//   h2     scripts/research/h2-results.json  (2026-08-12, passOOS=true, bestK=2,
+//          onTradesTotal=3688, OOS 4h ON PF 0.7921 vs OFF 0.6583 vs 억제군 0.5690)
+//   h3     scripts/research/h3-results.json  (2026-08-12, passOOS=false, totalRetestTrades=416,
+//          OOS retest PF 0.5172 vs baseline 0.5399, avgRetPct −1.0181)
+//   h4     scripts/research/h4-results.json  (2026-08-12, passOOS=false, sqTradesTotal=1795,
+//          OOS squeeze PF 0.5928 vs baseline 0.5498, fee-stress 0.4943, maxConsecLosses 34)
+//   h5     scripts/research/h5-results.json  (2026-08-12, passOOS=false, 5주장 전부 미지지,
+//          최저 IS p=0.045495(C3a), Bonferroni 문턱 raw p<0.01)
+//   candle api/_shared/candle-calibration.js (2026-07-03 생성 — 27조합 중 mult>0 3개:
+//          1h bullish_engulfing(OOS n=225 +67bps t=1.61)·4h piercing(OOS n=155 +71bps)·
+//          1d three_soldiers)
+//   timing api/_shared/timing-signals.js 헤더 (2026-07-04 — 42요소 중 9 생존(전부 롱),
+//          v4 딥 히스토리 1h 86만 봉, 홀드아웃 미지 6심볼 22만 봉에서 2요소 추가 탈락)
+//   sr     api/_shared/sr-levels.js Phase2 주석 (적대검증 P1 — 볼륨 가점을 t≥2 레벨로 한정)
+// ────────────────────────────────────────────────
+const RESEARCH_ARCHIVE = [
+  { id: "h1", verdict: "rejected", date: "2026-08-12", src: "research/h1-results.json" },
+  { id: "h2", verdict: "conditional", date: "2026-08-12", src: "research/h2-results.json" },
+  { id: "h3", verdict: "rejected", date: "2026-08-12", src: "research/h3-results.json" },
+  { id: "h4", verdict: "rejected", date: "2026-08-12", src: "research/h4-results.json" },
+  { id: "h5", verdict: "rejected", date: "2026-08-12", src: "research/h5-results.json" },
+  { id: "candle", verdict: "partial", date: "2026-07-03", src: "candle-calibration.js" },
+  { id: "timing", verdict: "partial", date: "2026-07-04", src: "timing-signals.js" },
+  { id: "sr", verdict: "scoped", date: "2026-06-15", src: "sr-levels.js (Phase2)" },
+];
+
+// 섀도 축적 트랙 — 시작일·게이트는 사전등록 사실(가짜 진행도 금지 — n 은 서버 내부 집계).
+//   oc: btc-cron OC_SHADOW (2026-08-11 배선, 게이트: 4주+ · n≥200 · adj≠0 n≥50 · p<0.05)
+//   h2: H2 거래량 돌파 필터 4h 섀도 (2026-08-17 이번 배포에서 배선 — 목표 기간은
+//       게이트 사전등록 후 표기: 미정 상태를 가짜 목표로 채우지 않음)
+const SHADOW_TRACKS = [
+  { id: "oc", start: "2026-08-11T00:00:00Z", targetDays: 28, hasGate: true },
+  { id: "h2", start: "2026-08-17T00:00:00Z", targetDays: null, hasGate: false, wiredDate: "2026-08-17" },
+];
 
 // Sharpe 등급 변환 — AutoTrading.jsx 와 동일 정책
 function sharpeToGrade(sharpe) {
   const s = parseFloat(sharpe);
-  if (!isFinite(s)) return { label: "측정 중", grade: "—", color: "neutral" };
-  if (s >= 2.0) return { label: "안정성 S 등급", grade: "S", color: "active" };
-  if (s >= 1.5) return { label: "안정성 A 등급", grade: "A", color: "active" };
-  if (s >= 1.0) return { label: "안정성 B 등급", grade: "B", color: "info" };
-  if (s >= 0.5) return { label: "안정성 C 등급", grade: "C", color: "watch" };
-  return                { label: "안정성 D 등급 (주의)", grade: "D", color: "disabled" };
+  if (!isFinite(s)) return { grade: "—", key: "measuring", color: "neutral" };
+  if (s >= 2.0) return { grade: "S", key: "s", color: "active" };
+  if (s >= 1.5) return { grade: "A", key: "a", color: "active" };
+  if (s >= 1.0) return { grade: "B", key: "b", color: "info" };
+  if (s >= 0.5) return { grade: "C", key: "c", color: "watch" };
+  return { grade: "D", key: "d", color: "disabled" };
 }
 
 // ────────────────────────────────────────────────
@@ -94,20 +98,20 @@ function sharpeToGrade(sharpe) {
 const fmtPct = (v, d = 1) => (v == null || !isFinite(v)) ? "—" : `${Number(v).toFixed(d)}%`;
 const fmtNum = (v, d = 2) => (v == null || !isFinite(v)) ? "—" : Number(v).toFixed(d);
 const fmtInt = (v) => (v == null || !isFinite(v)) ? "—" : Math.round(v).toLocaleString();
-const fmtAgo = (iso) => {
+const fmtAgo = (t, iso) => {
   if (!iso) return "—";
-  const ms = Date.now() - Date.parse(iso);
-  if (ms < 60000) return "방금";
-  if (ms < 3600000) return `${Math.floor(ms / 60000)}분 전`;
-  if (ms < 86400000) return `${Math.floor(ms / 3600000)}시간 전`;
-  return `${Math.floor(ms / 86400000)}일 전`;
+  const ms = Date.now() - (typeof iso === "number" ? iso : Date.parse(iso));
+  if (!isFinite(ms)) return "—";
+  if (ms < 60000) return t("alphalab.ago.justNow");
+  if (ms < 3600000) return t("alphalab.ago.minutes", { n: Math.floor(ms / 60000) });
+  if (ms < 86400000) return t("alphalab.ago.hours", { n: Math.floor(ms / 3600000) });
+  return t("alphalab.ago.days", { n: Math.floor(ms / 86400000) });
 };
 
 // ────────────────────────────────────────────────
 // 작은 UI 컴포넌트
 // ────────────────────────────────────────────────
 function Card({ children, style, ...rest }) {
-  // ★ 2026-06-03: hex(C.card) → CSS 변수로 전환. bento 스코프(elevation)와 라이트/다크 모두 자동 반영.
   return (
     <div
       style={{
@@ -165,92 +169,418 @@ function Stat({ label, value, sub, color, tip }) {
   );
 }
 
-// ────────────────────────────────────────────────
-// 시장 레짐 + 가중치 카드
-// ────────────────────────────────────────────────
-function RegimePanel({ data }) {
+// 접기/펼치기 — 카드 내부 상세 (정돈 패스: 첫 화면 밀도 억제, 상세는 요구 시)
+function Collapse({ title, sub, defaultOpen = false, children }) {
   const C = useThemeTokens();
-  const regime = data?.regime || data?.leaderboard?.regime || null;
-  // ★ 감사 P2: KV 가 손상된 비객체 truthy(문자열·배열)를 줘도 안전하게 — || {} 는 truthy 면
-  //   그대로 통과해 하단 Object.entries 순회가 깨질 수 있음. 평범한 객체만 허용.
-  const _w = data?.weights?.weights;
-  const weights = (_w && typeof _w === "object" && !Array.isArray(_w)) ? _w : {};
-  const updatedAt = data?.weights?.updatedAt;
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: RADIUS.md, overflow: "hidden" }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+          gap: 8, padding: "10px 12px", background: C.card2, border: "none", cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        <span style={{ minWidth: 0 }}>
+          <span style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>{title}</span>
+          {sub && <span style={{ fontSize: FONT.xs, color: C.text3, marginLeft: 8 }}>{sub}</span>}
+        </span>
+        <span aria-hidden="true" style={{ fontSize: FONT.xs, color: C.text3, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
+      </button>
+      {open && <div style={{ padding: 12, borderTop: `1px solid ${C.border}` }}>{children}</div>}
+    </div>
+  );
+}
 
-  const regimeKey = regime?.regime || "unknown";
-  // di:market:regime 실제 shape: { regime, efficiency, avgHurst, avgER, activeTickers, t }
-  const hurst = regime?.avgHurst ?? regime?.hurst ?? null;
-  const er = regime?.avgER ?? null;
-  const effKey = regime?.efficiency || "unknown";
-  const EFF_LABEL = { directional: "방향성 뚜렷", noisy: "노이즈 많음", mixed: "혼재", unknown: "—" };
+// 진행 게이지 — 시간 기반 실측 진행도(경과일/목표일)만 표시 (표본 n 은 서버 내부 집계)
+function Gauge({ pct }) {
+  const C = useThemeTokens();
+  const clamped = Math.max(0, Math.min(1, pct));
+  return (
+    <div style={{ height: 6, background: C.card, border: `1px solid ${C.border}`, borderRadius: RADIUS.full, overflow: "hidden" }}>
+      <div style={{ width: `${Math.round(clamped * 100)}%`, height: "100%", background: clamped >= 1 ? C.green : C.blue, borderRadius: RADIUS.full }} />
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════
+// 카드 1 — 알파 수명주기 파이프라인
+// ════════════════════════════════════════════════
+function StageTile({ no, name, desc, count, sub, accent }) {
+  const C = useThemeTokens();
+  return (
+    <div style={{ background: C.card2, border: `1px solid ${C.border}`, borderRadius: RADIUS.md, padding: "10px 12px", minWidth: 0 }}>
+      <div style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 700 }}>{no}. {name}</div>
+      <div style={{ fontSize: 22, fontWeight: 800, color: accent || C.text1, marginTop: 2 }}>{count}</div>
+      <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 2, lineHeight: 1.4 }}>{desc}</div>
+      {sub && <div style={{ fontSize: FONT.xs, color: C.text2, marginTop: 4, lineHeight: 1.4 }}>{sub}</div>}
+    </div>
+  );
+}
+
+function eventBadgeKind(e) {
+  const type = e?.type;
+  if (type === "inject" || type === "promote") return "active";
+  if (type === "revoke" || type === "demote") return "disabled";
+  if (type === "status") {
+    if (e?.to === "active") return "active";
+    if (e?.to === "disabled") return "disabled";
+    if (e?.to === "watch") return "watch";
+  }
+  return "neutral";
+}
+
+function LifecyclePipeline({ data }) {
+  const C = useThemeTokens();
+  const { t } = useLanguage();
+  const isMobile = useIsMobile();
+
+  const candidates = Array.isArray(data?.candidates) ? data.candidates : [];
+  const params = data?.params || {};
+  const events = Array.isArray(data?.events) ? data.events : [];
+
+  const rejectedCnt = RESEARCH_ARCHIVE.filter((r) => r.verdict === "rejected").length;
+  const adoptedCnt = RESEARCH_ARCHIVE.length - rejectedCnt;
+
+  // 실거래 반영중 — di:alpha:params 에 적재된(tunedAt 있는) 전략만 (실측)
+  const injected = useMemo(() => Object.entries(params)
+    .filter(([id, p]) => p && p.tunedAt && isValidStrategyId(id))
+    .map(([id, p]) => ({ id, sharpe: p.sharpe ?? null, oos: p.oosSharpe ?? null, tunedAt: p.tunedAt }))
+    .sort((a, b) => (b.sharpe || 0) - (a.sharpe || 0)), [params]);
+
+  const topCands = useMemo(() => [...candidates]
+    .sort((a, b) => (b.backtestResult?.sharpe || 0) - (a.backtestResult?.sharpe || 0))
+    .slice(0, 6), [candidates]);
 
   return (
     <Card>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>지금 시장 흐름 & 전략 가중치</div>
-        <span style={{ fontSize: FONT.xs, color: C.text3 }}>{regime?.t ? fmtAgo(new Date(regime.t).toISOString()) + " 갱신" : updatedAt ? fmtAgo(updatedAt) + " 갱신" : "데이터 없음"}</span>
+      <div style={{ marginBottom: 6 }}>
+        <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>{t("alphalab.pipeline.title")}</div>
+        <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 4, lineHeight: 1.5 }}>{t("alphalab.pipeline.subtitle")}</div>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 16 }}>
-        <Stat
-          label="시장 흐름"
-          value={REGIME_LABEL[regimeKey]?.label || regimeKey}
-          sub={REGIME_LABEL[regimeKey]?.desc}
-          color={regimeKey === "trending" ? C.green : regimeKey === "mean_reverting" ? C.purple : C.text1}
+
+      {/* 4단계 타일 */}
+      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, 1fr)", gap: 10, marginTop: 10 }}>
+        <StageTile
+          no={1}
+          name={t("alphalab.pipeline.stageCandidates")}
+          desc={t("alphalab.pipeline.stageCandidatesDesc")}
+          count={t("alphalab.pipeline.unitCount", { n: fmtInt(candidates.length) })}
+          accent={C.text2}
         />
-        <Stat
-          label="추세 강도 (Hurst)"
-          value={hurst != null ? fmtNum(hurst, 2) : "—"}
-          sub={hurst == null ? "산출 중" : hurst > 0.55 ? "한쪽 방향 흐름 강함" : hurst < 0.45 ? "박스권 회귀 성격" : "방향성 약함"}
-          color={hurst == null ? C.text1 : hurst > 0.55 ? C.green : hurst < 0.45 ? C.purple : C.text1}
-          tip={METRIC_TOOLTIP.hurst}
+        <StageTile
+          no={2}
+          name={t("alphalab.pipeline.stageValidation")}
+          desc={t("alphalab.pipeline.stageValidationDesc")}
+          count={t("alphalab.pipeline.unitCount", { n: RESEARCH_ARCHIVE.length })}
+          sub={t("alphalab.pipeline.validationSplit", { rejected: rejectedCnt, adopted: adoptedCnt })}
+          accent={C.blue}
         />
-        <Stat
-          label="시장 효율성 (ER)"
-          value={er != null ? fmtNum(er, 2) : "—"}
-          sub={EFF_LABEL[effKey] || effKey}
-          color={effKey === "directional" ? C.green : effKey === "noisy" ? C.red : C.text1}
-          tip="가격 움직임이 한 방향으로 효율적인지(높을수록 추세적), 노이즈가 많은지(낮을수록 횡보)를 0~1로 나타낸 지표예요."
+        <StageTile
+          no={3}
+          name={t("alphalab.pipeline.stageShadow")}
+          desc={t("alphalab.pipeline.stageShadowDesc")}
+          count={t("alphalab.pipeline.unitCount", { n: SHADOW_TRACKS.length })}
+          accent={C.purple}
         />
-        <Stat label="분석 종목" value={regime?.activeTickers != null ? `${regime.activeTickers}개` : "—"} sub="레짐 판정에 쓰인 종목 수" />
+        <StageTile
+          no={4}
+          name={t("alphalab.pipeline.stageLive")}
+          desc={t("alphalab.pipeline.stageLiveDesc")}
+          count={t("alphalab.pipeline.unitCount", { n: injected.length })}
+          accent={C.green}
+        />
       </div>
-      <div style={{ fontSize: FONT.sm, color: C.text2, marginBottom: 8 }}>전략별 가중치 — 시장 흐름에 맞춰 자동 조정됩니다:</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
-        {Object.entries(weights).map(([k, v]) => {
-          const tone = v > 1.1 ? C.green : v < 0.7 ? C.red : C.text2;
-          return (
-            <div key={k} style={{
-              padding: "6px 10px",
-              background: C.card2,
-              borderRadius: RADIUS.sm,
-              border: `1px solid ${C.border}`,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
+
+      {/* 실거래 반영중 — 한 줄 칩 (수치는 API params 실측) */}
+      {injected.length > 0 && (
+        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 10 }}>
+          <span style={{ fontSize: FONT.xs, fontWeight: 700, color: C.green }}>{t("alphalab.pipeline.injectedLead")}</span>
+          {injected.map((p) => (
+            <span key={p.id} style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              background: C.card2, border: `1px solid ${C.border}`, borderRadius: RADIUS.full,
+              padding: "3px 10px", fontSize: FONT.xs,
             }}>
-              <span style={{ fontSize: FONT.xs, color: C.text2 }}>{strategyLabel(k)}</span>
-              <span style={{ fontSize: FONT.sm, fontWeight: 700, color: tone }}>×{fmtNum(v, 2)}</span>
+              <span style={{ fontWeight: 700, color: C.text1 }}>{strategyLabel(t, p.id)}</span>
+              <span style={{ color: C.text3 }}>{t("alphalab.pipeline.injectedChip", { sharpe: fmtNum(p.sharpe, 2), oos: fmtNum(p.oos, 2) })}</span>
+              <span style={{ color: C.text3 }}>{fmtAgo(t, p.tunedAt)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* 섀도 축적 트랙 — 시간 기반 진행 게이지 + 사전등록 게이트 */}
+      <div style={{ marginTop: 14 }}>
+        <div style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1, marginBottom: 8 }}>{t("alphalab.pipeline.shadowTitle")}</div>
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
+          {SHADOW_TRACKS.map((tr) => {
+            const elapsedDays = Math.max(0, Math.floor((Date.now() - Date.parse(tr.start)) / 86400000));
+            const done = tr.targetDays != null && elapsedDays >= tr.targetDays;
+            return (
+              <div key={tr.id} style={{ background: C.card2, border: `1px solid ${C.border}`, borderRadius: RADIUS.md, padding: 12 }}>
+                <div style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>{t(`alphalab.pipeline.${tr.id}Name`)}</div>
+                <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 2, lineHeight: 1.5 }}>{t(`alphalab.pipeline.${tr.id}Desc`)}</div>
+                <div style={{ marginTop: 8 }}>
+                  {tr.targetDays != null ? (
+                    <>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: FONT.xs, color: C.text2, marginBottom: 4 }}>
+                        <span>{done
+                          ? t("alphalab.pipeline.gateReached")
+                          : t("alphalab.pipeline.accumDays", { days: elapsedDays + 1, target: tr.targetDays })}</span>
+                        <span style={{ color: C.text3 }}>{Math.min(100, Math.round((elapsedDays / tr.targetDays) * 100))}%</span>
+                      </div>
+                      <Gauge pct={elapsedDays / tr.targetDays} />
+                    </>
+                  ) : (
+                    <div style={{ fontSize: FONT.xs, color: C.text2 }}>
+                      {t("alphalab.pipeline.accumStart", { date: tr.wiredDate })}
+                    </div>
+                  )}
+                </div>
+                {tr.hasGate && (
+                  <div style={{ marginTop: 8, fontSize: FONT.xs, color: C.text3, lineHeight: 1.5 }}>
+                    <span style={{ fontWeight: 700, color: C.text2 }}>{t("alphalab.pipeline.gateLabel")}</span>{" "}
+                    {t("alphalab.pipeline.gateSpec")}
+                    <br />{t("alphalab.pipeline.gateNote")}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 6 }}>{t("alphalab.pipeline.nNote")}</div>
+      </div>
+
+      {/* 상세 펼침 — 발굴 후보 / 수명주기 로그 */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+        <Collapse
+          title={t("alphalab.pipeline.candDetailTitle")}
+          sub={t("alphalab.pipeline.unitCount", { n: fmtInt(candidates.length) })}
+        >
+          <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 8, lineHeight: 1.5 }}>{t("alphalab.pipeline.candDetailSub")}</div>
+          {topCands.length === 0 ? (
+            <div style={{ fontSize: FONT.xs, color: C.text3 }}>{t("alphalab.pipeline.candEmpty")}</div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 8 }}>
+              {topCands.map((c) => (
+                <div key={c.id} style={{
+                  background: C.card, border: `1px solid ${C.border}`, borderRadius: RADIUS.sm,
+                  padding: "8px 10px", display: "flex", flexDirection: "column", gap: 3,
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
+                    <span style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>{strategyLabel(t, c.parentStrategy)}</span>
+                    <span style={{ fontSize: 10, color: C.text3, border: `1px solid ${C.border}`, borderRadius: 4, padding: "1px 5px", whiteSpace: "nowrap" }}>
+                      {t("alphalab.pipeline.candUnverified")}
+                    </span>
+                  </div>
+                  <span style={{ fontSize: FONT.xs, color: C.text3 }}>
+                    {t("alphalab.pipeline.candStat", {
+                      symbol: (c.symbol || "").replace("USDT", ""),
+                      sharpe: fmtNum(c.backtestResult?.sharpe, 1),
+                      win: fmtNum(c.backtestResult?.winRate, 0),
+                    })}
+                  </span>
+                </div>
+              ))}
             </div>
-          );
-        })}
+          )}
+        </Collapse>
+
+        <Collapse
+          title={t("alphalab.pipeline.logTitle")}
+          sub={t("alphalab.pipeline.logSub", { n: events.length })}
+        >
+          {events.length === 0 ? (
+            <div style={{ fontSize: FONT.xs, color: C.text3 }}>{t("alphalab.pipeline.logEmpty")}</div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 0, maxHeight: 320, overflowY: "auto" }}>
+              {events.map((e, i) => {
+                const typeKey = ["inject", "status", "revoke", "promote", "demote", "refresh"].includes(e?.type) ? e.type : "event";
+                return (
+                  <div key={`${e?.ts || i}-${i}`} style={{
+                    display: "flex", alignItems: "flex-start", gap: 8, padding: "8px 2px",
+                    borderBottom: i < events.length - 1 ? `1px solid ${C.border}40` : "none",
+                  }}>
+                    <span style={{ flexShrink: 0 }}>
+                      <Badge kind={eventBadgeKind(e)}>{t(`alphalab.pipeline.evt.${typeKey}`)}</Badge>
+                    </span>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: FONT.sm, color: C.text1, fontWeight: 600 }}>
+                        {e?.family ? strategyLabel(t, e.family) : "—"}
+                        {e?.from && e?.to && (
+                          <span style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 500, marginLeft: 6 }}>
+                            {t(`alphalab.status.${e.from}`) !== `alphalab.status.${e.from}` ? t(`alphalab.status.${e.from}`) : e.from}
+                            {" → "}
+                            {t(`alphalab.status.${e.to}`) !== `alphalab.status.${e.to}` ? t(`alphalab.status.${e.to}`) : e.to}
+                          </span>
+                        )}
+                      </div>
+                      {e?.reason && <div style={{ fontSize: FONT.xs, color: C.text3, lineHeight: 1.4 }}>{e.reason}</div>}
+                    </div>
+                    <span style={{ fontSize: FONT.xs, color: C.text3, flexShrink: 0 }}>{fmtAgo(t, e?.ts)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Collapse>
       </div>
     </Card>
   );
 }
 
-// ────────────────────────────────────────────────
-// Strategy Leaderboard 테이블
-// ────────────────────────────────────────────────
-function LeaderboardTable({ data }) {
+// ════════════════════════════════════════════════
+// 카드 2 — 검증 아카이브 (결론 카드, "기각도 성과" 톤)
+// ════════════════════════════════════════════════
+const VERDICT_BADGE = { rejected: "disabled", conditional: "watch", partial: "active", scoped: "neutral" };
+
+function ArchiveItem({ item }) {
   const C = useThemeTokens();
-  // iPhone 16 (393pt) 기준 — 모바일은 카드 리스트로 정보 위계 축소 (테이블 가로 스크롤보다 가독성 우위)
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
+  const base = `alphalab.archive.items.${item.id}`;
+  return (
+    <div style={{ border: `1px solid ${C.border}`, borderRadius: RADIUS.md, overflow: "hidden" }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        style={{
+          width: "100%", display: "flex", alignItems: "center", gap: 8, padding: "10px 12px",
+          background: C.card2, border: "none", cursor: "pointer", textAlign: "left",
+        }}
+      >
+        <span style={{ flexShrink: 0 }}>
+          <Badge kind={VERDICT_BADGE[item.verdict] || "neutral"}>{t(`alphalab.archive.verdict.${item.verdict}`)}</Badge>
+        </span>
+        <span style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1, flex: 1, minWidth: 0 }}>{t(`${base}.title`)}</span>
+        <span aria-hidden="true" style={{ fontSize: FONT.xs, color: C.text3, flexShrink: 0 }}>{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div style={{ padding: 12, borderTop: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: FONT.sm, color: C.text2, lineHeight: 1.6 }}>{t(`${base}.concl`)}</div>
+          <div style={{
+            marginTop: 8, padding: "6px 10px", background: C.card2, borderRadius: RADIUS.sm,
+            fontSize: FONT.xs, color: C.text2, lineHeight: 1.5,
+          }}>
+            {t(`${base}.stat`)}
+          </div>
+          <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 6 }}>
+            {t("alphalab.archive.sourceLabel")}: {item.src} · {item.date}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ArchiveSection() {
+  const C = useThemeTokens();
+  const { t } = useLanguage();
+  const rejectedCnt = RESEARCH_ARCHIVE.filter((r) => r.verdict === "rejected").length;
+  return (
+    <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
+        <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>{t("alphalab.archive.title")}</div>
+        <span style={{ fontSize: FONT.xs, color: C.text3, whiteSpace: "nowrap" }}>
+          {t("alphalab.archive.summary", {
+            total: RESEARCH_ARCHIVE.length,
+            rejected: rejectedCnt,
+            adopted: RESEARCH_ARCHIVE.length - rejectedCnt,
+          })}
+        </span>
+      </div>
+      <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 10, lineHeight: 1.5 }}>{t("alphalab.archive.subtitle")}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {RESEARCH_ARCHIVE.map((item) => <ArchiveItem key={item.id} item={item} />)}
+      </div>
+    </Card>
+  );
+}
+
+// ════════════════════════════════════════════════
+// 카드 3 — 실전 전략 현황판 (9종 위상 + 상세 순위표·레짐·가중치)
+// ════════════════════════════════════════════════
+const STATUS_EMOJI = { active: "🟢", watch: "🟡", disabled: "🔴" };
+
+function RegimeDetail({ data }) {
+  const C = useThemeTokens();
+  const { t } = useLanguage();
+  const regime = data?.regime || data?.leaderboard?.regime || null;
+  const _w = data?.weights?.weights;
+  const weights = (_w && typeof _w === "object" && !Array.isArray(_w)) ? _w : {};
+
+  const regimeKeyMap = { trending: "trending", mean_reverting: "meanReverting", transitional: "transitional" };
+  const rk = regimeKeyMap[regime?.regime] || "unknown";
+  const hurst = regime?.avgHurst ?? regime?.hurst ?? null;
+  const er = regime?.avgER ?? null;
+  const effKey = ["directional", "noisy", "mixed"].includes(regime?.efficiency) ? regime.efficiency : "unknown";
+
+  return (
+    <div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 14 }}>
+        <Stat
+          label={t("alphalab.board.regimeStat")}
+          value={t(`alphalab.regime.${rk}`)}
+          sub={t(`alphalab.regime.${rk}Desc`)}
+          color={rk === "trending" ? C.green : rk === "meanReverting" ? C.purple : C.text1}
+        />
+        <Stat
+          label={t("alphalab.board.hurstStat")}
+          value={hurst != null ? fmtNum(hurst, 2) : "—"}
+          sub={hurst == null ? t("alphalab.board.calculating") : hurst > 0.55 ? t("alphalab.board.hurstStrong") : hurst < 0.45 ? t("alphalab.board.hurstRange") : t("alphalab.board.hurstWeak")}
+          color={hurst == null ? C.text1 : hurst > 0.55 ? C.green : hurst < 0.45 ? C.purple : C.text1}
+          tip={t("alphalab.metricTip.hurst")}
+        />
+        <Stat
+          label={t("alphalab.board.erStat")}
+          value={er != null ? fmtNum(er, 2) : "—"}
+          sub={t(`alphalab.efficiency.${effKey}`)}
+          color={effKey === "directional" ? C.green : effKey === "noisy" ? C.red : C.text1}
+          tip={t("alphalab.metricTip.er")}
+        />
+        <Stat
+          label={t("alphalab.board.tickersStat")}
+          value={regime?.activeTickers != null ? fmtInt(regime.activeTickers) : "—"}
+          sub={t("alphalab.board.tickersSub")}
+        />
+      </div>
+      {Object.keys(weights).length > 0 && (
+        <>
+          <div style={{ fontSize: FONT.sm, color: C.text2, marginBottom: 8 }}>{t("alphalab.board.weightsTitle")}</div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
+            {Object.entries(weights).map(([k, v]) => {
+              const tone = v > 1.1 ? C.green : v < 0.7 ? C.red : C.text2;
+              return (
+                <div key={k} style={{
+                  padding: "6px 10px", background: C.card2, borderRadius: RADIUS.sm,
+                  border: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center",
+                }}>
+                  <span style={{ fontSize: FONT.xs, color: C.text2 }}>{strategyLabel(t, k)}</span>
+                  <span style={{ fontSize: FONT.sm, fontWeight: 700, color: tone }}>×{fmtNum(v, 2)}</span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function LeaderboardDetail({ data }) {
+  const C = useThemeTokens();
+  const { t } = useLanguage();
   const isMobile = useIsMobile();
   const strategies = data?.leaderboard?.strategies || {};
   const statuses = data?.statuses || {};
   const params = data?.params || {};
 
   const rows = useMemo(() => {
-    // ★ 2026-06-01 — 리더보드 누락 수정: production 데이터 없는 family(검증된 mean-revert 등)도
-    //   표에 나오도록, strategies ∪ statuses ∪ params 의 합집합으로 모든 전략을 표시.
+    // production 데이터 없는 family(검증된 mean-revert 등)도 표에 나오도록 합집합.
     const allIds = Array.from(new Set([
       ...Object.keys(strategies || {}),
       ...Object.keys(statuses || {}),
@@ -261,67 +591,48 @@ function LeaderboardTable({ data }) {
         const m = strategies[id] || {};
         const statusObj = statuses[id];
         const status = (statusObj?.status) || "active";
-        // ★ 2026-05-29 — 지표 정합성: production 메트릭이 신뢰 불가(summary-fallback 또는 거래 없음)
-        //   이면 Sharpe·PF·netPnL 대신 백테스트 검증 등급 + "수집중" 표시.
         const tunedSharpe = (params[id] && Number.isFinite(params[id].sharpe)) ? params[id].sharpe : null;
-        // 실거래 누적 신뢰 불가: summary-fallback 이거나 실거래 trade 가 0
+        // 실거래 누적 신뢰 불가: summary-fallback 이거나 실거래 trade 가 0 → "수집중" 표기
         const isFallback = m._source === "summary-fallback" || !(m.trades > 0);
         const gradeSharpe = tunedSharpe != null ? tunedSharpe : (m.sharpe || 0);
         return {
           id,
-          name: strategyLabel(id),
+          name: strategyLabel(t, id),
           status,
           statusReason: statusObj?.reason || "",
           trades: m.trades || 0,
           winRate: m.winRate || 0,
-          sharpe: m.sharpe || 0,
           pf: m.profitFactor,
           netPnL: m.netPnL || 0,
           maxDD: m.maxDD || 0,
           avgHold: m.avgHoldHours || 0,
           tunedAt: params[id]?.tunedAt,
-          tunedSharpe,
           gradeSharpe,
-          isFallback,           // production 누적 신뢰 불가 → 수집중 표시
-          backtestGrade: tunedSharpe != null, // 등급이 백테스트 기준임
-          // 등급이 의미 있는 경우: 백테스트 검증(tuned) 또는 신뢰 가능한 실거래 Sharpe.
-          //   데이터·검증 없으면 등급을 "—" 로 (0 → D 오표시 방지).
+          isFallback,
+          backtestGrade: tunedSharpe != null,
           gradeMeaningful: tunedSharpe != null || (m._source !== "summary-fallback" && m.trades > 0 && Number.isFinite(m.sharpe)),
-          live: m.live || null,  // ★ 실거래 성과 {trades, winRate, netPnLUsd, avgPnLUsd}
+          live: m.live || null,
         };
       }).sort((a, b) => b.gradeSharpe - a.gradeSharpe);
-  }, [strategies, statuses, params]);
+  }, [strategies, statuses, params, t]);
 
   if (rows.length === 0) {
-    return (
-      <Card>
-        <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1, marginBottom: 8 }}>전략 순위표</div>
-        <div style={{ fontSize: FONT.sm, color: C.text3, padding: "24px 0", textAlign: "center" }}>
-          데이터를 모으는 중입니다 — 매시 정각마다 자동 갱신됩니다.
-        </div>
-      </Card>
-    );
+    return <div style={{ fontSize: FONT.sm, color: C.text3, padding: "16px 0", textAlign: "center" }}>{t("alphalab.board.emptyBody")}</div>;
   }
 
   const thStyle = { textAlign: "left", padding: "8px 6px", fontSize: FONT.xs, color: C.text3, fontWeight: 600, borderBottom: `1px solid ${C.border}` };
   const tdStyle = { padding: "10px 6px", fontSize: FONT.sm, color: C.text1, borderBottom: `1px solid ${C.border}40` };
 
   return (
-    <Card>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>전략 순위표</div>
-        <span style={{ fontSize: FONT.xs, color: C.text3 }}>{data?.generatedAt ? fmtAgo(data.generatedAt) + " 갱신" : ""}</span>
-      </div>
+    <div>
       <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 8, lineHeight: 1.5 }}>
-        안정성 등급은 위험 대비 수익률(Sharpe) 기준 — S/A 등급일수록 변동성 대비 꾸준한 수익을 냅니다.
+        {t("alphalab.board.tableNote1")}
         <br />
-        <span style={{ opacity: 0.85 }}>·BT 표시는 백테스트로 검증된 등급입니다. 실거래 누적 손익은 데이터가 쌓이면 "수집중"이 실제 수치로 바뀝니다.</span>
+        <span style={{ opacity: 0.85 }}>{t("alphalab.board.tableNote2")}</span>
       </div>
       {isMobile ? (
-        // 모바일 카드 리스트 — 가로 스크롤 테이블보다 위계가 명확
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           {rows.map((r) => {
-            const statusInfo = STATUS_LABEL[r.status] || STATUS_LABEL.active;
             const pnlColor = r.netPnL > 0 ? C.green : r.netPnL < 0 ? C.red : C.text2;
             const sharpeColor = r.gradeSharpe >= 1.5 ? C.green : r.gradeSharpe <= 0 ? C.red : C.text1;
             const grade = sharpeToGrade(r.gradeSharpe);
@@ -330,41 +641,41 @@ function LeaderboardTable({ data }) {
                 background: C.card2, border: `1px solid ${C.border}`,
                 borderRadius: RADIUS.md, padding: 12, display: "flex", flexDirection: "column", gap: 8,
               }}>
-                {/* 헤더: 이름 + 상태 */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 15, color: C.text1 }}>{r.name}</div>
                     {r.tunedAt && (
                       <div style={{ fontSize: FONT.xs, color: C.green, fontWeight: 600, marginTop: 1 }}>
-                        🧬 실거래 반영중 · 튜닝 {fmtAgo(r.tunedAt)}
+                        {t("alphalab.board.tunedTag", { ago: fmtAgo(t, r.tunedAt) })}
                       </div>
                     )}
                   </div>
-                  <Badge kind={r.status}>{statusInfo.emoji} {statusInfo.label}</Badge>
+                  <Badge kind={r.status}>{STATUS_EMOJI[r.status] || ""} {t(`alphalab.status.${r.status}`)}</Badge>
                 </div>
-                {/* 핵심 메트릭 2x2 그리드 */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                   <div style={{ background: C.card, borderRadius: RADIUS.sm, padding: "8px 10px" }}>
-                    <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>안정성 등급{r.gradeMeaningful && r.backtestGrade ? " · 백테스트" : ""}</div>
+                    <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>
+                      {r.gradeMeaningful && r.backtestGrade ? t("alphalab.board.gradeCellBt") : t("alphalab.board.gradeCell")}
+                    </div>
                     {r.gradeMeaningful ? (
                       <div style={{ fontSize: 16, fontWeight: 800, color: sharpeColor }}>{grade.grade}
                         <span style={{ fontSize: FONT.xs, fontWeight: 500, color: C.text3, marginLeft: 4 }}>{fmtNum(r.gradeSharpe, 2)}</span>
                       </div>
                     ) : (
-                      <div style={{ fontSize: 14, fontWeight: 600, color: C.text3 }}>— <span style={{ fontSize: FONT.xs }}>측정 전</span></div>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: C.text3 }}>— <span style={{ fontSize: FONT.xs }}>{t("alphalab.board.preMeasure")}</span></div>
                     )}
                   </div>
                   <div style={{ background: C.card, borderRadius: RADIUS.sm, padding: "8px 10px" }}>
-                    <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>{r.live ? "실거래 손익" : "누적 수익률"}</div>
+                    <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>{r.live ? t("alphalab.board.livePnl") : t("alphalab.board.cumPnl")}</div>
                     {r.live ? (
                       <>
                         <div style={{ fontSize: 16, fontWeight: 800, color: r.live.netPnLUsd > 0 ? C.green : r.live.netPnLUsd < 0 ? C.red : C.text2 }}>
                           {r.live.netPnLUsd > 0 ? "+" : ""}${fmtNum(r.live.netPnLUsd, 2)}
                         </div>
-                        <div style={{ fontSize: FONT.xs, color: C.text3 }}>{fmtInt(r.live.trades)}건 · 승률 {fmtNum(r.live.winRate, 0)}%</div>
+                        <div style={{ fontSize: FONT.xs, color: C.text3 }}>{t("alphalab.board.liveSub", { trades: fmtInt(r.live.trades), win: fmtNum(r.live.winRate, 0) })}</div>
                       </>
                     ) : r.isFallback ? (
-                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text3 }}>실거래 수집중</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text3 }}>{t("alphalab.board.collecting")}</div>
                     ) : (
                       <div style={{ fontSize: 16, fontWeight: 800, color: pnlColor }}>
                         {r.netPnL > 0 ? "+" : ""}{fmtNum(r.netPnL, 2)}%
@@ -372,19 +683,18 @@ function LeaderboardTable({ data }) {
                     )}
                   </div>
                   <div style={{ background: C.card, borderRadius: RADIUS.sm, padding: "8px 10px" }}>
-                    <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>승률</div>
+                    <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>{t("alphalab.board.winRateLabel")}</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: C.text1 }}>{r.isFallback ? "—" : fmtPct(r.winRate)}</div>
                   </div>
                   <div style={{ background: C.card, borderRadius: RADIUS.sm, padding: "8px 10px" }}>
-                    <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>최대 낙폭</div>
+                    <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 2 }}>{t("alphalab.board.mddLabel")}</div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: C.text1 }}>{r.isFallback ? "—" : fmtPct(r.maxDD)}</div>
                   </div>
                 </div>
-                {/* 보조 메트릭 — 인라인 한 줄 */}
                 <div style={{ display: "flex", gap: 12, flexWrap: "wrap", fontSize: FONT.xs, color: C.text3 }}>
-                  <span>누적 거래 {fmtInt(r.trades)}</span>
-                  <span>손익비 {r.isFallback || r.pf == null ? "—" : fmtNum(r.pf, 2)}</span>
-                  {!r.isFallback && <span>평균보유 {fmtNum(r.avgHold, 1)}h</span>}
+                  <span>{t("alphalab.board.subTrades", { n: fmtInt(r.trades) })}</span>
+                  <span>{t("alphalab.board.subPF", { v: r.isFallback || r.pf == null ? "—" : fmtNum(r.pf, 2) })}</span>
+                  {!r.isFallback && <span>{t("alphalab.board.subHold", { h: fmtNum(r.avgHold, 1) })}</span>}
                 </div>
                 {r.statusReason && (
                   <div style={{ fontSize: FONT.xs, color: C.text3, lineHeight: 1.5 }}>{r.statusReason}</div>
@@ -398,20 +708,19 @@ function LeaderboardTable({ data }) {
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 720 }}>
             <thead>
               <tr>
-                <th style={thStyle}>전략</th>
-                <th style={thStyle}>운영 상태</th>
-                <th style={{ ...thStyle, textAlign: "right" }} title="누적 거래 횟수">거래수</th>
-                <th style={{ ...thStyle, textAlign: "right" }} title={METRIC_TOOLTIP.winRate}>승률</th>
-                <th style={{ ...thStyle, textAlign: "right" }} title={METRIC_TOOLTIP.sharpe}>안정성 등급</th>
-                <th style={{ ...thStyle, textAlign: "right" }} title={METRIC_TOOLTIP.pf}>손익비</th>
-                <th style={{ ...thStyle, textAlign: "right" }}>누적 수익률</th>
-                <th style={{ ...thStyle, textAlign: "right" }} title={METRIC_TOOLTIP.mdd}>최대 낙폭</th>
-                <th style={{ ...thStyle, textAlign: "right" }}>평균 보유</th>
+                <th style={thStyle}>{t("alphalab.board.colStrategy")}</th>
+                <th style={thStyle}>{t("alphalab.board.colStatus")}</th>
+                <th style={{ ...thStyle, textAlign: "right" }} title={t("alphalab.board.tradesTip")}>{t("alphalab.board.colTrades")}</th>
+                <th style={{ ...thStyle, textAlign: "right" }} title={t("alphalab.metricTip.winRate")}>{t("alphalab.board.colWinRate")}</th>
+                <th style={{ ...thStyle, textAlign: "right" }} title={t("alphalab.metricTip.sharpe")}>{t("alphalab.board.colGrade")}</th>
+                <th style={{ ...thStyle, textAlign: "right" }} title={t("alphalab.metricTip.pf")}>{t("alphalab.board.colPF")}</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>{t("alphalab.board.colPnL")}</th>
+                <th style={{ ...thStyle, textAlign: "right" }} title={t("alphalab.metricTip.mdd")}>{t("alphalab.board.colMDD")}</th>
+                <th style={{ ...thStyle, textAlign: "right" }}>{t("alphalab.board.colHold")}</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => {
-                const statusInfo = STATUS_LABEL[r.status] || STATUS_LABEL.active;
                 const pnlColor = r.netPnL > 0 ? C.green : r.netPnL < 0 ? C.red : C.text2;
                 const sharpeColor = r.gradeSharpe >= 1.5 ? C.green : r.gradeSharpe <= 0 ? C.red : C.text1;
                 const grade = sharpeToGrade(r.gradeSharpe);
@@ -423,12 +732,12 @@ function LeaderboardTable({ data }) {
                       <div style={{ fontSize: FONT.xs, color: C.text3 }}>{r.id}</div>
                       {r.tunedAt && (
                         <div style={{ fontSize: FONT.xs, color: C.green, fontWeight: 600, marginTop: 2 }}>
-                          🧬 실거래 반영중 · {fmtAgo(r.tunedAt)}
+                          {t("alphalab.board.tunedTag", { ago: fmtAgo(t, r.tunedAt) })}
                         </div>
                       )}
                     </td>
                     <td style={tdStyle}>
-                      <Badge kind={r.status}>{statusInfo.emoji} {statusInfo.label}</Badge>
+                      <Badge kind={r.status}>{STATUS_EMOJI[r.status] || ""} {t(`alphalab.status.${r.status}`)}</Badge>
                       {r.statusReason && (
                         <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 2 }} title={r.statusReason}>
                           {r.statusReason.length > 28 ? r.statusReason.slice(0, 28) + "…" : r.statusReason}
@@ -437,32 +746,34 @@ function LeaderboardTable({ data }) {
                     </td>
                     <td style={{ ...tdStyle, textAlign: "right" }}>{fmtInt(r.trades)}</td>
                     <td style={{ ...tdStyle, textAlign: "right" }}>{r.isFallback ? "—" : fmtPct(r.winRate)}</td>
-                    <td style={{ ...tdStyle, textAlign: "right", color: r.gradeMeaningful ? sharpeColor : C.text3, fontWeight: 700 }} title={r.backtestGrade ? "백테스트로 검증된 안정성 등급 (실거래 누적 데이터 수집 중)" : METRIC_TOOLTIP.sharpe}>
+                    <td style={{ ...tdStyle, textAlign: "right", color: r.gradeMeaningful ? sharpeColor : C.text3, fontWeight: 700 }}
+                        title={r.backtestGrade ? t("alphalab.board.btTip") : t("alphalab.metricTip.sharpe")}>
                       {r.gradeMeaningful ? (
                         <>
                           <div>{grade.grade}{r.backtestGrade ? <span style={{ fontSize: FONT.xs, fontWeight: 500, color: C.text3 }}> ·BT</span> : null}</div>
                           <div style={{ fontSize: FONT.xs, fontWeight: 500, color: C.text3 }}>{fmtNum(r.gradeSharpe, 2)}</div>
                         </>
                       ) : (
-                        <div style={{ fontWeight: 600 }}>— <span style={{ fontSize: FONT.xs, fontWeight: 400 }}>측정 전</span></div>
+                        <div style={{ fontWeight: 600 }}>— <span style={{ fontSize: FONT.xs, fontWeight: 400 }}>{t("alphalab.board.preMeasure")}</span></div>
                       )}
                     </td>
-                    <td style={{ ...tdStyle, textAlign: "right" }} title={METRIC_TOOLTIP.pf}>{r.isFallback || r.pf == null ? "—" : fmtNum(r.pf, 2)}</td>
+                    <td style={{ ...tdStyle, textAlign: "right" }} title={t("alphalab.metricTip.pf")}>{r.isFallback || r.pf == null ? "—" : fmtNum(r.pf, 2)}</td>
                     {r.live ? (
-                      <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600 }} title={`실거래 ${r.live.trades}건 · 승률 ${r.live.winRate}% · 거래당 평균 $${r.live.avgPnLUsd}`}>
+                      <td style={{ ...tdStyle, textAlign: "right", fontWeight: 600 }}
+                          title={t("alphalab.board.liveTip", { trades: r.live.trades, win: r.live.winRate, avg: r.live.avgPnLUsd })}>
                         <div style={{ color: r.live.netPnLUsd > 0 ? C.green : r.live.netPnLUsd < 0 ? C.red : C.text2 }}>
                           {r.live.netPnLUsd > 0 ? "+" : ""}${fmtNum(r.live.netPnLUsd, 2)}
                         </div>
-                        <div style={{ fontSize: FONT.xs, fontWeight: 500, color: C.text3 }}>{fmtInt(r.live.trades)}건 · {fmtNum(r.live.winRate, 0)}%</div>
+                        <div style={{ fontSize: FONT.xs, fontWeight: 500, color: C.text3 }}>{t("alphalab.board.liveSub", { trades: fmtInt(r.live.trades), win: fmtNum(r.live.winRate, 0) })}</div>
                       </td>
                     ) : r.isFallback ? (
-                      <td style={muted} title="실거래 누적 손익은 데이터 수집 후 표시됩니다">수집중</td>
+                      <td style={muted} title={t("alphalab.board.collectingTip")}>{t("alphalab.board.collecting")}</td>
                     ) : (
                       <td style={{ ...tdStyle, textAlign: "right", color: pnlColor, fontWeight: 600 }}>
                         {r.netPnL > 0 ? "+" : ""}{fmtNum(r.netPnL, 2)}%
                       </td>
                     )}
-                    <td style={{ ...tdStyle, textAlign: "right" }} title={METRIC_TOOLTIP.mdd}>{r.isFallback ? "—" : fmtPct(r.maxDD)}</td>
+                    <td style={{ ...tdStyle, textAlign: "right" }} title={t("alphalab.metricTip.mdd")}>{r.isFallback ? "—" : fmtPct(r.maxDD)}</td>
                     <td style={{ ...tdStyle, textAlign: "right" }}>{r.isFallback ? "—" : `${fmtNum(r.avgHold, 1)}h`}</td>
                   </tr>
                 );
@@ -472,179 +783,91 @@ function LeaderboardTable({ data }) {
         </div>
       )}
       <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 12, padding: "8px 10px", background: C.card2, borderRadius: RADIUS.sm }}>
-        ⚠ Zepta 는 분석 도구입니다. 위 수치는 과거 시뮬레이션 결과이며 미래 수익을 보장하지 않습니다. 매매 결정과 손익은 본인 책임입니다.
+        {t("alphalab.disclaimerTable")}
       </div>
-    </Card>
+    </div>
   );
 }
 
-
-
-// ════════════════════════════════════════════════════════════════════
-// PipelineBoard — 전략 파이프라인 (발굴 → 검증 → 실거래) 통합 평가 칸반
-//   대표 지시(2026-06-03): 발굴 후보와 기존 8개 전략을 "같은 잣대"로 한 줄에 세움.
-//   3개 레인으로 깔때기 전체를 한눈에. 핵심: 화려한 단일심볼 백테스트(왼쪽)가
-//   실거래 성과(오른쪽)로 이어지는지 직접 비교 → "백테스트 ≠ 실거래" 체감.
-// ════════════════════════════════════════════════════════════════════
-const LANE = {
-  observe: { key: "observe", title: "관찰중", emoji: "🔬", desc: "발굴된 후보 · 단일심볼 관찰치(미검증)", accent: "text3" },
-  validated: { key: "validated", title: "검증 통과", emoji: "✅", desc: "여러 종목 + 미학습 구간(OOS) 통과", accent: "blue" },
-  live: { key: "live", title: "실거래", emoji: "🟢", desc: "실제 매매 중 · 진짜 돈 성과 기준", accent: "green" },
-};
-
-function PipelineCard({ children, accent, C }) {
-  return (
-    <div style={{
-      background: C.card2, border: `1px solid ${C.border}`, borderLeft: `3px solid ${accent}`,
-      borderRadius: RADIUS.sm, padding: "10px 12px", display: "flex", flexDirection: "column", gap: 5,
-    }}>{children}</div>
-  );
-}
-
-function PipelineBoard({ data }) {
+function StrategyBoard({ data }) {
   const C = useThemeTokens();
-  const isMobile = useIsMobile();
-  const strategies = data?.leaderboard?.strategies || {};
-  const params = data?.params || {};
-  const candidates = data?.candidates || [];
+  const { t } = useLanguage();
+  const statuses = data?.statuses || {};
 
-  // 레인1 — 관찰중: 발굴 후보, 단일심볼 Sharpe 상위
-  const observing = useMemo(() => [...candidates]
-    .sort((a, b) => (b.backtestResult?.sharpe || 0) - (a.backtestResult?.sharpe || 0))
-    .slice(0, 8).map((c) => ({
-      id: c.id, name: strategyLabel(c.parentStrategy),
-      symbol: (c.symbol || "").replace("USDT", ""),
-      sharpe: c.backtestResult?.sharpe, win: c.backtestResult?.winRate,
-    })), [candidates]);
+  // 실전 9종 위상 — di:alpha:strategy-status:* 실데이터 (statuses 키가 실전 종목 전체)
+  const chips = useMemo(() => Object.entries(statuses)
+    .filter(([id]) => isValidStrategyId(id))
+    .map(([id, s]) => ({ id, status: s?.status || "active", reason: s?.reason || "", updatedAt: s?.updatedAt }))
+    .sort((a, b) => {
+      const rank = { active: 0, watch: 1, disabled: 2 };
+      return (rank[a.status] ?? 3) - (rank[b.status] ?? 3);
+    }), [statuses]);
 
-  // 레인2 — 검증통과: 주입된 파라미터(교차심볼+OOS 통과분)
-  const validated = useMemo(() => Object.entries(params).filter(([, v]) => v && Number.isFinite(v.sharpe))
-    .map(([id, v]) => ({ id, name: strategyLabel(id), sharpe: v.sharpe, oos: v.oosSharpe, symbol: (v.symbol || "").replace("USDT", "") }))
-    .sort((a, b) => (b.sharpe || 0) - (a.sharpe || 0)), [params]);
-
-  // 레인3 — 실거래: 8개 전략, 실거래 누적손익 기준 정렬
-  const live = useMemo(() => Object.entries(strategies).map(([id, s]) => {
-    const lv = s.live || {};
-    return {
-      id, name: strategyLabel(id),
-      pnl: lv.netPnLUsd ?? null, trades: lv.trades || 0, winRate: lv.winRate ?? null,
-      injected: !!params[id],
-    };
-  }).sort((a, b) => (b.pnl ?? -1e9) - (a.pnl ?? -1e9)), [strategies, params]);
-
-  const sampleTag = (n) => n >= 20 ? { t: "📊 표본충분", c: C.text2 } : n >= 5 ? { t: "표본보통", c: C.text3 } : { t: "⚠ 표본부족", c: C.text3 };
-
-  const laneHead = (lane, count) => (
-    <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 8 }}>
-      <div style={{ fontSize: FONT.sm, fontWeight: 800, color: C[lane.accent] || C.text1 }}>{lane.emoji} {lane.title}</div>
-      <span style={{ fontSize: FONT.xs, color: C.text3 }}>{count}건</span>
-    </div>
-  );
-
-  const Lane = ({ lane, count, children }) => (
-    <div style={{ background: C.card2, border: `1px solid ${C.border}`, borderRadius: RADIUS.md, padding: 12, minWidth: 0 }}>
-      {laneHead(lane, count)}
-      <div style={{ fontSize: 11, color: C.text3, marginBottom: 10, lineHeight: 1.4, minHeight: isMobile ? 0 : 30 }}>{lane.desc}</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: isMobile ? 280 : 420, overflowY: "auto" }}>
-        {children}
-      </div>
-    </div>
-  );
+  const counts = useMemo(() => chips.reduce((acc, c) => {
+    acc[c.status] = (acc[c.status] || 0) + 1;
+    return acc;
+  }, {}), [chips]);
 
   return (
     <Card>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>전략 파이프라인</div>
-        <span style={{ fontSize: FONT.xs, color: C.text3 }}>발굴 → 검증 → 실거래</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 6 }}>
+        <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>{t("alphalab.board.title")}</div>
+        {chips.length > 0 && (
+          <span style={{ fontSize: FONT.xs, color: C.text3, whiteSpace: "nowrap" }}>
+            {t("alphalab.board.counts", { active: counts.active || 0, watch: counts.watch || 0, disabled: counts.disabled || 0 })}
+          </span>
+        )}
       </div>
-      <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 12, lineHeight: 1.5 }}>
-        발굴 후보부터 실거래 전략까지 <b style={{ color: C.text2 }}>같은 화면에서</b> 비교합니다.
-        왼쪽의 화려한 단일심볼 백테스트가 오른쪽 <b style={{ color: C.text2 }}>실거래 성과</b>로 이어지는지가 진짜 실력입니다.
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: 12 }}>
-        {/* 관찰중 */}
-        <Lane lane={LANE.observe} count={candidates.length}>
-          {observing.length === 0 ? <div style={{ fontSize: FONT.xs, color: C.text3 }}>발굴 중…</div> :
-            observing.map((c) => {
-              const g = sharpeToGrade(c.sharpe);
-              return (
-                <PipelineCard key={c.id} accent={C.border} C={C}>
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
-                    <span style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>{c.name}</span>
-                    <span style={{ fontSize: 10, color: C.text3, border: `1px solid ${C.border}`, borderRadius: 4, padding: "1px 5px", whiteSpace: "nowrap" }}>미검증</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                    <span style={{ fontSize: 17, fontWeight: 800, color: C.text2 }}>{g.grade}</span>
-                    <span style={{ fontSize: FONT.xs, color: C.text3 }}>{c.symbol} · 단일심볼 {fmtNum(c.sharpe, 1)}</span>
-                  </div>
-                  <span style={{ fontSize: FONT.xs, color: C.text3 }}>승률 {fmtPct(c.win, 0)}</span>
-                </PipelineCard>
-              );
-            })}
-        </Lane>
-        {/* 검증통과 */}
-        <Lane lane={LANE.validated} count={validated.length}>
-          {validated.length === 0 ? <div style={{ fontSize: FONT.xs, color: C.text3, lineHeight: 1.5 }}>아직 교차검증을 통과한 후보가 없습니다. 엄격한 게이트(여러 종목+OOS)를 넘어야 여기로 올라옵니다.</div> :
-            validated.map((v) => (
-              <PipelineCard key={v.id} accent={C.blue} C={C}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
-                  <span style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>{v.name}</span>
-                  <span style={{ fontSize: 10, color: C.green, border: `1px solid ${C.green}`, borderRadius: 4, padding: "1px 5px", whiteSpace: "nowrap" }}>🧬 반영중</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                  <span style={{ fontSize: 17, fontWeight: 800, color: C.blue }}>{fmtNum(v.sharpe, 2)}</span>
-                  <span style={{ fontSize: FONT.xs, color: C.text3 }}>교차검증 Sharpe</span>
-                </div>
-                <span style={{ fontSize: FONT.xs, color: C.text3 }}>OOS {fmtNum(v.oos, 2)} · 여러 종목 통과</span>
-              </PipelineCard>
-            ))}
-        </Lane>
-        {/* 실거래 */}
-        <Lane lane={LANE.live} count={live.length}>
-          {live.map((s) => {
-            const hasData = s.pnl != null && s.trades > 0;
-            const pnlColor = !hasData ? C.text3 : s.pnl > 0 ? C.green : s.pnl < 0 ? C.red : C.text2;
-            const tag = sampleTag(s.trades);
+      <div style={{ fontSize: FONT.xs, color: C.text3, marginBottom: 10, lineHeight: 1.5 }}>{t("alphalab.board.subtitle")}</div>
+
+      {chips.length === 0 ? (
+        <div style={{ fontSize: FONT.sm, color: C.text3, padding: "12px 0", textAlign: "center" }}>{t("alphalab.board.emptyBody")}</div>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+          {chips.map((c) => {
+            const fg = c.status === "active" ? C.green : c.status === "disabled" ? C.red : C.yellow;
             return (
-              <PipelineCard key={s.id} accent={C.green} C={C}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 6 }}>
-                  <span style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>{s.name}{s.injected ? " 🧬" : ""}</span>
-                  <span style={{ fontSize: 10, color: tag.c, whiteSpace: "nowrap" }}>{tag.t}</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                  <span style={{ fontSize: 17, fontWeight: 800, color: pnlColor }}>
-                    {hasData ? `${s.pnl > 0 ? "+" : ""}$${fmtNum(s.pnl, 1)}` : "거래 없음"}
-                  </span>
-                  <span style={{ fontSize: FONT.xs, color: C.text3 }}>실거래 누적</span>
-                </div>
-                <span style={{ fontSize: FONT.xs, color: C.text3 }}>{s.trades}건{s.winRate != null ? ` · 승률 ${fmtNum(s.winRate, 0)}%` : ""}</span>
-              </PipelineCard>
+              <span key={c.id}
+                title={`${t(`alphalab.status.${c.status}Desc`)}${c.reason ? ` — ${c.reason}` : ""}`}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 6,
+                  background: C.card2, border: `1px solid ${C.border}`,
+                  borderRadius: RADIUS.full, padding: "5px 12px",
+                }}>
+                <span aria-hidden="true" style={{ fontSize: FONT.xs }}>{STATUS_EMOJI[c.status] || ""}</span>
+                <span style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>{strategyLabel(t, c.id)}</span>
+                <span style={{ fontSize: FONT.xs, fontWeight: 600, color: fg }}>{t(`alphalab.status.${c.status}`)}</span>
+              </span>
             );
           })}
-        </Lane>
-      </div>
+        </div>
+      )}
+
+      <Collapse title={t("alphalab.board.detailTitle")}>
+        <RegimeDetail data={data} />
+        <div style={{ marginTop: 16, fontSize: FONT.sm, fontWeight: 700, color: C.text1, marginBottom: 8 }}>{t("alphalab.board.tableTitle")}</div>
+        <LeaderboardDetail data={data} />
+      </Collapse>
     </Card>
   );
 }
 
-
 // ────────────────────────────────────────────────
-// Public Mode — 비로그인 사용자용 카드 (PLAN-BIZ #1)
-// "오늘 잘 작동하는 알파 TOP 3" + 가입 CTA
-// 회원만 보는 절대 수치는 가리고, 1줄 설명 + 30일 수익률만 노출
+// Public Mode — 비로그인 사용자용 (TOP3 + 가입 CTA — 화면당 액션 1개)
 // ────────────────────────────────────────────────
 function PublicAlphaShowcase({ data, onSignup }) {
   const C = useThemeTokens();
+  const { t } = useLanguage();
   const strategies = data?.leaderboard?.strategies || {};
   const top3 = useMemo(() => {
     return Object.entries(strategies)
-      .filter(([id]) => isValidStrategyId(id)) // G-1 hotfix — raw ID 만 숨기고 나머지는 fallback 라벨
+      .filter(([id]) => isValidStrategyId(id))
       .sort((a, b) => (b[1].sharpe || 0) - (a[1].sharpe || 0))
       .slice(0, 3)
       .map(([id, m]) => ({ id, ...m }));
   }, [strategies]);
 
-  // 30일 PnL 추정 — historyTail 마지막값과 24시간 전 비교
+  // 최근 추이 — historyTail 처음/마지막 netPnL 차 (실데이터, 없으면 "측정 중")
   const hist = data?.historyTail || [];
   const periodPnL = (sid) => {
     if (hist.length < 2) return null;
@@ -654,18 +877,20 @@ function PublicAlphaShowcase({ data, onSignup }) {
     return tail - head;
   };
 
+  const descOf = (id) => {
+    const key = `alphalab.strategyDesc.${id}`;
+    const v = t(key);
+    return v === key ? t("alphalab.strategyDesc.fallback") : v;
+  };
+
   return (
     <Card>
       <div style={{ marginBottom: 12 }}>
-        <div style={{ fontSize: FONT.lg, fontWeight: 800, color: C.text1 }}>오늘 가장 잘 작동하는 알파 TOP 3</div>
-        <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 4 }}>
-          Zepta 의 AI 가 매시간 백테스트와 실시간 성과를 평가해 가장 안정적인 전략을 선정합니다.
-        </div>
+        <div style={{ fontSize: FONT.lg, fontWeight: 800, color: C.text1 }}>{t("alphalab.public.showcaseTitle")}</div>
+        <div style={{ fontSize: FONT.xs, color: C.text3, marginTop: 4 }}>{t("alphalab.public.showcaseSub")}</div>
       </div>
       {top3.length === 0 ? (
-        <div style={{ fontSize: FONT.sm, color: C.text3, padding: "16px 0", textAlign: "center" }}>
-          데이터를 모으는 중입니다.
-        </div>
+        <div style={{ fontSize: FONT.sm, color: C.text3, padding: "16px 0", textAlign: "center" }}>{t("alphalab.public.empty")}</div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
           {top3.map((s, idx) => {
@@ -674,31 +899,19 @@ function PublicAlphaShowcase({ data, onSignup }) {
             const recentColor = recent == null ? C.text3 : recent > 0 ? C.green : recent < 0 ? C.red : C.text2;
             return (
               <div key={s.id} style={{
-                padding: 14,
-                background: C.card2,
-                borderRadius: RADIUS.md,
-                border: `1px solid ${C.border}`,
-                display: "flex", flexDirection: "column", gap: 8,
+                padding: 14, background: C.card2, borderRadius: RADIUS.md,
+                border: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 8,
               }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: FONT.xs, color: C.text3, fontWeight: 600 }}>#{idx + 1}</span>
-                  <Badge kind={grade.color}>{grade.label}</Badge>
+                  <Badge kind={grade.color}>{t(`alphalab.gradeLabel.${grade.key}`)}</Badge>
                 </div>
-                <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>{strategyLabel(s.id)}</div>
-                <div style={{ fontSize: FONT.xs, color: C.text2, lineHeight: 1.5 }}>
-                  {s.id === "trend-follow" && "한 방향으로 흐름이 잡혔을 때 따라가는 전략"}
-                  {s.id === "mean-revert" && "박스권에서 과도하게 빠질 때 반등을 노리는 전략"}
-                  {s.id === "breakout" && "주요 저항선 돌파 시점에 진입하는 전략"}
-                  {s.id === "momentum-rotation" && "최근 강세 종목으로 자동 로테이션"}
-                  {s.id === "volatility-arb" && "변동성 차이를 이용한 차익 전략"}
-                  {s.id === "hurst-trend" && "추세 강도가 강한 구간만 골라 매매"}
-                  {s.id === "defi-momentum" && "DeFi 토큰의 모멘텀 추종"}
-                  {s.id === "ensemble" && "여러 전략의 합의된 시그널만 채택"}
-                  {!["trend-follow","mean-revert","breakout","momentum-rotation","volatility-arb","hurst-trend","defi-momentum","ensemble"].includes(s.id) && "AI 가 시장 흐름에 맞게 자동 운영"}
-                </div>
+                <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1 }}>{strategyLabel(t, s.id)}</div>
+                <div style={{ fontSize: FONT.xs, color: C.text2, lineHeight: 1.5 }}>{descOf(s.id)}</div>
                 <div style={{ fontSize: FONT.xs, color: C.text3 }}>
-                  최근 추이: <span style={{ color: recentColor, fontWeight: 600 }}>
-                    {recent == null ? "측정 중" : `${recent > 0 ? "+" : ""}${fmtNum(recent, 1)}%p`}
+                  {t("alphalab.public.recentTrend")}{" "}
+                  <span style={{ color: recentColor, fontWeight: 600 }}>
+                    {recent == null ? t("alphalab.public.measuring") : `${recent > 0 ? "+" : ""}${fmtNum(recent, 1)}%p`}
                   </span>
                 </div>
               </div>
@@ -707,24 +920,18 @@ function PublicAlphaShowcase({ data, onSignup }) {
         </div>
       )}
       <div style={{
-        marginTop: 16, padding: 14,
-        background: C.blueBg, borderRadius: RADIUS.md,
+        marginTop: 16, padding: 14, background: C.blueBg, borderRadius: RADIUS.md,
         display: "flex", flexDirection: "column", gap: 8, alignItems: "center",
       }}>
-        <div style={{ fontSize: FONT.sm, color: C.text1, fontWeight: 600 }}>
-          상세 수치 · 실시간 시그널 · 안정성 추이는 가입 후 확인할 수 있어요
-        </div>
+        <div style={{ fontSize: FONT.sm, color: C.text1, fontWeight: 600 }}>{t("alphalab.public.ctaLead")}</div>
         <button onClick={onSignup} style={{
-          padding: "10px 24px",
-          background: C.blue, color: "#fff",
+          padding: "10px 24px", background: C.blue, color: "#fff",
           border: "none", borderRadius: RADIUS.full,
           fontSize: FONT.sm, fontWeight: 700, cursor: "pointer",
         }}>
-          무료로 가입하고 전체 보기
+          {t("alphalab.public.ctaButton")}
         </button>
-        <div style={{ fontSize: FONT.xs, color: C.text3, textAlign: "center" }}>
-          가입은 30초 · 신용카드 불필요
-        </div>
+        <div style={{ fontSize: FONT.xs, color: C.text3, textAlign: "center" }}>{t("alphalab.public.ctaSub")}</div>
       </div>
     </Card>
   );
@@ -733,58 +940,9 @@ function PublicAlphaShowcase({ data, onSignup }) {
 // ────────────────────────────────────────────────
 // 메인 페이지
 // ────────────────────────────────────────────────
-// ────────────────────────────────────────────────
-// 발굴 → 실거래 반영 현황 배너 (2026-05-29)
-// 알파랩이 발굴한 우수 전략의 튜닝 파라미터가 실제 자동매매에 적용된 상태를
-// 한눈에 보여준다. di:alpha:params 에 적재된(=tunedAt 있는) 전략만 집계.
-// ────────────────────────────────────────────────
-function LiveTuningBanner({ data }) {
-  const C = useThemeTokens();
-  const params = data?.params || {};
-  const tuned = useMemo(() => {
-    return Object.entries(params)
-      .filter(([id, p]) => p && p.tunedAt && isValidStrategyId(id))
-      .map(([id, p]) => ({ id, name: strategyLabel(id), sharpe: p.sharpe ?? null, tunedAt: p.tunedAt }))
-      .sort((a, b) => (b.sharpe || 0) - (a.sharpe || 0));
-  }, [params]);
-
-  if (tuned.length === 0) return null;
-
-  return (
-    <Card style={{ position: "relative", overflow: "hidden" }}>
-      <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, background: C.green }} />
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        <div style={{ fontSize: FONT.lg, fontWeight: 800, color: C.text1 }}>🧬 발굴 전략 실거래 반영중</div>
-        <Badge kind="active">{tuned.length}개 적용</Badge>
-      </div>
-      <div style={{ fontSize: FONT.xs, color: C.text2, marginBottom: 10, lineHeight: 1.55 }}>
-        알파랩이 발굴·검증한 우수 전략의 최적 파라미터가 자동매매 신호에 적용돼 있습니다.
-        2시간마다 더 나은 전략이 나오면 자동으로 교체됩니다.
-      </div>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-        {tuned.map((t) => {
-          const grade = sharpeToGrade(t.sharpe);
-          return (
-            <div key={t.id} style={{
-              display: "flex", alignItems: "center", gap: 8,
-              background: C.card, border: `1px solid ${C.border}`,
-              borderRadius: RADIUS.full, padding: "5px 12px",
-            }}>
-              <span style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text1 }}>{t.name}</span>
-              <span style={{ fontSize: FONT.xs, fontWeight: 700, color: C.green }}>
-                {grade.grade}{t.sharpe != null && <span style={{ color: C.text3, fontWeight: 500 }}> · {fmtNum(t.sharpe, 1)}</span>}
-              </span>
-              <span style={{ fontSize: FONT.xs, color: C.text3 }}>{fmtAgo(t.tunedAt)}</span>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-}
-
 export default function AlphaLab({ onRequestLogin }) {
   const C = useThemeTokens();
+  const { t, lang } = useLanguage();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -800,12 +958,8 @@ export default function AlphaLab({ onRequestLogin }) {
 
   // SEO — 동적 메타데이터 (회원/비회원 분기)
   useEffect(() => {
-    const title = isPublic
-      ? "Alpha Lab — 오늘 가장 잘 작동하는 AI 매매 전략 TOP 3 | Zepta"
-      : "Alpha Lab — 24/7 알파 추적 대시보드 | Zepta";
-    const desc = isPublic
-      ? "Zepta AI 가 매시간 평가한 최상위 매매 전략을 무료로 확인하세요. 시장 흐름에 맞춰 자동 조정되는 8가지 전략을 한눈에."
-      : "시장 레짐, 전략별 안정성 등급, 손익비, 최대 낙폭까지. 실시간 매매 신호 모니터링.";
+    const title = isPublic ? t("alphalab.seo.publicTitle") : t("alphalab.seo.memberTitle");
+    const desc = isPublic ? t("alphalab.seo.publicDesc") : t("alphalab.seo.memberDesc");
     try {
       if (document.title !== title) document.title = title;
       let metaDesc = document.querySelector('meta[name="description"]');
@@ -816,13 +970,13 @@ export default function AlphaLab({ onRequestLogin }) {
       }
       metaDesc.setAttribute("content", desc);
     } catch {}
-  }, [isPublic]);
+  }, [isPublic, t]);
 
   const fetchData = async () => {
     try {
       const r = await fetch("/api/agents/alpha-status", { credentials: "same-origin" });
       const j = await r.json();
-      if (!j.ok) throw new Error(j.error || "응답 실패");
+      if (!j.ok) throw new Error(j.error || "fetch failed");
       setData(j);
       setError(null);
       setLastFetched(new Date());
@@ -835,19 +989,18 @@ export default function AlphaLab({ onRequestLogin }) {
 
   useEffect(() => {
     fetchData();
-    const t = setInterval(fetchData, REFRESH_MS);
-    return () => clearInterval(t);
+    const tm = setInterval(fetchData, REFRESH_MS);
+    return () => clearInterval(tm);
   }, []);
 
   if (loading && !data) {
-    // 2026-05-12 — Skeleton 표준화 (LoadingBlock)
     return (
       <div className="z-bento-scope" style={{ padding: "14px 14px", maxWidth: 1200, margin: "0 auto" }}>
         <div style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, letterSpacing: "-0.02em" }}>알파 랩</div>
-          <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4 }}>검증된 9개 전략을 한 자리에서 비교하세요</div>
+          <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, letterSpacing: "-0.02em" }}>{t("alphalab.title")}</div>
+          <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4 }}>{t("alphalab.taglineMember")}</div>
         </div>
-        <LoadingBlock rows={4} height={84} label="알파 데이터 불러오는 중…" />
+        <LoadingBlock rows={4} height={84} label={t("alphalab.loading")} />
       </div>
     );
   }
@@ -857,10 +1010,8 @@ export default function AlphaLab({ onRequestLogin }) {
     return (
       <div className="z-bento-scope" style={{ padding: "14px 14px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 1200, margin: "0 auto" }}>
         <div>
-          <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, letterSpacing: "-0.02em" }}>알파 랩</div>
-          <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4, lineHeight: 1.55 }}>
-            9개 매매 전략을 24시간 검증합니다. 가장 잘 작동하는 알파를 자동으로 골라냅니다.
-          </div>
+          <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, letterSpacing: "-0.02em" }}>{t("alphalab.title")}</div>
+          <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4, lineHeight: 1.55 }}>{t("alphalab.taglinePublic")}</div>
         </div>
 
         <PublicAlphaShowcase data={data} onSignup={() => {
@@ -868,57 +1019,49 @@ export default function AlphaLab({ onRequestLogin }) {
           if (typeof onRequestLogin === "function") onRequestLogin();
         }} />
 
-        {/* 회원만 보는 정보는 숨김 — 단, "이런 것도 볼 수 있어요" preview 카드 */}
+        {/* 검증 아카이브 — 정적 실측 결과라 공개 가능. "기각도 공개"가 곧 신뢰 자산 */}
+        <ArchiveSection />
+
         <Card>
-          <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1, marginBottom: 8 }}>회원만 볼 수 있는 정보</div>
+          <div style={{ fontSize: FONT.lg, fontWeight: 700, color: C.text1, marginBottom: 8 }}>{t("alphalab.public.membersTitle")}</div>
           <ul style={{ margin: 0, padding: "0 0 0 20px", color: C.text2, fontSize: FONT.sm, lineHeight: 1.8 }}>
-            <li>전체 9개 전략의 실시간 안정성 등급과 손익비</li>
-            <li>시장 레짐(추세/횡보)별 전략 가중치 실시간 반영</li>
-            <li>발굴 → 검증 → 실거래 주입 파이프라인 현황</li>
-            <li>새로 발굴 중인 전략 후보와 교차검증·OOS 백테스트 결과</li>
-            <li>전략별 매매 신호 즉시 알림 (텔레그램)</li>
+            {(Array.isArray(t("alphalab.public.membersItems")) ? t("alphalab.public.membersItems") : []).map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
           </ul>
         </Card>
 
         <div style={{ fontSize: FONT.xs, color: C.text3, textAlign: "center", padding: "8px 16px", lineHeight: 1.5 }}>
-          ⚠ Zepta 는 분석 도구입니다. 표시되는 수치는 과거 시뮬레이션 결과이며 미래 수익을 보장하지 않습니다.<br/>
-          매매 결정과 손익은 본인 책임입니다 — 투자 권유가 아닙니다.
+          {t("alphalab.publicDisclaimer1")}<br />
+          {t("alphalab.publicDisclaimer2")}
         </div>
       </div>
     );
   }
 
-  // ── 로그인 view (전체 정보) ──────────────────
+  // ── 로그인 view (첫 화면 카드 3개 — 파이프라인 / 아카이브 / 현황판) ──────────────────
   return (
     <div className="z-bento-scope" style={{ padding: "14px 14px", display: "flex", flexDirection: "column", gap: 14, maxWidth: 1200, margin: "0 auto" }}>
       <div>
-        <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, letterSpacing: "-0.02em" }}>알파 랩</div>
+        <div style={{ fontSize: FONT["2xl"], fontWeight: 800, color: C.text1, letterSpacing: "-0.02em" }}>{t("alphalab.title")}</div>
         <div style={{ fontSize: FONT.sm, color: C.text3, marginTop: 4, lineHeight: 1.55 }}>
-          24시간 매매 전략 추적 · 자동 튜닝 · 시장 흐름에 맞춰 가중치 자동 조정.
-          {lastFetched && <> · 마지막 갱신 {lastFetched.toLocaleTimeString("ko-KR", { hour12: false })}</>}
+          {t("alphalab.taglineMember")}
+          {lastFetched && <> · {t("alphalab.lastUpdated", { time: lastFetched.toLocaleTimeString(lang === "en" ? "en-US" : "ko-KR", { hour12: false }) })}</>}
         </div>
         {error && (
           <div style={{ marginTop: 8, padding: 10, background: C.redBg, color: C.red, borderRadius: RADIUS.sm, fontSize: FONT.sm }}>
-            오류: {error}
+            {t("alphalab.error", { msg: error })}
           </div>
         )}
       </div>
 
-      <LiveTuningBanner data={data} />
-      <RegimePanel data={data} />
-
-      {/* ★ 2026-06-03: 통합 평가 칸반 — 발굴·기존 8개를 '같은 잣대'로 (대표 지시). 이 화면의 중심. */}
-      <PipelineBoard data={data} />
-
-      {/* ── 자세히 보기 (전략 순위표) ── */}
-      {/* ★ 2026-06-03 군더더기 정리(대표 지시): Sharpe추이·종목/시간대별·후보패널 숨김.
-         발굴 후보는 파이프라인 '관찰중' 레인이 대체. 순위표만 상세로 유지. */}
-      <div style={{ fontSize: FONT.sm, fontWeight: 700, color: C.text3, marginTop: 6, marginBottom: -4 }}>자세히 보기</div>
-      <LeaderboardTable data={data} />
+      <LifecyclePipeline data={data} />
+      <ArchiveSection />
+      <StrategyBoard data={data} />
 
       <div style={{ fontSize: FONT.xs, color: C.text3, textAlign: "center", padding: "16px 0", lineHeight: 1.6 }}>
-        매시 정각 순위 갱신 · 새 전략 발굴 2시간 주기 · 파라미터 튜닝 3시간 주기 · 우수 전략은 자동매매에 자동 반영 (KST)<br/>
-        ⚠ Zepta 는 분석 도구입니다. 매매 결정과 손익은 본인 책임이며, 표시되는 수치는 미래 수익을 보장하지 않습니다.
+        {t("alphalab.footerCadence")}<br />
+        {t("alphalab.footerDisclaimer")}
       </div>
     </div>
   );

@@ -1809,5 +1809,261 @@
       "title": "About | Zepta",
       "desc": "About the Zepta investing intelligence platform"
     }
+  },
+  "alphalab": {
+    "title": "Alpha Lab",
+    "taglineMember": "A lab that shows the full lifecycle of every alpha — from discovery through validation, rejection, and live deployment. Every number is real data.",
+    "taglinePublic": "We validate 9 production strategies around the clock. Only alphas that pass survive — and rejected records stay public too.",
+    "loading": "Loading alpha data…",
+    "lastUpdated": "Last updated {{time}}",
+    "error": "Error: {{msg}}",
+    "updatedAgo": "updated {{ago}}",
+    "noData": "No data",
+    "ago": {
+      "justNow": "just now",
+      "minutes": "{{n}}m ago",
+      "hours": "{{n}}h ago",
+      "days": "{{n}}d ago"
+    },
+    "seo": {
+      "publicTitle": "Alpha Lab — Hypothesis Testing With Rejections Made Public | Zepta",
+      "publicDesc": "Zepta Alpha Lab publishes the full lifecycle of trading hypotheses — discovery, pre-registered validation, shadow accumulation, and live deployment — including the ones we rejected.",
+      "memberTitle": "Alpha Lab — Alpha Lifecycle Dashboard | Zepta",
+      "memberDesc": "Market regime, strategy states (live / watch / blocked), the pre-registered validation archive, and shadow-accumulation progress in real time."
+    },
+    "status": {
+      "active": "Live",
+      "watch": "Watch",
+      "disabled": "Blocked",
+      "activeDesc": "Fully operational — signals applied at 100%",
+      "watchDesc": "Cautious — weight halved",
+      "disabledDesc": "Blocked from live trading (shadow only)"
+    },
+    "regime": {
+      "trending": "Trending",
+      "meanReverting": "Mean-reverting",
+      "transitional": "Mixed",
+      "unknown": "Insufficient data",
+      "trendingDesc": "The market is moving in one direction",
+      "meanRevertingDesc": "Range-bound — reversion strategies favored",
+      "transitionalDesc": "Direction unclear — running conservatively",
+      "unknownDesc": "Hurst cannot be computed"
+    },
+    "efficiency": {
+      "directional": "Clearly directional",
+      "noisy": "Noisy",
+      "mixed": "Mixed",
+      "unknown": "—"
+    },
+    "metricTip": {
+      "sharpe": "Risk-adjusted return — how steadily a strategy earned for the same volatility. 1.0+ is decent, 2.0+ is excellent.",
+      "pf": "Profit Factor — money won divided by money lost. 1.5+ indicates a healthy strategy.",
+      "mdd": "Maximum drawdown — the deepest loss during operation. Smaller is safer.",
+      "winRate": "Win rate — share of winning trades. A low win rate can still profit with a good profit factor.",
+      "hurst": "Hurst exponent — above 0.5 trends persist, below 0.5 markets mean-revert. Measures directionality.",
+      "er": "Efficiency ratio (0–1) — how efficiently price moves in one direction (higher = trending, lower = choppy)."
+    },
+    "gradeLabel": {
+      "s": "Stability grade S",
+      "a": "Stability grade A",
+      "b": "Stability grade B",
+      "c": "Stability grade C",
+      "d": "Stability grade D (caution)",
+      "measuring": "Measuring"
+    },
+    "pipeline": {
+      "title": "Alpha Lifecycle Pipeline",
+      "subtitle": "From one idea to live trading — every count below is real data. Most candidates get rejected along the way. That is how it should be.",
+      "stageCandidates": "Discovery",
+      "stageCandidatesDesc": "Auto-discovered strategy/parameter candidates",
+      "stageValidation": "Pre-registered validation",
+      "stageValidationDesc": "Gates fixed first, then backtests and statistical tests",
+      "stageShadow": "Shadow accumulation",
+      "stageShadowDesc": "Recording alongside production — no trading involvement",
+      "stageLive": "Live deployment",
+      "stageLiveDesc": "Only gate-passing alphas get injected into signals",
+      "unitCount": "{{n}}",
+      "validationSplit": "{{rejected}} rejected · {{adopted}} adopted/conditional",
+      "injectedLead": "🧬 Live in production",
+      "injectedChip": "Validated Sharpe {{sharpe}} · OOS {{oos}}",
+      "shadowTitle": "Shadow accumulation tracks",
+      "ocName": "On-chain/derivatives adjustment (OC_SHADOW)",
+      "ocDesc": "Parallel record of what scores would look like adjusted by OI surges and long/short crowding — unused in trading or display",
+      "h2Name": "H2 volume breakout filter (4h)",
+      "h2Desc": "H2 passed validation as a filter — now measured live in a 4-hour shadow",
+      "accumDays": "Day {{days}} of accumulation · target {{target}}+ days",
+      "accumStart": "Wired {{date}} — accumulation starts with this deployment",
+      "gateReached": "Target period reached — awaiting gate verdict",
+      "gateLabel": "Promotion gate (pre-registered)",
+      "gateSpec": "4+ weeks · n≥200 samples · n≥50 with non-zero adjustment · p<0.05",
+      "gateNote": "No rule or constant tuning during accumulation — tuning voids the validation",
+      "nNote": "Sample counts are aggregated server-side — full results published at gate verdict",
+      "candDetailTitle": "Candidate details",
+      "candDetailSub": "Single-symbol observations — unvalidated before cross-validation, so discount the shiny numbers",
+      "candUnverified": "Unverified",
+      "candStat": "{{symbol}} · single-symbol Sharpe {{sharpe}} · win rate {{win}}%",
+      "candEmpty": "Discovering…",
+      "logTitle": "Lifecycle log",
+      "logSub": "Promotions, injections, and blocks recorded as-is (last {{n}})",
+      "logEmpty": "No events recorded yet",
+      "evt": {
+        "inject": "Inject",
+        "status": "Status change",
+        "revoke": "Revoke",
+        "promote": "Promote",
+        "demote": "Demote",
+        "refresh": "Revalidate",
+        "event": "Event"
+      }
+    },
+    "archive": {
+      "title": "Validation Archive",
+      "subtitle": "What we tested and why it passed or failed — a rejection is not a failure, it is knowledge that an idea has no edge. All figures are measured.",
+      "summary": "{{total}} hypotheses tested · {{rejected}} rejected · {{adopted}} adopted/conditional",
+      "sourceLabel": "Source",
+      "verdict": {
+        "rejected": "Rejected",
+        "conditional": "Conditional pass",
+        "partial": "Partially adopted",
+        "scoped": "Scope narrowed"
+      },
+      "items": {
+        "h1": {
+          "title": "H1 — Fibonacci retracement 'confirmed entry'",
+          "concl": "The idea: waiting for a close back above the level after a touch should be safer than entering immediately. Out-of-sample, both win rate and profit factor got worse than immediate entry — the cost of waiting for confirmation exceeded its benefit. Rejected.",
+          "stat": "354 reclaim trades (IS+OOS) · OOS PF 0.94 vs immediate 1.12 (1h) · difference p≈0.69"
+        },
+        "h2": {
+          "title": "H2 — Volume filter on breakout candles",
+          "concl": "We tested whether keeping only breakouts with unusually high volume (z≥2) filters out fake breakouts. As a filter it passed — the trades it removed really were worse — but the strategy itself lost money out-of-sample, so instead of production it goes to a 4-hour shadow.",
+          "stat": "3,688 filter-ON trades · OOS 4h PF 0.79 vs 0.66 unfiltered · suppressed group 0.57"
+        },
+        "h3": {
+          "title": "H3 — Break, then retest entry at S/R zones",
+          "concl": "The textbook pattern: break resistance, wait for the pullback to confirm support, then enter. Measured, it was no better than entering immediately — and both lost. Even textbook patterns get rejected by data.",
+          "stat": "416 retest trades · OOS PF 0.52 vs immediate 0.54 · avg return −1.02%"
+        },
+        "h4": {
+          "title": "H4 — Volatility squeeze breakout",
+          "concl": "The idea: ride whichever direction breaks out after the bands compress. It contributed an improvement over baseline, but profit factor never crossed 1 and fees made it worse. Rejected.",
+          "stat": "1,795 squeeze entries · OOS PF 0.59 vs baseline 0.55 · 0.49 after fees · 34 max consecutive losses"
+        },
+        "h5": {
+          "title": "H5 — KST hour-of-day / weekday seasonality",
+          "concl": "We statistically tested five folk claims like '9am is strong' and 'Wednesdays go up'. All five failed significance — even the closest one, the Wednesday effect, missed the multiple-testing threshold (p<0.01).",
+          "stat": "0 of 5 claims supported · lowest primary-test p 0.045 (threshold 0.01) · BTC·ETH + 6 cross-validation symbols"
+        },
+        "candle": {
+          "title": "Candlestick pattern calibration",
+          "concl": "We scored 9 patterns × 3 timeframes = 27 combinations on measured data; only 3 survived (1h bullish engulfing, 4h piercing, 1d three white soldiers). The other 24 score zero — famous patterns get no credit without an edge.",
+          "stat": "3 of 27 adopted · 1h bullish engulfing OOS n=225 +67bps (t 1.61) · 4h piercing OOS n=155 +71bps"
+        },
+        "timing": {
+          "title": "Entry engine v2 — confluence factor validation",
+          "concl": "In the first validation pass (2026-07), only 9 of 42 entry-factor candidates (factor × timeframe × direction) survived — all long at the time; showing unvalidated shorts would be dishonest. Deep-history revalidation (v4) then produced our first validated short factor (4h OBV divergence) and the holdout eliminated 2 more, so today 11 combinations (including 1 short) participate in firing.",
+          "stat": "First pass: 9 of 42 survived (all long) → 11 firing today after deep-history & holdout revalidation (1 short) · deep history: 860k 1h bars (incl. 2021–22 bear market) · holdout: 6 unseen symbols, 220k bars"
+        },
+        "sr": {
+          "title": "S/R levels — volume bonus",
+          "concl": "Adversarial validation of the rule that gives extra weight to high-volume levels showed one-off volume spikes distorting the bonus. So we narrowed it to multi-touch (2+) structural levels only — narrowing scope is also a validation outcome.",
+          "stat": "Qualitative (adversarial) validation — outside the statistical gate · bonus restricted to 2+ touch levels"
+        }
+      }
+    },
+    "board": {
+      "title": "Production Strategy Board",
+      "subtitle": "Current state of the 9 production strategies — re-evaluated hourly into live / watch / blocked.",
+      "counts": "{{active}} live · {{watch}} watch · {{disabled}} blocked",
+      "detailTitle": "Details — leaderboard · market regime · weights",
+      "regimeStat": "Market regime",
+      "hurstStat": "Trend strength (Hurst)",
+      "erStat": "Market efficiency (ER)",
+      "tickersStat": "Symbols analyzed",
+      "tickersSub": "Symbols used for regime detection",
+      "hurstStrong": "Strong one-directional flow",
+      "hurstRange": "Range-bound, mean-reverting",
+      "hurstWeak": "Weak directionality",
+      "calculating": "Computing",
+      "weightsTitle": "Per-strategy weights — auto-adjusted to the market regime",
+      "tableTitle": "Strategy leaderboard",
+      "tableNote1": "Stability grades are based on risk-adjusted return (Sharpe) — S/A grades earn steadily relative to volatility.",
+      "tableNote2": "·BT marks a grade validated by backtest. Live cumulative P&L replaces \"collecting\" as data accrues.",
+      "colStrategy": "Strategy",
+      "colStatus": "Status",
+      "colTrades": "Trades",
+      "colWinRate": "Win rate",
+      "colGrade": "Stability",
+      "colPF": "PF",
+      "colPnL": "Cumulative P&L",
+      "colMDD": "Max DD",
+      "colHold": "Avg hold",
+      "tradesTip": "Cumulative trade count",
+      "collecting": "Collecting",
+      "collectingTip": "Live cumulative P&L appears once data has accumulated",
+      "preMeasure": "Not yet measured",
+      "btTip": "Stability grade validated by backtest (live data still accumulating)",
+      "tunedTag": "🧬 Live in production · tuned {{ago}}",
+      "gradeCell": "Stability grade",
+      "gradeCellBt": "Stability grade · backtest",
+      "livePnl": "Live P&L",
+      "cumPnl": "Cumulative return",
+      "winRateLabel": "Win rate",
+      "mddLabel": "Max drawdown",
+      "liveSub": "{{trades}} trades · {{win}}% win",
+      "liveTip": "{{trades}} live trades · {{win}}% win rate · ${{avg}} avg per trade",
+      "subTrades": "{{n}} trades total",
+      "subPF": "PF {{v}}",
+      "subHold": "avg hold {{h}}h",
+      "emptyBody": "Collecting data — refreshes automatically every hour."
+    },
+    "public": {
+      "showcaseTitle": "Today's Top 3 Best-Performing Alphas",
+      "showcaseSub": "Zepta's AI evaluates backtests and live performance hourly to select the most stable strategies.",
+      "empty": "Collecting data.",
+      "recentTrend": "Recent trend:",
+      "measuring": "Measuring",
+      "ctaLead": "Detailed figures, the lifecycle pipeline, and real-time signals are available after signing up",
+      "ctaButton": "Sign up free and see everything",
+      "ctaSub": "30-second signup · no credit card required",
+      "membersTitle": "Members-only information",
+      "membersItems": [
+        "States of all 9 production strategies (live / watch / blocked) with real-time stability grades",
+        "The alpha lifecycle pipeline — from discovery to live deployment",
+        "Shadow-track progress (on-chain/derivatives adjustment, H2 volume filter)",
+        "The lifecycle log — promotion, injection, and block events",
+        "Instant per-strategy signal alerts (Telegram)"
+      ]
+    },
+    "strategyNames": {
+      "trend-follow": "Trend Following",
+      "mean-revert": "Mean Reversion",
+      "breakout": "Breakout",
+      "momentum-rotation": "Momentum Rotation",
+      "volatility-arb": "Volatility Arb",
+      "hurst-trend": "Hurst Trend",
+      "defi-momentum": "DeFi Momentum",
+      "ensemble": "Ensemble Consensus",
+      "supertrend": "Supertrend",
+      "composite": "Composite Signal",
+      "fallback": "AI Strategy"
+    },
+    "strategyDesc": {
+      "trend-follow": "Follows the market once a directional flow is established",
+      "mean-revert": "Buys overdone dips inside a range, targeting the bounce",
+      "breakout": "Enters at breaks of key resistance levels",
+      "momentum-rotation": "Auto-rotates into recently strong symbols",
+      "volatility-arb": "Arbitrages differences in volatility",
+      "hurst-trend": "Trades only when trend strength is high",
+      "defi-momentum": "Follows momentum in DeFi tokens",
+      "ensemble": "Takes only signals multiple strategies agree on",
+      "supertrend": "Trend detection based on volatility bands",
+      "composite": "A composite score across multiple indicators",
+      "fallback": "Operated automatically by AI to match the market"
+    },
+    "disclaimerTable": "⚠ Zepta is an analytics tool. Figures above are past simulation results and do not guarantee future returns. Trading decisions and outcomes are your own responsibility.",
+    "footerCadence": "Leaderboard refreshes hourly · new strategy discovery every 6h · parameter tuning every 3h · top strategies auto-applied to trading (KST)",
+    "footerDisclaimer": "⚠ Zepta is an analytics tool. Trading decisions and outcomes are your own responsibility; displayed figures do not guarantee future returns.",
+    "publicDisclaimer1": "⚠ Zepta is an analytics tool. Displayed figures are past simulation results and do not guarantee future returns.",
+    "publicDisclaimer2": "Trading decisions and outcomes are your own responsibility — this is not investment advice."
   }
 }
