@@ -151,11 +151,18 @@ export default function AssetDetailSheet({
            ⚠️ <header> 태그를 쓰면 안 됩니다. App 의 전역 스타일이 GNB 를 위해
            `header { position: fixed !important; top: 0 !important }` 를 걸어 두어서,
            이 시트의 sticky 헤더가 화면 최상단에 고정되며 아래 종목명 줄을 덮습니다.
-           (2026-08 프리뷰에서 실제로 재현 — div 로 두고 sticky 를 직접 지정합니다.) */}
+           (2026-08 프리뷰에서 실제로 재현 — div 로 두고 sticky 를 직접 지정합니다.)
+           ★ 2026-08-17 safe-area: 이 시트는 App 에서 fixed inset:0 오버레이(스크롤 컨테이너)로
+           떠서 sticky top:0 이 "물리 화면 최상단"입니다. viewport-fit=cover + 홈 화면
+           북마크(standalone) + 노치/다이내믹 아일랜드 기기에서 헤더가 시스템 상태바 뒤로
+           들어가던 문제(대표 실기기 보고) — 컨테이너 paddingTop 방식은 스크롤하면 sticky 가
+           다시 top:0 에 붙어 무효라, 헤더 자신의 상단 패딩에 inset 을 더합니다.
+           노치 없는 기기·데스크톱은 env()=0 폴백으로 기존과 동일(시각 회귀 없음). */}
       <div style={{
         position: "sticky", top: 0, zIndex: 5, background: C.bg,
         borderBottom: `1px solid ${C.border}`,
-        display: "flex", alignItems: "center", gap: "10px", padding: "10px 16px",
+        display: "flex", alignItems: "center", gap: "10px",
+        padding: "calc(env(safe-area-inset-top, 0px) + 10px) 16px 10px",
       }}>
         {onBack && (
           <IconButton onClick={onBack} ariaLabel={tt("mobile.kit.back", "뒤로 가기")}>

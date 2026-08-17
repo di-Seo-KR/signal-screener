@@ -361,6 +361,14 @@
     "sharpeRatio": "안정성 점수",
     "mdd": "최대 낙폭"
   },
+  "chart": {
+    "v3": {
+      "yAuto": "자동",
+      "yAutoRestore": "자동 복귀",
+      "yAutoOnAria": "가격축 자동 스케일 동작 중",
+      "yAutoOffAria": "가격축 수동 상태 — 탭하면 자동 스케일로 복귀"
+    }
+  },
   "chartModal": {
     "analysis": "📊 투자진단",
     "technicalIndicators": "기술지표",

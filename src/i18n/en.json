@@ -361,6 +361,14 @@
     "sharpeRatio": "Sharpe Ratio",
     "mdd": "Max Drawdown"
   },
+  "chart": {
+    "v3": {
+      "yAuto": "Auto",
+      "yAutoRestore": "Reset to auto",
+      "yAutoOnAria": "Price axis auto-scale is on",
+      "yAutoOffAria": "Price axis is manually scaled — tap to restore auto-scale"
+    }
+  },
   "chartModal": {
     "analysis": "📊 Investment Analysis",
     "technicalIndicators": "Technical Indicators",

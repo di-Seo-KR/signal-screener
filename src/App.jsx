@@ -14795,7 +14795,10 @@ function AppInner() {
           { label: t("searchOverlay.catEcon"), tab: "econ-calendar", icon: "📅" },
         ];
         return (
-          <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: isMobile ? "5vh" : "12vh" }}
+          // ★ 2026-08-17 safe-area: 모바일 5vh(아이폰 14 Pro 기준 ≈43px)는 다이내믹 아일랜드
+          //    상태바(59px)보다 얕아 standalone(홈 화면 북마크)에서 검색 카드 상단이 시스템 UI 뒤로
+          //    들어갑니다 — inset 을 더해 보정. 노치 없는 기기는 env()=0 폴백으로 기존과 동일.
+          <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)", display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: isMobile ? "calc(env(safe-area-inset-top, 0px) + 5vh)" : "calc(env(safe-area-inset-top, 0px) + 12vh)" }}
             onClick={(e) => { if (e.target === e.currentTarget) setGlobalSearchOpen(false); }}>
             {/* ★ 시안 1g — 오버레이 표면은 페이지 톤(C.bg), 타일은 카드 톤(C.card) */}
             <div style={{ width: "560px", maxWidth: "94vw", maxHeight: isMobile ? "85dvh" : "80vh", overflowY: "auto", background: C.bg, borderRadius: "20px", border: `1px solid ${C.border}`, boxShadow: "0 24px 80px rgba(0,0,0,0.5)" }}>

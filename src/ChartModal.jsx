@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { createChart, CrosshairMode, LineStyle } from "lightweight-charts";
-import { useIsMobile } from "./ui/useBreakpoint.jsx";
+import { useBreakpoint } from "./ui/useBreakpoint.jsx";
 import { BottomSheet } from "./ui/bottom-sheet.jsx";
 // 시안 1f 문법: 수치 mono 고정 + i18n 안전 조회(useKitText — 미등록 키는 한국어 기본값)
 import { MONO, useKitText } from "./components/mobileKit.jsx";
@@ -200,6 +200,39 @@ const CC_LIGHT = {
   gridColor: "#E2E6EF", crossColor: "#B7C0CE", labelBg: "#2563EB", chartText: "#7D889D",
 };
 
+// 우측 가격축 % 마진 SSOT — 차트 옵션과 모바일 Y축 제스처 수학이 같은 값을 참조해야
+// 수동 스케일 진입 시 화면 점프가 생기지 않습니다.
+const PRICE_SCALE_MARGINS = { top: 0.08, bottom: 0.05 };
+
+// 메인 차트 높이 — 데스크톱(정밀 포인터)은 기존 고정값 유지(회귀 금지),
+// 터치 기기는 뷰포트 높이 기반으로 산출해 가로모드에서도 화면을 활용합니다.
+function computeMainHeight(hasSubCharts, viewportH, isTouchDevice) {
+  if (!isTouchDevice) return hasSubCharts ? 360 : 520;
+  const vh = viewportH || 800;
+  return hasSubCharts
+    ? Math.max(220, Math.min(520, Math.round(vh * 0.45)))
+    : Math.max(260, Math.min(640, Math.round(vh * 0.62)));
+}
+
+// lightweight-charts v4 내부 로그 변환 재현.
+// 로그 모드에서 Y축 수동 범위 계산을 "화면 좌표와 선형 관계인 공간"에서 수행하기 위한 것.
+// 기본 공식은 log10(p + 1e-4)이지만, 라이브러리는 가시 범위 스팬이 1 미만이면 오프셋을
+// 10^-(4+digits)로 줄이는 적응 공식(logFormulaForPriceRange, dist 실측)을 씁니다.
+// 마이크로캡(가격이 1e-4 근접·미만인 SHIB·PEPE류) 종목에서 고정 1e-4를 쓰면 근사 공간이
+// 선형으로 붕괴해 수동 진입 시 미세 점프가 생기므로, 제스처 시작 시점의 뷰 스팬으로
+// 같은 오프셋을 계산해 스냅샷에 저장하고 to/from 왕복에 동일하게 사용합니다.
+// (동일 오프셋 사용 시 왕복 변환은 항등 — 제스처 시작 시점의 뷰는 정확히 보존됩니다.
+//  라이브러리의 logicalOffset 가산항은 스팬·중심 계산에서 상쇄되므로 재현 불필요.)
+const DEF_LOG_COORD_OFFSET = 1e-4;
+function logCoordOffsetForSpan(span) {
+  // logFormulaForPriceRange 재현: 스팬이 [1e-15, 1) 구간일 때만 자릿수만큼 오프셋 축소
+  if (!(span >= 1e-15) || span >= 1) return DEF_LOG_COORD_OFFSET;
+  const digits = Math.ceil(Math.abs(Math.log10(span)));
+  return Math.pow(10, -(4 + digits));
+}
+function toScaleU(price, log, coordOffset = DEF_LOG_COORD_OFFSET) { return log ? Math.log10(price + coordOffset) : price; }
+function fromScaleU(u, log, coordOffset = DEF_LOG_COORD_OFFSET) { return log ? Math.pow(10, u) - coordOffset : u; }
+
 // Chart options (theme-aware) — bg 를 넘기면 카드 위에 얹는 차트 배경으로 씁니다 (시안 1f 카드형)
 function makeChartOptions(height, width, tf, cc, bg) {
   const intra = isIntraday(tf);
@@ -220,7 +253,7 @@ function makeChartOptions(height, width, tf, cc, bg) {
     },
     rightPriceScale: {
       borderColor: cc.gridColor,
-      scaleMargins: { top: 0.08, bottom: 0.05 },
+      scaleMargins: { ...PRICE_SCALE_MARGINS },
       minimumWidth: 100,
       entireTextOnly: true,
     },
@@ -1344,11 +1377,13 @@ const numInput = (CC) => ({
 });
 
 // ── Full-page chart component ────────────────────────────────────
-// 모바일 감지는 useIsMobile (src/ui/useBreakpoint.jsx) SSOT 사용
+// 모바일/터치 감지는 useBreakpoint (src/ui/useBreakpoint.jsx) SSOT 사용
 
 export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) {
   const CC = theme === "dark" ? CC_DARK : CC_LIGHT;
-  const isMobile = useIsMobile();
+  // isMobile(폭 기준)은 레이아웃 밀도에, isTouchDevice(pointer: coarse)는 터치 제스처·
+  // 높이 산출에 사용 — 폰 가로모드에서 폭이 640을 넘어도 터치 UX 가 유지되게 분리합니다.
+  const { isMobile, isTouchDevice } = useBreakpoint();
   const containerRef = useRef(null);
   const mainRef   = useRef(null);
   const rsiRef    = useRef(null);
@@ -1358,6 +1393,21 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
   const lastCandleRef = useRef(null);    // last candle data
   const liveIntervalRef = useRef(null);  // polling interval
   const dialogRef = useRef(null);        // 다이얼로그 루트 — 열릴 때 포커스 진입 기준점 (a11y)
+  // ── Y축(가격축) 수동 스케일 — 모바일 터치 지원 (트레이딩뷰 A 버튼 문법) ──
+  const yAxisOverlayRef = useRef(null);  // 가격축 위 투명 제스처 표면 (터치 기기 한정 렌더)
+  const manualRangeRef = useRef(null);   // { min, max } 수동 가격 범위 (null = 자동)
+  // 우측 스케일의 모든 시리즈(캔들·MA·BB)가 공유하는 autoscaleInfoProvider —
+  // 수동 범위가 있으면 전 시리즈가 같은 범위를 돌려 합집합이 그 범위로 고정되고(마커 px 마진도 0 으로 통일),
+  // 없으면 원래 자동 계산(original)에 위임합니다. autoScale 옵션은 항상 true 로 유지되므로
+  // 데스크톱 축 드래그(라이브러리 내부 수동) 경로와 충돌하지 않습니다.
+  const yProviderRef = useRef(null);
+  if (yProviderRef.current === null) {
+    yProviderRef.current = (original) => {
+      const m = manualRangeRef.current;
+      if (!m) return original();
+      return { priceRange: { minValue: m.min, maxValue: m.max }, margins: { above: 0, below: 0 } };
+    };
+  }
   // onClose 는 소비처(App.jsx)에서 인라인 화살표로 넘어와 리렌더마다 identity 가 바뀝니다.
   // 접근성 이펙트가 그때마다 재실행되며 포커스를 강탈하지 않도록 ref 로 최신 값만 유지합니다.
   const onCloseRef = useRef(onClose);
@@ -1383,6 +1433,8 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
   const [showSR, setShowSR] = useState(true);        // 지지·저항 밴드 오버레이 (시안 1f — 기본 ON)
   const [srLevels, setSrLevels] = useState(null);    // { support, resistance } — 로드된 캔들 피벗 기준
   const [showTimingDetail, setShowTimingDetail] = useState(false); // 타이밍 마커 근거 접기 (기본 접힘)
+  const [yManual, setYManual] = useState(false);     // 가격축 수동 스케일 상태 (칩 표시용)
+  const [axisMetrics, setAxisMetrics] = useState(null); // { priceW, paneH, timeH } — 축 오버레이·칩 배치 실측
 
   // i18n 안전 조회 — 키 미등록 시 한국어 기본값 (mobileKit.useKitText 재사용)
   const tt = useKitText();
@@ -1402,6 +1454,31 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
     setSettings(newSettings);
     try { localStorage.setItem("chart-settings", JSON.stringify(newSettings)); } catch {}
   };
+
+  // 가격축 자동 스케일 복귀 — 터치 더블탭·"자동" 칩 공용.
+  // provider 수동 범위와 라이브러리 내부 수동(autoScale=false, 데스크톱 축 드래그) 두 경로를 함께 해제합니다.
+  const restoreAutoScale = useCallback(() => {
+    manualRangeRef.current = null;
+    setYManual(false);
+    try { chartObjs.current.main?.priceScale("right").applyOptions({ autoScale: true }); } catch {}
+  }, []);
+
+  // 축 실측 — 가격축 폭/판 높이/시간축 높이. 오버레이·칩 배치 기준 (렌더 후·리사이즈 시 재측정)
+  const measureAxisMetrics = useCallback(() => {
+    try {
+      const main = chartObjs.current.main;
+      const el = mainRef.current;
+      if (!main || !el) { setAxisMetrics(null); return; }
+      const priceW = main.priceScale("right").width();
+      const paneH = main.paneSize().height;
+      const totalH = el.clientHeight || 0;
+      if (!priceW || !paneH || !totalH) { setAxisMetrics(null); return; }
+      const next = { priceW, paneH, timeH: Math.max(0, totalH - paneH) };
+      setAxisMetrics(prev =>
+        prev && prev.priceW === next.priceW && prev.paneH === next.paneH && prev.timeH === next.timeH
+          ? prev : next);
+    } catch { setAxisMetrics(null); }
+  }, []);
 
   const isCrypto = asset?.market === "crypto";
   const isUS = asset?.market === "us";
@@ -1501,6 +1578,10 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
     if (rsiRef.current) rsiRef.current.innerHTML = "";
     if (macdRef.current) macdRef.current.innerHTML = "";
 
+    // 차트 재생성(TF·설정·테마 변경) 시 Y축 수동 범위는 새 데이터 맥락에 무의미 — 자동으로 리셋
+    manualRangeRef.current = null;
+    setYManual(false);
+
     const closes  = candles.map(c => c.close);
     const times   = candles.map(c => c.time);
     const volumes = candles.map(c => c.volume ?? 0);
@@ -1508,7 +1589,8 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
     const showRSI  = settings.rsi?.enabled;
     const showMACD = settings.macd?.enabled;
     const showVol  = settings.vol?.enabled;
-    const mainH  = showRSI || showMACD ? 360 : 520;
+    // 터치 기기는 뷰포트 기반 높이 — 가로모드 회전 시에도 화면 활용 (데스크톱은 기존 360/520 유지)
+    const mainH  = computeMainHeight(showRSI || showMACD, typeof window !== "undefined" ? window.innerHeight : 0, isTouchDevice);
     const subH   = 130;
 
     const containerW = containerRef.current?.clientWidth || 600;
@@ -1526,6 +1608,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       upColor: "#26a64b", downColor: "#ef4444",
       borderUpColor: "#26a64b", borderDownColor: "#ef4444",
       wickUpColor: "#26a64b", wickDownColor: "#ef4444",
+      autoscaleInfoProvider: yProviderRef.current, // Y축 수동 범위 지원 (수동 아닐 땐 원래 계산 위임)
     });
     candleSeries.setData(candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
     candleSeriesRef.current = candleSeries;
@@ -1648,6 +1731,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         color, lineWidth: width,
         priceLineVisible: false,
         lastValueVisible: false,
+        autoscaleInfoProvider: yProviderRef.current, // 수동 범위 시 합집합 확장 방지 (전 시리즈 동일 범위)
       });
       maSeries.setData(sma.map((v, i) => v != null ? { time: times[i], value: v } : null).filter(Boolean));
     });
@@ -1657,9 +1741,10 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       const bbPeriod = settings.bb.period || 20;
       const bbMult = settings.bb.mult || 2;
       const bbs = calcBB(closes, bbPeriod, bbMult);
-      const bbUpper = mainChart.addLineSeries({ color: "#60a5fa88", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, lineStyle: LineStyle.Dashed });
-      const bbMid   = mainChart.addLineSeries({ color: "#60a5facc", lineWidth: 1, priceLineVisible: false, lastValueVisible: false });
-      const bbLower = mainChart.addLineSeries({ color: "#60a5fa88", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, lineStyle: LineStyle.Dashed });
+      // autoscaleInfoProvider: Y축 수동 범위 시 BB 밴드가 합집합을 확장하지 않도록 캔들과 동일 provider 공유
+      const bbUpper = mainChart.addLineSeries({ color: "#60a5fa88", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, lineStyle: LineStyle.Dashed, autoscaleInfoProvider: yProviderRef.current });
+      const bbMid   = mainChart.addLineSeries({ color: "#60a5facc", lineWidth: 1, priceLineVisible: false, lastValueVisible: false, autoscaleInfoProvider: yProviderRef.current });
+      const bbLower = mainChart.addLineSeries({ color: "#60a5fa88", lineWidth: 1.5, priceLineVisible: false, lastValueVisible: false, lineStyle: LineStyle.Dashed, autoscaleInfoProvider: yProviderRef.current });
       const toSeries = (fn) => bbs.map((b, i) => b ? { time: times[i], value: fn(b) } : null).filter(Boolean);
       bbUpper.setData(toSeries(b => b.upper));
       bbMid.setData(toSeries(b => b.middle));
@@ -1749,8 +1834,9 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         });
         applyTvRange();
       }
+      measureAxisMetrics(); // 축 오버레이·자동 칩 배치용 실측 (가격축 폭·판 높이)
     });
-  }, [fetchData, settings, logScale, showSignals, fundingRates, showSR, CC, tt]);
+  }, [fetchData, settings, logScale, showSignals, fundingRates, showSR, CC, tt, isTouchDevice, measureAxisMetrics]);
 
   useEffect(() => {
     if (!asset) return;
@@ -1768,10 +1854,11 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
       const w = el.clientWidth;
       if (!w) return;
       Object.values(chartObjs.current).forEach(c => { try { c.applyOptions({ width: w }); } catch {} });
+      requestAnimationFrame(measureAxisMetrics); // 폭 변경 → 가격축 폭 재실측 (오버레이 정렬 유지)
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [measureAxisMetrics]);
 
   // ── Ctrl+Wheel 줌 (일반 스크롤은 페이지 스크롤) ──
   useEffect(() => {
@@ -1796,6 +1883,239 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
     el.addEventListener("wheel", handleWheel, { passive: false });
     return () => el.removeEventListener("wheel", handleWheel);
   }, []);
+
+  // ── 모바일 Y축(가격축) 제스처 — 터치 세로 드래그 확대/축소 + 더블탭 자동 복귀 (+하이브리드 마우스) ──
+  // 원인 실측: 라이브러리 PriceAxisWidget 은 handleScroll.vertTouchDrag=false 면 축 위 세로 터치를
+  // 페이지 스크롤로 양보(treatVertTouchDragAsPageScroll)해 모바일에서 Y축을 만질 방법이 없음.
+  // 해법: 축 영역에만 touch-action:none 오버레이를 얹어 제스처를 소유하고,
+  // 데스크톱 축 드래그와 같은 공식(coeff = (start+0.2h)/(cur+0.2h), 중심 기준 스케일)을 재현합니다.
+  useEffect(() => {
+    const overlay = yAxisOverlayRef.current;
+    if (!isTouchDevice || !overlay) return;
+
+    let gesture = null;   // { paneH, uTop, uBot, log, startY } — 진행 중 드래그 스냅샷
+    let moved = false;    // 유효 이동 발생 여부 (탭/드래그 구분)
+    let lastTapAt = 0;    // 더블탭 판정
+    let lastTapY = null;
+
+    // 현재 뷰의 판 상/하단 가격을 캡처 — coordinateToPrice(0)/(paneH)는 마진과 무관하게 정확
+    const captureView = () => {
+      const chart = chartObjs.current.main;
+      const series = candleSeriesRef.current;
+      if (!chart || !series) return null;
+      let paneH;
+      try { paneH = chart.paneSize().height; } catch { return null; }
+      if (!paneH || paneH < 10) return null;
+      const pTop = series.coordinateToPrice(0);
+      const pBot = series.coordinateToPrice(paneH);
+      if (pTop == null || pBot == null || !isFinite(pTop) || !isFinite(pBot) || pTop <= pBot) return null;
+      const log = !!logScale && pBot > 0; // 음수/0 가격이면 선형 수학으로 안전 폴백
+      // 라이브러리의 적응 로그 공식과 동일한 오프셋을 제스처 시작 뷰 스팬으로 계산해 고정
+      const coordOffset = log ? logCoordOffsetForSpan(Math.abs(pTop - pBot)) : DEF_LOG_COORD_OFFSET;
+      const uTop = toScaleU(pTop, log, coordOffset);
+      const uBot = toScaleU(pBot, log, coordOffset);
+      if (!isFinite(uTop) || !isFinite(uBot) || uTop <= uBot) return null;
+      return { paneH, uTop, uBot, log, coordOffset };
+    };
+
+    // 전체 뷰 스팬 [uBot, uTop] → provider 에 넘길 % 마진 보정 범위 (뷰 그대로 재현)
+    const spanToRange = (uBot, uTop, log, coordOffset) => {
+      const U = uTop - uBot;
+      const max = fromScaleU(uTop - PRICE_SCALE_MARGINS.top * U, log, coordOffset);
+      const min = fromScaleU(uBot + PRICE_SCALE_MARGINS.bottom * U, log, coordOffset);
+      if (!isFinite(min) || !isFinite(max) || max - min <= 0) return null;
+      return { min, max };
+    };
+
+    const applyManualRange = (range) => {
+      manualRangeRef.current = range;
+      setYManual(true);
+      // 시리즈 옵션 재적용 → 라이트 인밸리데이션 → 자동 스케일 재계산 시 provider 범위 사용
+      try { candleSeriesRef.current?.applyOptions({ autoscaleInfoProvider: yProviderRef.current }); } catch {}
+    };
+
+    // 첫 유효 이동 공통 처리 — 현재 뷰 그대로의 identity 범위를 먼저 등록한 뒤 autoScale 옵션을
+    // 정리해 (데스크톱 축 드래그로 내부 수동이었더라도) 화면 점프 없이 provider 경로로 일원화합니다.
+    const beginManualFromSnapshot = (g) => {
+      const idRange = spanToRange(g.uBot, g.uTop, g.log, g.coordOffset);
+      if (!idRange) return false;
+      applyManualRange(idRange);
+      try {
+        const ps = chartObjs.current.main?.priceScale("right");
+        if (ps && ps.options().autoScale === false) ps.applyOptions({ autoScale: true });
+      } catch {}
+      return true;
+    };
+
+    // 데스크톱 축 드래그와 동일 공식 재현 — 아래로 드래그 = 축소(범위 확대), 위로 = 확대.
+    // 터치·마우스 두 경로가 같은 스냅샷 구조 { paneH, uTop, uBot, log, coordOffset, startY } 를 씁니다.
+    const applyDragZoom = (g, curY) => {
+      const h = g.paneH;
+      const startInv = h - g.startY;
+      const curInv = Math.max(0, h - curY);
+      let coeff = (startInv + (h - 1) * 0.2) / (curInv + (h - 1) * 0.2);
+      if (!isFinite(coeff)) return;
+      coeff = Math.max(coeff, 0.1);
+      const centerU = (g.uTop + g.uBot) / 2;
+      const halfU = ((g.uTop - g.uBot) / 2) * coeff;
+      const range = spanToRange(centerU - halfU, centerU + halfU, g.log, g.coordOffset);
+      if (range) applyManualRange(range);
+    };
+
+    const onTouchStart = (e) => {
+      if (e.touches.length !== 1) { gesture = null; return; }
+      moved = false;
+      const cap = captureView();
+      if (!cap) { gesture = null; return; }
+      const rect = overlay.getBoundingClientRect();
+      gesture = { ...cap, startY: e.touches[0].clientY - rect.top };
+    };
+
+    const onTouchMove = (e) => {
+      if (!gesture || e.touches.length !== 1) return;
+      if (e.cancelable) e.preventDefault(); // 오버레이는 touch-action:none 이지만 iOS 러버밴드 보험
+      const rect = overlay.getBoundingClientRect();
+      const curY = e.touches[0].clientY - rect.top;
+      if (!moved && Math.abs(curY - gesture.startY) < 3) return; // 탭 흔들림 무시
+      if (!moved) {
+        moved = true;
+        if (!beginManualFromSnapshot(gesture)) { gesture = null; return; }
+      }
+      applyDragZoom(gesture, curY);
+    };
+
+    const onTouchEnd = (e) => {
+      if (e.touches.length > 0) { gesture = null; return; } // 손가락 일부 잔존 — 제스처 종료만
+      const endY = e.changedTouches?.[0]?.clientY ?? null;
+      const now = Date.now();
+      if (!moved && gesture) {
+        // 탭 — 300ms 내 근접 재탭이면 더블탭 → 자동 스케일 복귀 (트레이딩뷰 축 더블탭 문법)
+        if (now - lastTapAt < 300 && lastTapY != null && endY != null && Math.abs(endY - lastTapY) < 30) {
+          restoreAutoScale();
+          lastTapAt = 0; lastTapY = null;
+        } else {
+          lastTapAt = now; lastTapY = endY;
+        }
+      } else {
+        lastTapAt = 0; lastTapY = null;
+      }
+      gesture = null;
+    };
+
+    const onTouchCancel = () => { gesture = null; };
+
+    // ── 하이브리드(터치 기기 + 마우스/트랙패드, iPad·안드로이드 태블릿) 대응 ──
+    // 오버레이는 DOM 요소라 마우스 이벤트도 가로채, 라이브러리의 가격축 마우스 드래그
+    // (axisPressedMouseMove)·축 더블클릭 리셋이 막히는 회귀가 있었음 → 같은 공식으로 재배선.
+    // pointerType==='mouse' 만 처리 (터치는 위 터치 경로가 소유 — 이중 처리 없음).
+    let mouseGesture = null; // { ...captureView(), startY, moved }
+    const onPointerDown = (e) => {
+      if (e.pointerType !== "mouse" || e.button !== 0) return;
+      const cap = captureView();
+      if (!cap) return;
+      const rect = overlay.getBoundingClientRect();
+      mouseGesture = { ...cap, startY: e.clientY - rect.top, moved: false };
+      try { overlay.setPointerCapture(e.pointerId); } catch {} // 축 밖으로 나가도 드래그 유지
+    };
+    const onPointerMove = (e) => {
+      if (!mouseGesture || e.pointerType !== "mouse") return;
+      if (e.buttons === 0) { mouseGesture = null; return; } // 캡처 실패 후 축 밖 release 안전망
+      const rect = overlay.getBoundingClientRect();
+      const curY = e.clientY - rect.top;
+      if (!mouseGesture.moved && Math.abs(curY - mouseGesture.startY) < 3) return; // 클릭 흔들림 무시
+      if (!mouseGesture.moved) {
+        if (!beginManualFromSnapshot(mouseGesture)) { mouseGesture = null; return; }
+        mouseGesture.moved = true;
+      }
+      applyDragZoom(mouseGesture, curY);
+    };
+    const onPointerEnd = (e) => {
+      if (e.pointerType !== "mouse") return;
+      mouseGesture = null;
+    };
+    // 라이브러리 axisDoubleClickReset 동등 — 마우스 더블클릭 시 자동 스케일 복귀.
+    // (터치 더블탭이 dblclick 을 합성해도 restoreAutoScale 은 멱등이라 무해)
+    const onDblClick = () => restoreAutoScale();
+
+    overlay.addEventListener("touchstart", onTouchStart, { passive: true });
+    overlay.addEventListener("touchmove", onTouchMove, { passive: false });
+    overlay.addEventListener("touchend", onTouchEnd, { passive: true });
+    overlay.addEventListener("touchcancel", onTouchCancel, { passive: true });
+    overlay.addEventListener("pointerdown", onPointerDown);
+    overlay.addEventListener("pointermove", onPointerMove);
+    overlay.addEventListener("pointerup", onPointerEnd);
+    overlay.addEventListener("pointercancel", onPointerEnd);
+    overlay.addEventListener("dblclick", onDblClick);
+    return () => {
+      overlay.removeEventListener("touchstart", onTouchStart);
+      overlay.removeEventListener("touchmove", onTouchMove);
+      overlay.removeEventListener("touchend", onTouchEnd);
+      overlay.removeEventListener("touchcancel", onTouchCancel);
+      overlay.removeEventListener("pointerdown", onPointerDown);
+      overlay.removeEventListener("pointermove", onPointerMove);
+      overlay.removeEventListener("pointerup", onPointerEnd);
+      overlay.removeEventListener("pointercancel", onPointerEnd);
+      overlay.removeEventListener("dblclick", onDblClick);
+    };
+  }, [isTouchDevice, axisMetrics, logScale, restoreAutoScale]);
+
+  // ── 가격축 수동 상태 동기화 폴 — 데스크톱 축 드래그(라이브러리 내부 autoScale=false)도
+  //    "자동" 칩에 반영되도록 옵션을 주기 확인합니다 (v4 에 모드 변경 공개 이벤트 없음) ──
+  useEffect(() => {
+    const id = setInterval(() => {
+      try {
+        const ps = chartObjs.current.main?.priceScale("right");
+        if (!ps) return;
+        const manual = manualRangeRef.current != null || ps.options().autoScale === false;
+        setYManual(prev => (prev === manual ? prev : manual));
+      } catch {}
+    }, 600);
+    return () => clearInterval(id);
+  }, []);
+
+  // ── 핀치 줌 확보 — 차트 판은 touch-action: pan-y 유지(1손가락 세로 = 네이티브 페이지 스크롤 보존),
+  //    두 번째 손가락이 닿는 순간 touchstart/touchmove 를 preventDefault 해 브라우저의
+  //    2손가락 세로 팬 탈취를 차단하고 라이브러리 핀치 핸들러(handleScale.pinch)에 제스처를 넘깁니다. ──
+  useEffect(() => {
+    if (!isTouchDevice) return;
+    const els = [mainRef.current, rsiRef.current, macdRef.current].filter(Boolean);
+    if (!els.length) return;
+    const guard = (e) => {
+      if (e.touches.length >= 2 && e.cancelable) e.preventDefault();
+    };
+    els.forEach(el => {
+      el.addEventListener("touchstart", guard, { passive: false });
+      el.addEventListener("touchmove", guard, { passive: false });
+    });
+    return () => els.forEach(el => {
+      el.removeEventListener("touchstart", guard);
+      el.removeEventListener("touchmove", guard);
+    });
+  }, [isTouchDevice, settings]);
+
+  // ── 가로모드 대응 — 회전/리사이즈 시 메인 차트 높이를 뷰포트 기준으로 재적용 (재빌드 없이) ──
+  useEffect(() => {
+    if (!isTouchDevice) return;
+    let tid = null;
+    const onResize = () => {
+      clearTimeout(tid);
+      tid = setTimeout(() => {
+        const main = chartObjs.current.main;
+        if (!main) return;
+        const hasSub = !!(settings.rsi?.enabled || settings.macd?.enabled);
+        const h = computeMainHeight(hasSub, window.innerHeight, true);
+        try { main.applyOptions({ height: h }); } catch {}
+        requestAnimationFrame(measureAxisMetrics);
+      }, 200);
+    };
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", onResize);
+    return () => {
+      clearTimeout(tid);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("orientationchange", onResize);
+    };
+  }, [isTouchDevice, settings, measureAxisMetrics]);
 
   // ── Real-time price polling (3s interval) ──
   useEffect(() => {
@@ -2079,7 +2399,53 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
             </div>
           )}
           <div style={{ display: loading ? "none" : "block" }}>
-            <div ref={mainRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden", touchAction: "pan-y", WebkitOverflowScrolling: "auto" }} />
+            {/* 차트 판 래퍼 — Y축 터치 오버레이·자동 스케일 칩의 절대배치 기준 */}
+            <div style={{ position: "relative" }}>
+              <div ref={mainRef} style={{ width: "100%", borderRadius: "10px", overflow: "hidden", touchAction: "pan-y", WebkitOverflowScrolling: "auto" }} />
+              {/* 가격축 제스처 표면 — 터치 기기 한정 렌더 (순수 데스크톱은 미렌더 → 라이브러리 축 드래그 그대로).
+                  터치: 세로 드래그 = 확대/축소, 더블탭 = 자동 복귀.
+                  하이브리드(터치 기기 + 마우스): pointer 이벤트로 같은 드래그·더블클릭 리셋 재배선 (위 이펙트). */}
+              {isTouchDevice && axisMetrics && (
+                <div
+                  ref={yAxisOverlayRef}
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute", top: 0, right: 0,
+                    width: `${axisMetrics.priceW}px`,
+                    height: `${axisMetrics.paneH}px`,
+                    touchAction: "none",
+                    cursor: "ns-resize", // 하이브리드 마우스 사용자에게 축 드래그 가능함을 표시 (라이브러리 축 커서와 동일)
+                    userSelect: "none", WebkitUserSelect: "none", // 마우스 드래그 중 주변 텍스트 선택 방지
+                    zIndex: 3,
+                    background: "transparent",
+                  }}
+                />
+              )}
+              {/* 자동 스케일 상태 칩 (트레이딩뷰 A 버튼 문법) — 수동 여부를 항상 표시, 수동일 때 탭하면 복귀 */}
+              {axisMetrics && (
+                <button
+                  onClick={yManual ? restoreAutoScale : undefined}
+                  aria-disabled={!yManual}
+                  aria-label={yManual
+                    ? tt("chart.v3.yAutoOffAria", "가격축 수동 상태 — 탭하면 자동 스케일로 복귀")
+                    : tt("chart.v3.yAutoOnAria", "가격축 자동 스케일 동작 중")}
+                  title={yManual
+                    ? tt("chart.v3.yAutoOffAria", "가격축 수동 상태 — 탭하면 자동 스케일로 복귀")
+                    : tt("chart.v3.yAutoOnAria", "가격축 자동 스케일 동작 중")}
+                  style={{
+                    position: "absolute",
+                    right: `${axisMetrics.priceW + 6}px`,
+                    bottom: `${axisMetrics.timeH + 6}px`,
+                    zIndex: 4,
+                    fontSize: "10px", fontWeight: 800, padding: "4px 9px", borderRadius: "8px",
+                    cursor: yManual ? "pointer" : "default", fontFamily: "inherit", lineHeight: 1.2,
+                    background: yManual ? CC.yellowBg : `${CC.card}E6`,
+                    color: yManual ? CC.yellow : CC.text3,
+                    border: `1px solid ${yManual ? CC.yellow : CC.border}`,
+                  }}
+                >{yManual ? tt("chart.v3.yAutoRestore", "자동 복귀") : tt("chart.v3.yAuto", "자동")}</button>
+              )}
+            </div>
             {settings.rsi?.enabled && (
               <>
                 <div style={{
