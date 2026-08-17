@@ -1826,7 +1826,12 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
     };
     applyTvRange(); // 서브차트(RSI/MACD)는 logical-range 동기화 구독으로 자동 추종
 
-    requestAnimationFrame(() => {
+    // ★ rAF 유예 폴백 (2026-08-17 실측): requestAnimationFrame 은 문서가 숨겨져 있으면
+    //   (백그라운드 탭, iOS PWA 앱 전환 직후 등) 실행이 무기한 유예됩니다. 그 상태로
+    //   차트를 빌드하면 measureAxisMetrics 가 영영 안 불려 Y축 오버레이·자동 칩이
+    //   렌더되지 않습니다. setTimeout 병행으로 어느 경로로든 1회는 실측되게 합니다
+    //   (measure 는 같은 값이면 상태를 유지하는 idempotent — 이중 호출 무해).
+    const finalizeLayout = () => {
       const w = containerRef.current?.clientWidth;
       if (w) {
         Object.values(chartObjs.current).forEach(c => {
@@ -1835,7 +1840,9 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         applyTvRange();
       }
       measureAxisMetrics(); // 축 오버레이·자동 칩 배치용 실측 (가격축 폭·판 높이)
-    });
+    };
+    requestAnimationFrame(finalizeLayout);
+    setTimeout(finalizeLayout, 150);
   }, [fetchData, settings, logScale, showSignals, fundingRates, showSR, CC, tt, isTouchDevice, measureAxisMetrics]);
 
   useEffect(() => {
