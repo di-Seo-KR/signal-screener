@@ -18,6 +18,7 @@ import { loadUniverse, universeSymbolMap } from "./_shared/futures-universe.js";
 import { computeSRLevels, scaleSR } from "./_shared/sr-levels.js"; // ★ 지지·저항(매물대) — 표시 전용
 import { refineCompositeEntry } from "./_shared/strategies/_indicators.js"; // ★ MTF 소진·차트구조 진입 정제
 import { scoreCandleBlock } from "./_shared/candle-patterns.js"; // ★ 2026-07 캔들패턴 융합(캘리브레이션 게이트)
+import { applySideHysteresis, latestByAsset, hysteresisEnabled } from "./_shared/display-hysteresis.js"; // ★ 2026-08-17 표시 side 라벨 히스테리시스 (MTF 표시 풀 전용 — 거래 풀 미적용)
 
 // asset → 바이낸스 *선물(USDⓈ-M, fapi)* 심볼. 펀딩/OI/베이시스 맵 조회 키.
 //   ★ 2026-06-02 버그수정: 선물은 저가 밈코인을 1000배 묶음(1000SHIB/1000PEPE)으로,
@@ -75,6 +76,26 @@ const MAX_TOTAL_CRYPTO_EXPOSURE = 0.95;  // 0.80 → 0.95
 //   shadowScore = clamp(종합점수 + adj, 0, 100). 표시·매매 어디에도 쓰지 않는 순수 기록입니다.
 const OC_SHADOW = Object.freeze({
   OI_SURGE_PCT: 5, TREND_CONFIRM: 3, SQUEEZE_CAUTION: 3, CROWD_PENALTY: 2, LS_HIGH: 2.0, LS_LOW: 0.5,
+});
+
+// ★ 2026-08-17 (대표 지시 — 확실한 타점 개선) H2 섀도 상수 — **사전등록**(pre-registered).
+//   scripts/research/h2-results.json 확정 규칙의 관측 전용 배선입니다. 사후 튜닝 금지.
+//   규칙(4h 완결봉 한정, bestK=2.0): 직전 20봉 채널을 종가로 돌파(롱=상향/숏=하향)한 4h 봉이
+//   ① 거래량 z-score(직전 20봉 기준) ≥ 2.0 AND ② 방향 일치 캔들(롱=양봉/숏=음봉)이면 "확인 돌파".
+//   근거(h2-results.json OOS·전심볼·4h·k=2.0): 확인 돌파 PF 0.792 vs 전체 0.658 vs 억제군 0.569,
+//   억제군 평균수익 −0.98% vs 통과군 −0.46% — 억제 쪽 격차가 더 커서 페널티를 1pt 크게 설정.
+//   · CONFIRM(+3)  — 신호 방향의 4h "신규" 확인 돌파 동반 (검증 스크립트 detectSignals 와 동일:
+//                    직전 완결봉 종가가 자기 채널 안 → 이번 봉이 처음 채널 밖 마감한 경우만)
+//   · SUPPRESS(−4) — 신호 방향의 4h 신규 돌파가 있으나 거래량·캔들 미확인(h2 억제군)
+//   · 돌파 자체가 없으면 adj=0 (H2 규칙은 돌파 봉에만 적용 — 무돌파는 무보정 대조 표본)
+//   · 연속(비신규) 돌파봉(모멘텀 런)은 검증 모집단에 없던 표본 — adj=0 + cont:true 태그로만
+//     기록해 CONFIRM/SUPPRESS 라벨 오염을 차단(평가 시 대조군에서도 구분 가능).
+//   h2Shadow = { active(확인 돌파 여부), adj, barTime(판정 4h 완결봉 open time 초 — 이벤트 dedup 용),
+//                cont?(연속 돌파 태그) } — 엔진 미소비·표시 UI 미배선, 순수 축적 전용.
+//   ★ 승급(엔진 소비·표시 배선)은 홀드아웃(2026-08-12 이후) 검증 1회 + p<0.05 통과 전 금지.
+//   킬스위치: ZEPTA_H2_SHADOW=0 → 기록 전체 생략(null).
+const H2_SHADOW = Object.freeze({
+  K: 2.0, Z_WINDOW: 20, LOOKBACK: 20, CONFIRM: 3, SUPPRESS: 4,
 });
 
 // 딜레이 헬퍼 (프록시 부하 분산용 소량 딜레이)
@@ -849,6 +870,62 @@ export default async function handler(req, res) {
               _ocShadow = { adj: _adj, score: Math.max(0, Math.min(100, compositeSignal.score + _adj)) };
             }
           } catch { _oc = null; _ocShadow = null; } // 어떤 실패도 풀 적재를 막지 않음
+
+          // ── ★ 2026-08-17 H2 섀도 (4h 거래량 확인 돌파) — 관측 전용 additive ──
+          //   H2_SHADOW 상수(사전등록) 규칙을 신호 방향에 적용해 기록만 합니다.
+          //   엔진 미소비·표시 UI 미배선(순수 축적). 기존 필드 불변.
+          //   ★ 승급(엔진 소비·표시 배선)은 홀드아웃 검증 1회 + p<0.05 통과 전 금지.
+          //   4h *완결봉*만 사용 — 자체 마감 판정(ZEPTA_MTF_CLOSED_BARS 킬스위치와 독립,
+          //   H2 검증이 완결봉 기준이라 롤백 상태에서도 진행봉 오염을 차단해야 함).
+          let _h2Shadow = null;
+          try {
+            if (process.env.ZEPTA_H2_SHADOW !== "0" && (compositeSignal.side === "LONG" || compositeSignal.side === "SHORT")) {
+              let _c4 = Array.isArray(candles4h) ? candles4h : [];
+              const _nowSec = Math.floor(Date.now() / 1000);
+              if (_c4.length && (Number(_c4[_c4.length - 1].time) + 4 * 3600) > _nowSec) _c4 = _c4.slice(0, -1); // 진행봉 제거
+              if (_c4.length >= H2_SHADOW.Z_WINDOW + H2_SHADOW.LOOKBACK + 1) {
+                const _n = _c4.length, _bb = _c4[_n - 1]; // 마지막 완결 4h 봉
+                let _hh = -Infinity, _llv = Infinity;
+                for (let _k = _n - 1 - H2_SHADOW.LOOKBACK; _k < _n - 1; _k++) {
+                  if (_c4[_k].high > _hh) _hh = _c4[_k].high;
+                  if (_c4[_k].low < _llv) _llv = _c4[_k].low;
+                }
+                const _dirH2 = compositeSignal.side === "LONG" ? 1 : -1;
+                const _rawBreak = _dirH2 === 1 ? _bb.close > _hh : _bb.close < _llv;
+                // ★ 신규 돌파만 인정 — 검증 스크립트(h2-volume-breakout-filter.mjs detectSignals)와
+                //   동일 규칙: 직전 완결봉(_n-2) 종가가 자기 채널([_n-2-LOOKBACK, _n-2) 최고/최저) 안
+                //   이었을 때만 신호. 연속 돌파봉은 검증 모집단 밖 표본이라 라벨 없이 태그만.
+                let _prevInside = true; // 직전 봉 채널 산출 불가 시 신규로 간주(검증 스크립트와 동일)
+                if (_n - 2 >= H2_SHADOW.LOOKBACK) {
+                  let _phh = -Infinity, _pll = Infinity;
+                  for (let _k = _n - 2 - H2_SHADOW.LOOKBACK; _k < _n - 2; _k++) {
+                    if (_c4[_k].high > _phh) _phh = _c4[_k].high;
+                    if (_c4[_k].low < _pll) _pll = _c4[_k].low;
+                  }
+                  const _pc = _c4[_n - 2].close;
+                  _prevInside = _dirH2 === 1 ? _pc <= _phh : _pc >= _pll;
+                }
+                const _bt = Number(_bb.time) || null; // 판정에 쓴 4h 완결봉 open time(초) — 이벤트 단위 dedup 용
+                if (!_rawBreak) {
+                  _h2Shadow = { active: false, adj: 0, barTime: _bt }; // 무돌파 — 무보정 대조 표본
+                } else if (!_prevInside) {
+                  _h2Shadow = { active: false, adj: 0, cont: true, barTime: _bt }; // 연속(비신규) 돌파 — 무보정, 태그만
+                } else {
+                  let _vs = 0;
+                  for (let _k = _n - 1 - H2_SHADOW.Z_WINDOW; _k < _n - 1; _k++) _vs += (_c4[_k].volume || 0);
+                  const _vm = _vs / H2_SHADOW.Z_WINDOW;
+                  let _vss = 0;
+                  for (let _k = _n - 1 - H2_SHADOW.Z_WINDOW; _k < _n - 1; _k++) _vss += ((_c4[_k].volume || 0) - _vm) ** 2;
+                  const _vsd = Math.sqrt(_vss / H2_SHADOW.Z_WINDOW);
+                  const _z = _vsd > 1e-12 ? ((_bb.volume || 0) - _vm) / _vsd : 0;
+                  const _dirCandle = _dirH2 === 1 ? _bb.close > _bb.open : _bb.close < _bb.open;
+                  const _confirmed = _z >= H2_SHADOW.K && _dirCandle;
+                  _h2Shadow = { active: _confirmed, adj: _confirmed ? H2_SHADOW.CONFIRM : -H2_SHADOW.SUPPRESS, barTime: _bt };
+                }
+              }
+            }
+          } catch { _h2Shadow = null; } // 어떤 실패도 풀 적재를 막지 않음
+
           newMtfEntries.push({
             ts: Date.now(), time: new Date().toISOString(), asset,
             type: compositeSignal.type, side: compositeSignal.side, score: compositeSignal.score,
@@ -858,6 +935,7 @@ export default async function handler(req, res) {
             sr: srLevels, // ★ 지지·저항 — 코인 카드 매물대 표시용
             oc: _oc,             // ★ 표시용 온체인·파생 컨텍스트 (데이터 없으면 null)
             ocShadow: _ocShadow, // ★ 섀도 병행 기록 (표시·매매 미사용, 순수 기록)
+            h2Shadow: _h2Shadow, // ★ H2 4h 거래량 확인 돌파 섀도 — 관측 전용(엔진·표시 미소비), 킬스위치 ZEPTA_H2_SHADOW=0
           });
         }
       } catch (poolErr) {
@@ -1025,6 +1103,24 @@ export default async function handler(req, res) {
       if (newMtfEntries.length > 0) {
         const mKey = "di:signals:realtime-pool-mtf";
         const mPool = (await kv.get(mKey)) || [];
+        // ── ★ 2026-08-17 (대표 지시 "수시로 바뀌면 안 좋다") 표시 side 히스테리시스 ──
+        //   적재 전에 직전 풀의 심볼별 최신 상태를 읽어 방향 라벨(side) 전환만 지연.
+        //   "점수는 사실, 방향 라벨은 해석 — 해석의 안정성만 관리한다": score/breakdown/
+        //   reason 은 실계산 그대로, side 전환은 2사이클 연속 + 점수 임계(기본 58) 확정.
+        //   ★ 표시 풀(MTF) 전용 — 엔진이 읽는 di:signals:realtime-pool(위 mergedPool)에는
+        //     적용하지 않음. 킬스위치 ZEPTA_DISPLAY_HYSTERESIS=0 이면 기존 동작 그대로.
+        if (hysteresisEnabled()) {
+          try {
+            const prevMap = latestByAsset(mPool);
+            let heldN = 0, flippedN = 0;
+            for (const e of newMtfEntries) {
+              const r = applySideHysteresis(e, prevMap.get(e.asset));
+              if (r.held) heldN++;
+              if (r.flipped) flippedN++;
+            }
+            if (heldN || flippedN) addLog(`🧭 표시 히스테리시스: 라벨 유지 ${heldN}건 · 전환 확정 ${flippedN}건`);
+          } catch (hErr) { addLog(`⚠️ 표시 히스테리시스 실패(원본 노출): ${hErr?.message}`); }
+        }
         const mergedMtf = [...newMtfEntries, ...mPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200);
         await kv.set(mKey, mergedMtf);
       }

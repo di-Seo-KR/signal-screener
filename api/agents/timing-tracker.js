@@ -93,7 +93,10 @@ export default async function handler(req, res) {
     await kv.set(TRACK_KEY, track);
     await kv.set(STATS_KEY, stats);
 
-    // ③ 텔레그램 요약 (일일 스탠드업 직전)
+    // ③ 핵심 판정 요약 (2026-08-17 알림 통합 — 대표 지시 "데일리 보고 1건")
+    //   기본은 텔레그램 무발송 — 요약을 KV 에 남겨 KST 06:00 통합 스탠드업이
+    //   ③(오늘의 주목 시그널)에 반영합니다. 추적·채점·적재 기능은 전부 유지.
+    //   ZEPTA_TG_VERBOSE=1 이면 기존 개별 발송을 그대로 복원(되돌리기 스위치).
     const fmt = (k) => {
       const s = stats[k];
       if (!s || !s.n6) return `${k}: 표본 없음`;
@@ -101,11 +104,23 @@ export default async function handler(req, res) {
       const a12 = s.n12 ? Math.round(s.sum12 / s.n12 * 1e4) : 0, w12 = s.n12 ? Math.round(s.win12 / s.n12 * 100) : 0;
       return `${k}: +24h ${a6}bps/승률${w6}% (n${s.n6}) · +48h ${a12}bps/${w12}% (n${s.n12})`;
     };
-    const lines = ["📐 타점 신호 라이브 추적 (배포 규칙 그대로 자동 채점)",
-      `오늘 신규 ${added}건 · 채점 ${matured}건 · 추적 중 ${track.filter(r => r.e12 == null).length}건`,
-      fmt("4h:long"), fmt("4h:short"), fmt("1d:long"),
-      "→ 누적 엣지가 음전하면 해당 요소 재학습/비활성 판단"].join("\n");
-    try { await sendTelegram({ text: lines }); } catch {}
+    const statLines = [fmt("4h:long"), fmt("4h:short"), fmt("1d:long")];
+    try {
+      await kv.set("di:standup:timing", {
+        added,
+        matured,
+        tracking: track.filter((r) => r.e12 == null).length,
+        statLines,
+        updatedAt: new Date().toISOString(),
+      }, { ex: 3 * 86400 });
+    } catch {}
+    if (process.env.ZEPTA_TG_VERBOSE === "1") {
+      const lines = ["📐 타점 신호 라이브 추적 (배포 규칙 그대로 자동 채점)",
+        `오늘 신규 ${added}건 · 채점 ${matured}건 · 추적 중 ${track.filter(r => r.e12 == null).length}건`,
+        ...statLines,
+        "→ 누적 엣지가 음전하면 해당 요소 재학습/비활성 판단"].join("\n");
+      try { await sendTelegram({ text: lines }); } catch {}
+    }
 
     return res.status(200).json({ ok: true, added, matured, tracked: track.length, stats, ms: Date.now() - t0 });
   } catch (e) {

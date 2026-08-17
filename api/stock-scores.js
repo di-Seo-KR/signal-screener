@@ -28,7 +28,8 @@
 //                    type, score(0~100), confidence(0~1 — coin-scores 와 동일 정규화),
 //                    family, timeframe:"MTF", reason, ts(스캔 시각 ms),
 //                    dataTs(마지막 반영 캔들 시각 ms | null),
-//                    breakdown{1w,1d,4h,1h}, sr, marketState }],
+//                    breakdown{1w,1d,4h,1h}, sr, marketState,
+//                    stability{sideSince,pendingSide,flips24h}|null }],
 //     counts: { long, short, total },   // 필터 적용 후 전집합 기준 (페이지 아님)
 //     page: { offset, limit, returned, hasMore },
 //     updatedAt, meta
@@ -56,6 +57,18 @@ function normSide(entry) {
   if (t === "BUY") return "LONG";
   if (t === "SELL") return "SHORT";
   return null;
+}
+
+// stability 공개 형상 — 내부 산출근거 flipTs(확정 전환 타임스탬프 배열, 최대 50개)는
+//   응답에서 제외합니다. 헤더 스키마 { sideSince, pendingSide, flips24h } 와 실제 응답을
+//   일치시키고, 심볼당 최대 ~400B 의 불필요한 페이로드를 방지합니다 (coin-scores.js 동일 규칙).
+function pubStability(st) {
+  if (!st || typeof st !== "object") return null;
+  return {
+    sideSince: st.sideSince ?? null,
+    pendingSide: st.pendingSide ?? null,
+    flips24h: st.flips24h ?? 0,
+  };
 }
 
 export default async function handler(req, res) {
@@ -118,6 +131,10 @@ export default async function handler(req, res) {
           breakdown: normBreakdown(e.breakdown), // { 1w,1d,4h,1h: {side,score}|null }
           sr: e.sr || null,                  // 지지·저항 { s, r, piv, px, m } | null
           marketState: e.marketState ?? null, // 스캔 시점 개장 여부 — "REGULAR"|"CLOSED"|null
+          // ★ 2026-08-17 side 라벨 히스테리시스 상태 통과 — { sideSince, pendingSide, flips24h }
+          //   (stock-signals-cron 이 부여. 없으면 null — 킬스위치 OFF·구 엔트리 하위호환.
+          //    내부 산출근거 flipTs 는 pubStability 가 제거 — 공개 응답 미노출)
+          stability: pubStability(e.stability),
         });
       }
     }

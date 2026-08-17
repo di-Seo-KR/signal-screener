@@ -133,10 +133,24 @@ export default async function handler(req, res) {
       }
     }
 
+    // ★ 2026-08-17 알림 통합 — 대표 지시 "데일리 보고 1건": 기본은 무발송.
+    //   핵심 판정을 KV 에 남겨 KST 06:00 통합 스탠드업이 ④(게이트 현황)·⑤(경고)에 반영.
+    //   ZEPTA_TG_VERBOSE=1 이면 기존 개별 발송 복원(되돌리기 스위치). 판정·상태 저장은 전부 유지.
     let sendResult = null;
-    if (notify && text) {
+    if (notify && text && process.env.ZEPTA_TG_VERBOSE === "1") {
       sendResult = await sendTelegram({ text });
     }
+
+    // 통합 스탠드업이 읽는 핵심 판정 요약 (추가 필드 — 기존 상태 키와 별개)
+    try {
+      await kv.set("di:standup:capital", {
+        verdict,
+        blocker,
+        since: { trades, winRate: Number(winRate.toFixed(3)), netPnL: Number(netPnL.toFixed(2)), daysElapsed },
+        notice: notify && text ? text.split("\n")[0] : null,
+        updatedAt: nowIso,
+      }, { ex: 3 * 86400 });
+    } catch {}
 
     // ── 5) 상태 저장 ─────────────────────────────────────────────────
     await kv.set(STATE_KEY, {

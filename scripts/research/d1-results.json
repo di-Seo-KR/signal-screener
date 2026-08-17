@@ -1,0 +1,1733 @@
+{
+  "hypothesis": "D-1 — 시그널 발화 직후 w사이클(10분 단위) 내 재확인(같은 방향 유지)된 진입이 즉시 진입보다 낫다(플리커 진입 차단)",
+  "source": "대표 지시 2026-08-17 — 자동매매 확실한 타점 개선 (사전등록 백테스트)",
+  "preregistered": {
+    "wGridCycles": [
+      1,
+      3
+    ],
+    "cycleMinutes": 10,
+    "signalProxy": "10분봉(바이낸스 5m×2 집계) 20봉 채널 돌파 — h2 detectSignals 동일, 재확인 = w봉 뒤 종가가 발화 시점 채널 레벨 밖 유지",
+    "breakoutLookback": 20,
+    "exitBars": 24,
+    "atrPeriod": 14,
+    "stopAtrMult": 2,
+    "insampleSymbols": [
+      "BTCUSDT",
+      "ETHUSDT"
+    ],
+    "crossvalSymbols": [
+      "SOLUSDT",
+      "XRPUSDT",
+      "BNBUSDT",
+      "DOGEUSDT",
+      "ADAUSDT",
+      "LINKUSDT"
+    ],
+    "period": {
+      "isStart": "2025-02-12",
+      "oosStart": "2026-02-12",
+      "end": "2026-08-12",
+      "holdoutNote": "2026-08-12 이후 미사용 (H2 홀드아웃 공유 — 소진 금지)"
+    },
+    "bestWRule": "IS·insample(BTC+ETH) 풀링 (PF_hyst − PF_base) 최대 w",
+    "candidateRule": "OOS·전심볼 PF_hyst > PF_base AND 순열검정 p<0.05 (심볼 층화 라벨 셔플 1000회, 단측) AND 히스테리시스 거래수 IS+OOS ≥ 30",
+    "permutationSeed": 20260817,
+    "entryExit": "베이스=발화봉 종가 진입, 히스테리시스=재확인봉 종가 진입(미재확인 시 무거래), 손절 2×ATR(진입봉)·익봉부터 체크(갭=시가), 24봉 후 종가 청산, 수수료 미적용, 신호 독립 평가",
+    "caveats": [
+      "시그널 프록시(채널 돌파)는 실제 엔진 종합점수의 대리 — 방향 플리커 구조는 유사하나 동일하지 않음",
+      "수수료·슬리피지 미적용 — 양군 동일 규약이라 상대 비교에는 영향 없음",
+      "손절 ATR 앵커가 진입봉 기준이라 베이스/히스테리시스 손절폭이 미세하게 다름(실제 구현과 동일한 규약)",
+      "발화봉 귀속 세그먼트 — IS 말단 발화의 청산이 OOS 초입을 스칠 수 있음(h2와 동일)"
+    ]
+  },
+  "generatedAt": "2026-08-17T12:01:39.579Z",
+  "excluded": [],
+  "wScoreIS": {
+    "1": 0.0212,
+    "3": 0.0432
+  },
+  "bestW": 3,
+  "permutation": {
+    "1": {
+      "pfObs": 0.9724,
+      "nObs": 9120,
+      "nUniverse": 13252,
+      "nPerm": 1000,
+      "seed": 20260817,
+      "pValue": 0.2488,
+      "permMeanPf": 0.9618
+    },
+    "3": {
+      "pfObs": 0.9871,
+      "nObs": 8002,
+      "nUniverse": 13250,
+      "nPerm": 1000,
+      "seed": 20260817,
+      "pValue": 0.2527,
+      "permMeanPf": 0.9738
+    }
+  },
+  "verdict": {
+    "candidate": false,
+    "label": "기각",
+    "bestW": 3,
+    "reasons": {
+      "oosPfImproves": true,
+      "oosPfHyst": 0.9871,
+      "oosPfBase": 0.9501,
+      "permutationPass": false,
+      "permutationP": 0.2527,
+      "hystTradesTotal": 26136,
+      "minRequired": 30
+    }
+  },
+  "pooled": [
+    {
+      "w": 1,
+      "segment": "IS",
+      "group": "all",
+      "fires": 29813,
+      "reconfRate": 0.678,
+      "base": {
+        "trades": 29813,
+        "winRate": 0.3689,
+        "avgRetPct": -0.0084,
+        "medianRetPct": -0.378,
+        "pf": 0.9826
+      },
+      "hyst": {
+        "trades": 20212,
+        "winRate": 0.38,
+        "avgRetPct": 0.0065,
+        "medianRetPct": -0.3592,
+        "pf": 1.0135
+      },
+      "blockedBase": {
+        "trades": 9601,
+        "winRate": 0.2431,
+        "avgRetPct": -0.3217,
+        "medianRetPct": -0.554,
+        "pf": 0.4611
+      },
+      "delayedAll": {
+        "trades": 29813,
+        "winRate": 0.3828,
+        "avgRetPct": 0.0113,
+        "medianRetPct": -0.3506,
+        "pf": 1.0239
+      },
+      "blockedVsReconfBase": {
+        "t": -29.4703,
+        "pApprox": 0,
+        "n1": 9601,
+        "n2": 20212
+      }
+    },
+    {
+      "w": 1,
+      "segment": "OOS",
+      "group": "all",
+      "fires": 13252,
+      "reconfRate": 0.6882,
+      "base": {
+        "trades": 13252,
+        "winRate": 0.3565,
+        "avgRetPct": -0.0188,
+        "medianRetPct": -0.3393,
+        "pf": 0.9505
+      },
+      "hyst": {
+        "trades": 9120,
+        "winRate": 0.3637,
+        "avgRetPct": -0.0105,
+        "medianRetPct": -0.332,
+        "pf": 0.9724
+      },
+      "blockedBase": {
+        "trades": 4132,
+        "winRate": 0.2231,
+        "avgRetPct": -0.2723,
+        "medianRetPct": -0.4513,
+        "pf": 0.4219
+      },
+      "delayedAll": {
+        "trades": 13252,
+        "winRate": 0.3666,
+        "avgRetPct": -0.0143,
+        "medianRetPct": -0.3294,
+        "pf": 0.9619
+      },
+      "blockedVsReconfBase": {
+        "t": -21.2132,
+        "pApprox": 0,
+        "n1": 4132,
+        "n2": 9120
+      }
+    },
+    {
+      "w": 3,
+      "segment": "IS",
+      "group": "all",
+      "fires": 29813,
+      "reconfRate": 0.6083,
+      "base": {
+        "trades": 29813,
+        "winRate": 0.3689,
+        "avgRetPct": -0.0084,
+        "medianRetPct": -0.378,
+        "pf": 0.9826
+      },
+      "hyst": {
+        "trades": 18134,
+        "winRate": 0.3839,
+        "avgRetPct": 0.0075,
+        "medianRetPct": -0.3508,
+        "pf": 1.0155
+      },
+      "blockedBase": {
+        "trades": 11679,
+        "winRate": 0.1781,
+        "avgRetPct": -0.4822,
+        "medianRetPct": -0.6136,
+        "pf": 0.2648
+      },
+      "delayedAll": {
+        "trades": 29813,
+        "winRate": 0.3885,
+        "avgRetPct": 0.0147,
+        "medianRetPct": -0.3385,
+        "pf": 1.0312
+      },
+      "blockedVsReconfBase": {
+        "t": -53.7702,
+        "pApprox": 0,
+        "n1": 11679,
+        "n2": 18134
+      }
+    },
+    {
+      "w": 3,
+      "segment": "OOS",
+      "group": "all",
+      "fires": 13250,
+      "reconfRate": 0.6039,
+      "base": {
+        "trades": 13250,
+        "winRate": 0.3564,
+        "avgRetPct": -0.0189,
+        "medianRetPct": -0.3395,
+        "pf": 0.9501
+      },
+      "hyst": {
+        "trades": 8002,
+        "winRate": 0.3764,
+        "avgRetPct": -0.0049,
+        "medianRetPct": -0.3156,
+        "pf": 0.9871
+      },
+      "blockedBase": {
+        "trades": 5248,
+        "winRate": 0.1667,
+        "avgRetPct": -0.3723,
+        "medianRetPct": -0.4895,
+        "pf": 0.2733
+      },
+      "delayedAll": {
+        "trades": 13250,
+        "winRate": 0.3768,
+        "avgRetPct": -0.0094,
+        "medianRetPct": -0.3067,
+        "pf": 0.9746
+      },
+      "blockedVsReconfBase": {
+        "t": -35.7392,
+        "pApprox": 0,
+        "n1": 5248,
+        "n2": 8002
+      }
+    },
+    {
+      "w": 1,
+      "segment": "IS",
+      "group": "crossval",
+      "fires": 22635,
+      "reconfRate": 0.6789,
+      "base": {
+        "trades": 22635,
+        "winRate": 0.3717,
+        "avgRetPct": -0.0126,
+        "medianRetPct": -0.4487,
+        "pf": 0.9757
+      },
+      "hyst": {
+        "trades": 15367,
+        "winRate": 0.382,
+        "avgRetPct": 0.0045,
+        "medianRetPct": -0.4187,
+        "pf": 1.0088
+      },
+      "blockedBase": {
+        "trades": 7268,
+        "winRate": 0.2452,
+        "avgRetPct": -0.3513,
+        "medianRetPct": -0.6283,
+        "pf": 0.4569
+      },
+      "delayedAll": {
+        "trades": 22635,
+        "winRate": 0.3845,
+        "avgRetPct": 0.008,
+        "medianRetPct": -0.4118,
+        "pf": 1.0157
+      },
+      "blockedVsReconfBase": {
+        "t": -26.0195,
+        "pApprox": 0,
+        "n1": 7268,
+        "n2": 15367
+      }
+    },
+    {
+      "w": 1,
+      "segment": "OOS",
+      "group": "crossval",
+      "fires": 10009,
+      "reconfRate": 0.686,
+      "base": {
+        "trades": 10009,
+        "winRate": 0.3614,
+        "avgRetPct": -0.0139,
+        "medianRetPct": -0.3572,
+        "pf": 0.9647
+      },
+      "hyst": {
+        "trades": 6866,
+        "winRate": 0.3686,
+        "avgRetPct": -0.0034,
+        "medianRetPct": -0.3462,
+        "pf": 0.9915
+      },
+      "blockedBase": {
+        "trades": 3143,
+        "winRate": 0.2256,
+        "avgRetPct": -0.2851,
+        "medianRetPct": -0.4767,
+        "pf": 0.4202
+      },
+      "delayedAll": {
+        "trades": 10009,
+        "winRate": 0.3724,
+        "avgRetPct": -0.0098,
+        "medianRetPct": -0.3429,
+        "pf": 0.9749
+      },
+      "blockedVsReconfBase": {
+        "t": -19.0502,
+        "pApprox": 0,
+        "n1": 3143,
+        "n2": 6866
+      }
+    },
+    {
+      "w": 3,
+      "segment": "IS",
+      "group": "crossval",
+      "fires": 22635,
+      "reconfRate": 0.6078,
+      "base": {
+        "trades": 22635,
+        "winRate": 0.3717,
+        "avgRetPct": -0.0126,
+        "medianRetPct": -0.4487,
+        "pf": 0.9757
+      },
+      "hyst": {
+        "trades": 13757,
+        "winRate": 0.3838,
+        "avgRetPct": 0.0034,
+        "medianRetPct": -0.4182,
+        "pf": 1.0065
+      },
+      "blockedBase": {
+        "trades": 8878,
+        "winRate": 0.1824,
+        "avgRetPct": -0.5218,
+        "medianRetPct": -0.6836,
+        "pf": 0.262
+      },
+      "delayedAll": {
+        "trades": 22635,
+        "winRate": 0.3899,
+        "avgRetPct": 0.012,
+        "medianRetPct": -0.3987,
+        "pf": 1.0236
+      },
+      "blockedVsReconfBase": {
+        "t": -47.3889,
+        "pApprox": 0,
+        "n1": 8878,
+        "n2": 13757
+      }
+    },
+    {
+      "w": 3,
+      "segment": "OOS",
+      "group": "crossval",
+      "fires": 10007,
+      "reconfRate": 0.6015,
+      "base": {
+        "trades": 10007,
+        "winRate": 0.3612,
+        "avgRetPct": -0.0141,
+        "medianRetPct": -0.3574,
+        "pf": 0.9642
+      },
+      "hyst": {
+        "trades": 6019,
+        "winRate": 0.3803,
+        "avgRetPct": 0.0022,
+        "medianRetPct": -0.3317,
+        "pf": 1.0057
+      },
+      "blockedBase": {
+        "trades": 3988,
+        "winRate": 0.1703,
+        "avgRetPct": -0.3824,
+        "medianRetPct": -0.5151,
+        "pf": 0.2837
+      },
+      "delayedAll": {
+        "trades": 10007,
+        "winRate": 0.3802,
+        "avgRetPct": -0.003,
+        "medianRetPct": -0.3273,
+        "pf": 0.9923
+      },
+      "blockedVsReconfBase": {
+        "t": -31.0377,
+        "pApprox": 0,
+        "n1": 3988,
+        "n2": 6019
+      }
+    },
+    {
+      "w": 1,
+      "segment": "IS",
+      "group": "insample",
+      "fires": 7178,
+      "reconfRate": 0.675,
+      "base": {
+        "trades": 7178,
+        "winRate": 0.3601,
+        "avgRetPct": 0.0049,
+        "medianRetPct": -0.2758,
+        "pf": 1.0136
+      },
+      "hyst": {
+        "trades": 4845,
+        "winRate": 0.3738,
+        "avgRetPct": 0.0126,
+        "medianRetPct": -0.2624,
+        "pf": 1.0348
+      },
+      "blockedBase": {
+        "trades": 2333,
+        "winRate": 0.2366,
+        "avgRetPct": -0.2295,
+        "medianRetPct": -0.383,
+        "pf": 0.4803
+      },
+      "delayedAll": {
+        "trades": 7178,
+        "winRate": 0.3771,
+        "avgRetPct": 0.0217,
+        "medianRetPct": -0.257,
+        "pf": 1.0615
+      },
+      "blockedVsReconfBase": {
+        "t": -14.3579,
+        "pApprox": 0,
+        "n1": 2333,
+        "n2": 4845
+      }
+    },
+    {
+      "w": 1,
+      "segment": "OOS",
+      "group": "insample",
+      "fires": 3243,
+      "reconfRate": 0.695,
+      "base": {
+        "trades": 3243,
+        "winRate": 0.3414,
+        "avgRetPct": -0.0338,
+        "medianRetPct": -0.3009,
+        "pf": 0.899
+      },
+      "hyst": {
+        "trades": 2254,
+        "winRate": 0.3487,
+        "avgRetPct": -0.0322,
+        "medianRetPct": -0.2969,
+        "pf": 0.9045
+      },
+      "blockedBase": {
+        "trades": 989,
+        "winRate": 0.2154,
+        "avgRetPct": -0.2316,
+        "medianRetPct": -0.3842,
+        "pf": 0.4286
+      },
+      "delayedAll": {
+        "trades": 3243,
+        "winRate": 0.3488,
+        "avgRetPct": -0.0282,
+        "medianRetPct": -0.2908,
+        "pf": 0.9148
+      },
+      "blockedVsReconfBase": {
+        "t": -9.3515,
+        "pApprox": 0,
+        "n1": 989,
+        "n2": 2254
+      }
+    },
+    {
+      "w": 3,
+      "segment": "IS",
+      "group": "insample",
+      "fires": 7178,
+      "reconfRate": 0.6098,
+      "base": {
+        "trades": 7178,
+        "winRate": 0.3601,
+        "avgRetPct": 0.0049,
+        "medianRetPct": -0.2758,
+        "pf": 1.0136
+      },
+      "hyst": {
+        "trades": 4377,
+        "winRate": 0.3841,
+        "avgRetPct": 0.0206,
+        "medianRetPct": -0.2514,
+        "pf": 1.0568
+      },
+      "blockedBase": {
+        "trades": 2801,
+        "winRate": 0.1646,
+        "avgRetPct": -0.3569,
+        "medianRetPct": -0.43,
+        "pf": 0.2774
+      },
+      "delayedAll": {
+        "trades": 7178,
+        "winRate": 0.3838,
+        "avgRetPct": 0.023,
+        "medianRetPct": -0.2452,
+        "pf": 1.0654
+      },
+      "blockedVsReconfBase": {
+        "t": -26.3851,
+        "pApprox": 0,
+        "n1": 2801,
+        "n2": 4377
+      }
+    },
+    {
+      "w": 3,
+      "segment": "OOS",
+      "group": "insample",
+      "fires": 3243,
+      "reconfRate": 0.6115,
+      "base": {
+        "trades": 3243,
+        "winRate": 0.3414,
+        "avgRetPct": -0.0338,
+        "medianRetPct": -0.3009,
+        "pf": 0.899
+      },
+      "hyst": {
+        "trades": 1983,
+        "winRate": 0.3646,
+        "avgRetPct": -0.0263,
+        "medianRetPct": -0.2782,
+        "pf": 0.9208
+      },
+      "blockedBase": {
+        "trades": 1260,
+        "winRate": 0.1556,
+        "avgRetPct": -0.3403,
+        "medianRetPct": -0.4242,
+        "pf": 0.2339
+      },
+      "delayedAll": {
+        "trades": 3243,
+        "winRate": 0.366,
+        "avgRetPct": -0.0291,
+        "medianRetPct": -0.2651,
+        "pf": 0.9095
+      },
+      "blockedVsReconfBase": {
+        "t": -18.1398,
+        "pApprox": 0,
+        "n1": 1260,
+        "n2": 1983
+      }
+    }
+  ],
+  "perSymbol": [
+    {
+      "symbol": "BTCUSDT",
+      "w": 1,
+      "segment": "IS",
+      "fires": 3792,
+      "reconfRate": 0.6843,
+      "skipped": 0,
+      "base": {
+        "trades": 3792,
+        "winRate": 0.3565,
+        "avgRetPct": 0.0026,
+        "medianRetPct": -0.2226,
+        "pf": 1.0098
+      },
+      "hyst": {
+        "trades": 2595,
+        "winRate": 0.3638,
+        "avgRetPct": 0.0089,
+        "medianRetPct": -0.228,
+        "pf": 1.0325
+      },
+      "blockedBase": {
+        "trades": 1197,
+        "winRate": 0.2398,
+        "avgRetPct": -0.1732,
+        "medianRetPct": -0.3003,
+        "pf": 0.4633
+      },
+      "delayedAll": {
+        "trades": 3792,
+        "winRate": 0.3734,
+        "avgRetPct": 0.0188,
+        "medianRetPct": -0.2155,
+        "pf": 1.0718
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "w": 1,
+      "segment": "OOS",
+      "fires": 1746,
+      "reconfRate": 0.6901,
+      "skipped": 1,
+      "base": {
+        "trades": 1746,
+        "winRate": 0.3368,
+        "avgRetPct": -0.0534,
+        "medianRetPct": -0.274,
+        "pf": 0.8197
+      },
+      "hyst": {
+        "trades": 1205,
+        "winRate": 0.3444,
+        "avgRetPct": -0.0447,
+        "medianRetPct": -0.2772,
+        "pf": 0.8498
+      },
+      "blockedBase": {
+        "trades": 541,
+        "winRate": 0.2089,
+        "avgRetPct": -0.2242,
+        "medianRetPct": -0.3306,
+        "pf": 0.3766
+      },
+      "delayedAll": {
+        "trades": 1746,
+        "winRate": 0.3442,
+        "avgRetPct": -0.0435,
+        "medianRetPct": -0.2654,
+        "pf": 0.8515
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "w": 3,
+      "segment": "IS",
+      "fires": 3792,
+      "reconfRate": 0.6097,
+      "skipped": 0,
+      "base": {
+        "trades": 3792,
+        "winRate": 0.3565,
+        "avgRetPct": 0.0026,
+        "medianRetPct": -0.2226,
+        "pf": 1.0098
+      },
+      "hyst": {
+        "trades": 2312,
+        "winRate": 0.3841,
+        "avgRetPct": 0.0061,
+        "medianRetPct": -0.2153,
+        "pf": 1.0223
+      },
+      "blockedBase": {
+        "trades": 1480,
+        "winRate": 0.1588,
+        "avgRetPct": -0.2712,
+        "medianRetPct": -0.3332,
+        "pf": 0.2566
+      },
+      "delayedAll": {
+        "trades": 3792,
+        "winRate": 0.3837,
+        "avgRetPct": 0.0153,
+        "medianRetPct": -0.2028,
+        "pf": 1.0581
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "w": 3,
+      "segment": "OOS",
+      "fires": 1746,
+      "reconfRate": 0.6054,
+      "skipped": 1,
+      "base": {
+        "trades": 1746,
+        "winRate": 0.3368,
+        "avgRetPct": -0.0534,
+        "medianRetPct": -0.274,
+        "pf": 0.8197
+      },
+      "hyst": {
+        "trades": 1057,
+        "winRate": 0.3642,
+        "avgRetPct": -0.0316,
+        "medianRetPct": -0.2571,
+        "pf": 0.8907
+      },
+      "blockedBase": {
+        "trades": 689,
+        "winRate": 0.1466,
+        "avgRetPct": -0.3101,
+        "medianRetPct": -0.3735,
+        "pf": 0.2103
+      },
+      "delayedAll": {
+        "trades": 1746,
+        "winRate": 0.366,
+        "avgRetPct": -0.0361,
+        "medianRetPct": -0.2429,
+        "pf": 0.8728
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "w": 1,
+      "segment": "IS",
+      "fires": 3386,
+      "reconfRate": 0.6645,
+      "skipped": 0,
+      "base": {
+        "trades": 3386,
+        "winRate": 0.3641,
+        "avgRetPct": 0.0075,
+        "medianRetPct": -0.4363,
+        "pf": 1.0161
+      },
+      "hyst": {
+        "trades": 2250,
+        "winRate": 0.3853,
+        "avgRetPct": 0.0169,
+        "medianRetPct": -0.4115,
+        "pf": 1.0364
+      },
+      "blockedBase": {
+        "trades": 1136,
+        "winRate": 0.2333,
+        "avgRetPct": -0.2888,
+        "medianRetPct": -0.5527,
+        "pf": 0.4905
+      },
+      "delayedAll": {
+        "trades": 3386,
+        "winRate": 0.3813,
+        "avgRetPct": 0.0249,
+        "medianRetPct": -0.4039,
+        "pf": 1.0549
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "w": 1,
+      "segment": "OOS",
+      "fires": 1497,
+      "reconfRate": 0.7007,
+      "skipped": 0,
+      "base": {
+        "trades": 1497,
+        "winRate": 0.3467,
+        "avgRetPct": -0.011,
+        "medianRetPct": -0.3676,
+        "pf": 0.9711
+      },
+      "hyst": {
+        "trades": 1049,
+        "winRate": 0.3537,
+        "avgRetPct": -0.0179,
+        "medianRetPct": -0.3613,
+        "pf": 0.9532
+      },
+      "blockedBase": {
+        "trades": 448,
+        "winRate": 0.2232,
+        "avgRetPct": -0.2404,
+        "medianRetPct": -0.4472,
+        "pf": 0.4778
+      },
+      "delayedAll": {
+        "trades": 1497,
+        "winRate": 0.354,
+        "avgRetPct": -0.0104,
+        "medianRetPct": -0.354,
+        "pf": 0.9723
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "w": 3,
+      "segment": "IS",
+      "fires": 3386,
+      "reconfRate": 0.6099,
+      "skipped": 0,
+      "base": {
+        "trades": 3386,
+        "winRate": 0.3641,
+        "avgRetPct": 0.0075,
+        "medianRetPct": -0.4363,
+        "pf": 1.0161
+      },
+      "hyst": {
+        "trades": 2065,
+        "winRate": 0.384,
+        "avgRetPct": 0.0368,
+        "medianRetPct": -0.3796,
+        "pf": 1.0796
+      },
+      "blockedBase": {
+        "trades": 1321,
+        "winRate": 0.1711,
+        "avgRetPct": -0.4529,
+        "medianRetPct": -0.5978,
+        "pf": 0.2907
+      },
+      "delayedAll": {
+        "trades": 3386,
+        "winRate": 0.3839,
+        "avgRetPct": 0.0316,
+        "medianRetPct": -0.3728,
+        "pf": 1.0703
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "w": 3,
+      "segment": "OOS",
+      "fires": 1497,
+      "reconfRate": 0.6186,
+      "skipped": 0,
+      "base": {
+        "trades": 1497,
+        "winRate": 0.3467,
+        "avgRetPct": -0.011,
+        "medianRetPct": -0.3676,
+        "pf": 0.9711
+      },
+      "hyst": {
+        "trades": 926,
+        "winRate": 0.365,
+        "avgRetPct": -0.0203,
+        "medianRetPct": -0.3428,
+        "pf": 0.9469
+      },
+      "blockedBase": {
+        "trades": 571,
+        "winRate": 0.1664,
+        "avgRetPct": -0.3768,
+        "medianRetPct": -0.476,
+        "pf": 0.256
+      },
+      "delayedAll": {
+        "trades": 1497,
+        "winRate": 0.3661,
+        "avgRetPct": -0.0209,
+        "medianRetPct": -0.3056,
+        "pf": 0.9428
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "w": 1,
+      "segment": "IS",
+      "fires": 3807,
+      "reconfRate": 0.6745,
+      "skipped": 0,
+      "base": {
+        "trades": 3807,
+        "winRate": 0.3777,
+        "avgRetPct": 0.0093,
+        "medianRetPct": -0.5143,
+        "pf": 1.0177
+      },
+      "hyst": {
+        "trades": 2568,
+        "winRate": 0.3917,
+        "avgRetPct": 0.0394,
+        "medianRetPct": -0.476,
+        "pf": 1.0759
+      },
+      "blockedBase": {
+        "trades": 1239,
+        "winRate": 0.2462,
+        "avgRetPct": -0.345,
+        "medianRetPct": -0.6726,
+        "pf": 0.4676
+      },
+      "delayedAll": {
+        "trades": 3807,
+        "winRate": 0.3846,
+        "avgRetPct": 0.0288,
+        "medianRetPct": -0.4879,
+        "pf": 1.0559
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "w": 1,
+      "segment": "OOS",
+      "fires": 1648,
+      "reconfRate": 0.6748,
+      "skipped": 1,
+      "base": {
+        "trades": 1648,
+        "winRate": 0.3532,
+        "avgRetPct": -0.0357,
+        "medianRetPct": -0.4131,
+        "pf": 0.9163
+      },
+      "hyst": {
+        "trades": 1112,
+        "winRate": 0.3633,
+        "avgRetPct": -0.0388,
+        "medianRetPct": -0.3977,
+        "pf": 0.9097
+      },
+      "blockedBase": {
+        "trades": 536,
+        "winRate": 0.2183,
+        "avgRetPct": -0.307,
+        "medianRetPct": -0.5213,
+        "pf": 0.4059
+      },
+      "delayedAll": {
+        "trades": 1648,
+        "winRate": 0.3641,
+        "avgRetPct": -0.0387,
+        "medianRetPct": -0.3932,
+        "pf": 0.9079
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "w": 3,
+      "segment": "IS",
+      "fires": 3807,
+      "reconfRate": 0.6154,
+      "skipped": 0,
+      "base": {
+        "trades": 3807,
+        "winRate": 0.3777,
+        "avgRetPct": 0.0093,
+        "medianRetPct": -0.5143,
+        "pf": 1.0177
+      },
+      "hyst": {
+        "trades": 2343,
+        "winRate": 0.391,
+        "avgRetPct": 0.0284,
+        "medianRetPct": -0.4832,
+        "pf": 1.0535
+      },
+      "blockedBase": {
+        "trades": 1464,
+        "winRate": 0.1844,
+        "avgRetPct": -0.5255,
+        "medianRetPct": -0.7257,
+        "pf": 0.2585
+      },
+      "delayedAll": {
+        "trades": 3807,
+        "winRate": 0.3898,
+        "avgRetPct": 0.0262,
+        "medianRetPct": -0.4801,
+        "pf": 1.0509
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "w": 3,
+      "segment": "OOS",
+      "fires": 1647,
+      "reconfRate": 0.5968,
+      "skipped": 2,
+      "base": {
+        "trades": 1647,
+        "winRate": 0.3528,
+        "avgRetPct": -0.0364,
+        "medianRetPct": -0.4135,
+        "pf": 0.9148
+      },
+      "hyst": {
+        "trades": 983,
+        "winRate": 0.3795,
+        "avgRetPct": -0.0249,
+        "medianRetPct": -0.3775,
+        "pf": 0.9406
+      },
+      "blockedBase": {
+        "trades": 664,
+        "winRate": 0.1687,
+        "avgRetPct": -0.4285,
+        "medianRetPct": -0.5465,
+        "pf": 0.2538
+      },
+      "delayedAll": {
+        "trades": 1647,
+        "winRate": 0.3734,
+        "avgRetPct": -0.0306,
+        "medianRetPct": -0.378,
+        "pf": 0.9263
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "w": 1,
+      "segment": "IS",
+      "fires": 3766,
+      "reconfRate": 0.6784,
+      "skipped": 0,
+      "base": {
+        "trades": 3766,
+        "winRate": 0.3675,
+        "avgRetPct": -0.0312,
+        "medianRetPct": -0.4506,
+        "pf": 0.938
+      },
+      "hyst": {
+        "trades": 2555,
+        "winRate": 0.3785,
+        "avgRetPct": -0.0313,
+        "medianRetPct": -0.434,
+        "pf": 0.9383
+      },
+      "blockedBase": {
+        "trades": 1211,
+        "winRate": 0.2395,
+        "avgRetPct": -0.3182,
+        "medianRetPct": -0.5788,
+        "pf": 0.4857
+      },
+      "delayedAll": {
+        "trades": 3766,
+        "winRate": 0.3829,
+        "avgRetPct": -0.0106,
+        "medianRetPct": -0.4201,
+        "pf": 0.9785
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "w": 1,
+      "segment": "OOS",
+      "fires": 1702,
+      "reconfRate": 0.681,
+      "skipped": 1,
+      "base": {
+        "trades": 1702,
+        "winRate": 0.3484,
+        "avgRetPct": -0.0479,
+        "medianRetPct": -0.3619,
+        "pf": 0.8711
+      },
+      "hyst": {
+        "trades": 1159,
+        "winRate": 0.3469,
+        "avgRetPct": -0.0526,
+        "medianRetPct": -0.3553,
+        "pf": 0.8589
+      },
+      "blockedBase": {
+        "trades": 543,
+        "winRate": 0.2228,
+        "avgRetPct": -0.2588,
+        "medianRetPct": -0.4514,
+        "pf": 0.4299
+      },
+      "delayedAll": {
+        "trades": 1702,
+        "winRate": 0.3525,
+        "avgRetPct": -0.0465,
+        "medianRetPct": -0.3556,
+        "pf": 0.8733
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "w": 3,
+      "segment": "IS",
+      "fires": 3766,
+      "reconfRate": 0.6107,
+      "skipped": 0,
+      "base": {
+        "trades": 3766,
+        "winRate": 0.3675,
+        "avgRetPct": -0.0312,
+        "medianRetPct": -0.4506,
+        "pf": 0.938
+      },
+      "hyst": {
+        "trades": 2300,
+        "winRate": 0.3813,
+        "avgRetPct": -0.0229,
+        "medianRetPct": -0.4418,
+        "pf": 0.9552
+      },
+      "blockedBase": {
+        "trades": 1466,
+        "winRate": 0.1842,
+        "avgRetPct": -0.5001,
+        "medianRetPct": -0.6383,
+        "pf": 0.2706
+      },
+      "delayedAll": {
+        "trades": 3766,
+        "winRate": 0.3805,
+        "avgRetPct": -0.0111,
+        "medianRetPct": -0.4321,
+        "pf": 0.9778
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "w": 3,
+      "segment": "OOS",
+      "fires": 1702,
+      "reconfRate": 0.6099,
+      "skipped": 1,
+      "base": {
+        "trades": 1702,
+        "winRate": 0.3484,
+        "avgRetPct": -0.0479,
+        "medianRetPct": -0.3619,
+        "pf": 0.8711
+      },
+      "hyst": {
+        "trades": 1038,
+        "winRate": 0.3497,
+        "avgRetPct": -0.0563,
+        "medianRetPct": -0.3692,
+        "pf": 0.8543
+      },
+      "blockedBase": {
+        "trades": 664,
+        "winRate": 0.1536,
+        "avgRetPct": -0.3787,
+        "medianRetPct": -0.4723,
+        "pf": 0.2368
+      },
+      "delayedAll": {
+        "trades": 1702,
+        "winRate": 0.3613,
+        "avgRetPct": -0.04,
+        "medianRetPct": -0.3504,
+        "pf": 0.8901
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "w": 1,
+      "segment": "IS",
+      "fires": 3921,
+      "reconfRate": 0.696,
+      "skipped": 0,
+      "base": {
+        "trades": 3921,
+        "winRate": 0.3777,
+        "avgRetPct": 0.0094,
+        "medianRetPct": -0.2744,
+        "pf": 1.0285
+      },
+      "hyst": {
+        "trades": 2729,
+        "winRate": 0.3734,
+        "avgRetPct": 0.0063,
+        "medianRetPct": -0.2704,
+        "pf": 1.019
+      },
+      "blockedBase": {
+        "trades": 1192,
+        "winRate": 0.2542,
+        "avgRetPct": -0.2151,
+        "medianRetPct": -0.3775,
+        "pf": 0.4808
+      },
+      "delayedAll": {
+        "trades": 3921,
+        "winRate": 0.3785,
+        "avgRetPct": 0.0062,
+        "medianRetPct": -0.2677,
+        "pf": 1.0187
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "w": 1,
+      "segment": "OOS",
+      "fires": 1815,
+      "reconfRate": 0.6959,
+      "skipped": 3,
+      "base": {
+        "trades": 1815,
+        "winRate": 0.3691,
+        "avgRetPct": -0.0105,
+        "medianRetPct": -0.2657,
+        "pf": 0.9607
+      },
+      "hyst": {
+        "trades": 1263,
+        "winRate": 0.3721,
+        "avgRetPct": 0.0024,
+        "medianRetPct": -0.2603,
+        "pf": 1.0092
+      },
+      "blockedBase": {
+        "trades": 552,
+        "winRate": 0.2246,
+        "avgRetPct": -0.213,
+        "medianRetPct": -0.333,
+        "pf": 0.3709
+      },
+      "delayedAll": {
+        "trades": 1815,
+        "winRate": 0.3725,
+        "avgRetPct": -0.0042,
+        "medianRetPct": -0.2591,
+        "pf": 0.9838
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "w": 3,
+      "segment": "IS",
+      "fires": 3921,
+      "reconfRate": 0.6139,
+      "skipped": 0,
+      "base": {
+        "trades": 3921,
+        "winRate": 0.3777,
+        "avgRetPct": 0.0094,
+        "medianRetPct": -0.2744,
+        "pf": 1.0285
+      },
+      "hyst": {
+        "trades": 2407,
+        "winRate": 0.3681,
+        "avgRetPct": -0.006,
+        "medianRetPct": -0.2779,
+        "pf": 0.9828
+      },
+      "blockedBase": {
+        "trades": 1514,
+        "winRate": 0.1909,
+        "avgRetPct": -0.3149,
+        "medianRetPct": -0.3956,
+        "pf": 0.2954
+      },
+      "delayedAll": {
+        "trades": 3921,
+        "winRate": 0.3843,
+        "avgRetPct": 0.0095,
+        "medianRetPct": -0.2629,
+        "pf": 1.0288
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "w": 3,
+      "segment": "OOS",
+      "fires": 1814,
+      "reconfRate": 0.6009,
+      "skipped": 4,
+      "base": {
+        "trades": 1814,
+        "winRate": 0.3688,
+        "avgRetPct": -0.011,
+        "medianRetPct": -0.2657,
+        "pf": 0.9588
+      },
+      "hyst": {
+        "trades": 1090,
+        "winRate": 0.3761,
+        "avgRetPct": 0.0004,
+        "medianRetPct": -0.265,
+        "pf": 1.0016
+      },
+      "blockedBase": {
+        "trades": 724,
+        "winRate": 0.1796,
+        "avgRetPct": -0.2667,
+        "medianRetPct": -0.3519,
+        "pf": 0.2608
+      },
+      "delayedAll": {
+        "trades": 1814,
+        "winRate": 0.3804,
+        "avgRetPct": -0.0055,
+        "medianRetPct": -0.253,
+        "pf": 0.979
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "w": 1,
+      "segment": "IS",
+      "fires": 3665,
+      "reconfRate": 0.681,
+      "skipped": 0,
+      "base": {
+        "trades": 3665,
+        "winRate": 0.3741,
+        "avgRetPct": -0.0167,
+        "medianRetPct": -0.5352,
+        "pf": 0.9714
+      },
+      "hyst": {
+        "trades": 2496,
+        "winRate": 0.3802,
+        "avgRetPct": -0.0005,
+        "medianRetPct": -0.5322,
+        "pf": 0.9991
+      },
+      "blockedBase": {
+        "trades": 1169,
+        "winRate": 0.2549,
+        "avgRetPct": -0.406,
+        "medianRetPct": -0.7346,
+        "pf": 0.434
+      },
+      "delayedAll": {
+        "trades": 3665,
+        "winRate": 0.3899,
+        "avgRetPct": 0.0228,
+        "medianRetPct": -0.5066,
+        "pf": 1.0404
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "w": 1,
+      "segment": "OOS",
+      "fires": 1610,
+      "reconfRate": 0.677,
+      "skipped": 3,
+      "base": {
+        "trades": 1610,
+        "winRate": 0.3609,
+        "avgRetPct": 0.0152,
+        "medianRetPct": -0.4068,
+        "pf": 1.0367
+      },
+      "hyst": {
+        "trades": 1090,
+        "winRate": 0.3807,
+        "avgRetPct": 0.0608,
+        "medianRetPct": -0.3914,
+        "pf": 1.147
+      },
+      "blockedBase": {
+        "trades": 520,
+        "winRate": 0.2135,
+        "avgRetPct": -0.3051,
+        "medianRetPct": -0.528,
+        "pf": 0.4008
+      },
+      "delayedAll": {
+        "trades": 1610,
+        "winRate": 0.3733,
+        "avgRetPct": 0.0246,
+        "medianRetPct": -0.3888,
+        "pf": 1.0601
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "w": 3,
+      "segment": "IS",
+      "fires": 3665,
+      "reconfRate": 0.6076,
+      "skipped": 0,
+      "base": {
+        "trades": 3665,
+        "winRate": 0.3741,
+        "avgRetPct": -0.0167,
+        "medianRetPct": -0.5352,
+        "pf": 0.9714
+      },
+      "hyst": {
+        "trades": 2227,
+        "winRate": 0.3857,
+        "avgRetPct": 0.0255,
+        "medianRetPct": -0.5037,
+        "pf": 1.0442
+      },
+      "blockedBase": {
+        "trades": 1438,
+        "winRate": 0.1871,
+        "avgRetPct": -0.5889,
+        "medianRetPct": -0.801,
+        "pf": 0.2649
+      },
+      "delayedAll": {
+        "trades": 3665,
+        "winRate": 0.4005,
+        "avgRetPct": 0.039,
+        "medianRetPct": -0.4806,
+        "pf": 1.0698
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "w": 3,
+      "segment": "OOS",
+      "fires": 1610,
+      "reconfRate": 0.605,
+      "skipped": 3,
+      "base": {
+        "trades": 1610,
+        "winRate": 0.3609,
+        "avgRetPct": 0.0152,
+        "medianRetPct": -0.4068,
+        "pf": 1.0367
+      },
+      "hyst": {
+        "trades": 974,
+        "winRate": 0.3655,
+        "avgRetPct": 0.0644,
+        "medianRetPct": -0.3741,
+        "pf": 1.1564
+      },
+      "blockedBase": {
+        "trades": 636,
+        "winRate": 0.184,
+        "avgRetPct": -0.3917,
+        "medianRetPct": -0.5647,
+        "pf": 0.293
+      },
+      "delayedAll": {
+        "trades": 1610,
+        "winRate": 0.3708,
+        "avgRetPct": 0.0326,
+        "medianRetPct": -0.3741,
+        "pf": 1.0803
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "w": 1,
+      "segment": "IS",
+      "fires": 3665,
+      "reconfRate": 0.6748,
+      "skipped": 0,
+      "base": {
+        "trades": 3665,
+        "winRate": 0.3656,
+        "avgRetPct": -0.0345,
+        "medianRetPct": -0.6075,
+        "pf": 0.9424
+      },
+      "hyst": {
+        "trades": 2473,
+        "winRate": 0.3805,
+        "avgRetPct": -0.0054,
+        "medianRetPct": -0.5771,
+        "pf": 0.9909
+      },
+      "blockedBase": {
+        "trades": 1192,
+        "winRate": 0.2441,
+        "avgRetPct": -0.4231,
+        "medianRetPct": -0.7599,
+        "pf": 0.4316
+      },
+      "delayedAll": {
+        "trades": 3665,
+        "winRate": 0.3844,
+        "avgRetPct": -0.0185,
+        "medianRetPct": -0.569,
+        "pf": 0.9684
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "w": 1,
+      "segment": "OOS",
+      "fires": 1540,
+      "reconfRate": 0.6825,
+      "skipped": 2,
+      "base": {
+        "trades": 1540,
+        "winRate": 0.3851,
+        "avgRetPct": 0.0288,
+        "medianRetPct": -0.5082,
+        "pf": 1.0585
+      },
+      "hyst": {
+        "trades": 1051,
+        "winRate": 0.3968,
+        "avgRetPct": 0.0607,
+        "medianRetPct": -0.458,
+        "pf": 1.1257
+      },
+      "blockedBase": {
+        "trades": 489,
+        "winRate": 0.2434,
+        "avgRetPct": -0.3411,
+        "medianRetPct": -0.6778,
+        "pf": 0.4687
+      },
+      "delayedAll": {
+        "trades": 1540,
+        "winRate": 0.4065,
+        "avgRetPct": 0.0561,
+        "medianRetPct": -0.4424,
+        "pf": 1.1165
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "w": 3,
+      "segment": "IS",
+      "fires": 3665,
+      "reconfRate": 0.6052,
+      "skipped": 0,
+      "base": {
+        "trades": 3665,
+        "winRate": 0.3656,
+        "avgRetPct": -0.0345,
+        "medianRetPct": -0.6075,
+        "pf": 0.9424
+      },
+      "hyst": {
+        "trades": 2218,
+        "winRate": 0.3895,
+        "avgRetPct": -0.0167,
+        "medianRetPct": -0.5834,
+        "pf": 0.9727
+      },
+      "blockedBase": {
+        "trades": 1447,
+        "winRate": 0.1728,
+        "avgRetPct": -0.6189,
+        "medianRetPct": -0.8114,
+        "pf": 0.2343
+      },
+      "delayedAll": {
+        "trades": 3665,
+        "winRate": 0.3926,
+        "avgRetPct": -0.0122,
+        "medianRetPct": -0.5446,
+        "pf": 0.979
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "w": 3,
+      "segment": "OOS",
+      "fires": 1540,
+      "reconfRate": 0.589,
+      "skipped": 2,
+      "base": {
+        "trades": 1540,
+        "winRate": 0.3851,
+        "avgRetPct": 0.0288,
+        "medianRetPct": -0.5082,
+        "pf": 1.0585
+      },
+      "hyst": {
+        "trades": 907,
+        "winRate": 0.4245,
+        "avgRetPct": 0.0644,
+        "medianRetPct": -0.3497,
+        "pf": 1.1346
+      },
+      "blockedBase": {
+        "trades": 633,
+        "winRate": 0.1833,
+        "avgRetPct": -0.4317,
+        "medianRetPct": -0.6809,
+        "pf": 0.36
+      },
+      "delayedAll": {
+        "trades": 1540,
+        "winRate": 0.4188,
+        "avgRetPct": 0.0591,
+        "medianRetPct": -0.3756,
+        "pf": 1.1259
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "w": 1,
+      "segment": "IS",
+      "fires": 3811,
+      "reconfRate": 0.6681,
+      "skipped": 0,
+      "base": {
+        "trades": 3811,
+        "winRate": 0.3671,
+        "avgRetPct": -0.014,
+        "medianRetPct": -0.5767,
+        "pf": 0.9762
+      },
+      "hyst": {
+        "trades": 2546,
+        "winRate": 0.3881,
+        "avgRetPct": 0.018,
+        "medianRetPct": -0.543,
+        "pf": 1.031
+      },
+      "blockedBase": {
+        "trades": 1265,
+        "winRate": 0.2332,
+        "avgRetPct": -0.3996,
+        "medianRetPct": -0.7512,
+        "pf": 0.4567
+      },
+      "delayedAll": {
+        "trades": 3811,
+        "winRate": 0.3873,
+        "avgRetPct": 0.0186,
+        "medianRetPct": -0.5394,
+        "pf": 1.0322
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "w": 1,
+      "segment": "OOS",
+      "fires": 1694,
+      "reconfRate": 0.7031,
+      "skipped": 2,
+      "base": {
+        "trades": 1694,
+        "winRate": 0.353,
+        "avgRetPct": -0.0286,
+        "medianRetPct": -0.4467,
+        "pf": 0.9304
+      },
+      "hyst": {
+        "trades": 1191,
+        "winRate": 0.3552,
+        "avgRetPct": -0.0437,
+        "medianRetPct": -0.4607,
+        "pf": 0.8962
+      },
+      "blockedBase": {
+        "trades": 503,
+        "winRate": 0.2326,
+        "avgRetPct": -0.2939,
+        "medianRetPct": -0.5282,
+        "pf": 0.4228
+      },
+      "delayedAll": {
+        "trades": 1694,
+        "winRate": 0.3684,
+        "avgRetPct": -0.0432,
+        "medianRetPct": -0.4505,
+        "pf": 0.8958
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "w": 3,
+      "segment": "IS",
+      "fires": 3811,
+      "reconfRate": 0.5935,
+      "skipped": 0,
+      "base": {
+        "trades": 3811,
+        "winRate": 0.3671,
+        "avgRetPct": -0.014,
+        "medianRetPct": -0.5767,
+        "pf": 0.9762
+      },
+      "hyst": {
+        "trades": 2262,
+        "winRate": 0.3882,
+        "avgRetPct": 0.0121,
+        "medianRetPct": -0.549,
+        "pf": 1.0205
+      },
+      "blockedBase": {
+        "trades": 1549,
+        "winRate": 0.175,
+        "avgRetPct": -0.5878,
+        "medianRetPct": -0.8018,
+        "pf": 0.263
+      },
+      "delayedAll": {
+        "trades": 3811,
+        "winRate": 0.3923,
+        "avgRetPct": 0.0206,
+        "medianRetPct": -0.5232,
+        "pf": 1.0361
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "w": 3,
+      "segment": "OOS",
+      "fires": 1694,
+      "reconfRate": 0.6063,
+      "skipped": 2,
+      "base": {
+        "trades": 1694,
+        "winRate": 0.353,
+        "avgRetPct": -0.0286,
+        "medianRetPct": -0.4467,
+        "pf": 0.9304
+      },
+      "hyst": {
+        "trades": 1027,
+        "winRate": 0.3914,
+        "avgRetPct": -0.0246,
+        "medianRetPct": -0.4014,
+        "pf": 0.9383
+      },
+      "blockedBase": {
+        "trades": 667,
+        "winRate": 0.1529,
+        "avgRetPct": -0.4101,
+        "medianRetPct": -0.5661,
+        "pf": 0.2757
+      },
+      "delayedAll": {
+        "trades": 1694,
+        "winRate": 0.3796,
+        "avgRetPct": -0.0263,
+        "medianRetPct": -0.4046,
+        "pf": 0.9337
+      }
+    }
+  ]
+}

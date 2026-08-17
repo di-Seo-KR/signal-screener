@@ -252,8 +252,9 @@ async function processUser(kv, uid) {
       link: "/saved-screeners",
     });
 
-    // 텔레그램
-    if (prefs.channels?.telegram) {
+    // 텔레그램 — ★ 2026-08-17 알림 통합: 정보성 발송은 기본 무음(알림 센터 push 는 위에서 유지).
+    //   ZEPTA_TG_VERBOSE=1 이면 기존 발송 복원(되돌리기 스위치).
+    if (process.env.ZEPTA_TG_VERBOSE === "1" && prefs.channels?.telegram) {
       const lines = [
         `🎯 <b>스크리너 매칭</b> — ${scr.name}`,
         `조건: ${summarizeConditions(scr.conditions)}`,

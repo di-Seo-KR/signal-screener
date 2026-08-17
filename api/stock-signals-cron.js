@@ -60,6 +60,9 @@ import {
   STOCK_UNIVERSE, scanStockSymbol, isTooNewToScore,
   readFetchStats, resetFetchStats,
 } from "./_shared/stock-signals.js";
+// ★ 2026-08-17 표시 side 라벨 히스테리시스 — 코인 MTF 표시 풀과 동일 규칙(표시 전용).
+//   이 크론·풀은 매매 엔진과 완전 무관하므로(상단 고지) 표시 안정화만 담당합니다.
+import { applySideHysteresis, latestByAsset, hysteresisEnabled } from "./_shared/display-hysteresis.js";
 
 export const config = { maxDuration: 300 };
 
@@ -294,6 +297,29 @@ export default async function handler(req, res) {
     //    STALE_MS 를 넘긴(상장폐지·장기 실패) 엔트리도 정리합니다.)
     const universeSet = new Set(STOCK_UNIVERSE.map((u) => u.symbol));
     const prevPool = (await kv.get(POOL_KEY)) || [];
+
+    // ── ★ 2026-08-17 (대표 지시 "수시로 바뀌면 안 좋다") 표시 side 히스테리시스 ──
+    //   적재 전에 직전 풀의 종목별 최신 상태와 비교해 방향 라벨(side) 전환만 지연.
+    //   "점수는 사실, 방향 라벨은 해석 — 해석의 안정성만 관리한다": score/breakdown/
+    //   reason 은 실계산 그대로 노출하고, side 전환은 2사이클(= 같은 종목의 연속 2회
+    //   스캔) 연속 + 점수 임계(기본 58) 조건으로만 확정. 관찰 중 방향은
+    //   stability.pendingSide 로 정직 표기. 킬스위치 ZEPTA_DISPLAY_HYSTERESIS=0.
+    //   주의: 스캔 성공 후 "중립"이 된 종목은 옛 엔트리가 제거되므로(설계 — 정직),
+    //   중립을 거쳐 재등장한 방향은 이력 없이 새로 시작합니다(연속성 단절 = 사실).
+    let hysHeld = 0, hysFlipped = 0;
+    if (hysteresisEnabled()) {
+      try {
+        const prevMap = latestByAsset(prevPool);
+        for (const e of entries) {
+          const r = applySideHysteresis(e, prevMap.get(e.asset));
+          if (r.held) hysHeld++;
+          if (r.flipped) hysFlipped++;
+        }
+      } catch (hErr) {
+        console.warn(`[stock-signals-cron] 히스테리시스 실패(원본 노출): ${hErr?.message}`);
+      }
+    }
+
     const staleCut = Date.now() - STALE_MS;
     let evicted = 0;
     const kept = (Array.isArray(prevPool) ? prevPool : []).filter((e) => {
@@ -338,6 +364,7 @@ export default async function handler(req, res) {
       scanned: scannedOk.size,          // 그중 야후 응답까지 성공
       loaded: entries.length,           // 방향 합의가 있어 새로 적재된 엔트리
       neutral: scannedOk.size - entries.length, // 스캔 성공했으나 방향 합의 없음
+      hysteresis: { held: hysHeld, flipped: hysFlipped }, // ★ 라벨 유지/전환 확정 건수 (관측용)
       kept: kept.length,                // last-known 유지(미스캔·실패 심볼)
       evicted,                          // 14일 초과 노후 엔트리 정리
       failed: failed.slice(0, 40),      // 응답 실패 (전량 아님 — 응답 비대화 방지)

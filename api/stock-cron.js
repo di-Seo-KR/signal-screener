@@ -625,6 +625,12 @@ const STOCK_INITIAL_CASH = 100000; // $100,000 가상 자금
 
 // 단일 카드로 발송 — 기존 본문 텍스트는 그대로 lines 로 분리해 표시
 async function sendTelegramReport(title, message) {
+  // ★ 2026-08-17 알림 통합 — 대표 지시 "데일리 보고 1건": 가상 주식매매의 정보성
+  //   텔레그램 리포트는 기본 무음. 매매·성과 KV 적재는 전부 유지(발송만 끔).
+  //   ZEPTA_TG_VERBOSE=1 이면 기존 동작(virtual 채널 게이트 포함) 그대로 복원.
+  if (process.env.ZEPTA_TG_VERBOSE !== "1") {
+    return { ok: false, skipped: true, reason: "muted (2026-08-17 알림 통합)" };
+  }
   // Markdown 잔재 (* 강조) 제거. humanize() 가 "DI금융"→"Zepta" 자동 치환.
   const clean = String(message || "")
     .replace(/\*+/g, "")            // *bold* 제거

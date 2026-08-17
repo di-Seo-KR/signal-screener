@@ -217,9 +217,25 @@ export default async function handler(req, res) {
       L(`\n📡 시장 레짐: ${marketRegime} (Hurst ${avgHurst.toFixed(2)}) | 효율성: ${marketEfficiency} (ER ${avgER.toFixed(2)})`);
     }
 
-    // ── 중요 알림만 텔레그램 전송 (high severity만) ──
+    // ── 중요 알림 처리 (high severity만) ──
     const highAlerts = alerts.filter(a => a.severity === "high");
-    if (highAlerts.length > 0 && TG_TOKEN && TG_CHAT) {
+
+    // ★ 2026-08-17 알림 통합 — 대표 지시 "데일리 보고 1건": high 알림은 기본적으로
+    //   텔레그램 무발송, KV 이벤트로만 적재 → KST 06:00 통합 스탠드업 ①(시장 핵심 변화)에 반영.
+    //   스탠드업 ①은 24h 윈도로 집계(건수+최근 1건)하므로 06~18시 KST 발생분도 익일 보고에 포함.
+    //   TTL 은 48h — 크론 지연·스케줄 드리프트에도 24h 윈도 내 이벤트가 만료로 유실되지 않게 여유 확보.
+    //   레짐/알림 KV(di:market:regime, di:market:alerts)는 기존 그대로 유지(엔진 소비 경로 불변).
+    if (kv && highAlerts.length > 0) {
+      try {
+        let events = (await kv.get("di:standup:market-events")) || [];
+        if (!Array.isArray(events)) events = [];
+        events.push(...highAlerts.map((a) => ({ t: now, ticker: a.ticker, type: a.type, msg: a.msg })));
+        await kv.set("di:standup:market-events", events.slice(-20), { ex: 2 * 86400 });
+      } catch {}
+    }
+
+    // ZEPTA_TG_VERBOSE=1 이면 기존 즉시 발송(1시간 중복 방지 포함) 복원 — 되돌리기 스위치.
+    if (process.env.ZEPTA_TG_VERBOSE === "1" && highAlerts.length > 0 && TG_TOKEN && TG_CHAT) {
       // 중복 알림 방지: 같은 종목+타입 1시간 내 재알림 금지
       const alertsToSend = [];
       for (const alert of highAlerts) {

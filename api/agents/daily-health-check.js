@@ -10,7 +10,9 @@
 //   [알파랩]   발굴(leaderboard) freshness · 주입 파라미터 과적합/raw 잔재 · 후보 과적합 노출
 //   [공통]     KV 도달성
 //
-// Cron: 매일 1회. Timeout 60초. 이상 있을 때만 텔레그램 발송(스팸 방지).
+// Cron: 매일 1회. Timeout 60초.
+// ★ 2026-08-17 알림 통합: 발견 내역은 KV(di:standup:health)에만 적재 →
+//   KST 06:00 통합 스탠드업 ⑤에 병합. ZEPTA_TG_VERBOSE=1 이면 기존 개별 발송 복원.
 // ════════════════════════════════════════════════════════════════════
 
 import { requireCronAuth } from "../_shared/require-cron.js";
@@ -108,7 +110,19 @@ export default async function handler(req, res) {
     const warns = findings.filter((f) => f.level === "warn");
     const total = fails.length + warns.length;
 
-    if (total > 0) {
+    // ★ 2026-08-17 알림 통합 — 대표 지시 "데일리 보고 1건": 기본은 무발송.
+    //   발견 내역을 KV 에 남겨 KST 06:00 통합 스탠드업 ⑤(경고·액션 필요)에 병합.
+    //   ZEPTA_TG_VERBOSE=1 이면 기존 개별 발송 복원(되돌리기 스위치). 점검 자체는 전부 유지.
+    try {
+      await kv.set("di:standup:health", {
+        total,
+        failCount: fails.length,
+        warnCount: warns.length,
+        findings: [...fails, ...warns].slice(0, 10),
+        checkedAt: new Date().toISOString(),
+      }, { ex: 3 * 86400 });
+    } catch {}
+    if (total > 0 && process.env.ZEPTA_TG_VERBOSE === "1") {
       const lines = [...fails, ...warns].map((f) => `${f.level === "fail" ? "🔴" : "⚠️"} [${f.area}] ${f.msg}`);
       try { await sendTelegram({ text: `🩺 Zepta 일일 점검 — ${total}건 발견\n` + lines.join("\n") }); } catch {}
     }
@@ -121,7 +135,18 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error("[daily-health-check] fatal:", err);
-    try { await sendTelegram({ text: `🔴 Zepta 일일 점검 자체 실패: ${err?.message || err}` }); } catch {}
+    // 점검 자체 실패 = 치명 등급 — KV 에 fail 로 남겨 통합 스탠드업 ⑤가 반드시 노출
+    try {
+      const kv = await getKv();
+      await kv.set("di:standup:health", {
+        total: 1, failCount: 1, warnCount: 0,
+        findings: [{ level: "fail", area: "점검", msg: `일일 점검 자체 실패: ${err?.message || err}` }],
+        checkedAt: new Date().toISOString(),
+      }, { ex: 3 * 86400 });
+    } catch {}
+    if (process.env.ZEPTA_TG_VERBOSE === "1") {
+      try { await sendTelegram({ text: `🔴 Zepta 일일 점검 자체 실패: ${err?.message || err}` }); } catch {}
+    }
     return res.status(200).json({ ok: false, error: err?.message || String(err) });
   }
 }

@@ -1,18 +1,18 @@
 // ════════════════════════════════════════════════════════════════════
 // Zepta 에이전트 일일 스탠드업 (KST 06:00)
 //
-// 매일 아침 KST 06:00 에 Vercel cron 으로 호출되어 다음 에이전트들이
-// 각자 시니어 페르소나로 작업하고 텔레그램에 결과를 보고합니다.
+// ★ 2026-08-17 알림 통합 — 대표 지시 "데일리 분석 보고 1건, 핵심 포인트만":
+//   텔레그램 발송문을 "핵심 요약 카드 1건(총 12줄 이내)"으로 전면 재작성.
+//     ① 시장 한 줄 (레짐 + 핵심 변화)          ← di:market:regime / di:standup:market-events
+//     ② 실전매매 성과 한 줄 (일 손익·승률)      ← engine-log / live-summary (실데이터)
+//     ③ 오늘의 주목 시그널 최대 2줄             ← QUANT-RES / 알파랩 / di:standup:timing
+//     ④ 섀도 트랙 현황 한 줄 (축적 n·게이트)    ← shadow-summary / di:standup:capital
+//     ⑤ 경고·액션 필요 (있을 때만, 최대 3줄)    ← di:standup:health(치명 병합) 외
+//   상세 분석(7인 에이전트 전체)은 발송하지 않고 KV(di:standup:latest)에 적재 —
+//   웹에서 보기 → zepta.app/reports.
 //
-//   1) QUANT-RES (알파 리서처)
-//       - 어제 shadow ledger 성과 분석
-//       - 잘 작동한 전략 패밀리 / 부진한 전략 패밀리 식별
-//       - 새 알파 후보 1건 제안
-//
-//   2) QUANT-PLAN (전략 기획자)
-//       - shadow → production 승급 후보
-//       - 디머지(deprecate) 후보
-//       - 전략 가중치 조정 권고
+// 내부 파이프라인(변경 없음): QUANT-RES → (PLAN·MKT·SVC·DEV-IMPL·DEV-PERF 병렬)
+// → PLAN-BIZ. 결과는 응답 JSON + KV 로만 제공.
 //
 // 발송 대상: 텔레그램 (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
 // 사용 모델: claude-sonnet-4-6 (시니어 분석가 페르소나)
@@ -27,7 +27,7 @@
 
 import { requireCronAuth } from "../_shared/require-cron.js";
 import Anthropic from "@anthropic-ai/sdk";
-import { sendCards, buildCard, fmtKST } from "../_shared/telegram.js";
+import { sendTelegram, buildCard, fmtKST } from "../_shared/telegram.js";
 import { fetchGA4DailySummary } from "../_shared/ga4.js";
 import { fetchSentryDailySummary } from "../_shared/sentry.js";
 import { batchBacktest } from "../_shared/ohlc-backtest.js";
@@ -1277,6 +1277,118 @@ function buildCardsForMarketing(m) {
   });
 }
 
+// ════════════════════════════════════════════════════════════════════
+// ★ 통합 요약 카드 (2026-08-17 알림 통합) — 텔레그램으로 나가는 유일한 발송문.
+//   총 12줄 이내(제목 1 + 본문 ≤8 + 상세 링크 1 = 최대 10줄). 순수 함수 — 모킹 테스트 가능.
+// ════════════════════════════════════════════════════════════════════
+const REGIME_KO = { trending: "추세장", mean_reverting: "역추세장", transitional: "혼조" };
+
+function trimLine(s, max = 90) {
+  const t = String(s || "").replace(/\s+/g, " ").trim();
+  return t.length > max ? t.slice(0, max - 1) + "…" : t;
+}
+
+function isFreshTs(ts, hours) {
+  const t = typeof ts === "number" ? ts : Date.parse(ts || 0);
+  return Number.isFinite(t) && t > 0 && Date.now() - t < hours * 3600000;
+}
+
+export function buildStandupSummaryCard(d = {}) {
+  const lines = [];
+
+  // ① 시장 한 줄 — 레짐 + 핵심 변화 (market-monitor 실측)
+  const reg = d.marketRegime;
+  let market = reg && isFreshTs(reg.t, 24)
+    ? `시장: ${REGIME_KO[reg.regime] || reg.regime || "—"} (Hurst ${Number(reg.avgHurst || 0).toFixed(2)})`
+    : "시장: 레짐 데이터 없음";
+  // ★ 리뷰 수리: high 이벤트 윈도를 12h→24h 로 확장 + 건수 병기 — 06:00 KST 발송 기준
+  //   12h 윈도만 보면 약 06~18시 KST 발생분이 어디에도 안 나가고 유실되던 문제 보완.
+  const evs = Array.isArray(d.marketEvents)
+    ? d.marketEvents.filter((e) => e && isFreshTs(e.t, 24))
+    : [];
+  const ev = evs[evs.length - 1] || null;
+  if (ev?.msg) {
+    market += evs.length > 1
+      ? ` · 24h 이벤트 ${evs.length}건 (최근: ${trimLine(ev.msg, 45)})`
+      : ` · ${trimLine(ev.msg, 55)}`;
+  }
+  lines.push(trimLine(market, 130));
+
+  // ② 실전매매 성과 한 줄 — 어제 실현 손익 + 누적 승률 (전부 실데이터)
+  const me = d.realActivity?.users?.[0] || null;
+  const live = d.liveSummary || d.realActivity?.liveSummary || null;
+  if (me) {
+    const pnl = Number(me.realizedToday) || 0;
+    let l = `실전: 어제 진입 ${me.entries}·청산 ${me.exits} · 손익 ${pnl >= 0 ? "+" : "−"}$${Math.abs(pnl).toFixed(2)}`;
+    if (me.unknownPnlExits > 0) l += ` (미확인 ${me.unknownPnlExits}건)`;
+    const liveN = (live?.wins || 0) + (live?.losses || 0);
+    if (liveN > 0) l += ` · 누적 승률 ${Math.round((live.wins / liveN) * 100)}% (${liveN}건)`;
+    lines.push(trimLine(l, 130));
+  } else {
+    lines.push("실전: 어제 실거래 활동 데이터 없음");
+  }
+
+  // ③ 오늘의 주목 시그널 — 최대 2줄 (리서치 1줄 + 실측 1줄)
+  const watch = [];
+  if (d.research?.today_watch) watch.push(`주목: ${trimLine(d.research.today_watch, 85)}`);
+  const strat = d.alphaLeaderboard?.strategies
+    ? Object.entries(d.alphaLeaderboard.strategies)
+        .map(([id, m]) => ({ id, ...m }))
+        .sort((a, b) => (b.sharpe || 0) - (a.sharpe || 0))[0]
+    : null;
+  if (strat) watch.push(`알파 1위: ${strat.id} · Sharpe ${Number(strat.sharpe || 0).toFixed(2)} (${strat.trades || 0}건)`);
+  // ★ 리뷰 수리: 신선도 가드 — timing-tracker 크론이 이틀 정지해도(KV TTL 3일)
+  //   낡은 타점 통계가 현재형으로 표시되지 않도록 36h 이내 갱신분만 사용.
+  const timingLine = isFreshTs(d.timing?.updatedAt, 36)
+    ? (d.timing?.statLines || []).find((s) => s && !/표본 없음/.test(s))
+    : null;
+  if (timingLine) watch.push(`타점 실측: ${trimLine(timingLine, 75)}`);
+  lines.push(...watch.slice(0, 2));
+
+  // ④ 섀도 트랙 현황 한 줄 — 축적 n + 게이트까지 남은 것
+  const sw = d.shadowSummary;
+  const shadowN = (sw?.wins || 0) + (sw?.losses || 0);
+  let shadow;
+  if (shadowN > 0) {
+    const wr = Math.round((sw.wins / shadowN) * 100);
+    const pf = sw.profitFactor != null ? Number(sw.profitFactor).toFixed(2) : "—";
+    shadow = `섀도: 청산 ${shadowN}건 축적 · 승률 ${wr}% · PF ${pf}`;
+  } else {
+    shadow = "섀도: 데이터 누적 중";
+  }
+  // ★ 리뷰 수리: 신선도 가드 — capital-readiness 크론 정지 시(KV TTL 3일) 최대 72h 낡은
+  //   게이트 판정이 현재형으로 표시되지 않도록 36h 이내 갱신분만 사용.
+  const cap = d.capital && isFreshTs(d.capital.updatedAt, 36) ? d.capital : null;
+  if (cap?.verdict === "ready") shadow += " · 자본 검증 게이트 충족";
+  else if (cap?.blocker) shadow += ` · 게이트 미충족: ${cap.blocker}`;
+  lines.push(trimLine(shadow, 130));
+
+  // ⑤ 경고·액션 필요 — 있을 때만, 최대 3줄 (health-check 치명 경고 병합)
+  const warns = [];
+  const h = d.health;
+  if (h && isFreshTs(h.checkedAt, 36)) {
+    const fails = (h.findings || []).filter((f) => f?.level === "fail");
+    for (const f of fails.slice(0, 2)) warns.push(`🔴 [${f.area}] ${trimLine(f.msg, 70)}`);
+    if (!fails.length && (h.warnCount || 0) > 0) {
+      const first = (h.findings || [])[0];
+      warns.push(`⚠️ 자동 점검 경고 ${h.warnCount}건${first ? ` — [${first.area}] ${trimLine(first.msg, 45)}` : ""}`);
+    }
+  }
+  if ((me?.churnReentries || 0) > 0) warns.push(`⚠️ 청산 직후 재진입 ${me.churnReentries}회 — 쿨다운 점검 필요`);
+  if (me?.equity != null && me.equity < 200) warns.push(`⚠️ 잔고 $${Number(me.equity).toFixed(0)} — $200 미만이라 신규 진입 자동 차단`);
+  // cap.notice 는 1회성 전환 이벤트 — 24h 이내 발생분만 노출해 3일 연속 반복 경고 방지.
+  if (cap?.notice && isFreshTs(cap.updatedAt, 24)) warns.push(trimLine(cap.notice, 80));
+  lines.push(...warns.slice(0, 3));
+
+  const card = buildCard({
+    tag: "🌅",
+    title: `Zepta 데일리 — ${d.dateStr || fmtKST().slice(0, 8)}`,
+    lines,
+    footer: "상세 웹에서 보기 → zepta.app/reports",
+  });
+  return { card, lineCount: card.split("\n").length };
+}
+
 // ── 메인 핸들러 ──
 export default async function handler(req, res) {
   if (!requireCronAuth(req, res)) return; // ★ 크론/내부 전용 (2026-07-08 무인증 노출 차단)
@@ -1286,12 +1398,11 @@ export default async function handler(req, res) {
   const L = (m) => { log.push(m); console.log("[daily-standup]", m); };
 
   try {
-    if (!process.env.ANTHROPIC_API_KEY) {
-      return res.status(200).json({ ok: false, error: "ANTHROPIC_API_KEY not set", log });
-    }
+    // ★ 2026-08-17: 키 미설정이어도 통합 요약(실측 데이터 기반)은 발송 — LLM 에이전트만 생략.
+    const llmEnabled = !!process.env.ANTHROPIC_API_KEY;
 
     const kv = await getKv();
-    const [ledger, weights, summary, latestQuant, ga4, sentry, archive, realActivity, alphaLeaderboard, alphaCandidates, macro, onchainLiq, nfBtc, nfEth] = await Promise.all([
+    const [ledger, weights, summary, latestQuant, ga4, sentry, archive, realActivity, alphaLeaderboard, alphaCandidates, macro, onchainLiq, nfBtc, nfEth, marketRegime, marketEvents, healthVerdict, capitalVerdict, timingVerdict] = await Promise.all([
       readShadowLedger(kv, 7),
       readWeights(kv),
       readShadowSummary(kv),
@@ -1306,6 +1417,12 @@ export default async function handler(req, res) {
       fetchStablecoinLiquidity().catch(() => null),             // ★ 온체인 유동성 (DefiLlama, 키리스)
       fetchExchangeNetflow("btc").catch(() => null),            // ★ BTC 거래소 순흐름 (CryptoQuant, 게이트)
       fetchExchangeNetflow("eth").catch(() => null),            // ★ ETH 거래소 순흐름
+      // ★ 2026-08-17 알림 통합 — 발송 제거된 크론들이 남긴 핵심 판정 (①~⑤ 입력)
+      kv.get("di:market:regime").catch(() => null),             // market-monitor 10분 주기 레짐
+      kv.get("di:standup:market-events").catch(() => null),     // market-monitor high 알림 이벤트
+      kv.get("di:standup:health").catch(() => null),            // daily-health-check 발견 내역
+      kv.get("di:standup:capital").catch(() => null),           // capital-readiness 게이트 판정
+      kv.get("di:standup:timing").catch(() => null),            // timing-tracker 실측 채점
     ]);
     // QUANT-RES 입력에 OHLC 정확 백테스트 결과 주입 (Track A+B 통합)
     // archive 누적 부족 시 ledger.closed (최대 30건 샘플) fallback
@@ -1340,72 +1457,115 @@ export default async function handler(req, res) {
     L(`GA4: ${ga4 ? (ga4.error ? "error" : `${ga4.users}users/${ga4.sessions}sessions`) : "not connected"}`);
     L(`Sentry: ${sentry ? (sentry.error ? "error" : `${(sentry.newIssues || []).length} new issues`) : "not connected"}`);
 
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    // ── 7인 LLM 에이전트 파이프라인 (내부 분석 — 결과는 KV/응답 JSON 으로만, 발송 없음) ──
+    // ★ 리뷰 수리(2026-08-17): 블록 전체를 try/catch 로 격리 — Anthropic API 일시 장애
+    //   (429/5xx/타임아웃/키 오류)가 나도 통합 요약 카드(실측 데이터 기반)는 반드시 발송됩니다.
+    //   LLM 결과는 ③ 주목 시그널의 선택 입력일 뿐이므로 실패 시 null 유지(부분 성공분은 보존).
+    let research = null, plan = null, marketing = null, servicePlan = null, devImpl = null, devPerf = null, businessPlan = null;
+    if (llmEnabled) {
+      try {
+        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-    // 2-pass: RES 먼저 실행 → 결과를 PLAN 에 입력으로 전달
-    // 이래야 PLAN 이 RES 의 알파 후보·진단을 보고 의미 있는 승급/디머지 판단을 내림.
-    // 둘 다 약 5~8초 걸리므로 총 10~16초. Vercel 함수 60초 한도 내 안전.
-    const research = await runQuantResearcher(client, ledger, weights, summary, retroResult);
-    L(`QUANT-RES done: ${research.headline?.slice(0, 60)}`);
+        // 2-pass: RES 먼저 실행 → 결과를 PLAN 에 입력으로 전달
+        // 이래야 PLAN 이 RES 의 알파 후보·진단을 보고 의미 있는 승급/디머지 판단을 내림.
+        // 둘 다 약 5~8초 걸리므로 총 10~16초. Vercel 함수 60초 한도 내 안전.
+        research = await runQuantResearcher(client, ledger, weights, summary, retroResult);
+        L(`QUANT-RES done: ${research.headline?.slice(0, 60)}`);
 
-    // 3-스텝 파이프라인:
-    //   Step 1: RES 완료 (위)
-    //   Step 2: PLAN(RES), MKT(RES+GA4), SVC(RES+GA4+Sentry), DEV-IMPL(Sentry), DEV-PERF(GA4+Sentry) 5명 병렬
-    //   Step 3: PLAN-BIZ 만 별도 — Step 2 의 MKT 결과까지 흡수해서 사업 결정 (3-pass)
-    const [plan, marketing, servicePlan, devImpl, devPerf] = await Promise.all([
-      runQuantPlanner(client, ledger, weights, research),
-      runMarketingLead(client, research, latestQuant, ga4, sentry),
-      runServicePlanner(client, ga4, sentry, research),
-      runDevImplementer(client, sentry),
-      runDevPerf(client, ga4, sentry),
-    ]);
-    L(`QUANT-PLAN done: ${plan.headline?.slice(0, 60)}`);
-    L(`MKT-LEAD done: ${marketing.headline?.slice(0, 60)}`);
-    L(`PLAN-SVC done: ${servicePlan.headline?.slice(0, 60)}`);
-    L(`DEV-IMPL done: ${devImpl.headline?.slice(0, 60)}`);
-    L(`DEV-PERF done: ${devPerf.headline?.slice(0, 60)}`);
+        // 3-스텝 파이프라인:
+        //   Step 1: RES 완료 (위)
+        //   Step 2: PLAN(RES), MKT(RES+GA4), SVC(RES+GA4+Sentry), DEV-IMPL(Sentry), DEV-PERF(GA4+Sentry) 5명 병렬
+        //   Step 3: PLAN-BIZ 만 별도 — Step 2 의 MKT 결과까지 흡수해서 사업 결정 (3-pass)
+        [plan, marketing, servicePlan, devImpl, devPerf] = await Promise.all([
+          runQuantPlanner(client, ledger, weights, research),
+          runMarketingLead(client, research, latestQuant, ga4, sentry),
+          runServicePlanner(client, ga4, sentry, research),
+          runDevImplementer(client, sentry),
+          runDevPerf(client, ga4, sentry),
+        ]);
+        L(`QUANT-PLAN done: ${plan.headline?.slice(0, 60)}`);
+        L(`MKT-LEAD done: ${marketing.headline?.slice(0, 60)}`);
+        L(`PLAN-SVC done: ${servicePlan.headline?.slice(0, 60)}`);
+        L(`DEV-IMPL done: ${devImpl.headline?.slice(0, 60)}`);
+        L(`DEV-PERF done: ${devPerf.headline?.slice(0, 60)}`);
 
-    // Step 3: PLAN-BIZ — Step 2 결과 모두 보고 결정
-    const businessPlan = await runBusinessPlanner(client, ga4, research, marketing);
-    L(`PLAN-BIZ done: ${businessPlan.headline?.slice(0, 60)}`);
+        // Step 3: PLAN-BIZ — Step 2 결과 모두 보고 결정
+        businessPlan = await runBusinessPlanner(client, ga4, research, marketing);
+        L(`PLAN-BIZ done: ${businessPlan.headline?.slice(0, 60)}`);
+      } catch (e) {
+        L(`LLM 파이프라인 실패: ${e?.message || e} — 실측 요약만 발송`);
+      }
+    } else {
+      L("ANTHROPIC_API_KEY 미설정 — LLM 에이전트 생략, 실측 요약만 발송");
+    }
 
-    const header = buildCard({
-      tag: "🌅",
-      title: `Zepta 일일 보고 — ${fmtKST().slice(0, 8)}`,
-      lines: [
-        `실거래 활동 + 가상매매 참고 + 7인 시니어 진단`,
-      ],
-      footer: ga4 && !ga4.error ? `어제 GA4 사용자 ${ga4.users}명 · 세션 ${ga4.sessions}건` : undefined,
-    });
-
+    // ── 상세 카드 (발송 안 함 — KV·응답 JSON 전용. 웹 /reports 상세 뷰의 원천) ──
     const timeStops = analyzeTimeStops(archive); // ★ item6: 시간청산(TIME/SOFT_TIME) 단계 분석
-    const cards = [
-      header,
-      // ★ 실거래 활동 — 헤더 직후에 배치 (가장 중요한 정보)
+    const detailCards = [
       buildRealTradingActivityCard(realActivity, summary),
-      // ★ item6: 실거래 vs 가상 실행 괴리 (실거래 청산 표본 ≥5 시 비교 시작)
       buildLiveVsShadowCard(realActivity?.liveSummary, summary),
       buildShadowReferenceCard(summary, timeStops),
-      // ★ C: 미 증시 매크로 백드롭 (Massive — 키 없으면 미삽입)
       ...(macro ? [buildMacroCard(macro)] : []),
-      // ★ 온체인 유동성 백드롭 (DefiLlama, shadow 관측)
       ...[buildOnchainCard(onchainLiq, { btc: nfBtc, eth: nfEth })].filter(Boolean),
-      // ★ Alpha Lab (Phase 1~6) — 24/7 자동 알파 추적 결과
       buildAlphaLabCard(alphaLeaderboard, alphaCandidates),
-      buildCardsForResearch(research),
-      buildCardsForPlan(plan),
-      buildCardsForMarketing(marketing),
-      buildCardsForServicePlanner(servicePlan),
-      buildCardsForBusinessPlanner(businessPlan),
-      buildCardsForDevImplementer(devImpl),
-      buildCardsForDevPerf(devPerf),
+      // ★ 리뷰 수리: LLM 부분 실패 시 null 결과를 "파싱 실패" 카드로 오인 표시하지 않도록
+      //   에이전트별로 결과가 있을 때만 상세 카드 생성 (전원 성공 시 기존과 동일).
+      ...(research ? [buildCardsForResearch(research)] : []),
+      ...(plan ? [buildCardsForPlan(plan)] : []),
+      ...(marketing ? [buildCardsForMarketing(marketing)] : []),
+      ...(servicePlan ? [buildCardsForServicePlanner(servicePlan)] : []),
+      ...(businessPlan ? [buildCardsForBusinessPlanner(businessPlan)] : []),
+      ...(devImpl ? [buildCardsForDevImplementer(devImpl)] : []),
+      ...(devPerf ? [buildCardsForDevPerf(devPerf)] : []),
     ];
+
+    // ── ★ 통합 요약 카드 1건 (텔레그램으로 나가는 유일한 발송문, 12줄 이내) ──
+    const { card: summaryCard, lineCount: summaryLineCount } = buildStandupSummaryCard({
+      dateStr: fmtKST().slice(0, 8),
+      marketRegime,
+      marketEvents,
+      realActivity,
+      liveSummary: realActivity?.liveSummary,
+      shadowSummary: summary,
+      capital: capitalVerdict,
+      health: healthVerdict,
+      timing: timingVerdict,
+      research,
+      alphaLeaderboard,
+    });
+    L(`통합 요약 카드 생성: ${summaryLineCount}줄`);
+
+    // ── 상세 내용 KV 적재 (웹 /reports 에서 조회) ──
+    const kstDate = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+    const detailPayload = {
+      date: kstDate,
+      summary: summaryCard,
+      detailCards,
+      research, plan, marketing, servicePlan, businessPlan, devImpl, devPerf,
+      retroBacktest: retroResult,
+      generatedAt: new Date().toISOString(),
+    };
+    // ★ 리뷰 수리: dryRun 은 무부작용 계약 — 테스트 호출이 웹 /reports 원천(di:standup:latest)과
+    //   해당 날짜 아카이브를 덮어쓰지 않도록 실발송 경로에서만 적재합니다.
+    if (!dryRun) {
+      try {
+        await kv.set("di:standup:latest", detailPayload);
+        await kv.set(`di:standup:daily:${kstDate}`, detailPayload, { ex: 30 * 86400 });
+        L("상세 KV 적재 완료 (di:standup:latest)");
+      } catch (e) {
+        L(`상세 KV 적재 실패: ${e?.message}`);
+      }
+    } else {
+      L("dryRun — 상세 KV 적재 생략 (무부작용)");
+    }
 
     if (dryRun) {
       return res.status(200).json({
         ok: true,
         dryRun: true,
-        cards,
+        summaryCard,
+        summaryLineCount,
+        detailCards,
         research,
         plan,
         marketing,
@@ -1420,13 +1580,15 @@ export default async function handler(req, res) {
       });
     }
 
-    const tg = await sendCards(cards);
+    const tg = await sendTelegram({ text: summaryCard });
     L(`telegram send: ${tg.ok ? "ok" : "fail " + (tg.error || "")}`);
 
     return res.status(200).json({
       ok: true,
       sent: tg.ok,
       messageId: tg.message_id,
+      summaryCard,
+      summaryLineCount,
       research,
       plan,
       marketing,
@@ -1438,6 +1600,14 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     console.error("[daily-standup] fatal:", err);
+    // ★ 리뷰 수리: 알림 통합 후 스탠드업이 유일한 발송 경로 — 생성 자체가 죽으면
+    //   "오늘 보고가 안 온 것"조차 알 수 없으므로 최소 실패 통지를 발송합니다.
+    //   (정보성 알림이 아니라 그날의 데일리 1건을 대체하는 통지 — dryRun 은 무발송 유지)
+    if (!dryRun) {
+      try {
+        await sendTelegram({ text: `🔴 Zepta 데일리 생성 실패 — ${err?.message || err}\n수동 확인: /api/agents/daily-standup?dryRun=1` });
+      } catch {}
+    }
     return res.status(200).json({ ok: false, error: err?.message || String(err), log });
   }
 }
