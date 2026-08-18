@@ -38,6 +38,25 @@ export const RISK_CONFIG = {
     maxFactor: 1.0,  // riskAmount × 1.0
   },
 
+  // ★ 2026-08-18 (대표 지시): 고확신 신호 마진 플로어 — "정말 매력적인 종목은 50%까지 진입".
+  //   기존 체인은 확신도 감쇠(0.4~1.0) × sizeHint(기본 0.5) 이중 감쇠로 게이트(55) 근처
+  //   신호가 마진 $17~30 소액에 몰림. 점수 minScore 이상이면 최종 마진에 자본 비례
+  //   플로어를 깔아준다 (score 70 → 자본 15% … 88+ → 50%, 선형).
+  //   안전장치 3중:
+  //     (1) maxMarginPct(단일 50%)·가용잔고 90% 안에서만 — 초과 인출 불가
+  //     (2) riskCapMult: 부스트 후 SL 손실이 riskAmount × 2.0 초과 금지
+  //         (최광폭 SL 7.5% + 만점 신호일 때 최대 손실 = 자본 ~20% 가 절대 상한)
+  //     (3) env ZEPTA_CONVICTION_MARGIN=0 으로 즉시 전체 비활성 (기존 사이징 복원),
+  //         ZEPTA_CONVICTION_MARGIN_MAXFRAC 으로 상한 조정 (예: 0.3)
+  convictionMarginBoost: {
+    enabled: true,
+    minScore: 70,     // 이 점수부터 플로어 발동 (55~69 는 기존 소액 사이징 그대로)
+    maxScore: 88,     // 이상이면 maxFrac 풀 적용
+    minFrac: 0.15,    // score 70 → 자본 15% 마진
+    maxFrac: 0.50,    // score 88+ → 자본 50% 마진 (대표 지시 2026-08-18)
+    riskCapMult: 2.0, // 부스트 후 $위험 ≤ riskAmount × 2.0
+  },
+
   // 한 포지션 최대 증거금 비중 — 자본 대비 마진 상한 (lev 별 차이 흡수)
   // 자본 $325 × 0.5 = $163 마진 상한 (8x lev 면 노출 $1,300 → 한도 300 에서 잘림)
   maxMarginPct: 0.5,
@@ -90,12 +109,18 @@ export const RISK_CONFIG = {
   pyramidMinR: 0.0,
   sameSymbolMaxNotionalPct: 0.30,
 
-  // 심볼 간 상관 그룹 — 같은 그룹에서 동시 2개 금지
+  // 심볼 간 상관 그룹 — 같은 그룹에서 동시 2개 진입 차단(분산). inSameCorrelationGroup() 참조.
+  // ★ 2026-08-18: dead 심볼 정정 + 엔진 배선 (대표 지시 "전략 개선 반영").
+  //   - MATICUSDT 제거: 리브랜딩(POL) 후 선물 유니버스에서 빠짐(#109). POLUSDT 도 현
+  //     top-50 에 없어 교체해도 의미 없음 → 실거래되는 LINK+AAVE 로 재구성.
+  //   ⚠️ 유니버스가 동적이라 하위권 알트는 일시적으로 top-50 밖으로 빠질 수 있음.
+  //     그 경우 해당 심볼은 "짝 없음"이 되어 가드가 조용히 미발동(fail-open) — 에러 아님.
+  //     항구적 보강은 유니버스 기반 동적 그룹화(향후 과제).
   correlationGroups: [
     ["BTCUSDT", "ETHUSDT", "BNBUSDT"],              // 메가캡
     ["SOLUSDT", "AVAXUSDT", "ADAUSDT", "DOTUSDT"],  // L1
     ["DOGEUSDT", "XRPUSDT"],                        // 레거시 밈/페이먼트
-    ["MATICUSDT", "LINKUSDT"],                      // 인프라
+    ["LINKUSDT", "AAVEUSDT"],                       // DeFi 블루칩/인프라 (구 MATIC+LINK 대체)
   ],
 
   // 전략 family 별 ATR × 배수 (SL 거리) — 하위 호환용 (구버전 family 명)
@@ -601,8 +626,12 @@ export function approxLiquidationPct(leverage) {
   return (1 / leverage) * 0.9; // 유지증거금 ~10% 흡수
 }
 
-/** 상관 그룹에서 이미 오픈된 심볼과 같은 그룹인지 */
+/** 상관 그룹에서 이미 오픈된 심볼과 같은 그룹인지.
+ *  ★ 2026-08-18 엔진 배선 완료 (engine.js — 대표 지시 "전략 개선 반영").
+ *    env ZEPTA_CORRELATION_GUARD=0 으로 즉시 비활성(항상 false=차단 안 함). 기본 ON.
+ *  짝이 유니버스에서 빠져 그룹에 단독으로 남으면 자연히 false(미발동) — fail-open. */
 export function inSameCorrelationGroup(symbol, openSymbols, cfg = RISK_CONFIG) {
+  if (process.env.ZEPTA_CORRELATION_GUARD === "0") return false;
   const groups = cfg.correlationGroups || [];
   for (const g of groups) {
     if (g.includes(symbol) && openSymbols.some((s) => g.includes(s) && s !== symbol)) return true;
@@ -778,6 +807,38 @@ export function planTrade({ signal, equity, price, atr, filter, regime = null, a
   const sizeHint = clamp(signal.sizeHint ?? 0.5, 0.1, 1.0);
   notional = notional * sizeHint;
   push(`sizeHint=${sizeHint} → notional=$${notional.toFixed(2)}`);
+
+  // 8.4) ★ 2026-08-18 (대표 지시): 고확신 마진 플로어 — 점수 높은 신호는 감쇠 체인을
+  //   무시하고 자본 비례 마진까지 끌어올린다 (설정·안전장치는 convictionMarginBoost 주석 참조).
+  const cmb = cfg.convictionMarginBoost || {};
+  if (cmb.enabled !== false && process.env.ZEPTA_CONVICTION_MARGIN !== "0") {
+    const sc = Number(signal.score);
+    const cmbLo = cmb.minScore ?? 70;
+    if (Number.isFinite(sc) && sc >= cmbLo) {
+      const cmbHi = cmb.maxScore ?? 88;
+      const fLo = cmb.minFrac ?? 0.15;
+      const envMaxFrac = Number(process.env.ZEPTA_CONVICTION_MARGIN_MAXFRAC);
+      const fHi = Number.isFinite(envMaxFrac) && envMaxFrac > 0
+        ? Math.min(envMaxFrac, cfg.maxMarginPct || 0.5)
+        : Math.min(cmb.maxFrac ?? 0.50, cfg.maxMarginPct || 0.5);
+      const tt = cmbHi > cmbLo ? clamp((sc - cmbLo) / (cmbHi - cmbLo), 0, 1) : 1;
+      const frac = fLo + tt * (fHi - fLo);
+      // 마진 타깃 — 자본 비례. 가용잔고(90% 예산) 안으로 제한 (초과 인출 불가).
+      let targetMargin = equity * frac;
+      if (Number.isFinite(availableMargin) && availableMargin > 0) {
+        targetMargin = Math.min(targetMargin, availableMargin * (cfg.availableMarginBudgetPct ?? 0.90));
+      }
+      // $위험 상한 — 부스트로 늘어난 SL 손실이 riskAmount × riskCapMult 초과 금지.
+      const maxNotionalByRisk = (riskAmount * (cmb.riskCapMult ?? 2.0)) / effLossPct;
+      const targetNotional = Math.min(targetMargin * finalLev, maxNotionalByRisk);
+      if (targetNotional > notional) {
+        push(`conviction-margin floor: score ${sc} → 자본 ${(frac * 100).toFixed(0)}% 마진 타깃 $${targetMargin.toFixed(2)}`
+          + ` → notional $${notional.toFixed(2)} → $${targetNotional.toFixed(2)}`
+          + (targetNotional < targetMargin * finalLev ? ` (riskCap ${(cmb.riskCapMult ?? 2.0)}× 로 제한)` : ""));
+        notional = targetNotional;
+      }
+    }
+  }
 
   // 8.5) ★ 2026-05-12 자본 비례 최소 마진 강제 (이전: absoluteValue $50).
   //   minMargin = max(equity × minMarginPct, minMarginFloor)

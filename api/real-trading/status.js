@@ -133,6 +133,9 @@ export default async function handler(req, res) {
         maxRoiLossPct: RISK_CONFIG.maxRoiLossPct,
         minNetRR: RISK_CONFIG.minNetRR,
         maxConcurrentPositions: RISK_CONFIG.maxConcurrentPositions,
+        // ★ 2026-08-18 (대표 지시): 고확신 마진 플로어 — UI 리스크 프리셋 카드 SSOT
+        convictionMarginBoost: (RISK_CONFIG.convictionMarginBoost && process.env.ZEPTA_CONVICTION_MARGIN !== "0")
+          ? RISK_CONFIG.convictionMarginBoost : null,
       },
       shadow: {
         summary: shadowSummary || null,

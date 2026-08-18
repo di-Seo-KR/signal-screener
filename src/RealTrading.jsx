@@ -1222,6 +1222,11 @@ function RealTradingInner({ onNavigate }) {
         <KV label="합산 노셔널 한도"
           value={rcNotionalRatio == null ? "—"
             : `자본의 ${(rcNotionalRatio * 100).toFixed(0)}%${rcNotionalCap ? ` (현재 ${fmtUsd(rcNotionalCap, 0)})` : ""}`} />
+        {/* ★ 2026-08-18 (대표 지시): 고확신 마진 플로어 — 점수 높을수록 크게 진입 */}
+        {riskCfg.convictionMarginBoost && (
+          <KV label="고확신 진입 확대"
+            value={`score ${riskCfg.convictionMarginBoost.minScore}+ → 자본 ${(riskCfg.convictionMarginBoost.minFrac * 100).toFixed(0)}~${(riskCfg.convictionMarginBoost.maxFrac * 100).toFixed(0)}% 마진 (점수 비례)`} />
+        )}
         <KV label="SL/TP 방식" value={`ATR(14) + ROI -${rcRoiCap.toFixed(0)}% cap`} />
         <KV label="최소 net RR" value={`${rcMinRR.toFixed(1)}R`} />
         <KV label="최대 보유 시간" value="무제한 (TP/SL 만)" />
@@ -1237,10 +1242,9 @@ function RealTradingInner({ onNavigate }) {
         fontSize: 14, color: "var(--z-text-2)", lineHeight: 1.6,
       }}>
         <Badge tone="blue" size="sm" style={{ marginRight: 6 }}>안전장치</Badge>
-        Killswitch fail-closed · 봇 mark-price 모니터링(2분 주기)으로 SL/TP 청산 · 일일 Reconcile(Binance=진실)
-        {/* ★ 2026-08-18 (일일감사): "상관군 제한" 표기 삭제 — inSameCorrelationGroup() 은
-            risk-manager.js 에서 export 만 돼 있고 엔진 호출부가 0건(미배선)입니다.
-            작동하지 않는 안전장치를 안전장치로 표기하지 않습니다. 배선은 돈 직결이라 대표 판단 영역. */}
+        Killswitch fail-closed · 봇 mark-price 모니터링(2분 주기)으로 SL/TP 청산 · 일일 Reconcile(Binance=진실) · 상관군 제한
+        {/* ★ 2026-08-18 오전 일일감사에서 미배선으로 표기 삭제했다가, 같은 날 대표 지시
+            ("전략 개선 반영")로 engine.js 에 실제 배선 완료 후 표기 복원. */}
       </div>
     </Card>
   );
