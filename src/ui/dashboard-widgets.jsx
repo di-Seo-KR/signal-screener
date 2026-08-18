@@ -130,11 +130,23 @@ function computeLiveMetrics(orders, realized) {
   // ★ 2026-06-03: 청산 손익은 'realized'(바이낸스 REALIZED_PNL income) 를 우선 사용.
   //   orders 는 진입주문만 기록돼 pnl 이 없어 승률/손익비가 안 잡혔음 → realized 로 정확 집계.
   //   realized: [{ symbol, pnl, time }]. 없으면 기존 orders 폴백.
+  // ★ 2026-08-18 (일일감사): 부분청산 레코드 합산. 바이낸스 REALIZED_PNL income 은
+  //   "체결(fill) 단위"라 한 번의 청산이 수십 건으로 쪼개져 들어옵니다.
+  //   (실측: KAITOUSDT 한 청산이 동일 ms 타임스탬프로 58건) 이를 개별 거래로 세면
+  //   거래 수·승률·Sharpe 가 전부 왜곡됩니다 — 실측 128건→15건, 승률 52%→40%,
+  //   Sharpe 는 √(n) 계수 때문에 -1.51→-0.56 로 과대. 같은 (심볼, 시각) 은 한 청산으로 합산합니다.
   const pnls = [];
   if (Array.isArray(realized) && realized.length > 0) {
+    const byClose = new Map();
     for (const t of realized) {
       const pnl = parseFloat(t.pnl);
-      if (isFinite(pnl) && pnl !== 0) pnls.push(pnl);
+      if (!isFinite(pnl) || pnl === 0) continue;
+      const key = `${t.symbol || ""}@${t.time || 0}`;
+      byClose.set(key, (byClose.get(key) || 0) + pnl);
+    }
+    for (const sum of byClose.values()) {
+      // 부분청산 익절+손절이 정확히 상쇄돼 0 이 된 건은 승/패 판정 불가 → 제외
+      if (Math.abs(sum) > 1e-9) pnls.push(sum);
     }
   } else if (Array.isArray(orders)) {
     for (const o of orders) {

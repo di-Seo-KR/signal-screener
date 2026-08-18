@@ -349,6 +349,11 @@ function RealTradingInner({ onNavigate }) {
   const rcMaxLev = riskCfg.maxLeverage ?? 5;
   const rcLevLabel = rcMinLev === rcMaxLev ? `고정 ${rcMaxLev}×` : `${rcMinLev}~${rcMaxLev}× (확신도 기반)`;
   const rcMinRR = riskCfg.minNetRR ?? 1.8;
+  // ★ 2026-08-18 (일일감사): 노셔널 가드는 "비활성" 이라고 하드코딩돼 있었지만 실제로는
+  //   equity × maxTotalNotionalRatio 로 살아 있고, 지금 엔진 거절 사유의 대부분이 이 가드입니다.
+  //   실값(riskConfig.maxTotalNotionalRatio)과 현재 자본으로 환산한 실 한도를 그대로 보여줍니다.
+  const rcNotionalRatio = riskCfg.maxTotalNotionalRatio ?? null;
+  const rcNotionalCap = (rcNotionalRatio != null && equity > 0) ? equity * rcNotionalRatio : null;
 
   // ═════════════════════════════════════════════════════════
   // ★ 2026-08-12 IA v3 (시안 1g): 콘솔형 상태 히어로
@@ -1182,7 +1187,10 @@ function RealTradingInner({ onNavigate }) {
         <KV label="트레이드당 리스크" value={`${rcRiskPct.toFixed(0)}% equity`} />
         <KV label="최대 증거금 비율" value={`${rcMarginSingle.toFixed(0)}% (단일) · ${rcMarginTotal.toFixed(0)}% (합산)`} />
         <KV label="레버리지" value={rcLevLabel} />
-        <KV label="동시 포지션 한도" value="개수 무제한 · 합산 마진 95%가 실 안전망 (노셔널 가드 비활성)" />
+        <KV label="동시 포지션 한도" value={`개수 ${riskCfg.maxConcurrentPositions ?? "—"}개 · 합산 마진 ${rcMarginTotal.toFixed(0)}%`} />
+        <KV label="합산 노셔널 한도"
+          value={rcNotionalRatio == null ? "—"
+            : `자본의 ${(rcNotionalRatio * 100).toFixed(0)}%${rcNotionalCap ? ` (현재 ${fmtUsd(rcNotionalCap, 0)})` : ""}`} />
         <KV label="SL/TP 방식" value={`ATR(14) + ROI -${rcRoiCap.toFixed(0)}% cap`} />
         <KV label="최소 net RR" value={`${rcMinRR.toFixed(1)}R`} />
         <KV label="최대 보유 시간" value="무제한 (TP/SL 만)" />
@@ -1198,7 +1206,10 @@ function RealTradingInner({ onNavigate }) {
         fontSize: 14, color: "var(--z-text-2)", lineHeight: 1.6,
       }}>
         <Badge tone="blue" size="sm" style={{ marginRight: 6 }}>안전장치</Badge>
-        Killswitch fail-closed · 봇 mark-price 모니터링(2분 주기)으로 SL/TP 청산 · 일일 Reconcile(Binance=진실) · 상관군 제한
+        Killswitch fail-closed · 봇 mark-price 모니터링(2분 주기)으로 SL/TP 청산 · 일일 Reconcile(Binance=진실)
+        {/* ★ 2026-08-18 (일일감사): "상관군 제한" 표기 삭제 — inSameCorrelationGroup() 은
+            risk-manager.js 에서 export 만 돼 있고 엔진 호출부가 0건(미배선)입니다.
+            작동하지 않는 안전장치를 안전장치로 표기하지 않습니다. 배선은 돈 직결이라 대표 판단 영역. */}
       </div>
     </Card>
   );
