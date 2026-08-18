@@ -248,7 +248,13 @@ function LifecyclePipeline({ data }) {
   // 실거래 반영중 — di:alpha:params 에 적재된(tunedAt 있는) 전략만 (실측)
   const injected = useMemo(() => Object.entries(params)
     .filter(([id, p]) => p && p.tunedAt && isValidStrategyId(id))
-    .map(([id, p]) => ({ id, sharpe: p.sharpe ?? null, oos: p.oosSharpe ?? null, tunedAt: p.tunedAt }))
+    .map(([id, p]) => ({
+      id, sharpe: p.sharpe ?? null, oos: p.oosSharpe ?? null, tunedAt: p.tunedAt,
+      // ★ 2026-08-18 (일일감사): 표본 수를 함께 노출. OOS Sharpe 는 거래 수가 적으면
+      //   쉽게 두 자릿수로 튀어(실측: mean-revert OOS 14.83 / 표본 15거래) 숫자만 보면
+      //   대단한 알파처럼 보입니다. 표본이 작을 때는 "참고용" 임을 명시합니다.
+      trades: Number.isFinite(p.trades) ? p.trades : null,
+    }))
     .sort((a, b) => (b.sharpe || 0) - (a.sharpe || 0)), [params]);
 
   const topCands = useMemo(() => [...candidates]
@@ -299,17 +305,26 @@ function LifecyclePipeline({ data }) {
       {injected.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 10 }}>
           <span style={{ fontSize: FONT.xs, fontWeight: 700, color: C.green }}>{t("alphalab.pipeline.injectedLead")}</span>
-          {injected.map((p) => (
-            <span key={p.id} style={{
-              display: "inline-flex", alignItems: "center", gap: 6,
-              background: C.card2, border: `1px solid ${C.border}`, borderRadius: RADIUS.full,
-              padding: "3px 10px", fontSize: FONT.xs,
-            }}>
-              <span style={{ fontWeight: 700, color: C.text1 }}>{strategyLabel(t, p.id)}</span>
-              <span style={{ color: C.text3 }}>{t("alphalab.pipeline.injectedChip", { sharpe: fmtNum(p.sharpe, 2), oos: fmtNum(p.oos, 2) })}</span>
-              <span style={{ color: C.text3 }}>{fmtAgo(t, p.tunedAt)}</span>
-            </span>
-          ))}
+          {injected.map((p) => {
+            // 표본 30거래 미만이면 OOS Sharpe 를 성과가 아니라 "참고용" 으로 표기
+            const lowN = p.trades != null && p.trades < 30;
+            return (
+              <span key={p.id} style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                background: C.card2, border: `1px solid ${C.border}`, borderRadius: RADIUS.full,
+                padding: "3px 10px", fontSize: FONT.xs,
+              }} title={lowN ? t("alphalab.pipeline.injectedLowN", { trades: p.trades }) : undefined}>
+                <span style={{ fontWeight: 700, color: C.text1 }}>{strategyLabel(t, p.id)}</span>
+                <span style={{ color: C.text3 }}>
+                  {p.trades != null
+                    ? t("alphalab.pipeline.injectedChipN", { sharpe: fmtNum(p.sharpe, 2), oos: fmtNum(p.oos, 2), trades: fmtInt(p.trades) })
+                    : t("alphalab.pipeline.injectedChip", { sharpe: fmtNum(p.sharpe, 2), oos: fmtNum(p.oos, 2) })}
+                </span>
+                {lowN && <span style={{ color: C.text3, fontWeight: 700 }}>· {t("alphalab.pipeline.injectedLowNTag")}</span>}
+                <span style={{ color: C.text3 }}>{fmtAgo(t, p.tunedAt)}</span>
+              </span>
+            );
+          })}
         </div>
       )}
 
