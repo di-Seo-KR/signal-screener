@@ -25,7 +25,7 @@ import { loadUserCredentials, respondError } from "../_shared/binance-auth.js";
 // ★ 2026-05-09 audit N2: pickBestSignal 미사용 (rankSignals 만 사용) — dead import 제거
 import { extractSignal, rankSignals } from "../_shared/signal-extractor.js";
 import { loadFamilyWeightsRobust, applyWeightsToRanking } from "../_shared/strategy-weights.js";
-import { planTrade, RISK_CONFIG, SWING_EXITS, checkAggregateExposure, checkPyramidGuard, checkSameSymbolNotional } from "../_shared/risk-manager.js";
+import { planTrade, RISK_CONFIG, SWING_EXITS, checkAggregateExposure, checkPyramidGuard, checkSameSymbolNotional, inSameCorrelationGroup } from "../_shared/risk-manager.js";
 import { preTradeCheck } from "../_shared/circuit-breaker.js";
 import { getSymbolFilter, isSymbolAffordable } from "../_shared/exchange-info.js";
 import { getTickerPrice, getAccountInfo, getKlines, getPositionRisk, placeOrder } from "../_shared/binance-client.js";
@@ -881,6 +881,21 @@ async function runOnce({ userId, forceDryRun = false, shadow = false, probe = fa
           if (sameSideCount >= maxPerSide) {
             S(`  ↳ 방향 과밀 차단: ${cand.side} 이미 ${sameSideCount}개 (한도 ${maxPerSide})`);
             tried.push({ symbol: cand.symbol, reason: `side concentration: ${sameSideCount} ${cand.side} ≥ ${maxPerSide}` });
+            continue;
+          }
+        }
+        // ★ 2026-08-18 (대표 지시 "전략 개선 반영"): 상관군 가드 배선.
+        //   UI 가 "상관군 제한" 을 안전장치로 표기해 왔으나 실제 호출부가 0건이던 것을
+        //   오늘 배선. 같은 상관 그룹(메가캡/L1/밈·페이먼트/DeFi 인프라)에서 이미 포지션이
+        //   열려 있으면 신규 진입 차단 — 사실상 같은 방향 베팅의 중복 노출 방지.
+        //   env ZEPTA_CORRELATION_GUARD=0 으로 즉시 비활성 (risk-manager 내부 킬스위치).
+        {
+          const openSyms = (liveOpenPositions || [])
+            .filter((pos) => parseFloat(pos.positionAmt || 0) !== 0)
+            .map((pos) => pos.symbol);
+          if (openSyms.length && inSameCorrelationGroup(cand.symbol, openSyms, RISK_CONFIG)) {
+            S(`  ↳ 상관군 차단: ${cand.symbol} 이 오픈 포지션과 같은 상관 그룹`);
+            tried.push({ symbol: cand.symbol, reason: `correlation group: 같은 상관군 포지션 보유 중` });
             continue;
           }
         }
