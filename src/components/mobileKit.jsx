@@ -26,11 +26,15 @@ export const MONO = "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, mono
 export function useKitText() {
   const ctx = useLanguage();
   const t = ctx?.t;
-  return React.useCallback((key, fallback) => {
-    if (typeof t !== "function") return fallback;
-    const v = t(key);
+  return React.useCallback((key, fallback, params) => {
+    // 미등록 키 폴백에도 동일한 {{param}} 치환을 적용합니다 (사전 등록 전후 표기 일치).
+    const fill = (s) => (params && typeof s === "string"
+      ? s.replace(/\{\{(\w+)\}\}/g, (_, k) => params[k] ?? "")
+      : s);
+    if (typeof t !== "function") return fill(fallback);
+    const v = t(key, params);
     // t() 는 미등록 키를 키 문자열 그대로 돌려줍니다 — 그 경우 기본값으로 대체합니다.
-    return v === key ? fallback : v;
+    return v === key ? fill(fallback) : v;
   }, [t]);
 }
 

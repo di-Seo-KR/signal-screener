@@ -2574,7 +2574,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                 {/* 점수 게이지 + 요약 */}
                 <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "12px" }}>
                   <div style={{ position: "relative", width: "80px", height: "80px", flexShrink: 0 }}>
-                    <svg viewBox="0 0 80 80" width="80" height="80" role="img" aria-label={`종합 점수 ${diagData.score}점`}>
+                    <svg viewBox="0 0 80 80" width="80" height="80" role="img" aria-label={tt("chart.v3.scoreAria", "종합 점수 {{s}}점 만점 100점", { s: diagData.score })}>
                       <circle cx="40" cy="40" r="34" fill="none" stroke={CC.border} strokeWidth="7" />
                       <circle cx="40" cy="40" r="34" fill="none"
                         stroke={scoreTone(CC, diagData.score).fg}
@@ -2622,7 +2622,9 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                             }}>
                               {isOver ? "+" : ""}{premium.toFixed(1)}%
                               <span style={{ fontSize: "13px", marginLeft: "4px", fontWeight: 500 }}>
-                                {Math.abs(premium) < 5 ? "적정" : isOver ? "고평가" : "저평가"}
+                                {Math.abs(premium) < 5
+                                  ? tt("chart.v3.valFair", "적정")
+                                  : isOver ? tt("chart.v3.valOver", "고평가") : tt("chart.v3.valUnder", "저평가")}
                               </span>
                             </div>
                           );
@@ -2675,7 +2677,9 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                           flexShrink: 0, marginTop: "2px",
                           background: sig.type === "bullish" ? CC.greenBg : sig.type === "bearish" ? CC.redBg : CC.yellowBg,
                           color: sig.type === "bullish" ? CC.green : sig.type === "bearish" ? CC.red : CC.yellow,
-                        }}>{sig.type === "bullish" ? "강세" : sig.type === "bearish" ? "약세" : "중립"}</span>
+                        }}>{sig.type === "bullish"
+                          ? tt("chart.v3.sigBull", "강세")
+                          : sig.type === "bearish" ? tt("chart.v3.sigBear", "약세") : tt("chart.v3.sigNeutral", "중립")}</span>
                         <div>
                           <div style={{ fontSize: "13px", fontWeight: 600, color: CC.text1 }}>{sig.name}</div>
                           <div style={{ fontSize: "13px", color: CC.text3, marginTop: "2px" }}>{sig.detail}</div>
@@ -2719,7 +2723,10 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                 )}
                 {latestScore && latestScore.longScore === 0 && latestScore.recent && (
                   <div style={{ marginBottom: "6px", color: CC.green, fontSize: "12px", fontWeight: 600 }}>
-                    {tt("chart.v3.recentFire", "최근 발화")} {Math.min(100, Math.round(latestScore.recent.score / 2.5 * 100))}점 ({latestScore.recent.barsAgo}봉 전)
+                    {tt("chart.v3.recentFireVal", "최근 발화 {{s}}점 ({{n}}봉 전)", {
+                      s: Math.min(100, Math.round(latestScore.recent.score / 2.5 * 100)),
+                      n: latestScore.recent.barsAgo,
+                    })}
                   </div>
                 )}
                 {recentSignals.length === 0 ? (
@@ -2733,14 +2740,17 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
                       </div>
                     ) : (
                       <div key={`${s.i}-${idx}`} style={{ marginBottom: "4px", color: s.dir > 0 ? CC.green : CC.red }}>
-                        <span style={{ fontWeight: 700 }}>{s.dir > 0 ? "▲ 롱 진입" : "▼ 숏(단기)"} {Math.min(100, Math.round(s.score / 2.5 * 100))}점</span>
+                        <span style={{ fontWeight: 700 }}>
+                          {s.dir > 0 ? tt("chart.v3.longEntry", "▲ 롱 진입") : tt("chart.v3.shortEntry", "▼ 숏(단기)")}{" "}
+                          {tt("chart.v3.markerScore", "{{s}}점", { s: Math.min(100, Math.round(s.score / 2.5 * 100)) })}
+                        </span>
                         <span style={{ color: CC.text2 }}> — {(s.reasons || []).join(" + ")}</span>
                       </div>
                     )
                   ))
                 )}
                 <div style={{ color: CC.text3, fontSize: "11px", marginTop: "8px", lineHeight: 1.5 }}>
-                  상장 이후 전체(약세장 포함) 딥 실측+홀드아웃 통과 요소만 점수화 · 롱은 EMA200 위에서만(레짐 게이트) · ▼숏=OBV 분산(약세장 한정·단기 성격, 유일 검증 숏) · ■청산=EMA20 이탈 리스크 규칙 · 1h는 펀딩 기반 요소(서버 연동 예정)라 4h/일봉 권장 · 수익 보장 아님
+                  {tt("chart.v3.timingNote", "상장 이후 전체(약세장 포함) 딥 실측+홀드아웃 통과 요소만 점수화 · 롱은 EMA200 위에서만(레짐 게이트) · ▼숏=OBV 분산(약세장 한정·단기 성격, 유일 검증 숏) · ■청산=EMA20 이탈 리스크 규칙 · 1h는 펀딩 기반 요소(서버 연동 예정)라 4h/일봉 권장 · 수익 보장 아님")}
                 </div>
               </div>
             )}
@@ -2790,7 +2800,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
               newList[idx] = { ...newList[idx], period: parseInt(e.target.value) || 5 };
               updateSettings({ ...settings, maList: newList });
             }} style={numInput(CC)} />
-            <input type="color" value={ma.color} aria-label={`MA${ma.period} 색상`} onChange={e => {
+            <input type="color" value={ma.color} aria-label={tt("chart.v3.maColor", "MA{{p}} 색상", { p: ma.period })} onChange={e => {
               const newList = [...settings.maList];
               newList[idx] = { ...newList[idx], color: e.target.value };
               updateSettings({ ...settings, maList: newList });
@@ -2798,7 +2808,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
             <button onClick={() => {
               const newList = settings.maList.filter((_, i) => i !== idx);
               updateSettings({ ...settings, maList: newList });
-            }} aria-label={`MA${ma.period} 삭제`} style={{
+            }} aria-label={tt("chart.v3.maDelete", "MA{{p}} 삭제", { p: ma.period })} style={{
               background: "transparent", border: "none", color: CC.red, cursor: "pointer", fontSize: "16px", padding: "4px", marginLeft: "auto",
             }}>✕</button>
           </div>
@@ -2813,7 +2823,7 @@ export default function ChartModal({ asset, onClose, krwRate, theme = "dark" }) 
         }}>{tt("chart.v3.addMa", "+ MA 추가")}</button>
 
         <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", flexWrap: "wrap", borderTop: `1px solid ${CC.border}` }}>
-          <input type="checkbox" checked={!!settings.bb?.enabled} aria-label="볼린저 밴드" onChange={() => {
+          <input type="checkbox" checked={!!settings.bb?.enabled} aria-label={tt("chart.v3.bb", "볼린저 밴드")} onChange={() => {
             updateSettings({ ...settings, bb: { ...settings.bb, enabled: !settings.bb?.enabled } });
           }} style={{ width: "18px", height: "18px", accentColor: "#60a5fa" }} />
           <span style={{ fontSize: "14px", color: CC.text2, fontWeight: 600 }}>BB</span>
