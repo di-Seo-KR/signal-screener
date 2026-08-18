@@ -205,8 +205,15 @@ export const RISK_CONFIG = {
   //   마진 효율은 낮아짐(같은 노셔널에 마진 2배) → 동시 포지션 수는 자연 감소.
   // ★ audit M3/N4: leverageBias 객체 + 가변 lev 로직 모두 제거 (dead code).
   //   복원/조정 시 minLeverage 와 maxLeverage 를 다르게 두면 신뢰도 비례 가변 lev.
-  minLeverage: 5,
-  maxLeverage: 5,
+  // ★ 2026-08-18 대표 지시 — 5x → 10x 복원 (스코어·전략 개선과 함께).
+  //   효과: (1) 청산거리 ~18% → ~9% (liq-safe SL 캡 12.6% → 6.3% — 설계 SL 이
+  //       6.3~7.5% 구간인 광폭 종목은 SL 이 6.3% 로 압축됨. 청산 전 SL 순서는 유지).
+  //   (2) 같은 노셔널에 마진 절반 → 마진 효율 2배, 동시 포지션 여력 증가.
+  //   (3) 거래당 $위험은 SL 거리 기반 사이징이라 레버리지와 무관 — 불변.
+  //   (4) 고확신 마진 플로어(convictionMarginBoost)와 결합 시 노셔널이 커질 수 있으나
+  //       riskCapMult 2.0 (SL 손실 ≤ riskAmount×2 = 자본 ~20%) 이 최종 안전망.
+  minLeverage: 10,
+  maxLeverage: 10,
 
   // 청산거리 안전 버퍼
   //  SL 거리 ≤ 청산거리 × liqSafetyRatio 강제.
