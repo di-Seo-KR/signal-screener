@@ -30,9 +30,26 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, available: false, reason: e?.message || String(e), trades: [], count: 0 });
     }
 
-    const trades = (Array.isArray(rows) ? rows : [])
+    const fills = (Array.isArray(rows) ? rows : [])
       .map((r) => ({ symbol: r.symbol || "", pnl: Number(r.income) || 0, time: Number(r.time) || 0 }))
       .filter((t) => t.time > 0 && t.pnl !== 0)   // 손익 0(수수료 없는 평가) 제외
+      .sort((a, b) => b.time - a.time);
+
+    // ★ 2026-08-18 (일일감사): 부분청산 fill 합산 → "청산 1건 = 1거래".
+    //   income 레코드는 체결 단위라 한 청산이 수십 건으로 쪼개집니다(실측: KAITOUSDT 58건이
+    //   동일 ms). 그대로 세면 거래 수·승률·Sharpe 가 전부 왜곡돼 대시보드가 사용자를
+    //   오도합니다(실측 128건→15건, 승률 52%→40%). 같은 (심볼, 시각) 은 한 청산으로 합칩니다.
+    const byClose = new Map();
+    for (const f of fills) {
+      const key = `${f.symbol}@${f.time}`;
+      const cur = byClose.get(key);
+      if (cur) cur.pnl += f.pnl;
+      else byClose.set(key, { symbol: f.symbol, pnl: f.pnl, time: f.time, fills: 0 });
+      byClose.get(key).fills += 1;
+    }
+    const trades = [...byClose.values()]
+      .map((t) => ({ ...t, pnl: Number(t.pnl.toFixed(8)) }))
+      .filter((t) => t.pnl !== 0)   // 부분 익절/손절이 정확히 상쇄된 건은 승패 판정 불가
       .sort((a, b) => b.time - a.time);
 
     const wins = trades.filter((t) => t.pnl > 0).length;
@@ -42,11 +59,12 @@ export default async function handler(req, res) {
     return res.status(200).json({
       ok: true,
       available: true,
-      trades,                       // [{ symbol, pnl, time }] 최신순
+      trades,                       // [{ symbol, pnl, time, fills }] 최신순 — 청산 1건 단위
       count: trades.length,
       wins, losses,
+      fillCount: fills.length,      // 원본 income 레코드 수 (참고용)
       netPnL: Number(netPnL.toFixed(2)),
-      note: "REALIZED_PNL income 기준. 부분청산은 여러 레코드가 될 수 있음(승률 근사).",
+      note: "REALIZED_PNL income 기준. 같은 (심볼, 시각) 부분청산 fill 은 청산 1건으로 합산했습니다. fills = 그 청산의 체결 레코드 수.",
     });
   } catch (err) {
     return respondError(res, err);
