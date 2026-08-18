@@ -54,6 +54,19 @@ const fmtUsd = (v, digits = 2) => {
   return (n < 0 ? "-$" : "$") + Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits });
 };
 const fmtPct = (v, d = 2) => (v == null || !isFinite(v)) ? "—" : (v >= 0 ? "+" : "") + Number(v).toFixed(d) + "%";
+// 경과 표기 — 누적 지표가 언제 기준인지 함께 보여줘야 옛 수치를 현재로 오독하지 않습니다.
+const daysSince = (t) => {
+  const ms = typeof t === "number" ? t : Date.parse(t || "");
+  if (!ms || !isFinite(ms)) return null;
+  return Math.floor((Date.now() - ms) / 86400000);
+};
+const fmtSince = (t) => {
+  const d = daysSince(t);
+  if (d == null) return null;
+  if (d <= 0) return "오늘";
+  if (d === 1) return "어제";
+  return `${d}일 전`;
+};
 // float 연산 부작용(3.9000000000000004) 제거용 qty 포맷터
 const fmtQty = (v) => {
   if (v == null || !isFinite(v)) return "—";
@@ -1044,6 +1057,24 @@ function RealTradingInner({ onNavigate }) {
     >
       {shadow.summary ? (
         <>
+          {/* ★ 누적 지표의 기준 시점 — 원장이 오래 멈춰 있으면 옛 수치를 현재 성과로 오독하게 됩니다. */}
+          {(() => {
+            const staleDays = daysSince(shadow.summary.updatedAt);
+            if (staleDays == null) return null;
+            const stale = staleDays >= 7;
+            return (
+              <div style={{
+                marginBottom: 12, padding: "8px 10px", fontSize: 14, lineHeight: 1.5,
+                background: stale ? "var(--z-yellow-bg)" : "var(--z-card-2)",
+                border: `1px solid ${stale ? "var(--z-yellow)" : "var(--z-border)"}`,
+                borderRadius: "var(--z-r-sm)",
+                color: stale ? "var(--z-yellow-hi)" : "var(--z-text-3)",
+              }}>
+                마지막 기록 <strong>{fmtSince(shadow.summary.updatedAt)}</strong>
+                {stale && " — 아래 누적 수치는 그 시점까지의 값이며 현재 성과가 아닙니다. 원장 적재가 멈췄는지 확인이 필요합니다."}
+              </div>
+            );
+          })()}
           <div style={{ display: "grid", gap: 10, gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(auto-fit, minmax(120px, 1fr))", marginBottom: 12 }}>
             <Stat compact label="총 트레이드" value={shadow.summary.trades || 0} />
             <Stat compact label="승 / 패" value={`${shadow.summary.wins || 0} / ${shadow.summary.losses || 0}`} />
