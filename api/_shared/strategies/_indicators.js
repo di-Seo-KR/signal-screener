@@ -363,6 +363,26 @@ export function refineCompositeEntry({ side, perTF = {}, sr = null, price = null
     reasons.push(`과매도 ${osCount}TF 소진(${tfs.filter(t => rsiVals[t] <= 30).map(t => `${t}:${rsiVals[t]}`).join("·")})`);
   }
 
+  // ── ①-b 단일 TF 극단 역주행 가드 (2026-08-18, 대표 제보 "과매도인데 숏 / 과매수인데 롱") ──
+  //   기존 ① 은 2TF 동시 극단만 감쇠 → 1h 단독 RSI 22 숏 같은 케이스가 무감쇠 통과했음.
+  //   실측 근거 (2026-08-18, 유동성 상위 8종 × 1h 1500봉 ≈ 62일, 이 커밋 메시지에 수치):
+  //     • RSI≥70 에서 롱: 6h -0.33%(t=-5.8) / 48h -0.95%(t=-5.3) — 전 시계 유의하게 불리
+  //     • RSI≤25 에서 숏: 6h +0.28%(t=+1.9) / 48h +0.85%(t=+2.9) — 반등 역행 + 스퀴즈
+  //       (48h 역방향 최대폭주 평균 3.43% vs 기준 2.85%)
+  //   1h(진입 TF) 기준 2단계 감쇠 — 점수가 깎이므로 게이트(55)·마진부스트(70+)와 자동 연동:
+  //     경계(OB70/OS25) ×0.80, 심층(OB75/OS20) ×0.65 (심층이면 82점 신호도 53 → 게이트 차단).
+  //   과매수/과매도 문턱이 비대칭(70 vs 25)인 것은 실측 분포 반영 — 하락장에서 RSI 분포가
+  //   아래로 쏠려 과매도는 더 깊어야 소진을 뜻함. env ZEPTA_RSI_EXTREME_GUARD=0 즉시 비활성.
+  if (process.env.ZEPTA_RSI_EXTREME_GUARD !== "0" && !mtfExhausted) {
+    const r1 = rsiVals["1h"] ?? rsiVals["4h"]; // 1h 우선, 없으면 4h 폴백
+    if (r1 != null) {
+      if (dir > 0 && r1 >= 75)      { mult *= 0.65; reasons.push(`1h 심층 과매수 ${r1} 롱 억제`); }
+      else if (dir > 0 && r1 >= 70) { mult *= 0.80; reasons.push(`1h 과매수 ${r1} 추격 롱 감쇠`); }
+      if (dir < 0 && r1 <= 20)      { mult *= 0.65; reasons.push(`1h 심층 과매도 ${r1} 숏 억제`); }
+      else if (dir < 0 && r1 <= 25) { mult *= 0.80; reasons.push(`1h 과매도 ${r1} 역행 숏 감쇠`); }
+    }
+  }
+
   // ── ② 과확장(추격) — 일봉 BB %B + 60봉 고저 위치 ──
   const d = perTF["1d"];
   if (d?.closes?.length >= 21 && price != null) {
