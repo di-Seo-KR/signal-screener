@@ -549,7 +549,9 @@ export default async function handler(req, res) {
       const sig1d = latestSignal; // ★ 순수 1d 신호 캡처(이후 폴백이 latestSignal 을 덮어써도 보존)
 
       // ★ 2026-06-03 (대표 지시): 멀티 타임프레임 종합 스코어.
-      //   주25·일30·4h25·1h20 부호 가중합 → 전 봉 합의 시 점수↑, 갈리면 상쇄(자동 컨플루언스).
+      //   주30·일25·4h25·1h20 부호 가중합 → 전 봉 합의 시 점수↑, 갈리면 상쇄(자동 컨플루언스).
+      //   (2026-08-19 감사: 이 줄의 이전 표기 "주25·일30"은 오기 — 코드·아래 주석·stock-signals
+      //    TF_WEIGHTS 모두 주0.30·일0.25 로 일관. 코드가 정본.)
       const _signed = (s) => !s ? 0 : ((s.type === "BUY" ? 1 : s.type === "SELL" ? -1 : 0) * (parseFloat(s.score) || 0));
       // 가중치(대표 지시 2026-06-03): 주30 · 일25 · 4h25 · 1h20
       const _compRaw = 0.30 * _signed(tf1wSignal) + 0.25 * _signed(sig1d) + 0.25 * _signed(tf4hSignal) + 0.20 * _signed(tf1hSignal);
@@ -717,25 +719,43 @@ export default async function handler(req, res) {
           ? { closes: arr.map(c => c.close), highs: arr.map(c => c.high), lows: arr.map(c => c.low), volumes: arr.map(c => c.volume || 0) } : null;
         // ★ 완결봉 1h/4h (sigForTF 와 일관). 1d 는 메인신호 배열 그대로(반응성 보존).
         const _perTF = { "1h": _mk(_closedTF(candles1h)), "4h": _mk(_closedTF(candles4h)), "1d": { closes, highs, lows, volumes } };
-        const _refSide = compositeSignal?.side || latestSignal?.side;
-        if (_refSide) {
-          const _ref = refineCompositeEntry({ side: _refSide, perTF: _perTF, sr: srLevels, price: closes[closes.length - 1] });
-          // ★ 적대감사 P2-14: refine 으로 score 가 바뀌면 confidence(A/B/C)도 재산출해야 정합
-          //   (안 그러면 score↓인데 confidence A 그대로 → 랭킹·노출게이트가 stale confidence 사용).
-          const _grade = (s) => s >= 80 ? "A" : s >= 60 ? "B" : "C";
+        // ★ 2026-08-19 전략 감사 (A) 결함 수정 — 방향별 정제:
+        //   기존엔 `compositeSignal?.side || latestSignal?.side` 한 방향으로 배율을 1회
+        //   계산해 두 신호 모두에 곱했습니다. 기본 설정(ZEPTA_TRADE_COMPOSITE 미설정)의
+        //   실거래 신호는 latestSignal 인데, composite 와 방향이 갈리면(1d 숏 + 주·4h·1h
+        //   롱 등) #260 RSI 극단 가드·MTF 소진 감쇠가 실거래 신호에 **반대 방향 기준**으로
+        //   적용됐습니다 — 과매수 상황의 SHORT 를 부당 감쇠(0.65×)하고, 정작 과매도
+        //   상황의 SHORT(가드가 잡아야 할 케이스)는 무감쇠 통과. refineCompositeEntry 는
+        //   순수 함수라 신호별 side 로 각각 호출합니다. 방향이 같으면(대부분) 캐시로 1회만
+        //   계산돼 기존 동작과 비트 동일 — 갈릴 때만 각자 올바른 가드를 받습니다.
+        // ★ 적대감사 P2-14: refine 으로 score 가 바뀌면 confidence(A/B/C)도 재산출해야 정합
+        //   (안 그러면 score↓인데 confidence A 그대로 → 랭킹·노출게이트가 stale confidence 사용).
+        const _grade = (s) => s >= 80 ? "A" : s >= 60 ? "B" : "C";
+        const _refCache = {};
+        const _refFor = (side) => _refCache[side]
+          || (_refCache[side] = refineCompositeEntry({ side, perTF: _perTF, sr: srLevels, price: closes[closes.length - 1] }));
+        if (compositeSignal?.side) {
+          const _ref = _refFor(compositeSignal.side);
           if (_ref.mult !== 1) {
-            if (compositeSignal) {
-              compositeSignal.entryRefine = { mult: _ref.mult, reasons: _ref.reasons, before: compositeSignal.score };
-              compositeSignal.score = Math.max(0, Math.min(100, Math.round(compositeSignal.score * _ref.mult)));
-              compositeSignal.confidence = _grade(compositeSignal.score); // ★ P2-14
-              if (_ref.reasons.length) compositeSignal.reason = (compositeSignal.reason || "") + ` | 진입정제 ${_ref.mult.toFixed(2)}×(${_ref.reasons.join(", ")})`;
-            }
-            if (latestSignal) {
-              latestSignal.entryRefine = { mult: _ref.mult, reasons: _ref.reasons, before: latestSignal.score };
-              latestSignal.score = Math.max(0, Math.min(100, Math.round((latestSignal.score || 60) * _ref.mult)));
-              latestSignal.confidence = _grade(latestSignal.score); // ★ P2-14
-            }
-            addLog(`  🎯 ${asset} 진입정제 ${_ref.mult.toFixed(2)}×: ${_ref.reasons.join(" · ")}`);
+            compositeSignal.entryRefine = { mult: _ref.mult, reasons: _ref.reasons, before: compositeSignal.score };
+            compositeSignal.score = Math.max(0, Math.min(100, Math.round(compositeSignal.score * _ref.mult)));
+            compositeSignal.confidence = _grade(compositeSignal.score); // ★ P2-14
+            if (_ref.reasons.length) compositeSignal.reason = (compositeSignal.reason || "") + ` | 진입정제 ${_ref.mult.toFixed(2)}×(${_ref.reasons.join(", ")})`;
+          }
+        }
+        if (latestSignal?.side) {
+          const _ref = _refFor(latestSignal.side);
+          if (_ref.mult !== 1) {
+            latestSignal.entryRefine = { mult: _ref.mult, reasons: _ref.reasons, before: latestSignal.score };
+            latestSignal.score = Math.max(0, Math.min(100, Math.round((latestSignal.score || 60) * _ref.mult)));
+            latestSignal.confidence = _grade(latestSignal.score); // ★ P2-14
+          }
+        }
+        {
+          const _sides = [...new Set([compositeSignal?.side, latestSignal?.side].filter(Boolean))];
+          for (const _s of _sides) {
+            const _ref = _refCache[_s];
+            if (_ref && _ref.mult !== 1) addLog(`  🎯 ${asset} 진입정제(${_s}) ${_ref.mult.toFixed(2)}×: ${_ref.reasons.join(" · ")}`);
           }
         }
       } catch (e) { addLog(`  진입정제 skip: ${e?.message}`); }

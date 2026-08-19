@@ -837,6 +837,7 @@
       "aggregatedHourAgo": "aggregated {{n}} h ago",
       "asOfDailyClose": "Based on latest daily close",
       "staleSuffix": "update delayed",
+      "marketClosedSuffix": "market closed",
       "topNews": "Top News",
       "more": "More",
       "noNews": "No news to show yet.",

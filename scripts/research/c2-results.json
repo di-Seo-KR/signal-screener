@@ -1,0 +1,862 @@
+{
+  "hypothesis": "C-2 — 레짐 정합 발화(추세장×추세계 / 횡보장×회귀계)가 역행 발화보다 우위 → 랭킹 가중 정합 ×1.15 / 역행 ×0.85",
+  "source": "대표 지시 2026-08-19 — 스코어 단독이 아닌 전략 결합 자동매매 (사전등록 백테스트)",
+  "preregistered": {
+    "hurstHi": 0.55,
+    "hurstLo": 0.45,
+    "trendFamilies": [
+      "trend-follow",
+      "breakout",
+      "supertrend",
+      "hurst-trend"
+    ],
+    "meanRevertFamilies": [
+      "mean-revert",
+      "volatility-arb"
+    ],
+    "weightsIfPass": {
+      "aligned": 1.15,
+      "opposed": 0.85
+    },
+    "regimeSource": "avgHurst = BTC·ETH·SOL 완결 일봉 종가 100개 R/S Hurst 평균 (market-monitor 미러, 일별) — c0 하네스 산출",
+    "candidateRule": "OOS·전심볼 PF_aligned > PF_opposed AND 순열검정 p<0.05 (aligned∪opposed 심볼 층화 셔플 1000회, 단측) AND aligned IS+OOS ≥ 30 AND opposed IS+OOS ≥ 10",
+    "permutationSeed": 20260819,
+    "harness": "c0-strategy-fire-replay.mjs (실제 전략 코드 실행 — 프록시 흉내 아님). 규약·caveat 은 c0-fire-trades.json preregistered 블록 참조",
+    "caveats": [
+      "8심볼 봇 라우팅상 top 발화 패밀리는 ensemble·trend-follow·momentum-rotation·volatility-arb·defi-momentum — 추세계=trend-follow, 회귀계=volatility-arb 만 관측됨 (breakout·supertrend·hurst-trend·mean-revert 는 단독 top 미등장, 프로덕션 실태 그대로)"
+    ]
+  },
+  "generatedAt": "2026-08-19T12:46:01.880Z",
+  "harnessGeneratedAt": "2026-08-19T12:45:41.217Z",
+  "harnessDiag": [
+    {
+      "symbol": "BTCUSDT",
+      "bots": [
+        "btc-alpha",
+        "highcap-momentum",
+        "crypto-diversity",
+        "crypto-swing"
+      ],
+      "steps": 78624,
+      "fires": 31518,
+      "f3Blocked": 24346,
+      "gateSkipped": 21006,
+      "skippedEdge": 0,
+      "trades": 118,
+      "famCount": {
+        "trend-follow": 13767,
+        "momentum-rotation": 16412,
+        "volatility-arb": 586,
+        "ensemble": 753
+      },
+      "elapsedSec": 39
+    },
+    {
+      "symbol": "ETHUSDT",
+      "bots": [
+        "highcap-momentum",
+        "crypto-diversity",
+        "crypto-swing"
+      ],
+      "steps": 78624,
+      "fires": 30959,
+      "f3Blocked": 24171,
+      "gateSkipped": 5947,
+      "skippedEdge": 0,
+      "trades": 305,
+      "famCount": {
+        "trend-follow": 14107,
+        "momentum-rotation": 16723,
+        "volatility-arb": 129
+      },
+      "elapsedSec": 17
+    },
+    {
+      "symbol": "SOLUSDT",
+      "bots": [
+        "highcap-momentum",
+        "crypto-diversity",
+        "crypto-swing"
+      ],
+      "steps": 78624,
+      "fires": 28438,
+      "f3Blocked": 26844,
+      "gateSkipped": 2964,
+      "skippedEdge": 0,
+      "trades": 316,
+      "famCount": {
+        "trend-follow": 14381,
+        "momentum-rotation": 13812,
+        "volatility-arb": 245
+      },
+      "elapsedSec": 17
+    },
+    {
+      "symbol": "XRPUSDT",
+      "bots": [
+        "highcap-momentum",
+        "crypto-diversity",
+        "crypto-swing"
+      ],
+      "steps": 78624,
+      "fires": 27977,
+      "f3Blocked": 27474,
+      "gateSkipped": 5890,
+      "skippedEdge": 0,
+      "trades": 264,
+      "famCount": {
+        "momentum-rotation": 14834,
+        "trend-follow": 12942,
+        "volatility-arb": 201
+      },
+      "elapsedSec": 17
+    },
+    {
+      "symbol": "BNBUSDT",
+      "bots": [
+        "crypto-diversity",
+        "crypto-swing"
+      ],
+      "steps": 78624,
+      "fires": 28484,
+      "f3Blocked": 23276,
+      "gateSkipped": 15551,
+      "skippedEdge": 0,
+      "trades": 156,
+      "famCount": {
+        "momentum-rotation": 26946,
+        "volatility-arb": 1538
+      },
+      "elapsedSec": 11
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "bots": [
+        "meme-trend",
+        "crypto-diversity",
+        "crypto-swing"
+      ],
+      "steps": 78624,
+      "fires": 26053,
+      "f3Blocked": 23809,
+      "gateSkipped": 2140,
+      "skippedEdge": 0,
+      "trades": 303,
+      "famCount": {
+        "momentum-rotation": 23701,
+        "ensemble": 2100,
+        "volatility-arb": 252
+      },
+      "elapsedSec": 33
+    },
+    {
+      "symbol": "ADAUSDT",
+      "bots": [
+        "highcap-momentum",
+        "crypto-diversity",
+        "crypto-swing"
+      ],
+      "steps": 78624,
+      "fires": 27935,
+      "f3Blocked": 28309,
+      "gateSkipped": 1246,
+      "skippedEdge": 99,
+      "trades": 323,
+      "famCount": {
+        "momentum-rotation": 15529,
+        "trend-follow": 12273,
+        "volatility-arb": 133
+      },
+      "elapsedSec": 17
+    },
+    {
+      "symbol": "LINKUSDT",
+      "bots": [
+        "defi-infra",
+        "crypto-diversity",
+        "crypto-swing"
+      ],
+      "steps": 78624,
+      "fires": 28877,
+      "f3Blocked": 29101,
+      "gateSkipped": 2063,
+      "skippedEdge": 0,
+      "trades": 319,
+      "famCount": {
+        "defi-momentum": 23509,
+        "momentum-rotation": 5338,
+        "volatility-arb": 30
+      },
+      "elapsedSec": 17
+    }
+  ],
+  "permutation": {
+    "pfObs": 0.4289,
+    "nObs": 70,
+    "nUniverse": 81,
+    "nPerm": 1000,
+    "seed": 20260819,
+    "pValue": 0.1269,
+    "permMeanPf": 0.3847
+  },
+  "verdict": {
+    "candidate": false,
+    "label": "기각",
+    "reasons": {
+      "oosPfImproves": true,
+      "oosPfAligned": 0.4289,
+      "oosPfOpposed": 0.2958,
+      "oosPfNeutral": 0.973,
+      "oosPfAll": 0.8757,
+      "permutationPass": false,
+      "permutationP": 0.1269,
+      "alignedTradesTotal": 149,
+      "minRequired": 30,
+      "opposedTradesTotal": 17,
+      "minOpposedRequired": 10
+    }
+  },
+  "pooled": [
+    {
+      "segment": "IS",
+      "group": "insample",
+      "all": {
+        "trades": 293,
+        "winRate": 0.5495,
+        "avgRetPct": 0.5371,
+        "medianRetPct": 0.3458,
+        "pf": 1.5033
+      },
+      "aligned": {
+        "trades": 23,
+        "winRate": 0.6087,
+        "avgRetPct": 0.9178,
+        "medianRetPct": 2.2265,
+        "pf": 1.9639
+      },
+      "opposed": {
+        "trades": 4,
+        "winRate": 0.75,
+        "avgRetPct": 0.5828,
+        "medianRetPct": 2.7854,
+        "pf": 1.3386
+      },
+      "neutral": {
+        "trades": 266,
+        "winRate": 0.5414,
+        "avgRetPct": 0.5035,
+        "medianRetPct": 0.3033,
+        "pf": 1.4718
+      }
+    },
+    {
+      "segment": "IS",
+      "group": "crossval",
+      "all": {
+        "trades": 1175,
+        "winRate": 0.5064,
+        "avgRetPct": 0.2815,
+        "medianRetPct": 0.0365,
+        "pf": 1.2088
+      },
+      "aligned": {
+        "trades": 56,
+        "winRate": 0.4107,
+        "avgRetPct": -0.0382,
+        "medianRetPct": -0.4397,
+        "pf": 0.9785
+      },
+      "opposed": {
+        "trades": 2,
+        "winRate": 0,
+        "avgRetPct": -7.1158,
+        "medianRetPct": -7.1158,
+        "pf": 0
+      },
+      "neutral": {
+        "trades": 1117,
+        "winRate": 0.5121,
+        "avgRetPct": 0.3108,
+        "medianRetPct": 0.0606,
+        "pf": 1.236
+      }
+    },
+    {
+      "segment": "IS",
+      "group": "all",
+      "all": {
+        "trades": 1468,
+        "winRate": 0.515,
+        "avgRetPct": 0.3325,
+        "medianRetPct": 0.0979,
+        "pf": 1.2573
+      },
+      "aligned": {
+        "trades": 79,
+        "winRate": 0.4684,
+        "avgRetPct": 0.2401,
+        "medianRetPct": -0.1828,
+        "pf": 1.1566
+      },
+      "opposed": {
+        "trades": 6,
+        "winRate": 0.5,
+        "avgRetPct": -1.9834,
+        "medianRetPct": -2.2857,
+        "pf": 0.4364
+      },
+      "neutral": {
+        "trades": 1383,
+        "winRate": 0.5177,
+        "avgRetPct": 0.3479,
+        "medianRetPct": 0.121,
+        "pf": 1.2741
+      }
+    },
+    {
+      "segment": "OOS",
+      "group": "insample",
+      "all": {
+        "trades": 130,
+        "winRate": 0.5077,
+        "avgRetPct": -0.1776,
+        "medianRetPct": 0.057,
+        "pf": 0.8347
+      },
+      "aligned": {
+        "trades": 29,
+        "winRate": 0.4138,
+        "avgRetPct": -1.0267,
+        "medianRetPct": -0.7465,
+        "pf": 0.2821
+      },
+      "opposed": {
+        "trades": 1,
+        "winRate": 0,
+        "avgRetPct": -3.0304,
+        "medianRetPct": -3.0304,
+        "pf": 0
+      },
+      "neutral": {
+        "trades": 100,
+        "winRate": 0.54,
+        "avgRetPct": 0.0971,
+        "medianRetPct": 0.1992,
+        "pf": 1.102
+      }
+    },
+    {
+      "segment": "OOS",
+      "group": "crossval",
+      "all": {
+        "trades": 506,
+        "winRate": 0.4783,
+        "avgRetPct": -0.1514,
+        "medianRetPct": -0.1807,
+        "pf": 0.8843
+      },
+      "aligned": {
+        "trades": 41,
+        "winRate": 0.4146,
+        "avgRetPct": -0.9123,
+        "medianRetPct": -1.0427,
+        "pf": 0.5088
+      },
+      "opposed": {
+        "trades": 10,
+        "winRate": 0.4,
+        "avgRetPct": -1.1573,
+        "medianRetPct": -2.2556,
+        "pf": 0.3464
+      },
+      "neutral": {
+        "trades": 455,
+        "winRate": 0.4857,
+        "avgRetPct": -0.0608,
+        "medianRetPct": -0.1451,
+        "pf": 0.9514
+      }
+    },
+    {
+      "segment": "OOS",
+      "group": "all",
+      "all": {
+        "trades": 636,
+        "winRate": 0.4843,
+        "avgRetPct": -0.1568,
+        "medianRetPct": -0.1225,
+        "pf": 0.8757
+      },
+      "aligned": {
+        "trades": 70,
+        "winRate": 0.4143,
+        "avgRetPct": -0.9597,
+        "medianRetPct": -0.8799,
+        "pf": 0.4289
+      },
+      "opposed": {
+        "trades": 11,
+        "winRate": 0.3636,
+        "avgRetPct": -1.3276,
+        "medianRetPct": -2.3256,
+        "pf": 0.2958
+      },
+      "neutral": {
+        "trades": 555,
+        "winRate": 0.4955,
+        "avgRetPct": -0.0323,
+        "medianRetPct": -0.0467,
+        "pf": 0.973
+      }
+    }
+  ],
+  "regimeFamilyCrosstab": {
+    "neutral|neutral": 962,
+    "neutral|trend": 406,
+    "neutral|mr": 16,
+    "range|trend": 13,
+    "range|neutral": 36,
+    "trend|trend": 149,
+    "trend|neutral": 518,
+    "trend|mr": 4
+  },
+  "familyMetrics": {
+    "momentum-rotation": {
+      "trades": 1243,
+      "winRate": 0.5117,
+      "avgRetPct": 0.1514,
+      "medianRetPct": 0.0891,
+      "pf": 1.1211
+    },
+    "trend-follow": {
+      "trades": 568,
+      "winRate": 0.5,
+      "avgRetPct": 0.2801,
+      "medianRetPct": 0.0183,
+      "pf": 1.2207
+    },
+    "volatility-arb": {
+      "trades": 20,
+      "winRate": 0.45,
+      "avgRetPct": -0.8815,
+      "medianRetPct": -0.2372,
+      "pf": 0.5297
+    },
+    "ensemble": {
+      "trades": 25,
+      "winRate": 0.64,
+      "avgRetPct": 1.45,
+      "medianRetPct": 0.9512,
+      "pf": 2.8381
+    },
+    "defi-momentum": {
+      "trades": 248,
+      "winRate": 0.4798,
+      "avgRetPct": 0.0908,
+      "medianRetPct": -0.3017,
+      "pf": 1.0613
+    }
+  },
+  "perSymbol": [
+    {
+      "symbol": "BTCUSDT",
+      "segment": "IS",
+      "aligned": {
+        "trades": 6,
+        "winRate": 0.5,
+        "avgRetPct": -0.0278,
+        "medianRetPct": 0.2502,
+        "pf": 0.9795
+      },
+      "opposed": {
+        "trades": 2,
+        "winRate": 1,
+        "avgRetPct": 2.7854,
+        "medianRetPct": 2.7854,
+        "pf": null
+      },
+      "neutral": {
+        "trades": 69,
+        "winRate": 0.5217,
+        "avgRetPct": 0.2838,
+        "medianRetPct": 0.1077,
+        "pf": 1.2646
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "segment": "OOS",
+      "aligned": {
+        "trades": 10,
+        "winRate": 0.6,
+        "avgRetPct": -0.6187,
+        "medianRetPct": 0.1536,
+        "pf": 0.4715
+      },
+      "opposed": {
+        "trades": 0,
+        "winRate": null,
+        "avgRetPct": null,
+        "medianRetPct": null,
+        "pf": null
+      },
+      "neutral": {
+        "trades": 31,
+        "winRate": 0.5806,
+        "avgRetPct": 0.1357,
+        "medianRetPct": 0.256,
+        "pf": 1.1728
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "segment": "IS",
+      "aligned": {
+        "trades": 17,
+        "winRate": 0.6471,
+        "avgRetPct": 1.2515,
+        "medianRetPct": 2.2265,
+        "pf": 2.547
+      },
+      "opposed": {
+        "trades": 2,
+        "winRate": 0.5,
+        "avgRetPct": -1.6198,
+        "medianRetPct": -1.6198,
+        "pf": 0.5295
+      },
+      "neutral": {
+        "trades": 197,
+        "winRate": 0.5482,
+        "avgRetPct": 0.5804,
+        "medianRetPct": 0.3049,
+        "pf": 1.5449
+      }
+    },
+    {
+      "symbol": "ETHUSDT",
+      "segment": "OOS",
+      "aligned": {
+        "trades": 19,
+        "winRate": 0.3158,
+        "avgRetPct": -1.2414,
+        "medianRetPct": -0.8754,
+        "pf": 0.2076
+      },
+      "opposed": {
+        "trades": 1,
+        "winRate": 0,
+        "avgRetPct": -3.0304,
+        "medianRetPct": -3.0304,
+        "pf": 0
+      },
+      "neutral": {
+        "trades": 69,
+        "winRate": 0.5217,
+        "avgRetPct": 0.0798,
+        "medianRetPct": 0.1128,
+        "pf": 1.0777
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "segment": "IS",
+      "aligned": {
+        "trades": 23,
+        "winRate": 0.4783,
+        "avgRetPct": -0.3859,
+        "medianRetPct": -0.1135,
+        "pf": 0.8159
+      },
+      "opposed": {
+        "trades": 1,
+        "winRate": 0,
+        "avgRetPct": -7.322,
+        "medianRetPct": -7.322,
+        "pf": 0
+      },
+      "neutral": {
+        "trades": 200,
+        "winRate": 0.52,
+        "avgRetPct": 0.4214,
+        "medianRetPct": 0.0561,
+        "pf": 1.3313
+      }
+    },
+    {
+      "symbol": "SOLUSDT",
+      "segment": "OOS",
+      "aligned": {
+        "trades": 13,
+        "winRate": 0.3846,
+        "avgRetPct": -1.144,
+        "medianRetPct": -0.8844,
+        "pf": 0.4193
+      },
+      "opposed": {
+        "trades": 2,
+        "winRate": 0,
+        "avgRetPct": -3.6089,
+        "medianRetPct": -3.6089,
+        "pf": 0
+      },
+      "neutral": {
+        "trades": 77,
+        "winRate": 0.5195,
+        "avgRetPct": 0.1117,
+        "medianRetPct": 0.1533,
+        "pf": 1.0928
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "segment": "IS",
+      "aligned": {
+        "trades": 14,
+        "winRate": 0.3571,
+        "avgRetPct": 0.8999,
+        "medianRetPct": -0.572,
+        "pf": 1.4799
+      },
+      "opposed": {
+        "trades": 0,
+        "winRate": null,
+        "avgRetPct": null,
+        "medianRetPct": null,
+        "pf": null
+      },
+      "neutral": {
+        "trades": 176,
+        "winRate": 0.4886,
+        "avgRetPct": 0.0995,
+        "medianRetPct": -0.0246,
+        "pf": 1.0796
+      }
+    },
+    {
+      "symbol": "XRPUSDT",
+      "segment": "OOS",
+      "aligned": {
+        "trades": 17,
+        "winRate": 0.5294,
+        "avgRetPct": -0.3522,
+        "medianRetPct": 0.1254,
+        "pf": 0.7517
+      },
+      "opposed": {
+        "trades": 1,
+        "winRate": 1,
+        "avgRetPct": 1.7496,
+        "medianRetPct": 1.7496,
+        "pf": null
+      },
+      "neutral": {
+        "trades": 56,
+        "winRate": 0.6071,
+        "avgRetPct": 0.3515,
+        "medianRetPct": 0.3417,
+        "pf": 1.3615
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "segment": "IS",
+      "aligned": {
+        "trades": 0,
+        "winRate": null,
+        "avgRetPct": null,
+        "medianRetPct": null,
+        "pf": null
+      },
+      "opposed": {
+        "trades": 0,
+        "winRate": null,
+        "avgRetPct": null,
+        "medianRetPct": null,
+        "pf": null
+      },
+      "neutral": {
+        "trades": 123,
+        "winRate": 0.4228,
+        "avgRetPct": -0.3399,
+        "medianRetPct": -0.6073,
+        "pf": 0.7584
+      }
+    },
+    {
+      "symbol": "BNBUSDT",
+      "segment": "OOS",
+      "aligned": {
+        "trades": 0,
+        "winRate": null,
+        "avgRetPct": null,
+        "medianRetPct": null,
+        "pf": null
+      },
+      "opposed": {
+        "trades": 1,
+        "winRate": 1,
+        "avgRetPct": 2.9036,
+        "medianRetPct": 2.9036,
+        "pf": null
+      },
+      "neutral": {
+        "trades": 32,
+        "winRate": 0.375,
+        "avgRetPct": -0.6159,
+        "medianRetPct": -0.9994,
+        "pf": 0.5795
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "segment": "IS",
+      "aligned": {
+        "trades": 0,
+        "winRate": null,
+        "avgRetPct": null,
+        "medianRetPct": null,
+        "pf": null
+      },
+      "opposed": {
+        "trades": 0,
+        "winRate": null,
+        "avgRetPct": null,
+        "medianRetPct": null,
+        "pf": null
+      },
+      "neutral": {
+        "trades": 206,
+        "winRate": 0.5291,
+        "avgRetPct": 0.4408,
+        "medianRetPct": 0.3247,
+        "pf": 1.3219
+      }
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "segment": "OOS",
+      "aligned": {
+        "trades": 0,
+        "winRate": null,
+        "avgRetPct": null,
+        "medianRetPct": null,
+        "pf": null
+      },
+      "opposed": {
+        "trades": 2,
+        "winRate": 1,
+        "avgRetPct": 0.7403,
+        "medianRetPct": 0.7403,
+        "pf": null
+      },
+      "neutral": {
+        "trades": 95,
+        "winRate": 0.4842,
+        "avgRetPct": -0.2321,
+        "medianRetPct": -0.0549,
+        "pf": 0.801
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "segment": "IS",
+      "aligned": {
+        "trades": 19,
+        "winRate": 0.3684,
+        "avgRetPct": -0.3085,
+        "medianRetPct": -0.2863,
+        "pf": 0.7638
+      },
+      "opposed": {
+        "trades": 1,
+        "winRate": 0,
+        "avgRetPct": -6.9096,
+        "medianRetPct": -6.9096,
+        "pf": 0
+      },
+      "neutral": {
+        "trades": 186,
+        "winRate": 0.5538,
+        "avgRetPct": 0.705,
+        "medianRetPct": 0.5986,
+        "pf": 1.6403
+      }
+    },
+    {
+      "symbol": "ADAUSDT",
+      "segment": "OOS",
+      "aligned": {
+        "trades": 11,
+        "winRate": 0.2727,
+        "avgRetPct": -1.504,
+        "medianRetPct": -1.8289,
+        "pf": 0.3739
+      },
+      "opposed": {
+        "trades": 4,
+        "winRate": 0,
+        "avgRetPct": -2.6222,
+        "medianRetPct": -2.3803,
+        "pf": 0
+      },
+      "neutral": {
+        "trades": 102,
+        "winRate": 0.4902,
+        "avgRetPct": 0.2271,
+        "medianRetPct": -0.207,
+        "pf": 1.1744
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "segment": "IS",
+      "aligned": {
+        "trades": 0,
+        "winRate": null,
+        "avgRetPct": null,
+        "medianRetPct": null,
+        "pf": null
+      },
+      "opposed": {
+        "trades": 0,
+        "winRate": null,
+        "avgRetPct": null,
+        "medianRetPct": null,
+        "pf": null
+      },
+      "neutral": {
+        "trades": 226,
+        "winRate": 0.5221,
+        "avgRetPct": 0.2888,
+        "medianRetPct": 0.0861,
+        "pf": 1.1938
+      }
+    },
+    {
+      "symbol": "LINKUSDT",
+      "segment": "OOS",
+      "aligned": {
+        "trades": 0,
+        "winRate": null,
+        "avgRetPct": null,
+        "medianRetPct": null,
+        "pf": null
+      },
+      "opposed": {
+        "trades": 0,
+        "winRate": null,
+        "avgRetPct": null,
+        "medianRetPct": null,
+        "pf": null
+      },
+      "neutral": {
+        "trades": 93,
+        "winRate": 0.4194,
+        "avgRetPct": -0.4015,
+        "medianRetPct": -0.8189,
+        "pf": 0.7145
+      }
+    }
+  ]
+}

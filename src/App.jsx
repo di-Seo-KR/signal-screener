@@ -1385,7 +1385,7 @@ function signalSideLabel(sig, isStock, t) {
  *  두 번째 인자로 i18n t() 를 넘기면 로케일 문구(tabs.home.aggregated*)로 표기합니다 —
  *  영어 화면에서 한국어 고정 문구가 섞이던 문제 방지. t 를 생략하면 기존 한국어
  *  문구 그대로라 아직 i18n 미적용 화면(상세 시트 asOfLabel)은 동작이 변하지 않습니다. */
-function coinScoreFreshness(ts, t, staleMin = 30) {
+function coinScoreFreshness(ts, t, staleMin = 30, marketClosed = false) {
   const n = Number(ts);
   if (!Number.isFinite(n) || n <= 0) return null;
   const min = Math.max(0, Math.round((Date.now() - n) / 60000));
@@ -1394,12 +1394,38 @@ function coinScoreFreshness(ts, t, staleMin = 30) {
       : min < 60 ? t("tabs.home.aggregatedMinAgo", { n: min })
       : t("tabs.home.aggregatedHourAgo", { n: Math.floor(min / 60) }))
     : (min < 1 ? "방금 집계" : min < 60 ? `${min}분 전 집계` : `${Math.floor(min / 60)}시간 전 집계`);
-  const stale = t ? t("tabs.home.staleSuffix") : "갱신 지연";
-  return min >= staleMin ? `${base} · ${stale}` : base;
+  if (min < staleMin) return base;
+  // ★ 2026-08-19 감사: 주식 풀은 장 마감 후 마지막 장중 데이터가 "유지되는 설계"
+  //   (stock-scores meta.staleNote — ts 는 스캔 시각)라, 마감 동안 경과 시간만으로
+  //   "갱신 지연"을 붙이면 매일 저녁·주말 내내 오탐 경고가 떴습니다(바로 아래 장 상태
+  //   배지의 "장 마감"과 자기모순). 엔트리별 marketState("REGULAR"=장중)가 실려 오면
+  //   장중이 아닐 때 지연 대신 "장 마감 기준"으로 정직하게 서술합니다.
+  //   marketClosed 미전달(코인 경로·구 페이로드)이면 기존 동작 그대로입니다.
+  // ★ 리뷰 후속(잔여 구멍): marketState 는 스캔 시점에 박제된 값이라, 크론이 "장 마감 중"에
+  //   죽어 다음 개장까지 복구되지 않으면(주말 배포 사고, 킬스위치 방치 등) 풀 전체가 stale
+  //   CLOSED 로 남아 개장 시간 내내 "갱신 지연" 대신 "장 마감 기준"을 오표기했습니다.
+  //   정상 마감의 최장 공백(금요일 마감→월요일 개장 ≈ 65.5h)을 넘는 72h(4320분) 이상이면
+  //   마감 억제를 해제하고 "갱신 지연"으로 복귀합니다 — 크론 사망 tripwire 복원.
+  //   ⚠️ 3일 이상 연휴(추석·설·감사절 연휴 등)는 휴장 캘린더 미배선이라 정상 휴장도
+  //   지연으로 표기되는 트레이드오프 — 경고 과다(오탐) 방향이라 침묵(미탐)보다 안전해
+  //   감수합니다. (장중 크론 사망은 REGULAR 잔존으로 종전처럼 즉시 경고됩니다.)
+  const CLOSED_SUPPRESS_CAP_MIN = 4320; // 72h — 주말 최장 정상 공백 초과 기준
+  const suffix = (marketClosed && min < CLOSED_SUPPRESS_CAP_MIN)
+    ? (t ? t("tabs.home.marketClosedSuffix") : "장 마감 기준")
+    : (t ? t("tabs.home.staleSuffix") : "갱신 지연");
+  return `${base} · ${suffix}`;
 }
 
 /** 풀 종류별 "갱신 지연" 임계(분) — 코인 30분(10분 주기×3), 주식 90분(한국 60분 주기×1.5). */
 const STALE_MIN_STOCK = 90;
+
+/** 주식 스코어 풀이 "장중 갱신 가능 상태"가 아닌지 — 엔트리 marketState("REGULAR"|"CLOSED"|null,
+ *  stock-scores 계약) 기반. 필드가 실린 엔트리가 하나도 없으면 false(기존 동작 보존 — 지어내지 않음). */
+function stockPoolClosed(rows) {
+  const withMs = (Array.isArray(rows) ? rows : [])
+    .filter((s) => typeof s?.marketState === "string" && s.marketState);
+  return withMs.length > 0 && withMs.every((s) => s.marketState.toUpperCase() !== "REGULAR");
+}
 
 /** 정규장 세션 상태 (★ 2026-08-12 IA v3 시안 1b 장 상태 배지).
  *  현재 시각을 해당 시장 타임존으로 환산해(Intl — 미국 서머타임 자동 반영) 요일·시각만으로
@@ -1613,7 +1639,7 @@ function buildAssetDetailProps(sig, t) {
       // 지연 임계는 주식 크론 주기(미국 30분·한국 60분)에 맞춘 90분 — 정시 운영을
       // "갱신 지연"으로 단정하지 않기 위함입니다.
       asOfLabel: isStock
-        ? (coinScoreFreshness(sig.ts, t, STALE_MIN_STOCK) || undefined)
+        ? (coinScoreFreshness(sig.ts, t, STALE_MIN_STOCK, stockPoolClosed([sig])) || undefined)
         : (priceStr
           ? [t ? t("tabs.home.asOfDailyClose") : "최근 일봉 종가 기준", coinScoreFreshness(sig.ts, t)].filter(Boolean).join(" · ")
           : undefined),
@@ -8064,6 +8090,36 @@ function AppInner() {
   //    기존 지표 허브가 쓰던 동일 엔드포인트(김프·펀딩 배선 승계). 실패 시 null 유지 —
   //    컨텍스트 구역만 조용히 생략하고 시그널 리스트는 정상 동작합니다(부분 실패 원칙).
   const [coinCtx, setCoinCtx] = useState(null); // null=미적재 | indicators 배열
+  // ★ 2026-08-19 감사: summary 의 김프(id:"kimchi")는 kimchi-premium 이 10분 내에 호출돼
+  //   KV 캐시(di:kimp:cache)를 데워 놨을 때만 실립니다 — 앱은 그 엔드포인트를 부르는 경로가
+  //   없어 김프 카드가 사실상 상시 미표시였습니다(라이브 실측: /api/kimchi-premium?json=1
+  //   호출 직후에만 카드 등장). summary 에 김프가 빠져 있으면 경량 JSON(?json=1, ~200B)을
+  //   직접 받아 같은 스키마로 합성합니다 — 전부 실측값이며(가짜 데이터 아님), 이 호출이
+  //   KV 캐시도 데워 다른 사용자의 summary 에도 김프가 실리게 됩니다.
+  const fetchKimchiFallback = async () => {
+    const r = await fetch("/api/kimchi-premium?json=1");
+    if (!r.ok) return null;
+    const j = await r.json();
+    const kp = Number(j?.btc?.premiumPct);
+    if (!j?.ok || !Number.isFinite(kp)) return null;
+    // api/indicators/summary.js 의 김프 빌더와 동일 포맷 (문구·톤 임계 일치)
+    return {
+      id: "kimchi",
+      title: "BTC 김치프리미엄",
+      value: +kp.toFixed(2), unit: "%",
+      label: kp >= 0 ? "프리미엄" : "역프리미엄",
+      tone: kp > 0.5 ? "up" : kp < -0.5 ? "down" : "neutral",
+      market: "crypto",
+      desc: `BTC 국내 가격이 해외 대비 ${Math.abs(kp).toFixed(2)}% ${kp >= 0 ? "높은" : "낮은"} 상태입니다.`,
+      detail: [
+        Number.isFinite(Number(j?.btc?.upbitKrw)) && Number.isFinite(Number(j?.btc?.binanceUsdt)) && Number.isFinite(Number(j?.usdtKrw))
+          ? `업비트 ${Math.round(j.btc.upbitKrw).toLocaleString("ko-KR")}원 vs 바이낸스 $${Math.round(j.btc.binanceUsdt).toLocaleString("ko-KR")} (KRW-USDT ${Math.round(j.usdtKrw).toLocaleString("ko-KR")}원 환산).`
+          : "",
+        Number.isFinite(Number(j?.eth?.premiumPct)) ? `ETH 김프는 ${j.eth.premiumPct >= 0 ? "+" : ""}${Number(j.eth.premiumPct).toFixed(2)}% 입니다.` : "",
+      ].filter(Boolean).join(" "),
+      updatedAt: j.updatedAt,
+    };
+  };
   const fetchCoinCtx = useCallback(async () => {
     // ★ 실패 시 빈 배열로 확정 — null 을 유지하면 스켈레톤이 영구 셔머링되어
     //   "로딩 중"이라는 거짓 상태를 보여줍니다(적대 리뷰 지적). 빈 배열이면 구역만
@@ -8072,7 +8128,22 @@ function AppInner() {
       const r = await fetch("/api/indicators/summary");
       if (!r.ok) { setCoinCtx((prev) => prev ?? []); return; }
       const j = await r.json();
-      if (j?.ok && Array.isArray(j.indicators)) setCoinCtx(j.indicators);
+      if (j?.ok && Array.isArray(j.indicators)) {
+        const list = j.indicators;
+        // ★ 리뷰 후속(성능): 김프 폴백을 직렬 await 하면 콜드 캐시(서버가 업비트·바이낸스를
+        //   실시간 왕복)에서 김프 1장 때문에 컨텍스트 카드 전체의 첫 렌더가 밀려 스켈레톤이
+        //   길어집니다. 나머지 지표를 먼저 그리고, 폴백 성공분만 후속 append 하는 2단 갱신.
+        setCoinCtx(list);
+        if (!list.some((ind) => ind?.id === "kimchi")) {
+          // 김프 미수신 시에만 폴백 1회 — 실패해도 나머지 카드는 그대로(부분 실패 원칙)
+          fetchKimchiFallback().then((kimchi) => {
+            if (!kimchi) return;
+            // 그 사이 5분 폴링이 김프 실린 새 목록으로 교체했을 수 있어 중복 삽입을 막습니다.
+            setCoinCtx((prev) => (Array.isArray(prev) && !prev.some((ind) => ind?.id === "kimchi"))
+              ? [...prev, kimchi] : prev);
+          }).catch(() => {});
+        }
+      }
       else setCoinCtx((prev) => prev ?? []);
     } catch { setCoinCtx((prev) => prev ?? []); }
   }, []);
@@ -9631,15 +9702,20 @@ function AppInner() {
                     })}
                   </div>
                   <div style={{ fontSize: "11px", color: C.text4, marginTop: "8px" }}>
-                    {/* 엔진 산출 시각(ts) 실측 병기 — 크론이 멈춰 스코어가 밀리면
-                        "N시간 전 집계 · 갱신 지연"이 그대로 드러납니다. ts 없으면 병기 생략. */}
+                    {/* 엔진 산출 시각(ts) 실측 병기 — 크론이 장중에 멈춰 스코어가 밀리면
+                        "N시간 전 집계 · 갱신 지연"이 그대로 드러납니다. 단, "장 마감 중" 정지는
+                        stale marketState(CLOSED 박제) 때문에 최대 72h 동안 "장 마감 기준"으로
+                        표기됩니다 — coinScoreFreshness 의 절대 상한(4320분) 초과 시 지연 표기로
+                        복귀합니다. ts 없으면 병기 생략. */}
                     {(() => {
                       const newestTs = signalRows.reduce((m, s) => Math.max(m, Number(s?.ts) || 0), 0);
                       // t 를 넘겨 신선도 문구도 로케일을 따릅니다 (영어 화면 혼합 언어 방지).
                       // 지연 임계는 활성 풀의 크론 주기를 따릅니다 — 코인 30분 / 주식 90분
                       // (주식 크론은 미국 30분·한국 60분 주기라 30분 기준이면 정상 운영도 지연 표기).
                       const fresh = coinScoreFreshness(newestTs, t,
-                        activeSignalMarket === "stock" ? STALE_MIN_STOCK : 30);
+                        activeSignalMarket === "stock" ? STALE_MIN_STOCK : 30,
+                        // 주식 풀 표시 중 + 전 엔트리 장중 아님 → "갱신 지연" 대신 "장 마감 기준"
+                        activeSignalMarket === "stock" && stockPoolClosed(signalRows));
                       // 출처 캡션도 활성 풀을 따릅니다 (코인=바이낸스 / 주식=미국·한국 유니버스).
                       // ★ #10: 종목 수는 캡션에 하드코딩하지 않습니다 — 유니버스는 서버에서
                       //   바뀌고(2026-08-13 51→1,016) 클라는 그 값을 알 수 없어, 고정 숫자는
@@ -10007,7 +10083,9 @@ function AppInner() {
           const isSignalsView = !stockSubTabsOn || stocksView !== "screener";
           const isScreenerView = !stockSubTabsOn || stocksView === "screener";
           const stockNewestTs = stockRowsAll.reduce((m, s) => Math.max(m, Number(s?.ts) || 0), 0);
-          const stockFresh = coinScoreFreshness(stockNewestTs, t, STALE_MIN_STOCK);
+          // 장 마감 중(전 엔트리 marketState ≠ REGULAR)엔 "갱신 지연" 대신 "장 마감 기준" —
+          // 바로 아래 장 상태 배지("한국 장 마감")와 모순되는 상시 오탐 경고를 없앱니다.
+          const stockFresh = coinScoreFreshness(stockNewestTs, t, STALE_MIN_STOCK, stockPoolClosed(stockRowsAll));
           const STOCK_TF_LABEL = { "1w": t("tabs.coin.tf1w"), "1d": t("tabs.coin.tf1d"), "4h": t("tabs.coin.tf4h"), "1h": t("tabs.coin.tf1h") };
           // ── 장 상태 배지 (marketSessionOf — 정규장 시각 기준, 휴장일 캘린더 미배선) ──
           const krSession = marketSessionOf("Asia/Seoul", 9 * 60, 15 * 60 + 30);
@@ -12056,7 +12134,11 @@ function AppInner() {
                   ) : (
                     <div style={isMobile
                       ? { display: "flex", flexDirection: "column", gap: "9px" }
-                      : { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "10px", alignItems: "start" }}>
+                      // ★ 2026-08-19 감사: 3번째 카드 뒤에 끼우는 전폭 광고 래퍼가 새 행을 강제해,
+                      //   열 수가 3이 아닐 때(뷰포트에 따라 auto-fill 2열 등) 3번째 카드 옆 셀이
+                      //   빈 구멍으로 남았습니다(라이브 실측 — XMR 우측 공백). dense 백필로 뒤 카드가
+                      //   그 구멍을 채웁니다 — 카드가 전부 1×1 이라 점수 내림차순 읽기 순서도 유지됩니다.
+                      : { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "10px", alignItems: "start", gridAutoFlow: "dense" }}>
                       {rowsShown.map((sig, i) => {
                         // ★ #13: 코인 풀도 같은 확신도 게이팅(종합 스코어 = 구간 부호 가중합의 절대값)
                         const conv = signalConviction(sig);

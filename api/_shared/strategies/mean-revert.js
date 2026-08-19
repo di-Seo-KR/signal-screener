@@ -42,7 +42,10 @@ export function runMeanRevert({ closes, highs, lows, volumes, asset, timeframe =
     return null;
   }
 
-  const reasons = [`ADX${adx.toFixed(0)} 비추세`, `H${hurst.toFixed(2)}`];
+  // ★ 2026-08-19 감사(표시 전용 — 점수·발화 로직 불변): 게이트가 (ADX>MAX && H>0.6)
+  //   AND 조건이라 강추세(ADX 90+)에서도 H≤0.6 이면 발화하는데, 그때 사유 문구가
+  //   "ADX97 비추세"로 사실과 반대였음 → 실제 비추세일 때만 "비추세" 라벨 부착.
+  const reasons = [`ADX${adx.toFixed(0)}${adx <= ADX_MAX ? " 비추세" : ""}`, `H${hurst.toFixed(2)}`];
   let buy = 0, sell = 0;
 
   // RSI 극단 (핵심 3점)

@@ -406,9 +406,15 @@ export function scoreStockTF({ closes, highs, lows, volumes }, tf = "1d") {
     else { sellScore += 2; reasons.push("ER가속↓"); }
   }
   // ATR 폭발 (±1)
+  //   ★ 2026-08-19 경계 케이스 교정: 기존 calcSMA(atr.map(v=>v||0), 50) 은 워밍업
+  //     구간의 null 을 0 으로 치환해 평균했기 때문에, 봉 수가 정확히 최소치(62봉)인
+  //     심볼만 last-50 윈도우에 null 1개가 포함돼(calcATR=EMA(tr,14) → null 인덱스
+  //     0~12, 62봉 윈도우는 12~61) 기준선이 49/50 로 하향 왜곡 → atrVal/atrBase
+  //     비율 과대 → "ATR폭발" ±1 이 과발화했습니다. null 제외 실측 평균으로 교정 —
+  //     63봉 이상은 윈도우(13~…)에 null 이 없어 신·구 결과가 완전히 동일합니다(회귀 0).
   const atrVal = atr[L] || 0;
-  const atrLongMA = calcSMA(atr.map((v) => v || 0), 50);
-  const atrBase = atrLongMA[atrLongMA.length - 1];
+  const atrWin = atr.slice(-50).filter((v) => v != null);
+  const atrBase = atrWin.length > 0 ? atrWin.reduce((a, b) => a + b, 0) / atrWin.length : 0;
   if (atrVal > 0 && atrBase > 0 && atrVal / atrBase > 1.5) {
     if (price > prev) { buyScore += 1; reasons.push("ATR폭발↑"); }
     else { sellScore += 1; reasons.push("ATR폭발↓"); }
@@ -447,6 +453,63 @@ export function scoreStockTF({ closes, highs, lows, volumes }, tf = "1d") {
     family: "stock-ta",                   // 기술적 지표 종합(펀딩·온체인 미포함) 표식
     reason: reasons.join("+").slice(0, 160),
   };
+}
+
+// ════════════════════════════════════════════════════════
+// 종합 조립 — btc-cron compositeSignal 과 동일 공식(부호 가중합, 임계 ±0.5)의
+// 순수 함수 분리(단위 테스트 가능). 2026-08-19 스코어링 감사 + 리뷰 2차 수리 2건:
+//
+// ★ TF 결측 희석(감사 발견 — v1 산술 결함): compScore = round(|가중합|) 은 가중치
+//   합이 4TF 전제(1.0)라, 데이터 자체가 결측인 TF(예: 상장 14.3개월 미만 → 주봉
+//   62개 미충족)는 합의 강도와 무관하게 결측 가중치만큼 점수가 *희석*됩니다.
+//   예: 1w 결측 + 3TF 전원 BUY 80 → 종합 56 (완전 합의인데 30% 감점),
+//       1d 만 존재 BUY 55 → 종합 14 (TF 개별 점수 바닥이 50인 스케일에서 14 는
+//       사용자에게 "계산이 깨진 값"으로 보임 — 신뢰 문제).
+//   '결측'은 반대 의견이 아니므로, 가용 TF 가중치 합(coverage)으로 나눈 재정규화
+//   점수를 covAdjScore 로 산출합니다. 4TF 모두 있으면 coverage=1 → 산식상 동일값.
+//
+// ★ 리뷰 2차 수리 ① — coverage 는 "신호 존재"가 아니라 "데이터 충분성" 기준:
+//   scoreStockTF 는 봉 수 부족(진짜 결측)뿐 아니라 확신 미달(max(buy,sell)<2)·횡보
+//   동점 등 *데이터를 전부 보고 '방향 없음'이라 판정한 중립*에도 null 을 반환합니다.
+//   신호 존재로 coverage 를 세면 중립 TF 까지 분모에서 빠져 나머지 TF 합의가
+//   부풀려집니다(예: 1w BUY70·1d BUY70 + 4h·1h 데이터 충분-중립 → 39점이 70점으로).
+//   그래서 호출부가 hasW/hasD/has4/has1(봉 수 ≥ MIN_BARS)을 전달하고, 데이터는
+//   충분하나 중립-null 인 TF 는 분모에 남아 기여 0 — v1 과 동일한 희석('합의 부재'
+//   의미론)을 보존합니다. 봉 수는 충분하나 지표 산출 불능(가격≤0 등)으로 null 인
+//   극귀한 케이스도 같은 취급(보수적 희석 — 지어내지 않음).
+//
+// ★ 리뷰 2차 수리 ② — 사전등록 게이트 보호(covAdjScore 는 additive 로만 적재):
+//   entry.score 는 표시 외에 ⓐ 스윙 알림 사전등록 게이트 ②(swing-signals.js
+//   SWING_RULES 2026-08-17.v1, score≥65 — 라이브 크론 swing-alert 소비)와
+//   ⓑ 표시 히스테리시스 side 전환 확정 임계(display-hysteresis.js, 기본 58)가
+//   그대로 소비합니다. 재정규화 점수가 이 경로로 흐르면 v1 에서 구조적으로 불가능
+//   했던 발화가 생깁니다 — 구 공식에서 coverage 0.55(1w+1d만) 심볼은 최대 ~52점이라
+//   ② 통과·ⓑ 전환 확정이 불가했는데(암묵적 커버리지 하한), 재정규화 시 통과 가능
+//   해지고 그때 게이트 ③(4h 반대→WAIT)·⑤(4h/1h 과열 배제)는 해당 TF 가 null 이라
+//   판정 불능입니다(야후 1h 일시 장애만으로 이전에 불가능했던 알림 발화 가능).
+//   SWING_RULES 는 "규칙 변경 시 새 version 등록"을 사전등록해 두었으므로, 소비
+//   필드(score·confidence·reason)는 v1 산식(compScore = round(min(100,|raw|)))
+//   비트 동일로 유지하고, 재정규화 점수는 additive 필드(covAdjScore·tfCoverage)로만
+//   실어 둡니다 — 현재 소비 경로 0, 전 소비자 델타 0. 표시 채택(stock-scores→App)
+//   또는 게이트 전환(covAdjScore ?? score)은 QUANT-PLAN 의 SWING_RULES v2 사전등록과
+//   함께 별도 결재로 진행합니다(사전등록 개체군 무단 변경 금지).
+//   방향(compType)·적재 여부·breakdown 도 기존 raw 기준 그대로 불변입니다.
+// ════════════════════════════════════════════════════════
+export function composeStockScore({ sigW = null, sigD = null, sig4 = null, sig1 = null,
+                                    hasW = undefined, hasD = undefined, has4 = undefined, has1 = undefined }) {
+  const signed = (s) => (!s ? 0 : (s.type === "BUY" ? 1 : s.type === "SELL" ? -1 : 0) * (parseFloat(s.score) || 0));
+  const raw = TF_WEIGHTS["1w"] * signed(sigW) + TF_WEIGHTS["1d"] * signed(sigD)
+    + TF_WEIGHTS["4h"] * signed(sig4) + TF_WEIGHTS["1h"] * signed(sig1);
+  const compType = raw > 0.5 ? "BUY" : raw < -0.5 ? "SELL" : null; // 방향 — 기존 raw 기준 불변
+  // coverage — 데이터 충분성 기준(위 수리 ①). 신호가 있으면 데이터 충분이 함의되므로 OR
+  //   (신호 존재 TF 가 분모에서 빠지는 모순 방지). has* 미전달 레거시 호출은 신호
+  //   존재로 폴백 — 이 폴백은 additive 인 covAdjScore/coverage 에만 영향.
+  const avail = (has, sig) => sig != null || has === true;
+  const coverage = (avail(hasW, sigW) ? TF_WEIGHTS["1w"] : 0) + (avail(hasD, sigD) ? TF_WEIGHTS["1d"] : 0)
+    + (avail(has4, sig4) ? TF_WEIGHTS["4h"] : 0) + (avail(has1, sig1) ? TF_WEIGHTS["1h"] : 0);
+  const compScore = Math.round(Math.min(100, Math.abs(raw))); // v1 산식 그대로 — 사전등록 소비 경로 비트 동일
+  const covAdjScore = coverage > 0 ? Math.round(Math.min(100, Math.abs(raw) / coverage)) : 0;
+  return { raw, coverage, compScore, covAdjScore, compType };
 }
 
 // ════════════════════════════════════════════════════════
@@ -499,17 +562,21 @@ export async function scanStockSymbol({ symbol, name, market }) {
     volumes: cs.map((c) => c.volume || 0),
   });
 
-  const sigW = candles1w && candles1w.length >= MIN_BARS ? scoreStockTF(toArrays(candles1w), "1w") : null;
-  const sigD = scoreStockTF(toArrays(candles1d), "1d");
-  const sig4 = candles4h.length >= MIN_BARS ? scoreStockTF(toArrays(candles4h), "4h") : null;
-  const sig1 = candles1h && candles1h.length >= MIN_BARS ? scoreStockTF(toArrays(candles1h), "1h") : null;
+  // 데이터 충분성 플래그 — coverage 판정용(신호 존재와 구분: 봉이 충분해도 중립이면
+  //   신호는 null. 결측≠중립 — composeStockScore 헤더 수리 ① 참조).
+  const hasW = !!(candles1w && candles1w.length >= MIN_BARS);
+  const hasD = candles1d.length >= MIN_BARS; // 위 조기 반환 통과 시 항상 true
+  const has4 = candles4h.length >= MIN_BARS;
+  const has1 = !!(candles1h && candles1h.length >= MIN_BARS);
 
-  // ── 종합 — btc-cron compositeSignal 과 동일 공식(부호 가중합, 임계 ±0.5) ──
-  const signed = (s) => (!s ? 0 : (s.type === "BUY" ? 1 : s.type === "SELL" ? -1 : 0) * (parseFloat(s.score) || 0));
-  const raw = TF_WEIGHTS["1w"] * signed(sigW) + TF_WEIGHTS["1d"] * signed(sigD)
-    + TF_WEIGHTS["4h"] * signed(sig4) + TF_WEIGHTS["1h"] * signed(sig1);
-  const compScore = Math.round(Math.min(100, Math.abs(raw)));
-  const compType = raw > 0.5 ? "BUY" : raw < -0.5 ? "SELL" : null;
+  const sigW = hasW ? scoreStockTF(toArrays(candles1w), "1w") : null;
+  const sigD = scoreStockTF(toArrays(candles1d), "1d");
+  const sig4 = has4 ? scoreStockTF(toArrays(candles4h), "4h") : null;
+  const sig1 = has1 ? scoreStockTF(toArrays(candles1h), "1h") : null;
+
+  // ── 종합 — composeStockScore(위 순수 함수: btc-cron 동일 공식. compScore 는 v1
+  //   산식 비트 동일, 결측 재정규화는 additive covAdjScore — 헤더 수리 ② 참조) ──
+  const { coverage, compScore, covAdjScore, compType } = composeStockScore({ sigW, sigD, sig4, sig1, hasW, hasD, has4, has1 });
   if (!compType) return { status: "ok", entry: null, marketState }; // 방향 합의 없음 — 코인 풀과 동일하게 미적재
 
   const tfTag = (s) => (!s ? "—" : `${s.type === "BUY" ? "롱" : "숏"}${Math.round(s.score)}`);
@@ -545,10 +612,12 @@ export async function scanStockSymbol({ symbol, name, market }) {
     market,                      // "us" | "kr"
     type: compType,
     side: compType === "BUY" ? "LONG" : "SHORT",
-    score: compScore,
+    score: compScore,            // v1 산식 유지 — 스윙 게이트 ②·히스테리시스 소비 경로 비트 동일(수리 ②)
     confidence: compScore >= 80 ? "A" : compScore >= 60 ? "B" : "C",
     family: "composite",
     timeframe: "MTF",
+    covAdjScore,                 // ★ additive — TF 결측 재정규화 점수(소비 경로 0, 표시 채택·v2 사전등록 대기)
+    tfCoverage: Math.round(coverage * 100) / 100, // ★ additive — 데이터 충분성 기준 가용 TF 가중치 합(1.0=4TF 전부)
     breakdown,
     reason: `종합 ${compScore} (주${tfTag(sigW)}·일${tfTag(sigD)}·4h${tfTag(sig4)}·1h${tfTag(sig1)}) — 기술적 지표 종합`,
     source: "stock-signals-cron",
