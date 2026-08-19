@@ -78,6 +78,45 @@ const fmtQty = (v) => {
 const fmtTime = (t) => t ? new Date(t).toLocaleTimeString("ko-KR", { hour12: false }) : "—";
 const fmtDT = (t) => t ? new Date(t).toLocaleString("ko-KR", { hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
 
+// ★ 2026-08-19 (일일감사 · 대표 제보 "진입타점 보완이 작동 안 하는 것 같다"):
+//   엔진 로그에 "all 6 signals rejected" 만 뜨고 *왜* 기각됐는지가 화면에 없어,
+//   보유 노출 한도에 막혀 있는 상태와 신호 자체가 없는 상태가 구분되지 않았습니다.
+//   서버는 이미 tried[{symbol, reason}] 를 내려주고 있으므로 그대로 한국어로 묶어 보여줍니다.
+//   (표시 전용 — 매매 로직·기각 기준은 일절 건드리지 않습니다.)
+const REJECT_LABELS = [
+  [/합산 노셔널/, "보유 노출 한도 초과"],
+  [/합산 마진|마진 한도/, "마진 한도 초과"],
+  [/^low ATR/, "변동성 부족(박스권)"],
+  [/^score gate/, "점수 미달"],
+  [/^volume gate/, "거래대금 부족"],
+  [/reentry cooldown/, "재진입 쿨다운"],
+  [/correlation group/, "상관군 중복"],
+  [/side concentration/, "한 방향 과밀"],
+  [/RSI extreme/, "RSI 극단 추격 방지"],
+  [/same-symbol notional/, "같은 종목 노출 한도"],
+  [/pyramid/, "물타기 가드"],
+  [/^unaffordable/, "최소 주문금액 미달"],
+  [/auto-blocked/, "성과 부진 자동 차단"],
+  [/^dedup/, "이미 보유 중"],
+];
+function labelReject(reason) {
+  const r = String(reason || "");
+  for (const [re, label] of REJECT_LABELS) if (re.test(r)) return label;
+  return r ? "기타" : "사유 미기록";
+}
+/** tried[] → [{ label, count, symbols }] (많은 사유 순) */
+function summarizeTried(tried) {
+  const m = new Map();
+  for (const t of Array.isArray(tried) ? tried : []) {
+    const label = labelReject(t?.reason);
+    const cur = m.get(label) || { label, count: 0, symbols: [] };
+    cur.count += 1;
+    if (t?.symbol && cur.symbols.length < 6) cur.symbols.push(String(t.symbol).replace(/USDT$/, ""));
+    m.set(label, cur);
+  }
+  return [...m.values()].sort((a, b) => b.count - a.count);
+}
+
 // ★ 2026-06-02 — Supabase 세션 토큰을 Authorization 으로 첨부 (서버 인증 게이트용).
 async function authHeaders() {
   try {
@@ -368,6 +407,19 @@ function RealTradingInner({ onNavigate }) {
   const rcNotionalRatio = riskCfg.maxTotalNotionalRatio ?? null;
   const rcNotionalCap = (rcNotionalRatio != null && equity > 0) ? equity * rcNotionalRatio : null;
 
+  // ★ 2026-08-19 (일일감사 · 대표 제보): 진입 여력 실측.
+  //   보유 포지션 합산 노출이 한도를 넘으면 새 신호가 아무리 좋아도 전부 기각됩니다.
+  //   이 상태가 화면 어디에도 없어 "엔진이 고장난 것처럼" 보였습니다 — 수치로 그대로 노출합니다.
+  //   (표시 전용 — 한도값·기각 규칙은 서버 riskConfig 그대로 사용합니다.)
+  const sumNotional = positions.reduce((acc, p) => {
+    const amt = Math.abs(Number(p?.positionAmt) || 0);
+    const px = Number(p?.markPrice) || Number(p?.entryPrice) || 0;
+    return acc + amt * px;
+  }, 0);
+  const availableBalance = status?.availableBalance ?? null;
+  const notionalUsedPct = (rcNotionalCap > 0) ? (sumNotional / rcNotionalCap) * 100 : null;
+  const entryBlocked = rcNotionalCap != null && sumNotional > rcNotionalCap;
+
   // ═════════════════════════════════════════════════════════
   // ★ 2026-08-12 IA v3 (시안 1g): 콘솔형 상태 히어로
   //   브랜딩 헤더 + KPI 카드 5장을 히어로 1장으로 통합 — 가동 상태·총자산·일 손익.
@@ -476,6 +528,30 @@ function RealTradingInner({ onNavigate }) {
             )}
           </div>
         </div>
+        {/* ★ 2026-08-19 (일일감사): 진입 여력 — 신규 진입이 막혀 있는지 한눈에 */}
+        {rcNotionalCap != null && (
+          <div style={{ minWidth: 0, maxWidth: isMobile ? "100%" : 320 }}>
+            <div style={{ fontSize: 11.5, color: "var(--z-text-3)", fontWeight: 700 }}>진입 여력 · 보유 노출 / 한도</div>
+            <div style={{
+              fontSize: isMobile ? 22 : 26, fontWeight: 900, lineHeight: 1.1,
+              fontFamily: "var(--z-font-mono)", letterSpacing: "-0.01em", marginTop: 3,
+              color: entryBlocked ? "var(--z-red-hi)" : "var(--z-text)",
+            }}>
+              {fmtUsd(sumNotional, 0)}
+              <span style={{ fontSize: isMobile ? 12.5 : 14, fontWeight: 800, opacity: 0.7 }}> / {fmtUsd(rcNotionalCap, 0)}</span>
+              {notionalUsedPct != null && (
+                <span style={{ fontSize: isMobile ? 12.5 : 14, fontWeight: 800, marginLeft: 6, opacity: 0.85 }}>
+                  {notionalUsedPct.toFixed(0)}%
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: 11.5, color: entryBlocked ? "var(--z-red-hi)" : "var(--z-text-3)", marginTop: 4, fontWeight: entryBlocked ? 700 : 400 }}>
+              {entryBlocked
+                ? `신규 진입 차단 중 — 한도 초과로 새 신호가 전부 기각됩니다${availableBalance != null ? ` · 가용 ${fmtUsd(availableBalance, 2)}` : ""}`
+                : availableBalance != null ? `가용 잔고 ${fmtUsd(availableBalance, 2)}` : "여유 있음"}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1037,6 +1113,29 @@ function RealTradingInner({ onNavigate }) {
               )}
               {e.reason && !e.signal && (
                 <div style={{ color: "var(--z-text-3)", fontSize: 14 }}>reason: {e.reason}</div>
+              )}
+              {/* ★ 2026-08-19 (일일감사): 기각 사유 요약 — "왜 진입을 안 했는지" 를 그대로 노출 */}
+              {!e.ran && Array.isArray(e.tried) && e.tried.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+                  {summarizeTried(e.tried).map((g) => (
+                    <span
+                      key={g.label}
+                      title={g.symbols.join(", ")}
+                      style={{
+                        display: "inline-flex", alignItems: "center", gap: 5,
+                        padding: "3px 8px", borderRadius: "var(--z-r-xs)",
+                        background: "var(--z-card)", border: "1px solid var(--z-border)",
+                        color: "var(--z-text-2)", fontSize: 12.5, fontWeight: 700,
+                      }}
+                    >
+                      {g.label}
+                      <span style={{ color: "var(--z-text-3)", fontWeight: 800, fontFamily: "var(--z-font-mono)" }}>{g.count}</span>
+                      {g.symbols.length > 0 && (
+                        <span style={{ color: "var(--z-text-3)", fontWeight: 600 }}>· {g.symbols.join(" ")}</span>
+                      )}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
           ))}
