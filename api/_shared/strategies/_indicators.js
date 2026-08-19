@@ -221,9 +221,11 @@ export function gradeConfidence(absNet) {
   return "C";
 }
 
-// 0~100 점수로 정규화 (기존 호환): absNet 7+ → 95, 1 → 50
+// 0~100 점수로 정규화 (기존 호환): absNet 8+ → 95, 1 → 56
+//   (2026-08-19 감사: 주석 수치 오기만 교정 — 실제 산식 50+min(absNet,8)*6 은
+//    1→56, 3→68, 5→80, 7→92, 8+→95(상한 캡). 코드 동작 불변.)
 export function scaleScore(absNet) {
-  // absNet 1 → 55,  3 → 70,  5 → 82,  7+ → 92~95
+  // absNet 1 → 56,  3 → 68,  5 → 80,  7 → 92,  8+ → 95
   const base = 50 + Math.min(absNet, 8) * 6;
   return Math.min(95, Math.max(50, base));
 }

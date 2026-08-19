@@ -837,6 +837,7 @@
       "aggregatedHourAgo": "{{n}}시간 전 집계",
       "asOfDailyClose": "최근 일봉 종가 기준",
       "staleSuffix": "갱신 지연",
+      "marketClosedSuffix": "장 마감 기준",
       "topNews": "톱 뉴스",
       "more": "더보기",
       "noNews": "표시할 뉴스가 아직 없습니다.",
