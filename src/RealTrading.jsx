@@ -411,14 +411,21 @@ function RealTradingInner({ onNavigate }) {
   //   보유 포지션 합산 노출이 한도를 넘으면 새 신호가 아무리 좋아도 전부 기각됩니다.
   //   이 상태가 화면 어디에도 없어 "엔진이 고장난 것처럼" 보였습니다 — 수치로 그대로 노출합니다.
   //   (표시 전용 — 한도값·기각 규칙은 서버 riskConfig 그대로 사용합니다.)
+  //   ★ 2026-08-21 (일일감사): 가격 기준을 엔진과 일치시켰습니다.
+  //   엔진(checkAggregateExposure)은 진입가(entryPrice)로 합산 노셔널을 계산하는데
+  //   화면만 현재가(markPrice)를 써서, 같은 지표가 화면 $4,256 · 엔진 기각로그 $3,811 로
+  //   다르게 보였습니다. 이 카드는 "왜 진입이 막혔는가" 를 설명하는 카드이므로
+  //   기각 판정과 같은 기준(진입가)으로 맞춥니다.
   const sumNotional = positions.reduce((acc, p) => {
     const amt = Math.abs(Number(p?.positionAmt) || 0);
-    const px = Number(p?.markPrice) || Number(p?.entryPrice) || 0;
+    const px = Number(p?.entryPrice) || Number(p?.markPrice) || 0;
     return acc + amt * px;
   }, 0);
   const availableBalance = status?.availableBalance ?? null;
   const notionalUsedPct = (rcNotionalCap > 0) ? (sumNotional / rcNotionalCap) * 100 : null;
   const entryBlocked = rcNotionalCap != null && sumNotional > rcNotionalCap;
+  // 한도 대비 남은/초과한 금액 — "얼마를 줄여야 다시 진입되는가" 를 그대로 보여줍니다.
+  const notionalHeadroom = (rcNotionalCap != null) ? rcNotionalCap - sumNotional : null;
 
   // ═════════════════════════════════════════════════════════
   // ★ 2026-08-12 IA v3 (시안 1g): 콘솔형 상태 히어로
@@ -531,7 +538,7 @@ function RealTradingInner({ onNavigate }) {
         {/* ★ 2026-08-19 (일일감사): 진입 여력 — 신규 진입이 막혀 있는지 한눈에 */}
         {rcNotionalCap != null && (
           <div style={{ minWidth: 0, maxWidth: isMobile ? "100%" : 320 }}>
-            <div style={{ fontSize: 11.5, color: "var(--z-text-3)", fontWeight: 700 }}>진입 여력 · 보유 노출 / 한도</div>
+            <div style={{ fontSize: 11.5, color: "var(--z-text-3)", fontWeight: 700 }}>진입 여력 · 보유 노출(진입가) / 한도</div>
             <div style={{
               fontSize: isMobile ? 22 : 26, fontWeight: 900, lineHeight: 1.1,
               fontFamily: "var(--z-font-mono)", letterSpacing: "-0.01em", marginTop: 3,
@@ -547,8 +554,8 @@ function RealTradingInner({ onNavigate }) {
             </div>
             <div style={{ fontSize: 11.5, color: entryBlocked ? "var(--z-red-hi)" : "var(--z-text-3)", marginTop: 4, fontWeight: entryBlocked ? 700 : 400 }}>
               {entryBlocked
-                ? `신규 진입 차단 중 — 한도 초과로 새 신호가 전부 기각됩니다${availableBalance != null ? ` · 가용 ${fmtUsd(availableBalance, 2)}` : ""}`
-                : availableBalance != null ? `가용 잔고 ${fmtUsd(availableBalance, 2)}` : "여유 있음"}
+                ? `신규 진입 차단 중 — 한도 ${fmtUsd(Math.abs(notionalHeadroom ?? 0), 0)} 초과로 새 신호가 전부 기각됩니다${availableBalance != null ? ` · 가용 ${fmtUsd(availableBalance, 2)}` : ""}`
+                : `잔여 여력 ${fmtUsd(notionalHeadroom ?? 0, 0)}${availableBalance != null ? ` · 가용 잔고 ${fmtUsd(availableBalance, 2)}` : ""}`}
             </div>
           </div>
         )}
