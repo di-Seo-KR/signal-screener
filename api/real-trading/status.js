@@ -127,7 +127,15 @@ export default async function handler(req, res) {
         riskPerTradePct: RISK_CONFIG.riskPerTradePct,
         maxMarginPct: RISK_CONFIG.maxMarginPct,
         maxTotalMarginRatio: Number(process.env.ZEPTA_MAX_TOTAL_MARGIN_RATIO) || RISK_CONFIG.maxTotalMarginRatio,
-        maxTotalNotionalRatio: RISK_CONFIG.maxTotalNotionalRatio,
+        maxTotalNotionalRatio: (() => { const n = Number(process.env.ZEPTA_MAX_TOTAL_NOTIONAL_RATIO); return (Number.isFinite(n) && n > 0) ? n : RISK_CONFIG.maxTotalNotionalRatio; })(),
+        // ★ 2026-08-21 (대표 승인, 옵션 1): 가용잔고 판정 모드 여부 — UI 진입 여력 카드가
+        //   "노셔널 한도 초과 = 차단" 표시를 이 플래그로 분기 (가용 모드에선 노셔널 선차단 없음).
+        // ★ 검증 지적 반영: 엔진의 실판정(risk-manager useAvail)은 env 외에 availableMargin>0
+        //   도 요구 — 가용이 0으로 소진되면 엔진은 strict(노셔널 선차단)로 폴백하므로,
+        //   UI 에도 실효 모드를 내려 화면·엔진 표기가 어긋나지 않게 한다.
+        aggUseAvailable: process.env.ZEPTA_AGG_USE_AVAILABLE !== "0"
+          && Number.isFinite(availableBalance) && availableBalance > 0,
+        availableMarginBudgetPct: RISK_CONFIG.availableMarginBudgetPct ?? 0.90,
         minLeverage: RISK_CONFIG.minLeverage,
         maxLeverage: RISK_CONFIG.maxLeverage,
         maxRoiLossPct: RISK_CONFIG.maxRoiLossPct,
