@@ -77,7 +77,11 @@ export const RISK_CONFIG = {
   //   합산 $1500+ 로 한도 자주 초과. 거래 다양화 막힘.
   //   진짜 안전망은 maxTotalMarginRatio 0.6 (자본의 60% 마진).
   //   노셔널 가드는 10x 늘려 사실상 비활성 — 마진 가드 의지.
-  maxTotalNotionalRatio: 10.0,  // 사실상 무제한 (마진 가드 0.6 이 실 안전망)
+  // ★ 2026-08-21 (대표 승인, 옵션 1): 이 가드는 이제 strict 경로(가용잔고 미제공 또는
+  //   ZEPTA_AGG_USE_AVAILABLE=0)에서만 적용. 가용잔고 판정 모드에선 "신규 마진 ≤ 가용×90%"
+  //   가 단일 기준 — 수동 포지션이 커도 남은 가용 안에서는 봇이 진입한다.
+  //   env ZEPTA_MAX_TOTAL_NOTIONAL_RATIO 로 배율 런타임 조정 가능.
+  maxTotalNotionalRatio: 10.0,  // strict 경로 전용 (가용 모드에선 미적용)
   // 합산 마진 노출 cap (위 노셔널과 별개로 마진 합산도 제한)
   // ★ 2026-05-12 hotfix v2: 0.85 → 0.95 (대표 지시: "자본 한도의 95%까지는 다 사용해서 진입").
   //   $518 × 0.95 = $492 한도 → 자본 거의 풀 사용 → 거래 다양화 극대화.
@@ -377,25 +381,31 @@ export function checkAggregateExposure({ plan, openPositions, equity, availableM
 
   const newSumNotional = sumNotional + plan.notional;
   const newSumMargin = sumMargin + (plan.marginRequired || (plan.notional / (plan.leverage || 10)));
-  const notionalCap = equity * (cfg.maxTotalNotionalRatio || 1.5);
+  // ★ 2026-08-21 (대표 승인): 노셔널 배율도 env 오버라이드 신설 — 런타임 조정용.
+  //   ※ 검증 지적 반영: `Number(env) ||` 안티패턴(0 설정 시 조용히 기본값 폴백) 대신
+  //   engine.js MIN_EQUITY 와 같은 isFinite+양수 패턴. 이 env 는 strict 경로 전용이며,
+  //   가용 모드의 유일한 원복 레버는 ZEPTA_AGG_USE_AVAILABLE=0 하나뿐이다.
+  const _nr = Number(process.env.ZEPTA_MAX_TOTAL_NOTIONAL_RATIO);
+  const notionalRatio = (Number.isFinite(_nr) && _nr > 0) ? _nr : (cfg.maxTotalNotionalRatio || 1.5);
+  const notionalCap = equity * notionalRatio;
   // env override 우선 — 런타임 조정 가능 (대표가 위험 식별 시 즉시 0.6 로 strict 복원 가능)
   const marginRatio = Number(process.env.ZEPTA_MAX_TOTAL_MARGIN_RATIO) || cfg.maxTotalMarginRatio || 0.85;
   const marginCap = equity * marginRatio;
   push(`예정 합산 noSi=$${newSumNotional.toFixed(2)} margin=$${newSumMargin.toFixed(2)} (cap noSi=$${notionalCap.toFixed(2)}, margin=$${marginCap.toFixed(2)})`);
-
-  if (newSumNotional > notionalCap) {
-    return {
-      ok: false,
-      reason: `합산 노셔널 $${newSumNotional.toFixed(2)} > 한도 $${notionalCap.toFixed(2)} (${((cfg.maxTotalNotionalRatio||1.5)*100).toFixed(0)}% of equity)`,
-      sumNotional, sumMargin, log,
-    };
-  }
 
   // ★ 2026-06-03 (대표 지시 "있는대로 잡으면 되지"): 가용잔고(availableBalance)가 주어지면
   //   그게 진짜 진입 가능 한도다 — equity×ratio 소프트 가드 대신 "신규 마진 ≤ 가용×budget"
   //   으로 판정한다. 수동 포지션이 자본의 95% 를 차지해도, 남은 가용 안에서는 봇이 진입.
   //   (equity 비례 가드는 all-bot 계정 가정이라 대표의 수동 롱/숏이 사용률을 부풀려 봇을 막던 문제)
   //   env ZEPTA_AGG_USE_AVAILABLE=0 으로 옛 strict(equity 비례) 동작 복원 가능.
+  // ★ 2026-08-21 (대표 승인, 옵션 1 — 위 지시 취지 완성): 노셔널 선차단을 useAvail 분기
+  //   *뒤*(strict 경로 전용)로 이동. 기존엔 이 선차단이 분기 앞에 있어, DOGE 수동 포지션
+  //   (진입가 노셔널 $3,611)이 지갑잔고 $228×10배 한도를 넘는 순간 가용잔고가 남아 있어도
+  //   모든 신규 진입이 기각됐다 — "남은 가용 안에서는 진입" 지시가 마진 체크에만 반영되고
+  //   노셔널 체크는 그 앞에서 선차단하던 반쪽 구현의 완성.
+  //   가용 모드 단일 기준 = "신규 마진 ≤ 가용잔고 × availableMarginBudgetPct(기본 90%)".
+  //   (신규 노셔널 자체는 planTrade 의 riskPerTradePct 사이징 + 레버리지 상한이 자연 제한.)
+  //   원복: ZEPTA_AGG_USE_AVAILABLE=0 → strict 경로(노셔널+마진 equity 비례 선차단) 복원.
   const useAvail = Number.isFinite(availableMargin) && availableMargin > 0
     && process.env.ZEPTA_AGG_USE_AVAILABLE !== "0";
   const newMargin = plan.marginRequired || (plan.notional / (plan.leverage || 10));
@@ -416,6 +426,13 @@ export function checkAggregateExposure({ plan, openPositions, equity, availableM
   }
 
   // ── 이하 equity 비례 strict 경로 (가용잔고 미제공 또는 ZEPTA_AGG_USE_AVAILABLE=0) ──
+  if (newSumNotional > notionalCap) {
+    return {
+      ok: false,
+      reason: `합산 노셔널 $${newSumNotional.toFixed(2)} > 한도 $${notionalCap.toFixed(2)} (${(notionalRatio*100).toFixed(0)}% of equity)`,
+      sumNotional, sumMargin, log,
+    };
+  }
   if (newSumMargin > marginCap) {
     return {
       ok: false,

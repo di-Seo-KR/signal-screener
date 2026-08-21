@@ -85,6 +85,8 @@ const fmtDT = (t) => t ? new Date(t).toLocaleString("ko-KR", { hour12: false, mo
 //   (표시 전용 — 매매 로직·기각 기준은 일절 건드리지 않습니다.)
 const REJECT_LABELS = [
   [/합산 노셔널/, "보유 노출 한도 초과"],
+  // ★ 2026-08-21 (옵션 1 검증 지적): 가용 모드의 지배적 기각 사유가 "기타" 로 뭉개지지 않게 추가
+  [/가용 한도|가용잔고/, "가용 잔고 부족"],
   [/합산 마진|마진 한도/, "마진 한도 초과"],
   [/^low ATR/, "변동성 부족(박스권)"],
   [/^score gate/, "점수 미달"],
@@ -423,7 +425,16 @@ function RealTradingInner({ onNavigate }) {
   }, 0);
   const availableBalance = status?.availableBalance ?? null;
   const notionalUsedPct = (rcNotionalCap > 0) ? (sumNotional / rcNotionalCap) * 100 : null;
-  const entryBlocked = rcNotionalCap != null && sumNotional > rcNotionalCap;
+  // ★ 2026-08-21 (대표 승인, 옵션 1): 서버가 가용잔고 판정 모드(aggUseAvailable)면 노셔널
+  //   선차단이 없다 — "한도 초과 = 진입 차단" 표시는 strict 모드에서만 참. 가용 모드에선
+  //   신규 마진 한도(가용 × availableMarginBudgetPct)를 진입 여력으로 보여준다.
+  //   (구버전 API 캐시로 플래그가 없으면 기존 strict 표시 유지 — 보수적 폴백.)
+  const aggUseAvailable = riskCfg.aggUseAvailable === true;
+  const availBudgetPct = riskCfg.availableMarginBudgetPct ?? 0.90;
+  const availMarginCap = (availableBalance != null) ? availableBalance * availBudgetPct : null;
+  const entryBlocked = !aggUseAvailable && rcNotionalCap != null && sumNotional > rcNotionalCap;
+  // 가용 한도가 바닥이면(표시용 휴리스틱 $10 미만) 신규 진입이 사실상 막힌 상태 — 경고색으로 알림
+  const availNearEmpty = aggUseAvailable && availMarginCap != null && availMarginCap < 10;
   // 한도 대비 남은/초과한 금액 — "얼마를 줄여야 다시 진입되는가" 를 그대로 보여줍니다.
   const notionalHeadroom = (rcNotionalCap != null) ? rcNotionalCap - sumNotional : null;
 
@@ -535,27 +546,48 @@ function RealTradingInner({ onNavigate }) {
             )}
           </div>
         </div>
-        {/* ★ 2026-08-19 (일일감사): 진입 여력 — 신규 진입이 막혀 있는지 한눈에 */}
-        {rcNotionalCap != null && (
+        {/* ★ 2026-08-19 (일일감사): 진입 여력 — 신규 진입이 막혀 있는지 한눈에
+            ★ 2026-08-21 (대표 승인, 옵션 1): 가용잔고 판정 모드에선 노셔널 선차단이 없으므로
+              "신규 마진 한도(가용 기준)" 를 진입 여력으로 표시. strict 모드는 기존 표시 유지. */}
+        {(aggUseAvailable ? availMarginCap != null : rcNotionalCap != null) && (
           <div style={{ minWidth: 0, maxWidth: isMobile ? "100%" : 320 }}>
-            <div style={{ fontSize: 11.5, color: "var(--z-text-3)", fontWeight: 700 }}>진입 여력 · 보유 노출(진입가) / 한도</div>
-            <div style={{
-              fontSize: isMobile ? 22 : 26, fontWeight: 900, lineHeight: 1.1,
-              fontFamily: "var(--z-font-mono)", letterSpacing: "-0.01em", marginTop: 3,
-              color: entryBlocked ? "var(--z-red-hi)" : "var(--z-text)",
-            }}>
-              {fmtUsd(sumNotional, 0)}
-              <span style={{ fontSize: isMobile ? 12.5 : 14, fontWeight: 800, opacity: 0.7 }}> / {fmtUsd(rcNotionalCap, 0)}</span>
-              {notionalUsedPct != null && (
-                <span style={{ fontSize: isMobile ? 12.5 : 14, fontWeight: 800, marginLeft: 6, opacity: 0.85 }}>
-                  {notionalUsedPct.toFixed(0)}%
-                </span>
-              )}
+            <div style={{ fontSize: 11.5, color: "var(--z-text-3)", fontWeight: 700 }}>
+              {aggUseAvailable ? "진입 여력 · 신규 마진 한도 (가용 기준)" : "진입 여력 · 보유 노출(진입가) / 한도"}
             </div>
-            <div style={{ fontSize: 11.5, color: entryBlocked ? "var(--z-red-hi)" : "var(--z-text-3)", marginTop: 4, fontWeight: entryBlocked ? 700 : 400 }}>
-              {entryBlocked
-                ? `신규 진입 차단 중 — 한도 ${fmtUsd(Math.abs(notionalHeadroom ?? 0), 0)} 초과로 새 신호가 전부 기각됩니다${availableBalance != null ? ` · 가용 ${fmtUsd(availableBalance, 2)}` : ""}`
-                : `잔여 여력 ${fmtUsd(notionalHeadroom ?? 0, 0)}${availableBalance != null ? ` · 가용 잔고 ${fmtUsd(availableBalance, 2)}` : ""}`}
+            {aggUseAvailable ? (
+              <div style={{
+                fontSize: isMobile ? 22 : 26, fontWeight: 900, lineHeight: 1.1,
+                fontFamily: "var(--z-font-mono)", letterSpacing: "-0.01em", marginTop: 3,
+                color: availNearEmpty ? "var(--z-red-hi)" : "var(--z-text)",
+              }}>
+                {fmtUsd(availMarginCap, 0)}
+                <span style={{ fontSize: isMobile ? 12.5 : 14, fontWeight: 800, marginLeft: 6, opacity: 0.7 }}>
+                  = 가용 {fmtUsd(availableBalance, 0)} × {(availBudgetPct * 100).toFixed(0)}%
+                </span>
+              </div>
+            ) : (
+              <div style={{
+                fontSize: isMobile ? 22 : 26, fontWeight: 900, lineHeight: 1.1,
+                fontFamily: "var(--z-font-mono)", letterSpacing: "-0.01em", marginTop: 3,
+                color: entryBlocked ? "var(--z-red-hi)" : "var(--z-text)",
+              }}>
+                {fmtUsd(sumNotional, 0)}
+                <span style={{ fontSize: isMobile ? 12.5 : 14, fontWeight: 800, opacity: 0.7 }}> / {fmtUsd(rcNotionalCap, 0)}</span>
+                {notionalUsedPct != null && (
+                  <span style={{ fontSize: isMobile ? 12.5 : 14, fontWeight: 800, marginLeft: 6, opacity: 0.85 }}>
+                    {notionalUsedPct.toFixed(0)}%
+                  </span>
+                )}
+              </div>
+            )}
+            <div style={{ fontSize: 11.5, color: (entryBlocked || availNearEmpty) ? "var(--z-red-hi)" : "var(--z-text-3)", marginTop: 4, fontWeight: (entryBlocked || availNearEmpty) ? 700 : 400 }}>
+              {aggUseAvailable
+                ? availNearEmpty
+                  ? `가용 잔고 거의 소진 — 신규 진입이 사실상 막혀 있습니다 · 보유 노출(진입가) ${fmtUsd(sumNotional, 0)}`
+                  : `진입 1건당 이 금액 안에서 마진이 잡힙니다 · 보유 노출(진입가) ${fmtUsd(sumNotional, 0)}`
+                : entryBlocked
+                  ? `신규 진입 차단 중 — 한도 ${fmtUsd(Math.abs(notionalHeadroom ?? 0), 0)} 초과로 새 신호가 전부 기각됩니다${availableBalance != null ? ` · 가용 ${fmtUsd(availableBalance, 2)}` : ""}`
+                  : `잔여 여력 ${fmtUsd(notionalHeadroom ?? 0, 0)}${availableBalance != null ? ` · 가용 잔고 ${fmtUsd(availableBalance, 2)}` : ""}`}
             </div>
           </div>
         )}
@@ -1325,9 +1357,12 @@ function RealTradingInner({ onNavigate }) {
         <KV label="최대 증거금 비율" value={`${rcMarginSingle.toFixed(0)}% (단일) · ${rcMarginTotal.toFixed(0)}% (합산)`} />
         <KV label="레버리지" value={rcLevLabel} />
         <KV label="동시 포지션 한도" value={`개수 ${riskCfg.maxConcurrentPositions ?? "—"}개 · 합산 마진 ${rcMarginTotal.toFixed(0)}%`} />
+        {/* ★ 2026-08-21 (대표 승인, 옵션 1): 가용 모드에선 노셔널 선차단이 없으므로 실 판정 기준을 표기 */}
         <KV label="합산 노셔널 한도"
-          value={rcNotionalRatio == null ? "—"
-            : `자본의 ${(rcNotionalRatio * 100).toFixed(0)}%${rcNotionalCap ? ` (현재 ${fmtUsd(rcNotionalCap, 0)})` : ""}`} />
+          value={aggUseAvailable
+            ? `미적용 — 가용 기준 모드 (신규 마진 ≤ 가용 × ${(availBudgetPct * 100).toFixed(0)}%)`
+            : rcNotionalRatio == null ? "—"
+              : `자본의 ${(rcNotionalRatio * 100).toFixed(0)}%${rcNotionalCap ? ` (현재 ${fmtUsd(rcNotionalCap, 0)})` : ""}`} />
         {/* ★ 2026-08-18 (대표 지시): 고확신 마진 플로어 — 점수 높을수록 크게 진입 */}
         {riskCfg.convictionMarginBoost && (
           <KV label="고확신 진입 확대"
