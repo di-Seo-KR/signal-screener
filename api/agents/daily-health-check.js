@@ -86,14 +86,26 @@ export default async function handler(req, res) {
         const p = await kv.get(`di:alpha:params:${id}`);
         if (!p) continue;
         active += 1;
-        if (Number.isFinite(p.sharpe) && p.sharpe > 8) inflated.push(`${id}(${p.sharpe})`);
+        // ★ 2026-08-21 (일일감사): 기존엔 p.sharpe 만 봐서 실제 과적합을 놓쳤습니다.
+        //   예) trend-follow 는 sharpe 5.3 이라 통과했지만 oosSharpe 가 14.79(15거래) 로
+        //   in-sample 3.46 의 4.3배 — 전형적인 검증창 과소 표본 신호인데 무경보였습니다.
+        //   이제 ① sharpe>8 ② oosSharpe>8 ③ OOS 가 in-sample 의 2.5배 초과 중 하나라도
+        //   걸리면 경보합니다. (탐지 전용 — 승급/주입 규칙 자체는 변경하지 않습니다.)
+        const flags = [];
+        if (Number.isFinite(p.sharpe) && p.sharpe > 8) flags.push(`Sharpe ${p.sharpe}`);
+        if (Number.isFinite(p.oosSharpe) && p.oosSharpe > 8) flags.push(`OOS ${p.oosSharpe}`);
+        if (Number.isFinite(p.oosSharpe) && Number.isFinite(p.inSampleSharpe) && p.inSampleSharpe > 0
+            && p.oosSharpe > p.inSampleSharpe * 2.5) {
+          flags.push(`OOS/IS ${(p.oosSharpe / p.inSampleSharpe).toFixed(1)}배`);
+        }
+        if (flags.length) inflated.push(`${id}(${flags.join(", ")}${Number.isFinite(p.trades) ? `, ${p.trades}거래` : ""})`);
       }
       let raw = [];
       for (const rid of RAW_LEGACY) {
         const p = await kv.get(`di:alpha:params:${rid}`);
         if (p) raw.push(rid);
       }
-      if (inflated.length) add("warn", "주입", `과적합 의심 주입(Sharpe>8): ${inflated.join(", ")} — 교차검증 누수 점검`);
+      if (inflated.length) add("warn", "주입", `과적합 의심 주입: ${inflated.join(", ")} — 교차검증 누수/표본 부족 점검`);
       if (raw.length) add("warn", "주입", `canonical 외 raw family 키 잔재: ${raw.join(", ")}`);
     } catch (e) { add("warn", "주입", `확인 실패: ${e?.message}`); }
 
