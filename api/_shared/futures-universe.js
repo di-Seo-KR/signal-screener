@@ -19,11 +19,13 @@
 import { getExchangeInfo, get24hrTickers } from "./binance-client.js";
 
 export const UNIVERSE_KV_KEY = "di:signals:futures-universe";
-// ★ 2026-09-04 (대표 지시 "코인 시그널 갯수 늘려줘"): 50 → 65. env ZEPTA_UNIVERSE_SIZE 로 조정.
-//   btc-cron maxDuration 300s 기준 헤드룸 실측: 50종 ≈ 60~90s → 65+버퍼 15 = 최대 80종도 여유.
+// ★ 2026-09-04 (대표 지시 "코인 시그널 갯수 늘려줘" → 같은 날 "100종까지"): 50 → 65 → 100.
+//   env ZEPTA_UNIVERSE_SIZE 로 조정(10~120). 100+버퍼 15 = 최대 115종은 btc-cron 300s 예산의
+//   ~2.3배 부하라, btc-cron 쪽에 스캔 시간예산 가드(240s) + 순환 시작 오프셋을 함께 배선 —
+//   예산 초과로 뒤쪽 자산이 밀려도 런마다 시작점이 돌아 몇 런 안에 전 자산이 커버됩니다.
 export const UNIVERSE_SIZE = (() => {
   const v = Number(process.env.ZEPTA_UNIVERSE_SIZE);
-  return Number.isFinite(v) && v >= 10 && v <= 100 ? Math.round(v) : 65;
+  return Number.isFinite(v) && v >= 10 && v <= 120 ? Math.round(v) : 100;
 })();
 // ★ 멤버십 히스테리시스 — 대표 제보 "몇몇 코인이 있다가 없어지고 자주 그래":
 //   순위 경계(기존 50위) 부근 코인이 6시간마다 거래대금 순위로 들락거리며 보드에서
@@ -96,7 +98,10 @@ export async function loadUniverse(kv, { maxAgeMs = REFRESH_MS } = {}) {
   let cached = null;
   try { cached = await kv.get(UNIVERSE_KV_KEY); } catch { cached = null; }
   const age = cached?.generatedAt ? Date.now() - Date.parse(cached.generatedAt) : Infinity;
-  if (Array.isArray(cached?.entries) && cached.entries.length && age < maxAgeMs) return cached;
+  // ★ 2026-09-04: 사이즈 설정이 커졌는데 캐시가 옛 규모면 TTL 을 기다리지 않고 즉시 재산출
+  //   (50→100 확대가 최대 6시간 지연되던 문제). 축소 방향은 TTL 대로(불필요한 재산출 방지).
+  const sizeOutdated = Array.isArray(cached?.entries) && cached.entries.length < UNIVERSE_SIZE * 0.9;
+  if (Array.isArray(cached?.entries) && cached.entries.length && age < maxAgeMs && !sizeOutdated) return cached;
   try {
     return await refreshUniverse(kv);
   } catch {
