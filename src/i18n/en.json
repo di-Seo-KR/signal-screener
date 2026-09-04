@@ -974,7 +974,9 @@
       "valueEmptyDesc1": " — tap to analyze US & Korean stocks",
       "valueEmptyDesc2": "with a combined valuation model",
       "valueBasis": "Based on PER · PBR · dividend yield · forward PE · analyst targets · 52-week position · MA200 gap",
-      "valueMarketEmpty": "No stocks meet the value criteria in this market — try another filter"
+      "valueMarketEmpty": "No stocks meet the value criteria in this market — try another filter",
+      "sigSearchMeta": "{{n}} signal(s) for '{{q}}' — searched across the full pool",
+      "sigSearchNoMatch": "No signals in the pool for '{{q}}'"
     },
     "quantReport": {
       "title": "Quant Report",
@@ -1152,7 +1154,9 @@
       "indexDetailLink": "Full guide & methodology",
       "asOf": "as of {{time}}",
       "disclaimer": "This information is for reference only and is not investment advice or a solicitation.",
-      "findByConditions": "Find coins by conditions"
+      "findByConditions": "Find coins by conditions",
+      "sigSearchPlaceholder": "Search coins (e.g. BTC, SOL)",
+      "sigSearchNoMatch": "'{{q}}' is not in the current signal pool — only top-liquidity coins are scanned"
     },
     "indicators": {
       "title": "Indicators",

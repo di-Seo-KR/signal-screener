@@ -974,7 +974,9 @@
       "valueEmptyDesc1": "을 눌러 미국·한국 주식의",
       "valueEmptyDesc2": "밸류에이션을 종합 분석합니다",
       "valueBasis": "PER · PBR · 배당수익률 · Forward PE · 애널리스트 목표가 · 52주 위치 · 200일선 괴리 기반",
-      "valueMarketEmpty": "선택한 시장에 저평가 기준 충족 종목 없음 — 필터를 변경해보세요"
+      "valueMarketEmpty": "선택한 시장에 저평가 기준 충족 종목 없음 — 필터를 변경해보세요",
+      "sigSearchMeta": "'{{q}}' 검색 결과 {{n}}건 — 시그널 풀 전체 대상",
+      "sigSearchNoMatch": "'{{q}}' 종목의 시그널이 풀에 없습니다"
     },
     "quantReport": {
       "title": "퀀트 리포트",
@@ -1152,7 +1154,9 @@
       "indexDetailLink": "해설·산식 전체 보기",
       "asOf": "{{time}} 기준",
       "disclaimer": "본 정보는 참고용 지표이며 투자 자문·권유가 아닙니다.",
-      "findByConditions": "조건으로 코인 찾기"
+      "findByConditions": "조건으로 코인 찾기",
+      "sigSearchPlaceholder": "코인 검색 (예: BTC, SOL)",
+      "sigSearchNoMatch": "'{{q}}' 코인은 현재 시그널 풀에 없습니다 — 유동성 상위 코인만 집계됩니다"
     },
     "indicators": {
       "title": "지표",
