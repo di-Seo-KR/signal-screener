@@ -273,6 +273,18 @@ textarea {
   font-size: max(16px, 1em);
 }
 
+/* ★ 2026-09-04 (대표 제보 "검색창 누르면 화면이 자동 확대"): 위 규칙은 인라인
+   font-size(예: 시그널 검색창 14px)에 밀려 무력화 — 터치 기기에서만 !important 로
+   강제해 모든 텍스트 입력이 16px 이상이 되게 합니다(iOS 포커스 자동 확대의 유일
+   원인 제거). 데스크탑(pointer: fine)은 기존 인라인 크기 그대로 — 시각 회귀 없음. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em) !important;
+  }
+}
+
 /* 모바일 fixed bottom 요소 — safe-area-inset-bottom 자동 적용
    대상: .z-fixed-bottom 클래스를 단 요소 (BottomSheet, FAB, BottomNav 등) */
 .z-fixed-bottom {
