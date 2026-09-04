@@ -190,8 +190,8 @@ export default async function handler(req, res) {
 
     const { kv } = await import("@vercel/kv");
 
-    // 상장 직후(일봉 62개 미만 확정) 종목은 호출 자체를 건너뜁니다 — 야후 3콜을
-    // 써도 신호가 나올 수 없기 때문. 봉이 차면 자동으로 대상에 편입됩니다.
+    // 상장 극초기(일봉 25개 미만 확정 — ★ 2026-09-04 부분 커버리지로 62→25 완화) 종목은
+    // 호출 자체를 건너뜁니다. 일봉 25~61개는 4h/1h 중심 부분 산출로 편입됩니다(SPCX 등).
     const now = Date.now();
     const pendingNew = [];
     const eligible = STOCK_UNIVERSE.filter((u) => {
