@@ -19,7 +19,16 @@
 import { getExchangeInfo, get24hrTickers } from "./binance-client.js";
 
 export const UNIVERSE_KV_KEY = "di:signals:futures-universe";
-export const UNIVERSE_SIZE = 50;
+// ★ 2026-09-04 (대표 지시 "코인 시그널 갯수 늘려줘"): 50 → 65. env ZEPTA_UNIVERSE_SIZE 로 조정.
+//   btc-cron maxDuration 300s 기준 헤드룸 실측: 50종 ≈ 60~90s → 65+버퍼 15 = 최대 80종도 여유.
+export const UNIVERSE_SIZE = (() => {
+  const v = Number(process.env.ZEPTA_UNIVERSE_SIZE);
+  return Number.isFinite(v) && v >= 10 && v <= 100 ? Math.round(v) : 65;
+})();
+// ★ 멤버십 히스테리시스 — 대표 제보 "몇몇 코인이 있다가 없어지고 자주 그래":
+//   순위 경계(기존 50위) 부근 코인이 6시간마다 거래대금 순위로 들락거리며 보드에서
+//   깜빡이던 문제. 신규 편입은 상위 SIZE 위까지만, **기존 멤버는 SIZE+버퍼 위까지 유지**.
+const EXIT_BUFFER = 15;
 const REFRESH_MS = 6 * 60 * 60 * 1000; // 6시간
 
 // 스테이블코인 베이스 — 유동성 상위에 들어와도 매매 신호 대상 아님
@@ -46,7 +55,7 @@ export async function refreshUniverse(kv, { size = UNIVERSE_SIZE } = {}) {
   const minAgeMs = minAgeDays * 24 * 60 * 60 * 1000;
   const nowMs = Date.now();
 
-  const entries = symbols
+  const ranked = symbols
     .filter((s) =>
       s?.status === "TRADING" &&
       s?.contractType === "PERPETUAL" &&
@@ -61,8 +70,18 @@ export async function refreshUniverse(kv, { size = UNIVERSE_SIZE } = {}) {
       quoteVolume: volBySym[s.symbol] || 0,
     }))
     .filter((e) => e.quoteVolume > 0)
-    .sort((a, b) => b.quoteVolume - a.quoteVolume)
-    .slice(0, size);
+    .sort((a, b) => b.quoteVolume - a.quoteVolume);
+
+  // ★ 멤버십 히스테리시스 — 진입: 순위 ≤ size, 유지: 기존 멤버는 순위 ≤ size+EXIT_BUFFER.
+  //   경계 churn(들락거림)만 막는 규칙이라 진짜로 유동성이 빠진 코인은 버퍼 밖에서 자연 이탈.
+  let prevBases = new Set();
+  try {
+    const prev = await kv.get(UNIVERSE_KV_KEY);
+    for (const e of prev?.entries || []) if (e?.base) prevBases.add(e.base);
+  } catch { /* 이전 캐시 없으면 순수 top-N (초기 1회) */ }
+  const entries = ranked.filter((e, rank) =>
+    rank < size || (rank < size + EXIT_BUFFER && prevBases.has(e.base))
+  );
 
   // 거래소 응답이 비정상적으로 작으면(부분 장애 등) 기존 캐시를 덮어쓰지 않도록 거부
   if (entries.length < 10) throw new Error(`universe too small: ${entries.length}`);

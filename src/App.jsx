@@ -8169,7 +8169,7 @@ function AppInner() {
   useEffect(() => { setCoinCtxSheet(null); }, [tab]);
 
   // ② 코인 시그널 풀 전체 — 홈 미리보기(limit=12)와 같은 소스의 전 유니버스 조회.
-  //    GET /api/real-trading/coin-scores?limit=60 (엔드포인트 상한 60 = 유동성 상위 풀 전체).
+  //    GET /api/real-trading/coin-scores?limit=100 (상한 100 = 유니버스 65+버퍼 15 전체 커버).
   //    파생 지표 바(OI·롱숏·24h 청산)도 이 응답의 oc 필드를 집계해 그립니다 — 추가 fetch 없음.
   const [coinTabSignals, setCoinTabSignals] = useState(() => {
     // 홈·시그널 보드와 같은 캐시 키 — 첫 페인트에서 빈 화면이 깜빡이지 않게 합니다.
@@ -8181,10 +8181,13 @@ function AppInner() {
   const [coinTabStatus, setCoinTabStatus] = useState("idle"); // idle | loading | ready | error
   // 코인 리스트도 주식 탭과 같은 "더 보기" 증분 규칙 (동일 스크롤 피로 — 대표 지시)
   const [coinSigShown, setCoinSigShown] = useState(SIG_PAGE);
+  // ★ 2026-09-04 (대표 지시 "더보기 스크롤 없이 검색으로 확인"): 코인 시그널 리스트 검색.
+  //   풀 전체(≤100건)를 이미 받아두므로 클라이언트 필터로 충분 — 검색 중엔 페이지네이션 우회.
+  const [coinSigQuery, setCoinSigQuery] = useState("");
   const fetchCoinTabSignals = useCallback(async () => {
     setCoinTabStatus((prev) => (prev === "ready" ? "ready" : "loading"));
     try {
-      const r = await fetch("/api/real-trading/coin-scores?limit=60");
+      const r = await fetch("/api/real-trading/coin-scores?limit=100");
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
       if (!j?.ok || !Array.isArray(j.coins)) throw new Error("bad payload");
@@ -8398,6 +8401,38 @@ function AppInner() {
     }, 5 * 60 * 1000); // 크론 주기(30~60분)보다 촘촘한 폴링
     return () => clearInterval(iv);
   }, [tab, fetchStockTabSignals]);
+  // ── ★ 2026-09-04 (대표 지시 "더보기 스크롤 없이 검색으로 확인"): 시그널 풀 서버 검색 ──
+  //   주식 풀은 유니버스가 커서(1,000종+) 클라이언트에 전량이 없습니다 — stock-scores 의
+  //   기존 서버측 q 필터(symbol/name)를 시그널 리스트에 실배선합니다. 300ms 디바운스.
+  //   null = 검색 비활성(일반 페이지네이션), [] = 검색했지만 0건.
+  const [stockSigSearchRows, setStockSigSearchRows] = useState(null);
+  const [stockSigSearchLoading, setStockSigSearchLoading] = useState(false);
+  useEffect(() => {
+    if (!STOCK_SIGNALS_ON || tab !== "screener") { setStockSigSearchRows(null); return; }
+    const q = assetQuery.trim();
+    if (!q) { setStockSigSearchRows(null); setStockSigSearchLoading(false); return; }
+    let cancelled = false;
+    setStockSigSearchLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const mkt = stockSigFilter === "us" || stockSigFilter === "kr" ? `&market=${stockSigFilter}` : "";
+        const r = await fetch(`/api/stock-scores?limit=60&q=${encodeURIComponent(q.slice(0, 40))}${mkt}`);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const j = await r.json();
+        const arr = Array.isArray(j?.stocks) ? j.stocks : [];
+        if (cancelled) return;
+        // market 필드 정규화 — fetchStockTabSignals 와 동일 규칙
+        setStockSigSearchRows(arr.filter(Boolean).map((s) => s.market ? s
+          : { ...s, market: /^\d{6}(\.(KS|KQ))?$/i.test(String(s.symbol || "")) ? "kr" : "us" }));
+      } catch {
+        if (!cancelled) setStockSigSearchRows([]); // 실패 시 0건 서술 (지어내지 않음)
+      } finally {
+        if (!cancelled) setStockSigSearchLoading(false);
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [assetQuery, stockSigFilter, tab]);
+
   // ── 시장별 건수 (전체·미국·한국) — 칩 라벨 전용 ──
   //   limit=1 로 counts 만 받아옵니다(응답 1건 ≈ 1KB · 엣지 60초 캐시). 페이지 배열 길이로
   //   세면 크론이 한 바퀴 돌 때마다 "전체 60" 같은 페이지 크기가 풀 규모로 읽힙니다.
@@ -8595,6 +8630,7 @@ function AppInner() {
   useEffect(() => {
     setStockSigShown(SIG_PAGE);
     setCoinSigShown(SIG_PAGE);
+    setCoinSigQuery(""); // 검색어도 초기화 — 재진입 시 전체 리스트부터
   }, [tab]);
 
   // ── 소셜 센티먼트 ──
@@ -10076,16 +10112,22 @@ function AppInner() {
             .sort((a, b) => Number(b.score) - Number(a.score));
           // 시장 필터는 서버(market=us|kr)가 이미 적용합니다 — 여기 필터는 페이지 전환 중
           // 남아 있는 이전 시장 엔트리를 걸러내는 방어선입니다.
-          const stockRows = stockRowsAll.filter(s => stockSigFilter === "all" || s.market === stockSigFilter);
+          const stockRowsBase = stockRowsAll.filter(s => stockSigFilter === "all" || s.market === stockSigFilter);
+          // ★ 2026-09-04 (대표 지시): 검색 중이면 서버 q 필터 결과가 리스트를 대체합니다
+          //   (풀 전체 대상 — 받아둔 페이지에 없는 종목도 찾아짐). 페이지네이션은 우회.
+          const stockSearching = stockSigSearchRows != null;
+          const stockRows = stockSearching
+            ? stockSigSearchRows.slice().sort((a, b) => Number(b.score) - Number(a.score))
+            : stockRowsBase;
           // ★ 2026-08-13: 초기 SIG_PAGE 개만 렌더 — 나머지는 "더 보기"로 증분합니다.
-          const stockRowsShown = stockRows.slice(0, stockSigShown);
+          const stockRowsShown = stockSearching ? stockRows : stockRows.slice(0, stockSigShown);
           // 남은 개수는 **서버 전집합 집계(counts.total)** 기준입니다. 받아온 배열 길이로 세면
           // "60건 중 12건 표시"처럼 페이지 크기가 풀 규모로 읽힙니다(리뷰 지적 #10 후속).
           const stockLocalRest = stockRows.length - stockRowsShown.length;        // 이미 받아둔 잔여
           const stockTotalCount = stockCounts[stockSigFilter];                    // null = 아직 미집계
           const stockPoolRest = stockTotalCount != null
             ? Math.max(0, stockTotalCount - stockRowsShown.length) : stockLocalRest;
-          const stockCanMore = stockLocalRest > 0 || stockPageMore;               // 로컬 잔여 또는 다음 서버 페이지
+          const stockCanMore = !stockSearching && (stockLocalRest > 0 || stockPageMore); // 검색 중엔 전건 표시라 "더 보기" 불필요
           const stockMoreN = Math.max(stockLocalRest, stockPoolRest);             // 0 이면 건수 없이 "더 보기"
           // 서브탭은 시그널 풀이 살아 있을 때만 의미가 있습니다 — 킬스위치
           // (VITE_ZEPTA_STOCK_SIGNALS=0)로 시그널이 꺼지면 서브탭 없이 한 화면으로
@@ -10383,10 +10425,19 @@ function AppInner() {
                       : t("tabs.screener.showMorePlain")}
                   </button>
                 )}
-                {/* 필터 결과 0건 — 풀은 있으나 선택 시장에 시그널이 없는 경우(칩 건수와 일치) */}
+                {/* 필터/검색 결과 0건 — 풀은 있으나 조건에 맞는 시그널이 없는 경우 */}
                 {stockRowsAll.length > 0 && stockRows.length === 0 && (
                   <div style={{ fontSize: mf(12), color: C.text3, textAlign: "center", padding: "14px 0" }}>
-                    {t("tabs.screener.sigFilterEmpty")}
+                    {stockSearching
+                      ? (stockSigSearchLoading ? t("tabs.screener.showMoreLoading")
+                        : t("tabs.screener.sigSearchNoMatch", { q: assetQuery.trim() }))
+                      : t("tabs.screener.sigFilterEmpty")}
+                  </div>
+                )}
+                {/* ★ 2026-09-04: 검색 중 메타 — 시그널 풀 전체 대상 서버 검색 결과임을 서술 */}
+                {stockSearching && stockRows.length > 0 && (
+                  <div style={{ fontSize: mf(11), color: C.text4 }}>
+                    {t("tabs.screener.sigSearchMeta", { q: assetQuery.trim(), n: stockRows.length })}
                   </div>
                 )}
                 {stockRows.length > 0 && (
@@ -11985,14 +12036,19 @@ function AppInner() {
           const derivSampled = Math.max(oiVals.length, lsVals.length, liqSampled);
           const hasDeriv = derivRows.length > 0 || (liqLongPct != null);
           // ③ 시그널 리스트 — score 내림차순 (설계서: 전 유니버스, 점수순)
-          const rows = pool
+          const rowsAll = pool
             .filter(s => s && (s.side === "LONG" || s.side === "SHORT") && Number.isFinite(Number(s.score)))
             .slice()
             .sort((a, b) => Number(b.score) - Number(a.score));
+          // ★ 2026-09-04 (대표 지시): 티커 검색 — 검색 중엔 매칭 전건 표시(페이지네이션 우회).
+          const coinQ = coinSigQuery.trim().toUpperCase();
+          const rows = coinQ
+            ? rowsAll.filter(s => String(s.symbol || s.asset || "").toUpperCase().includes(coinQ))
+            : rowsAll;
           // ★ 2026-08-13 (대표 지시 — 스크롤 피로): 주식 탭과 같은 "더 보기" 증분 규칙.
-          const rowsShown = rows.slice(0, coinSigShown);
-          const rowsRest = rows.length - rowsShown.length;
-          const newestTs = rows.reduce((m, s) => Math.max(m, Number(s?.ts) || 0), 0);
+          const rowsShown = coinQ ? rows : rows.slice(0, coinSigShown);
+          const rowsRest = coinQ ? 0 : rows.length - rowsShown.length;
+          const newestTs = rowsAll.reduce((m, s) => Math.max(m, Number(s?.ts) || 0), 0); // 신선도는 검색과 무관하게 풀 전체 기준
           const fresh = coinScoreFreshness(newestTs, t);
           const TF_LABEL = { "1w": t("tabs.coin.tf1w"), "1d": t("tabs.coin.tf1d"), "4h": t("tabs.coin.tf4h"), "1h": t("tabs.coin.tf1h") };
           // updatedAt(ISO) → "MM.DD HH:MM 기준" (확장 시트용 — 파싱 실패 시 표기 생략)
@@ -12113,11 +12169,11 @@ function AppInner() {
                 {/* ── 우측(데스크탑) / 하단(모바일): 코인 시그널 리스트 ── */}
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "7px" }}>
-                    {rows.length > 0 && <span className="z-pulse" aria-hidden="true" style={{ width: "7px", height: "7px", borderRadius: "50%", background: C.green, flexShrink: 0 }} />}
+                    {rowsAll.length > 0 && <span className="z-pulse" aria-hidden="true" style={{ width: "7px", height: "7px", borderRadius: "50%", background: C.green, flexShrink: 0 }} />}
                     <h2 style={{ margin: 0, fontSize: mf(14), fontWeight: 800, color: C.text1, whiteSpace: "nowrap" }}>{t("tabs.coin.signalsTitle")}</h2>
                     <span style={{ flex: 1 }} />
                     {/* 정렬은 점수순 고정 — 상태 서술 알약(죽은 드롭다운을 두지 않습니다) */}
-                    {rows.length > 0 && (
+                    {rowsAll.length > 0 && (
                       <span style={{
                         fontSize: mf(11), fontWeight: 800, padding: "5px 11px", borderRadius: "9999px",
                         background: C.card, border: `1px solid ${C.border}`, color: C.text3, whiteSpace: "nowrap",
@@ -12125,7 +12181,46 @@ function AppInner() {
                     )}
                   </div>
 
-                  {rows.length === 0 ? (
+                  {/* ── ★ 2026-09-04 (대표 지시): 시그널 리스트 티커 검색 — 더보기 스크롤 없이 바로 확인 ── */}
+                  {rowsAll.length > 0 && (
+                    <div style={{ position: "relative" }}>
+                      <span style={{
+                        position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)",
+                        color: C.text3, pointerEvents: "none", display: "flex", alignItems: "center",
+                      }} aria-hidden="true">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                          strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="11" cy="11" r="7" /><line x1="16.5" y1="16.5" x2="21" y2="21" />
+                        </svg>
+                      </span>
+                      <input
+                        value={coinSigQuery}
+                        onChange={(e) => setCoinSigQuery(e.target.value.slice(0, 20))}
+                        placeholder={t("tabs.coin.sigSearchPlaceholder")}
+                        aria-label={t("tabs.coin.sigSearchPlaceholder")}
+                        style={{
+                          width: "100%", boxSizing: "border-box", padding: "11px 36px 11px 38px", borderRadius: 12,
+                          background: C.card, border: `1px solid ${C.border}`, color: C.text1, fontSize: mf(14), outline: "none",
+                        }}
+                        onFocus={(e) => { e.currentTarget.style.borderColor = C.blue; }}
+                        onBlur={(e) => { e.currentTarget.style.borderColor = C.border; }}
+                      />
+                      {coinSigQuery && (
+                        <button onClick={() => setCoinSigQuery("")} aria-label={t("tabs.screener.clearSearch")} style={{
+                          position: "absolute", right: 9, top: "50%", transform: "translateY(-50%)",
+                          background: "none", border: "none", color: C.text3, fontSize: 17, cursor: "pointer", lineHeight: 1, padding: 4,
+                        }}>✕</button>
+                      )}
+                    </div>
+                  )}
+                  {/* 검색 결과 0건 — 풀은 살아 있으나 해당 티커의 시그널이 없는 경우(유동성 상위 풀만 집계) */}
+                  {coinQ && rowsAll.length > 0 && rows.length === 0 && (
+                    <div style={{ fontSize: mf(12), color: C.text3, textAlign: "center", padding: "16px 0" }}>
+                      {t("tabs.coin.sigSearchNoMatch", { q: coinSigQuery.trim() })}
+                    </div>
+                  )}
+
+                  {rowsAll.length === 0 ? (
                     coinTabStatus === "loading" || coinTabStatus === "idle" ? (
                       <div style={{ display: "flex", flexDirection: "column", gap: "9px" }}>
                         {[0, 1, 2].map(i => <Skeleton key={`cs-skel-${i}`} width="100%" height="96px" />)}
