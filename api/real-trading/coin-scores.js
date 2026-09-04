@@ -117,7 +117,8 @@ export default async function handler(req, res) {
           score: parseFloat(e.score || 0) || 0,   // 종합 스코어 0~100
           confidence: normConfidence(e.confidence),
           family: "composite", timeframe: "MTF",
-          reason: (e.reason || "").slice(0, 180),
+          // ★ 2026-09-04: 180→220 — 안정성 보정 사유(" | 안정성 0.95×(…)")까지 잘리지 않게
+          reason: (e.reason || "").slice(0, 220),
           ts: e.ts || 0,
           breakdown: normBreakdown(e.breakdown), // { 1w,1d,4h,1h: {side,score}|null }
           entryRefine: e.entryRefine || null, // ★ MTF 소진·차트구조 정제 { mult, reasons, before }
@@ -129,6 +130,8 @@ export default async function handler(req, res) {
           //   (btc-cron 표시 풀에서 부여. 없으면 null — 킬스위치 OFF·구 엔트리 하위호환.
           //    내부 산출근거 flipTs 는 pubStability 가 제거 — 공개 응답 미노출)
           stability: pubStability(e.stability),
+          // ★ 2026-09-04 신호 안정성 보정 { mult, before } — 보정 전 점수 투명 노출 (없으면 null)
+          stabilityAdjust: e.stabilityAdjust || null,
         });
       }
     }

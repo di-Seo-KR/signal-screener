@@ -1547,6 +1547,17 @@ function buildAssetDetailProps(sig, t) {
     // 확신도 미달이면 왜 방향을 단정하지 않는지 한 줄로 설명합니다(#13).
     if (!conv.confident) reasons.push(t ? t("diag.lowConvictionNote") : "구간별 신호가 서로 상쇄돼 방향을 단정하지 않습니다");
   }
+  // ── ★ 2026-09-04 신호 안정성(히스테리시스 실측) 사실 서술 — 코인 전용 ──
+  //    btc-cron 이 flips24h 기반 보정을 적용한 경우에만 한 줄 추가(지어내지 않음).
+  if (!isStock && sig.stabilityAdjust && sig.stability) {
+    const _fl = Number(sig.stability.flips24h) || 0;
+    if (sig.stabilityAdjust.mult < 1 && _fl >= 2) {
+      reasons.push(t ? t("diag.stabilityChurn", { n: _fl }) : `최근 24시간 방향 전환이 ${_fl}회로 잦아 점수를 보수적으로 반영했습니다.`);
+    } else if (sig.stabilityAdjust.mult > 1 && Number.isFinite(sig.stability.sideSince)) {
+      const _hrs = Math.max(1, Math.floor((Date.now() - sig.stability.sideSince) / 3600000));
+      reasons.push(t ? t("diag.stabilityHold", { hrs: _hrs }) : `한 방향이 ${_hrs}시간째 유지돼 신호 안정성 가점을 반영했습니다.`);
+    }
+  }
   const distParts = [];
   if (rArr[0] && Number.isFinite(Number(rArr[0].d))) distParts.push(t ? t("diag.toResistance", { pct: Math.abs(Number(rArr[0].d)).toFixed(1) }) : `가장 가까운 저항까지 +${Math.abs(Number(rArr[0].d)).toFixed(1)}%`);
   if (sArr[0] && Number.isFinite(Number(sArr[0].d))) distParts.push(t ? t("diag.toSupport", { pct: Math.abs(Number(sArr[0].d)).toFixed(1) }) : `지지까지 −${Math.abs(Number(sArr[0].d)).toFixed(1)}%`);

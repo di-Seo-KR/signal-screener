@@ -1347,6 +1347,8 @@
     "axesBasis": "Based on {{n}} of {{total}} axes",
     "directionUnclear": "Direction unclear",
     "lowConvictionNote": "Timeframe signals offset each other, so no direction is asserted",
+    "stabilityChurn": "Direction flipped {{n}} times in the last 24h, so the score is applied conservatively.",
+    "stabilityHold": "Direction has held for {{hrs}}h, so a signal-stability bonus is applied.",
     "verdictLabel": {
       "strongUp": "Strong bullish signals",
       "up": "Bullish signals dominant",
