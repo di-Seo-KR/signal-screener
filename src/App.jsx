@@ -8169,7 +8169,7 @@ function AppInner() {
   useEffect(() => { setCoinCtxSheet(null); }, [tab]);
 
   // ② 코인 시그널 풀 전체 — 홈 미리보기(limit=12)와 같은 소스의 전 유니버스 조회.
-  //    GET /api/real-trading/coin-scores?limit=100 (상한 100 = 유니버스 65+버퍼 15 전체 커버).
+  //    GET /api/real-trading/coin-scores?limit=130 (상한 130 = 유니버스 100+버퍼 15 전체 커버).
   //    파생 지표 바(OI·롱숏·24h 청산)도 이 응답의 oc 필드를 집계해 그립니다 — 추가 fetch 없음.
   const [coinTabSignals, setCoinTabSignals] = useState(() => {
     // 홈·시그널 보드와 같은 캐시 키 — 첫 페인트에서 빈 화면이 깜빡이지 않게 합니다.
@@ -8187,7 +8187,7 @@ function AppInner() {
   const fetchCoinTabSignals = useCallback(async () => {
     setCoinTabStatus((prev) => (prev === "ready" ? "ready" : "loading"));
     try {
-      const r = await fetch("/api/real-trading/coin-scores?limit=100");
+      const r = await fetch("/api/real-trading/coin-scores?limit=130");
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const j = await r.json();
       if (!j?.ok || !Array.isArray(j.coins)) throw new Error("bad payload");

@@ -78,8 +78,8 @@ export default async function handler(req, res) {
   try {
     const _lim = parseInt(req.query?.limit, 10);
     // ★ 2026-06-12 (대표 제보): 동적 유니버스 전환 후에도 기본 30 캡이 남아 일부만 표시되던 버그.
-    // ★ 2026-09-04: 유니버스 65+히스테리시스 버퍼 15(최대 80종) 확대에 맞춰 상한 60 → 100.
-    const limit = Math.min(Number.isFinite(_lim) && _lim > 0 ? _lim : 100, 100); // NaN/잘못된 입력 방어
+    // ★ 2026-09-04: 유니버스 100+히스테리시스 버퍼 15(최대 115종) 확대에 맞춰 상한 → 130.
+    const limit = Math.min(Number.isFinite(_lim) && _lim > 0 ? _lim : 130, 130); // NaN/잘못된 입력 방어
     const kv = await getKv();
     const [pool, poolMtf] = await Promise.all([
       kv.get(POOL_KEY).then((p) => p || []),

@@ -216,6 +216,20 @@ export default async function handler(req, res) {
       addLog(`⚠️ 유니버스 로드 실패(${e?.message}) — 정적 ${ASSETS.length}종 폴백`);
     }
 
+    // ── ★ 2026-09-04 100종 확장 안전장치 ① 순환 시작 오프셋 ──
+    //   아래 시간예산 가드로 런 후반 자산이 스킵되더라도, 런(10분)마다 시작점이 돌아
+    //   몇 런 안에 전 자산이 스캔됩니다 (풀 유지 윈도우 4h = 24런 여유 — 굶는 자산 없음).
+    //   스캔 순서는 결과에 중립(자산별 독립 계산) — 가상 포트폴리오 현금 경합만 순서 영향,
+    //   표시 전용이라 허용. ZEPTA_SCAN_ROTATE=0 으로 끄면 기존 거래대금순 고정.
+    if (process.env.ZEPTA_SCAN_ROTATE !== "0" && ASSETS.length > 1) {
+      const rot = Math.floor(Date.now() / 600000) % ASSETS.length; // 10분 런 인덱스 기반
+      if (rot > 0) ASSETS = [...ASSETS.slice(rot), ...ASSETS.slice(0, rot)];
+    }
+    // ── ★ 안전장치 ② 스캔 시간예산 — maxDuration 300s 의 80% 에서 잔여 자산 스킵 ──
+    const SCAN_BUDGET_MS = Number(process.env.ZEPTA_SCAN_BUDGET_MS) > 0
+      ? Number(process.env.ZEPTA_SCAN_BUDGET_MS) : 240000;
+    let scanSkippedByBudget = 0;
+
     // ── 활성 봇 확인 → 매매 대상 자산 필터링 + 자산별 배분금액 한도 ──
     let activeAssets = new Set(ASSETS); // 기본: 전체
     const assetAllocationMap = {}; // { "BTC/USD": 총 배분금액 }  — 봇별 배분금액 합산
@@ -432,6 +446,12 @@ export default async function handler(req, res) {
     const _shadow1hByAsset = {};
 
     for (const asset of ASSETS) {
+      // ★ 시간예산 가드 — 남은 자산은 이번 런 스킵(다음 런에서 순환 오프셋으로 우선 커버).
+      //   기존 풀 엔트리는 4h 윈도우 안에서 유지되므로 보드에서 사라지지 않습니다.
+      if (Date.now() - startTime > SCAN_BUDGET_MS) {
+        scanSkippedByBudget++;
+        continue;
+      }
       addLog(`\n📊 ${asset} 스캔 중...`);
       const futSymbol = assetToBinanceSymbol(asset, dynSymbolMap);
       if (!futSymbol) {
@@ -1118,6 +1138,10 @@ export default async function handler(req, res) {
       }
     }
 
+    if (scanSkippedByBudget > 0) {
+      addLog(`⏱️ 시간예산(${Math.round(SCAN_BUDGET_MS / 1000)}s) 도달 — ${scanSkippedByBudget}종 이번 런 스킵 (다음 런 순환 오프셋으로 커버)`);
+    }
+
     // ── ★ 시그널 풀 일괄 적재 (감사 #3) — 루프 후 풀당 1회만 쓰기 ──
     //   에셋별 ts 는 루프에서 이미 부여됨(엔진 ts 내림차순 재정렬 → 순서 동일). 신규 엔트리를
     //   앞에 두고 4h cutoff 통과한 기존 엔트리 뒤에 이어 200개 슬라이스. btc-cron 만 write 라
@@ -1126,7 +1150,8 @@ export default async function handler(req, res) {
       const cutoffMs = Date.now() - 4 * 60 * 60 * 1000;
       const poolKey = "di:signals:realtime-pool";
       const existingPool = (await kv.get(poolKey)) || [];
-      const mergedPool = [...newPoolEntries, ...existingPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200);
+      // ★ 2026-09-04 100종 확장: cap 200 → 250 (115종/런 × 2런 커버 — KV 값 크기 ~0.5MB 이내)
+      const mergedPool = [...newPoolEntries, ...existingPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 250);
       await kv.set(poolKey, mergedPool);
       // ★ 2026-07-08 하트비트 (리뷰 A): "btc-cron 장애로 풀이 빔"과 "신호 전부 필터 차단으로
       //   풀이 빔"을 엔진이 구분할 수 있게 — 적재 0건이어도 런마다 기록. 엔진 perf 폴백은
@@ -1186,7 +1211,7 @@ export default async function handler(req, res) {
             if (_adjN) addLog(`🧭 안정성 보정: ${_adjN}건 (flips24h·sideSince 기반, 표시 풀 전용)`);
           } catch (stErr) { addLog(`⚠️ 안정성 보정 실패(원점수 노출): ${stErr?.message}`); }
         }
-        const mergedMtf = [...newMtfEntries, ...mPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200);
+        const mergedMtf = [...newMtfEntries, ...mPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 250); // ★ 100종 확장 cap 250
         await kv.set(mKey, mergedMtf);
       }
       addLog(`💾 시그널 풀 일괄 적재: 거래 ${newPoolEntries.length}건 / 표시 ${newMtfEntries.length}건 (KV set 2회)`);
