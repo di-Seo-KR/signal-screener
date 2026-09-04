@@ -48,23 +48,34 @@ export { STOCK_UNIVERSE } from "./stock-universe.js";
 // (상장 직후 종목을 호출 없이 걸러내는 판정에 사용).
 export const MIN_BARS = 62;
 
-// 상장 직후라 아직 일봉이 MIN_BARS 개도 안 쌓인 종목인지 — 야후 호출 0회로 판정.
-//   거래일 수 ≤ 평일 수 이므로 "평일 수 < MIN_BARS" 면 봉 수 부족이 *확정*입니다
+// ★ 2026-09-04 (대표 제보 "주식 풀에 SPCX 가 없네"): 신규상장 부분 커버리지 하한.
+//   기존엔 일봉 62개 미만이면 전면 스킵 → SPCX(2026-06-12 상장, 거래일 ~58개)처럼
+//   인기 신규상장이 62봉 찰 때까지 몇 주간 보드에서 아예 안 보였습니다.
+//   일봉 25~61개 구간은 스킵 대신 *부분 산출* 합니다: 1d/1w 신호는 결측(null) 처리하되
+//   1h(3mo 범위 → 봉 수 충분)·4h 중심으로 종합 — 기존 결측 희석(coverage/covAdjScore)
+//   아키텍처가 그대로 정직하게 반영하고, reason 의 "일—·주—" 표기로 투명 노출됩니다.
+//   25개 미만(상장 ~5주 미만)은 극초기 변동성·표본 부족으로 기존대로 스킵.
+export const NEW_LISTING_MIN_BARS = 25;
+
+// 상장 직후라 아직 일봉이 NEW_LISTING_MIN_BARS 개도 안 쌓인 종목인지 — 야후 호출 0회로 판정.
+//   거래일 수 ≤ 평일 수 이므로 "평일 수 < 하한" 이면 봉 수 부족이 *확정*입니다
 //   (휴장일을 몰라도 안전한 하한 판정 — 반대로 평일이 충분하면 실제 스캔이
 //   최종 판정을 하므로 종목이 영구히 누락될 일은 없습니다).
+//   ★ 2026-09-04: 판정 기준 MIN_BARS(62) → NEW_LISTING_MIN_BARS(25) — 부분 커버리지
+//   대상(일봉 25~61개)이 호출 전에 걸러지지 않도록 하한만 낮춥니다.
 export function isTooNewToScore(listedAt, now = Date.now()) {
   if (!listedAt) return false;
   const t0 = Date.parse(`${listedAt}T00:00:00Z`);
   if (!Number.isFinite(t0)) return false;   // 형식 이상 — 스캔에서 최종 판정
   if (t0 > now) return true;                // 상장 예정
   const days = Math.floor((now - t0) / 86400000);
-  if (days >= MIN_BARS * 2) return false;   // 평일만 세도 확실히 충분 — 루프 생략
+  if (days >= NEW_LISTING_MIN_BARS * 2) return false; // 평일만 세도 확실히 충분 — 루프 생략
   let weekdays = 0;
   for (let i = 0; i <= days; i++) {
     const d = new Date(t0 + i * 86400000).getUTCDay();
     if (d !== 0 && d !== 6) weekdays++;
   }
-  return weekdays < MIN_BARS;
+  return weekdays < NEW_LISTING_MIN_BARS;
 }
 
 // TF 가중치 — 코인 종합 스코어(btc-cron, 대표 지시 2026-06-03)와 동일:
@@ -541,7 +552,11 @@ export async function scanStockSymbol({ symbol, name, market }) {
 
   const candles1d = jsonD ? parseChartCandles(jsonD) : null;
   if (!jsonD || !candles1d) return { status: "fetch-failed", entry: null, marketState: null };
-  if (candles1d.length < MIN_BARS) { // 일봉은 필수(스코어+지지저항 기준)
+  // ★ 2026-09-04 신규상장 부분 커버리지: 일봉 25~61개는 스킵하지 않고 계속 진행 —
+  //   sigD 는 scoreStockTF 의 MIN_BARS 하한으로 자연히 null(결측)이 되고, 종합은
+  //   4h/1h 중심으로 산출됩니다(coverage 희석·breakdown "일—" 정직 표기는 기존 배선).
+  //   지지·저항은 computeSRLevels 자체 폴백(15봉~)이 실데이터 범위에서 산출합니다.
+  if (candles1d.length < NEW_LISTING_MIN_BARS) { // 극초기(상장 ~5주 미만)만 스킵
     return { status: "insufficient-data", entry: null, marketState: deriveMarketState(jsonD), bars: candles1d.length };
   }
 
