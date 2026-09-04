@@ -1347,6 +1347,8 @@
     "axesBasis": "{{total}}축 중 {{n}}축 기준",
     "directionUnclear": "방향성 불명확",
     "lowConvictionNote": "구간별 신호가 서로 상쇄돼 방향을 단정하지 않습니다",
+    "stabilityChurn": "최근 24시간 방향 전환이 {{n}}회로 잦아 점수를 보수적으로 반영했습니다.",
+    "stabilityHold": "한 방향이 {{hrs}}시간째 유지돼 신호 안정성 가점을 반영했습니다.",
     "verdictLabel": {
       "strongUp": "상승 신호 강함",
       "up": "상승 신호 우세",

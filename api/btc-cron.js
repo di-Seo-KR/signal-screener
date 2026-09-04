@@ -19,6 +19,7 @@ import { computeSRLevels, scaleSR } from "./_shared/sr-levels.js"; // ★ 지지
 import { refineCompositeEntry } from "./_shared/strategies/_indicators.js"; // ★ MTF 소진·차트구조 진입 정제
 import { scoreCandleBlock } from "./_shared/candle-patterns.js"; // ★ 2026-07 캔들패턴 융합(캘리브레이션 게이트)
 import { applySideHysteresis, latestByAsset, hysteresisEnabled } from "./_shared/display-hysteresis.js"; // ★ 2026-08-17 표시 side 라벨 히스테리시스 (MTF 표시 풀 전용 — 거래 풀 미적용)
+import { buildScoreShadowSamples, processScoreShadow, scoreShadowEnabled } from "./_shared/score-shadow.js"; // ★ 2026-09-04 스코어 섀도 표본 영구 축적 + 자동 채점 (측정 전용)
 
 // asset → 바이낸스 *선물(USDⓈ-M, fapi)* 심볼. 펀딩/OI/베이시스 맵 조회 키.
 //   ★ 2026-06-02 버그수정: 선물은 저가 밈코인을 1000배 묶음(1000SHIB/1000PEPE)으로,
@@ -426,6 +427,9 @@ export default async function handler(req, res) {
     //   재정렬하므로 배열 순서 무관·기존과 동일 결과). 이 두 키는 btc-cron 만 write(전수 확인).
     const newPoolEntries = []; // di:signals:realtime-pool (거래 신호 — engine 이 읽음)
     const newMtfEntries = [];  // di:signals:realtime-pool-mtf (코인 카드 표시용)
+    // ★ 2026-09-04 스코어 섀도 채점용 — asset 별 1h 캔들(시각·종가만) 캡처.
+    //   +24h 성숙 표본을 추가 API 호출 없이 이 런의 캔들로 채점 (score-shadow.js).
+    const _shadow1hByAsset = {};
 
     for (const asset of ASSETS) {
       addLog(`\n📊 ${asset} 스캔 중...`);
@@ -456,6 +460,14 @@ export default async function handler(req, res) {
         addLog(`❌ ${asset} 캔들 부족 (${candles.length}개 < 100개) — 스킵 (신규상장/일시오류)`);
         assetResults.push({ asset, ok: false, error: "Insufficient candle data" });
         continue;
+      }
+
+      // ★ 2026-09-04 스코어 섀도 — 이 asset 의 1h 시각·종가 캡처(채점 재사용, 메모리 소량)
+      if (scoreShadowEnabled() && Array.isArray(candles1h) && candles1h.length) {
+        _shadow1hByAsset[asset] = {
+          times: candles1h.map((c) => Number(c.time)),
+          closes: candles1h.map((c) => Number(c.close)),
+        };
       }
 
       // ★ 2026-06-03 (대표 지시): 멀티 타임프레임 종합 스코어용 — 각 TF 신호를 *항상* 계산.
@@ -1141,12 +1153,59 @@ export default async function handler(req, res) {
             if (heldN || flippedN) addLog(`🧭 표시 히스테리시스: 라벨 유지 ${heldN}건 · 전환 확정 ${flippedN}건`);
           } catch (hErr) { addLog(`⚠️ 표시 히스테리시스 실패(원본 노출): ${hErr?.message}`); }
         }
+        // ── ★ 2026-09-04 (대표 지시 "코인별 시그널 스코어링 정밀화") 신호 안정성 보정 ──
+        //   히스테리시스가 이미 실측 추적하는 코인별 flips24h(24h 확정 전환 횟수)·sideSince 로
+        //   "그 코인의 현재 신호가 얼마나 믿을 만한가"를 점수에 반영합니다. 잦은 전환 = 신호
+        //   churn(borderline 왕복) → bounded 감점, 장시간 방향 유지 = 소폭 가점.
+        //   · 스무딩 아님 — 과거 점수와 혼합하지 않고, 전환 이력의 결정적 함수(진입정제와 동류).
+        //     보정 전 점수는 stabilityAdjust.before 로, 사유는 reason 에 그대로 노출(해석 원칙).
+        //   · 표시(MTF) 풀 전용 — 엔진 거래 풀(newPoolEntries)은 불변.
+        //   · 방향 불변 — 배율 0.85~1.03, side/type 은 건드리지 않음.
+        //   · 킬스위치 ZEPTA_SCORE_STABILITY=0 (히스테리시스 OFF 면 stability 없음 → 자동 무동작).
+        if (process.env.ZEPTA_SCORE_STABILITY !== "0") {
+          try {
+            const _sGrade = (s) => (s >= 80 ? "A" : s >= 60 ? "B" : "C");
+            let _adjN = 0;
+            for (const e of newMtfEntries) {
+              const st = e?.stability;
+              if (!st) continue;
+              const flips = Number(st.flips24h) || 0;
+              const sideHours = Number.isFinite(st.sideSince) ? (Date.now() - st.sideSince) / 3600000 : 0;
+              let m = 1, why = null;
+              if (flips >= 4) { m = 0.85; why = `24h 전환 ${flips}회`; }
+              else if (flips === 3) { m = 0.90; why = "24h 전환 3회"; }
+              else if (flips === 2) { m = 0.95; why = "24h 전환 2회"; }
+              else if (flips === 0 && sideHours >= 12) { m = 1.03; why = `방향 ${Math.floor(sideHours)}h 유지`; }
+              if (m === 1) continue;
+              e.stabilityAdjust = { mult: m, before: e.score };
+              e.score = Math.max(0, Math.min(100, Math.round((Number(e.score) || 0) * m)));
+              e.confidence = _sGrade(e.score);
+              e.reason = `${e.reason || ""} | 안정성 ${m.toFixed(2)}×(${why})`;
+              _adjN++;
+            }
+            if (_adjN) addLog(`🧭 안정성 보정: ${_adjN}건 (flips24h·sideSince 기반, 표시 풀 전용)`);
+          } catch (stErr) { addLog(`⚠️ 안정성 보정 실패(원점수 노출): ${stErr?.message}`); }
+        }
         const mergedMtf = [...newMtfEntries, ...mPool.filter(e => (e.ts || 0) >= cutoffMs)].slice(0, 200);
         await kv.set(mKey, mergedMtf);
       }
       addLog(`💾 시그널 풀 일괄 적재: 거래 ${newPoolEntries.length}건 / 표시 ${newMtfEntries.length}건 (KV set 2회)`);
     } catch (poolErr) {
       addLog(`⚠️ 시그널 풀 일괄 적재 실패: ${poolErr.message}`);
+    }
+
+    // ── ★ 2026-09-04 스코어 섀도 표본 영구 축적 + 자동 채점 (측정 전용) ──
+    //   표시 풀은 4h cutoff 로 잘려 ocShadow/h2Shadow 표본이 증발하던 공백을 메움.
+    //   순수 additive KV(di:score:shadow-*) — 엔진·표시 무영향. 킬스위치 ZEPTA_SCORE_SHADOW=0.
+    if (scoreShadowEnabled()) {
+      try {
+        await processScoreShadow({
+          kv,
+          newSamples: buildScoreShadowSamples(newMtfEntries, _shadow1hByAsset),
+          oneHByAsset: _shadow1hByAsset,
+          log: addLog,
+        });
+      } catch (ssErr) { addLog(`⚠️ 스코어 섀도 처리 실패(비치명): ${ssErr?.message}`); }
     }
 
     // ── 가상 포트폴리오 KV 저장 ──
