@@ -1156,7 +1156,20 @@
       "disclaimer": "This information is for reference only and is not investment advice or a solicitation.",
       "findByConditions": "Find coins by conditions",
       "sigSearchPlaceholder": "Search coins (e.g. BTC, SOL)",
-      "sigSearchNoMatch": "'{{q}}' is not in the current signal pool — only top-liquidity coins are scanned"
+      "sigSearchNoMatch": "'{{q}}' is not in the current signal pool — only top-liquidity coins are scanned",
+      "filterAll": "All",
+      "filterLong": "Long",
+      "filterShort": "Short",
+      "sideFilterAria": "Signal direction filter",
+      "sideFilterEmpty": "No signals for the selected direction",
+      "hitStatsTitle": "Hit rate by score band",
+      "hitStatsBasis": "+24h directional hit",
+      "hitStatsN": "n={{n}}",
+      "hitStatsNote": "Live signals auto-scored 24h later (total {{n}} samples, fees excluded). Only bands with 30+ samples are shown.",
+      "bucket85": "85 and above",
+      "bucket75": "75–84",
+      "bucket65": "65–74",
+      "bucket55": "55–64"
     },
     "indicators": {
       "title": "Indicators",
