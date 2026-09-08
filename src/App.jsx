@@ -8182,8 +8182,26 @@ function AppInner() {
   // 코인 리스트도 주식 탭과 같은 "더 보기" 증분 규칙 (동일 스크롤 피로 — 대표 지시)
   const [coinSigShown, setCoinSigShown] = useState(SIG_PAGE);
   // ★ 2026-09-04 (대표 지시 "더보기 스크롤 없이 검색으로 확인"): 코인 시그널 리스트 검색.
-  //   풀 전체(≤100건)를 이미 받아두므로 클라이언트 필터로 충분 — 검색 중엔 페이지네이션 우회.
+  //   풀 전체(≤130건)를 이미 받아두므로 클라이언트 필터로 충분 — 검색 중엔 페이지네이션 우회.
   const [coinSigQuery, setCoinSigQuery] = useState("");
+  // ★ 2026-09-08 (대표 지시 "서비스 개선"): 109종 내비게이션용 방향 필터 칩 (전체|롱|숏)
+  const [coinSideFilter, setCoinSideFilter] = useState("all"); // all | LONG | SHORT
+  // ★ 2026-09-08 점수대별 실측 적중률 (score-stats — 섀도 자동 채점 #270 의 공개 집계).
+  //   실패/표본 부족 시 null 유지 → 카드 자체를 그리지 않음(지어내지 않음).
+  const [coinScoreStats, setCoinScoreStats] = useState(null);
+  useEffect(() => {
+    if (tab !== "news") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch("/api/real-trading/score-stats");
+        if (!r.ok) return;
+        const j = await r.json();
+        if (!cancelled && j?.ok && j.available) setCoinScoreStats(j);
+      } catch { /* 카드 미표시로 축퇴 */ }
+    })();
+    return () => { cancelled = true; };
+  }, [tab]);
   const fetchCoinTabSignals = useCallback(async () => {
     setCoinTabStatus((prev) => (prev === "ready" ? "ready" : "loading"));
     try {
@@ -8631,6 +8649,7 @@ function AppInner() {
     setStockSigShown(SIG_PAGE);
     setCoinSigShown(SIG_PAGE);
     setCoinSigQuery(""); // 검색어도 초기화 — 재진입 시 전체 리스트부터
+    setCoinSideFilter("all"); // 방향 필터도 초기화
   }, [tab]);
 
   // ── 소셜 센티먼트 ──
@@ -12042,9 +12061,16 @@ function AppInner() {
             .sort((a, b) => Number(b.score) - Number(a.score));
           // ★ 2026-09-04 (대표 지시): 티커 검색 — 검색 중엔 매칭 전건 표시(페이지네이션 우회).
           const coinQ = coinSigQuery.trim().toUpperCase();
-          const rows = coinQ
-            ? rowsAll.filter(s => String(s.symbol || s.asset || "").toUpperCase().includes(coinQ))
-            : rowsAll;
+          // ★ 2026-09-08: 방향 필터(전체|롱|숏) — 검색과 AND 결합. 칩 건수는 검색 반영 전
+          //   rowsAll 기준(칩이 검색어에 따라 출렁이지 않게).
+          const sideCounts = {
+            all: rowsAll.length,
+            LONG: rowsAll.filter(s => s.side === "LONG").length,
+            SHORT: rowsAll.filter(s => s.side === "SHORT").length,
+          };
+          const rows = rowsAll
+            .filter(s => coinSideFilter === "all" || s.side === coinSideFilter)
+            .filter(s => !coinQ || String(s.symbol || s.asset || "").toUpperCase().includes(coinQ));
           // ★ 2026-08-13 (대표 지시 — 스크롤 피로): 주식 탭과 같은 "더 보기" 증분 규칙.
           const rowsShown = coinQ ? rows : rows.slice(0, coinSigShown);
           const rowsRest = coinQ ? 0 : rows.length - rowsShown.length;
@@ -12164,6 +12190,41 @@ function AppInner() {
                     </div>
                   )}
 
+                  {/* ── ★ 2026-09-08 점수대별 실측 적중률 (score-stats — 섀도 자동 채점 공개) ──
+                       "이 점수가 실제로 맞는가"를 +24h 전방 실측으로 서술. n<30 구간·데이터
+                       없음이면 카드째 생략(지어내지 않음). 표본은 매일 자동 누적됩니다. */}
+                  {(() => {
+                    if (!coinScoreStats?.byBucket) return null;
+                    const ORDER = [["85+", t("tabs.coin.bucket85")], ["75-84", t("tabs.coin.bucket75")], ["65-74", t("tabs.coin.bucket65")], ["55-64", t("tabs.coin.bucket55")]];
+                    const rowsHit = ORDER
+                      .map(([k, label]) => ({ k, label, s: coinScoreStats.byBucket[k] }))
+                      .filter((r) => r.s && r.s.n >= 30);
+                    if (rowsHit.length === 0) return null;
+                    return (
+                      <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "14px", padding: "13px 15px" }}>
+                        <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "8px", marginBottom: "9px" }}>
+                          <span style={{ fontSize: mf(13), fontWeight: 800, color: C.text1 }}>{t("tabs.coin.hitStatsTitle")}</span>
+                          <span style={{ fontSize: mf(10), color: C.text3 }}>{t("tabs.coin.hitStatsBasis")}</span>
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                          {rowsHit.map(({ k, label, s }) => (
+                            <div key={k} style={{ display: "flex", alignItems: "baseline", gap: "8px", fontSize: mf(12) }}>
+                              <span style={{ width: "96px", flexShrink: 0, color: C.text3, fontWeight: 700 }}>{label}</span>
+                              <Num size={mf(12)} weight={800}
+                                color={s.winRate >= 55 ? (C.greenL || C.green) : s.winRate < 45 ? (C.redL || C.red) : C.text1}>
+                                {s.winRate}%
+                              </Num>
+                              <span style={{ marginLeft: "auto", fontSize: mf(10), color: C.text4 }}>{t("tabs.coin.hitStatsN", { n: s.n })}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ marginTop: "9px", fontSize: mf(10), color: C.text4, lineHeight: 1.5 }}>
+                          {t("tabs.coin.hitStatsNote", { n: coinScoreStats.total?.n ?? 0 })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                 </div>
 
                 {/* ── 우측(데스크탑) / 하단(모바일): 코인 시그널 리스트 ── */}
@@ -12172,8 +12233,29 @@ function AppInner() {
                     {rowsAll.length > 0 && <span className="z-pulse" aria-hidden="true" style={{ width: "7px", height: "7px", borderRadius: "50%", background: C.green, flexShrink: 0 }} />}
                     <h2 style={{ margin: 0, fontSize: mf(14), fontWeight: 800, color: C.text1, whiteSpace: "nowrap" }}>{t("tabs.coin.signalsTitle")}</h2>
                     <span style={{ flex: 1 }} />
-                    {/* 정렬은 점수순 고정 — 상태 서술 알약(죽은 드롭다운을 두지 않습니다) */}
+                    {/* ★ 2026-09-08: 방향 필터 칩 (전체|롱|숏) — 109종 내비게이션. 건수는 실측 */}
                     {rowsAll.length > 0 && (
+                      <div role="group" aria-label={t("tabs.coin.sideFilterAria")} style={{ display: "flex", gap: "5px" }}>
+                        {[
+                          { k: "all", label: t("tabs.coin.filterAll"), n: sideCounts.all },
+                          { k: "LONG", label: t("tabs.coin.filterLong"), n: sideCounts.LONG },
+                          { k: "SHORT", label: t("tabs.coin.filterShort"), n: sideCounts.SHORT },
+                        ].map(({ k, label, n }) => {
+                          const on = coinSideFilter === k;
+                          return (
+                            <button key={k} onClick={() => setCoinSideFilter(k)} aria-pressed={on} style={{
+                              fontSize: mf(11), fontWeight: 800, padding: "5px 10px", borderRadius: "9999px",
+                              cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", minHeight: "30px",
+                              background: on ? `${C.blue}26` : C.card,
+                              border: `1px solid ${on ? C.blue : C.border}`,
+                              color: on ? (C.isDark ? C.blueL : C.blue) : C.text3,
+                            }}>{label} {n}</button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    {/* 정렬은 점수순 고정 — 상태 서술 알약(죽은 드롭다운을 두지 않습니다) */}
+                    {rowsAll.length > 0 && !isMobile && (
                       <span style={{
                         fontSize: mf(11), fontWeight: 800, padding: "5px 11px", borderRadius: "9999px",
                         background: C.card, border: `1px solid ${C.border}`, color: C.text3, whiteSpace: "nowrap",
@@ -12213,10 +12295,12 @@ function AppInner() {
                       )}
                     </div>
                   )}
-                  {/* 검색 결과 0건 — 풀은 살아 있으나 해당 티커의 시그널이 없는 경우(유동성 상위 풀만 집계) */}
-                  {coinQ && rowsAll.length > 0 && rows.length === 0 && (
+                  {/* 검색/필터 결과 0건 — 풀은 살아 있으나 조건에 맞는 시그널이 없는 경우 */}
+                  {rowsAll.length > 0 && rows.length === 0 && (
                     <div style={{ fontSize: mf(12), color: C.text3, textAlign: "center", padding: "16px 0" }}>
-                      {t("tabs.coin.sigSearchNoMatch", { q: coinSigQuery.trim() })}
+                      {coinQ
+                        ? t("tabs.coin.sigSearchNoMatch", { q: coinSigQuery.trim() })
+                        : t("tabs.coin.sideFilterEmpty")}
                     </div>
                   )}
 

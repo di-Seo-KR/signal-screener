@@ -1156,7 +1156,20 @@
       "disclaimer": "본 정보는 참고용 지표이며 투자 자문·권유가 아닙니다.",
       "findByConditions": "조건으로 코인 찾기",
       "sigSearchPlaceholder": "코인 검색 (예: BTC, SOL)",
-      "sigSearchNoMatch": "'{{q}}' 코인은 현재 시그널 풀에 없습니다 — 유동성 상위 코인만 집계됩니다"
+      "sigSearchNoMatch": "'{{q}}' 코인은 현재 시그널 풀에 없습니다 — 유동성 상위 코인만 집계됩니다",
+      "filterAll": "전체",
+      "filterLong": "롱",
+      "filterShort": "숏",
+      "sideFilterAria": "시그널 방향 필터",
+      "sideFilterEmpty": "선택한 방향의 시그널이 없습니다",
+      "hitStatsTitle": "점수대별 실측 적중률",
+      "hitStatsBasis": "+24시간 방향 적중",
+      "hitStatsN": "표본 {{n}}건",
+      "hitStatsNote": "발화한 시그널을 24시간 뒤 자동 채점한 실측 누적입니다 (총 {{n}}건 · 수수료 미반영). 표본 30건 이상 구간만 표시합니다.",
+      "bucket85": "85점 이상",
+      "bucket75": "75~84점",
+      "bucket65": "65~74점",
+      "bucket55": "55~64점"
     },
     "indicators": {
       "title": "지표",
